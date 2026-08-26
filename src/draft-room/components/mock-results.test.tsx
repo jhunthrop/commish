@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import Link from "next/link";
 import type { DraftStateView } from "@/draft-engine";
 import { renderSurface } from "@/components/ui/test-utils";
 import { PLAYERS, SNAKE_VIEW } from "../test-fixtures";
@@ -15,9 +16,9 @@ const COPY: MockResultsCopy = {
 };
 
 const ACTIONS = {
-  runAgain: <a href="/app/mock-drafts?create=solo">{COPY.runAgainLabel}</a>,
-  openLobby: <a href="/app/mock-drafts">{COPY.openLobbyLabel}</a>,
-  browseLeagues: <a href="/browse">{COPY.browseLeaguesLabel}</a>,
+  runAgain: <Link href="/app/mock-drafts?create=solo">{COPY.runAgainLabel}</Link>,
+  openLobby: <Link href="/app/mock-drafts">{COPY.openLobbyLabel}</Link>,
+  browseLeagues: <Link href="/browse">{COPY.browseLeaguesLabel}</Link>,
 };
 
 // PLAYERS (test-fixtures) is [qb1, rb1, rb2, wr1] — pool rank order 1..4.

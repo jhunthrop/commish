@@ -63,6 +63,11 @@ import { RoomTour } from "@/draft-room/components/room-tour";
 import { ShareLinkPanel } from "@/draft-room/components/share-link-panel";
 import { PLAYERS, SNAKE_VIEW } from "@/draft-room/test-fixtures";
 import { MOCK_COPY } from "@/mock-draft/config";
+import type { MockRoomSummary } from "@/mock-draft-service/lobby";
+import { MockLobby } from "@/league-room/components/mock-lobby";
+import { MockSetupForm } from "@/league-room/components/mock-setup-form";
+import { MockShareLanding } from "@/league-room/components/mock-share-landing";
+import { PracticeEntryLink } from "@/league-room/components/practice-entry-link";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
@@ -1746,15 +1751,110 @@ const MOCK_RESULTS_VIEW = {
 describe("MockResults says nothing that breaks the house copy rules, with and without a team of your own", () => {
   it("is clean for a team with a roster and picks, and for a commissioner with neither", () => {
     const actions = {
-      runAgain: <a href="/app/mock-drafts?create=solo">{MOCK_RESULTS_COPY.runAgainLabel}</a>,
-      openLobby: <a href="/app/mock-drafts">{MOCK_RESULTS_COPY.openLobbyLabel}</a>,
-      browseLeagues: <a href="/browse">{MOCK_RESULTS_COPY.browseLeaguesLabel}</a>,
+      runAgain: <Link href="/app/mock-drafts?create=solo">{MOCK_RESULTS_COPY.runAgainLabel}</Link>,
+      openLobby: <Link href="/app/mock-drafts">{MOCK_RESULTS_COPY.openLobbyLabel}</Link>,
+      browseLeagues: <Link href="/browse">{MOCK_RESULTS_COPY.browseLeaguesLabel}</Link>,
     };
     for (const myTeamId of ["t1", null]) {
       const { container, unmount } = render(
         <MockResults view={MOCK_RESULTS_VIEW} players={PLAYERS} myTeamId={myTeamId} copy={MOCK_RESULTS_COPY} actions={actions} />,
       );
       expectClean(container, "Marcus Reed");
+      unmount();
+    }
+  });
+});
+
+/**
+ * Task 9's own three new client components — `PracticeEntryLink`, `MockSetupForm` and `MockLobby`
+ * (`src/league-room/**`) plus `MockShareLanding` (also `src/league-room/**`) — none of which may
+ * value-import `@/mock-draft` either, the identical client-boundary reason `PracticeBanner`/
+ * `MockResults`/`ShareLinkPanel` above are swept here rather than trusted.
+ */
+describe("PracticeEntryLink says nothing that breaks the house copy rules", () => {
+  it("is clean signed in and signed out", () => {
+    for (const signedIn of [true, false]) {
+      const { container, unmount } = render(<PracticeEntryLink signedIn={signedIn} />);
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+describe("MockSetupForm says nothing that breaks the house copy rules", () => {
+  it("is clean with the real MOCK_CONFIG options threaded down as props", () => {
+    const { container } = render(
+      <MockSetupForm
+        modes={["solo", "lobby", "link"]}
+        teamCountOptions={[8, 10, 12]}
+        pickSecondsOptions={[30, 60, 90]}
+        defaultTeamCount={12}
+        defaultPickSeconds={60}
+        onCreated={() => {}}
+      />,
+    );
+    expectClean(container);
+  });
+});
+
+const MOCK_LOBBY_OPEN_ROOM = { leagueId: "l1", shareCode: "OPEN01", teamCount: 10, seatsOpen: 3, pickSeconds: 60, startsInMs: 90_000 };
+const MOCK_LOBBY_MINE_ROOM = {
+  leagueId: "l2",
+  draftId: "d2",
+  shareCode: "MINE01",
+  teamCount: 8,
+  seatsOpen: 0,
+  pickSeconds: 30,
+  startsInMs: -5_000,
+  mode: "solo" as const,
+  status: "in_progress" as const,
+};
+
+describe("MockLobby says nothing that breaks the house copy rules, empty and populated", () => {
+  it("is clean with nothing open and nothing of the caller's own, and with both populated", () => {
+    for (const props of [
+      { initialOpen: [], initialMine: [] },
+      { initialOpen: [MOCK_LOBBY_OPEN_ROOM], initialMine: [MOCK_LOBBY_MINE_ROOM] },
+    ]) {
+      const { container, unmount } = render(
+        <MockLobby
+          {...props}
+          modes={["solo", "lobby", "link"]}
+          teamCountOptions={[8, 10, 12]}
+          pickSecondsOptions={[30, 60, 90]}
+          defaultTeamCount={12}
+          defaultPickSeconds={60}
+          emptyMessage={MOCK_COPY.lobbyEmptyMessage}
+          emptyActionLabel={MOCK_COPY.lobbyEmptyActionLabel}
+        />,
+      );
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+const MOCK_SHARE_SUMMARY: MockRoomSummary = {
+  leagueId: "l1",
+  shareCode: "ABC123",
+  teamCount: 8,
+  seatsOpen: 3,
+  pickSeconds: 60,
+  startsInMs: 90_000,
+  mode: "link",
+  started: false,
+  alreadySeated: false,
+};
+
+describe("MockShareLanding says nothing that breaks the house copy rules, joinable and already started", () => {
+  it("is clean joinable, already seated, and started for a stranger", () => {
+    for (const summary of [
+      MOCK_SHARE_SUMMARY,
+      { ...MOCK_SHARE_SUMMARY, alreadySeated: true },
+      { ...MOCK_SHARE_SUMMARY, started: true, alreadySeated: false },
+    ]) {
+      const { container, unmount } = render(<MockShareLanding code="ABC123" summary={summary} />);
+      expectClean(container, "ABC123");
       unmount();
     }
   });
