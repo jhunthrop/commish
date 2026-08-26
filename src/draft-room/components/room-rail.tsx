@@ -343,7 +343,13 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                 <span className="truncate font-display text-display-sm font-semibold leading-display text-text-primary">{turn.subject}</span>
               </div>
             </div>
-            <div className="flex flex-col items-end">
+            {/* `id="room-clock"` (Task 4, R3): the anchored `RoomTour`'s "The clock" stop points
+                here — the one wrapper that's always present for every in-progress/hot state
+                regardless of which of paused/counting/tightening is showing inside it. Absent
+                during `scheduled`/`complete` (a different branch of this same ternary renders
+                then), which is exactly the "not rendered on this surface" signal `RoomTour`
+                reads to fall back to its modal instead of anchoring to nothing. */}
+            <div id="room-clock" className="flex flex-col items-end">
               {paused ? (
                 <span data-testid="paused-message" className="text-sm font-medium text-warning">
                   {formatPausedUntil(pausedUntil!)}

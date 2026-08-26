@@ -151,14 +151,18 @@ describe("DraftRoom", () => {
     expect(await screen.findByText("Reconnecting…")).toBeInTheDocument();
   });
 
-  it("shows the room tour once, before it has ever been dismissed", async () => {
+  // Task 4, R3: a real `DraftRoom` renders `RoomRail`/`RoomDock`/`PlayerPool`, so every anchor
+  // target `RoomTour` looks for is already in the DOM the moment the tour opens here — it gets
+  // the anchored coach marks, not the modal (`room-tour.test.tsx` covers the modal fallback
+  // itself, on surfaces — like the waiting room's preview — that never render those three).
+  it("shows the room tour once, anchored to the real clock, before it has ever been dismissed", async () => {
     mount(fixtureDeps(), null);
-    await waitFor(() => expect(screen.getByRole("dialog", { name: "How this room works" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "The clock" })).toBeInTheDocument());
   });
 
-  it("PATCHes the dismissal and closes the tour without blocking the room", async () => {
+  it("PATCHes the dismissal and closes the anchored tour without blocking the room", async () => {
     const { fixture } = mount(fixtureDeps(), null);
-    await waitFor(() => expect(screen.getByRole("dialog", { name: "How this room works" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "The clock" })).toBeInTheDocument());
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Got it" }));
     });

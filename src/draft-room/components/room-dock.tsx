@@ -117,14 +117,19 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
       // wide (a real 360px defect this task's own e2e sweep of the room's mock dressing was the
       // first to reach: the two-team fixture every earlier draft-room spec used never left a
       // human this far from their own turn with an empty queue).
-      <p className="min-w-0 basis-full flex-1 self-center text-sm text-text-muted lg:basis-auto">
+      //
+      // `id="dock-queue"` (Task 4, R3): the anchored `RoomTour`'s "The queue" stop points here.
+      // Carried on BOTH this empty-state sentence and the populated wrapper below, on purpose —
+      // the target must exist whether or not a manager has queued anyone yet, so opening the
+      // tour with an empty queue still anchors instead of falling back to the modal.
+      <p id="dock-queue" className="min-w-0 basis-full flex-1 self-center text-sm text-text-muted lg:basis-auto">
         Star players in the pool to build your queue. The room picks for you from your queue if your clock runs out.
       </p>
     );
   }
 
   return (
-    <div className="flex min-w-0 basis-full flex-1 flex-col gap-1 lg:basis-auto">
+    <div id="dock-queue" className="flex min-w-0 basis-full flex-1 flex-col gap-1 lg:basis-auto">
       <h2 className={`${EYEBROW} text-text-muted`}>Your queue</h2>
       {/* `[contain:layout]` — D1 (2026-08-26 design review): at 360px the first chip's box
           leaked past this list's `overflow-x-auto` clip into the PAGE's scrollable overflow,

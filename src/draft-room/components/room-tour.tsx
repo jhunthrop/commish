@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Button, Modal } from "@/components/ui";
+import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { CoachMarks, type CoachMarkStop } from "./coach-marks";
 
 export interface RoomTourProps {
   /** From the server-read preference row. `null` means the tour has never been dismissed. */
@@ -71,6 +73,54 @@ function tourStops(actionLabel: string): readonly TourStop[] {
 }
 
 /**
+ * The three real controls the first three stops point at, in the SAME order `tourStops` returns
+ * them — the closing stop has no target (it centers) and so has no entry here, which is why
+ * `anchoredStops` below falls back to `null` past the end of this list rather than requiring a
+ * fourth entry. Stable, plain DOM ids (not `data-testid`, which this codebase reserves for
+ * tests) added at Task 4 to `room-rail.tsx` (the clock band), `room-dock.tsx` (the queue,
+ * present in both its empty and populated shapes) and `player-pool.tsx` (already carried
+ * `id="player-pool"` from Task 3's "jump to the pool" affordance, reused rather than duplicated).
+ */
+const ANCHOR_TARGET_IDS: readonly string[] = ["room-clock", "dock-queue", "player-pool"];
+
+/** `tourStops`'s own four stops, each paired with the target it anchors to (`null` for the
+ *  closing stop) — the one list `CoachMarks` renders, built without touching `tourStops`'s own
+ *  pinned copy in any way. */
+function anchoredStops(actionLabel: string): readonly CoachMarkStop[] {
+  return tourStops(actionLabel).map((stop, index) => ({ ...stop, targetId: ANCHOR_TARGET_IDS[index] ?? null }));
+}
+
+/**
+ * Whether every real anchor target is in the DOM right now — read only while `active` (the tour
+ * is actually open), and only from an effect: this is a `document.getElementById` read, which
+ * during a render pass would run before React commits anything (the exact trap `CoachMarks`'
+ * own docblock names), and would disagree with the server render either way. Starts `false` —
+ * the same safe-default-then-upgrade shape `usePrefersReducedMotion` uses — so a room that never
+ * gets a chance to run the effect (or fails every target) simply keeps the modal, never leaves
+ * the tour showing nothing at all.
+ */
+function useAnchorsReady(active: boolean): boolean {
+  const [ready, setReady] = useState(false);
+
+  // `useLayoutEffect`, not `useEffect`: this runs synchronously right after the SAME commit
+  // that first mounts `RoomTour` alongside `RoomRail`/`RoomDock`/`PlayerPool` (they are siblings
+  // in `DraftRoom`'s own return, so their DOM lands in one commit together) and before the
+  // browser paints — a plain `useEffect` here left a real, observable frame where this component
+  // had already rendered its (stale, default-`false`) modal fallback before flipping to
+  // anchored, which is both a visible flash in the room and a race any `waitFor` polling for a
+  // dialog could catch mid-flip.
+  useLayoutEffect(() => {
+    if (!active) {
+      setReady(false);
+      return;
+    }
+    setReady(ANCHOR_TARGET_IDS.every((id) => document.getElementById(id) !== null));
+  }, [active]);
+
+  return ready;
+}
+
+/**
  * Two callers, two modes, same component — `open` is always exactly `dismissedAt === null &&
  * !dismissedLocally`, and each caller shapes the props that flow into it differently.
  *
@@ -88,6 +138,19 @@ function tourStops(actionLabel: string): readonly TourStop[] {
  * `/api/preferences` write at all: `onDismiss` just unmounts it (a local `showTour` flip in the
  * caller). It opens every time the caller mounts it, by construction, and is never itself the
  * "have you seen this" gate — that gate belongs entirely to the draft room's own caller above.
+ *
+ * **Anchored by default, modal as the fallback (Task 4, R3).** Neither caller changed a prop —
+ * `RoomTour` decides its OWN presentation from what is actually on screen. It renders
+ * `CoachMarks`, pointing one popover at a time at the real clock/queue/pool, whenever BOTH: (1)
+ * `usePrefersReducedMotion()` is false (a moving popover chasing scroll/resize is exactly the
+ * motion that preference asks this product to skip), and (2) every one of `ANCHOR_TARGET_IDS` is
+ * already in the DOM the moment the tour opens. Condition (2) is what keeps the waiting room's
+ * preview caller on today's modal, byte-for-byte: `WaitingChecklist`'s "See how the draft room
+ * works" item never renders `RoomRail`/`RoomDock`/`PlayerPool` at all, so `room-clock`,
+ * `dock-queue` and `player-pool` never exist there, and the anchor check fails every time. The
+ * real draft room (`DraftRoom`, both formats) renders all three, so it gets the anchored tour.
+ * Both branches share the identical `dismiss` below — one fire-and-forget guard around
+ * `onDismiss`, not two.
  */
 export function RoomTour({ dismissedAt, onDismiss, actionLabel }: RoomTourProps) {
   // Local, not derived solely from `dismissedAt`: the write that would update that prop is
@@ -95,6 +158,9 @@ export function RoomTour({ dismissedAt, onDismiss, actionLabel }: RoomTourProps)
   // so closing has to be something this component can do to itself.
   const [dismissedLocally, setDismissedLocally] = useState(false);
   const open = dismissedAt === null && !dismissedLocally;
+  const reducedMotion = usePrefersReducedMotion();
+  const anchorsReady = useAnchorsReady(open);
+  const anchored = open && !reducedMotion && anchorsReady;
 
   const dismiss = (): void => {
     try {
@@ -105,6 +171,10 @@ export function RoomTour({ dismissedAt, onDismiss, actionLabel }: RoomTourProps)
       setDismissedLocally(true);
     }
   };
+
+  if (anchored) {
+    return <CoachMarks stops={anchoredStops(actionLabel)} onDismiss={dismiss} />;
+  }
 
   return (
     <Modal open={open} title="How this room works" onClose={dismiss} footer={<Button onClick={dismiss}>Got it</Button>}>
