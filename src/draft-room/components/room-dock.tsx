@@ -101,7 +101,14 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <h2 className={`${EYEBROW} text-text-muted`}>Your queue</h2>
-      <ol aria-label="Your queue" className="flex items-center gap-2 overflow-x-auto pb-1">
+      {/* `[contain:layout]` — D1 (2026-08-26 design review): at 360px the first chip's box
+          leaked past this list's `overflow-x-auto` clip into the PAGE's scrollable overflow,
+          panning the whole room sideways into a 186px void. Layout containment makes this
+          list its own formatting root, so nothing it lays out can ever contribute to an
+          ancestor's scrollable overflow — verified in-browser against the real compiled CSS
+          (`overflow-hidden` on the parent did NOT close it). The 360px e2e walk asserts the
+          page-level effect with a queued chip present. */}
+      <ol aria-label="Your queue" className="flex items-center gap-2 overflow-x-auto pb-1 [contain:layout]">
         {queue.map((playerId, index) => {
           const name = playerName(playersById, playerId);
           const player = playersById.get(playerId);

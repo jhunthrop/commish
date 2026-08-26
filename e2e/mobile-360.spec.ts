@@ -286,6 +286,15 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(page.getByLabel("Player pool")).toBeVisible();
     await expectNoHorizontalScroll(page, "the draft room");
 
+    // --- D1 (2026-08-26 design review): the phantom sideways pan. The defect only reproduces
+    // once the dock's queue rail holds a chip — the first chip's box leaked past the queue
+    // list's `overflow-x-auto` clip into the page's own scrollable overflow (scrollWidth 546
+    // vs 360). So this check queues a real player FIRST and then asserts the page still does
+    // not pan: the exact state the review pinned, against the real engine. -------------------
+    await page.getByRole("button", { name: /^Queue / }).first().click();
+    await expect(page.getByRole("list", { name: "Your queue" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the mid-draft room with a queued chip");
+
     // --- Phase 3 Plan D, Task 10: the held-trade banner — a long sentence inside a bordered
     // panel, and one of the two new surfaces this task adds to this spec's own 360px walk.
     // `e2e/enforcement.spec.ts` sorts alphabetically before this file and already held a real

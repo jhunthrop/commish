@@ -94,6 +94,17 @@ describe("RoomDock", () => {
     expect(onQueueChange).toHaveBeenCalledWith(["qb1"]);
   });
 
+  // D1 (2026-08-26 design review): at 360px the first queue chip's box leaked past this
+  // `<ol>`'s `overflow-x-auto` clip into the PAGE's scrollable overflow — a 186px phantom
+  // sideways pan (scrollWidth 546 vs 360, Chromium, real compiled CSS). `contain: layout` on
+  // the `<ol>` was the fix the review verified in-browser (`overflow-hidden` on the parent was
+  // tried and did NOT restore 360). happy-dom computes no layout, so this pins the class;
+  // `e2e/mobile-360.spec.ts` proves the page-level effect against the real engine.
+  it("contains the queue rail's own layout so a chip can never leak into page overflow (D1)", () => {
+    render(<RoomDock {...props} />);
+    expect(screen.getByRole("list", { name: "Your queue" }).className).toContain("[contain:layout]");
+  });
+
   it("invites you to build a queue when you have none", () => {
     render(<RoomDock {...props} queue={[]} />);
     expect(screen.getByText(/Star players in the pool to build your queue/)).toBeInTheDocument();
