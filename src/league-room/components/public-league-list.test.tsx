@@ -11,6 +11,7 @@ import {
   OPEN_LEAGUE_LEGEND,
   OpenLeagueShelf,
   featuredLeagueId,
+  featuredScheduledLeague,
   seatCountsAsOfSentence,
 } from "./public-league-list";
 
@@ -98,6 +99,47 @@ describe("featuredLeagueId (D2)", () => {
   });
 });
 
+/**
+ * The front door hero's own "Next draft" module reads (2026-08-25 founder finding): the exact
+ * qualifying subset of `featuredLeagueId` — a genuinely scheduled, nearest draft — returned as
+ * the league object, `null` whenever `featuredLeagueId` would have fallen back to the tightest-
+ * seats pick (or the shelf is empty). The module renders nothing in either `null` case.
+ */
+describe("featuredScheduledLeague (2026-08-25 hero finding)", () => {
+  const scheduledSoon: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "soon", draftAtIso: "2026-09-10T19:00:00.000Z" };
+  const scheduledLater: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "later", draftAtIso: "2026-09-12T19:00:00.000Z" };
+  const whenFull: PublicLeagueSummary = {
+    ...HOUSE_LEAGUE,
+    id: "wf",
+    startTrigger: "when_full",
+    draftAtIso: "2026-09-01T00:00:00.000Z",
+    filledTeams: 11,
+  };
+
+  it("answers null for an empty shelf", () => {
+    expect(featuredScheduledLeague([])).toBeNull();
+  });
+
+  it("returns the nearest scheduled league as the object, not just its id", () => {
+    const result = featuredScheduledLeague([scheduledLater, scheduledSoon]);
+    expect(result).toBe(scheduledSoon);
+  });
+
+  it("answers null when nothing is scheduled with a real instant — never the fallback tightest-seats pick", () => {
+    const noIso: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "no_iso" };
+    delete (noIso as { draftAtIso?: string }).draftAtIso;
+    // `featuredLeagueId` would answer "wf" here (its own fallback branch); the module must
+    // answer null instead — a `when_full`-only shelf has nothing genuinely ticking to show.
+    expect(featuredLeagueId([whenFull, noIso])).toBe("wf");
+    expect(featuredScheduledLeague([whenFull, noIso])).toBeNull();
+  });
+
+  it("agrees with featuredLeagueId's id whenever a scheduled league qualifies", () => {
+    const merged = [whenFull, scheduledLater, scheduledSoon];
+    expect(featuredScheduledLeague(merged)?.id).toBe(featuredLeagueId(merged));
+  });
+});
+
 /** The two responsive renderings of the one merged shelf (FOUNDER-ORDERED, 2026-08-24):
  *  hairline rows on lg+ viewports, the ledger cards below — jsdom applies no stylesheet, so
  *  every structural assertion here scopes to one rendering by its testid. */
@@ -120,6 +162,21 @@ describe("OpenLeagueShelf", () => {
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+  });
+
+  // 2026-08-25, the absolutism sweep's carried finding: the shelf-wide disclosure defers to the
+  // Entry column once `moneyIsLive()` is true, rather than re-asserting "no money changes hands"
+  // for a merged list that can now hold a real fee.
+  it("defers to the Entry column once live, and never claims 'no money changes hands' for a mixed list (live prop, injected)", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} live />);
+    expect(screen.getByText(MATCHMAKING_CONFIG.liveShelfStakeDisclosure)).toBeInTheDocument();
+    expect(screen.queryByText(MATCHMAKING_CONFIG.stakeDisclosure)).not.toBeInTheDocument();
+  });
+
+  it("keeps the dark disclosure byte-identical when `live` is left at its default (moneyIsLive() false today)", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />);
+    expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
+    expect(screen.queryByText(MATCHMAKING_CONFIG.liveShelfStakeDisclosure)).not.toBeInTheDocument();
   });
 
   it("shows rows at lg and up, cards below — the lg boundary, spelled as classes (Task 13)", () => {
@@ -245,6 +302,25 @@ describe("OpenLeagueShelf", () => {
     for (const rendering of [rows(), cards()]) {
       const ink = rendering.querySelector('[class*="bg-text-primary"]');
       expect(ink?.getAttribute("aria-label")).toContain("Soonest Draft Room");
+    }
+  });
+
+  // 2026-08-25 founder finding: the hero's own "Next draft" module carries this league's ink
+  // instead, so the shelf goes all-quiet rather than double-inking the same league.
+  it("marks NOTHING ink, in either rendering, once the hero module carries the featured league (featuredInHero)", () => {
+    const soon: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "soonest", name: "Soonest Draft Room", draftAtIso: "2026-09-10T19:00:00.000Z" };
+    render(
+      <OpenLeagueShelf
+        house={[HOUSE_LEAGUE]}
+        leagues={[soon, PUBLIC_LEAGUES[1]!]}
+        signedIn={false}
+        helpLevel="standard"
+        asOfTime={AS_OF}
+        featuredInHero
+      />,
+    );
+    for (const rendering of [rows(), cards()]) {
+      expect(inkPillCount(rendering)).toBe(0);
     }
   });
 

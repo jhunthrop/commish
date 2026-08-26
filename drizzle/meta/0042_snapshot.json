@@ -1,6 +1,6 @@
 {
-  "id": "03a340bb-0272-4e85-9e71-92c6a72187a1",
-  "prevId": "a6e4d37d-94da-48fe-a82d-74cdac145ef0",
+  "id": "a6e4d37d-94da-48fe-a82d-74cdac145ef0",
+  "prevId": "92535667-d237-49f9-8360-8b2136d58641",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1482,10 +1482,6 @@
         "leagues_house_commissioner_ck": {
           "name": "leagues_house_commissioner_ck",
           "value": "(\"leagues\".\"house_rung\" IS NULL) = (\"leagues\".\"commissioner_user_id\" IS NOT NULL)"
-        },
-        "leagues_mock_private_ck": {
-          "name": "leagues_mock_private_ck",
-          "value": "NOT \"leagues\".\"is_mock\" OR \"leagues\".\"is_public_matchmade\" = false"
         }
       },
       "isRLSEnabled": false

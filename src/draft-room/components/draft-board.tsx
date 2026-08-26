@@ -6,6 +6,7 @@ import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { Avatar, Badge, EYEBROW, Sticker } from "@/components/ui";
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { rosterSpots } from "../state/format";
 import { teamName, teamsById } from "../lib/lookups";
 
@@ -231,8 +232,11 @@ function StickerCell({
   }
 
   // Far-future rounds compress to slivers: the present deserves the space, and the shape of
-  // the season is still visible without shouting.
-  return <div aria-hidden="true" className={`h-full rounded-sm border border-dashed ${cell.future ? "min-h-4 border-line/35" : "min-h-12 border-line"}`} />;
+  // the season is still visible without shouting. The recede is height only — see
+  // `DRAFT_ROOM_CONFIG.emptyCellBorderClass`'s own docblock for why the border color never
+  // dilutes further than `border-line`'s own decorative-hairline floor.
+  const borderClass = cell.future ? DRAFT_ROOM_CONFIG.emptyCellBorderClass.future : DRAFT_ROOM_CONFIG.emptyCellBorderClass.near;
+  return <div aria-hidden="true" className={`h-full rounded-sm border border-dashed ${borderClass}`} />;
 }
 
 /**
@@ -279,15 +283,14 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
   return (
     <section aria-label="Draft board" className="flex h-full min-h-0 flex-col gap-3">
       {/* Wide: the board itself, scrolling inside its own container so the page never does.
-          The edge fades make a scrolled board read as intentional depth, not clipped stickers. */}
+          The grid's own native scrollbar is the scroll affordance — the same convention
+          `Table` already uses for its own horizontal overflow. A prior version painted a
+          decorative edge-fade here unconditionally (whether or not the grid actually had
+          anything left to scroll to), which read as shading smeared across the last visible
+          column's own sticker colors — founder live defect #2. Removed outright rather than
+          made conditional on real scroll position: a box painted over a sticker's own color
+          is exactly what rule 4 (hairlines, not boxes) rules out. */}
       <div className="relative hidden min-h-0 w-full flex-1 sm:block">
-        {/* The left fade starts past the sticky round gutter, exactly where a mid-scroll
-            column edge would otherwise show as a clipped sticker sliver. */}
-        {/* bottom-3, not inset-y-0: the fades must stop above the grid's horizontal scrollbar
-            track — a fade painted over the track shades a segment of it, which reads as a
-            second, separate scrollbar. */}
-        <span aria-hidden="true" className="pointer-events-none absolute top-0 bottom-3 left-10 z-20 w-10 bg-gradient-to-r from-surface via-surface/70 to-transparent" />
-        <span aria-hidden="true" className="pointer-events-none absolute top-0 bottom-3 right-0 z-20 w-8 bg-gradient-to-l from-surface to-transparent" />
         {/* Column snap: a scrolled board always rests on whole stickers, never slivers. */}
         <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full overflow-auto">
         <table className="w-full border-separate border-spacing-1 text-left">

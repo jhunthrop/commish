@@ -1,5 +1,5 @@
 import type { Player, Position, StatLine } from "@/domain/player";
-import type { GameStatus, GameSummary } from "../provider";
+import type { AdpEntry, GameStatus, GameSummary } from "../provider";
 import { TANK01_CONFIG } from "./config";
 
 /**
@@ -70,6 +70,48 @@ export function mapTeamsToDefensePlayers(body: unknown): readonly Player[] {
       },
     ];
   });
+}
+
+/**
+ * `/getNFLADP` → one `AdpEntry` per LISTED player the market ranks. Verified against a live
+ * capture (2026-08-25, 521 entries): the body is `{adpDate, adpType, adpList}`, and `adpList`
+ * carries three shapes this has to survive:
+ *
+ * 1. **Ordinary players** carry `playerID` + `overallADP`, both strings.
+ * 2. **Team defenses carry NO `playerID` at all** — they arrive keyed by `teamAbv` (+ `teamID`),
+ *    so the id is minted from the SAME `defensePlayerIdPrefix` + abbreviation
+ *    `mapTeamsToDefensePlayers` used, or a DEF's market position could never land on the player
+ *    row that adapter minted for it.
+ * 3. **A handful of deep entries have an EMPTY `playerID`** and no team either (2 of 521 in the
+ *    capture) — dropped: an ADP that cannot be keyed to a listed player ranks nobody.
+ *
+ * `Number`, not `num()`: `num` maps an unparsable value to 0, which is the right answer for a
+ * stat and exactly the wrong one for an ADP — `rankedPlayers` sorts ascending, so a silent 0
+ * would put a parsing bug at the top of every draft board. Unparsable and non-positive values
+ * drop the entry instead. First entry wins a duplicate id, because the feed lists best-first and
+ * the contract requires each player at most once.
+ */
+export function mapAdpList(body: unknown, listedPlayerIds: ReadonlySet<string>): readonly AdpEntry[] {
+  const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  const list = record.adpList;
+  if (!Array.isArray(list)) return [];
+  const entries = new Map<string, AdpEntry>();
+  for (const raw of list) {
+    const entry = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
+    const directId = str(entry.playerID);
+    const teamAbbreviation = str(entry.teamAbv);
+    const playerId =
+      directId !== ""
+        ? directId
+        : teamAbbreviation !== ""
+          ? `${TANK01_CONFIG.defensePlayerIdPrefix}${teamAbbreviation}`
+          : "";
+    if (playerId === "" || !listedPlayerIds.has(playerId)) continue;
+    const adp = Number(entry.overallADP);
+    if (!Number.isFinite(adp) || adp <= 0) continue;
+    if (!entries.has(playerId)) entries.set(playerId, { playerId, adp });
+  }
+  return [...entries.values()];
 }
 
 /** `/getNFLGamesForWeek` → the fixtures, with the composite `YYYYMMDD_AWAY@HOME` id the box-score call needs. */

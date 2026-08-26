@@ -29,7 +29,7 @@ import { ModerationSummary } from "@/league-room/components/moderation-summary";
 import { OpenLeagueCard } from "@/league-room/components/open-league-card";
 import { OpenSeatsPanel } from "@/league-room/components/open-seats-panel";
 import { Wire } from "@/league-room/components/wire";
-import type { WireItem } from "@/matchmaking/contract";
+import type { PublicLeagueSummary, WireItem } from "@/matchmaking/contract";
 import { ProofStrip } from "@/league-room/components/proof-strip";
 import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
 import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
@@ -830,6 +830,18 @@ describe("OpenLeagueShelf says nothing that breaks the house copy rules, includi
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name), HOUSE.name);
       unmount();
     }
+  });
+
+  // 2026-08-25, the absolutism sweep's carried finding: the LIVE disclosure
+  // (`MATCHMAKING_CONFIG.liveShelfStakeDisclosure`), swept on a list that mixes a free and a real
+  // paid league — the exact shape that made the old blanket "no money changes hands" sentence
+  // false, so this is the branch the finding exists to cover.
+  it("is clean live, with a real entry fee on one listed league", () => {
+    const PAID: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "live_paid_sweep", name: "Real Stakes Sweep League", entryFeeCents: 5000 };
+    const { container } = render(
+      <OpenLeagueShelf house={[HOUSE]} leagues={[PAID, ...PUBLIC_LEAGUES]} signedIn={false} helpLevel="standard" asOfTime={AS_OF} live />,
+    );
+    expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name), HOUSE.name, PAID.name);
   });
 });
 

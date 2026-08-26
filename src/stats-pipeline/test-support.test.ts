@@ -53,6 +53,14 @@ describe("fakeStatsProvider", () => {
     await expect(provider.getWeeklyStatLines(1)).resolves.toEqual([LINE, otherLine]);
     await expect(provider.getWeeklyStatLines(2)).resolves.toEqual([]);
   });
+
+  it("listAdp answers the scripted entries, or an empty list when none were scripted", async () => {
+    const scripted = fakeStatsProvider({ games: {}, adp: [{ playerId: "p1", adp: 3.5 }] });
+    await expect(scripted.listAdp()).resolves.toEqual([{ playerId: "p1", adp: 3.5 }]);
+
+    const unscripted = fakeStatsProvider({ games: {} });
+    await expect(unscripted.listAdp()).resolves.toEqual([]);
+  });
 });
 
 /**
@@ -72,6 +80,14 @@ const CONTRACT_PLAYERS: readonly Player[] = [
 const CONTRACT_SCRIPT: FakeStatsProviderScript = {
   players: CONTRACT_PLAYERS,
   lastWeekOfSeason: 2,
+  // Listed players only, each once, every value positive and finite — the three ADP laws the
+  // contract now asserts. DEF included: the real feed ranks team defenses too.
+  adp: [
+    { playerId: "rb_sf", adp: 1.6 },
+    { playerId: "wr_sea", adp: 2.5 },
+    { playerId: "qb_sf", adp: 11.4 },
+    { playerId: "def_den", adp: 152.9 },
+  ],
   games: {
     1: [
       {

@@ -58,6 +58,26 @@ export interface RequestBudget {
   remaining(): Promise<number>;
 }
 
+/**
+ * Reserves `count` backfill requests or fails LOUDLY, for the operator-run spenders
+ * (`seedPlayers`, `ingestAdp`) that must stop rather than half-finish: a partially backfilled
+ * table looks exactly like a complete one to every reader. One message, shared, so the operator
+ * remedy — raise `STATS_MONTHLY_REQUEST_BUDGET` to the purchased quota, or wait for the month —
+ * reads identically wherever the ledger says no.
+ */
+export async function reserveBackfillOrThrow(
+  budget: Pick<RequestBudget, "reserveBackfill">,
+  count: number,
+  what: string,
+): Promise<void> {
+  const reservation = await budget.reserveBackfill(count);
+  if (reservation.granted) return;
+  throw new Error(
+    `The monthly upstream request budget could not cover ${what} (${count} requests, denied: ${reservation.denial}). ` +
+      `Raise STATS_MONTHLY_REQUEST_BUDGET to the purchased quota, or wait for the calendar month to roll over.`,
+  );
+}
+
 /** `YYYY-MM`, derived from the injected clock so the ledger rolls over with the calendar month. */
 function currentMonthKey(clock: Clock): string {
   return STATS_INGESTION_CONFIG.keys.budget(clock.now().slice(0, 7));

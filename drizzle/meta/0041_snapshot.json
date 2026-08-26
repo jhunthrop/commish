@@ -1,5 +1,5 @@
 {
-  "id": "a6e4d37d-94da-48fe-a82d-74cdac145ef0",
+  "id": "92535667-d237-49f9-8360-8b2136d58641",
   "prevId": "52c4a6a7-2ebb-4e56-891f-4f15c4834818",
   "version": "7",
   "dialect": "postgresql",
@@ -1395,13 +1395,6 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_mock": {
-          "name": "is_mock",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {
@@ -1816,132 +1809,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.mock_rooms": {
-      "name": "mock_rooms",
-      "schema": "",
-      "columns": {
-        "league_id": {
-          "name": "league_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "host_user_id": {
-          "name": "host_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mode": {
-          "name": "mode",
-          "type": "mock_mode",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pick_seconds": {
-          "name": "pick_seconds",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bot_seed": {
-          "name": "bot_seed",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "share_code": {
-          "name": "share_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "starts_at": {
-          "name": "starts_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "mock_rooms_share_code_idx": {
-          "name": "mock_rooms_share_code_idx",
-          "columns": [
-            {
-              "expression": "share_code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "mock_rooms_starts_at_idx": {
-          "name": "mock_rooms_starts_at_idx",
-          "columns": [
-            {
-              "expression": "starts_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "mock_rooms_league_id_leagues_id_fk": {
-          "name": "mock_rooms_league_id_leagues_id_fk",
-          "tableFrom": "mock_rooms",
-          "tableTo": "leagues",
-          "columnsFrom": [
-            "league_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mock_rooms_host_user_id_users_id_fk": {
-          "name": "mock_rooms_host_user_id_users_id_fk",
-          "tableFrom": "mock_rooms",
-          "tableTo": "users",
-          "columnsFrom": [
-            "host_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "mock_rooms_pick_seconds_positive_ck": {
-          "name": "mock_rooms_pick_seconds_positive_ck",
-          "value": "\"mock_rooms\".\"pick_seconds\" > 0"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.money_accounts": {
@@ -2509,6 +2376,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "adp": {
+          "name": "adp",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3641,13 +3514,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_bot": {
-          "name": "is_bot",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {
@@ -3830,15 +3696,6 @@
         "pending",
         "verified",
         "failed"
-      ]
-    },
-    "public.mock_mode": {
-      "name": "mock_mode",
-      "schema": "public",
-      "values": [
-        "solo",
-        "lobby",
-        "link"
       ]
     },
     "public.money_account_kind": {

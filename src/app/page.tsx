@@ -14,7 +14,8 @@ import { getProofCache } from "@/league-service/proof-cache-instance";
 import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
-import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
+import { NextDraftModule } from "@/league-room/components/next-draft-module";
+import { OpenLeagueShelf, featuredScheduledLeague } from "@/league-room/components/public-league-list";
 import { ProofStrip } from "@/league-room/components/proof-strip";
 import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
 import { Wire } from "@/league-room/components/wire";
@@ -72,6 +73,12 @@ const NAV: readonly NavLink[] = [
  * E2 (Task 6): the two bands are FULL-WIDTH — no `max-w-6xl` well — with the mock's 40px desktop
  * gutter from the spacing scale (`sm:px-10`; `px-4` keeps the product's usual minimum-viewport
  * gutter below that).
+ *
+ * 2026-08-25 founder finding, controller-ruled: at xl+, when a league qualifies
+ * (`featuredScheduledLeague`), the hero band's headline pairs with `NextDraftModule` in a
+ * two-column grid — the SAME merged, capped list the shelf renders, so the module and the
+ * shelf's one inked row/card can never disagree about which league is featured
+ * (`featuredInHero` tells the shelf to go all-quiet while the module carries that ink instead).
  */
 export default async function Home() {
   const nowIso = new Date().toISOString();
@@ -89,6 +96,14 @@ export default async function Home() {
   // D1/E7 (Phase 3.7, Task 5): guided is a signed-in PREFERENCE behavior, never a surface
   // default — see `/browse`'s identical read.
   const helpLevel: HelpLevel = user === null ? "standard" : (await readPreferences(getDb(), user)).helpLevel;
+
+  // 2026-08-25 founder finding, controller-ruled: the SAME capped, merged list the shelf below
+  // renders (house whole, member leagues capped at `shelfCap`) — no second query, no second cap.
+  // `featuredScheduledLeague` is the exact subset of `featuredLeagueId` that is a genuinely
+  // scheduled, ticking draft (never the shelf's own fallback-to-tightest-seats pick), so the hero
+  // module and the shelf's one inked row/card can never point at two different leagues.
+  const cappedLeagues = leagues.slice(0, UI_CONFIG.frontDoor.shelfCap);
+  const featuredLeague = featuredScheduledLeague([...house, ...cappedLeagues]);
 
   return (
     <>
@@ -112,7 +127,20 @@ export default async function Home() {
         <section className="floodlight w-full overflow-hidden">
           <div aria-hidden="true" className="yard-lines" />
           <div className="relative flex flex-col gap-6 px-4 py-10 sm:px-10 sm:py-14">
-            <FrontDoorHero />
+            {/* 2026-08-25 founder finding, controller-ruled: at xl+ the headline block pairs
+                with "THE NEXT DRAFT" module in a two-column grid, vertically centered against
+                each other — the right half of the hero band used to be a dead dark field once
+                the headline went left-aligned. Below xl (and whenever nothing qualifies —
+                `featuredLeague` null) the hero keeps its current single-column shape: real or
+                absent, never dressed up (rule 6). */}
+            {featuredLeague === null ? (
+              <FrontDoorHero />
+            ) : (
+              <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_360px] xl:items-center xl:gap-10">
+                <FrontDoorHero />
+                <NextDraftModule league={featuredLeague} signedIn={user !== null} />
+              </div>
+            )}
             <SeatClaimSteps />
             <ProofStrip stats={stats} nowIso={nowIso} />
           </div>
@@ -121,10 +149,11 @@ export default async function Home() {
         <section className="flex w-full flex-col gap-4 border-t border-line px-4 pb-10 pt-8 sm:px-10">
           <OpenLeagueShelf
             house={house}
-            leagues={leagues.slice(0, UI_CONFIG.frontDoor.shelfCap)}
+            leagues={cappedLeagues}
             signedIn={user !== null}
             helpLevel={helpLevel}
             asOfTime={formatAbsoluteTime(nowIso)}
+            featuredInHero={featuredLeague !== null}
           />
           <div>
             {/* D3's one way out of the teaser: quiet on purpose — the shelf's featured card

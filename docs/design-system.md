@@ -541,10 +541,15 @@ rule 3 (linearizes last on a phone, never shrinks), and it is optional because t
 the same frame with nobody to talk to.
 
 Widths come from the spacing scale (`lg:w-88` = 352px for the pool rail), never an arbitrary
-value — `w-88` is Tailwind v4's on-demand spacing utility, not a bracket escape hatch.
+value — `w-88` is Tailwind v4's on-demand spacing utility, not a bracket escape hatch. The pool
+declares its own `lg:w-88` directly on `RoomLayout`'s frame; the aside's open/collapsed width
+lives on its CONTENT instead (`lg:w-88` open, `lg:w-12` collapsed) so the frame never has to know
+chat exists — but the frame still caps the band itself at `lg:max-w-88`, the same ceiling the
+pool carries, so a wider descendant can never push the band (and the stage it starves) past the
+viewport (founder live defect #2).
 
 ## Stacking
-No z-index scale yet — four sanctioned layers exist by convention: a sticky board header/gutter is `z-10` (inside its own scroll container), `DraftBoard`'s edge fades are `z-20` (must paint over the sticky `z-10` gutter beneath them), the toast region is `z-40`, and `Modal` is `z-50` (always above toasts). Any new overlay must pick a value against these, not invent an unrelated one.
+No z-index scale yet — three sanctioned layers exist by convention: a sticky board header/gutter is `z-10` (inside its own scroll container), the toast region is `z-40`, and `Modal` is `z-50` (always above toasts). Any new overlay must pick a value against these, not invent an unrelated one. (`DraftBoard` briefly had a `z-20` decorative edge-fade over the board's scroll edges; it painted unconditionally, tinting the last visible column's own sticker colors — founder live defect #2 — and was removed outright rather than made conditional, since the grid's native scrollbar is already the scroll affordance every other horizontally-scrolling surface in this app relies on.)
 
 ## Theming
 `<ThemeProvider>` (in `layout.tsx`) manages `system | light | dark`, persisted, stamping `data-theme` on `<html>`. Default is system.

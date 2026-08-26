@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { players, playerStatLines, scoringSettings } from "@/db/schema";
@@ -58,6 +59,47 @@ describe("buildDraftPool", () => {
     await db.insert(playerStatLines).values([{ ...zeroLine, playerId: "vet", week: 1, receivingYards: 50 }]);
 
     expect((await buildDraftPool(db, leagueId)).map((p) => p.playerId)).toEqual(["vet", "a_rookie", "b_rookie"]);
+  });
+
+  it("leads with ADP ascending and sinks players without ADP below every ranked one, regardless of projection", async () => {
+    // The founder-reported failure this ordering ends: 250 fabricated demo players with stat
+    // lines outranked 1,646 real NFL players that had none. ADP is the market's draft order —
+    // lower = taken earlier — and a player the feed does not rank belongs after every player it
+    // does, no matter how loud his (possibly fabricated) projection is.
+    const { leagueId } = await seedDraftFixture(db, {
+      draftId: "draft_adp", leagueId: "league_adp", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    await db.insert(players).values([
+      { id: "demo_star", name: "Demo Star", position: "RB", nflTeam: "KC", adp: null },
+      { id: "real_late", name: "Real Late Rounder", position: "WR", nflTeam: "SF", adp: 141.2 },
+      { id: "real_first", name: "Real First Pick", position: "RB", nflTeam: "SEA", adp: 1.6 },
+      { id: "demo_scrub", name: "Demo Scrub", position: "WR", nflTeam: "NYJ", adp: null },
+    ]);
+    // The demo players are the only ones with stat lines — the exact live-data shape.
+    await db.insert(playerStatLines).values([
+      { ...zeroLine, playerId: "demo_star", week: 1, rushingYards: 300, rushingTouchdowns: 3 },
+      { ...zeroLine, playerId: "demo_scrub", week: 1, receivingYards: 12 },
+    ]);
+
+    const pool = await buildDraftPool(db, leagueId);
+    expect(pool.map((p) => p.playerId)).toEqual(["real_first", "real_late", "demo_star", "demo_scrub"]);
+  });
+
+  it("breaks an ADP tie by projected points, then by id, keeping the order total", async () => {
+    const { leagueId } = await seedDraftFixture(db, {
+      draftId: "draft_adp_tie", leagueId: "league_adp_tie", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    await db.insert(players).values([
+      { id: "tie_b_quiet", name: "Tied Quiet B", position: "WR", nflTeam: "SF", adp: 24.5 },
+      { id: "tie_a_quiet", name: "Tied Quiet A", position: "WR", nflTeam: "SEA", adp: 24.5 },
+      { id: "tie_loud", name: "Tied Loud", position: "RB", nflTeam: "KC", adp: 24.5 },
+    ]);
+    await db.insert(playerStatLines).values([{ ...zeroLine, playerId: "tie_loud", week: 1, rushingYards: 120 }]);
+
+    const pool = await buildDraftPool(db, leagueId);
+    expect(pool.map((p) => p.playerId)).toEqual(["tie_loud", "tie_a_quiet", "tie_b_quiet"]);
   });
 
   it("ranks by the league's own scoring settings, not the PPR fallback", async () => {
@@ -130,6 +172,29 @@ describe("rankedPlayers", () => {
     expect(await rankedPlayers(db, "league_empty_then_seeded")).toEqual([]);
     await db.insert(players).values({ id: "late_arrival", name: "Late Arrival", position: "RB", nflTeam: "SF" });
     expect((await rankedPlayers(db, "league_empty_then_seeded")).map((player) => player.id)).toEqual(["late_arrival"]);
+  });
+
+  it("sinks a null-ADP player whichever side of the comparison it lands on", async () => {
+    // Two two-player leagues over the same pair, inserted in opposite orders, so the comparator
+    // meets the null on each side deterministically — the property must not depend on which
+    // element the sort happens to probe first.
+    await db.insert(players).values([
+      { id: "null_side", name: "Unranked", position: "RB", nflTeam: "SF", adp: null },
+      { id: "ranked_side", name: "Ranked", position: "RB", nflTeam: "KC", adp: 8.2 },
+    ]);
+    await db.insert(playerStatLines).values([{ ...zeroLine, playerId: "null_side", week: 1, rushingYards: 250 }]);
+
+    const ranked = await rankedPlayers(db, "league_null_each_side");
+    expect(ranked.map((p) => p.id)).toEqual(["ranked_side", "null_side"]);
+
+    invalidateRankedPlayersCache("league_null_each_side_reversed");
+    await db.delete(players).where(sql`true`);
+    await db.insert(players).values([
+      { id: "ranked_side", name: "Ranked", position: "RB", nflTeam: "KC", adp: 8.2 },
+      { id: "null_side", name: "Unranked", position: "RB", nflTeam: "SF", adp: null },
+    ]);
+    const reversed = await rankedPlayers(db, "league_null_each_side_reversed");
+    expect(reversed.map((p) => p.id)).toEqual(["ranked_side", "null_side"]);
   });
 
   it("caches the ranking per league id: a row written straight to the DB (bypassing the cache) is not reflected until invalidated", async () => {

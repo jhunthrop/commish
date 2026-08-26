@@ -3,7 +3,7 @@
 import type { ReactElement } from "react";
 import { Badge, InfoTip, buttonClassName } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
-import { Countdown, useCountdown } from "@/components/ui/countdown";
+import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import type { DraftFormat } from "@/domain/league";
@@ -200,21 +200,28 @@ export function FormatLine({ league, helpLevel }: { readonly league: PublicLeagu
  * league, whose placeholder kickoff is never rendered as though somebody chose it
  * (`DraftTimingNotes` below says what is true instead). `className` is the caller's alignment
  * on the absolute span only (the card right-aligns its ledger value; the row reads left).
+ *
+ * `size` defaults to `"sm"` — the card/row's own ledger-row register, unchanged for both
+ * existing callers — and is threaded straight to `Countdown` for a caller that needs the SAME
+ * gated clock at a larger register (the front door hero's "Next draft" module, `size="lg"`)
+ * rather than forking a second ticking clock with its own onDeck gate.
  */
 export function ScheduledDraftValue({
   league,
   onDeck,
   remainingMs,
   className = "",
+  size = "sm",
 }: {
   readonly league: PublicLeagueSummary;
   readonly onDeck: boolean;
   readonly remainingMs: number | null;
   readonly className?: string;
+  readonly size?: CountdownSize;
 }) {
   if (league.startTrigger !== "scheduled") return null;
   return onDeck && remainingMs !== null ? (
-    <Countdown remainingMs={remainingMs} size="sm" tone="hot" data-testid="draft-clock" />
+    <Countdown remainingMs={remainingMs} size={size} tone="hot" data-testid="draft-clock" />
   ) : (
     <span className={`min-w-0 font-medium tabular-nums text-text-primary ${className}`}>{league.draftAt}</span>
   );

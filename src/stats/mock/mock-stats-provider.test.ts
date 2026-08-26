@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Player, StatLine } from "@/domain/player";
+import { PPR_SCORING } from "@/domain/scoring";
+import { computeFantasyPoints } from "@/scoring";
 import { createMockStatsProvider } from "./mock-stats-provider";
 import { PLAYER_COUNT, type Dataset } from "./generate-dataset";
 import { describeStatsProviderContract } from "../test-support";
@@ -72,6 +74,58 @@ describe("MockStatsProvider", () => {
     const otherGames = await live.listGames(4);
     expect(otherGames.length).toBeGreaterThan(0);
     expect(otherGames.every((game) => game.status === "final")).toBe(true);
+  });
+});
+
+describe("MockStatsProvider ADP", () => {
+  const provider = createMockStatsProvider();
+
+  it("is deterministic: two independently built providers agree entry for entry", async () => {
+    // The contract suite deliberately does not assert determinism (it is false of a live feed),
+    // so it lives here, where it is a real property: mock-mode tests and dev seeds must produce
+    // the same draft board on every run.
+    const first = await createMockStatsProvider().listAdp();
+    const second = await createMockStatsProvider().listAdp();
+    expect(second).toEqual(first);
+  });
+
+  it("ranks every dataset player exactly once, ADP 1..N", async () => {
+    const entries = await provider.listAdp();
+    expect(entries).toHaveLength(PLAYER_COUNT);
+    expect(new Set(entries.map((entry) => entry.playerId)).size).toBe(PLAYER_COUNT);
+    expect([...entries.map((entry) => entry.adp)].sort((a, b) => a - b)).toEqual(
+      Array.from({ length: PLAYER_COUNT }, (_, index) => index + 1),
+    );
+  });
+
+  it("orders by PPR season total, best first — the same market meaning a real feed carries", async () => {
+    const players = await provider.listPlayers();
+    const positionById = new Map(players.map((p) => [p.id, p.position]));
+    const totals = new Map<string, number>();
+    for (let week = 1; week <= provider.lastWeekOfSeason; week++) {
+      for (const statLine of await provider.getWeeklyStatLines(week)) {
+        totals.set(
+          statLine.playerId,
+          (totals.get(statLine.playerId) ?? 0) + computeFantasyPoints(statLine, positionById.get(statLine.playerId)!, PPR_SCORING),
+        );
+      }
+    }
+    const entries = [...(await provider.listAdp())].sort((a, b) => a.adp - b.adp);
+    for (let i = 1; i < entries.length; i++) {
+      expect(totals.get(entries[i - 1]!.playerId) ?? 0).toBeGreaterThanOrEqual(totals.get(entries[i]!.playerId) ?? 0);
+    }
+  });
+
+  it("breaks a total tie by id and skips a stat line for an unlisted player, over a hand-rolled dataset", async () => {
+    // Two players with identical (zero) totals — the ghost line ranks nobody, so both players
+    // tie and the id decides, keeping the order total the same way rankedPlayers' own
+    // tie-break does.
+    const dataset: Dataset = { players: [player("b_tied", "SF"), player("a_tied", "SEA")], statLines: [line("ghost", 1)] };
+    const entries = await createMockStatsProvider(dataset).listAdp();
+    expect(entries).toEqual([
+      { playerId: "a_tied", adp: 1 },
+      { playerId: "b_tied", adp: 2 },
+    ]);
   });
 });
 

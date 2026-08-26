@@ -802,6 +802,16 @@ export const players = pgTable(
     name: text("name").notNull(),
     position: playerPositionEnum("position").notNull(),
     nflTeam: text("nfl_team").notNull(),
+    /**
+     * Average Draft Position from the configured stats provider's ADP feed (`listAdp`), written
+     * by `ingestAdp` (`src/stats-pipeline/adp.ts`), never by the seed. NULLABLE and null by
+     * default: a player the feed does not rank has no ADP, and `rankedPlayers`
+     * (`src/draft-service/pool.ts`) sorts null-ADP players after every ranked one — which is the
+     * industry meaning (lower ADP = drafted earlier) and what sinks fabricated demo players below
+     * real NFL players when a real feed is configured. `real`, not `integer`: feeds publish
+     * fractional positions ("1.6", "12.8").
+     */
+    adp: real("adp"),
   },
   (t) => [index("players_position_idx").on(t.position)],
 );

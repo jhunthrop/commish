@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, afterAll, vi } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
 import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
-import { playerStatLines } from "@/db/schema";
+import { players, playerStatLines } from "@/db/schema";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { PLAYER_COUNT, SEASON_WEEKS } from "@/stats/mock/generate-dataset";
 import type { StatsProvider } from "@/stats/provider";
@@ -71,6 +71,7 @@ describe("seedPlayers", () => {
         );
       },
       getWeeklyStatLines: (week) => provider.getWeeklyStatLines(week),
+      listAdp: () => provider.listAdp(),
     };
 
     await seedPlayers(db, revisedProvider);
@@ -81,6 +82,21 @@ describe("seedPlayers", () => {
       .where(and(eq(playerStatLines.playerId, target.playerId), eq(playerStatLines.week, 1)));
     expect(row?.passingYards).toBe(revisedPassingYards);
     expect(await countOf("player_stat_lines")).toBe(PLAYER_COUNT * SEASON_WEEKS);
+  }, 30_000);
+
+  it("re-running the seed preserves an ingested ADP value instead of nulling it back out", async () => {
+    // `players.adp` is owned by `ingestAdp` (`src/stats-pipeline/adp.ts`), not by the seed:
+    // `seedPlayers` inserts rows without an adp value, so an update set built over every non-key
+    // column would assign `excluded.adp` — always NULL — and every `npm run seed` re-run would
+    // silently wipe the enrichment the draft pool ranks by.
+    await seedPlayers(db, provider);
+    const [first] = await provider.listPlayers();
+    await db.update(players).set({ adp: 1.6 }).where(eq(players.id, first!.id));
+
+    await seedPlayers(db, provider);
+
+    const [row] = await db.select({ adp: players.adp }).from(players).where(eq(players.id, first!.id));
+    expect(row?.adp).toBe(1.6);
   }, 30_000);
 
   it("invalidates the player index after a successful seed", async () => {

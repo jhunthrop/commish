@@ -4,6 +4,7 @@ import { EmptyState, InfoTip } from "@/components/ui";
 import type { HelpLevel } from "@/identity/preferences";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { moneyIsLive } from "@/money/states";
 import { LeagueRow, LeagueRowsHeader } from "./league-row";
 import { OpenLeagueCard } from "./open-league-card";
 
@@ -50,24 +51,44 @@ export function seatCountsAsOfSentence(asOfTime: string): string {
 }
 
 /**
+ * The subset of `featuredLeagueId`'s own first pass, as the league object rather than its id
+ * alone: leagues with a `scheduled` `startTrigger` AND the instant actually on the wire (a
+ * `when_full` league's `draftAtIso` is the same placeholder its `draftAt` is — never mistaken for
+ * a chosen kickoff), reduced to the nearest one. `null` when nothing qualifies. ISO-8601 UTC
+ * instants of one shape compare correctly as strings, so no `now` is needed here either.
+ */
+function nearestScheduledLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
+  const scheduled = leagues.filter((league) => league.startTrigger === "scheduled" && league.draftAtIso !== undefined);
+  if (scheduled.length === 0) return null;
+  return scheduled.reduce((nearest, league) => (league.draftAtIso! < nearest.draftAtIso! ? league : nearest));
+}
+
+/**
  * D2 (rule 5, one ink action per view): which card, if any, is the shelf's single featured one —
- * the nearest scheduled draft, else the fewest seats remaining. Pure and clock-free: an open
- * league's draft is still to come by `listPublicLeagues`'s own definition, so "nearest" is simply
- * the smallest instant, no `now` needed. A `when_full` league's `draftAtIso` is the same
- * placeholder its `draftAt` is (`PublicLeagueSummary.draftAtIso`'s own docblock), so only a
- * `scheduled` league with the instant actually on the wire enters the first pass — the identical
- * gate every other reader of `draftAt`/`draftAtIso` holds. Ties keep list order, so the answer is
- * deterministic for one rendered shelf.
+ * the nearest scheduled draft (`nearestScheduledLeague`), else the fewest seats remaining. Pure
+ * and clock-free — see `nearestScheduledLeague`'s own docblock for why "nearest" needs no `now`.
+ * Ties keep list order, so the answer is deterministic for one rendered shelf.
  */
 export function featuredLeagueId(leagues: readonly PublicLeagueSummary[]): string | null {
   if (leagues.length === 0) return null;
-  const scheduled = leagues.filter((league) => league.startTrigger === "scheduled" && league.draftAtIso !== undefined);
-  if (scheduled.length > 0) {
-    // ISO-8601 UTC instants of one shape compare correctly as strings.
-    return scheduled.reduce((nearest, league) => (league.draftAtIso! < nearest.draftAtIso! ? league : nearest)).id;
-  }
+  const nearest = nearestScheduledLeague(leagues);
+  if (nearest !== null) return nearest.id;
   const seatsRemaining = (league: PublicLeagueSummary): number => league.teamCount - league.filledTeams;
   return leagues.reduce((tightest, league) => (seatsRemaining(league) < seatsRemaining(tightest) ? league : tightest)).id;
+}
+
+/**
+ * The front door hero's own "Next draft" module (2026-08-25 founder finding, controller-ruled):
+ * the SAME league `featuredLeagueId` marks `emphasis="ink"` on the shelf, but ONLY the genuinely
+ * scheduled, nearest-draft case — never the fallback tightest-seats pick a shelf with nothing
+ * scheduled falls back to. `nearestScheduledLeague` is exactly that qualifying subset already;
+ * this is its public name for a caller outside this module (`page.tsx`), which needs the league
+ * OBJECT, not its id, to render the module from. `null` (empty shelf, or nothing scheduled with a
+ * real instant) tells the hero band to render nothing at all — rule 6, real or absent, never
+ * dressed up.
+ */
+export function featuredScheduledLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
+  return nearestScheduledLeague(leagues);
 }
 
 export interface OpenLeagueShelfProps {
@@ -94,6 +115,26 @@ export interface OpenLeagueShelfProps {
   /** `/browse`'s `BrowseFilters` row. The front door renders none: it is the capped teaser (D3)
    *  and `/browse` is the full, filterable lobby. */
   readonly filters?: ReactNode;
+  /**
+   * 2026-08-25 founder finding, controller-ruled: true when the hero band's own "Next draft"
+   * module (`NextDraftModule`) already renders this shelf's featured league — `page.tsx` derives
+   * that league from the SAME `featuredScheduledLeague` this component would otherwise call, so
+   * passing `true` here (rather than recomputing and comparing) is the one place that decision
+   * lives. Rule 5's one-ink-per-view budget means the shelf then marks NOTHING `emphasis="ink"`:
+   * the module IS that league's featured rendering, and two inked renderings of the same league
+   * would double the budget. Default `false` preserves every existing caller's own
+   * one-ink-per-render behavior (`/browse` never renders the hero module, so it always computes
+   * its own feature).
+   */
+  readonly featuredInHero?: boolean;
+  /**
+   * 2026-08-25, the absolutism sweep's carried finding: defaults to the real `moneyIsLive()` —
+   * injectable so a test can exercise the live shelf disclosure without editing shipped state,
+   * the identical `FrontDoorHero`/`SeatClaimSteps` idiom. No production caller, and no test
+   * beyond the live-branch ones, ever passes anything but the default: `MONEY_STATES.enabled`
+   * ships empty, so every real render reads `MATCHMAKING_CONFIG.stakeDisclosure`.
+   */
+  readonly live?: boolean;
 }
 
 /**
@@ -126,9 +167,11 @@ export function OpenLeagueShelf({
   headingLevel = 2,
   intro,
   filters,
+  featuredInHero = false,
+  live = moneyIsLive(),
 }: OpenLeagueShelfProps) {
   const merged: readonly PublicLeagueSummary[] = [...house, ...leagues];
-  const featuredId = featuredLeagueId(merged);
+  const featuredId = featuredInHero ? null : featuredLeagueId(merged);
   const Heading = headingLevel === 1 ? "h1" : "h2";
 
   return (
@@ -197,7 +240,12 @@ export function OpenLeagueShelf({
               </li>
             ))}
           </ul>
-          <p className="text-sm text-text-muted">{MATCHMAKING_CONFIG.stakeDisclosure}</p>
+          {/* 2026-08-25, the absolutism sweep's carried finding: this ONE sentence describes the
+              WHOLE merged list, so it defers to the per-league Entry column rather than
+              re-asserting "no money changes hands" once `moneyIsLive()` lets one listed league
+              carry a real fee — see `MATCHMAKING_CONFIG.liveShelfStakeDisclosure`'s own
+              docblock. */}
+          <p className="text-sm text-text-muted">{live ? MATCHMAKING_CONFIG.liveShelfStakeDisclosure : MATCHMAKING_CONFIG.stakeDisclosure}</p>
         </>
       ) : null}
 
