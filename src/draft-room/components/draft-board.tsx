@@ -6,6 +6,7 @@ import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { Avatar, Badge, EYEBROW, Sticker } from "@/components/ui";
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { plural } from "@/domain/duration";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { rosterSpots } from "../state/format";
 import { teamName, teamsById } from "../lib/lookups";
@@ -140,7 +141,16 @@ function directionOf(picks: readonly CompletedPick[], columnIds: readonly string
   return columnIds.indexOf(first.teamId) < columnIds.indexOf(last.teamId) ? "forward" : "reverse";
 }
 
-function buildRows(view: DraftStateView, columnIds: readonly string[]): readonly BoardRow[] {
+interface BuiltBoard {
+  readonly rows: readonly BoardRow[];
+  /** Which round the board is actively filling — the same derivation `RoomRail`'s own
+   *  `currentRound` makes, exposed here too since E7's TV compression cuts off relative to it
+   *  (`activeRound + DRAFT_ROOM_CONFIG.tv.futureRoundsShown`), not the `future` flag above
+   *  (which recedes by SHAPE one round earlier, for the room's own sliver treatment). */
+  readonly activeRound: number;
+}
+
+function buildRows(view: DraftStateView, columnIds: readonly string[]): BuiltBoard {
   // The last round with any action; empties beyond the next round fade to quiet the wall.
 
   const byCell = new Map(view.picks.map((pick) => [pickKey(pick.teamId, pick.round), pick]));
@@ -153,7 +163,7 @@ function buildRows(view: DraftStateView, columnIds: readonly string[]): readonly
   const isSnake = view.format === "snake";
   const activeRound = Math.max(1, ...view.picks.map((pick) => pick.round), ...(onClockTeamId ? [nextRound.get(onClockTeamId) ?? 1] : []));
 
-  return Array.from({ length: rosterSpots(view.slotConfig) }, (_, index): BoardRow => {
+  const rows = Array.from({ length: rosterSpots(view.slotConfig) }, (_, index): BoardRow => {
     const round = index + 1;
     return {
       round,
@@ -167,6 +177,8 @@ function buildRows(view: DraftStateView, columnIds: readonly string[]): readonly
       })),
     };
   });
+
+  return { rows, activeRound };
 }
 
 function StickerCell({
@@ -257,8 +269,16 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
   const reduced = usePrefersReducedMotion();
   const byId = teamsById(teams);
   const columnIds = columnIdsOf(view, teams);
-  const rows = buildRows(view, columnIds);
+  const { rows, activeRound } = buildRows(view, columnIds);
   const slapPickNumber = reduced ? null : landedPickNumber;
+
+  // E7 (2026-08-26 design review): the TV variant draws only the active round plus
+  // `DRAFT_ROOM_CONFIG.tv.futureRoundsShown` beyond it — far-future rounds collapse into one
+  // quiet summary line instead of ~60% of the stage sitting bare. The room variant renders
+  // every row exactly as before (its own sliver recede is a separate, untouched mechanism).
+  const tvCutoff = activeRound + DRAFT_ROOM_CONFIG.tv.futureRoundsShown;
+  const wideRows = variant === "tv" ? rows.filter((row) => row.round <= tvCutoff) : rows;
+  const collapsedRoundCount = rows.length - wideRows.length;
 
   const gridRef = useRef<HTMLDivElement | null>(null);
   const onClockKey = view.phase === "in_progress" ? `${view.onClockTeamId ?? ""}:${view.pickNumber}` : "";
@@ -337,7 +357,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {wideRows.map((row) => (
               <tr key={row.round}>
                 <th scope="row" className="sticky left-0 z-10 bg-surface px-2 py-1 align-middle font-display font-semibold text-text-muted">
                   <span className="flex items-center gap-1">
@@ -360,6 +380,18 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
               </tr>
             ))}
           </tbody>
+          {collapsedRoundCount <= 0 ? null : (
+            // E7: the season's shape past the TV's own reading distance is a number, not 140
+            // empty cells — one hairline-topped, mono, muted line rather than the void the
+            // review flagged.
+            <tfoot>
+              <tr>
+                <td colSpan={columnIds.length + 1} className="border-t border-line px-2 py-1 font-mono text-sm text-text-muted">
+                  {`${plural(collapsedRoundCount, "round")} ahead`}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
         </div>
       </div>

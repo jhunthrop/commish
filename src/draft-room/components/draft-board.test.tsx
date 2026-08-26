@@ -375,4 +375,53 @@ describe("DraftBoard", () => {
     expect(container.querySelector(".bg-gradient-to-r")).toBeNull();
     expect(container.querySelector(".bg-gradient-to-l")).toBeNull();
   });
+
+  // E7 (2026-08-26 design review): through the early-mid draft, most of a long board is bare
+  // future rows — worse on the TV, where the void is bigger. The TV variant renders only the
+  // active round plus `DRAFT_ROOM_CONFIG.tv.futureRoundsShown` beyond it, then one quiet summary
+  // line for the rest; the room variant's own sliver recede (tested above) is untouched.
+  describe("far-future rounds collapse into one line on the TV (E7)", () => {
+    const TEN_ROUND_VIEW: DraftStateView = {
+      ...SNAKE_VIEW,
+      slotConfig: [{ slot: "QB", count: 10, eligiblePositions: ["QB"] }],
+      picks: [],
+      onClockTeamId: "t1",
+      pickNumber: 1,
+    };
+
+    it("renders only the active round plus futureRoundsShown, then one summary line, on the TV", () => {
+      stubMatchMedia(false);
+      render(<DraftBoard {...props} view={TEN_ROUND_VIEW} variant="tv" />);
+      const roundHeaders = within(grid())
+        .getAllByRole("rowheader")
+        .map((header) => header.textContent);
+      // Active round 1, plus DRAFT_ROOM_CONFIG.tv.futureRoundsShown (2) more: rounds 1-3.
+      expect(roundHeaders).toEqual(["1", "2", "3"]);
+      const summary = within(grid()).getByText("7 rounds ahead");
+      expect(summary.className).toContain("font-mono");
+      expect(summary.className).toContain("text-text-muted");
+      expect(summary.closest("tr")!.className + summary.className).toMatch(/border-t/);
+    });
+
+    it("renders every round on the room variant, with no summary line at all", () => {
+      stubMatchMedia(false);
+      render(<DraftBoard {...props} view={TEN_ROUND_VIEW} />);
+      expect(within(grid()).getAllByRole("rowheader")).toHaveLength(10);
+      expect(screen.queryByText(/rounds ahead/)).toBeNull();
+    });
+
+    it("says '1 round ahead' in the singular for exactly one collapsed round", () => {
+      stubMatchMedia(false);
+      const view: DraftStateView = { ...TEN_ROUND_VIEW, slotConfig: [{ slot: "QB", count: 4, eligiblePositions: ["QB"] }] };
+      render(<DraftBoard {...props} view={view} variant="tv" />);
+      expect(within(grid()).getByText("1 round ahead")).toBeInTheDocument();
+    });
+
+    it("shows no summary line at all when there is nothing left to collapse", () => {
+      stubMatchMedia(false);
+      const view: DraftStateView = { ...TEN_ROUND_VIEW, slotConfig: [{ slot: "QB", count: 3, eligiblePositions: ["QB"] }] };
+      render(<DraftBoard {...props} view={view} variant="tv" />);
+      expect(screen.queryByText(/rounds ahead/)).toBeNull();
+    });
+  });
 });

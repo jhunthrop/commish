@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { Avatar, Badge, Button, ErrorState, Skeleton } from "@/components/ui";
+import { Avatar, Badge, Button, ErrorState, PositionBadge, Skeleton } from "@/components/ui";
+import { Countdown, useCountdown } from "@/components/ui/countdown";
+import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { playersById as buildPlayersById, teamsById } from "../lib/lookups";
 import { DraftBoard } from "./draft-board";
@@ -21,6 +23,11 @@ import { RoomRail } from "./room-rail";
 export function TvBoard({ draftId }: { readonly draftId: string }) {
   const room = useDraftRoom(draftId);
   const playersById = useMemo(() => buildPlayersById(room.players), [room.players]);
+  // Task 2 (review E5/E6): the spotlight band's own clock — the same `useCountdown` the rail
+  // itself uses for the pick deadline, never a second clock source. Called unconditionally,
+  // before either early return below, per React's Rules of Hooks; `room.view` is null while
+  // loading or on error, so the deadline reads null right along with it.
+  const { remainingMs } = useCountdown(room.view?.deadlineAt ?? null);
 
   if (room.status === "loading") {
     return (
@@ -44,6 +51,13 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
   const view = room.view;
   const teamsMap = teamsById(room.teams);
   const onClock = view.onClockTeamId === null ? null : (teamsMap.get(view.onClockTeamId) ?? null);
+  // Rule 1: clocks and live are the negative family — the band's clock goes hot for everyone in
+  // the final `DRAFT_ROOM_CONFIG.tv.hotThresholdMs`, the same way the room rail's own countdown
+  // goes hot for whoever's turn it is (`turnSummary`'s `mine`). A TV has no "me", so the trigger
+  // here is time, not identity.
+  const spotlightHot = remainingMs !== null && remainingMs <= DRAFT_ROOM_CONFIG.tv.hotThresholdMs;
+  const lastPick = room.lastPick;
+  const lastPickPlayer = lastPick === null ? null : (playersById.get(lastPick.pick.playerId) ?? null);
 
   return (
     <div className="flex min-h-dvh flex-col text-lg lg:h-dvh lg:min-h-0 lg:overflow-hidden">
@@ -62,15 +76,36 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
 
         {/* A plain <section>, not <Card>: `data-*` attributes are not part of `CardProps`, and
             the spotlight needs a stable test hook. Its label is "Now picking", not "On the
-            clock": the rail above already carries that phrase and the countdown, and saying
-            the same thing twice on one screen is what made the old room feel confusing. What
-            this panel adds is the FACE — the owner's portrait, readable across a room. */}
+            clock": the rail above already carries that phrase, and saying the same thing twice
+            on one screen is what made the old room feel confusing. What this panel adds is the
+            FACE — the owner's portrait, readable across a room.
+            Task 2 (review E6): the band folds in the two facts that used to sit elsewhere on the
+            TV — the countdown (E5, moved out of the rail entirely, see `RoomRail`) and the last
+            pick landed, restated quietly at glance scale. This is the TV's one dense fact-band
+            now, not a mostly-empty restatement of the rail. */}
         <section data-testid="spotlight" className="flex shrink-0 items-center gap-4 rounded-lg border border-line bg-surface-elevated p-6 shadow-card">
           {onClock === null ? null : <Avatar name={onClock.ownerDisplayName} avatar={onClock.ownerAvatarUrl} size="lg" />}
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="font-display text-sm tracking-wide text-text-muted">Now picking</p>
             <p className="font-display text-display-lg font-semibold leading-display text-text-primary">{onClock?.name ?? "Nobody"}</p>
             {onClock === null ? null : <Badge tone="neutral">{onClock.ownerDisplayName}</Badge>}
+          </div>
+          <div className="ml-auto flex flex-col items-end gap-1">
+            {remainingMs === null ? null : (
+              <Countdown remainingMs={remainingMs} size="lg" tone={spotlightHot ? "hot" : "default"} data-testid="spotlight-countdown" />
+            )}
+            {/* The wire underneath already carries the newest pick's ink (`PickWire`'s own
+                docblock); this is a restatement at glance scale, so the player name stays
+                muted rather than repeating that emphasis — one fact earns ink per view.
+                Skipped, same as `PickWire`'s own `wireEntries`, when the player id hasn't
+                resolved yet (a resync gap) — never a guessed name or a `RosterSlotType` value
+                (which includes FLEX/BENCH) masquerading as a `PositionBadge`'s `Position`. */}
+            {lastPick === null || lastPickPlayer === null ? null : (
+              <p data-testid="spotlight-last-pick" className="flex items-center gap-1 whitespace-nowrap text-sm text-text-muted">
+                {`#${lastPick.pick.pickNumber} ${lastPickPlayer.name}`}
+                <PositionBadge position={lastPickPlayer.position} size="sm" />
+              </p>
+            )}
           </div>
         </section>
 

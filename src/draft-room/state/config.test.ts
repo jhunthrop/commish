@@ -15,7 +15,7 @@ import { DRAFT_ROOM_CONFIG } from "./config";
 describe("DRAFT_ROOM_CONFIG", () => {
   it("defines every numeric tunable as a positive number", () => {
     const numericKeys: readonly (keyof typeof DRAFT_ROOM_CONFIG)[] = ["poolPageSize", "celebrationMs"];
-    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire"] as const;
+    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire", "tv"] as const;
     expect(Object.keys(DRAFT_ROOM_CONFIG).sort()).toEqual([...allKeys].sort());
     for (const key of numericKeys) {
       expect(Number.isFinite(DRAFT_ROOM_CONFIG[key])).toBe(true);
@@ -28,6 +28,18 @@ describe("DRAFT_ROOM_CONFIG", () => {
   it("caps the pick wire at a positive number of items", () => {
     expect(Number.isFinite(DRAFT_ROOM_CONFIG.wire.maxItems)).toBe(true);
     expect(DRAFT_ROOM_CONFIG.wire.maxItems).toBeGreaterThan(0);
+  });
+
+  // Task 2 (review E5/E7): the TV's own tunables — the ms threshold the spotlight clock goes
+  // hot at, and how many rounds past the active one the board still draws before collapsing
+  // the rest into one summary line. Both positive, or the rule they gate never fires (a
+  // zero/negative threshold never goes hot; a zero/negative round count collapses everything,
+  // including the active round).
+  it("defines the TV's own hot-threshold and future-rounds-shown as positive numbers", () => {
+    expect(Number.isFinite(DRAFT_ROOM_CONFIG.tv.hotThresholdMs)).toBe(true);
+    expect(DRAFT_ROOM_CONFIG.tv.hotThresholdMs).toBeGreaterThan(0);
+    expect(Number.isFinite(DRAFT_ROOM_CONFIG.tv.futureRoundsShown)).toBe(true);
+    expect(DRAFT_ROOM_CONFIG.tv.futureRoundsShown).toBeGreaterThan(0);
   });
 
   // `DraftBoard`'s empty-cell recede: a future round's border may shrink, never dim past

@@ -348,7 +348,11 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                 <span data-testid="paused-message" className="text-sm font-medium text-warning">
                   {formatPausedUntil(pausedUntil!)}
                 </span>
-              ) : remainingMs === null ? null : (
+              ) : remainingMs === null || variant === "tv" ? null : (
+                // Task 2 (review E5/E6): the TV variant renders NO countdown of its own here —
+                // the TV board's spotlight band now owns the party's one clock (`TvBoard`, its
+                // own `hotThresholdMs` rule), and a second ticking clock beside it would be the
+                // exact "one clock per screen" violation E5/E6 called out.
                 <Countdown remainingMs={remainingMs} size={RAIL_COUNTDOWN_SIZE[variant]} tone={turn.mine ? "hot" : "default"} data-testid="countdown" />
               )}
               {tightening === null ? null : <span className={`${TIGHTENING_TEXT[variant]} text-warning`}>{tightening}</span>}

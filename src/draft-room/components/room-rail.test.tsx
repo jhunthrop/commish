@@ -345,13 +345,21 @@ describe("RoomRail", () => {
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "watching");
   });
 
-  // Task 12 Step 3: the TV board takes the largest countdown — the room's own headline `lg`
-  // stays put everywhere else.
-  it("takes the xl countdown on the TV, and lg in the room", () => {
-    const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+  it("keeps its lg countdown in the room", () => {
+    render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
     expect(screen.getByTestId("countdown").className).toContain("text-3xl");
-    rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" variant="tv" />);
-    expect(screen.getByTestId("countdown").className).toContain("text-display-xl");
+  });
+
+  // Task 2 (review E5/E6): the TV spotlight band now owns the party's one clock — folding in
+  // the countdown AND the last pick landed (E6) is what made the old band worth looking at.
+  // With that clock living in the band, the rail must never print a second one on the same
+  // screen (E5's "one clock per screen, in the band where eyes are"), so `variant="tv"` drops
+  // its own `Countdown` entirely rather than rendering a redundant `xl` one in the corner. This
+  // replaces the old "xl on the TV" assertion this same test used to make — that was the exact
+  // TV-variant behavior this task deliberately removes.
+  it("renders no countdown of its own on the TV — the spotlight band owns that clock", () => {
+    render(<RoomRail {...props} view={liveView()} myTeamId="t2" variant="tv" />);
+    expect(screen.queryByTestId("countdown")).toBeNull();
   });
 
   // Task 12 Step 3: "the one surface where `xs` never appears", scoped to this rail's OWN

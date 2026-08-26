@@ -132,4 +132,66 @@ describe("TvBoard", () => {
     expect(screen.queryByText("Jalen Croft")).toBeNull();
     expect(screen.getAllByText("On the clock").length).toBeGreaterThan(0);
   });
+
+  // Task 2 (review E5/E6): the spotlight band folds in the one clock the party sees — the
+  // rail's own countdown is gone on this variant (see room-rail.test.tsx), so this band is now
+  // the TV's only ticking clock.
+  describe("the spotlight band's own clock (E5/E6)", () => {
+    it("shows the shared countdown in the band, calm above the hot threshold", async () => {
+      stubMatchMedia();
+      const fixture = fixtureDeps({ ...SNAKE_VIEW, deadlineAt: new Date(Date.now() + 45_000).toISOString() });
+      renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
+      await waitFor(() => expect(screen.getByTestId("spotlight-countdown")).toBeInTheDocument());
+      expect(screen.getByTestId("spotlight-countdown").className).not.toContain("text-negative");
+      // One clock per screen (E5): the rail beside it prints none of its own.
+      expect(screen.queryByTestId("countdown")).toBeNull();
+    });
+
+    it("goes hot inside the final 30 seconds, and not a moment before", async () => {
+      stubMatchMedia();
+      const fixture = fixtureDeps({ ...SNAKE_VIEW, deadlineAt: new Date(Date.now() + 20_000).toISOString() });
+      renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
+      await waitFor(() => expect(screen.getByTestId("spotlight-countdown")).toBeInTheDocument());
+      expect(screen.getByTestId("spotlight-countdown").className).toContain("text-negative");
+    });
+  });
+
+  // Task 2 (review E6): the last pick landed, restated quietly at glance scale beside the
+  // band's own clock — the wire underneath already carries the newest pick's ink; this is a
+  // restatement, so the player's name stays muted rather than repeating that emphasis.
+  it("restates the last pick landed, quietly, beside the spotlight clock", async () => {
+    stubMatchMedia();
+    const fixture = fixtureDeps();
+    renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
+    await waitFor(() => expect(fixture.sources).toHaveLength(1));
+
+    act(() =>
+      fixture.sources[0]!.emit("draft.pick", {
+        draftId: "d1",
+        clock: { phase: "in_progress", sequence: 2, pickNumber: 2, onClockTeamId: "t2", deadlineAt: SNAKE_VIEW.deadlineAt, clockSeconds: 28_800, nextTightening: null, upcoming: SNAKE_VIEW.upcoming },
+        pickNumber: 1,
+        round: 1,
+        teamId: "t1",
+        playerId: "qb1",
+        slot: "QB",
+        slotIndex: 0,
+        price: null,
+        timestamp: "2026-09-01T00:05:00.000Z",
+        auto: false,
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByTestId("spotlight-last-pick")).toHaveTextContent("#1"));
+    const lastPick = screen.getByTestId("spotlight-last-pick");
+    expect(lastPick).toHaveTextContent("Jalen Croft");
+    expect(lastPick.className).toContain("text-text-muted");
+  });
+
+  it("shows no last-pick restatement before anything has been drafted", async () => {
+    stubMatchMedia();
+    const fixture = fixtureDeps();
+    renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
+    await waitFor(() => expect(screen.getByTestId("spotlight")).toBeInTheDocument());
+    expect(screen.queryByTestId("spotlight-last-pick")).toBeNull();
+  });
 });

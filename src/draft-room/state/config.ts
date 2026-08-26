@@ -37,4 +37,16 @@ export const DRAFT_ROOM_CONFIG = {
   wire: {
     maxItems: 6,
   },
+  /**
+   * The TV surface's own tunables (2026-08-26 design review, E5 + E7). `hotThresholdMs` is the
+   * spotlight band's clock — rule 1 puts clocks in the negative family, and the party clock
+   * goes hot for everyone in the final 30 seconds, the same way the rail's own clock goes hot
+   * for whoever's turn it is. `futureRoundsShown` is how many rounds past the active one the
+   * TV board still draws before collapsing the rest into one summary line (E7) — the room
+   * variant keeps its own sliver recede untouched; this only gates the TV's row COUNT.
+   */
+  tv: {
+    hotThresholdMs: 30_000,
+    futureRoundsShown: 2,
+  },
 } as const;
