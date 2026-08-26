@@ -6,8 +6,13 @@ import { formatCoarseDuration } from "@/components/ui/countdown";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import type { WireItem } from "@/matchmaking/contract";
 
-/** The mock's `.wire b`: the one fact in an otherwise quiet sentence, in ink at 600. */
-function Ink({ children }: { readonly children: ReactNode }) {
+/**
+ * The mock's `.wire b`: the one fact in an otherwise quiet sentence, in ink at 600. Exported for
+ * `MockWire` (`./mock-wire`) — the practice lobby's own sibling ticker shares this exact visual
+ * idiom for its own quiet items rather than respelling it (DRY on the visuals, per R3's ruling),
+ * even though the two components speak entirely separate item vocabularies.
+ */
+export function Ink({ children }: { readonly children: ReactNode }) {
   return <b className="font-semibold text-text-primary">{children}</b>;
 }
 
@@ -22,15 +27,32 @@ function Ink({ children }: { readonly children: ReactNode }) {
  */
 function toneOf(item: WireItem): "quiet" | "money" | "live" {
   if (item.kind === "league_filled") return "money";
-  if (item.kind === "seat_claimed" && item.seatsOpen > 0 && item.seatsOpen < UI_CONFIG.seatMeter.lowSeatsThreshold) return "live";
+  if (
+    item.kind === "seat_claimed" &&
+    item.seatsOpen > 0 &&
+    item.seatsOpen < UI_CONFIG.seatMeter.lowSeatsThreshold
+  )
+    return "live";
   return "quiet";
 }
 
-const TONE_CLASS: Readonly<Record<ReturnType<typeof toneOf>, string>> = {
+/** Exported for `MockWire` (./mock-wire): its own `toneOf` only ever answers `"quiet"` or
+ *  `"live"` (a mock room carries no money moment, R3's ruling), both drawn from this SAME map
+ *  rather than a second copy of the two colors. */
+export const TONE_CLASS: Readonly<Record<ReturnType<typeof toneOf>, string>> = {
   quiet: "text-text-muted",
   money: "font-semibold text-accent",
   live: "font-semibold text-negative",
 };
+
+/**
+ * The band's own shell classes, shared verbatim with `MockWire` (R3's DRY-on-the-visuals
+ * ruling): a hairline-bottomed, inset strip in the wire's own mono/xs register. `overflow-hidden`
+ * + `whitespace-nowrap` serve two different callers' needs — this component's own scrolling
+ * marquee, and `MockWire`'s static truncating line — with the identical two utilities.
+ */
+export const WIRE_BAND_CLASSNAME =
+  "overflow-hidden whitespace-nowrap border-b border-line bg-surface-inset py-1.5 font-mono text-xs";
 
 /**
  * One item's sentence — every kind's copy lives here, actor-free (S9: no member name, ever, on
@@ -38,26 +60,33 @@ const TONE_CLASS: Readonly<Record<ReturnType<typeof toneOf>, string>> = {
  * money- or live-toned item speaks whole-sentence in its tint (the mock's `.up`/`.hot` spans);
  * a quiet one carries its one fact in `Ink`.
  */
-function sentenceOf(item: WireItem, tone: "quiet" | "money" | "live"): ReactNode {
+function sentenceOf(
+  item: WireItem,
+  tone: "quiet" | "money" | "live",
+): ReactNode {
   switch (item.kind) {
     case "seat_claimed": {
-      const league = tone === "quiet" ? <Ink>{item.leagueName}</Ink> : item.leagueName;
+      const league =
+        tone === "quiet" ? <Ink>{item.leagueName}</Ink> : item.leagueName;
       return (
         <>
-          A seat was claimed in {league} · {formatCoarseDuration(item.agoMs)} ago
+          A seat was claimed in {league} · {formatCoarseDuration(item.agoMs)}{" "}
+          ago
         </>
       );
     }
     case "league_filled":
       return (
         <>
-          {item.leagueName} filled · drafting {item.draftStatus === "in_progress" ? "now" : "soon"}
+          {item.leagueName} filled · drafting{" "}
+          {item.draftStatus === "in_progress" ? "now" : "soon"}
         </>
       );
     case "draft_tonight":
       return (
         <>
-          <Ink>{item.leagueName}</Ink> drafts in {formatCoarseDuration(item.untilMs)}
+          <Ink>{item.leagueName}</Ink> drafts in{" "}
+          {formatCoarseDuration(item.untilMs)}
         </>
       );
     case "season_count":
@@ -69,7 +98,13 @@ function sentenceOf(item: WireItem, tone: "quiet" | "money" | "live"): ReactNode
   }
 }
 
-function WireList({ items, hidden }: { readonly items: readonly WireItem[]; readonly hidden?: boolean }) {
+function WireList({
+  items,
+  hidden,
+}: {
+  readonly items: readonly WireItem[];
+  readonly hidden?: boolean;
+}) {
   return (
     <ul
       role={hidden === true ? undefined : "list"}
@@ -80,7 +115,10 @@ function WireList({ items, hidden }: { readonly items: readonly WireItem[]; read
       {items.map((item, index) => {
         const tone = toneOf(item);
         return (
-          <li key={index} className={`mx-6 inline whitespace-nowrap ${TONE_CLASS[tone]}`}>
+          <li
+            key={index}
+            className={`mx-6 inline whitespace-nowrap ${TONE_CLASS[tone]}`}
+          >
             {sentenceOf(item, tone)}
           </li>
         );
@@ -120,7 +158,7 @@ export function Wire({ items }: WireProps) {
   if (items.length < UI_CONFIG.wire.minItems) return null;
 
   return (
-    <div className="overflow-hidden whitespace-nowrap border-b border-line bg-surface-inset py-1.5 font-mono text-xs">
+    <div className={WIRE_BAND_CLASSNAME}>
       {reducedMotion ? (
         <WireList items={items.slice(0, UI_CONFIG.wire.minItems)} />
       ) : (

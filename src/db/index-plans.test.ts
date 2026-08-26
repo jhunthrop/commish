@@ -22,6 +22,7 @@ import { chatPageQuery } from "@/chat-service/chat";
 import { dueDraftsQuery } from "@/draft-service/auto-start";
 import { dueMockRoomsQuery } from "@/mock-draft-service/driver";
 import { listOpenMockRoomsQuery } from "@/mock-draft-service/lobby";
+import { recentlyFilledMocksQuery, runningMocksCountQuery } from "@/mock-draft-service/wire";
 import { liveDraftsQuery } from "@/draft-service/ticker";
 import { openQuestionsQuery, pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
@@ -1540,5 +1541,62 @@ describe("mock_rooms_starts_at_idx serves the due-scan and sweep shape, never a 
   it("returns exactly MOCK_CONFIG.maxLobbyListing rows against the 2,000-room corpus — every room here is an open lobby seat", async () => {
     const rows = await listOpenMockRoomsQuery(db);
     expect(rows).toHaveLength(MOCK_CONFIG.maxLobbyListing);
+  });
+});
+
+/**
+ * R3 (the lobby design review's carry) — the practice wire's own two reads
+ * (`recentlyFilledMocksQuery`/`runningMocksCountQuery`, `@/mock-draft-service/wire`), measured
+ * against a dedicated corpus rather than assumed to ride `drafts_status_idx` just because
+ * `draftsNext48hQuery` does. 2,000 mock leagues, each with one draft: ~10% `in_progress`
+ * (`g % 10 = 0`), the rest `scheduled` — a realistic, genuinely selective slice, the same
+ * proportion reasoning `mock_rooms_starts_at_idx`'s own corpus above states for its half-due
+ * split. `kickoff_at` spans one second to ~33 minutes ago, straddling
+ * `MOCK_CONFIG.wire.filledWindowMs` (30 minutes) on purpose, so `recentlyFilledMocksQuery`'s own
+ * range predicate discards some `in_progress` rows rather than matching every one of them.
+ */
+describe("drafts_status_idx serves the practice wire's mock_filled/mocks_running reads, never a sequential scan of drafts", () => {
+  const WIRE_ROOM_COUNT = 2000;
+
+  beforeAll(async () => {
+    await truncateAll(db);
+    await db.execute(sql`
+      INSERT INTO users (id, email, display_name)
+      SELECT 'wireidx_host_' || g, 'wireidx_host_' || g || '@test.local', 'Wire Host ' || g
+      FROM generate_series(1, ${sql.raw(String(WIRE_ROOM_COUNT))}) g
+    `);
+    await db.execute(sql`
+      INSERT INTO leagues (id, name, format, team_count, stake_tier, is_public_matchmade, experience_tier, commissioner_user_id, is_mock, created_at)
+      SELECT 'wireidx_lg_' || g, 'Wire Mock ' || g, 'snake'::draft_format, 12, 0, false, 'beginner'::experience_tier,
+             'wireidx_host_' || g, true, now()
+      FROM generate_series(1, ${sql.raw(String(WIRE_ROOM_COUNT))}) g
+    `);
+    await db.execute(sql`
+      INSERT INTO drafts (id, league_id, format, status, kickoff_at)
+      SELECT 'wireidx_dr_' || g, 'wireidx_lg_' || g, 'snake'::draft_format,
+             CASE WHEN g % 10 = 0 THEN 'in_progress'::draft_status ELSE 'scheduled'::draft_status END,
+             now() - (g || ' seconds')::interval
+      FROM generate_series(1, ${sql.raw(String(WIRE_ROOM_COUNT))}) g
+    `);
+    await db.execute(sql`ANALYZE users, leagues, drafts`);
+  }, 60_000);
+
+  afterAll(async () => {
+    await truncateAll(db);
+  });
+
+  it("recentlyFilledMocksQuery seeks drafts_status_idx on (status, kickoff_at), never a sequential scan of drafts", async () => {
+    const plan = await explainPlan(db, recentlyFilledMocksQuery(db, new Date()));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("drafts");
+    const draftsIndex = indexScanNode(plan, "drafts_status_idx");
+    expect(draftsIndex).toBeDefined();
+    expect(draftsIndex?.["Index Cond"]).toContain("status");
+    expect(draftsIndex?.["Index Cond"]).toContain("kickoff_at");
+  });
+
+  it("runningMocksCountQuery seeks drafts_status_idx on its leading status column alone, never a sequential scan of drafts", async () => {
+    const plan = await explainPlan(db, runningMocksCountQuery(db));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("drafts");
+    expect(indexScanNode(plan, "drafts_status_idx")).toBeDefined();
   });
 });

@@ -93,6 +93,34 @@ export const MOCK_CONFIG = {
    */
   maxLobbyListing: 20,
   /**
+   * R3 (the lobby design review's carry): the practice wire's own tunables —
+   * `listMockWireItems` (`@/mock-draft-service/wire`), rendered by `MockWire`
+   * (`@/league-room/components/mock-wire`). Deliberately its own object, never a value read off
+   * `MATCHMAKING_CONFIG.wire`: a mock lifecycle write appends NO audit event, ever (ruling 2),
+   * so this domain shares none of the front door's audit-backed window and needs no anonymous-
+   * surface concern at all — the vocabulary and the numbers describing it belong together.
+   */
+  wire: {
+    /**
+     * How far back a `mock_filled` item looks. A mock's `drafts.kickoff_at` IS its
+     * `mock_rooms.starts_at` (`createMockRoom`'s own docblock: "the draft's own kickoff is the
+     * same instant", never rewritten after creation), so `status = 'in_progress' AND
+     * kickoff_at` inside this window is the honest, cheap proxy for "went in_progress this
+     * recently" — no audit event exists to read instead (ruling 2's carve-out), and the ticker's
+     * own due-scan cadence (`sweepIntervalMs`, 60s, above) keeps that proxy accurate to within
+     * one tick.
+     */
+    filledWindowMs: 30 * 60 * 1000,
+    /**
+     * The most items one render of the practice wire carries. Small on purpose: unlike the
+     * front-door wire (`MATCHMAKING_CONFIG.wire.maxItems`, 12) this band never scrolls (RULED —
+     * no `animate-wire` here, "a lobby is not a marquee"), so the cap is exactly how many facts
+     * a single truncating line can honestly hold before the newest ones crowd the rest off the
+     * end anyway.
+     */
+    maxItems: 4,
+  },
+  /**
    * Task 7's per-user ceilings on the mock-drafts surface — every route behind it requires a
    * signed-in caller (no anonymous rooms), so each is keyed on the caller's own id, the identical
    * shape `ADVISOR_CONFIG.maxRequestsPerWindow`/`rateLimitWindowMs` and
@@ -214,7 +242,8 @@ export type MockMode = (typeof MOCK_CONFIG.modes)[number];
  */
 export const MOCK_COPY = {
   /** The banner every mock room shows, verbatim, for the whole life of the room. */
-  practiceBanner: "This is a mock draft. Nothing here counts, and this room clears itself after a day.",
+  practiceBanner:
+    "This is a mock draft. Nothing here counts, and this room clears itself after a day.",
   /** The `leagues.name` every mock room is created under (`createMockRoom`,
    *  `@/mock-draft-service/creation`, Task 5) — rendered wherever a real league's own name would
    *  be, so it says plainly what the room is rather than pretending to be a league. */
@@ -231,7 +260,8 @@ export const MOCK_COPY = {
    * real league's rail quotes `describeStartTiming` (`@/matchmaking/roll`) instead; a mock's
    * start has its own trigger (the fill window), so it gets its own honest sentence.
    */
-  waitingDetail: "This mock draft starts when the countdown ends. Practice opponents fill any open seats.",
+  waitingDetail:
+    "This mock draft starts when the countdown ends. Practice opponents fill any open seats.",
   /** The results page heading. Deliberately not a grade or a score against the room: this
    *  product invents no draft-grade authority (founder self-ruling), only confirms the practice
    *  round is over. */
@@ -246,7 +276,8 @@ export const MOCK_COPY = {
    * actually lands on, and it used to say none of this until the room's own `practiceBanner`
    * (below), which nobody sees until after they have already committed.
    */
-  lobbyPromise: "A mock draft is the real room against practice opponents. Free, nothing counts, done in minutes.",
+  lobbyPromise:
+    "A mock draft is the real room against practice opponents. Free, nothing counts, done in minutes.",
   /** Shown in the mock lobby when no open room is waiting to be joined. Pairs with the honest
    *  one-tap `MockLobby` builds from `defaultTeamCount`/`defaultPickSeconds` (D3's ruling: a
    *  labeled quick start, never a bare "Start a mock draft" link that could be mistaken for the
@@ -265,7 +296,8 @@ export const MOCK_COPY = {
    * arithmetic" reason `practiceBanner`'s own "after a day" phrasing already accepts — pinned
    * against the real config value in `config.test.ts` so the two can never quietly drift apart.
    */
-  resultsRetentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
+  resultsRetentionSentence:
+    "Your results stay here for 24 hours, then this room clears itself.",
   /** The results page's three next actions (Task 8, Step 2 — "never a dead end"): a quick
    *  rematch, the lobby, and the real thing. `MockResults` (`@/draft-room/components/
    *  mock-results`) renders all three, every time — a finished mock draft never leaves a

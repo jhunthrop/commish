@@ -4,16 +4,28 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import type { MockLobbyBody, CreateMockRoomBody } from "@/app/api/mock-drafts/route";
+import type {
+  MockLobbyBody,
+  CreateMockRoomBody,
+} from "@/app/api/mock-drafts/route";
 import type { ClaimMockSeatBody } from "@/app/api/mock-drafts/[code]/route";
-import type { MockLobbyRoomSummary, MyMockRoomSummary } from "@/mock-draft-service/lobby";
+import type {
+  MockLobbyRoomSummary,
+  MyMockRoomSummary,
+} from "@/mock-draft-service/lobby";
+import type { MockWireItem } from "@/mock-draft-service/wire";
 import type { MockMode } from "@/mock-draft/config";
 import { Button, EYEBROW, Panel, SeatMeter } from "@/components/ui";
-import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
+import {
+  Countdown,
+  formatCoarseDuration,
+  useCountdown,
+} from "@/components/ui/countdown";
 import type { DraftStatus } from "@/domain/draft";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { MockSetupForm } from "./mock-setup-form";
+import { MockWire } from "./mock-wire";
 
 /**
  * `?create=solo`'s own path (`DraftRoom`'s identical `MOCK_LOBBY_PATH`,
@@ -26,7 +38,9 @@ const SOLO_LOBBY_PATH = "/app/mock-drafts?create=solo";
  *  `formatRelativeCountdown` clamps a real league's own countdown; the wire states the fact
  *  (`startsInMs` can read negative — the ticker has not reached it yet), this is the rendering. */
 function startsInSentence(startsInMs: number): string {
-  return startsInMs <= 0 ? "Starting any moment" : `Starts in ${formatCoarseDuration(startsInMs)}`;
+  return startsInMs <= 0
+    ? "Starting any moment"
+    : `Starts in ${formatCoarseDuration(startsInMs)}`;
 }
 
 const STATUS_LABEL: Readonly<Record<DraftStatus, string>> = {
@@ -59,7 +73,10 @@ const MODE_ROW_LABEL: Readonly<Record<MockMode, string>> = {
  * still waiting to fill (`startsInSentence`) and backward, as "X ago", for one that already
  * started, finished, or was abandoned.
  */
-export function historyWhenSentence(status: DraftStatus, startsInMs: number): string {
+export function historyWhenSentence(
+  status: DraftStatus,
+  startsInMs: number,
+): string {
   if (status === "scheduled") return startsInSentence(startsInMs);
   return `${formatCoarseDuration(Math.abs(startsInMs))} ago`;
 }
@@ -70,7 +87,10 @@ export function historyWhenSentence(status: DraftStatus, startsInMs: number): st
  * threaded here as `defaultTeamCount`/`defaultPickSeconds`) — rather than a generic "Start a
  * mock draft" that could be mistaken for the form's own submit button two feet away.
  */
-export function soloQuickStartLabel(teamCount: number, pickSeconds: number): string {
+export function soloQuickStartLabel(
+  teamCount: number,
+  pickSeconds: number,
+): string {
   return `Start a solo mock now, ${teamCount} teams, ${pickSeconds}s clock`;
 }
 
@@ -86,9 +106,17 @@ interface SoloQuickStartProps {
  * shortcut duplicating its logic. `?create=solo` is `DraftRoom`'s own contract with this page;
  * this is the one place that link ever gets a label.
  */
-function SoloQuickStart({ teamCount, pickSeconds, "data-testid": testId }: SoloQuickStartProps) {
+function SoloQuickStart({
+  teamCount,
+  pickSeconds,
+  "data-testid": testId,
+}: SoloQuickStartProps) {
   return (
-    <Link href={SOLO_LOBBY_PATH} data-testid={testId} className="text-sm font-medium text-accent underline">
+    <Link
+      href={SOLO_LOBBY_PATH}
+      data-testid={testId}
+      className="text-sm font-medium text-accent underline"
+    >
       {soloQuickStartLabel(teamCount, pickSeconds)}
     </Link>
   );
@@ -101,7 +129,10 @@ function SoloQuickStart({ teamCount, pickSeconds, "data-testid": testId }: SoloQ
  *  carries its own (the seat sentence, the status text, the action's accessible name). */
 function ShelfColumnHeader({ trailing = "" }: { readonly trailing?: string }) {
   return (
-    <div aria-hidden="true" className={`flex items-center justify-between gap-3 pb-2 ${EYEBROW} text-text-muted`}>
+    <div
+      aria-hidden="true"
+      className={`flex items-center justify-between gap-3 pb-2 ${EYEBROW} text-text-muted`}
+    >
       <span>Room</span>
       <span>{trailing}</span>
     </div>
@@ -125,7 +156,9 @@ function OpenRoomRow({ room, joiningCode, onJoin }: OpenRoomRowProps) {
   // Computed once, from the request-time `startsInMs` the server read (ruling 10) — the same
   // "a relative duration becomes an absolute deadline the moment the client has it" shape
   // `MockShareLanding` keeps for this identical fact.
-  const [startsAt] = useState(() => new Date(Date.now() + room.startsInMs).toISOString());
+  const [startsAt] = useState(() =>
+    new Date(Date.now() + room.startsInMs).toISOString(),
+  );
   const { remainingMs } = useCountdown(startsAt);
   return (
     <li className="border-t border-line">
@@ -134,8 +167,13 @@ function OpenRoomRow({ room, joiningCode, onJoin }: OpenRoomRowProps) {
           <span className="min-w-0 text-sm font-medium text-text-primary">
             {room.teamCount} teams · {room.pickSeconds}s clock
           </span>
-          <SeatMeter filled={room.teamCount - room.seatsOpen} total={room.teamCount} />
-          {remainingMs === null ? null : <Countdown remainingMs={remainingMs} size="sm" />}
+          <SeatMeter
+            filled={room.teamCount - room.seatsOpen}
+            total={room.teamCount}
+          />
+          {remainingMs === null ? null : (
+            <Countdown remainingMs={remainingMs} size="sm" />
+          )}
         </div>
         <Button
           variant="secondary"
@@ -162,12 +200,18 @@ function MineRoomRow({ room }: { readonly room: MyMockRoomSummary }) {
       <div className="flex flex-wrap items-center justify-between gap-3 py-3">
         <div className="flex min-w-0 flex-col gap-1">
           <span className="min-w-0 break-words text-sm font-medium text-text-primary">
-            {room.teamName} · {MODE_ROW_LABEL[room.mode]} · {room.teamCount} teams · {room.pickSeconds}s ·{" "}
+            {room.teamName} · {MODE_ROW_LABEL[room.mode]} · {room.teamCount}{" "}
+            teams · {room.pickSeconds}s ·{" "}
             {historyWhenSentence(room.status, room.startsInMs)}
           </span>
-          <span className="text-sm text-text-muted">{STATUS_LABEL[room.status]}</span>
+          <span className="text-sm text-text-muted">
+            {STATUS_LABEL[room.status]}
+          </span>
         </div>
-        <Link href={`/app/drafts/${room.draftId}`} className="text-sm font-medium text-accent underline">
+        <Link
+          href={`/app/drafts/${room.draftId}`}
+          className="text-sm font-medium text-accent underline"
+        >
           {STATUS_LINK_LABEL[room.status]}
         </Link>
       </div>
@@ -176,7 +220,11 @@ function MineRoomRow({ room }: { readonly room: MyMockRoomSummary }) {
 }
 
 type HistoryGroupName = "Today" | "Yesterday" | "Earlier";
-const HISTORY_GROUP_ORDER: readonly HistoryGroupName[] = ["Today", "Yesterday", "Earlier"];
+const HISTORY_GROUP_ORDER: readonly HistoryGroupName[] = [
+  "Today",
+  "Yesterday",
+  "Earlier",
+];
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function dayKey(ms: number): string {
@@ -189,7 +237,10 @@ function dayKey(ms: number): string {
  * "Today"/"Yesterday" compare the room's own absolute instant against the render's `now`,
  * "Earlier" catches everything before that.
  */
-export function historyGroupFor(startsAtMs: number, nowMs: number): HistoryGroupName {
+export function historyGroupFor(
+  startsAtMs: number,
+  nowMs: number,
+): HistoryGroupName {
   const day = dayKey(startsAtMs);
   if (day === dayKey(nowMs)) return "Today";
   if (day === dayKey(nowMs - MS_PER_DAY)) return "Yesterday";
@@ -202,6 +253,9 @@ export interface MockLobbyProps {
    *  (`DraftSchedulePanel`'s own docblock), never a client-side fetch on this page's first paint. */
   readonly initialOpen: readonly MockLobbyRoomSummary[];
   readonly initialMine: readonly MyMockRoomSummary[];
+  /** R3: the practice wire's own server-read items, refreshed by the SAME 30s poll as `open`/
+   *  `mine` (one fetch, not two) — see `MockWire`'s own docblock for the surface it renders. */
+  readonly initialWireItems: readonly MockWireItem[];
   readonly modes: readonly MockMode[];
   readonly teamCountOptions: readonly number[];
   readonly pickSecondsOptions: readonly number[];
@@ -229,6 +283,7 @@ export interface MockLobbyProps {
 export function MockLobby({
   initialOpen,
   initialMine,
+  initialWireItems,
   modes,
   teamCountOptions,
   pickSecondsOptions,
@@ -241,6 +296,7 @@ export function MockLobby({
   const { fetchJson } = useLeagueRoomDeps();
   const [open, setOpen] = useState(initialOpen);
   const [mine, setMine] = useState(initialMine);
+  const [wireItems, setWireItems] = useState(initialWireItems);
   const [joiningCode, setJoiningCode] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -252,6 +308,7 @@ export function MockLobby({
       if (!body.ok) return;
       setOpen(body.data.open);
       setMine(body.data.mine);
+      setWireItems(body.data.wire);
     } catch {
       // R5: a failed background poll leaves the last-known list on screen — the page already
       // rendered real data from the server, and this loop exists to keep it moving, not to be
@@ -274,7 +331,9 @@ export function MockLobby({
     setJoiningCode(shareCode);
     setJoinError(null);
     try {
-      const response = await fetchJson(`/api/mock-drafts/${shareCode}`, { method: "POST" });
+      const response = await fetchJson(`/api/mock-drafts/${shareCode}`, {
+        method: "POST",
+      });
       const body = (await response.json()) as ApiEnvelope<ClaimMockSeatBody>;
       if (!body.ok) {
         setJoinError(body.error);
@@ -282,7 +341,9 @@ export function MockLobby({
       }
       router.push(`/app/drafts/${body.data.draftId}`);
     } catch {
-      setJoinError("We could not reach the server. Check your connection and try again.");
+      setJoinError(
+        "We could not reach the server. Check your connection and try again.",
+      );
     } finally {
       setJoiningCode(null);
     }
@@ -290,93 +351,133 @@ export function MockLobby({
 
   // E7: newest first, capped to `mockHistoryVisibleCount` until the reader asks for more.
   const sortedMine = [...mine].sort((a, b) => b.startsInMs - a.startsInMs);
-  const visibleMine = showAllHistory ? sortedMine : sortedMine.slice(0, LEAGUE_ROOM_CONFIG.mockHistoryVisibleCount);
+  const visibleMine = showAllHistory
+    ? sortedMine
+    : sortedMine.slice(0, LEAGUE_ROOM_CONFIG.mockHistoryVisibleCount);
   const nowMs = Date.now();
   const historyGroups = HISTORY_GROUP_ORDER.map((group) => ({
     group,
-    rooms: visibleMine.filter((room) => historyGroupFor(nowMs + room.startsInMs, nowMs) === group),
+    rooms: visibleMine.filter(
+      (room) => historyGroupFor(nowMs + room.startsInMs, nowMs) === group,
+    ),
   })).filter((bucket) => bucket.rooms.length > 0);
 
   return (
-    <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
-      {/* R1: the act — the form, at its own measure, plus one honest one-tap beneath it. */}
-      <div className="flex flex-col gap-4">
-        <Panel title="Start a mock draft">
-          <MockSetupForm
-            modes={modes}
-            teamCountOptions={teamCountOptions}
-            pickSecondsOptions={pickSecondsOptions}
-            defaultTeamCount={defaultTeamCount}
-            defaultPickSeconds={defaultPickSeconds}
-            onCreated={(created: CreateMockRoomBody) => {
-              router.push(`/app/drafts/${created.draftId}`);
-            }}
+    <div className="flex flex-col gap-6">
+      {/* R3: the practice wire — the Sunday Standard's signature on this surface, a quiet ticker
+          of real events directly under the page's own h1/promise line (rendered by the server
+          page above this component). Renders nothing at all when `wireItems` is empty. */}
+      <MockWire items={wireItems} />
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
+        {/* R1: the act — the form, at its own measure, plus one honest one-tap beneath it. */}
+        <div className="flex flex-col gap-4">
+          <Panel title="Start a mock draft">
+            <MockSetupForm
+              modes={modes}
+              teamCountOptions={teamCountOptions}
+              pickSecondsOptions={pickSecondsOptions}
+              defaultTeamCount={defaultTeamCount}
+              defaultPickSeconds={defaultPickSeconds}
+              onCreated={(created: CreateMockRoomBody) => {
+                router.push(`/app/drafts/${created.draftId}`);
+              }}
+            />
+          </Panel>
+          <SoloQuickStart
+            teamCount={defaultTeamCount}
+            pickSeconds={defaultPickSeconds}
+            data-testid="quick-start-primary"
           />
-        </Panel>
-        <SoloQuickStart teamCount={defaultTeamCount} pickSeconds={defaultPickSeconds} data-testid="quick-start-primary" />
-      </div>
+        </div>
 
-      {/* R1: the live lobby and the caller's own history. */}
-      <div className="flex flex-col gap-8">
-        <Panel title="Open mock drafts">
-          <div className="flex flex-col gap-3">
-            {joinError === null ? null : (
-              <p role="alert" className="text-sm text-negative">
-                {joinError}
-              </p>
-            )}
-            {open.length === 0 ? (
+        {/* R1: the live lobby and the caller's own history. */}
+        <div className="flex flex-col gap-8">
+          <Panel title="Open mock drafts">
+            <div className="flex flex-col gap-3">
+              {joinError === null ? null : (
+                <p role="alert" className="text-sm text-negative">
+                  {joinError}
+                </p>
+              )}
+              {open.length === 0 ? (
+                <div className="flex flex-col items-start gap-2">
+                  <p className="text-sm text-text-muted">{emptyMessage}</p>
+                  <SoloQuickStart
+                    teamCount={defaultTeamCount}
+                    pickSeconds={defaultPickSeconds}
+                    data-testid="quick-start-open-empty"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <ShelfColumnHeader />
+                  <ul className="flex flex-col">
+                    {open.map((room) => (
+                      <OpenRoomRow
+                        key={room.shareCode}
+                        room={room}
+                        joiningCode={joiningCode}
+                        onJoin={(code) => void join(code)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          <Panel
+            title="Your mock drafts"
+            meta={
+              mine.length === 0
+                ? undefined
+                : `${mine.length} mock draft${mine.length === 1 ? "" : "s"}`
+            }
+          >
+            {mine.length === 0 ? (
               <div className="flex flex-col items-start gap-2">
-                <p className="text-sm text-text-muted">{emptyMessage}</p>
-                <SoloQuickStart teamCount={defaultTeamCount} pickSeconds={defaultPickSeconds} data-testid="quick-start-open-empty" />
-              </div>
-            ) : (
-              <div>
-                <ShelfColumnHeader />
-                <ul className="flex flex-col">
-                  {open.map((room) => (
-                    <OpenRoomRow key={room.shareCode} room={room} joiningCode={joiningCode} onJoin={(code) => void join(code)} />
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </Panel>
-
-        <Panel title="Your mock drafts" meta={mine.length === 0 ? undefined : `${mine.length} mock draft${mine.length === 1 ? "" : "s"}`}>
-          {mine.length === 0 ? (
-            <div className="flex flex-col items-start gap-2">
-              <p className="text-sm text-text-muted">{historyEmptyMessage}</p>
-              {/* At most TWO one-taps on screen (fix-pass review MEDIUM): a brand-new account
+                <p className="text-sm text-text-muted">{historyEmptyMessage}</p>
+                {/* At most TWO one-taps on screen (fix-pass review MEDIUM): a brand-new account
                   has both lists empty, and three byte-identical CTAs raced for the same eyeball
                   — each placement individually right (D3, R1, E12), never reconciled. The open
                   list's empty state already carries the action in exactly that state, so this
                   one yields to it and renders only when the open shelf has real rooms. */}
-              {open.length === 0 ? null : (
-                <SoloQuickStart teamCount={defaultTeamCount} pickSeconds={defaultPickSeconds} data-testid="quick-start-history-empty" />
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <ShelfColumnHeader />
-              {historyGroups.map(({ group, rooms }) => (
-                <div key={group} className="flex flex-col gap-1">
-                  <h3 className={`${EYEBROW} text-text-muted`}>{group}</h3>
-                  <ul className="flex flex-col">
-                    {rooms.map((room) => (
-                      <MineRoomRow key={room.draftId} room={room} />
-                    ))}
-                  </ul>
-                </div>
-              ))}
-              {showAllHistory || sortedMine.length <= LEAGUE_ROOM_CONFIG.mockHistoryVisibleCount ? null : (
-                <Button variant="ghost" size="sm" onClick={() => setShowAllHistory(true)}>
-                  Show all {sortedMine.length}
-                </Button>
-              )}
-            </div>
-          )}
-        </Panel>
+                {open.length === 0 ? null : (
+                  <SoloQuickStart
+                    teamCount={defaultTeamCount}
+                    pickSeconds={defaultPickSeconds}
+                    data-testid="quick-start-history-empty"
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <ShelfColumnHeader />
+                {historyGroups.map(({ group, rooms }) => (
+                  <div key={group} className="flex flex-col gap-1">
+                    <h3 className={`${EYEBROW} text-text-muted`}>{group}</h3>
+                    <ul className="flex flex-col">
+                      {rooms.map((room) => (
+                        <MineRoomRow key={room.draftId} room={room} />
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                {showAllHistory ||
+                sortedMine.length <=
+                  LEAGUE_ROOM_CONFIG.mockHistoryVisibleCount ? null : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAllHistory(true)}
+                  >
+                    Show all {sortedMine.length}
+                  </Button>
+                )}
+              </div>
+            )}
+          </Panel>
+        </div>
       </div>
     </div>
   );

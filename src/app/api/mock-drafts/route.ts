@@ -1,20 +1,36 @@
 import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { createMockRoom } from "@/mock-draft-service/creation";
-import { listOpenMockRooms, myMockRooms, type MockLobbyRoomSummary, type MyMockRoomSummary } from "@/mock-draft-service/lobby";
+import {
+  listOpenMockRooms,
+  myMockRooms,
+  type MockLobbyRoomSummary,
+  type MyMockRoomSummary,
+} from "@/mock-draft-service/lobby";
 import { createMockRoomSchema } from "@/mock-draft-service/schemas";
+import {
+  listMockWireItems,
+  type MockWireItem,
+} from "@/mock-draft-service/wire";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
-import { createMockRateLimited, mockLifecycleDeps, readMockRateLimited } from "./_shared";
+import {
+  createMockRateLimited,
+  mockLifecycleDeps,
+  readMockRateLimited,
+} from "./_shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** `GET /api/mock-drafts`'s whole answer: the open lobby (join a stranger) and the caller's own
- *  rooms (re-entry) — two different promises, the identical member-list/shelf split `BrowseBody`
- *  (`@/matchmaking/contract`) already keeps for a real league, never one merged array. */
+/** `GET /api/mock-drafts`'s whole answer: the open lobby (join a stranger), the caller's own
+ *  rooms (re-entry), and the practice wire (R3) — three different promises, the identical
+ *  member-list/shelf split `BrowseBody` (`@/matchmaking/contract`) already keeps for a real
+ *  league, never one merged array. `wire` rides this SAME read rather than a second endpoint so
+ *  `MockLobby`'s own 30s poll refreshes the band with the lists in one fetch, not two. */
 export interface MockLobbyBody {
   readonly open: readonly MockLobbyRoomSummary[];
   readonly mine: readonly MyMockRoomSummary[];
+  readonly wire: readonly MockWireItem[];
 }
 
 export interface CreateMockRoomBody {
@@ -38,8 +54,12 @@ export async function GET(request: Request) {
     if (limited !== null) return limited;
 
     const db = getDb();
-    const [open, mine] = await Promise.all([listOpenMockRooms(db), myMockRooms(db, userId)]);
-    return ok<MockLobbyBody>({ open, mine });
+    const [open, mine, wire] = await Promise.all([
+      listOpenMockRooms(db),
+      myMockRooms(db, userId),
+      listMockWireItems(db),
+    ]);
+    return ok<MockLobbyBody>({ open, mine, wire });
   });
 }
 
@@ -62,10 +82,20 @@ export async function POST(request: Request) {
     const parsed = await parseJson(req, createMockRoomSchema);
     if (!parsed.ok) return parsed.response;
 
-    const result = await createMockRoom(getDb(), { hostUserId: userId, ...parsed.value }, mockLifecycleDeps());
+    const result = await createMockRoom(
+      getDb(),
+      { hostUserId: userId, ...parsed.value },
+      mockLifecycleDeps(),
+    );
     if (!result.ok) return fail(result.reason, result.status);
     return ok<CreateMockRoomBody>(
-      { leagueId: result.leagueId, teamId: result.teamId, draftId: result.draftId, shareCode: result.shareCode, startsAt: result.startsAt },
+      {
+        leagueId: result.leagueId,
+        teamId: result.teamId,
+        draftId: result.draftId,
+        shareCode: result.shareCode,
+        startsAt: result.startsAt,
+      },
       { status: 201 },
     );
   });

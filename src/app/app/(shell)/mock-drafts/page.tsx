@@ -7,16 +7,24 @@ import { MOCK_CONFIG, MOCK_COPY } from "@/mock-draft/config";
 import { createMockRoom } from "@/mock-draft-service/creation";
 import { listOpenMockRooms, myMockRooms } from "@/mock-draft-service/lobby";
 import { createMockRoomSchema } from "@/mock-draft-service/schemas";
-import { createMockRateLimited, mockLifecycleDeps } from "@/app/api/mock-drafts/_shared";
+import { listMockWireItems } from "@/mock-draft-service/wire";
+import {
+  createMockRateLimited,
+  mockLifecycleDeps,
+} from "@/app/api/mock-drafts/_shared";
 import { MockLobby } from "@/league-room/components/mock-lobby";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  readonly searchParams: Promise<Record<string, string | readonly string[] | undefined>>;
+  readonly searchParams: Promise<
+    Record<string, string | readonly string[] | undefined>
+  >;
 }
 
-const RETRY_ACTION = <ButtonLink href="/app/mock-drafts">Back to the lobby</ButtonLink>;
+const RETRY_ACTION = (
+  <ButtonLink href="/app/mock-drafts">Back to the lobby</ButtonLink>
+);
 
 /**
  * The practice lobby (Task 9, Step 2) — the setup form, the open lobby a stranger can join, and
@@ -39,7 +47,8 @@ export default async function MockDraftsPage({ searchParams }: PageProps) {
   const user = await requireCurrentUser();
   const params = await searchParams;
   const create = params.create;
-  const wantsImmediateSolo = (typeof create === "string" ? create : create?.[0]) === "solo";
+  const wantsImmediateSolo =
+    (typeof create === "string" ? create : create?.[0]) === "solo";
 
   if (wantsImmediateSolo) {
     const limited = createMockRateLimited(user.id);
@@ -48,24 +57,40 @@ export default async function MockDraftsPage({ searchParams }: PageProps) {
       return (
         <>
           <PageTitle>Mock drafts</PageTitle>
-          <ErrorState title="Too many mock drafts" description={body.error} action={RETRY_ACTION} />
+          <ErrorState
+            title="Too many mock drafts"
+            description={body.error}
+            action={RETRY_ACTION}
+          />
         </>
       );
     }
 
     const request = createMockRoomSchema.parse({ mode: "solo" });
-    const result = await createMockRoom(getDb(), { hostUserId: user.id, ...request }, mockLifecycleDeps());
+    const result = await createMockRoom(
+      getDb(),
+      { hostUserId: user.id, ...request },
+      mockLifecycleDeps(),
+    );
     if (result.ok) redirect(`/app/drafts/${result.draftId}`);
     return (
       <>
         <PageTitle>Mock drafts</PageTitle>
-        <ErrorState title="We could not start that mock draft" description={result.reason} action={RETRY_ACTION} />
+        <ErrorState
+          title="We could not start that mock draft"
+          description={result.reason}
+          action={RETRY_ACTION}
+        />
       </>
     );
   }
 
   const db = getDb();
-  const [open, mine] = await Promise.all([listOpenMockRooms(db), myMockRooms(db, user.id)]);
+  const [open, mine, wire] = await Promise.all([
+    listOpenMockRooms(db),
+    myMockRooms(db, user.id),
+    listMockWireItems(db),
+  ]);
 
   return (
     <>
@@ -73,10 +98,16 @@ export default async function MockDraftsPage({ searchParams }: PageProps) {
       {/* R2 (the lobby design review's ruling): the page leads with the promise before it asks
           anything — read directly from MOCK_COPY here, since the page's own h1 lives in this
           server component, not in MockLobby below it. */}
-      <p className="max-w-2xl text-base text-text-muted">{MOCK_COPY.lobbyPromise}</p>
+      <p className="max-w-2xl text-base text-text-muted">
+        {MOCK_COPY.lobbyPromise}
+      </p>
+      {/* R3: the practice wire renders inside MockLobby (below), positioned first in its own
+          markup, so the same 30s poll that refreshes the lists also keeps the wire current —
+          it still reads as sitting directly under this h1/promise line. */}
       <MockLobby
         initialOpen={open}
         initialMine={mine}
+        initialWireItems={wire}
         modes={MOCK_CONFIG.modes}
         teamCountOptions={MOCK_CONFIG.teamCountOptions}
         pickSecondsOptions={MOCK_CONFIG.pickClockSecondsOptions}

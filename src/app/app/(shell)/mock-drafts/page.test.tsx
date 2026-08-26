@@ -5,6 +5,7 @@ vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/mock-draft-service/creation", () => ({ createMockRoom: vi.fn() }));
 vi.mock("@/mock-draft-service/lobby", () => ({ listOpenMockRooms: vi.fn(), myMockRooms: vi.fn() }));
+vi.mock("@/mock-draft-service/wire", () => ({ listMockWireItems: vi.fn() }));
 vi.mock("@/app/api/mock-drafts/_shared", () => ({
   createMockRateLimited: vi.fn(() => null),
   mockLifecycleDeps: vi.fn(() => ({})),
@@ -25,6 +26,7 @@ vi.mock("next/navigation", () => ({
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { createMockRoom } from "@/mock-draft-service/creation";
 import { listOpenMockRooms, myMockRooms } from "@/mock-draft-service/lobby";
+import { listMockWireItems } from "@/mock-draft-service/wire";
 import { createMockRateLimited } from "@/app/api/mock-drafts/_shared";
 import MockDraftsPage from "./page";
 
@@ -41,6 +43,7 @@ describe("MockDraftsPage", () => {
     vi.mocked(createMockRateLimited).mockReturnValue(null);
     vi.mocked(listOpenMockRooms).mockResolvedValue([]);
     vi.mocked(myMockRooms).mockResolvedValue([]);
+    vi.mocked(listMockWireItems).mockResolvedValue([]);
   });
 
   it("renders the lobby with the real config's own options when there is no ?create=solo", async () => {

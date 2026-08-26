@@ -1813,12 +1813,16 @@ const MOCK_LOBBY_MINE_ROOM = {
   status: "in_progress" as const,
   teamName: "Mock Squad",
 };
+const MOCK_LOBBY_WIRE_ITEMS = [
+  { kind: "mocks_running" as const, count: 3 },
+  { kind: "mock_filled" as const, teamCount: 12, agoMs: 4 * 60_000 },
+];
 
 describe("MockLobby says nothing that breaks the house copy rules, empty and populated", () => {
   it("is clean with nothing open and nothing of the caller's own, and with both populated", () => {
     for (const props of [
-      { initialOpen: [], initialMine: [] },
-      { initialOpen: [MOCK_LOBBY_OPEN_ROOM], initialMine: [MOCK_LOBBY_MINE_ROOM] },
+      { initialOpen: [], initialMine: [], initialWireItems: [] },
+      { initialOpen: [MOCK_LOBBY_OPEN_ROOM], initialMine: [MOCK_LOBBY_MINE_ROOM], initialWireItems: MOCK_LOBBY_WIRE_ITEMS },
     ]) {
       const { container, unmount } = render(
         <MockLobby

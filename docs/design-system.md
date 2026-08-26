@@ -330,6 +330,43 @@ identical halves), with the duplicate `aria-hidden`; the one accessible form is 
 motion is a real branch, not a frozen marquee: the first `minItems` items render as a static row
 and nothing scrolls or duplicates — both branches are asserted in `wire.test.tsx`.
 
+### The practice wire — a second surface honoring the same contract (R3)
+
+`MockWire` (`src/league-room/components/mock-wire.tsx`), fed by `listMockWireItems`
+(`src/mock-draft-service/wire.ts`), is the mock lobby's own signed-in sibling of the wire above —
+the lobby design review's R3 finding ("no wire, no density, no live event... the one move that
+turns an empty lobby from a dead form into a place"). It honors the same three commitments
+(request-time truth, real-or-nothing, actor-free) but is a deliberate SIBLING component, never an
+extension of `WireItem`, for a reason worth recording so the next ticker on this product does not
+re-litigate it:
+
+- **A separate type, not a bigger union.** `WireItem` already names a specific real-league,
+  signed-out disclosure surface (`ENFORCED_LEAGUE_SQL`'s public-only join); a mock room's own
+  vocabulary — no money, no seats, no league name at all — has nothing to do with that contract,
+  and folding it in would make `Wire`'s `toneOf`/`sentenceOf` responsible for a lane they never
+  render. `MockWireItem` (two kinds: `mock_filled`, `mocks_running`) lives beside its own reader
+  in `src/mock-draft-service/wire.ts`.
+- **The presentational shell IS shared, verbatim.** `Ink`, `TONE_CLASS` and
+  `WIRE_BAND_CLASSNAME` are exported from `./wire` and imported by `./mock-wire` unchanged — DRY
+  on the visuals, separate on the words, rather than two copies of the same three lines of
+  Tailwind and the same money/live color pair.
+- **No scroll, ever (RULED).** The front door's `animate-wire` marquee serves an anonymous public
+  nav; a signed-in practice lobby is not a broadcast. `MockWire` renders ONE static, truncating
+  line, newest-first, with no `animate-wire` track and no duplicated accessible list.
+- **Real-or-nothing at one item, not `UI_CONFIG.wire.minItems` (3).** The front door's floor of
+  three exists because a two-item non-scrolling row would read as "barely anything happened"; a
+  static single line has no such tell, so `MockWire` renders as soon as there is exactly one true
+  fact to say, never holding back a genuinely live count to wait for company.
+- **`mocks_running` leads.** It carries no age — always current by construction — so it sits
+  first regardless of how recent the newest `mock_filled` item is; only the newest `mock_filled`
+  item carries `Ink`, since a static always-visible line has no scroll to hide the other items'
+  plainness behind.
+- **A third item, `seat_taken`, was in the original vocabulary and was never built.** A claim on
+  a mock room writes no audit event (ruling 2's carve-out) and `teams` carries no claim
+  timestamp for any league, mock or real — there is no honest, cheap read that answers "was a
+  seat taken here in the last 10 minutes." Real-or-nothing forbids inventing one. `MockWireItem`'s
+  own docblock carries the full argument for the next implementer who reaches for this item.
+
 ### Type
 
 Two faces, one family (v2, Task 1: `Barlow_Condensed` removed).

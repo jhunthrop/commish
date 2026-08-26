@@ -30,6 +30,7 @@ function baseProps() {
   return {
     initialOpen: [],
     initialMine: [],
+    initialWireItems: [],
     modes: ["solo", "lobby", "link"] as const,
     teamCountOptions: [8, 10, 12],
     pickSecondsOptions: [30, 60, 90],
@@ -100,6 +101,18 @@ describe("MockLobby", () => {
     expect(screen.getByTestId("quick-start-primary")).toHaveTextContent("Start a solo mock now, 12 teams, 60s clock");
   });
 
+  it("renders nothing for the practice wire when initialWireItems is empty (R3, real-or-nothing)", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
+    expect(screen.queryByRole("list", { name: "Recent practice activity" })).not.toBeInTheDocument();
+  });
+
+  it("renders the practice wire's own server-read items on first paint (R3)", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<MockLobby {...baseProps()} initialWireItems={[{ kind: "mocks_running", count: 4 }]} />, fixture.deps);
+    expect(screen.getByText("4 mocks drafting right now")).toBeInTheDocument();
+  });
+
   it("never renders a manual refresh control (R5 — this lobby polls instead)", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
@@ -135,7 +148,7 @@ describe("MockLobby", () => {
   it("polls the live read on an interval and refreshes both lists, with no user action (R5)", async () => {
     vi.useFakeTimers();
     try {
-      const fixture = fixtureLeagueDeps({ ok: true, data: { open: [OPEN_ROOM], mine: [MINE_ROOM] } });
+      const fixture = fixtureLeagueDeps({ ok: true, data: { open: [OPEN_ROOM], mine: [MINE_ROOM], wire: [{ kind: "mocks_running", count: 2 }] } });
       renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
       expect(fixture.calls).toEqual([]);
 
@@ -145,6 +158,7 @@ describe("MockLobby", () => {
 
       expect(fixture.calls).toEqual(["GET /api/mock-drafts"]);
       expect(screen.getByText("10 teams · 60s clock")).toBeInTheDocument();
+      expect(screen.getByText("2 mocks drafting right now")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -153,7 +167,7 @@ describe("MockLobby", () => {
   it("stops polling once unmounted", async () => {
     vi.useFakeTimers();
     try {
-      const fixture = fixtureLeagueDeps({ ok: true, data: { open: [], mine: [] } });
+      const fixture = fixtureLeagueDeps({ ok: true, data: { open: [], mine: [], wire: [] } });
       const { unmount } = renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
       unmount();
 
