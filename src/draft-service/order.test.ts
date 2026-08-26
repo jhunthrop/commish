@@ -51,8 +51,8 @@ describe("draftOrderFor", () => {
     // Under draw-order, an indifferent team drawn early consumes lowestFree and can block the
     // one seat anyone asked for; ranked-first resolves choosers before the indifferent, so a
     // practice host's pick is granted for ANY slot, not only the last (founder directive
-    // 2026-08-26). Prove it across every slot of a 10-team room and many draft ids.
-    for (const wanted of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    // 2026-08-26). Prove it across every slot of the 12-team fixture and many draft ids.
+    for (const wanted of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
       for (const draftId of ["d_a", "d_b", "d_c"]) {
         const order = draftOrderFor(draftId, TEAMS, { t03: [wanted] }, "ranked-first");
         expect(order[wanted - 1]).toBe("t03");
