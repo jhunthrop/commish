@@ -130,6 +130,7 @@ export function RoomShell({
           view={view}
           queue={room.queue}
           playersById={playersById}
+          teams={room.teams}
           myTeamId={room.myTeamId}
           submitting={room.submitting}
           canAct={canAct}

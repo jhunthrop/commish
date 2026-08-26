@@ -3,13 +3,14 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { DraftStateView } from "@/draft-engine";
 import { renderSurface } from "@/components/ui/test-utils";
-import { SNAKE_VIEW, playersById } from "../test-fixtures";
+import { SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { RoomDock } from "./room-dock";
 
 const props = {
   view: SNAKE_VIEW,
   queue: ["rb1", "qb1"],
   playersById: playersById(),
+  teams: TEAMS,
   myTeamId: "t1",
   submitting: false,
   canAct: false,
@@ -92,6 +93,39 @@ describe("RoomDock", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove Marcus Reed from your queue" }));
     expect(onQueueChange).toHaveBeenCalledWith(["qb1"]);
+  });
+
+  // E2 (2026-08-26 design review): below `lg` only the dock sticks, and the rail — the room's
+  // ONLY clock — scrolled away, so a phone user deep in the pool acted against an invisible
+  // clock. The dock now carries a compact echo of the same clock, `lg:hidden` (never spoken
+  // twice at desktop widths) and `aria-hidden` (the rail still owns the screen-reader story —
+  // a second live region would double every announcement).
+  it("rides the sticky dock with the clock below lg, hot on my turn, calm on theirs (E2)", () => {
+    const live = { ...SNAKE_VIEW, deadlineAt: new Date(Date.now() + 42_000).toISOString() };
+    const { rerender } = render(<RoomDock {...props} view={live} canAct />);
+    const clock = screen.getByTestId("dock-clock");
+    expect(clock.className).toContain("lg:hidden");
+    expect(clock).toHaveAttribute("aria-hidden", "true");
+    expect(clock).toHaveTextContent("You're on the clock");
+    expect(clock.querySelector(".text-negative")).not.toBeNull();
+
+    rerender(<RoomDock {...props} view={{ ...live, ...waiting }} />);
+    const calm = screen.getByTestId("dock-clock");
+    expect(calm).toHaveTextContent("On the clock");
+    expect(calm).not.toHaveTextContent("You're on the clock");
+    expect(calm.querySelector(".text-negative")).toBeNull();
+  });
+
+  it("shows no dock clock before the draft starts, after it ends, or while picks are paused (E2)", () => {
+    const scheduled: DraftStateView = { ...SNAKE_VIEW, phase: "scheduled", availablePlayerIds: [], onClockTeamId: null, upcoming: [], deadlineAt: null };
+    const { rerender } = render(<RoomDock {...props} view={scheduled} />);
+    expect(screen.queryByTestId("dock-clock")).toBeNull();
+
+    // Paused: a frozen countdown is a false clock — the standing sentence beside it already
+    // says "once picks resume", so the compact clock stands down entirely.
+    const paused: DraftStateView = { ...SNAKE_VIEW, ...waiting, deadlineAt: new Date(Date.now() + 42_000).toISOString(), pausedUntil: new Date(Date.now() + 600_000).toISOString() };
+    rerender(<RoomDock {...props} view={paused} />);
+    expect(screen.queryByTestId("dock-clock")).toBeNull();
   });
 
   // D1 (2026-08-26 design review): at 360px the first queue chip's box leaked past this

@@ -141,8 +141,12 @@ function pendingPickCount(view: DraftStateView): number {
  * ever claiming somebody is "on the clock" during a live lot. This is also where the
  * `AuctionLotPanel` went: the standing bid and its holder are a fact about *the turn*, and the
  * turn has exactly one home.
+ *
+ * Exported for exactly one other consumer: `RoomDock`'s compact below-`lg` clock echo (E2),
+ * which must speak THIS grammar rather than derive a second one — one authority for whose
+ * turn it is, two places that render it.
  */
-function turnSummary(
+export function turnSummary(
   view: DraftStateView,
   teams: readonly TeamCard[],
   playersById: ReadonlyMap<string, Player>,

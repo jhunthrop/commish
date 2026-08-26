@@ -3,11 +3,14 @@
 import type { ReactNode } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { RosterSlotType } from "@/domain/roster";
+import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
 import { Button, EYEBROW, PositionBadge, SlotChip } from "@/components/ui";
+import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { formatYourTurn } from "../state/format";
 import { playerName, queueButtonLabel } from "../lib/lookups";
 import { moveInQueue, removeFromQueue } from "../state/queue";
+import { turnSummary } from "./room-rail";
 
 export type DockMode = "bidding" | "acting" | "watching";
 
@@ -16,6 +19,8 @@ export interface RoomDockProps {
   /** The caller's OWN ranked autopick queue. Never anybody else's. */
   readonly queue: readonly string[];
   readonly playersById: ReadonlyMap<string, Player>;
+  /** The league's teams, for the compact clock's turn label (E2) — same list the rail reads. */
+  readonly teams: readonly TeamCard[];
   readonly myTeamId: string | null;
   readonly submitting: boolean;
   /** True only when the server says it is this user's turn to act. */
@@ -142,6 +147,45 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
 }
 
 /**
+ * E2 (2026-08-26 design review): below `lg` only the dock sticks — the rail, the room's ONLY
+ * clock, scrolled away, so a phone user deep in the pool acted against an invisible clock and
+ * the essential loop (see clock, see pool, pick) did not hold at 360px. This is the same clock
+ * riding the sticky dock: `lg:hidden`, so the fact is never spoken twice at desktop widths,
+ * and its grammar is the rail's own `turnSummary` — one authority, two renderings.
+ *
+ * `aria-hidden` on purpose: the rail's coarse live region and turn sentence stay in the
+ * accessibility tree wherever the page has scrolled, so this echo is visual-only — a second
+ * live region would double every clock announcement. Hydration discipline holds: `useCountdown`
+ * is null until the client clock snaps and `Countdown` renders its placeholder, never a false
+ * "0:00". A paused room renders nothing rather than a frozen, false clock — the dock's own
+ * standing sentence already says "once picks resume".
+ */
+function DockClock({
+  view,
+  teams,
+  playersById,
+  myTeamId,
+}: {
+  readonly view: DraftStateView;
+  readonly teams: readonly TeamCard[];
+  readonly playersById: ReadonlyMap<string, Player>;
+  readonly myTeamId: string | null;
+}) {
+  // Called unconditionally, before any early return — React's Rules of Hooks.
+  const { remainingMs, now } = useCountdown(view.deadlineAt);
+  const pausedUntil = view.pausedUntil ?? null;
+  const paused = pausedUntil !== null && now !== null && now < Date.parse(pausedUntil);
+  if (view.phase !== "in_progress" || view.deadlineAt === null || paused) return null;
+  const turn = turnSummary(view, teams, playersById, myTeamId);
+  return (
+    <div aria-hidden="true" data-testid="dock-clock" className="ml-auto flex shrink-0 flex-col items-end lg:hidden">
+      <Countdown remainingMs={remainingMs} size="md" tone={turn.mine ? "hot" : "default"} />
+      <span className={`${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>{turn.label}</span>
+    </div>
+  );
+}
+
+/**
  * The dock's left edge: the one thing to do right now. On your turn it is a single button
  * that drafts the top of your queue — one click if you planned. With nothing draftable queued
  * it points at the pool instead of pretending there is a button; the pool is already under
@@ -211,6 +255,7 @@ export function RoomDock({
   view,
   queue,
   playersById,
+  teams,
   myTeamId,
   submitting,
   canAct,
@@ -249,6 +294,7 @@ export function RoomDock({
           yourTurn={formatYourTurn(view.upcoming, myTeamId, view.clockSeconds, view.pausedUntil ?? null)}
         />
       )}
+      <DockClock view={view} teams={teams} playersById={playersById} myTeamId={myTeamId} />
       <QueueChips queue={queue} playersById={playersById} draftedIds={draftedIds} busy={submitting} onChange={onQueueChange} />
       <RosterFill view={view} myTeamId={myTeamId} />
     </footer>
