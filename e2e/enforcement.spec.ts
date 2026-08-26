@@ -187,6 +187,17 @@ test("a commissioner schedules and starts a draft; a signed-out visitor reads th
     await pageA.getByRole("button", { name: "Edit time" }).click();
     await pageA.getByLabel("Draft time").fill(localValue);
     await pageA.getByRole("button", { name: "Save time" }).click();
+    // The click above only FIRES the PUT — the "Draft scheduled" heading below was already
+    // visible before the save, so it proves nothing about the write landing. The editor closing
+    // (the "Edit time" button returning) is the panel's own success signal:
+    // `draft-schedule-panel.tsx` leaves `editing` only on the PUT's ok envelope, and a refused
+    // save keeps the form open with a `role="alert"` sentence instead — so this wait also turns
+    // a silent refusal into a failure HERE, at the save, rather than three lines later at the
+    // preview. Task 12 triage of the one recorded failure (the phase 4.5 closing full-suite run):
+    // without this barrier the signed-out `goto` below raced the UPDATE's commit, the preview
+    // server-rendered the seeded kickoff instead of the new one, and a static page never re-reads
+    // — the 15s `getByText` poll was waiting on a page that could no longer change.
+    await expect(pageA.getByRole("button", { name: "Edit time" })).toBeVisible();
     await expect(pageA.getByRole("heading", { name: "Draft scheduled" })).toBeVisible();
 
     // --- A signed-out visitor reads the NEW time on the invite preview — never sees it from
