@@ -403,6 +403,14 @@ export function createDraftStore({
             const state = await load(draftId, tx);
             if (state === null) return { ok: false, reason: "That draft does not exist." };
             previous = state;
+            // TASK 4'S GUARD, READ ONCE. `config.isMock` never changes for a draft's lifetime
+            // (it is set once by `loadDraftConfig` from the `mock_rooms` sidecar), so `state`'s
+            // own config is as good a read of it as `result.state`'s would be after `reduceDraft`
+            // runs. Everything this flag skips below is a REAL-WORLD consequence — an audit row,
+            // a notice, a season commit — never the reducer, the clock, the cache or SSE, which
+            // is what makes a mock draft "the real engine, none of the consequences" rather than
+            // a second, parallel implementation of one.
+            const isMock = state.config.isMock === true;
 
             // THE ACTION, RESOLVED UNDER THE LOCK (final review F9 — see `DraftActionSource`).
             // For every action but `START_DRAFT` this is the value the caller already handed in;
@@ -445,11 +453,21 @@ export function createDraftStore({
             // `auto: false` — a real bidding war happened) needs its winner's identity resolved
             // from the team they play, not left unattributed. This plain read runs before the
             // anchor lock (ruling 3) and takes no lock of its own.
-            const contestedWinners = submittedActorId === null
+            //
+            // TASK 4: a mock draft never produces a `draft_pick` audit event, so there is no
+            // attribution to resolve — `ownerIdsForContestedPicks` is skipped outright rather
+            // than run and thrown away.
+            const contestedWinners = !isMock && submittedActorId === null
               ? result.state.picks.slice(state.picks.length).filter((p) => !p.auto).map((p) => p.teamId)
               : [];
-            const ownerOf = await ownerIdsForContestedPicks(tx, contestedWinners);
-            const picked = auditEventsForPicks(state, result.state, submittedActorId, ownerOf);
+            const ownerOf = isMock ? new Map<string, string>() : await ownerIdsForContestedPicks(tx, contestedWinners);
+            // THE MOCK LANE'S FIRST CUT (Task 4, the phase's central law): `picked` is empty for
+            // a mock by construction, not computed and discarded. Everything downstream that
+            // reads its length — the autopick-notice loop right below, and `audit.recordAll`
+            // further down — is what an empty array already turns into a no-op, so this one
+            // guard is what keeps a mock from ever writing a `member_notices` or `audit_events`
+            // row for a pick the clock made.
+            const picked = isMock ? [] : auditEventsForPicks(state, result.state, submittedActorId, ownerOf);
 
             // Task 7's first real sender: the manager whose pick the clock made for them is told
             // nothing today, and this is that telling. `picked` and the new picks slice are built
@@ -488,7 +506,11 @@ export function createDraftStore({
             // riding the `pending` loop above. `newlySkippedPick` diffs the owed-picks before and
             // after — the identical diff `draftEventsFor`'s `skipped` flag reads, so the two can
             // never disagree about which transition this was.
-            const skip = newlySkippedPick(state, result.state);
+            // TASK 4: a mock never tells anyone their pick was skipped — there is no member to
+            // notify (a bot owns no inbox) and no `system_action` event a practice room may
+            // write. `skip` stays null outright rather than being diffed and its notice
+            // discarded, the same discipline `picked` above keeps.
+            const skip = isMock ? null : newlySkippedPick(state, result.state);
             let skipNotice: { readonly notice: MemberNotice; readonly userId: string } | null = null;
             if (skip !== null) {
               const context = await skipNoticeContext(tx, skip.teamId);
@@ -513,13 +535,27 @@ export function createDraftStore({
             // `commitDraftState` writes `draft_picks`/`roster_slots` and the schedule, every one
             // of which takes an FK lock on `leagues`/`teams`/`players` — so it runs here, before
             // the anchor, not after it.
+            //
+            // TASK 4: A MOCK DRAFT NEVER BECOMES A SEASON. `!isMock` guards the ONE call site —
+            // `counts` stays `null` for a mock even once every pick is in, which is also what
+            // keeps `completedLeagueId` unset below (so `sweepQuietly`'s post-commit trigger
+            // never fires for it) and the `draft_completed` audit write further down from ever
+            // running (it is itself gated on `counts !== null`). `drafts.status` therefore never
+            // reaches `'complete'` for a mock — this engine's `phase: "complete"` is the only
+            // place a finished mock draft is ever recorded, and `state.config.isMock` came off
+            // the `mock_rooms` sidecar, not off this row, so that is exactly the trace the
+            // retention sweep (Task 6) is free to delete without the audit spine noticing.
             const counts =
-              result.state.phase === "complete" && state.phase !== "complete" ? await commitDraftState(tx, result.state) : null;
+              !isMock && result.state.phase === "complete" && state.phase !== "complete" ? await commitDraftState(tx, result.state) : null;
             if (counts !== null) completedLeagueId = result.state.config.leagueId;
 
             // THE ANCHOR, LAST. Nothing below takes a lock on any table another audited
             // transaction locks first.
-            const pickedEvents = await audit.recordAll(tx, picked);
+            //
+            // TASK 4: a mock takes no anchor lock at all — `audit.recordAll` is skipped outright
+            // (not merely called with an empty `picked`) so this transaction never touches
+            // `audit_chains` for a mock draft, the literal proof the trace tests hold this to.
+            const pickedEvents = isMock ? [] : await audit.recordAll(tx, picked);
             if (counts !== null) {
               await audit.record(tx, {
                 eventType: "draft_completed",

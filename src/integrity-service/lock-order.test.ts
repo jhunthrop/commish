@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, moneyAccounts, moneyTransactions, playerStatLines, reviews, rosterSlots, seatHolds, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
+import { auditChains, auditEvents, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, moneyAccounts, moneyTransactions, playerStatLines, reviews, rosterSlots, seatHolds, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
 import { currentDeadline, DRAFT_SKIP_POLICY } from "@/draft-engine";
 import { setSlotPreference } from "@/draft-service/slot-preference";
@@ -4011,5 +4011,71 @@ describe("settleSeasonPayouts' lock order — leagues[X] FOR UPDATE first, befor
 
     const [escrow] = await joinDb.select({ balanceCents: moneyAccounts.balanceCents }).from(moneyAccounts).where(eq(moneyAccounts.id, accountIdFor("league_escrow", leagueId)));
     expect(escrow!.balanceCents).toBe(0);
+  });
+});
+
+/**
+ * PHASE 4.5, TASK 4's OWN ENTRY. `applyAction`'s mock lane (`@/draft-service/store`) still takes
+ * its first two statements exactly as a real draft does — `leagues[X] FOR KEY SHARE`, then
+ * `drafts FOR UPDATE` — Task 4 changes nothing about THAT order, only about what runs after it.
+ * A mock's own pick reaches neither `member_notices` (its FK lock on `leagues`) nor the audit
+ * anchor at all, so its lock footprint is a strict SUBSET of a real pick's: exactly the shape
+ * that can only ever be safer against the "join and an autopick" cycle the first `describe`
+ * block in this file exists to close, never a new way to reopen it. Proven the identical way —
+ * two real connections, a genuine rendezvous — rather than argued from the smaller diff.
+ *
+ * Task 5 (not yet built) will give a mock room its own seat-claim primitive (`claimMockSeat`);
+ * until then `joinLeagueInTx` is reused here as the concurrent `leagues[X] FOR UPDATE` holder —
+ * mechanically the same contended lock a seat claim would take, and the only one this proof
+ * actually needs.
+ */
+describe("the mock lane's applyAction — no anchor lock to contend for (Task 4)", () => {
+  it("lets a mock draft's pick run beside a concurrent join in the same league without deadlocking, and never reaches the audit anchor", async () => {
+    const { draftId, leagueId, teamIds } = await seedDraftFixture(joinDb, {
+      draftId: "draft_mock_lock",
+      leagueId: "league_mock_lock",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 2,
+    });
+    // An open seat for the joiner — mirrors the real-league proof at the top of this file; a join
+    // refused for capacity never reaches the append, which is the half of this proof under test.
+    await joinDb.update(leagues).set({ teamCount: 3 }).where(eq(leagues.id, leagueId));
+    await joinDb.insert(users).values({ id: "user_mock_joiner", email: "mock_joiner@test.local", displayName: "Joiner" });
+
+    const store = pickStore();
+    // The DIRECT `applyAction`, not `store.startDraft` — bypassing `claimAutoStart` on purpose,
+    // the same technique the "join and an autopick" proof above uses, so `drafts.status` stays
+    // `'scheduled'` and the concurrent join's own shared draft-status refusal still passes.
+    await store.applyAction(draftId, { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: clock.now(), draftOrder: teamIds, pool: POOL });
+    const state = await store.getDraftState(draftId);
+
+    const join = parkedJoin(leagueId, "user_mock_joiner", "team_mock_joiner");
+    await join.leagueLocked;
+
+    // T_pick: the mock lane's own `applyAction`. It still takes `leagues[X] FOR KEY SHARE` as its
+    // own first statement (Task 4 changes nothing about that) — this is where it blocks, behind
+    // T_join, identically to a real draft's pick.
+    const picking = store.applyAction(draftId, { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    const joined = await join.joining;
+    const picked = await picking;
+    expect(joined).toMatchObject({ ok: true, alreadyMember: false });
+    expect(picked.ok).toBe(true);
+
+    // The join's own `member_joined` event is the ONLY thing on this league's chain — the mock
+    // pick never reached the anchor at all, the literal proof that the shorter mock-lane lock
+    // footprint (no notice insert, no `commitDraftState`, no `audit.recordAll`) introduces no new
+    // contention and closes no new cycle.
+    const chainEvents = await joinDb.select({ eventType: auditEvents.eventType }).from(auditEvents).where(eq(auditEvents.chainScope, leagueId));
+    expect(chainEvents).toEqual([{ eventType: "member_joined" }]);
+    expect(await joinDb.select().from(memberNotices).where(eq(memberNotices.leagueId, leagueId))).toHaveLength(0);
   });
 });

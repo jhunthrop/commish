@@ -41,4 +41,38 @@ describe("loadDraftConfig", () => {
       auctionBudget: null,
     });
   });
+
+  it("gives a mock the configured clock and a real league the real schedule (Task 4)", async () => {
+    const mock = await seedDraftFixture(db, {
+      draftId: "draft_setup_mock",
+      leagueId: "league_setup_mock",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isMock: true,
+      mockPickSeconds: 45,
+    });
+    const real = await seedDraftFixture(db, {
+      draftId: "draft_setup_real",
+      leagueId: "league_setup_real",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+    });
+
+    const mockConfig = await loadDraftConfig(db, mock.draftId);
+    const realConfig = await loadDraftConfig(db, real.draftId);
+
+    expect(mockConfig!.isMock).toBe(true);
+    expect(mockConfig!.clockSchedule).toEqual([{ untilHoursBeforeKickoff: 0, pickSeconds: 45 }]);
+    expect(mockConfig!.pauseWindow).toBeNull();
+
+    expect(realConfig!.isMock).toBe(false);
+    expect(realConfig!.clockSchedule).toBe(DRAFT_CLOCK_SCHEDULE);
+    expect(realConfig!.pauseWindow).toBe(DRAFT_PAUSE_WINDOW);
+  });
 });

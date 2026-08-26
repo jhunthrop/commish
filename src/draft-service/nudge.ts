@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { draftNudges, teams } from "@/db/schema";
+import { draftNudges, teams, users } from "@/db/schema";
 import { currentDeadline, draftClockView, isPaused, nudgeDeadline, teamOnClock, type DraftState } from "@/draft-engine";
 import { MS_PER_SECOND } from "@/domain/duration";
 import { DRAFT_NUDGE_CONFIG } from "./config";
@@ -51,6 +51,23 @@ export function createNudgeScheduler({
   thresholdPct = DRAFT_NUDGE_CONFIG.thresholdPct,
   onError,
 }: NudgeSchedulerDeps): NudgeScheduler {
+  // Task 4's guard, cached per team: a team's owner never changes mid-draft, so one indexed
+  // read per team (never per nudge check) is enough to know for the rest of this scheduler's
+  // lifetime whether the moderator may ever speak to it. `MOCK_CONFIG.botDelay.maxSeconds`
+  // (`@/mock-draft/config`) already keeps a bot's own pick well inside the nudge threshold, so
+  // this guard is structurally moot in practice — it exists to make "the moderator never talks
+  // to a bot" a FACT this scheduler enforces, not a coincidence of two configs staying in sync.
+  const isBotCache = new Map<string, boolean>();
+
+  async function isBotOwned(teamId: string): Promise<boolean> {
+    const cached = isBotCache.get(teamId);
+    if (cached !== undefined) return cached;
+    const [row] = await db.select({ isBot: users.isBot }).from(teams).innerJoin(users, eq(users.id, teams.userId)).where(eq(teams.id, teamId));
+    const isBot = row?.isBot ?? false;
+    isBotCache.set(teamId, isBot);
+    return isBot;
+  }
+
   return {
     async nudge(state, now) {
       const draftId = state.config.draftId;
@@ -61,6 +78,10 @@ export function createNudgeScheduler({
         // No single team on the clock (a live auction lot, or no turn running) means there is
         // nobody to prompt; past the deadline is the ticker's expiry, not the moderator's.
         if (teamId === null || dueAt === null || deadlineAt === null) return "skipped";
+        // Task 4: the moderator is part of the mock showcase (ruling 11 — a first-timer stalling
+        // in a mock gets the same nudge a real room gives), but it never talks to a bot, which
+        // owns no inbox and reads no draft.nudge frame.
+        if (await isBotOwned(teamId)) return "skipped";
         const nowMs = Date.parse(now);
         if (nowMs < Date.parse(dueAt) || nowMs >= Date.parse(deadlineAt)) return "skipped";
         // Task 4's overnight freeze. `dueAt`/`deadlineAt` are each already pushed past it

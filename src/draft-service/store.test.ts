@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb, recordStatements, truncateAll } from "@/db/test-db";
 import { auditEvents, draftActions, drafts, memberNotices, players, teams } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline, DRAFT_SKIP_POLICY, initialDraftState, type DraftConfig } from "@/draft-engine";
@@ -233,15 +233,17 @@ describe("draft store — persistence", () => {
     // is the only way to split them and prove `load()`'s own null case is handled too.
     // TWO statements reach `innerJoin` now (final review F1): the `leagues FOR KEY SHARE` lock
     // that opens the transaction, which ends in `.for(...)` and must find its row, and
-    // `loadDraftConfig`'s own config join, which is awaited directly and is the empty result this
-    // test exists to drive. A drizzle query builder is itself thenable, so one object standing in
-    // for both is the shape the real API already has.
+    // `loadDraftConfig`'s own config join, which now chains a further `.leftJoin(mockRooms, ...)`
+    // (Task 4) before the `.where(...)` that is awaited directly — the empty result this test
+    // exists to drive. A drizzle query builder is itself thenable, so one object standing in for
+    // both real call sites is the shape the real API already has.
     const stubTx = {
       select: () => ({
         from: () => ({
           where: () => ({ for: () => Promise.resolve([{ id: "draft_locked_ghost" }]) }),
           innerJoin: () => ({
             where: () => Object.assign(Promise.resolve([]), { for: () => Promise.resolve([{ id: "league_locked_ghost" }]) }),
+            leftJoin: () => ({ where: () => Promise.resolve([]) }),
           }),
         }),
       }),
@@ -930,5 +932,83 @@ describe("draft store — the public-room-short refusal (Task 7 fix round 1, M5)
     const result = await newStore().startDraft(draftId);
 
     expect(result.ok).toBe(true);
+  });
+});
+
+/**
+ * The trace tests' own regex, factored out so the "not a table this pick touched" reasoning is
+ * written once. A NAMED-TABLE match, never a bare substring one: `leagues.rosterSlots` is a real
+ * JSONB column also spelled `roster_slots`, so `loadDraftConfig`'s own config join — which runs
+ * for a real draft's replay too, mock or not — would otherwise read as a false positive on the
+ * `roster_slots` TABLE `commitDraftState` writes. The negative lookbehind excludes exactly that
+ * qualified-column shape (`"leagues"."roster_slots"`, the name preceded by a `.`) while still
+ * matching the table itself wherever it is genuinely the INSERT/SELECT target
+ * (`insert into "roster_slots" (...)`, never preceded by a dot).
+ */
+const REAL_WORLD_CONSEQUENCE_TABLES = /(?<!\.)"(audit_\w+|member_notices|money_\w+|draft_picks|roster_slots|matchups)"/;
+
+describe("draft store — the mock lane (Task 4)", () => {
+  /** A 2-team snake mock, both seats bot-owned — the shape `runFullDraft` drives end to end
+   *  with nobody ever submitting a manual action, exactly like every other fixture in this
+   *  file's audit/notice describe blocks above, so the ONLY variable between this and the real
+   *  "byte-identical" mirror test below is `leagues.is_mock` (and its `mock_rooms` sidecar). */
+  /** `mockPickSeconds` is left OMITTED by every caller of this fixture below (never `undefined`
+   *  passed explicitly) — `seedDraftFixture`'s own `?? 60` default is what this exercises;
+   *  `setup.test.ts`'s "gives a mock the configured clock" test is the one that passes an
+   *  explicit value, so the pair together covers both sides of that default. */
+  async function mockFixture() {
+    return seedDraftFixture(db, {
+      draftId: "draft_mock_1",
+      leagueId: "league_mock_1",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 2,
+    });
+  }
+
+  it("runs a complete mock draft without one audit, notice, money or season statement — the phase's central law", async () => {
+    const { draftId, teamIds } = await mockFixture();
+
+    const statements = await recordStatements(db, async (logged) => {
+      const store = createDraftStore({ db: logged, publish, clock, deliverNotice: deliverNoticeFake });
+      await store.applyAction(draftId, start(teamIds));
+      await runFullDraft(store, draftId);
+    });
+
+    expect(statements.filter((s) => REAL_WORLD_CONSEQUENCE_TABLES.test(s))).toHaveLength(0);
+
+    // The silence above must not be "it never really ran": the engine genuinely finished the
+    // draft (the same reducer, the same clock), while `drafts.status` never left `scheduled` —
+    // `commitDraftState` is the ONLY writer of `'complete'`, and it never ran for this draft.
+    const finalState = await createDraftStore({ db, publish, clock }).getDraftState(draftId);
+    expect(finalState?.phase).toBe("complete");
+    const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
+    expect(row?.status).toBe("scheduled");
+  });
+
+  it("keeps every real-league consequence for a real league, byte-identical — the mock lane cannot leak backward", async () => {
+    // The mirror test (identical drive, a real league this time): a picks audit event per pick,
+    // the season's own `draft_picks`/`roster_slots`/`matchups` and the completed status all still
+    // fire — proving the guard added above is a real branch, not a change that quietly always
+    // skips these effects regardless of `isMock`.
+    const { draftId, teamIds } = await fixture();
+
+    const statements = await recordStatements(db, async (logged) => {
+      const store = createDraftStore({ db: logged, publish, clock, deliverNotice: deliverNoticeFake });
+      await store.applyAction(draftId, start(teamIds));
+      await runFullDraft(store, draftId);
+    });
+
+    expect(statements.some((s) => /audit_events/.test(s))).toBe(true);
+    expect(statements.some((s) => /draft_picks/.test(s))).toBe(true);
+    expect(statements.some((s) => /roster_slots/.test(s))).toBe(true);
+    expect(statements.some((s) => /matchups/.test(s))).toBe(true);
+
+    const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
+    expect(row?.status).toBe("complete");
   });
 });

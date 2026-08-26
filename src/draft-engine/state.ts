@@ -39,6 +39,21 @@ export interface DraftConfig {
    * the schema defaulted the field to TODAY's tunable.
    */
   readonly skipPolicy?: DraftSkipPolicy | null;
+  /**
+   * True for a mock draft (Task 4), set by `loadDraftConfig` from the `mock_rooms` sidecar
+   * beside `clockSchedule`/`pauseWindow` above — the same kind of tunable, injected the same
+   * way. The ONE field `applyAction` (`@/draft-service/store`) reads to skip every real-world
+   * side effect (audit, notices, money, season-commit) for a mock room while running the
+   * identical reducer, clock and SSE machinery a real draft gets — see that function's own
+   * docblock for the full list of guarded effect sites. The REDUCER never reads it: this is
+   * config the same way `clockSchedule` is, and `reduce.ts`/`snake.ts`/`auction.ts`/
+   * `apply-pick.ts` stay exactly as pure as the reducer-purity ruling (`pause.ts`'s own
+   * docblock) already requires. Optional, defaulting to falsy everywhere a caller reads it
+   * (`state.config.isMock === true`) — every hand-written `DraftConfig` literal already in this
+   * engine's own test suite, and every real (non-mock) draft `loadDraftConfig` has ever built,
+   * means "not a mock" the same way an absent `pauseWindow` means "no freeze".
+   */
+  readonly isMock?: boolean;
 }
 
 export interface CompletedPick {

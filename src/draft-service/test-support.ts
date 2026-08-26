@@ -1,5 +1,5 @@
 import type { Db } from "@/db/client";
-import { drafts, leagues, teams, users } from "@/db/schema";
+import { drafts, leagues, mockRooms, teams, users } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
 import type { RosterSlotConfig } from "@/domain/roster";
 
@@ -34,6 +34,22 @@ interface SeedDraftInput {
   /** Defaults to `"scheduled"` — `leagues.start_trigger`'s own default, so every existing caller
    *  keeps seeding a commissioner-timed draft unchanged. */
   readonly startTrigger?: "scheduled" | "when_full";
+  /**
+   * Task 4: seeds `leagues.is_mock` and a `mock_rooms` sidecar row instead of a real league, so
+   * the store's own trace tests can drive the identical reducer/clock/SSE machinery against a
+   * mock room without waiting on Task 5's own room-creation service (`createMockRoom`, not yet
+   * built). Defaults to `false` — every existing caller keeps seeding a real league unchanged.
+   */
+  readonly isMock?: boolean;
+  /**
+   * Only meaningful when `isMock` is `true`: how many of the seeded `teamCount` users are bot
+   * owners (`users.is_bot`), taken from the END of the roster so a caller who wants "team 1 is
+   * the only human" can just ask for `teamCount - 1`. Defaults to `0`.
+   */
+  readonly botTeams?: number;
+  /** Only meaningful when `isMock` is `true`: the `mock_rooms.pick_seconds` a fixture's config
+   *  should carry. Defaults to `60` — `MOCK_CONFIG.defaultPickClockSeconds`. */
+  readonly mockPickSeconds?: number;
 }
 
 /** Module-private — see `SeedDraftInput` above. */
@@ -47,10 +63,13 @@ interface DraftFixture {
 /** Inserts users, a league, its teams and a scheduled draft. Test-only. */
 export async function seedDraftFixture(db: Db, input: SeedDraftInput): Promise<DraftFixture> {
   const filledTeams = input.filledTeams ?? input.teamCount;
+  const botTeams = input.botTeams ?? 0;
   const userIds = Array.from({ length: input.teamCount }, (_, i) => `${input.leagueId}_user_${i + 1}`);
   const teamIds = Array.from({ length: filledTeams }, (_, i) => `${input.leagueId}_team_${i + 1}`);
 
-  await db.insert(users).values(userIds.map((id) => ({ id, email: `${id}@test.local`, displayName: id })));
+  await db.insert(users).values(
+    userIds.map((id, i) => ({ id, email: `${id}@test.local`, displayName: id, isBot: i >= filledTeams - botTeams })),
+  );
   await db.insert(leagues).values({
     id: input.leagueId,
     name: input.leagueId,
@@ -59,6 +78,7 @@ export async function seedDraftFixture(db: Db, input: SeedDraftInput): Promise<D
     commissionerUserId: userIds[0]!,
     rosterSlots: [...input.slotConfig],
     isPublicMatchmade: input.isPublicMatchmade ?? false,
+    isMock: input.isMock ?? false,
   });
   await db.insert(teams).values(
     teamIds.map((id, i) => ({ id, leagueId: input.leagueId, userId: userIds[i]!, name: `Team ${i + 1}` })),
@@ -72,6 +92,17 @@ export async function seedDraftFixture(db: Db, input: SeedDraftInput): Promise<D
     auctionBudget: input.auctionBudget,
     startTrigger: input.startTrigger ?? "scheduled",
   });
+  if (input.isMock === true) {
+    await db.insert(mockRooms).values({
+      leagueId: input.leagueId,
+      hostUserId: userIds[0]!,
+      mode: "solo",
+      pickSeconds: input.mockPickSeconds ?? 60,
+      botSeed: 7,
+      shareCode: `${input.leagueId}_code`,
+      startsAt: input.kickoffAt,
+    });
+  }
 
   return { draftId: input.draftId, leagueId: input.leagueId, teamIds, userIds };
 }

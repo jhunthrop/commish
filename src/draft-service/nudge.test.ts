@@ -1,6 +1,7 @@
+import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { players, users } from "@/db/schema";
 import type { DraftState } from "@/draft-engine";
 import { createDraftStore } from "./store";
 import { createNudgeScheduler, NO_OP_NUDGE_SCHEDULER } from "./nudge";
@@ -236,5 +237,27 @@ describe("nudge scheduler", () => {
   it("has a no-op scheduler for callers that do not want one", async () => {
     const draft = await liveDraft();
     expect(await NO_OP_NUDGE_SCHEDULER.nudge(draft.state, AFTER_THRESHOLD)).toBe("skipped");
+  });
+
+  it("never nudges a bot on the clock (Task 4) — the moderator only ever speaks to a human", async () => {
+    const draft = await liveDraft();
+    const onClockTeamIndex = draft.teamIds.indexOf(draft.state.draftOrder[0]!);
+    await db.update(users).set({ isBot: true }).where(eq(users.id, draft.userIds[onClockTeamIndex]!));
+    const { scheduler, published } = schedulerWith();
+
+    expect(await scheduler.nudge(draft.state, AFTER_THRESHOLD)).toBe("skipped");
+    expect(published).toEqual([]);
+  });
+
+  it("still nudges a human even after a DIFFERENT team's owner was resolved as a bot — the cache is keyed per team", async () => {
+    const draft = await liveDraft();
+    // A team NOT on the clock is the bot here — proves `isBotCache` keys on the team id actually
+    // checked, not on "any bot exists in this draft".
+    const offClockTeamIndex = draft.teamIds.indexOf(draft.state.draftOrder[1]!);
+    await db.update(users).set({ isBot: true }).where(eq(users.id, draft.userIds[offClockTeamIndex]!));
+    const { scheduler, published } = schedulerWith();
+
+    expect(await scheduler.nudge(draft.state, AFTER_THRESHOLD)).toBe("published");
+    expect(published).toHaveLength(1);
   });
 });
