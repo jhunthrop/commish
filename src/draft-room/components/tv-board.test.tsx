@@ -195,6 +195,13 @@ describe("TvBoard", () => {
     const lastPick = screen.getByTestId("spotlight-last-pick");
     expect(lastPick).toHaveTextContent("Jalen Croft");
     expect(lastPick.className).toContain("text-text-muted");
+    // The face beside the line (T1 review MEDIUM): qb1's fixture carries a real headshot URL,
+    // so the restatement renders the image branch — the pool's own test carries the initials
+    // branch with the same fixture set.
+    // The Avatar renders BESIDE the testid'd line, inside the same spotlight band — scope the
+    // query there, keyed by qb1's own URL so the on-clock owner's avatar can never satisfy it.
+    const faces = Array.from(screen.getByTestId("spotlight").querySelectorAll("img"));
+    expect(faces.some((img) => (img.getAttribute("src") ?? "").includes("qb1.png"))).toBe(true);
   });
 
   it("shows no last-pick restatement before anything has been drafted", async () => {
