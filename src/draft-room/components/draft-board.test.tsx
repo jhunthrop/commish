@@ -306,4 +306,21 @@ describe("DraftBoard", () => {
       }
     });
   });
+
+  /**
+   * Founder live defect #2 (2026-08-25, ~2000px viewport): a scroll-edge fade painted over the
+   * last visible pick column, tinting its colored sticker cells — "the shading... takes up a lot
+   * of the screen." The fade was a static decorative overlay, always rendered regardless of
+   * whether the grid actually had anything left to scroll to, pinned `z-20` above the sticker
+   * cells themselves. Removed outright rather than made conditional: the grid's own native
+   * scrollbar is the scroll affordance (the same convention `Table` already uses for its own
+   * horizontal overflow, `docs/decisions/design-v2.md` §4), and a decorative box painted on top
+   * of a sticker's own color is the "boxes" rule 4 (hairlines, not boxes) exists to rule out.
+   */
+  it("never paints a decorative gradient over the board's own scroll edges", () => {
+    stubMatchMedia(false);
+    const { container } = render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} />);
+    expect(container.querySelector(".bg-gradient-to-r")).toBeNull();
+    expect(container.querySelector(".bg-gradient-to-l")).toBeNull();
+  });
 });

@@ -47,10 +47,18 @@ export function RoomLayout({ rail, pool, stage, dock, aside }: RoomLayoutProps) 
         {aside === undefined ? null : (
           <div
             data-testid="room-aside"
-            className="order-3 min-w-0 border-line lg:order-3 lg:shrink-0 lg:overflow-hidden lg:border-l"
+            className="order-3 min-w-0 max-w-full border-line lg:order-3 lg:max-w-88 lg:shrink-0 lg:overflow-hidden lg:border-l"
           >
-            {/* Width lives on the aside CONTENT (lg:w-88 open, slim strip collapsed) so the
-                band can collapse without this frame knowing chat exists. */}
+            {/* The OPEN/COLLAPSED width still lives on the aside CONTENT (lg:w-88 open, lg:w-12
+                collapsed) so this frame never has to know chat exists. `lg:max-w-88` is this
+                frame's own ceiling, not a duplicate of that content width — a `shrink-0` flex
+                item with no width of its own hugs whatever its content wants (flex-basis:auto
+                falls back to content size), so nothing upstream stopped a wider descendant (a
+                long unbroken message, a future aside nobody has audited yet) from pushing this
+                whole band, and the stage it starves, past the viewport — the founder's live
+                defect #2. The cap makes the contract this frame always documented actually
+                load-bearing: this band can never claim more than the pool's own `lg:w-88`,
+                whatever it renders inside. */}
             {aside}
           </div>
         )}

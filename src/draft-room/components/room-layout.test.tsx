@@ -63,4 +63,20 @@ describe("RoomLayout", () => {
     render(<RoomLayout rail={<p>rail</p>} pool={<p>pool</p>} stage={<p>stage</p>} dock={<p>dock</p>} />);
     expect(screen.queryByTestId("room-aside")).not.toBeInTheDocument();
   });
+
+  /**
+   * Founder live defect #2: at a wide viewport the aside's outer band delegated its width
+   * entirely to its content (`lg:w-88` lived on the chat div, never on this frame — see the
+   * band's own docblock), which is how a manager saw the chat band pushed half off-screen. The
+   * frame now caps the band itself at the same width the open content already declares, so the
+   * band can never grow past it no matter what a future aside renders inside it — the pool
+   * column's own `lg:w-88` is the one other fixed-width band in this layout, and this test holds
+   * the aside to the identical ceiling.
+   */
+  it("caps the aside band's own width so it can never push the stage off the viewport", () => {
+    render(<RoomLayout rail={<p>rail</p>} pool={<p>pool</p>} stage={<p>stage</p>} dock={<p>dock</p>} aside={<p>aside</p>} />);
+    const band = screen.getByTestId("room-aside");
+    expect(band.className).toContain("lg:max-w-88");
+    expect(band.className).toContain("lg:shrink-0");
+  });
 });
