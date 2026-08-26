@@ -754,7 +754,19 @@ export function createDraftStore({
             // surface loudly, not a rejection to hand back quietly.
             const claimed = await claimAutoStart(tx, draftId);
             if (!claimed) throw new Error(`Draft "${draftId}" was not "scheduled" when its own start transaction tried to claim it.`);
-            if (options?.auto !== true) return;
+            // TASK 4 FIX ROUND (review MEDIUM 1). `config.isMock === true` sits in this ONE
+            // condition beside `options?.auto !== true`, not as a separate early return: a mock
+            // draft never announces itself, full stop, regardless of who calls `startDraft` with
+            // `{ auto: true }`. `dueDraftsQuery`'s own `is_public_matchmade` predicate
+            // (`./auto-start.ts`) already keeps a mock off the platform's real auto-start scan —
+            // every mock ships `is_public_matchmade: false` — but that is a fact about the ONE
+            // caller this codebase has today, not a guarantee this function can enforce on its
+            // own. This is the belt over that suspenders (and over `leagues_mock_private_ck`'s
+            // own CHECK, Task 2's fix round): a future caller class that somehow reached here
+            // with `{ auto: true }` against a mock draft still writes no notice and no audit
+            // event, the identical guarantee `applyAction`'s own `isMock` branches give every
+            // other effect site.
+            if (options?.auto !== true || config.isMock === true) return;
 
             // TASK 7'S ANNOUNCEMENT, FUSED HERE rather than in a second, post-commit transaction
             // (review fix round 1, F1): a crash between "the draft started" and "the league was

@@ -948,6 +948,24 @@ describe("draft store — the public-room-short refusal (Task 7 fix round 1, M5)
 const REAL_WORLD_CONSEQUENCE_TABLES = /(?<!\.)"(audit_\w+|member_notices|money_\w+|draft_picks|roster_slots|matchups)"/;
 
 describe("draft store — the mock lane (Task 4)", () => {
+  // Fix round (review MEDIUM 2): captured by the central-law test below and compared against by
+  // the mirror test right after it — vitest runs a file's tests in declaration order by default
+  // (no shuffle configured, the same assumption `lock-order.test.ts`'s own ordered two-connection
+  // proofs already lean on), so this is a safe, deliberate coupling rather than a hazard.
+  //
+  // A `draft.pick` COUNT, not the full published event-TYPE sequence: this fixture's mock runs
+  // its own single fast tier (60s, never skip-eligible), while `fixture()`'s real league starts
+  // on the slow 8h tier, where a queueless team IS skip-eligible (`store.test.ts`'s own "draft
+  // store — notices" describe block documents this) — so the real drive genuinely emits a few
+  // extra `draft.timer_expire`-only events (skip cycles) the mock's fast tier never produces.
+  // That difference is `isMock`'s OWN clock-schedule branch working as designed (`setup.ts`),
+  // not something this proof should paper over. What both drives are guaranteed to share,
+  // mechanically, is the roster: 2 teams × `SPRINT_ROSTER_SLOTS` (3 slots) = 6 filled slots, and
+  // every filled slot is exactly one `draft.pick` broadcast, skip or no skip — so THAT count,
+  // compared between the two lanes, is the honest SSE-liveness invariant, not a sequence two
+  // differently-paced clocks were never going to agree on anyway.
+  let mockPublishedPickCount = 0;
+
   /** A 2-team snake mock, both seats bot-owned — the shape `runFullDraft` drives end to end
    *  with nobody ever submitting a manual action, exactly like every other fixture in this
    *  file's audit/notice describe blocks above, so the ONLY variable between this and the real
@@ -988,6 +1006,15 @@ describe("draft store — the mock lane (Task 4)", () => {
     expect(finalState?.phase).toBe("complete");
     const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
     expect(row?.status).toBe("scheduled");
+
+    // Fix round (review MEDIUM 2): the store's own `broadcast` is untouched by `isMock` — SSE
+    // liveness for a mock room is pinned here, not assumed from "the code path is unguarded".
+    // `published` is THIS test's own capture (`beforeEach` resets it, and the drive above ran on
+    // the `logged` store built from `publish` — the same file-level sink every other describe
+    // block in this file already asserts against).
+    expect(published.length).toBeGreaterThan(0);
+    mockPublishedPickCount = published.filter((event) => event.type === "draft.pick").length;
+    expect(mockPublishedPickCount).toBe(6); // 2 teams × SPRINT_ROSTER_SLOTS' 3 slots
   });
 
   it("keeps every real-league consequence for a real league, byte-identical — the mock lane cannot leak backward", async () => {
@@ -1010,5 +1037,29 @@ describe("draft store — the mock lane (Task 4)", () => {
 
     const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
     expect(row?.status).toBe("complete");
+
+    // Fix round (review MEDIUM 2): the same roster (2 teams × 3 slots) means the same number of
+    // `draft.pick` broadcasts land here as did for the mock's own drive above, even though the
+    // real league's slower starting tier means a few extra `draft.timer_expire`-only (skip)
+    // events sit alongside them — SSE liveness is real and comparable for both lanes, not
+    // "also non-empty by coincidence".
+    expect(published.length).toBeGreaterThan(0);
+    expect(published.filter((event) => event.type === "draft.pick").length).toBe(mockPublishedPickCount);
+  });
+
+  it("never announces or audits an auto-start for a mock draft, even called with { auto: true } (fix round: review MEDIUM 1)", async () => {
+    // `dueDraftsQuery`'s own `is_public_matchmade` predicate already keeps a mock off the
+    // platform's real auto-start scan (every mock ships `is_public_matchmade: false`) — this
+    // test is the belt over that suspenders, proving `startDraft` itself refuses to announce a
+    // mock regardless of who calls it with `{ auto: true }`, not merely that nobody happens to
+    // today.
+    const { draftId } = await mockFixture();
+    const store = newStore();
+
+    const result = await store.startDraft(draftId, { auto: true });
+
+    expect(result.ok).toBe(true);
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
+    expect(await db.select().from(auditEvents)).toHaveLength(0);
   });
 });

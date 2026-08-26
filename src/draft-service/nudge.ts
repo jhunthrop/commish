@@ -57,6 +57,20 @@ export function createNudgeScheduler({
   // (`@/mock-draft/config`) already keeps a bot's own pick well inside the nudge threshold, so
   // this guard is structurally moot in practice — it exists to make "the moderator never talks
   // to a bot" a FACT this scheduler enforces, not a coincidence of two configs staying in sync.
+  //
+  // LIFETIME (fix round, review LOW): this `Map` lives for as long as the ENCLOSING
+  // `NudgeScheduler` does — in production that is the server process's own uptime, one scheduler
+  // shared across EVERY draft it ever nudges, not one per draft and not one per turn. That is
+  // safe, not merely convenient: a `teams` row is DELETE + INSERT across its lifetime, never
+  // reassigned to a different `userId` in place (a departed team's seat is released and a new
+  // team row — a new id — is what a replacement seat gets, `releaseSeat`/`joinLeagueInTx`'s own
+  // shape), so a cached `isBot` answer for a given `teamId` can never go stale out from under it.
+  // NO SIZE CAP: this repo's 100%-branch coverage gate (`src/draft-service/**`) makes an
+  // eviction branch this suite would have to seed tens of thousands of team rows to actually
+  // exercise a worse trade than the risk it guards — a `teams.id`-keyed `boolean` is a few dozen
+  // bytes, so even a platform with a million historical teams keeps this Map in the low tens of
+  // megabytes, well inside what one long-lived Node process already budgets for a query cache
+  // this small.
   const isBotCache = new Map<string, boolean>();
 
   async function isBotOwned(teamId: string): Promise<boolean> {
