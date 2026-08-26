@@ -28,7 +28,7 @@ function RosterRow({
   readonly className?: string;
 }) {
   return (
-    <li key={`${slot}:${slotIndex}`} className={`flex items-center gap-2 ${className ?? ""}`}>
+    <li className={`flex items-center gap-2 ${className ?? ""}`}>
       {player === null ? (
         <>
           {/* Founder directive 2026-08-26 (room-product pass): an OPEN spot names the SLOT it
@@ -67,16 +67,16 @@ function RosterRow({
  */
 export function RosterRail({ view, myTeamId, playersById, slotConfig }: RosterRailProps) {
   const rows = rosterFillRows(slotConfig, view.rosters[myTeamId] ?? []);
-  let seenBench = false;
+  // The bench's own quiet hairline lands once, on the first bench row — derived, never a
+  // mutable flag in the render map (T2 review MEDIUM): starters and bench are one list (one
+  // region, one heading) but visually two groups.
+  const firstBenchIndex = rows.findIndex((row) => row.slot === BENCH_SLOT);
   return (
     <div className="flex flex-col gap-2">
       <h2 className={`${EYEBROW} text-text-muted`}>Your roster</h2>
       <ul aria-label="Your roster" className="flex flex-col gap-1.5">
-        {rows.map((row) => {
-          // The bench's own quiet hairline, applied once, to the first bench row — starters and
-          // bench are the same list (one region, one heading) but visually two groups.
-          const startsBench = row.slot === BENCH_SLOT && !seenBench;
-          if (startsBench) seenBench = true;
+        {rows.map((row, index) => {
+          const startsBench = index === firstBenchIndex;
           return (
             <RosterRow
               key={`${row.slot}:${row.slotIndex}`}

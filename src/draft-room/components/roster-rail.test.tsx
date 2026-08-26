@@ -45,6 +45,15 @@ describe("RosterRail", () => {
     expect(within(roster).getAllByText("WR")).not.toHaveLength(0);
   });
 
+  it("draws the bench's hairline exactly once, on the first bench row (T2 review LOW)", () => {
+    render(<RosterRail view={VIEW} myTeamId="t1" playersById={playersById()} slotConfig={VIEW.slotConfig} />);
+    const roster = screen.getByRole("list", { name: "Your roster" });
+    const rows = within(roster).getAllByRole("listitem");
+    const divided = rows.filter((row) => row.className.includes("border-t"));
+    expect(divided).toHaveLength(1);
+    expect(rows.indexOf(divided[0]!)).toBe(4); // QB, RB, RB, FLEX, then the bench begins
+  });
+
   it("shows an open spot as its own slot chip and a quiet placeholder, no player name", () => {
     render(<RosterRail view={VIEW} myTeamId="t1" playersById={playersById()} slotConfig={VIEW.slotConfig} />);
     const roster = screen.getByRole("list", { name: "Your roster" });

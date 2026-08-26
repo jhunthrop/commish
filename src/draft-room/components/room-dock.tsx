@@ -76,7 +76,13 @@ function RosterFill({ view, myTeamId }: { readonly view: DraftStateView; readonl
   if (myTeamId === null) return null;
   const filled = view.rosters[myTeamId] ?? [];
   return (
-    <div className="hidden shrink-0 flex-col gap-1 lg:flex">
+    // `lg:hidden`, inverted from its original `hidden lg:flex` (T2 review HIGH, room-product
+    // pass): at lg+ the aside's RosterRail owns the roster — two visible "Your roster"
+    // landmarks was a real duplication — while BELOW lg these compact meters become the
+    // phone's own answer to "what positions have I filled", which the old gating never showed
+    // anywhere the rail wasn't. display:none keeps the hidden copy out of the a11y tree, so
+    // exactly one roster landmark is exposed at every width.
+    <div className="flex shrink-0 flex-col gap-1 lg:hidden">
       <h2 className={`${EYEBROW} text-text-muted`}>Your roster</h2>
       <ul aria-label="Your roster" className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {view.slotConfig.map((config) => (
