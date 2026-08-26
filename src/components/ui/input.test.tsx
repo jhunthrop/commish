@@ -30,4 +30,11 @@ describe("Input", () => {
     expect(input.className).toMatch(/disabled:opacity-60/);
     expect(input.className).toMatch(/disabled:cursor-not-allowed/);
   });
+
+  it("draws its boundary in border-edge, never the decorative border-line (D1)", () => {
+    render(<Input label="Team name" />);
+    const input = screen.getByLabelText("Team name");
+    expect(input.className).toContain("border-edge");
+    expect(input.className).not.toContain("border-line");
+  });
 });

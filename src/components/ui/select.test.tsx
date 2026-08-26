@@ -41,4 +41,11 @@ describe("Select", () => {
     render(<Select label="Position" options={POSITIONS} disabled />);
     expect(screen.getByLabelText("Position")).toBeDisabled();
   });
+
+  it("draws its boundary in border-edge, never the decorative border-line (D1)", () => {
+    render(<Select label="Position" options={POSITIONS} />);
+    const select = screen.getByLabelText("Position");
+    expect(select.className).toContain("border-edge");
+    expect(select.className).not.toContain("border-line");
+  });
 });

@@ -62,6 +62,22 @@ describe("MockSetupForm", () => {
     expect(fixture.calls).toEqual(["POST /api/mock-drafts"]);
   });
 
+  it("gets a measure — the form column is not the full-bleed page (E2)", () => {
+    const { container } = renderForm();
+    expect(container.querySelector("form")?.className).toContain("max-w-2xl");
+  });
+
+  it("groups its fields under Room, Rules and You, in that order (E2)", () => {
+    renderForm();
+    const eyebrows = screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent);
+    expect(eyebrows).toEqual(["Room", "Rules", "You"]);
+  });
+
+  it("keeps the submit button a pill, not a bar the width of the form column (E1)", () => {
+    renderForm();
+    expect(screen.getByRole("button", { name: "Start mock draft" }).className).toContain("self-start");
+  });
+
   describe("Draft position — founder directive 2026-08-26", () => {
     it("defaults to Random and offers one 'Pick Nth' option per CURRENTLY selected team count", () => {
       renderForm();
@@ -123,6 +139,24 @@ describe("MockSetupForm", () => {
       const randomizeButton = screen.getByRole("button", { name: "Randomize" });
       expect(randomizeButton.className).not.toContain("bg-text-primary");
       expect(screen.getByRole("button", { name: "Start mock draft" }).className).toContain("bg-text-primary");
+    });
+
+    it("size-matches Randomize to the select it sits beside (E3 — the old sm/40px mismatch)", () => {
+      renderForm();
+      expect(screen.getByRole("button", { name: "Randomize" }).className).toContain("min-h-10");
+    });
+
+    it("announces the drawn option's own label politely, for a screen-reader user (E3)", () => {
+      const { container } = renderForm();
+      const live = container.querySelector('span[aria-live="polite"]');
+      expect(live).not.toBeNull();
+      // Nothing announced before a roll happens.
+      expect(live).toHaveTextContent("");
+
+      const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
+      fireEvent.click(screen.getByRole("button", { name: "Randomize" }));
+      expect(live).toHaveTextContent("Pick 7th");
+      random.mockRestore();
     });
   });
 

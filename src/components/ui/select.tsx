@@ -36,7 +36,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           "h-10 rounded-md border bg-surface-elevated px-3 text-md text-text-primary " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
           "disabled:opacity-60 disabled:cursor-not-allowed " +
-          (error ? "border-negative " : "border-line ") +
+          // `border-edge`, never `border-line`: a select is a control a user must find, not a
+          // decorative hairline between two surfaces (D1, lobby review 2026-08-26 — the same
+          // "edge bounds, line separates" rule `Button`'s quiet pill and
+          // `AdvancedSettingsDrawer`'s `<details>` already hold).
+          (error ? "border-negative " : "border-edge ") +
           className
         }
         {...rest}

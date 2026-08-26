@@ -72,8 +72,15 @@ describe("TOKENS.color", () => {
         // separator between two panels and is nowhere near WCAG 1.4.11's 3:1 for the boundary
         // of a control a user must find. v2 therefore ships BOTH: `line` separates, `edge`
         // bounds — in both themes.
+        //
+        // D1 (mock lobby review, 2026-08-26): the field primitives (`Select`, `Input`,
+        // `Textarea`) drew their own boundary in `line` — 1.17:1 dark / 1.22:1 light, a control
+        // border missing WCAG 1.4.11's 3:1 floor by roughly 2.6x — and never had a test that
+        // would have caught it, because this gate only ever checked THREE of the product's four
+        // surfaces. All four now: a control can sit on the page ground, a panel, a raised row,
+        // or an inset well, and `edge` must clear 3:1 on every one it is asked to bound.
         expect(contrastRatio(c.line, c.surface)).toBeLessThan(3);
-        for (const surface of ["surface", "surfaceElevated", "surfaceRaised"] as const) {
+        for (const surface of ["surface", "surfaceElevated", "surfaceRaised", "surfaceInset"] as const) {
           expect(contrastRatio(c.edge, c[surface])).toBeGreaterThanOrEqual(3);
         }
       });

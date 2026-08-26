@@ -4,7 +4,7 @@ import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import type { MockRoomSummary } from "@/mock-draft-service/lobby";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
-import { MockShareLanding } from "./mock-share-landing";
+import { MOCK_SHARE_LANDING_PRACTICE_SENTENCE, MockShareLanding } from "./mock-share-landing";
 
 const calls: string[] = [];
 vi.mock("next/navigation", () => ({
@@ -31,7 +31,33 @@ describe("MockShareLanding", () => {
   it("shows the room's own seat count and clock", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockShareLanding code="ABC123" summary={SUMMARY} />, fixture.deps);
-    expect(screen.getByText("8 teams · 60s clock")).toBeInTheDocument();
+    expect(screen.getByText("Private link · 8 teams · 60s clock")).toBeInTheDocument();
+  });
+
+  it("renders the room's own mode, per summary.mode (E10)", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<MockShareLanding code="ABC123" summary={{ ...SUMMARY, mode: "lobby" }} />, fixture.deps);
+    expect(screen.getByText("Open lobby · 8 teams · 60s clock")).toBeInTheDocument();
+  });
+
+  it("states the invitation in the title and the act on the button — not the same words twice (E10)", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<MockShareLanding code="ABC123" summary={SUMMARY} />, fixture.deps);
+    expect(screen.getByRole("heading", { name: "You are invited to a mock draft" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join this mock draft" })).toBeInTheDocument();
+  });
+
+  it("states the practice promise before a stranger commits to anything (E10)", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<MockShareLanding code="ABC123" summary={SUMMARY} />, fixture.deps);
+    expect(screen.getByText(MOCK_SHARE_LANDING_PRACTICE_SENTENCE)).toBeInTheDocument();
+  });
+
+  it("carries no hand-rolled wrapper margins — the shell owns the gutter (E9)", () => {
+    const fixture = fixtureLeagueDeps();
+    const { container } = renderInLeague(<MockShareLanding code="ABC123" summary={SUMMARY} />, fixture.deps);
+    expect(container.querySelector(".mx-4")).toBeNull();
+    expect(container.querySelector(".mt-3")).toBeNull();
   });
 
   it("joins on the button and navigates straight into the room", async () => {

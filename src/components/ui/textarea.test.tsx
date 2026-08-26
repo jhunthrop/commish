@@ -58,6 +58,13 @@ describe("Textarea", () => {
     expect(screen.getByText(/over the limit/)).toBeInTheDocument();
   });
 
+  it("draws its boundary in border-edge, never the decorative border-line (D1)", () => {
+    render(<Textarea label="Your review" />);
+    const textarea = screen.getByLabelText("Your review");
+    expect(textarea.className).toContain("border-edge");
+    expect(textarea.className).not.toContain("border-line");
+  });
+
   it("counts down to exactly zero at the review body's own configured ceiling", () => {
     // The name used to claim this "reads validateReviewDraft's own length window" while the body
     // hardcoded 1000 and imported no config at all — so a change to the ceiling would have left

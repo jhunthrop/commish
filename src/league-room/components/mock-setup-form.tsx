@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { CreateMockRoomBody } from "@/app/api/mock-drafts/route";
 import type { MockMode } from "@/mock-draft/config";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, EYEBROW, Input, Select } from "@/components/ui";
 import { formatOrdinal } from "@/draft-room/state/format";
 import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { useLeagueRoomDeps } from "../hooks/deps";
@@ -90,6 +90,12 @@ export function MockSetupForm({
   const [teamName, setTeamName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // E3 (lobby review, 2026-08-26): Randomize is a silent value assignment today — a sighted
+  // reader sees the select change, a screen-reader user gets nothing. This is the drawn
+  // option's own label ("Pick 4th"), read out politely the moment a draw happens, cleared by
+  // nothing (a live region says the last thing that happened, not the current state — the
+  // select itself already carries that).
+  const [rolledAnnouncement, setRolledAnnouncement] = useState<string | null>(null);
 
   /** Shrinking Teams can strand a chosen slot above the new ceiling (picking 10th, then
    *  dropping to 8 teams) — reset to Random rather than clamp, so the reader never sees a
@@ -105,7 +111,12 @@ export function MockSetupForm({
    *  binds the bot/draw streams `deps.random`/`deps.newSeed` feed, never a form control). */
   const randomize = (): void => {
     const max = Number(teamCount);
-    setDraftSlot(String(Math.floor(Math.random() * max) + 1));
+    const slot = Math.floor(Math.random() * max) + 1;
+    setDraftSlot(String(slot));
+    // The drawn option's OWN label, looked up rather than re-derived, so the announcement can
+    // never say something different from what the select now shows.
+    const rolled = draftSlotOptions(max).find((option) => option.value === String(slot));
+    setRolledAnnouncement(rolled?.label ?? null);
   };
 
   const submit = async (): Promise<void> => {
@@ -139,60 +150,90 @@ export function MockSetupForm({
   };
 
   return (
+    // E2 (lobby review, 2026-08-26): the form gets a MEASURE — `max-w-2xl`, not the full-bleed
+    // width the page around it still holds — because a `<select>` whose value is two words at
+    // 1,550px is the same defect the constitution's own measured-paragraph carve-out names for
+    // body text. Three quiet field groups (Room, Rules, You) replace the old flat run of seven
+    // controls, each named by an `EYEBROW` label the way `CreateLeagueForm`'s own drawer and
+    // panel headings already are.
     <form
-      className="flex flex-col gap-3"
+      className="flex max-w-2xl flex-col gap-6"
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
       }}
     >
-      <Select
-        label="Mode"
-        options={modes.map((value) => ({ value, label: MODE_LABEL[value] }))}
-        value={mode}
-        onChange={(event) => setMode(event.target.value as MockMode)}
-      />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Select
-          label="Teams"
-          options={teamCountOptions.map((n) => ({ value: String(n), label: `${n} teams` }))}
-          value={teamCount}
-          onChange={(event) => changeTeamCount(event.target.value)}
-        />
-        <Select
-          label="Pick clock"
-          options={pickSecondsOptions.map((n) => ({ value: String(n), label: `${n} seconds` }))}
-          value={pickSeconds}
-          onChange={(event) => setPickSeconds(event.target.value)}
-        />
-        <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => setScoringPreset(event.target.value)} />
-        <Select
-          label="Roster shape"
-          options={ROSTER_SHAPE_OPTIONS}
-          value={rosterShape}
-          onChange={(event) => setRosterShape(event.target.value)}
-        />
-      </div>
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
+      <div className="flex flex-col gap-3">
+        <h3 className={`${EYEBROW} text-text-muted`}>Room</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
           <Select
-            label="Draft position"
-            options={draftSlotOptions(Number(teamCount))}
-            value={draftSlot}
-            onChange={(event) => setDraftSlot(event.target.value)}
+            label="Mode"
+            options={modes.map((value) => ({ value, label: MODE_LABEL[value] }))}
+            value={mode}
+            onChange={(event) => setMode(event.target.value as MockMode)}
+          />
+          <Select
+            label="Teams"
+            options={teamCountOptions.map((n) => ({ value: String(n), label: `${n} teams` }))}
+            value={teamCount}
+            onChange={(event) => changeTeamCount(event.target.value)}
           />
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={randomize}>
-          Randomize
-        </Button>
       </div>
-      <Input label="Team name (optional)" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
+
+      <div className="flex flex-col gap-3">
+        <h3 className={`${EYEBROW} text-text-muted`}>Rules</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select
+            label="Pick clock"
+            options={pickSecondsOptions.map((n) => ({ value: String(n), label: `${n} seconds` }))}
+            value={pickSeconds}
+            onChange={(event) => setPickSeconds(event.target.value)}
+          />
+          <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => setScoringPreset(event.target.value)} />
+          <Select
+            label="Roster shape"
+            options={ROSTER_SHAPE_OPTIONS}
+            value={rosterShape}
+            onChange={(event) => setRosterShape(event.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h3 className={`${EYEBROW} text-text-muted`}>You</h3>
+        {/* E3: Draft position and Randomize as one size-matched row — `size="md"` on the
+            button matches `Select`'s own `h-10`, closing the 8px baseline mismatch the review
+            measured against the old `size="sm"` (32px vs 40px). */}
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Select
+              label="Draft position"
+              options={draftSlotOptions(Number(teamCount))}
+              value={draftSlot}
+              onChange={(event) => setDraftSlot(event.target.value)}
+            />
+          </div>
+          <Button type="button" variant="ghost" size="md" onClick={randomize}>
+            Randomize
+          </Button>
+        </div>
+        {/* Present from first render, announced politely — the same "the region exists before
+            it has anything to say" shape `Countdown`'s own sr-only sibling uses. */}
+        <span className="sr-only" aria-live="polite">
+          {rolledAnnouncement}
+        </span>
+        <Input label="Team name (optional)" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
+      </div>
+
       {error === null ? null : (
         <p role="alert" className="text-sm text-negative">
           {error}
         </p>
       )}
-      <Button type="submit" loading={submitting} disabled={submitting}>
+      {/* E1: `self-start`, not the flex column's default stretch — a submit button at the
+          form's own measure is still a PILL, never a bar the width of whatever column holds it. */}
+      <Button type="submit" className="self-start" loading={submitting} disabled={submitting}>
         Start mock draft
       </Button>
     </form>
