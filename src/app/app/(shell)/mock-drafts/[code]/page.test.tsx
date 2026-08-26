@@ -25,7 +25,8 @@ describe("MockDraftLandingPage", () => {
     });
     const page = await MockDraftLandingPage({ params: Promise.resolve({ code: "ABC123" }) });
     render(page);
-    expect(screen.getByText("8 teams · 60s clock")).toBeInTheDocument();
+    // T-A's E10 fix: the meta line now leads with the mode word this landing renders itself.
+    expect(screen.getByText(/8 teams · 60s clock/)).toBeInTheDocument();
     expect(mockRoomSummary).toHaveBeenCalledWith(expect.anything(), "ABC123", "u1");
   });
 
