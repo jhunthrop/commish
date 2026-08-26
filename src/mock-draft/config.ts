@@ -45,8 +45,19 @@ export const MOCK_CONFIG = {
    *  never absurd ones). A bot considers at most `reachDepth` eligible players and samples
    *  softmax-ish by rank, warmed toward a reach when the room is mid-run on a position
    *  (`runReaction`): `window` picks back, `threshold` of them at one position, `needBoost`
-   *  multiplies that position's weight for this bot's own next pick only. */
-  strategy: { temperature: 3.0, reachDepth: 8, runReaction: { window: 4, threshold: 3, needBoost: 2.0 } },
+   *  multiplies that position's weight for a `followsRuns` archetype's own next pick only —
+   *  `baseBoost` is the milder tilt EVERY brain gets, because a real room feels a run too.
+   *  Positional need reads the roster, never a memory: each open dedicated starting slot at a
+   *  position raises that position's weight by `needPerOpenStartingSlot` (scaled by the
+   *  archetype's own `needWeight`), and a position whose starters are all rostered falls to
+   *  `startersFilledDamp` — a bot with no QB late wants one, a bot with three RBs cools on RBs. */
+  strategy: {
+    temperature: 3.0,
+    reachDepth: 8,
+    needPerOpenStartingSlot: 0.4,
+    startersFilledDamp: 0.6,
+    runReaction: { window: 4, threshold: 3, needBoost: 2.0, baseBoost: 1.3 },
+  },
   /** Lobby and link rooms start this long after creation, bots topping up whatever seat is
    *  still empty when the window fires. */
   fillWindowSeconds: 180,

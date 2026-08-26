@@ -56,6 +56,15 @@ describe("MOCK_CONFIG", () => {
     expect(MOCK_CONFIG.strategy.runReaction.window).toBeGreaterThan(0);
     expect(MOCK_CONFIG.strategy.runReaction.threshold).toBeLessThanOrEqual(MOCK_CONFIG.strategy.runReaction.window);
   });
+
+  it("keeps the need and run tuning sane: need warms, surplus damps below neutral, the follower's boost outruns the room's", () => {
+    const { needPerOpenStartingSlot, startersFilledDamp, runReaction } = MOCK_CONFIG.strategy;
+    expect(needPerOpenStartingSlot).toBeGreaterThan(0);
+    expect(startersFilledDamp).toBeGreaterThan(0);
+    expect(startersFilledDamp).toBeLessThan(1);
+    expect(runReaction.baseBoost).toBeGreaterThan(1);
+    expect(runReaction.needBoost).toBeGreaterThan(runReaction.baseBoost);
+  });
 });
 
 describe("MOCK_COPY", () => {
