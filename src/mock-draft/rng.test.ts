@@ -39,6 +39,15 @@ describe("rngFor", () => {
     expect(rngFor(42, "team_a").next()).not.toBe(rngFor(43, "team_a").next());
   });
 
+  it("treats a negative seed as the raw bit pattern of its unsigned twin — the |0 route bug's invariant", () => {
+    // `cryptoSeed32` reinterprets an unsigned 32-bit draw as signed (`| 0`) to fit the Postgres
+    // integer column; `seedForKey`'s ToInt32 coercion makes the sign immaterial. This pin is what
+    // keeps a stored negative seed replaying byte-identically to its unsigned twin forever.
+    const negative = rngFor(-1, "team_a");
+    const unsignedTwin = rngFor(-1 >>> 0, "team_a");
+    for (let i = 0; i < 8; i++) expect(negative.next()).toBe(unsignedTwin.next());
+  });
+
   it("is stable across every character of the key, not just its length", () => {
     // "team_a" and "team_b" are the same length; only their content may distinguish the streams.
     expect(rngFor(1, "team_a").next()).not.toBe(rngFor(1, "team_b").next());
