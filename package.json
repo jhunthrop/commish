@@ -22,6 +22,7 @@
     "seed": "dotenv -e .env.local -- tsx src/data/seed/index.ts",
     "stats:ingest": "dotenv -e .env.local -- tsx scripts/ingest-once.ts",
     "stats:adp": "dotenv -e .env.local -- tsx scripts/ingest-adp.ts",
+    "stats:headshots": "dotenv -e .env.local -- tsx scripts/backfill-headshots.ts",
     "stats:correct": "dotenv -e .env.local -- tsx scripts/correct-stat-week.ts",
     "audit:verify": "dotenv -e .env.local -- tsx scripts/verify-audit-chain.ts",
     "reviews:remove": "dotenv -e .env.local -- tsx scripts/remove-review.ts",
