@@ -69,6 +69,20 @@ describe("DraftBoard", () => {
     });
   });
 
+  // E4 (2026-08-26 design review): at 1440px with chat open, the room variant's own
+  // `min-w-32`/`xl:min-w-40` stickers left only ~4.3 of 12 columns on screen — the on-clock
+  // cell and the manager's own column were routinely off-viewport. A denser floor BELOW `lg`
+  // (a laptop's own belt, where "wide" is not yet desktop-wide) buys back columns without
+  // touching the `lg`/`xl` sizes a wider monitor already had right.
+  it("gives the room variant a denser sticker floor below lg, unchanged at lg and xl (E4)", () => {
+    stubMatchMedia(false);
+    render(<DraftBoard {...props} view={SNAKE_VIEW} />);
+    const header = within(grid()).getByRole("columnheader", { name: /Bay Bandits/ });
+    expect(header.className).toContain("min-w-28");
+    expect(header.className).toContain("lg:min-w-32");
+    expect(header.className).toContain("xl:min-w-40");
+  });
+
   it("puts each pick in its own team's column and round's row, as a position-colored sticker", () => {
     stubMatchMedia(false);
     render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} />);

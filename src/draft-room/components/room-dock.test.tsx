@@ -254,4 +254,59 @@ describe("RoomDock", () => {
     expect(screen.queryByText("Already drafted")).toBeNull();
     expect(screen.getByText("Marcus Reed").className).not.toContain("line-through");
   });
+
+  // E3 (2026-08-26 design review): below `lg` the pool linearizes after the whole board — a
+  // 6,100–10,300px scroll away from the sticky dock — so "Your pick. Take somebody from the
+  // pool." pointed at content nowhere near the screen. `lg:hidden` because at `lg+` the pool
+  // is its own always-visible rail (`RoomLayout`); the affordance would point at something
+  // already in view. Gated on `canAct` — this is an on-turn shortcut, not a standing nav item.
+  describe("the 'Jump to the pool' affordance (E3)", () => {
+    it("renders only while it is my turn to act", () => {
+      const { rerender } = render(<RoomDock {...props} canAct={false} />);
+      expect(screen.queryByRole("button", { name: "Jump to the pool" })).toBeNull();
+
+      rerender(<RoomDock {...props} canAct />);
+      expect(screen.getByRole("button", { name: "Jump to the pool" })).toBeInTheDocument();
+    });
+
+    it("carries lg:hidden — it is a mobile-only shortcut, redundant at lg where the pool is always visible", () => {
+      render(<RoomDock {...props} canAct />);
+      expect(screen.getByRole("button", { name: "Jump to the pool" }).className).toContain("lg:hidden");
+    });
+
+    it("scrolls the pool target into view, smoothly by default", () => {
+      const pool = document.createElement("div");
+      pool.id = "player-pool";
+      document.body.appendChild(pool);
+      const scrollIntoView = vi.fn();
+      pool.scrollIntoView = scrollIntoView;
+
+      render(<RoomDock {...props} canAct />);
+      fireEvent.click(screen.getByRole("button", { name: "Jump to the pool" }));
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+
+      pool.remove();
+    });
+
+    it("scrolls instantly instead when the user prefers reduced motion", () => {
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: true,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }));
+      const pool = document.createElement("div");
+      pool.id = "player-pool";
+      document.body.appendChild(pool);
+      const scrollIntoView = vi.fn();
+      pool.scrollIntoView = scrollIntoView;
+
+      render(<RoomDock {...props} canAct />);
+      fireEvent.click(screen.getByRole("button", { name: "Jump to the pool" }));
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
+
+      pool.remove();
+      vi.unstubAllGlobals();
+    });
+  });
 });

@@ -7,6 +7,7 @@ import type { RosterSlotType } from "@/domain/roster";
 import type { DraftStateView } from "@/draft-engine";
 import { Button, EYEBROW, PositionBadge, SlotChip } from "@/components/ui";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
+import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { formatYourTurn } from "../state/format";
 import { playerName, queueButtonLabel } from "../lib/lookups";
 import { moveInQueue, removeFromQueue } from "../state/queue";
@@ -207,6 +208,35 @@ function DockClock({
   );
 }
 
+/** The pool's own root (`PlayerPool`'s outermost `<section>`) — the one scroll target this
+ *  button and the pool ever need to agree on. */
+const POOL_TARGET_ID = "player-pool";
+
+/**
+ * E3 (2026-08-26 design review): below `lg` the pool linearizes after the WHOLE board — a
+ * 6,100-10,300px scroll from the sticky dock — so "Your pick. Take somebody from the pool."
+ * pointed at content nowhere near the screen. This button closes that gap without adding a
+ * second nav: `lg:hidden` because at `lg+` the pool is its own always-visible rail
+ * (`RoomLayout`), where the affordance would point at something already in view. Gated on
+ * `canAct` (below) — this is an on-turn shortcut, not a standing nav item, so it never
+ * competes with the dock's other bands the rest of the time.
+ */
+function JumpToPoolButton() {
+  const reducedMotion = usePrefersReducedMotion();
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="lg:hidden"
+      onClick={() => {
+        document.getElementById(POOL_TARGET_ID)?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+      }}
+    >
+      Jump to the pool
+    </Button>
+  );
+}
+
 /**
  * The dock's left edge: the one thing to do right now. On your turn it is a single button
  * that drafts the top of your queue — one click if you planned. With nothing draftable queued
@@ -342,6 +372,7 @@ export function RoomDock({
         />
       )}
       <DockClock view={view} teams={teams} playersById={playersById} myTeamId={myTeamId} />
+      {canAct ? <JumpToPoolButton /> : null}
       <QueueChips queue={queue} playersById={playersById} draftedIds={draftedIds} busy={submitting} onChange={onQueueChange} />
       <RosterFill view={view} myTeamId={myTeamId} />
     </footer>

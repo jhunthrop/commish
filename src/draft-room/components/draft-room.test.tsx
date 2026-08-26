@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
@@ -7,10 +7,25 @@ import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { fixtureDeps, MOCK_ROOM, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
 import { DraftRoomDepsProvider } from "../hooks/deps";
-import { DraftRoom } from "./draft-room";
+import { CHAT_OPEN_QUERY, DraftRoom } from "./draft-room";
 
 /** Already dismissed, so `RoomTour` stays out of the way of every case that isn't testing it. */
 const TOUR_DISMISSED = "2026-01-01T00:00:00.000Z";
+
+/** E4: the chat's initial open/collapsed state reads `matchMedia(CHAT_OPEN_QUERY)` once, on
+ *  mount — this stubs it to whichever side of the breakpoint a case wants to pin. */
+function stubChatBreakpoint(matches: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === CHAT_OPEN_QUERY ? matches : false,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function mount(fixture = fixtureDeps(), dismissedAt: string | null = TOUR_DISMISSED) {
   const rendered = renderInRoom(
@@ -52,6 +67,9 @@ describe("DraftRoom", () => {
   });
 
   it("collapses the chat band to a reopen strip and brings it back", async () => {
+    // Pinned open (xl+) so this test is exercising the manual toggle, not the initial-state
+    // rule below — that has its own pair of cases.
+    stubChatBreakpoint(true);
     mount();
     await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
 
@@ -62,6 +80,25 @@ describe("DraftRoom", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Show chat" }));
     expect(await screen.findByRole("region", { name: "League chat" })).toBeInTheDocument();
+  });
+
+  // E4 (2026-08-26 design review): "and/or auto-collapse chat under a width threshold" — the
+  // review's own alternative fix for the laptop-width board squeeze. Below `xl` the chat starts
+  // collapsed so the board gets the width back; the user's own toggle (tested above) still wins
+  // from then on — this pins only the ONE-TIME initial read.
+  it("starts the chat collapsed below xl", async () => {
+    stubChatBreakpoint(false);
+    mount();
+    await waitFor(() => expect(screen.getByTestId("room-aside")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Show chat" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "League chat" })).not.toBeInTheDocument();
+  });
+
+  it("starts the chat open at xl and up", async () => {
+    stubChatBreakpoint(true);
+    mount();
+    await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Hide chat" })).toBeInTheDocument();
   });
 
   it("offers a retry when the draft cannot be loaded", async () => {

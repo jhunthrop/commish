@@ -71,8 +71,15 @@ const CELL_TEXT: Readonly<Record<DraftBoardVariant, string>> = {
  * table spreads the surplus evenly across the columns — which is what "maximize the width"
  * actually means for a board whose column count is the league's, not ours.
  */
+/**
+ * E4 (2026-08-26 design review): at 1440px with chat open, the room variant's stickers
+ * (`min-w-32`/`xl:min-w-40`) left only ~4.3 of 12 columns on screen — the on-clock cell and
+ * the manager's own column were routinely off-viewport. `min-w-28` is a denser floor for the
+ * belt BELOW `lg` (a laptop that is not yet desktop-wide); `lg:min-w-32` and `xl:min-w-40`
+ * are the same two sizes this board already had right at wider widths — untouched.
+ */
 const CELL_MIN_WIDTH: Readonly<Record<DraftBoardVariant, string>> = {
-  room: "min-w-32 xl:min-w-40",
+  room: "min-w-28 lg:min-w-32 xl:min-w-40",
   tv: "min-w-48",
 };
 

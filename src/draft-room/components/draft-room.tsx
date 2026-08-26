@@ -23,6 +23,10 @@ import { AuctionRoom } from "./auction-room";
  */
 const MOCK_LOBBY_PATH = "/app/mock-drafts";
 
+/** E4 (2026-08-26 design review): `xl`, one step up from the `lg:w-88`/`lg:w-12` band the
+ *  chat's own width classes already key off — see `chatOpen`'s docblock below. */
+export const CHAT_OPEN_QUERY = "(min-width: 1280px)";
+
 export interface DraftRoomProps {
   readonly draftId: string;
   /**
@@ -44,7 +48,23 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
   const deps = useDraftRoomDeps();
   const { show } = useToast();
   const playersById = useMemo(() => buildPlayersById(room.players), [room.players]);
-  const [chatOpen, setChatOpen] = useState(true);
+  /**
+   * E4 (2026-08-26 design review): the review's own alternative fix for the laptop-width board
+   * squeeze — "auto-collapse chat under a width threshold" — so the board gets its columns
+   * back below `xl` without anybody having to find the "Hide chat" button first. Below `xl`
+   * the chat starts collapsed; at `xl+` there is room for both, so it starts open. Read ONCE,
+   * inside `useState`'s lazy initializer — the user's own toggle (`setChatOpen` below) wins
+   * from then on, exactly like every other "default from a media query, user wins after"
+   * control in this app (`ThemeProvider`, `usePrefersReducedMotion`).
+   *
+   * `typeof window === "undefined"` guards the server render, which this component's own
+   * `"use client"` still runs during SSR before hydration — there is no viewport to ask yet.
+   * Defaulting OPEN there (rather than collapsed) is the deliberate choice: it is the WIDEST
+   * state, so a client that turns out to be `xl+` never has to visibly snap open after
+   * hydration — only a narrower client ever corrects the initial paint, and it does so by
+   * collapsing a band shut, never by having content pop into view.
+   */
+  const [chatOpen, setChatOpen] = useState<boolean>(() => (typeof window === "undefined" ? true : window.matchMedia(CHAT_OPEN_QUERY).matches));
 
   const act = (action: ClientDraftAction): void => {
     void room.submit(action).then((outcome) => {

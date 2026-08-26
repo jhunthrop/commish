@@ -118,7 +118,10 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
   const truncated = filtered.length > DRAFT_ROOM_CONFIG.poolPageSize;
 
   return (
-    <section aria-label="Player pool" className="flex h-full min-h-0 flex-col gap-2 p-3">
+    // `id="player-pool"` (review E3): the dock's below-`lg` "Jump to the pool" affordance
+    // (`RoomDock`) scrolls straight to this element — the pool's own root, so the jump lands on
+    // the search box, not somewhere mid-list.
+    <section id="player-pool" aria-label="Player pool" className="flex h-full min-h-0 flex-col gap-2 p-3">
       <div className="flex shrink-0 flex-col gap-2">
         <Input label="Search players" value={query} placeholder="Name" onChange={(event) => setQuery(event.target.value)} />
         <PositionFilters value={position} onChange={setPosition} />
