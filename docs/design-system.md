@@ -266,6 +266,28 @@ routed through `buttonClassName` so it can never drift into a hand-rolled fill; 
 per-row fills became quiet pills, with only a needs-you row keeping the fill (E12); error/404
 pages keep their single CTA as ink.
 
+### The room wire and the composed TV surface (the 2026-08-26 composition pass)
+
+The draft room carries the wire's second life: `PickWire` (`src/draft-room/components/pick-wire.tsx`)
+renders the last six REAL picks as one fixed-height mono line under the rail (room, `text-xs`) and
+between the TV spotlight and the board (`text-base`) — newest first, only the newest player name in
+ink, no animation (the celebration owns the landing moment; the wire whispers history). The band's
+`h-8` slot is always reserved: inside the room frame, the nothing-reflows law beats the
+nothing-to-say law (the D2 precedent), so an empty pre-first-pick band is an empty band, never a
+layout shift. The TV board is composed as a TV surface: the spotlight band owns the party's ONE
+clock (`spotlightClockTone` — time-hot inside the final 30s, rule 1: a clock in its final seconds
+is red for everyone), the rail prints no in-progress countdown of its own, and rounds beyond
+active+2 collapse to one sticky-pinned "N rounds ahead" line. Reveal-on-intent is the pass's
+quieting idiom, documented in full in `ReactionBar`'s docblock: controls that are offers (unused
+reaction prompts, queue chip reorder/remove, Report) gate on `@media(hover:hover)` and reveal on
+their row's hover/focus — touch keeps everything always-on, landed counts are information and
+never hide, and everything stays in the DOM at full accessible name. The tour is anchored coach
+marks by default (`CoachMarks`), degrading to the untouched modal under reduced motion or wherever
+an anchor target does not exist; the whole anchored decision resolves in ONE pre-paint layout
+effect so no audience ever sees the wrong presentation flash first. Board tallies (review R4) were
+adjudicated and REFUSED: the position color field already tells the draft's story, and 48 mono
+digits at 12-team density read as texture, not information.
+
 ### The wire's honesty contract (rule 6)
 
 `Wire` (`src/league-room/components/wire.tsx`), fed by `listWireItems`
