@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import type { CountdownTone } from "@/components/ui/countdown";
 import { Avatar, Badge, Button, ErrorState, PositionBadge, Skeleton } from "@/components/ui";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
@@ -20,6 +21,16 @@ import { RoomRail } from "./room-rail";
  * It is the room's stage, alone: the rail (without a shred of personal chrome — no team chip,
  * no my-turn heat) and the board. No pool, no dock, because nobody acts from across a room.
  */
+/**
+ * The party clock's tone rule (review E5), as arithmetic a test can pin at the exact boundary:
+ * hot at `hotThresholdMs` remaining ON THE NOSE (`<=`, so 30,000ms is hot and 30,001 is calm),
+ * calm with no clock at all. Time-based, never mine-based — a TV has no "me", and rule 1 says
+ * a clock in its final seconds is red for everyone in the room.
+ */
+export function spotlightClockTone(remainingMs: number | null): CountdownTone {
+  return remainingMs !== null && remainingMs <= DRAFT_ROOM_CONFIG.tv.hotThresholdMs ? "hot" : "default";
+}
+
 export function TvBoard({ draftId }: { readonly draftId: string }) {
   const room = useDraftRoom(draftId);
   const playersById = useMemo(() => buildPlayersById(room.players), [room.players]);
@@ -55,7 +66,7 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
   // the final `DRAFT_ROOM_CONFIG.tv.hotThresholdMs`, the same way the room rail's own countdown
   // goes hot for whoever's turn it is (`turnSummary`'s `mine`). A TV has no "me", so the trigger
   // here is time, not identity.
-  const spotlightHot = remainingMs !== null && remainingMs <= DRAFT_ROOM_CONFIG.tv.hotThresholdMs;
+  const spotlightHot = spotlightClockTone(remainingMs) === "hot";
   const lastPick = room.lastPick;
   const lastPickPlayer = lastPick === null ? null : (playersById.get(lastPick.pick.playerId) ?? null);
 

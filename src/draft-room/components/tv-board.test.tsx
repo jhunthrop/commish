@@ -3,8 +3,9 @@ import { screen, waitFor, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { DraftRoomDepsProvider } from "../hooks/deps";
+import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { fixtureDeps, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
-import { TvBoard } from "./tv-board";
+import { spotlightClockTone, TvBoard } from "./tv-board";
 
 /** `PickCelebration` calls `usePrefersReducedMotion`, which reads `matchMedia`; happy-dom's is minimal. */
 function stubMatchMedia() {
@@ -145,6 +146,15 @@ describe("TvBoard", () => {
       expect(screen.getByTestId("spotlight-countdown").className).not.toContain("text-negative");
       // One clock per screen (E5): the rail beside it prints none of its own.
       expect(screen.queryByTestId("countdown")).toBeNull();
+    });
+
+    it("flips at the exact threshold millisecond — <= on the nose (T2 review MEDIUM)", () => {
+      // The component tests on either side of the boundary ride the wall clock, which cannot
+      // sit still AT the boundary; the extracted rule can. A future <= -> < regression fails here.
+      expect(spotlightClockTone(DRAFT_ROOM_CONFIG.tv.hotThresholdMs)).toBe("hot");
+      expect(spotlightClockTone(DRAFT_ROOM_CONFIG.tv.hotThresholdMs + 1)).toBe("default");
+      expect(spotlightClockTone(0)).toBe("hot");
+      expect(spotlightClockTone(null)).toBe("default");
     });
 
     it("goes hot inside the final 30 seconds, and not a moment before", async () => {
