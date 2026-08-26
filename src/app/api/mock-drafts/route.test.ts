@@ -12,7 +12,8 @@ vi.mock("@/lib/auth/current-user", () => ({
 
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, mockRooms, users } from "@/db/schema";
+import { draftSlotPreferences, drafts, mockRooms, users } from "@/db/schema";
+import { createDraftStore } from "@/draft-service/store";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { seedLobbyMock, seedPracticePlayers } from "@/mock-draft-service/test-support";
@@ -124,6 +125,43 @@ describe("POST /api/mock-drafts", () => {
       lastStatus = (await post({ mode: "lobby" })).status;
     }
     expect(lastStatus).toBe(429);
+  });
+
+  it("threads draftSlot through to the started draft's own order (founder directive 2026-08-26)", async () => {
+    await seedUser("u_slot_host");
+    await seedPracticePlayers(db);
+    signedInAs("u_slot_host");
+
+    // The LAST slot (draftSlot === teamCount) is the one preference `assignDraftSlots`
+    // (`@/draft-service/order`) can never lose regardless of where the real-UUID shuffle draws
+    // the host: with only the host ranked, every unranked bot fills strictly bottom-up, so the
+    // final slot is never claimed by fallback ahead of the host's own turn. A middle slot (say
+    // 5 of 8) is NOT a sure thing — the host only keeps it if drawn before position 5 in the
+    // shuffle — so this route-level test (real random UUIDs, no seeded shuffle to control) picks
+    // the one slot number that is deterministic under any draw order, to avoid a flaky assertion.
+    const response = await post({ mode: "solo", teamCount: 8, draftSlot: 8 });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { readonly ok: true; readonly data: { readonly draftId: string; readonly teamId: string } };
+
+    const [preference] = await db
+      .select({ ranking: draftSlotPreferences.ranking })
+      .from(draftSlotPreferences)
+      .where(eq(draftSlotPreferences.draftId, body.data.draftId));
+    expect(preference?.ranking).toEqual([8]);
+
+    const store = createDraftStore({ db, publish: async () => "0-0", clock: { now: () => new Date().toISOString() } });
+    const state = await store.getDraftState(body.data.draftId);
+    expect(state!.draftOrder[7]).toBe(body.data.teamId);
+  });
+
+  it("answers 400 naming the field for a draftSlot outside the request's own teamCount", async () => {
+    await seedUser("u_bad_slot");
+    signedInAs("u_bad_slot");
+
+    const response = await post({ mode: "lobby", teamCount: 8, draftSlot: 9 });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { readonly ok: false; readonly error: string };
+    expect(body.error).toBe("draftSlot: Pick a draft position from 1 to 8.");
   });
 
   it("forwards createMockRoom's own failure status and reason, rather than assuming 500", async () => {

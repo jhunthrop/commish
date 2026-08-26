@@ -5,9 +5,27 @@ import type { ApiEnvelope } from "@/lib/api/respond";
 import type { CreateMockRoomBody } from "@/app/api/mock-drafts/route";
 import type { MockMode } from "@/mock-draft/config";
 import { Button, Input, Select } from "@/components/ui";
+import { formatOrdinal } from "@/draft-room/state/format";
 import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { PRESETS } from "./create-league-form";
+
+/** "" means random (the silent server-side draw, `createMockRoomSchema`'s own default). Any
+ *  other value is a 1-based slot number, as a string, the same string-state idiom every other
+ *  numeric `<Select>` in this form already keeps (`teamCount`, `pickSeconds`). */
+const RANDOM_DRAFT_SLOT = "";
+
+/** `["", "1", "2", ..., String(teamCount)]`'s options — "Random" first (the default, matching
+ *  the schema's own silence), then one "Pick Nth" per slot the CURRENTLY chosen team count
+ *  offers (founder directive 2026-08-26: "users should be able to select their draft
+ *  position"). Recomputed from `teamCount` on every render rather than from
+ *  `MOCK_CONFIG.teamCountOptions`'s widest room, so shrinking Teams shrinks this list too. */
+function draftSlotOptions(teamCount: number): readonly { readonly value: string; readonly label: string }[] {
+  return [
+    { value: RANDOM_DRAFT_SLOT, label: "Random" },
+    ...Array.from({ length: teamCount }, (_, i) => i + 1).map((slot) => ({ value: String(slot), label: `Pick ${formatOrdinal(slot)}` })),
+  ];
+}
 
 /**
  * Words for the three modes — this component's own, not `MOCK_COPY` (`src/league-room/**` may
@@ -65,9 +83,30 @@ export function MockSetupForm({
   // with (`LEAGUE_CONFIG.defaults`), which this client component may not value-import.
   const [scoringPreset, setScoringPreset] = useState("half_ppr");
   const [rosterShape, setRosterShape] = useState("standard");
+  // "" (`RANDOM_DRAFT_SLOT`) is the default — the silent server-side draw
+  // `createMockRoomSchema.draftSlot` already falls back to when omitted. Founder directive
+  // 2026-08-26: "users should be able to select their draft position."
+  const [draftSlot, setDraftSlot] = useState(RANDOM_DRAFT_SLOT);
   const [teamName, setTeamName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  /** Shrinking Teams can strand a chosen slot above the new ceiling (picking 10th, then
+   *  dropping to 8 teams) — reset to Random rather than clamp, so the reader never sees a
+   *  silently renumbered choice they never made. */
+  const changeTeamCount = (value: string): void => {
+    setTeamCount(value);
+    if (draftSlot !== RANDOM_DRAFT_SLOT && Number(draftSlot) > Number(value)) setDraftSlot(RANDOM_DRAFT_SLOT);
+  };
+
+  /** The founder's own follow-up: "we should also have a randomize button that randomizes for
+   *  them." A plain `Math.random()` roll is fine here — this sets a value the person SEES and
+   *  can still change before submitting, not a step in the seeded draw itself (the replay law
+   *  binds the bot/draw streams `deps.random`/`deps.newSeed` feed, never a form control). */
+  const randomize = (): void => {
+    const max = Number(teamCount);
+    setDraftSlot(String(Math.floor(Math.random() * max) + 1));
+  };
 
   const submit = async (): Promise<void> => {
     setSubmitting(true);
@@ -83,6 +122,7 @@ export function MockSetupForm({
           scoringPreset,
           rosterShape,
           ...(teamName.trim().length > 0 ? { teamName: teamName.trim() } : {}),
+          ...(draftSlot !== RANDOM_DRAFT_SLOT ? { draftSlot: Number(draftSlot) } : {}),
         }),
       });
       const body = (await response.json()) as ApiEnvelope<CreateMockRoomBody>;
@@ -117,7 +157,7 @@ export function MockSetupForm({
           label="Teams"
           options={teamCountOptions.map((n) => ({ value: String(n), label: `${n} teams` }))}
           value={teamCount}
-          onChange={(event) => setTeamCount(event.target.value)}
+          onChange={(event) => changeTeamCount(event.target.value)}
         />
         <Select
           label="Pick clock"
@@ -132,6 +172,19 @@ export function MockSetupForm({
           value={rosterShape}
           onChange={(event) => setRosterShape(event.target.value)}
         />
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <Select
+            label="Draft position"
+            options={draftSlotOptions(Number(teamCount))}
+            value={draftSlot}
+            onChange={(event) => setDraftSlot(event.target.value)}
+          />
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={randomize}>
+          Randomize
+        </Button>
       </div>
       <Input label="Team name (optional)" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
       {error === null ? null : (

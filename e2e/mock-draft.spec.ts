@@ -202,6 +202,13 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   // docblock for why this is the 90s tier, not the 30s one) --------------------------------
   await managerA.getByLabel("Teams").selectOption(String(TEAM_COUNT));
   await managerA.getByLabel("Pick clock").selectOption(String(PICK_SECONDS));
+  // Founder directive 2026-08-26: "users should be able to select their draft position." The
+  // LAST slot is the one choice `assignDraftSlots` (`@/draft-service/order`) honors under EVERY
+  // possible shuffle (see `creation.test.ts`'s own note on this) — the one deterministic pick
+  // available to a real-UUID room this spec cannot seed. Choosing it here also means the host
+  // now ALWAYS lands in the exact worst case `ON_CLOCK_TIMEOUT_MS` was already sized for (the
+  // host drafting last), so this changes nothing about that bound's own margin.
+  await managerA.getByLabel("Draft position").selectOption(String(TEAM_COUNT));
   // Click-and-verify, retried: this is a React form's submit button on a page freshly navigated
   // to a moment ago, the identical pre-hydration hazard `design-v2.spec.ts`'s own keyboard walk
   // documents for a button in the same position in its own journey.
@@ -221,6 +228,10 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   // own grid (`data-testid="draft-board-grid"`, the desktop-width column-header table) rather
   // than the whole page, so this can never accidentally count a second, unrelated mention.
   await expect(managerA.getByTestId("draft-board-grid").getByText(MOCK_COPY.botMarkerLabel)).toHaveCount(BOT_COUNT);
+  // The chosen seat landed exactly where picked: the host's own column ("You", `draft-board.tsx`'s
+  // own marker) carries the sr-only "Draft slot 12" label — the last column, matching the LAST
+  // slot selected above.
+  await expect(managerA.getByTestId("draft-board-grid").locator("th").filter({ hasText: "You" })).toContainText(`Draft slot ${TEAM_COUNT}:`);
 
   // --- Wait for the human's own turn — the shuffled draft order (`drawSequenceFor`) makes no
   // promise about WHERE the host lands, so this bound covers every seat, not just pick 1. Any

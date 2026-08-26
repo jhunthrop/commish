@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb, recordStatements, truncateAll } from "@/db/test-db";
-import { drafts, leagues, mockRooms, teams, users } from "@/db/schema";
+import { draftSlotPreferences, drafts, leagues, mockRooms, teams, users } from "@/db/schema";
 import { LEAGUE_CONFIG } from "@/league";
 import { MOCK_CONFIG, MOCK_COPY } from "@/mock-draft/config";
 import { copyViolations } from "@/integrity/copy-rules";
@@ -109,6 +109,78 @@ describe("createMockRoom — solo", () => {
       okOrFail(await createMockRoom(logged, soloInput, mockLifecycleDeps(logged)));
     });
     expect(statements.filter((s) => /"(audit_\w+|member_notices|money_\w+)"/.test(s))).toHaveLength(0);
+  });
+});
+
+describe("createMockRoom — draftSlot (founder directive 2026-08-26)", () => {
+  // NOTE ON THE GUARANTEE: `assignDraftSlots` (`@/draft-service/order`) resolves teams in DRAW
+  // order, not by preference priority. With only the host ranked, an unranked bot always takes
+  // the lowest still-free slot, so the host keeps its preferred slot p ONLY IF the shuffle draws
+  // the host at or before position p; drawn later, the host instead lands on its own draw
+  // position. This test's deterministic fixture ids (`mockLifecycleDeps`'s sequential
+  // `mock_id_N` source) happen to draw the host early enough for slot 7 of 12 here, which is
+  // why this passes every run (same ids -> same seeded shuffle -> same outcome) — it is NOT
+  // proof that ANY requested slot always wins for ANY draw. The one slot that IS guaranteed
+  // under every draw order is the LAST one (`draftSlot === teamCount`): an unranked bot can
+  // never fill it out from under the host by racing to the bottom first. See this file's
+  // `route.test.ts` sibling assertion, which relies on exactly that guarantee against REAL
+  // random UUIDs rather than this file's fixed ids.
+  it("seats the host in their chosen slot when the draw favors them, through the real stack end to end", async () => {
+    await seedHost();
+    await seedPracticePlayers(db);
+    const deps = mockLifecycleDeps(db);
+
+    const out = okOrFail(await createMockRoom(db, { ...soloInput, draftSlot: 7 }, deps));
+
+    const state = await deps.store.getDraftState(out.draftId);
+    expect(state!.draftOrder[6]).toBe(out.teamId);
+
+    const [row] = await db
+      .select({ ranking: draftSlotPreferences.ranking })
+      .from(draftSlotPreferences)
+      .where(eq(draftSlotPreferences.draftId, out.draftId));
+    expect(row?.ranking).toEqual([7]);
+  });
+
+  it("guarantees the LAST slot regardless of draw order: no unranked bot can race past it", async () => {
+    await seedHost();
+    await seedPracticePlayers(db);
+    const deps = mockLifecycleDeps(db);
+
+    const out = okOrFail(await createMockRoom(db, { ...soloInput, draftSlot: 12 }, deps));
+
+    const state = await deps.store.getDraftState(out.draftId);
+    expect(state!.draftOrder[11]).toBe(out.teamId);
+  });
+
+  it("writes no preference row at all when draftSlot is omitted — random stays random", async () => {
+    await seedHost();
+    await seedPracticePlayers(db);
+    const deps = mockLifecycleDeps(db);
+
+    const out = okOrFail(await createMockRoom(db, soloInput, deps));
+
+    expect(await db.select().from(draftSlotPreferences).where(eq(draftSlotPreferences.draftId, out.draftId))).toEqual([]);
+  });
+
+  it("holds for lobby and link too — the host's own row is written at creation regardless of mode", async () => {
+    await seedHost();
+    const lobbyOut = okOrFail(await createMockRoom(db, { ...soloInput, mode: "lobby", draftSlot: 3 }, mockLifecycleDeps(db)));
+    const [lobbyRow] = await db
+      .select({ ranking: draftSlotPreferences.ranking, teamId: draftSlotPreferences.teamId })
+      .from(draftSlotPreferences)
+      .where(eq(draftSlotPreferences.draftId, lobbyOut.draftId));
+    expect(lobbyRow).toMatchObject({ ranking: [3], teamId: lobbyOut.teamId });
+
+    await seedHost("u_host_link");
+    const linkOut = okOrFail(
+      await createMockRoom(db, { ...soloInput, hostUserId: "u_host_link", mode: "link", draftSlot: 5 }, mockLifecycleDeps(db)),
+    );
+    const [linkRow] = await db
+      .select({ ranking: draftSlotPreferences.ranking, teamId: draftSlotPreferences.teamId })
+      .from(draftSlotPreferences)
+      .where(eq(draftSlotPreferences.draftId, linkOut.draftId));
+    expect(linkRow).toMatchObject({ ranking: [5], teamId: linkOut.teamId });
   });
 });
 

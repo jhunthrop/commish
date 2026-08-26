@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { ensureMockBotRoster } from "@/data/seed/bot-roster";
 import type { Db, DbTx } from "@/db/client";
-import { mockRooms, users } from "@/db/schema";
+import { draftSlotPreferences, mockRooms, users } from "@/db/schema";
 import type { AuditEvent, AuditEventInput } from "@/domain/audit";
 import type { RosterShapeName } from "@/domain/roster";
 import type { ScoringPresetName } from "@/domain/scoring";
@@ -54,6 +54,15 @@ export interface CreateMockRoomInput {
   readonly rosterShape: RosterShapeName;
   /** The host's team name; their profile display name when omitted, the join door's own rule. */
   readonly teamName?: string;
+  /**
+   * The host's own draft-position pick (founder directive 2026-08-26). `undefined` means
+   * random — the same silence a member who never opens the real slot-preference panel leaves.
+   * `createMockRoomSchema` (`./schemas`) already bounds this to `[1, teamCount]`, so this
+   * function trusts it: a single-entry ranking, `[draftSlot]`, written for the host's team in
+   * the SAME transaction that seats them, feeding the Kentucky Derby draw
+   * (`assignDraftSlots`, `@/draft-service/order`) every draft's start already reads from.
+   */
+  readonly draftSlot?: number;
 }
 
 export type CreateMockRoomResult =
@@ -148,6 +157,21 @@ export async function createMockRoom(db: Db, input: CreateMockRoomInput, deps: M
       // Unreachable for a fresh UUID (`createLeague`'s own reasoning for the same branch) —
       // thrown so an injected-id collision rolls the WHOLE room back rather than half-creating.
       if (!outcome.claimed) throw new Error(`createMockRoom: league id "${leagueId}" already exists.`);
+      // Founder directive 2026-08-26: "users should be able to select their draft position."
+      // The ONE preference row `assignDraftSlots` (`@/draft-service/order`) reads at start —
+      // the same Kentucky Derby machinery a real league's `setSlotPreference`
+      // (`@/draft-service/slot-preference`) writes, never a second mechanism. Written directly
+      // here (not through `setSlotPreference` itself) because that function opens its OWN
+      // transaction and re-derives `teamId`/`draftId` through a league-membership join this
+      // creation transaction already holds as plain locals — calling it here would either nest
+      // a transaction or read this not-yet-committed league back out through a second
+      // connection. `setSlotPreference` remains the ONLY writer for every post-creation
+      // re-pick (a real league's own panel); this is creation-time only, one ranking entry,
+      // for the host's own fresh team, and holds for all three modes — the host picked their
+      // own seat regardless of who else joins later.
+      if (input.draftSlot !== undefined) {
+        await tx.insert(draftSlotPreferences).values({ draftId, teamId, ranking: [input.draftSlot], updatedAt: new Date() });
+      }
       shareCode = await insertRoomWithFreshCode(
         tx,
         { leagueId, hostUserId: input.hostUserId, mode: input.mode, pickSeconds: input.pickSeconds, botSeed, startsAt },

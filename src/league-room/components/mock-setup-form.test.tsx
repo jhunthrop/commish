@@ -9,6 +9,17 @@ const CREATED = { leagueId: "l1", teamId: "t1", draftId: "d1", shareCode: "ABC12
 
 function renderForm(onCreated = vi.fn(), response: unknown = { ok: true, data: CREATED }) {
   const fixture = fixtureLeagueDeps(response);
+  // Records each POST body as parsed JSON, indexed the same way `fixture.calls` is — the
+  // fixture itself only records the method+url, never the body, so this test file spies on the
+  // one `fetchJson` call the form ever makes rather than growing the shared fixture's contract
+  // for a single consumer.
+  const bodies: unknown[] = [];
+  const fetchJson = vi.spyOn(fixture.deps, "fetchJson");
+  fetchJson.mockImplementation(async (url, init) => {
+    fixture.calls.push(`${init?.method ?? "GET"} ${url}`);
+    if (typeof init?.body === "string") bodies.push(JSON.parse(init.body));
+    return { json: async () => fixture.response } as unknown as Response;
+  });
   const utils = renderInLeague(
     <MockSetupForm
       modes={["solo", "lobby", "link"]}
@@ -20,7 +31,7 @@ function renderForm(onCreated = vi.fn(), response: unknown = { ok: true, data: C
     />,
     fixture.deps,
   );
-  return { ...utils, fixture, onCreated };
+  return { ...utils, fixture, bodies, onCreated };
 }
 
 describe("MockSetupForm", () => {
@@ -49,6 +60,70 @@ describe("MockSetupForm", () => {
     await vi.waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED));
 
     expect(fixture.calls).toEqual(["POST /api/mock-drafts"]);
+  });
+
+  describe("Draft position — founder directive 2026-08-26", () => {
+    it("defaults to Random and offers one 'Pick Nth' option per CURRENTLY selected team count", () => {
+      renderForm();
+      expect(screen.getByLabelText("Draft position")).toHaveValue("");
+      expect(screen.getByRole("option", { name: "Random" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Pick 1st" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "Pick 12th" })).toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: "Pick 13th" })).not.toBeInTheDocument();
+    });
+
+    it("shrinks its options when Teams shrinks", () => {
+      renderForm();
+      fireEvent.change(screen.getByLabelText("Teams"), { target: { value: "8" } });
+      expect(screen.getByRole("option", { name: "Pick 8th" })).toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: "Pick 9th" })).not.toBeInTheDocument();
+    });
+
+    it("resets to Random when Teams shrinks below the chosen slot", () => {
+      renderForm();
+      fireEvent.change(screen.getByLabelText("Draft position"), { target: { value: "10" } });
+      fireEvent.change(screen.getByLabelText("Teams"), { target: { value: "8" } });
+      expect(screen.getByLabelText("Draft position")).toHaveValue("");
+    });
+
+    it("keeps the chosen slot when Teams shrinks but the slot still fits", () => {
+      renderForm();
+      fireEvent.change(screen.getByLabelText("Draft position"), { target: { value: "5" } });
+      fireEvent.change(screen.getByLabelText("Teams"), { target: { value: "8" } });
+      expect(screen.getByLabelText("Draft position")).toHaveValue("5");
+    });
+
+    it("posts draftSlot only when a real slot is chosen, never for Random", async () => {
+      const onCreated = vi.fn();
+      const { bodies } = renderForm(onCreated);
+      fireEvent.click(screen.getByRole("button", { name: "Start mock draft" }));
+      // Waits for the round trip to fully settle (`submitting` back to false) before the second
+      // click, the same "the button re-enables" assumption the pre-existing submit test relies
+      // on via `onCreated`.
+      await vi.waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+      expect(bodies[0]).not.toHaveProperty("draftSlot");
+
+      fireEvent.change(screen.getByLabelText("Draft position"), { target: { value: "7" } });
+      fireEvent.click(screen.getByRole("button", { name: "Start mock draft" }));
+      await vi.waitFor(() => expect(onCreated).toHaveBeenCalledTimes(2));
+      expect(bodies[1]).toMatchObject({ draftSlot: 7 });
+    });
+
+    it("Randomize rolls a slot in range and sets the select to it, deterministically under a stubbed Math.random", () => {
+      renderForm();
+      // teamCount defaults to 12 (`defaultTeamCount` prop): floor(0.5 * 12) + 1 = 7.
+      const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
+      fireEvent.click(screen.getByRole("button", { name: "Randomize" }));
+      expect(screen.getByLabelText("Draft position")).toHaveValue("7");
+      random.mockRestore();
+    });
+
+    it("Randomize is a ghost, sentence-case control and never a second ink action", () => {
+      renderForm();
+      const randomizeButton = screen.getByRole("button", { name: "Randomize" });
+      expect(randomizeButton.className).not.toContain("bg-text-primary");
+      expect(screen.getByRole("button", { name: "Start mock draft" }).className).toContain("bg-text-primary");
+    });
   });
 
   it("shows the server's own refusal on failure, and never calls onCreated", async () => {

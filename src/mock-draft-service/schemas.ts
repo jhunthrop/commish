@@ -41,26 +41,42 @@ const teamName = z
  * with a real league, `MOCK_CONFIG` for the practice clock), and the membership refines are what
  * hold those defaults honest against the offered options.
  */
-export const createMockRoomSchema = z.object({
-  mode: z.enum(MOCK_CONFIG.modes),
-  teamCount: z
-    .number()
-    .int()
-    .refine((value) => (MOCK_CONFIG.teamCountOptions as readonly number[]).includes(value), {
-      message: `Choose ${spoken(MOCK_CONFIG.teamCountOptions)} teams.`,
-    })
-    .default(LEAGUE_CONFIG.defaults.teamCount),
-  pickSeconds: z
-    .number()
-    .int()
-    .refine((value) => (MOCK_CONFIG.pickClockSecondsOptions as readonly number[]).includes(value), {
-      message: `Choose a ${spoken(MOCK_CONFIG.pickClockSecondsOptions)} second pick clock.`,
-    })
-    .default(MOCK_CONFIG.defaultPickClockSeconds),
-  scoringPreset: z.enum(scoringPresetNames).default(LEAGUE_CONFIG.defaults.scoringPreset),
-  rosterShape: z.enum(rosterShapeNames).default(LEAGUE_CONFIG.defaults.rosterShape),
-  teamName: teamName.optional(),
-});
+export const createMockRoomSchema = z
+  .object({
+    mode: z.enum(MOCK_CONFIG.modes),
+    teamCount: z
+      .number()
+      .int()
+      .refine((value) => (MOCK_CONFIG.teamCountOptions as readonly number[]).includes(value), {
+        message: `Choose ${spoken(MOCK_CONFIG.teamCountOptions)} teams.`,
+      })
+      .default(LEAGUE_CONFIG.defaults.teamCount),
+    pickSeconds: z
+      .number()
+      .int()
+      .refine((value) => (MOCK_CONFIG.pickClockSecondsOptions as readonly number[]).includes(value), {
+        message: `Choose a ${spoken(MOCK_CONFIG.pickClockSecondsOptions)} second pick clock.`,
+      })
+      .default(MOCK_CONFIG.defaultPickClockSeconds),
+    scoringPreset: z.enum(scoringPresetNames).default(LEAGUE_CONFIG.defaults.scoringPreset),
+    rosterShape: z.enum(rosterShapeNames).default(LEAGUE_CONFIG.defaults.rosterShape),
+    teamName: teamName.optional(),
+    /**
+     * The host's own draft-position pick (founder directive 2026-08-26: "users should be able to
+     * select their draft position"). Omitted or `undefined` means random — the same silence a
+     * member who never opens the real slot-preference panel leaves — so `createMockRoom` writes
+     * nothing for this field unless it is present. Bounded against THIS body's own `teamCount`,
+     * never a fixed number, in the cross-field refine below: the identical reasoning
+     * `outOfRangeMessage` (`@/draft-service/slot-preference`) already holds for a real league's
+     * ranking, since the ceiling is a room's own size, not a platform-wide constant.
+     */
+    draftSlot: z.number().int({ message: "Please choose a whole number for your draft position." }).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.draftSlot !== undefined && (data.draftSlot < 1 || data.draftSlot > data.teamCount)) {
+      ctx.addIssue({ code: "custom", path: ["draftSlot"], message: `Pick a draft position from 1 to ${data.teamCount}.` });
+    }
+  });
 
 export type CreateMockRoomRequest = z.infer<typeof createMockRoomSchema>;
 

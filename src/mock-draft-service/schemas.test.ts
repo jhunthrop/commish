@@ -49,6 +49,45 @@ describe("createMockRoomSchema", () => {
     expect(createMockRoomSchema.safeParse({ mode: "solo", teamName: "evil‮name" }).success).toBe(false);
     expect(createMockRoomSchema.parse({ mode: "solo", teamName: "  Padded  " }).teamName).toBe("Padded");
   });
+
+  describe("draftSlot — founder directive 2026-08-26", () => {
+    it("omits draftSlot entirely when it is never given: random stays the default", () => {
+      const parsed = createMockRoomSchema.parse({ mode: "solo", teamCount: 12 });
+      expect(parsed.draftSlot).toBeUndefined();
+      expect("draftSlot" in parsed).toBe(false);
+    });
+
+    it("accepts any slot from 1 to the SAME body's own teamCount", () => {
+      expect(createMockRoomSchema.parse({ mode: "solo", teamCount: 8, draftSlot: 1 }).draftSlot).toBe(1);
+      expect(createMockRoomSchema.parse({ mode: "solo", teamCount: 8, draftSlot: 8 }).draftSlot).toBe(8);
+    });
+
+    it("refuses a slot above the request's own teamCount, naming the field", () => {
+      const out = createMockRoomSchema.safeParse({ mode: "solo", teamCount: 8, draftSlot: 9 });
+      expect(out.success).toBe(false);
+      const issue = out.error!.issues.find((entry) => entry.path[0] === "draftSlot");
+      expect(issue?.message).toBe("Pick a draft position from 1 to 8.");
+    });
+
+    it("refuses a slot above the DEFAULT teamCount when teamCount itself is omitted", () => {
+      const out = createMockRoomSchema.safeParse({ mode: "solo", draftSlot: LEAGUE_CONFIG.defaults.teamCount + 1 });
+      expect(out.success).toBe(false);
+      const issue = out.error!.issues.find((entry) => entry.path[0] === "draftSlot");
+      expect(issue?.message).toBe(`Pick a draft position from 1 to ${LEAGUE_CONFIG.defaults.teamCount}.`);
+    });
+
+    it("refuses zero and negative slots", () => {
+      expect(createMockRoomSchema.safeParse({ mode: "solo", teamCount: 8, draftSlot: 0 }).success).toBe(false);
+      expect(createMockRoomSchema.safeParse({ mode: "solo", teamCount: 8, draftSlot: -1 }).success).toBe(false);
+    });
+
+    it("refuses a non-integer slot with a plain-language message", () => {
+      const out = createMockRoomSchema.safeParse({ mode: "solo", teamCount: 8, draftSlot: 3.5 });
+      expect(out.success).toBe(false);
+      const issue = out.error!.issues.find((entry) => entry.path[0] === "draftSlot");
+      expect(issue?.message).toBe("Please choose a whole number for your draft position.");
+    });
+  });
 });
 
 describe("claimMockSeatSchema", () => {
