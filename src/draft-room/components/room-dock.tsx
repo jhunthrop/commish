@@ -82,7 +82,10 @@ function RosterFill({ view, myTeamId }: { readonly view: DraftStateView; readonl
     // phone's own answer to "what positions have I filled", which the old gating never showed
     // anywhere the rail wasn't. display:none keeps the hidden copy out of the a11y tree, so
     // exactly one roster landmark is exposed at every width.
-    <div className="flex shrink-0 flex-col gap-1 lg:hidden">
+    // `min-w-0 basis-full`, never `shrink-0`: this block is phone-only now, and inside the
+    // dock's wrapping flex row a shrink-refusing child is exactly the D1 overflow class — the
+    // meters take their own full-width line and the chip list wraps within it.
+    <div className="flex min-w-0 basis-full flex-col gap-1 lg:hidden">
       <h2 className={`${EYEBROW} text-text-muted`}>Your roster</h2>
       <ul aria-label="Your roster" className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {view.slotConfig.map((config) => (
