@@ -442,4 +442,13 @@ describe("DraftBoard", () => {
       expect(screen.queryByText(/rounds ahead/)).toBeNull();
     });
   });
+
+  it("wears the player's own face on a drafted sticker, initials only as the fallback (founder directive)", () => {
+    stubMatchMedia(false);
+    render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} />);
+    // qb1's fixture carries a real headshot URL; the drafted sticker renders its image.
+    const grid_ = grid();
+    const faces = Array.from(grid_.querySelectorAll("img"));
+    expect(faces.some((img) => (img.getAttribute("src") ?? "").includes("qb1.png"))).toBe(true);
+  });
 });

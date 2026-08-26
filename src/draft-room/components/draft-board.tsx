@@ -206,8 +206,9 @@ function StickerCell({
     const layout = `flex h-full items-center gap-2 px-2 py-2 ${slap ? "animate-sticker-slap" : ""}`;
     const body = (
       <>
-        {/* Initials until the licensed stats feed brings real headshots (Phase 2). */}
-        <Avatar name={player?.name ?? cell.pick.playerId} size="sm" className="shrink-0 bg-scrim/20" />
+        {/* The real face, initials fallback (founder directive 2026-08-26 — the "until the
+            stats feed brings real headshots" day arrived with players.headshot_url). */}
+        <Avatar name={player?.name ?? cell.pick.playerId} avatar={player?.headshotUrl ?? null} size="sm" className="shrink-0 bg-scrim/20" />
         <div className="flex min-w-0 flex-col justify-center gap-0.5">
           <span className={`truncate font-display font-semibold leading-display ${CELL_TEXT[variant]}`}>
             {player?.name ?? cell.pick.playerId}
