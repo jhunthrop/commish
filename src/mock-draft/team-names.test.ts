@@ -31,6 +31,22 @@ describe("pickBotTeamNames", () => {
     expect([...names].sort()).toEqual([...MOCK_BOT_TEAM_NAME_POOL].sort());
   });
 
+  it("skips excluded names without disturbing the deck's order (T2 review MEDIUM)", () => {
+    // The exclusion is what makes naming safe under ANY caller batching: a name already on a
+    // team row in the league — a host who picked a pool name for themselves, or an earlier bot
+    // batch — is simply not in this draw, and the rest of the deck arrives in its seeded order.
+    const full = pickBotTeamNames(7, 5);
+    const excluded = new Set([full[0]!, full[2]!]);
+    const drawn = pickBotTeamNames(7, 3, excluded);
+    expect(drawn).toEqual([full[1]!, full[3]!, full[4]!]);
+    expect(drawn.some((name) => excluded.has(name))).toBe(false);
+  });
+
+  it("throws rather than repeat a name when exclusions exhaust the pool", () => {
+    const everything = new Set(MOCK_BOT_TEAM_NAME_POOL);
+    expect(() => pickBotTeamNames(3, 1, everything)).toThrow(/pool/);
+  });
+
   it("returns nothing for a zero count", () => {
     expect(pickBotTeamNames(1, 0)).toEqual([]);
   });

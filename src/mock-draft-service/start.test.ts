@@ -56,6 +56,21 @@ describe("topUpBots", () => {
     expect(await botUserIdsFor(twin.leagueId)).toEqual(bots);
   });
 
+  it("never hands a bot the name an existing team already carries — the host's own pool-name twin (T2 review MEDIUM)", async () => {
+    // The host names their team EXACTLY what the room's seed would deal first: without the
+    // exclusion the first bot seated would be their twin. The fixture's stored seed is what
+    // `topUpBots` re-reads, so the collision is engineered off the same deck the code draws.
+    const room = await seedLobbyMock(db, { teamCount: 8, humans: 1 });
+    const [{ botSeed }] = await db.select({ botSeed: mockRooms.botSeed }).from(mockRooms).where(eq(mockRooms.leagueId, room.leagueId));
+    const [firstDealt] = pickBotTeamNames(botSeed!, 1);
+    await db.update(teams).set({ name: firstDealt! }).where(eq(teams.leagueId, room.leagueId));
+
+    await topUpBots(db, room.leagueId, mockLifecycleDeps(db));
+    const names = (await db.select({ name: teams.name }).from(teams).where(eq(teams.leagueId, room.leagueId))).map((row) => row.name);
+    expect(names).toHaveLength(8);
+    expect(new Set(names).size).toBe(8); // no twin, ever
+  });
+
   it("is idempotent by arithmetic: a second call finds no empty seat and adds nothing", async () => {
     const room = await seedLobbyMock(db, { teamCount: 8, humans: 1 });
     const deps = mockLifecycleDeps(db);

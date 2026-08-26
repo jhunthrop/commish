@@ -23,11 +23,21 @@ import { rngFor, seededShuffle } from "./rng";
 const TEAM_NAME_STREAM_KEY = "team-names";
 
 /**
- * Returns `count` distinct team names, deterministic per `botSeed`. `count` is expected to be at
- * most `MOCK_BOT_TEAM_NAME_POOL.length` — every offered room size is (`config.test.ts`'s own
- * gate) — so this never needs to wrap the pool or repeat a name within one draw.
+ * Returns `count` distinct team names, deterministic per `botSeed`, never one in `exclude`.
+ *
+ * The exclusion set is what makes naming correct under ANY caller batching, not just today's
+ * fill-every-empty-seat-at-once shape (T2 review MEDIUM): `seatBotsInTx` passes the league's
+ * EXISTING team names, so a host who named their own team straight off this pool never gets a
+ * bot twin, and a hypothetical second bot batch can never re-deal the first batch's names —
+ * the deck's seeded order is untouched, excluded entries are simply skipped. `count` plus the
+ * plausible exclusions sit far under `MOCK_BOT_TEAM_NAME_POOL.length` (the widest room is 12
+ * seats against a pool of 24, `config.test.ts`'s own gate); an exhausted pool throws rather
+ * than repeating a name, the same caller-bug-worth-a-rollback posture `seatBotsInTx` takes.
  */
-export function pickBotTeamNames(botSeed: number, count: number): readonly string[] {
-  const deck = seededShuffle(MOCK_BOT_TEAM_NAME_POOL, rngFor(botSeed, TEAM_NAME_STREAM_KEY));
+export function pickBotTeamNames(botSeed: number, count: number, exclude: ReadonlySet<string> = new Set()): readonly string[] {
+  const deck = seededShuffle(MOCK_BOT_TEAM_NAME_POOL, rngFor(botSeed, TEAM_NAME_STREAM_KEY)).filter((name) => !exclude.has(name));
+  if (deck.length < count) {
+    throw new Error(`pickBotTeamNames: the team-name pool (${MOCK_BOT_TEAM_NAME_POOL.length}) cannot cover ${count} names after ${exclude.size} exclusion(s).`);
+  }
   return deck.slice(0, count);
 }

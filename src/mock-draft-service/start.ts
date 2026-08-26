@@ -44,9 +44,9 @@ export function drawBotSeats(botSeed: number, seatedUserIds: readonly string[], 
  * same already-seated ids, same count) always names each of those bots identically, regardless of
  * which order this batch happens to iterate them in.
  */
-function nameBotTeams(botSeed: number, bots: readonly BotSeat[]): ReadonlyMap<string, string> {
+function nameBotTeams(botSeed: number, bots: readonly BotSeat[], takenNames: ReadonlySet<string>): ReadonlyMap<string, string> {
   const sortedIds = [...bots.map((bot) => bot.id)].sort();
-  const names = pickBotTeamNames(botSeed, sortedIds.length);
+  const names = pickBotTeamNames(botSeed, sortedIds.length, takenNames);
   return new Map(sortedIds.map((id, i) => [id, names[i]!]));
 }
 
@@ -66,14 +66,17 @@ export async function seatBotsInTx(
   tx: DbTx,
   input: { readonly leagueId: string; readonly teamCount: number; readonly botSeed: number; readonly newId: () => string },
 ): Promise<number> {
-  const seatedRows = await tx.select({ userId: teams.userId }).from(teams).where(eq(teams.leagueId, input.leagueId));
+  const seatedRows = await tx.select({ userId: teams.userId, name: teams.name }).from(teams).where(eq(teams.leagueId, input.leagueId));
   const needed = input.teamCount - seatedRows.length;
   if (needed <= 0) return 0;
   const bots = drawBotSeats(input.botSeed, seatedRows.map((row) => row.userId), needed);
   if (bots.length < needed) {
     throw new Error(`seatBotsInTx: the bot roster (${MOCK_CONFIG.botRoster.length}) cannot fill ${needed} empty seats in league "${input.leagueId}".`);
   }
-  const teamNames = nameBotTeams(input.botSeed, bots);
+  // The league's existing team names are this draw's exclusions (T2 review MEDIUM): a host who
+  // named their team straight off the pool never gets a bot twin, and any future second batch
+  // can never re-deal an earlier batch's names.
+  const teamNames = nameBotTeams(input.botSeed, bots, new Set(seatedRows.map((row) => row.name)));
   await tx.insert(teams).values(bots.map((bot) => ({ id: input.newId(), leagueId: input.leagueId, userId: bot.id, name: teamNames.get(bot.id)! })));
   return bots.length;
 }
