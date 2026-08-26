@@ -254,17 +254,24 @@ column — rail, dock (sticky, so the action is always reachable), board (the ex
 list), pool — via `order-*` classes, so no region is ever rendered twice. Down to the 360px
 baseline nothing scrolls horizontally except the board and the queue chips, each inside itself.
 
-### The aside band: league chat
+### The aside band: your roster, with chat as a strip
 
-The room has a fourth region beyond the table above: an optional `aside` band carrying
-`LeagueChat` (`src/chat-room/**`, see `docs/chat.md`). It follows the same scroll rule as the
-pool rail (its own list scrolling inside itself), mirrored to the **right** edge with a left
-border instead of the pool's right one. Width lives on the band's *content*, not the frame:
-open it is the pool rail's width, and the **Hide chat** control collapses it to a slim strip
-holding a vertical **Show chat** tab, handing the board those pixels back. A closed chat
-unmounts — history is server-side, so reopening refetches through the hook's normal mount
-path and nothing is lost. Below `lg` it linearizes **last** — after rail, dock and board — so
-chat is never wedged between a manager and the board they're trying to watch.
+The room's fourth region is the `aside` band down the right edge, and since the room-product
+pass (founder directive 2026-08-26: "the right hand side should be your roster and what
+positions you have filled... the chat feature should be much smaller") it carries **`RosterRail`
+by default**: one row per roster spot in slot order — filled spots as the player's face
+(`Avatar` + headshot, initials fallback), name and true position; open spots as their own quiet
+`SlotChip` placeholder; bench under one hairline. Fill assignment is the shared
+`rosterFillRows` derivation (`src/draft-room/state/roster-fill.ts`) — the same one
+`MockResults` consumes, so the rule lives once. **Chat is a slim hairline-topped strip** at the
+band's bottom: one ghost toggle ("League chat" / "Back to your roster") swaps which panel fills
+the same fixed-width column — nothing ever reflows. Collapsed is the default at every width
+(superseding the earlier xl-open media default). A commissioner with no team gets chat expanded
+outright — they have no roster to show. A closed chat unmounts — history is server-side, so
+reopening refetches through the hook's normal mount path and nothing is lost. Below `lg` the
+band linearizes **last** — after rail, dock and board — and the dock's own compact roster
+meters (phone-only, `lg:hidden`) answer "what have I filled" up top; exactly one roster
+landmark is exposed per width.
 
 It is built once, in `DraftRoom` (`src/draft-room/components/draft-room.tsx`), and passed down
 as a prop exactly the way `bidConsole` and `poolFooter` already are: `DraftRoom` → `SnakeRoom` /
