@@ -148,7 +148,12 @@ test.describe("the hold journey (Task 6)", () => {
     await page.goto(`/join/${E2E_HOLD_LEAGUE_ID}/hold`);
     const ownOrigin = new URL(page.url()).origin;
 
-    await expect(page.getByRole("heading", { name: "E2E Hold Journey League" })).toBeVisible();
+    // `level: 1` is load-bearing (Task 12 of the mock-drafts closeout): once `SeatHoldPanel`'s
+    // on-mount claim lands, its own panel eyebrow is a SECOND heading with this exact name
+    // (`Panel`'s `<Heading className={EYEBROW}>{title}</Heading>`), so an un-leveled locator is a
+    // strict-mode violation whenever that POST beats this assertion's first poll — a race this
+    // spec loses only on a fast round trip, which is exactly when everything is working.
+    await expect(page.getByRole("heading", { level: 1, name: "E2E Hold Journey League" })).toBeVisible();
     // `SeatHoldPanel` claims the hold on mount — the countdown is the receipt that the real
     // `POST /api/public/leagues/[leagueId]/hold` round trip actually happened, not merely that
     // the page rendered.
