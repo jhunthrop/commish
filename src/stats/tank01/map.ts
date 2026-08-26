@@ -39,7 +39,11 @@ export function mapPlayerList(body: unknown): readonly Player[] {
     // A player missing any of these cannot be drafted, displayed or scored, so it is dropped
     // rather than emitted with a placeholder that would fail a foreign key at seed time.
     if (id === "" || name === "" || nflTeam === "" || !isScoredPosition(position)) return [];
-    return [{ id, name, position, nflTeam }];
+    // `|| null`, not left as "": an absent or empty espnHeadshot is "no photo", the same fact
+    // `headshotUrl: null` already means everywhere else — never an empty-string URL an `<img
+    // src>` would fail to load (founder directive 2026-08-26).
+    const headshotUrl = str(record.espnHeadshot) || null;
+    return [{ id, name, position, nflTeam, headshotUrl }];
   });
 }
 
@@ -67,6 +71,9 @@ export function mapTeamsToDefensePlayers(body: unknown): readonly Player[] {
         name: name === "" ? abbreviation : name,
         position: "DEF",
         nflTeam: abbreviation,
+        // A team defense is not a person Tank01 photographs — always null, never derived from
+        // any per-team logo/asset (founder directive 2026-08-26).
+        headshotUrl: null,
       },
     ];
   });

@@ -551,7 +551,7 @@ describe("matchupWeek's reference cache", () => {
     // HIT: `load` never runs at all. A decoy player index (wrong name) and decoy scoring rules
     // (touchdowns worth 0) prove the response came from the CACHE, not from a DB read that just
     // happened to agree with it.
-    const decoyPlayers: readonly Player[] = [{ id: "qb1", name: "Cached Impostor", position: "QB", nflTeam: "KC" }];
+    const decoyPlayers: readonly Player[] = [{ id: "qb1", name: "Cached Impostor", position: "QB", nflTeam: "KC", headshotUrl: null }];
     const decoySettings: ScoringSettings = { leagueId: created.leagueId, ...PPR_SCORING, pointsPerPassingTouchdown: 0 };
     const hit = recordingReferenceCache({ players: decoyPlayers, scoringSettings: decoySettings });
     const hitBody = await matchupWeek(db, created.leagueId, 1, "u1", hit.cache);

@@ -112,6 +112,18 @@ describe("PlayerPool", () => {
     expect(within(rowFor("Jalen Croft")).getByText("QB").className).toContain("bg-pos-qb");
   });
 
+  // Founder directive 2026-08-26 ("why aren't we showing the players picture?"): qb1 (Jalen
+  // Croft) carries a headshot in the shared PLAYERS fixture; rb1 (Marcus Reed) is null.
+  it("renders the player's headshot when the pool has one, and the initials fallback when it doesn't", () => {
+    render(<PlayerPool {...props} />);
+    // Decorative (`Avatar` gets no `label` here), so the <img> carries alt="" and role
+    // "presentation" — found by its src, not by an accessible role.
+    const withPhoto = rowFor("Jalen Croft").querySelector("img");
+    expect(withPhoto).toHaveAttribute("src", "https://a.espncdn.com/i/headshots/nfl/players/full/qb1.png");
+    expect(rowFor("Marcus Reed").querySelector("img")).toBeNull();
+    expect(within(rowFor("Marcus Reed")).getByText("MR")).toBeInTheDocument();
+  });
+
   it("shows no act button while waiting — the star is the action — and reports the player on your turn", () => {
     const onAct = vi.fn();
     const { rerender } = render(<PlayerPool {...props} canAct={false} onAct={onAct} />);
@@ -150,7 +162,7 @@ describe("PlayerPool", () => {
   });
 
   it("tells you when results are capped, and by how much, so narrowing the search isn't a mystery", () => {
-    const manyPlayers = Array.from({ length: 75 }, (_, index) => ({ id: `p${index}`, name: `Player ${index}`, position: "WR" as const, nflTeam: "DAL" }));
+    const manyPlayers = Array.from({ length: 75 }, (_, index) => ({ id: `p${index}`, name: `Player ${index}`, position: "WR" as const, nflTeam: "DAL", headshotUrl: null }));
     const view = { ...SNAKE_VIEW, availablePlayerIds: manyPlayers.map((player) => player.id) };
     render(<PlayerPool {...props} players={manyPlayers} view={view} />);
     expect(screen.getByText("Showing the top 60 of 75. Narrow your search to see more.")).toBeInTheDocument();

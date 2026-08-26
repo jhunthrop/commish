@@ -22,11 +22,12 @@ function rawTextOf(fragment: unknown): string {
 describe("excludedSetFor", () => {
   it("maps every non-key column to its excluded.<column> reference", () => {
     const set = excludedSetFor(players, ["id"]);
-    expect(Object.keys(set).sort()).toEqual(["adp", "name", "nflTeam", "position"].sort());
+    expect(Object.keys(set).sort()).toEqual(["adp", "headshotUrl", "name", "nflTeam", "position"].sort());
     expect(rawTextOf(set.name)).toBe("excluded.name");
     expect(rawTextOf(set.nflTeam)).toBe("excluded.nfl_team");
     expect(rawTextOf(set.position)).toBe("excluded.position");
     expect(rawTextOf(set.adp)).toBe("excluded.adp");
+    expect(rawTextOf(set.headshotUrl)).toBe("excluded.headshot_url");
   });
 
   it("excludes every key column, even when there is more than one", () => {
@@ -58,7 +59,7 @@ describe("changedRowWhere", () => {
   it("compares every non-key column between the table and excluded via IS DISTINCT FROM", () => {
     const where = changedRowWhere(players, ["id"]);
     expect(fullTextOf(where)).toBe(
-      '("players"."name", "players"."position", "players"."nfl_team", "players"."adp") IS DISTINCT FROM (excluded.name, excluded.position, excluded.nfl_team, excluded.adp)',
+      '("players"."name", "players"."position", "players"."nfl_team", "players"."adp", "players"."headshot_url") IS DISTINCT FROM (excluded.name, excluded.position, excluded.nfl_team, excluded.adp, excluded.headshot_url)',
     );
   });
 

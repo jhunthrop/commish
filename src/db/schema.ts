@@ -814,6 +814,18 @@ export const players = pgTable(
      * fractional positions ("1.6", "12.8").
      */
     adp: real("adp"),
+    /**
+     * Migration 0045 (founder directive 2026-08-26: "why aren't we showing the players picture?
+     * we have the link don't we?"). Tank01's `/getNFLPlayerList` carries `espnHeadshot` per
+     * player — `mapPlayerList` (`src/stats/tank01/map.ts`) reads it into this column, an ESPN CDN
+     * `https://` URL. NULLABLE and null by default: a team defense has no headshot (there is no
+     * "player" to photograph), and a player the feed doesn't carry a photo for renders the same
+     * `Avatar` initials fallback every avatarless person in this product already gets — a missing
+     * face is never a broken image. Refreshed, not excluded, on every seed re-run (see
+     * `seed-players.ts`'s upsert set): unlike `adp`, this column has exactly one upstream source of
+     * truth and no in-product writer of its own, so a stale or newly-added URL should always win.
+     */
+    headshotUrl: text("headshot_url"),
   },
   (t) => [index("players_position_idx").on(t.position)],
 );

@@ -14,7 +14,7 @@ const PLAYERS_KEY = STATS_INGESTION_CONFIG.keys.playerIndex;
 const SETTINGS_KEY_A = STATS_INGESTION_CONFIG.keys.scoringSettings(LEAGUE_A);
 const SETTINGS_KEY_B = STATS_INGESTION_CONFIG.keys.scoringSettings(LEAGUE_B);
 
-const PLAYERS: readonly Player[] = [{ id: "p1", name: "One Guy", position: "QB", nflTeam: "SF" }];
+const PLAYERS: readonly Player[] = [{ id: "p1", name: "One Guy", position: "QB", nflTeam: "SF", headshotUrl: null }];
 
 const SETTINGS_A: ScoringSettings = {
   leagueId: LEAGUE_A,

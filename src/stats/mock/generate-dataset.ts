@@ -69,7 +69,10 @@ export function generateDataset(seed: number): Dataset {
       const id = `player_${String(n).padStart(3, "0")}`;
       const nflTeam = pick(rand, NFL_TEAMS);
       const name = position === "DEF" ? `${nflTeam} Defense` : `${pick(rand, FIRST)} ${pick(rand, LAST)}`;
-      players.push({ id, name, position, nflTeam });
+      // The mock dataset ships no photos at all (founder directive 2026-08-26): every mock player
+      // exercises the SAME `Avatar` initials fallback a real player with no ESPN photo gets,
+      // rather than a fabricated data URI nothing in production ever produces.
+      players.push({ id, name, position, nflTeam, headshotUrl: null });
     }
   }
   const statLines: StatLine[] = [];

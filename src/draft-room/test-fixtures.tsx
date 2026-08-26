@@ -7,10 +7,12 @@ import type { MockRoomInfo, WaitingInfo } from "./contract";
 import { DraftRoomDepsProvider, type DraftRoomDeps, type EventSourceLike } from "./hooks/deps";
 
 export const PLAYERS: readonly Player[] = [
-  { id: "qb1", name: "Jalen Croft", position: "QB", nflTeam: "KC" },
-  { id: "rb1", name: "Marcus Reed", position: "RB", nflTeam: "SF" },
-  { id: "rb2", name: "Devon Marsh", position: "RB", nflTeam: "NYJ" },
-  { id: "wr1", name: "Andre Salas", position: "WR", nflTeam: "DAL" },
+  // qb1 carries a headshot; the other three are null — one fixture set exercises both the
+  // `Avatar` image branch and its initials fallback across every test that imports PLAYERS.
+  { id: "qb1", name: "Jalen Croft", position: "QB", nflTeam: "KC", headshotUrl: "https://a.espncdn.com/i/headshots/nfl/players/full/qb1.png" },
+  { id: "rb1", name: "Marcus Reed", position: "RB", nflTeam: "SF", headshotUrl: null },
+  { id: "rb2", name: "Devon Marsh", position: "RB", nflTeam: "NYJ", headshotUrl: null },
+  { id: "wr1", name: "Andre Salas", position: "WR", nflTeam: "DAL", headshotUrl: null },
 ];
 
 export const LEAGUE_NAME = "Sunday Money";

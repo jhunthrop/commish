@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Badge, Button, EmptyState, Input, PositionBadge } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, Input, PositionBadge } from "@/components/ui";
 import { queueButtonLabel } from "../lib/lookups";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 
@@ -161,6 +161,10 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
               >
                 <span className="w-5 shrink-0 text-right font-mono text-xs tabular-nums text-text-muted">{row.rank}</span>
                 <PositionBadge position={row.player.position} size="sm" />
+                {/* Founder directive 2026-08-26 ("why aren't we showing the players picture?"):
+                    decorative (no `label`) — the name right beside it already says who this is,
+                    and `sm` keeps the row at its fixed `h-11` with no reflow at the 360px floor. */}
+                <Avatar name={row.player.name} avatar={row.player.headshotUrl} size="sm" />
                 <span className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
                 <span className="shrink-0 text-xs text-text-muted">{row.player.nflTeam}</span>
                 {row.drafted ? null : (

@@ -80,11 +80,17 @@ export async function seedPlayers(
   for (const batch of chunks(allPlayers, BATCH)) {
     await db
       .insert(players)
-      .values(batch.map((p) => ({ id: p.id, name: p.name, position: p.position, nflTeam: p.nflTeam })))
+      .values(batch.map((p) => ({ id: p.id, name: p.name, position: p.position, nflTeam: p.nflTeam, headshotUrl: p.headshotUrl })))
       // `adp` is excluded from the update set alongside the conflict key: the seed inserts rows
       // WITHOUT an adp value, so `excluded.adp` is always NULL, and including it would make every
       // seed re-run silently wipe the ADP enrichment `ingestAdp` (`src/stats-pipeline/adp.ts`)
       // wrote — the column has exactly one writer, and this function is not it.
+      //
+      // `headshotUrl` is DELIBERATELY NOT in this exclusion list (founder directive 2026-08-26):
+      // unlike `adp`, the seed IS this column's only writer, and the incoming value is always the
+      // provider's current one — a re-run should overwrite a stale or missing URL rather than
+      // leave it behind, so `excludedSetFor`'s default (assign every non-key column) is exactly
+      // right here without a carve-out.
       .onConflictDoUpdate({ target: players.id, set: excludedSetFor(players, ["id", "adp"]) });
   }
   void cache.invalidatePlayers();

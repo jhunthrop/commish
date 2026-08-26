@@ -99,6 +99,36 @@ describe("seedPlayers", () => {
     expect(row?.adp).toBe(1.6);
   }, 30_000);
 
+  it("re-running the seed refreshes a stale headshot URL while an ingested ADP survives (founder directive 2026-08-26)", async () => {
+    // `headshotUrl` and `adp` are opposite cases of the same upsert set: `adp` is excluded
+    // (owned by `ingestAdp`, never the seed) and `headshotUrl` is not (owned by the seed's own
+    // provider, never anything else) — one test proving both halves is what pins the contrast
+    // `seedPlayers`'s own docblock draws between them.
+    await seedPlayers(db, provider);
+    const [first] = await provider.listPlayers();
+    await db.update(players).set({ adp: 1.6, headshotUrl: "https://stale.example.com/old.png" }).where(eq(players.id, first!.id));
+
+    const refreshedUrl = "https://a.espncdn.com/i/headshots/nfl/players/full/refreshed.png";
+    const refreshedProvider: StatsProvider = {
+      requestCost: provider.requestCost,
+      lastWeekOfSeason: provider.lastWeekOfSeason,
+      listPlayers: async () => {
+        const all = await provider.listPlayers();
+        return all.map((p) => (p.id === first!.id ? { ...p, headshotUrl: refreshedUrl } : p));
+      },
+      listGames: (week) => provider.listGames(week),
+      getGameStatLines: (game) => provider.getGameStatLines(game),
+      getWeeklyStatLines: (week) => provider.getWeeklyStatLines(week),
+      listAdp: () => provider.listAdp(),
+    };
+
+    await seedPlayers(db, refreshedProvider);
+
+    const [row] = await db.select({ adp: players.adp, headshotUrl: players.headshotUrl }).from(players).where(eq(players.id, first!.id));
+    expect(row?.headshotUrl).toBe(refreshedUrl);
+    expect(row?.adp).toBe(1.6);
+  }, 30_000);
+
   it("invalidates the player index after a successful seed", async () => {
     const cache = recordingReferenceCache();
     await seedPlayers(db, provider, cache);

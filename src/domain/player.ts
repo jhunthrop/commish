@@ -5,6 +5,14 @@ export interface Player {
   readonly name: string;
   readonly position: Position;
   readonly nflTeam: string;
+  /**
+   * The player's photo — an ESPN CDN `https://` URL from Tank01's `espnHeadshot`
+   * (`src/stats/tank01/map.ts`'s `mapPlayerList`), or `null` for a team defense (no person to
+   * photograph) and for any player the feed doesn't carry a photo for. REQUIRED, not optional:
+   * every `Player` states its own headshot rather than leaving callers to guess whether "absent"
+   * means "not fetched yet" or "genuinely has none" (founder directive 2026-08-26).
+   */
+  readonly headshotUrl: string | null;
 }
 
 export interface StatLine {

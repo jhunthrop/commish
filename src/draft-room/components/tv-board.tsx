@@ -112,10 +112,17 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
                 resolved yet (a resync gap) — never a guessed name or a `RosterSlotType` value
                 (which includes FLEX/BENCH) masquerading as a `PositionBadge`'s `Position`. */}
             {lastPick === null || lastPickPlayer === null ? null : (
-              <p data-testid="spotlight-last-pick" className="flex items-center gap-1 whitespace-nowrap text-sm text-text-muted">
-                {`#${lastPick.pick.pickNumber} ${lastPickPlayer.name}`}
-                <PositionBadge position={lastPickPlayer.position} size="sm" />
-              </p>
+              <div className="flex items-center gap-2">
+                {/* Founder directive 2026-08-26 ("why aren't we showing the players picture?"):
+                    the same face-beside-name pattern the onClock owner already gets above, at
+                    the spotlight's own `lg` size — decorative, the name text beside it already
+                    says who this is. */}
+                <Avatar name={lastPickPlayer.name} avatar={lastPickPlayer.headshotUrl} size="lg" />
+                <p data-testid="spotlight-last-pick" className="flex items-center gap-1 whitespace-nowrap text-sm text-text-muted">
+                  {`#${lastPick.pick.pickNumber} ${lastPickPlayer.name}`}
+                  <PositionBadge position={lastPickPlayer.position} size="sm" />
+                </p>
+              </div>
             )}
           </div>
         </section>

@@ -5,14 +5,20 @@ import { mapAdpList, mapBoxScoreToStatLines, mapGames, mapPlayerList, mapTeamsTo
 describe("mapPlayerList", () => {
   it("keeps only the positions the scoring engine handles", () => {
     const players = mapPlayerList([
-      { playerID: "4240499", longName: "Justin Jefferson", pos: "WR", team: "MIN" },
+      { playerID: "4240499", longName: "Justin Jefferson", pos: "WR", team: "MIN", espnHeadshot: "https://a.espncdn.com/i/headshots/nfl/players/full/4240499.png" },
       { playerID: "3139477", longName: "Patrick Mahomes", pos: "QB", team: "KC" },
       { playerID: "1", longName: "A Long Snapper", pos: "LS", team: "SF" },
       { playerID: "2", longName: "A Linebacker", pos: "LB", team: "SF" },
     ]);
     expect(players).toEqual([
-      { id: "4240499", name: "Justin Jefferson", position: "WR", nflTeam: "MIN" },
-      { id: "3139477", name: "Patrick Mahomes", position: "QB", nflTeam: "KC" },
+      { id: "4240499", name: "Justin Jefferson", position: "WR", nflTeam: "MIN", headshotUrl: "https://a.espncdn.com/i/headshots/nfl/players/full/4240499.png" },
+      { id: "3139477", name: "Patrick Mahomes", position: "QB", nflTeam: "KC", headshotUrl: null },
+    ]);
+  });
+
+  it("maps a missing or empty espnHeadshot to null, never an empty-string URL (founder directive 2026-08-26)", () => {
+    expect(mapPlayerList([{ playerID: "9", longName: "Somebody", pos: "WR", team: "SF", espnHeadshot: "" }])).toEqual([
+      { id: "9", name: "Somebody", position: "WR", nflTeam: "SF", headshotUrl: null },
     ]);
   });
 
@@ -29,14 +35,14 @@ describe("mapPlayerList", () => {
 });
 
 describe("mapTeamsToDefensePlayers", () => {
-  it("mints one DEF player per team, with the configured id prefix", () => {
+  it("mints one DEF player per team, with the configured id prefix, and no headshot (a defense is not a person)", () => {
     const defenses = mapTeamsToDefensePlayers([
       { teamID: "28", teamAbv: "SF", teamCity: "San Francisco", teamName: "49ers" },
       { teamID: "32", teamAbv: "WSH", teamCity: "Washington", teamName: "Commanders" },
     ]);
     expect(defenses).toEqual([
-      { id: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`, name: "San Francisco 49ers", position: "DEF", nflTeam: "SF" },
-      { id: `${TANK01_CONFIG.defensePlayerIdPrefix}WSH`, name: "Washington Commanders", position: "DEF", nflTeam: "WSH" },
+      { id: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`, name: "San Francisco 49ers", position: "DEF", nflTeam: "SF", headshotUrl: null },
+      { id: `${TANK01_CONFIG.defensePlayerIdPrefix}WSH`, name: "Washington Commanders", position: "DEF", nflTeam: "WSH", headshotUrl: null },
     ]);
   });
 });
@@ -345,7 +351,7 @@ describe("defensive parsing of shapes the fixtures never exercise", () => {
 
   it("mapTeamsToDefensePlayers falls back to the abbreviation when city and name are both blank", () => {
     expect(mapTeamsToDefensePlayers([{ teamAbv: "SF" }])).toEqual([
-      { id: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`, name: "SF", position: "DEF", nflTeam: "SF" },
+      { id: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`, name: "SF", position: "DEF", nflTeam: "SF", headshotUrl: null },
     ]);
   });
 
