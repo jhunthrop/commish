@@ -728,7 +728,9 @@ export function createDraftStore({
             // preference saved after this instant can never change history (ruling 27 — see
             // `draft_slot_preferences`'s own docblock in `@/db/schema`). What F9 changed is only
             // WHEN the input is read, never that the output is a snapshot.
-            draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id), await slotPreferencesFor(tx, draftId)),
+            // Mock rooms grant a chosen seat outright ("ranked-first" — see `assignDraftSlots`);
+            // real leagues keep the fair-lottery draw-order rule byte-identical.
+            draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id), await slotPreferencesFor(tx, draftId), config.isMock === true ? "ranked-first" : "draw-order"),
             pool,
             // Command time is the ONE place the tunable is read — it rides the persisted
             // action from here on, so replay never consults AUCTION_CONFIG.

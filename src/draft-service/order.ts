@@ -40,6 +40,9 @@ export function drawSequenceFor(draftId: string, teamIds: readonly string[]): re
 /** A team's ranked draft-slot wish list, most-wanted first. 1-based slot numbers. */
 export type SlotPreferenceMap = Readonly<Record<string, readonly number[]>>;
 
+/** Who resolves first when preferences and indifference collide — see `assignDraftSlots`. */
+export type SlotAssignMode = "draw-order" | "ranked-first";
+
 /**
  * NFFC's Kentucky Derby System, run over `drawOrder`: each team, taken in TURN — draw order,
  * one team fully resolved before the next is even considered — gets its highest-ranked slot
@@ -58,8 +61,24 @@ export type SlotPreferenceMap = Readonly<Record<string, readonly number[]>>;
  * Pure: never touches the database, never reads a clock. `draftOrderFor` below is the only
  * caller that knows where `drawOrder` and `preferences` actually come from.
  */
-export function assignDraftSlots(drawOrder: readonly string[], preferences: SlotPreferenceMap): readonly string[] {
+export function assignDraftSlots(
+  drawOrder: readonly string[],
+  preferences: SlotPreferenceMap,
+  mode: SlotAssignMode = "draw-order",
+): readonly string[] {
   const slotCount = drawOrder.length;
+  // "ranked-first" (mock rooms — founder directive 2026-08-26): teams that EXPRESSED a choice
+  // resolve before teams that did not, so a practice host's picked seat is granted outright
+  // instead of surviving only when the shuffle happens to draw them early — under the pure
+  // Kentucky Derby rule an indifferent bot drawn first consumes `lowestFree` and can block the
+  // one seat anyone in the room actually asked for. Real leagues keep "draw-order" untouched
+  // (ruling 27's fair-lottery semantics): there, every seat-holder is a person and the draw IS
+  // the fairness. Within each group the draw order still decides ties, so two ranked teams
+  // wanting one slot resolve exactly as before.
+  const resolveOrder =
+    mode === "ranked-first"
+      ? [...drawOrder.filter((id) => (preferences[id] ?? []).length > 0), ...drawOrder.filter((id) => (preferences[id] ?? []).length === 0)]
+      : drawOrder;
   const slots: (string | undefined)[] = new Array(slotCount).fill(undefined);
   const taken = new Set<number>();
   // The lowest slot not yet claimed, advanced lazily (only when a team actually falls back to
@@ -67,7 +86,7 @@ export function assignDraftSlots(drawOrder: readonly string[], preferences: Slot
   // because every slot below it is either already taken or already assigned.
   let lowestFree = 1;
 
-  for (const teamId of drawOrder) {
+  for (const teamId of resolveOrder) {
     const ranking = preferences[teamId] ?? [];
     const preferred = ranking.find((slot) => slot >= 1 && slot <= slotCount && !taken.has(slot));
     let assigned: number;
@@ -94,6 +113,7 @@ export function draftOrderFor(
   draftId: string,
   teamIds: readonly string[],
   preferences: SlotPreferenceMap = {},
+  mode: SlotAssignMode = "draw-order",
 ): readonly string[] {
-  return assignDraftSlots(drawSequenceFor(draftId, teamIds), preferences);
+  return assignDraftSlots(drawSequenceFor(draftId, teamIds), preferences, mode);
 }

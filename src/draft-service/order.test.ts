@@ -47,6 +47,29 @@ describe("draftOrderFor", () => {
     expect(draftOrderFor("d_1", TEAMS, {})).toEqual(drawSequenceFor("d_1", TEAMS));
   });
 
+  it("ranked-first mode grants EVERY chosen slot outright, whatever the draw did (the mock rule)", () => {
+    // Under draw-order, an indifferent team drawn early consumes lowestFree and can block the
+    // one seat anyone asked for; ranked-first resolves choosers before the indifferent, so a
+    // practice host's pick is granted for ANY slot, not only the last (founder directive
+    // 2026-08-26). Prove it across every slot of a 10-team room and many draft ids.
+    for (const wanted of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+      for (const draftId of ["d_a", "d_b", "d_c"]) {
+        const order = draftOrderFor(draftId, TEAMS, { t03: [wanted] }, "ranked-first");
+        expect(order[wanted - 1]).toBe("t03");
+      }
+    }
+  });
+
+  it("ranked-first mode changes nothing when nobody ranked anything", () => {
+    expect(draftOrderFor("d_1", TEAMS, {}, "ranked-first")).toEqual(drawSequenceFor("d_1", TEAMS));
+  });
+
+  it("two ranked-first choosers wanting one slot still tie-break by the draw, and both land ranked slots", () => {
+    const order = draftOrderFor("d_1", KDS_TEAMS, { t_alice: [1], t_bob: [1, 3] }, "ranked-first");
+    expect(order[0]).toBe("t_alice");
+    expect(order[2]).toBe("t_bob");
+  });
+
   it("reproduces the same order forever from the same draft id and the same preferences", () => {
     expect(draftOrderFor("d_1", TEAMS, { t01: [3, 1] })).toEqual(draftOrderFor("d_1", TEAMS, { t01: [3, 1] }));
   });

@@ -113,19 +113,13 @@ describe("createMockRoom — solo", () => {
 });
 
 describe("createMockRoom — draftSlot (founder directive 2026-08-26)", () => {
-  // NOTE ON THE GUARANTEE: `assignDraftSlots` (`@/draft-service/order`) resolves teams in DRAW
-  // order, not by preference priority. With only the host ranked, an unranked bot always takes
-  // the lowest still-free slot, so the host keeps its preferred slot p ONLY IF the shuffle draws
-  // the host at or before position p; drawn later, the host instead lands on its own draw
-  // position. This test's deterministic fixture ids (`mockLifecycleDeps`'s sequential
-  // `mock_id_N` source) happen to draw the host early enough for slot 7 of 12 here, which is
-  // why this passes every run (same ids -> same seeded shuffle -> same outcome) — it is NOT
-  // proof that ANY requested slot always wins for ANY draw. The one slot that IS guaranteed
-  // under every draw order is the LAST one (`draftSlot === teamCount`): an unranked bot can
-  // never fill it out from under the host by racing to the bottom first. See this file's
-  // `route.test.ts` sibling assertion, which relies on exactly that guarantee against REAL
-  // random UUIDs rather than this file's fixed ids.
-  it("seats the host in their chosen slot when the draw favors them, through the real stack end to end", async () => {
+  // THE GUARANTEE IS UNIVERSAL NOW: a mock draft's order resolves "ranked-first"
+  // (`assignDraftSlots`'s mock mode — the implementing agent's own honest flag was that under
+  // the pure draw-order rule only the LAST slot survived every shuffle; the controller closed
+  // that by resolving choosers before the indifferent, for mocks only). ANY chosen slot wins
+  // for ANY draw; `order.test.ts` proves the arithmetic across every slot, and these prove the
+  // wiring through the real stack end to end.
+  it("seats the host in EXACTLY their chosen slot, through the real stack end to end", async () => {
     await seedHost();
     await seedPracticePlayers(db);
     const deps = mockLifecycleDeps(db);
@@ -142,7 +136,18 @@ describe("createMockRoom — draftSlot (founder directive 2026-08-26)", () => {
     expect(row?.ranking).toEqual([7]);
   });
 
-  it("guarantees the LAST slot regardless of draw order: no unranked bot can race past it", async () => {
+  it("grants an EARLY slot too — the seat an unranked bot would have raced to under draw-order", async () => {
+    await seedHost();
+    await seedPracticePlayers(db);
+    const deps = mockLifecycleDeps(db);
+
+    const out = okOrFail(await createMockRoom(db, { ...soloInput, draftSlot: 1 }, deps));
+
+    const state = await deps.store.getDraftState(out.draftId);
+    expect(state!.draftOrder[0]).toBe(out.teamId);
+  });
+
+  it("guarantees the LAST slot as well, regardless of draw order", async () => {
     await seedHost();
     await seedPracticePlayers(db);
     const deps = mockLifecycleDeps(db);
