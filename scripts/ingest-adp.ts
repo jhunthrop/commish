@@ -20,7 +20,7 @@ async function main(): Promise<void> {
   console.log(`the ADP feed ranked ${result.adpEntries} players; ${result.playersUpdated} players rows took a value`);
   if (result.playersUpdated < result.adpEntries) {
     console.log(
-      `${result.adpEntries - result.playersUpdated} ranked player(s) have no players row yet — run \`npm run seed\` first if that number looks large`,
+      `${result.adpEntries - result.playersUpdated} ranked player(s) have no players row yet; run \`npm run seed\` first if that number looks large`,
     );
   }
 
