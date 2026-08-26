@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, expectRejectionMatching, truncateAll } from "@/db/test-db";
-import { drafts, leagues, teams, users } from "@/db/schema";
+import { drafts, leagues, mockRooms, teams, users } from "@/db/schema";
 import { currentDeadline } from "@/draft-engine";
 import { MOCK_CONFIG } from "@/mock-draft/config";
+import { pickBotTeamNames } from "@/mock-draft/team-names";
 import { MOCK_REFUSALS } from "./claim";
 import { drawBotSeats, seatBotsInTx, startMockDraft, topUpBots } from "./start";
 import { MOCK_TEST_CLOCK, mockLifecycleDeps, seedLobbyMock, seedPracticePlayers } from "./test-support";
@@ -90,6 +91,57 @@ describe("seatBotsInTx", () => {
     );
     // Rolled back: the room still holds only its host.
     expect(await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, room.leagueId))).toHaveLength(1);
+  });
+});
+
+describe("bot team naming", () => {
+  it("names each bot team off the seeded team-name pool, sorted by bot id, never the owner's roster display name", async () => {
+    const room = await seedLobbyMock(db, { teamCount: 8, humans: 2 });
+    const out = await topUpBots(db, room.leagueId, mockLifecycleDeps(db));
+    expect(out).toEqual({ ok: true, added: 6 });
+
+    const [mockRoom] = await db.select({ botSeed: mockRooms.botSeed }).from(mockRooms).where(eq(mockRooms.leagueId, room.leagueId));
+    const rows = await db
+      .select({ userId: teams.userId, teamName: teams.name, isBot: users.isBot })
+      .from(teams)
+      .innerJoin(users, eq(users.id, teams.userId))
+      .where(eq(teams.leagueId, room.leagueId));
+    const botRows = rows.filter((row) => row.isBot);
+    expect(botRows).toHaveLength(6);
+
+    const sortedBotIds = [...botRows.map((row) => row.userId)].sort();
+    const expectedNames = pickBotTeamNames(mockRoom!.botSeed, sortedBotIds.length);
+    const expectedNameByBotId = new Map(sortedBotIds.map((id, i) => [id, expectedNames[i]]));
+
+    for (const row of botRows) {
+      expect(row.teamName).toBe(expectedNameByBotId.get(row.userId));
+      const rosterBot = MOCK_CONFIG.botRoster.find((bot) => bot.id === row.userId);
+      expect(rosterBot).toBeDefined();
+      // The team name is drawn from the SEPARATE team-name pool — never the seat's owner handle.
+      expect(row.teamName).not.toBe(rosterBot!.name);
+    }
+  });
+
+  it("re-derives byte-identical team names on a replay: same botSeed, same drawn bots, same names", async () => {
+    const room = await seedLobbyMock(db, { teamCount: 8, humans: 2 });
+    await topUpBots(db, room.leagueId, mockLifecycleDeps(db));
+    const twin = await seedLobbyMock(db, { teamCount: 8, humans: 2 });
+    await topUpBots(db, twin.leagueId, mockLifecycleDeps(db));
+
+    const botNamesFor = async (leagueId: string) =>
+      db
+        .select({ userId: teams.userId, teamName: teams.name, isBot: users.isBot })
+        .from(teams)
+        .innerJoin(users, eq(users.id, teams.userId))
+        .where(eq(teams.leagueId, leagueId))
+        .then((rows) => rows.filter((row) => row.isBot).map(({ userId, teamName }) => ({ userId, teamName })));
+
+    // Both rooms share the SAME stored `botSeed` fixture value (`seedLobbyMock` mints a fresh
+    // one per room in general, but the deterministic test seed source `mockLifecycleDeps` hands
+    // out the identical sequence for identical inputs) — drawn bots and their team names must
+    // match. The human seats' own team names differ between the two rooms by fixture design
+    // (`seedLobbyMock`'s per-room id stamp), so only the bot rows are compared here.
+    expect(await botNamesFor(room.leagueId)).toEqual(await botNamesFor(twin.leagueId));
   });
 });
 

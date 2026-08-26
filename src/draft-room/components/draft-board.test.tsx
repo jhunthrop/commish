@@ -297,7 +297,7 @@ describe("DraftBoard", () => {
       await renderSurface(
         <DraftBoard {...props} teams={TEAMS_WITH_BOT} view={SNAKE_VIEW} mock={mock} />,
         async ({ container }) => {
-          const botHeader = within(grid()).getByRole("columnheader", { name: /Park Bench Bot/ });
+          const botHeader = within(grid()).getByRole("columnheader", { name: /Turf Burners/ });
           expect(within(botHeader).getByText("Bot")).toBeInTheDocument();
           expect(within(botHeader).getByText(/practice opponent/)).toBeInTheDocument();
           const humanHeader = within(grid()).getByRole("columnheader", { name: /Bay Bandits/ });

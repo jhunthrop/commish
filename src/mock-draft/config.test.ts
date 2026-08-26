@@ -2,7 +2,80 @@ import { describe, expect, it } from "vitest";
 import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
 import { copyViolations } from "@/integrity/copy-rules";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
-import { MOCK_CONFIG, MOCK_COPY } from "./config";
+import { MOCK_BOT_TEAM_NAME_POOL, MOCK_CONFIG, MOCK_COPY } from "./config";
+
+/**
+ * The 24 `botRoster` ids as shipped — load-bearing for replay (`rngFor` keys every bot's seeded
+ * stream off its id, `./rng`'s own docblock). Task 2 (founder directive 2026-08-26) renamed every
+ * `name`, never an `id`: this pin is what makes that promise a test rather than a claim.
+ */
+const EXPECTED_BOT_ROSTER_IDS = [
+  "bot_park",
+  "bot_earlybird",
+  "bot_latenight",
+  "bot_chalk",
+  "bot_contrarian",
+  "bot_sleeper",
+  "bot_valuehunter",
+  "bot_zerorb",
+  "bot_workhorse",
+  "bot_stacker",
+  "bot_rookietruther",
+  "bot_steadyvet",
+  "bot_upside",
+  "bot_safefloor",
+  "bot_committee",
+  "bot_benchdepth",
+  "bot_streamer",
+  "bot_hunch",
+  "bot_spreadsheet",
+  "bot_gutcheck",
+  "bot_lastyear",
+  "bot_riskaverse",
+  "bot_boomorbust",
+  "bot_homer",
+];
+
+/**
+ * The founder's two honesty rules for a name a member sees beside a bot seat (owner handle or
+ * team name alike): never spell "bot" or "AI" as a whole word (word-boundary, so "Auntie Vee" or
+ * "The Waiver Wolves" are never falsely flagged for the "ai"/"bot" substrings buried inside an
+ * unrelated word), and never carry any word from the strategy vocabulary a member could read a
+ * bot's archetype off of.
+ */
+const BANNED_STRATEGY_VOCABULARY = [
+  "zero rb",
+  "sleeper",
+  "chalk",
+  "contrarian",
+  "value",
+  "upside",
+  "floor",
+  "stack",
+  "streamer",
+  "spreadsheet",
+  "hunch",
+  "boom",
+  "bust",
+  "workhorse",
+  "committee",
+  "rookie",
+  "vet",
+  "homer",
+  "hometown",
+  "risk",
+];
+
+function nameViolations(name: string): readonly string[] {
+  const lower = name.toLowerCase();
+  const violations: string[] = [];
+  if (/\bbot\b/i.test(name)) violations.push("bot");
+  if (/\bai\b/i.test(name)) violations.push("ai");
+  for (const word of BANNED_STRATEGY_VOCABULARY) {
+    if (lower.includes(word)) violations.push(word);
+  }
+  return violations;
+}
 
 describe("MOCK_CONFIG", () => {
   it("keeps every bot think-delay inside the fastest pick clock, with room for the human safety net", () => {
@@ -19,11 +92,21 @@ describe("MOCK_CONFIG", () => {
     expect(new Set(MOCK_CONFIG.botRoster.map((b) => b.id)).size).toBe(MOCK_CONFIG.botRoster.length);
   });
 
+  it("keeps every bot roster id byte-identical to what shipped — renaming an id re-deals every in-flight seed", () => {
+    expect(MOCK_CONFIG.botRoster.map((b) => b.id)).toEqual(EXPECTED_BOT_ROSTER_IDS);
+  });
+
   it("gives every bot a distinct, non-empty name", () => {
     const names = MOCK_CONFIG.botRoster.map((b) => b.name);
     expect(new Set(names).size).toBe(names.length);
     for (const name of names) {
       expect(name.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("never lets a bot's owner handle spell out \"bot\"/\"AI\" or leak its archetype's strategy vocabulary", () => {
+    for (const bot of MOCK_CONFIG.botRoster) {
+      expect(nameViolations(bot.name), `botRoster name "${bot.name}"`).toEqual([]);
     }
   });
 
@@ -90,6 +173,26 @@ describe("MOCK_CONFIG", () => {
     expect(startersFilledDamp).toBeLessThan(1);
     expect(runReaction.baseBoost).toBeGreaterThan(1);
     expect(runReaction.needBoost).toBeGreaterThan(runReaction.baseBoost);
+  });
+});
+
+describe("MOCK_BOT_TEAM_NAME_POOL", () => {
+  it("holds at least as many names as the widest room needs, so a full room never runs the pool dry", () => {
+    expect(MOCK_BOT_TEAM_NAME_POOL.length).toBeGreaterThanOrEqual(Math.max(...MOCK_CONFIG.teamCountOptions));
+    expect(MOCK_BOT_TEAM_NAME_POOL.length).toBeGreaterThanOrEqual(20);
+  });
+
+  it("gives every team name a distinct, non-empty entry", () => {
+    expect(new Set(MOCK_BOT_TEAM_NAME_POOL).size).toBe(MOCK_BOT_TEAM_NAME_POOL.length);
+    for (const name of MOCK_BOT_TEAM_NAME_POOL) {
+      expect(name.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("never spells out \"bot\"/\"AI\" or leaks strategy vocabulary either", () => {
+    for (const name of MOCK_BOT_TEAM_NAME_POOL) {
+      expect(nameViolations(name), `team name "${name}"`).toEqual([]);
+    }
   });
 });
 

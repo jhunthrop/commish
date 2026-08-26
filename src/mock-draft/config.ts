@@ -120,37 +120,86 @@ export const MOCK_CONFIG = {
    * (`Math.max(...teamCountOptions) + 4`, `config.test.ts`'s own gate on this) needs even if a
    * mock somehow reused the same seat twice in one draw. A bot's `id` is what a stream key in
    * `rngFor` (`./rng`) is built from, so the id, once shipped, is load-bearing for replay and
-   * must never be renamed out from under an in-flight seed. `name` is what a member sees beside
-   * the visible "Bot" marker (`MOCK_COPY.botBadge`) — never "AI", never a claim of intelligence,
-   * a named practice opponent and nothing more.
+   * must never be renamed out from under an in-flight seed.
+   *
+   * `name` is the OWNER a member sees seated across the table — a playful, coach-style handle,
+   * never a claim of intelligence and never a realistic full name a member could mistake for
+   * another person's (founder directive 2026-08-26: a mock draft should feel like drafting
+   * against real people, not a wall of "X Bot" labels, without ever pretending a bot is one).
+   * Two rules keep the illusion honest rather than deceptive: the visible "Bot" marker
+   * (`MOCK_COPY.botBadge`) stays on every bot seat everywhere, unconditionally — the name is
+   * flavor, the badge is the truth — and no name may spell "bot" or "AI" as a whole word, or
+   * carry any of `config.test.ts`'s banned strategy vocabulary, so a member can never read a
+   * bot's archetype off the seat label the way "Zero RB Bot" or "Contrarian Bot" once let them.
+   * `MOCK_BOT_TEAM_NAME_POOL` (below) is the separate, unrelated pool a bot's TEAM is named
+   * from — never this array — so the same bot's owner handle and team name never collide.
    */
   botRoster: [
-    { id: "bot_park", name: "Park Bench Bot" },
-    { id: "bot_earlybird", name: "Early Bird Bot" },
-    { id: "bot_latenight", name: "Late Night Bot" },
-    { id: "bot_chalk", name: "Chalk Bot" },
-    { id: "bot_contrarian", name: "Contrarian Bot" },
-    { id: "bot_sleeper", name: "Sleeper Bot" },
-    { id: "bot_valuehunter", name: "Value Hunter Bot" },
-    { id: "bot_zerorb", name: "Zero RB Bot" },
-    { id: "bot_workhorse", name: "Workhorse Bot" },
-    { id: "bot_stacker", name: "Stack Bot" },
-    { id: "bot_rookietruther", name: "Rookie Truther Bot" },
-    { id: "bot_steadyvet", name: "Steady Vet Bot" },
-    { id: "bot_upside", name: "Upside Bot" },
-    { id: "bot_safefloor", name: "Safe Floor Bot" },
-    { id: "bot_committee", name: "Committee Back Bot" },
-    { id: "bot_benchdepth", name: "Bench Depth Bot" },
-    { id: "bot_streamer", name: "Streamer Bot" },
-    { id: "bot_hunch", name: "Hunch Bot" },
-    { id: "bot_spreadsheet", name: "Spreadsheet Bot" },
-    { id: "bot_gutcheck", name: "Gut Check Bot" },
-    { id: "bot_lastyear", name: "Last Year Bot" },
-    { id: "bot_riskaverse", name: "Risk Averse Bot" },
-    { id: "bot_boomorbust", name: "Boom or Bust Bot" },
-    { id: "bot_homer", name: "Hometown Bot" },
+    { id: "bot_park", name: "Coach Parker" },
+    { id: "bot_earlybird", name: "Dana Q." },
+    { id: "bot_latenight", name: "Marty the Commish" },
+    { id: "bot_chalk", name: "Coach Bee" },
+    { id: "bot_contrarian", name: "Sam T." },
+    { id: "bot_sleeper", name: "Lena K." },
+    { id: "bot_valuehunter", name: "Pixel Pete" },
+    { id: "bot_zerorb", name: "Auntie Vee" },
+    { id: "bot_workhorse", name: "Coach Ramirez" },
+    { id: "bot_stacker", name: "Frankie Twice" },
+    { id: "bot_rookietruther", name: "Coach Delgado" },
+    { id: "bot_steadyvet", name: "Uncle Randy" },
+    { id: "bot_upside", name: "Miss Fixit" },
+    { id: "bot_safefloor", name: "Coach Ortiz" },
+    { id: "bot_committee", name: "Skip the Ref" },
+    { id: "bot_benchdepth", name: "Coach Reyes" },
+    { id: "bot_streamer", name: "Nana Debbie" },
+    { id: "bot_hunch", name: "Deacon Fife" },
+    { id: "bot_spreadsheet", name: "Coach Tanaka" },
+    { id: "bot_gutcheck", name: "Reggie Overtime" },
+    { id: "bot_lastyear", name: "Coach Winslow" },
+    { id: "bot_riskaverse", name: "Big Country Dale" },
+    { id: "bot_boomorbust", name: "Coach Alvarez" },
+    { id: "bot_homer", name: "Lucky Jean" },
   ],
 } as const;
+
+/**
+ * The pool `pickBotTeamNames` (`./team-names`) shuffles and takes from, one seeded draw per
+ * room's `botSeed` — a bot's TEAM name, distinct from its owner handle above
+ * (`MOCK_CONFIG.botRoster.name`) the same way a real member's team name is distinct from their
+ * profile display name. Fun, generic fantasy-football flavor, never a member-facing claim:
+ * `config.test.ts` enforces the identical banned-vocabulary and no-"bot"/"AI" rules
+ * `MOCK_CONFIG.botRoster` names carry, so a team name can never leak the archetype dealt to the
+ * bot sitting in that seat (`assignArchetypes`, `./archetypes`, a wholly separate seeded deal off
+ * the SAME `botSeed` — this pool and the archetype deck are two independent draws, never
+ * coupled). At least `MOCK_CONFIG.teamCountOptions`' widest room needs (`config.test.ts`'s own
+ * gate), so a full 12-bot room never runs the pool dry. Founder directive 2026-08-26.
+ */
+export const MOCK_BOT_TEAM_NAME_POOL = [
+  "Turf Burners",
+  "The Waiver Wolves",
+  "Fourth Down Fanatics",
+  "Bench Mob",
+  "The Garbage Timers",
+  "Flex Appeal",
+  "Trophy or Nothing",
+  "Gridiron Grinders",
+  "The Taco Tuesday 12",
+  "End Zone Enthusiasts",
+  "Red Zone Renegades",
+  "The Comeback Kids",
+  "Blitz Brigade",
+  "Pigskin Pirates",
+  "The Tailgate Titans",
+  "Fantasy Outlaws",
+  "The Sunday Scholars",
+  "Field Goal Fanatics",
+  "The Draft Dodgers",
+  "Turnover Kings",
+  "The End Around",
+  "Hail Mary Heroes",
+  "The Scramble Squad",
+  "Gridiron Gladiators",
+] as const;
 
 /** The three founder-required mock room modes, named once (`MOCK_CONFIG.modes`) and shared as a
  *  type the way every other closed vocabulary in this codebase is. */

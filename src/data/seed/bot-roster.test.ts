@@ -30,12 +30,26 @@ describe("ensureMockBotRoster", () => {
     }
   });
 
-  it("is idempotent — a second call against an already-seeded database inserts nothing and errors on nothing", async () => {
+  it("is idempotent — a second call against an already-seeded database writes the same values and errors on nothing", async () => {
     await ensureMockBotRoster(db);
     await expect(ensureMockBotRoster(db)).resolves.toBeUndefined();
 
     const rows = await db.select().from(users);
     expect(rows).toHaveLength(MOCK_CONFIG.botRoster.length);
+  });
+
+  it("upserts a rename: a pre-existing bot row's stale display name is corrected on the next call (Task 2, founder directive 2026-08-26)", async () => {
+    const bot = MOCK_CONFIG.botRoster[0]!;
+    await db.insert(users).values({ id: bot.id, email: `${bot.id}@bots.commish.internal`, displayName: "Old Stale Bot Name", isBot: true });
+
+    await ensureMockBotRoster(db);
+
+    const [row] = await db.select().from(users).where(eq(users.id, bot.id));
+    expect(row?.displayName).toBe(bot.name);
+    expect(row?.displayName).not.toBe("Old Stale Bot Name");
+    // The id, email and is_bot columns are never part of the update — only display_name rides
+    // the conflict path.
+    expect(row).toMatchObject({ id: bot.id, email: `${bot.id}@bots.commish.internal`, isBot: true });
   });
 
   it("never disturbs a real user row that happens to share no id with any bot", async () => {

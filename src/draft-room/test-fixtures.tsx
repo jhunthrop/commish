@@ -24,7 +24,7 @@ export const TEAMS: readonly TeamCard[] = [
  *  actually set, rather than every caller redeclaring its own bot-flagged team literal. */
 export const TEAMS_WITH_BOT: readonly TeamCard[] = [
   TEAMS[0]!,
-  { id: "t2", name: "Park Bench Bot", ownerDisplayName: "Park Bench Bot", ownerAvatarUrl: null, isBot: true },
+  { id: "t2", name: "Turf Burners", ownerDisplayName: "Coach Parker", ownerAvatarUrl: null, isBot: true },
 ];
 
 /** Task 8: `DraftSnapshotBody.mock` for an unstarted, non-link mock room — the shape most tests

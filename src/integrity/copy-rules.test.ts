@@ -47,6 +47,6 @@ describe("copyViolations", () => {
   });
 
   it("passes the mock draft's own honest bot copy", () => {
-    expect(copyViolations("Park Bench Bot is a practice opponent, seeded for this room only.")).toEqual([]);
+    expect(copyViolations("Coach Parker is a practice opponent, seeded for this room only.")).toEqual([]);
   });
 });

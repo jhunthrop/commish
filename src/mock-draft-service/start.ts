@@ -3,6 +3,7 @@ import type { Db, DbTx } from "@/db/client";
 import { drafts, leagues, mockRooms, teams } from "@/db/schema";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { rngFor, seededShuffle } from "@/mock-draft/rng";
+import { pickBotTeamNames } from "@/mock-draft/team-names";
 import { MOCK_REFUSALS, type MockLifecycleDeps } from "./claim";
 
 /**
@@ -33,6 +34,23 @@ export function drawBotSeats(botSeed: number, seatedUserIds: readonly string[], 
 }
 
 /**
+ * Names the bots being seated in THIS batch — never `bot.name` (`MOCK_CONFIG.botRoster`'s owner
+ * handle, the seat's identity), always a distinct pick off `MOCK_BOT_TEAM_NAME_POOL`
+ * (`pickBotTeamNames`, `@/mock-draft/team-names`). Sorted by bot id BEFORE zipping with the
+ * picker's output, deliberately decoupled from `drawBotSeats`'s own shuffle order: which roster
+ * bot fills which league seat is one seeded draw, and which team name that bot's seat gets is a
+ * second, independent one, keyed off the bot's own identity rather than an incidental insertion
+ * order — so a restart or a replay that re-derives the identical drawn-bot set (same `botSeed`,
+ * same already-seated ids, same count) always names each of those bots identically, regardless of
+ * which order this batch happens to iterate them in.
+ */
+function nameBotTeams(botSeed: number, bots: readonly BotSeat[]): ReadonlyMap<string, string> {
+  const sortedIds = [...bots.map((bot) => bot.id)].sort();
+  const names = pickBotTeamNames(botSeed, sortedIds.length);
+  return new Map(sortedIds.map((id, i) => [id, names[i]!]));
+}
+
+/**
  * Seats `teamCount - seated` roster bots inside the CALLER's transaction — `createMockRoom`'s
  * solo fill runs it in the creation transaction itself, `topUpBots` (below) under its own
  * `leagues FOR UPDATE`. Idempotent by arithmetic: seats needed is a count, not a memory, so a
@@ -55,7 +73,8 @@ export async function seatBotsInTx(
   if (bots.length < needed) {
     throw new Error(`seatBotsInTx: the bot roster (${MOCK_CONFIG.botRoster.length}) cannot fill ${needed} empty seats in league "${input.leagueId}".`);
   }
-  await tx.insert(teams).values(bots.map((bot) => ({ id: input.newId(), leagueId: input.leagueId, userId: bot.id, name: bot.name })));
+  const teamNames = nameBotTeams(input.botSeed, bots);
+  await tx.insert(teams).values(bots.map((bot) => ({ id: input.newId(), leagueId: input.leagueId, userId: bot.id, name: teamNames.get(bot.id)! })));
   return bots.length;
 }
 

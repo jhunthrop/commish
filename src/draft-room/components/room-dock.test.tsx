@@ -114,7 +114,7 @@ describe("RoomDock", () => {
   // carried on the wire (`MockRoomInfo.expectedBotPickSeconds`), and a human seat at the clock.
   it("prices practice opponents' turns honestly in the wait estimate", () => {
     const bots = [
-      { id: "t2", name: "Chalk Bot", ownerDisplayName: "Chalk Bot", ownerAvatarUrl: null, isBot: true },
+      { id: "t2", name: "Bench Mob", ownerDisplayName: "Coach Bee", ownerAvatarUrl: null, isBot: true },
     ];
     const view: DraftStateView = { ...SNAKE_VIEW, onClockTeamId: "t2", upcoming: ["t2", "t2", "t1"] };
     // both intervening turns are the bot's: 2 × 6s, never 2 × 8h
