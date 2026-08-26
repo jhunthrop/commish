@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { TeamCard } from "@/domain/league";
 import type { Player, Position } from "@/domain/player";
 import type { RosterSlotType } from "@/domain/roster";
 import type { DraftStateView } from "@/draft-engine";
@@ -24,6 +25,14 @@ export interface RoomDockProps {
   readonly actionLabel: string;
   readonly onAct: (playerId: string) => void;
   readonly onQueueChange: (playerIds: readonly string[]) => void;
+  /**
+   * Task 10, finding 1: which seats are practice opponents, for the wait estimate alone — a
+   * bot's turn is priced at `expectedBotPickSeconds`, never the full clock. Optional so every
+   * real-league caller (and test) that omits it keeps the flat estimate unchanged.
+   */
+  readonly teams?: readonly TeamCard[];
+  /** `MockRoomInfo.expectedBotPickSeconds`, or null for a real league. */
+  readonly expectedBotPickSeconds?: number | null;
   /**
    * The auction's live-lot console (`BidControls`), or null. Passing it in rather than
    * building it here is what keeps the dock format-agnostic: it renders whatever occupies its
@@ -161,7 +170,8 @@ function PrimarySlot({
   readonly targetName: string;
   readonly submitting: boolean;
   readonly onAct: (playerId: string) => void;
-  readonly yourTurn: string | null;
+  /** The standing line off your turn — the wait estimate, or the phase's own quiet fallback. */
+  readonly yourTurn: string;
 }) {
   if (canAct && targetId !== null) {
     return (
@@ -189,7 +199,7 @@ function PrimarySlot({
   }
   return (
     <p data-testid="dock-your-turn" className="shrink-0 self-center font-display text-display-sm font-semibold leading-display text-text-primary">
-      {yourTurn ?? "Watching the board."}
+      {yourTurn}
     </p>
   );
 }
@@ -212,6 +222,8 @@ export function RoomDock({
   actionLabel,
   onAct,
   onQueueChange,
+  teams = [],
+  expectedBotPickSeconds = null,
   bidConsole = null,
 }: RoomDockProps) {
   const available = new Set(view.availablePlayerIds);
@@ -225,6 +237,14 @@ export function RoomDock({
   // a courtesy is not a hot turn, so it never flips `mode` the way `canAct` does below.
   const owesPick = myTeamId !== null && (view.owedPicks?.[myTeamId]?.length ?? 0) > 0;
   const mode: DockMode = bidConsole !== null ? "bidding" : canAct ? "acting" : "watching";
+  // Task 10, finding 1: price practice opponents' turns at the seeded delay's expected value.
+  const botSeats =
+    expectedBotPickSeconds === null
+      ? null
+      : { ids: new Set(teams.filter((team) => team.isBot === true).map((team) => team.id)), pickSeconds: expectedBotPickSeconds };
+  // E11 (fixed at Task 10's persona checkpoint): before kickoff there is no board to watch —
+  // the standing line says what the room is actually doing, and the rail above says when.
+  const standingLine = formatYourTurn(view.upcoming, myTeamId, view.clockSeconds, view.pausedUntil ?? null, botSeats) ?? (preStart ? "Waiting for kickoff." : "Watching the board.");
 
   return (
     <footer
@@ -241,7 +261,7 @@ export function RoomDock({
           targetName={targetId === null ? "" : playerName(playersById, targetId)}
           submitting={submitting}
           onAct={onAct}
-          yourTurn={formatYourTurn(view.upcoming, myTeamId, view.clockSeconds, view.pausedUntil ?? null)}
+          yourTurn={standingLine}
         />
       )}
       <QueueChips queue={queue} playersById={playersById} draftedIds={draftedIds} busy={submitting} onChange={onQueueChange} />

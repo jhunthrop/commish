@@ -81,6 +81,30 @@ describe("RoomDock", () => {
     expect(screen.queryByRole("list", { name: "Your roster" })).toBeNull();
   });
 
+  // E11 (the draft-room design review, fixed at Task 10's persona checkpoint): the dock used
+  // to claim "Watching the board." over an empty pre-start board — there is nothing to watch
+  // yet, and the rail above already says why.
+  it("says it is waiting for kickoff, not watching the board, before the draft starts", () => {
+    const scheduled: DraftStateView = { ...SNAKE_VIEW, phase: "scheduled", onClockTeamId: null, deadlineAt: null, clockSeconds: null, upcoming: [] };
+    render(<RoomDock {...props} view={scheduled} />);
+    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("Waiting for kickoff.");
+  });
+
+  // Task 10's persona checkpoint, finding 1: in a practice room the flat `picksAway ×
+  // clockSeconds` ETA overstated the wait roughly tenfold (bots pick in seconds, never the
+  // full clock), and a first-timer who walks away on a wrong "~8m" misses her first pick.
+  // The dock now prices a practice opponent's turn at the seeded delay's own expected value,
+  // carried on the wire (`MockRoomInfo.expectedBotPickSeconds`), and a human seat at the clock.
+  it("prices practice opponents' turns honestly in the wait estimate", () => {
+    const bots = [
+      { id: "t2", name: "Chalk Bot", ownerDisplayName: "Chalk Bot", ownerAvatarUrl: null, isBot: true },
+    ];
+    const view: DraftStateView = { ...SNAKE_VIEW, onClockTeamId: "t2", upcoming: ["t2", "t2", "t1"] };
+    // both intervening turns are the bot's: 2 × 6s, never 2 × 8h
+    render(<RoomDock {...props} view={view} teams={bots} expectedBotPickSeconds={6} />);
+    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're up in 2 picks (any moment).");
+  });
+
   it("reorders and removes from the queue with named, keyboard-reachable buttons", () => {
     const onQueueChange = vi.fn();
     render(<RoomDock {...props} onQueueChange={onQueueChange} />);

@@ -164,10 +164,7 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                     </span>
                   </Button>
                 )}
-                {preStart ? (
-                  // Quiet, not disabled-looking: there is nothing to do here yet, and the rail says why.
-                  <span className="shrink-0 text-text-muted">—</span>
-                ) : row.drafted ? (
+                {preStart ? null : row.drafted ? ( // E11: pre-start rows have no action — sixty quiet dashes said nothing; the star is the action.
                   <Badge tone="neutral">Drafted</Badge>
                 ) : canDraft ? (
                   // Picking mode: the act button exists while it is genuinely your turn, OR

@@ -110,18 +110,31 @@ export function rosterSpots(slotConfig: readonly RosterSlotConfig[]): number {
  * "under a minute"/"any moment" cutoffs can never drift apart.
  *
  * `pausedUntil` is `DraftClockView.pausedUntil` (Task 4's overnight freeze). The flat
- * `picksAway * clockSeconds` estimate below already assumes every intervening turn runs its
- * full, un-paused length — an assumption a six-hour freeze breaks outright, and an ETA that
- * ignores it is worse than no ETA at all. Rather than projecting through the freeze (this room
- * cannot value-import `@/draft-engine`'s own `deadlineAfter` — see `formatTightening`'s
- * docblock for the same boundary), a currently-paused room gets the honest, qualitative answer
- * instead of a wrong number.
+ * per-pick estimate below already assumes every intervening turn runs its full, un-paused
+ * length — an assumption a six-hour freeze breaks outright, and an ETA that ignores it is
+ * worse than no ETA at all. Rather than projecting through the freeze (this room cannot
+ * value-import `@/draft-engine`'s own `deadlineAfter` — see `formatTightening`'s docblock for
+ * the same boundary), a currently-paused room gets the honest, qualitative answer instead of
+ * a wrong number.
+ *
+ * `botSeats` (Task 10's persona checkpoint, finding 1): a practice opponent's turn never runs
+ * the pick clock — the seeded delay lands it in seconds — so pricing every intervening turn
+ * at `clockSeconds` overstated a mock's wait roughly tenfold. A bot seat is priced at
+ * `pickSeconds` (the delay draw's expected value, `MockRoomInfo.expectedBotPickSeconds`,
+ * carried on the wire by the snapshot route); a human seat still gets the full clock. Null —
+ * every real league — keeps the flat estimate exactly as it was.
  */
+export interface BotSeatPricing {
+  readonly ids: ReadonlySet<string>;
+  readonly pickSeconds: number;
+}
+
 export function formatYourTurn(
   upcoming: readonly string[],
   myTeamId: string | null,
   clockSeconds: number | null,
   pausedUntil: string | null = null,
+  botSeats: BotSeatPricing | null = null,
 ): string | null {
   if (myTeamId === null) return null;
   const picksAway = upcoming.indexOf(myTeamId);
@@ -130,7 +143,9 @@ export function formatYourTurn(
   const picks = plural(picksAway, "pick");
   if (clockSeconds === null) return `You're up in ${picks}.`;
   if (pausedUntil !== null) return `You're up in ${picks}, once picks resume.`;
-  const waitMs = picksAway * clockSeconds * MS_PER_SECOND;
+  const waitMs = upcoming
+    .slice(0, picksAway)
+    .reduce((total, teamId) => total + (botSeats !== null && botSeats.ids.has(teamId) ? botSeats.pickSeconds : clockSeconds) * MS_PER_SECOND, 0);
   const wait = waitMs < UI_CONFIG.countdown.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
   return `You're up in ${picks} (${wait}).`;
 }

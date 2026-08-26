@@ -6,6 +6,7 @@ import { draftStateView, queueFor } from "@/draft-engine";
 import { getDraftStore } from "@/draft-service";
 import { leagueNameFor, listTeamCards } from "@/draft-service/teams";
 import { describeStartTiming } from "@/matchmaking/roll";
+import { expectedBotThinkDelaySeconds } from "@/mock-draft/bots";
 import { MOCK_COPY } from "@/mock-draft/config";
 import type { DraftSnapshotBody, MockResultsCopy, MockRoomInfo, MockShareInfo, WaitingInfo } from "@/draft-room/contract";
 import { withLeagueMember, type RouteContext } from "./_shared";
@@ -103,6 +104,10 @@ export async function GET(request: Request, context: RouteContext) {
             practiceBanner: MOCK_COPY.practiceBanner,
             botMarkerLabel: MOCK_COPY.botMarkerLabel,
             botBadge: MOCK_COPY.botBadge,
+            // Task 10, finding 1: the dock's honest practice ETA. A mock's clock schedule is
+            // one room-paced tier (Task 4's `loadDraftConfig`), so the schedule's floor IS the
+            // room's own pick clock.
+            expectedBotPickSeconds: expectedBotThinkDelaySeconds(state.config.clockSchedule[state.config.clockSchedule.length - 1]!.pickSeconds),
             share: view.phase === "scheduled" ? await mockShareInfoFor(getDb(), actor.leagueId) : null,
             results: view.phase === "complete" ? mockResultsCopy() : null,
           };

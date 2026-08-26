@@ -16,7 +16,7 @@ import {
 } from "@/draft-engine";
 import { submitCommand } from "@/draft-engine/test-support";
 import { BOT_ARCHETYPES, assignArchetypes, type BotArchetype } from "./archetypes";
-import { botThinkDelaySeconds, chooseBotPick } from "./bots";
+import { botThinkDelaySeconds, chooseBotPick, expectedBotThinkDelaySeconds } from "./bots";
 import { MOCK_CONFIG } from "./config";
 import { rngFor } from "./rng";
 
@@ -289,6 +289,17 @@ describe("botThinkDelaySeconds", () => {
   it("derives the identical delay from the identical stream, and a different one from another pick's stream", () => {
     expect(botThinkDelaySeconds(60, rngFor(3, "pick_1"))).toBe(botThinkDelaySeconds(60, rngFor(3, "pick_1")));
     expect(botThinkDelaySeconds(60, rngFor(3, "pick_1"))).not.toBe(botThinkDelaySeconds(60, rngFor(3, "pick_2")));
+  });
+
+  // Task 10's persona checkpoint, finding 1: the room's own wait estimate needs the delay
+  // draw's honest center — the same bounds as the draw itself, never a second literal.
+  it("expectedBotThinkDelaySeconds is the midpoint of the draw's own interval", () => {
+    for (const clockSeconds of MOCK_CONFIG.pickClockSecondsOptions) {
+      const cap = Math.min(MOCK_CONFIG.botDelay.maxSeconds, clockSeconds * MOCK_CONFIG.botDelay.maxFractionOfClock);
+      expect(expectedBotThinkDelaySeconds(clockSeconds)).toBe((MOCK_CONFIG.botDelay.minSeconds + cap) / 2);
+    }
+    // a clock short enough to bind the fraction cap shrinks the expectation with it
+    expect(expectedBotThinkDelaySeconds(8)).toBe((MOCK_CONFIG.botDelay.minSeconds + 4) / 2);
   });
 
   it("actually varies across a stream, so a room's cadence never metronomes", () => {

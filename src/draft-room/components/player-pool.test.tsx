@@ -95,11 +95,14 @@ describe("PlayerPool", () => {
     expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
   });
 
-  it("shows a quiet dash instead of an action, and still lets you queue, before the draft starts", () => {
+  // E11 (the draft-room design review, fixed at Task 10's persona checkpoint): the pre-start
+  // pool used to print a "—" per row — sixty dashes claiming a meaning nothing else on the
+  // surface gives them. Before the draft starts a row simply has no action; the star still does.
+  it("shows no action at all, and still lets you queue, before the draft starts", () => {
     const scheduled = { ...SNAKE_VIEW, phase: "scheduled" as const, availablePlayerIds: [], onClockTeamId: null };
     render(<PlayerPool {...props} view={scheduled} canAct={false} />);
     const row = rowFor("Jalen Croft");
-    expect(within(row).getByText("—")).toBeInTheDocument();
+    expect(within(row).queryByText("—")).toBeNull();
     expect(within(row).queryByRole("button", { name: "Draft" })).toBeNull();
     expect(within(row).getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument();
   });

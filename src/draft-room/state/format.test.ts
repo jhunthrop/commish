@@ -115,6 +115,27 @@ describe("formatYourTurn", () => {
     expect(formatYourTurn(["t2", "t1"], "t1", null)).toBe("You're up in 1 pick.");
   });
 
+  // Task 10's persona checkpoint, finding 1: a practice opponent's turn never runs the pick
+  // clock — pricing it at the clock overstated a mock's wait roughly tenfold. A bot seat is
+  // priced at the seeded delay's expected value; a human seat still gets the full clock.
+  describe("with practice-opponent seats priced honestly", () => {
+    const botSeats = { ids: new Set(["b1", "b2"]), pickSeconds: 6 };
+
+    it("prices an all-bot wait in seconds, not clocks", () => {
+      // 2 bot turns × 6s = 12s -> under the one-minute floor
+      expect(formatYourTurn(["b1", "b2", "t1"], "t1", 60, null, botSeats)).toBe("You're up in 2 picks (any moment).");
+    });
+
+    it("prices a mixed wait as bots-at-delay plus humans-at-clock", () => {
+      // 6s + 600s + 6s = 612s -> ~10m
+      expect(formatYourTurn(["b1", "t9", "b2", "t1"], "t1", 600, null, botSeats)).toBe("You're up in 3 picks (~10m).");
+    });
+
+    it("changes nothing for a room with no bot seats given", () => {
+      expect(formatYourTurn(["t2", "t2", "t1"], "t1", 600, null, null)).toBe("You're up in 2 picks (~20m).");
+    });
+  });
+
   it("gives an honest, qualitative answer instead of a wrong number while the room is paused", () => {
     // An ETA that ignores a six-hour freeze is worse than no ETA — the flat estimate would say
     // "~10m" here, which is not what actually happens next.

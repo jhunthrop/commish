@@ -33,6 +33,7 @@ export const MOCK_ROOM: MockRoomInfo = {
   practiceBanner: "This is a practice draft. Nothing here counts, and this room clears itself after a day.",
   botMarkerLabel: "practice opponent",
   botBadge: "Bot",
+  expectedBotPickSeconds: 6,
   share: null,
   results: null,
 };

@@ -138,3 +138,17 @@ export function botThinkDelaySeconds(pickClockSeconds: number, rng: Rng): number
   const cap = Math.min(maxSeconds, pickClockSeconds * maxFractionOfClock);
   return minSeconds + rng.next() * (cap - minSeconds);
 }
+
+/**
+ * The expected value of `botThinkDelaySeconds`' uniform draw — the midpoint of the same
+ * interval, from the same bounds, never a second literal (Task 10's persona checkpoint,
+ * finding 1). The snapshot route carries this to the room
+ * (`MockRoomInfo.expectedBotPickSeconds`) so the dock's wait estimate can price a practice
+ * opponent's turn at what it actually costs instead of the full pick clock — the flat
+ * clock-per-pick estimate overstated a mock's wait roughly tenfold, and a first-timer who
+ * walks away on a wrong "~8m" misses her first pick.
+ */
+export function expectedBotThinkDelaySeconds(pickClockSeconds: number): number {
+  const { minSeconds, maxSeconds, maxFractionOfClock } = MOCK_CONFIG.botDelay;
+  return (minSeconds + Math.min(maxSeconds, pickClockSeconds * maxFractionOfClock)) / 2;
+}

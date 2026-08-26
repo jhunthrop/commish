@@ -50,6 +50,14 @@ export interface MockRoomInfo {
   readonly botMarkerLabel: string;
   /** `MOCK_COPY.botBadge` — the visible short badge text. */
   readonly botBadge: string;
+  /**
+   * Task 10, finding 1: the expected seconds a practice opponent's turn actually takes
+   * (`expectedBotThinkDelaySeconds`, the delay draw's own midpoint for this room's clock) — the
+   * dock's wait estimate prices bot seats with this instead of the full pick clock, which
+   * overstated a mock's wait roughly tenfold. A number, not the delay bounds: the bot's
+   * playbook (`MOCK_CONFIG.strategy`) stays server-only.
+   */
+  readonly expectedBotPickSeconds: number;
   /** Present only for an unstarted `link`-mode room. */
   readonly share: MockShareInfo | null;
   /** Present only once the draft has actually finished. */

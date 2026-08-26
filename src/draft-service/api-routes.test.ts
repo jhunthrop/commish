@@ -227,6 +227,9 @@ describe("GET /api/drafts/[draftId] — Task 8's mock room info", () => {
     expect(body.data.mock.practiceBanner).toBe(MOCK_COPY.practiceBanner);
     expect(body.data.mock.botBadge).toBe(MOCK_COPY.botBadge);
     expect(body.data.mock.botMarkerLabel).toBe(MOCK_COPY.botMarkerLabel);
+    // Task 10, finding 1: the dock's honest practice ETA — the delay draw's expected value for
+    // this room's 60s clock: (3 + min(9, 30)) / 2.
+    expect(body.data.mock.expectedBotPickSeconds).toBe(6);
     // Not "link" mode, so ShareLinkPanel has nothing to show; not complete, so no results yet.
     expect(body.data.mock.share).toBeNull();
     expect(body.data.mock.results).toBeNull();

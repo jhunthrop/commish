@@ -124,6 +124,8 @@ export function RoomShell({
           actionLabel={actionLabel}
           onAct={onAct}
           onQueueChange={onQueueChange}
+          teams={room.teams}
+          expectedBotPickSeconds={room.mock?.expectedBotPickSeconds ?? null}
           bidConsole={bidConsole}
         />
       }
