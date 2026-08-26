@@ -7,6 +7,35 @@ import { PPR_SCORING } from "@/domain/scoring";
 
 const db = createTestDb();
 
+/** Postgres' generic check-violation SQLSTATE — shared by every CHECK constraint test in this
+ *  file, since asserting only "it threw" would pass for any OTHER check on the same table too. */
+const CHECK_VIOLATION_SQLSTATE = "23514";
+
+/** The driver's own error fields sit one level down on `.cause` — `./errors`' own finding,
+ *  reused here rather than re-derived. */
+function violatedConstraint(error: unknown): { readonly code: unknown; readonly name: unknown } {
+  const fields = (key: string) => {
+    for (const link of unwrapCauseChain(error)) {
+      if (typeof link === "object" && link !== null && key in link) return (link as Record<string, unknown>)[key];
+    }
+    return undefined;
+  };
+  return { code: fields("code"), name: fields("constraint_name") };
+}
+
+/** Asserts `insert` was refused BY NAME, the named CHECK constraint's own SQLSTATE — the same
+ *  "assert the constraint's name, not just that it threw" discipline every CHECK test here
+ *  follows, hoisted once (Phase 4.5, Task 2 review fix round 1) so a second CHECK constraint on
+ *  `leagues` does not duplicate this helper alongside the first. */
+async function expectCheckViolation(insert: Promise<unknown>, constraintName: string): Promise<void> {
+  let caught: unknown;
+  await insert.catch((error: unknown) => {
+    caught = error;
+  });
+  expect(caught, "the row committed — the CHECK constraint is not enforcing").toBeDefined();
+  expect(violatedConstraint(caught)).toEqual({ code: CHECK_VIOLATION_SQLSTATE, name: constraintName });
+}
+
 beforeEach(async () => {
   await truncateAll(db);
 });
@@ -116,33 +145,10 @@ async function seedLeague(): Promise<void> {
  * code, and any other check on this table raises it too.
  */
 describe("leagues_house_commissioner_ck", () => {
-  const CHECK_VIOLATION_SQLSTATE = "23514";
-
-  /** The driver's own error fields sit one level down on `.cause` — `./errors`' own finding,
-   *  reused here rather than re-derived. */
-  function violatedConstraint(error: unknown): { readonly code: unknown; readonly name: unknown } {
-    const fields = (key: string) => {
-      for (const link of unwrapCauseChain(error)) {
-        if (typeof link === "object" && link !== null && key in link) return (link as Record<string, unknown>)[key];
-      }
-      return undefined;
-    };
-    return { code: fields("code"), name: fields("constraint_name") };
-  }
-
-  async function expectRefused(insert: Promise<unknown>): Promise<void> {
-    let caught: unknown;
-    await insert.catch((error: unknown) => {
-      caught = error;
-    });
-    expect(caught, "the row committed — the CHECK constraint is not enforcing").toBeDefined();
-    expect(violatedConstraint(caught)).toEqual({ code: CHECK_VIOLATION_SQLSTATE, name: "leagues_house_commissioner_ck" });
-  }
-
   it("refuses a league that names BOTH a commissioner and a house rung", async () => {
     await db.insert(users).values({ id: "user_ck", email: "ck@example.com", displayName: "CK" });
 
-    await expectRefused(
+    await expectCheckViolation(
       db.insert(leagues).values({
         id: "league_ck_both",
         name: "Both",
@@ -151,12 +157,13 @@ describe("leagues_house_commissioner_ck", () => {
         commissionerUserId: "user_ck",
         houseRung: "open_12",
       }),
+      "leagues_house_commissioner_ck",
     );
     expect(await db.select().from(leagues)).toEqual([]);
   });
 
   it("refuses a league that names NEITHER a commissioner nor a house rung", async () => {
-    await expectRefused(
+    await expectCheckViolation(
       db.insert(leagues).values({
         id: "league_ck_neither",
         name: "Neither",
@@ -165,6 +172,7 @@ describe("leagues_house_commissioner_ck", () => {
         commissionerUserId: null,
         houseRung: null,
       }),
+      "leagues_house_commissioner_ck",
     );
     expect(await db.select().from(leagues)).toEqual([]);
   });
@@ -181,6 +189,58 @@ describe("leagues_house_commissioner_ck", () => {
 
     const rows = await db.select({ id: leagues.id }).from(leagues);
     expect(rows.map((row) => row.id).sort()).toEqual(["league_ck_house", "league_ck_member"]);
+  });
+});
+
+/**
+ * PHASE 4.5, TASK 2 REVIEW (HIGH, fix round 1) — THE SAME GUARD, FOR THE SAME REASON.
+ *
+ * `isMock`'s own docblock (`./schema.ts`) states "every mock ships `is_public_matchmade = false`"
+ * as the load-bearing fact that lets `ENFORCED_LEAGUE_SQL` (`@/league-service/enforcement`)
+ * exclude a mock from browse, the wire and the proof strip's 48h/next-draft reads BY
+ * CONSTRUCTION. Until `leagues_mock_private_ck` (migration `0042`) existed, that fact was
+ * conventional — upheld only by every writer remembering to set both columns in step. A future
+ * mock writer that set `is_public_matchmade: true` would silently leak a mock into every
+ * `ENFORCED_LEAGUE_SQL` consumer with no test anywhere failing, because none of those consumers
+ * know a mock exists — they trust the predicate they already have. The identical
+ * `leagues_house_commissioner_ck` precedent above: an invariant load-bearing enough to sit in
+ * prose belongs in the DDL, not in a writer's discipline.
+ */
+describe("leagues_mock_private_ck", () => {
+  it("refuses a mock league declared public-matchmade", async () => {
+    await db.insert(users).values({ id: "user_mck", email: "mck@example.com", displayName: "MCK" });
+
+    await expectCheckViolation(
+      db.insert(leagues).values({
+        id: "league_mck_public_mock",
+        name: "Leaky Mock",
+        format: "snake",
+        teamCount: 12,
+        commissionerUserId: "user_mck",
+        isMock: true,
+        isPublicMatchmade: true,
+      }),
+      "leagues_mock_private_ck",
+    );
+    expect(await db.select().from(leagues)).toEqual([]);
+  });
+
+  it("accepts the one legal mock shape, and an ordinary public league untouched", async () => {
+    // The other half of a constraint test: a rule that refuses everything is not the rule.
+    await db.insert(users).values({ id: "user_mck_ok", email: "mck-ok@example.com", displayName: "MCK OK" });
+    await db.insert(leagues).values({
+      id: "league_mck_private_mock", name: "Practice Room", format: "snake", teamCount: 12,
+      commissionerUserId: "user_mck_ok", isMock: true, isPublicMatchmade: false,
+    });
+    // `isMock` false makes the CHECK's left side true regardless of `isPublicMatchmade` — a real
+    // public league is untouched by this constraint, the exact shape this row proves.
+    await db.insert(leagues).values({
+      id: "league_mck_real_public", name: "Open Room", format: "snake", teamCount: 12,
+      commissionerUserId: "user_mck_ok", isMock: false, isPublicMatchmade: true,
+    });
+
+    const rows = await db.select({ id: leagues.id }).from(leagues);
+    expect(rows.map((row) => row.id).sort()).toEqual(["league_mck_private_mock", "league_mck_real_public"]);
   });
 });
 

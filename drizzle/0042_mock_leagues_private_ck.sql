@@ -1,0 +1,1 @@
+ALTER TABLE "leagues" ADD CONSTRAINT "leagues_mock_private_ck" CHECK (NOT "leagues"."is_mock" OR "leagues"."is_public_matchmade" = false);

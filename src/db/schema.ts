@@ -368,6 +368,23 @@ export const leagues = pgTable(
      * scan is trivial and the deploy-era split is not needed here.
      */
     check("leagues_house_commissioner_ck", sql`(${t.houseRung} IS NULL) = (${t.commissionerUserId} IS NOT NULL)`),
+    /**
+     * Phase 4.5, Task 2 review (HIGH, fix round 1): `isMock`'s own docblock above states "every
+     * mock ships `is_public_matchmade = false`" as the load-bearing fact that lets `ENFORCED_
+     * LEAGUE_SQL` exclude a mock from browse, the wire and the proof strip's 48h/next-draft reads
+     * BY CONSTRUCTION — but until this CHECK existed, that fact was conventional, upheld only by
+     * every writer remembering to set both columns in step. A future mock writer that set
+     * `is_public_matchmade: true` (a copy-paste off `createLeague`'s own default, or a new lobby
+     * feature that seats a mock into the public shelf "just this once") would silently leak into
+     * every `ENFORCED_LEAGUE_SQL` consumer with no test anywhere failing, because none of those
+     * consumers know a mock exists — they trust the predicate they already have. The same
+     * `leagues_house_commissioner_ck` precedent immediately above: an invariant load-bearing
+     * enough to sit in prose belongs in the DDL, not in a writer's discipline. `NOT is_mock`
+     * reads "this row is not a mock" — the CHECK holds trivially for every non-mock league
+     * (`is_mock` false makes the left side true regardless of `is_public_matchmade`) and for a
+     * mock row demands `is_public_matchmade = false` explicitly.
+     */
+    check("leagues_mock_private_ck", sql`NOT ${t.isMock} OR ${t.isPublicMatchmade} = false`),
   ],
 );
 
