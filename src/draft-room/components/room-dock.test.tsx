@@ -70,6 +70,19 @@ describe("RoomDock", () => {
     expect(screen.queryByRole("button", { name: /^Draft/ })).toBeNull();
   });
 
+  it("contains every growing dock sentence on its own line at phone width — the 360px squeeze pin", () => {
+    // The mobile-360 fixture caught display-size text squeezed to a sliver inside the dock's
+    // flex-wrap row (unqualified shrink/flex terms); the fix is room-rail's own NEW-3 idiom,
+    // `basis-full lg:basis-auto`. This pins the class shape so a jsdom CI run catches a
+    // regression the browser walk would otherwise be alone in seeing.
+    const { rerender } = render(<RoomDock {...props} queue={[]} canAct />);
+    expect(screen.getByTestId("dock-primary-empty").className).toContain("basis-full");
+    expect(screen.getByTestId("dock-primary-empty").className).toContain("lg:basis-auto");
+    rerender(<RoomDock {...props} view={{ ...SNAKE_VIEW, upcoming: ["t1", "t2"] }} />);
+    expect(screen.getByTestId("dock-your-turn").className).toContain("basis-full");
+    expect(screen.getByTestId("dock-your-turn").className).toContain("lg:basis-auto");
+  });
+
   it("says you are on the clock, from the engine's own lookahead, without a turn rule of its own", () => {
     render(<RoomDock {...props} view={{ ...SNAKE_VIEW, upcoming: ["t1", "t2"] }} />);
     expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're on the clock.");
