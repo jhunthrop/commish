@@ -101,8 +101,22 @@ export function RoomShell({
       }
       stage={
         <div className="flex h-full min-h-0 flex-col gap-3 p-4">
-          <NudgeBanner nudge={room.nudge} sequence={view.sequence} />
-          <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
+          {/* D2 (2026-08-26 design review): the celebration and the nudge used to render
+              in-flow above the board, so every landing pick shoved the board ~64px down and
+              snapped it back 2.4s later — the exact reflow the room's own "nothing reflows
+              when state changes" law forbids. This slot is the fix's whole mechanism: a
+              reserved band (`h-16` fits the celebration's own single-line height) that exists
+              whether or not anything is speaking, holding an absolutely positioned layer the
+              notices render into. The board below never learns a notice appeared; the rare
+              taller notice (nudge + celebration at once, or a two-line auction detail) floats
+              over the board's top edge instead of displacing it — the review's own sanctioned
+              alternative. */}
+          <div data-testid="stage-notices" className="relative h-16 shrink-0">
+            <div className="absolute inset-x-0 top-0 z-10 flex flex-col gap-2">
+              <NudgeBanner nudge={room.nudge} sequence={view.sequence} />
+              <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
+            </div>
+          </div>
           <DraftBoard
             view={view}
             teams={room.teams}
@@ -118,13 +132,13 @@ export function RoomShell({
           view={view}
           queue={room.queue}
           playersById={playersById}
+          teams={room.teams}
           myTeamId={room.myTeamId}
           submitting={room.submitting}
           canAct={canAct}
           actionLabel={actionLabel}
           onAct={onAct}
           onQueueChange={onQueueChange}
-          teams={room.teams}
           expectedBotPickSeconds={room.mock?.expectedBotPickSeconds ?? null}
           bidConsole={bidConsole}
         />

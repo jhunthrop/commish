@@ -95,10 +95,10 @@ describe("PlayerPool", () => {
     expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
   });
 
-  // E11 (the draft-room design review, fixed at Task 10's persona checkpoint): the pre-start
-  // pool used to print a "—" per row — sixty dashes claiming a meaning nothing else on the
-  // surface gives them. Before the draft starts a row simply has no action; the star still does.
-  it("shows no action at all, and still lets you queue, before the draft starts", () => {
+  // E11 (2026-08-26 design review): the pre-start pool printed a 60-row column of "—"
+  // placeholders — sixty dashes saying nothing sixty times. Dropped outright: no action slot
+  // renders at all before kickoff, and the star is still the whole story.
+  it("shows no action slot at all — not even a dash — and still lets you queue, before the draft starts (E11)", () => {
     const scheduled = { ...SNAKE_VIEW, phase: "scheduled" as const, availablePlayerIds: [], onClockTeamId: null };
     render(<PlayerPool {...props} view={scheduled} canAct={false} />);
     const row = rowFor("Jalen Croft");
@@ -122,6 +122,21 @@ describe("PlayerPool", () => {
     rerender(<PlayerPool {...props} canAct onAct={onAct} />);
     fireEvent.click(screen.getAllByRole("button", { name: "Draft" })[0]!);
     expect(onAct).toHaveBeenCalledWith("qb1");
+  });
+
+  // D3 (2026-08-26 design review, rule 5): on your turn the pool used to fill the view with
+  // up to sixty solid ink "Draft" pills against a one-ink law — the row act button, the "All"
+  // filter and the empty-state button all took `Button`'s default primary. The pool is now
+  // quiet by construction: the dock's one confirmed pick affordance is the room's single ink
+  // action, and nothing in this component may ever wear the ink fill.
+  it("keeps every pool control quiet — no ink pill ever renders here, even on your turn (D3)", () => {
+    const { container } = render(<PlayerPool {...props} />);
+    expect(screen.getAllByRole("button", { name: "Draft" }).length).toBeGreaterThan(0);
+    expect(container.querySelector(".bg-text-primary")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Search players"), { target: { value: "zzzz" } });
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+    expect(container.querySelector(".bg-text-primary")).toBeNull();
   });
 
   it("shows the in-flight player as pending", () => {

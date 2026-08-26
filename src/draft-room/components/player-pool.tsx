@@ -46,9 +46,11 @@ interface PoolRow {
 function PositionFilters({ value, onChange }: { readonly value: string; readonly onChange: (next: string) => void }) {
   return (
     <div role="group" aria-label="Filter by position" className="flex flex-wrap items-center gap-1">
+      {/* Secondary when selected, ghost when not — never primary: a filter is not the room's
+          one ink action (D3, rule 5). The outline alone says "this is the active toggle". */}
       <Button
         size="sm"
-        variant={value === ALL ? "primary" : "ghost"}
+        variant={value === ALL ? "secondary" : "ghost"}
         aria-pressed={value === ALL}
         onClick={() => onChange(ALL)}
       >
@@ -135,6 +137,7 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
           icon="search"
           action={
             <Button
+              variant="secondary"
               onClick={() => {
                 setQuery("");
                 setPosition(ALL);
@@ -164,15 +167,25 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                     </span>
                   </Button>
                 )}
-                {preStart ? null : row.drafted ? ( // E11: pre-start rows have no action — sixty quiet dashes said nothing; the star is the action.
+                {preStart ? (
+                  // Nothing at all — E11 (2026-08-26 design review): a per-row "—" printed a
+                  // 60-row column of dashes before kickoff. There is nothing to do here yet,
+                  // the rail says why, and the star beside this slot is still the whole story.
+                  null
+                ) : row.drafted ? (
                   <Badge tone="neutral">Drafted</Badge>
                 ) : canDraft ? (
                   // Picking mode: the act button exists while it is genuinely your turn, OR
                   // (Task 5) while you owe a pick from an earlier skip — live on your turn and
                   // off it. While neither is true, the star is the action — a disabled "Draft"
                   // would be a lie-in-waiting.
+                  //
+                  // `secondary`, never the default primary — D3 (2026-08-26 design review,
+                  // rule 5): sixty ink pills in the on-turn pool shouted over the dock's one
+                  // true action. The pool offers; the dock's single ink pill confirms.
                   <Button
                     size="sm"
+                    variant="secondary"
                     loading={submitting && pendingPlayerId === row.player.id}
                     onClick={() => onAct(row.player.id)}
                   >

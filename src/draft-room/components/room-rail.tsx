@@ -150,8 +150,12 @@ function pendingPickCount(view: DraftStateView): number {
  * ever claiming somebody is "on the clock" during a live lot. This is also where the
  * `AuctionLotPanel` went: the standing bid and its holder are a fact about *the turn*, and the
  * turn has exactly one home.
+ *
+ * Exported for exactly one other consumer: `RoomDock`'s compact below-`lg` clock echo (E2),
+ * which must speak THIS grammar rather than derive a second one — one authority for whose
+ * turn it is, two places that render it.
  */
-function turnSummary(
+export function turnSummary(
   view: DraftStateView,
   teams: readonly TeamCard[],
   playersById: ReadonlyMap<string, Player>,
@@ -353,7 +357,11 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
             <p className="sr-only">{turn.sentence}</p>
           </>
         )}
-        {myTeamName === null ? null : (
+        {/* Suppressed while `hot` — E9 (2026-08-26 design review): "Your team: Turf Burners"
+            beside "You're on the clock · Turf Burners" said the same name twice at the exact
+            moment the rail should say one thing. The turn line owns the fact while the turn
+            is mine; the chip returns the moment it isn't. */}
+        {myTeamName === null || mode === "hot" ? null : (
           <span className="whitespace-nowrap text-sm text-text-muted">
             Your team: <span className="font-display font-semibold text-text-primary">{myTeamName}</span>
           </span>

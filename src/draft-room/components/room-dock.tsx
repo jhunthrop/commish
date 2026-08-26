@@ -6,9 +6,11 @@ import type { Player, Position } from "@/domain/player";
 import type { RosterSlotType } from "@/domain/roster";
 import type { DraftStateView } from "@/draft-engine";
 import { Button, EYEBROW, PositionBadge, SlotChip } from "@/components/ui";
+import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { formatYourTurn } from "../state/format";
 import { playerName, queueButtonLabel } from "../lib/lookups";
 import { moveInQueue, removeFromQueue } from "../state/queue";
+import { turnSummary } from "./room-rail";
 
 export type DockMode = "bidding" | "acting" | "watching";
 
@@ -17,6 +19,8 @@ export interface RoomDockProps {
   /** The caller's OWN ranked autopick queue. Never anybody else's. */
   readonly queue: readonly string[];
   readonly playersById: ReadonlyMap<string, Player>;
+  /** The league's teams, for the compact clock's turn label (E2) — same list the rail reads. */
+  readonly teams: readonly TeamCard[];
   readonly myTeamId: string | null;
   readonly submitting: boolean;
   /** True only when the server says it is this user's turn to act. */
@@ -25,13 +29,9 @@ export interface RoomDockProps {
   readonly actionLabel: string;
   readonly onAct: (playerId: string) => void;
   readonly onQueueChange: (playerIds: readonly string[]) => void;
-  /**
-   * Task 10, finding 1: which seats are practice opponents, for the wait estimate alone — a
-   * bot's turn is priced at `expectedBotPickSeconds`, never the full clock. Optional so every
-   * real-league caller (and test) that omits it keeps the flat estimate unchanged.
-   */
-  readonly teams?: readonly TeamCard[];
-  /** `MockRoomInfo.expectedBotPickSeconds`, or null for a real league. */
+  /** `MockRoomInfo.expectedBotPickSeconds`, or null for a real league — Task 10, finding 1:
+   *  a bot's turn is priced at this expected value (bot seats read off `teams`), never the
+   *  full clock. Null keeps the flat estimate byte-identical for every real-league caller. */
   readonly expectedBotPickSeconds?: number | null;
   /**
    * The auction's live-lot console (`BidControls`), or null. Passing it in rather than
@@ -120,7 +120,14 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
   return (
     <div className="flex min-w-0 basis-full flex-1 flex-col gap-1 lg:basis-auto">
       <h2 className={`${EYEBROW} text-text-muted`}>Your queue</h2>
-      <ol aria-label="Your queue" className="flex items-center gap-2 overflow-x-auto pb-1">
+      {/* `[contain:layout]` — D1 (2026-08-26 design review): at 360px the first chip's box
+          leaked past this list's `overflow-x-auto` clip into the PAGE's scrollable overflow,
+          panning the whole room sideways into a 186px void. Layout containment makes this
+          list its own formatting root, so nothing it lays out can ever contribute to an
+          ancestor's scrollable overflow — verified in-browser against the real compiled CSS
+          (`overflow-hidden` on the parent did NOT close it). The 360px e2e walk asserts the
+          page-level effect with a queued chip present. */}
+      <ol aria-label="Your queue" className="flex items-center gap-2 overflow-x-auto pb-1 [contain:layout]">
         {queue.map((playerId, index) => {
           const name = playerName(playersById, playerId);
           const player = playersById.get(playerId);
@@ -154,6 +161,45 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
 }
 
 /**
+ * E2 (2026-08-26 design review): below `lg` only the dock sticks — the rail, the room's ONLY
+ * clock, scrolled away, so a phone user deep in the pool acted against an invisible clock and
+ * the essential loop (see clock, see pool, pick) did not hold at 360px. This is the same clock
+ * riding the sticky dock: `lg:hidden`, so the fact is never spoken twice at desktop widths,
+ * and its grammar is the rail's own `turnSummary` — one authority, two renderings.
+ *
+ * `aria-hidden` on purpose: the rail's coarse live region and turn sentence stay in the
+ * accessibility tree wherever the page has scrolled, so this echo is visual-only — a second
+ * live region would double every clock announcement. Hydration discipline holds: `useCountdown`
+ * is null until the client clock snaps and `Countdown` renders its placeholder, never a false
+ * "0:00". A paused room renders nothing rather than a frozen, false clock — the dock's own
+ * standing sentence already says "once picks resume".
+ */
+function DockClock({
+  view,
+  teams,
+  playersById,
+  myTeamId,
+}: {
+  readonly view: DraftStateView;
+  readonly teams: readonly TeamCard[];
+  readonly playersById: ReadonlyMap<string, Player>;
+  readonly myTeamId: string | null;
+}) {
+  // Called unconditionally, before any early return — React's Rules of Hooks.
+  const { remainingMs, now } = useCountdown(view.deadlineAt);
+  const pausedUntil = view.pausedUntil ?? null;
+  const paused = pausedUntil !== null && now !== null && now < Date.parse(pausedUntil);
+  if (view.phase !== "in_progress" || view.deadlineAt === null || paused) return null;
+  const turn = turnSummary(view, teams, playersById, myTeamId);
+  return (
+    <div aria-hidden="true" data-testid="dock-clock" className="ml-auto flex shrink-0 flex-col items-end lg:hidden">
+      <Countdown remainingMs={remainingMs} size="md" tone={turn.mine ? "hot" : "default"} />
+      <span className={`${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>{turn.label}</span>
+    </div>
+  );
+}
+
+/**
  * The dock's left edge: the one thing to do right now. On your turn it is a single button
  * that drafts the top of your queue — one click if you planned. With nothing draftable queued
  * it points at the pool instead of pretending there is a button; the pool is already under
@@ -179,7 +225,7 @@ function PrimarySlot({
   readonly submitting: boolean;
   readonly onAct: (playerId: string) => void;
   /** The standing line off your turn — the wait estimate, or the phase's own quiet fallback. */
-  readonly yourTurn: string;
+  readonly yourTurn: string | null;
 }) {
   if (canAct && targetId !== null) {
     return (
@@ -235,13 +281,13 @@ export function RoomDock({
   view,
   queue,
   playersById,
+  teams,
   myTeamId,
   submitting,
   canAct,
   actionLabel,
   onAct,
   onQueueChange,
-  teams = [],
   expectedBotPickSeconds = null,
   bidConsole = null,
 }: RoomDockProps) {
@@ -263,7 +309,11 @@ export function RoomDock({
       : { ids: new Set(teams.filter((team) => team.isBot === true).map((team) => team.id)), pickSeconds: expectedBotPickSeconds };
   // E11 (fixed at Task 10's persona checkpoint): before kickoff there is no board to watch —
   // the standing line says what the room is actually doing, and the rail above says when.
-  const standingLine = formatYourTurn(view.upcoming, myTeamId, view.clockSeconds, view.pausedUntil ?? null, botSeats) ?? (preStart ? "Waiting for kickoff." : "Watching the board.");
+  // MERGE of both lanes' E11 fixes: the mock lane threads `botSeats` so a practice room's ETA
+  // uses the bots' real think-delay midpoint (Task 10 fix 1), and the design lane's fix pass
+  // ruled the live-board fallback is NOTHING rather than "Watching the board." (E11 — a sentence
+  // over a board with nothing to say is noise). Pre-start keeps its honest kickoff line.
+  const standingLine = formatYourTurn(view.upcoming, myTeamId, view.clockSeconds, view.pausedUntil ?? null, botSeats) ?? (preStart ? "Waiting for kickoff." : null);
 
   return (
     <footer
@@ -283,6 +333,7 @@ export function RoomDock({
           yourTurn={standingLine}
         />
       )}
+      <DockClock view={view} teams={teams} playersById={playersById} myTeamId={myTeamId} />
       <QueueChips queue={queue} playersById={playersById} draftedIds={draftedIds} busy={submitting} onChange={onQueueChange} />
       <RosterFill view={view} myTeamId={myTeamId} />
     </footer>

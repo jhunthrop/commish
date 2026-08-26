@@ -3,13 +3,14 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { DraftStateView } from "@/draft-engine";
 import { renderSurface } from "@/components/ui/test-utils";
-import { SNAKE_VIEW, playersById } from "../test-fixtures";
+import { SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { RoomDock } from "./room-dock";
 
 const props = {
   view: SNAKE_VIEW,
   queue: ["rb1", "qb1"],
   playersById: playersById(),
+  teams: TEAMS,
   myTeamId: "t1",
   submitting: false,
   canAct: false,
@@ -88,9 +89,12 @@ describe("RoomDock", () => {
     expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're on the clock.");
   });
 
-  it("falls back to a quiet line for a commissioner with no team in the draft", () => {
+  it("says nothing at all for a commissioner with no team in the draft — E11's live-board silence", () => {
+    // MERGED SEMANTICS (the design lane's fix pass, E11): when `formatYourTurn` has nothing to
+    // say on a LIVE board, the standing line is silent — a sentence with no information was the
+    // finding. Pre-start keeps its honest kickoff line (tested above).
     render(<RoomDock {...props} myTeamId={null} />);
-    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("Watching the board.");
+    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("");
     expect(screen.queryByRole("list", { name: "Your roster" })).toBeNull();
   });
 
@@ -129,6 +133,50 @@ describe("RoomDock", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove Marcus Reed from your queue" }));
     expect(onQueueChange).toHaveBeenCalledWith(["qb1"]);
+  });
+
+  // E2 (2026-08-26 design review): below `lg` only the dock sticks, and the rail — the room's
+  // ONLY clock — scrolled away, so a phone user deep in the pool acted against an invisible
+  // clock. The dock now carries a compact echo of the same clock, `lg:hidden` (never spoken
+  // twice at desktop widths) and `aria-hidden` (the rail still owns the screen-reader story —
+  // a second live region would double every announcement).
+  it("rides the sticky dock with the clock below lg, hot on my turn, calm on theirs (E2)", () => {
+    const live = { ...SNAKE_VIEW, deadlineAt: new Date(Date.now() + 42_000).toISOString() };
+    const { rerender } = render(<RoomDock {...props} view={live} canAct />);
+    const clock = screen.getByTestId("dock-clock");
+    expect(clock.className).toContain("lg:hidden");
+    expect(clock).toHaveAttribute("aria-hidden", "true");
+    expect(clock).toHaveTextContent("You're on the clock");
+    expect(clock.querySelector(".text-negative")).not.toBeNull();
+
+    rerender(<RoomDock {...props} view={{ ...live, ...waiting }} />);
+    const calm = screen.getByTestId("dock-clock");
+    expect(calm).toHaveTextContent("On the clock");
+    expect(calm).not.toHaveTextContent("You're on the clock");
+    expect(calm.querySelector(".text-negative")).toBeNull();
+  });
+
+  it("shows no dock clock before the draft starts, after it ends, or while picks are paused (E2)", () => {
+    const scheduled: DraftStateView = { ...SNAKE_VIEW, phase: "scheduled", availablePlayerIds: [], onClockTeamId: null, upcoming: [], deadlineAt: null };
+    const { rerender } = render(<RoomDock {...props} view={scheduled} />);
+    expect(screen.queryByTestId("dock-clock")).toBeNull();
+
+    // Paused: a frozen countdown is a false clock — the standing sentence beside it already
+    // says "once picks resume", so the compact clock stands down entirely.
+    const paused: DraftStateView = { ...SNAKE_VIEW, ...waiting, deadlineAt: new Date(Date.now() + 42_000).toISOString(), pausedUntil: new Date(Date.now() + 600_000).toISOString() };
+    rerender(<RoomDock {...props} view={paused} />);
+    expect(screen.queryByTestId("dock-clock")).toBeNull();
+  });
+
+  // D1 (2026-08-26 design review): at 360px the first queue chip's box leaked past this
+  // `<ol>`'s `overflow-x-auto` clip into the PAGE's scrollable overflow — a 186px phantom
+  // sideways pan (scrollWidth 546 vs 360, Chromium, real compiled CSS). `contain: layout` on
+  // the `<ol>` was the fix the review verified in-browser (`overflow-hidden` on the parent was
+  // tried and did NOT restore 360). happy-dom computes no layout, so this pins the class;
+  // `e2e/mobile-360.spec.ts` proves the page-level effect against the real engine.
+  it("contains the queue rail's own layout so a chip can never leak into page overflow (D1)", () => {
+    render(<RoomDock {...props} />);
+    expect(screen.getByRole("list", { name: "Your queue" }).className).toContain("[contain:layout]");
   });
 
   it("invites you to build a queue when you have none", () => {
@@ -176,6 +224,15 @@ describe("RoomDock", () => {
     render(<RoomDock {...props} view={view} canAct queue={[]} />);
     expect(screen.getByTestId("dock-primary-empty")).toHaveTextContent("Your pick. Take somebody from the pool.");
     expect(screen.queryByTestId("dock-owed-pick")).toBeNull();
+  });
+
+  // E11 (2026-08-26 design review): "Watching the board." over an empty, not-yet-started
+  // board was a claim with nothing to watch. The scheduled phase gets its own sentence.
+  it("waits for kickoff before the draft starts, instead of claiming to watch an empty board (E11)", () => {
+    const scheduled: DraftStateView = { ...SNAKE_VIEW, phase: "scheduled", availablePlayerIds: [], onClockTeamId: null, upcoming: [], deadlineAt: null };
+    render(<RoomDock {...props} view={scheduled} />);
+    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("Waiting for kickoff.");
+    expect(screen.queryByText("Watching the board.")).toBeNull();
   });
 
   it("never strikes a queued player through before the draft has started", () => {

@@ -108,6 +108,40 @@ describe("SnakeRoom", () => {
     expect(onAct).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "qb1" });
   });
 
+  // D3 (2026-08-26 design review, rule 5): the room's peak state — you on the clock, a full
+  // pool — is exactly when the one-ink law matters most. The dock's confirmed pick affordance
+  // is the ONE ink pill; sixty pool rows beside it stay quiet. Counted on the rendered room,
+  // not one component, so a future call site can't quietly reintroduce a second pill.
+  it("shows at most one ink pill in the whole room, even on your turn (D3, rule 5)", () => {
+    const { container } = renderRoom();
+    expect(screen.getByRole("button", { name: "Draft Marcus Reed" })).toBeInTheDocument();
+    expect(container.querySelectorAll(".bg-text-primary").length).toBeLessThanOrEqual(1);
+  });
+
+  // D2 (2026-08-26 design review): every landing pick used to shove the whole board ~64px
+  // down and snap it back 2.4s later — ~180 reflows per draft, against the room's own
+  // "nothing reflows when state changes" law. The stage now reserves a fixed-height notice
+  // slot whether or not anything is speaking, and the celebration/nudge render in an
+  // absolutely positioned layer inside it, so a notice taller than the band floats over the
+  // board instead of displacing it. happy-dom computes no layout, so this pins the classes;
+  // the harness screenshots prove the pixels.
+  it("reserves a fixed-height notice slot so a landing pick never moves the board (D2)", () => {
+    const { unmount } = renderRoom();
+    const quiet = screen.getByTestId("stage-notices");
+    expect(quiet.className).toContain("h-16");
+    expect(quiet.className).toContain("shrink-0");
+    expect(quiet.className).toContain("relative");
+    unmount();
+
+    const landed = { pickNumber: 1, round: 1, teamId: "t1", playerId: "rb1", slot: "RB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:05:00.000Z", auto: false };
+    renderRoom({ lastPick: { pick: landed, isMine: true } });
+    const slot = screen.getByTestId("stage-notices");
+    const celebration = screen.getByTestId("pick-celebration");
+    expect(slot.contains(celebration)).toBe(true);
+    // The layer, not the slot, is absolute: the slot holds the band's height open.
+    expect(celebration.closest(".absolute")).not.toBeNull();
+  });
+
   it("shows the moderator's nudge, addressed to my own team for this turn", () => {
     renderRoom({ nudge: { message: "You're on the clock.", sequence: SNAKE_VIEW.sequence } });
     expect(screen.getByRole("status")).toHaveTextContent("You're on the clock.");
