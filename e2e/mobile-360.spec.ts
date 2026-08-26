@@ -72,8 +72,9 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
 
   try {
     // --- Phase 3.6, Task 13: the front door, the v2 set's first surface --------------------
-    // Renders identically signed in or signed out (`FrontDoorHero`/`ProofStrip`/the shelf never
-    // branch on session), so this reuses the one signed-in context the rest of the spec already
+    // The headline/`ProofStrip`/shelf never branch on session (Phase 4.5, Task 9's own
+    // `PracticeEntryLink` is the one exception, and it changes only an href, never the layout
+    // this spec checks), so this reuses the one signed-in context the rest of the spec already
     // holds rather than opening a second one just for this page.
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Real leagues. Real seats. Drafting this week." })).toBeVisible();

@@ -610,7 +610,9 @@ decision somebody made once, not a precedent the next writer generalizes from.
 
 **The safety net is named once: "the room picks for you from your queue"** (C3). Every surface
 that reassures a member about missing a draft quotes that exact phrase (`waiting-room.tsx`,
-`src/help/glossary.ts`); no surface invents "autopick," "auto-draft," or "we will draft for you."
+`src/help/glossary.ts`, `room-tour.tsx` — Phase 4.5, Task 9, whose first-ever rendered sweep
+caught the tour's own pre-existing "autopick" wording, unswept since before that phase); no
+surface invents "autopick," "auto-draft," or "we will draft for you."
 
 **The when-full promise and every start-timing sentence are `describeStartTiming`'s** (F9), not
 prose composed at the call site — `src/matchmaking/roll.ts` is the one function every surface
