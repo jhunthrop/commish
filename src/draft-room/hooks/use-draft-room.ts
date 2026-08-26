@@ -5,7 +5,7 @@ import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { ClientDraftAction, CompletedPick, DraftStateView } from "@/draft-engine";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import type { DraftPlayersBody, DraftQueueBody, DraftSnapshotBody, MockRoomInfo } from "@/draft-room/contract";
+import type { DraftPlayersBody, DraftQueueBody, DraftSnapshotBody, MockRoomInfo, WaitingInfo } from "@/draft-room/contract";
 import { applyDraftEvent } from "@/draft-room/state/apply-event";
 import { optimisticView } from "@/draft-room/state/optimistic";
 import { useDraftRoomDeps } from "./deps";
@@ -51,6 +51,8 @@ interface RoomState {
   /** Null for a real league. See `MockRoomInfo`'s own docblock (`../contract`) for why the mock
    *  lane's own words reach this room as data rather than a value import. */
   readonly mock: MockRoomInfo | null;
+  /** R2: the scheduled room's waiting story, straight off the snapshot — null once live. */
+  readonly waiting: WaitingInfo | null;
 }
 
 export interface DraftRoom extends RoomState {
@@ -75,6 +77,7 @@ const INITIAL: RoomState = {
   queue: [],
   nudge: null,
   mock: null,
+  waiting: null,
 };
 
 /**
@@ -169,6 +172,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
           pendingPlayerId: null,
           queue: snapshot.data.queue,
           mock: snapshot.data.mock,
+          waiting: snapshot.data.waiting,
         }));
       } catch {
         if (generation === generationRef.current) {

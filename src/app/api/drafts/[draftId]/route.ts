@@ -1,12 +1,13 @@
 import { eq } from "drizzle-orm";
 import { getDb, type Db } from "@/db/client";
-import { leagues, mockRooms, teams as teamsTable } from "@/db/schema";
+import { drafts, leagues, mockRooms, teams as teamsTable } from "@/db/schema";
 import { fail, ok } from "@/lib/api/respond";
 import { draftStateView, queueFor } from "@/draft-engine";
 import { getDraftStore } from "@/draft-service";
 import { leagueNameFor, listTeamCards } from "@/draft-service/teams";
+import { describeStartTiming } from "@/matchmaking/roll";
 import { MOCK_COPY } from "@/mock-draft/config";
-import type { DraftSnapshotBody, MockResultsCopy, MockRoomInfo, MockShareInfo } from "@/draft-room/contract";
+import type { DraftSnapshotBody, MockResultsCopy, MockRoomInfo, MockShareInfo, WaitingInfo } from "@/draft-room/contract";
 import { withLeagueMember, type RouteContext } from "./_shared";
 
 export const runtime = "nodejs";
@@ -35,6 +36,33 @@ async function mockShareInfoFor(db: Db, leagueId: string): Promise<MockShareInfo
     teamCount: room.teamCount,
     seatsFilled: seated.length,
     startsAt: room.startsAt.toISOString(),
+  };
+}
+
+/**
+ * R2 (the draft-room design review, carried by Task 10): the scheduled room's waiting story —
+ * only ever called while `phase === "scheduled"`. For a practice room the countdown target is
+ * the fill window's own `mock_rooms.starts_at` and the sentence is `MOCK_COPY.waitingDetail`;
+ * for a real league the sentence is quoted verbatim from `describeStartTiming` (the one
+ * start-timing authority — never restated here) and the target is the draft's own `kickoff_at`,
+ * but only for a `scheduled` trigger: a `when_full` room has no chosen time to count to, so its
+ * only honest answer is the sentence. The `undefined` guards are the same "the row vanished
+ * mid-request" defensiveness `mockShareInfoFor` already keeps: answer less, never invent.
+ */
+async function waitingInfoFor(db: Db, leagueId: string, draftId: string, isMock: boolean): Promise<WaitingInfo | null> {
+  if (isMock) {
+    const [room] = await db.select({ startsAt: mockRooms.startsAt }).from(mockRooms).where(eq(mockRooms.leagueId, leagueId));
+    return { kickoffAt: room?.startsAt.toISOString() ?? null, detail: MOCK_COPY.waitingDetail };
+  }
+  const [row] = await db
+    .select({ kickoffAt: drafts.kickoffAt, startTrigger: drafts.startTrigger, houseRung: leagues.houseRung })
+    .from(drafts)
+    .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
+    .where(eq(drafts.id, draftId));
+  if (row === undefined) return null;
+  return {
+    kickoffAt: row.startTrigger === "scheduled" ? row.kickoffAt.toISOString() : null,
+    detail: describeStartTiming({ startTrigger: row.startTrigger, authority: row.houseRung === null ? "member" : "house" }),
   };
 }
 
@@ -88,6 +116,8 @@ export async function GET(request: Request, context: RouteContext) {
       // Own queue only. `queueFor` returns [] for a commissioner with no team.
       queue: actor.teamId === null ? [] : queueFor(state, actor.teamId),
       mock,
+      // R2: the waiting story is a scheduled-room fact only — null the moment the draft starts.
+      waiting: view.phase === "scheduled" ? await waitingInfoFor(getDb(), actor.leagueId, actor.draftId, state.config.isMock === true) : null,
     };
     return ok(body);
   });

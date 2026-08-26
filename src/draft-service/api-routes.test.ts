@@ -14,7 +14,8 @@ vi.mock("@/lib/auth/current-user", () => ({
 
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, leagues, mockRooms, players, users } from "@/db/schema";
+import { draftActions, drafts, leagues, mockRooms, players, users } from "@/db/schema";
+import { describeStartTiming } from "@/matchmaking/roll";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { GET as getDraft } from "@/app/api/drafts/[draftId]/route";
 import { GET as getPlayers } from "@/app/api/drafts/[draftId]/players/route";
@@ -272,6 +273,64 @@ describe("GET /api/drafts/[draftId] — Task 8's mock room info", () => {
       browseLeaguesLabel: MOCK_COPY.resultsBrowseLeaguesLabel,
     });
     expect(body.data.mock.share).toBeNull();
+  });
+});
+
+/**
+ * R2 (the draft-room design review, Task 10's carry): the scheduled room's waiting story on
+ * `DraftSnapshotBody.waiting` — the kickoff instant the rail counts down to and the
+ * trigger-aware sentence, quoted from `describeStartTiming` (the one start-timing authority)
+ * for a real league and from `MOCK_COPY.waitingDetail` for a practice room. Null the moment
+ * the draft leaves `scheduled`.
+ */
+describe("GET /api/drafts/[draftId] — the scheduled waiting story (R2)", () => {
+  const snapshot = async () => (await (await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params })).json()).data;
+
+  it("quotes the member-league scheduled sentence and the draft's own kickoff instant", async () => {
+    const f = await fixture();
+    signedInAs(f.userIds[0]!);
+    expect((await snapshot()).waiting).toEqual({
+      kickoffAt: "2026-09-10T17:00:00.000Z",
+      detail: describeStartTiming({ startTrigger: "scheduled", authority: "member" }),
+    });
+  });
+
+  it("quotes the house sentence for a house league — no commissioner is ever implied", async () => {
+    const f = await fixture();
+    await db.update(leagues).set({ houseRung: "casual", commissionerUserId: null }).where(eq(leagues.id, f.leagueId));
+    signedInAs(f.userIds[0]!);
+    expect((await snapshot()).waiting).toEqual({
+      kickoffAt: "2026-09-10T17:00:00.000Z",
+      detail: describeStartTiming({ startTrigger: "scheduled", authority: "house" }),
+    });
+  });
+
+  it("carries the when-full commitment with no countdown target — there is no chosen time", async () => {
+    const f = await fixture();
+    await db.update(drafts).set({ startTrigger: "when_full" }).where(eq(drafts.id, DRAFT_ID));
+    signedInAs(f.userIds[0]!);
+    expect((await snapshot()).waiting).toEqual({
+      kickoffAt: null,
+      detail: describeStartTiming({ startTrigger: "when_full", authority: "member" }),
+    });
+  });
+
+  it("counts a practice room down to its own fill-window start with MOCK_COPY's sentence", async () => {
+    const f = await mockFixture("lobby", 1);
+    signedInAs(f.userIds[0]!);
+    const [room] = await db.select({ startsAt: mockRooms.startsAt }).from(mockRooms).where(eq(mockRooms.leagueId, f.leagueId));
+    const body = await (await getDraft(new Request(`http://test/api/drafts/${MOCK_DRAFT_ID}`), { params: mockParams })).json();
+    expect(body.data.waiting).toEqual({
+      kickoffAt: room!.startsAt.toISOString(),
+      detail: MOCK_COPY.waitingDetail,
+    });
+  });
+
+  it("answers waiting: null the moment the draft starts", async () => {
+    const f = await fixture();
+    signedInAs(f.userIds[0]!);
+    await getDraftStore().startDraft(DRAFT_ID);
+    expect((await snapshot()).waiting).toBeNull();
   });
 });
 

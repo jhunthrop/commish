@@ -175,6 +175,14 @@ export const MOCK_COPY = {
    *  `sweptRoomActionLabel` below so the sentence is never a dead end. */
   sweptRoomMessage: "This practice draft has cleared. Start a new one whenever you like.",
   sweptRoomActionLabel: "Start a mock draft",
+  /**
+   * R2 (the draft-room design review's carry, Task 10): the scheduled rail's waiting sentence
+   * for a practice room — the trigger-aware answer to "what starts this draft", carried to the
+   * room over the wire (`DraftSnapshotBody.waiting.detail`) like every other string here. A
+   * real league's rail quotes `describeStartTiming` (`@/matchmaking/roll`) instead; a mock's
+   * start has its own trigger (the fill window), so it gets its own honest sentence.
+   */
+  waitingDetail: "This practice draft starts when the countdown ends. Practice opponents fill any open seats.",
   /** The results page heading. Deliberately not a grade or a score against the room: this
    *  product invents no draft-grade authority (founder self-ruling), only confirms the practice
    *  round is over. */

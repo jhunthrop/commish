@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { GLOSSARY } from "@/help/glossary";
+import { describeStartTiming } from "@/matchmaking/roll";
 import { renderSurface } from "@/components/ui/test-utils";
 import { AUCTION_VIEW, LEAGUE_NAME, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { RoomRail } from "./room-rail";
@@ -198,12 +199,83 @@ describe("RoomRail", () => {
   it("explains a draft that has not started and one that has finished, and drops the turn label", () => {
     const { rerender } = render(<RoomRail {...props} view={{ ...SNAKE_VIEW, phase: "scheduled", ...finished }} myTeamId="t1" />);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "scheduled");
-    expect(screen.getByText("Your commissioner starts it when everyone is here.")).toBeInTheDocument();
+    expect(screen.getByText("Not started")).toBeInTheDocument();
     expect(screen.queryByTestId("turn-label")).toBeNull();
 
     rerender(<RoomRail {...props} view={{ ...SNAKE_VIEW, phase: "complete", ...finished }} myTeamId="t1" />);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "complete");
     expect(screen.getByText("Every roster is final.")).toBeInTheDocument();
+  });
+
+  // R2 (the draft-room design review, carried into this lane by Task 10): the scheduled rail
+  // tells the real waiting story — a kickoff countdown and the trigger-aware sentence quoted
+  // off the wire from the `describeStartTiming` authority (or `MOCK_COPY` for a practice room)
+  // — never the commissioner sentence it used to hardcode, which was false for every house,
+  // auto-start and mock room.
+  describe("the scheduled waiting story (R2)", () => {
+    const scheduledView: DraftStateView = { ...SNAKE_VIEW, phase: "scheduled", ...finished };
+
+    it("counts down to kickoff and quotes the trigger-aware sentence — both themes, axe-clean", async () => {
+      const waiting = {
+        kickoffAt: new Date(Date.now() + 125_000).toISOString(),
+        detail: describeStartTiming({ startTrigger: "scheduled", authority: "member" }),
+      };
+      await renderSurface(<RoomRail {...props} view={scheduledView} myTeamId="t1" waiting={waiting} />, async ({ container }) => {
+        expect(screen.getByText("Not started")).toBeInTheDocument();
+        expect(screen.getByText(waiting.detail)).toBeInTheDocument();
+        expect(screen.getByText("Starts in")).toBeInTheDocument();
+        expect(screen.getByTestId("kickoff-countdown")).toHaveTextContent("2:05");
+        expect(await axe(container)).toHaveNoViolations();
+      });
+    });
+
+    it("shows the sentence alone when the trigger has no kickoff time (a when_full room)", () => {
+      const waiting = { kickoffAt: null, detail: describeStartTiming({ startTrigger: "when_full", authority: "member" }) };
+      render(<RoomRail {...props} view={scheduledView} myTeamId="t1" waiting={waiting} />);
+      expect(screen.getByText(waiting.detail)).toBeInTheDocument();
+      expect(screen.queryByTestId("kickoff-countdown")).toBeNull();
+      expect(screen.queryByText("Starts in")).toBeNull();
+    });
+
+    it("carries a practice room's own waiting sentence and counts to its fill-window start", () => {
+      // The detail is a PROP here, as every MOCK_COPY string reaching this room is — the string
+      // itself is pinned to `MOCK_COPY.waitingDetail` by the snapshot route's own test.
+      const waiting = {
+        kickoffAt: new Date(Date.now() + 125_000).toISOString(),
+        detail: "This practice draft starts when the countdown ends. Practice opponents fill any open seats.",
+      };
+      render(<RoomRail {...props} view={scheduledView} myTeamId="t1" waiting={waiting} />);
+      expect(screen.getByText(waiting.detail)).toBeInTheDocument();
+      expect(screen.getByTestId("kickoff-countdown")).toHaveTextContent("2:05");
+    });
+
+    it("never guesses a commissioner into a room that has none — with no waiting info, the headline stands alone", () => {
+      render(<RoomRail {...props} view={scheduledView} myTeamId="t1" />);
+      expect(screen.getByText("Not started")).toBeInTheDocument();
+      expect(screen.queryByText(/commissioner/)).toBeNull();
+      expect(screen.queryByTestId("kickoff-countdown")).toBeNull();
+    });
+
+    it("keeps the kickoff clock calm, and TV-sized on the TV variant", () => {
+      const waiting = {
+        kickoffAt: new Date(Date.now() + 125_000).toISOString(),
+        detail: describeStartTiming({ startTrigger: "scheduled", authority: "house" }),
+      };
+      const { rerender } = render(<RoomRail {...props} view={scheduledView} myTeamId="t1" waiting={waiting} />);
+      expect(screen.getByTestId("kickoff-countdown").className).toContain("text-text-primary");
+      expect(screen.getByTestId("kickoff-countdown").className).toContain("text-3xl");
+      rerender(<RoomRail {...props} view={scheduledView} myTeamId={null} variant="tv" waiting={waiting} />);
+      expect(screen.getByTestId("kickoff-countdown").className).toContain("text-display-xl");
+      expect(screen.getByText("Starts in").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+    });
+
+    it("ignores waiting info entirely once the draft is live — the pick clock owns the rail", () => {
+      const waiting = { kickoffAt: new Date(Date.now() + 9_000_000).toISOString(), detail: "Stale sentence." };
+      render(<RoomRail {...props} view={liveView()} myTeamId="t2" waiting={waiting} />);
+      expect(screen.queryByTestId("kickoff-countdown")).toBeNull();
+      expect(screen.queryByText("Stale sentence.")).toBeNull();
+      expect(screen.getByTestId("countdown")).toHaveTextContent("2:05");
+    });
   });
 
   it("never claims a team is on the clock during a live auction lot — it becomes the lot instead", async () => {

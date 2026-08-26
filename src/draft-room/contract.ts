@@ -56,6 +56,28 @@ export interface MockRoomInfo {
   readonly results: MockResultsCopy | null;
 }
 
+/**
+ * The scheduled room's waiting story (R2, the draft-room design review carried into this lane):
+ * present only while `draft.phase === "scheduled"`, null the moment the draft leaves it. The
+ * rail renders `detail` in place of the commissioner sentence it used to hardcode — false for
+ * every house, auto-start and mock room — and counts down to `kickoffAt` when one exists.
+ */
+export interface WaitingInfo {
+  /**
+   * The ISO instant the rail counts down to — the draft's own `kickoff_at` for a `scheduled`
+   * trigger, the fill window's `mock_rooms.starts_at` for a practice room, and null for a
+   * `when_full` room, whose only honest answer is the sentence (there is no chosen time).
+   */
+  readonly kickoffAt: string | null;
+  /**
+   * The trigger-aware sentence: quoted verbatim from `describeStartTiming`
+   * (`@/matchmaking/roll`, the one start-timing authority) for a real league, or
+   * `MOCK_COPY.waitingDetail` for a practice room — composed by the snapshot route, never by
+   * the client, for the same boundary reason as `MockRoomInfo` above.
+   */
+  readonly detail: string;
+}
+
 export interface DraftSnapshotBody {
   readonly draft: DraftStateView;
   /** The league's display name — what `RoomRail` puts at the top of the room. */
@@ -69,6 +91,8 @@ export interface DraftSnapshotBody {
   /** Null for a real league. See `MockRoomInfo`'s own docblock for why this crosses the wire as
    *  data rather than the client ever importing `@/mock-draft` itself. */
   readonly mock: MockRoomInfo | null;
+  /** The scheduled room's waiting story (R2) — null once the draft has left `scheduled`. */
+  readonly waiting: WaitingInfo | null;
 }
 
 export interface DraftPlayersBody {

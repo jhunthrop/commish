@@ -54,6 +54,7 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
         playersById={playersById}
         connection={room.connection}
         variant="tv"
+        waiting={room.waiting}
       />
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-6 lg:overflow-hidden">
         <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />

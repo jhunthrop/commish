@@ -3,7 +3,7 @@ import { render, type RenderResult } from "@testing-library/react";
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftClockView, DraftStateView } from "@/draft-engine";
-import type { MockRoomInfo } from "./contract";
+import type { MockRoomInfo, WaitingInfo } from "./contract";
 import { DraftRoomDepsProvider, type DraftRoomDeps, type EventSourceLike } from "./hooks/deps";
 
 export const PLAYERS: readonly Player[] = [
@@ -124,6 +124,9 @@ export interface FixtureDeps {
   /** Task 8: what the snapshot reports for `DraftSnapshotBody.mock`. Defaults to `null` — every
    *  existing caller keeps testing a real league's own room unchanged. */
   mock: MockRoomInfo | null;
+  /** R2: what the snapshot reports for `DraftSnapshotBody.waiting`. Defaults to `null` — the
+   *  default `SNAKE_VIEW` is live, and a live room has no waiting story. */
+  waiting: WaitingInfo | null;
 }
 
 /** Injected doubles for the whole room: no module mocks, no real network, no real EventSource. */
@@ -137,6 +140,7 @@ export function fixtureDeps(view: DraftStateView = SNAKE_VIEW): FixtureDeps {
     queue: [],
     queueResponse: { ok: true, data: { queue: [] } },
     mock: null,
+    waiting: null,
     deps: {
       fetchJson: async (url, init) => {
         fixture.calls.push(`${init?.method ?? "GET"} ${url}`);
@@ -158,6 +162,7 @@ export function fixtureDeps(view: DraftStateView = SNAKE_VIEW): FixtureDeps {
                 teams: TEAMS,
                 queue: fixture.queue,
                 mock: fixture.mock,
+                waiting: fixture.waiting,
               },
             };
         return { json: async () => body } as unknown as Response;

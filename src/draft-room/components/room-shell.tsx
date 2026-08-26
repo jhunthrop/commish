@@ -83,6 +83,7 @@ export function RoomShell({
           playersById={playersById}
           connection={room.connection}
           helpLevel={helpLevel}
+          waiting={room.waiting}
         />
       }
       pool={

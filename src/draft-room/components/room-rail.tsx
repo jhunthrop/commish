@@ -3,6 +3,7 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
+import type { WaitingInfo } from "../contract";
 import { Avatar, Badge, EYEBROW, InfoTip } from "@/components/ui";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SessionNotice } from "@/components/app-shell/session-notice";
@@ -30,6 +31,14 @@ export interface RoomRailProps {
    *  that don't care about this branch — `InfoTip` itself defaults to the click-only, non-inline
    *  behavior when it's absent. */
   readonly helpLevel?: HelpLevel;
+  /**
+   * R2: the scheduled room's waiting story, straight off the snapshot
+   * (`DraftSnapshotBody.waiting`) — the kickoff instant this rail counts down to and the
+   * trigger-aware sentence it quotes. Read only while `view.phase === "scheduled"`; a live or
+   * finished room ignores it entirely. Omitted (or null) it degrades to the bare headline —
+   * never to an invented sentence about a commissioner the room may not have.
+   */
+  readonly waiting?: WaitingInfo | null;
 }
 
 const FORMAT_LABEL: Readonly<Record<DraftStateView["format"], string>> = {
@@ -194,14 +203,18 @@ function modeOf(view: DraftStateView, turn: TurnSummary): RoomMode {
   return turn.mine ? "hot" : "watching";
 }
 
-/** The waiting and finished states: no clock, one plain sentence, nothing to hunt for.
+/** The waiting and finished states: no pick clock, one plain sentence, nothing to hunt for.
  *  `eyebrowClass` is `RAIL_EYEBROW[variant]` — the TV variant's own "no `xs` anywhere" rule
- *  (Step 3) applied to this headline the same way it applies to the turn label below. */
-function StaticState({ headline, detail, eyebrowClass }: { readonly headline: string; readonly detail: string; readonly eyebrowClass: string }) {
+ *  (Step 3) applied to this headline the same way it applies to the turn label below. `detail`
+ *  is nullable for R2's degraded case (a scheduled room whose snapshot carried no waiting
+ *  story): the headline stands alone rather than the rail inventing a sentence. `max-w-md`
+ *  caps the one long detail (`describeStartTiming`'s when-full commitment, three sentences)
+ *  so it wraps as a paragraph instead of stretching the masthead. */
+function StaticState({ headline, detail, eyebrowClass }: { readonly headline: string; readonly detail: string | null; readonly eyebrowClass: string }) {
   return (
     <div className="flex flex-col">
       <span className={`${eyebrowClass} text-text-muted`}>{headline}</span>
-      <span className="text-sm text-text-muted">{detail}</span>
+      {detail === null ? null : <span className="max-w-md text-sm text-text-muted">{detail}</span>}
     </div>
   );
 }
@@ -228,16 +241,21 @@ function StaticState({ headline, detail, eyebrowClass }: { readonly headline: st
  * lets it grow the rare time a guided caption does, rather than fighting content that has every
  * right to be there.
  */
-export function RoomRail({ leagueName, view, teams, myTeamId, playersById, connection, variant = "room", helpLevel }: RoomRailProps) {
+export function RoomRail({ leagueName, view, teams, myTeamId, playersById, connection, variant = "room", helpLevel, waiting }: RoomRailProps) {
   // The TV board is nobody's team: `personalId` is what every personal affordance reads, so
   // dropping the chrome for that variant is one assignment rather than a flag per element.
   const personalId = variant === "room" ? myTeamId : null;
   const turn = turnSummary(view, teams, playersById, personalId);
   const mode = modeOf(view, turn);
+  // R2: the waiting story is a fact about a SCHEDULED room only — a stale `waiting` riding a
+  // snapshot that has since gone live must never leak a kickoff clock into a live rail.
+  const waitingInfo = view.phase === "scheduled" ? (waiting ?? null) : null;
+  // The rail's ONE clock, its target switched by phase: the kickoff instant while scheduled
+  // (R2), the pick deadline once live — one `useCountdown`, never two ticking intervals.
   // Called unconditionally, before any early return — React's Rules of Hooks. `now` is the
   // same wall-clock reading `remainingMs` came from, so the tightening line shares this one
   // ticking interval instead of running a second `useNow` beside it.
-  const { remainingMs, now } = useCountdown(view.deadlineAt);
+  const { remainingMs, now } = useCountdown(view.phase === "scheduled" ? (waitingInfo?.kickoffAt ?? null) : view.deadlineAt);
   const pausedUntil = view.pausedUntil ?? null;
   // Live, not a one-shot read of the payload: `now` ticks every second (the same `useCountdown`
   // reading `remainingMs` came from), so a turn that started BEFORE the freeze but runs into it
@@ -286,11 +304,21 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
 
       <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 lg:flex-nowrap">
         {mode === "scheduled" ? (
-          <StaticState
-            headline="Not started"
-            detail="Your commissioner starts it when everyone is here."
-            eyebrowClass={RAIL_EYEBROW[variant]}
-          />
+          // R2: the waiting story — the trigger-aware sentence quoted off the wire (from
+          // `describeStartTiming` for a real league, `MOCK_COPY` for a practice room), and the
+          // kickoff countdown whenever a kickoff instant actually exists. The countdown wrapper
+          // renders on the TARGET, not on `remainingMs`: `useCountdown` is null for one
+          // hydrating frame, and `Countdown`'s own placeholder holds the line box rather than
+          // the whole block popping in a frame late.
+          <>
+            <StaticState headline="Not started" detail={waitingInfo?.detail ?? null} eyebrowClass={RAIL_EYEBROW[variant]} />
+            {waitingInfo?.kickoffAt == null ? null : (
+              <div className="flex flex-col items-end">
+                <span className={`${RAIL_EYEBROW[variant]} text-text-muted`}>Starts in</span>
+                <Countdown remainingMs={remainingMs} size={RAIL_COUNTDOWN_SIZE[variant]} data-testid="kickoff-countdown" />
+              </div>
+            )}
+          </>
         ) : mode === "complete" ? (
           <StaticState headline="Draft complete" detail="Every roster is final." eyebrowClass={RAIL_EYEBROW[variant]} />
         ) : (
