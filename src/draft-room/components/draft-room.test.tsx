@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { screen, waitFor, fireEvent, act, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { hydrateSurface, renderSurface } from "@/components/ui/test-utils";
@@ -9,21 +9,10 @@ import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { fixtureDeps, MOCK_ROOM, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
 import { DraftRoomDepsProvider } from "../hooks/deps";
-import { CHAT_OPEN_QUERY, DraftRoom } from "./draft-room";
+import { DraftRoom } from "./draft-room";
 
 /** Already dismissed, so `RoomTour` stays out of the way of every case that isn't testing it. */
 const TOUR_DISMISSED = "2026-01-01T00:00:00.000Z";
-
-/** E4: the chat's initial open/collapsed state reads `matchMedia(CHAT_OPEN_QUERY)` once, on
- *  mount — this stubs it to whichever side of the breakpoint a case wants to pin. */
-function stubChatBreakpoint(matches: boolean) {
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: query === CHAT_OPEN_QUERY ? matches : false,
-    media: query,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  }));
-}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -68,39 +57,45 @@ describe("DraftRoom", () => {
     await waitFor(() => expect(screen.getByTestId("room-aside")).toBeInTheDocument());
   });
 
-  it("collapses the chat band to a reopen strip and brings it back", async () => {
-    // Pinned open (xl+) so this test is exercising the manual toggle, not the initial-state
-    // rule below — that has its own pair of cases.
-    stubChatBreakpoint(true);
+  // FOUNDER DIRECTIVE 2026-08-26 (room-product pass): "the right hand side should be your
+  // roster and what positions you have filled" — this supersedes E4's own xl-open default
+  // (2026-08-26 design review) outright. The aside shows the roster by default at EVERY width,
+  // never chat, and there is no `matchMedia` read left to stub — a plain `useState(false)`.
+  // `within(room-aside)` throughout: `RoomDock`'s own `RosterFill` band (`room-dock.tsx`) also
+  // carries a "Your roster" heading (the phone's answer, always mounted, merely `hidden` above
+  // `lg`) — scoping to the aside is what tells the two apart.
+  it("shows the roster rail by default at every width, with no window.matchMedia dependency", async () => {
     mount();
-    await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide chat" }));
+    const aside = await screen.findByTestId("room-aside");
+    expect(within(aside).getByRole("heading", { name: "Your roster" })).toBeInTheDocument();
+    expect(within(aside).getByRole("button", { name: "League chat" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "League chat" })).not.toBeInTheDocument();
-    // The band itself stays — a slim strip holding the way back in.
+  });
+
+  it("swaps the aside to chat on toggle, and back to the roster — one panel at a time, the same fixed-width band throughout", async () => {
+    mount();
+    const aside = await screen.findByTestId("room-aside");
+    expect(within(aside).getByRole("heading", { name: "Your roster" })).toBeInTheDocument();
+
+    fireEvent.click(within(aside).getByRole("button", { name: "League chat" }));
+    expect(await screen.findByRole("region", { name: "League chat" })).toBeInTheDocument();
+    expect(within(aside).queryByRole("heading", { name: "Your roster" })).not.toBeInTheDocument();
+    // The band itself never moves — the aside is still there, just showing the other panel.
     expect(screen.getByTestId("room-aside")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show chat" }));
-    expect(await screen.findByRole("region", { name: "League chat" })).toBeInTheDocument();
-  });
-
-  // E4 (2026-08-26 design review): "and/or auto-collapse chat under a width threshold" — the
-  // review's own alternative fix for the laptop-width board squeeze. Below `xl` the chat starts
-  // collapsed so the board gets the width back; the user's own toggle (tested above) still wins
-  // from then on — this pins only the ONE-TIME initial read.
-  it("starts the chat collapsed below xl", async () => {
-    stubChatBreakpoint(false);
-    mount();
-    await waitFor(() => expect(screen.getByTestId("room-aside")).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Show chat" })).toBeInTheDocument();
+    fireEvent.click(within(aside).getByRole("button", { name: "Back to your roster" }));
+    await waitFor(() => expect(within(aside).getByRole("heading", { name: "Your roster" })).toBeInTheDocument());
     expect(screen.queryByRole("region", { name: "League chat" })).not.toBeInTheDocument();
   });
 
-  it("starts the chat open at xl and up", async () => {
-    stubChatBreakpoint(true);
-    mount();
+  it("shows the chat panel directly for a commissioner with no team of their own — no roster, no strip", async () => {
+    const fixture = fixtureDeps();
+    fixture.teamId = null;
+    mount(fixture);
     await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Hide chat" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Your roster" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "League chat" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back to your roster" })).not.toBeInTheDocument();
   });
 
   it("offers a retry when the draft cannot be loaded", async () => {
@@ -261,12 +256,11 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     );
   });
 
-  // T3 review HIGH: the chat's breakpoint default must be read AFTER mount, never in the
-  // render pass — the LeagueRow/useNow incident's exact defect class. Two guards, because the
-  // loading gate (DraftRoom's first paint is always the skeleton) would mask a render-time
-  // read from the hydration harness itself:
+  // T3 review HIGH, still load-bearing after the founder directive 2026-08-26 (room-product
+  // pass) removed the chat's own matchMedia read: DraftRoom must hydrate cleanly regardless —
+  // the LeagueRow/useNow incident's exact defect class this guard exists to catch, should any
+  // future render-time global read sneak back in.
   it("hydrates onto the server HTML with zero errors on a narrow viewport", async () => {
-    stubChatBreakpoint(false);
     const fixture = fixtureDeps();
     await hydrateSurface(
       () => (
@@ -285,10 +279,12 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     );
   });
 
+  // Trivially true since the founder directive 2026-08-26 (room-product pass) removed the
+  // chat's own matchMedia read entirely (`chatOpen` is a plain `useState(false)`) — kept as a
+  // regression guard against a lazy useState initializer reaching for `matchMedia` (or any
+  // other render-time global read) ever coming back.
   it("never reads matchMedia during render — the mount effect is the one sanctioned reader", () => {
     const source = readFileSync(join(process.cwd(), "src/draft-room/components/draft-room.tsx"), "utf8");
-    // A lazy useState initializer that touches matchMedia is the hydration trap itself; the
-    // loading gate that hides it today is a coincidence, not an invariant.
     expect(source).not.toMatch(/useState[^\n]*matchMedia/);
     expect(source).not.toMatch(/useState<boolean>\(\(\) =>/);
   });

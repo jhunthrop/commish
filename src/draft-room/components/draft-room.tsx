@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ButtonLink, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
@@ -11,6 +11,7 @@ import { actionLabelFor, playersById as buildPlayersById } from "../lib/lookups"
 import { MockResults } from "./mock-results";
 import { PracticeBanner } from "./practice-banner";
 import { RoomTour } from "./room-tour";
+import { RosterRail } from "./roster-rail";
 import { ShareLinkPanel } from "./share-link-panel";
 import { SnakeRoom } from "./snake-room";
 import { AuctionRoom } from "./auction-room";
@@ -22,10 +23,6 @@ import { AuctionRoom } from "./auction-room";
  * hands the lobby that query param; "Open the lobby" hands it none.
  */
 const MOCK_LOBBY_PATH = "/app/mock-drafts";
-
-/** E4 (2026-08-26 design review): `xl`, one step up from the `lg:w-88`/`lg:w-12` band the
- *  chat's own width classes already key off — see `chatOpen`'s docblock below. */
-export const CHAT_OPEN_QUERY = "(min-width: 1280px)";
 
 export interface DraftRoomProps {
   readonly draftId: string;
@@ -49,26 +46,17 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
   const { show } = useToast();
   const playersById = useMemo(() => buildPlayersById(room.players), [room.players]);
   /**
-   * E4 (2026-08-26 design review): the review's own alternative fix for the laptop-width board
-   * squeeze — "auto-collapse chat under a width threshold" — so the board gets its columns
-   * back below `xl` without anybody having to find the "Hide chat" button first. Below `xl`
-   * the chat starts collapsed; at `xl+` there is room for both, so it starts open. Read ONCE,
-   * in a mount effect — NEVER during render: reading `matchMedia` in the render pass is the
-   * exact hydration trap `usePrefersReducedMotion`'s own docblock documents (and the
-   * `LeagueRow`/`useNow` incident already cost a founder-reported bug to learn). The state
-   * starts `true` (the widest, SSR-safe answer) on server and hydrating client alike, and the
-   * effect corrects a narrower viewport immediately after mount. Today `DraftRoom` paints only
-   * its loading skeleton on first render, which would mask a render-time read — but that is a
-   * coincidence of the loading gate, not an invariant, and the hydration regression test
-   * (`draft-room.test.tsx`, hydrateSurface) exists so nobody gets to rediscover why.
-   *
-   * The user's own toggle (`setChatOpen` below) wins from the first paint on: the effect runs
-   * once at mount, before any human can reach the toggle, so it never overwrites a choice.
+   * FOUNDER DIRECTIVE 2026-08-26 (room-product pass): "the chat feature should be much
+   * smaller. People aren't usually actively chatting during the draft much. The right hand
+   * side should be your roster and what positions you have filled." This supersedes E4's own
+   * xl-open default (2026-08-26 design review) outright — chat starts collapsed at EVERY
+   * width now, never just below `xl`, and there is no `matchMedia` read to make that decision:
+   * a plain `useState(false)` is both the SSR-safe answer and the permanent one. The aside's
+   * default content is `RosterRail` below; the user's own toggle (`setChatOpen`) is what ever
+   * brings chat forward, and it wins from the first paint on since nothing else writes this
+   * state after mount.
    */
-  const [chatOpen, setChatOpen] = useState<boolean>(true);
-  useEffect(() => {
-    setChatOpen(window.matchMedia(CHAT_OPEN_QUERY).matches);
-  }, []);
+  const [chatOpen, setChatOpen] = useState<boolean>(false);
 
   const act = (action: ClientDraftAction): void => {
     void room.submit(action).then((outcome) => {
@@ -115,33 +103,38 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
   // Built here, not inside RoomShell: DraftRoom is the one component that knows the league id
   // and the only one whose test renders a fully-loaded room, so the chat's dependencies enter
   // the tree in exactly one place — the same reason `bidConsole` and `poolFooter` are props.
-  // Collapsible on the founder's ask: closed, the band shrinks to a slim reopen strip so the
-  // board gets the width back; the closed chat unmounts (its SSE messages are server history,
-  // nothing is lost) — reopening refetches, which is the hook's normal mount path.
-  const chat = chatOpen ? (
-    <div className="flex h-full min-h-0 flex-col lg:w-88">
-      <div className="flex shrink-0 justify-end px-3 pt-2">
-        <Button variant="ghost" size="sm" aria-expanded="true" onClick={() => setChatOpen(false)}>
-          Hide chat
-        </Button>
+  //
+  // FOUNDER DIRECTIVE 2026-08-26 (room-product pass): the aside is no longer chat-first. Its
+  // width contract never moves (`lg:w-88`, same as `RoomLayout`'s own pool rail) — only its
+  // CONTENT swaps, one panel at a time: `RosterRail` by default, chat on demand via the strip
+  // below. A commissioner has no roster of their own to show (the "nothing to say" law), so
+  // for them chat IS the panel — no strip, nothing to toggle back to.
+  const aside =
+    room.myTeamId === null ? (
+      <div className="flex h-full min-h-0 flex-col lg:w-88">
+        <div className="min-h-0 flex-1 px-3 pb-3 pt-2">
+          <LeagueChat leagueId={room.view.leagueId} />
+        </div>
       </div>
-      <div className="min-h-0 flex-1 px-3 pb-3">
-        <LeagueChat leagueId={room.view.leagueId} />
+    ) : (
+      <div className="flex h-full min-h-0 flex-col lg:w-88">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-2">
+          {chatOpen ? (
+            <LeagueChat leagueId={room.view.leagueId} />
+          ) : (
+            <RosterRail view={room.view} myTeamId={room.myTeamId} playersById={playersById} slotConfig={room.view.slotConfig} />
+          )}
+        </div>
+        {/* The one toggle, hairline-topped: it never invents an unread count, and its label
+            says what clicking it does, not where it goes ("League chat" opens chat; "Back to
+            your roster" returns) — founder directive 2026-08-26, room-product pass. */}
+        <div className="shrink-0 border-t border-line px-3 py-2">
+          <Button variant="ghost" size="sm" aria-expanded={chatOpen} onClick={() => setChatOpen((open) => !open)}>
+            {chatOpen ? "Back to your roster" : "League chat"}
+          </Button>
+        </div>
       </div>
-    </div>
-  ) : (
-    <div className="flex justify-center p-2 lg:h-full lg:w-12 lg:items-start">
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-expanded="false"
-        onClick={() => setChatOpen(true)}
-        className="lg:mt-2 lg:[writing-mode:vertical-rl]"
-      >
-        Show chat
-      </Button>
-    </div>
-  );
+    );
 
   // Task 8: a mock room's own honest chrome. `room.mock` is null for every real draft, so none
   // of this branch ever runs there — the real room's own DOM is untouched by this addition.
@@ -187,9 +180,9 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
         <>
           <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} actionLabel={actionLabelFor(room.view.format)} />
           {room.view.format === "auction" ? (
-            <AuctionRoom room={room} playersById={playersById} onAct={act} aside={chat} helpLevel={helpLevel} />
+            <AuctionRoom room={room} playersById={playersById} onAct={act} aside={aside} helpLevel={helpLevel} />
           ) : (
-            <SnakeRoom room={room} playersById={playersById} onAct={act} aside={chat} helpLevel={helpLevel} />
+            <SnakeRoom room={room} playersById={playersById} onAct={act} aside={aside} helpLevel={helpLevel} />
           )}
         </>
       )}

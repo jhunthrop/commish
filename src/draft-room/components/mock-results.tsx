@@ -4,6 +4,7 @@ import type { DraftStateView } from "@/draft-engine";
 import { EYEBROW, PositionBadge, SlotChip } from "@/components/ui";
 import { playerName, playersById as buildPlayersById } from "../lib/lookups";
 import { formatBoardDelta, rankByPlayerId } from "../state/format";
+import { rosterFillRows } from "../state/roster-fill";
 import { SLOT_POSITION } from "./room-dock";
 
 /** Mirrors `MockResultsCopy` (`../contract`) — the wire type this room fetches, forwarded down
@@ -54,23 +55,20 @@ function RosterSection({
   readonly playersById: ReadonlyMap<string, Player>;
   readonly myTeamId: string;
 }) {
-  const bySpot = new Map((view.rosters[myTeamId] ?? []).map((spot) => [`${spot.slot}:${spot.slotIndex}`, spot]));
+  const rows = rosterFillRows(view.slotConfig, view.rosters[myTeamId] ?? []);
   return (
     <div className="flex flex-col gap-2">
       <h2 className={`${EYEBROW} text-text-muted`}>Your roster</h2>
       <ul aria-label="Your roster" className="flex flex-col gap-1.5">
-        {view.slotConfig.flatMap((config) => {
-          const position = SLOT_POSITION[config.slot];
-          return Array.from({ length: config.count }, (_, slotIndex) => {
-            const spot = bySpot.get(`${config.slot}:${slotIndex}`) ?? null;
-            const name = spot?.playerId === null || spot?.playerId === undefined ? "Open" : playerName(playersById, spot.playerId);
-            return (
-              <li key={`${config.slot}:${slotIndex}`} className="flex flex-wrap items-center gap-2">
-                {position === undefined ? <SlotChip slot={config.slot} /> : <PositionBadge position={position} size="sm" />}
-                <span className="text-sm text-text-primary">{name}</span>
-              </li>
-            );
-          });
+        {rows.map((row) => {
+          const position = SLOT_POSITION[row.slot];
+          const name = row.playerId === null ? "Open" : playerName(playersById, row.playerId);
+          return (
+            <li key={`${row.slot}:${row.slotIndex}`} className="flex flex-wrap items-center gap-2">
+              {position === undefined ? <SlotChip slot={row.slot} /> : <PositionBadge position={position} size="sm" />}
+              <span className="text-sm text-text-primary">{name}</span>
+            </li>
+          );
         })}
       </ul>
     </div>
