@@ -341,3 +341,23 @@ medianGame ?? false` twice — once for the `leagues` insert, once for the audit
 it to spread the way `format`, `teamCount`, `scoringPreset` and `rosterShape` all are. All three
 still agree, so no behavior bug exists, but the carry is now three literal `false`s rather than
 two. See `docs/decisions/house-leagues.md` §12.
+
+
+## The whole shelf is sit-and-go (founder directive, 2026-08-26)
+
+Verbatim: "It seems like we have too many open tournaments at once. Should we dial it back a bit.
+Can we change the mechanism to create new leagues as open one fills instead of trying to make a
+time and then rotating the users off to a new time."
+
+Ruled and shipped: every `HOUSE_CATALOG` rung is `when_full` — a house league drafts the moment
+its last seat fills (`fireWhenFullInTx`, the machinery the sit-and-go rung was born on), and the
+reconciler's existing replace-what-left-the-shelf behavior IS "a new league opens as one fills";
+no new trigger code exists. Width dropped 6 to 2 (`open_12` and `beginner_12` at one apiece);
+`sitandgo_12` is retired via `openAtOnce: 0` with its key and label preserved for existing rows,
+because `open_12` now IS the sit-and-go. The scheduled-kickoff and roll-until-full machinery
+stays in the codebase, dormant for house rungs, live for member-created scheduled leagues.
+House spawns draw fun names from per-rung pools (`houseLeagueName`) instead of "Open 12-team
+League N". Migration `0044` is the one-time transition for house leagues that already existed as
+rows — without it a legacy scheduled league would roll forever and hold its shelf slot, and the
+directive would never take effect on a populated database. Legacy open leagues keep their old
+names and drain naturally; the reconciler never deletes a league that exists.

@@ -120,6 +120,20 @@ seven or fewer bots are structurally all-distinct. Proven variety: 20 seeds prod
 full pick logs; two identical-settings solo drafts overlapped on 13% of pick positions,
 divergent from pick 1 (the Task 10 founder-acceptance check).
 
+## Bot identity — opponents, not labels (founder directive, 2026-08-26)
+
+A bot seat carries three names, each with one job: the TEAM name (what the board shows — a
+seeded draw off `MOCK_BOT_TEAM_NAME_POOL` via `pickBotTeamNames`, distinct within the room,
+excluding any name an existing team already carries, so a host who names their team off the pool
+never gets a twin); the OWNER handle (`MOCK_CONFIG.botRoster[].name` — coach-style, playful,
+never a real-person-plausible full name, never "bot"/"AI" as a word, never a strategy word); and
+the honest marker (`MOCK_COPY.botBadge`/`botMarkerLabel`, unconditional on every bot seat — the
+badge is the truth, the names are flavor). Names never leak the archetype: the deal is a separate
+seeded draw, so no fixed name could describe it anyway, and the vocabulary rules are pinned by
+`config.test.ts`. Bot USER ids are byte-identical forever — `rngFor` streams key off them, so
+they are load-bearing for replay; `ensureMockBotRoster` upserts display names so a rename
+reaches existing databases.
+
 ## Seeded replay — the debugging recipe
 
 Every random draw in the mock path routes through `rngFor(seed, key)`
