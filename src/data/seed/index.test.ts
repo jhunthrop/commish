@@ -95,66 +95,67 @@ describe("seedHouseCatalogDemo", () => {
   });
 
   /**
-   * Fix round 1, F1: the aging-class hazard, proven directly rather than merely reasoned about.
-   * A stale-but-unfilled earliest league must never be backstage-filled (that's the race with
-   * `autoStartDueDrafts`) — it must be SKIPPED for the next-earliest league that is either
-   * already full or has a safe kickoff.
+   * Fix round 1, F1's aging-class hazard, still real for a `'when_full'` house league even though
+   * the SHAPE of the fix changed (founder directive 2026-08-26): `open_12`'s own shelf width
+   * dropped to `1`, so a stale sole candidate has no sibling to fall back to any more — the old
+   * "skip to the next-earliest safe one" outcome cannot happen on a shelf this narrow. What the
+   * guard still does: refuse to fill the one candidate it has rather than risk
+   * `autoStartDueDrafts` claiming its draft mid-fill, because the placeholder `kickoffFor` wrote
+   * at spawn time (`@/league-service/house-factory.ts`) can age toward "now" on a long-idle league
+   * exactly the way a `'scheduled'` kickoff used to.
    */
-  it("skips a stale-but-unfilled earliest league and fills the next-earliest safe one instead", async () => {
+  it("refuses to fill the sole open_12 league once its placeholder kickoff has aged past the safety margin", async () => {
     // Stock the shelf directly (never `seedHouseCatalogDemo` itself yet — this test needs to
-    // stamp staleness onto the earliest league BEFORE any fill is attempted against it).
+    // stamp staleness onto the league BEFORE any fill is attempted against it).
     await ensureHouseCatalog(db, { clock, newId: () => crypto.randomUUID() });
-    const [earliest] = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.houseRung, "open_12")).orderBy(asc(leagues.createdAt)).limit(1);
+    const [only] = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.houseRung, "open_12")).orderBy(asc(leagues.createdAt)).limit(1);
     // One millisecond short of the safety margin — deliberately at the boundary, not comfortably
     // past it, so this proves the guard's own `>=` rather than a generously-stale fixture that
     // would pass even a looser check.
-    await setKickoffOffset(earliest!.id, SAFE_HOUSE_FILL_KICKOFF_MARGIN_MS - 1);
+    await setKickoffOffset(only!.id, SAFE_HOUSE_FILL_KICKOFF_MARGIN_MS - 1);
 
-    const result = await seedHouseCatalogDemo(db, clock);
-
-    expect(result.filledLeagueId).not.toBe(earliest!.id);
-    const staleLeagueSeats = await db.select().from(teams).where(eq(teams.leagueId, earliest!.id));
-    expect(staleLeagueSeats).toHaveLength(0);
-    const filledSeats = await db.select().from(teams).where(eq(teams.leagueId, result.filledLeagueId));
-    expect(filledSeats).toHaveLength(FILLER_COUNT);
+    await expect(seedHouseCatalogDemo(db, clock)).rejects.toThrow(/stale shelf, not a flake/);
+    const seats = await db.select().from(teams).where(eq(teams.leagueId, only!.id));
+    expect(seats).toHaveLength(0);
   });
 
   /**
-   * FINAL WHOLE-BRANCH REVIEW, F2. This case used to end in the loud "stale shelf" throw, and it
-   * no longer can: an under-filled house league whose kickoff has passed stops counting toward
-   * the rung's width (`openHouseLeaguesQuery`), so the reconciler this arc runs FIRST sees the
-   * shortfall and opens fresh editions — and the arc then fills one of those instead of failing.
-   * That is the whole point of F2, so the test says so rather than pinning the old error.
+   * FINAL WHOLE-BRANCH REVIEW, F2's self-heal was for a `'scheduled'`-trigger house league:
+   * `houseKickoffStillAhead` retired a stale one from the reconciler's own count, so the very next
+   * `ensureHouseCatalog` pass saw a shortfall and opened a fresh edition in its place. Founder
+   * directive 2026-08-26 makes `open_12` `'when_full'`, and `houseKickoffStillAhead` reads
+   * UNCONDITIONALLY true for a `'when_full'` draft (its first `OR` branch,
+   * `@/league-service/house-factory.ts`) — staling its placeholder kickoff by hand no longer
+   * makes the reconciler see any shortfall at all, so it never restocks. This documents that
+   * directly: the old self-heal does not happen for a house league any more, and the arc throws
+   * rather than silently drafting from a fresh edition nobody asked it to open.
    */
-  it("self-heals an entirely stale shelf: the reconciler opens fresh editions and the arc fills one of those", async () => {
+  it("does not self-heal any more — a stale when_full placeholder never triggers a restock, so the arc throws", async () => {
     await ensureHouseCatalog(db, { clock, newId: () => crypto.randomUUID() });
-    const staleLeagues = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.houseRung, "open_12"));
-    for (const league of staleLeagues) {
-      await setKickoffOffset(league.id, -60_000); // one minute PAST kickoff — as stale as it gets.
-    }
+    const [only] = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.houseRung, "open_12"));
+    await setKickoffOffset(only!.id, -60_000); // one minute PAST kickoff — as stale as it gets.
 
-    const result = await seedHouseCatalogDemo(db, clock);
+    await expect(seedHouseCatalogDemo(db, clock)).rejects.toThrow(/stale shelf, not a flake/);
 
-    // Never one of the stalled ones, and every one of them is left exactly as it was found.
-    expect(staleLeagues.map((league) => league.id)).not.toContain(result.filledLeagueId);
-    expect(result.seatsJoined).toBe(FILLER_COUNT);
-    for (const league of staleLeagues) {
-      const seats = await db.select().from(teams).where(eq(teams.leagueId, league.id));
-      expect(seats).toHaveLength(0);
-    }
+    // No restock happened — the shelf still shows exactly the one (stale) league it started with.
+    const openLeagues = await db.select().from(leagues).where(eq(leagues.houseRung, "open_12"));
+    expect(openLeagues).toHaveLength(1);
+    const seats = await db.select().from(teams).where(eq(teams.leagueId, only!.id));
+    expect(seats).toHaveLength(0);
   });
 
-  it("throws a named, loud error when every open_12 league is stale AND the reconciler cannot restock — never a flaky fill", async () => {
+  // Retargeted (founder directive 2026-08-26): a stale `when_full` placeholder never makes
+  // `ensureHouseCatalog` see a shortfall (the test directly above), so the restock this test used
+  // to force into failing via a colliding `newId` is never even attempted any more — the loud
+  // throw below is reached the same way the two tests above reach it. Kept anyway: it still pins
+  // the exact error message and proves the collision is harmless rather than a second failure
+  // mode, which is worth knowing even though it no longer changes which branch fires.
+  it("throws the same named, loud error even when a colliding newId would also break any restock attempt", async () => {
     await ensureHouseCatalog(db, { clock, newId: () => crypto.randomUUID() });
     const openLeagues = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.houseRung, "open_12"));
     for (const league of openLeagues) {
       await setKickoffOffset(league.id, -60_000);
     }
-    // The restock's own failure mode, driven rather than imagined: `ensureHouseCatalog` catches a
-    // spawn error, reports it on `refused` and moves on WITHOUT opening anything (its own
-    // docblock). Handing it a draft id that ALREADY EXISTS makes every spawn attempt fail exactly
-    // that way, which leaves the shelf as stale as it was — the one state in which this arc still
-    // has no safe league to fill and must say so loudly rather than race `autoStartDueDrafts`.
     const [taken] = await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, openLeagues[0]!.id));
 
     await expect(seedHouseCatalogDemo(db, clock, { newId: () => taken!.id })).rejects.toThrow(/stale shelf, not a flake/);

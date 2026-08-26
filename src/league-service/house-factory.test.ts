@@ -6,7 +6,8 @@ import type { Db } from "@/db/client";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";
 import { createDraftStore } from "@/draft-service/store";
 import type { AuditLogger } from "@/integrity-service/audit-logger";
-import { HOUSE_CATALOG, houseKickoffFor, type HouseRungName } from "@/matchmaking/house-catalog";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import { HOUSE_CATALOG, type HouseRungName } from "@/matchmaking/house-catalog";
 import { ensureHouseCatalog, openHouseLeaguesQuery, type HouseFactoryDeps } from "./house-factory";
 import { joinPublicLeague } from "./join";
 import { rollDueDrafts } from "./roll";
@@ -161,17 +162,20 @@ describe("ensureHouseCatalog", () => {
 
   it("stamps every spawn with a real, distinct deterministic id (house_<rung>_<edition>)", async () => {
     await ensureHouseCatalog(db, deps());
+    // `beginner_12`'s own width dropped to 1 (founder directive 2026-08-26) — one cold spawn.
     const ids = await leagueIdsOf(db, "beginner_12");
-    expect([...ids].sort()).toEqual(["house_beginner_12_1", "house_beginner_12_2"]);
+    expect([...ids].sort()).toEqual(["house_beginner_12_1"]);
   });
 
   it("gives a when_full rung's spawn a far-future placeholder kickoff, never an immediately-due one", async () => {
+    // `sitandgo_12` is retired to `openAtOnce: 0` (founder directive 2026-08-26) and never
+    // spawns any more — `open_12` is the live `when_full` rung this now proves against.
     await ensureHouseCatalog(db, deps());
     const [draft] = await db
       .select({ kickoffAt: drafts.kickoffAt })
       .from(drafts)
       .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
-      .where(eq(leagues.houseRung, "sitandgo_12"));
+      .where(eq(leagues.houseRung, "open_12"));
     expect(draft).toBeDefined();
     expect(Date.parse(draft!.kickoffAt.toISOString())).toBeGreaterThan(Date.parse(NOW));
   });
@@ -192,6 +196,12 @@ describe("ensureHouseCatalog", () => {
     await ensureHouseCatalog(db, deps());
     for (const rung of Object.keys(HOUSE_CATALOG.rungs) as (keyof typeof HOUSE_CATALOG.rungs)[]) {
       const spawned = await db.select().from(leagues).where(eq(leagues.houseRung, rung));
+      // `sitandgo_12` is retired to `openAtOnce: 0` (founder directive 2026-08-26) — a cold
+      // catalog spawns nothing for it, so only the two live rungs have anything to check here.
+      if (HOUSE_CATALOG.rungs[rung].openAtOnce === 0) {
+        expect(spawned.length).toBe(0);
+        continue;
+      }
       expect(spawned.length).toBeGreaterThan(0);
       for (const league of spawned) {
         expect({ id: league.id, entryFeeCents: league.entryFeeCents, platformFeeCents: league.platformFeeCents, payoutTable: league.payoutTable }).toEqual({
@@ -227,14 +237,30 @@ describe("ensureHouseCatalog", () => {
     };
     const outcome = await ensureHouseCatalog(db, deps({ audit: throwingAudit }));
     expect(outcome.opened).toEqual([]);
-    expect(outcome.refused.length).toBe(Object.keys(HOUSE_CATALOG.rungs).length);
+    // Only the rungs with a real shortfall to attempt ever reach the `catch` that populates
+    // `refused` — `sitandgo_12` is retired to `openAtOnce: 0` (founder directive 2026-08-26), so
+    // its attempt ceiling is `0` and it is never attempted, therefore never refused either.
+    const liveRungs = (Object.keys(HOUSE_CATALOG.rungs) as HouseRungName[]).filter((rung) => HOUSE_CATALOG.rungs[rung].openAtOnce > 0);
+    expect(outcome.refused.length).toBe(liveRungs.length);
     for (const refusal of outcome.refused) {
-      expect(Object.keys(HOUSE_CATALOG.rungs)).toContain(refusal.rung);
+      expect(liveRungs).toContain(refusal.rung);
       expect(refusal.reason.length).toBeGreaterThan(0);
     }
     // A failed spawn attempt never partially commits — the transaction it ran in rolled back
     // whole, so nothing about it is on the shelf at all.
     expect(await snapshotOf(db)).toEqual({ leagues: [], drafts: [], scoringSettings: [], auditEvents: [] });
+  });
+
+  // Founder directive 2026-08-26: sitandgo_12 is retired to `openAtOnce: 0` — `open_12` is the
+  // sit-and-go now. The shortfall arithmetic needed no new guard for this (`rung.openAtOnce * 3`
+  // is `0`, and `open.length >= rung.openAtOnce` is true at zero leagues too); this test is that
+  // claim, proven rather than reasoned about.
+  it("spawns nothing at all for a retired, openAtOnce: 0 rung, and never throws over it", async () => {
+    const outcome = await ensureHouseCatalog(db, deps());
+    expect(await openCountOf(db, "sitandgo_12")).toBe(0);
+    expect(await leagueIdsOf(db, "sitandgo_12")).toEqual([]);
+    expect(outcome.opened.some((id) => id.startsWith("house_sitandgo_12_"))).toBe(false);
+    expect(outcome.refused.some((refusal) => refusal.rung === "sitandgo_12")).toBe(false);
   });
 
   it("ignores a malformed edition suffix rather than corrupting the next one it mints", async () => {
@@ -247,10 +273,10 @@ describe("ensureHouseCatalog", () => {
       commissionerUserId: null, houseRung: "open_12",
     });
     await ensureHouseCatalog(db, deps());
+    // `open_12`'s own width dropped to 1 (founder directive 2026-08-26) — one real spawn, at
+    // edition 1, since the bogus row's unparseable suffix never counted toward `nextEdition`.
     const ids = await leagueIdsOf(db, "open_12");
     expect(ids).toContain("house_open_12_1");
-    expect(ids).toContain("house_open_12_2");
-    expect(ids).toContain("house_open_12_3");
   });
 });
 
@@ -261,93 +287,51 @@ describe("openHouseLeaguesQuery", () => {
 });
 
 /**
- * FINAL WHOLE-BRANCH REVIEW, F2 — THE PERMANENT STALL.
- *
- * An under-filled `scheduled`-trigger house league whose kickoff passed used to hold its shelf
- * slot forever. `reduceStart` (`@/draft-engine`) refuses a draft with fewer than two teams, so
- * its status never left `'scheduled'`; this query had no kickoff predicate, so it kept counting
- * toward the rung's width and the reconciler never restocked; and `houseShelfQuery` kept
- * rendering it at the TOP of the public shelf, reading "starting now". Nothing could repair it by
- * hand either — a house league's kickoff refuses edits by design. One predicate on both queries
- * (`houseKickoffStillAhead`) retires it from both roles at the same instant.
+ * FOUNDER DIRECTIVE 2026-08-26 — THE STALL THIS BLOCK USED TO PROVE IS NOW STRUCTURALLY
+ * IMPOSSIBLE FOR A HOUSE LEAGUE, not merely untested. Final whole-branch review F2's fix
+ * (`houseKickoffStillAhead`) protected an under-filled `'scheduled'`-trigger house league whose
+ * fixed kickoff had passed. Every `HOUSE_CATALOG` rung is `'when_full'` now (width dropped
+ * 6 → 2), and `houseKickoffStillAhead` reads TRUE UNCONDITIONALLY for a `'when_full'` draft (its
+ * first `OR` branch, `@/league-service/house-factory.ts`) — there is no clock left for a house
+ * league's shelf slot to age past. The old two-test scenario ("kickoff passes while unfilled" /
+ * "kickoff passes while full") cannot be constructed through the reconciler at all any more, so
+ * this is the new invariant, proven directly rather than left unasserted: a house league's shelf
+ * slot survives arbitrary clock passage, and only filling or starting ever closes it.
  */
-describe("a stale scheduled-trigger house league", () => {
-  /** `open_12`'s first slot kicks off `firstKickoffMinutes` out; this is a minute past that. */
-  function justPastTheFirstKickoff(): { readonly now: () => string } {
-    const dueAt = new Date(Date.parse(houseKickoffFor(NOW, HOUSE_CATALOG.rungs.open_12, 0)) + 60_000).toISOString();
-    return { now: () => dueAt };
-  }
-
-  it("stops counting toward the shelf, and the next reconcile opens a fresh edition in its place", async () => {
+describe("a house league no longer stalls by clock alone, because every rung is when_full", () => {
+  it("stays on the shelf a year later, untouched by the clock, until it fills or starts", async () => {
     await ensureHouseCatalog(db, deps());
     const rung = HOUSE_CATALOG.rungs.open_12;
     expect(await openCountOf(db, "open_12")).toBe(rung.openAtOnce);
 
-    // Nobody joined `house_open_12_1`, and its chosen time came and went.
-    const laterClock = justPastTheFirstKickoff();
-    expect((await openHouseLeaguesQuery(db, "open_12", laterClock.now())).map((row) => row.id)).not.toContain("house_open_12_1");
-    expect((await openHouseLeaguesQuery(db, "open_12", laterClock.now())).length).toBe(rung.openAtOnce - 1);
+    const aYearLater = { now: () => new Date(Date.parse(NOW) + 365 * 24 * 60 * 60 * 1000).toISOString() };
+    expect((await openHouseLeaguesQuery(db, "open_12", aYearLater.now())).map((row) => row.id)).toContain("house_open_12_1");
+    expect(await openCountOf(db, "open_12")).toBe(rung.openAtOnce);
 
-    // THE POINT: the shortfall is now visible, so the reconciler restocks the slot — with a
-    // fresh edition, never a resurrection of the stalled one (ruling 35).
-    const outcome = await ensureHouseCatalog(db, deps({ clock: laterClock }));
-    expect(outcome.opened).toEqual([`house_open_12_${rung.openAtOnce + 1}`]);
-    expect((await openHouseLeaguesQuery(db, "open_12", laterClock.now())).length).toBe(rung.openAtOnce);
-
-    // Closed, not deleted — the stalled league's row and its members' history stay exactly where
-    // they are. No abandonment state machine ships with this fix (Phase 3.6's Task 7, "roll until
-    // full", replaces this whole door).
-    expect(await leagueIdsOf(db, "open_12")).toContain("house_open_12_1");
-  });
-
-  it("leaves a stale but FULL league alone — a full room is startable, so it is not stalled at all", async () => {
-    await ensureHouseCatalog(db, deps());
-    const rung = HOUSE_CATALOG.rungs.open_12;
-    await fillLeague(db, "house_open_12_1");
-
-    const laterClock = justPastTheFirstKickoff();
-    // It was already off the shelf for being FULL, before its kickoff ever passed — the staleness
-    // predicate adds nothing here and takes nothing away.
-    expect((await openHouseLeaguesQuery(db, "open_12", laterClock.now())).length).toBe(rung.openAtOnce - 1);
-
-    // And it still STARTS, through the real scan: `dueDraftsQuery`/`autoStartDueDrafts` never
-    // consulted the shelf-width predicate and still do not. A full room whose time has come is
-    // exactly the room this platform exists to draft.
-    const positions = ["QB", "RB", "WR", "TE", "K", "DEF"] as const;
-    await db.insert(players).values(
-      Array.from({ length: 200 }, (_, i) => ({
-        id: `stale_p_${i}`, name: `Pool Player ${i}`, position: positions[i % positions.length], nflTeam: "KC",
-      })),
-    );
-    const store = createDraftStore({ db, publish: async () => "1-0", clock: laterClock });
-    const outcomes = await autoStartDueDrafts(db, { store, clock: laterClock });
-    expect(outcomes).toContainEqual({ draftId: await draftIdOf(db, "house_open_12_1"), started: true });
-
-    const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, "house_open_12_1"));
-    expect(row?.status).toBe("in_progress");
+    // The reconciler, asked again at that same far-future instant, restocks nothing — there was
+    // never a shortfall to see, because the clock never created one.
+    const outcome = await ensureHouseCatalog(db, deps({ clock: aYearLater }));
+    expect(outcome.opened).toEqual([]);
   });
 });
 
 /**
- * PHASE 3.6, TASK 7 — THE COMPOSITION THIS DESCRIBE BLOCK'S OWN DOCBLOCK PROMISED. "No abandonment
- * state machine ships with this fix (Phase 3.6's Task 7, 'roll until full', replaces this whole
- * door)" — this is that replacement, proven rather than asserted. A stale scheduled-trigger house
- * league does not sit retired forever waiting for a fresh edition to paper over it: the SAME
- * `dueDraftsQuery`/`autoStartDueDrafts` scan that starts a full public league (`ENFORCED_LEAGUE_
- * SQL` is `is_public_matchmade = true`, and a house league's own `spawnHouseLeagueInTx` always
- * writes that) finds this one too, sees its room is not full, and ROLLS its kickoff forward
- * instead. The instant that write lands, `houseKickoffStillAhead` reads TRUE again for this exact
- * row — the identical predicate `houseShelfQuery` (public) and `openHouseLeaguesQuery`
- * (reconciler) both already gate on — so the league re-enters BOTH roles on the very same write
- * that retired it, with no separate "unstall" step and no state this task had to invent.
+ * PHASE 3.6, TASK 7's ROLL, NOW STRUCTURALLY EXCLUDED FROM EVERY HOUSE LEAGUE (founder directive
+ * 2026-08-26). The roll only ever touches a `startTrigger: 'scheduled'` draft
+ * (`dueUnfilledScheduledDraftsQuery`'s own predicate and `rollUnfilledDraftInTx`'s own
+ * `ROLL_REFUSALS.notScheduled`, both `@/league-service/roll.ts`) — every house rung is
+ * `'when_full'` now, so no house league's draft ever carries `startTrigger: 'scheduled'` for the
+ * roll to find. This is the "rolls for member-created scheduled leagues are untouched behavior"
+ * half of the founder's directive, proven directly against a real, short-of-capacity, way-overdue
+ * house league rather than merely asserted: the roll finds nothing to do for it, ever.
  */
-describe("a stale scheduled-trigger house league composes with the roll (Task 7)", () => {
-  it("rolls instead of stalling, and re-enters the shelf the instant its kickoff moves forward", async () => {
+describe("the roll no longer reaches a house league at all — Task 7's mechanism is member-only now", () => {
+  it("skips a short, way-overdue house league entirely — it was never startTrigger: scheduled", async () => {
     await ensureHouseCatalog(db, deps());
-    const rung = HOUSE_CATALOG.rungs.open_12;
     const leagueId = "house_open_12_1";
 
-    // A short room, the exact shape the founder's ruling exists for — some seats taken, not all.
+    // A short room, some seats taken, not all — the exact shape the roll exists to catch for a
+    // MEMBER-created scheduled league.
     const [league] = await db.select({ teamCount: leagues.teamCount }).from(leagues).where(eq(leagues.id, leagueId));
     const shortOf = 3;
     for (let i = 0; i < (league?.teamCount ?? 0) - shortOf; i++) {
@@ -357,30 +341,17 @@ describe("a stale scheduled-trigger house league composes with the roll (Task 7)
       if (!outcome.ok) throw new Error(outcome.reason);
     }
 
-    // `open_12`'s first slot kicks off `firstKickoffMinutes` out; this is a minute past that —
-    // the identical instant `justPastTheFirstKickoff` (the stall describe block above) computes.
-    const dueAt = new Date(Date.parse(houseKickoffFor(NOW, rung, 0)) + 60_000).toISOString();
-    const laterClock = { now: () => dueAt };
-    // Off the shelf, exactly as the existing stall test already proves.
-    expect((await openHouseLeaguesQuery(db, "open_12", laterClock.now())).map((row) => row.id)).not.toContain(leagueId);
-
-    // THE COMPOSITION: the roll finds it (still short a seat, still due) and moves its kickoff
-    // forward — never starts it, because `roomIsFull` still says no.
-    const outcomes = await rollDueDrafts(db, { clock: laterClock });
+    // Way overdue by any clock — proves this is about `startTrigger`, not merely about being
+    // early relative to some placeholder.
+    const wayLater = { now: () => new Date(Date.parse(NOW) + 30 * 24 * 60 * 60 * 1000).toISOString() };
     const draftId = await draftIdOf(db, leagueId);
-    const rolledThisLeague = outcomes.find((outcome) => outcome.draftId === draftId);
-    expect(rolledThisLeague).toMatchObject({ rolled: true });
 
-    const [draft] = await db.select({ kickoffAt: drafts.kickoffAt, kickoffRolls: drafts.kickoffRolls }).from(drafts).where(eq(drafts.id, draftId));
-    expect(draft?.kickoffRolls).toBe(1);
-    expect(Date.parse(draft!.kickoffAt.toISOString())).toBeGreaterThan(Date.parse(laterClock.now()));
+    const outcomes = await rollDueDrafts(db, { clock: wayLater });
+    expect(outcomes.find((outcome) => outcome.draftId === draftId)).toBeUndefined();
 
-    // BACK ON THE SHELF — the SAME `houseKickoffStillAhead` predicate that retired it a moment
-    // ago now reads TRUE again for the SAME row, with no second write and no unstall step.
-    expect((await openHouseLeaguesQuery(db, "open_12", laterClock.now())).map((row) => row.id)).toContain(leagueId);
-    // And the reconciler, asked again right now, sees the shelf as it actually is — full width,
-    // not short one slot the way the old retire-and-replace shape would have reported it.
-    expect(await openCountOf(db, "open_12")).toBe(rung.openAtOnce);
+    // Untouched — no roll count, still exactly the placeholder `ensureHouseCatalog` wrote it.
+    const [draft] = await db.select({ kickoffRolls: drafts.kickoffRolls }).from(drafts).where(eq(drafts.id, draftId));
+    expect(draft?.kickoffRolls).toBe(0);
   });
 });
 
@@ -413,10 +384,12 @@ describe("the reconciler -> auto-start -> reconciler loop (fix round 1, F2)", ()
       })),
     );
 
-    // A minute past this league's real, staggered kickoff (`houseKickoffFor`'s own index-0
-    // arithmetic) — advanced on a LOCAL clock, never a hand-flipped `status` column, so the real
-    // `autoStartDueDrafts` scan is what starts it.
-    const dueAt = new Date(Date.parse(houseKickoffFor(NOW, rung, 0)) + 60_000).toISOString();
+    // A minute past `fireWhenFullInTx`'s own grace window — `fillLeague`'s last join (on the
+    // fixed module `clock`, `NOW`) fired the trigger and wrote `kickoff_at = NOW +
+    // graceSeconds` (`./fill-trigger.ts`); this rung is `when_full` now, so that grace window is
+    // its ONLY real kickoff — advanced on a LOCAL clock, never a hand-flipped `status` column, so
+    // the real `autoStartDueDrafts` scan is what starts it.
+    const dueAt = new Date(Date.parse(NOW) + MATCHMAKING_CONFIG.sitAndGo.graceSeconds * 1_000 + 60_000).toISOString();
     const laterClock = { now: () => dueAt };
     const store = createDraftStore({ db, publish: async () => "1-0", clock: laterClock });
     const outcomes = await autoStartDueDrafts(db, { store, clock: laterClock });
@@ -436,6 +409,6 @@ describe("the reconciler -> auto-start -> reconciler loop (fix round 1, F2)", ()
     expect(await openCountOf(db, "open_12")).toBe(rung.openAtOnce);
     const ids = await leagueIdsOf(db, "open_12");
     expect(ids).toContain(firstLeagueId); // still exists — closed, not deleted
-    expect(new Set(ids).size).toBe(rung.openAtOnce + 1); // the original 3, plus #1's replacement
+    expect(new Set(ids).size).toBe(rung.openAtOnce + 1); // the original 1, plus #1's replacement
   });
 });

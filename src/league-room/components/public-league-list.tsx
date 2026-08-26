@@ -18,8 +18,13 @@ import { OpenLeagueCard } from "./open-league-card";
  * the reconciler makes it true by construction (`ensureHouseCatalog`,
  * `@/league-service/house-factory.ts`). The dropped "everyone joins the same way and plays the
  * same rules" clause lives one press away in the house-league glossary entry beside it. Still
- * written WITHOUT pointing at a badge: a factory-named house league carries its rung in its
- * TITLE by construction (`houseLeagueName`), so neither form renders a rung badge (E3).
+ * written WITHOUT pointing at a badge: a rung badge would be redundant on a house row regardless
+ * of what its title says — `stakeBadge` (`./open-league-shared.tsx`) decides by AUTHORITY
+ * (`houseRung === null`), never by inspecting the name, so neither form renders one (E3). Before
+ * the founder's 2026-08-26 fun-name pass, a factory-named house league's title also happened to
+ * spell its rung out literally ("Open 12-team League 3"); `houseLeagueName` now draws from a
+ * curated pool instead, and the badge decision needed no change at all because it was never
+ * keyed off the title text to begin with.
  */
 export const HOUSE_SHELF_SENTENCE =
   "Commish runs some of these leagues itself, and a new league opens as soon as one fills, so there is always a seat.";
@@ -144,10 +149,10 @@ export interface OpenLeagueShelfProps {
  * (FOUNDER-ORDERED, 2026-08-24: "horizontal row elements instead of these cards - my eyes don't
  * know where to focus"); below lg it stays the `OpenLeagueCard` grid, the form that fits 360px.
  * The mock's `m-shelf-head` — title beside the quiet freshness sub — keeps the collapsed house
- * sentence beneath it (`HOUSE_SHELF_SENTENCE`) and the one legend line (D1). House leagues
- * differentiate by TITLE — the factory names them "Open 12-team League 3" — and member leagues
- * by their stake badge, so the merged list needs no section boundary to keep the two kinds
- * apart (E3).
+ * sentence beneath it (`HOUSE_SHELF_SENTENCE`) and the one legend line (D1). House leagues carry
+ * no rung badge at all (`stakeBadge` decides by authority, `houseRung === null`, never by
+ * inspecting the title) and member leagues carry their stake badge always, so the merged list
+ * needs no section boundary to keep the two kinds apart (E3).
  *
  * Exactly one league gets `emphasis="ink"` PER RENDERING (D2, rule 5): `featuredLeagueId` above
  * picks it once across the WHOLE merged list, house and member alike, and both its row and its

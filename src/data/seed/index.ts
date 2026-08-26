@@ -45,15 +45,20 @@ import { seedTrades } from "./seed-trades";
  * (`./seed-tier-demo.ts`) already keeps for its own aging-class incident — a needless second copy
  * of that hazard for an arc that doesn't need to touch the tier gate at all.
  *
- * `open_12`, never `sitandgo_12`: filling a `'scheduled'`-trigger league never moves its kickoff
- * (`fireWhenFullInTx` refuses with `FILL_TRIGGER_REFUSALS.notWhenFull` for every non-`when_full`
- * draft, house or not — read `./fill-trigger.ts`'s own top guard). Filling `sitandgo_12` instead
- * would rewrite `drafts.kickoff_at` to `now + graceSeconds`, a state the running dev server's own
- * ticker (`@/draft-service/ticker.ts`) can then advance out from under a later `npm run dev` —
- * the identical "a seeded league the ticker can move" hazard `seed-tier-demo.ts`'s own docblock
- * already root-caused once. `open_12` leaves the filled league's kickoff exactly where
- * `houseKickoffFor` put it — stable across every later `npm run dev`, and every later `npm run
- * seed` re-run.
+ * `open_12`, never `sitandgo_12` — RETARGETED (founder directive 2026-08-26): `sitandgo_12` is
+ * retired to `openAtOnce: 0`, so `ensureHouseCatalog` never spawns one for this arc to fill at
+ * all any more; the choice is no longer between two rungs, only one still exists to pick. What
+ * used to distinguish them (a `'scheduled'`-trigger fill leaves `kickoff_at` untouched, a
+ * `'when_full'` fill moves it to `now + graceSeconds` via `fireWhenFullInTx`, `./fill-trigger.ts`)
+ * no longer distinguishes anything either: `open_12` is `'when_full'` now too, exactly like
+ * `sitandgo_12` always was, so filling it moves its kickoff the identical way. The demo league
+ * this arc fills is therefore no longer "stable forever, full but never drafting" — it starts
+ * drafting a few minutes after `npm run seed` finishes, which is an accurate demonstration of the
+ * sit-and-go feature this whole shelf now runs on, not a stale artifact of the old
+ * scheduled/when_full split. The ticker CAN advance this league's kickoff out from under a later
+ * `npm run dev` the same "a seeded league the ticker can move" way `seed-tier-demo.ts`'s own
+ * docblock already root-caused once — accepted here rather than routed around, because there is
+ * no other rung left for this arc to fill instead.
  *
  * The EARLIEST SAFE `open_12` league, addressed by creation order rather than a hardcoded id
  * (this arc has no reason to know `house-factory.ts`'s own `house_${rung}_${edition}` format):

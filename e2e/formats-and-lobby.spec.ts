@@ -114,9 +114,11 @@ async function fillAllButOneSeat(db: Db, leagueId: string): Promise<void> {
 // but a dedicated pool still keeps this journey from ever touching a seat another spec depends on.
 //
 // Fix round 1, F1: "oldest STILL-OPEN" is not automatically SAFE — on a long-lived shared dev
-// database, `open_12`'s earliest still-open league can carry a fixed kickoff (Task 13's own
-// `houseKickoffFor`, never rewritten for a `'scheduled'`-trigger league) that has already aged
-// past "now". Backstage-filling one of those to two-plus seats would arm `autoStartDueDrafts`
+// database, `open_12`'s earliest still-open league can carry a fixed kickoff (the `'when_full'`
+// placeholder `kickoffFor` wrote at spawn time, `@/league-service/house-factory.ts` — founder
+// directive 2026-08-26 made every house rung `'when_full'`, so this is the only kickoff a house
+// league ever gets until it fills) that has already aged past "now". Backstage-filling one of
+// those to two-plus seats would arm `autoStartDueDrafts`
 // (no fill-completeness requirement of its own — `@/draft-service/auto-start`) and race the real
 // ticker for whether the live last-seat click below lands before the draft does — an intermittent
 // `DRAFT_ALREADY_STARTED` flake unrelated to the shelf behavior this journey actually tests.
@@ -314,15 +316,15 @@ test.describe("formats and lobby", () => {
       await db.$client.end();
     }
 
-    // --- BEFORE: the shelf's own open_12 width, read from the hydrated page — never
-    //     `HOUSE_CATALOG.rungs.open_12.openAtOnce` asserted directly. A hardcoded shelf width
-    //     would be asserting the CATALOG, not the behavior: the factory itself changes the row
-    //     count between page loads (Task 13's own reconciler, `ensureHouseCatalog`), so every
-    //     count assertion below is a DELTA against this exact set, read moments ago. -----------
-    const openRungHeading = /^Open 12-team League \d+$/;
+    // --- BEFORE: the shelf shows this exact league, read from the hydrated page. Founder
+    //     directive 2026-08-26 dropped `open_12`'s own shelf width to 1 and replaced its factory
+    //     name with a fun, curated pool entry (`houseLeagueName`, `@/matchmaking/house-catalog`)
+    //     — there is no longer a shared "Open 12-team League N" substring every open_12 heading
+    //     carries for a regex to filter the shelf on, so the deltas below poll the database by
+    //     the SAME query the reconciler itself counts by (`openHouseLeaguesQuery`) rather than
+    //     scrape a pattern out of the page's own heading list. ---------------------------------
     await managerA.goto("/browse");
     await expect(managerA.getByRole("heading", { name: target.name })).toBeVisible();
-    const beforeNames = await managerA.getByRole("heading", { name: openRungHeading }).allInnerTexts();
 
     // --- THE LAST SEAT, live, through the real UI -----------------------------------------------
     await managerB.goto("/browse");
@@ -339,29 +341,35 @@ test.describe("formats and lobby", () => {
     //     league `hasOpenSeat` still accepts. -------------------------------------------------
     // e2e checkpoint (Phase 3.7 fix round): `reload()` resolves on the document's load event,
     // which fires while the root `loading.tsx` skeleton (`AppShellSkeleton shape="public"`) is
-    // still on screen — the dynamic page streams in after it — and `allInnerTexts` reads WITHOUT
-    // waiting. The checkpoint trace showed every post-reload read returning [] (this step passing
-    // trivially on an empty list, the delayed delta below never passing) while the BEFORE read,
-    // anchored by its own `toBeVisible`, saw all three open house headings. Each post-reload read
-    // now anchors on the page's own hydrated `h1` first, so the name-diff compares the same fully
-    // rendered shelf the BEFORE snapshot read. The assertions themselves are unchanged.
+    // still on screen — the dynamic page streams in after it. Anchoring on the page's own
+    // hydrated `h1` first (`"Open leagues"`) before asking whether `target.name` is gone is what
+    // keeps this from passing trivially against a still-loading shell.
     await expect(async () => {
       await managerA.reload();
       await expect(managerA.getByRole("heading", { name: "Open leagues" })).toBeVisible();
-      const afterNames = await managerA.getByRole("heading", { name: openRungHeading }).allInnerTexts();
-      expect(afterNames).not.toContain(target.name);
+      expect(await managerA.getByRole("heading", { name: target.name }).count()).toBe(0);
     }).toPass({ timeout: 15_000 });
 
     // --- DELAYED DELTA: the reconciler's own next tick opens a real replacement — retried up to
     //     comfortably past `DRAFT_SERVICE_CONFIG.houseReconcileIntervalMs` (30s), the real ticker
-    //     interval, never a synthesized "tick now" call. -----------------------------------------
-    await expect(async () => {
-      await managerA.reload();
-      // The same hydration anchor as the immediate delta above — see that step's comment.
-      await expect(managerA.getByRole("heading", { name: "Open leagues" })).toBeVisible();
-      const afterNames = await managerA.getByRole("heading", { name: openRungHeading }).allInnerTexts();
-      const replacement = afterNames.filter((name) => !beforeNames.includes(name));
-      expect(replacement.length).toBeGreaterThan(0);
-    }).toPass({ timeout: 45_000 });
+    //     interval, never a synthesized "tick now" call. `open_12`'s own width is 1, so the exact
+    //     replacement is read back by NAME straight off `openHouseLeaguesQuery` (the reconciler's
+    //     own count) rather than guessed at from the page. -------------------------------------
+    const replacementDb = createDb();
+    try {
+      await expect(async () => {
+        const [open] = await openHouseLeaguesQuery(replacementDb, "open_12", new Date().toISOString());
+        expect(open?.id).toBeDefined();
+        expect(open!.id).not.toBe(target.id);
+        const [replacement] = await replacementDb.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, open!.id));
+        expect(replacement?.name).toBeDefined();
+
+        await managerA.reload();
+        await expect(managerA.getByRole("heading", { name: "Open leagues" })).toBeVisible();
+        await expect(managerA.getByRole("heading", { name: replacement!.name })).toBeVisible();
+      }).toPass({ timeout: 45_000 });
+    } finally {
+      await replacementDb.$client.end();
+    }
   });
 });

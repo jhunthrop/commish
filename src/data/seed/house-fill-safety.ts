@@ -1,21 +1,27 @@
 /**
  * Fix round 1 (Task 15, F1): the one predicate a caller asks BEFORE seating a second member into
- * a `'scheduled'`-trigger house league, shared by `index.ts`'s own house arc and
+ * an already-spawned house league, shared by `index.ts`'s own house arc and
  * `e2e/formats-and-lobby.spec.ts`'s browser journey — the two call sites that backstage-fill a
  * real, already-spawned house league rather than one they just created themselves.
  *
  * THE HAZARD. `autoStartDueDrafts` (`@/draft-service/auto-start`) has no fill-completeness
  * requirement of its own: `status = 'scheduled' AND kickoff_at <= now`, plus `store.startDraft`'s
- * own floor of two seated teams, is the whole test. A house league's kickoff is fixed once, at
- * spawn time (`houseKickoffFor`, `@/matchmaking/house-catalog`), and a `'scheduled'`-trigger
- * league's kickoff never moves again — nothing rewrites it the way `fireWhenFullInTx` rewrites a
- * `'when_full'` league's. On a long-lived shared dev database, that fixed kickoff is exactly the
- * kind of fixture that ages out from under a later run: found running Task 15's own e2e battery,
- * where the real ticker (`@/draft-service/ticker.ts`) runs alongside a backstage fill and can
- * claim a stale-kickoff draft mid-loop, turning a routine seat-taking into an intermittent
- * `DRAFT_ALREADY_STARTED` refusal that has nothing to do with whatever the caller is actually
- * proving — the identical "a seeded fixture the ticker can move" class of hazard `seed-tier-
- * demo.ts`'s own docblock already root-caused once for a shared identity pool.
+ * own floor of two seated teams, is the whole test. A house league's kickoff is fixed once at
+ * spawn time — for a `'scheduled'` rung via `houseKickoffFor` (`@/matchmaking/house-catalog`),
+ * for a `'when_full'` rung via the placeholder `kickoffFor` writes instead
+ * (`@/league-service/house-factory.ts`, `now + draftDaysFromCreation`) — and neither one moves
+ * again on its own except `fireWhenFullInTx` rewriting a `'when_full'` league's the moment it
+ * fills. Founder directive 2026-08-26: every `HOUSE_CATALOG` rung is `'when_full'` today, so this
+ * hazard is entirely about that placeholder aging now, not a chosen kickoff — but the mechanism
+ * and the fix are identical either way, because this predicate only ever reads the kickoff column
+ * and asks whether it sits comfortably ahead, never which arm wrote it. On a long-lived shared dev
+ * database, that fixed-until-filled kickoff is exactly the kind of fixture that ages out from
+ * under a later run: found running Task 15's own e2e battery, where the real ticker
+ * (`@/draft-service/ticker.ts`) runs alongside a backstage fill and can claim a stale-kickoff
+ * draft mid-loop, turning a routine seat-taking into an intermittent `DRAFT_ALREADY_STARTED`
+ * refusal that has nothing to do with whatever the caller is actually proving — the identical "a
+ * seeded fixture the ticker can move" class of hazard `seed-tier-demo.ts`'s own docblock already
+ * root-caused once for a shared identity pool.
  *
  * WHY NOT REWRITE THE KICKOFF INSTEAD. The legitimate write path (`PUT /api/leagues/[leagueId]/
  * draft-schedule`, `setDraftKickoff`) is commissioner-gated, and a house league has no

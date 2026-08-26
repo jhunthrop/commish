@@ -349,7 +349,9 @@ export const leagues = pgTable(
      * The shelf itself (Task 14, `houseShelfQuery`, `@/league-service/browse.ts`) does NOT read
      * this second column for its own ordering — an earlier draft of this note assumed creation
      * order and the shelf's soonest-draft order would coincide, true only WITHIN one rung
-     * (`houseKickoffFor`'s own stagger), never ACROSS rungs staggering on independent clocks. The
+     * (`houseKickoffFor`'s own stagger), never ACROSS rungs that could stagger on independent
+     * clocks. (Founder directive 2026-08-26: every rung is `when_full` today, so no rung staggers
+     * at all right now — the general argument against relying on creation order still holds.) The
      * shelf orders on `drafts.kickoff_at` instead, a `Sort` measured after this index's own scan
      * in `src/db/index-plans.test.ts` rather than served by the index directly. This index still
      * serves the shelf query's `WHERE house_rung IS NOT NULL` predicate — that half of the plan,

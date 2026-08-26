@@ -9,6 +9,7 @@ import {
   houseKickoffFor,
   houseLeagueName,
   plusMinutesIso,
+  type HouseRung,
   type HouseRungName,
 } from "./house-catalog";
 import { MATCHMAKING_CONFIG } from "./config";
@@ -20,21 +21,25 @@ function plusMinutes(iso: string, minutes: number): string {
 }
 
 describe("HOUSE_CATALOG", () => {
-  it("staggers each open league of a rung by the rung's own spacing", () => {
-    const rung = HOUSE_CATALOG.rungs.open_12;
-    expect(houseKickoffFor(NOW, rung, 0)).toBe(plusMinutes(NOW, rung.firstKickoffMinutes));
-    expect(houseKickoffFor(NOW, rung, 2)).toBe(plusMinutes(NOW, rung.firstKickoffMinutes + 2 * rung.staggerMinutes));
+  // Founder directive 2026-08-26: the whole shelf is sit-and-go now — every rung drafts the
+  // moment its last seat fills, never at a chosen clock time.
+  it("makes every rung when_full — there is no scheduled-trigger house rung left", () => {
+    for (const rung of Object.values(HOUSE_CATALOG.rungs)) {
+      expect(rung.startTrigger).toBe("when_full");
+    }
   });
 
-  it("keeps every staggered kickoff inside the window setDraftKickoff would accept", () => {
-    const widest = Math.max(
-      ...Object.values(HOUSE_CATALOG.rungs).map((rung) => rung.firstKickoffMinutes + (rung.openAtOnce - 1) * rung.staggerMinutes),
-    );
-    expect(widest).toBeLessThan(LEAGUE_CONFIG.defaults.maxDraftDaysAhead * MINUTES_PER_DAY);
+  it("drops the shelf's total width to exactly two, one open_12 and one beginner_12 apiece", () => {
+    const total = Object.values(HOUSE_CATALOG.rungs).reduce((sum, rung) => sum + rung.openAtOnce, 0);
+    expect(total).toBe(2);
+    expect(HOUSE_CATALOG.rungs.open_12.openAtOnce).toBe(1);
+    expect(HOUSE_CATALOG.rungs.beginner_12.openAtOnce).toBe(1);
   });
 
-  it("gives a sit-and-go rung no scheduled time at all, because filling is its schedule", () => {
+  it("retires sitandgo_12 to zero width, without dropping the key or its label", () => {
+    expect(HOUSE_CATALOG.rungs.sitandgo_12.openAtOnce).toBe(0);
     expect(HOUSE_CATALOG.rungs.sitandgo_12.startTrigger).toBe("when_full");
+    expect(HOUSE_RUNG_LABEL.sitandgo_12.length).toBeGreaterThan(0);
   });
 
   it("declares every rung against a tier the enforcement gate actually recognizes", () => {
@@ -53,12 +58,6 @@ describe("HOUSE_CATALOG", () => {
       expect(HOUSE_RUNG_LABEL[rung].length).toBeGreaterThan(0);
     }
   });
-
-  it("gives every rung a positive shelf width", () => {
-    for (const rung of Object.values(HOUSE_CATALOG.rungs)) {
-      expect(rung.openAtOnce).toBeGreaterThan(0);
-    }
-  });
 });
 
 describe("HOUSE_RUNG_LABEL copy sweep", () => {
@@ -69,11 +68,68 @@ describe("HOUSE_RUNG_LABEL copy sweep", () => {
   });
 });
 
+/**
+ * `houseKickoffFor` is dormant (no catalog rung is `"scheduled"` any more — see `HOUSE_CATALOG`'s
+ * own docblock), but it stays pure, exported and tested against a synthetic scheduled-shaped
+ * rung, so the stagger arithmetic is not lost the day a rung turns `"scheduled"` again.
+ */
+describe("houseKickoffFor (dormant, kept for a future scheduled rung)", () => {
+  const scheduledLikeRung: HouseRung = { ...HOUSE_CATALOG.rungs.open_12, startTrigger: "scheduled", firstKickoffMinutes: 180, staggerMinutes: 180 };
+
+  it("staggers each open league of a rung by the rung's own spacing", () => {
+    expect(houseKickoffFor(NOW, scheduledLikeRung, 0)).toBe(plusMinutes(NOW, scheduledLikeRung.firstKickoffMinutes));
+    expect(houseKickoffFor(NOW, scheduledLikeRung, 2)).toBe(plusMinutes(NOW, scheduledLikeRung.firstKickoffMinutes + 2 * scheduledLikeRung.staggerMinutes));
+  });
+
+  it("keeps a widely-staggered kickoff inside the window setDraftKickoff would accept", () => {
+    const openAtOnce = 3;
+    const widest = scheduledLikeRung.firstKickoffMinutes + (openAtOnce - 1) * scheduledLikeRung.staggerMinutes;
+    expect(widest).toBeLessThan(LEAGUE_CONFIG.defaults.maxDraftDaysAhead * MINUTES_PER_DAY);
+  });
+
+  it("is a no-op at zero minutes — every live rung's own shape today", () => {
+    expect(houseKickoffFor(NOW, HOUSE_CATALOG.rungs.open_12, 0)).toBe(NOW);
+    expect(houseKickoffFor(NOW, HOUSE_CATALOG.rungs.open_12, 3)).toBe(NOW);
+  });
+});
+
 describe("houseLeagueName", () => {
-  it("names a spawn from its rung's label and edition, so two editions never share a name", () => {
-    expect(houseLeagueName("open_12", 1)).toBe("Open 12-team League 1");
-    expect(houseLeagueName("open_12", 2)).toBe("Open 12-team League 2");
-    expect(houseLeagueName("open_12", 1)).not.toBe(houseLeagueName("open_12", 2));
+  it("draws the first cycle straight from the rung's pool, un-suffixed", () => {
+    expect(houseLeagueName("open_12", 1)).toBe("The Blitz Room");
+    expect(houseLeagueName("open_12", 2)).toBe("Fourth and Long");
+    expect(houseLeagueName("open_12", 12)).toBe("Play Action Party");
+    expect(houseLeagueName("beginner_12", 1)).toBe("The Rookie Room");
+    expect(houseLeagueName("beginner_12", 8)).toBe("Kickoff Classic");
+  });
+
+  it("wraps to the pool's first entry again, suffixed with the lap count, once a rung's editions exceed its pool", () => {
+    expect(houseLeagueName("open_12", 13)).toBe("The Blitz Room 2");
+    expect(houseLeagueName("open_12", 24)).toBe("Play Action Party 2");
+    expect(houseLeagueName("open_12", 25)).toBe("The Blitz Room 3");
+    expect(houseLeagueName("beginner_12", 9)).toBe("The Rookie Room 2");
+  });
+
+  it("never reproduces the retired 'Open 12-team League N' shape for any rung or edition", () => {
+    for (const rung of Object.keys(HOUSE_CATALOG.rungs) as HouseRungName[]) {
+      for (const edition of [1, 2, 13, 9999]) {
+        expect(houseLeagueName(rung, edition)).not.toBe(`${HOUSE_RUNG_LABEL[rung]} League ${edition}`);
+      }
+    }
+  });
+
+  it("is unique across 30 consecutive editions of every rung", () => {
+    for (const rung of Object.keys(HOUSE_CATALOG.rungs) as HouseRungName[]) {
+      const names = Array.from({ length: 30 }, (_, i) => houseLeagueName(rung, i + 1));
+      expect(new Set(names).size).toBe(30);
+    }
+  });
+
+  it("never shouts — no run of two or more consecutive uppercase letters in any name", () => {
+    for (const rung of Object.keys(HOUSE_CATALOG.rungs) as HouseRungName[]) {
+      for (const edition of [1, 2, 13, 9999]) {
+        expect(houseLeagueName(rung, edition)).not.toMatch(/[A-Z]{2,}/);
+      }
+    }
   });
 
   it("breaks none of the product's copy rules for any rung or a large edition number", () => {

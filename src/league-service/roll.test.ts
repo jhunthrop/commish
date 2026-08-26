@@ -9,7 +9,6 @@ import { ROLL_CADENCE_HOURS } from "@/matchmaking/config";
 import { ROLL_REFUSALS } from "@/matchmaking/roll";
 import { createLeague } from "./creation";
 import { joinPublicLeague } from "./join";
-import { ensureHouseCatalog } from "./house-factory";
 import { rollDueDrafts, rollUnfilledDraftInTx, DRAFT_KICKOFF_ROLLED_SUMMARY } from "./roll";
 
 const db = createTestDb();
@@ -175,19 +174,39 @@ describe("rollDueDrafts", () => {
     await expectNoRollTookPlace(leagueId, before);
   });
 
-  it("names the house's own sentence for a house league, no commissioner named", async () => {
-    const opened = await ensureHouseCatalog(db, { clock, newId });
-    const leagueId = opened.opened.find((id) => id.includes("open_12") || id.includes("beginner_12"));
-    if (leagueId === undefined) throw new Error("ensureHouseCatalog did not open a scheduled-trigger house league");
-    // A fresh spawn has no seats at all — join one real member (leaving the room well short of
-    // full) so this test proves the notice actually reaches somebody, not merely that nobody
-    // objected to an empty loop.
+  // Retargeted (founder directive 2026-08-26): every `HOUSE_CATALOG` rung is `when_full` now, so
+  // `ensureHouseCatalog` never produces a `startTrigger: 'scheduled'` house league for the roll
+  // to find any more (the roll is member-only in practice — see `house-factory.test.ts`'s own
+  // "the roll no longer reaches a house league at all"). `describeStartTiming`'s house-authority
+  // naming is still real, generic code, keyed off `leagues.house_rung` rather than the catalog,
+  // so this constructs the shape directly through `createLeague`'s own `owner: { kind: "house" }`
+  // branch — legal today (`writeLeagueInTx` never ties a house owner to a particular
+  // `startTrigger`) even though no catalog rung currently chooses it.
+  it("names the house's own sentence for a house-owned scheduled draft, no commissioner named", async () => {
+    const created = await createLeague(
+      { db, clock, newId },
+      {
+        name: "Direct House Fixture",
+        format: "snake",
+        teamCount: 3,
+        scoringPreset: "ppr",
+        auctionBudget: null,
+        owner: { kind: "house", rung: "open_12" },
+        experienceTier: "experienced",
+        stakeTier: 0,
+        isPublicMatchmade: true,
+        startTrigger: "scheduled",
+        kickoffAt: ORIGINAL_KICKOFF,
+      },
+    );
+    if (!created.ok) throw new Error(created.reason);
+    const leagueId = created.leagueId;
+    // A fresh house-owned league has no seats at all — join one real member (leaving the room
+    // well short of full) so this test proves the notice actually reaches somebody, not merely
+    // that nobody objected to an empty loop.
     await db.insert(users).values({ id: "house_joiner", email: "house_joiner@test.local", displayName: "House Joiner" }).onConflictDoNothing();
     const joined = await joinPublicLeague({ db, newId, clock }, { leagueId, userId: "house_joiner" });
     if (!joined.ok) throw new Error(joined.reason);
-    // Back the kickoff into the past so this house league's own draft is due — a fresh spawn's
-    // own kickoff is staggered into the future by construction.
-    await db.update(drafts).set({ kickoffAt: new Date(ORIGINAL_KICKOFF) }).where(eq(drafts.leagueId, leagueId));
 
     await rollDueDrafts(db, { clock });
     const notices = await noticesOf(leagueId, "draft_kickoff_rolled");

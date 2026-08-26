@@ -282,14 +282,15 @@ describe("fireWhenFullInTx, driven through the real join door", () => {
     expect(events).toHaveLength(1);
   });
 
-  // Phase 3.5 addendum, Task 14, Step 4: the house case — `sitandgo_12` is the one catalog rung
-  // whose `startTrigger` is `when_full` (`HOUSE_CATALOG`'s own docblock), so it is the ONLY house
-  // rung this trigger ever reaches. Real production spawn (`ensureHouseCatalog`), not a hand-built
-  // fixture, so this proves the wiring an actual restock produces, not a lookalike.
-  it("sends house_league_filled, not draft_fill_triggered, when a HOUSE sit-and-go league fills", async () => {
+  // Phase 3.5 addendum, Task 14, Step 4 — retargeted (founder directive 2026-08-26): every
+  // `HOUSE_CATALOG` rung is `when_full` now (`sitandgo_12` itself is retired to `openAtOnce: 0`
+  // and never spawns), so `open_12` is the live house rung this trigger reaches today. Real
+  // production spawn (`ensureHouseCatalog`), not a hand-built fixture, so this proves the wiring
+  // an actual restock produces, not a lookalike.
+  it("sends house_league_filled, not draft_fill_triggered, when a HOUSE league fills", async () => {
     const opened = await ensureHouseCatalog(db, { clock, newId });
-    const leagueId = opened.opened.find((id) => id.includes("sitandgo"));
-    if (leagueId === undefined) throw new Error("ensureHouseCatalog did not open a sitandgo_12 league");
+    const leagueId = opened.opened.find((id) => id.includes("open_12"));
+    if (leagueId === undefined) throw new Error("ensureHouseCatalog did not open an open_12 league");
 
     await fillTo(leagueId, 12);
 

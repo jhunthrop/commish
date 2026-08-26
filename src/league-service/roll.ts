@@ -43,6 +43,10 @@ export interface RollOutcome {
  *
  * Exported as the query BUILDER, the shape every other due-scan in this codebase uses, so an
  * `EXPLAIN` assertion can wrap the real thing rather than a hand copy.
+ *
+ * HOUSE RUNGS NO LONGER EXERCISE THIS (founder directive 2026-08-26): every `HOUSE_CATALOG` rung
+ * is `startTrigger: "when_full"` now, so `startTrigger = 'scheduled'` here only ever matches a
+ * member-created league — this roll remains exactly as live for those.
  */
 export function dueUnfilledScheduledDraftsQuery(db: Db, nowIso: string) {
   return db

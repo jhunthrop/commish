@@ -207,10 +207,14 @@ describe("OpenLeagueCard", () => {
 
   describe("the badge carries only what the title does not (E3) — decided by authority, never by user text", () => {
     it("renders no rung badge on a house card — the factory title carries the rung by construction", () => {
-      render(card({ ...BASE, id: "house3", name: "Open 12-team League 3", houseRung: "open_12" }));
-      // The rung reaches the reader exactly once, via the title.
-      expect(screen.getByRole("heading", { name: "Open 12-team League 3" })).toBeInTheDocument();
-      expect(screen.getAllByText(/Open 12-team/)).toHaveLength(1);
+      // "The Longshot League" — a real `houseLeagueName("open_12", 3)` output (founder directive
+      // 2026-08-26), not the retired "Open 12-team League 3" shape. The badge itself is decided
+      // by authority (`stakeBadge`, `@/league-room/components/open-league-shared.tsx`), never by
+      // inspecting the title text, so a fun name proves the same invariant: the title renders
+      // once, and no stake badge accompanies it.
+      render(card({ ...BASE, id: "house3", name: "The Longshot League", houseRung: "open_12" }));
+      expect(screen.getByRole("heading", { name: "The Longshot League" })).toBeInTheDocument();
+      expect(screen.queryAllByText("Free")).toHaveLength(1);
     });
 
     it("badges a member league with its stake tier", () => {

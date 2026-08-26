@@ -826,7 +826,9 @@ describe("OpenLeagueShelf says nothing that breaks the house copy rules, includi
   // rather than subtracted. Task 13's `LeagueRow` rendering (the lg+ form, column header
   // included) is part of this same render, so its copy is swept here too.
   const AS_OF = "Saturday 12 September, 7:42 PM UTC";
-  const HOUSE = { ...PUBLIC_LEAGUES[0]!, id: "house_sweep", name: "Open 12-team League 3", houseRung: "open_12" as const };
+  // "The Longshot League" is `houseLeagueName("open_12", 3)`'s real output (founder directive
+  // 2026-08-26's fun-name pass) — not the retired "Open 12-team League 3" shape.
+  const HOUSE = { ...PUBLIC_LEAGUES[0]!, id: "house_sweep", name: "The Longshot League", houseRung: "open_12" as const };
   it("is clean signed in, signed out, house-shelved, and empty", () => {
     for (const element of [
       <OpenLeagueShelf key="signed-in" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={true} helpLevel="guided" asOfTime={AS_OF} />,

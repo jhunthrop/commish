@@ -182,8 +182,13 @@ describe("LeagueRow", () => {
 
   describe("the badge carries only what the title does not (E3), by authority", () => {
     it("renders no rung badge on a house row — the factory title carries the rung by construction", () => {
-      render(row({ ...BASE, id: "house3", name: "Open 12-team League 3", houseRung: "open_12" }));
-      expect(screen.getAllByText(/Open 12-team/)).toHaveLength(1);
+      // "The Longshot League" — a real `houseLeagueName("open_12", 3)` output (founder directive
+      // 2026-08-26), not the retired "Open 12-team League 3" shape. The badge itself is decided
+      // by authority (`stakeBadge`, `@/league-room/components/open-league-shared.tsx`), never by
+      // inspecting the title text, so a fun name proves the same invariant just as well: exactly
+      // one "Free" text renders (the Entry value), never a second one for a stake badge.
+      render(row({ ...BASE, id: "house3", name: "The Longshot League", houseRung: "open_12" }));
+      expect(screen.getAllByText("Free")).toHaveLength(1);
     });
 
     it("badges a member row with its stake tier, whatever the member named the league", () => {

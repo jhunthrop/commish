@@ -105,21 +105,38 @@ const CANON = {
 } as const;
 
 /**
- * The shelf itself. Three rungs: an open room for anyone (`open_12`), a room the beginner-tier
- * join gate reserves for newer players (`beginner_12`, `@/league-service/join`'s
- * `publicJoinPrecondition`), and a sit-and-go room whose draft has no chosen time at all
- * (`sitandgo_12`) — the one rung `MATCHMAKING_CONFIG.sitAndGo` (Task 7) exists for.
+ * THE WHOLE SHELF IS SIT-AND-GO (founder directive 2026-08-26). Too many open tournaments at once
+ * was the complaint, and a scheduled kickoff that rolls a member to a new time when the room never
+ * fills feels bad on top of it — so every rung now drafts the moment its last seat fills
+ * (`startTrigger: "when_full"`), never at a chosen clock time. `fireWhenFullInTx`
+ * (`@/league-service/fill-trigger.ts`) is the machinery every rung now points at; `sitandgo_12`
+ * (below) was simply the rung that machinery was born on.
  *
- * `openAtOnce`/`firstKickoffMinutes`/`staggerMinutes` are Model A's dated-draft mechanic: three
- * `open_12` leagues stand open at once, three hours apart, so a visitor at any hour of the
- * evening finds a draft they can actually attend — the half of "like FFPC and Apex" a browse
- * page alone does not give you.
+ * WIDTH DROPS 6 → 2. `open_12` and `beginner_12` each stand exactly one league open at once
+ * (`openAtOnce: 1`) — a visitor never finds an empty shelf, because `ensureHouseCatalog`
+ * (`@/league-service/house-factory.ts`) is a level-triggered reconciler: the instant a league
+ * leaves the shelf (fills, or its draft starts), the next tick opens its replacement. There is
+ * no dated kickoff left to stagger, so `firstKickoffMinutes`/`staggerMinutes` are `0` on every
+ * rung — the fields stay on `HouseRung` (a future `"scheduled"` rung would need them again) but
+ * nothing reads them as anything but zero today.
+ *
+ * `sitandgo_12` (`openAtOnce: 0`) — RETIRED. `open_12` IS the sit-and-go now, so the shelf never
+ * spawns a `sitandgo_12` league again. The key and its label stay in the catalog and in
+ * `HouseRungName` because existing rows in `leagues.house_rung` still carry `'sitandgo_12'`, and
+ * dropping the key would leave those rows pointing at a rung `HOUSE_RUNG_LABEL`/`HouseRungName`
+ * no longer recognize. `ensureHouseCatalog`'s shortfall arithmetic already treats `openAtOnce: 0`
+ * as "never short" without a guard (`rung.openAtOnce * 3` attempt ceiling is `0`, and
+ * `open.length >= rung.openAtOnce` is true at zero leagues too), so retiring a rung to zero width
+ * needed no new code, only this declaration.
  */
 export const HOUSE_CATALOG = {
   rungs: {
-    open_12: { experienceTier: "experienced", startTrigger: "scheduled", openAtOnce: 3, firstKickoffMinutes: 180, staggerMinutes: 180, ...CANON },
-    beginner_12: { experienceTier: "beginner", startTrigger: "scheduled", openAtOnce: 2, firstKickoffMinutes: 240, staggerMinutes: 240, ...CANON },
-    sitandgo_12: { experienceTier: "experienced", startTrigger: "when_full", openAtOnce: 1, firstKickoffMinutes: 0, staggerMinutes: 0, ...CANON },
+    open_12: { experienceTier: "experienced", startTrigger: "when_full", openAtOnce: 1, firstKickoffMinutes: 0, staggerMinutes: 0, ...CANON },
+    beginner_12: { experienceTier: "beginner", startTrigger: "when_full", openAtOnce: 1, firstKickoffMinutes: 0, staggerMinutes: 0, ...CANON },
+    /** RETIRED (founder directive 2026-08-26) — see this constant's own docblock. `open_12` IS
+     *  the sit-and-go now; this key and its `HOUSE_RUNG_LABEL` entry are preserved only so
+     *  existing `leagues.house_rung = 'sitandgo_12'` rows still resolve to a real rung. */
+    sitandgo_12: { experienceTier: "experienced", startTrigger: "when_full", openAtOnce: 0, firstKickoffMinutes: 0, staggerMinutes: 0, ...CANON },
   },
 } as const satisfies { rungs: Record<string, HouseRung> };
 
@@ -150,14 +167,64 @@ export function plusMinutesIso(nowIso: string, minutes: number): string {
  * The `index`-th open league of `rung`'s scheduled kickoff, counting from `now` — `0` for the
  * first of the group, `1` for the second, and so on. Meaningless (and never called) for a
  * `when_full` rung, whose draft has no chosen time to compute at all.
+ *
+ * DORMANT, NOT DEAD (founder directive 2026-08-26): every rung in `HOUSE_CATALOG` is `when_full`
+ * now, so no catalog spawn calls this today — `house-factory.ts`'s own `kickoffFor` only reaches
+ * this branch for a `"scheduled"` rung, and there is currently no such rung. Kept, pure and
+ * tested, because a rung could turn `"scheduled"` again without this arithmetic needing to be
+ * reinvented.
  */
 export function houseKickoffFor(nowIso: string, rung: HouseRung, index: number): string {
   return plusMinutesIso(nowIso, rung.firstKickoffMinutes + index * rung.staggerMinutes);
 }
 
-/** The league name a catalog spawn gets: the rung's own label, plus the edition that keeps two
- *  leagues on the same rung from sharing a name. `src/league-service/house-factory.ts`'s only
- *  caller. */
+/**
+ * Curated, sentence-case fun names, one pool per rung, verbatim from the founder's 2026-08-26
+ * naming pass — never generated, never a template over the rung's label. `sitandgo_12`'s pool is
+ * a single legacy entry: the rung is retired (`HOUSE_CATALOG`'s own docblock), so this pool exists
+ * only in case some historical row's display name is ever recomputed.
+ */
+const HOUSE_NAME_POOL: Readonly<Record<HouseRungName, readonly string[]>> = {
+  open_12: [
+    "The Blitz Room",
+    "Fourth and Long",
+    "The Longshot League",
+    "Prime Time Twelve",
+    "The Two-Minute Drill",
+    "Hail Mary Society",
+    "The Red Zone Club",
+    "Midnight Waivers",
+    "The Flea Flicker",
+    "Goal Line Stand",
+    "The Audible",
+    "Play Action Party",
+  ],
+  beginner_12: [
+    "The Rookie Room",
+    "First Snap League",
+    "The Learning Curve",
+    "Fresh Legs League",
+    "The Opening Drive",
+    "Training Camp Twelve",
+    "The First Down Club",
+    "Kickoff Classic",
+  ],
+  sitandgo_12: ["Sit and Go Twelve"],
+};
+
+/**
+ * The league name a catalog spawn gets. Draws from `rung`'s own pool at `(edition - 1) %
+ * pool.length` — the first `pool.length` editions of a rung each get a distinct, un-suffixed
+ * pool entry. From the second cycle on, uniqueness needs a suffix too (the pool has wrapped), so
+ * every edition past the first cycle gets `` `${entry} ${cycle}` ``, `cycle =
+ * Math.ceil(edition / pool.length)` — `2` for the whole second lap through the pool, `3` for the
+ * third, and so on. Editions are monotonic and never reused (`nextEdition`,
+ * `@/league-service/house-factory.ts`), so this is unique for a rung's entire lifetime, not just
+ * within one lap.
+ */
 export function houseLeagueName(rung: HouseRungName, edition: number): string {
-  return `${HOUSE_RUNG_LABEL[rung]} League ${edition}`;
+  const pool = HOUSE_NAME_POOL[rung];
+  const entry = pool[(edition - 1) % pool.length]!;
+  if (edition <= pool.length) return entry;
+  return `${entry} ${Math.ceil(edition / pool.length)}`;
 }

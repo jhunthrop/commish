@@ -334,13 +334,16 @@ export function browseQuery(db: Db, filter: BrowseFilter, options: BrowseQueryOp
  * new spawn the next stagger slot) — a documented drift this task closes rather than repeats: an
  * earlier draft of both that index's own docblock and this module assumed creation order and the
  * soonest-draft order would coincide, because a `scheduled` rung's kickoff IS creation-ordered
- * WITHIN one rung (`houseKickoffFor`'s own stagger). They do NOT coincide ACROSS rungs — `open_12`
- * and `beginner_12` stagger on different clocks, and interleaving them by `created_at` is not the
- * same order as interleaving them by `kickoff_at`. `leagues_house_rung_idx` still serves this
- * query's `WHERE house_rung IS NOT NULL` predicate (its partial predicate matches exactly, the
- * same reasoning `leagues_season_completed_idx`'s own consumer note carries) — the plan is an
- * index scan for the FILTER, then a `Sort` on `kickoff_at` for the order, measured rather than
- * assumed in `src/db/index-plans.test.ts`.
+ * WITHIN one rung (`houseKickoffFor`'s own stagger). They do NOT coincide ACROSS rungs in general
+ * — a `scheduled` `open_12` and a `scheduled` `beginner_12` could stagger on independent clocks,
+ * and interleaving them by `created_at` would not be the same order as interleaving them by
+ * `kickoff_at`. (Founder directive 2026-08-26: every rung is `when_full` today, so neither rung
+ * staggers at all right now — this paragraph documents why creation order is the wrong general
+ * assumption, not a claim that the two orders currently diverge.) `leagues_house_rung_idx` still
+ * serves this query's `WHERE house_rung IS NOT NULL` predicate (its partial predicate matches
+ * exactly, the same reasoning `leagues_season_completed_idx`'s own consumer note carries) — the
+ * plan is an index scan for the FILTER, then a `Sort` on `kickoff_at` for the order, measured
+ * rather than assumed in `src/db/index-plans.test.ts`.
  *
  * `is_public_matchmade` IS CHECKED HERE (final whole-branch review, F6). This is an
  * UNAUTHENTICATED read, and `browseQuery` above states the opt-in rule as the first of the three

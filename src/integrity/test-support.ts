@@ -217,7 +217,9 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   draft_auto_started: { leagueName: "Sunday Money" },
   draft_pick_skipped: { leagueName: "Sunday Money" },
   draft_fill_triggered: { leagueName: "Sunday Money", graceLabel: "5 minutes" },
-  house_league_filled: { leagueName: "Open 12-team League 3" },
+  // "The Longshot League" is `houseLeagueName("open_12", 3)`'s real output (founder directive
+  // 2026-08-26's fun-name pass) — not the retired "Open 12-team League 3" shape.
+  house_league_filled: { leagueName: "The Longshot League" },
   draft_kickoff_rolled: {
     leagueName: "Sunday Money",
     newKickoffAt: "Friday 11 September, 8:00 PM UTC",

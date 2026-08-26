@@ -26,7 +26,9 @@ const AS_OF = "Saturday 12 September, 7:42 PM UTC";
 
 const HOUSE_LEAGUE: PublicLeagueSummary = {
   id: "house_1",
-  name: "Open 12-team League 3",
+  // "The Longshot League" — a real `houseLeagueName("open_12", 3)` output (founder directive
+  // 2026-08-26), not the retired "Open 12-team League 3" shape.
+  name: "The Longshot League",
   format: "snake",
   experienceTier: "experienced",
   stakeTier: 0,

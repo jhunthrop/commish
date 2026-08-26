@@ -20,9 +20,11 @@ export const DRAFT_SERVICE_CONFIG = {
    * Phase 3.5 addendum, Task 13: the ceiling on house leagues `ensureHouseCatalog`
    * (`@/league-service/house-factory`) may spawn in one reconcile — following `maxDraftsPerTick`
    * above and `AUTO_SET_CONFIG.maxLeaguesPerRun` (`@/league-service/config`), the same "no scan
-   * this codebase runs is unbounded" precedent. `HOUSE_CATALOG`'s three rungs sum to 6 open
-   * leagues total, so this ceiling is headroom for a cold-start reconcile plus lost-race
-   * retries, never a limit the shelf is expected to brush against in ordinary operation.
+   * this codebase runs is unbounded" precedent. `HOUSE_CATALOG`'s three rungs sum to 2 open
+   * leagues total today (founder directive 2026-08-26 dropped the shelf from 6; `sitandgo_12`
+   * itself is retired to `openAtOnce: 0`), so this ceiling is headroom for a cold-start reconcile
+   * plus lost-race retries, never a limit the shelf is expected to brush against in ordinary
+   * operation.
    */
   maxHouseSpawnsPerRun: 20,
   /**
