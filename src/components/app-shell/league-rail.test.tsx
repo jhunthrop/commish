@@ -88,4 +88,13 @@ describe("LeagueRail", () => {
       expect(screen.getByRole("link", { name: "Join or create another league" })).toBeInTheDocument();
     });
   });
+
+  it("scrolls inside itself at lg — capped at the viewport, stuck to it, never dragging the page (E11)", () => {
+    render(<LeagueRail leagues={LEAGUES} />);
+    const rail = screen.getByTestId("league-rail");
+    expect(rail.className).toContain("lg:max-h-dvh");
+    expect(rail.className).toContain("lg:overflow-y-auto");
+    expect(rail.className).toContain("lg:sticky");
+    expect(rail.className).not.toContain("lg:overflow-visible");
+  });
 });

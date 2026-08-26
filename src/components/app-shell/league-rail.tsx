@@ -71,7 +71,12 @@ export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
     <nav
       aria-label="Your leagues"
       data-testid="league-rail"
-      className={`flex flex-row items-center gap-2 overflow-x-auto border-b border-line bg-surface px-3 py-2 lg:flex-col lg:items-stretch lg:overflow-visible lg:border-b-0 lg:border-r lg:px-2 lg:py-4 ${className}`}
+      // lg: the rail scrolls INSIDE itself, capped at the viewport and stuck to it (lobby
+      // review E11): unbounded, a long account's rail dragged the whole document thousands of
+      // px past the page's own content — the void below every short page. Sticky keeps the
+      // rail in reach while the main column scrolls, the same scroll-inside rule every other
+      // outgrowing region already keeps.
+      className={`flex flex-row items-center gap-2 overflow-x-auto border-b border-line bg-surface px-3 py-2 lg:sticky lg:top-0 lg:max-h-dvh lg:flex-col lg:items-stretch lg:self-start lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-2 lg:py-4 ${className}`}
     >
       {leagues.map((league) => {
         const isCurrent = pathname?.startsWith(`/app/leagues/${league.id}`) ?? false;
