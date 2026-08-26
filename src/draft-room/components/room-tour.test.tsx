@@ -1,12 +1,23 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { RoomTour } from "./room-tour";
 
-vi.mock("@/design/use-reduced-motion", () => ({ usePrefersReducedMotion: vi.fn(() => false) }));
-import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
+
+/** `RoomTour` reads the reduced-motion query pre-paint via matchMedia (T4 review HIGH — one
+ *  layout effect owns the whole anchored decision), so the tests stub matchMedia itself, both
+ *  ways, and `afterEach` unstubs so no case can leak its preference into the next. */
+function stubReducedMotion(matches: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === REDUCED_MOTION_QUERY ? matches : false,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
 
 /** The three real anchor targets (Task 4, R3), rendered as ordinary siblings so RTL's automatic
  *  unmount-on-cleanup removes them the same way it removes everything else — present together
@@ -20,6 +31,10 @@ function AnchorTargets() {
     </>
   );
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("RoomTour", () => {
   it("is shown once and never again", async () => {
@@ -101,7 +116,7 @@ describe("RoomTour", () => {
 
 /**
  * Task 4, R3: the anchored tour, and the two ways it degrades back to today's modal
- * byte-for-byte — `usePrefersReducedMotion`, and a target missing from the DOM. Every case here
+ * byte-for-byte — the reduced-motion preference, and a target missing from the DOM. Every case here
  * mounts the real `AnchorTargets` (or deliberately withholds one) rather than mocking `document`
  * — `RoomTour` reads `document.getElementById` for real, so the test should too.
  */
@@ -132,7 +147,7 @@ describe("RoomTour — anchored mode (Task 4, R3)", () => {
   });
 
   it("falls back to the modal under prefers-reduced-motion, even with every target present", () => {
-    vi.mocked(usePrefersReducedMotion).mockReturnValue(true);
+    stubReducedMotion(true);
     render(
       <>
         <AnchorTargets />
@@ -140,7 +155,8 @@ describe("RoomTour — anchored mode (Task 4, R3)", () => {
       </>,
     );
     expect(screen.getByRole("dialog", { name: "How this room works" })).toBeInTheDocument();
-    vi.mocked(usePrefersReducedMotion).mockReturnValue(false);
+    // Never a first-paint anchored flash for this audience: the modal IS the first presentation.
+    expect(screen.queryByRole("dialog", { name: "The clock" })).not.toBeInTheDocument();
   });
 
   it("falls back to the modal when even one anchor target is missing from the DOM", () => {

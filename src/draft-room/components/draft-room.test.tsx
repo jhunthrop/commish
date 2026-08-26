@@ -160,6 +160,15 @@ describe("DraftRoom", () => {
     await waitFor(() => expect(screen.getByRole("dialog", { name: "The clock" })).toBeInTheDocument());
   });
 
+  // T4 review MEDIUM: a SCHEDULED room renders no ticking clock, so `room-clock` is absent and
+  // the tour must degrade to the modal — cleanly, no crash, no empty overlay. This is the
+  // waiting phase a lobby/link mock's first-timer actually lands in.
+  it("falls back to the modal tour in a scheduled room, where the clock anchor does not exist yet", async () => {
+    mount(fixtureDeps({ ...SNAKE_VIEW, phase: "scheduled", onClockTeamId: null, deadlineAt: null }), null);
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "How this room works" })).toBeInTheDocument());
+    expect(screen.queryByRole("dialog", { name: "The clock" })).toBeNull();
+  });
+
   it("PATCHes the dismissal and closes the anchored tour without blocking the room", async () => {
     const { fixture } = mount(fixtureDeps(), null);
     await waitFor(() => expect(screen.getByRole("dialog", { name: "The clock" })).toBeInTheDocument());

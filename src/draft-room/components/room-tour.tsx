@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useState } from "react";
 import { Button, Modal } from "@/components/ui";
-import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
 import { CoachMarks, type CoachMarkStop } from "./coach-marks";
 
 export interface RoomTourProps {
@@ -99,7 +99,7 @@ function anchoredStops(actionLabel: string): readonly CoachMarkStop[] {
  * gets a chance to run the effect (or fails every target) simply keeps the modal, never leaves
  * the tour showing nothing at all.
  */
-function useAnchorsReady(active: boolean): boolean {
+function useAnchoredPresentation(active: boolean): boolean {
   const [ready, setReady] = useState(false);
 
   // `useLayoutEffect`, not `useEffect`: this runs synchronously right after the SAME commit
@@ -109,12 +109,22 @@ function useAnchorsReady(active: boolean): boolean {
   // had already rendered its (stale, default-`false`) modal fallback before flipping to
   // anchored, which is both a visible flash in the room and a race any `waitFor` polling for a
   // dialog could catch mid-flip.
+  //
+  // BOTH halves of the decision live in this one effect (T4 review HIGH): the reduced-motion
+  // preference is read here directly rather than through `usePrefersReducedMotion`, whose
+  // post-paint `useEffect` shape (right for everything that merely tones motion down) would
+  // leave its half of the gate stale-`false` at this effect's own pre-paint flip — the first
+  // paint could show the anchored tour to the exact audience the modal fallback protects,
+  // then snap to the modal a frame later. One layout effect, one paint-safe answer. Read once
+  // per open, not subscribed: the tour is transient, and re-deciding presentation mid-tour
+  // would teleport an open popover.
   useLayoutEffect(() => {
     if (!active) {
       setReady(false);
       return;
     }
-    setReady(ANCHOR_TARGET_IDS.every((id) => document.getElementById(id) !== null));
+    const reduced = window.matchMedia(REDUCED_MOTION_QUERY).matches;
+    setReady(!reduced && ANCHOR_TARGET_IDS.every((id) => document.getElementById(id) !== null));
   }, [active]);
 
   return ready;
@@ -142,8 +152,9 @@ function useAnchorsReady(active: boolean): boolean {
  * **Anchored by default, modal as the fallback (Task 4, R3).** Neither caller changed a prop —
  * `RoomTour` decides its OWN presentation from what is actually on screen. It renders
  * `CoachMarks`, pointing one popover at a time at the real clock/queue/pool, whenever BOTH: (1)
- * `usePrefersReducedMotion()` is false (a moving popover chasing scroll/resize is exactly the
- * motion that preference asks this product to skip), and (2) every one of `ANCHOR_TARGET_IDS` is
+ * the reduced-motion media query does not match (a moving popover chasing scroll/resize is
+ * exactly the motion that preference asks this product to skip — read pre-paint inside
+ * `useAnchoredPresentation`, see its docblock), and (2) every one of `ANCHOR_TARGET_IDS` is
  * already in the DOM the moment the tour opens. Condition (2) is what keeps the waiting room's
  * preview caller on today's modal, byte-for-byte: `WaitingChecklist`'s "See how the draft room
  * works" item never renders `RoomRail`/`RoomDock`/`PlayerPool` at all, so `room-clock`,
@@ -158,9 +169,8 @@ export function RoomTour({ dismissedAt, onDismiss, actionLabel }: RoomTourProps)
   // so closing has to be something this component can do to itself.
   const [dismissedLocally, setDismissedLocally] = useState(false);
   const open = dismissedAt === null && !dismissedLocally;
-  const reducedMotion = usePrefersReducedMotion();
-  const anchorsReady = useAnchorsReady(open);
-  const anchored = open && !reducedMotion && anchorsReady;
+  const anchoredReady = useAnchoredPresentation(open);
+  const anchored = open && anchoredReady;
 
   const dismiss = (): void => {
     try {
