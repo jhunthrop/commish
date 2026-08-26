@@ -302,6 +302,11 @@ async function main(): Promise<void> {
     `house catalog: filled ${house.filledLeagueId} (${house.seatsJoined} new seat(s)), ` +
       `replacement(s) opened: ${house.replacementOpened.length === 0 ? "none" : house.replacementOpened.join(", ")}`,
   );
+  // The whole shelf is sit-and-go now (founder directive 2026-08-26): a FULL league's draft
+  // fires on the when_full grace, so the demo league above genuinely starts drafting shortly
+  // after seeding — a feature demo, not a stale artifact (T1 review note). Said out loud so a
+  // developer who loads the app later isn't surprised to find the room mid-draft.
+  console.log("note: the filled demo league is sit-and-go and will start drafting within minutes of seeding");
 }
 
 // Guarded so `index.test.ts` (Task 15, Step 1) can import `seedHouseCatalogDemo` without running
