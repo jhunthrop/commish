@@ -133,4 +133,25 @@ describe("MessageList", () => {
       expect(screen.queryByRole("button", { name: /React with/ })).not.toBeInTheDocument();
     });
   });
+
+  it("reveals Report on the row's own intent for hover devices, always-on for touch (review E10)", () => {
+    render(
+      <MessageList
+        leagueId="lg1"
+        messages={[chatMessage("m1", { authorUserId: "u2" })]}
+        meUserId="u1"
+        hasMore={false}
+        loadingEarlier={false}
+        onLoadEarlier={() => {}}
+        onReact={() => {}}
+      />,
+    );
+    const report = screen.getByRole("button", { name: "Report" });
+    expect(report.className).toContain("[@media(hover:hover)]:opacity-0");
+    expect(report.className).toContain("group-hover/msg:opacity-100");
+    expect(report.className).toContain("group-focus-within/msg:opacity-100");
+    expect(report.className).toContain("focus-visible:opacity-100");
+    // The row is the intent surface the reveals key off.
+    expect(report.closest("li")?.className).toContain("group/msg");
+  });
 });

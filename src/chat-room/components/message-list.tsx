@@ -60,7 +60,9 @@ export function MessageList({ leagueId, messages, meUserId, hasMore, loadingEarl
                 <RemovedMessage authorName={message.authorName} authorAvatarUrl={message.authorAvatarUrl} removal={message.removal} />
               </li>
             ) : (
-              <li key={message.id} className="flex gap-2">
+              // `group/msg` is the intent surface the quiet controls key off — see
+              // `ReactionBar`'s own docblock for the whole reveal contract (review E10).
+              <li key={message.id} className="group/msg flex gap-2">
                 <Avatar name={message.authorName} avatar={message.authorAvatarUrl} />
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <p className="flex flex-wrap items-baseline gap-2">
@@ -72,12 +74,13 @@ export function MessageList({ leagueId, messages, meUserId, hasMore, loadingEarl
                     <span className="font-mono text-xs tabular-nums text-text-muted">{formatChatTime(message.createdAt)}</span>
                     {message.authorUserId === meUserId ? null : (
                       // Findable when needed, invisible the rest of the time — small, muted,
-                      // ALWAYS in the DOM (not a hover reveal, which a touch screen has no
-                      // equivalent for: this product is mobile-first at 360px).
+                      // ALWAYS in the DOM. On hover-capable devices it now also waits for the
+                      // row's own intent (review E10) — the media gate keeps a touch screen,
+                      // which has no hover, always-on: this product is mobile-first at 360px.
                       <button
                         type="button"
                         onClick={() => setReportingId(message.id)}
-                        className="text-xs text-text-muted underline hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        className="text-xs text-text-muted underline hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent [@media(hover:hover)]:opacity-0 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 focus-visible:opacity-100 transition-opacity motion-reduce:transition-none"
                       >
                         Report
                       </button>

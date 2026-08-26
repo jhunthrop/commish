@@ -14,13 +14,22 @@ export interface ReactionBarProps {
 }
 
 /**
- * The whole reaction set, always visible — five buttons is cheaper to hit on a phone than a
- * picker behind a menu, and it keeps the row's width constant as counts land.
+ * The whole reaction set, in the DOM for every message — five buttons is cheaper to hit on a
+ * phone than a picker behind a menu, and it keeps the row's width constant as counts land.
+ *
+ * Quiet until wanted (review E10): a ZERO-count button is an offer, not information, so on a
+ * hover-capable device it reveals only on the message row's own hover or focus intent (the
+ * parent `<li>` renders `group/msg` — `MessageList` owns that contract). The gate is
+ * `@media(hover:hover)`: a touch screen has no hover, so there the offers stay always visible,
+ * exactly the mobile-first rule the Report link has always kept. A button with a landed count
+ * IS information and never hides. Opacity only, never display — focus lands on the real
+ * button and reveals it, so keyboard and AT lose nothing.
  *
  * `aria-pressed` is what makes a toggle a toggle to a screen reader; the count is plain text
  * inside the same button so the accessible name stays stable ("React with 🔥") while the
  * number changes.
  */
+const REVEAL_ON_INTENT = "[@media(hover:hover)]:opacity-0 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100 focus-visible:opacity-100 transition-opacity motion-reduce:transition-none";
 export function ReactionBar({ messageId, reactions, meUserId, disabled, onReact }: ReactionBarProps) {
   const summary = summarizeReactions(reactions, meUserId);
   const countFor = (emoji: string): number => summary.find((entry) => entry.emoji === emoji)?.count ?? 0;
@@ -35,6 +44,7 @@ export function ReactionBar({ messageId, reactions, meUserId, disabled, onReact 
             key={emoji}
             size="sm"
             variant="ghost"
+            className={count === 0 ? REVEAL_ON_INTENT : undefined}
             disabled={disabled}
             aria-pressed={mineFor(emoji)}
             aria-label={`React with ${emoji}`}
