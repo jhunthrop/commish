@@ -232,21 +232,25 @@ test("front door -> practice lobby -> a solo mock -> a real pick -> bots pick ar
   // "status"` toast — an unscoped locator resolves both once that banner appears.
   await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
 
-  // --- The human's own real pick -------------------------------------------------------------
+  // --- The human's own real pick — with the board's pick number captured FIRST, so the
+  // post-sim assertion below measures movement against the state the human acted from ---------
+  const pickNumberBeforeOurTurn = pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText());
   await makeTopPick(managerA);
 
-  // --- Bots pick around it: proven by the board's own pick number advancing FURTHER with zero
-  // action from this page, and by the turn genuinely leaving the human's own seat. Bounded past
-  // a full pick clock, not just past `makeTopPick`'s own quick receipt: a 12-team snake draft's
-  // own last slot picks twice in a row (round 1's final pick is round 2's first), and this test
-  // deliberately does not pick a second time to cover that — it lets the room's own real clock
-  // resolve it, the identical "practice opponent" honesty this journey extends to every turn
-  // that is not this test's own single human pick.
-  await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeHidden({ timeout: (PICK_SECONDS + 15) * 1_000 });
-  const pickNumberAfterOurTurn = pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText());
+  // --- Bots pick around it, SIM-TO-NEXT-PICK style (the founder's directive: a lone human
+  // never waits): the pick request itself sims every consecutive bot pick, so the receipt of
+  // "the bots picked around me" is the human being back ON the clock — quickly, never a
+  // think-delay cadence — with the board's own pick number already advanced past their own
+  // pick. A 12-team snake's last seat picks twice in a row, so "back on the clock" covers
+  // every seat; the pick number strictly exceeding the human's own pick is what proves other
+  // seats (or the wrap's own second turn) genuinely moved without one further action from this
+  // page. The 20s bound is generous slack for the request plus SSE folding — the paced lane's
+  // 3–9s-per-bot arithmetic would blow it eleven times over, so this bound also PROVES the sim
+  // lane is the one driving.
+  await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeVisible({ timeout: 20_000 });
   await expect
-    .poll(async () => pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText()), { timeout: 40_000 })
-    .toBeGreaterThan(pickNumberAfterOurTurn);
+    .poll(async () => pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText()), { timeout: 20_000 })
+    .toBeGreaterThan(pickNumberBeforeOurTurn);
 
   // --- Fast-forward the remaining board server-side (the sanctioned shortcut — see the
   // function's own docblock), then reload to read the results the same honest way a returning

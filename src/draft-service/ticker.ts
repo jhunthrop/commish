@@ -6,7 +6,7 @@ import type { Clock } from "@/domain/timing";
 import { currentDeadline } from "@/draft-engine";
 import { ensureHouseCatalog, type HouseFactoryDeps, type HouseFactoryOutcome } from "@/league-service/house-factory";
 import { MOCK_CONFIG } from "@/mock-draft/config";
-import { createMockBotDriver, startDueMockRooms, type MockBotDriveFn, type MockStartOutcome } from "@/mock-draft-service/driver";
+import { createMockBotDriver, startDueMockRooms, type MockBotDriveFn, type MockBotDriver, type MockStartOutcome } from "@/mock-draft-service/driver";
 import type { MockLifecycleDeps } from "@/mock-draft-service/claim";
 import { sweepExpiredMocks, type MockSweepDeps, type SweptMockRoom } from "@/mock-draft-service/sweep";
 import { autoStartDueDrafts, type AutoStartDeps, type AutoStartOutcome } from "./auto-start";
@@ -86,11 +86,20 @@ interface TickerDeps {
    */
   readonly startDueMocks?: (db: Db, deps: Pick<MockLifecycleDeps, "store" | "clock" | "newId">) => Promise<readonly MockStartOutcome[]>;
   /**
-   * Task 6's bot driver: at most one bot pick per live MOCK draft per tick, invoked from
-   * `tickOne` against the very rows the expiry scan already fetched — no second scan. Defaults
-   * to the real `createMockBotDriver({ db, store }).driveBotPick`.
+   * Task 6's bot driver: one PACED bot pick — or one whole sim stretch (`simToNextPick`, the
+   * founder's sim-to-next-pick directive) — per live MOCK draft per tick, invoked from `tickOne`
+   * against the very rows the expiry scan already fetched — no second scan. Defaults to
+   * `mockDriver`'s own `driveBotPick` (the shared instance below).
    */
   readonly driveMockPick?: MockBotDriveFn;
+  /**
+   * The ONE `MockBotDriver` this process drives mocks through. `@/draft-service`'s
+   * `getDraftTicker` injects its process-wide instance — the same one the actions route sims
+   * through after a lone human's own pick — so there is a single per-draft meta cache, and the
+   * sweep's `invalidateDraft` wiring below empties it for BOTH callers. Defaults to a fresh
+   * instance for tests that construct tickers directly.
+   */
+  readonly mockDriver?: MockBotDriver;
   /**
    * Task 6's retention sweep, gated by `MOCK_CONFIG.sweepIntervalMs` exactly the way
    * `reconcileHouse` is gated by `houseReconcileIntervalMs`. Defaults to the real
@@ -99,11 +108,14 @@ interface TickerDeps {
   readonly sweepMocks?: (db: Db, deps: MockSweepDeps) => Promise<readonly SweptMockRoom[]>;
   /**
    * Tick-wide ceiling on bot picks across ALL mock drafts, defaulting to
-   * `MOCK_CONFIG.maxBotPicksPerTick`. In ordinary operation the ceiling is slack by
-   * arithmetic — the expiry scan itself is bounded by `maxDraftsPerTick` (50) and the driver
-   * lands at most one pick per draft per tick, so at the shipped numbers at most 50 of the 100
-   * budgeted picks can ever be attempted. Injectable so the exhausted-budget branch is a test's
-   * to reach rather than dead configuration.
+   * `MOCK_CONFIG.maxBotPicksPerTick`. Spent per PICK, not per drive call: a paced drive costs
+   * 1, a sim stretch (`simToNextPick`) costs its whole pick count — up to `2 × (teamCount - 1)`
+   * — so a tick full of sim rooms genuinely can exhaust it. Gated BETWEEN drives (a started
+   * stretch always runs to its natural end, so the ceiling can overshoot by at most one
+   * stretch); once spent, the un-driven rooms' own state is untouched, and the next tick (or
+   * each room's own human-pick sim trigger, the actions route) resumes them from the log. That
+   * is the ceiling working, not failing. Injectable so the
+   * exhausted-budget branch is a test's to reach rather than dead configuration.
    */
   readonly maxBotPicksPerTick?: number;
 }
@@ -128,6 +140,7 @@ export function createDraftTicker({
   onOutcome = defaultOnOutcome,
   startDueMocks = startDueMockRooms,
   driveMockPick,
+  mockDriver: injectedMockDriver,
   sweepMocks = sweepExpiredMocks,
   maxBotPicksPerTick = MOCK_CONFIG.maxBotPicksPerTick,
 }: TickerDeps): DraftTicker {
@@ -136,7 +149,9 @@ export function createDraftTicker({
   // it needs both sibling parameters. Built even when `driveMockPick` is injected: the sweep
   // lane below always hands the sweep THIS driver's `invalidateDraft` (fix round, review
   // MEDIUM), and against an instance whose cache never filled that call is a free no-op.
-  const mockDriver = createMockBotDriver({ db, store });
+  // When `mockDriver` IS injected (the process singleton, see `TickerDeps.mockDriver`), that
+  // one instance serves both roles instead.
+  const mockDriver = injectedMockDriver ?? createMockBotDriver({ db, store });
   const driveMock = driveMockPick ?? mockDriver.driveBotPick;
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
@@ -178,7 +193,9 @@ export function createDraftTicker({
         const driven = await driveMock(state, now);
         if (driven !== null) {
           if (driven.picked) {
-            botPickBudget -= 1;
+            // A sim stretch spends its whole pick count (the budget bounds DB work, not calls);
+            // a paced drive spends exactly 1.
+            botPickBudget = Math.max(0, botPickBudget - driven.picks);
             return { draftId, applied: true };
           }
           return { draftId, applied: false, reason: driven.reason };

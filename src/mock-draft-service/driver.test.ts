@@ -2,8 +2,9 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, mockRooms, players, teams, users } from "@/db/schema";
+import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
-import type { DraftState } from "@/draft-engine";
+import { teamOnClock, type DraftState } from "@/draft-engine";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";
 import { createDraftTicker, liveDraftsQuery, type DraftTicker } from "@/draft-service/ticker";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
@@ -429,7 +430,7 @@ describe("the bot driver (Task 6, Step 3)", () => {
     const driver = createMockBotDriver({ db, store });
     advance(MOCK_CONFIG.botDelay.maxSeconds * 1000);
 
-    expect(await driver.driveBotPick(stale!, now)).toEqual({ picked: true }); // meta cached here
+    expect(await driver.driveBotPick(stale!, now)).toEqual({ picked: true, picks: 1 }); // meta cached here
     await db.delete(mockRooms).where(eq(mockRooms.leagueId, fixture.leagueId));
 
     // CONTROL — the cache is real: with the sidecar row already gone, the cached meta still
@@ -496,7 +497,7 @@ describe("the bot driver (Task 6, Step 3)", () => {
     const { driveBotPick } = createMockBotDriver({ db, store });
     advance(MOCK_CONFIG.botDelay.maxSeconds * 1000);
 
-    expect(await driveBotPick(stale!, now)).toEqual({ picked: true });
+    expect(await driveBotPick(stale!, now)).toEqual({ picked: true, picks: 1 });
     // The same STALE state again: the driver re-derives the identical pick, and the real
     // admit/reduce path — judging against the FRESH log under the row lock — refuses it.
     const second = await driveBotPick(stale!, now);
@@ -506,8 +507,104 @@ describe("the bot driver (Task 6, Step 3)", () => {
   });
 });
 
+describe("sim-to-next-pick (the founder's directive: no wait at all against bots)", () => {
+  /** The human's next legal pick in the sprint fixture: any untaken player at a position the
+   *  human's own roster still has open. Position is the id's own prefix (qb1/rb2/wr1...). */
+  function nextHumanPlayer(state: DraftState, humanTeamId: string): string {
+    const taken = new Set(state.picks.map((pick) => pick.playerId));
+    const filled = new Set(state.picks.filter((pick) => pick.teamId === humanTeamId).map((pick) => pick.playerId.slice(0, 2)));
+    const playerId = ["qb1", "qb2", "rb1", "rb2", "wr1", "wr2"].find((id) => !taken.has(id) && !filled.has(id.slice(0, 2)));
+    if (playerId === undefined) throw new Error("no eligible player left for the human");
+    return playerId;
+  }
+
+  it("a lone human's room sims the whole bot stretch in ONE drive call, with ZERO think-delay", async () => {
+    // One human (team 1), one bot — `simToNextPick` by seat arithmetic. `advance` is NEVER
+    // called in this test: on the paced path even the fastest possible delay draw
+    // (`botDelay.minSeconds: 3`) would refuse every drive below, so every landed pick is the
+    // sim lane's own doing.
+    const fixture = await seedAllBotMock("sim", { botTeams: 1 });
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    const humanTeamId = fixture.teamIds[0]!;
+    const { driveBotPick } = createMockBotDriver({ db, store });
+
+    let state = (await store.getDraftState(fixture.draftId))!;
+    let driveCalls = 0;
+    // Drive the room to completion with no clock movement at all: the human picks through the
+    // real store; every bot stretch between two human turns lands in ONE drive call.
+    for (let i = 0; i < 20 && state.phase !== "complete"; i += 1) {
+      const onClock = teamOnClock(state);
+      if (onClock === humanTeamId) {
+        const picked = await store.applyAction(fixture.draftId, {
+          v: DRAFT_ACTION_VERSION,
+          type: "MAKE_PICK",
+          timestamp: now,
+          teamId: humanTeamId,
+          playerId: nextHumanPlayer(state, humanTeamId),
+        });
+        if (!picked.ok) throw new Error(picked.reason);
+        state = picked.state;
+        continue;
+      }
+      const outcome = await driveBotPick(state, now);
+      driveCalls += 1;
+      // Every drive against a bot-on-clock state lands the ENTIRE consecutive stretch: the
+      // human is back on the clock (or the room is done) after every single call.
+      expect(outcome).toMatchObject({ picked: true });
+      state = (await store.getDraftState(fixture.draftId))!;
+      const nextUp = teamOnClock(state);
+      expect(nextUp === humanTeamId || nextUp === null).toBe(true);
+    }
+
+    expect(state.phase).toBe("complete");
+    expect(state.picks).toHaveLength(6);
+    // The 2-team snake's bot stretches around the human: 3 bot picks landed across at most 2
+    // drive calls proves at least one call carried more than one pick.
+    const botPicks = state.picks.filter((pick) => pick.teamId !== humanTeamId);
+    expect(botPicks).toHaveLength(3);
+    expect(botPicks.every((pick) => !pick.auto)).toBe(true);
+    expect(driveCalls).toBeLessThan(botPicks.length);
+  });
+
+  it("completion settles in the SAME call — results are live the instant the last pick lands, no extra tick", async () => {
+    const fixture = await seedAllBotMock("sim_settle", { botTeams: 1 });
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    const humanTeamId = fixture.teamIds[0]!;
+    const { driveBotPick } = createMockBotDriver({ db, store });
+
+    let state = (await store.getDraftState(fixture.draftId))!;
+    for (let i = 0; i < 20 && state.phase !== "complete"; i += 1) {
+      if (teamOnClock(state) === humanTeamId) {
+        const picked = await store.applyAction(fixture.draftId, {
+          v: DRAFT_ACTION_VERSION,
+          type: "MAKE_PICK",
+          timestamp: now,
+          teamId: humanTeamId,
+          playerId: nextHumanPlayer(state, humanTeamId),
+        });
+        if (!picked.ok) throw new Error(picked.reason);
+        state = picked.state;
+      } else {
+        await driveBotPick(state, now);
+        state = (await store.getDraftState(fixture.draftId))!;
+      }
+    }
+    expect(state.phase).toBe("complete");
+
+    // Whichever seat made the final pick, ONE more drive call against the finished state is
+    // the most that stands between the last pick and a settled row (a bot-finished room is
+    // settled by the very loop that finished it; a human-finished room by the drive the
+    // actions route fires inside the same request).
+    await driveBotPick(state, now);
+    const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, fixture.draftId));
+    expect(row?.status).toBe("complete");
+  });
+});
+
 describe("the whole practice round, through the real writers", () => {
-  it("a solo room drafts itself to completion: bots pick on their own clocks, the host is autopicked, status never lies", async () => {
+  it("a solo room drafts itself to completion: bots sim instantly (sim-to-next-pick), the absent host is autopicked, status never lies", async () => {
     await seedPracticePlayers(db);
     await db.insert(users).values({ id: "solo_full_host", email: "solo_full@test.local", displayName: "Solo Host" });
     const created = await createMockRoom(
@@ -537,16 +634,12 @@ describe("the whole practice round, through the real writers", () => {
     expect(botPicks.every((pick) => !pick.auto)).toBe(true); // no bot ever timed out (the T1 guarantee)
 
     // Task 4's law still holds at the completing pick itself: the pick that finishes a mock
-    // writes NO status (`commitDraftState` never runs) — so right here, one tick after the last
-    // pick landed, the row still says in_progress and still occupies an expiry-scan slot.
-    const [before] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, room.draftId));
-    expect(before?.status).toBe("in_progress");
-    expect((await liveDraftsQuery(db)).map((row) => row.id)).toContain(room.draftId);
-
-    // THE SETTLE (Task 6 fix round, ruled): the very next tick observes the finished room and
-    // settles its status with the bare guarded write — promptly, ~1 tick, never the retention
-    // window — which frees its `liveDraftsQuery` slot for real drafts (the slot-freed
-    // regression the ruling exists for).
+    // writes NO status through `commitDraftState` — the flip is only ever the bare guarded
+    // SETTLE (Task 6 fix round, ruled). A solo room sims (`simToNextPick`), so a bot-finished
+    // room is settled inside the very drive that finished it; a host-autopick finish waits one
+    // tick for the drive that observes it. Either way, within one tick of completion the row is
+    // settled and its `liveDraftsQuery` slot is freed for real drafts (the slot-freed
+    // regression the ruling exists for) — promptly, never the retention window.
     await ticker.tick();
     const [after] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, room.draftId));
     expect(after?.status).toBe("complete");

@@ -2,6 +2,7 @@ import { getDb } from "@/db/client";
 import { isLLMEnabled, getLlmClient } from "@/lib/llm/client";
 import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "./store";
+import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
 import { createNudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
 import { createDraftStore, type DraftStore } from "./store";
@@ -12,6 +13,7 @@ const systemClock = { now: () => new Date().toISOString() };
 
 let store: DraftStore | undefined;
 let ticker: DraftTicker | undefined;
+let mockDriver: MockBotDriver | undefined;
 
 /**
  * The store's `onPublishError` wiring, extracted to its own name — same reasoning as
@@ -57,12 +59,44 @@ export function getDraftStore(): DraftStore {
  * the process-wide logger and publisher, by `createDraftStore`'s own defaults above — with nothing
  * new to wire here.
  */
+/**
+ * The process-wide bot driver — ONE instance, shared by the ticker's own drive lane and
+ * `simMockToNextHumanTurn` below, so there is a single per-draft meta cache and the retention
+ * sweep's `invalidateDraft` wiring (through the ticker) empties it for both callers.
+ */
+function getMockBotDriver(): MockBotDriver {
+  if (mockDriver === undefined) {
+    mockDriver = createMockBotDriver({ db: getDb(), store: getDraftStore() });
+  }
+  return mockDriver;
+}
+
+/**
+ * SIM-TO-NEXT-PICK's request-time trigger (founder directive, 2026-08-26): called by the
+ * actions route the moment a human's own pick lands in a MOCK draft, so a solo room's bots
+ * answer inside the same request instead of waiting for the ticker's next second. The driver
+ * itself decides whether this room sims (`simToNextPick` — exactly one human seat) or keeps the
+ * paced cadence (in which case this call lands at most the one due pick, usually none — the
+ * think-delay has not elapsed). Never throws: a sim failure must not fail the pick that
+ * already landed, and the ticker's own lane retries from the log within a second anyway.
+ */
+export async function simMockToNextHumanTurn(draftId: string): Promise<void> {
+  try {
+    const state = await getDraftStore().getDraftState(draftId);
+    if (state === null || state.config.isMock !== true) return;
+    await getMockBotDriver().driveBotPick(state, systemClock.now());
+  } catch (error: unknown) {
+    console.error("[draft] post-pick mock sim failed", { draftId }, error);
+  }
+}
+
 export function getDraftTicker(): DraftTicker {
   if (ticker === undefined) {
     ticker = createDraftTicker({
       db: getDb(),
       store: getDraftStore(),
       clock: systemClock,
+      mockDriver: getMockBotDriver(),
       nudger: createNudgeScheduler({
         db: getDb(),
         publish: publishDraftEvent,

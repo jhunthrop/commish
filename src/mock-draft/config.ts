@@ -36,10 +36,14 @@ export const MOCK_CONFIG = {
    *  rehearsal. */
   pickClockSecondsOptions: [30, 60, 90] as const,
   defaultPickClockSeconds: 60,
-  /** Bot think-delay, seeded per pick: a live lobby sees a realistic cadence, never an
-   *  eleven-pick burst landing in the same tick. Max stays under `maxFractionOfClock` of the
-   *  fastest offered clock so a bot can never be autopicked by its own dawdling and never
-   *  collides with the moderator's own nudge threshold (`DRAFT_NUDGE_CONFIG.thresholdPct`). */
+  /** Bot think-delay, seeded per pick — the PACED cadence, for rooms with two or more humans:
+   *  a live lobby sees a realistic rhythm, never an eleven-pick burst landing in the same tick.
+   *  A room with exactly ONE human seat skips this entirely and sims (the founder's
+   *  sim-to-next-pick directive — `MockDraftMeta.simToNextPick`, `@/mock-draft-service/driver`):
+   *  realism is for the people sharing the room, and a lone human has no one to share it with.
+   *  Max stays under `maxFractionOfClock` of the fastest offered clock so a bot can never be
+   *  autopicked by its own dawdling and never collides with the moderator's own nudge threshold
+   *  (`DRAFT_NUDGE_CONFIG.thresholdPct`). */
   botDelay: { minSeconds: 3, maxSeconds: 9, maxFractionOfClock: 0.5 },
   /** Rank-weighted sampling temperature and the hard reach cap (founder ruling: varied bots,
    *  never absurd ones). A bot considers at most `reachDepth` eligible players and samples

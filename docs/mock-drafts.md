@@ -136,11 +136,27 @@ replays byte-identically too: the driver derives each bot's stream cursor from t
 itself (the non-auto pick count — exactly one draw per sampled pick), never from memory, and
 human picks never advance a bot's stream.
 
-Bot cadence is a seeded think-delay (`botDelay`: 3–9s, capped at half the fastest clock) so a
-live lobby sees a human-feeling room, never an eleven-pick burst — sampled live at Task 10's
-checkpoint: median 6.0s across 43 gaps, zero bursts, zero bot autopicks. The room's "your turn"
-ETA prices bot turns at the delay draw's midpoint (`expectedBotThinkDelaySeconds`), carried
-over the wire as `MockRoomInfo.expectedBotPickSeconds`.
+Bot cadence has two lanes, chosen by seat arithmetic (`MockDraftMeta.simToNextPick`,
+`src/mock-draft-service/driver.ts`):
+
+- **Sim-to-next-pick — exactly one human seat** (founder directive, 2026-08-26: "there
+  shouldn't be a wait at all — like Madden's sim to next pick"). Zero think-delay, and one
+  drive call carries every consecutive bot pick. The actions route fires that drive inside the
+  human's own pick request (`simMockToNextHumanTurn`, `@/draft-service`) and answers with the
+  post-sim board, so the lone human is back on the clock the moment their screen updates — a
+  whole solo draft takes exactly as many requests as the human has picks. The wire's
+  `expectedBotPickSeconds` is `0` for these rooms, which the dock renders as "any moment".
+  Completion settles inside the same call, so the results view is live the instant the last
+  pick lands. Pick CHOICE is untouched — the delay rides its own rng stream, so a sim room's
+  log is byte-identical to the log the paced driver would have produced.
+- **Paced — two or more human seats**: a seeded think-delay (`botDelay`: 3–9s, capped at half
+  the fastest clock) so a live lobby sees a human-feeling room, never an eleven-pick burst —
+  sampled live at Task 10's checkpoint: median 6.0s across 43 gaps, zero bursts, zero bot
+  autopicks. The room's "your turn" ETA prices bot turns at the delay draw's midpoint
+  (`expectedBotThinkDelaySeconds`), carried over the wire as
+  `MockRoomInfo.expectedBotPickSeconds`. Realism is FOR the people sharing the room; a lone
+  human has no one to share it with, which is why the lane split is seat arithmetic and never a
+  setting.
 
 ## The exclusion architecture — "a rehearsal never counts"
 

@@ -156,6 +156,30 @@ differential proof was extended over the settle (still zero consequence statemen
 invite accept), proven both ways. The exclusion contract runs in both directions: no mock row
 in a real aggregate, no bot row in a real league.
 
+## 17. Sim-to-next-pick for a lone human; paced cadence only when humans share the room (founder directive, 2026-08-26)
+
+The founder, on solo mocks: "there shouldn't be a wait at all — think about it in Madden when
+doing a draft and 'sim to next pick' should be the default." Ruled and shipped post-merge:
+
+- The lane split is SEAT ARITHMETIC, never a setting: exactly one human seat sims
+  (`MockDraftMeta.simToNextPick`); two or more humans keep the paced 3–9s cadence, because
+  realism is for the people sharing the room and a lone human has no one to share it with. The
+  production invariant (every room has at least its host) makes "exactly one" and "at most one"
+  the same test; an all-bot fixture room keeps the cadence, which keeps the delay/replay proofs
+  driveable as written.
+- Zero think-delay changes NOTHING about pick choice: the delay draw rides its own rng stream,
+  so a sim room's log is byte-identical to the paced driver's would-be log — the replay law
+  survives untouched.
+- The drive is level-triggered from two edges: the ticker's own lane (≤1s after start or a
+  host autopick) and `simMockToNextHumanTurn` inside the human's own pick request, which
+  answers with the post-sim board. A whole solo draft = exactly the human's own pick count in
+  requests, proven at the route in `api-routes.test.ts`.
+- The tick budget (`maxBotPicksPerTick`) is spent per PICK, gated between drives — a started
+  stretch runs to its natural end. Completion settles inside the finishing drive, so results
+  are live the instant the last pick lands.
+- The wire prices a sim room's bot turns at `expectedBotPickSeconds: 0` — the dock's existing
+  arithmetic renders that as "any moment"; no new copy.
+
 ## Deferred and refused, each with the fact it waits on
 
 | # | Item | Decision | The fact it waits on |
