@@ -168,8 +168,10 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                   </Button>
                 )}
                 {preStart ? (
-                  // Quiet, not disabled-looking: there is nothing to do here yet, and the rail says why.
-                  <span className="shrink-0 text-text-muted">—</span>
+                  // Nothing at all — E11 (2026-08-26 design review): a per-row "—" printed a
+                  // 60-row column of dashes before kickoff. There is nothing to do here yet,
+                  // the rail says why, and the star beside this slot is still the whole story.
+                  null
                 ) : row.drafted ? (
                   <Badge tone="neutral">Drafted</Badge>
                 ) : canDraft ? (

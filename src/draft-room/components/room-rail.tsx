@@ -329,7 +329,11 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
             <p className="sr-only">{turn.sentence}</p>
           </>
         )}
-        {myTeamName === null ? null : (
+        {/* Suppressed while `hot` — E9 (2026-08-26 design review): "Your team: Turf Burners"
+            beside "You're on the clock · Turf Burners" said the same name twice at the exact
+            moment the rail should say one thing. The turn line owns the fact while the turn
+            is mine; the chip returns the moment it isn't. */}
+        {myTeamName === null || mode === "hot" ? null : (
           <span className="whitespace-nowrap text-sm text-text-muted">
             Your team: <span className="font-display font-semibold text-text-primary">{myTeamName}</span>
           </span>

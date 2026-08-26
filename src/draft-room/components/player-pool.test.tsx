@@ -95,11 +95,14 @@ describe("PlayerPool", () => {
     expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
   });
 
-  it("shows a quiet dash instead of an action, and still lets you queue, before the draft starts", () => {
+  // E11 (2026-08-26 design review): the pre-start pool printed a 60-row column of "—"
+  // placeholders — sixty dashes saying nothing sixty times. Dropped outright: no action slot
+  // renders at all before kickoff, and the star is still the whole story.
+  it("shows no action slot at all — not even a dash — and still lets you queue, before the draft starts (E11)", () => {
     const scheduled = { ...SNAKE_VIEW, phase: "scheduled" as const, availablePlayerIds: [], onClockTeamId: null };
     render(<PlayerPool {...props} view={scheduled} canAct={false} />);
     const row = rowFor("Jalen Croft");
-    expect(within(row).getByText("—")).toBeInTheDocument();
+    expect(within(row).queryByText("—")).toBeNull();
     expect(within(row).queryByRole("button", { name: "Draft" })).toBeNull();
     expect(within(row).getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument();
   });

@@ -238,6 +238,18 @@ describe("RoomRail", () => {
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "hot");
   });
 
+  // E9 (2026-08-26 design review): hot-state redundancy — "Your team: Bay Bandits" sat beside
+  // "You're on the clock · Bay Bandits". While the turn is mine the turn line already names my
+  // team; the chip returns the moment the turn moves on.
+  it("suppresses the team chip while the turn is mine — the turn line already says it (E9)", () => {
+    const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
+    expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "hot");
+    expect(screen.queryByText(/Your team:/)).toBeNull();
+
+    rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+    expect(screen.getByText(/Your team:/)).toBeInTheDocument();
+  });
+
   it("says nothing about your team for a commissioner who fields none", () => {
     render(<RoomRail {...props} view={liveView()} myTeamId={null} />);
     expect(screen.queryByText(/Your team:/)).toBeNull();

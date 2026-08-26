@@ -291,7 +291,14 @@ export function RoomDock({
           targetName={targetId === null ? "" : playerName(playersById, targetId)}
           submitting={submitting}
           onAct={onAct}
-          yourTurn={formatYourTurn(view.upcoming, myTeamId, view.clockSeconds, view.pausedUntil ?? null)}
+          // E11 (2026-08-26 design review): before kickoff `formatYourTurn` has no lookahead
+          // to speak from, and the old fallback claimed "Watching the board." over a board
+          // with nothing on it. The scheduled phase gets its own honest sentence; the
+          // watching fallback stays for a live board.
+          yourTurn={
+            formatYourTurn(view.upcoming, myTeamId, view.clockSeconds, view.pausedUntil ?? null) ??
+            (preStart ? "Waiting for kickoff." : null)
+          }
         />
       )}
       <DockClock view={view} teams={teams} playersById={playersById} myTeamId={myTeamId} />

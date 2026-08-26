@@ -186,6 +186,15 @@ describe("RoomDock", () => {
     expect(screen.queryByTestId("dock-owed-pick")).toBeNull();
   });
 
+  // E11 (2026-08-26 design review): "Watching the board." over an empty, not-yet-started
+  // board was a claim with nothing to watch. The scheduled phase gets its own sentence.
+  it("waits for kickoff before the draft starts, instead of claiming to watch an empty board (E11)", () => {
+    const scheduled: DraftStateView = { ...SNAKE_VIEW, phase: "scheduled", availablePlayerIds: [], onClockTeamId: null, upcoming: [], deadlineAt: null };
+    render(<RoomDock {...props} view={scheduled} />);
+    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("Waiting for kickoff.");
+    expect(screen.queryByText("Watching the board.")).toBeNull();
+  });
+
   it("never strikes a queued player through before the draft has started", () => {
     const scheduled: DraftStateView = { ...SNAKE_VIEW, phase: "scheduled", availablePlayerIds: [], onClockTeamId: null, upcoming: [] };
     render(<RoomDock {...props} view={scheduled} />);
