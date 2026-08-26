@@ -63,6 +63,25 @@ src/
                           the useDraftRoom hook (hooks/), every room component (components/), and
                           id→display-name lookups (lib/). Imports from draft-engine are TYPE-ONLY —
                           no draft rule runs in React. See docs/draft-room.md.
+  mock-draft/             Phase 4.5: the mock-draft vocabulary, pure and server-only (BLOCKED,
+                          not exempt — see the client boundary below). config.ts (MOCK_CONFIG —
+                          modes, clocks, bot delays, sampler strategy, retention windows, rate
+                          limits, the 24-name bot roster; MOCK_COPY — every practice-room
+                          sentence, sweep-clean), rng.ts (the seeded mulberry32 behind the Rng
+                          interface, rngFor's keyed streams — replay identity), archetypes.ts
+                          (the seven weight-tweak brains, dealt per draft), bots.ts
+                          (chooseBotPick — ONE sampler mirroring bestAvailableFor's preference
+                          order, plus the seeded think-delay). 100% coverage (gate 25). See
+                          docs/mock-drafts.md and docs/decisions/mock-drafts.md.
+  mock-draft-service/     Phase 4.5: the mock lane's Postgres/Redis half, server-only, on the
+                          banned value-import list, 100% coverage (gate 26). creation.ts
+                          (createMockRoom + MOCK_NOOP_AUDIT, the audit carve-out's one named
+                          no-op), claim.ts (claimMockSeat + MOCK_REFUSALS), start.ts (the bot
+                          top-up and the real startDraft call), driver.ts (the ticker's due
+                          scan and the bot drive through store.applyAction — never a second
+                          pick path), sweep.ts (retention delete-not-archive; its legality
+                          rests on the mock lane writing no trigger-protected rows), lobby.ts
+                          (the bounded lobby reads), schemas.ts. See docs/mock-drafts.md.
   league/                 Pure league rules: schedule generation, standings, clinch, lineup
                           eligibility, invite codes, LEAGUE_CONFIG, roster-shape.ts (superflex,
                           Phase 3.5 Task 1 — describeRosterShape mirrors describeScoring) and
@@ -334,9 +353,12 @@ src/
                           chat_messages, chat_message_reports, chat_reactions, reviews,
                           review_reports, audit_events, audit_chains, audit_chain_checkpoints,
                           member_notices, integrity_flags, session_signals, trade_proposals,
-                          seat_holds, and Phase 4's money four — money_accounts,
+                          seat_holds, Phase 4's money four — money_accounts,
                           money_transactions, money_entries (append-only by trigger, migration
-                          0035) and payment_transfer_intents), client.ts (createDb/getDb),
+                          0035) and payment_transfer_intents, and Phase 4.5's mock_rooms (the
+                          practice-draft sidecar keyed by league; leagues.is_mock and
+                          users.is_bot land beside it, with leagues_mock_private_ck pinning
+                          every mock private at the database)), client.ts (createDb/getDb),
                           test-db.ts
   lib/
     env.ts                envOr/envOrUndefined — the ONE place an optional env var is read with a
@@ -365,7 +387,9 @@ src/
                           design-system.md.
 drizzle/                  generated SQL migrations (committed)
 docs/                     conventions.md (this), design-system.md, draft-engine.md, draft-room.md,
-                          draft-moderator.md, league.md, research/, decisions/ (architecture
+                          draft-moderator.md, league.md, mock-drafts.md — Phase 4.5's practice
+                          drafts: the three modes, the bot brain, the exclusion architecture and
+                          the sweep, research/, decisions/ (architecture
                           decision records — audit-and-integrity.md, operators-and-moderation.md,
                           enforcement-and-tiers.md, formats-and-lobby.md — Phase 3.5's toggles,
                           the median's storage split, the pause/skip asymmetry, the KDS snapshot
@@ -375,7 +399,9 @@ docs/                     conventions.md (this), design-system.md, draft-engine.
                           reversal, the retone's contrast corrections, the roll's start predicate,
                           the seat hold's Postgres argument, design-v3.md — Phase 3.7's Sunday
                           Standard record, money-foundations.md — Phase 4's own closing record,
-                          and the two FOUNDER-GATED application packs,
+                          mock-drafts.md — Phase 4.5's practice-draft rulings: the leagues-row
+                          call, the audit carve-out, sign-in-first, no grades, the deferred and
+                          refused list, and the two FOUNDER-GATED application packs,
                           column-fbo-application.md + payments-gateway-application.md, prepared
                           but never submitted, each ending in a blank founder sign-off line),
                           money.md — the money system's own doc: the two seams, the four laws,
@@ -460,6 +486,7 @@ surface respectively. Each talks to its service layer ONLY over the wire (`GET`/
 `GET /api/notices/stream`) — never by importing `@/draft-engine`,
 `@/draft-service`, `@/league`, `@/league-service`, `@/chat-service`, `@/ai-advisor`,
 `@/review-service`, `@/db`, `@/integrity`, `@/integrity-service`, `@/mock-draft`,
+`@/mock-draft-service`,
 `@/lib/realtime`, `@/lib/auth`, `@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond`, `@/data/seed`,
 `@/stats-pipeline`, `@/stats` or `@/gifs` as VALUES.
 An ESLint `@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s
@@ -575,11 +602,13 @@ it delivered and an activity row arrives from the service layer already rendered
 `@/money`. Two reasons keep it off the exempt side: `MOCK_CONFIG.strategy` (temperature, reach
 depth, run-reaction thresholds) is a bot's own playbook, and shipping it into the client bundle as
 inspectable data would let a member solve the bot rather than practice against it; and the room's
-copy (the practice banner, the bot marker, the swept-room and empty-lobby sentences) reaches a mock
+copy (the practice banner, the bot marker, the results and empty-lobby sentences) reaches a mock
 room the same pre-rendered way `NoticeView`/`ActivityRow` do, never a live client-side
 `import { MOCK_COPY }`. `src/mock-draft/config.ts`'s own docblock argues this in full.
-`src/mock-draft-service/**` (a later task, gate 26) is this directory's Postgres/Redis half and
-stays exactly as blocked as `@/integrity-service` always has — one boundary, not two.
+`src/mock-draft-service/**` (Phase 4.5, Task 5 — gate 26) is this directory's Postgres/Redis half
+and stays exactly as blocked as `@/integrity-service` always has — one boundary, not two; both
+names sit on `SERVER_ONLY_MODULE_GROUPS` explicitly, because the `@/mock-draft` entry cannot
+catch its sibling on its own.
 
 A second, simpler layering rule sits beside this one: nothing under `src/**` may import from
 `scripts/**` or `e2e/**`. Build tooling and the browser suite may depend on source; source may
@@ -607,7 +636,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**`, `src/moderation/**`, `src/trades/**`, `src/participation/**`, `src/money/**`, `src/money-service/**`, `src/payments-provider/**` and `src/mock-draft/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twenty-five gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does; `src/trades` (gate 20) is pure and holds the one fairness function the write path calls inside a transaction, moved out of the coverage-ungated `src/ai-advisor/**` for exactly that reason (`docs/decisions/trades-and-fairness.md` §2); `src/participation` (gate 21, Phase 3 Plan D) is pure and holds the third tier vocabulary that decides who is a veteran, joining two plans early gated `src/league-service`/`src/draft-service`/`src/integrity`/`src/integrity-service` in covering by construction every directory this plan writes into; `src/money` (gate 22, Phase 4 Task 1) is pure and holds the money vocabulary; `src/money-service` (gate 23, Phase 4 Task 3) is Postgres-backed and holds `postMoneyTransaction`, the one writer of the money book of record — the service-layer reason gates 13-18 exist, and more so; `src/payments-provider` (gate 24, Phase 4 Task 4) is Seam A, the external-money boundary — the webhook signature check, the strict callback parse and the mock's return-after-completion machinery are exactly the code whose unmeasured branch is a forged or misread callback; `src/mock-draft` (gate 25, Phase 4.5 Task 1) is pure and holds the mock draft vocabulary — `MOCK_CONFIG`'s tunables and `MOCK_COPY`'s honest, sweep-clean sentences — and gates for the reason every pure directory does, even though (unlike `src/money`) it sits on the BLOCKED side of the client boundary rather than the exempt side; see its own `config.ts` docblock and the client-boundary note above for why. See `docs/decisions/operators-and-moderation.md` and `docs/decisions/enforcement-and-tiers.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**`, `src/moderation/**`, `src/trades/**`, `src/participation/**`, `src/money/**`, `src/money-service/**`, `src/payments-provider/**`, `src/mock-draft/**` and `src/mock-draft-service/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twenty-six gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does; `src/trades` (gate 20) is pure and holds the one fairness function the write path calls inside a transaction, moved out of the coverage-ungated `src/ai-advisor/**` for exactly that reason (`docs/decisions/trades-and-fairness.md` §2); `src/participation` (gate 21, Phase 3 Plan D) is pure and holds the third tier vocabulary that decides who is a veteran, joining two plans early gated `src/league-service`/`src/draft-service`/`src/integrity`/`src/integrity-service` in covering by construction every directory this plan writes into; `src/money` (gate 22, Phase 4 Task 1) is pure and holds the money vocabulary; `src/money-service` (gate 23, Phase 4 Task 3) is Postgres-backed and holds `postMoneyTransaction`, the one writer of the money book of record — the service-layer reason gates 13-18 exist, and more so; `src/payments-provider` (gate 24, Phase 4 Task 4) is Seam A, the external-money boundary — the webhook signature check, the strict callback parse and the mock's return-after-completion machinery are exactly the code whose unmeasured branch is a forged or misread callback; `src/mock-draft` (gate 25, Phase 4.5 Task 1) is pure and holds the mock draft vocabulary — `MOCK_CONFIG`'s tunables and `MOCK_COPY`'s honest, sweep-clean sentences — and gates for the reason every pure directory does, even though (unlike `src/money`) it sits on the BLOCKED side of the client boundary rather than the exempt side; see its own `config.ts` docblock and the client-boundary note above for why; `src/mock-draft-service` (gate 26, Phase 4.5 Task 5) is Postgres-backed and holds the mock lane's lifecycle writers — the room creation that swaps in `MOCK_NOOP_AUDIT`, the seat claim, the bot top-up/start, the bot driver and the retention sweep whose `DELETE` is legal only because that lane writes no trigger-protected rows — exactly the code whose unmeasured branch is a practice room leaking into a real aggregate or a real league losing a row to the sweep (`docs/mock-drafts.md`). See `docs/decisions/operators-and-moderation.md` and `docs/decisions/enforcement-and-tiers.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 
 **The gate count stays twenty-one through the Phase 3.5 addendum (house leagues) too.** Every module the addendum adds — `src/league-service/authority.ts`, `src/league-service/house-factory.ts`, `src/matchmaking/house-catalog.ts` — lands inside a directory already on the list above; `src/matchmaking` and `src/league-service` were both gated before this addendum existed, for reasons unrelated to it. No ninth pure-exempt directory and no twenty-second gate were needed because nothing new here is a directory-level concern — see `docs/decisions/house-leagues.md`.
 
@@ -639,6 +668,8 @@ One rulebook, `src/integrity/copy-rules.ts` (`copyViolations`): no em or en dash
 
 ### Migrations
 `ADD COLUMN … NOT NULL` without a `DEFAULT` is acceptable only while the table is empty (pre-first-deploy, as in `drizzle/0001`); once deployed, add with a DEFAULT or backfill in a separate migration.
+
+**An applied migration is never amended — always followed on (Phase 4.5, Task 2 fix round; proven by investigation, not taste).** drizzle's postgres migrator decides "already applied" from the single most-recent `__drizzle_migrations` row's `created_at` timestamp against each migration's own journal `when` — never from a content hash. Editing an already-applied migration file in place is therefore either silently skipped (the edit never reaches any database that already ran the file) or, on an environment whose tracking row's timestamp no longer covers it, re-runs the WHOLE file — including its already-existing `CREATE TYPE`/`CREATE TABLE` statements — and fails loudly. A correction to an applied migration ships as its own follow-on migration (`drizzle/0043_mock_leagues_private_ck.sql` is the precedent: a CHECK the review wanted inside 0042, shipped as 0043 with 0042 byte-identical). This is why merge-time migration renumbering (two branches both minting the next free index) is resolved by renumbering the UNAPPLIED-elsewhere lane files and hand-reconciling the journal and each environment's `__drizzle_migrations` rows against the migrator's actual gating logic — dev-only, ledger-sanctioned, done once at Phase 4.5's Task 9 merge.
 
 **Index rebuilds hold ACCESS EXCLUSIVE, and nothing in this repo uses `CONCURRENTLY`.** A `DROP INDEX` + `CREATE INDEX` pair (as in `drizzle/0029_draft_due_scan_index.sql`) locks the whole table for the duration of the rebuild, blocking every reader — including the draft ticker's every-tick scan. This is a repo-wide property, not a property of any one migration: drizzle-kit runs each migration inside a transaction and `CREATE INDEX CONCURRENTLY` cannot run inside one, so no migration here can express it. Acceptable today because no deploy has happened yet and every table is small. **Named for the deploy era:** once there is production data, an index rebuild on a hot table is a runbook step, applied by hand outside drizzle-kit (`CREATE INDEX CONCURRENTLY` under the new name, then `DROP INDEX CONCURRENTLY` the old one, then a no-op migration to bring the generated SQL back in line), never a migration run against a live database.
 

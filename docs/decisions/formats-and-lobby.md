@@ -29,7 +29,10 @@ to see superflex."
 **What this excluded, by name.** Mock drafts (a public lobby full of drafters nobody occupies) are
 out for a schema reason, not a scope reason: `teams.user_id` is a `NOT NULL` foreign key to a real
 user, so a mock seat needs a first-class non-human participant this codebase has nowhere to put —
-ledgered to Phase 6. Two-layer prizes and real stake tiers stay cosmetic pending Phase 4's
+ledgered to Phase 6. (Superseded by Phase 4.5, exactly the way this document predicted it would
+be: the schema fact changed — bots became seeded `is_bot` `users` rows, so the FK holds untouched
+— see `docs/decisions/mock-drafts.md` ruling 6. The learning-bots half stays with Phase 6, D3
+there.) Two-layer prizes and real stake tiers stay cosmetic pending Phase 4's
 payout-structure domain. Best ball and guillotine are post-launch fast follows that would fragment
 the pool this phase concentrates. Third-round reversal and linear draft order are real formats in
 the competitive taxonomy that nobody in the underlying research asked to browse by. Dynasty and

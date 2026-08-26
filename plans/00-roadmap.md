@@ -56,6 +56,10 @@ suggested owner phases, none of it implemented in 3.6.
 
 `docs/superpowers/plans/2026-08-24-phase3p7-design-v3.md` is Phase 3.7: the founder-ordered remediation of Phase 3.6's rejected mint-on-ink identity into the approved "Sunday Standard" (near-monochrome six-rule palette, the caps and accent-budget sweeps, the ledger card, the wire, and the mid-phase founder-ordered row shelf) — same non-renumbering rule, Phase 4's position **unchanged**; `docs/decisions/design-v3.md` is its decision record, closed by Task 12's persona checkpoint.
 
+## Phase 4.5 — mock drafts
+
+`docs/superpowers/plans/2026-08-25-phase4p5-mock-drafts.md` is Phase 4.5: founder-ordered practice drafts (2026-08-25) — the real draft room against 24 named, seeded bot opponents in three modes (solo, live lobby, share link), excluded from every real number by construction, predicate and writer behavior, and swept after a day. Same non-renumbering rule as every inserted pass: the nine-phase sequence and Phase 5's position are **unchanged**. `docs/mock-drafts.md` is the feature's own doc and `docs/decisions/mock-drafts.md` its decision record (which also supersedes `docs/decisions/formats-and-lobby.md`'s "mock drafts are out for a schema reason" — the schema reason is answered by seeded `is_bot` user rows, not by relaxing the constraint).
+
 ## Cross-phase dependency graph
 
 ```
