@@ -109,4 +109,18 @@ describe("MOCK_COPY", () => {
     expect(MOCK_COPY.sweptRoomActionLabel.length).toBeGreaterThan(0);
     expect(MOCK_COPY.lobbyEmptyActionLabel.length).toBeGreaterThan(0);
   });
+
+  /** Task 8: the results page's own three actions, and its retention line kept honest against
+   *  the config number it describes — the same "state the config, then pin the sentence
+   *  against it" idiom the `MOCK_CONFIG.retention` test above already uses. */
+  it("never leaves a finished results page without its three next actions", () => {
+    expect(MOCK_COPY.resultsRunAgainLabel.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.resultsOpenLobbyLabel.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.resultsBrowseLeaguesLabel.length).toBeGreaterThan(0);
+  });
+
+  it("states the same retention window in its results sentence that MOCK_CONFIG actually enforces", () => {
+    expect(MOCK_CONFIG.retention.completedMs).toBe(24 * 60 * 60 * 1000);
+    expect(MOCK_COPY.resultsRetentionSentence).toContain("24 hours");
+  });
 });

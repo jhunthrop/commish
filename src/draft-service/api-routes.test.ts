@@ -14,18 +14,22 @@ vi.mock("@/lib/auth/current-user", () => ({
 
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, leagues, players, users } from "@/db/schema";
+import { draftActions, leagues, mockRooms, players, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { GET as getDraft } from "@/app/api/drafts/[draftId]/route";
 import { GET as getPlayers } from "@/app/api/drafts/[draftId]/players/route";
 import { POST as postAction } from "@/app/api/drafts/[draftId]/actions/route";
 import { POST as postStart } from "@/app/api/drafts/[draftId]/start/route";
 import { getDraftStore } from "@/draft-service";
+import { MOCK_COPY } from "@/mock-draft/config";
+import type { MockMode } from "@/mock-draft/config";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
 const db = createTestDb();
 const DRAFT_ID = "draft_api";
 const params = Promise.resolve({ draftId: DRAFT_ID });
+const MOCK_DRAFT_ID = "draft_api_mock";
+const mockParams = Promise.resolve({ draftId: MOCK_DRAFT_ID });
 const signedInAs = (id: string | null) =>
   vi.mocked(getCurrentUser).mockResolvedValue(
     id === null ? null : { id, email: `${id}@test.local`, displayName: id, experienceTier: "beginner", avatarUrl: null, createdAt: "2026-09-01T00:00:00.000Z", isAdmin: false },
@@ -55,9 +59,66 @@ function postJson(body: unknown): Request {
   });
 }
 
+/**
+ * Task 8: a mock room's own fixture, alongside `fixture()` above rather than a parameter on it
+ * — `seedDraftFixture`'s own `isMock`/`botTeams` inputs (Task 4's addition) do the seeding;
+ * this only patches `mock_rooms.mode` after the fact, since `seedDraftFixture` always seeds
+ * `"solo"` and Task 8's own `ShareLinkPanel` data only ever answers for `"link"`.
+ */
+async function mockFixture(mode: MockMode = "solo", botTeams = 0) {
+  const f = await seedDraftFixture(db, {
+    draftId: MOCK_DRAFT_ID, leagueId: "league_api_mock", format: "snake", teamCount: 2,
+    slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    isMock: true, botTeams,
+  });
+  if (mode !== "solo") await db.update(mockRooms).set({ mode }).where(eq(mockRooms.leagueId, f.leagueId));
+  await db.insert(players).values([
+    { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
+    { id: "rb1", name: "RB One", position: "RB", nflTeam: "SF" },
+    { id: "wr1", name: "WR One", position: "WR", nflTeam: "NYJ" },
+    { id: "qb2", name: "QB Two", position: "QB", nflTeam: "KC" },
+    { id: "rb2", name: "RB Two", position: "RB", nflTeam: "SF" },
+    { id: "wr2", name: "WR Two", position: "WR", nflTeam: "NYJ" },
+  ]);
+  return f;
+}
+
+/** Drives a 2-team, 3-slot mock draft to `phase: "complete"` through the real actions route —
+ *  every pick a real human's own MAKE_PICK, never a store shortcut, so this proves the SAME
+ *  route this file already tests actually reaches the completed state Task 8's results copy
+ *  depends on. */
+async function completeMockDraft(f: { readonly teamIds: readonly string[]; readonly userIds: readonly string[] }): Promise<void> {
+  const started = await getDraftStore().startDraft(MOCK_DRAFT_ID);
+  if (!started.ok) throw new Error(started.reason);
+  let phase: string = started.state.phase;
+  // `DraftState` has no `onClockTeamId` field of its own (it is a VIEW selector,
+  // `teamOnClock`) — the first pick of a fresh snake draft always belongs to `draftOrder[0]`,
+  // and every pick after that reads the on-clock team off the previous response's own view.
+  let onClockTeamId: string | null = started.state.draftOrder[0]!;
+  // Pick order t1,t2,t2,t1,t1,t2 (2-team snake, 3 rounds) — one of each position per team, never
+  // a repeat before the OTHER two slots are filled, so every pick lands on an open slot.
+  for (const playerId of ["qb1", "qb2", "rb2", "rb1", "wr1", "wr2"]) {
+    if (phase === "complete") break;
+    signedInAs(f.userIds[f.teamIds.indexOf(onClockTeamId!)]!);
+    const response = await postAction(
+      new Request(`http://test/api/drafts/${MOCK_DRAFT_ID}/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "MAKE_PICK", playerId }),
+      }),
+      { params: mockParams },
+    );
+    const body = await response.json();
+    if (!body.ok) throw new Error(`pick failed: ${JSON.stringify(body)}`);
+    phase = body.data.draft.phase;
+    onClockTeamId = body.data.draft.onClockTeamId;
+  }
+}
+
 beforeEach(async () => {
   await truncateAll(db);
   getDraftStore().invalidate(DRAFT_ID);
+  getDraftStore().invalidate(MOCK_DRAFT_ID);
   vi.mocked(getCurrentUser).mockReset();
 });
 
@@ -140,6 +201,77 @@ describe("GET /api/drafts/[draftId]", () => {
     expect(body.data.teams).toHaveLength(f.teamIds.length);
     expect(body.data.teams[0]).toMatchObject({ id: expect.any(String), name: expect.any(String), ownerDisplayName: expect.any(String) });
     expect(body.data.draft.slotConfig).toEqual(SPRINT_ROSTER_SLOTS);
+  });
+});
+
+/**
+ * Task 8: the mock room's own words, carried on `DraftSnapshotBody.mock` — null for a real
+ * league (proven against the SAME fixture every test above already drives), and populated with
+ * `MOCK_COPY`'s exact strings, each bot seat's `TeamCard.isBot`, `ShareLinkPanel`'s own data for
+ * a `link`-mode room, and `MockResults`' own copy once the draft actually finishes.
+ */
+describe("GET /api/drafts/[draftId] — Task 8's mock room info", () => {
+  it("answers mock: null for a real league's draft", async () => {
+    const f = await fixture();
+    signedInAs(f.userIds[0]!);
+    const body = await (await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params })).json();
+    expect(body.data.mock).toBeNull();
+  });
+
+  it("carries MOCK_COPY's exact words and every seat's isBot flag for an unstarted, non-link mock", async () => {
+    const f = await mockFixture("lobby", 1);
+    signedInAs(f.userIds[0]!); // botTeams takes seats from the end — index 0 is the human host
+    const body = await (await getDraft(new Request(`http://test/api/drafts/${MOCK_DRAFT_ID}`), { params: mockParams })).json();
+
+    expect(body.data.mock.practiceBanner).toBe(MOCK_COPY.practiceBanner);
+    expect(body.data.mock.botBadge).toBe(MOCK_COPY.botBadge);
+    expect(body.data.mock.botMarkerLabel).toBe(MOCK_COPY.botMarkerLabel);
+    // Not "link" mode, so ShareLinkPanel has nothing to show; not complete, so no results yet.
+    expect(body.data.mock.share).toBeNull();
+    expect(body.data.mock.results).toBeNull();
+
+    const teams: readonly { readonly isBot?: boolean }[] = body.data.teams;
+    expect(teams.filter((team) => team.isBot === true)).toHaveLength(1);
+    expect(teams.filter((team) => team.isBot !== true)).toHaveLength(1);
+  });
+
+  it("carries ShareLinkPanel's own data for an unstarted link-mode mock", async () => {
+    const f = await mockFixture("link");
+    signedInAs(f.userIds[0]!);
+    const body = await (await getDraft(new Request(`http://test/api/drafts/${MOCK_DRAFT_ID}`), { params: mockParams })).json();
+
+    expect(body.data.mock.share).toEqual({
+      shareCode: "league_api_mock_code",
+      path: "/app/mock-drafts/league_api_mock_code",
+      teamCount: 2,
+      seatsFilled: 2,
+      startsAt: "2026-09-10T17:00:00.000Z",
+    });
+    expect(body.data.mock.results).toBeNull();
+  });
+
+  it("answers a null share for a solo mock, even unstarted", async () => {
+    const f = await mockFixture("solo");
+    signedInAs(f.userIds[0]!);
+    const body = await (await getDraft(new Request(`http://test/api/drafts/${MOCK_DRAFT_ID}`), { params: mockParams })).json();
+    expect(body.data.mock.share).toBeNull();
+  });
+
+  it("yields MockResults' own copy, and nulls the share, once the mock draft actually finishes", async () => {
+    const f = await mockFixture("solo");
+    await completeMockDraft(f);
+    signedInAs(f.userIds[0]!);
+    const body = await (await getDraft(new Request(`http://test/api/drafts/${MOCK_DRAFT_ID}`), { params: mockParams })).json();
+
+    expect(body.data.draft.phase).toBe("complete");
+    expect(body.data.mock.results).toEqual({
+      heading: MOCK_COPY.resultsHeading,
+      retentionSentence: MOCK_COPY.resultsRetentionSentence,
+      runAgainLabel: MOCK_COPY.resultsRunAgainLabel,
+      openLobbyLabel: MOCK_COPY.resultsOpenLobbyLabel,
+      browseLeaguesLabel: MOCK_COPY.resultsBrowseLeaguesLabel,
+    });
+    expect(body.data.mock.share).toBeNull();
   });
 });
 

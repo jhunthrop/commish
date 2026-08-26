@@ -4,7 +4,7 @@ import { axe } from "vitest-axe";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
 import { renderSurface } from "@/components/ui/test-utils";
-import { AUCTION_VIEW, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
+import { AUCTION_VIEW, PLAYERS, SNAKE_VIEW, TEAMS, TEAMS_WITH_BOT, playersById } from "../test-fixtures";
 import { DraftBoard } from "./draft-board";
 
 function stubMatchMedia(reduced: boolean) {
@@ -243,6 +243,38 @@ describe("DraftBoard", () => {
       render(<DraftBoard {...props} view={view} variant="tv" />);
       const rows = within(grid()).getAllByRole("row");
       expect(within(rows[1]!).getAllByRole("cell")[1]).toHaveTextContent("Pending");
+    });
+  });
+
+  /**
+   * Task 8, Step 1: every bot team card renders the practice marker, a human's never does, and
+   * a real draft (`mock` omitted, its own default) renders no marker at all — the "byte-identical
+   * for a real draft" requirement, proven here since `TeamCard.isBot` and `mock` are both new,
+   * purely additive props with no existing consumer.
+   */
+  describe("the mock lane's bot marker", () => {
+    const mock = { botMarkerLabel: "practice opponent", botBadge: "Bot" };
+
+    it("marks a bot's own column with a quiet, ink-only chip, and never a human's — axe-clean, both themes", async () => {
+      stubMatchMedia(false);
+      await renderSurface(
+        <DraftBoard {...props} teams={TEAMS_WITH_BOT} view={SNAKE_VIEW} mock={mock} />,
+        async ({ container }) => {
+          const botHeader = within(grid()).getByRole("columnheader", { name: /Park Bench Bot/ });
+          expect(within(botHeader).getByText("Bot")).toBeInTheDocument();
+          expect(within(botHeader).getByText(/practice opponent/)).toBeInTheDocument();
+          const humanHeader = within(grid()).getByRole("columnheader", { name: /Bay Bandits/ });
+          expect(within(humanHeader).queryByText("Bot")).not.toBeInTheDocument();
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+
+    it("renders no marker at all for a real draft, where mock is never passed", () => {
+      stubMatchMedia(false);
+      render(<DraftBoard {...props} teams={TEAMS_WITH_BOT} view={SNAKE_VIEW} />);
+      expect(screen.queryByText("Bot")).not.toBeInTheDocument();
+      expect(screen.queryByText(/practice opponent/)).not.toBeInTheDocument();
     });
   });
 });

@@ -3,6 +3,7 @@ import { render, type RenderResult } from "@testing-library/react";
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftClockView, DraftStateView } from "@/draft-engine";
+import type { MockRoomInfo } from "./contract";
 import { DraftRoomDepsProvider, type DraftRoomDeps, type EventSourceLike } from "./hooks/deps";
 
 export const PLAYERS: readonly Player[] = [
@@ -18,6 +19,23 @@ export const TEAMS: readonly TeamCard[] = [
   { id: "t1", name: "Bay Bandits", ownerDisplayName: "Dana Whitfield", ownerAvatarUrl: null },
   { id: "t2", name: "Iron Owls", ownerDisplayName: "Rey Okafor", ownerAvatarUrl: null },
 ];
+
+/** Task 8: the same two seats, one of them a bot — for every test that needs `TeamCard.isBot`
+ *  actually set, rather than every caller redeclaring its own bot-flagged team literal. */
+export const TEAMS_WITH_BOT: readonly TeamCard[] = [
+  TEAMS[0]!,
+  { id: "t2", name: "Park Bench Bot", ownerDisplayName: "Park Bench Bot", ownerAvatarUrl: null, isBot: true },
+];
+
+/** Task 8: `DraftSnapshotBody.mock` for an unstarted, non-link mock room — the shape most tests
+ *  reach for; `share`/`results` are overridden per-case for the other two states. */
+export const MOCK_ROOM: MockRoomInfo = {
+  practiceBanner: "This is a practice draft. Nothing here counts, and this room clears itself after a day.",
+  botMarkerLabel: "practice opponent",
+  botBadge: "Bot",
+  share: null,
+  results: null,
+};
 
 export const SNAKE_VIEW: DraftStateView = {
   phase: "in_progress",
@@ -103,6 +121,9 @@ export interface FixtureDeps {
   queue: readonly string[];
   /** What `POST /queue` answers with. */
   queueResponse: unknown;
+  /** Task 8: what the snapshot reports for `DraftSnapshotBody.mock`. Defaults to `null` — every
+   *  existing caller keeps testing a real league's own room unchanged. */
+  mock: MockRoomInfo | null;
 }
 
 /** Injected doubles for the whole room: no module mocks, no real network, no real EventSource. */
@@ -115,6 +136,7 @@ export function fixtureDeps(view: DraftStateView = SNAKE_VIEW): FixtureDeps {
     postResponse: { ok: true, data: { draft: view } },
     queue: [],
     queueResponse: { ok: true, data: { queue: [] } },
+    mock: null,
     deps: {
       fetchJson: async (url, init) => {
         fixture.calls.push(`${init?.method ?? "GET"} ${url}`);
@@ -126,7 +148,18 @@ export function fixtureDeps(view: DraftStateView = SNAKE_VIEW): FixtureDeps {
               : { ok: true, data: { queue: fixture.queue } }
             : init?.method === "POST"
               ? fixture.postResponse
-              : { ok: true, data: { draft: fixture.view, leagueName: LEAGUE_NAME, teamId: fixture.teamId, isCommissioner: false, teams: TEAMS, queue: fixture.queue } };
+              : {
+              ok: true,
+              data: {
+                draft: fixture.view,
+                leagueName: LEAGUE_NAME,
+                teamId: fixture.teamId,
+                isCommissioner: false,
+                teams: TEAMS,
+                queue: fixture.queue,
+                mock: fixture.mock,
+              },
+            };
         return { json: async () => body } as unknown as Response;
       },
       openEventSource: (url) => {

@@ -7,7 +7,17 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
  */
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { totalRosterSlots } from "@/draft-engine";
-import { formatClockLength, formatGap, formatPausedUntil, formatTightening, formatYourTurn, rosterSpots } from "./format";
+import {
+  formatBoardDelta,
+  formatClockLength,
+  formatGap,
+  formatOrdinal,
+  formatPausedUntil,
+  formatTightening,
+  formatYourTurn,
+  rankByPlayerId,
+  rosterSpots,
+} from "./format";
 
 describe("formatClockLength", () => {
   it.each([
@@ -113,6 +123,50 @@ describe("formatYourTurn", () => {
 
   it("still says nothing to a spectator, even while the room is paused", () => {
     expect(formatYourTurn(UPCOMING, null, 600, "2026-09-15T09:00:00.000Z")).toBeNull();
+  });
+});
+
+describe("formatOrdinal", () => {
+  it.each([
+    [1, "1st"],
+    [2, "2nd"],
+    [3, "3rd"],
+    [4, "4th"],
+    [9, "9th"],
+    [11, "11th"],
+    [12, "12th"],
+    [13, "13th"],
+    [21, "21st"],
+    [22, "22nd"],
+    [23, "23rd"],
+    [101, "101st"],
+    [111, "111th"],
+  ])("renders %i as %s", (n, expected) => {
+    expect(formatOrdinal(n)).toBe(expected);
+  });
+});
+
+describe("rankByPlayerId", () => {
+  it("maps each id to its 1-based position in pool order", () => {
+    const ranks = rankByPlayerId([{ id: "p1" }, { id: "p2" }, { id: "p3" }]);
+    expect(ranks.get("p1")).toBe(1);
+    expect(ranks.get("p2")).toBe(2);
+    expect(ranks.get("p3")).toBe(3);
+    expect(ranks.get("p9")).toBeUndefined();
+  });
+
+  it("is empty for an empty pool", () => {
+    expect(rankByPlayerId([]).size).toBe(0);
+  });
+});
+
+describe("formatBoardDelta", () => {
+  it("states the pick and the board's own rank for it", () => {
+    expect(formatBoardDelta("Bijan Robinson", 14, 9)).toBe("You took Bijan Robinson at pick 14. The board ranked Bijan Robinson 9th.");
+  });
+
+  it("degrades to the plain fact when the player has no rank to report", () => {
+    expect(formatBoardDelta("Bijan Robinson", 14, null)).toBe("You took Bijan Robinson at pick 14.");
   });
 });
 

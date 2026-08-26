@@ -5,7 +5,7 @@ import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { ClientDraftAction, CompletedPick, DraftStateView } from "@/draft-engine";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import type { DraftPlayersBody, DraftQueueBody, DraftSnapshotBody } from "@/draft-room/contract";
+import type { DraftPlayersBody, DraftQueueBody, DraftSnapshotBody, MockRoomInfo } from "@/draft-room/contract";
 import { applyDraftEvent } from "@/draft-room/state/apply-event";
 import { optimisticView } from "@/draft-room/state/optimistic";
 import { useDraftRoomDeps } from "./deps";
@@ -48,6 +48,9 @@ interface RoomState {
   /** The caller's own autopick queue. Never anybody else's. */
   readonly queue: readonly string[];
   readonly nudge: RoomNudge | null;
+  /** Null for a real league. See `MockRoomInfo`'s own docblock (`../contract`) for why the mock
+   *  lane's own words reach this room as data rather than a value import. */
+  readonly mock: MockRoomInfo | null;
 }
 
 export interface DraftRoom extends RoomState {
@@ -71,6 +74,7 @@ const INITIAL: RoomState = {
   lastPick: null,
   queue: [],
   nudge: null,
+  mock: null,
 };
 
 /**
@@ -164,6 +168,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
           isCommissioner: snapshot.data.isCommissioner,
           pendingPlayerId: null,
           queue: snapshot.data.queue,
+          mock: snapshot.data.mock,
         }));
       } catch {
         if (generation === generationRef.current) {

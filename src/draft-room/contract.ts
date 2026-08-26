@@ -7,6 +7,55 @@ import type { DraftStateView } from "@/draft-engine";
  * handlers as their return shape and by the client hook as its parse target, so the two
  * sides of the wire cannot drift. Types only — this module emits no runtime code.
  */
+/**
+ * The `link`-mode waiting surface's own data (Task 8, Step 3) — present on `DraftSnapshotBody.
+ * mock.share` only for an unstarted `link`-mode room. `ShareLinkPanel`'s whole scope: a `lobby`
+ * or `solo` room, or a started draft, never carries this at all.
+ */
+export interface MockShareInfo {
+  readonly shareCode: string;
+  /** An absolute PATH, not a full URL — the browser already knows its own origin, the same
+   *  convention `InviteBody.path` (`@/league-room/contract`) already keeps for a real league's
+   *  own invite link. */
+  readonly path: string;
+  readonly teamCount: number;
+  readonly seatsFilled: number;
+  /** ISO instant the fill window fires — `ShareLinkPanel`'s own countdown target. */
+  readonly startsAt: string;
+}
+
+/** `MockResults`' own copy (Task 8, Step 2), present on `DraftSnapshotBody.mock.results` only
+ *  once `phase === "complete"` — a live or scheduled mock never renders `MockResults` at all. */
+export interface MockResultsCopy {
+  readonly heading: string;
+  readonly retentionSentence: string;
+  readonly runAgainLabel: string;
+  readonly openLobbyLabel: string;
+  readonly browseLeaguesLabel: string;
+}
+
+/**
+ * Everything a mock room's OWN chrome needs to say, carried over the wire from the route that
+ * already knows `MOCK_COPY` (Task 8) — the client boundary
+ * (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`) blocks every `src/draft-room/**` file from
+ * value-importing `@/mock-draft` itself, so this is how its words reach `PracticeBanner`,
+ * `DraftBoard`'s bot marker and `MockResults` — pre-rendered data, the identical `NoticeView`/
+ * `ActivityRow` shape `@/integrity` already uses for the same reason. `null` for a real league,
+ * for every field this route ever answers.
+ */
+export interface MockRoomInfo {
+  /** `MOCK_COPY.practiceBanner`, verbatim. */
+  readonly practiceBanner: string;
+  /** `MOCK_COPY.botMarkerLabel` — the accessible label a bot's seat carries. */
+  readonly botMarkerLabel: string;
+  /** `MOCK_COPY.botBadge` — the visible short badge text. */
+  readonly botBadge: string;
+  /** Present only for an unstarted `link`-mode room. */
+  readonly share: MockShareInfo | null;
+  /** Present only once the draft has actually finished. */
+  readonly results: MockResultsCopy | null;
+}
+
 export interface DraftSnapshotBody {
   readonly draft: DraftStateView;
   /** The league's display name — what `RoomRail` puts at the top of the room. */
@@ -17,6 +66,9 @@ export interface DraftSnapshotBody {
   readonly teams: readonly TeamCard[];
   /** The caller's OWN autopick queue. Never anybody else's — a queue is a private draft plan. */
   readonly queue: readonly string[];
+  /** Null for a real league. See `MockRoomInfo`'s own docblock for why this crosses the wire as
+   *  data rather than the client ever importing `@/mock-draft` itself. */
+  readonly mock: MockRoomInfo | null;
 }
 
 export interface DraftPlayersBody {

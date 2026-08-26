@@ -3,7 +3,7 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
-import { Avatar, EYEBROW, Sticker } from "@/components/ui";
+import { Avatar, Badge, EYEBROW, Sticker } from "@/components/ui";
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { rosterSpots } from "../state/format";
@@ -20,6 +20,14 @@ export interface DraftBoardProps {
   readonly landedPickNumber?: number | null;
   /** `tv` is the same board at party scale: bigger stickers, bigger lettering. */
   readonly variant?: DraftBoardVariant;
+  /**
+   * The mock lane's own words for a bot seat (Task 8, Step 1) — `null` for a real draft, which
+   * renders no marker at all and is otherwise byte-identical to before this task. Two strings,
+   * not a boolean: this board never imports `@/mock-draft` itself (the client boundary), so
+   * `MOCK_COPY.botMarkerLabel`/`botBadge` arrive as data from `DraftRoom`, which read them off
+   * `room.mock` — see `MockRoomInfo`'s own docblock (`../contract`).
+   */
+  readonly mock?: { readonly botMarkerLabel: string; readonly botBadge: string } | null;
 }
 
 interface BoardCell {
@@ -236,7 +244,7 @@ function StickerCell({
  * row", and a round's serpentine direction is read off the pick numbers already in it rather
  * than from the alternation rule that produced them (which is the engine's, and stays there).
  */
-export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumber = null, variant = "room" }: DraftBoardProps) {
+export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumber = null, variant = "room", mock = null }: DraftBoardProps) {
   const reduced = usePrefersReducedMotion();
   const byId = teamsById(teams);
   const columnIds = columnIdsOf(view, teams);
@@ -302,6 +310,17 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
                   <span aria-hidden="true" className={`mr-1.5 font-mono tabular-nums text-text-muted ${META_TEXT[variant]}`}>{index + 1}</span>
                   <span className="sr-only">{`Draft slot ${index + 1}: `}</span>
                   {teamName(byId, teamId)}
+                  {mock === null || byId.get(teamId)?.isBot !== true ? null : (
+                    // Rule 1: ink, not color — `Badge`'s `neutral` tone is a hairline border and
+                    // muted text, the same quiet chip every other neutral label in this room
+                    // already wears. The visible text is `mock.botBadge` ("Bot"); the fuller,
+                    // never-claims-intelligence label rides alongside it for assistive tech only
+                    // (`MOCK_COPY.botMarkerLabel`'s own docblock — never "AI opponent").
+                    <Badge tone="neutral" className="ml-1.5 align-middle">
+                      {mock.botBadge}
+                      <span className="sr-only"> ({mock.botMarkerLabel})</span>
+                    </Badge>
+                  )}
                   {teamId === myTeamId ? (
                     <span className={`ml-2 font-display tracking-wide text-accent ${META_TEXT[variant]}`}>You</span>
                   ) : null}

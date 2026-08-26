@@ -2,15 +2,26 @@
 
 import { useMemo, useState } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
-import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
+import { Button, ButtonLink, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import type { HelpLevel } from "@/identity/preferences";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { useDraftRoomDeps } from "../hooks/deps";
 import { actionLabelFor, playersById as buildPlayersById } from "../lib/lookups";
+import { MockResults } from "./mock-results";
+import { PracticeBanner } from "./practice-banner";
 import { RoomTour } from "./room-tour";
+import { ShareLinkPanel } from "./share-link-panel";
 import { SnakeRoom } from "./snake-room";
 import { AuctionRoom } from "./auction-room";
+
+/**
+ * Task 9's own contract with this one (recorded here since it created no page of its own yet):
+ * the practice lobby lives at `/app/mock-drafts`, and `?create=solo` is this room's own request
+ * to open straight into creating another one rather than browsing first — "Run it again" below
+ * hands the lobby that query param; "Open the lobby" hands it none.
+ */
+const MOCK_LOBBY_PATH = "/app/mock-drafts";
 
 export interface DraftRoomProps {
   readonly draftId: string;
@@ -108,13 +119,55 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
     </div>
   );
 
+  // Task 8: a mock room's own honest chrome. `room.mock` is null for every real draft, so none
+  // of this branch ever runs there — the real room's own DOM is untouched by this addition.
   return (
     <>
-      <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} actionLabel={actionLabelFor(room.view.format)} />
-      {room.view.format === "auction" ? (
-        <AuctionRoom room={room} playersById={playersById} onAct={act} aside={chat} helpLevel={helpLevel} />
+      {room.mock ? <PracticeBanner message={room.mock.practiceBanner} /> : null}
+      {room.mock?.share ? (
+        <ShareLinkPanel
+          path={room.mock.share.path}
+          shareCode={room.mock.share.shareCode}
+          seatsFilled={room.mock.share.seatsFilled}
+          seatsTotal={room.mock.share.teamCount}
+          startsAt={room.mock.share.startsAt}
+        />
+      ) : null}
+      {room.mock?.results ? (
+        // Step 2: the board yields entirely to the results panel once a mock finishes — the
+        // room's every next action lives here, never a dead end.
+        <MockResults
+          view={room.view}
+          players={room.players}
+          myTeamId={room.myTeamId}
+          copy={room.mock.results}
+          actions={{
+            runAgain: (
+              <ButtonLink href={`${MOCK_LOBBY_PATH}?create=solo`} variant="secondary">
+                {room.mock.results.runAgainLabel}
+              </ButtonLink>
+            ),
+            openLobby: (
+              <ButtonLink href={MOCK_LOBBY_PATH} variant="secondary">
+                {room.mock.results.openLobbyLabel}
+              </ButtonLink>
+            ),
+            browseLeagues: (
+              <ButtonLink href="/browse" variant="secondary">
+                {room.mock.results.browseLeaguesLabel}
+              </ButtonLink>
+            ),
+          }}
+        />
       ) : (
-        <SnakeRoom room={room} playersById={playersById} onAct={act} aside={chat} helpLevel={helpLevel} />
+        <>
+          <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} actionLabel={actionLabelFor(room.view.format)} />
+          {room.view.format === "auction" ? (
+            <AuctionRoom room={room} playersById={playersById} onAct={act} aside={chat} helpLevel={helpLevel} />
+          ) : (
+            <SnakeRoom room={room} playersById={playersById} onAct={act} aside={chat} helpLevel={helpLevel} />
+          )}
+        </>
       )}
     </>
   );

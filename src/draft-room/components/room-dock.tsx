@@ -32,8 +32,10 @@ export interface RoomDockProps {
   readonly bidConsole?: ReactNode;
 }
 
-/** Slot types that ARE a position, so the fill meter can wear the right sticker. */
-const SLOT_POSITION: Readonly<Partial<Record<RosterSlotType, Position>>> = {
+/** Slot types that ARE a position, so the fill meter can wear the right sticker. Exported for
+ *  `MockResults` (`./mock-results`), which groups a finished roster by the same slot shape —
+ *  one map, not a second copy of it. */
+export const SLOT_POSITION: Readonly<Partial<Record<RosterSlotType, Position>>> = {
   QB: "QB",
   RB: "RB",
   WR: "WR",

@@ -22,6 +22,7 @@ const room: DraftRoomState = {
   lastPick: null,
   queue: ["rb1"],
   nudge: null,
+  mock: null,
   submit: async () => ({ ok: true }),
   refresh: async () => {},
   setQueue: async () => ({ ok: true }),

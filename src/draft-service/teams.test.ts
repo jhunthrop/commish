@@ -41,6 +41,32 @@ describe("listTeamCards", () => {
       id: "team_b", name: "Team B", ownerDisplayName: "Zed Owner", ownerAvatarUrl: "https://example.test/avatars/zed.png",
     });
   });
+
+  /**
+   * Phase 4.5, Task 8: `TeamCard.isBot`, threaded from `users.is_bot`. A real seat's owner never
+   * sets it, so the SAME query that already serves a real league's own room proves both sides
+   * of the fact in one row set — no separate mock fixture needed to show a bot seat reads
+   * `true` and a human seat reads `false`, never the other way around.
+   */
+  it("carries each owner's isBot flag, never flipping a human seat or missing a bot one", async () => {
+    const leagueId = "league_cards_bots";
+    await db.insert(users).values([
+      { id: "user_human", email: "user_human@test.local", displayName: "Human Owner" },
+      { id: "user_bot", email: "user_bot@test.local", displayName: "Bot Owner", isBot: true },
+    ]);
+    await db.insert(leagues).values({
+      id: leagueId, name: leagueId, format: "snake", teamCount: 2,
+      commissionerUserId: "user_human", rosterSlots: [...STANDARD_ROSTER_SLOTS],
+    });
+    await db.insert(teams).values([
+      { id: "team_human", leagueId, userId: "user_human", name: "Human Team" },
+      { id: "team_bot", leagueId, userId: "user_bot", name: "Bot Team" },
+    ]);
+
+    const cards = await listTeamCards(db, leagueId);
+    expect(cards.find((card) => card.id === "team_human")?.isBot).toBe(false);
+    expect(cards.find((card) => card.id === "team_bot")?.isBot).toBe(true);
+  });
 });
 
 describe("leagueNameFor", () => {

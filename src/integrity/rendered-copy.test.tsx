@@ -57,6 +57,10 @@ import { ExclusionPanel } from "@/account-room/components/exclusion-panel";
 import type { MethodDescriptor } from "@/payments-provider/contract";
 import { QueueTable } from "@/admin-room/components/queue-table";
 import { ExclusionControl } from "@/admin-room/components/exclusion-control";
+import { MockResults, type MockResultsCopy } from "@/draft-room/components/mock-results";
+import { PracticeBanner } from "@/draft-room/components/practice-banner";
+import { ShareLinkPanel } from "@/draft-room/components/share-link-panel";
+import { PLAYERS, SNAKE_VIEW } from "@/draft-room/test-fixtures";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
@@ -1649,5 +1653,77 @@ describe("ExclusionPanel says nothing that breaks the house copy rules, excluded
     const { container: excludedContainer, unmount: unmountExcluded } = render(<ExclusionPanel selfExcludedAt="2026-06-01T12:00:00.000Z" />);
     expectClean(excludedContainer);
     unmountExcluded();
+  });
+});
+
+/**
+ * Phase 4.5, Task 8. All three of the mock room's own new components carry `MOCK_COPY` text
+ * ONLY as props from a server ancestor (`src/draft-room/**` cannot value-import `@/mock-draft`
+ * — the client boundary), so this is the one place a stray dash, contraction or forbidden word
+ * in that text would actually be caught rendered rather than at its source. The literal strings
+ * below are `@/mock-draft/config`'s own `MOCK_COPY` values, copied rather than imported, for the
+ * same reason: this file has no business reaching a directory `src/draft-room/**` itself cannot.
+ */
+describe("PracticeBanner says nothing that breaks the house copy rules", () => {
+  it("is clean with the room's own practice banner text", () => {
+    const message = "This is a practice draft. Nothing here counts, and this room clears itself after a day.";
+    const { container } = render(<PracticeBanner message={message} />);
+    expectClean(container);
+  });
+});
+
+describe("ShareLinkPanel says nothing that breaks the house copy rules", () => {
+  it("is clean with a share code, a partial seat count and a live countdown", () => {
+    const { container } = render(
+      <ShareLinkPanel
+        path="/app/mock-drafts/ABC123"
+        shareCode="ABC123"
+        seatsFilled={3}
+        seatsTotal={8}
+        startsAt={new Date(Date.now() + 3 * 60_000).toISOString()}
+      />,
+    );
+    expectClean(container, "ABC123", "/app/mock-drafts/ABC123");
+  });
+});
+
+const MOCK_RESULTS_COPY: MockResultsCopy = {
+  heading: "Your practice draft is complete.",
+  retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
+  runAgainLabel: "Run another practice draft",
+  openLobbyLabel: "Open the practice lobby",
+  browseLeaguesLabel: "Browse real leagues",
+};
+
+const MOCK_RESULTS_VIEW = {
+  ...SNAKE_VIEW,
+  phase: "complete" as const,
+  onClockTeamId: null,
+  picks: [
+    { pickNumber: 1, round: 1, teamId: "t1", playerId: "rb1", slot: "RB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false },
+  ],
+  rosters: {
+    t1: [
+      { slot: "QB" as const, slotIndex: 0, playerId: null },
+      { slot: "RB" as const, slotIndex: 0, playerId: "rb1" },
+      { slot: "RB" as const, slotIndex: 1, playerId: null },
+    ],
+  },
+};
+
+describe("MockResults says nothing that breaks the house copy rules, with and without a team of your own", () => {
+  it("is clean for a team with a roster and picks, and for a commissioner with neither", () => {
+    const actions = {
+      runAgain: <a href="/app/mock-drafts?create=solo">{MOCK_RESULTS_COPY.runAgainLabel}</a>,
+      openLobby: <a href="/app/mock-drafts">{MOCK_RESULTS_COPY.openLobbyLabel}</a>,
+      browseLeagues: <a href="/browse">{MOCK_RESULTS_COPY.browseLeaguesLabel}</a>,
+    };
+    for (const myTeamId of ["t1", null]) {
+      const { container, unmount } = render(
+        <MockResults view={MOCK_RESULTS_VIEW} players={PLAYERS} myTeamId={myTeamId} copy={MOCK_RESULTS_COPY} actions={actions} />,
+      );
+      expectClean(container, "Marcus Reed");
+      unmount();
+    }
   });
 });

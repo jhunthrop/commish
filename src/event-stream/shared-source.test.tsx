@@ -38,6 +38,7 @@ const SNAPSHOT: DraftSnapshotBody = {
   isCommissioner: false,
   teams: TEAMS,
   queue: [],
+  mock: null,
 };
 
 const PLAYERS_BODY: DraftPlayersBody = { players: PLAYERS };

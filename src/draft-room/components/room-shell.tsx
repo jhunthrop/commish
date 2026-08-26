@@ -108,6 +108,7 @@ export function RoomShell({
             playersById={playersById}
             myTeamId={room.myTeamId}
             landedPickNumber={room.lastPick?.pick.pickNumber ?? null}
+            mock={room.mock ? { botMarkerLabel: room.mock.botMarkerLabel, botBadge: room.mock.botBadge } : null}
           />
         </div>
       }

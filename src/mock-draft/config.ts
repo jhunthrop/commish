@@ -183,4 +183,18 @@ export const MOCK_COPY = {
    *  `lobbyEmptyActionLabel` so an empty lobby is an invitation, never a dead end. */
   lobbyEmptyMessage: "No practice drafts are open right now.",
   lobbyEmptyActionLabel: "Start a mock draft",
+  /**
+   * Task 8's own results-page line, beside `resultsHeading`. The number is a literal, not a
+   * computed `MOCK_CONFIG.retention.completedMs` string, for the same "no reader should do
+   * arithmetic" reason `practiceBanner`'s own "after a day" phrasing already accepts — pinned
+   * against the real config value in `config.test.ts` so the two can never quietly drift apart.
+   */
+  resultsRetentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
+  /** The results page's three next actions (Task 8, Step 2 — "never a dead end"): a quick
+   *  rematch, the lobby, and the real thing. `MockResults` (`@/draft-room/components/
+   *  mock-results`) renders all three, every time — a finished practice draft never leaves a
+   *  member with nowhere to go. */
+  resultsRunAgainLabel: "Run another practice draft",
+  resultsOpenLobbyLabel: "Open the practice lobby",
+  resultsBrowseLeaguesLabel: "Browse real leagues",
 } as const;

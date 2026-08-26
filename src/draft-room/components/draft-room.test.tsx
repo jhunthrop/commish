@@ -5,7 +5,7 @@ import { ToastProvider } from "@/components/ui";
 import { renderSurface } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
-import { fixtureDeps, renderInRoom } from "../test-fixtures";
+import { fixtureDeps, MOCK_ROOM, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
 import { DraftRoomDepsProvider } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
 
@@ -133,5 +133,79 @@ describe("DraftRoom", () => {
     mount();
     await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+/**
+ * Task 8: the room's own honest chrome for a mock draft. `mock: null` (the default `fixtureDeps`
+ * already sets) is a REAL draft, and every case above already proves that shape unaffected —
+ * these cases exercise the three new `mock`-populated shapes instead.
+ */
+describe("DraftRoom — Task 8's mock room dressing", () => {
+  it("mounts no practice banner and no share panel for a real draft", async () => {
+    mount();
+    await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
+    expect(screen.queryByTestId("practice-banner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("share-link-panel")).not.toBeInTheDocument();
+  });
+
+  it("shows the practice banner for the whole life of a mock room", async () => {
+    const fixture = fixtureDeps();
+    fixture.mock = MOCK_ROOM;
+    mount(fixture);
+    await waitFor(() => expect(screen.getByTestId("practice-banner")).toHaveTextContent(MOCK_ROOM.practiceBanner));
+    // The rest of the room is unaffected — the banner is additive chrome, not a replacement.
+    expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
+  });
+
+  it("mounts ShareLinkPanel beside the waiting room for an unstarted link-mode mock", async () => {
+    const fixture = fixtureDeps({ ...SNAKE_VIEW, phase: "scheduled", onClockTeamId: null });
+    fixture.mock = {
+      ...MOCK_ROOM,
+      share: { shareCode: "ABC123", path: "/app/mock-drafts/ABC123", teamCount: 8, seatsFilled: 3, startsAt: "2026-09-01T00:10:00.000Z" },
+    };
+    mount(fixture);
+    await waitFor(() => expect(screen.getByTestId("share-link-panel")).toBeInTheDocument());
+    expect(screen.getByLabelText("Share link")).toHaveValue("/app/mock-drafts/ABC123");
+  });
+
+  it("lets the board yield entirely to MockResults once a mock draft finishes", async () => {
+    const fixture = fixtureDeps({ ...SNAKE_VIEW, phase: "complete", onClockTeamId: null });
+    fixture.mock = {
+      ...MOCK_ROOM,
+      results: {
+        heading: "Your practice draft is complete.",
+        retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
+        runAgainLabel: "Run another practice draft",
+        openLobbyLabel: "Open the practice lobby",
+        browseLeaguesLabel: "Browse real leagues",
+      },
+    };
+    mount(fixture);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Your practice draft is complete." })).toBeInTheDocument());
+    // The board and dock are gone — the results panel is what the room shows now.
+    expect(screen.queryByRole("list", { name: /available players/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse real leagues" })).toBeInTheDocument();
+  });
+
+  it("is axe-clean with every one of its own additions mounted at once, in both themes", async () => {
+    const fixture = fixtureDeps({ ...SNAKE_VIEW, phase: "scheduled", onClockTeamId: null });
+    fixture.mock = {
+      ...MOCK_ROOM,
+      share: { shareCode: "ABC123", path: "/app/mock-drafts/ABC123", teamCount: 8, seatsFilled: 3, startsAt: "2026-09-01T00:10:00.000Z" },
+    };
+    await renderSurface(
+      <DraftRoomDepsProvider deps={fixture.deps}>
+        <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+          <ToastProvider>
+            <DraftRoom draftId="d1" dismissedAt="2026-01-01T00:00:00.000Z" />
+          </ToastProvider>
+        </ChatRoomDepsProvider>
+      </DraftRoomDepsProvider>,
+      async ({ container }) => {
+        await waitFor(() => expect(screen.getByTestId("share-link-panel")).toBeInTheDocument());
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
   });
 });

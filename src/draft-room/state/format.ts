@@ -52,6 +52,41 @@ export function formatPausedUntil(resumeAt: string): string {
 }
 
 /**
+ * "1st", "2nd", "3rd", "4th", ... "11th", "21st" — the English ordinal suffix rule, exceptions
+ * (11-13) first. Plain arithmetic rather than an `Intl.PluralRules` lookup: a draft board's own
+ * player count is a small, closed range, and this room already avoids reaching for a locale API
+ * where a five-line rule reads just as clearly (`formatGap`'s own precedent, above).
+ */
+export function formatOrdinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  const suffix = n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
+  return `${n}${suffix}`;
+}
+
+/**
+ * `playerId` → its 1-based rank in the pool order a draft actually started with — `room.players`
+ * (`useDraftRoom`), fetched in "the same ranked order `START_DRAFT` snapshots" (`GET /api/
+ * drafts/[draftId]/players`'s own docblock), never re-derived here. Built once per render rather
+ * than a `.findIndex` per pick, the same "map once, read many" shape `teamsById`/`playersById`
+ * (`@/lib/display/lookups`) already use.
+ */
+export function rankByPlayerId(players: readonly { readonly id: string }[]): ReadonlyMap<string, number> {
+  return new Map(players.map((player, index) => [player.id, index + 1]));
+}
+
+/**
+ * `MockResults`' own honest line (Task 8, ruling 5: no letter grade). `rank` is `null` only when
+ * a pick's player somehow isn't in the ranked pool this draft snapshotted — a defensive branch,
+ * not an expected shape, since every drafted player came FROM that same pool — and the sentence
+ * degrades to the plain fact rather than a fabricated number.
+ */
+export function formatBoardDelta(playerName: string, pickNumber: number, rank: number | null): string {
+  const took = `You took ${playerName} at pick ${pickNumber}.`;
+  return rank === null ? took : `${took} The board ranked ${playerName} ${formatOrdinal(rank)}.`;
+}
+
+/**
  * How many roster spots the league declares. Config arithmetic, not a draft rule — which is
  * why it lives here rather than being value-imported from `@/draft-engine` (the room imports
  * types from the engine and nothing else, so no rule can leak into React). The test above
