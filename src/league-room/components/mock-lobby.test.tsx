@@ -43,7 +43,7 @@ describe("MockLobby", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} initialOpen={[OPEN_ROOM]} />, fixture.deps);
     expect(screen.getByText("10 teams · 3 open · 60s clock")).toBeInTheDocument();
-    expect(screen.getByText("You have no practice rooms yet.")).toBeInTheDocument();
+    expect(screen.getByText("You have no mock drafts yet.")).toBeInTheDocument();
   });
 
   it("renders one of the caller's own rooms with the status-appropriate link label", () => {

@@ -119,7 +119,7 @@ describe("firstRunPlan", () => {
     expect(byKey(beginner).get("practice")).toEqual({
       key: "practice",
       title: "Try a mock draft",
-      detail: "Draft against practice bots anytime, before your real league starts.",
+      detail: "Run a mock draft against practice opponents anytime, before your real league starts.",
       cta: "Try a mock draft",
     });
   });

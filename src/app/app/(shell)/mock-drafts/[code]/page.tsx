@@ -35,7 +35,7 @@ export default async function MockDraftLandingPage({ params }: PageProps) {
         <ErrorState
           title="We could not find that mock draft"
           description={result.reason}
-          action={<ButtonLink href="/app/mock-drafts">Open the practice lobby</ButtonLink>}
+          action={<ButtonLink href="/app/mock-drafts">Open the mock draft lobby</ButtonLink>}
         />
       </>
     );

@@ -188,7 +188,7 @@ function pickNumberFromTurnLabel(text: string): number {
  * rather than an incidental one or two.
  * -------------------------------------------------------------------------------------------
  */
-test("front door -> practice lobby -> a solo mock -> a real pick -> bots pick around it -> results -> run it again", async ({ managerA }) => {
+test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick around it -> results -> run it again", async ({ managerA }) => {
   test.setTimeout(480_000);
 
   // --- Front door -> the practice CTA -------------------------------------------------------

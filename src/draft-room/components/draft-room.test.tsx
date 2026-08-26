@@ -229,7 +229,7 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
         heading: "Your mock draft is complete.",
         retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
         runAgainLabel: "Run another mock draft",
-        openLobbyLabel: "Open the practice lobby",
+        openLobbyLabel: "Open the mock draft lobby",
         browseLeaguesLabel: "Browse real leagues",
       },
     };

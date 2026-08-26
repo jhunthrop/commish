@@ -252,6 +252,6 @@ export const MOCK_COPY = {
    *  mock-results`) renders all three, every time — a finished mock draft never leaves a
    *  member with nowhere to go. */
   resultsRunAgainLabel: "Run another mock draft",
-  resultsOpenLobbyLabel: "Open the practice lobby",
+  resultsOpenLobbyLabel: "Open the mock draft lobby",
   resultsBrowseLeaguesLabel: "Browse real leagues",
 } as const;

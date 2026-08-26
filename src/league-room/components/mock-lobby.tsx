@@ -192,10 +192,10 @@ export function MockLobby({
         )}
       </section>
 
-      <section aria-label="Your practice rooms" className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-text-primary">Your practice rooms</h2>
+      <section aria-label="Your mock drafts" className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold text-text-primary">Your mock drafts</h2>
         {mine.length === 0 ? (
-          <p className="text-sm text-text-muted">You have no practice rooms yet.</p>
+          <p className="text-sm text-text-muted">You have no mock drafts yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {mine.map((room) => (

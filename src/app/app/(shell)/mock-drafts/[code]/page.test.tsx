@@ -35,6 +35,6 @@ describe("MockDraftLandingPage", () => {
     render(page);
     expect(screen.getByText("We could not find that mock draft")).toBeInTheDocument();
     expect(screen.getByText(/does not exist/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open the practice lobby" })).toHaveAttribute("href", "/app/mock-drafts");
+    expect(screen.getByRole("link", { name: "Open the mock draft lobby" })).toHaveAttribute("href", "/app/mock-drafts");
   });
 });

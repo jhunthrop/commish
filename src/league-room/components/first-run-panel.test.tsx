@@ -69,7 +69,7 @@ describe("FirstRunPanel", () => {
         "Join with an invite",
         "Start a league",
       ]);
-      expect(screen.getByText("Draft against practice bots anytime, before your real league starts.")).toBeInTheDocument();
+      expect(screen.getByText("Run a mock draft against practice opponents anytime, before your real league starts.")).toBeInTheDocument();
       expect(screen.getByText("Browse leagues that still have seats and join one today.")).toBeInTheDocument();
       expect(screen.getByText("Paste the link or code your commissioner sent you.")).toBeInTheDocument();
       expect(screen.getByText("You pick the format, the scoring and who is in it.")).toBeInTheDocument();

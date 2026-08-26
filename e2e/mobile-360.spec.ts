@@ -433,11 +433,11 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(page.getByText("Trade", { exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, "a trade flag's detail page");
 
-    // --- Phase 4.5, Task 11: the practice lobby --------------------------------------------
+    // --- Phase 4.5, Task 11: the mock draft lobby --------------------------------------------
     await page.goto("/app/mock-drafts");
     await expect(page.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Start a mock draft" })).toBeVisible();
-    await expectNoHorizontalScroll(page, "the practice lobby");
+    await expectNoHorizontalScroll(page, "the mock draft lobby");
 
     // --- Task 11: the mock draft's share-link landing -----------------------------------
     await page.goto(mobile360LinkRoomPath);
