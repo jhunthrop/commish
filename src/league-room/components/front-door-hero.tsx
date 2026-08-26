@@ -1,5 +1,6 @@
 import { Rise } from "@/components/ui";
 import { moneyIsLive } from "@/money/states";
+import { PracticeEntryLink } from "./practice-entry-link";
 
 /**
  * The two money sentences the hero's one money line can render — the SAME `moneyIsLive()` switch
@@ -19,6 +20,13 @@ export interface FrontDoorHeroProps {
    *  but the default: `MONEY_STATES.enabled` ships empty, so every real render reaches the dark
    *  branch. */
   readonly live?: boolean;
+  /**
+   * Task 9: whether the visitor is signed in — required, not defaulted, so every caller (`/`,
+   * and any future one) states it explicitly rather than this component guessing. Decides only
+   * where `PracticeEntryLink` points; every other word on this hero is unconditional marketing
+   * copy, said the same way to everyone.
+   */
+  readonly signedIn: boolean;
 }
 
 /**
@@ -41,7 +49,7 @@ export interface FrontDoorHeroProps {
  * way to the live sentence the day a state is enabled, never a stale claim quoting data this
  * task could get wrong. The numbers that can be checked live in `ProofStrip`, right below this.
  */
-export function FrontDoorHero({ live = moneyIsLive() }: FrontDoorHeroProps = {}) {
+export function FrontDoorHero({ live = moneyIsLive(), signedIn }: FrontDoorHeroProps) {
   return (
     <div className="flex flex-col items-start gap-4">
       <Rise step={1}>
@@ -56,6 +64,11 @@ export function FrontDoorHero({ live = moneyIsLive() }: FrontDoorHeroProps = {})
         </p>
         <p className="text-md font-medium text-positive">{live ? LIVE_MONEY_SENTENCE : FREE_SEASON_SENTENCE}</p>
         <p className="text-sm text-text-muted">No account is needed to look.</p>
+        {/* Task 9: the practice invitation lives in the hero's own left column, never the right
+            column `NextDraftModule` occupies at xl+ (`src/app/page.tsx`) — the two can never
+            fight for the same space because this one is never in it. Quiet on purpose (rule 5):
+            the front door's one ink pill is "Take a seat", not this. */}
+        <PracticeEntryLink signedIn={signedIn} className="mt-1" />
       </Rise>
     </div>
   );

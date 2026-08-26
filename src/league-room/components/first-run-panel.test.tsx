@@ -59,15 +59,17 @@ describe("FirstRunPanel", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 
-  it("renders all four cards — the identity step, then all three paths, in the plan's own order, with real titles and detail", async () => {
+  it("renders all five cards — the identity step, then practice, then all three paths, in the plan's own order, with real titles and detail", async () => {
     await renderSurface(<FirstRunPanel plan={GUIDED_BEGINNER} profile={PROFILE} />, async ({ container }) => {
       const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
       expect(headings).toEqual([
         "Set up your manager profile",
+        "Try a practice draft",
         "Find an open league",
         "Join with an invite",
         "Start a league",
       ]);
+      expect(screen.getByText("Draft against practice bots anytime, before your real league starts.")).toBeInTheDocument();
       expect(screen.getByText("Browse leagues that still have seats and join one today.")).toBeInTheDocument();
       expect(screen.getByText("Paste the link or code your commissioner sent you.")).toBeInTheDocument();
       expect(screen.getByText("You pick the format, the scoring and who is in it.")).toBeInTheDocument();
@@ -85,14 +87,22 @@ describe("FirstRunPanel", () => {
     expect(screen.queryByText(/A league is a group of managers/)).not.toBeInTheDocument();
   });
 
-  it("reorders for an experienced manager, create leading — the identity card always stays first", () => {
+  it("reorders for an experienced manager, create leading — the identity card and practice both stay put", () => {
     renderPanel(STANDARD_EXPERIENCED);
     const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(headings).toEqual(["Set up your manager profile", "Start a league", "Join with an invite", "Find an open league"]);
+    expect(headings).toEqual([
+      "Set up your manager profile",
+      "Try a practice draft",
+      "Start a league",
+      "Join with an invite",
+      "Find an open league",
+    ]);
   });
 
   it("gives every path a real, working control, not a description-only card", () => {
     renderPanel(GUIDED_BEGINNER);
+    // practice: the real, signed-in practice lobby link.
+    expect(screen.getByRole("link", { name: "Try a practice draft" })).toHaveAttribute("href", "/app/mock-drafts");
     // browse: a real link, labeled with the plan's own cta text, to the real page.
     expect(screen.getByRole("link", { name: "Browse open leagues" })).toHaveAttribute("href", "/browse");
     // join: the actual invite-entry form, not a placeholder.

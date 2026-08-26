@@ -11,14 +11,14 @@ describe("FrontDoorHero", () => {
   // S8 ruling: the mock's headline and sub, verbatim — the accessible name concatenates the
   // ink phrase and the money phrase into the one sentence the e2e walk asserts.
   it("says the mock's headline verbatim, with the closing phrase in money", async () => {
-    await renderSurface(<FrontDoorHero />, ({ getByRole, getByText }) => {
+    await renderSurface(<FrontDoorHero signedIn={false} />, ({ getByRole, getByText }) => {
       expect(getByRole("heading", { level: 1, name: "Real leagues. Real seats. Drafting this week." })).toBeInTheDocument();
       expect(getByText("Drafting this week.").className).toContain("text-positive");
     });
   });
 
   it("steps the display size responsively: display-md, then display-xl from sm up (E6)", async () => {
-    await renderSurface(<FrontDoorHero />, ({ getByRole }) => {
+    await renderSurface(<FrontDoorHero signedIn={false} />, ({ getByRole }) => {
       const heading = getByRole("heading", { level: 1 });
       expect(heading.className).toContain("text-display-md");
       expect(heading.className).toContain("sm:text-display-xl");
@@ -29,7 +29,7 @@ describe("FrontDoorHero", () => {
   // reads as an omission to the one persona most likely to ask. The mock's `.free` line renders
   // in money too.
   it("says what a seat costs, because a visitor who searched for money deserves an answer", async () => {
-    await renderSurface(<FrontDoorHero />, ({ getByText }) => {
+    await renderSurface(<FrontDoorHero signedIn={false} />, ({ getByText }) => {
       const free = getByText("Every league is free this season.");
       expect(free).toBeInTheDocument();
       expect(free.className).toContain("text-positive");
@@ -41,7 +41,7 @@ describe("FrontDoorHero", () => {
   // free-season sentence and the config can never disagree: this is the ONE other value `live`
   // can take, and the free sentence must never appear once it does.
   it("gives way to the live money sentence once a state is enabled, and never says both", async () => {
-    await renderSurface(<FrontDoorHero live={true} />, ({ getByText, queryByText }) => {
+    await renderSurface(<FrontDoorHero live={true} signedIn={false} />, ({ getByText, queryByText }) => {
       const live = getByText("Play free everywhere, or play for real money where your state allows.");
       expect(live).toBeInTheDocument();
       expect(live.className).toContain("text-positive");
@@ -52,7 +52,7 @@ describe("FrontDoorHero", () => {
   // S8: the sub adopts the mock's one sentence; "No account is needed to look." survives as a
   // detail line — it answered a persona concern and costs one quiet line.
   it("keeps the mock's sub sentence and the quiet no-account detail line", async () => {
-    await renderSurface(<FrontDoorHero />, ({ getByText, queryByText }) => {
+    await renderSurface(<FrontDoorHero signedIn={false} />, ({ getByText, queryByText }) => {
       expect(
         getByText(
           "Season-long fantasy football with a live draft room, real-time scoring, and a platform that runs the league so no brother-in-law has to.",
@@ -66,22 +66,40 @@ describe("FrontDoorHero", () => {
   // Task 7 (hero band): headline rises first, the sub block second; reduced motion is a real
   // branch — the words stay, the animation classes go.
   it("staggers its two risers, and drops both under reduced motion", () => {
-    const animated = render(<FrontDoorHero />);
+    const animated = render(<FrontDoorHero signedIn={false} />);
     expect(animated.container.querySelector(".rise-1")?.className).toContain("animate-rise");
     expect(animated.container.querySelector(".rise-2")?.className).toContain("animate-rise");
     animated.unmount();
 
     vi.mocked(usePrefersReducedMotion).mockReturnValue(true);
-    const still = render(<FrontDoorHero />);
+    const still = render(<FrontDoorHero signedIn={false} />);
     expect(still.getByRole("heading", { level: 1 })).toBeInTheDocument();
     expect(still.container.querySelector(".animate-rise")).toBeNull();
     vi.mocked(usePrefersReducedMotion).mockReturnValue(false);
   });
 
   it("has a heading, in both themes, axe-clean", async () => {
-    await renderSurface(<FrontDoorHero />, async ({ container, getByRole }) => {
+    await renderSurface(<FrontDoorHero signedIn={false} />, async ({ container, getByRole }) => {
       expect(getByRole("heading", { level: 1 })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  // Task 9, Step 1: the quiet practice invitation, signed in and signed out — never the ink pill.
+  describe("the practice invitation", () => {
+    it("points a signed-in visitor straight at the practice lobby", async () => {
+      await renderSurface(<FrontDoorHero signedIn={true} />, ({ getByRole }) => {
+        expect(getByRole("link", { name: "Try a practice draft" })).toHaveAttribute("href", "/app/mock-drafts");
+      });
+    });
+
+    it("sends a signed-out visitor through sign-up, carrying the lobby as its own intent", async () => {
+      await renderSurface(<FrontDoorHero signedIn={false} />, ({ getByRole }) => {
+        expect(getByRole("link", { name: "Try a practice draft" })).toHaveAttribute(
+          "href",
+          "/sign-up?returnTo=%2Fapp%2Fmock-drafts",
+        );
+      });
     });
   });
 });

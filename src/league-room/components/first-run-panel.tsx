@@ -5,6 +5,7 @@ import { PROFILE_FORM_FIRST_RUN_HEADING, ProfileForm } from "@/account-room/comp
 import type { ProfileBody } from "@/account-room/contract";
 import { CreateLeaguePanel } from "./create-league-panel";
 import { JoinLeagueEntry } from "./join-league-entry";
+import { PracticeEntryLink } from "./practice-entry-link";
 
 /**
  * The one place the product explains what a season-long league IS — three plain sentences, no
@@ -35,6 +36,12 @@ function FirstRunPathAction({ path }: { readonly path: FirstRunPath }) {
   }
   if (path.key === "join") {
     return <JoinLeagueEntry />;
+  }
+  // Task 9: every caller of `FirstRunPanel` lives under `/app`, already signed in — the same
+  // reason `WaitingChecklist`'s own practice link (`waiting-room.tsx`) never checks `signedIn`
+  // either.
+  if (path.key === "practice") {
+    return <PracticeEntryLink signedIn={true} />;
   }
   return <CreateLeaguePanel />;
 }

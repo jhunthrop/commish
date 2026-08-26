@@ -1,7 +1,16 @@
 import type { ExperienceTier } from "@/domain/user";
 import type { HelpLevel } from "./preferences";
 
-export type FirstRunPathKey = "create" | "join" | "browse";
+/**
+ * The three keys `firstRunPathOrder` reorders per tier — `StartOrJoinDisclosure`
+ * (`@/league-room/components/start-or-join-disclosure.tsx`) keys its own sections by exactly
+ * this type, never the wider `FirstRunPathKey` below, so a future path added to that fork (the
+ * way `practice` was, Task 9) cannot silently demand a section from a component that has no
+ * business rendering it — the returning-manager disclosure never re-litigates practice.
+ */
+export type TierOrderedPathKey = "create" | "join" | "browse";
+
+export type FirstRunPathKey = TierOrderedPathKey | "practice";
 
 export interface FirstRunPath {
   readonly key: FirstRunPathKey;
@@ -40,15 +49,29 @@ const PATH_COPY: Readonly<Record<FirstRunPathKey, FirstRunPath>> = {
     detail: "Browse leagues that still have seats and join one today.",
     cta: "Browse open leagues",
   },
+  /**
+   * Task 9: a leagueless account's first suggestion, always — not one of the three tier-ordered
+   * choices above, so it is never subject to `firstRunPathOrder` (that function still answers
+   * exactly the three keys `StartOrJoinDisclosure` depends on). Every real league still starts
+   * behind whichever of create/join/browse leads for this manager; this leads ALL of them,
+   * because a manager who has never drafted here benefits from a real practice round before
+   * either of those two much bigger commitments.
+   */
+  practice: {
+    key: "practice",
+    title: "Try a practice draft",
+    detail: "Draft against practice bots anytime, before your real league starts.",
+    cta: "Try a practice draft",
+  },
 };
 
 /** Order for a manager who told us they're new: they're looking for a game, not standing up
  *  their own — browse and join lead, create trails. */
-const BEGINNER_ORDER: readonly FirstRunPathKey[] = ["browse", "join", "create"];
+const BEGINNER_ORDER: readonly TierOrderedPathKey[] = ["browse", "join", "create"];
 
 /** Order for a manager who told us they've done this before and still has zero leagues on this
  *  product: that combination is almost always someone who came here to RUN one. */
-const EXPERIENCED_ORDER: readonly FirstRunPathKey[] = ["create", "join", "browse"];
+const EXPERIENCED_ORDER: readonly TierOrderedPathKey[] = ["create", "join", "browse"];
 
 /**
  * The ONE rule behind every ordered rendering of create/join/browse, first-run or not:
@@ -58,7 +81,7 @@ const EXPERIENCED_ORDER: readonly FirstRunPathKey[] = ["create", "join", "browse
  * for that disclosure is usually reaching for Create, same as the fork itself says, so the two
  * surfaces order the same way rather than each encoding its own opinion.
  */
-export function firstRunPathOrder(experienceTier: ExperienceTier): readonly FirstRunPathKey[] {
+export function firstRunPathOrder(experienceTier: ExperienceTier): readonly TierOrderedPathKey[] {
   return experienceTier === "experienced" ? EXPERIENCED_ORDER : BEGINNER_ORDER;
 }
 
@@ -80,7 +103,10 @@ export function firstRunPlan(input: {
 
   return {
     headline: "Pick how you want to get started.",
-    paths: firstRunPathOrder(input.experienceTier).map((key) => PATH_COPY[key]),
+    // The practice path leads unconditionally (Task 9) — everyone with zero leagues benefits
+    // from a real, zero-stakes round before create/join/browse, whichever of those three leads
+    // for THIS manager's own tier.
+    paths: [PATH_COPY.practice, ...firstRunPathOrder(input.experienceTier).map((key) => PATH_COPY[key])],
     showsExplainer: input.helpLevel === "guided",
   };
 }

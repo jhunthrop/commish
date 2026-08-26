@@ -8,6 +8,6 @@ export { isPrintableDisplayName } from "./display-name";
 export { defaultPreferences, isDraftTourDismissed } from "./preferences";
 export type { HelpLevel, PreferenceState } from "./preferences";
 export { firstRunPathOrder, firstRunPlan } from "./first-run";
-export type { FirstRunPath, FirstRunPathKey, FirstRunPlan } from "./first-run";
+export type { FirstRunPath, FirstRunPathKey, FirstRunPlan, TierOrderedPathKey } from "./first-run";
 export { NOTIFICATION_CATALOG, channelStatus, deliverableChannels } from "./notifications";
 export type { NotificationChannel, NotificationTopic } from "./notifications";

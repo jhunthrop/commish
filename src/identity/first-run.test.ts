@@ -21,22 +21,29 @@ describe("firstRunPathOrder", () => {
 });
 
 describe("firstRunPlan", () => {
-  it("orders the paths by what this manager most likely needs", () => {
+  it("orders the paths by what this manager most likely needs, with practice leading both", () => {
     // A first-timer with no group is looking for a game to join. An experienced manager with no
     // leagues on this product is nearly always the person who came here to RUN one. Same three
     // paths, different order, because ordering is the only honest way to guide without hiding.
+    // Practice leads unconditionally (Task 9) — it is not one of the tier-ordered three.
     expect(firstRunPlan({ experienceTier: "beginner", helpLevel: "guided", leagueCount: 0 })!.paths.map((p) => p.key))
-      .toEqual(["browse", "join", "create"]);
+      .toEqual(["practice", "browse", "join", "create"]);
     expect(firstRunPlan({ experienceTier: "experienced", helpLevel: "standard", leagueCount: 0 })!.paths.map((p) => p.key))
-      .toEqual(["create", "join", "browse"]);
+      .toEqual(["practice", "create", "join", "browse"]);
   });
 
-  it("always offers all three paths, whichever way it orders them", () => {
+  it("always offers all four paths, whichever way it orders the tier-dependent three", () => {
     // Guidance is ordering, never removal. A first-timer who came here to run their office league
     // must not have to find the create form behind an experience setting they set wrong.
     for (const tier of ["beginner", "experienced"] as const) {
       const plan = firstRunPlan({ experienceTier: tier, helpLevel: "guided", leagueCount: 0 })!;
-      expect(new Set(plan.paths.map((p) => p.key))).toEqual(new Set(["create", "join", "browse"]));
+      expect(new Set(plan.paths.map((p) => p.key))).toEqual(new Set(["practice", "create", "join", "browse"]));
+    }
+  });
+
+  it("puts practice first regardless of tier", () => {
+    for (const tier of ["beginner", "experienced"] as const) {
+      expect(firstRunPlan({ experienceTier: tier, helpLevel: "guided", leagueCount: 0 })!.paths[0]!.key).toBe("practice");
     }
   });
 
@@ -108,6 +115,12 @@ describe("firstRunPlan", () => {
       title: "Find an open league",
       detail: "Browse leagues that still have seats and join one today.",
       cta: "Browse open leagues",
+    });
+    expect(byKey(beginner).get("practice")).toEqual({
+      key: "practice",
+      title: "Try a practice draft",
+      detail: "Draft against practice bots anytime, before your real league starts.",
+      cta: "Try a practice draft",
     });
   });
 

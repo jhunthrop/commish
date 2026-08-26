@@ -134,10 +134,10 @@ export default async function Home() {
                 `featuredLeague` null) the hero keeps its current single-column shape: real or
                 absent, never dressed up (rule 6). */}
             {featuredLeague === null ? (
-              <FrontDoorHero />
+              <FrontDoorHero signedIn={user !== null} />
             ) : (
               <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_360px] xl:items-center xl:gap-10">
-                <FrontDoorHero />
+                <FrontDoorHero signedIn={user !== null} />
                 <NextDraftModule league={featuredLeague} signedIn={user !== null} />
               </div>
             )}

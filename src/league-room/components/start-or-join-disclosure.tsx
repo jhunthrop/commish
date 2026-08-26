@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactElement } from "react";
 import Link from "next/link";
 import type { ExperienceTier } from "@/domain/user";
-import { firstRunPathOrder, type FirstRunPathKey } from "@/identity";
+import { firstRunPathOrder, type TierOrderedPathKey } from "@/identity";
 import { CreateLeaguePanel } from "./create-league-panel";
 import { JoinLeagueEntry } from "./join-league-entry";
 
@@ -15,7 +15,7 @@ const CREATE_LEAGUE_HASH = "#create-league";
  * component's own — a returning manager reads "Invited by a friend?", not `FirstRunPath`'s
  * "Join with an invite" — only the ORDER is shared, never the copy.
  */
-const SECTIONS: Readonly<Record<FirstRunPathKey, () => ReactElement>> = {
+const SECTIONS: Readonly<Record<TierOrderedPathKey, () => ReactElement>> = {
   join: () => (
     <section key="join" aria-label="Join a league" className="flex flex-col gap-2">
       <h2 className="text-lg font-medium text-text-primary">Invited by a friend?</h2>

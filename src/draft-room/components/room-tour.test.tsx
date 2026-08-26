@@ -43,7 +43,7 @@ describe("RoomTour", () => {
     expect(screen.getByText("The queue")).toBeInTheDocument();
     expect(screen.getByText("Taking your turn")).toBeInTheDocument();
     expect(
-      screen.getByText("When it's your turn, click Draft next to the player you want. Do it before the clock runs out, or an autopick chooses for you."),
+      screen.getByText("When it is your turn, click Draft next to the player you want. Do it before the clock runs out, or the room picks for you from your queue."),
     ).toBeInTheDocument();
   });
 
@@ -52,9 +52,18 @@ describe("RoomTour", () => {
     // renders is "Nominate" in an auction room, never "Draft", so the copy has to say so too.
     render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Nominate" />);
     expect(
-      screen.getByText("When it's your turn, click Nominate next to the player you want. Do it before the clock runs out, or an autopick chooses for you."),
+      screen.getByText("When it is your turn, click Nominate next to the player you want. Do it before the clock runs out, or the room picks for you from your queue."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/click Draft/)).not.toBeInTheDocument();
+  });
+
+  // Task 9, Step 1: the closing stop points at practice, regardless of format or dismissal state.
+  it("closes with a stop pointing at practice, quoting the safety net's one sanctioned phrase", () => {
+    render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Draft" />);
+    expect(screen.getByText("Practice anytime")).toBeInTheDocument();
+    expect(
+      screen.getByText("Even if you miss your pick, the room picks for you from your queue. Start a mock draft anytime to practice first."),
+    ).toBeInTheDocument();
   });
 
   it("closes on Escape without throwing", async () => {

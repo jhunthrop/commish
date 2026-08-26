@@ -59,8 +59,10 @@ import { QueueTable } from "@/admin-room/components/queue-table";
 import { ExclusionControl } from "@/admin-room/components/exclusion-control";
 import { MockResults, type MockResultsCopy } from "@/draft-room/components/mock-results";
 import { PracticeBanner } from "@/draft-room/components/practice-banner";
+import { RoomTour } from "@/draft-room/components/room-tour";
 import { ShareLinkPanel } from "@/draft-room/components/share-link-panel";
 import { PLAYERS, SNAKE_VIEW } from "@/draft-room/test-fixtures";
+import { MOCK_COPY } from "@/mock-draft/config";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
@@ -882,9 +884,12 @@ describe("OpenLeagueCard says nothing that breaks the house copy rules, in every
 });
 
 describe("FrontDoorHero says nothing that breaks the house copy rules", () => {
-  it("is clean", () => {
-    const { container } = render(<FrontDoorHero />);
-    expectClean(container);
+  it("is clean signed in and signed out", () => {
+    for (const signedIn of [true, false]) {
+      const { container, unmount } = render(<FrontDoorHero signedIn={signedIn} />);
+      expectClean(container);
+      unmount();
+    }
   });
 });
 
@@ -1681,6 +1686,21 @@ describe("PracticeBanner says nothing that breaks the house copy rules", () => {
     const message = "This is a practice draft. Nothing here counts, and this room clears itself after a day.";
     const { container } = render(<PracticeBanner message={message} />);
     expectClean(container);
+  });
+});
+
+/**
+ * Task 9, Step 1. `RoomTour`'s closing stop quotes C3's safety-net phrase verbatim and
+ * `MOCK_CONFIG`'s own action-label phrase for the rest — both hardcoded literals in
+ * `room-tour.tsx` (`src/draft-room/**` may not value-import `@/mock-draft`, its own docblock),
+ * so this is the one place that can hold BOTH the literal and the real config value at once and
+ * prove neither has quietly drifted from the other.
+ */
+describe("RoomTour says nothing that breaks the house copy rules, and never drifts from MOCK_CONFIG's own words", () => {
+  it("is clean, and its closing stop's practice phrase is MOCK_CONFIG's own", () => {
+    const { container, getByText } = render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Draft" />);
+    expectClean(container);
+    expect(getByText(/Start a mock draft anytime to practice first\./)).toHaveTextContent(MOCK_COPY.lobbyEmptyActionLabel);
   });
 });
 

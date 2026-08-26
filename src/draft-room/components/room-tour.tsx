@@ -26,17 +26,47 @@ interface TourStop {
 }
 
 /**
+ * The closing stop's own sentence (Task 9, Step 1) — two phrases, neither invented here. The
+ * first is C3's own safety-net phrase, verbatim, the ONE sanctioned way this product reassures
+ * anyone about missing a draft (`docs/design-system.md`'s "Copy" section, `copy-rules.ts`'s
+ * `FORBIDDEN_VOCABULARY` family). The second is `MOCK_CONFIG.lobbyEmptyActionLabel` /
+ * `sweptRoomActionLabel`'s own words (`@/mock-draft/config`) — copied rather than imported:
+ * `src/draft-room/**` may not value-import `@/mock-draft` (the client boundary), the identical
+ * reason `PracticeBanner`/`MockResults` receive that module's words as PROPS rather than a live
+ * import. This stop needs no prop plumbing because it says the same thing in every room,
+ * mock or real, unlike those two: `src/integrity/rendered-copy.test.tsx` renders this component
+ * and compares its literal text against `MOCK_CONFIG`'s real value directly, the same drift-proof
+ * pattern that file already keeps for `TradeCard`'s held-trade sentence.
+ */
+const CLOSING_STOP: TourStop = {
+  heading: "Practice anytime",
+  body: "Even if you miss your pick, the room picks for you from your queue. Start a mock draft anytime to practice first.",
+};
+
+/**
  * Fixed content plus the one stop whose body depends on `actionLabel` — kept as a function
  * rather than a second static table, so there is exactly one list of stops regardless of format.
+ *
+ * Task 9's own sweep (`src/integrity/rendered-copy.test.tsx`, RoomTour's first-ever rendered
+ * sweep) caught a REAL pre-existing gap here: `src/draft-room` sits outside
+ * `room-copy.source.test.ts`'s own `ROOM_DIRS`, so these three stops had said "an autopick..."
+ * (C3's own banned vocabulary) and a contraction ("it's") since before this task, unswept by
+ * anything. Fixed in the same commit that added the sweep that found it — every mention of the
+ * safety net below now quotes C3's own sanctioned phrase, verbatim, the identical string the
+ * closing stop quotes.
  */
 function tourStops(actionLabel: string): readonly TourStop[] {
   return [
-    { heading: "The clock", body: "Counts down the team currently on the clock. When it reaches zero, an autopick fills the slot so the draft never stalls." },
-    { heading: "The queue", body: "Your own list of players, in order. Set it once and the room drafts down it automatically whenever your pick is autopicked." },
+    {
+      heading: "The clock",
+      body: "Counts down whoever is on the clock, including you. When it reaches zero, the room picks for you from your queue so the draft never stalls.",
+    },
+    { heading: "The queue", body: "Your own list of players, in order. The room picks for you from your queue whenever you miss your turn." },
     {
       heading: "Taking your turn",
-      body: `When it's your turn, click ${actionLabel} next to the player you want. Do it before the clock runs out, or an autopick chooses for you.`,
+      body: `When it is your turn, click ${actionLabel} next to the player you want. Do it before the clock runs out, or the room picks for you from your queue.`,
     },
+    CLOSING_STOP,
   ];
 }
 

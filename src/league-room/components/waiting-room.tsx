@@ -85,10 +85,20 @@ export function checklistItems(params: {
     key: "tour",
     heading: "See how the draft room works",
     body: "A quick look at the clock, the queue and how a pick actually happens, before it is your turn for real.",
+    // Task 9, Step 1 (row 18's ask): a guided preview of THIS room, and a real practice draft
+    // against seeded bots, side by side — the tour describes the room, the practice link lets a
+    // manager actually run one before it counts. `/app/mock-drafts?create=solo` is `DraftRoom`'s
+    // own "Run it again" contract (`@/draft-room/components/draft-room.tsx`'s `MOCK_LOBBY_PATH`
+    // docblock): immediate solo creation, straight into the room, never the lobby first.
     content: (
-      <button type="button" className="text-sm font-medium text-accent underline" onClick={params.onOpenTour}>
-        Preview the room
-      </button>
+      <div className="flex flex-wrap items-center gap-4">
+        <button type="button" className="text-sm font-medium text-accent underline" onClick={params.onOpenTour}>
+          Preview the room
+        </button>
+        <Link href="/app/mock-drafts?create=solo" className="text-sm font-medium text-accent underline">
+          Run a practice draft
+        </Link>
+      </div>
     ),
   };
   const name: WaitingChecklistItem = {
