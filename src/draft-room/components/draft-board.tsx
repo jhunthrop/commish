@@ -394,7 +394,11 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
             <tfoot>
               <tr>
                 <td colSpan={columnIds.length + 1} className="border-t border-line px-2 py-1 font-mono text-sm text-text-muted">
-                  {`${plural(collapsedRoundCount, "round")} ahead`}
+                  {/* The cell spans the board's whole scroll width, and the board auto-scrolls
+                      to the current pick — without the sticky pin (the Rd column's own idiom,
+                      above) this label sat thousands of px off-viewport and a TV across the
+                      room saw only a bare hairline (closing visual pass). */}
+                  <span className="sticky left-2 inline-block">{`${plural(collapsedRoundCount, "round")} ahead`}</span>
                 </td>
               </tr>
             </tfoot>

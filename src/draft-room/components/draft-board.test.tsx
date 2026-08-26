@@ -412,9 +412,13 @@ describe("DraftBoard", () => {
       // Active round 1, plus DRAFT_ROOM_CONFIG.tv.futureRoundsShown (2) more: rounds 1-3.
       expect(roundHeaders).toEqual(["1", "2", "3"]);
       const summary = within(grid()).getByText("7 rounds ahead");
-      expect(summary.className).toContain("font-mono");
-      expect(summary.className).toContain("text-text-muted");
-      expect(summary.closest("tr")!.className + summary.className).toMatch(/border-t/);
+      // The voice classes live on the td; the inner span is the sticky pin that keeps the
+      // label inside the viewport while the board auto-scrolls (closing visual pass).
+      expect(summary.className).toContain("sticky");
+      const cell = summary.closest("td")!;
+      expect(cell.className).toContain("font-mono");
+      expect(cell.className).toContain("text-text-muted");
+      expect(cell.className).toMatch(/border-t/);
     });
 
     it("renders every round on the room variant, with no summary line at all", () => {
