@@ -103,14 +103,22 @@ interface QueueChipsProps {
 function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChipsProps) {
   if (queue.length === 0) {
     return (
-      <p className="min-w-0 flex-1 self-center text-sm text-text-muted">
+      // `basis-full lg:basis-auto`: the same "give the growing term its own line" containment
+      // `room-rail.tsx`'s own masthead already applies (NEW-3) — below `lg:` (where the dock is
+      // still `flex-wrap`, not yet `flex-nowrap`), `flex-1`'s own `min-w-0` lets this sentence
+      // shrink to whatever sliver is left beside `PrimarySlot` on the SAME wrapped line instead
+      // of wrapping to its own, which at a phone width squeezed it into a column a few characters
+      // wide (a real 360px defect this task's own e2e sweep of the room's mock dressing was the
+      // first to reach: the two-team fixture every earlier draft-room spec used never left a
+      // human this far from their own turn with an empty queue).
+      <p className="min-w-0 basis-full flex-1 self-center text-sm text-text-muted lg:basis-auto">
         Star players in the pool to build your queue. The room picks for you from your queue if your clock runs out.
       </p>
     );
   }
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1">
+    <div className="flex min-w-0 basis-full flex-1 flex-col gap-1 lg:basis-auto">
       <h2 className={`${EYEBROW} text-text-muted`}>Your queue</h2>
       <ol aria-label="Your queue" className="flex items-center gap-2 overflow-x-auto pb-1">
         {queue.map((playerId, index) => {
@@ -180,9 +188,20 @@ function PrimarySlot({
       </Button>
     );
   }
+  // `basis-full lg:basis-auto` (the same "give the growing term its own line" containment
+  // `room-rail.tsx`'s own masthead already applies, NEW-3, and `QueueChips` above now shares):
+  // below `lg:` the dock is still `flex-wrap`, and an unqualified `shrink-0` on a display-size
+  // sentence held it to a SINGLE line beside `PrimarySlot`'s other siblings regardless of how
+  // little room was left, squeezing "Your pick. Take somebody from the pool." (and its two
+  // siblings below) into a sliver a few characters wide at a phone width — a real 360px defect
+  // this task's own e2e sweep of the room's mock dressing was the first to reach (every earlier
+  // draft-room spec's two-team fixture always put a real manager on the clock immediately, never
+  // several picks away with an empty queue, and never showed this exact turn-state banner at
+  // 360px either). `lg:shrink-0` keeps the desktop layout — a fixed-height dock row, nothing
+  // reflowing when the turn changes — untouched.
   if (canAct) {
     return (
-      <p data-testid="dock-primary-empty" className="shrink-0 self-center font-display text-display-sm font-semibold leading-display text-negative">
+      <p data-testid="dock-primary-empty" className="basis-full self-center font-display text-display-sm font-semibold leading-display text-negative lg:basis-auto lg:shrink-0">
         Your pick. Take somebody from the pool.
       </p>
     );
@@ -192,13 +211,13 @@ function PrimarySlot({
     // other turn state uses, saying the one thing this manager can do. The pool's own Draft
     // buttons are what actually makes the pick; this is the standing answer to "what now?".
     return (
-      <p data-testid="dock-owed-pick" className="shrink-0 self-center font-display text-display-sm font-semibold leading-display text-warning">
+      <p data-testid="dock-owed-pick" className="basis-full self-center font-display text-display-sm font-semibold leading-display text-warning lg:basis-auto lg:shrink-0">
         Your pick passed while you were away. Make it whenever you are ready.
       </p>
     );
   }
   return (
-    <p data-testid="dock-your-turn" className="shrink-0 self-center font-display text-display-sm font-semibold leading-display text-text-primary">
+    <p data-testid="dock-your-turn" className="basis-full self-center font-display text-display-sm font-semibold leading-display text-text-primary lg:basis-auto lg:shrink-0">
       {yourTurn}
     </p>
   );

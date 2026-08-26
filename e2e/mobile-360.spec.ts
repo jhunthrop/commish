@@ -1,7 +1,45 @@
+import type { Clock } from "../src/domain/timing";
+import { createDraftStore, type DraftStore } from "../src/draft-service/store";
+import { getPublisher } from "../src/lib/realtime/publisher";
 import { DEV_SEED } from "../src/data/seed/config";
-import { createDb } from "../src/db/client";
-import { ensureOpenHoldLeague, ensureRoomJourneyLeague, expect, SEEDED_SEASON_LEAGUE_ID, startDraftAndEnterRoom, test } from "./support/fixtures";
+import { createDb, getDb } from "../src/db/client";
+import type { MockLifecycleDeps } from "../src/mock-draft-service/claim";
+import { createMockRoom } from "../src/mock-draft-service/creation";
+import { ensureOpenHoldLeague, ensureRoomJourneyLeague, expect, managerAUserId, SEEDED_SEASON_LEAGUE_ID, startDraftAndEnterRoom, test } from "./support/fixtures";
 import { E2E_HELD_TRADE_LEAGUE_ID, MANAGER_A_STATE, SEEDED_SEASON_CURRENT_WEEK } from "./global-setup";
+
+/**
+ * The production `mockLifecycleDeps()` (`@/app/api/mock-drafts/_shared.ts`) is NOT safe to
+ * import from `e2e/**`: that file also exports the route's rate-limit helpers, which pull in
+ * `@/lib/api/respond` and, through it, `next/server` — a module Playwright's own Node process
+ * (outside Next's bundler) cannot resolve, and a whole-file import loads every top-level import
+ * whether or not this caller uses it. `getDraftStore()` (`@/draft-service`'s own barrel) carries
+ * the identical hazard one door over — it re-exports `resolveDraftActor` from `./authz`, which
+ * imports `@/lib/leagues/membership` and, through it, `next/server` too — so this builds the
+ * store directly from `./store` instead, the same avoid-the-barrel idiom `mock-draft.spec.ts`'s
+ * own `draftStoreForE2e` uses for the identical reason. This is the identical five collaborators
+ * `_shared.ts`'s own builder assembles (the real store, the wall clock, `crypto.randomUUID` ids,
+ * and two `crypto`-derived draws), copied rather than imported for that one reason —
+ * `global-setup.ts`'s own `cryptoRandom` already sets this precedent for the identical hazard.
+ */
+let cachedStore: DraftStore | undefined;
+function mockLifecycleDepsForE2e(): MockLifecycleDeps {
+  if (cachedStore === undefined) {
+    cachedStore = createDraftStore({ db: getDb(), publish: (input) => getPublisher().publish(input), clock: { now: () => new Date().toISOString() } });
+  }
+  const clock: Clock = { now: () => new Date().toISOString() };
+  const cryptoFloat = (): number => {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0]! / 2 ** 32;
+  };
+  const cryptoSeed32 = (): number => {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0]! | 0;
+  };
+  return { store: cachedStore, clock, newId: () => crypto.randomUUID(), newSeed: cryptoSeed32, random: cryptoFloat };
+}
 
 // Phase 3.6, Task 13, Step 1: the v2 surface set adds a hold interstitial (anonymous), a waiting
 // room and a draft room — none of which this spec's pre-existing fixtures reach. Both new
@@ -15,6 +53,22 @@ const E2E_MOBILE360_ROOM_DRAFT_ID = "e2e_mobile360_room_draft";
 const E2E_MOBILE360_ROOM_TEAM_A_ID = "e2e_mobile360_room_team_a";
 const E2E_MOBILE360_ROOM_TEAM_B_ID = "e2e_mobile360_room_team_b";
 
+/**
+ * Phase 4.5, Task 11's own two surfaces: the practice draft's share landing (a `link`-mode room,
+ * never started) and the room's own mock dressing (a `solo`-mode room, in progress the instant
+ * `createMockRoom` returns). Set by `beforeAll`, read by the main test below.
+ *
+ * Minted fresh through the REAL `createMockRoom` writer every run — never a `delete-then-
+ * recreate` against a fixed id the way `E2E_MOBILE360_HOLD_LEAGUE_ID`/`E2E_MOBILE360_ROOM_
+ * LEAGUE_ID` above are. A mock room needs no such care: it is `is_mock`, invisible to every
+ * real-league query this spec's OWN dispute-queue count below reads, and it self-expires through
+ * the running server's own retention sweep (`MOCK_CONFIG.retention`) whether or not this run
+ * ever gets to it — the identical accepted deviation `mock-draft.spec.ts`'s own docblock states
+ * for its two journeys.
+ */
+let mobile360LinkRoomPath = "";
+let mobile360SoloDraftId = "";
+
 test.beforeAll(async () => {
   const db = createDb();
   try {
@@ -26,6 +80,16 @@ test.beforeAll(async () => {
       teamBId: E2E_MOBILE360_ROOM_TEAM_B_ID,
       name: "Mobile360 Room League",
     });
+
+    const hostUserId = await managerAUserId(db);
+    const deps = mockLifecycleDepsForE2e();
+    const linkRoom = await createMockRoom(db, { hostUserId, mode: "link", teamCount: 8, pickSeconds: 60, scoringPreset: "half_ppr", rosterShape: "standard" }, deps);
+    if (!linkRoom.ok) throw new Error(`[e2e] mobile-360: could not create the link-mode fixture room: ${linkRoom.reason}`);
+    mobile360LinkRoomPath = `/app/mock-drafts/${linkRoom.shareCode}`;
+
+    const soloRoom = await createMockRoom(db, { hostUserId, mode: "solo", teamCount: 8, pickSeconds: 60, scoringPreset: "half_ppr", rosterShape: "standard" }, deps);
+    if (!soloRoom.ok) throw new Error(`[e2e] mobile-360: could not create the solo-mode fixture room: ${soloRoom.reason}`);
+    mobile360SoloDraftId = soloRoom.draftId;
   } finally {
     await db.$client.end();
   }
@@ -359,6 +423,29 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(page.getByRole("heading", { name: "Flag detail" })).toBeVisible();
     await expect(page.getByText("Trade", { exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, "a trade flag's detail page");
+
+    // --- Phase 4.5, Task 11: the practice lobby --------------------------------------------
+    await page.goto("/app/mock-drafts");
+    await expect(page.getByRole("heading", { name: "Practice drafts", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Start a practice draft" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the practice lobby");
+
+    // --- Task 11: the practice draft's share-link landing -----------------------------------
+    await page.goto(mobile360LinkRoomPath);
+    await expect(page.getByRole("heading", { name: "Join this practice draft" })).toBeVisible();
+    // Manager A is this fixture room's own host (`beforeAll` above), so the real claim door
+    // answers a re-entry — "Enter", never "Join" — the same honest server answer every caller
+    // gets (`MockShareLanding`'s own docblock).
+    await expect(page.getByRole("button", { name: "Enter this practice draft" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the practice draft share landing");
+
+    // --- Task 11: the room's own mock dressing — the practice banner and the board itself ---
+    await page.goto(`/app/drafts/${mobile360SoloDraftId}`);
+    const mockRoomGotIt = page.getByRole("button", { name: "Got it" });
+    if ((await mockRoomGotIt.count()) > 0) await mockRoomGotIt.click();
+    await expect(page.getByTestId("practice-banner")).toBeVisible();
+    await expect(page.getByLabel("Player pool")).toBeVisible();
+    await expectNoHorizontalScroll(page, "the practice draft room");
   } finally {
     await context.close();
   }
