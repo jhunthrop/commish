@@ -37,9 +37,15 @@ export function BidControls({ view, myTeamId, submitting, onBid }: BidControlsPr
             ? "You can't afford the current bid and still fill your roster."
             : null;
 
+  // One-tap increments for a bid war (review R5): stepping clamps at the server's own
+  // ceiling, and refuses exactly when bidding itself is blocked — the input stays the
+  // precision path for any other number.
+  const step = (by: number): void => setAmount((current) => (maxBid === null ? current : Math.min(maxBid, current + by)));
+  const atCeiling = maxBid !== null && amount >= maxBid;
+
   return (
     // A row, not a stack: this is the dock's primary slot during a live lot, and the dock is a
-    // fixed-height band. Label above, hint below, button beside — one line of the room's height.
+    // fixed-height band. Label above, hint below, buttons beside — one line of the room's height.
     <div data-testid="bid-console" className="flex shrink-0 items-end gap-2">
       <Input
         label="Your bid"
@@ -52,6 +58,12 @@ export function BidControls({ view, myTeamId, submitting, onBid }: BidControlsPr
         hint={blocked ?? `Between $${minBid} and $${maxBid}.`}
         onChange={(event) => setAmount(Number(event.target.value))}
       />
+      <Button variant="secondary" size="sm" disabled={blocked !== null || atCeiling} onClick={() => step(1)}>
+        +$1
+      </Button>
+      <Button variant="secondary" size="sm" disabled={blocked !== null || atCeiling} onClick={() => step(5)}>
+        +$5
+      </Button>
       <Button disabled={blocked !== null} loading={submitting} onClick={() => onBid(amount)}>
         Bid
       </Button>

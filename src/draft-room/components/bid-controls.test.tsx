@@ -36,6 +36,29 @@ describe("BidControls", () => {
     expect((screen.getByLabelText("Your bid") as HTMLInputElement).value).toBe("25");
   });
 
+  it("steps the bid one tap at a time, clamped at the team's own ceiling (review R5)", () => {
+    render(<BidControls view={open} myTeamId="t1" submitting={false} onBid={() => {}} />);
+    const input = screen.getByLabelText("Your bid") as HTMLInputElement;
+    // From the $25 floor: +$5 lands 30, +$1 lands 31 — a bid war without typing.
+    fireEvent.click(screen.getByRole("button", { name: "+$5" }));
+    expect(input.value).toBe("30");
+    fireEvent.click(screen.getByRole("button", { name: "+$1" }));
+    expect(input.value).toBe("31");
+    // The ceiling is the server's own maxBid (80): stepping never overshoots it...
+    for (let i = 0; i < 12; i += 1) fireEvent.click(screen.getByRole("button", { name: "+$5" }));
+    expect(input.value).toBe("80");
+    // ...and at the ceiling both steppers refuse, while the input stays the precision path.
+    expect(screen.getByRole("button", { name: "+$1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "+$5" })).toBeDisabled();
+  });
+
+  it("steppers are blocked exactly when bidding itself is blocked (review R5)", () => {
+    const mine = { ...open, auction: { ...open.auction, lot: { ...open.auction.lot, highBidTeamId: "t1" } } };
+    render(<BidControls view={mine} myTeamId="t1" submitting={false} onBid={() => {}} />);
+    expect(screen.getByRole("button", { name: "+$1" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "+$5" })).toBeDisabled();
+  });
+
   it("tells you why you cannot bid instead of silently disabling", () => {
     const mine = { ...open, auction: { ...open.auction, lot: { ...open.auction.lot, highBidTeamId: "t1" } } };
     const { rerender } = render(<BidControls view={mine} myTeamId="t1" submitting={false} onBid={() => {}} />);
