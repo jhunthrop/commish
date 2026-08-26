@@ -46,9 +46,11 @@ interface PoolRow {
 function PositionFilters({ value, onChange }: { readonly value: string; readonly onChange: (next: string) => void }) {
   return (
     <div role="group" aria-label="Filter by position" className="flex flex-wrap items-center gap-1">
+      {/* Secondary when selected, ghost when not — never primary: a filter is not the room's
+          one ink action (D3, rule 5). The outline alone says "this is the active toggle". */}
       <Button
         size="sm"
-        variant={value === ALL ? "primary" : "ghost"}
+        variant={value === ALL ? "secondary" : "ghost"}
         aria-pressed={value === ALL}
         onClick={() => onChange(ALL)}
       >
@@ -135,6 +137,7 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
           icon="search"
           action={
             <Button
+              variant="secondary"
               onClick={() => {
                 setQuery("");
                 setPosition(ALL);
@@ -174,8 +177,13 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                   // (Task 5) while you owe a pick from an earlier skip — live on your turn and
                   // off it. While neither is true, the star is the action — a disabled "Draft"
                   // would be a lie-in-waiting.
+                  //
+                  // `secondary`, never the default primary — D3 (2026-08-26 design review,
+                  // rule 5): sixty ink pills in the on-turn pool shouted over the dock's one
+                  // true action. The pool offers; the dock's single ink pill confirms.
                   <Button
                     size="sm"
+                    variant="secondary"
                     loading={submitting && pendingPlayerId === row.player.id}
                     onClick={() => onAct(row.player.id)}
                   >

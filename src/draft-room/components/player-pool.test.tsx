@@ -121,6 +121,21 @@ describe("PlayerPool", () => {
     expect(onAct).toHaveBeenCalledWith("qb1");
   });
 
+  // D3 (2026-08-26 design review, rule 5): on your turn the pool used to fill the view with
+  // up to sixty solid ink "Draft" pills against a one-ink law — the row act button, the "All"
+  // filter and the empty-state button all took `Button`'s default primary. The pool is now
+  // quiet by construction: the dock's one confirmed pick affordance is the room's single ink
+  // action, and nothing in this component may ever wear the ink fill.
+  it("keeps every pool control quiet — no ink pill ever renders here, even on your turn (D3)", () => {
+    const { container } = render(<PlayerPool {...props} />);
+    expect(screen.getAllByRole("button", { name: "Draft" }).length).toBeGreaterThan(0);
+    expect(container.querySelector(".bg-text-primary")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Search players"), { target: { value: "zzzz" } });
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+    expect(container.querySelector(".bg-text-primary")).toBeNull();
+  });
+
   it("shows the in-flight player as pending", () => {
     render(<PlayerPool {...props} pendingPlayerId="qb1" submitting />);
     expect(within(rowFor("Jalen Croft")).getByRole("button", { name: "Draft" })).toHaveAttribute("aria-busy", "true");

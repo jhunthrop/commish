@@ -106,6 +106,16 @@ describe("SnakeRoom", () => {
     expect(onAct).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "qb1" });
   });
 
+  // D3 (2026-08-26 design review, rule 5): the room's peak state — you on the clock, a full
+  // pool — is exactly when the one-ink law matters most. The dock's confirmed pick affordance
+  // is the ONE ink pill; sixty pool rows beside it stay quiet. Counted on the rendered room,
+  // not one component, so a future call site can't quietly reintroduce a second pill.
+  it("shows at most one ink pill in the whole room, even on your turn (D3, rule 5)", () => {
+    const { container } = renderRoom();
+    expect(screen.getByRole("button", { name: "Draft Marcus Reed" })).toBeInTheDocument();
+    expect(container.querySelectorAll(".bg-text-primary").length).toBeLessThanOrEqual(1);
+  });
+
   // D2 (2026-08-26 design review): every landing pick used to shove the whole board ~64px
   // down and snap it back 2.4s later — ~180 reflows per draft, against the room's own
   // "nothing reflows when state changes" law. The stage now reserves a fixed-height notice
