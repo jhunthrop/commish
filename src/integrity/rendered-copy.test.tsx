@@ -1697,17 +1697,18 @@ describe("PracticeBanner says nothing that breaks the house copy rules", () => {
 });
 
 /**
- * Task 9, Step 1. `RoomTour`'s closing stop quotes C3's safety-net phrase verbatim and
- * `MOCK_CONFIG`'s own action-label phrase for the rest — both hardcoded literals in
- * `room-tour.tsx` (`src/draft-room/**` may not value-import `@/mock-draft`, its own docblock),
- * so this is the one place that can hold BOTH the literal and the real config value at once and
- * prove neither has quietly drifted from the other.
+ * Task 9, Step 1. `RoomTour`'s closing stop quotes C3's safety-net phrase verbatim, hardcoded in
+ * `room-tour.tsx` (`src/draft-room/**` may not value-import `@/mock-draft`, its own docblock).
+ * The lobby design review (2026-08-26) removed the static `MOCK_COPY` phrase this stop's second
+ * half used to mirror word-for-word (replaced by a defaults-stating one-tap,
+ * `soloQuickStartLabel`), so this sweep now only proves the stop is copy-clean and still says
+ * what it always has, not that it matches a config value that no longer exists.
  */
 describe("RoomTour says nothing that breaks the house copy rules, and never drifts from MOCK_CONFIG's own words", () => {
-  it("is clean, and its closing stop's practice phrase is MOCK_CONFIG's own", () => {
+  it("is clean, and its closing stop still states the practice phrase", () => {
     const { container, getByText } = render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Draft" />);
     expectClean(container);
-    expect(getByText(/Start a mock draft anytime to practice first\./)).toHaveTextContent(MOCK_COPY.lobbyEmptyActionLabel);
+    expect(getByText(/Start a mock draft anytime to practice first\./)).toBeInTheDocument();
   });
 });
 
@@ -1810,6 +1811,7 @@ const MOCK_LOBBY_MINE_ROOM = {
   startsInMs: -5_000,
   mode: "solo" as const,
   status: "in_progress" as const,
+  teamName: "Mock Squad",
 };
 
 describe("MockLobby says nothing that breaks the house copy rules, empty and populated", () => {
@@ -1827,7 +1829,7 @@ describe("MockLobby says nothing that breaks the house copy rules, empty and pop
           defaultTeamCount={12}
           defaultPickSeconds={60}
           emptyMessage={MOCK_COPY.lobbyEmptyMessage}
-          emptyActionLabel={MOCK_COPY.lobbyEmptyActionLabel}
+          historyEmptyMessage={MOCK_COPY.lobbyHistoryEmptyMessage}
         />,
       );
       expectClean(container);

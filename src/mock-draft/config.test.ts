@@ -208,8 +208,14 @@ describe("MOCK_COPY", () => {
     expect(MOCK_COPY.botBadge).toBe("Bot");
   });
 
-  it("never leaves an empty lobby without an action", () => {
-    expect(MOCK_COPY.lobbyEmptyActionLabel.length).toBeGreaterThan(0);
+  it("never leaves an empty lobby without an honest one-tap sentence to pair it with", () => {
+    expect(MOCK_COPY.lobbyEmptyMessage.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.lobbyHistoryEmptyMessage.length).toBeGreaterThan(0);
+  });
+
+  it("leads with the promise before any settings form (R2)", () => {
+    expect(MOCK_COPY.lobbyPromise.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.lobbyPromise.toLowerCase()).toContain("nothing counts");
   });
 
   /** Task 8: the results page's own three actions, and its retention line kept honest against

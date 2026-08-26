@@ -73,9 +73,13 @@ describe("listOpenMockRooms", () => {
 });
 
 describe("myMockRooms", () => {
-  it("includes the caller's own room in every mode, not just lobby", async () => {
+  it("includes the caller's own room in every mode, not just lobby, with the caller's own team name (R4b)", async () => {
     const hostId = await seedUser("u_mine_link_host");
-    const created = await createMockRoom(db, { hostUserId: hostId, mode: "link", teamCount: 8, pickSeconds: 30, scoringPreset: "ppr", rosterShape: "standard" }, mockLifecycleDeps(db));
+    const created = await createMockRoom(
+      db,
+      { hostUserId: hostId, mode: "link", teamCount: 8, pickSeconds: 30, scoringPreset: "ppr", rosterShape: "standard", teamName: "The Link Legends" },
+      mockLifecycleDeps(db),
+    );
     expect(created).toMatchObject({ ok: true });
     const room = created as Extract<typeof created, { ok: true }>;
 
@@ -90,8 +94,19 @@ describe("myMockRooms", () => {
         teamCount: 8,
         seatsOpen: 7,
         pickSeconds: 30,
+        teamName: "The Link Legends",
       }),
     ]);
+  });
+
+  it("falls back to the host's own display name for the team name when none was chosen", async () => {
+    const hostId = await seedUser("u_mine_default_name_host");
+    const created = await createMockRoom(db, { hostUserId: hostId, mode: "solo", teamCount: 8, pickSeconds: 30, scoringPreset: "ppr", rosterShape: "standard" }, mockLifecycleDeps(db));
+    expect(created).toMatchObject({ ok: true });
+
+    const mine = await myMockRooms(db, hostId, MOCK_TEST_CLOCK);
+
+    expect(mine).toEqual([expect.objectContaining({ teamName: `User ${hostId}` })]);
   });
 
   it("never surfaces a room the caller has no seat in", async () => {
@@ -107,6 +122,13 @@ describe("myMockRooms", () => {
     const mine = await myMockRooms(db, room.hostUserId, MOCK_TEST_CLOCK);
 
     expect(mine).toEqual([expect.objectContaining({ leagueId: room.leagueId, seatsOpen: 5 })]);
+  });
+
+  it("excludes a dissolved room from the caller's own list — a room that cleared itself is not history worth a row (D4)", async () => {
+    const room = await seedLobbyMock(db, { teamCount: 8, humans: 1 });
+    await db.update(drafts).set({ status: "dissolved" }).where(eq(drafts.id, room.draftId));
+
+    expect(await myMockRooms(db, room.hostUserId, MOCK_TEST_CLOCK)).toEqual([]);
   });
 });
 

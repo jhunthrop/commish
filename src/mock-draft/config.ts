@@ -236,10 +236,29 @@ export const MOCK_COPY = {
    *  product invents no draft-grade authority (founder self-ruling), only confirms the practice
    *  round is over. */
   resultsHeading: "Your mock draft is complete.",
-  /** Shown in the mock lobby when no open room is waiting to be joined. Pairs with
-   *  `lobbyEmptyActionLabel` so an empty lobby is an invitation, never a dead end. */
+  /**
+   * R2 (the lobby design review's ruling): the page's own lead sentence, read directly by the
+   * server page (`src/app/app/(shell)/mock-drafts/page.tsx`) beside its `<h1>` — never threaded
+   * as a `MockLobby` prop, since the page's own heading lives in the page itself, not the client
+   * component below it. States what a mock draft IS, that it costs nothing, that nothing counts
+   * and that it is quick, all in one sentence, before the settings form asks anything: the front
+   * door sells this promise (`FrontDoorHero`'s own copy); this page is the surface the funnel
+   * actually lands on, and it used to say none of this until the room's own `practiceBanner`
+   * (below), which nobody sees until after they have already committed.
+   */
+  lobbyPromise: "A mock draft is the real room against practice opponents. Free, nothing counts, done in minutes.",
+  /** Shown in the mock lobby when no open room is waiting to be joined. Pairs with the honest
+   *  one-tap `MockLobby` builds from `defaultTeamCount`/`defaultPickSeconds` (D3's ruling: a
+   *  labeled quick start, never a bare "Start a mock draft" link that could be mistaken for the
+   *  form's own submit button) so an empty lobby is an invitation, never a dead end. */
   lobbyEmptyMessage: "No mock drafts are open right now.",
-  lobbyEmptyActionLabel: "Start a mock draft",
+  /**
+   * E12 (the same review): the caller's own empty-history sentence, moved here beside its
+   * sibling above rather than a bare string literal `MockLobby` used to hold — no copy gate had
+   * ever seen it. Pairs with the identical honest one-tap `lobbyEmptyMessage` does, for the same
+   * "never a dead end" reason.
+   */
+  lobbyHistoryEmptyMessage: "You have no mock drafts yet.",
   /**
    * Task 8's own results-page line, beside `resultsHeading`. The number is a literal, not a
    * computed `MOCK_CONFIG.retention.completedMs` string, for the same "no reader should do

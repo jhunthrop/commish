@@ -28,17 +28,18 @@ interface TourStop {
 }
 
 /**
- * The closing stop's own sentence (Task 9, Step 1) — two phrases, neither invented here. The
- * first is C3's own safety-net phrase, verbatim, the ONE sanctioned way this product reassures
- * anyone about missing a draft (`docs/design-system.md`'s "Copy" section, `copy-rules.ts`'s
- * `FORBIDDEN_VOCABULARY` family). The second is `MOCK_COPY.lobbyEmptyActionLabel`'s own words
- * (`@/mock-draft/config`) — copied rather than imported:
- * `src/draft-room/**` may not value-import `@/mock-draft` (the client boundary), the identical
- * reason `PracticeBanner`/`MockResults` receive that module's words as PROPS rather than a live
- * import. This stop needs no prop plumbing because it says the same thing in every room,
- * mock or real, unlike those two: `src/integrity/rendered-copy.test.tsx` renders this component
- * and compares its literal text against `MOCK_CONFIG`'s real value directly, the same drift-proof
- * pattern that file already keeps for `TradeCard`'s held-trade sentence.
+ * The closing stop's own sentence (Task 9, Step 1) — its first half is C3's own safety-net
+ * phrase, verbatim, the ONE sanctioned way this product reassures anyone about missing a draft
+ * (`docs/design-system.md`'s "Copy" section, `copy-rules.ts`'s `FORBIDDEN_VOCABULARY` family).
+ * The second half used to be copied word-for-word from `MOCK_COPY.lobbyEmptyActionLabel`
+ * (`@/mock-draft/config`); the lobby design review (2026-08-26) replaced that bare "Start a mock
+ * draft" link with a labeled, defaults-stating one-tap (`soloQuickStartLabel`,
+ * `@/league-room/components/mock-lobby.tsx`), so there is no longer a single static MOCK_COPY
+ * phrase to mirror here. This sentence is now its OWN standalone copy, still swept by
+ * `src/integrity/rendered-copy.test.tsx` for the house copy rules, just no longer pinned against
+ * a value in `@/mock-draft/config` — `src/draft-room/**` may not value-import that module anyway
+ * (the client boundary), the identical reason `PracticeBanner`/`MockResults` receive its words as
+ * PROPS rather than a live import.
  */
 const CLOSING_STOP: TourStop = {
   heading: "Practice anytime",

@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "@/db/client";
 import { drafts, leagues, mockRooms, teams } from "@/db/schema";
@@ -43,6 +43,11 @@ export interface MyMockRoomSummary extends MockLobbyRoomSummary {
   readonly draftId: string;
   readonly mode: MockMode;
   readonly status: DraftStatus;
+  /** R4(b) (the lobby design review's carry): the caller's OWN team name in this room —
+   *  `teams.name` is `NOT NULL` (`db/schema.ts`), and `createMockRoom` always writes one (the
+   *  host's chosen name, else their profile display name, else "New team") — so a history row
+   *  can name the room by what the caller actually called their team, not just its settings. */
+  readonly teamName: string;
 }
 
 export interface MockRoomSummary extends MockLobbyRoomSummary {
@@ -113,6 +118,15 @@ export async function listOpenMockRooms(db: Db, clock: Clock = systemClock): Pro
  * two-purpose split `browseQuery`'s `seatCompletedSeasonsQuery` already keeps for the same
  * table joined twice. A bot never carries a human's `userId`, so this can never surface a room
  * the caller only shares with bots.
+ *
+ * `myTeams.name` rides the same join, selected via the identical primary-key functional
+ * dependency `leagues.teamCount`/`drafts.status` already lean on above (Postgres allows any
+ * column from a table whose PRIMARY KEY is fully present in `GROUP BY` — `myTeams.id` here,
+ * `leagues.id`/`drafts.id` there) rather than a second query for a fact this join already holds
+ * (R4(b), the lobby design review's carry).
+ *
+ * D4 (the same review): a `dissolved` room is excluded outright — a room that cleared itself is
+ * not history worth a row, and the results page it would have linked to already died with it.
  */
 export function myMockRoomsQuery(db: Db, userId: string) {
   return db
@@ -125,6 +139,7 @@ export function myMockRoomsQuery(db: Db, userId: string) {
       pickSeconds: mockRooms.pickSeconds,
       startsAt: mockRooms.startsAt,
       teamCount: leagues.teamCount,
+      teamName: myTeams.name,
       filledTeams: sql<number>`count(${teams.id})::int`,
     })
     .from(mockRooms)
@@ -132,7 +147,8 @@ export function myMockRoomsQuery(db: Db, userId: string) {
     .innerJoin(drafts, eq(drafts.leagueId, mockRooms.leagueId))
     .innerJoin(myTeams, and(eq(myTeams.leagueId, mockRooms.leagueId), eq(myTeams.userId, userId)))
     .leftJoin(teams, eq(teams.leagueId, mockRooms.leagueId))
-    .groupBy(mockRooms.leagueId, leagues.id, drafts.id)
+    .where(ne(drafts.status, "dissolved"))
+    .groupBy(mockRooms.leagueId, leagues.id, drafts.id, myTeams.id)
     .orderBy(asc(mockRooms.startsAt))
     .limit(MOCK_CONFIG.maxLobbyListing);
 }
@@ -147,6 +163,7 @@ export async function myMockRooms(db: Db, userId: string, clock: Clock = systemC
     mode: row.mode,
     status: row.status,
     teamCount: row.teamCount,
+    teamName: row.teamName,
     seatsOpen: row.teamCount - row.filledTeams,
     pickSeconds: row.pickSeconds,
     startsInMs: row.startsAt.getTime() - nowMs,

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
+import type { MyMockRoomSummary } from "@/mock-draft-service/lobby";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
-import { MockLobby } from "./mock-lobby";
+import { LEAGUE_ROOM_CONFIG } from "../config";
+import { MockLobby, historyGroupFor, historyWhenSentence, soloQuickStartLabel } from "./mock-lobby";
 
 const calls: string[] = [];
 vi.mock("next/navigation", () => ({
@@ -11,7 +13,18 @@ vi.mock("next/navigation", () => ({
 }));
 
 const OPEN_ROOM = { leagueId: "l1", shareCode: "OPEN01", teamCount: 10, seatsOpen: 3, pickSeconds: 60, startsInMs: 90_000 };
-const MINE_ROOM = { leagueId: "l2", draftId: "d2", shareCode: "MINE01", teamCount: 8, seatsOpen: 0, pickSeconds: 30, startsInMs: -5_000, mode: "solo" as const, status: "in_progress" as const };
+const MINE_ROOM: MyMockRoomSummary = {
+  leagueId: "l2",
+  draftId: "d2",
+  shareCode: "MINE01",
+  teamCount: 8,
+  seatsOpen: 0,
+  pickSeconds: 30,
+  startsInMs: -5_000,
+  mode: "solo",
+  status: "in_progress",
+  teamName: "Mock Squad",
+};
 
 function baseProps() {
   return {
@@ -23,42 +36,163 @@ function baseProps() {
     defaultTeamCount: 12,
     defaultPickSeconds: 60,
     emptyMessage: "No mock drafts are open right now.",
-    emptyActionLabel: "Start a mock draft",
+    historyEmptyMessage: "You have no mock drafts yet.",
   };
 }
+
+function mineRoom(overrides: Partial<MyMockRoomSummary> & { readonly draftId: string; readonly leagueId: string; readonly shareCode: string }): MyMockRoomSummary {
+  return { ...MINE_ROOM, ...overrides };
+}
+
+describe("soloQuickStartLabel", () => {
+  it("states the actual defaults it will create, never a bare generic label", () => {
+    expect(soloQuickStartLabel(12, 60)).toBe("Start a solo mock now, 12 teams, 60s clock");
+    expect(soloQuickStartLabel(8, 30)).toBe("Start a solo mock now, 8 teams, 30s clock");
+  });
+
+});
+
+describe("historyWhenSentence", () => {
+  it("reads forward for a room still waiting to fill", () => {
+    expect(historyWhenSentence("scheduled", 90_000)).toBe("Starts in 2 minutes");
+    expect(historyWhenSentence("scheduled", -1)).toBe("Starting any moment");
+  });
+
+  it("reads backward, as X ago, for a room that already started, finished, or was abandoned", () => {
+    expect(historyWhenSentence("complete", -3_600_000)).toBe("1 hour ago");
+    expect(historyWhenSentence("in_progress", -5_000)).toBe("under a minute ago");
+  });
+});
+
+describe("historyGroupFor", () => {
+  const now = Date.parse("2026-08-26T12:00:00.000Z");
+
+  it("buckets the same calendar day as Today", () => {
+    expect(historyGroupFor(now - 1_000, now)).toBe("Today");
+  });
+
+  it("buckets the prior calendar day as Yesterday, regardless of hour", () => {
+    expect(historyGroupFor(Date.parse("2026-08-25T23:00:00.000Z"), now)).toBe("Yesterday");
+  });
+
+  it("buckets anything before that as Earlier", () => {
+    expect(historyGroupFor(Date.parse("2026-08-23T12:00:00.000Z"), now)).toBe("Earlier");
+  });
+});
 
 describe("MockLobby", () => {
   beforeEach(() => {
     calls.length = 0;
   });
 
-  it("shows the empty-lobby invitation when nothing is open, pointing at an immediate solo start", () => {
+  it("shows the empty-lobby invitation when nothing is open, pointing at an honest one-tap stating the defaults", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
     expect(screen.getByText("No mock drafts are open right now.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Start a mock draft" })).toHaveAttribute("href", "/app/mock-drafts?create=solo");
+    const quickStart = screen.getByTestId("quick-start-open-empty");
+    expect(quickStart).toHaveTextContent("Start a solo mock now, 12 teams, 60s clock");
+    expect(quickStart).toHaveAttribute("href", "/app/mock-drafts?create=solo");
   });
 
-  it("renders an open room's own facts, and a plain no-rooms sentence for mine when both start empty", () => {
+  it("always offers the same honest one-tap beside the form, whether or not the lobby is empty", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} initialOpen={[OPEN_ROOM]} />, fixture.deps);
-    expect(screen.getByText("10 teams · 3 open · 60s clock")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-start-primary")).toHaveTextContent("Start a solo mock now, 12 teams, 60s clock");
+  });
+
+  it("never renders a manual refresh control (R5 — this lobby polls instead)", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
+    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
+  });
+
+  it("renders an open room's own live facts — a seat meter and a ticking countdown, not frozen prose", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<MockLobby {...baseProps()} initialOpen={[OPEN_ROOM]} />, fixture.deps);
+    expect(screen.getByText("10 teams · 60s clock")).toBeInTheDocument();
+    expect(screen.getByText("7 of 10 seated")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-start-history-empty")).toHaveTextContent("Start a solo mock now, 12 teams, 60s clock");
     expect(screen.getByText("You have no mock drafts yet.")).toBeInTheDocument();
   });
 
-  it("renders one of the caller's own rooms with the status-appropriate link label", () => {
+  it("renders one of the caller's own rooms with its identity line and status-appropriate link label", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} initialMine={[MINE_ROOM]} />, fixture.deps);
+    expect(screen.getByText("Mock Squad · Solo · 8 teams · 30s · under a minute ago")).toBeInTheDocument();
     expect(screen.getByText("Drafting now")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Continue" })).toHaveAttribute("href", "/app/drafts/d2");
+    expect(screen.getByText("1 mock draft")).toBeInTheDocument();
   });
 
-  it("refreshes the open and mine lists from the live read on request", async () => {
-    const fixture = fixtureLeagueDeps({ ok: true, data: { open: [OPEN_ROOM], mine: [MINE_ROOM] } });
-    renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(screen.getByText("10 teams · 3 open · 60s clock")).toBeInTheDocument());
-    expect(fixture.calls).toEqual(["GET /api/mock-drafts"]);
+  it("polls the live read on an interval and refreshes both lists, with no user action (R5)", async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = fixtureLeagueDeps({ ok: true, data: { open: [OPEN_ROOM], mine: [MINE_ROOM] } });
+      renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
+      expect(fixture.calls).toEqual([]);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(LEAGUE_ROOM_CONFIG.mockLobbyPollIntervalMs);
+      });
+
+      expect(fixture.calls).toEqual(["GET /api/mock-drafts"]);
+      expect(screen.getByText("10 teams · 60s clock")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops polling once unmounted", async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = fixtureLeagueDeps({ ok: true, data: { open: [], mine: [] } });
+      const { unmount } = renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
+      unmount();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(LEAGUE_ROOM_CONFIG.mockLobbyPollIntervalMs * 3);
+      });
+
+      expect(fixture.calls).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("groups history rows by day — Today, Yesterday, Earlier", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-26T12:00:00.000Z"));
+      const today = mineRoom({ leagueId: "g1", draftId: "g1", shareCode: "G1", startsInMs: -1_000, status: "complete" });
+      const yesterday = mineRoom({ leagueId: "g2", draftId: "g2", shareCode: "G2", startsInMs: -13 * 60 * 60 * 1000, status: "complete" });
+      const earlier = mineRoom({ leagueId: "g3", draftId: "g3", shareCode: "G3", startsInMs: -3 * 24 * 60 * 60 * 1000, status: "complete" });
+      const fixture = fixtureLeagueDeps();
+      renderInLeague(<MockLobby {...baseProps()} initialMine={[today, yesterday, earlier]} />, fixture.deps);
+
+      expect(screen.getByText("Today")).toBeInTheDocument();
+      expect(screen.getByText("Yesterday")).toBeInTheDocument();
+      expect(screen.getByText("Earlier")).toBeInTheDocument();
+      expect(screen.getByText("3 mock drafts")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("collapses history beyond the newest 8 rows behind a quiet disclosure, and reveals the rest on request", () => {
+    const rooms = Array.from({ length: 9 }, (_, i) =>
+      mineRoom({ leagueId: `h${i}`, draftId: `h${i}`, shareCode: `H${i}`, startsInMs: -(i + 1) * 60_000, status: "complete" }),
+    );
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<MockLobby {...baseProps()} initialMine={rooms} />, fixture.deps);
+
+    expect(screen.getByText("9 mock drafts")).toBeInTheDocument();
+    expect(screen.getAllByText(/^Mock Squad/)).toHaveLength(LEAGUE_ROOM_CONFIG.mockHistoryVisibleCount);
+    const disclosure = screen.getByRole("button", { name: "Show all 9" });
+
+    fireEvent.click(disclosure);
+
+    expect(screen.getAllByText(/^Mock Squad/)).toHaveLength(9);
+    expect(screen.queryByRole("button", { name: "Show all 9" })).not.toBeInTheDocument();
   });
 
   it("joins an open room and navigates straight into it", async () => {
@@ -89,4 +223,5 @@ describe("MockLobby", () => {
       expect(await axe(container)).toHaveNoViolations();
     });
   });
+
 });

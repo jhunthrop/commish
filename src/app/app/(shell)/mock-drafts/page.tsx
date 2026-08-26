@@ -70,6 +70,10 @@ export default async function MockDraftsPage({ searchParams }: PageProps) {
   return (
     <>
       <PageTitle>Mock drafts</PageTitle>
+      {/* R2 (the lobby design review's ruling): the page leads with the promise before it asks
+          anything — read directly from MOCK_COPY here, since the page's own h1 lives in this
+          server component, not in MockLobby below it. */}
+      <p className="max-w-2xl text-base text-text-muted">{MOCK_COPY.lobbyPromise}</p>
       <MockLobby
         initialOpen={open}
         initialMine={mine}
@@ -79,7 +83,7 @@ export default async function MockDraftsPage({ searchParams }: PageProps) {
         defaultTeamCount={LEAGUE_CONFIG.defaults.teamCount}
         defaultPickSeconds={MOCK_CONFIG.defaultPickClockSeconds}
         emptyMessage={MOCK_COPY.lobbyEmptyMessage}
-        emptyActionLabel={MOCK_COPY.lobbyEmptyActionLabel}
+        historyEmptyMessage={MOCK_COPY.lobbyHistoryEmptyMessage}
       />
     </>
   );
