@@ -29,8 +29,8 @@ interface TourStop {
  * The closing stop's own sentence (Task 9, Step 1) — two phrases, neither invented here. The
  * first is C3's own safety-net phrase, verbatim, the ONE sanctioned way this product reassures
  * anyone about missing a draft (`docs/design-system.md`'s "Copy" section, `copy-rules.ts`'s
- * `FORBIDDEN_VOCABULARY` family). The second is `MOCK_CONFIG.lobbyEmptyActionLabel` /
- * `sweptRoomActionLabel`'s own words (`@/mock-draft/config`) — copied rather than imported:
+ * `FORBIDDEN_VOCABULARY` family). The second is `MOCK_COPY.lobbyEmptyActionLabel`'s own words
+ * (`@/mock-draft/config`) — copied rather than imported:
  * `src/draft-room/**` may not value-import `@/mock-draft` (the client boundary), the identical
  * reason `PracticeBanner`/`MockResults` receive that module's words as PROPS rather than a live
  * import. This stop needs no prop plumbing because it says the same thing in every room,

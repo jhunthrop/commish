@@ -171,10 +171,6 @@ export const MOCK_COPY = {
   botMarkerLabel: "practice opponent",
   /** The short visible badge text placed beside a bot's name in the room and on the board. */
   botBadge: "Bot",
-  /** Shown when a member reaches a room the retention sweep already cleared. Pairs with
-   *  `sweptRoomActionLabel` below so the sentence is never a dead end. */
-  sweptRoomMessage: "This practice draft has cleared. Start a new one whenever you like.",
-  sweptRoomActionLabel: "Start a mock draft",
   /**
    * R2 (the draft-room design review's carry, Task 10): the scheduled rail's waiting sentence
    * for a practice room — the trigger-aware answer to "what starts this draft", carried to the

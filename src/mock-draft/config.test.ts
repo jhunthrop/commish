@@ -105,8 +105,7 @@ describe("MOCK_COPY", () => {
     expect(MOCK_COPY.botBadge).toBe("Bot");
   });
 
-  it("never leaves a swept room or an empty lobby without an action", () => {
-    expect(MOCK_COPY.sweptRoomActionLabel.length).toBeGreaterThan(0);
+  it("never leaves an empty lobby without an action", () => {
     expect(MOCK_COPY.lobbyEmptyActionLabel.length).toBeGreaterThan(0);
   });
 
