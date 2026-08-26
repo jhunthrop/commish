@@ -106,6 +106,14 @@ describe("MockLobby", () => {
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
   });
 
+  it("caps the one-tap at two placements when both lists are empty — the brand-new account never sees three (review MEDIUM)", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
+    expect(screen.getByTestId("quick-start-primary")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-start-open-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-start-history-empty")).not.toBeInTheDocument();
+  });
+
   it("renders an open room's own live facts — a seat meter and a ticking countdown, not frozen prose", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} initialOpen={[OPEN_ROOM]} />, fixture.deps);

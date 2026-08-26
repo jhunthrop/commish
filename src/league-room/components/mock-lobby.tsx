@@ -347,7 +347,14 @@ export function MockLobby({
           {mine.length === 0 ? (
             <div className="flex flex-col items-start gap-2">
               <p className="text-sm text-text-muted">{historyEmptyMessage}</p>
-              <SoloQuickStart teamCount={defaultTeamCount} pickSeconds={defaultPickSeconds} data-testid="quick-start-history-empty" />
+              {/* At most TWO one-taps on screen (fix-pass review MEDIUM): a brand-new account
+                  has both lists empty, and three byte-identical CTAs raced for the same eyeball
+                  — each placement individually right (D3, R1, E12), never reconciled. The open
+                  list's empty state already carries the action in exactly that state, so this
+                  one yields to it and renders only when the open shelf has real rooms. */}
+              {open.length === 0 ? null : (
+                <SoloQuickStart teamCount={defaultTeamCount} pickSeconds={defaultPickSeconds} data-testid="quick-start-history-empty" />
+              )}
             </div>
           ) : (
             <div className="flex flex-col gap-4">
