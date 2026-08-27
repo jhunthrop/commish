@@ -174,14 +174,14 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                   {/* Founder directive 2026-08-26 ("why aren't we showing the players picture?"):
                       decorative (no `label`) — the name right beside it already says who this is. */}
                   <Avatar name={row.player.name} avatar={row.player.headshotUrl} size="sm" />
-                  <span className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
+                  <span data-testid="pool-player-name" className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
                 </div>
                 {/* The meta row: the team code (no longer fighting the name for width, so it no
                     longer needs the laptop-fit `xl:` gate — it fits on its own line at the
                     320px rail floor) on the left, and the fixed action column on the right —
                     the star and the act control never move, whichever state they're in. */}
                 <div className="flex items-center justify-between gap-2 pl-7">
-                  <span className="min-w-0 truncate text-xs text-text-muted">{row.player.nflTeam}</span>
+                  <span data-testid="pool-player-team" className="min-w-0 truncate text-xs text-text-muted">{row.player.nflTeam}</span>
                   <div className="flex shrink-0 items-center gap-2">
                     {row.drafted ? null : (
                       <Button size="sm" variant="ghost" disabled={submitting} aria-label={queueButtonLabel(row.player.name, queued)} onClick={() => onQueue(row.player.id)}>

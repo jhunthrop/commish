@@ -153,9 +153,15 @@ const AVAILABLE_PLAYERS_LIST = "Available players, best first";
 async function makeTopPick(page: import("@playwright/test").Page): Promise<void> {
   const pool = page.getByRole("list", { name: AVAILABLE_PLAYERS_LIST });
   await pool.getByRole("button", { name: "Draft" }).first().waitFor({ timeout: 15_000 });
-  const nameLocator = pool.getByRole("listitem").first().locator("span.truncate.font-display");
-  const pickedName = await nameLocator.innerText();
-  const pickedTeam = await nameLocator.locator("xpath=following-sibling::span[1]").innerText();
+  // `data-testid`, not DOM adjacency. These two facts used to be read as "the name span" and
+  // "the span right after it", which was true until the pool row became TWO lines (the headshot
+  // and name on one, the team code and the act controls on the next) — after which the name span
+  // was the last child of its own div, `following-sibling::span[1]` matched nothing, and this
+  // helper hung until the whole test timed out, eight minutes at a time. A row's layout is a
+  // design decision that will change again; which span carries the team is not.
+  const firstRow = pool.getByRole("listitem").first();
+  const pickedName = await firstRow.getByTestId("pool-player-name").innerText();
+  const pickedTeam = await firstRow.getByTestId("pool-player-team").innerText();
   const uniqueRow = pool.getByRole("listitem").filter({ hasText: pickedName }).filter({ hasText: pickedTeam });
   // Checks for the row's own departure BEFORE clicking again on each retry: a prior attempt's
   // click can land (the row leaves) even when that SAME attempt's own `toHaveCount(0)` check

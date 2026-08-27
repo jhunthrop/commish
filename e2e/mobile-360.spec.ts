@@ -224,8 +224,22 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
 
     // --- The invite preview, the surface an invitee actually lands on ---------------------
-    await page.getByRole("button", { name: "Create invite link" }).click();
-    const invitePath = await page.getByLabel("Invite link").inputValue();
+    // ASK THE PANEL WHICH STATE IT IS IN. Flow analysis C-03 made `InvitePanel` load the league's
+    // LIVE invites on mount, so a commissioner who navigates away and back sees the code she
+    // already sent instead of a panel that quietly forgot it — which means the mint button exists
+    // only while there are none, and reads "Create another link" once one does. Unlike
+    // `league-lifecycle.spec.ts`, which creates its league fresh in the same test, THIS walk
+    // reuses a seeded fixture league, and an invite minted by any earlier run is still live on
+    // it. Waiting unconditionally for "Create invite link" hung the whole walk for five minutes
+    // on a button that was never going to appear.
+    const inviteInput = page.getByLabel("Invite link").first();
+    const mintInvite = page.getByRole("button", { name: "Create invite link" });
+    // The panel renders a skeleton until its own GET lands, so settle on EITHER outcome before
+    // branching — reading the count too early sees the loading state's zero and takes the wrong
+    // arm.
+    await expect(inviteInput.or(mintInvite).first()).toBeVisible({ timeout: 15_000 });
+    if (await mintInvite.isVisible()) await mintInvite.click();
+    const invitePath = await inviteInput.inputValue();
     await expectNoHorizontalScroll(page, "a league home with the invite panel open");
 
     await page.goto(invitePath);
@@ -456,6 +470,11 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(page.getByLabel("Player pool")).toBeVisible();
     await expectNoHorizontalScroll(page, "the mock draft room");
   } finally {
-    await context.close();
+    // `.catch()` is load-bearing, not defensive noise. When the body times out, Playwright aborts
+    // it and then runs this cleanup — and `context.close()` on an already-torn-down context
+    // throws, which REPLACES the real failure in the report. A whole run once reported nothing
+    // but "browserContext.close: Test ended" at this line while the actual hang was twenty
+    // surfaces earlier. A cleanup that hides the failure is a defect in the harness.
+    await context.close().catch(() => {});
   }
 });

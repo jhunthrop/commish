@@ -138,18 +138,21 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // `span.font-display` alone also matches the position badge (e.g. "QB") next to the name —
   // `.truncate` is unique to the player-name span (see player-pool.tsx).
   await picker.getByRole("button", { name: "Draft" }).first().waitFor({ timeout: 15_000 });
-  const pickedNameLocator = picker
+  const pickedRow = picker
     .getByRole("listitem")
     .filter({ has: picker.getByRole("button", { name: "Draft" }) })
-    .first()
-    .locator("span.truncate.font-display");
-  const pickedName = await pickedNameLocator.innerText();
+    .first();
+  const pickedName = await pickedRow.getByTestId("pool-player-name").innerText();
   // The mock dataset (`DATASET_SEED`, fixed) mints its 250 players from a limited first/last
   // name pool, so two DIFFERENT players can land on the identical name — a name-only match can
-  // then resolve to more than one row. The team abbreviation (the span immediately after the
-  // name, see player-pool.tsx's row markup) is what tells them apart, so both filters below key
-  // on the pair rather than the name alone.
-  const pickedTeam = await pickedNameLocator.locator("xpath=following-sibling::span[1]").innerText();
+  // then resolve to more than one row. The team abbreviation tells them apart, so both filters
+  // below key on the pair rather than the name alone.
+  //
+  // Read by `data-testid`, never by DOM adjacency: this was "the span immediately after the
+  // name" until the pool row became two lines, at which point it matched nothing and this test
+  // hung for its full four-minute budget. See `mock-draft.spec.ts`'s `makeTopPick` for the same
+  // fix at the same cause.
+  const pickedTeam = await pickedRow.getByTestId("pool-player-team").innerText();
   const uniqueRow = (pool: Locator) =>
     pool.getByRole("listitem").filter({ hasText: pickedName }).filter({ hasText: pickedTeam });
 
