@@ -37,4 +37,34 @@ describe("LeagueRulesPage", () => {
     const { container } = render(<LeagueRulesPage />);
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  // B4 (flow analysis journey J08; finding 3): opens with the plain-language definition and a
+  // short season summary, before any format detail — the same sentence `FrontDoorHero` leads
+  // the front door with.
+  it("opens with the plain-language definition, verbatim, before the format detail", () => {
+    render(<LeagueRulesPage />);
+    expect(
+      screen.getByText(
+        "A league is a group of managers who draft NFL players, then start the ones they think will " +
+          "score most each week. You play one other manager every week of the NFL season. Your team's " +
+          "score is whatever your starters do in their real games.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says how a season goes before the format detail, with no hardcoded week count", () => {
+    render(<LeagueRulesPage />);
+    expect(screen.getByText(/Here is how a season goes/)).toBeInTheDocument();
+  });
+
+  // B4: ends with a way forward, not a list of absences — the page still states the honest
+  // limits (the previous test would fail if that paragraph vanished), it just no longer gets
+  // the last word.
+  it("ends with a way forward rather than the list of what this product cannot do yet", () => {
+    render(<LeagueRulesPage />);
+    expect(
+      screen.getByText(/This product does not yet support a waiver wire/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See open leagues" })).toHaveAttribute("href", "/browse");
+  });
 });

@@ -2,10 +2,22 @@ import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
+import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { PUBLIC_LEAGUES } from "@/league-room/test-fixtures";
 import { FrontDoorHero } from "./front-door-hero";
 
 vi.mock("@/design/use-reduced-motion", () => ({ usePrefersReducedMotion: vi.fn(() => false) }));
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+
+// `OpenLeagueCta`'s signed-in branch renders `JoinPublicLeagueButton`, which calls `useRouter()`
+// — the same mock `next-draft-module.test.tsx` carries for the identical reason.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
+// `PUBLIC_LEAGUES[0]` is a beginner-tier league, so `ctaAccessibleName` appends " Newer players
+// only." — matched explicitly below rather than assumed away.
+const FEATURED: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "featured_1", name: "Backyard Brawl" };
 
 describe("FrontDoorHero", () => {
   // S8 ruling: the mock's headline and sub, verbatim — the accessible name concatenates the
@@ -93,13 +105,59 @@ describe("FrontDoorHero", () => {
       });
     });
 
-    it("sends a signed-out visitor through sign-up, carrying the lobby as its own intent", async () => {
+    // B2: the signed-out label states the truth (an account is required) before it navigates.
+    it("sends a signed-out visitor through sign-up, carrying the lobby as its own intent, and says so", async () => {
       await renderSurface(<FrontDoorHero signedIn={false} />, ({ getByRole }) => {
-        expect(getByRole("link", { name: "Try a mock draft" })).toHaveAttribute(
+        expect(getByRole("link", { name: "Sign up and try a mock draft" })).toHaveAttribute(
           "href",
           "/sign-up?returnTo=%2Fapp%2Fmock-drafts",
         );
       });
+    });
+  });
+
+  // B1 (flow analysis): the plain-language definition, verbatim, leads the signed-out front
+  // door — the whole reason the first-timer persona quit was never reaching it.
+  describe("the game definition (B1)", () => {
+    it("says, verbatim, what a league is — the same sentence /app opens with", async () => {
+      await renderSurface(<FrontDoorHero signedIn={false} />, ({ getByText }) => {
+        expect(
+          getByText(
+            "A league is a group of managers who draft NFL players, then start the ones they think will " +
+              "score most each week. You play one other manager every week of the NFL season. Your team's " +
+              "score is whatever your starters do in their real games.",
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("offers the fuller explainer one quiet click away, at /league-rules", async () => {
+      await renderSurface(<FrontDoorHero signedIn={false} />, ({ getByRole }) => {
+        expect(getByRole("link", { name: "See how it works" })).toHaveAttribute("href", "/league-rules");
+      });
+    });
+  });
+
+  // E2 (storefront review): the hero band earns the page's own ink action once a league is
+  // genuinely filling, and renders nothing at all when nothing is (rule 6).
+  describe("the featured league's seat action (E2)", () => {
+    it("renders no seat action at all when nothing is filling — real or absent, never dressed up", () => {
+      const { queryByText } = render(<FrontDoorHero signedIn={false} featuredLeague={null} />);
+      expect(queryByText(/Filling now/)).not.toBeInTheDocument();
+    });
+
+    it("gives a signed-out visitor the ink seat action for the featured league, naming it", () => {
+      const { getByRole, getByText } = render(<FrontDoorHero signedIn={false} featuredLeague={FEATURED} />);
+      expect(getByText(FEATURED.name)).toBeInTheDocument();
+      const cta = getByRole("link", { name: `Take a seat in ${FEATURED.name}. Newer players only.` });
+      expect(cta.className).toContain("bg-text-primary");
+      expect(cta).toHaveAttribute("href", `/sign-in?returnTo=%2Fjoin%2F${FEATURED.id}%2Fhold`);
+    });
+
+    it("gives a signed-in visitor the real, ink join button for the featured league", () => {
+      const { getByRole } = render(<FrontDoorHero signedIn={true} featuredLeague={FEATURED} />);
+      const cta = getByRole("button", { name: `Join ${FEATURED.name}` });
+      expect(cta.className).toContain("bg-text-primary");
     });
   });
 });

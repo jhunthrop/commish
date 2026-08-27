@@ -13,6 +13,8 @@ import { proofStats } from "@/league-service/proof";
 import { getProofCache } from "@/league-service/proof-cache-instance";
 import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
+import { listReviews } from "@/review-service/reviews";
+import { excludeFixtureReviews } from "./reviews/fixture-filter";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
 import { NextDraftModule } from "@/league-room/components/next-draft-module";
 import { OpenLeagueShelf, featuredFillingLeague } from "@/league-room/components/public-league-list";
@@ -26,17 +28,23 @@ export const dynamic = "force-dynamic";
 const PAGE_INTENT = "/";
 
 /**
- * The mock's three nav links (Task 16, F5) — `PublicBar` renders bare on every other public
- * surface (`/browse`, `/reviews`, `/app/join/[code]`); the front door alone fills these in.
- * "How it works" points at `/league-rules` (the addendum's Task 21 Step 4 page, stubbed real by
- * this task — see `src/app/league-rules/page.tsx`): a nav item pointing at a route nobody
- * created is the footer-to-a-404 failure with a bigger font.
+ * The mock's nav links (Task 16, F5) — `PublicBar` renders bare on every other public surface
+ * (`/browse`, `/reviews`, `/app/join/[code]`); the front door alone fills these in. "How it
+ * works" points at `/league-rules` (the addendum's Task 21 Step 4 page, stubbed real by this
+ * task — see `src/app/league-rules/page.tsx`): a nav item pointing at a route nobody created is
+ * the footer-to-a-404 failure with a bigger font.
+ *
+ * D3 (flow analysis; storefront review): "Reviews" is appended ONLY once the feed genuinely has
+ * something to show — `hasRealReviews` below reads the SAME fixture-exclusion `/reviews` itself
+ * applies (`excludeFixtureReviews`, `./reviews/fixture-filter`), so the nav never advertises a
+ * room this task already knows is empty (the site's one review today is a fixture, filed by the
+ * onboarding e2e spec). `NAV_BASE` is what every build ships regardless.
  */
-const NAV: readonly NavLink[] = [
+const NAV_BASE: readonly NavLink[] = [
   { href: "/browse", label: "Open leagues" },
   { href: "/league-rules", label: "How it works" },
-  { href: "/reviews", label: "Reviews" },
 ];
+const REVIEWS_NAV_LINK: NavLink = { href: "/reviews", label: "Reviews" };
 
 /**
  * The signed-out landing page (Phase 3.6, Task 5; reshaped by Phase 3.7, Task 6) — the first
@@ -54,12 +62,11 @@ const NAV: readonly NavLink[] = [
  * dies here. Reading no params also means this page is one fixed document: two visitors always
  * see the same front door.
  *
- * `PublicBar`'s `action` (the ink-pill "Take a seat" CTA) points at `/browse`, never an anchor
- * into this page's own shelf: the shelf IS where a seat is actually taken, on this page or on
- * `/browse`, but a fixed, bookmarkable destination is simpler to reason about than a scroll
- * position, and `/browse` renders the identical shelf this page does. The shelf's own single
- * featured card carries the view's one CARD ink (D2) — the mock itself pairs the nav pill with
- * exactly one inked Join, and rule 5's budget is judged against that founder-approved frame.
+ * `PublicBar`'s `action` (the ink-pill "Take a seat" CTA) points at `/browse` when nothing on the
+ * shelf is genuinely filling; once `featuredLeague` names a room, the hero band itself earns the
+ * page's one ink action (E2, `FrontDoorHero`'s own docblock) and this pill steps back to quiet —
+ * rule 5's one-ink-per-view budget applied to the WHOLE page, nav corner included, not merely the
+ * content below it.
  *
  * `proofStats` is read through `getProofCache()` (`@/league-service/proof-cache-instance`) —
  * this is the highest-traffic unauthenticated page in the product, and the three-query read
@@ -84,13 +91,16 @@ export default async function Home() {
   const nowIso = new Date().toISOString();
   const clock = { now: () => nowIso };
 
-  const [user, { leagues, house }, stats, wireItems] = await Promise.all([
+  const [user, { leagues, house }, stats, wireItems, reviewsPage] = await Promise.all([
     getCurrentUser(),
     listPublicLeagues(getDb(), normalizeBrowseFilter({}), clock, { sort: "seats_remaining", whenFullOnly: false }),
     getProofCache().stats(() => proofStats(getDb())),
     // Task 8: the wire's request-time read, on the page's one clock — see `Wire`'s own docblock
     // for the whole request-time-truth account (deferral D4, no anonymous SSE).
     listWireItems(getDb(), clock),
+    // D3: whether the nav's own "Reviews" link has anything honest to advertise — the same first
+    // page `/reviews` itself reads, so "is there anything real to show" is answered once.
+    listReviews(getDb(), {}),
   ]);
 
   // D1/E7 (Phase 3.7, Task 5): guided is a signed-in PREFERENCE behavior, never a surface
@@ -108,13 +118,18 @@ export default async function Home() {
   const cappedLeagues = leagues.slice(0, UI_CONFIG.frontDoor.shelfCap);
   const featuredLeague = featuredFillingLeague([...house, ...cappedLeagues]);
 
+  const hasRealReviews = excludeFixtureReviews(reviewsPage.reviews).length > 0;
+  const nav: readonly NavLink[] = hasRealReviews ? [...NAV_BASE, REVIEWS_NAV_LINK] : NAV_BASE;
+
   return (
     <>
       <PublicBar
         intent={PAGE_INTENT}
-        nav={NAV}
+        nav={nav}
         action={
-          <ButtonLink href="/browse">Take a seat</ButtonLink>
+          <ButtonLink href="/browse" variant={featuredLeague === null ? "primary" : "secondary"}>
+            Take a seat
+          </ButtonLink>
         }
       />
       {/* Task 8: the wire — real events under the nav, per the mock. Renders nothing at all
@@ -135,12 +150,14 @@ export default async function Home() {
                 each other — the right half of the hero band used to be a dead dark field once
                 the headline went left-aligned. Below xl (and whenever nothing qualifies —
                 `featuredLeague` null) the hero keeps its current single-column shape: real or
-                absent, never dressed up (rule 6). */}
+                absent, never dressed up (rule 6). Either way `FrontDoorHero` gets the SAME
+                `featuredLeague`, so its own in-band ink seat action (E2) and this module (when
+                it renders) can never point at two different leagues. */}
             {featuredLeague === null ? (
-              <FrontDoorHero signedIn={user !== null} />
+              <FrontDoorHero signedIn={user !== null} featuredLeague={null} />
             ) : (
               <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_360px] xl:items-center xl:gap-10">
-                <FrontDoorHero signedIn={user !== null} />
+                <FrontDoorHero signedIn={user !== null} featuredLeague={featuredLeague} />
                 <NextDraftModule league={featuredLeague} signedIn={user !== null} />
               </div>
             )}

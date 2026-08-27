@@ -85,6 +85,14 @@ describe("NextDraftModule (2026-08-25 hero finding)", () => {
     expect(cta.className).toBe(buttonClassName("secondary", "md"));
   });
 
+  // D1-storefront (measured 318 × 40 in a 360px module): the Join control's own wrapper must
+  // opt out of the module's `flex-col` stretch, the same fix `PracticeEntryLink` applies.
+  it("wraps its join control in a self-start block, immune to the module's own flex-col stretch", () => {
+    render(<NextDraftModule league={LEAGUE} signedIn={false} />);
+    const cta = screen.getByRole("link", { name: "Take a seat in Half-PPR #241." });
+    expect(cta.parentElement?.className).toContain("self-start");
+  });
+
   it("stays hidden below xl and only appears at xl+ (the shelf is one scroll away below that)", () => {
     render(<NextDraftModule league={LEAGUE} signedIn={false} />);
     const root = screen.getByTestId("next-draft-module");

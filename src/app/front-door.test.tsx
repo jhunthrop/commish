@@ -8,6 +8,7 @@ vi.mock("@/league-service/browse", () => ({ listPublicLeagues: vi.fn() }));
 vi.mock("@/league-service/proof", () => ({ proofStats: vi.fn() }));
 vi.mock("@/league-service/proof-cache-instance", () => ({ getProofCache: vi.fn() }));
 vi.mock("@/league-service/wire", () => ({ listWireItems: vi.fn() }));
+vi.mock("@/review-service/reviews", () => ({ listReviews: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
@@ -16,11 +17,14 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { listPublicLeagues } from "@/league-service/browse";
 import { getProofCache } from "@/league-service/proof-cache-instance";
 import { listWireItems } from "@/league-service/wire";
+import { listReviews } from "@/review-service/reviews";
 import { UI_CONFIG } from "@/components/ui/config";
 import { featuredLeagueId, featuredFillingLeague } from "@/league-room/components/public-league-list";
 import { PUBLIC_LEAGUES } from "@/league-room/test-fixtures";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import Home from "./page";
+
+const EMPTY_REVIEWS = { reviews: [], hasMore: false, nextBefore: null };
 
 const EMPTY_BROWSE: BrowseBody = { leagues: [], house: [] };
 const EMPTY_STATS: ProofStats = { leaguesFilled: null, roomsFillingNow: null, rating: null, tightestRoomSeatsRemaining: null, any: false };
@@ -37,9 +41,11 @@ async function renderHome() {
   return render(page);
 }
 
-/** How many ink pills (rule 5's `bg-text-primary` fill) the WHOLE rendered page holds — the nav's
- *  "Take a seat" CTA is always one of them, so this is the count `next-draft-module` tests below
- *  check against, the same convention `public-league-list.test.tsx`'s own `inkPillCount` uses. */
+/** How many ink pills (rule 5's `bg-text-primary` fill) the WHOLE rendered page holds — the same
+ *  convention `public-league-list.test.tsx`'s own `inkPillCount` uses. Before E2, the nav's "Take
+ *  a seat" CTA was always one of them; since E2, the nav's own pill steps back to quiet the
+ *  instant a league is genuinely filling and the HERO band's own seat action carries the page's
+ *  one ink action instead — see the "Next Draft module" describe block below for both shapes. */
 function inkPillCount(container: HTMLElement): number {
   return container.querySelectorAll('[class*="bg-text-primary"]').length;
 }
@@ -73,6 +79,8 @@ beforeEach(() => {
   // Quiet by default — the wire's own component tests own its rendering; the page tests below
   // only assert where it mounts and that a quiet product mounts nothing.
   vi.mocked(listWireItems).mockReset().mockResolvedValue([]);
+  // Empty by default — D3's own tests below override this to prove the nav link's own honesty.
+  vi.mocked(listReviews).mockReset().mockResolvedValue(EMPTY_REVIEWS);
 });
 
 describe("the front door (Task 5)", () => {
@@ -82,6 +90,14 @@ describe("the front door (Task 5)", () => {
   });
 
   it("renders the mock's three nav links and the Take a seat CTA, both pointing where the plan says", async () => {
+    // D3: a real review, so the "Reviews" nav link has something honest to advertise — this
+    // test's own purpose is the three links' hrefs, not the nav's own D3 visibility rule (its
+    // own describe block below).
+    vi.mocked(listReviews).mockResolvedValue({
+      reviews: [{ id: "r1", rating: 5, body: "Great season.", createdAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:00.000Z", authorName: "A manager", authorAvatar: null, verified: false }],
+      hasMore: false,
+      nextBefore: null,
+    });
     await renderHome();
     expect(screen.getByRole("link", { name: "Open leagues" })).toHaveAttribute("href", "/browse");
     expect(screen.getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/league-rules");
@@ -209,8 +225,8 @@ describe("the front door (Task 5)", () => {
   });
 });
 
-describe("the front door's Next Draft module — page-level wiring (2026-08-25 hero finding; repointed by storefront review R1)", () => {
-  it("mounts the module naming the shelf's own featured (fullest filling) league, and leaves the shelf all-quiet (rule 5)", async () => {
+describe("the front door's Next Draft module — page-level wiring (2026-08-25 hero finding; repointed by storefront review R1; E2)", () => {
+  it("mounts the module naming the shelf's own featured (fullest filling) league, leaves the shelf all-quiet, and gives the HERO the page's one ink action (rule 5, E2)", async () => {
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [FULLEST_FILLING, PUBLIC_LEAGUES[1]!], house: [] });
     const { container } = await renderHome();
 
@@ -218,12 +234,29 @@ describe("the front door's Next Draft module — page-level wiring (2026-08-25 h
     const nextDraftModule = screen.getByTestId("next-draft-module");
     expect(within(nextDraftModule).getByText(FULLEST_FILLING.name)).toBeInTheDocument();
 
-    // (2) the page's total ink stays at exactly the nav's one CTA — the shelf goes all-quiet
-    // (`featuredInHero`) because the module IS this league's featured rendering (rule 5): two
-    // inked renderings of the same league would double the one-ink-per-view budget.
+    // (2) E2: the nav's own "Take a seat" pill steps back to quiet — the hero band's own ink
+    // seat action (below) carries the page's one ink action instead.
+    const header = screen.getByRole("banner");
+    const navCta = within(header).getByRole("link", { name: "Take a seat" });
+    expect(navCta.className).not.toContain("bg-text-primary");
+
+    // (3) E2: the hero band itself carries an ink seat control for the SAME featured league,
+    // named — this, not the nav, is now the page's one ink action. `FULLEST_FILLING` sits at its
+    // own last seat (11 of 12) on a beginner-tier league, so the CTA's accessible name is the
+    // same "last seat / newer players only" sentence `ctaAccessibleName` builds everywhere else —
+    // the SAME name the module's own quiet CTA and the (now all-quiet) shelf rows/cards carry
+    // too, so this asserts on the one INK instance among them rather than a name unique to it.
+    const sameNameCtas = screen.getAllByRole("link", { name: `Take the last seat in ${FULLEST_FILLING.name}. Newer players only.` });
+    const inkCtas = sameNameCtas.filter((el) => el.className.includes("bg-text-primary"));
+    expect(inkCtas).toHaveLength(1);
+
+    // (4) the page's total ink stays at exactly one — the shelf goes all-quiet (`featuredInHero`)
+    // because the module IS this league's featured rendering (rule 5): two inked renderings of
+    // the same league would double the one-ink-per-view budget, and the nav's own pill (2) no
+    // longer counts toward it either.
     expect(inkPillCount(container)).toBe(1);
 
-    // (3) the module names the SAME league id the shelf's own featured-selection logic
+    // (5) the module names the SAME league id the shelf's own featured-selection logic
     // (`featuredLeagueId`) would independently pick for this identical merged list — proving
     // `page.tsx` derives ONE feature and threads it to both children, rather than the module and
     // the shelf each computing (and risking disagreeing on) their own.
@@ -233,15 +266,73 @@ describe("the front door's Next Draft module — page-level wiring (2026-08-25 h
     expect(within(nextDraftModule).getByText(FULLEST_FILLING.name).textContent).toBe(featuredFillingLeague(merged)!.name);
   });
 
-  // (4) the paired case: nothing filling means no module at all, and the shelf's OWN featured
-  // pick keeps rule 5's one ink action — just owned by the shelf instead of the hero.
-  it("stays absent, and lets the shelf carry its own featured ink, when nothing on the shelf is filling", async () => {
+  // (6) the paired case: nothing filling means no module at all and no hero seat action, so the
+  // nav's own pill stays the page's one ink action, and the shelf's OWN featured pick keeps rule
+  // 5's one ink action — just owned by the shelf instead of the hero.
+  it("stays absent, keeps the nav's own pill inked, and lets the shelf carry its own featured ink, when nothing on the shelf is filling", async () => {
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [...NOTHING_FILLING], house: [] });
     const { container } = await renderHome();
     expect(screen.queryByTestId("next-draft-module")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Filling now/)).not.toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    expect(within(header).getByRole("link", { name: "Take a seat" }).className).toContain("bg-text-primary");
     // 1 nav CTA + 1 ink row + 1 ink card — both responsive shelf renderings coexist in jsdom
     // (Task 13's own pair, no stylesheet to hide either), each carrying the shelf's own single
     // featured ink since `featuredInHero` is never passed `true` in this branch.
     expect(inkPillCount(container)).toBe(3);
+  });
+});
+
+/**
+ * D3 (flow analysis; storefront review) — the nav's own "Reviews" link never advertises a room
+ * this page already knows is empty.
+ */
+describe("the front door's Reviews nav entry (D3)", () => {
+  it("hides the Reviews nav entry when the feed has nothing real to show", async () => {
+    vi.mocked(listReviews).mockResolvedValue(EMPTY_REVIEWS);
+    await renderHome();
+    expect(screen.queryByRole("link", { name: "Reviews" })).not.toBeInTheDocument();
+  });
+
+  it("hides the Reviews nav entry when the only review is a dev/e2e fixture", async () => {
+    vi.mocked(listReviews).mockResolvedValue({
+      reviews: [
+        {
+          id: "fixture",
+          rating: 1,
+          body: "This league ate my roster overnight and nobody ever explained why. Filed at 1787735299359.",
+          createdAt: "2026-08-01T00:00:00.000Z",
+          updatedAt: "2026-08-01T00:00:00.000Z",
+          authorName: "A manager",
+          authorAvatar: null,
+          verified: false,
+        },
+      ],
+      hasMore: false,
+      nextBefore: null,
+    });
+    await renderHome();
+    expect(screen.queryByRole("link", { name: "Reviews" })).not.toBeInTheDocument();
+  });
+
+  it("shows the Reviews nav entry once a real review exists", async () => {
+    vi.mocked(listReviews).mockResolvedValue({
+      reviews: [
+        {
+          id: "real",
+          rating: 5,
+          body: "Great season, the draft room just worked.",
+          createdAt: "2026-08-01T00:00:00.000Z",
+          updatedAt: "2026-08-01T00:00:00.000Z",
+          authorName: "A manager",
+          authorAvatar: null,
+          verified: false,
+        },
+      ],
+      hasMore: false,
+      nextBefore: null,
+    });
+    await renderHome();
+    expect(screen.getByRole("link", { name: "Reviews" })).toHaveAttribute("href", "/reviews");
   });
 });

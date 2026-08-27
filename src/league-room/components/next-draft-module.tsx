@@ -66,7 +66,13 @@ export function NextDraftModule({ league, signedIn }: NextDraftModuleProps) {
             `LeagueRow`'s own Seats column already holds. */}
         <SeatMeter filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} srOnlySentence />
       </div>
-      <div>
+      {/* D1-storefront: the same stretch bug `PracticeEntryLink` had — this module's own
+          `flex-col` (the root div above) defaults `align-items: stretch`, so an unguarded plain
+          `<div>` here inflated to the module's full 318px content width, and `JoinPublicLeagueButton`'s
+          own `flex flex-col` wrapper then stretched the Button to match. `self-start` opts this
+          wrapper (and everything shrink-wrapped inside it) out of the stretch, the identical fix
+          `practice-entry-link.tsx` applies at its own root. */}
+      <div className="self-start">
         <OpenLeagueCta league={league} signedIn={signedIn} emphasis="quiet" />
       </div>
     </div>

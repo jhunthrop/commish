@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
 import { LEAGUE_CONFIG } from "@/league/config";
+import { notAFixtureLeague } from "@/league-service/browse";
 import { ENFORCED_LEAGUE_SQL } from "@/league-service/enforcement";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { ProofStats } from "@/matchmaking/contract";
@@ -47,6 +48,11 @@ export function leaguesFilledQuery(db: Db) {
         inArray(drafts.status, DRAFTED_STATUSES),
         gte(leagues.createdAt, new Date(LEAGUE_CONFIG.season.startedAt)),
         eq(leagues.isMock, false),
+        // D1 (storefront review; flow analysis J04): a dev/e2e fixture league never inflates
+        // the "leagues filled this season" count a stranger reads on the front door — the SAME
+        // shared predicate `browseQuery`/`houseShelfQuery` (`@/league-service/browse.ts`) apply,
+        // read here rather than restated.
+        notAFixtureLeague(),
       ),
     );
 }
@@ -77,7 +83,7 @@ function fillingRoomsQuery(db: Db) {
     .from(leagues)
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
     .innerJoin(teams, eq(teams.leagueId, leagues.id))
-    .where(and(eq(drafts.status, "scheduled"), ENFORCED_LEAGUE_SQL))
+    .where(and(eq(drafts.status, "scheduled"), ENFORCED_LEAGUE_SQL, notAFixtureLeague()))
     .groupBy(leagues.id, drafts.id)
     .having(sql`count(${teams.id}) < ${leagues.teamCount}`);
 }

@@ -77,3 +77,36 @@ describe("/reviews rate limiting", () => {
     expect(screen.getByRole("heading", { name: "What managers are saying" })).toBeInTheDocument();
   });
 });
+
+/**
+ * D3 (flow analysis; storefront review) — the site's one review today is a fixture the
+ * onboarding e2e spec filed ("...Filed at 1787735299359."). A stranger deciding whether to sign
+ * up must never read it as the product's honest, one-and-only review.
+ */
+describe("/reviews excludes dev/e2e fixture reviews (D3)", () => {
+  const FIXTURE = {
+    id: "fixture",
+    rating: 1,
+    body: "This league ate my roster overnight and nobody ever explained why. Filed at 1787735299359.",
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+    authorName: "A manager",
+    authorAvatar: null,
+    verified: false,
+  };
+
+  it("shows the honest empty state, not the lone fixture complaint, when the fixture is the only review", async () => {
+    vi.mocked(listReviews).mockResolvedValue({ reviews: [FIXTURE], hasMore: false, nextBefore: null });
+    await renderPage();
+    expect(screen.getByText("No reviews yet")).toBeInTheDocument();
+    expect(screen.queryByText(/ate my roster overnight/)).not.toBeInTheDocument();
+  });
+
+  it("keeps a real review beside a filtered-out fixture", async () => {
+    const real = { ...FIXTURE, id: "real", body: "Great season, the draft room just worked." };
+    vi.mocked(listReviews).mockResolvedValue({ reviews: [FIXTURE, real], hasMore: false, nextBefore: null });
+    await renderPage();
+    expect(screen.getByText("Great season, the draft room just worked.")).toBeInTheDocument();
+    expect(screen.queryByText(/ate my roster overnight/)).not.toBeInTheDocument();
+  });
+});

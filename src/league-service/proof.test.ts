@@ -39,6 +39,8 @@ async function seedLeague(opts: {
   readonly createdAt?: Date;
   readonly kickoffAt?: Date;
   readonly isPublicMatchmade?: boolean;
+  /** Defaults to the generated id. Set explicitly by D1's own fixture-name tests. */
+  readonly name?: string;
 }): Promise<string> {
   leagueSeq += 1;
   const id = `plg${leagueSeq}`;
@@ -46,7 +48,7 @@ async function seedLeague(opts: {
   await db.insert(users).values({ id: commissionerId, email: `${commissionerId}@test.local`, displayName: commissionerId }).onConflictDoNothing();
   await db.insert(leagues).values({
     id,
-    name: id,
+    name: opts.name ?? id,
     format: "snake",
     teamCount: 12,
     isPublicMatchmade: opts.isPublicMatchmade ?? true,
@@ -93,6 +95,8 @@ async function seedFillingLeague(opts: {
   readonly filledTeams: number;
   readonly isPublicMatchmade?: boolean;
   readonly draftStatus?: "scheduled" | "in_progress" | "complete";
+  /** Defaults to the generated id. Set explicitly by D1's own fixture-name tests. */
+  readonly name?: string;
 }): Promise<string> {
   leagueSeq += 1;
   const id = `fill${leagueSeq}`;
@@ -101,7 +105,7 @@ async function seedFillingLeague(opts: {
   await db.insert(users).values({ id: commissionerId, email: `${commissionerId}@test.local`, displayName: commissionerId }).onConflictDoNothing();
   await db.insert(leagues).values({
     id,
-    name: id,
+    name: opts.name ?? id,
     format: "snake",
     teamCount,
     isPublicMatchmade: opts.isPublicMatchmade ?? true,
@@ -280,6 +284,28 @@ describe("proofStats — roomsFillingNow (storefront review R1)", () => {
     await seedFillingLeague({ teamCount: 12, filledTeams: 1 });
 
     expect((await proofStats(db)).roomsFillingNow).toBe(3);
+  });
+});
+
+/**
+ * D1 (storefront review; flow analysis J04) — `notAFixtureLeague()` applied to the two proof
+ * reads that count leagues by name: `leaguesFilledQuery` and `fillingRoomsQuery` (which
+ * `roomsFillingQuery`/`tightestRoomQuery` both derive from). A fixture league must never inflate
+ * a number a stranger reads as social proof.
+ */
+describe("proofStats excludes dev/e2e fixture leagues from every count (D1)", () => {
+  it("never counts a fixture-named league toward leaguesFilled, while normal ones still count", async () => {
+    await seedLeagues({ drafted: MATCHMAKING_CONFIG.proof.floors.leaguesFilled, full: 0, filling: 0 });
+    await seedLeague({ draftStatus: "complete", name: "E2E Money Dark 1787678163994" });
+    await seedLeague({ draftStatus: "complete", name: "Mobile360 Room League" });
+    expect((await proofStats(db)).leaguesFilled).toBe(MATCHMAKING_CONFIG.proof.floors.leaguesFilled);
+  });
+
+  it("never counts a fixture-named league toward roomsFillingNow, while normal ones still count", async () => {
+    await seedFillingLeague({ teamCount: 12, filledTeams: 5 });
+    await seedFillingLeague({ teamCount: 12, filledTeams: 1 });
+    await seedFillingLeague({ teamCount: 12, filledTeams: 3, name: "E2E Held Trade League" });
+    expect((await proofStats(db)).roomsFillingNow).toBe(2);
   });
 });
 

@@ -45,12 +45,15 @@ async function seedHouseLeague(league: {
    *  for exactly one test: the final review's F6, proving the shelf's privacy boundary is
    *  structural rather than conventional. */
   readonly isPublicMatchmade?: boolean;
+  /** Defaults to `House ${id}` — set explicitly by D1's own fixture-name tests, which need a
+   *  house row whose name actually starts with a real fixture prefix. */
+  readonly name?: string;
 }): Promise<void> {
   const teamCount = league.teamCount ?? 12;
   const filled = league.filled ?? 0;
   await db.insert(leagues).values({
     id: league.id,
-    name: `House ${league.id}`,
+    name: league.name ?? `House ${league.id}`,
     format: "snake",
     teamCount,
     stakeTier: 0,
@@ -927,6 +930,48 @@ describe("listPublicLeagues house shelf", () => {
     await seedHouseLeague({ id: "house_snake", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
     const { house } = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "auction" });
     expect(house.map((l) => l.id)).toEqual(["house_snake"]);
+  });
+});
+
+/**
+ * D1 (storefront review; flow analysis J04) — `notAFixtureLeague()` proven against BOTH halves
+ * of the shelf it governs. A fixture-named league is otherwise a perfectly normal, open, public
+ * league in every other respect here (the point: name is the ONLY thing that should ever exclude
+ * it), and a normally-named one seeded in the same call must still come through — the exclusion
+ * must never widen into "nothing renders".
+ */
+describe("listPublicLeagues excludes dev/e2e fixture leagues (D1)", () => {
+  it("never lists a member league whose name carries a fixture prefix, while a normal one still appears", async () => {
+    await seed({
+      id: "fixture_e2e", name: "E2E Money Dark 1787678163994", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    await seed({
+      id: "fixture_mobile360", name: "Mobile360UnbrokenOverlongIdentifierFixture", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    await seed({
+      id: "real", name: "The Longshot League 5", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
+
+    expect(rows.map((row) => row.id)).toEqual(["real"]);
+  });
+
+  it("never lists a house-shelf league whose name carries a fixture prefix, while a normal one still appears", async () => {
+    await seedHouseLeague({
+      id: "house_fixture", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z"),
+      name: "E2E Held Trade League",
+    });
+    await seedHouseLeague({
+      id: "house_real", rung: "beginner_12", kickoffAt: new Date("2026-09-11T19:00:00.000Z"),
+    });
+
+    const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+
+    expect(house.map((l) => l.id)).toEqual(["house_real"]);
   });
 });
 

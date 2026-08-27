@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNotNull, isNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, notLike, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "@/db/client";
 import { drafts, leagues, scoringSettings, seatHolds, teams } from "@/db/schema";
@@ -10,11 +10,38 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { describeRosterShape, formatDraftTime, LEAGUE_CONFIG } from "@/league";
 import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { houseKickoffStillAhead } from "./house-factory";
+import { FIXTURE_LEAGUE_NAME_PREFIXES } from "@/matchmaking/fixtures";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseBody, BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
 import type { HouseRungName } from "@/matchmaking/house-catalog";
 import { compositionCategoryFor, tierCompositionFor } from "@/participation/composition";
 import { describeScoring, type ScoringRules } from "@/scoring";
+
+/**
+ * D1 (storefront review; flow analysis J04) — THE ONE SHARED PREDICATE that keeps a seeded or
+ * end-to-end-test league off every public read this application makes. Dev fixtures write a
+ * `leagues.name` starting with one of `FIXTURE_LEAGUE_NAME_PREFIXES` (`@/matchmaking/fixtures`,
+ * the pure list both this function and any future pure caller read) — 17 of 50 rows on a real
+ * seeded database once carried a name like "E2E Money Dark 1787678163994", indistinguishable to a
+ * stranger from a real listing, sitting directly under a promise that "every league is free".
+ *
+ * NEVER restated per query — `browseQuery` and `houseShelfQuery` below both call this once, and
+ * so do `seatClaimsQuery`/`filledLeaguesQuery` (`@/league-service/wire.ts`) and
+ * `leaguesFilledQuery`/`fillingRoomsQuery` (`@/league-service/proof.ts`) — the front door shelf,
+ * `/browse`, the wire and the proof strip all read the SAME condition rather than four hand
+ * copies that could quietly drift apart on which prefixes they exclude.
+ *
+ * Exported as the query BUILDER, the same shape `houseKickoffStillAhead`
+ * (`@/league-service/house-factory.ts`) already uses for a predicate two different queries share.
+ */
+export function notAFixtureLeague(): SQL {
+  // `and()` with two or more defined `SQLWrapper` operands always returns a real `SQL`, never
+  // `undefined` — `FIXTURE_LEAGUE_NAME_PREFIXES` is a fixed, non-empty literal array, so this
+  // assertion is safe rather than hopeful (the identical shape `houseKickoffStillAhead`'s own
+  // `or(...)` call is trusted without one, here spelled explicitly because `and()`'s general
+  // signature stays `SQL | undefined` for the zero- and one-operand cases this call never hits).
+  return and(...FIXTURE_LEAGUE_NAME_PREFIXES.map((prefix) => notLike(leagues.name, `${prefix}%`)))!;
+}
 
 /** The outermost edge is the only place a wall clock is allowed — see every other service
  *  module's identical constant (`creation.ts`, `read.ts`, ...). */
@@ -287,6 +314,7 @@ export function browseQuery(db: Db, filter: BrowseFilter, options: BrowseQueryOp
         // BEFORE the `LIMIT` on the identical "narrow before you cap" discipline this query's
         // own docblock already holds every other narrowing to.
         options.whenFullOnly === true ? eq(drafts.startTrigger, "when_full") : undefined,
+        notAFixtureLeague(),
         ...narrowingFor(filter),
       ),
     )
@@ -391,7 +419,15 @@ export function houseShelfQuery(db: Db, nowIso: string) {
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
     .leftJoin(teams, eq(teams.leagueId, leagues.id))
     .leftJoinLateral(seatCompletion, sql`true`)
-    .where(and(eq(leagues.isPublicMatchmade, true), isNotNull(leagues.houseRung), eq(drafts.status, "scheduled"), houseKickoffStillAhead(nowIso)))
+    .where(
+      and(
+        eq(leagues.isPublicMatchmade, true),
+        isNotNull(leagues.houseRung),
+        eq(drafts.status, "scheduled"),
+        houseKickoffStillAhead(nowIso),
+        notAFixtureLeague(),
+      ),
+    )
     .groupBy(leagues.id, drafts.id)
     .having(sql`count(${teams.id}) < ${leagues.teamCount}`)
     .orderBy(asc(drafts.kickoffAt))

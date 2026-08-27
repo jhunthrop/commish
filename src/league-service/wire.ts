@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { auditEvents, drafts, leagues, teams } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
+import { notAFixtureLeague } from "@/league-service/browse";
 import { ENFORCED_LEAGUE_SQL } from "@/league-service/enforcement";
 import { leaguesFilledQuery } from "@/league-service/proof";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
@@ -55,6 +56,9 @@ export function seatClaimsQuery(db: Db, now: Date) {
         gte(auditEvents.occurredAt, windowStart),
         lte(auditEvents.occurredAt, now),
         ENFORCED_LEAGUE_SQL,
+        // D1: a dev/e2e fixture league never reaches a stranger's wire, same shared predicate
+        // `browseQuery`/`houseShelfQuery` (`@/league-service/browse.ts`) already apply.
+        notAFixtureLeague(),
       ),
     )
     .groupBy(auditEvents.eventId, leagues.id)
@@ -83,11 +87,42 @@ export function filledLeaguesQuery(db: Db) {
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
     .leftJoin(teams, eq(teams.leagueId, leagues.id))
     .leftJoin(auditEvents, and(eq(auditEvents.leagueId, leagues.id), eq(auditEvents.eventType, "member_joined"), NOT_A_SEAT_RELEASE))
-    .where(and(ENFORCED_LEAGUE_SQL, inArray(drafts.status, ["scheduled", "in_progress"])))
+    .where(and(ENFORCED_LEAGUE_SQL, inArray(drafts.status, ["scheduled", "in_progress"]), notAFixtureLeague()))
     .groupBy(leagues.id, drafts.id)
     .having(sql`count(distinct ${teams.id}) = ${leagues.teamCount}`)
     .orderBy(sql`max(${auditEvents.occurredAt}) desc nulls last`, asc(leagues.createdAt))
     .limit(MATCHMAKING_CONFIG.wire.maxItems);
+}
+
+/**
+ * D2 (storefront review; flow analysis journey J23) — collapses many raw rows for the SAME
+ * (kind, subject) down to the one item nearest to now, before `interleave` ever sees them. A
+ * house room filling in a burst produced ten-plus DISTINCT `member_joined` audit rows for the
+ * SAME league inside one window (ten different people, near-identical timestamps), and
+ * `formatCoarseDuration` rounded every one of them to the same bucket — "A seat was claimed in
+ * The Longshot League 5 · 11 minutes ago" repeated roughly ten times in a single marquee pass,
+ * always the same league, the same coarse time. `subject` is the league name for both kinds this
+ * function is ever called with (`seat_claimed`, `league_filled`) — the wire's third kind,
+ * `season_count`, is already exactly one row (`leaguesFilledQuery`'s own `count(*)`), so no
+ * caller below needs to run this over it.
+ *
+ * KEEPS THE NEWEST WITHOUT A SECOND SORT: `seatClaimsQuery` already orders
+ * `desc(auditEvents.occurredAt)` and `filledLeaguesQuery` already orders by fill recency
+ * `desc` — both queries hand this function their rows newest-first, so keeping the FIRST
+ * occurrence of a subject IS keeping the newest one.
+ *
+ * Applied to EACH kind's own list, before `interleave` — never to the merged wire — which is
+ * exactly "de-duplicate by (kind, subject)": the same league can legitimately carry both a
+ * `seat_claimed` item and a `league_filled` item at once (two different, both-true facts), and
+ * this function is never asked to choose between them.
+ */
+function dedupeByLeagueName<T extends { readonly leagueName: string }>(items: readonly T[]): readonly T[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.leagueName)) return false;
+    seen.add(item.leagueName);
+    return true;
+  });
 }
 
 /**
@@ -149,19 +184,25 @@ export async function listWireItems(db: Db, clock: Clock = systemClock): Promise
     leaguesFilledQuery(db),
   ]);
 
-  const seatClaimed: readonly WireItem[] = claimRows.map((row) => ({
-    kind: "seat_claimed",
-    leagueName: row.leagueName,
-    agoMs: now.getTime() - row.occurredAt.getTime(),
-    seatsOpen: row.teamCount - row.filledTeams,
-  }));
-  const leagueFilled: readonly WireItem[] = filledRows.map((row) => ({
-    kind: "league_filled",
-    leagueName: row.leagueName,
-    // The WHERE already restricts to the two wire-worthy statuses; this narrows the row type
-    // to the contract's union without a cast.
-    draftStatus: row.draftStatus === "in_progress" ? "in_progress" : "scheduled",
-  }));
+  // D2: collapse a burst of raw rows for the same league down to the one item nearest to now —
+  // see `dedupeByLeagueName`'s own docblock. Applied per kind, before `interleave`.
+  const seatClaimed: readonly WireItem[] = dedupeByLeagueName(
+    claimRows.map((row) => ({
+      kind: "seat_claimed" as const,
+      leagueName: row.leagueName,
+      agoMs: now.getTime() - row.occurredAt.getTime(),
+      seatsOpen: row.teamCount - row.filledTeams,
+    })),
+  );
+  const leagueFilled: readonly WireItem[] = dedupeByLeagueName(
+    filledRows.map((row) => ({
+      kind: "league_filled" as const,
+      leagueName: row.leagueName,
+      // The WHERE already restricts to the two wire-worthy statuses; this narrows the row type
+      // to the contract's union without a cast.
+      draftStatus: row.draftStatus === "in_progress" ? ("in_progress" as const) : ("scheduled" as const),
+    })),
+  );
   const seasonCountValue = seasonRow?.count ?? 0;
   const seasonCount: readonly WireItem[] =
     seasonCountValue >= MATCHMAKING_CONFIG.proof.floors.leaguesFilled ? [{ kind: "season_count", count: seasonCountValue }] : [];

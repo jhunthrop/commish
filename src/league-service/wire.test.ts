@@ -234,6 +234,66 @@ describe("listWireItems — a mock league is invisible to every one of the three
   });
 });
 
+/**
+ * D1 (storefront review; flow analysis J04) — `notAFixtureLeague()` proven against the wire's
+ * own two league-named reads. `seatClaimsQuery`/`filledLeaguesQuery` are `@/league-service/
+ * browse.ts`'s shared predicate applied a second place, not a second rule.
+ */
+describe("listWireItems excludes dev/e2e fixture leagues (D1)", () => {
+  it("never reports a fixture-named league's seat claim, while a normal one still appears", async () => {
+    const fixture = await seedLeague({ name: "E2E Money Dark 1787678163994" });
+    await seedJoinEvent(fixture, new Date(nowMs - MS_PER_MINUTE));
+    const real = await seedLeague({ name: "The Longshot League 5" });
+    await seedJoinEvent(real, new Date(nowMs - 2 * MS_PER_MINUTE));
+
+    const claims = ofKind(await listWireItems(db, clock), "seat_claimed");
+    expect(claims.map((claim) => claim.leagueName)).toEqual(["The Longshot League 5"]);
+  });
+
+  it("never reports a fixture-named league as filled, while a normal one still appears", async () => {
+    await seedLeague({ name: "Mobile360 Hold League", teamCount: 2, filledTeams: 2 });
+    await seedLeague({ name: "Sunday Money", teamCount: 2, filledTeams: 2 });
+
+    const filled = ofKind(await listWireItems(db, clock), "league_filled");
+    expect(filled.map((item) => item.leagueName)).toEqual(["Sunday Money"]);
+  });
+});
+
+/**
+ * D2 (storefront review; flow analysis journey J23) — a burst of joins to the SAME league inside
+ * the window used to print the identical sentence roughly ten times in a single marquee pass.
+ */
+describe("listWireItems de-duplicates a burst for the same league (D2)", () => {
+  it("collapses many seat claims for the same league down to the newest one", async () => {
+    const leagueId = await seedLeague({ name: "The Longshot League 5", teamCount: 12, filledTeams: 10 });
+    await seedJoinEvent(leagueId, new Date(nowMs - 11 * MS_PER_MINUTE));
+    await seedJoinEvent(leagueId, new Date(nowMs - 11 * MS_PER_MINUTE));
+    await seedJoinEvent(leagueId, new Date(nowMs - 2 * MS_PER_MINUTE));
+
+    const claims = ofKind(await listWireItems(db, clock), "seat_claimed");
+    expect(claims).toEqual([{ kind: "seat_claimed", leagueName: "The Longshot League 5", agoMs: 2 * MS_PER_MINUTE, seatsOpen: 2 }]);
+  });
+
+  it("never collapses claims from two different leagues into one", async () => {
+    const a = await seedLeague({ name: "League A" });
+    const b = await seedLeague({ name: "League B" });
+    await seedJoinEvent(a, new Date(nowMs - MS_PER_MINUTE));
+    await seedJoinEvent(b, new Date(nowMs - 2 * MS_PER_MINUTE));
+
+    const claims = ofKind(await listWireItems(db, clock), "seat_claimed");
+    expect(claims.map((claim) => claim.leagueName).sort()).toEqual(["League A", "League B"]);
+  });
+
+  it("keeps a seat_claimed and a league_filled item for the same league — dedup never crosses kinds", async () => {
+    const leagueId = await seedLeague({ name: "Filled After A Claim", teamCount: 2, filledTeams: 2 });
+    await seedJoinEvent(leagueId, new Date(nowMs - MS_PER_MINUTE));
+
+    const items = await listWireItems(db, clock);
+    expect(ofKind(items, "seat_claimed").map((i) => i.leagueName)).toEqual(["Filled After A Claim"]);
+    expect(ofKind(items, "league_filled").map((i) => i.leagueName)).toEqual(["Filled After A Claim"]);
+  });
+});
+
 describe("listWireItems — the merged wire", () => {
   it("returns [] on a quiet product, never padding", async () => {
     expect(await listWireItems(db, clock)).toEqual([]);
