@@ -16,7 +16,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { getCurrentUser, requireAdmin } from "@/lib/auth/current-user";
 import { MONEY_CONFIG } from "@/money/config";
 import { resetExclusionRateLimit } from "../_shared";
-import { DELETE, POST } from "./route";
+import { DELETE, GET, POST } from "./route";
 
 const db = createTestDb();
 
@@ -52,6 +52,10 @@ async function seedUser(id: string): Promise<void> {
 
 function post() {
   return POST(new Request("http://test/api/wallet/exclusion", { method: "POST" }));
+}
+
+function get(query: string) {
+  return GET(new Request(`http://test/api/wallet/exclusion${query}`));
 }
 
 function del(body: unknown) {
@@ -107,6 +111,49 @@ describe("POST /api/wallet/exclusion", () => {
       expect((await post()).status).toBe(200);
     }
     expect((await post()).status).toBe(429);
+  });
+});
+
+describe("GET /api/wallet/exclusion", () => {
+  it("answers 401 to a caller with no session at all", async () => {
+    operatorSignedInAs(null);
+    const res = await get("?userId=u1");
+    expect(res.status).toBe(401);
+  });
+
+  it("answers 404, never 403, to a signed-in non-operator", async () => {
+    operatorSignedInAs("u_plain");
+    const res = await get("?userId=u1");
+    expect(res.status).toBe(404);
+  });
+
+  it("answers 400 for a missing userId", async () => {
+    operatorSignedInAs("u_op");
+    const res = await get("");
+    expect(res.status).toBe(400);
+  });
+
+  it("previews the member's own name and exclusion date for an operator", async () => {
+    operatorSignedInAs("u_op");
+    await seedUser("u_op");
+    await seedUser("u1");
+    signedInAs("u1");
+    await post(); // u1 self-excludes first
+
+    const res = await get("?userId=u1");
+    expect(res.status).toBe(200);
+    const payload = (await res.json()) as { data: { userId: string; displayName: string; selfExcludedAt: string } };
+    expect(payload.data.userId).toBe("u1");
+    expect(payload.data.displayName).toBe("u1");
+    expect(payload.data.selfExcludedAt).toMatch(/\S/);
+  });
+
+  it("answers 404 for a member who is not excluded — nothing to preview", async () => {
+    operatorSignedInAs("u_op");
+    await seedUser("u_op");
+    await seedUser("u1");
+    const res = await get("?userId=u1");
+    expect(res.status).toBe(404);
   });
 });
 

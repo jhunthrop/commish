@@ -14,7 +14,7 @@ import type { PrizeTable } from "@/money/prize-table";
 import { MONEY_STATES, type MoneyStatesConfig, type StateCode } from "@/money/states";
 import { postMoneyTransaction } from "./post";
 import { accountBalance, walletSummary } from "./read";
-import { confiscateHold, releaseHold, SETTLEMENT_REFUSALS, settleSeasonPayouts, type SettlementDeps } from "./settlement";
+import { confiscateHold, holdPreview, releaseHold, settlementPreview, SETTLEMENT_REFUSALS, settleSeasonPayouts, type SettlementDeps } from "./settlement";
 import { snapshotMoneyBook } from "./test-support";
 
 /**
@@ -822,6 +822,81 @@ describe("releaseHold and confiscateHold", () => {
     const refuse: NonNullable<SettlementDeps["postTransaction"]> = async () => ({ ok: false, reason: MONEY_REFUSALS.insufficientBalance });
     await expect(releaseHold(db, { userId: "u_flag", operatorUserId: OPERATOR }, { ...deps, postTransaction: refuse })).rejects.toThrow();
     await expectNoSettlementTookPlace(before);
+  });
+});
+
+describe("settlementPreview", () => {
+  it("answers the league-missing refusal for an id that does not exist", async () => {
+    expect(await settlementPreview(db, "lg_ghost")).toEqual({ ok: false, status: 404, reason: SETTLEMENT_REFUSALS.leagueMissing });
+  });
+
+  it("names the league, its prize table, escrow and every seated member — without moving money", async () => {
+    await seedLeague({ id: "lg_preview" });
+    await fund("u1", FEE);
+    await fund("u2", FEE);
+    await paidJoin("lg_preview", "u1", "TN");
+    await paidJoin("lg_preview", "u2", "TN");
+
+    const preview = await settlementPreview(db, "lg_preview");
+    expect(preview).toMatchObject({
+      ok: true,
+      leagueName: "Settlement Test League",
+      seasonCompleted: false,
+      entryFeeCents: FEE,
+      prizeTable: TABLE_4,
+      escrowCents: FEE * 2,
+    });
+    if (!preview.ok) throw new Error("expected ok");
+    expect(preview.roster).toHaveLength(2);
+    expect(preview.roster.map((row) => row.userId).sort()).toEqual(["u1", "u2"]);
+    for (const row of preview.roster) {
+      expect(row.teamName).toMatch(/\S/);
+      expect(row.ownerDisplayName).toMatch(/\S/);
+    }
+
+    // A read: the escrow and the league's own state are untouched.
+    expect(await accountBalance(db, accountIdFor("league_escrow", "lg_preview"))).toBe(FEE * 2);
+  });
+
+  it("reports seasonCompleted true once the season is stamped", async () => {
+    await seedLeague({ id: "lg_preview_done" });
+    await fund("u1", FEE);
+    await paidJoin("lg_preview_done", "u1", "TN");
+    await completeSeason("lg_preview_done");
+
+    const preview = await settlementPreview(db, "lg_preview_done");
+    expect(preview).toMatchObject({ ok: true, seasonCompleted: true });
+  });
+});
+
+describe("holdPreview", () => {
+  it("answers the member-missing refusal for an id that does not exist", async () => {
+    expect(await holdPreview(db, "u_ghost")).toEqual({ ok: false, status: 404, reason: SETTLEMENT_REFUSALS.memberMissing });
+  });
+
+  it("names the member and the amount held, without moving money", async () => {
+    // A minimal held-winner arc, `releaseHold and confiscateHold`'s own `seedHeldWinner` shape
+    // reproduced here rather than reached across a `describe` boundary it is private to.
+    await seedLeague({ id: "lg_hp", teamCount: 2, entryFeeCents: 20_00, platformFeeCents: 0, payoutTable: [{ place: 1, amountCents: 40_00 }] });
+    await fund("u_hp_flag", 50_00);
+    await fund("u_hp_other", 50_00);
+    await paidJoin("lg_hp", "u_hp_flag", "TN");
+    await paidJoin("lg_hp", "u_hp_other", "TN");
+    await completeSeason("lg_hp");
+    await raisePairFlag("u_hp_flag", "u_hp_other", "flag_hp");
+    const settled = await settle("lg_hp", [{ place: 1, userId: "u_hp_flag" }]);
+    expect(settled).toMatchObject({ ok: true, heldCents: 40_00 });
+
+    const preview = await holdPreview(db, "u_hp_flag");
+    expect(preview).toEqual({ ok: true, displayName: "u_hp_flag", heldCents: 40_00 });
+    // A read: the held balance is untouched, unlike release/confiscate.
+    expect(await accountBalance(db, accountIdFor("held_for_review", "u_hp_flag"))).toBe(40_00);
+  });
+
+  it("reads zero for a member with nothing held", async () => {
+    await seedUser("u_clean");
+    const preview = await holdPreview(db, "u_clean");
+    expect(preview).toEqual({ ok: true, displayName: "u_clean", heldCents: 0 });
   });
 });
 

@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, EYEBROW, Modal, PositionBadge, Sticker, Textarea } from "@/components/ui";
+import { Button, Card, EYEBROW, PositionBadge, Sticker, Textarea } from "@/components/ui";
+import { positionMutedOnFillTextClass } from "@/components/ui/position-badge";
 import { Icon } from "@/components/ui/icon";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { ActivityRow } from "@/integrity/activity-view";
 import type { ResolutionDecision } from "@/integrity/flags";
 import type { FlagSubjectView, HeldTradeManagerView, TradedPlayerView } from "@/integrity/queue-view";
 import { useAdminRoomDeps } from "../hooks/deps";
+import { ConfirmModal } from "./confirm-modal";
 
 export type HeldTradeSubject = Extract<FlagSubjectView, { readonly kind: "held_trade" }>;
 
@@ -74,7 +76,14 @@ function TradedPlayerList({ heading, players }: { readonly heading: string; read
                 <Sticker position={player.position} className="flex items-center gap-2 px-2 py-1">
                   <PositionBadge position={player.position} size="sm" />
                   <span className="min-w-0 break-words text-sm font-medium">{player.name}</span>
-                  <span className="shrink-0 text-xs text-text-muted">{player.averagePoints.toFixed(1)} pts/wk</span>
+                  {/* D2 (operator review): the sticker's OWN on-fill role, muted by opacity
+                      rather than swapped for a page-ground `text-text-muted` — that role assumes
+                      a page surface behind it, and every position's saturated fill measured well
+                      under 3:1 against it, in both themes (1.07:1 dark, 1.15:1 light, QB). Opacity
+                      blends the on-fill color TOWARD the fill it already clears ≥4.5:1 against,
+                      so the result stays in that fill's own designed-contrast family — proven for
+                      all six positions, both themes, in `held-trade-detail.test.tsx`. */}
+                  <span className={`shrink-0 text-xs ${positionMutedOnFillTextClass(player.position)}`}>{player.averagePoints.toFixed(1)} pts/wk</span>
                 </Sticker>
               )}
             </li>
@@ -82,45 +91,6 @@ function TradedPlayerList({ heading, players }: { readonly heading: string; read
         </ul>
       )}
     </div>
-  );
-}
-
-/** The one place either irreversible decision is confirmed — mirroring `TradeCard`'s own
- *  Accept/Decline `Modal`, since a held trade's release or block is the identical class of
- *  one-way control. */
-function ConfirmModal({
-  open,
-  title,
-  body,
-  busy,
-  onCancel,
-  onConfirm,
-}: {
-  readonly open: boolean;
-  readonly title: string;
-  readonly body: string;
-  readonly busy: boolean;
-  readonly onCancel: () => void;
-  readonly onConfirm: () => void;
-}) {
-  return (
-    <Modal
-      open={open}
-      title={title}
-      onClose={onCancel}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="destructive" loading={busy} disabled={busy} onClick={onConfirm}>
-            Confirm
-          </Button>
-        </>
-      }
-    >
-      <p>{body}</p>
-    </Modal>
   );
 }
 
@@ -268,7 +238,9 @@ export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLeng
       <ConfirmModal
         open={confirming === "trade_released"}
         title="Release this trade?"
-        body="The trade goes through exactly as the two managers agreed to it. Both rosters change immediately, and you can't undo it."
+        body={<p>The trade goes through exactly as the two managers agreed to it. Both rosters change immediately. This cannot be undone.</p>}
+        confirmLabel="Release the trade"
+        variant="primary"
         busy={submitting}
         onCancel={() => setConfirming(null)}
         onConfirm={() => void submit("trade_released")}
@@ -276,7 +248,9 @@ export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLeng
       <ConfirmModal
         open={confirming === "trade_blocked"}
         title="Block this trade?"
-        body="The trade never goes through. Both rosters stay exactly as they were, and you can't undo it."
+        body={<p>The trade never goes through. Both rosters stay exactly as they were. This cannot be undone.</p>}
+        confirmLabel="Block the trade"
+        variant="destructive"
         busy={submitting}
         onCancel={() => setConfirming(null)}
         onConfirm={() => void submit("trade_blocked")}

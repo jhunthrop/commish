@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { auditEvents, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
-import { clearSelfExclusion, setSelfExclusion } from "./exclusion";
+import { clearSelfExclusion, exclusionPreview, setSelfExclusion } from "./exclusion";
 
 const db = createTestDb();
 const NOW = "2026-09-01T00:00:00.000Z";
@@ -66,6 +66,24 @@ describe("setSelfExclusion", () => {
     await seedUser("u1");
     const result = await setSelfExclusion(db, "u1");
     expect(result).toMatch(/\S/);
+  });
+});
+
+describe("exclusionPreview", () => {
+  it("names the member and their exclusion date", async () => {
+    await seedUser("u1");
+    await setSelfExclusion(db, "u1", at(NOW), logger);
+
+    expect(await exclusionPreview(db, "u1")).toEqual({ ok: true, displayName: "u1", selfExcludedAt: NOW });
+  });
+
+  it("refuses, the same sentence clearSelfExclusion uses, for a member who is not excluded", async () => {
+    await seedUser("u1");
+    expect(await exclusionPreview(db, "u1")).toEqual({ ok: false, reason: '"u1" is not a user, or is not excluded.' });
+  });
+
+  it("refuses the same way for a userId that does not exist at all", async () => {
+    expect(await exclusionPreview(db, "u_never_seen")).toEqual({ ok: false, reason: '"u_never_seen" is not a user, or is not excluded.' });
   });
 });
 

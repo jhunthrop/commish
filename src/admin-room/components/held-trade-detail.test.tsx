@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
+import type { Position } from "@/domain/player";
+import { blendOver, contrastRatio } from "@/design/test-support";
+import { TOKENS, type ThemeName } from "@/design/tokens";
 import { renderSurface } from "@/components/ui/test-utils";
 import { AdminRoomDepsProvider } from "../hooks/deps";
 import { fixtureAdminDeps, renderInAdmin } from "../test-fixtures";
@@ -111,10 +114,11 @@ describe("HeldTradeDetail", () => {
     renderInAdmin(<HeldTradeDetail flagId="flag_1" subject={SUBJECT} trail={[]} decisions={BOTH_DECISIONS} noteMaxLength={500} />, fixture.deps);
 
     fireEvent.click(screen.getByRole("button", { name: "Release the trade" }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("Release this trade?");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Release this trade?");
     expect(fixture.calls).toEqual([]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Release the trade" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Released."));
     expect(fixture.calls).toEqual(["POST /api/admin/flags/flag_1/resolve"]);
     expect(refresh).toHaveBeenCalled();
@@ -126,9 +130,10 @@ describe("HeldTradeDetail", () => {
 
     fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Both teams belong to one person." } });
     fireEvent.click(screen.getByRole("button", { name: "Block the trade" }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("Block this trade?");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Block this trade?");
 
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Block the trade" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Blocked."));
     expect(fixture.calls).toEqual(["POST /api/admin/flags/flag_1/resolve"]);
   });
@@ -148,7 +153,7 @@ describe("HeldTradeDetail", () => {
     renderInAdmin(<HeldTradeDetail flagId="flag_1" subject={SUBJECT} trail={[]} decisions={BOTH_DECISIONS} noteMaxLength={500} />, fixture.deps);
 
     fireEvent.click(screen.getByRole("button", { name: "Release the trade" }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Release the trade" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("already resolved"));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -171,11 +176,35 @@ describe("HeldTradeDetail", () => {
     expect(screen.getByRole("button", { name: "Block the trade" })).toHaveFocus();
     await user.keyboard("{Enter}");
 
-    expect(screen.getByRole("dialog")).toHaveTextContent("Block this trade?");
-    const confirm = screen.getByRole("button", { name: "Confirm" });
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Block this trade?");
+    const confirm = within(dialog).getByRole("button", { name: "Block the trade" });
     confirm.focus();
     await user.keyboard("{Enter}");
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Blocked."));
   });
+
+  /**
+   * D2 (operator review, 2026-08-27): `TradedPlayerList`'s `pts/wk` caption used to carry
+   * `text-text-muted` — a page-ground role — inside a `Sticker`'s own saturated fill, and
+   * measured 1.07:1 in dark and 1.15:1 in light (both on QB), well under WCAG's 3:1 floor for a
+   * UI-adjacent label. The fix mutes the sticker's OWN on-fill role (`positionMutedOnFillTextClass`,
+   * `@/components/ui/position-badge`) by opacity instead of swapping the color family — proven
+   * here for every position, both themes, against the ACTUAL rendered contrast rather than the
+   * un-blended token pair `tokens.test.ts` already checks (`PositionColor.stickerText` alone).
+   */
+  const ALL_POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
+  const THEMES: readonly ThemeName[] = ["dark", "light"];
+
+  it.each(THEMES.flatMap((theme) => ALL_POSITIONS.map((position) => ({ theme, position }))))(
+    "keeps the muted pts/wk caption at or above 3:1 against its own sticker fill — $theme $position",
+    ({ theme, position }) => {
+      const { sticker, stickerText } = TOKENS.position[theme][position.toLowerCase() as Lowercase<Position>];
+      // The exact math `opacity-80` performs: the on-fill label blended 80% toward itself, 20%
+      // toward the fill behind it — a real CSS `opacity` on an element painted over that fill.
+      const muted = blendOver(stickerText, 0.8, sticker);
+      expect(contrastRatio(muted, sticker)).toBeGreaterThanOrEqual(3);
+    },
+  );
 });

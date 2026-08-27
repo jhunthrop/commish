@@ -10,7 +10,7 @@ import { acceptInvite, createInvite } from "@/league-service/invites";
 import { DRAFT_ALREADY_STARTED, joinPublicLeague } from "@/league-service/join";
 import { accountIdFor } from "@/money/accounts";
 import { MONEY_STATES, type MoneyStatesConfig, type StateCode } from "@/money/states";
-import { DISSOLUTION_REFUSALS, dissolveLeague, LEAGUE_DISSOLVED_SUMMARY } from "./dissolution";
+import { DISSOLUTION_REFUSALS, dissolutionPreview, dissolveLeague, LEAGUE_DISSOLVED_SUMMARY } from "./dissolution";
 import { postMoneyTransaction } from "./post";
 import { walletSummary } from "./read";
 import { expectNoPostingTookPlace, snapshotMoneyBook } from "./test-support";
@@ -142,6 +142,26 @@ beforeEach(async () => {
 afterAll(async () => {
   await truncateAll(db);
   await truncateMoneyTables(db);
+});
+
+describe("dissolutionPreview", () => {
+  it("answers the league-missing refusal for an id that does not exist", async () => {
+    expect(await dissolutionPreview(db, "lg_ghost")).toEqual({ ok: false, status: 404, reason: DISSOLUTION_REFUSALS.leagueMissing });
+  });
+
+  it("names the league and its seated count, without touching the draft or the book", async () => {
+    await seedLeague({ id: "lg_dp", filled: 3 });
+
+    expect(await dissolutionPreview(db, "lg_dp")).toEqual({ ok: true, leagueName: "Dissolution Test League", seatedCount: 3 });
+
+    const [draft] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, "lg_dp"));
+    expect(draft!.status).toBe("scheduled");
+  });
+
+  it("reads zero for a league nobody has joined yet", async () => {
+    await seedLeague({ id: "lg_dp_empty" });
+    expect(await dissolutionPreview(db, "lg_dp_empty")).toEqual({ ok: true, leagueName: "Dissolution Test League", seatedCount: 0 });
+  });
 });
 
 describe("dissolveLeague — refusals", () => {

@@ -53,7 +53,7 @@ describe("AdminMoneyReconcilePage — rendering", () => {
     const fixture = fixtureAdminDeps({ ok: true, data: cleanReport });
     await renderSurface(<AdminRoomDepsProvider deps={fixture.deps}>{page}</AdminRoomDepsProvider>, async ({ container }) => {
       expect(screen.getByText("Money reconciliation")).toBeInTheDocument();
-      expect(await screen.findByText("No drift found. The ledger agrees with the bank, and every internal check is clean.")).toBeInTheDocument();
+      expect(await screen.findByText("The book holds no money yet. There is nothing to check.")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
   });

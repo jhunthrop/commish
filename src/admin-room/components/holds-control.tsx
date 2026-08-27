@@ -5,6 +5,7 @@ import { Button, Input } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { formatUsd } from "@/money/config";
 import { useAdminRoomDeps } from "../hooks/deps";
+import { ConfirmModal } from "./confirm-modal";
 
 interface HoldOutcomeBody {
   readonly userId: string;
@@ -12,43 +13,84 @@ interface HoldOutcomeBody {
   readonly amountCents: number;
 }
 
+interface HoldPreviewBody {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly heldCents: number;
+}
+
+interface HoldConfirmState extends HoldPreviewBody {
+  readonly action: "release" | "confiscate";
+}
+
 /**
- * The admin-room held-payout panel (Phase 4, Task 10): the two one-way exits from
- * `held_for_review`, in `ExclusionControl`'s own paste-an-id shape — an operator arrives from the
- * flag they just resolved, which names the member. Release when the flag closed in the member's
- * favor; confiscate when it closed against them. Both are one press and one-way: the first
- * outcome drains the hold, and a second press answers the plain "nothing held" refusal.
+ * The admin-room held-payout panel (Phase 4, Task 10; read-then-confirm added per the operator
+ * review, 2026-08-27, findings D1/D3): the two one-way exits from `held_for_review`. Neither
+ * button fires its `POST` directly any more — each first fetches `GET /api/admin/holds/[userId]`,
+ * a plain read that names the member and the exact amount held, and opens `ConfirmModal` naming
+ * that member and that amount. Release's confirm stays the page's one quiet ink (`variant`
+ * defaults to `"primary"`); confiscate's confirm stays `"destructive"` — the SAME visual
+ * distinction the two trigger buttons already carried, now carried into the moment that actually
+ * moves the money, restated in words ("takes the member's balance") rather than color alone.
  */
 export function HoldsControl() {
   const { fetchJson } = useAdminRoomDeps();
   const [userId, setUserId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [confirming, setConfirming] = useState<HoldConfirmState | null>(null);
   const [outcome, setOutcome] = useState<HoldOutcomeBody | null>(null);
 
-  const submit = async (action: "release" | "confiscate"): Promise<void> => {
+  const beginConfirm = async (action: "release" | "confiscate"): Promise<void> => {
     const trimmed = userId.trim();
     if (trimmed.length === 0) {
       setError("Enter the member's user id.");
       return;
     }
-    setSubmitting(true);
+    setPreviewing(true);
     setError(null);
     try {
-      const response = await fetchJson(`/api/admin/holds/${trimmed}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      const envelope = (await response.json()) as ApiEnvelope<HoldOutcomeBody>;
+      const response = await fetchJson(`/api/admin/holds/${trimmed}`);
+      const envelope = (await response.json()) as ApiEnvelope<HoldPreviewBody>;
       if (!envelope.ok) {
         setError(envelope.error);
         return;
       }
-      setOutcome(envelope.data);
-      setUserId("");
+      if (envelope.data.heldCents <= 0) {
+        setError("Nothing is held for this member.");
+        return;
+      }
+      setConfirming({ ...envelope.data, action });
     } catch {
       setError("We could not reach the server. Check your connection and try again.");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const submit = async (): Promise<void> => {
+    if (confirming === null) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetchJson(`/api/admin/holds/${confirming.userId}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: confirming.action }),
+      });
+      const envelope = (await response.json()) as ApiEnvelope<HoldOutcomeBody>;
+      if (!envelope.ok) {
+        setError(envelope.error);
+        setConfirming(null);
+        return;
+      }
+      setOutcome(envelope.data);
+      setUserId("");
+      setConfirming(null);
+    } catch {
+      setError("We could not reach the server. Check your connection and try again.");
+      setConfirming(null);
     } finally {
       setSubmitting(false);
     }
@@ -59,7 +101,7 @@ export function HoldsControl() {
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        void submit("release");
+        void beginConfirm("release");
       }}
     >
       <Input
@@ -87,13 +129,32 @@ export function HoldsControl() {
       )}
 
       <div className="flex gap-3">
-        <Button type="submit" loading={submitting} disabled={submitting}>
+        <Button type="submit" loading={previewing && confirming === null} disabled={previewing || submitting}>
           Release hold
         </Button>
-        <Button type="button" variant="destructive" disabled={submitting} onClick={() => void submit("confiscate")}>
+        <Button type="button" variant="destructive" disabled={previewing || submitting} onClick={() => void beginConfirm("confiscate")}>
           Confiscate hold
         </Button>
       </div>
+
+      {confirming === null ? null : (
+        <ConfirmModal
+          open
+          title={confirming.action === "release" ? `Release hold for ${confirming.displayName}?` : `Confiscate hold for ${confirming.displayName}?`}
+          body={
+            <p>
+              {confirming.action === "release"
+                ? `Pay ${formatUsd(confirming.heldCents)} to ${confirming.displayName}'s wallet. This cannot be undone.`
+                : `Take ${formatUsd(confirming.heldCents)} from ${confirming.displayName}'s balance. This cannot be undone.`}
+            </p>
+          }
+          confirmLabel={confirming.action === "release" ? `Release ${confirming.displayName}'s hold` : `Confiscate ${confirming.displayName}'s hold`}
+          variant={confirming.action === "release" ? "primary" : "destructive"}
+          busy={submitting}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => void submit()}
+        />
+      )}
     </form>
   );
 }

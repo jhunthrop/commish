@@ -5,6 +5,7 @@ import { Button, Input, Textarea } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { formatUsd } from "@/money/config";
 import { useAdminRoomDeps } from "../hooks/deps";
+import { ConfirmModal } from "./confirm-modal";
 
 interface SettleLeagueBody {
   readonly leagueId: string;
@@ -14,54 +15,142 @@ interface SettleLeagueBody {
   readonly rakeCents: number;
 }
 
+interface SettlePreviewRosterEntry {
+  readonly userId: string;
+  readonly teamName: string;
+  readonly ownerDisplayName: string;
+}
+
+interface SettlePreviewBody {
+  readonly leagueId: string;
+  readonly leagueName: string;
+  readonly seasonCompleted: boolean;
+  readonly entryFeeCents: number;
+  readonly prizeTable: readonly { readonly place: number; readonly amountCents: number }[];
+  readonly escrowCents: number;
+  readonly roster: readonly SettlePreviewRosterEntry[];
+}
+
+interface SettleStanding {
+  readonly place: number;
+  readonly userId: string;
+}
+
+interface SettleConfirmRow extends SettleStanding {
+  readonly amountCents: number;
+  readonly displayName: string;
+  /** `false` when the pasted id matched nobody on this league's own roster — the confirm still
+   *  shows it, verbatim, rather than silently dropping a line the operator typed. */
+  readonly knownMember: boolean;
+}
+
+interface SettleConfirmState {
+  readonly leagueId: string;
+  readonly leagueName: string;
+  readonly escrowCents: number;
+  readonly rows: readonly SettleConfirmRow[];
+}
+
+/** "1st", "2nd", "3rd", "4th"… — a local copy of `formatOrdinal`'s own five-line rule
+ *  (`@/draft-room/state/format`), duplicated rather than imported: this file is client boundary
+ *  code, and reaching into a sibling room's module for five lines of arithmetic would be a new,
+ *  undocumented cross-room dependency for no shared behavior worth coupling over. */
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  const suffix = n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
+  return `${n}${suffix}`;
+}
+
+function parseStandings(text: string): readonly SettleStanding[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((userId, index) => ({ place: index + 1, userId }));
+}
+
+function buildConfirmRows(standings: readonly SettleStanding[], preview: SettlePreviewBody): readonly SettleConfirmRow[] {
+  const rosterByUserId = new Map(preview.roster.map((row) => [row.userId, row]));
+  const prizeByPlace = new Map(preview.prizeTable.map((entry) => [entry.place, entry.amountCents]));
+  return standings.map((standing) => {
+    const member = rosterByUserId.get(standing.userId);
+    return {
+      ...standing,
+      amountCents: prizeByPlace.get(standing.place) ?? 0,
+      displayName: member === undefined ? standing.userId : `${member.ownerDisplayName} (${member.teamName})`,
+      knownMember: member !== undefined,
+    };
+  });
+}
+
 /**
- * The admin-room settlement control (Phase 4, Task 10): the season's end game, in
- * `DissolveLeagueControl`'s own paste-an-id shape (`./dissolve-league-control.tsx`) — an operator
- * arrives from the season-close checklist that already names the league. The standings go in as
- * one member id per line, top line first place: WHO finished where is the ONLY thing this form
- * can say, because the request schema has no amount field at all — every dollar figure is the
- * league's own stored payout table, read server-side under lock.
- *
- * No confirmation dialog beyond the button's own label: `settleSeasonPayouts` answers a repeat
- * as a clean idempotent no-op, so the worst a mis-click costs is the "already settled" sentence.
+ * The admin-room settlement control (Phase 4, Task 10; read-then-confirm added per the operator
+ * review, 2026-08-27, findings D1/D3): the season's end game. Pressing the button — or Enter in
+ * either field — no longer fires the one-way `POST` directly: it fetches `GET /api/admin/leagues/
+ * [leagueId]/settle`, a plain read that names the league, its published prize table, its escrow
+ * and every seated member, and opens `ConfirmModal` with the operator's OWN pasted standings
+ * resolved against that roster — a name and a dollar amount beside every place, not a textarea of
+ * bare ids. A pasted id the roster does not recognize still renders, verbatim, so a typo is
+ * visible before it is irreversible rather than silently swallowed.
  */
 export function SettleLeagueControl() {
   const { fetchJson } = useAdminRoomDeps();
   const [leagueId, setLeagueId] = useState("");
   const [standingsText, setStandingsText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [confirming, setConfirming] = useState<SettleConfirmState | null>(null);
   const [settled, setSettled] = useState<SettleLeagueBody | null>(null);
 
-  const submit = async (): Promise<void> => {
+  const beginConfirm = async (): Promise<void> => {
     const trimmed = leagueId.trim();
     if (trimmed.length === 0) {
       setError("Enter the league's id.");
       return;
     }
-    const standings = standingsText
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((userId, index) => ({ place: index + 1, userId }));
+    const standings = parseStandings(standingsText);
+    setPreviewing(true);
+    setError(null);
+    try {
+      const response = await fetchJson(`/api/admin/leagues/${trimmed}/settle`);
+      const envelope = (await response.json()) as ApiEnvelope<SettlePreviewBody>;
+      if (!envelope.ok) {
+        setError(envelope.error);
+        return;
+      }
+      setConfirming({ leagueId: trimmed, leagueName: envelope.data.leagueName, escrowCents: envelope.data.escrowCents, rows: buildConfirmRows(standings, envelope.data) });
+    } catch {
+      setError("We could not reach the server. Check your connection and try again.");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const submit = async (): Promise<void> => {
+    if (confirming === null) return;
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetchJson(`/api/admin/leagues/${trimmed}/settle`, {
+      const response = await fetchJson(`/api/admin/leagues/${confirming.leagueId}/settle`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ standings }),
+        body: JSON.stringify({ standings: confirming.rows.map(({ place, userId }) => ({ place, userId })) }),
       });
       const envelope = (await response.json()) as ApiEnvelope<SettleLeagueBody>;
       if (!envelope.ok) {
         setError(envelope.error);
+        setConfirming(null);
         return;
       }
       setSettled(envelope.data);
       setLeagueId("");
       setStandingsText("");
+      setConfirming(null);
     } catch {
       setError("We could not reach the server. Check your connection and try again.");
+      setConfirming(null);
     } finally {
       setSubmitting(false);
     }
@@ -80,7 +169,7 @@ export function SettleLeagueControl() {
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        void submit();
+        void beginConfirm();
       }}
     >
       <Input
@@ -115,10 +204,40 @@ export function SettleLeagueControl() {
       )}
 
       <div>
-        <Button type="submit" loading={submitting} disabled={submitting}>
+        <Button type="submit" loading={previewing} disabled={previewing || submitting}>
           Settle league
         </Button>
       </div>
+
+      {confirming === null ? null : (
+        <ConfirmModal
+          open
+          title={`Settle ${confirming.leagueName}?`}
+          body={
+            <div className="flex flex-col gap-2">
+              <p>Pay {confirming.leagueName}&apos;s prize table and close its escrow. This cannot be undone.</p>
+              {confirming.rows.length === 0 ? (
+                <p className="text-sm">No standings were entered. No prize will be paid.</p>
+              ) : (
+                <ul className="flex flex-col gap-1 text-sm">
+                  {confirming.rows.map((row) => (
+                    <li key={row.place}>
+                      {ordinal(row.place)}: {row.displayName}
+                      {row.knownMember ? null : " (not on this league's roster)"}, {formatUsd(row.amountCents)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-sm">Escrow closing: {formatUsd(confirming.escrowCents)}.</p>
+            </div>
+          }
+          confirmLabel={`Settle ${confirming.leagueName}`}
+          variant="destructive"
+          busy={submitting}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => void submit()}
+        />
+      )}
     </form>
   );
 }

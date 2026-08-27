@@ -22,6 +22,29 @@ export const DISSOLUTION_REFUSALS = {
   draftStarted: "This league's draft has already started, so it cannot be dissolved.",
 } as const;
 
+export type DissolutionPreviewResult =
+  | { readonly ok: true; readonly leagueName: string; readonly seatedCount: number }
+  | { readonly ok: false; readonly status: number; readonly reason: string };
+
+/**
+ * The read-then-confirm half of this door (operator review, 2026-08-27, findings D1/D3): what
+ * `dissolveLeague` is ABOUT to do, named, before an operator presses the one-way button — the
+ * league's own name and how many seats it would refund, neither of which `dissolveLeague` itself
+ * needed to compute for a caller until now. Plain reads, no lock, no transaction: two operators
+ * previewing the same league at once can never interfere with each other, and `dissolveLeague`'s
+ * own `leagues[X] FOR UPDATE` is what makes the ACT safe, not this read — a preview that raced a
+ * real dissolution would simply read whichever side of that transaction had or had not committed
+ * yet, the same "a preview is a snapshot, not a lock" contract every read-only door in this
+ * codebase already holds to.
+ */
+export async function dissolutionPreview(db: Db, leagueId: string): Promise<DissolutionPreviewResult> {
+  const [league] = await db.select({ id: leagues.id, name: leagues.name }).from(leagues).where(eq(leagues.id, leagueId));
+  if (league === undefined) return { ok: false, status: 404, reason: DISSOLUTION_REFUSALS.leagueMissing };
+
+  const seated = await db.select({ userId: teams.userId }).from(teams).where(eq(teams.leagueId, league.id));
+  return { ok: true, leagueName: league.name, seatedCount: seated.length };
+}
+
 export interface DissolveLeagueInput {
   readonly leagueId: string;
   /** The operator's own verified id, from `withAdmin`'s session — never from a request body.

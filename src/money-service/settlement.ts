@@ -1,14 +1,15 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db, DbTx } from "@/db/client";
-import { chatMessages, integrityFlags, leagues, moneyAccounts, moneyEntries, moneyTransactions, reviews, teams, tradeProposals } from "@/db/schema";
+import { chatMessages, integrityFlags, leagues, moneyAccounts, moneyEntries, moneyTransactions, reviews, teams, tradeProposals, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember } from "@/integrity-service/notify";
 import { accountIdFor, type MoneyAccountId } from "@/money/accounts";
-import { prizeTableInvariant } from "@/money/prize-table";
+import { prizeTableInvariant, type PrizeTable } from "@/money/prize-table";
 import { entryFeeContributionInTx } from "./entry-fee";
 import { ensureAndLockMoneyAccounts, postMoneyTransaction, type MoneyEntryInput } from "./post";
+import { accountBalance } from "./read";
 
 /**
  * Every reason settlement (or a hold outcome) declines to act, named once — `DISSOLUTION_REFUSALS`'
@@ -24,7 +25,95 @@ export const SETTLEMENT_REFUSALS = {
    *  pot the escrow holds, and settlement refuses whole rather than pays what it can. */
   escrowMismatch: "No money moved. This league's escrow does not match its published prize table to the cent, so settlement refused rather than guessed.",
   nothingHeld: "No money moved. Nothing is held for review on this account.",
+  /** The hold preview's own refusal — a read, so "No money moved" would be a strange thing to
+   *  promise about an act that was never attempted. */
+  memberMissing: "That member does not exist.",
 } as const;
+
+export interface SettlementPreviewRosterEntry {
+  readonly userId: string;
+  readonly teamName: string;
+  readonly ownerDisplayName: string;
+}
+
+export type SettlementPreviewResult =
+  | {
+      readonly ok: true;
+      readonly leagueName: string;
+      readonly seasonCompleted: boolean;
+      readonly entryFeeCents: number;
+      readonly prizeTable: PrizeTable;
+      readonly escrowCents: number;
+      readonly roster: readonly SettlementPreviewRosterEntry[];
+    }
+  | { readonly ok: false; readonly status: number; readonly reason: string };
+
+/**
+ * The read-then-confirm half of this door (operator review, 2026-08-27, findings D1/D3): what
+ * `settleSeasonPayouts` is ABOUT to pay, before an operator commits standings that close a
+ * league's escrow for good. `roster` names every seat by its owner's own display name
+ * (`listTeamCards`'s own join, `@/draft-service/teams`, reproduced here rather than imported —
+ * `@/draft-service` sits on this codebase's own server-only-module list, and a service module
+ * importing a SIBLING service module's read helper would be a second, undocumented dependency
+ * edge this file's own docblocks never argue for) so the confirm step can put a name, not a bare
+ * id, beside every place the operator typed. `prizeTable` and `escrowCents` are the same two
+ * figures `settleSeasonPayouts` itself checks under lock (`prizeTableInvariant`, the escrow
+ * rollup) — read here WITHOUT a lock, because a preview is a snapshot an operator reads before
+ * deciding, never the authority the real settlement re-derives for itself a moment later.
+ */
+export async function settlementPreview(db: Db, leagueId: string): Promise<SettlementPreviewResult> {
+  const [league] = await db
+    .select({
+      id: leagues.id,
+      name: leagues.name,
+      entryFeeCents: leagues.entryFeeCents,
+      payoutTable: leagues.payoutTable,
+      seasonCompletedAt: leagues.seasonCompletedAt,
+    })
+    .from(leagues)
+    .where(eq(leagues.id, leagueId));
+  if (league === undefined) return { ok: false, status: 404, reason: SETTLEMENT_REFUSALS.leagueMissing };
+
+  const roster = await db
+    .select({ userId: teams.userId, teamName: teams.name, ownerDisplayName: users.displayName })
+    .from(teams)
+    .innerJoin(users, eq(users.id, teams.userId))
+    .where(eq(teams.leagueId, league.id))
+    .orderBy(asc(teams.id));
+
+  const escrowCents = await accountBalance(db, accountIdFor("league_escrow", league.id));
+
+  return {
+    ok: true,
+    leagueName: league.name,
+    seasonCompleted: league.seasonCompletedAt !== null,
+    entryFeeCents: league.entryFeeCents,
+    prizeTable: league.payoutTable ?? [],
+    escrowCents,
+    roster,
+  };
+}
+
+export type HoldPreviewResult =
+  | { readonly ok: true; readonly displayName: string; readonly heldCents: number }
+  | { readonly ok: false; readonly status: number; readonly reason: string };
+
+/**
+ * The read-then-confirm half of `releaseHold`/`confiscateHold` (operator review, finding D1/D3):
+ * the member's own name and the exact amount either one-way exit would move, read with
+ * `accountBalance` (`./read`) — the SAME entry-sum a real reconciliation trusts, never the
+ * `money_accounts` rollup — but with no lock, because a preview commits nothing. Two operators
+ * previewing the same member's hold at once simply both see the balance as it stood a moment
+ * ago; `resolveHeldPayout`'s own locked re-read is what decides which of them (if either) still
+ * finds money there when they actually press the button.
+ */
+export async function holdPreview(db: Db, userId: string): Promise<HoldPreviewResult> {
+  const [user] = await db.select({ id: users.id, displayName: users.displayName }).from(users).where(eq(users.id, userId));
+  if (user === undefined) return { ok: false, status: 404, reason: SETTLEMENT_REFUSALS.memberMissing };
+
+  const heldCents = await accountBalance(db, accountIdFor("held_for_review", userId));
+  return { ok: true, displayName: user.displayName, heldCents };
+}
 
 /** One line of the operator's standings input: WHO finished at each place. Never an amount —
  *  the amounts are the league's own stored `payout_table`, read under lock. */

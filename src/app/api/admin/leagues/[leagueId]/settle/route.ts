@@ -1,6 +1,7 @@
 import { getDb } from "@/db/client";
-import { settleSeasonPayouts } from "@/money-service/settlement";
+import { settlementPreview, settleSeasonPayouts } from "@/money-service/settlement";
 import { settleSeasonRequestSchema } from "@/money-service/schemas";
+import type { PrizeTable } from "@/money/prize-table";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { withAdmin } from "../../../_shared";
 
@@ -17,6 +18,45 @@ interface SettleLeagueBody {
   readonly prizesPaidCents: number;
   readonly heldCents: number;
   readonly rakeCents: number;
+}
+
+export interface SettlePreviewRosterEntry {
+  readonly userId: string;
+  readonly teamName: string;
+  readonly ownerDisplayName: string;
+}
+
+export interface SettlePreviewBody {
+  readonly leagueId: string;
+  readonly leagueName: string;
+  readonly seasonCompleted: boolean;
+  readonly entryFeeCents: number;
+  readonly prizeTable: PrizeTable;
+  readonly escrowCents: number;
+  readonly roster: readonly SettlePreviewRosterEntry[];
+}
+
+/**
+ * The read-then-confirm door (operator review, 2026-08-27, finding D1/D3): the league's own name,
+ * prize table, escrow balance and roster (a name beside every seat), so `SettleLeagueControl` can
+ * show the operator exactly who is about to be paid what, in place of a bare textarea of ids, and
+ * before the one-way `POST` below closes the escrow. `GET`, not `POST` — this door moves no money.
+ */
+export async function GET(request: Request, { params }: RouteContext) {
+  return withAdmin(request, async () => {
+    const { leagueId } = await params;
+    const preview = await settlementPreview(getDb(), leagueId);
+    if (!preview.ok) return fail(preview.reason, preview.status);
+    return ok<SettlePreviewBody>({
+      leagueId,
+      leagueName: preview.leagueName,
+      seasonCompleted: preview.seasonCompleted,
+      entryFeeCents: preview.entryFeeCents,
+      prizeTable: preview.prizeTable,
+      escrowCents: preview.escrowCents,
+      roster: preview.roster,
+    });
+  });
 }
 
 /**

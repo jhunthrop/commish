@@ -1,5 +1,5 @@
 import { getDb } from "@/db/client";
-import { dissolveLeague } from "@/money-service/dissolution";
+import { dissolutionPreview, dissolveLeague } from "@/money-service/dissolution";
 import { fail, ok } from "@/lib/api/respond";
 import { withAdmin } from "../../../_shared";
 
@@ -14,6 +14,27 @@ interface DissolveLeagueBody {
   readonly leagueId: string;
   readonly refundedMembers: number;
   readonly totalRefundedCents: number;
+}
+
+export interface DissolvePreviewBody {
+  readonly leagueId: string;
+  readonly leagueName: string;
+  readonly seatedCount: number;
+}
+
+/**
+ * The read-then-confirm door (operator review, 2026-08-27, finding D1/D3): the league's own name
+ * and seated count, so `DissolveLeagueControl` can name the object and state the consequence
+ * BEFORE the operator confirms the one-way `POST` below. `GET`, not `POST` — this door moves no
+ * money and changes no state, `reconcile/route.ts`'s own reasoning for the identical distinction.
+ */
+export async function GET(request: Request, { params }: RouteContext) {
+  return withAdmin(request, async () => {
+    const { leagueId } = await params;
+    const preview = await dissolutionPreview(getDb(), leagueId);
+    if (!preview.ok) return fail(preview.reason, preview.status);
+    return ok<DissolvePreviewBody>({ leagueId, leagueName: preview.leagueName, seatedCount: preview.seatedCount });
+  });
 }
 
 /**

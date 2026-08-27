@@ -4,49 +4,80 @@ import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { useAdminRoomDeps } from "../hooks/deps";
+import { ConfirmModal } from "./confirm-modal";
+
+interface ExclusionPreviewBody {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly selfExcludedAt: string;
+}
+
+function formatWhen(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+}
 
 /**
- * The admin-room self-exclusion clear control (Task 7 Step 2, the brief's own words: "only an
- * operator can clear it, from the admin room, audited as admin_action"). Calls
- * `DELETE /api/wallet/exclusion` — the same route file the member's own `POST` lives on
- * (`src/app/api/wallet/exclusion/route.ts`'s own docblock explains why one file carries both
- * directions).
- *
- * An operator pastes a user id rather than searching for one: the fuller responsible-gaming
- * surface (a member lookup, limits, cool-offs) is Phase 8 scope by the plan's own ruling. This is
- * the narrow, correct-today shape — a support conversation ends with an operator who already has
- * the member's id from that conversation, typing it here.
+ * The admin-room self-exclusion clear control (Task 7 Step 2; read-then-confirm added per the
+ * operator review, 2026-08-27, findings D1/D3): "only an operator can clear it, from the admin
+ * room, audited as admin_action". Pressing the button — or Enter in the id field — no longer
+ * fires the one-way `DELETE` directly: it fetches `GET /api/wallet/exclusion?userId=…`, a plain
+ * read that names the member and the date they excluded themselves, and opens `ConfirmModal`
+ * with both facts. Only the modal's own button reopens paid play.
  */
 export function ExclusionControl() {
   const { fetchJson } = useAdminRoomDeps();
   const [userId, setUserId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [confirming, setConfirming] = useState<ExclusionPreviewBody | null>(null);
   const [clearedFor, setClearedFor] = useState<string | null>(null);
 
-  const submit = async (): Promise<void> => {
+  const beginConfirm = async (): Promise<void> => {
     const trimmed = userId.trim();
     if (trimmed.length === 0) {
       setError("Enter the member's user id.");
       return;
     }
+    setPreviewing(true);
+    setError(null);
+    try {
+      const response = await fetchJson(`/api/wallet/exclusion?userId=${encodeURIComponent(trimmed)}`);
+      const envelope = (await response.json()) as ApiEnvelope<ExclusionPreviewBody>;
+      if (!envelope.ok) {
+        setError(envelope.error);
+        return;
+      }
+      setConfirming(envelope.data);
+    } catch {
+      setError("We could not reach the server. Check your connection and try again.");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const submit = async (): Promise<void> => {
+    if (confirming === null) return;
     setSubmitting(true);
     setError(null);
     try {
       const response = await fetchJson("/api/wallet/exclusion", {
         method: "DELETE",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ userId: trimmed }),
+        body: JSON.stringify({ userId: confirming.userId }),
       });
       const envelope = (await response.json()) as ApiEnvelope<{ readonly userId: string }>;
       if (!envelope.ok) {
         setError(envelope.error);
+        setConfirming(null);
         return;
       }
       setClearedFor(envelope.data.userId);
       setUserId("");
+      setConfirming(null);
     } catch {
       setError("We could not reach the server. Check your connection and try again.");
+      setConfirming(null);
     } finally {
       setSubmitting(false);
     }
@@ -57,7 +88,7 @@ export function ExclusionControl() {
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        void submit();
+        void beginConfirm();
       }}
     >
       <Input
@@ -83,10 +114,27 @@ export function ExclusionControl() {
       )}
 
       <div>
-        <Button type="submit" loading={submitting} disabled={submitting}>
+        <Button type="submit" loading={previewing} disabled={previewing || submitting}>
           Clear self exclusion
         </Button>
       </div>
+
+      {confirming === null ? null : (
+        <ConfirmModal
+          open
+          title={`Clear self exclusion for ${confirming.displayName}?`}
+          body={
+            <p>
+              Paid play opens again for {confirming.displayName}, excluded since {formatWhen(confirming.selfExcludedAt)}. This cannot be undone.
+            </p>
+          }
+          confirmLabel={`Clear exclusion for ${confirming.displayName}`}
+          variant="destructive"
+          busy={submitting}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => void submit()}
+        />
+      )}
     </form>
   );
 }

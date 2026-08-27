@@ -58,6 +58,25 @@ export async function setSelfExclusion(db: Db, userId: string, clock: Clock = sy
   });
 }
 
+export type ExclusionPreviewResult =
+  | { readonly ok: true; readonly displayName: string; readonly selfExcludedAt: string }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * The read-then-confirm half of `clearSelfExclusion` (operator review, 2026-08-27, finding
+ * D1/D3): the member's own name and the date they excluded themselves, before an operator
+ * reopens paid play for their account. Refuses with the identical sentence `clearSelfExclusion`
+ * itself refuses with for the same two cases (no such user, or not currently excluded) — a
+ * preview that disagreed with the write it previews would be worse than no preview at all.
+ */
+export async function exclusionPreview(db: Db, userId: string): Promise<ExclusionPreviewResult> {
+  const [user] = await db.select({ id: users.id, displayName: users.displayName, selfExcludedAt: users.selfExcludedAt }).from(users).where(eq(users.id, userId));
+  if (user === undefined || user.selfExcludedAt === null) {
+    return { ok: false, reason: `"${userId}" is not a user, or is not excluded.` };
+  }
+  return { ok: true, displayName: user.displayName, selfExcludedAt: user.selfExcludedAt.toISOString() };
+}
+
 export interface ClearSelfExclusionInput {
   /** The excluded member. */
   readonly userId: string;

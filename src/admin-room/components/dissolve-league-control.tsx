@@ -5,6 +5,7 @@ import { Button, Input } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { formatUsd } from "@/money/config";
 import { useAdminRoomDeps } from "../hooks/deps";
+import { ConfirmModal } from "./confirm-modal";
 
 interface DissolveLeagueBody {
   readonly leagueId: string;
@@ -12,45 +13,72 @@ interface DissolveLeagueBody {
   readonly totalRefundedCents: number;
 }
 
+interface DissolvePreviewBody {
+  readonly leagueId: string;
+  readonly leagueName: string;
+  readonly seatedCount: number;
+}
+
 /**
- * The admin-room dissolution control (Phase 4, Task 9, brief's own words: "operator-triggered,
- * pre-draft only, every fee refunded, every member told"). Calls `POST /api/admin/leagues/
- * [leagueId]/dissolve`, `ExclusionControl`'s own shape (`./exclusion-control.tsx`): an operator
- * pastes a league id rather than searching for one, on the identical reasoning — the fuller
- * league-lookup surface is later scope, and a support conversation that ends in "close this
- * league" already has the id from that conversation.
- *
- * No confirmation dialog beyond the button's own label: `dissolveLeague`'s guarded `UPDATE`
- * makes a second press against an already-dissolved league answer the plain "draft already
- * started" refusal rather than double-refund anyone, so the worst a mis-click costs is one
- * honest error message, not a second payout.
+ * The admin-room dissolution control (Phase 4, Task 9; read-then-confirm added per the operator
+ * review, 2026-08-27, findings D1/D3): "operator-triggered, pre-draft only, every fee refunded,
+ * every member told". Pressing the button — or Enter in the id field — no longer fires the
+ * one-way `POST` directly: it fetches `GET /api/admin/leagues/[leagueId]/dissolve`, a plain read
+ * that names the league and its seated count, and opens `ConfirmModal` with that name IN the
+ * question ("Dissolve The Blitz Room?") and the consequence stated as a fact. Only the modal's
+ * own button fires the mutation. An empty field still short-circuits before any request at all —
+ * the review's own "zero non-GET requests" proof now reads "zero requests, full stop".
  */
 export function DissolveLeagueControl() {
   const { fetchJson } = useAdminRoomDeps();
   const [leagueId, setLeagueId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [confirming, setConfirming] = useState<DissolvePreviewBody | null>(null);
   const [dissolved, setDissolved] = useState<DissolveLeagueBody | null>(null);
 
-  const submit = async (): Promise<void> => {
+  const beginConfirm = async (): Promise<void> => {
     const trimmed = leagueId.trim();
     if (trimmed.length === 0) {
       setError("Enter the league's id.");
       return;
     }
-    setSubmitting(true);
+    setPreviewing(true);
     setError(null);
     try {
-      const response = await fetchJson(`/api/admin/leagues/${trimmed}/dissolve`, { method: "POST" });
-      const envelope = (await response.json()) as ApiEnvelope<DissolveLeagueBody>;
+      const response = await fetchJson(`/api/admin/leagues/${trimmed}/dissolve`);
+      const envelope = (await response.json()) as ApiEnvelope<DissolvePreviewBody>;
       if (!envelope.ok) {
         setError(envelope.error);
         return;
       }
-      setDissolved(envelope.data);
-      setLeagueId("");
+      setConfirming(envelope.data);
     } catch {
       setError("We could not reach the server. Check your connection and try again.");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const submit = async (): Promise<void> => {
+    if (confirming === null) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetchJson(`/api/admin/leagues/${confirming.leagueId}/dissolve`, { method: "POST" });
+      const envelope = (await response.json()) as ApiEnvelope<DissolveLeagueBody>;
+      if (!envelope.ok) {
+        setError(envelope.error);
+        setConfirming(null);
+        return;
+      }
+      setDissolved(envelope.data);
+      setLeagueId("");
+      setConfirming(null);
+    } catch {
+      setError("We could not reach the server. Check your connection and try again.");
+      setConfirming(null);
     } finally {
       setSubmitting(false);
     }
@@ -61,7 +89,7 @@ export function DissolveLeagueControl() {
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        void submit();
+        void beginConfirm();
       }}
     >
       <Input
@@ -91,10 +119,29 @@ export function DissolveLeagueControl() {
       )}
 
       <div>
-        <Button type="submit" loading={submitting} disabled={submitting}>
+        <Button type="submit" loading={previewing} disabled={previewing || submitting}>
           Dissolve league
         </Button>
       </div>
+
+      {confirming === null ? null : (
+        <ConfirmModal
+          open
+          title={`Dissolve ${confirming.leagueName}?`}
+          body={
+            <p>
+              {confirming.seatedCount === 0
+                ? `This closes ${confirming.leagueName} for good. Nobody is seated, so nothing is refunded. This cannot be undone.`
+                : `This closes ${confirming.leagueName} for good and refunds its ${confirming.seatedCount} seated ${confirming.seatedCount === 1 ? "member" : "members"}. This cannot be undone.`}
+            </p>
+          }
+          confirmLabel={`Dissolve ${confirming.leagueName}`}
+          variant="destructive"
+          busy={submitting}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => void submit()}
+        />
+      )}
     </form>
   );
 }

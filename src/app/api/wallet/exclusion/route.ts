@@ -1,7 +1,7 @@
 import { getDb } from "@/db/client";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
-import { fail, ok, parseJson } from "@/lib/api/respond";
-import { clearSelfExclusion, setSelfExclusion } from "@/money-service/exclusion";
+import { fail, ok, parseJson, parseQuery } from "@/lib/api/respond";
+import { clearSelfExclusion, exclusionPreview, setSelfExclusion } from "@/money-service/exclusion";
 import { clearExclusionRequestSchema } from "@/money-service/schemas";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
 import { withAdmin } from "@/app/api/admin/_shared";
@@ -29,6 +29,33 @@ export async function POST(request: Request) {
 
     const selfExcludedAt = await setSelfExclusion(getDb(), userId, systemClock, getAuditLogger());
     return ok<SetExclusionBody>({ selfExcludedAt });
+  });
+}
+
+export interface ExclusionPreviewBody {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly selfExcludedAt: string;
+}
+
+/**
+ * The read-then-confirm door (operator review, 2026-08-27, finding D1/D3): the member's own name
+ * and the date they excluded themselves, so `ExclusionControl` can name the object and state the
+ * consequence BEFORE the operator confirms the one-way `DELETE` below. Operator-only, `withAdmin`
+ * — a member has no reason to look up another account's exclusion date, and this door answers
+ * ONLY that question, never their own (`GET /api/wallet` is where a member reads their own
+ * standing). Query-string, not path-scoped: this route carries no `[userId]` segment, the same
+ * reason `DELETE`'s body carries the id rather than the path.
+ */
+export async function GET(request: Request) {
+  return withAdmin(request, async () => {
+    const url = new URL(request.url);
+    const parsed = parseQuery(Object.fromEntries(url.searchParams), clearExclusionRequestSchema);
+    if (!parsed.ok) return parsed.response;
+
+    const preview = await exclusionPreview(getDb(), parsed.value.userId);
+    if (!preview.ok) return fail(preview.reason, 404);
+    return ok<ExclusionPreviewBody>({ userId: parsed.value.userId, displayName: preview.displayName, selfExcludedAt: preview.selfExcludedAt });
   });
 }
 

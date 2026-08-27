@@ -1,5 +1,5 @@
 import { getDb } from "@/db/client";
-import { confiscateHold, releaseHold } from "@/money-service/settlement";
+import { confiscateHold, holdPreview, releaseHold } from "@/money-service/settlement";
 import { holdOutcomeRequestSchema } from "@/money-service/schemas";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { withAdmin } from "../../_shared";
@@ -15,6 +15,27 @@ interface HoldOutcomeBody {
   readonly userId: string;
   readonly action: "release" | "confiscate";
   readonly amountCents: number;
+}
+
+export interface HoldPreviewBody {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly heldCents: number;
+}
+
+/**
+ * The read-then-confirm door (operator review, 2026-08-27, finding D1/D3): the member's own name
+ * and the amount currently held, so `HoldsControl` can name the object and state which direction
+ * money moves BEFORE the operator confirms either one-way `POST` below. `GET`, not `POST` — this
+ * door moves no money.
+ */
+export async function GET(request: Request, { params }: RouteContext) {
+  return withAdmin(request, async () => {
+    const { userId } = await params;
+    const preview = await holdPreview(getDb(), userId);
+    if (!preview.ok) return fail(preview.reason, preview.status);
+    return ok<HoldPreviewBody>({ userId, displayName: preview.displayName, heldCents: preview.heldCents });
+  });
 }
 
 /**

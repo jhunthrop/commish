@@ -26,6 +26,18 @@ const FILL: Readonly<Record<Position, string>> = {
   DEF: "bg-pos-def text-pos-def-on",
 };
 
+/** The on-fill label color alone, no fill — `FILL`'s second half, split out for a caller that
+ *  sits INSIDE a `Sticker`'s own fill (which already paints the background) and only needs the
+ *  text role. */
+const ON_FILL_TEXT: Readonly<Record<Position, string>> = {
+  QB: "text-pos-qb-on",
+  RB: "text-pos-rb-on",
+  WR: "text-pos-wr-on",
+  TE: "text-pos-te-on",
+  K: "text-pos-k-on",
+  DEF: "text-pos-def-on",
+};
+
 const SIZE: Readonly<Record<PositionBadgeSize, string>> = {
   sm: "h-5 px-2 text-xs",
   md: "h-6 px-2 text-sm",
@@ -39,6 +51,21 @@ const SIZE: Readonly<Record<PositionBadgeSize, string>> = {
  */
 export function positionStickerClass(position: Position): string {
   return FILL[position];
+}
+
+/**
+ * A secondary label sitting INSIDE a `Sticker`'s own fill — a caption that must stay legible
+ * (≥3:1) without competing with the primary label beside it. `text-text-muted` (a page-ground
+ * role) is the wrong tool here: it assumes a page surface behind it, and every position's
+ * saturated fill measures well under 3:1 against it in both themes (operator review, finding D2 —
+ * 1.07:1 dark, 1.15:1 light, measured on QB). `opacity-80` blends the on-fill role TOWARD the
+ * fill it is already proven to clear ≥4.5:1 against (`PositionColor.stickerText`'s own docblock,
+ * `@/design/tokens`), so the muted result stays inside that fill's own designed-contrast family
+ * rather than introducing a second, unrelated color — proven ≥3:1 for all six positions, both
+ * themes, by `held-trade-detail.test.tsx` (`contrastRatio`/`blendOver`, `@/design/test-support`).
+ */
+export function positionMutedOnFillTextClass(position: Position): string {
+  return `${ON_FILL_TEXT[position]} opacity-80`;
 }
 
 export function PositionBadge({ position, size = "md", className = "" }: PositionBadgeProps) {
