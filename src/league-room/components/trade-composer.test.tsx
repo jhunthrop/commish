@@ -40,6 +40,15 @@ describe("TradeComposer", () => {
     );
   });
 
+  // E5 (competition review): the picker's rows used to wrap each checkbox label in a full-width
+  // `Sticker` slab — the same treatment that made the trade card 40.4% saturated pigment. A
+  // plain row with a `PositionBadge` chip replaces it.
+  it("renders the roster picker as quiet rows with a PositionBadge chip, never a sticker slab (E5)", () => {
+    const { container } = render(<TradeComposer context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
+    expect(container.querySelector(".shadow-sticker")).toBeNull();
+    expect(screen.getByText("RB").className).toContain("bg-pos-rb");
+  });
+
   it("shows the counterparty's roster only once a team is chosen", () => {
     render(<TradeComposer context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByText("Choose a team to see their roster.")).toBeInTheDocument();

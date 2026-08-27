@@ -564,6 +564,49 @@ describe("matchupWeek's reference cache", () => {
   });
 });
 
+describe("matchupWeek's own honesty facts (E1/D2/D4)", () => {
+  // D4 (competition review, HIGH): `entryFor` used to coalesce a missing stat line to `0` —
+  // the exact conflation the codebase's own live-scores docblock forbids one layer up
+  // ("'no live value yet' and 'scored zero' are different facts"). `playableSeason` seeds a
+  // real stat line for the QB slot only; the RB slot below gets a real roster player with NO
+  // line for the week, the same "seeded stat set covers a subset of players" gap the veteran
+  // journey review actually hit.
+  it("renders a starter with no stat line for the week as null, never a silent zero", async () => {
+    const created = await createDefaultLeague("u1");
+    await playableSeason(created.leagueId, created.teamId);
+    await db.insert(players).values({ id: "rb1", name: "RB One", position: "RB", nflTeam: "DAL" });
+    await db.insert(rosterSlots).values({ teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "rb1" });
+
+    const week = await matchupWeek(db, created.leagueId, 1, "u1");
+    const rb = week!.matchups[0]!.home.starters.find((entry) => entry.playerId === "rb1");
+    expect(rb).toMatchObject({ playerName: "RB One", points: null });
+    // The QB slot DOES have a real stat line — this is not "every player is null", only the
+    // one with no line for the week.
+    const qb = week!.matchups[0]!.home.starters.find((entry) => entry.playerId === "qb1");
+    expect(qb).toMatchObject({ points: 24 });
+  });
+
+  // E1(a)/D2: the same `stat_weeks.games_final`/`games_total` pair the live socket rides on
+  // every frame (`ScoreUpdatePayload`), read here so the server-rendered snapshot starts honest
+  // before any frame ever arrives.
+  it("returns the week's own games-final count from stat_weeks", async () => {
+    const created = await createDefaultLeague("u1");
+    await playableSeason(created.leagueId, created.teamId);
+    await db.insert(statWeeks).values({ week: 1, status: "in_progress", gamesFinal: 3, gamesTotal: 8 });
+
+    const week = await matchupWeek(db, created.leagueId, 1, "u1");
+    expect(week).toMatchObject({ gamesFinal: 3, gamesTotal: 8 });
+  });
+
+  it("defaults to zero of zero games final for a week with no stat_weeks row yet", async () => {
+    const created = await createDefaultLeague("u1");
+    await playableSeason(created.leagueId, created.teamId);
+
+    const week = await matchupWeek(db, created.leagueId, 1, "u1");
+    expect(week).toMatchObject({ gamesFinal: 0, gamesTotal: 0 });
+  });
+});
+
 describe("GET /api/public/leagues", () => {
   it("answers a signed-OUT visitor, because public browse is deliberately unauthenticated", async () => {
     signedInAs(null);

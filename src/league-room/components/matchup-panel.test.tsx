@@ -19,6 +19,35 @@ describe("MatchupPanel", () => {
     });
   });
 
+  // D5 (competition review, MEDIUM a11y): axe's `heading-order` used to fail at both viewports —
+  // the document ran `<h1>` straight into `Side`'s own team-name `<h3>`, since this panel gave
+  // its matchup an eyebrow `<span>` rather than a heading. A real `<h2>` now anchors the
+  // matchup, so `Side`'s `<h3>` nests under something instead of being the first heading at all.
+  it("anchors the matchup with a real h2, so the side tables' h3s are never the first heading under the page title (D5)", () => {
+    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    expect(screen.getByRole("heading", { level: 2, name: "Bay Bandits against Iron Owls" })).toBeInTheDocument();
+  });
+
+  // D4 (competition review, HIGH): a starter with no stat line for the week used to coalesce to
+  // `0.00` — the exact conflation `matchupWeek`'s own `entryFor` docblock (and `initialScores`
+  // one layer up) forbids: "has not played" and "played and scored nothing" are different facts.
+  it("renders a starter with no stat line as a dash, never a silent zero (D4)", () => {
+    const notYetPlayed = {
+      ...MATCHUP,
+      home: { ...MATCHUP.home, starters: [{ ...MATCHUP.home.starters[0]!, points: null }] },
+    };
+    render(<MatchupPanel matchup={notYetPlayed} myTeamId="t1" weekStatus="final" />);
+    expect(screen.getByRole("cell", { name: "—" })).toBeInTheDocument();
+    expect(screen.queryByText("0.00")).not.toBeInTheDocument();
+  });
+
+  // E1(a)+(c) (D2/E3, competition review): the margin and the week's own games-final count,
+  // both already on the wire and neither printed before this.
+  it("prints the margin and the games-final count when both are supplied", () => {
+    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" gamesFinal={13} gamesTotal={13} />);
+    expect(screen.getByText("You are up 14.25. 13 of 13 games final.")).toBeInTheDocument();
+  });
+
   // Phase 2 Plan B: live scoring EXISTS. This case used to assert the opposite, and it was
   // correct while the stat set was a fixed file a commissioner scored by hand. Inverting it is
   // the point of the change, not a casualty of it: the panel must now say which of the three

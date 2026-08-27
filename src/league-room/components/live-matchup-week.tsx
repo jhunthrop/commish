@@ -17,6 +17,15 @@ function initialScores(body: MatchupWeekBody): readonly TeamScore[] {
   ]);
 }
 
+/** E3: the one honest sentence for a week that has kicked off but not finished — said ONCE for
+ *  the whole page, not once per matchup panel (`gamesFinal`/`gamesTotal` are a week-wide fact,
+ *  identical on every panel, so repeating it four or six times would be noise, not honesty).
+ *  `null` outside `in_progress`: a scheduled week has no live stats to disclaim, and a final
+ *  week's numbers already are final. */
+function statsNotFinalNotice(status: MatchupWeekBody["weekStatus"]): string | null {
+  return status === "in_progress" ? "These scores are live. They are not final until every game in the week ends." : null;
+}
+
 /** `matchup`, with its score and `final` flag folded from the live map when the live layer has
  *  a value for that team — falling back to the server-rendered snapshot otherwise. Per-player
  *  starter/bench points are NOT folded: `score.update` only ever carries team totals
@@ -47,16 +56,22 @@ export function LiveMatchupWeek({ leagueId, body }: { readonly leagueId: string;
     week: body.weekNumber,
     status: body.weekStatus,
     scores: initialScores(body),
+    gamesFinal: body.gamesFinal,
+    gamesTotal: body.gamesTotal,
   });
+  const notice = statsNotFinalNotice(live.status);
 
   return (
     <>
+      {notice === null ? null : <p className="text-sm text-text-muted">{notice}</p>}
       {body.matchups.map((matchup) => (
         <MatchupPanel
           key={`${matchup.home.teamId}:${matchup.away.teamId}`}
           matchup={foldLiveScore(matchup, live.scores, live.status)}
           myTeamId={body.myTeamId}
           weekStatus={live.status}
+          gamesFinal={live.gamesFinal}
+          gamesTotal={live.gamesTotal}
         />
       ))}
     </>

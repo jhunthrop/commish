@@ -16,7 +16,14 @@ import { MedianResultLine } from "./median-result";
 const COLUMNS: readonly TableColumn<MatchupSide["starters"][number]>[] = [
   { key: "slot", header: "Slot", cell: (row) => <SlotChip slot={row.slot} /> },
   { key: "player", header: "Player", cell: (row) => row.playerName ?? "Empty" },
-  { key: "points", header: "Points", cell: (row) => formatPoints(row.points), numeric: true },
+  {
+    key: "points",
+    header: "Points",
+    // D4: `null` means this player has no stat line for the week yet — not-yet-played, never a
+    // silent zero. The same dash the team-level score already renders for the identical fact.
+    cell: (row) => (row.points === null ? "—" : formatPoints(row.points)),
+    numeric: true,
+  },
 ];
 
 /** One side's own median line, or `null` when there's nothing to say yet — the toggle is off,
@@ -88,13 +95,28 @@ export function MatchupPanel({
   matchup,
   myTeamId,
   weekStatus,
+  gamesFinal,
+  gamesTotal,
 }: {
   readonly matchup: MatchupDetail;
   readonly myTeamId: string | null;
   readonly weekStatus: WeekStatus;
+  /** E1(a)/D2: the week's own `stat_weeks.games_final`/`games_total`, live-folded upstream
+   *  (`LiveMatchupWeek`) — optional so every OTHER existing caller of this panel is unaffected;
+   *  the matchup page (the one production caller) always supplies both. */
+  readonly gamesFinal?: number;
+  readonly gamesTotal?: number;
 }) {
+  // D5: a real `<h2>` anchors this matchup — the document used to run `<h1>` straight into
+  // `Side`'s own team-name `<h3>` with nothing in between (`MatchupPanel` gave each matchup an
+  // eyebrow `<span>`, never a heading), an axe `heading-order` failure at both viewports. The
+  // heading is visually silent (`sr-only`): the eyebrow and scoreboard already say the same
+  // thing out loud, so `aria-labelledby` points the section at this heading instead of
+  // repeating the text a second time as a plain `aria-label`.
+  const headingId = `matchup-${matchup.home.teamId}-${matchup.away.teamId}`;
   return (
-    <section aria-label={`${matchup.home.teamName} against ${matchup.away.teamName}`} className="flex flex-col gap-3">
+    <section aria-labelledby={headingId} className="flex flex-col gap-3">
+      <h2 id={headingId} className="sr-only">{`${matchup.home.teamName} against ${matchup.away.teamName}`}</h2>
       <span className="flex items-center gap-1">
         <span className={`${EYEBROW} text-text-muted`}>Matchup</span>
         <InfoTip term="matchup" />
@@ -112,6 +134,8 @@ export function MatchupPanel({
           weekStatus,
         }}
         myTeamId={myTeamId}
+        gamesFinal={gamesFinal}
+        gamesTotal={gamesTotal}
       />
       <div className="grid gap-3 lg:grid-cols-2">
         <Side side={matchup.home} myTeamId={myTeamId} median={medianLineFor(matchup, "home")} />

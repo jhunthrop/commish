@@ -6,6 +6,43 @@ import { WeekStatusBadge } from "./week-status-badge";
 export interface MatchupScoreboardProps {
   readonly matchup: MatchupSummary;
   readonly myTeamId: string | null;
+  /** E1(a)/(c): the week's own games-final count, folded from the live socket
+   *  (`use-live-scores.ts`) upstream — optional so `HomeLeagueCard`/`LeagueHome`, the scoreboard's
+   *  other two callers, are unaffected; the matchup page (`MatchupPanel`) always supplies both. */
+  readonly gamesFinal?: number;
+  readonly gamesTotal?: number;
+}
+
+/** E1(a)+(c): "You are up 7.40. 6 of 13 games final." — the two facts the review named
+ *  (`docs/research/2026-08-27-competition-review.md`, D2/E3) composed into one sentence, from
+ *  data already on the wire: the margin is a plain subtraction of the two scores already on
+ *  screen (the same arithmetic `league-board.tsx`'s own Margin column does), and the games-final
+ *  count is the SAME pair `ScoreUpdatePayload` carries on every live frame. `null` when either
+ *  score is not in yet — a margin needs two real numbers, never a guess against a `—`. */
+function honestLine(matchup: MatchupSummary, myTeamId: string | null, gamesFinal: number | undefined, gamesTotal: number | undefined): string | null {
+  const { homeScore, awayScore, homeTeamId, awayTeamId, homeTeamName, awayTeamName } = matchup;
+  if (homeScore === null || awayScore === null) return null;
+  const margin = formatPoints(Math.abs(homeScore - awayScore));
+  const iAmHome = myTeamId === homeTeamId;
+  const iAmAway = myTeamId === awayTeamId;
+
+  let lead: string;
+  if (homeScore === awayScore) {
+    lead = iAmHome || iAmAway ? `You are tied at ${formatPoints(homeScore)}.` : `Tied at ${formatPoints(homeScore)} apiece.`;
+  } else {
+    const homeLeads = homeScore > awayScore;
+    if (iAmHome || iAmAway) {
+      const winning = (iAmHome && homeLeads) || (iAmAway && !homeLeads);
+      lead = winning ? `You are up ${margin}.` : `You are down ${margin}.`;
+    } else {
+      lead = `${homeLeads ? homeTeamName : awayTeamName} leads by ${margin}.`;
+    }
+  }
+
+  // `gamesTotal === 0` reads the same as "not provided" — a week with no `stat_weeks` row yet
+  // has nothing honest to say about how many of zero games are final.
+  if (gamesTotal === undefined || gamesTotal === 0) return lead;
+  return `${lead} ${gamesFinal ?? 0} of ${gamesTotal} games final.`;
 }
 
 /**
@@ -16,10 +53,11 @@ export interface MatchupScoreboardProps {
  * (Task 9: the caps charter treats DOM text as data, not CSS, so this was the one literal
  * left shouting after Task 3's class-level sweep — respelled sentence-case here to match).
  */
-export function MatchupScoreboard({ matchup, myTeamId }: MatchupScoreboardProps) {
+export function MatchupScoreboard({ matchup, myTeamId, gamesFinal, gamesTotal }: MatchupScoreboardProps) {
   const decided = matchup.final && matchup.homeScore !== null && matchup.awayScore !== null;
   const homeWon = decided && matchup.homeScore! > matchup.awayScore!;
   const awayWon = decided && matchup.awayScore! > matchup.homeScore!;
+  const honest = honestLine(matchup, myTeamId, gamesFinal, gamesTotal);
 
   const side = (name: string, score: number | null, teamId: string, won: boolean) => (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
@@ -58,6 +96,11 @@ export function MatchupScoreboard({ matchup, myTeamId }: MatchupScoreboardProps)
         </span>
         {side(matchup.awayTeamName, matchup.awayScore, matchup.awayTeamId, awayWon)}
       </div>
+      {/* E1(a)+(c) (D2/E3, competition review): the margin and the games-final count — both
+          already on the wire, neither printed before this. Mono/tabular, no color: a record
+          carries typographic weight, never a hue (the same register `league-board.tsx`'s own
+          Margin column already keeps). */}
+      {honest === null ? null : <p className="text-center text-sm font-mono tabular-nums text-text-muted">{honest}</p>}
     </Card>
   );
 }

@@ -173,6 +173,31 @@ describe("TradeCard states", () => {
     expect(screen.getByText("RB")).toBeInTheDocument();
   });
 
+  // E5 (competition review): a position used to be a 769px `Sticker` slab per asset — 202 of
+  // them, 40.4% of the trades page's own ink. It is a plain row with a `PositionBadge` chip now,
+  // the same treatment the matchup table and `LineupEditor`'s roster table already use.
+  it("renders each asset as a quiet row, never a full sticker slab (E5)", () => {
+    const { container } = render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(container.querySelector(".shadow-sticker")).toBeNull();
+    expect(screen.getByText("WR").className).toContain("bg-pos-wr");
+  });
+
+  // E6 (competition review): `counterpartyName` used to be computed for the `aria-label` alone
+  // — a card never visibly named who you traded with, and neither `proposedAt` nor `settledAt`
+  // was ever rendered despite both being on the wire.
+  it("names the counterparty and the date visibly, not only in the aria-label (E6)", () => {
+    render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.getByText(/With Iron Owls/)).toBeInTheDocument();
+    expect(screen.getByText(/Proposed August 18/)).toBeInTheDocument();
+  });
+
+  it("names both sides plainly, and the settled date, for a league-wide history row that is not the viewer's own trade (E6)", () => {
+    const trade: TradeProposalView = { ...BASE, status: "accepted", settledAt: "2026-08-19T00:00:00.000Z" };
+    render(<TradeCard trade={trade} meTeamId="somebody_else" playersById={PLAYERS} />);
+    expect(screen.getByText(/Iron Owls and Bay Bandits/)).toBeInTheDocument();
+    expect(screen.getByText(/Settled August 19/)).toBeInTheDocument();
+  });
+
   it("degrades a player no longer on any roster to a neutral label instead of a raw id", () => {
     const trade: TradeProposalView = { ...BASE, from: { ...BASE.from, assets: [{ kind: "player", playerId: "ghost" }] } };
     render(<TradeCard trade={trade} meTeamId="me" playersById={PLAYERS} />);
@@ -284,14 +309,17 @@ describe("TradeCard states", () => {
   });
 
   it("carries no em dash or en dash across every state it can render", () => {
+    // E6: `settledAt`/`reversedAt` are real ISO instants now that the card renders them (a
+    // date line, "Settled August 19." etc.) — "x"/"y" placeholders would throw once formatted,
+    // where before they were write-only fields this card never read.
     const states: readonly TradeProposalView[] = [
       BASE,
-      { ...BASE, status: "accepted", settledAt: "x" },
-      { ...BASE, status: "accepted", settledAt: "x", reversedAt: "y" },
-      { ...BASE, status: "rejected", settledAt: "x" },
-      { ...BASE, status: "withdrawn", settledAt: "x" },
+      { ...BASE, status: "accepted", settledAt: "2026-08-19T00:00:00.000Z" },
+      { ...BASE, status: "accepted", settledAt: "2026-08-19T00:00:00.000Z", reversedAt: "2026-08-20T00:00:00.000Z" },
+      { ...BASE, status: "rejected", settledAt: "2026-08-19T00:00:00.000Z" },
+      { ...BASE, status: "withdrawn", settledAt: "2026-08-19T00:00:00.000Z" },
       { ...BASE, status: "expired" },
-      { ...BASE, status: "superseded", settledAt: "x" },
+      { ...BASE, status: "superseded", settledAt: "2026-08-19T00:00:00.000Z" },
     ];
     for (const trade of states) {
       const { unmount, container } = render(<TradeCard trade={trade} meTeamId="me" playersById={PLAYERS} />);

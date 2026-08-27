@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, Card, Modal, PositionBadge, Sticker } from "@/components/ui";
+import { Badge, Button, Card, Modal, PositionBadge } from "@/components/ui";
 import { describeAsset, type TradeAsset } from "@/trades/assets";
 import type { TradeProposalView, TradeSideView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { isExpired } from "@/trades/lifecycle";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useNow } from "../hooks/use-now";
-import { daysUntil, formatExpired, formatExpiry, formatWeek } from "../lib/format";
+import { daysUntil, formatDate, formatExpired, formatExpiry, formatWeek } from "../lib/format";
 import { HeldTradeBanner } from "./held-trade-banner";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
 
@@ -47,6 +47,14 @@ export interface TradeCardProps {
   readonly busy?: boolean;
 }
 
+/**
+ * E5 (competition review): this used to stretch a `Sticker` — "the Poster Board's signature
+ * shape", a board CELL — into a 769px full-width slab per asset, 202 of them summing to 40.4%
+ * of the trades page's own ink on a near-monochrome constitution. A quiet row with a
+ * `PositionBadge` chip is the SAME treatment the matchup table and `LineupEditor`'s own roster
+ * table already use for "this player, and their position" — the sticker fill stays exactly
+ * where LED-2 ruled it belongs, on a board cell, never a list row.
+ */
 function AssetList({ heading, assets, playersById }: { readonly heading: string; readonly assets: readonly TradeAsset[]; readonly playersById: Readonly<Record<string, ValuedPlayer>> }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -55,15 +63,9 @@ function AssetList({ heading, assets, playersById }: { readonly heading: string;
         {assets.map((asset, index) => {
           const described = describeAsset(asset, playersById);
           return (
-            <li key={`${asset.kind}:${asset.kind === "player" ? asset.playerId : index}`}>
-              {described.position === null ? (
-                <span className="text-sm text-text-primary">{described.label}</span>
-              ) : (
-                <Sticker position={described.position} className="flex items-center gap-2 px-2 py-1">
-                  <PositionBadge position={described.position} size="sm" />
-                  <span className="min-w-0 break-words text-sm font-medium">{described.label}</span>
-                </Sticker>
-              )}
+            <li key={`${asset.kind}:${asset.kind === "player" ? asset.playerId : index}`} className="flex min-w-0 items-center gap-2">
+              {described.position === null ? null : <PositionBadge position={described.position} size="sm" />}
+              <span className="min-w-0 break-words text-sm font-medium text-text-primary">{described.label}</span>
             </li>
           );
         })}
@@ -159,12 +161,21 @@ export function TradeCard({
   const gettingHeading = sides === null ? `${trade.to.teamName} gives` : "You get";
   const counterpartyName = sides === null ? null : sides.theirs.teamName;
   const cardLabel = counterpartyName === null ? `Trade between ${trade.from.teamName} and ${trade.to.teamName}` : `Trade with ${counterpartyName}`;
+  // E6 (competition review): `counterpartyName` used to be computed for the `aria-label` alone
+  // — a card never visibly named who you traded with. Visible now, in the same line as the
+  // week and the date, for a party and for a league-wide history row alike.
+  const counterpartyLabel = counterpartyName === null ? `${trade.from.teamName} and ${trade.to.teamName}` : `With ${counterpartyName}`;
+  // E6: `proposedAt`/`settledAt` were both on the wire and neither was rendered — twenty
+  // identical history cards with no date on any of them. `settledAt` once the trade has one
+  // (every terminal state writes it in the same transaction that settles); `proposedAt`
+  // otherwise, for a still-open offer.
+  const dateLabel = trade.settledAt === null ? `Proposed ${formatDate(trade.proposedAt)}` : `Settled ${formatDate(trade.settledAt)}`;
 
   return (
     <Card as="article" aria-label={cardLabel}>
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-text-muted">{formatWeek(trade.weekNumber)}</p>
+          <p className="text-sm text-text-muted">{`${formatWeek(trade.weekNumber)} · ${counterpartyLabel} · ${dateLabel}`}</p>
           {isAnswerable ? <Badge tone="accent">Needs your answer</Badge> : null}
         </div>
 

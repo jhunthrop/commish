@@ -124,6 +124,29 @@ describe("PlayerPool", () => {
     expect(within(rowFor("Marcus Reed")).getByText("MR")).toBeInTheDocument();
   });
 
+  // V-04 (veteran journey, BLOCKER): the name used to sit in the same flex row as the rank,
+  // sticker, avatar, team code, queue star AND the Draft button — the only element with
+  // `min-w-0` (so the only one that could shrink), it absorbed the whole width deficit and
+  // truncated to 3-4 characters the instant the on-turn Draft button appeared. jsdom performs no
+  // real layout, so this cannot assert pixel width — it asserts the STRUCTURAL fix instead: the
+  // name's own row no longer contains the act button (or the "Drafted" badge) at all, on your
+  // turn, at the exact width the bug reproduced at.
+  it("keeps the Draft button off the name's own row, so nothing there competes with the name for width (V-04)", () => {
+    render(<PlayerPool {...props} canAct />);
+    const nameRow = screen.getByText("Jalen Croft").closest("div")!;
+    expect(within(nameRow).queryByRole("button", { name: "Draft" })).toBeNull();
+    const draftButton = screen.getAllByRole("button", { name: "Draft" })[0]!;
+    expect(nameRow).not.toContainElement(draftButton);
+  });
+
+  it("shows the team code on its own meta line under the name, unconditionally rather than gated on a wide viewport", () => {
+    render(<PlayerPool {...props} canAct />);
+    const nameRow = screen.getByText("Jalen Croft").closest("div")!;
+    const teamCode = screen.getByText(PLAYERS[0]!.nflTeam);
+    expect(nameRow).not.toContainElement(teamCode);
+    expect(teamCode.className).not.toMatch(/\bhidden\b/);
+  });
+
   it("shows no act button while waiting — the star is the action — and reports the player on your turn", () => {
     const onAct = vi.fn();
     const { rerender } = render(<PlayerPool {...props} canAct={false} onAct={onAct} />);

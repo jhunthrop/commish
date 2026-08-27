@@ -16,12 +16,18 @@ export interface LiveScoresInitial {
   readonly week: number;
   readonly status: WeekStatus;
   readonly scores: readonly TeamScore[];
+  /** E1(a)/D2: the week's own `MatchupWeekBody.gamesFinal`/`gamesTotal` — the server-rendered
+   *  seed this hook folds a live `score.update` frame's own pair over. */
+  readonly gamesFinal: number;
+  readonly gamesTotal: number;
 }
 
 export interface LiveScores {
   readonly scores: ReadonlyMap<string, number>;
   readonly status: WeekStatus;
   readonly connection: LiveScoresConnection;
+  readonly gamesFinal: number;
+  readonly gamesTotal: number;
 }
 
 function toScoresMap(scores: readonly TeamScore[]): ReadonlyMap<string, number> {
@@ -99,6 +105,8 @@ interface LiveScoresState {
   readonly scores: ReadonlyMap<string, number>;
   readonly status: WeekStatus;
   readonly connection: LiveScoresConnection;
+  readonly gamesFinal: number;
+  readonly gamesTotal: number;
 }
 
 /**
@@ -135,6 +143,8 @@ export function useLiveScores(leagueId: string, initial: LiveScoresInitial): Liv
     scores: toScoresMap(initial.scores),
     status: initial.status,
     connection: "connecting",
+    gamesFinal: initial.gamesFinal,
+    gamesTotal: initial.gamesTotal,
   });
   const deps = useLeagueRoomDeps();
   const scoresRef = useRef<ReadonlyMap<string, number>>(toScoresMap(initial.scores));
@@ -162,7 +172,7 @@ export function useLiveScores(leagueId: string, initial: LiveScoresInitial): Liv
       if (!body.ok) return;
       const scores = toScoresMap(scoresFromWeek(body.data));
       scoresRef.current = scores;
-      setState((prev) => ({ ...prev, scores, status: body.data.weekStatus }));
+      setState((prev) => ({ ...prev, scores, status: body.data.weekStatus, gamesFinal: body.data.gamesFinal, gamesTotal: body.data.gamesTotal }));
     } catch {
       // A failed background refresh leaves the last-known state on screen rather than an error
       // state of its own — the page's own server render already has real data, and this hook
@@ -191,7 +201,7 @@ export function useLiveScores(leagueId: string, initial: LiveScoresInitial): Liv
       const merged = new Map(scoresRef.current);
       for (const score of payload.scores) merged.set(score.teamId, score.points);
       scoresRef.current = merged;
-      setState((prev) => ({ ...prev, scores: merged, status: payload.status }));
+      setState((prev) => ({ ...prev, scores: merged, status: payload.status, gamesFinal: payload.gamesFinal, gamesTotal: payload.gamesTotal }));
     };
 
     const onOpen = (): void => {

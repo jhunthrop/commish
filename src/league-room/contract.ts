@@ -117,10 +117,33 @@ export interface CreateLeagueBody {
 
 export interface InviteBody {
   readonly code: string;
-  /** An absolute PATH, not a full URL — the browser already knows its own origin. */
+  /**
+   * An absolute PATH — `/app/join/{code}` — kept for callers that only ever navigate within the
+   * app (never rendered as the shareable value on its own: pasted into a text message it is not
+   * a link that opens).
+   */
   readonly path: string;
+  /**
+   * Flow analysis C-01 (2026-08-27): the value a commissioner actually copies and shares —
+   * `origin + path`, the origin read off the REQUEST server-side (`originFor`,
+   * `@/app/api/leagues/[leagueId]/invites/route.ts`), never assumed from the browser. A relative
+   * `path` pasted into a text message is not a link that opens; this is.
+   */
+  readonly url: string;
   readonly expiresAt: string;
   readonly maxUses: number;
+  /** How many times this code has been redeemed already — `0` for a freshly minted invite, and
+   *  the fact that tells a reloaded panel (C-03) it is looking at a code someone may already have
+   *  used, not a brand new one. */
+  readonly uses: number;
+}
+
+/** `GET /api/leagues/[leagueId]/invites`'s success payload (flow analysis C-03): every LIVE
+ *  invite this league holds right now — not expired, not used up — newest first. A commissioner
+ *  who reloads the page sees the code they already sent, instead of the panel offering "Create
+ *  invite link" again and minting a second one silently. */
+export interface InviteListBody {
+  readonly invites: readonly InviteBody[];
 }
 
 export interface JoinBody {
@@ -344,7 +367,14 @@ export interface MatchupLineupEntry {
   readonly playerId: string | null;
   readonly playerName: string | null;
   readonly position: Position | null;
-  readonly points: number;
+  /**
+   * `null` when this player has no stat line for the week yet — "has not played" and "played
+   * and scored nothing" are different facts (`MatchupSide.score`'s own team-level rule, and
+   * `initialScores`' docblock, `live-matchup-week.tsx`), and coalescing the first into the
+   * second used to print `0.00` beside a player who simply had not kicked off. A caller renders
+   * `null` the same way it already renders a `null` team score — a dash, never a zero.
+   */
+  readonly points: number | null;
 }
 
 export interface MatchupSide {
@@ -391,6 +421,18 @@ export interface MatchupWeekBody {
   readonly myTeamId: string | null;
   readonly matchups: readonly MatchupDetail[];
   readonly weekStatus: WeekStatus;
+  /**
+   * `stat_weeks.games_final` / `stat_weeks.games_total` for THIS week — the same two columns
+   * `ScoreUpdatePayload` carries on every live frame (`parseScoreFrame`, `use-live-scores.ts`)
+   * and `liveStateFor` already reduces for the top bar's own live pill (`@/league-service/home`).
+   * Read here so the matchup page itself can say how much of the week has played instead of
+   * discarding a fact the browser is already holding — `0`/`0` for a week with no `stat_weeks`
+   * row yet (mirroring `weekStatusFor`'s own "scheduled" default), never `null`: a week that has
+   * not started has genuinely zero of zero games final, which is a true sentence, not a missing
+   * one.
+   */
+  readonly gamesFinal: number;
+  readonly gamesTotal: number;
 }
 
 export interface LineupSlotView {

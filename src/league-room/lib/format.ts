@@ -52,3 +52,38 @@ const EXPIRED_DATE_FORMAT = new Intl.DateTimeFormat("en-US", { month: "long", da
 export function formatExpired(iso: string): string {
   return `Expired ${EXPIRED_DATE_FORMAT.format(new Date(iso))}.`;
 }
+
+/** "August 18" — the same month-and-day format `formatExpired` already renders, exported bare
+ *  so a caller can build its own sentence around it (E6: a trade history card names WHEN a
+ *  trade was proposed or settled, not only how it stands today). */
+export function formatDate(iso: string): string {
+  return EXPIRED_DATE_FORMAT.format(new Date(iso));
+}
+
+/**
+ * Flow analysis C-02 (2026-08-27): "Saturday 12 September, 7:00 PM UTC" — byte-identical to
+ * `formatAbsoluteTime` (`@/league/terms.ts`), duplicated here rather than imported for the same
+ * reason `invite-landing.tsx`'s own `DEAD_CODE_TEXT` and `league-terms-panel.tsx`'s own
+ * `SCORING_LABEL_TERM` duplicate across the client boundary: `@/league` is server-only
+ * (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`), and `src/league-room/**` is client-boundary
+ * code by construction, so a `"use client"` component may never import it as a value.
+ *
+ * The bug this closes: one league showing two different draft days on one screen —
+ * `DraftSchedulePanel`'s own hero used to read the reader's BROWSER-local time with no zone
+ * label at all (`toLocaleString`), while the league's terms panel and the invite landing a
+ * stranger reads both already rendered `leagueTerms`'s UTC, zone-labelled convention. Two
+ * different timezone treatments for the same instant is the defect (finding C-02), not UTC
+ * itself — UTC is the convention this product already commits to everywhere it has no per-visitor
+ * timezone signal to read (`formatAbsoluteTime`'s own docblock: no timezone beacon exists), so
+ * this function joins that convention rather than inventing a third one. `DraftSchedulePanel`'s
+ * own hero (`../components/draft-schedule-panel.tsx`) is this function's one caller.
+ */
+const WEEKDAY_FORMAT = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
+const DAY_FORMAT = new Intl.DateTimeFormat("en-US", { day: "numeric", timeZone: "UTC" });
+const MONTH_FORMAT = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" });
+const CLOCK_FORMAT = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
+
+export function formatDraftAbsolute(iso: string): string {
+  const instant = new Date(iso);
+  return `${WEEKDAY_FORMAT.format(instant)} ${DAY_FORMAT.format(instant)} ${MONTH_FORMAT.format(instant)}, ${CLOCK_FORMAT.format(instant)} UTC`;
+}

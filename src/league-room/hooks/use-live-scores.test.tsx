@@ -19,6 +19,8 @@ const INITIAL: LiveScoresInitial = {
     { teamId: "t1", points: 12 },
     { teamId: "t2", points: 9 },
   ],
+  gamesFinal: 0,
+  gamesTotal: 4,
 };
 
 const WEEK_BODY: MatchupWeekBody = {
@@ -27,6 +29,8 @@ const WEEK_BODY: MatchupWeekBody = {
   totalWeeks: 14,
   myTeamId: "t1",
   weekStatus: "in_progress",
+  gamesFinal: 0,
+  gamesTotal: 4,
   matchups: [
     {
       weekNumber: 5,
@@ -46,21 +50,27 @@ describe("useLiveScores", () => {
     expect(result.current.scores.get("t1")).toBe(12);
     expect(result.current.status).toBe("in_progress");
     expect(result.current.connection).toBe("connecting");
+    expect(result.current.gamesFinal).toBe(0);
+    expect(result.current.gamesTotal).toBe(4);
   });
 
-  it("folds a score.update frame's teams and status in", async () => {
+  // E1(a)/D2: `gamesFinal`/`gamesTotal` ride the same frame the scores do — a caller that only
+  // watched `scores`/`status` would never learn how much of the week has actually played.
+  it("folds a score.update frame's teams, status, and games-final count in", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: WEEK_BODY });
     const { result } = renderHook(() => useLiveScores("l1", INITIAL), { wrapper: wrapper(fixture.deps) });
 
     act(() =>
       fixture.emit("score.update", {
-        week: 5, status: "in_progress", version: 1, gamesFinal: 0, gamesTotal: 4,
+        week: 5, status: "in_progress", version: 1, gamesFinal: 2, gamesTotal: 4,
         scores: [{ teamId: "t1", points: 17 }],
       }),
     );
     await waitFor(() => expect(result.current.scores.get("t1")).toBe(17));
     // A frame that only names t1 must not erase t2's last-known score.
     expect(result.current.scores.get("t2")).toBe(9);
+    expect(result.current.gamesFinal).toBe(2);
+    expect(result.current.gamesTotal).toBe(4);
   });
 
   it("ignores a frame for a different week, however new its version", async () => {
@@ -171,12 +181,19 @@ describe("useLiveScores", () => {
 
     fixture.response = {
       ok: true,
-      data: { ...WEEK_BODY, weekStatus: "final", matchups: [{ ...WEEK_BODY.matchups[0]!, final: true, weekStatus: "final", home: { ...WEEK_BODY.matchups[0]!.home, score: 30 }, away: { ...WEEK_BODY.matchups[0]!.away, score: 22 } }] },
+      data: {
+        ...WEEK_BODY,
+        weekStatus: "final",
+        gamesFinal: 4,
+        matchups: [{ ...WEEK_BODY.matchups[0]!, final: true, weekStatus: "final", home: { ...WEEK_BODY.matchups[0]!.home, score: 30 }, away: { ...WEEK_BODY.matchups[0]!.away, score: 22 } }],
+      },
     };
     act(() => fixture.fire("open"));
     await waitFor(() => expect(result.current.status).toBe("final"));
     expect(result.current.scores.get("t1")).toBe(30);
     expect(result.current.scores.get("t2")).toBe(22);
+    // A refetch's response carries a fresh `gamesFinal`/`gamesTotal` too, not only scores/status.
+    expect(result.current.gamesFinal).toBe(4);
   });
 
   // Task 8 review, FIX 2: the report claimed this race was "tested adversarially", but no test

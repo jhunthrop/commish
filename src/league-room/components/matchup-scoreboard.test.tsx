@@ -49,6 +49,39 @@ describe("MatchupScoreboard", () => {
     expect(screen.queryByText("Final")).not.toBeInTheDocument();
   });
 
+  // E1(a)+(c) (D2/E3, competition review): the two facts a manager needs to know whether a lead
+  // is safe — the margin (a plain subtraction of two scores already on screen) and how much of
+  // the week has played — composed into one honest sentence, from data already in the props.
+  describe("the honest line (E1)", () => {
+    it("says nothing when either score is not in yet", () => {
+      render(<MatchupScoreboard matchup={{ ...FINAL, homeScore: null }} myTeamId="t1" gamesFinal={0} gamesTotal={4} />);
+      expect(screen.queryByText(/games final/)).not.toBeInTheDocument();
+    });
+
+    it("speaks in the second person for the caller's own matchup, up or down", () => {
+      render(<MatchupScoreboard matchup={FINAL} myTeamId="t1" gamesFinal={13} gamesTotal={13} />);
+      expect(screen.getByText("You are up 22.78. 13 of 13 games final.")).toBeInTheDocument();
+
+      render(<MatchupScoreboard matchup={FINAL} myTeamId="t2" gamesFinal={13} gamesTotal={13} />);
+      expect(screen.getByText("You are down 22.78. 13 of 13 games final.")).toBeInTheDocument();
+    });
+
+    it("names the leader in the third person for a spectator with no team in this matchup", () => {
+      render(<MatchupScoreboard matchup={FINAL} myTeamId={null} gamesFinal={13} gamesTotal={13} />);
+      expect(screen.getByText("Bay Bandits leads by 22.78. 13 of 13 games final.")).toBeInTheDocument();
+    });
+
+    it("says tied rather than a zero margin", () => {
+      render(<MatchupScoreboard matchup={{ ...FINAL, homeScore: 100, awayScore: 100 }} myTeamId="t1" gamesFinal={2} gamesTotal={4} />);
+      expect(screen.getByText("You are tied at 100.00. 2 of 4 games final.")).toBeInTheDocument();
+    });
+
+    it("omits the games-final clause when the week has no stat_weeks row at all", () => {
+      render(<MatchupScoreboard matchup={FINAL} myTeamId="t1" />);
+      expect(screen.getByText("You are up 22.78.")).toBeInTheDocument();
+    });
+  });
+
   // Fix round 1, F2: a regression test for the truncation fix, missing until now. Before `w-full`
   // was added to the name `<p>`, its `flex-col items-center` parent sized it to its own content
   // (the cross-axis default for that layout), so `truncate`'s `overflow-hidden`/`ellipsis` never

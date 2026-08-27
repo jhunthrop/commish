@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, Card, ErrorState, PositionBadge, Select, Sticker, Textarea } from "@/components/ui";
+import { Button, Card, ErrorState, PositionBadge, Select, Textarea } from "@/components/ui";
 import type { ProposeTradeBody } from "@/trades/contract";
 import { TRADE_CONFIG } from "@/trades/config";
 import type { TradeRoomContext, TradeRosterPlayer } from "../contract";
@@ -60,8 +60,12 @@ function PlayerPicker({
             const checked = selected.includes(player.playerId);
             const atCap = !checked && selected.length >= TRADE_CONFIG.maxAssetsPerSide;
             return (
+              // E5 (competition review): the picker's own row used to wrap a `Sticker` — the
+              // same full-width slab the trade card carried — around every checkbox label. A
+              // plain row with a `PositionBadge` chip is the treatment the matchup table and
+              // `LineupEditor` already use; the sticker fill stays on the board it was built for.
               <li key={player.playerId}>
-                <label className="flex items-center gap-2">
+                <label className="flex min-w-0 items-center gap-2">
                   <input
                     type="checkbox"
                     checked={checked}
@@ -69,10 +73,8 @@ function PlayerPicker({
                     onChange={() => onToggle(player.playerId)}
                     className="size-4 accent-accent"
                   />
-                  <Sticker position={player.position} className="flex items-center gap-2 px-2 py-1">
-                    <PositionBadge position={player.position} size="sm" />
-                    <span className="text-sm font-medium">{player.name}</span>
-                  </Sticker>
+                  <PositionBadge position={player.position} size="sm" />
+                  <span className="min-w-0 break-words text-sm font-medium text-text-primary">{player.name}</span>
                 </label>
               </li>
             );

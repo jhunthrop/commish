@@ -157,51 +157,66 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
             return (
               <li
                 key={row.player.id}
-                className={`flex h-11 shrink-0 items-center gap-2 rounded-sm border border-line px-2 ${row.drafted ? "opacity-60" : "bg-surface-elevated"}`}
+                className={`flex shrink-0 flex-col justify-center gap-1 rounded-sm border border-line px-2 py-1.5 ${row.drafted ? "opacity-60" : "bg-surface-elevated"}`}
               >
-                <span className="w-5 shrink-0 text-right font-mono text-xs tabular-nums text-text-muted">{row.rank}</span>
-                <PositionBadge position={row.player.position} size="sm" />
-                {/* Founder directive 2026-08-26 ("why aren't we showing the players picture?"):
-                    decorative (no `label`) — the name right beside it already says who this is,
-                    and `sm` keeps the row at its fixed `h-11` with no reflow at the 360px floor. */}
-                <Avatar name={row.player.name} avatar={row.player.headshotUrl} size="sm" />
-                <span className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
-                {/* The team abbreviation yields to the NAME below xl (laptop fit, 2026-08-26):
-                    at the pool's 320px rail a three-letter code cost long names their last
-                    readable syllable, and the name is what a drafter is scanning for. */}
-                <span className="hidden shrink-0 text-xs text-text-muted xl:inline">{row.player.nflTeam}</span>
-                {row.drafted ? null : (
-                  <Button size="sm" variant="ghost" disabled={submitting} aria-label={queueButtonLabel(row.player.name, queued)} onClick={() => onQueue(row.player.id)}>
-                    <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>
-                      {queued ? "★" : "☆"}
-                    </span>
-                  </Button>
-                )}
-                {preStart ? (
-                  // Nothing at all — E11 (2026-08-26 design review): a per-row "—" printed a
-                  // 60-row column of dashes before kickoff. There is nothing to do here yet,
-                  // the rail says why, and the star beside this slot is still the whole story.
-                  null
-                ) : row.drafted ? (
-                  <Badge tone="neutral">Drafted</Badge>
-                ) : canDraft ? (
-                  // Picking mode: the act button exists while it is genuinely your turn, OR
-                  // (Task 5) while you owe a pick from an earlier skip — live on your turn and
-                  // off it. While neither is true, the star is the action — a disabled "Draft"
-                  // would be a lie-in-waiting.
-                  //
-                  // `secondary`, never the default primary — D3 (2026-08-26 design review,
-                  // rule 5): sixty ink pills in the on-turn pool shouted over the dock's one
-                  // true action. The pool offers; the dock's single ink pill confirms.
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    loading={submitting && pendingPlayerId === row.player.id}
-                    onClick={() => onAct(row.player.id)}
-                  >
-                    {actionLabel}
-                  </Button>
-                ) : null}
+                {/* V-04 (veteran journey, BLOCKER): the name used to share ONE row with the
+                    rank, sticker, avatar, team code, queue star and act button — every one of
+                    those has a natural, non-shrinking minimum width, so the only element that
+                    could ever give up space (`min-w-0 flex-1 truncate`) absorbed the ENTIRE
+                    deficit and collapsed to 3-4 characters the instant a "Draft"/"Nominate"
+                    button appeared beside it, on a 60-second clock, where you cannot pick a
+                    player you cannot read. The name now owns its own line at the row's full
+                    width — nothing else competes with it for space, so it truncates only a
+                    genuinely long name, never first and never most. */}
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="w-5 shrink-0 text-right font-mono text-xs tabular-nums text-text-muted">{row.rank}</span>
+                  <PositionBadge position={row.player.position} size="sm" />
+                  {/* Founder directive 2026-08-26 ("why aren't we showing the players picture?"):
+                      decorative (no `label`) — the name right beside it already says who this is. */}
+                  <Avatar name={row.player.name} avatar={row.player.headshotUrl} size="sm" />
+                  <span className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
+                </div>
+                {/* The meta row: the team code (no longer fighting the name for width, so it no
+                    longer needs the laptop-fit `xl:` gate — it fits on its own line at the
+                    320px rail floor) on the left, and the fixed action column on the right —
+                    the star and the act control never move, whichever state they're in. */}
+                <div className="flex items-center justify-between gap-2 pl-7">
+                  <span className="min-w-0 truncate text-xs text-text-muted">{row.player.nflTeam}</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {row.drafted ? null : (
+                      <Button size="sm" variant="ghost" disabled={submitting} aria-label={queueButtonLabel(row.player.name, queued)} onClick={() => onQueue(row.player.id)}>
+                        <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>
+                          {queued ? "★" : "☆"}
+                        </span>
+                      </Button>
+                    )}
+                    {preStart ? (
+                      // Nothing at all — E11 (2026-08-26 design review): a per-row "—" printed a
+                      // 60-row column of dashes before kickoff. There is nothing to do here yet,
+                      // the rail says why, and the star beside this slot is still the whole story.
+                      null
+                    ) : row.drafted ? (
+                      <Badge tone="neutral">Drafted</Badge>
+                    ) : canDraft ? (
+                      // Picking mode: the act button exists while it is genuinely your turn, OR
+                      // (Task 5) while you owe a pick from an earlier skip — live on your turn
+                      // and off it. While neither is true, the star is the action — a disabled
+                      // "Draft" would be a lie-in-waiting.
+                      //
+                      // `secondary`, never the default primary — D3 (2026-08-26 design review,
+                      // rule 5): sixty ink pills in the on-turn pool shouted over the dock's one
+                      // true action. The pool offers; the dock's single ink pill confirms.
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        loading={submitting && pendingPlayerId === row.player.id}
+                        onClick={() => onAct(row.player.id)}
+                      >
+                        {actionLabel}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
               </li>
             );
           })}

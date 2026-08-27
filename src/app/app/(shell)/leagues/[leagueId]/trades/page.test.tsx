@@ -58,6 +58,8 @@ const WEEK_BODY = {
   totalWeeks: 14,
   myTeamId: "t1",
   weekStatus: "in_progress" as const,
+  gamesFinal: 0,
+  gamesTotal: 0,
   matchups: [
     {
       weekNumber: 5,
@@ -115,9 +117,17 @@ describe("TradesPage", () => {
   // Persona panel (commissioner, step 4): no approval step and no veto window is a real
   // departure from other platforms, said plainly rather than discovered the first time a
   // commissioner tries to stop a trade and can't.
-  it("tells every viewer trades complete with no review step", async () => {
+  //
+  // D7 (competition review): the OLD sentence ("There's no review step, for anyone.") was false
+  // the moment a held trade rendered on this same page — Plan D's own fairness-review carve-out
+  // for lopsided public-league trades contradicted it 400px below, on the same screen. The header
+  // now states the rule INCLUDING its one exception, so it can never disagree with
+  // `HeldTradeBanner` again.
+  it("states the trade policy including its one exception, so it never contradicts a held trade on the same page", async () => {
     await renderPage();
-    expect(await screen.findByText("Trades complete as soon as both sides agree. There's no review step, for anyone.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Trades complete as soon as both sides agree. Public leagues hold back a lopsided trade for a short fairness review first."),
+    ).toBeInTheDocument();
   });
 
   it("404s a league that doesn't exist", async () => {

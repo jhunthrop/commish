@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams, weeks } from "@/db/schema";
+import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, statWeeks, teams, weeks } from "@/db/schema";
 import { UI_CONFIG } from "@/components/ui/config";
 import type { DraftStatus } from "@/domain/draft";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
@@ -370,7 +370,14 @@ export async function matchupWeek(
   const allRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const { totalWeeks } = seasonProgress(allRows, LEAGUE_CONFIG.regularSeasonWeeks);
   const weekStatus = await weekStatusFor(db, weekNumber);
-  if (week.length === 0) return { leagueId, weekNumber, totalWeeks, myTeamId: null, matchups: [], weekStatus };
+  // E1(a)/D2: the same two columns `ScoreUpdatePayload` rides on every live frame
+  // (`parseScoreFrame`, `use-live-scores.ts`) — read here so the server-rendered snapshot and
+  // the live socket agree on where they start. `0`/`0` for a week with no `stat_weeks` row yet,
+  // the same "nothing recorded" default `weekStatusFor` already takes for `status`.
+  const [statWeekRow] = await db.select({ gamesFinal: statWeeks.gamesFinal, gamesTotal: statWeeks.gamesTotal }).from(statWeeks).where(eq(statWeeks.week, weekNumber));
+  const gamesFinal = statWeekRow?.gamesFinal ?? 0;
+  const gamesTotal = statWeekRow?.gamesTotal ?? 0;
+  if (week.length === 0) return { leagueId, weekNumber, totalWeeks, myTeamId: null, matchups: [], weekStatus, gamesFinal, gamesTotal };
 
   // `null` for a non-median league (`leagues.median_game` off) and for a week that hasn't
   // settled yet — `finalizeWeekInTx` (`@/stats-pipeline/finalize`) only ever writes this column
@@ -402,7 +409,12 @@ export async function matchupWeek(
       playerId: slot.playerId,
       playerName: player?.name ?? null,
       position: player?.position ?? null,
-      points: player === undefined || line === undefined ? 0 : computeFantasyPoints(line, player.position, rules),
+      // D4: "has not played" and "played and scored nothing" are different facts — the SAME
+      // rule `MatchupSide.score` already honors at the team level (`null` for no live value
+      // yet), stated one layer up by `initialScores`' own docblock (`live-matchup-week.tsx`).
+      // A player with no stat line for the week has not been coalesced to zero since a real
+      // stat set only ever covers the players who actually took the field.
+      points: player === undefined || line === undefined ? null : computeFantasyPoints(line, player.position, rules),
     };
   };
 
@@ -446,5 +458,5 @@ export async function matchupWeek(
     }),
   );
 
-  return { leagueId, weekNumber, totalWeeks, myTeamId, matchups: details, weekStatus };
+  return { leagueId, weekNumber, totalWeeks, myTeamId, matchups: details, weekStatus, gamesFinal, gamesTotal };
 }
