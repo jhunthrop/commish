@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { TvBoard } from "@/draft-room/components/tv-board";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: honest static title — the room's real name is drawn from a draft record this task does not
+// own a read for; "Draft board" is the room's own established name for this route (RoomRail's
+// own docblock reference, `src/draft-room/components/room-rail.tsx`).
+export const metadata: Metadata = pageTitle("Draft board");
 
 interface PageProps {
   readonly params: Promise<{ readonly draftId: string }>;

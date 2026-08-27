@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
@@ -7,8 +8,11 @@ import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices, quoteFor } from "@/integrity-service/notify";
 import { InfoTip, PageTitle } from "@/components/ui";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1>.
+export const metadata: Metadata = pageTitle("League activity");
 
 interface PageProps {
   readonly params: Promise<{ readonly leagueId: string }>;

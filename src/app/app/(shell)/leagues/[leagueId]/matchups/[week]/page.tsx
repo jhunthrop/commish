@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
@@ -6,12 +7,26 @@ import { leagueHome, matchupWeek } from "@/league-service";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import { LiveMatchupWeek } from "@/league-room/components/live-matchup-week";
 import { WeekNav } from "@/league-room/components/week-nav";
+import { formatWeek } from "@/league-room/lib/format";
 import { liveScoringCopy } from "@/stats/live-scoring-copy";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
   readonly params: Promise<{ readonly leagueId: string; readonly week: string }>;
+}
+
+/**
+ * A5: the week number is a route param, not a DB read, so it composes a real, honest title
+ * (`formatWeek`, `@/league-room/lib/format` — the same string `WeekNav` already renders) without
+ * the league-name DB read this page's own body makes (`leagueHome`, above) — that read stays
+ * this task's line, not crossed for a browser tab.
+ */
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { week } = await params;
+  const weekNumber = Number.parseInt(week, 10);
+  return pageTitle(Number.isInteger(weekNumber) && weekNumber >= 1 ? formatWeek(weekNumber) : "Matchups");
 }
 
 /**

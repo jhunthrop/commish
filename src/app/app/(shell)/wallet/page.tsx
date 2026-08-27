@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { renderWalletContent } from "./wallet-content";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1>.
+export const metadata: Metadata = pageTitle("Wallet");
 
 /**
  * The account room's wallet page (Task 12) — the first user-facing money surface. Renders no

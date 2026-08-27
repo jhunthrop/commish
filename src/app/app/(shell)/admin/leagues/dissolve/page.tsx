@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
 import { PageTitle } from "@/components/ui";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { DissolveLeagueControl } from "@/admin-room/components/dissolve-league-control";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1>, and `AdminConsoleNav`'s label for this route.
+export const metadata: Metadata = pageTitle("Dissolve league");
 
 /**
  * The admin room's league-dissolution surface (Phase 4, Task 9). Renders no `TopBar` and no

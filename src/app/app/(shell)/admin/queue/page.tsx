@@ -1,11 +1,15 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { listPendingFlags } from "@/integrity-service/flags";
 import { formatFlagCursor, parseFlagCursor } from "@/integrity/queue-view";
 import { PageTitle } from "@/components/ui";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { QueueTable } from "@/admin-room/components/queue-table";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1>, and `AdminConsoleNav`'s label for this route.
+export const metadata: Metadata = pageTitle("Dispute queue");
 
 interface PageProps {
   readonly searchParams: Promise<Record<string, string | readonly string[] | undefined>>;

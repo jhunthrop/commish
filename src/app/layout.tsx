@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/design/theme-provider";
 import { NoticesProvider } from "@/components/app-shell/notices-provider";
+import { TITLE_TEMPLATE } from "@/components/app-shell/page-metadata";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,7 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Commish",
+  // A5/N11: every page used to render with `document.title = "Commish"` — this template is the
+  // one place the " · Commish" suffix is assembled (`pageTitle`, `@/components/app-shell/page-
+  // metadata`); a page that sets its own `metadata.title` gets it appended automatically, and a
+  // page that sets none (the front door itself) falls back to `default` below, unchanged from
+  // before this task.
+  title: { default: "Commish", template: TITLE_TEMPLATE },
   description: "Season-long fantasy football, done right.",
 };
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import type { JsonObject } from "@/domain/audit";
@@ -12,8 +13,12 @@ import { Icon } from "@/components/ui/icon";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { ResolutionForm, type DecisionPreview } from "@/admin-room/components/resolution-form";
 import { HeldTradeDetail, type HeldTradeSubject } from "@/admin-room/components/held-trade-detail";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: honest static title — the real one (held trade vs. flag detail) depends on a DB read
+// (`flagDetail`, below) this task does not duplicate for a browser tab.
+export const metadata: Metadata = pageTitle("Dispute detail");
 
 interface PageProps {
   readonly params: Promise<{ readonly flagId: string }>;

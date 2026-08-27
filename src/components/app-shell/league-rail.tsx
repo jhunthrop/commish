@@ -86,7 +86,15 @@ export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
             href={`/app/leagues/${league.id}`}
             aria-current={isCurrent ? "page" : undefined}
             aria-label={accessibleNameFor(league)}
-            className="relative flex shrink-0 items-center justify-center self-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            // D4: the one persistent navigation in the product had no visual "you are here" —
+            // `aria-current="page"` was set but every tile shared one class string. The current
+            // tile now carries the product's own selected idiom (`ThemeSwitcher`'s checked chip,
+            // `src/account-room/components/theme-switcher.tsx`: `ring-1 ring-edge` plus a surface
+            // step the tile itself cannot swallow), an `<Crest>`-sized ring rather than a change
+            // to `Crest`'s own tone fill, which stays the league's deterministic color either way.
+            className={`relative flex shrink-0 items-center justify-center self-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+              isCurrent ? "ring-2 ring-edge ring-offset-2 ring-offset-surface" : ""
+            }`}
             style={tileStyle}
           >
             <Crest id={league.id} label={league.shortName} size={crestSize} />

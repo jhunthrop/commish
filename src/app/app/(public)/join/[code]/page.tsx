@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
@@ -8,8 +9,11 @@ import { invitePreview } from "@/league-service/invites";
 import { formatUsd } from "@/money/config";
 import { walletSummary } from "@/money-service/read";
 import { InviteLanding, type InviteLandingState } from "@/league-room/components/invite-landing";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1> (a static "Join a league" regardless of invite outcome).
+export const metadata: Metadata = pageTitle("Join a league");
 
 interface PageProps {
   readonly params: Promise<{ readonly code: string }>;

@@ -1,8 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import type { HelpLevel } from "@/identity/preferences";
@@ -17,6 +19,8 @@ import { PracticeEntryLink } from "@/league-room/components/practice-entry-link"
 import { Wire } from "@/league-room/components/wire";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1> (`OpenLeagueShelf`'s `headingLevel={1}` band, "Open leagues").
+export const metadata: Metadata = pageTitle("Open leagues");
 
 /** This page's own path — its `PublicBar`'s sign-in link returns here (Task 16, F6). */
 const PAGE_INTENT = "/browse";

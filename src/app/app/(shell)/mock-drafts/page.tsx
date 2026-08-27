@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
@@ -13,8 +14,11 @@ import {
   mockLifecycleDeps,
 } from "@/app/api/mock-drafts/_shared";
 import { MockLobby } from "@/league-room/components/mock-lobby";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1>.
+export const metadata: Metadata = pageTitle("Mock drafts");
 
 interface PageProps {
   readonly searchParams: Promise<

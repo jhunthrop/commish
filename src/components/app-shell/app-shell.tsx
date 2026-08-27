@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import { UI_CONFIG } from "@/components/ui/config";
+import { AdminConsoleNav } from "./admin-console-nav";
 import { LeagueRail } from "./league-rail";
+import { ShellFooter } from "./shell-footer";
 import { TopBar } from "./top-bar";
 import type { LiveState, RailLeague } from "./shell-data";
 
@@ -25,12 +27,16 @@ export interface AppShellProps {
  * .railWidthPx` reaches the DOM as the `--rail` custom property in an inline style, the same
  * "a dynamic value has to reach the DOM as a style, not a class" idiom `InfoTip`'s own
  * `minTargetPx` already uses, since a Tailwind arbitrary value cannot read a JS constant.
+ *
+ * A third row (`ShellFooter`, flow analysis A3) sits under the content column only — never
+ * under the rail — so the grid grows by one row (`auto`) rather than being restructured. Below
+ * `lg` the grid collapses to a single column and the footer simply falls in flow after `<main>`.
  */
 export function AppShell({ user, rail, liveState, children }: AppShellProps) {
   const shellStyle = { "--rail": `${UI_CONFIG.shell.railWidthPx}px` } as CSSProperties;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[var(--rail)_1fr] lg:grid-rows-[auto_1fr]" style={shellStyle}>
+    <div className="grid grid-cols-1 lg:grid-cols-[var(--rail)_1fr] lg:grid-rows-[auto_1fr_auto]" style={shellStyle}>
       <TopBar
         className="lg:col-span-2 lg:row-start-1"
         displayName={user.displayName}
@@ -42,7 +48,13 @@ export function AppShell({ user, rail, liveState, children }: AppShellProps) {
       {/* Full-bleed: no `max-w-*` here at all. A long-form reading surface keeps its own
           `max-w-prose` on its paragraph column instead — "full-bleed frames, measured
           paragraphs" (Step 2). */}
-      <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4 lg:col-start-2 lg:row-start-2">{children}</main>
+      <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4 lg:col-start-2 lg:row-start-2">
+        {/* Flow analysis A4: the operator console index, visible only for an admin standing on
+            `/app/admin/*`. Silent (renders null) for every other page and every other user. */}
+        <AdminConsoleNav isAdmin={user.isAdmin} />
+        {children}
+      </main>
+      <ShellFooter className="lg:col-start-2 lg:row-start-3" />
     </div>
   );
 }

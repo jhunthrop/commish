@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
@@ -16,8 +17,11 @@ import { NotificationSummary } from "@/account-room/components/notification-summ
 import { StandingPanel } from "@/account-room/components/standing-panel";
 import { ThemeSwitcher } from "@/account-room/components/theme-switcher";
 import { ReviewComposer } from "@/account-room/components/review-composer";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1>.
+export const metadata: Metadata = pageTitle("Your profile");
 
 /**
  * A Server Component reading through the service layer directly, same rationale as the other

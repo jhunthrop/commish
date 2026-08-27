@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { PageTitle, buttonClassName } from "@/components/ui";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { safeReturnTo } from "@/lib/auth/return-to";
+
+// A5: matches this page's own <h1> exactly.
+export const metadata: Metadata = pageTitle("Sign-in did not go through");
 
 interface PageProps {
   readonly searchParams: Promise<Record<string, string | readonly string[] | undefined>>;

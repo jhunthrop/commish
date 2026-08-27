@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
@@ -5,8 +6,12 @@ import { readPreferences } from "@/identity-service/preferences";
 import { LEAGUE_CONFIG, nextAction } from "@/league";
 import { leagueHome, lineupView } from "@/league-service";
 import { LeagueHome } from "@/league-room/components/league-home";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: honest static title — the real one (the league's own name) needs a DB read this task does
+// not own; `LeagueHome`'s own `<PageTitle>{home.name}</PageTitle>` still carries the real name.
+export const metadata: Metadata = pageTitle("League home");
 
 interface PageProps {
   readonly params: Promise<{ readonly leagueId: string }>;

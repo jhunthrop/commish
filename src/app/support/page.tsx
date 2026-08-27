@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { PageTitle } from "@/components/ui";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
+
+// A5.
+export const metadata: Metadata = pageTitle("Support");
 
 /** This page's own path — its `PublicBar`'s sign-in link returns here (Task 16, F6). */
 const PAGE_INTENT = "/support";

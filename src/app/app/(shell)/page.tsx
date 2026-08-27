@@ -1,9 +1,11 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { readProfile } from "@/identity-service/profile";
 import { firstRunPlan } from "@/identity";
 import { PageTitle } from "@/components/ui";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 import { crossLeagueHome } from "@/league-service";
 import { listPublicLeagues } from "@/league-service/browse";
 import { getScoreCache } from "@/league-service/score-cache-instance";
@@ -13,6 +15,8 @@ import { HomeBoard } from "@/league-room/components/home-board";
 import { StartOrJoinDisclosure } from "@/league-room/components/start-or-join-disclosure";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1>.
+export const metadata: Metadata = pageTitle("Your leagues");
 
 /**
  * The signed-in home answers what needs this manager right now, in every league they're in: a

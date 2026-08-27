@@ -55,6 +55,22 @@ describe("LeagueRail", () => {
     expect(screen.getByRole("link", { name: "Golden Hawks. Watch the scores." })).not.toHaveAttribute("aria-current");
   });
 
+  // D4: `aria-current="page"` was already set, but every tile shared one class string — the
+  // one persistent navigation in the product had no visual "you are here". The current tile now
+  // carries a real visual state, not just an accessibility attribute.
+  it("gives the current tile a class string that differs from every sibling's", () => {
+    mockPathname("/app/leagues/lg_bandits/matchups/3");
+    render(<LeagueRail leagues={LEAGUES} />);
+    const current = screen.getByRole("link", { name: "Bay Bandits" });
+    const siblingOne = screen.getByRole("link", { name: "Thunder Squad. Join the draft." });
+    const siblingTwo = screen.getByRole("link", { name: "Golden Hawks. Watch the scores." });
+    expect(current.className).not.toBe(siblingOne.className);
+    expect(current.className).not.toBe(siblingTwo.className);
+    // The idiom itself: `ThemeSwitcher`'s own checked-chip treatment (ring-1 ring-edge).
+    expect(current.className).toMatch(/ring-edge/);
+    expect(siblingOne.className).not.toMatch(/ring-edge/);
+  });
+
   it("hides every state dot from the accessibility tree — the state lives in the accessible name only", async () => {
     mockPathname("/app");
     await renderSurface(<LeagueRail leagues={LEAGUES} />, ({ container }) => {

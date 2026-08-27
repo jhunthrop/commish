@@ -46,7 +46,7 @@ function renderShell(props: AppShellProps) {
 }
 
 describe("AppShell", () => {
-  it("renders one banner, one navigation and one main, so a screen reader hears a place", async () => {
+  it("renders one banner, one league rail, one footer nav and one main, so a screen reader hears a place", async () => {
     mockPathname("/app");
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     await renderSurface(
@@ -58,9 +58,51 @@ describe("AppShell", () => {
       ({ getAllByRole }) => {
         expect(getAllByRole("banner")).toHaveLength(1);
         expect(getAllByRole("navigation", { name: "Your leagues" })).toHaveLength(1);
+        // A3: the shell's own footer, always present outside the admin console.
+        expect(getAllByRole("navigation", { name: "Support and legal" })).toHaveLength(1);
         expect(getAllByRole("main")).toHaveLength(1);
       },
     );
+  });
+
+  // A3, N2: Support/Terms/Privacy/How it works were unreachable from all 17 signed-in routes —
+  // PublicFooter was their only door and AppShell never rendered it. Every AppShell render now
+  // carries a quiet equivalent, regardless of which page is inside <main>.
+  it("carries Support, How it works, Terms and Privacy on every render, beneath the content", () => {
+    mockPathname("/app");
+    const { getByRole } = renderShell(baseProps());
+    expect(getByRole("link", { name: "Support" })).toHaveAttribute("href", "/support");
+    expect(getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/league-rules");
+    expect(getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/legal/terms");
+    expect(getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/legal/privacy");
+  });
+
+  // A4, N3: five of six operator surfaces had no inbound link anywhere in the product.
+  describe("the admin console nav (A4)", () => {
+    it("lists all six operator surfaces for an admin standing on /app/admin/*", () => {
+      mockPathname("/app/admin/queue");
+      const props: AppShellProps = { ...baseProps(), user: { displayName: "Ada Lovelace", avatar: null, isAdmin: true } };
+      const { getByRole } = renderShell(props);
+      expect(getByRole("link", { name: "Dispute queue" })).toHaveAttribute("href", "/app/admin/queue");
+      expect(getByRole("link", { name: "Held payouts" })).toHaveAttribute("href", "/app/admin/holds");
+      expect(getByRole("link", { name: "Self exclusion" })).toHaveAttribute("href", "/app/admin/exclusions");
+      expect(getByRole("link", { name: "Settle league" })).toHaveAttribute("href", "/app/admin/leagues/settle");
+      expect(getByRole("link", { name: "Dissolve league" })).toHaveAttribute("href", "/app/admin/leagues/dissolve");
+      expect(getByRole("link", { name: "Money reconciliation" })).toHaveAttribute("href", "/app/admin/money/reconcile");
+    });
+
+    it("never renders for an ordinary member, even standing on an admin URL", () => {
+      mockPathname("/app/admin/queue");
+      const { queryByRole } = renderShell(baseProps());
+      expect(queryByRole("link", { name: "Dispute queue" })).not.toBeInTheDocument();
+    });
+
+    it("stays silent for an admin anywhere outside /app/admin/*", () => {
+      mockPathname("/app");
+      const props: AppShellProps = { ...baseProps(), user: { displayName: "Ada Lovelace", avatar: null, isAdmin: true } };
+      const { queryByRole } = renderShell(props);
+      expect(queryByRole("navigation", { name: "Admin console" })).not.toBeInTheDocument();
+    });
   });
 
   it("marks the league the current URL belongs to, by aria-current and not by color", () => {

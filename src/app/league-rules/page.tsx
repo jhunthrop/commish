@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { PageTitle } from "@/components/ui";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { GlossarySection } from "./glossary-section";
 import { TermLink } from "./term-link";
+
+// A5: matches this page's own <h1> and the front door's nav label — "How it works", never
+// "League rules" (`ShellFooter`'s own docblock, `@/components/app-shell/shell-footer.tsx`).
+export const metadata: Metadata = pageTitle("How it works");
 
 /** This page's own path — its `PublicBar`'s sign-in link returns here (Task 16, F6). */
 const PAGE_INTENT = "/league-rules";

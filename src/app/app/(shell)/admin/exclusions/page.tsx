@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
 import { PageTitle } from "@/components/ui";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { ExclusionControl } from "@/admin-room/components/exclusion-control";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1>, and `AdminConsoleNav`'s label for this route.
+export const metadata: Metadata = pageTitle("Self exclusion");
 
 /**
  * The admin room's self-exclusion clear surface (Task 7 Step 2). Renders no `TopBar` and no

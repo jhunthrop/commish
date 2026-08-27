@@ -1,10 +1,15 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { ToastProvider } from "@/components/ui";
 import { DraftRoom } from "@/draft-room/components/draft-room";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: honest static title — the room's real name (the league name `RoomRail` renders as its own
+// <h1>) needs a DB read this task does not own.
+export const metadata: Metadata = pageTitle("Draft room");
 
 interface PageProps {
   readonly params: Promise<{ readonly draftId: string }>;

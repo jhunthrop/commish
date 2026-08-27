@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { getDb } from "@/db/client";
@@ -5,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { ErrorState, PageTitle } from "@/components/ui";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
@@ -12,8 +14,11 @@ import { listReviews, myReview } from "@/review-service/reviews";
 import { ReviewComposer } from "@/account-room/components/review-composer";
 import { ReviewFeed } from "@/account-room/components/review-feed";
 import { browseAllowed } from "@/app/api/reviews/_shared";
+import { excludeFixtureReviews } from "./fixture-filter";
 
 export const dynamic = "force-dynamic";
+// A5: the front door's own nav label for this route (`src/app/page.tsx:37`-adjacent list).
+export const metadata: Metadata = pageTitle("Reviews");
 
 /** This page's own path — every signed-out `SignInLink` on it returns here (Task 16, F6). */
 const PAGE_INTENT = "/reviews";
@@ -68,8 +73,17 @@ export default async function ReviewsPage() {
     );
   }
 
-  const [user, page] = await Promise.all([getCurrentUser(), listReviews(getDb(), {})]);
+  const [user, rawPage] = await Promise.all([getCurrentUser(), listReviews(getDb(), {})]);
   const mine = user === null ? null : await myReview(getDb(), user.id);
+
+  // D3 (flow analysis; storefront review): a fixture review — the site's own one review today,
+  // filed by the onboarding e2e spec — never reaches a stranger deciding whether to sign up. See
+  // `./fixture-filter`'s own docblock for the exact signature and its known limitation. Once the
+  // fixture is excluded, an otherwise-empty result renders `ReviewFeed`'s own honest empty state
+  // ("No reviews yet. Be the first to say what Commish is like to use.") rather than a lone
+  // one-star complaint — no separate branch needed here, `ReviewFeed` already does this for any
+  // page whose `reviews` array is empty.
+  const page = { ...rawPage, reviews: excludeFixtureReviews(rawPage.reviews) };
 
   const emptyAction =
     user === null || mine === null ? (

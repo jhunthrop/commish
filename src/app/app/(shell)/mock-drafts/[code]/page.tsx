@@ -1,10 +1,14 @@
+import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { ButtonLink, ErrorState, PageTitle } from "@/components/ui";
 import { mockRoomSummary } from "@/mock-draft-service/lobby";
 import { MockShareLanding } from "@/league-room/components/mock-share-landing";
+import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
+// A5: matches this page's own <h1> (a static "Mock drafts" regardless of share outcome).
+export const metadata: Metadata = pageTitle("Mock drafts");
 
 interface PageProps {
   readonly params: Promise<{ readonly code: string }>;
