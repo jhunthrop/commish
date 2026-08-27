@@ -32,8 +32,9 @@
     "money:reconcile": "dotenv -e .env.local -- tsx scripts/money-reconcile.ts",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
-    "e2e": "dotenv -e .env.local -v STATS_PROVIDER=mock -- playwright test",
-    "e2e:ui": "dotenv -e .env.local -v STATS_PROVIDER=mock -- playwright test --ui",
+    "e2e:build": "dotenv -e .env.local -v STATS_PROVIDER=mock -v NEXT_DIST_DIR=.next-e2e -- next build",
+    "e2e": "npm run e2e:build && dotenv -e .env.local -v STATS_PROVIDER=mock -- playwright test",
+    "e2e:ui": "npm run e2e:build && dotenv -e .env.local -v STATS_PROVIDER=mock -- playwright test --ui",
     "e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {

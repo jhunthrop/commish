@@ -14,9 +14,15 @@ const PORT = new URL(BASE_URL).port || "3100";
 
 // A `next dev` process can be running against this same checkout at the same time as this
 // suite (both default to `.next`); its HMR writes corrupt `next start`'s asset manifest out
-// from under it. Isolate the e2e build/serve in its own dist dir (see next.config.ts). The
-// `npm run build` step in the README/brief for this suite must set the same var:
-// `NEXT_DIST_DIR=.next-e2e npm run build`.
+// from under it. Isolate the e2e build/serve in its own dist dir (see next.config.ts).
+//
+// `npm run e2e` BUILDS this directory before it tests (the `e2e:build` script). It did not used
+// to, and the resulting foot-gun cost a full day: `webServer.command` is `next start`, which
+// serves whatever bundle is already on disk, so a source fix that was committed, type-checked
+// and unit-tested still did not reach the suite. Three consecutive runs "confirmed" a bug that
+// had already been fixed, because the running server predated the fix. If you ever run
+// `playwright test` directly instead of through `npm run e2e`, build first or you are testing
+// the past: `npm run e2e:build`.
 const NEXT_DIST_DIR = ".next-e2e";
 
 /**
@@ -64,7 +70,12 @@ export default defineConfig({
     // dev-mode compilation on first hit is the single largest source of e2e timeout flake.
     command: `npm run start -- -p ${PORT}`,
     url: BASE_URL,
-    reuseExistingServer: process.env.CI === undefined,
+    // NEVER reuse, in CI or out. `e2e:build` has just written a fresh bundle, and a server that
+    // was already listening on this port is serving the previous one — reuse would hand that
+    // stale process the run and quietly undo the build. Starting fresh costs about a second;
+    // testing the wrong bundle costs a day. If the port is busy, Playwright says so loudly,
+    // which is the outcome we want over a silent pass against old code.
+    reuseExistingServer: false,
     timeout: 180_000,
     // The suite's own leagues are named `E2E …`/`Mobile360…`, which is exactly what
     // `notAFixtureLeague()` (`@/league-service/browse`) hides from every public read so the
