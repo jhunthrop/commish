@@ -26,6 +26,10 @@ const TONE: Readonly<Record<BadgeTone, string>> = {
 const GLOW: Readonly<Partial<Record<BadgeTone, string>>> = {
   accent: "ring-2 ring-accent-glow",
   warning: "ring-2 ring-warning-glow",
+  // The live family's glow (competition review D1, 2026-08-27): an alpha of the existing
+  // negative token rather than a new role — the rail's own hot tint (bg-negative/10) already
+  // set that precedent, and a glow color is a tint of its family, not a fifth pigment.
+  negative: "ring-2 ring-negative/25",
 };
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

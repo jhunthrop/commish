@@ -52,6 +52,21 @@ export function LineupEditor({
   // takes a quarterback" is a newer word than FLEX and worth the click-to-learn-more.
   const hasSuperflexSlot = lineup.starters.some((slot) => slot.slot === "SUPERFLEX");
 
+  // League-life review D2 (2026-08-27): a league whose draft has not run has NOTHING on any
+  // roster — and the locked branch below told that first-timer "Week 1 has started, so its
+  // lineup cannot change" over nine Empty rows. Week 1 had not started; the slots were empty
+  // because nobody had drafted. A rosterless lineup is exactly the pre-draft state (a drafted
+  // team always holds players), so it gets the honest sentence and no scaffold at all.
+  const rosterless = [...lineup.starters, ...lineup.bench].every((slot) => slot.playerId === null);
+  if (rosterless) {
+    return (
+      <section id="lineup" className="flex flex-col gap-2">
+        <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
+        <p className="text-sm text-text-muted">Your lineup appears here after the draft.</p>
+      </section>
+    );
+  }
+
   if (lineup.locked) {
     // Persona review (first-timer, FIX 4): stating the situation without naming what happens
     // next reads as a dead end. There IS a next step — it just isn't available yet — so say

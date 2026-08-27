@@ -15,7 +15,10 @@ describe("WeekStatusBadge", () => {
   it("says an in-progress week is in progress, with the live pill's tinted ring, in both themes, axe-clean", async () => {
     await renderSurface(<WeekStatusBadge status="in_progress" />, async ({ container }) => {
       expect(screen.getByText("In progress")).toBeInTheDocument();
-      expect(screen.getByText("In progress").className).toMatch(/ring-accent-glow/);
+      // Live wears the red family now (competition review D1): rule 1's own color for the
+      // one genuinely live fact a league week has.
+      expect(screen.getByText("In progress").className).toMatch(/ring-negative/);
+      expect(screen.getByText("In progress").className).toMatch(/text-negative/);
       expect(await axe(container)).toHaveNoViolations();
     });
   });
