@@ -1,3 +1,4 @@
+import { formatOrdinal } from "@/domain/format";
 import { formatUsd } from "@/money/config";
 
 /**
@@ -637,11 +638,11 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
  * how a place reads.
  */
 export function ordinalPlace(place: number): string {
-  const mod100 = place % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
-  const mod10 = place % 10;
-  const suffix = mod10 === 1 ? "st" : mod10 === 2 ? "nd" : mod10 === 3 ? "rd" : "th";
-  return `${place}${suffix}`;
+  // The ONE ordinal rule (`@/domain/format`, Wave-1 Q9) — this export survives as the named
+  // seam its two consumers already import, delegating rather than restating the suffix table
+  // a third time (the re-review's residual: `@/integrity` may import downward freely; the
+  // boundary blocks others from importing IT, not the reverse).
+  return formatOrdinal(place);
 }
 
 export function renderNotice<T extends NoticeType>(type: T, context: NoticeContexts[T]): RenderedNotice {
