@@ -313,7 +313,9 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
     await managerA.reload();
     await expect(managerA.getByRole("heading", { name: MOCK_COPY.resultsHeading, level: 1 })).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 45_000 });
-  await expect(managerA.getByText(MOCK_COPY.resultsRetentionSentence)).toBeVisible();
+  // E3 (results review): the panel restates NO retention — the practice banner above it owns
+  // the one clearing fact per view.
+  await expect(managerA.getByText(MOCK_COPY.resultsRetentionSentence)).toHaveCount(0);
   await expect(managerA.getByRole("list", { name: "Your roster" })).toBeVisible();
   // At least the one pick this test's own human made lands in the pick list — a fact of this
   // draft's own log, not a live ranking (`MockResults`'s own docblock).
