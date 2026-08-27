@@ -12,6 +12,9 @@ vi.mock("@/league-service/browse", () => ({ publicLeaguePreview: vi.fn() }));
 // mock — never given an implementation — throws the instant it is called, failing every test in
 // this file loudly rather than one silently starting to write again.
 vi.mock("@/league-service/join", () => ({ returnFromSignIn: vi.fn() }));
+// A-3's own read: the page asks whether this visitor already holds a team before offering them a
+// seat. A pure SELECT, mocked here the same way every other read on this page is.
+vi.mock("@/lib/leagues/membership", () => ({ resolveLeagueMembership: vi.fn() }));
 vi.mock("@/components/app-shell/shell-data", () => ({ shellData: vi.fn() }));
 // `AppShell` itself (its `TopBar`, live notices and live scores) is tested on its own — this
 // file is about the seat-hold page's own wiring, not `AppShell`'s internals, so it is stubbed to
@@ -34,8 +37,15 @@ import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { publicLeaguePreview } from "@/league-service/browse";
 import { returnFromSignIn } from "@/league-service/join";
+import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import { shellData } from "@/components/app-shell/shell-data";
 import SeatHoldPage from "./page";
+
+/** A signed-in visitor who holds NO team here — the only state that is offered a seat. */
+const NOT_A_MEMBER = {
+  ok: true as const,
+  membership: { leagueId: "lg_1", teamId: null, isCommissioner: false, authority: { kind: "house" as const, rung: "open_12" as const } },
+};
 
 const USER = { id: "u1", email: "u1@test.local", displayName: "Ada", experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false };
 
@@ -86,6 +96,7 @@ describe("/join/[leagueId]/hold — signed in (A1: a read, never a write)", () =
   it("renders the league's own facts and a one-tap confirm, and calls returnFromSignIn NOT ONCE", async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(USER);
     vi.mocked(publicLeaguePreview).mockResolvedValue(PREVIEW);
+    vi.mocked(resolveLeagueMembership).mockResolvedValue(NOT_A_MEMBER);
 
     await renderPage(fixtureLeagueDeps().deps);
 
@@ -104,6 +115,19 @@ describe("/join/[leagueId]/hold — signed in (A1: a read, never a write)", () =
     vi.mocked(publicLeaguePreview).mockResolvedValue(null);
 
     await expect(SeatHoldPage({ params: Promise.resolve({ leagueId: "lg1" }) })).rejects.toBeInstanceOf(NotFound);
+    expect(vi.mocked(returnFromSignIn)).not.toHaveBeenCalled();
+  });
+
+  it("sends a member who already holds a team straight to their league, and offers no seat (A-3)", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(USER);
+    vi.mocked(publicLeaguePreview).mockResolvedValue(PREVIEW);
+    vi.mocked(resolveLeagueMembership).mockResolvedValue({
+      ...NOT_A_MEMBER,
+      membership: { ...NOT_A_MEMBER.membership, teamId: "team_already" },
+    });
+
+    await expect(renderPage(fixtureLeagueDeps().deps)).rejects.toThrow(/NEXT_REDIRECT|redirect/i);
+    // The read decides it — the writer is still never reached on a render.
     expect(vi.mocked(returnFromSignIn)).not.toHaveBeenCalled();
   });
 });
