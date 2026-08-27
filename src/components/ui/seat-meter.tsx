@@ -60,7 +60,11 @@ export function SeatMeter({ filled, total, heldSeats = 0, srOnlySentence = false
           leaves it less than a readable minimum. */}
       <span data-testid="seat-segments" aria-hidden="true" className="flex h-1.5 min-w-24 flex-1 gap-0.5">
         {Array.from({ length: total }, (_, index) => (
-          <span key={index} className={`flex-1 rounded-pill ${index < filled ? "bg-accent" : "bg-surface-inset"}`} />
+          // Unfilled segments carry a REAL boundary (joining review, 2026-08-27: the inset
+          // fill measured 1.03:1 against `surface` in dark — the product's signature money
+          // element rendered as one green dash with no visible extent). `border-edge` is the
+          // control-boundary token the primitives already hold to 3:1 on every surface.
+          <span key={index} className={`flex-1 rounded-pill ${index < filled ? "bg-accent" : "border border-edge bg-surface-inset"}`} />
         ))}
       </span>
     </div>

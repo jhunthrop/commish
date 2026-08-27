@@ -130,7 +130,10 @@ export function ThemeSwitcher() {
                 onKeyDown={(event) => handleKeyDown(event, index)}
                 className={
                   "rounded px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
-                  (checked ? "bg-surface-elevated text-text-primary" : "text-text-muted hover:text-text-primary")
+                  // The chosen chip carries a boundary the surface cannot swallow (self review
+                  // D3, 2026-08-27: elevated-on-elevated measured 1.00:1 in BOTH themes — the
+                  // control that makes the both-themes ruling real could not show its state).
+                  (checked ? "bg-surface-inset text-text-primary ring-1 ring-edge" : "text-text-muted hover:text-text-primary")
                 }
               >
                 {option.label}
