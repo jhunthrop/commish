@@ -211,10 +211,15 @@ describe("RoomRail", () => {
       expect(screen.getByRole("link", { name: props.leagueName })).toHaveAttribute("href", `/app/leagues/${view.leagueId}`);
     });
 
-    it("renders both exits on the TV variant, which owns the only chrome a party screen has", () => {
+    it("renders NO exit links on the TV variant — an unattended screen has no clickable control", () => {
+      // RULED (flow-remediation review D-3): this rail's own TV invariant wins. A party screen
+      // is unattended; one bumped trackpad navigating it away from the board mid-draft is worse
+      // than N1's dead end, and whoever opened that display still has the browser it opened in.
       render(<RoomRail {...props} view={liveView()} myTeamId={null} variant="tv" />);
-      expect(screen.getByRole("link", { name: "Commish" })).toHaveAttribute("href", "/app");
-      expect(screen.getByRole("link", { name: props.leagueName })).toHaveAttribute("href", "/app/leagues/l1");
+      expect(screen.queryByRole("link", { name: "Commish" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: props.leagueName })).not.toBeInTheDocument();
+      // The league name still reads as the rail's own heading — it simply is not a control.
+      expect(screen.getByRole("heading", { level: 1, name: props.leagueName })).toBeInTheDocument();
     });
 
     it("keeps the league name as the rail's h1, not merely a link beside it", () => {

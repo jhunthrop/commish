@@ -290,13 +290,26 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
           masthead — to its league home. Nothing else joins this group; a room's one other exit
           (leaving the draft mid-pick) is a decision this rail does not make for anyone. */}
       <div className="flex min-w-0 items-baseline gap-2">
-        <Link href="/app" className="shrink-0 text-xs font-medium text-text-muted hover:text-text-primary">
-          Commish
-        </Link>
-        <h1 className={`min-w-0 truncate font-display font-semibold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>
-          <Link href={`/app/leagues/${view.leagueId}`} className="hover:underline">
-            {leagueName}
+        {/* RULED (flow-remediation review D-3): the exits obey this rail's own TV invariant
+            ("no control on it is ever clickable", below) rather than quietly excepting
+            themselves. A TV board is an unattended shared display — one bumped trackpad
+            navigating the party away from the board mid-draft is a worse failure than the
+            dead end N1 named, and the person who opened that screen still holds the browser
+            it opened in. The ROOM variant is where a human sits, and that is where the way
+            home belongs. */}
+        {variant === "room" ? (
+          <Link href="/app" className="shrink-0 text-xs font-medium text-text-muted hover:text-text-primary">
+            Commish
           </Link>
+        ) : null}
+        <h1 className={`min-w-0 truncate font-display font-semibold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>
+          {variant === "room" ? (
+            <Link href={`/app/leagues/${view.leagueId}`} className="hover:underline">
+              {leagueName}
+            </Link>
+          ) : (
+            leagueName
+          )}
         </h1>
       </div>
       {/* NEW-3: `basis-full` so that below `lg:` (where the header is still `flex-wrap`, not yet

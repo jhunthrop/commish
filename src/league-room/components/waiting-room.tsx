@@ -53,9 +53,18 @@ export interface WaitingRoomLeague extends DraftScheduleBody {
   readonly totalWeeks?: number;
 }
 
-/** "Thursday" from a real, given instant — never the ambient clock. */
+/** "Thursday" from a real, given instant — never the ambient clock, and never the READER's own
+ *  zone either (flow-remediation review D-1): `toLocaleDateString(undefined, …)` rendered this
+ *  weekday in the browser's timezone while the terms panel one screen away rendered the SAME
+ *  instant in UTC, so a reader east of UTC could see two different days for one draft — C-02's
+ *  own defect, on the surface the sweep missed. UTC here too, matching `formatDraftAbsolute`
+ *  (`../lib/format`) and the product's one convention. */
+const WAITING_WEEKDAY_FORMAT = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
+
 function weekdayOf(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { weekday: "long" });
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  return WAITING_WEEKDAY_FORMAT.format(at);
 }
 
 /**
