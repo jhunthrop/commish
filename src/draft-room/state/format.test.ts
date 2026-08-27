@@ -7,16 +7,17 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
  */
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { totalRosterSlots } from "@/draft-engine";
+import type { PickReview } from "./pick-review";
 import {
-  formatBoardDelta,
   formatClockLength,
   formatGap,
   formatOrdinal,
   formatPausedUntil,
+  formatPickFact,
   formatTightening,
   formatYourTurn,
-  rankByPlayerId,
   rosterSpots,
+  type PickFactCopy,
 } from "./format";
 
 describe("formatClockLength", () => {
@@ -167,27 +168,35 @@ describe("formatOrdinal", () => {
   });
 });
 
-describe("rankByPlayerId", () => {
-  it("maps each id to its 1-based position in pool order", () => {
-    const ranks = rankByPlayerId([{ id: "p1" }, { id: "p2" }, { id: "p3" }]);
-    expect(ranks.get("p1")).toBe(1);
-    expect(ranks.get("p2")).toBe(2);
-    expect(ranks.get("p3")).toBe(3);
-    expect(ranks.get("p9")).toBeUndefined();
+const PICK_FACT_COPY: PickFactCopy = {
+  took: "You took {name} at pick {pickNumber}.",
+  bestAvailable: "The board's best player available.",
+  positionBestAvailable: "The board's best {position} available.",
+  rankedHigherAvailable: "{count} ranked higher were available.",
+  positionRank: "{position}{rank} on the board.",
+};
+
+function review(overrides: Partial<PickReview>): PickReview {
+  return { pickNumber: 1, playerId: "p1", bestAvailableDelta: 0, positionRank: 1, positionBestDelta: 0, ...overrides };
+}
+
+describe("formatPickFact", () => {
+  it("states the board's own best player available when the delta is 0", () => {
+    expect(formatPickFact(PICK_FACT_COPY, review({ pickNumber: 12, positionRank: 2 }), "Bijan Robinson", "RB")).toBe(
+      "You took Bijan Robinson at pick 12. The board's best player available. RB2 on the board.",
+    );
   });
 
-  it("is empty for an empty pool", () => {
-    expect(rankByPlayerId([]).size).toBe(0);
-  });
-});
-
-describe("formatBoardDelta", () => {
-  it("states the pick and the board's own rank for it", () => {
-    expect(formatBoardDelta("Bijan Robinson", 14, 9)).toBe("You took Bijan Robinson at pick 14. The board ranked Bijan Robinson 9th.");
+  it("states the board's own best player AT THE POSITION when only the position delta is 0 (the round-15-kicker case)", () => {
+    expect(
+      formatPickFact(PICK_FACT_COPY, review({ pickNumber: 180, bestAvailableDelta: 550, positionRank: 12, positionBestDelta: 0 }), "Xavier Walker", "K"),
+    ).toBe("You took Xavier Walker at pick 180. The board's best K available. K12 on the board.");
   });
 
-  it("degrades to the plain fact when the player has no rank to report", () => {
-    expect(formatBoardDelta("Bijan Robinson", 14, null)).toBe("You took Bijan Robinson at pick 14.");
+  it("states the honest reach when neither delta is 0", () => {
+    expect(formatPickFact(PICK_FACT_COPY, review({ pickNumber: 13, bestAvailableDelta: 1, positionRank: 9, positionBestDelta: 1 }), "Nico Collins", "WR")).toBe(
+      "You took Nico Collins at pick 13. 1 ranked higher were available. WR9 on the board.",
+    );
   });
 });
 

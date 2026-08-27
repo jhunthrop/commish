@@ -72,6 +72,17 @@ function mockResultsCopy(): MockResultsCopy {
   return {
     heading: MOCK_COPY.resultsHeading,
     retentionSentence: MOCK_COPY.resultsRetentionSentence,
+    rosterHeading: MOCK_COPY.resultsRosterHeading,
+    picksHeading: MOCK_COPY.resultsPicksHeading,
+    openSlotLabel: MOCK_COPY.resultsOpenSlotLabel,
+    noPicksMessage: MOCK_COPY.resultsNoPicksMessage,
+    pickFact: {
+      took: MOCK_COPY.resultsPickTook,
+      bestAvailable: MOCK_COPY.resultsPickBestAvailable,
+      positionBestAvailable: MOCK_COPY.resultsPickPositionBestAvailable,
+      rankedHigherAvailable: MOCK_COPY.resultsPickRankedHigherAvailable,
+      positionRank: MOCK_COPY.resultsPickPositionRank,
+    },
     runAgainLabel: MOCK_COPY.resultsRunAgainLabel,
     openLobbyLabel: MOCK_COPY.resultsOpenLobbyLabel,
     browseLeaguesLabel: MOCK_COPY.resultsBrowseLeaguesLabel,

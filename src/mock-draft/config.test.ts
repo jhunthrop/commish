@@ -231,4 +231,23 @@ describe("MOCK_COPY", () => {
     expect(MOCK_CONFIG.retention.completedMs).toBe(24 * 60 * 60 * 1000);
     expect(MOCK_COPY.resultsRetentionSentence).toContain("24 hours");
   });
+
+  /** The mock-results design review's E6: these four used to be bare literals in
+   *  `mock-results.tsx`, never passed through this file's own copy sweep above. */
+  it("never leaves the results roster or pick list without its own labels", () => {
+    expect(MOCK_COPY.resultsRosterHeading.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.resultsPicksHeading.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.resultsOpenSlotLabel.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.resultsNoPicksMessage.length).toBeGreaterThan(0);
+  });
+
+  /** D3 + R2: the pick-fact templates never carry a raw, un-normalized rank number — only the
+   *  tokens `formatPickFact` (`@/draft-room/state/format`) fills from `reviewPicks`' own facts. */
+  it("states the pick-fact sentences as honest, normalized facts — never a bare overall rank", () => {
+    expect(MOCK_COPY.resultsPickBestAvailable.toLowerCase()).not.toMatch(/\brank/);
+    expect(MOCK_COPY.resultsPickPositionBestAvailable).toContain("{position}");
+    expect(MOCK_COPY.resultsPickRankedHigherAvailable).toContain("{count}");
+    expect(MOCK_COPY.resultsPickPositionRank).toContain("{position}");
+    expect(MOCK_COPY.resultsPickPositionRank).toContain("{rank}");
+  });
 });

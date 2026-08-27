@@ -1,7 +1,9 @@
 import type { Tightening } from "@/draft-engine";
+import type { Position } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { UI_CONFIG } from "@/components/ui/config";
 import { MINUTES_PER_HOUR, MS_PER_SECOND, formatClockLength, plural } from "@/domain/duration";
+import type { PickReview } from "./pick-review";
 
 export { formatClockLength };
 
@@ -65,25 +67,58 @@ export function formatOrdinal(n: number): string {
 }
 
 /**
- * `playerId` → its 1-based rank in the pool order a draft actually started with — `room.players`
- * (`useDraftRoom`), fetched in "the same ranked order `START_DRAFT` snapshots" (`GET /api/
- * drafts/[draftId]/players`'s own docblock), never re-derived here. Built once per render rather
- * than a `.findIndex` per pick, the same "map once, read many" shape `teamsById`/`playersById`
- * (`@/lib/display/lookups`) already use.
+ * Fills `{token}` placeholders in a `MOCK_COPY` template with the given values — the one
+ * mechanism every pick-fact sentence below uses, rather than each caller hand-rolling its own
+ * template literal (which is exactly how a bare, ungated sentence like the old `formatBoardDelta`
+ * happened, per the mock-results review's E6). A plain string split/join rather than a regex:
+ * the token set is small and fixed per template, so no template can accidentally match part of
+ * another token.
  */
-export function rankByPlayerId(players: readonly { readonly id: string }[]): ReadonlyMap<string, number> {
-  return new Map(players.map((player, index) => [player.id, index + 1]));
+function fillTemplate(template: string, values: Readonly<Record<string, string>>): string {
+  return Object.entries(values).reduce((text, [token, value]) => text.split(`{${token}}`).join(value), template);
 }
 
 /**
- * `MockResults`' own honest line (Task 8, ruling 5: no letter grade). `rank` is `null` only when
- * a pick's player somehow isn't in the ranked pool this draft snapshotted — a defensive branch,
- * not an expected shape, since every drafted player came FROM that same pool — and the sentence
- * degrades to the plain fact rather than a fabricated number.
+ * `MockResults`' own pick-fact sentence, in four parts a caller assembles with
+ * `formatPickFact` below. Every template is `@/mock-draft`'s own `MOCK_COPY` text, threaded to
+ * this client module as data (never a value import — the client boundary,
+ * `eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`) the same way every other mock-room sentence
+ * reaches it (`MockRoomInfo`'s own docblock, `../contract`).
  */
-export function formatBoardDelta(playerName: string, pickNumber: number, rank: number | null): string {
-  const took = `You took ${playerName} at pick ${pickNumber}.`;
-  return rank === null ? took : `${took} The board ranked ${playerName} ${formatOrdinal(rank)}.`;
+export interface PickFactCopy {
+  /** `"You took {name} at pick {pickNumber}."` */
+  readonly took: string;
+  /** `bestAvailableDelta === 0`: the board's own top player, taken at the turn. No placeholder. */
+  readonly bestAvailable: string;
+  /** `bestAvailableDelta > 0` but `positionBestDelta === 0`: the board's own top player AT THIS
+   *  POSITION, taken with skill players still on the board (the round-15-kicker case D3 exists
+   *  for). Takes `{position}`. */
+  readonly positionBestAvailable: string;
+  /** Otherwise: a genuine reach, at this player's own position too. Takes `{count}`. */
+  readonly rankedHigherAvailable: string;
+  /** Always appended: the player's own position rank on the whole board. Takes `{position}` and
+   *  `{rank}`. */
+  readonly positionRank: string;
+}
+
+/**
+ * `MockResults`' own honest line (Task 8, ruling 5: no letter grade; the mock-results review's
+ * D3/R2, 2026-08-26: state the pick against the board's own best available AT THAT PICK, and
+ * within position, rather than a raw un-normalized rank that implies a verdict it never earned).
+ * `review` is a pure fact of this draft's own log (`reviewPicks`, `./pick-review`) — this
+ * function only chooses which of the three honest sentences fits it and fills the templates,
+ * never judges the pick itself.
+ */
+export function formatPickFact(copy: PickFactCopy, review: PickReview, playerName: string, position: Position): string {
+  const took = fillTemplate(copy.took, { name: playerName, pickNumber: String(review.pickNumber) });
+  const delta =
+    review.bestAvailableDelta === 0
+      ? copy.bestAvailable
+      : review.positionBestDelta === 0
+        ? fillTemplate(copy.positionBestAvailable, { position })
+        : fillTemplate(copy.rankedHigherAvailable, { count: String(review.bestAvailableDelta) });
+  const positionRank = fillTemplate(copy.positionRank, { position, rank: String(review.positionRank) });
+  return `${took} ${delta} ${positionRank}`;
 }
 
 /**

@@ -1,6 +1,7 @@
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
+import type { PickFactCopy } from "./state/format";
 
 /**
  * The two response bodies the draft room reads. Declared once, imported by the route
@@ -25,10 +26,18 @@ export interface MockShareInfo {
 }
 
 /** `MockResults`' own copy (Task 8, Step 2), present on `DraftSnapshotBody.mock.results` only
- *  once `phase === "complete"` — a live or scheduled mock never renders `MockResults` at all. */
+ *  once `phase === "complete"` — a live or scheduled mock never renders `MockResults` at all.
+ *  `rosterHeading`/`picksHeading`/`openSlotLabel`/`noPicksMessage`/`pickFact` are the mock-results
+ *  design review's own finding (E6, 2026-08-26): the surface's remaining bare literals, moved
+ *  beside their siblings here rather than hardcoded in the client component or `state/format.ts`. */
 export interface MockResultsCopy {
   readonly heading: string;
   readonly retentionSentence: string;
+  readonly rosterHeading: string;
+  readonly picksHeading: string;
+  readonly openSlotLabel: string;
+  readonly noPicksMessage: string;
+  readonly pickFact: PickFactCopy;
   readonly runAgainLabel: string;
   readonly openLobbyLabel: string;
   readonly browseLeaguesLabel: string;

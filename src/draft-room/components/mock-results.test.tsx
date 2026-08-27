@@ -4,16 +4,10 @@ import { axe } from "vitest-axe";
 import Link from "next/link";
 import type { DraftStateView } from "@/draft-engine";
 import { renderSurface } from "@/components/ui/test-utils";
-import { PLAYERS, SNAKE_VIEW } from "../test-fixtures";
-import { MockResults, type MockResultsCopy } from "./mock-results";
+import { MOCK_RESULTS_COPY, PLAYERS, SNAKE_VIEW } from "../test-fixtures";
+import { MockResults } from "./mock-results";
 
-const COPY: MockResultsCopy = {
-  heading: "Your mock draft is complete.",
-  retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
-  runAgainLabel: "Run another mock draft",
-  openLobbyLabel: "Open the mock draft lobby",
-  browseLeaguesLabel: "Browse real leagues",
-};
+const COPY = MOCK_RESULTS_COPY;
 
 const ACTIONS = {
   runAgain: <Link href="/app/mock-drafts?create=solo">{COPY.runAgainLabel}</Link>,
@@ -63,12 +57,16 @@ describe("MockResults", () => {
     expect(within(roster).getAllByText("Open").length).toBeGreaterThan(0);
   });
 
-  it("states each pick's honest board delta — the fact of this draft's own log, never a grade", () => {
+  it("states each pick's honest board facts — the board's own best available at that position, never a raw rank", () => {
     render(<MockResults view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
     const picks = screen.getByRole("list", { name: "Your picks" });
-    expect(within(picks).getByText("You took Marcus Reed at pick 1. The board ranked Marcus Reed 2nd.")).toBeInTheDocument();
+    // rb1 (Marcus Reed) is the board's own best available RB at pick 1 — qb1 (a higher overall
+    // rank) is still on the board, but no RB ranked above rb1 is, which is the D3 case exactly.
+    expect(within(picks).getByText("You took Marcus Reed at pick 1. The board's best RB available. RB1 on the board.")).toBeInTheDocument();
     // Never a letter grade (ruling 5) — no A/B/C/D/F verdict anywhere on the panel.
     expect(screen.queryByText(/grade/i)).not.toBeInTheDocument();
+    // Never a bare, un-normalized overall rank either (D3) — the defect this replaces.
+    expect(screen.queryByText(/ranked \d/)).not.toBeInTheDocument();
   });
 
   it("never leaves the room a dead end — the three next actions always render", () => {

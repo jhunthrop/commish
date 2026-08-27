@@ -3,15 +3,24 @@ import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { EYEBROW, PositionBadge, SlotChip } from "@/components/ui";
 import { playerName, playersById as buildPlayersById } from "../lib/lookups";
-import { formatBoardDelta, rankByPlayerId } from "../state/format";
+import { formatPickFact, type PickFactCopy } from "../state/format";
+import { reviewPicks } from "../state/pick-review";
 import { rosterFillRows } from "../state/roster-fill";
 import { SLOT_POSITION } from "./room-dock";
 
 /** Mirrors `MockResultsCopy` (`../contract`) — the wire type this room fetches, forwarded down
- *  as one prop rather than five so `DraftRoom` stays a single pass-through. */
+ *  as one prop rather than several so `DraftRoom` stays a single pass-through.
+ *  `rosterHeading`/`picksHeading`/`openSlotLabel`/`noPicksMessage`/`pickFact` are the mock-
+ *  results design review's own finding (E6, 2026-08-26): this surface's remaining bare literals,
+ *  moved into `MOCK_COPY` beside their siblings rather than hardcoded here. */
 export interface MockResultsCopy {
   readonly heading: string;
   readonly retentionSentence: string;
+  readonly rosterHeading: string;
+  readonly picksHeading: string;
+  readonly openSlotLabel: string;
+  readonly noPicksMessage: string;
+  readonly pickFact: PickFactCopy;
   readonly runAgainLabel: string;
   readonly openLobbyLabel: string;
   readonly browseLeaguesLabel: string;
@@ -50,19 +59,21 @@ function RosterSection({
   view,
   playersById,
   myTeamId,
+  copy,
 }: {
   readonly view: DraftStateView;
   readonly playersById: ReadonlyMap<string, Player>;
   readonly myTeamId: string;
+  readonly copy: MockResultsCopy;
 }) {
   const rows = rosterFillRows(view.slotConfig, view.rosters[myTeamId] ?? []);
   return (
     <div className="flex flex-col gap-2">
-      <h2 className={`${EYEBROW} text-text-muted`}>Your roster</h2>
-      <ul aria-label="Your roster" className="flex flex-col gap-1.5">
+      <h2 className={`${EYEBROW} text-text-muted`}>{copy.rosterHeading}</h2>
+      <ul aria-label={copy.rosterHeading} className="flex flex-col gap-1.5">
         {rows.map((row) => {
           const position = SLOT_POSITION[row.slot];
-          const name = row.playerId === null ? "Open" : playerName(playersById, row.playerId);
+          const name = row.playerId === null ? copy.openSlotLabel : playerName(playersById, row.playerId);
           return (
             <li key={`${row.slot}:${row.slotIndex}`} className="flex flex-wrap items-center gap-2">
               {position === undefined ? <SlotChip slot={row.slot} /> : <PositionBadge position={position} size="sm" />}
@@ -80,26 +91,32 @@ function PickList({
   players,
   playersById,
   myTeamId,
+  copy,
 }: {
   readonly view: DraftStateView;
   readonly players: readonly Player[];
   readonly playersById: ReadonlyMap<string, Player>;
   readonly myTeamId: string;
+  readonly copy: MockResultsCopy;
 }) {
-  const rank = rankByPlayerId(players);
-  const myPicks = [...view.picks].filter((pick) => pick.teamId === myTeamId).sort((a, b) => a.pickNumber - b.pickNumber);
+  const reviews = reviewPicks(players, view.picks, myTeamId);
   return (
     <div className="flex flex-col gap-2">
-      <h2 className={`${EYEBROW} text-text-muted`}>Your picks</h2>
-      {myPicks.length === 0 ? (
-        <p className="text-sm text-text-muted">You did not draft anyone in this room.</p>
+      <h2 className={`${EYEBROW} text-text-muted`}>{copy.picksHeading}</h2>
+      {reviews.length === 0 ? (
+        <p className="text-sm text-text-muted">{copy.noPicksMessage}</p>
       ) : (
-        <ol aria-label="Your picks" className="flex flex-col gap-1">
-          {myPicks.map((pick) => (
-            <li key={pick.pickNumber} className="text-sm text-text-primary">
-              {formatBoardDelta(playerName(playersById, pick.playerId), pick.pickNumber, rank.get(pick.playerId) ?? null)}
-            </li>
-          ))}
+        <ol aria-label={copy.picksHeading} className="flex flex-col gap-1">
+          {reviews.map((review) => {
+            const player = playersById.get(review.playerId);
+            return (
+              <li key={review.pickNumber} className="text-sm text-text-primary">
+                {player === undefined
+                  ? null
+                  : formatPickFact(copy.pickFact, review, playerName(playersById, review.playerId), player.position)}
+              </li>
+            );
+          })}
         </ol>
       )}
     </div>
@@ -109,14 +126,16 @@ function PickList({
 /**
  * The post-draft panel for a mock room (Task 8, Step 2). On `phase === "complete"`, `DraftRoom`
  * lets this yield the whole board: your roster grouped by slot, your pick list with each pick's
- * board delta (a fact of this draft's own log, computed from the pool order the draft itself
- * snapshotted at start — never a live ranking), the retention sentence, and the room's three
- * next actions.
+ * honest board facts (`reviewPicks`, `../state/pick-review`: best available at that pick, and at
+ * that position, both computed from the pool order the draft itself snapshotted at start — never
+ * a live ranking), the retention sentence, and the room's three next actions.
  *
  * Deliberately NO letter grade (ruling 5) — a grade manufactures authority this platform has not
- * earned, and the real-only rule forbids it. The board delta is the honest version of the same
- * itch: what you actually took, against what the board actually said, both facts of this one
- * draft.
+ * earned, and the real-only rule forbids it. The pick facts are the honest version of the same
+ * itch: what you actually took, against what the board actually still had, both facts of this
+ * one draft. Ruling R2 (the mock-results design review, 2026-08-26): a raw, un-normalized board
+ * rank implies exactly the verdict ruling 5 refuses, and points it backwards for any pick late in
+ * a long draft — best-available-at-the-pick never drifts with the round the way raw rank does.
  */
 export function MockResults({ view, players, myTeamId, copy, actions }: MockResultsProps) {
   const playersById = buildPlayersById(players);
@@ -128,8 +147,8 @@ export function MockResults({ view, players, myTeamId, copy, actions }: MockResu
       </div>
       {myTeamId === null ? null : (
         <div className="grid gap-6 sm:grid-cols-2">
-          <RosterSection view={view} playersById={playersById} myTeamId={myTeamId} />
-          <PickList view={view} players={players} playersById={playersById} myTeamId={myTeamId} />
+          <RosterSection view={view} playersById={playersById} myTeamId={myTeamId} copy={copy} />
+          <PickList view={view} players={players} playersById={playersById} myTeamId={myTeamId} copy={copy} />
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">

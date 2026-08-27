@@ -57,11 +57,11 @@ import { ExclusionPanel } from "@/account-room/components/exclusion-panel";
 import type { MethodDescriptor } from "@/payments-provider/contract";
 import { QueueTable } from "@/admin-room/components/queue-table";
 import { ExclusionControl } from "@/admin-room/components/exclusion-control";
-import { MockResults, type MockResultsCopy } from "@/draft-room/components/mock-results";
+import { MockResults } from "@/draft-room/components/mock-results";
 import { PracticeBanner } from "@/draft-room/components/practice-banner";
 import { RoomTour } from "@/draft-room/components/room-tour";
 import { ShareLinkPanel } from "@/draft-room/components/share-link-panel";
-import { PLAYERS, SNAKE_VIEW } from "@/draft-room/test-fixtures";
+import { MOCK_RESULTS_COPY, PLAYERS, SNAKE_VIEW } from "@/draft-room/test-fixtures";
 import { MOCK_COPY } from "@/mock-draft/config";
 import type { MockRoomSummary } from "@/mock-draft-service/lobby";
 import { MockLobby } from "@/league-room/components/mock-lobby";
@@ -1726,14 +1726,6 @@ describe("ShareLinkPanel says nothing that breaks the house copy rules", () => {
     expectClean(container, "ABC123", "/app/mock-drafts/ABC123");
   });
 });
-
-const MOCK_RESULTS_COPY: MockResultsCopy = {
-  heading: "Your mock draft is complete.",
-  retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
-  runAgainLabel: "Run another mock draft",
-  openLobbyLabel: "Open the mock draft lobby",
-  browseLeaguesLabel: "Browse real leagues",
-};
 
 const MOCK_RESULTS_VIEW = {
   ...SNAKE_VIEW,

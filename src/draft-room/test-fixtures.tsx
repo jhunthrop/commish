@@ -3,7 +3,7 @@ import { render, type RenderResult } from "@testing-library/react";
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftClockView, DraftStateView } from "@/draft-engine";
-import type { MockRoomInfo, WaitingInfo } from "./contract";
+import type { MockResultsCopy, MockRoomInfo, WaitingInfo } from "./contract";
 import { DraftRoomDepsProvider, type DraftRoomDeps, type EventSourceLike } from "./hooks/deps";
 
 export const PLAYERS: readonly Player[] = [
@@ -38,6 +38,29 @@ export const MOCK_ROOM: MockRoomInfo = {
   expectedBotPickSeconds: 6,
   share: null,
   results: null,
+};
+
+/** `MOCK_COPY`'s own results-page words (`@/mock-draft/config`), copied rather than imported —
+ *  `src/draft-room/**` may not value-import `@/mock-draft` (the client boundary). One fixture
+ *  rather than every test file re-declaring the same literal, so a future MOCK_COPY addition
+ *  needs one update here, not three. */
+export const MOCK_RESULTS_COPY: MockResultsCopy = {
+  heading: "Your mock draft is complete.",
+  retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
+  rosterHeading: "Your roster",
+  picksHeading: "Your picks",
+  openSlotLabel: "Open",
+  noPicksMessage: "You did not draft anyone in this room.",
+  pickFact: {
+    took: "You took {name} at pick {pickNumber}.",
+    bestAvailable: "The board's best player available.",
+    positionBestAvailable: "The board's best {position} available.",
+    rankedHigherAvailable: "{count} ranked higher were available.",
+    positionRank: "{position}{rank} on the board.",
+  },
+  runAgainLabel: "Run another mock draft",
+  openLobbyLabel: "Open the mock draft lobby",
+  browseLeaguesLabel: "Browse real leagues",
 };
 
 export const SNAKE_VIEW: DraftStateView = {

@@ -298,6 +298,30 @@ export const MOCK_COPY = {
    */
   resultsRetentionSentence:
     "Your results stay here for 24 hours, then this room clears itself.",
+  /**
+   * The results-page roster and pick-list labels (mock-results design review, 2026-08-26,
+   * finding E6): moved here beside their siblings rather than left as bare literals in
+   * `mock-results.tsx` and `state/format.ts` — the same "no surface's own words skip the gate"
+   * fix `lobbyHistoryEmptyMessage` already got for the lobby's own review.
+   */
+  resultsRosterHeading: "Your roster",
+  resultsPicksHeading: "Your picks",
+  resultsOpenSlotLabel: "Open",
+  resultsNoPicksMessage: "You did not draft anyone in this room.",
+  /**
+   * The pick-fact sentence (finding D3 + ruling R2): the honest replacement for the old,
+   * un-normalized "The board ranked X Nth" line, which implied a verdict a raw rank never
+   * earned (a round-15 kicker with a huge raw rank can still be the board's own best kicker
+   * still available). `state/format.ts`'s `formatPickFact` fills these four templates from
+   * `reviewPicks`' own facts (`state/pick-review.ts`) — a pure derivation of the draft's own
+   * log, never a judgment. `{name}`/`{pickNumber}`/`{position}`/`{count}`/`{rank}` are the only
+   * tokens any of these four ever carry.
+   */
+  resultsPickTook: "You took {name} at pick {pickNumber}.",
+  resultsPickBestAvailable: "The board's best player available.",
+  resultsPickPositionBestAvailable: "The board's best {position} available.",
+  resultsPickRankedHigherAvailable: "{count} ranked higher were available.",
+  resultsPickPositionRank: "{position}{rank} on the board.",
   /** The results page's three next actions (Task 8, Step 2 — "never a dead end"): a quick
    *  rematch, the lobby, and the real thing. `MockResults` (`@/draft-room/components/
    *  mock-results`) renders all three, every time — a finished mock draft never leaves a

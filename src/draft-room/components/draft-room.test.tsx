@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
-import { fixtureDeps, MOCK_ROOM, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
+import { fixtureDeps, MOCK_RESULTS_COPY, MOCK_ROOM, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
 import { DraftRoomDepsProvider } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
 
@@ -220,13 +220,7 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     const fixture = fixtureDeps({ ...SNAKE_VIEW, phase: "complete", onClockTeamId: null });
     fixture.mock = {
       ...MOCK_ROOM,
-      results: {
-        heading: "Your mock draft is complete.",
-        retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
-        runAgainLabel: "Run another mock draft",
-        openLobbyLabel: "Open the mock draft lobby",
-        browseLeaguesLabel: "Browse real leagues",
-      },
+      results: MOCK_RESULTS_COPY,
     };
     mount(fixture);
     await waitFor(() => expect(screen.getByRole("heading", { name: "Your mock draft is complete." })).toBeInTheDocument());
