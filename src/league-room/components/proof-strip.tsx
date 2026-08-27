@@ -5,39 +5,12 @@ import type { ProofStats } from "@/matchmaking/contract";
 
 export interface ProofStripProps {
   readonly stats: ProofStats;
-  /** The page's ONE `now` instant (`page.tsx` reads it once and threads it everywhere) — the
-   *  next-draft chip's coarse wording is derived from it, never from a second clock read. */
-  readonly nowIso: string;
-}
-
-const MS_PER_MINUTE = 60_000;
-const MS_PER_HOUR = 60 * MS_PER_MINUTE;
-
-/**
- * The coarse wording the ruling asked for — a unit count, never a countdown and never a clock
- * time (a bare "9:04" is ambiguous across time zones; a coarse "5 hours" is not). The same
- * rounding shape as `relativeDraftTime` (`@/league/terms`), reshaped into the chip's
- * number-plus-label anatomy rather than that function's one prose clause. `null` when the
- * instant is absent or already behind `now` (the 60s proof cache can let one slip into the
- * past) — a chip counting down to a draft that already kicked off would be dressing, and the
- * ruling is real or absent.
- */
-function coarseUntil(nextDraftAtIso: string | null, nowIso: string): { readonly value: number; readonly label: string } | null {
-  if (nextDraftAtIso === null) return null;
-  const diffMs = new Date(nextDraftAtIso).getTime() - new Date(nowIso).getTime();
-  if (diffMs <= 0) return null;
-  if (diffMs < MS_PER_HOUR) {
-    const minutes = Math.max(1, Math.round(diffMs / MS_PER_MINUTE));
-    return { value: minutes, label: `minute${minutes === 1 ? "" : "s"} until the next draft` };
-  }
-  const hours = Math.round(diffMs / MS_PER_HOUR);
-  return { value: hours, label: `hour${hours === 1 ? "" : "s"} until the next draft` };
 }
 
 interface ScoreChipProps {
   readonly number: string | number;
-  /** `text-negative` is reserved for the one LIVE count (drafts in the next 48 hours) — every
-   *  other chip's number is plain ink, exactly like the mock's `.score.liveN` singling. */
+  /** `text-negative` is reserved for the one LIVE count (rooms filling now) — every other
+   *  chip's number is plain ink, exactly like the mock's `.score.liveN` singling. */
   readonly numberTone?: "ink" | "live";
   readonly label: ReactNode;
 }
@@ -55,14 +28,27 @@ function ScoreChip({ number, numberTone = "ink", label }: ScoreChipProps) {
 }
 
 /**
+ * "N seat(s) left in the tightest room" — the tightest-room chip's label, pluralized honestly
+ * rather than a bare number nobody could parse (storefront review R1).
+ */
+function tightestRoomLabel(seatsRemaining: number): string {
+  return `seat${seatsRemaining === 1 ? "" : "s"} left in the tightest room`;
+}
+
+/**
  * The front door's scoreboard (Phase 3.6, Task 4 built `proofStats`; Phase 3.7, Task 7
  * re-renders it as the Sunday Standard mock's score chips). Every number here is a query or it
  * is not on the page — `stats.any` is `false` exactly when every one of the three floored
  * numbers sat below its own credibility floor (`MATCHMAKING_CONFIG.proof.floors`), and this
  * component renders NOTHING at all in that case: never a placeholder, never a rounded-up
- * substitute, never "coming soon". The next-draft chip never changes that: it rides a strip the
- * floored numbers earned (`ProofStats.nextDraftAt`'s own docblock) and is itself omitted
- * outside its window — real or absent, never dressed up.
+ * substitute, never "coming soon". The tightest-room chip never changes that: it rides a strip
+ * the floored numbers earned (`ProofStats.tightestRoomSeatsRemaining`'s own docblock) and is
+ * itself omitted when nothing is filling — real or absent, never dressed up.
+ *
+ * Storefront review R1: the chip repoints from "N hours until the next draft" (a countdown to a
+ * chosen kickoff the sit-and-go shelf no longer produces) to "N seats left in the tightest room"
+ * — no clock, no `nowIso` needed any more, because a seat count does not go stale the way a
+ * future instant would.
  *
  * The rating links to `/reviews`, with its own review count folded into the link's accessible
  * name rather than sitting beside it as sighted-only context — "Read all 63 member reviews" tells
@@ -71,16 +57,16 @@ function ScoreChip({ number, numberTone = "ink", label }: ScoreChipProps) {
  *
  * The strip is the hero band's fourth riser (`Rise` 4, the mock's `d4`).
  */
-export function ProofStrip({ stats, nowIso }: ProofStripProps) {
+export function ProofStrip({ stats }: ProofStripProps) {
   if (!stats.any) return null;
-
-  const nextDraft = coarseUntil(stats.nextDraftAt, nowIso);
 
   return (
     <Rise step={4} className="flex flex-wrap gap-3">
       {stats.leaguesFilled === null ? null : <ScoreChip number={stats.leaguesFilled} label="leagues filled this season" />}
-      {stats.draftsNext48h === null ? null : <ScoreChip number={stats.draftsNext48h} numberTone="live" label="drafts in the next 48 hours" />}
-      {nextDraft === null ? null : <ScoreChip number={nextDraft.value} label={nextDraft.label} />}
+      {stats.roomsFillingNow === null ? null : <ScoreChip number={stats.roomsFillingNow} numberTone="live" label="rooms filling right now" />}
+      {stats.tightestRoomSeatsRemaining === null ? null : (
+        <ScoreChip number={stats.tightestRoomSeatsRemaining} label={tightestRoomLabel(stats.tightestRoomSeatsRemaining)} />
+      )}
       {stats.rating === null ? null : (
         <ScoreChip
           number={stats.rating.average}

@@ -6,6 +6,7 @@ import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { LEAGUE_CONFIG } from "@/league";
 import { HOUSE_CATALOG, houseKickoffFor, houseLeagueName, type HouseRung, type HouseRungName } from "@/matchmaking/house-catalog";
+import { dissolveLeague } from "@/money-service/dissolution";
 import { MS_PER_DAY } from "./config";
 import { writeLeagueInTx, type CreateLeagueInput } from "./creation";
 
@@ -86,10 +87,15 @@ export function houseKickoffStillAhead(nowIso: string): SQL | undefined {
  * Phase 3.6's Task 7 ("roll until full") replaces this whole door — a house league that cannot
  * start rolls its own kickoff forward instead of being retired — so a retirement state written
  * here would be built to be deleted.
+ *
+ * `filledTeams` (storefront review E13) rides the SAME `count(teams.id)` this query's own
+ * `HAVING` already computes — added to the projection, not a second aggregate, so
+ * `retirementCandidates` below can tell an empty shelf slot from a partly-seated one without a
+ * second query over the identical join.
  */
 export function openHouseLeaguesQuery(db: Db, rung: HouseRungName, nowIso: string) {
   return db
-    .select({ id: leagues.id, createdAt: leagues.createdAt })
+    .select({ id: leagues.id, createdAt: leagues.createdAt, filledTeams: sql<number>`count(${teams.id})::int` })
     .from(leagues)
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
     .leftJoin(teams, eq(teams.leagueId, leagues.id))
@@ -97,6 +103,34 @@ export function openHouseLeaguesQuery(db: Db, rung: HouseRungName, nowIso: strin
     .groupBy(leagues.id, drafts.id)
     .having(sql`count(${teams.id}) < ${leagues.teamCount}`)
     .orderBy(asc(leagues.createdAt));
+}
+
+/**
+ * Storefront review E13: "too many open tournaments at once" was the founder's own complaint, and
+ * width dropped 6 -> 2 (`open_12`/`beginner_12` at `openAtOnce: 1` apiece) — but the reconciler
+ * only ever opened the shortfall, never closed a surplus, so the six legacy leagues the
+ * 2026-08-26 directive left behind (migration `0044` converted them to `when_full`, never
+ * shrank the shelf) sit on the rung forever. This is the surplus half of "keep the shelf at
+ * `openAtOnce`", read from the SAME `open` list `ensureHouseCatalog` already fetched for the
+ * shortfall side, so there is no second query to disagree with it.
+ *
+ * THE RULE, EXACTLY: when `open.length` exceeds `rung.openAtOnce`, the surplus — oldest first,
+ * `open` is already ordered that way — is retired ONE SEAT AT A TIME, but only among leagues
+ * NOBODY HAS JOINED (`filledTeams === 0`). A league with even one seated team is never a
+ * candidate, belt-and-suspenders: the shelf can carry more than `openAtOnce` leagues indefinitely
+ * if every surplus league already has a member in it, and that is correct — a seated manager is
+ * never evicted to make the shelf's own width arithmetic come out even.
+ */
+function retirementCandidates(
+  open: readonly { readonly id: string; readonly createdAt: Date; readonly filledTeams: number }[],
+  openAtOnce: number,
+): readonly string[] {
+  const surplus = open.length - openAtOnce;
+  if (surplus <= 0) return [];
+  return open
+    .filter((league) => league.filledTeams === 0)
+    .slice(0, surplus)
+    .map((league) => league.id);
 }
 
 /**
@@ -144,10 +178,25 @@ export interface HouseFactoryDeps {
 export interface HouseFactoryOutcome {
   /** Every league id this call actually created, across every rung, in the order created. */
   readonly opened: readonly string[];
-  /** A rung this call gave up restocking this tick, and why — never thrown, always reported,
-   *  the same shape `AutoStartOutcome.reason` already is. */
+  /** Every league id this call actually retired (storefront review E13), across every rung, in
+   *  the order dissolved — oldest-empty-first within a rung, never a league with a seated team. */
+  readonly retired: readonly string[];
+  /** A rung this call gave up restocking OR retiring this tick, and why — never thrown, always
+   *  reported, the same shape `AutoStartOutcome.reason` already is. */
   readonly refused: readonly { readonly rung: HouseRungName; readonly reason: string }[];
 }
+
+/**
+ * The reconciler's own system actor (storefront review E13) — `dissolveLeague`
+ * (`@/money-service/dissolution`) is an OPERATOR door, built for `withAdmin`'s verified session,
+ * and `operatorUserId` is carried on the `league_dissolved` audit payload for a human console's
+ * trail, never as a foreign key (no `users` row named `"house-reconciler"` needs to exist). No
+ * other headless writer in this codebase invokes an operator-shaped door (grepped: every
+ * `operatorUserId` caller in `src/app/api/admin/**` reads it from `withAdmin`'s own session) — this
+ * is the first, so the sentinel is named here rather than reusing a human's id or `null`, which
+ * `dissolveLeague`'s own type does not accept.
+ */
+export const HOUSE_RECONCILER_ACTOR = "house-reconciler";
 
 /**
  * `HOUSE_LEAGUE_OPENED_SUMMARY`'s the league-wide sentence `house_league_opened`'s `system_action`
@@ -232,6 +281,62 @@ export async function spawnHouseLeagueInTx(
 }
 
 /**
+ * Storefront review E13: retires `rungName`'s surplus empty leagues (`retirementCandidates`
+ * above), oldest first, spending from the SHARED `budget` counter every rung draws from — the
+ * identical shared-counter shape `ensureHouseCatalog`'s own spawn `budget` already uses, so one
+ * rung with a large legacy surplus cannot starve every other rung's own retirement this tick.
+ *
+ * Rides the EXISTING operator dissolution door (`dissolveLeague`, `@/money-service/dissolution`)
+ * headlessly — a house league is a REAL league with real audit rows, so deletion is blocked by
+ * the audit triggers the same way any league's would be; `dissolveLeague` is the one writer this
+ * codebase already has for "close a room nobody is coming back to fill", and an empty league's
+ * refund-all is a no-op over zero seated members (its own `entryFeeCents > 0` gate never runs,
+ * `seated.length` is `0`, so zero refunds and zero notices post) — the audit trail still records
+ * the dissolution, which is the whole point: a retired league is CLOSED, never deleted, so its
+ * row and its history survive exactly as `dissolveLeague`'s own docblock already guarantees for
+ * a paid league's members.
+ *
+ * NEVER RETIRES A SEATED LEAGUE (belt, `retirementCandidates`' own `filledTeams === 0` filter) OR
+ * A NON-HOUSE LEAGUE (suspenders: `open` is always this ONE rung's own `openHouseLeaguesQuery`
+ * result, which is scoped to `leagues.house_rung = rungName` in its own `WHERE` — this function
+ * never receives, and could not construct, a candidate id from any other league).
+ *
+ * Never throws past one league's own failure, the identical discipline the spawn loop below
+ * holds itself to: a refusal (the draft raced into starting, or the league vanished) is reported
+ * on `refused` and the loop moves to the next candidate rather than abandoning the whole rung.
+ */
+async function retireSurplusForRung(
+  db: Db,
+  rungName: HouseRungName,
+  candidates: readonly string[],
+  deps: HouseFactoryDeps,
+  audit: AuditLogger,
+  budget: { remaining: number },
+): Promise<{ readonly retired: readonly string[]; readonly refused: readonly { readonly rung: HouseRungName; readonly reason: string }[] }> {
+  const retired: string[] = [];
+  const refused: { readonly rung: HouseRungName; readonly reason: string }[] = [];
+
+  for (const leagueId of candidates) {
+    if (budget.remaining <= 0) break;
+    budget.remaining -= 1;
+    try {
+      const result = await dissolveLeague(
+        db,
+        { leagueId, operatorUserId: HOUSE_RECONCILER_ACTOR },
+        { clock: deps.clock, audit, newId: deps.newId },
+      );
+      if (result.ok) retired.push(leagueId);
+      else refused.push({ rung: rungName, reason: result.reason });
+    } catch (error: unknown) {
+      console.error("[house-factory] retire failed for rung", rungName, error);
+      refused.push({ rung: rungName, reason: "Something went wrong retiring this league." });
+    }
+  }
+
+  return { retired, refused };
+}
+
+/**
  * For every rung: count the open leagues, compute the shortfall, open exactly that many — one
  * league per transaction (never all of a rung's shortfall in one), because the lock order is
  * "business writes, then the audit anchor" per transaction, and batching three spawns would hold
@@ -255,11 +360,26 @@ export async function spawnHouseLeagueInTx(
 export async function ensureHouseCatalog(db: Db, deps: HouseFactoryDeps): Promise<HouseFactoryOutcome> {
   const audit = deps.audit ?? getAuditLogger();
   const opened: string[] = [];
+  const retired: string[] = [];
   const refused: { readonly rung: HouseRungName; readonly reason: string }[] = [];
   let budget = DRAFT_SERVICE_CONFIG.maxHouseSpawnsPerRun;
+  const retireBudget = { remaining: DRAFT_SERVICE_CONFIG.maxHouseRetiresPerRun };
 
   for (const rungName of Object.keys(HOUSE_CATALOG.rungs) as HouseRungName[]) {
     const rung = HOUSE_CATALOG.rungs[rungName];
+
+    // RETIRE FIRST (storefront review E13) — a surplus this rung is carrying today is real
+    // regardless of what the shortfall side finds a moment later, and retiring first means the
+    // shortfall loop's own FRESH re-read (below) already sees the narrowed shelf rather than
+    // computing against a surplus this same call is about to close.
+    const openBeforeRetire = await openHouseLeaguesQuery(db, rungName, deps.clock.now());
+    const candidates = retirementCandidates(openBeforeRetire, rung.openAtOnce);
+    if (candidates.length > 0) {
+      const outcome = await retireSurplusForRung(db, rungName, candidates, deps, audit, retireBudget);
+      retired.push(...outcome.retired);
+      refused.push(...outcome.refused);
+    }
+
     // Generous slack over `openAtOnce` for lost races between two concurrent instances — each
     // lost race still makes real progress (the winner's league now counts toward the shelf), so
     // this is headroom against a pathological run of bad luck, not a number either instance is
@@ -296,5 +416,5 @@ export async function ensureHouseCatalog(db: Db, deps: HouseFactoryDeps): Promis
     }
   }
 
-  return { opened, refused };
+  return { opened, retired, refused };
 }

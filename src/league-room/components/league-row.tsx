@@ -19,9 +19,21 @@ import {
  * name+chip · format line · Drafts · Entry · Seats · action. `minmax(0, …)` on every fr column
  * for the same reason the card grid's items carry `min-w-0`: a grid track's default
  * `min-width: auto` otherwise lets a long league name widen its column past its share.
+ *
+ * Entry and action are FIXED pixel tracks, never `max-content` (storefront review D2, fixed
+ * rather than left as the finding's second option): `LeagueRowsHeader` and `LeagueRow` are TWO
+ * SEPARATE grid containers sharing this one class string, and `max-content` resolves PER
+ * CONTAINER — the header's own Entry cell ("Entry", ~34px) and a data row's own Entry cell
+ * ("Free" or a real fee, ~27–70px) sized to two different widths, which pushed every column to
+ * its right out of alignment by exactly that difference (measured: up to 80px at Entry/Seats).
+ * A fixed track resolves to the identical width in both containers regardless of either one's
+ * content, which is what makes the header sit over its columns rather than merely near them. 96px
+ * clears every entry-fee string this product renders today (`entryFeeLabel`, up to `$9,999.00`);
+ * 176px clears the row's longest CTA text, "Take the last seat" (`ctaVisibleText`), at the
+ * button's own `md` padding.
  */
 export const LEAGUE_ROW_GRID =
-  "grid grid-cols-[minmax(0,2.1fr)_minmax(0,2fr)_minmax(0,1.7fr)_max-content_minmax(0,1.9fr)_max-content] items-center gap-x-4";
+  "grid grid-cols-[minmax(0,2.1fr)_minmax(0,2fr)_minmax(0,1.7fr)_96px_minmax(0,1.9fr)_176px] items-center gap-x-4";
 
 /**
  * The five column names, once, above the stack — EYEBROW register (sentence case, mono, quiet;
@@ -68,7 +80,7 @@ export interface LeagueRowProps {
  * a row, regardless of the member's stored preference — the InfoTips stay click-only.
  */
 export function LeagueRow({ league, signedIn, emphasis = "quiet" }: LeagueRowProps) {
-  const { authority, remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
+  const { remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
 
   return (
     <div className={`${LEAGUE_ROW_GRID} py-3`}>
@@ -86,7 +98,7 @@ export function LeagueRow({ league, signedIn, emphasis = "quiet" }: LeagueRowPro
 
       <div className="min-w-0 text-sm">
         <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} />
-        <DraftTimingNotes league={league} authority={authority} />
+        <DraftTimingNotes league={league} />
       </div>
 
       <div className="text-sm">

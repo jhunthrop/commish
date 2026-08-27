@@ -56,13 +56,13 @@ export interface OpenLeagueCardProps {
  * escape hatch, and one action. Every fact on it comes from `PublicLeagueSummary` and nothing
  * else — see that contract for what a stranger is and is not told.
  *
- * The when-full commitment is `describeStartTiming`'s own sentence (F9), quoted rather than
- * restated, in `text-text-muted` (E5: `warning` is reserved for a tightening clock, and this
- * sentence is reassurance) — `DraftTimingNotes` renders it in place of the Drafts value, never
- * both a date and the sentence.
+ * The when-full commitment (F9) is one press away: `ScheduledDraftValue` renders the compact
+ * "Drafts when full" value plus the `sit-and-go` glossary `InfoTip` (storefront review E1
+ * retired the 30-word paragraph this row used to print inline, in place of the Drafts value,
+ * on every `when_full` card).
  */
 export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet" }: OpenLeagueCardProps) {
-  const { authority, remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
+  const { remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
   const isBeginnerOnly = league.experienceTier === "beginner";
   const badge = stakeBadge(league);
 
@@ -93,7 +93,7 @@ export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet"
             <span className="shrink-0 text-text-muted">Drafts</span>
             <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} className="text-right" />
           </div>
-          <DraftTimingNotes league={league} authority={authority} />
+          <DraftTimingNotes league={league} />
         </div>
         <LedgerRow label="Entry">
           {/* Real, not promotional: `entryFeeLabel` reads the league's REAL entry fee — "Free"

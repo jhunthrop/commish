@@ -137,10 +137,11 @@ describe("LeagueRow", () => {
       expect(screen.getByText(BASE.draftAt)).toBeInTheDocument();
     });
 
-    it("quotes the when-full sentence muted, never a placeholder date", () => {
+    it("prints a compact 'Drafts when full' value with the full commitment one press away, never a placeholder date (storefront review E1)", () => {
       render(row({ ...BASE, startTrigger: "when_full" }));
-      const sentence = screen.getByText(/This one drafts the moment the last seat is taken/);
-      expect(sentence.className).toContain("text-text-muted");
+      expect(screen.getByText("Drafts when full")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "What is a sit-and-go league?" })).toBeInTheDocument();
+      expect(screen.queryByText(/This one drafts the moment the last seat is taken/)).not.toBeInTheDocument();
       expect(screen.queryByText(BASE.draftAt)).not.toBeInTheDocument();
     });
 

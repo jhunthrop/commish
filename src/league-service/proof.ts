@@ -1,21 +1,12 @@
-import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues } from "@/db/schema";
+import { drafts, leagues, teams } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG } from "@/league/config";
 import { ENFORCED_LEAGUE_SQL } from "@/league-service/enforcement";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { ProofStats } from "@/matchmaking/contract";
 import { reviewAggregate } from "@/review-service/reviews";
-
-/** The outermost edge is the only place a wall clock is allowed — see every other service
- *  module's identical constant (`browse.ts`, `creation.ts`, `read.ts`, ...). */
-const systemClock: Clock = { now: () => new Date().toISOString() };
-
-const MS_PER_HOUR = 60 * 60 * 1000;
-/** The window `draftsNext48hQuery` counts inside — named once so the query and this module's
- *  own docblock can never state two different numbers of hours. */
-const NEXT_48H_MS = 48 * MS_PER_HOUR;
 
 /** A draft that actually ran — never `'scheduled'`, which is a room still waiting on a seat. */
 const DRAFTED_STATUSES = ["in_progress", "complete"] as const;
@@ -40,7 +31,7 @@ export interface ProofStatsDeps {
  *
  * Deliberately NOT joined on `ENFORCED_LEAGUE_SQL`: this is a total count across every league,
  * public or private, and a bare total discloses nothing about any one private league the way an
- * aggregate broken out BY league (`draftsNext48hQuery`'s own reasoning) would.
+ * aggregate broken out BY league (`fillingRoomsQuery`'s own reasoning, below) would.
  *
  * `NOT is_mock` (Phase 4.5, Task 2): the ONE aggregate `ENFORCED_LEAGUE_SQL` does not already
  * keep a mock out of. Every other query in this module (and `wire.ts`'s three) is scoped to
@@ -68,56 +59,69 @@ export function leaguesFilledQuery(db: Db) {
 }
 
 /**
- * "Drafts in the next 48 hours" (Phase 3.6, Task 4) — counted over `'scheduled'` drafts whose
- * `kickoff_at` falls in `[now, now + 48h]`, joined on `ENFORCED_LEAGUE_SQL`
- * (`@/league-service/enforcement`) so a private league's calendar is never disclosed in
- * aggregate, the identical join `dueDraftsQuery` (`@/draft-service/auto-start`) already applies
- * to the same table for the same reason.
+ * THE ONE CANDIDATE SET both R1 "filling" proof reads share (storefront review R1) — public,
+ * still-joinable leagues (`ENFORCED_LEAGUE_SQL`, `@/league-service/enforcement`) that at least
+ * one team has already joined and that are not yet full. `teams` is INNER joined, not left —
+ * that alone is what keeps a genuinely empty room out of the `GROUP BY` entirely, so no `HAVING
+ * count(...) > 0` is needed to say "at least one seat taken". `status = 'scheduled'` reads "still
+ * joinable" regardless of `start_trigger`: a `when_full` room's placeholder kickoff never enters
+ * either query below, because neither reads `kickoff_at` at all — this is the fill-based
+ * replacement for the scheduled-kickoff facts a `when_full` shelf no longer produces
+ * (`docs/decisions/formats-and-lobby.md`, "The whole shelf is sit-and-go").
  *
- * `now` is a parameter, never read from inside this function — the caller's `Clock`
- * (`proofStats` below) is the one and only source of "now" for this query.
+ * ONE predicate, TWO readers (`roomsFillingQuery` counts the rows, `tightestRoomQuery` reads the
+ * smallest `remainingSeats`) — the identical "two readers, one rule" discipline
+ * `houseKickoffStillAhead` (`@/league-service/house-factory`) already holds itself to, so the
+ * front door's live count and its tightest-room chip can never disagree about which rooms are
+ * "filling".
  */
-export function draftsNext48hQuery(db: Db, now: Date) {
-  const in48h = new Date(now.getTime() + NEXT_48H_MS);
+function fillingRoomsQuery(db: Db) {
   return db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(drafts)
-    .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
-    .where(and(eq(drafts.status, "scheduled"), gte(drafts.kickoffAt, now), lte(drafts.kickoffAt, in48h), ENFORCED_LEAGUE_SQL));
+    .select({
+      leagueId: leagues.id,
+      remainingSeats: sql<number>`(${leagues.teamCount} - count(${teams.id}))::int`.as("remaining_seats"),
+    })
+    .from(leagues)
+    .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
+    .innerJoin(teams, eq(teams.leagueId, leagues.id))
+    .where(and(eq(drafts.status, "scheduled"), ENFORCED_LEAGUE_SQL))
+    .groupBy(leagues.id, drafts.id)
+    .having(sql`count(${teams.id}) < ${leagues.teamCount}`);
 }
 
 /**
- * "Next draft" (Phase 3.7, Task 7 — the phase's one sanctioned `proof.ts` addition):
- * `min(kickoff_at)` over `'scheduled'` drafts joined on `ENFORCED_LEAGUE_SQL`
- * (`@/league-service/enforcement`) — read-only, and the SAME privacy join `draftsNext48hQuery`
- * above applies for the same reason: a private league's calendar is never disclosed in
- * aggregate, and a MIN is an aggregate that would otherwise leak one private instant exactly.
+ * "Rooms filling now" (storefront review R1) — repoints "drafts in the next 48 hours", a fact no
+ * `when_full` house rung produces any more, onto a fact this world actually has: how many public
+ * rooms have somebody already sitting in them. `count(*)` over `fillingRoomsQuery`'s own
+ * one-row-per-league result, so the plan rides the SAME `leagues_public_browse_idx` /
+ * `drafts_status_idx` seek `draftsNext48hQuery` used to (`src/db/index-plans.test.ts`), with one
+ * additional join (`teams_league_id_idx`) for the seat count neither predecessor query needed.
  *
- * Bounded to `[now, now + MATCHMAKING_CONFIG.proof.nextDraftWithinMs]` in SQL, mirroring
- * `draftsNext48hQuery`'s own window idiom: outside the window the scoreboard chip is omitted by
- * construction (see the config field's docblock — real or absent, never dressed up), so there is
- * no post-hoc filter for a caller to forget.
+ * No time window, unlike the query it replaces: "somebody is sitting in this room right now"
+ * does not go stale the way a future kickoff instant would — the 60-second proof cache
+ * (`MATCHMAKING_CONFIG.proof.cacheTtlSeconds`) is what keeps this number fresh, the same as every
+ * other proof stat.
  */
-export function nextDraftAtQuery(db: Db, now: Date) {
-  const horizon = new Date(now.getTime() + MATCHMAKING_CONFIG.proof.nextDraftWithinMs);
-  return db
-    .select({ min: sql<Date | string | null>`min(${drafts.kickoffAt})` })
-    .from(drafts)
-    .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
-    .where(and(eq(drafts.status, "scheduled"), gte(drafts.kickoffAt, now), lte(drafts.kickoffAt, horizon), ENFORCED_LEAGUE_SQL));
+export function roomsFillingQuery(db: Db) {
+  const filling = fillingRoomsQuery(db).as("filling_rooms");
+  return db.select({ count: sql<number>`count(*)::int` }).from(filling);
 }
 
-/** `min()` comes back from the driver as a `Date` (pg parses the timestamp OID itself, drizzle
- *  never sees a raw `sql` fragment's type) — normalized to the ISO string the contract states,
- *  defensively accepting a string in case a driver upgrade changes the parse. */
-function toIsoOrNull(value: Date | string | null): string | null {
-  if (value === null) return null;
-  return new Date(value).toISOString();
+/**
+ * "The tightest room" (storefront review R1) — repoints "the earliest scheduled kickoff" (a fact
+ * a `when_full` shelf has none of) onto "how few seats are left in the room closest to full", over
+ * the SAME `fillingRoomsQuery` candidate set `roomsFillingQuery` counts. A filling room is this
+ * world's version of "next draft": the fewer seats it has left, the sooner it fires
+ * (`fireWhenFullInTx`). `null` when nothing is filling — real or absent, never dressed up.
+ */
+export function tightestRoomQuery(db: Db) {
+  const filling = fillingRoomsQuery(db).as("filling_rooms");
+  return db.select({ min: sql<number | null>`min(${filling.remainingSeats})` }).from(filling);
 }
 
 /**
  * The front door's proof strip (Phase 3.6, Task 4), real only. Three independent reads —
- * `leaguesFilledQuery`, `draftsNext48hQuery` and `reviewAggregate` (`@/review-service/reviews`)
+ * `leaguesFilledQuery`, `roomsFillingQuery` and `reviewAggregate` (`@/review-service/reviews`)
  * — run concurrently through `Promise.all` on the same pooled `db`, the identical idiom
  * `listLeagueActivity` (`@/integrity-service/activity.ts`) already uses for its own three batched
  * reads: independent statements against a connection pool, not three round trips serialized for
@@ -134,28 +138,38 @@ function toIsoOrNull(value: Date | string | null): string | null {
  * in `reviewAggregate` — that function hands back the raw average as a fact; rounding for
  * display is this module's call to make, the same separation `summarizeRow`
  * (`@/league-service/browse.ts`) draws between a row's raw fields and its derived, rendered ones.
+ *
+ * `deps.clock` is UNREAD here (storefront review R1: neither "filling" query takes a time window
+ * any more, and neither ever did for `leaguesFilledQuery`/`reviewAggregate`) — `ProofStatsDeps`
+ * keeps the field anyway rather than breaking every existing caller's `{ clock }` shape over a
+ * plumbing change, and `proof.test.ts`'s own `deps` fixture is untouched by it.
  */
-export async function proofStats(db: Db, deps: ProofStatsDeps = {}): Promise<ProofStats> {
-  const clock = deps.clock ?? systemClock;
-  const now = new Date(clock.now());
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for API compatibility, see this function's own docblock
+export async function proofStats(db: Db, _deps: ProofStatsDeps = {}): Promise<ProofStats> {
   const floors = MATCHMAKING_CONFIG.proof.floors;
 
-  const [[filledRow], [next48hRow], [nextDraftRow], aggregate] = await Promise.all([
+  const [[filledRow], [fillingRow], [tightestRow], aggregate] = await Promise.all([
     leaguesFilledQuery(db),
-    draftsNext48hQuery(db, now),
-    nextDraftAtQuery(db, now),
+    roomsFillingQuery(db),
+    tightestRoomQuery(db),
     reviewAggregate(db),
   ]);
 
   const leaguesFilledCount = filledRow?.count ?? 0;
-  const draftsNext48hCount = next48hRow?.count ?? 0;
+  const roomsFillingCount = fillingRow?.count ?? 0;
 
   const leaguesFilled = leaguesFilledCount >= floors.leaguesFilled ? leaguesFilledCount : null;
-  const draftsNext48h = draftsNext48hCount >= floors.draftsNext48h ? draftsNext48hCount : null;
+  const roomsFillingNow = roomsFillingCount >= floors.roomsFillingNow ? roomsFillingCount : null;
   const rating = aggregate.count >= floors.reviewCount ? { average: Math.round(aggregate.average * 10) / 10, count: aggregate.count } : null;
-  const nextDraftAt = toIsoOrNull(nextDraftRow?.min ?? null);
+  const tightestRoomSeatsRemaining = tightestRow?.min ?? null;
 
-  // `any` stays blind to `nextDraftAt` on purpose — the chip rides a strip the three floored
-  // stats earned, it never carries the strip itself (`ProofStats.nextDraftAt`'s own docblock).
-  return { leaguesFilled, draftsNext48h, rating, nextDraftAt, any: leaguesFilled !== null || draftsNext48h !== null || rating !== null };
+  // `any` stays blind to `tightestRoomSeatsRemaining` on purpose — the chip rides a strip the
+  // other stats earned, it never carries the strip itself (`ProofStats` own docblock).
+  return {
+    leaguesFilled,
+    roomsFillingNow,
+    rating,
+    tightestRoomSeatsRemaining,
+    any: leaguesFilled !== null || roomsFillingNow !== null || rating !== null,
+  };
 }

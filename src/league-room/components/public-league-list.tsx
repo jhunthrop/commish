@@ -56,44 +56,52 @@ export function seatCountsAsOfSentence(asOfTime: string): string {
 }
 
 /**
- * The subset of `featuredLeagueId`'s own first pass, as the league object rather than its id
- * alone: leagues with a `scheduled` `startTrigger` AND the instant actually on the wire (a
- * `when_full` league's `draftAtIso` is the same placeholder its `draftAt` is — never mistaken for
- * a chosen kickoff), reduced to the nearest one. `null` when nothing qualifies. ISO-8601 UTC
- * instants of one shape compare correctly as strings, so no `now` is needed here either.
+ * THE FULLEST FILLING LEAGUE (storefront review R1) — house or member, at least one seat taken,
+ * and, for a `scheduled` league, one that has never rolled (E4: a room the shelf already
+ * confirmed short of its own promised time is not the one to feature). `null` when nothing
+ * qualifies. Pure and clock-free: "fullest" only ever compares two already-known seat counts,
+ * never `now`.
+ *
+ * Repoints `featuredLeagueId`'s and `featuredScheduledLeague`'s shared first pass from "the
+ * nearest SCHEDULED kickoff" — a fact the sit-and-go shelf no longer produces
+ * (`docs/decisions/formats-and-lobby.md`, "The whole shelf is sit-and-go") — onto "the room
+ * closest to full": a filling room is this world's own version of "next draft", since the fewer
+ * seats it has left, the sooner `fireWhenFullInTx` fires it.
  */
-function nearestScheduledLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
-  const scheduled = leagues.filter((league) => league.startTrigger === "scheduled" && league.draftAtIso !== undefined);
-  if (scheduled.length === 0) return null;
-  return scheduled.reduce((nearest, league) => (league.draftAtIso! < nearest.draftAtIso! ? league : nearest));
+function fullestFillingLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
+  const filling = leagues.filter((league) => league.filledTeams > 0 && (league.startTrigger !== "scheduled" || league.kickoffRolls === 0));
+  if (filling.length === 0) return null;
+  const seatsRemaining = (league: PublicLeagueSummary): number => league.teamCount - league.filledTeams;
+  return filling.reduce((tightest, league) => (seatsRemaining(league) < seatsRemaining(tightest) ? league : tightest));
 }
 
 /**
  * D2 (rule 5, one ink action per view): which card, if any, is the shelf's single featured one —
- * the nearest scheduled draft (`nearestScheduledLeague`), else the fewest seats remaining. Pure
- * and clock-free — see `nearestScheduledLeague`'s own docblock for why "nearest" needs no `now`.
- * Ties keep list order, so the answer is deterministic for one rendered shelf.
+ * the fullest filling league (`fullestFillingLeague`), else the fewest seats remaining across the
+ * WHOLE shelf (the only fallback left once nothing is genuinely filling — an empty shelf, or one
+ * where every room still sits at zero). Ties keep list order, so the answer is deterministic for
+ * one rendered shelf.
  */
 export function featuredLeagueId(leagues: readonly PublicLeagueSummary[]): string | null {
   if (leagues.length === 0) return null;
-  const nearest = nearestScheduledLeague(leagues);
-  if (nearest !== null) return nearest.id;
+  const fullest = fullestFillingLeague(leagues);
+  if (fullest !== null) return fullest.id;
   const seatsRemaining = (league: PublicLeagueSummary): number => league.teamCount - league.filledTeams;
   return leagues.reduce((tightest, league) => (seatsRemaining(league) < seatsRemaining(tightest) ? league : tightest)).id;
 }
 
 /**
- * The front door hero's own "Next draft" module (2026-08-25 founder finding, controller-ruled):
- * the SAME league `featuredLeagueId` marks `emphasis="ink"` on the shelf, but ONLY the genuinely
- * scheduled, nearest-draft case — never the fallback tightest-seats pick a shelf with nothing
- * scheduled falls back to. `nearestScheduledLeague` is exactly that qualifying subset already;
- * this is its public name for a caller outside this module (`page.tsx`), which needs the league
- * OBJECT, not its id, to render the module from. `null` (empty shelf, or nothing scheduled with a
- * real instant) tells the hero band to render nothing at all — rule 6, real or absent, never
- * dressed up.
+ * The front door hero's own "Next draft" module (2026-08-25 founder finding, controller-ruled;
+ * repointed by storefront review R1): the SAME league `featuredLeagueId` marks `emphasis="ink"`
+ * on the shelf, but ONLY the genuinely filling case — never the fallback tightest-seats pick a
+ * shelf where nothing has a single seat taken falls back to (E4: never feature an empty room).
+ * `fullestFillingLeague` is exactly that qualifying subset already; this is its public name for a
+ * caller outside this module (`page.tsx`), which needs the league OBJECT, not its id, to render
+ * the module from. `null` (empty shelf, or every room still at zero) tells the hero band to
+ * render nothing at all — rule 6, real or absent, never dressed up.
  */
 export function featuredScheduledLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
-  return nearestScheduledLeague(leagues);
+  return fullestFillingLeague(leagues);
 }
 
 export interface OpenLeagueShelfProps {

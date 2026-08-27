@@ -9,7 +9,7 @@ import { SignInLink } from "@/components/app-shell/sign-in-link";
 import type { DraftFormat } from "@/domain/league";
 import type { TermKey } from "@/help/glossary";
 import type { HelpLevel } from "@/identity/preferences";
-import { describeStartTiming, rollNoticeSentence } from "@/matchmaking/roll";
+import { rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { formatUsd } from "@/money/config";
@@ -84,8 +84,6 @@ export function LiveChip({ label }: { readonly label: string }) {
 }
 
 export interface OpenLeagueLive {
-  /** E3's deciding fact: a house league's title carries its rung by construction. */
-  readonly authority: "house" | "member";
   readonly remainingSeats: number;
   /** Ms until a SCHEDULED kickoff, `null` for `when_full` (the placeholder never reaches the
    *  clock) or when the summary carries no instant. */
@@ -117,7 +115,6 @@ export function useOpenLeagueLive(league: PublicLeagueSummary): OpenLeagueLive {
   const remainingSeats = league.teamCount - league.filledTeams;
   const filling = remainingSeats > 0 && remainingSeats < UI_CONFIG.seatMeter.lowSeatsThreshold;
   return {
-    authority: league.houseRung === null ? "member" : "house",
     remainingSeats,
     remainingMs,
     onDeck,
@@ -195,11 +192,23 @@ export function FormatLine({ league, helpLevel }: { readonly league: PublicLeagu
 }
 
 /**
- * The Drafts VALUE for a scheduled league — the ticking `Countdown` (tone `hot`) inside the
- * clock window, the absolute `draftAt` sentence outside it — and `null` for a `when_full`
- * league, whose placeholder kickoff is never rendered as though somebody chose it
- * (`DraftTimingNotes` below says what is true instead). `className` is the caller's alignment
- * on the absolute span only (the card right-aligns its ledger value; the row reads left).
+ * The Drafts VALUE, both triggers (storefront review E1) — a scheduled league's ticking
+ * `Countdown` (tone `hot`) inside the clock window, its absolute `draftAt` sentence outside it,
+ * and now a `when_full` league's OWN compact value: "Drafts when full" beside the click-only
+ * `InfoTip` that carries the full commitment (the `sit-and-go` glossary entry, the same term the
+ * waiting room and the create-league form already quote). Before this, a `when_full` row's
+ * Drafts column returned `null` here and let `DraftTimingNotes` print `describeStartTiming`'s
+ * whole 30-word sentence as the column's only content — honest, but on a shelf that is now
+ * entirely `when_full` that sentence repeated on every row, under a header naming a value that
+ * was never there (E1, measured: 21 of 29 browse rows, 1,218px of one repeated paragraph). The
+ * column now always carries a short VALUE; the longer commitment is one press away, exactly the
+ * way every other glossary-backed fact on this shelf already works (D1's own legend line: "Press
+ * any ⓘ for a plain answer").
+ *
+ * `className` is the caller's alignment on the absolute span only (the card right-aligns its
+ * ledger value; the row reads left) — the `when_full` value is left-set for both, matching the
+ * row's own reading direction; the card's `LedgerRow` wrapper right-aligns its children
+ * regardless of this component's own class, so no caller needs a second branch.
  *
  * `size` defaults to `"sm"` — the card/row's own ledger-row register, unchanged for both
  * existing callers — and is threaded straight to `Countdown` for a caller that needs the SAME
@@ -219,7 +228,14 @@ export function ScheduledDraftValue({
   readonly className?: string;
   readonly size?: CountdownSize;
 }) {
-  if (league.startTrigger !== "scheduled") return null;
+  if (league.startTrigger === "when_full") {
+    return (
+      <span className={`inline-flex min-w-0 items-center gap-1 font-medium text-text-primary ${className}`}>
+        Drafts when full
+        <InfoTip term="sit-and-go" />
+      </span>
+    );
+  }
   return onDeck && remainingMs !== null ? (
     <Countdown remainingMs={remainingMs} size={size} tone="hot" data-testid="draft-clock" />
   ) : (
@@ -228,34 +244,19 @@ export function ScheduledDraftValue({
 }
 
 /**
- * The Drafts value's two muted footnotes, one source for both forms:
- *
- * The when-full commitment is `describeStartTiming`'s own sentence (F9), quoted rather than
- * restated, in `text-text-muted` (E5: `warning` is reserved for a tightening clock, and this
- * sentence is reassurance). It REPLACES the value for a `when_full` league — never both a date
- * and the sentence.
+ * The Drafts value's one remaining footnote, one source for both forms (storefront review E1
+ * retired the when-full paragraph that used to live here — `ScheduledDraftValue` above now
+ * carries that fact as the column's own compact value plus an `InfoTip`, never both a value and
+ * a footnote saying the same thing twice).
  *
  * F12/F21: `kickoffRolls` is `PublicLeagueSummary`'s own field, read here rather than silently
  * showing a different date than the one a visitor is comparing against their own calendar —
  * only a SCHEDULED league can ever roll, so a `when_full` form never renders this line.
  */
-export function DraftTimingNotes({
-  league,
-  authority,
-}: {
-  readonly league: PublicLeagueSummary;
-  readonly authority: "house" | "member";
-}) {
-  return (
-    <>
-      {league.startTrigger === "when_full" ? (
-        <p className="mt-1 text-text-muted">{describeStartTiming({ startTrigger: "when_full", authority })}</p>
-      ) : null}
-      {league.startTrigger === "scheduled" && league.kickoffRolls > 0 ? (
-        <p className="mt-1 text-xs text-text-muted">{rollNoticeSentence(league.kickoffRolls)}</p>
-      ) : null}
-    </>
-  );
+export function DraftTimingNotes({ league }: { readonly league: PublicLeagueSummary }) {
+  return league.startTrigger === "scheduled" && league.kickoffRolls > 0 ? (
+    <p className="mt-1 text-xs text-text-muted">{rollNoticeSentence(league.kickoffRolls)}</p>
+  ) : null;
 }
 
 /**

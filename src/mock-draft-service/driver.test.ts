@@ -49,7 +49,7 @@ function testTicker(store: DraftStore): DraftTicker {
     store,
     clock,
     autoStart: async () => [],
-    reconcileHouse: async () => ({ opened: [], refused: [] }),
+    reconcileHouse: async () => ({ opened: [], retired: [], refused: [] }),
   });
 }
 

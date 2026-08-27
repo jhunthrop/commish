@@ -57,87 +57,87 @@ function occurrences(container: HTMLElement, sentence: string): number {
 }
 
 /**
- * D2's selector, tested as the pure function it is: the shelf's single featured card is the
- * nearest scheduled draft, else the fewest seats remaining — the exact rule Task 6's brief
- * states, with `when_full` placeholders never mistaken for a scheduled instant.
+ * D2's selector, repointed by storefront review R1: the shelf's single featured card is the
+ * FULLEST FILLING league (at least one seat taken, and, if `scheduled`, never rolled), else the
+ * fewest seats remaining across the whole shelf.
  */
-describe("featuredLeagueId (D2)", () => {
-  const scheduledSoon: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "soon", draftAtIso: "2026-09-10T19:00:00.000Z" };
-  const scheduledLater: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "later", draftAtIso: "2026-09-12T19:00:00.000Z" };
-  const whenFull: PublicLeagueSummary = {
-    ...HOUSE_LEAGUE,
-    id: "wf",
-    startTrigger: "when_full",
-    // A `when_full` league's `draftAtIso` is the same PLACEHOLDER its `draftAt` is
-    // (`PublicLeagueSummary.draftAtIso`'s own docblock) — earlier than every scheduled
-    // instant here, to prove the gate is `startTrigger`, never the raw timestamp.
-    draftAtIso: "2026-09-01T00:00:00.000Z",
-    filledTeams: 11,
-  };
+describe("featuredLeagueId (D2, repointed by storefront review R1)", () => {
+  const fullest: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "fullest", filledTeams: 11 }; // 1 remaining
+  const filling: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "filling", filledTeams: 5 }; // 7 remaining
+  const empty: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "empty", filledTeams: 0 };
+  const whenFullFilling: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "wf", startTrigger: "when_full", filledTeams: 10 }; // 2 remaining
 
   it("answers null for an empty shelf", () => {
     expect(featuredLeagueId([])).toBeNull();
   });
 
-  it("picks the nearest scheduled draft", () => {
-    expect(featuredLeagueId([scheduledLater, scheduledSoon])).toBe("soon");
+  it("picks the fullest filling league", () => {
+    expect(featuredLeagueId([filling, fullest])).toBe("fullest");
   });
 
-  it("never lets a when_full placeholder instant outrank a scheduled draft", () => {
-    expect(featuredLeagueId([whenFull, scheduledLater])).toBe("later");
+  it("never lets an empty room outrank one that has at least one seat taken", () => {
+    expect(featuredLeagueId([empty, filling])).toBe("filling");
   });
 
-  it("falls back to the fewest seats remaining when nothing is scheduled with an instant", () => {
-    const roomier: PublicLeagueSummary = { ...whenFull, id: "roomy", filledTeams: 3 };
-    const noIso: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "no_iso" };
-    delete (noIso as { draftAtIso?: string }).draftAtIso;
-    expect(featuredLeagueId([roomier, whenFull, { ...noIso, filledTeams: 2 }])).toBe("wf");
+  it("never lets an already-rolled scheduled league outrank a clean filling one, even if it is fuller (E4)", () => {
+    const rolledButFullest: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "rolled", filledTeams: 11, kickoffRolls: 2 };
+    expect(featuredLeagueId([rolledButFullest, filling])).toBe("filling");
+  });
+
+  it("a when_full league's own fill counts exactly like a scheduled one's", () => {
+    expect(featuredLeagueId([filling, whenFullFilling])).toBe("wf");
+  });
+
+  it("falls back to the fewest seats remaining across the whole shelf when nothing is filling", () => {
+    const roomier: PublicLeagueSummary = { ...empty, id: "roomy", teamCount: 20 };
+    const tighter: PublicLeagueSummary = { ...empty, id: "tight", teamCount: 4 };
+    expect(featuredLeagueId([roomier, tighter])).toBe("tight");
   });
 
   it("breaks a tie by list order, deterministically", () => {
-    const twinA: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "twin_a", draftAtIso: "2026-09-10T19:00:00.000Z" };
-    const twinB: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "twin_b", draftAtIso: "2026-09-10T19:00:00.000Z" };
+    const twinA: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "twin_a", filledTeams: 6 };
+    const twinB: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "twin_b", filledTeams: 6 };
     expect(featuredLeagueId([twinA, twinB])).toBe("twin_a");
   });
 });
 
 /**
- * The front door hero's own "Next draft" module reads (2026-08-25 founder finding): the exact
- * qualifying subset of `featuredLeagueId` — a genuinely scheduled, nearest draft — returned as
- * the league object, `null` whenever `featuredLeagueId` would have fallen back to the tightest-
- * seats pick (or the shelf is empty). The module renders nothing in either `null` case.
+ * The front door hero's own "Next draft" module reads (2026-08-25 founder finding; repointed by
+ * storefront review R1): the exact qualifying subset of `featuredLeagueId` — a genuinely filling
+ * league — returned as the league object, `null` whenever `featuredLeagueId` would have fallen
+ * back to the tightest-seats pick across an all-empty shelf (or the shelf is empty). The module
+ * renders nothing in either `null` case.
  */
-describe("featuredScheduledLeague (2026-08-25 hero finding)", () => {
-  const scheduledSoon: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "soon", draftAtIso: "2026-09-10T19:00:00.000Z" };
-  const scheduledLater: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "later", draftAtIso: "2026-09-12T19:00:00.000Z" };
-  const whenFull: PublicLeagueSummary = {
-    ...HOUSE_LEAGUE,
-    id: "wf",
-    startTrigger: "when_full",
-    draftAtIso: "2026-09-01T00:00:00.000Z",
-    filledTeams: 11,
-  };
+describe("featuredScheduledLeague (2026-08-25 hero finding; repointed by storefront review R1)", () => {
+  const fullest: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "fullest", filledTeams: 11 };
+  const filling: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "filling", filledTeams: 5 };
+  const empty: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "empty", filledTeams: 0 };
 
   it("answers null for an empty shelf", () => {
     expect(featuredScheduledLeague([])).toBeNull();
   });
 
-  it("returns the nearest scheduled league as the object, not just its id", () => {
-    const result = featuredScheduledLeague([scheduledLater, scheduledSoon]);
-    expect(result).toBe(scheduledSoon);
+  it("returns the fullest filling league as the object, not just its id", () => {
+    const result = featuredScheduledLeague([filling, fullest]);
+    expect(result).toBe(fullest);
   });
 
-  it("answers null when nothing is scheduled with a real instant — never the fallback tightest-seats pick", () => {
-    const noIso: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "no_iso" };
-    delete (noIso as { draftAtIso?: string }).draftAtIso;
-    // `featuredLeagueId` would answer "wf" here (its own fallback branch); the module must
-    // answer null instead — a `when_full`-only shelf has nothing genuinely ticking to show.
-    expect(featuredLeagueId([whenFull, noIso])).toBe("wf");
-    expect(featuredScheduledLeague([whenFull, noIso])).toBeNull();
+  it("answers null when nothing has a single seat taken — never the fallback tightest-seats pick across an empty shelf", () => {
+    const roomier: PublicLeagueSummary = { ...empty, id: "roomy", teamCount: 20 };
+    const tighter: PublicLeagueSummary = { ...empty, id: "tight", teamCount: 4 };
+    // `featuredLeagueId` would answer "tight" here (its own fallback branch); the module must
+    // answer null instead — a shelf where nothing is filling has nothing genuinely featured.
+    expect(featuredLeagueId([roomier, tighter])).toBe("tight");
+    expect(featuredScheduledLeague([roomier, tighter])).toBeNull();
   });
 
-  it("agrees with featuredLeagueId's id whenever a scheduled league qualifies", () => {
-    const merged = [whenFull, scheduledLater, scheduledSoon];
+  it("never features an already-rolled scheduled league, even the fullest one (E4)", () => {
+    const rolled: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "rolled", filledTeams: 11, kickoffRolls: 1 };
+    expect(featuredScheduledLeague([rolled, filling])).toBe(filling);
+  });
+
+  it("agrees with featuredLeagueId's id whenever something is genuinely filling", () => {
+    const merged = [empty, filling, fullest];
     expect(featuredScheduledLeague(merged)?.id).toBe(featuredLeagueId(merged));
   });
 });
@@ -296,21 +296,22 @@ describe("OpenLeagueShelf", () => {
     }
   });
 
-  it("gives the ink to the nearest scheduled draft in BOTH renderings, quiet pills everywhere else", () => {
-    const soon: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "soonest", name: "Soonest Draft Room", draftAtIso: "2026-09-10T19:00:00.000Z" };
+  it("gives the ink to the fullest filling league in BOTH renderings, quiet pills everywhere else (repointed by storefront review R1)", () => {
+    // 11 of 12 seated — tighter than HOUSE_LEAGUE (5 of 12) and PUBLIC_LEAGUES[1] (9 of 10).
+    const soon: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "soonest", name: "Fullest Draft Room", filledTeams: 11 };
     render(
       <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={[soon, PUBLIC_LEAGUES[1]!]} signedIn={false} helpLevel="standard" asOfTime={AS_OF} />,
     );
     for (const rendering of [rows(), cards()]) {
       const ink = rendering.querySelector('[class*="bg-text-primary"]');
-      expect(ink?.getAttribute("aria-label")).toContain("Soonest Draft Room");
+      expect(ink?.getAttribute("aria-label")).toContain("Fullest Draft Room");
     }
   });
 
   // 2026-08-25 founder finding: the hero's own "Next draft" module carries this league's ink
   // instead, so the shelf goes all-quiet rather than double-inking the same league.
   it("marks NOTHING ink, in either rendering, once the hero module carries the featured league (featuredInHero)", () => {
-    const soon: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "soonest", name: "Soonest Draft Room", draftAtIso: "2026-09-10T19:00:00.000Z" };
+    const soon: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "soonest", name: "Soonest Draft Room", filledTeams: 11 };
     render(
       <OpenLeagueShelf
         house={[HOUSE_LEAGUE]}

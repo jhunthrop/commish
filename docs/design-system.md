@@ -305,24 +305,26 @@ ticker does not have to re-derive them:
 - **Real-or-nothing, never padded.** `listWireItems` returns `[]` when a source is quiet — no
   fabricated item, no placeholder row, ever ("no mock data on a real surface"). The component
   itself renders `null` entirely below `UI_CONFIG.wire.minItems` (3): a quiet product shows a
-  clean hairline, never filler. The four sources are all reads already in the product
+  clean hairline, never filler. The three sources are all reads already in the product
   (`audit_events` `member_joined` rows for `seat_claimed`; public leagues at capacity for
-  `league_filled`; `'scheduled'` kickoffs inside the window for `draft_tonight`; `proofStats`'s
-  own floored `leaguesFilled` for `season_count`) — one `Promise.all`, capped at
-  `MATCHMAKING_CONFIG.wire.maxItems`, round-robined across kinds so a burst of claims never
-  crowds the season count off the ticker.
+  `league_filled`; `proofStats`'s own floored `leaguesFilled` for `season_count`) — one
+  `Promise.all`, capped at `MATCHMAKING_CONFIG.wire.maxItems`, round-robined across kinds so a
+  burst of claims never crowds the season count off the ticker.
 - **Actor-free (S9, privacy self-ruling).** The mock's literal copy names a member ("Marcus
   claimed a seat"); this product does not put a display name on an anonymous marketing surface,
   so `seatClaimsQuery` never selects `actor_id` at all — the projection cannot leak what it never
   reads — and every sentence `Wire` renders is built from a league name, a count, or a coarse
   duration, never a person. Recorded as a deliberate deviation from the mock's literal copy, not
   from its idea.
-- **The `draft_tonight` gate is CHOSEN kickoffs only** (Task 8 ruling, carried from `proof.ts`'s
-  identical gate): a `when_full` league's stored `kickoff_at` is a placeholder until
-  `fireWhenFullInTx` stamps it real, so the wire (and the scoreboard) only ever advertises a
-  kickoff somebody actually chose (`start_trigger = 'scheduled'`) or the fill trigger actually
-  set (`fill_fired_at IS NOT NULL`) — advertising the placeholder as a real time would be exactly
-  the dressed-up claim this rule exists to refuse.
+- **`draft_tonight` is RETIRED (storefront review R1, 2026-08-27).** The kind used to gate on a
+  CHOSEN kickoff — `start_trigger = 'scheduled'`, or the fill trigger's own `fill_fired_at`
+  stamp — but every `HOUSE_CATALOG` rung is `when_full` now (`docs/decisions/formats-and-lobby.md`,
+  "The whole shelf is sit-and-go"), so a sit-and-go room has no chosen kickoff left to announce
+  and the source starved by construction. `seat_claimed` (already tinted live the instant a claim
+  leaves a room urgently short of seats) and `league_filled` tell this world's own "filling"
+  story honestly; no replacement kind was added. `proof.ts`'s own scoreboard chip was repointed
+  the same way, onto `roomsFillingQuery`/`tightestRoomQuery` — see that module for the fill-based
+  facts that replaced the scheduled-kickoff ones.
 
 Accessibility: the visible marquee duplicates its item list once (the `-50%` keyframe loop needs
 identical halves), with the duplicate `aria-hidden`; the one accessible form is a static

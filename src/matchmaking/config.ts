@@ -113,23 +113,21 @@ export const MATCHMAKING_CONFIG = {
     floors: {
       /** Below this, "N leagues filled this season" reads as a startup counting its friends. */
       leaguesFilled: 25,
-      /** Below this, "drafts in the next 48 hours" is a schedule, not a signal. */
-      draftsNext48h: 3,
+      /**
+       * Storefront review R1: renamed from `draftsNext48h` — below this, "N rooms filling now"
+       * reads as a startup counting its friends, the identical reasoning `leaguesFilled` already
+       * carries, applied to the fill-based fact that replaced a scheduled-kickoff count no
+       * `when_full` shelf produces any more. Same threshold, same register: three is still the
+       * floor below which a count reads as a schedule rather than a signal.
+       */
+      roomsFillingNow: 3,
       /** Below this, an average rating is one person's mood. */
       reviewCount: 20,
     },
     /**
-     * Phase 3.7, Task 7 (self-ruled: 24 hours): how far ahead the scoreboard's "next draft"
-     * chip is allowed to look (`nextDraftAtQuery`, `@/league-service/proof`). Inside the
-     * window, a coarse "hours until the next draft" is a fact a visitor can act on tonight;
-     * beyond it, "next draft on Thursday" is a schedule wearing a scoreboard chip, so the chip
-     * is omitted instead — the same real-or-absent ruling as the floors above.
-     */
-    nextDraftWithinMs: 24 * 60 * 60 * 1000,
-    /**
      * Phase 3.6, Task 5 (P4 review, binding CARRY): the front door is the product's
      * highest-traffic unauthenticated read, and `proofStats` runs three aggregate queries
-     * (`leaguesFilledQuery`, `draftsNext48hQuery`, `reviewAggregate`) — cheap individually, but
+     * (`leaguesFilledQuery`, `roomsFillingQuery`, `reviewAggregate`) — cheap individually, but
      * paid on every render of the one page every stranger lands on first. `createProofCache`
      * (`@/stats-pipeline/proof-cache.ts`) wraps it in a blind TTL, the same seam
      * `ScoringSettings`'s belt-and-braces TTL uses (`STATS_INGESTION_CONFIG.ttlSeconds.
@@ -156,11 +154,11 @@ export const MATCHMAKING_CONFIG = {
    */
   wire: {
     /**
-     * How far the wire looks — BACK for claimed seats, FORWARD for scheduled kickoffs. One
-     * day, the same horizon `proof.nextDraftWithinMs` above already rules for the same
-     * register: inside it, "a seat was claimed · 3 hours ago" still reads as activity and a
-     * kickoff is a fact a visitor can act on tonight; beyond it, one is history and the other
-     * is a schedule, and the real-or-absent ruling omits both rather than dressing them up.
+     * How far BACK the wire looks for a claimed seat or a filled league. One day: inside it, "a
+     * seat was claimed · 3 hours ago" still reads as activity; beyond it, it is history, and the
+     * real-or-absent ruling omits it rather than dressing it up. Storefront review R1 retired
+     * this constant's own FORWARD half (`draft_tonight`'s scheduled-kickoff window) along with
+     * the kind it bounded — a sit-and-go room has no chosen kickoff to look forward to.
      */
     windowMs: 24 * 60 * 60 * 1000,
     /**

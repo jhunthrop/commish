@@ -31,7 +31,7 @@ import { browseQuery, houseShelfQuery } from "@/league-service/browse";
 import { leaguesNeedingAutoSetQuery } from "@/league-service/auto-lineup";
 import { ENFORCED_LEAGUE_SQL } from "@/league-service/enforcement";
 import { dueUnfilledScheduledDraftsQuery } from "@/league-service/roll";
-import { draftsNext48hQuery, leaguesFilledQuery } from "@/league-service/proof";
+import { leaguesFilledQuery, roomsFillingQuery, tightestRoomQuery } from "@/league-service/proof";
 import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { MOCK_CONFIG } from "@/mock-draft/config";
@@ -878,24 +878,29 @@ describe("hot read paths use indexes", () => {
   });
 
   /**
-   * `draftsNext48hQuery` (`@/league-service/proof`) is the SELECTIVE one of the three, and BOTH
-   * halves of the brief's own claim ("served by indexes that exist: `drafts_status_idx`, the
-   * browse index") measure true: `'scheduled'` status narrowed to a 48-hour `kickoff_at` band is
-   * the identical composite seek `dueDraftsQuery`'s own measured assertion above already proves
-   * `drafts_status_idx` serves (a narrower band of the same index, same two-predicate `Index
-   * Cond`), and `ENFORCED_LEAGUE_SQL`'s `is_public_matchmade = true` reaches `leagues` through
-   * `leagues_public_browse_idx` — the SAME partial index `browseQuery` leads every plan with,
-   * because this query's own `WHERE` matches that index's partial predicate exactly. Measured:
-   * `Aggregate -> Hash Join -> (Index Scan using leagues_public_browse_idx, Bitmap Heap Scan on
-   * drafts via Bitmap Index Scan on drafts_status_idx)`.
+   * `roomsFillingQuery`/`tightestRoomQuery` (`@/league-service/proof`, storefront review R1) —
+   * both wrap the SAME `fillingRoomsQuery` candidate set, so one EXPLAIN of one representative
+   * (`roomsFillingQuery`) stands for both: identical inner plan, a different outer aggregate.
+   * `ENFORCED_LEAGUE_SQL`'s `is_public_matchmade = true` still reaches `leagues` through
+   * `leagues_public_browse_idx` — the SAME partial index `browseQuery`/`draftsNext48hQuery`
+   * (this query's predecessor) already led every plan with, because the `WHERE` still matches
+   * that index's partial predicate exactly. `status = 'scheduled'` no longer carries a
+   * `kickoff_at` range beside it (this query has no time window at all — see its own docblock),
+   * so `drafts_status_idx` serves the equality alone rather than the two-predicate seek
+   * `dueDraftsQuery`'s assertion measures; `teams` joins through `teams_league_id_idx`, the one
+   * relation neither `leaguesFilledQuery` nor the query this repoints ever touched.
    */
-  it("the proof strip's draftsNext48h scan seeks on drafts_status_idx and leagues_public_browse_idx, never a sequential scan of either table", async () => {
-    const plan = await explainPlan(db, draftsNext48hQuery(db, new Date()));
+  it("the proof strip's roomsFillingNow/tightestRoom scan seeks on drafts_status_idx, leagues_public_browse_idx and teams_league_id_idx, never a sequential scan of any of the three", async () => {
+    const plan = await explainPlan(db, roomsFillingQuery(db));
     expect(sequentiallyScannedRelations(plan)).toEqual([]);
-    const draftsIndex = indexScanNode(plan, "drafts_status_idx");
-    expect(draftsIndex).toBeDefined();
-    expect(draftsIndex?.["Index Cond"]).toContain("status");
-    expect(draftsIndex?.["Index Cond"]).toContain("kickoff_at");
+    expect(indexScanNode(plan, "drafts_status_idx")).toBeDefined();
+    expect(indexScanNode(plan, "leagues_public_browse_idx")).toBeDefined();
+    expect(indexScanNode(plan, "teams_league_id_idx")).toBeDefined();
+  });
+
+  it("tightestRoomQuery rides the identical index seeks — one shared candidate set, a different outer aggregate", async () => {
+    const plan = await explainPlan(db, tightestRoomQuery(db));
+    expect(sequentiallyScannedRelations(plan)).toEqual([]);
     expect(indexScanNode(plan, "leagues_public_browse_idx")).toBeDefined();
   });
 

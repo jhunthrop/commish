@@ -28,6 +28,17 @@ export const DRAFT_SERVICE_CONFIG = {
    */
   maxHouseSpawnsPerRun: 20,
   /**
+   * Storefront review E13: the ceiling on house leagues `ensureHouseCatalog`
+   * (`@/league-service/house-factory`) may RETIRE (dissolve) in one reconcile — the surplus half
+   * of the same "keep the shelf at `openAtOnce`" rule `maxHouseSpawnsPerRun` above already bounds
+   * on the shortfall side. A small number on purpose: retirement runs the real operator
+   * dissolution door (`dissolveLeague`, `@/money-service/dissolution`), a full transaction per
+   * league, and the legacy surplus this exists to drain is a one-time, small population (six
+   * pre-directive leagues at most, per rung) — never a scan this reconciler is expected to run
+   * hot against in steady state.
+   */
+  maxHouseRetiresPerRun: 3,
+  /**
    * How often `reconcileHouse` (Task 13, Step 6) actually runs, gated against the injected
    * clock rather than every tick: the ticker fires once a second and a shelf of house leagues
    * does not change that fast. Comfortably above one tick, comfortably below a minute — long

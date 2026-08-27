@@ -13,14 +13,16 @@ export interface NextDraftModuleProps {
 }
 
 /**
- * THE NEXT DRAFT (2026-08-25 founder finding, controller-ruled): the hero band's right half at
- * xl+ used to be a dead dark field once the headline went left-aligned — "does the hero
- * left-aligned help with visual hierarchy?" This module fills it with the shelf's own featured
- * league (`featuredScheduledLeague`, `./public-league-list`) rather than decoration: the league's
- * name, the SAME gated ticking clock the shelf's row and card render (`ScheduledDraftValue`,
- * extracted there rather than forked here — see its own docblock for the `size` it now threads),
- * the SAME seat bar and "{n} of {t} open" sentence (`LeagueRow`'s own Seats column shape), and
- * ONE join action.
+ * THE NEXT DRAFT (2026-08-25 founder finding, controller-ruled; repointed by storefront review
+ * R1): the hero band's right half at xl+ used to be a dead dark field once the headline went
+ * left-aligned — "does the hero left-aligned help with visual hierarchy?" This module fills it
+ * with the shelf's own featured league (`featuredScheduledLeague`, `./public-league-list` — now
+ * the FULLEST filling room, never a scheduled-kickoff pick a `when_full` shelf has none of left
+ * to make) rather than decoration: the league's name, the SAME gated Drafts value the shelf's row
+ * and card render (`ScheduledDraftValue`, extracted there rather than forked here — see its own
+ * docblock for the `size` it now threads, and for the compact "Drafts when full" value a
+ * sit-and-go league renders here too), the SAME seat bar and "{n} of {t} open" sentence
+ * (`LeagueRow`'s own Seats column shape), and ONE join action.
  *
  * RULE-5 ACCOUNTING: this module's join action is QUIET (`emphasis="quiet"`) — the nav's "Take a
  * seat" already carries this page's one ink pill, and this module's own urgency is the red

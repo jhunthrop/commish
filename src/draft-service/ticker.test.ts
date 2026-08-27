@@ -31,6 +31,7 @@ const clock = { now: () => now };
  */
 const NO_OP_HOUSE_RECONCILE = async (): Promise<HouseFactoryOutcome> => ({
   opened: [],
+  retired: [],
   refused: [],
 });
 
@@ -565,7 +566,7 @@ describe("draft ticker — auto-start (Task 7)", () => {
 });
 
 describe("draft ticker — house reconcile (Phase 3.5 addendum, Task 13)", () => {
-  const noOutcome: HouseFactoryOutcome = { opened: [], refused: [] };
+  const noOutcome: HouseFactoryOutcome = { opened: [], retired: [], refused: [] };
 
   it("runs house reconcile SECOND: after auto-start, before the expiry scan", async () => {
     const { store, fixture } = await liveDraft();
@@ -598,6 +599,7 @@ describe("draft ticker — house reconcile (Phase 3.5 addendum, Task 13)", () =>
     const { store } = await liveDraft();
     const reconcileHouse = async (): Promise<HouseFactoryOutcome> => ({
       opened: [],
+      retired: [],
       refused: [
         {
           rung: "open_12",
@@ -754,7 +756,7 @@ describe("draft ticker — mock lanes (Phase 4.5, Task 6)", () => {
       },
       reconcileHouse: async () => {
         calls.push("house-reconcile");
-        return { opened: [], refused: [] };
+        return { opened: [], retired: [], refused: [] };
       },
       startDueMocks: async () => {
         calls.push("mock-due-start");

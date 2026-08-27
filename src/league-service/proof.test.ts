@@ -28,9 +28,9 @@ const deps: ProofStatsDeps = { clock: fixedAt(NOW) };
 let leagueSeq = 0;
 
 /**
- * One league and its one draft — the whole shape every proof query reads. No `teams` rows:
- * none of the three proof queries (`leaguesFilledQuery`, `draftsNext48hQuery`,
- * `reviewAggregateQuery`) reads `teams` at all, so seeding them here would only be decoration.
+ * One league and its one draft — the whole shape `leaguesFilledQuery` and `reviewAggregateQuery`
+ * read. No `teams` rows: neither query reads `teams` at all, so seeding them here would only be
+ * decoration — `seedFillingLeague` below is the seeder for the two queries that do.
  */
 async function seedLeague(opts: {
   readonly draftStatus: "scheduled" | "in_progress" | "complete";
@@ -78,6 +78,47 @@ async function seedLeagues(counts: { readonly drafted: number; readonly full: nu
   for (let i = 0; i < counts.filling; i += 1) {
     await seedLeague({ draftStatus: "scheduled" });
   }
+}
+
+/**
+ * A league, its one `'scheduled'` draft, and `filledTeams` real seats — the shape
+ * `roomsFillingQuery`/`tightestRoomQuery` read (storefront review R1). Real teams through a
+ * direct insert (not `joinPublicLeague`) because these two queries only ever read `teams`'
+ * count, never the join door's own side effects.
+ */
+async function seedFillingLeague(opts: {
+  readonly teamCount?: number;
+  readonly filledTeams: number;
+  readonly isPublicMatchmade?: boolean;
+  readonly draftStatus?: "scheduled" | "in_progress" | "complete";
+}): Promise<string> {
+  leagueSeq += 1;
+  const id = `fill${leagueSeq}`;
+  const commissionerId = `fill_owner_${leagueSeq}`;
+  const teamCount = opts.teamCount ?? 12;
+  await db.insert(users).values({ id: commissionerId, email: `${commissionerId}@test.local`, displayName: commissionerId }).onConflictDoNothing();
+  await db.insert(leagues).values({
+    id,
+    name: id,
+    format: "snake",
+    teamCount,
+    isPublicMatchmade: opts.isPublicMatchmade ?? true,
+    commissionerUserId: commissionerId,
+    createdAt: DEFAULT_CREATED_AT,
+  });
+  await db.insert(drafts).values({
+    id: `${id}_draft`,
+    leagueId: id,
+    format: "snake",
+    status: opts.draftStatus ?? "scheduled",
+    kickoffAt: DEFAULT_KICKOFF,
+  });
+  for (let i = 0; i < opts.filledTeams; i += 1) {
+    const userId = `${id}_u${i}`;
+    await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: userId }).onConflictDoNothing();
+    await db.insert(teams).values({ id: `${id}_t${i}`, leagueId: id, userId, name: `${id} team ${i}` });
+  }
+  return id;
 }
 
 let reviewSeq = 0;
@@ -183,34 +224,61 @@ describe("proofStats — leaguesFilled", () => {
   });
 });
 
-describe("proofStats — draftsNext48h", () => {
-  it("counts only the drafts a visitor could actually still join, in the next 48 hours", async () => {
-    const now = new Date(NOW);
-    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const in47h = new Date(now.getTime() + 47 * 60 * 60 * 1000);
-    // Four public, scheduled drafts inside the window — clears the floor (3).
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: now, isPublicMatchmade: true });
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: in24h, isPublicMatchmade: true });
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: in47h, isPublicMatchmade: true });
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: new Date(now.getTime() + 48 * 60 * 60 * 1000), isPublicMatchmade: true });
-    // A private league's draft, inside the window — excluded by ENFORCED_LEAGUE_SQL so a
-    // private calendar is never disclosed in aggregate.
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: in24h, isPublicMatchmade: false });
-    // Three days out — a real draft, but not one a visitor could join in the next 48 hours.
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: new Date(now.getTime() + 72 * 60 * 60 * 1000), isPublicMatchmade: true });
-    // Already started — a visitor cannot join a draft that is no longer `'scheduled'`.
-    await seedLeague({ draftStatus: "in_progress", kickoffAt: in24h, isPublicMatchmade: true });
+describe("proofStats — roomsFillingNow (storefront review R1)", () => {
+  it("counts only public, still-joinable rooms with at least one seat taken", async () => {
+    // Three public, scheduled, genuinely filling rooms — clears the floor (3).
+    await seedFillingLeague({ teamCount: 12, filledTeams: 5 });
+    await seedFillingLeague({ teamCount: 12, filledTeams: 1 });
+    await seedFillingLeague({ teamCount: 8, filledTeams: 7 });
+    // A private league's room, filling — excluded by ENFORCED_LEAGUE_SQL so a private league's
+    // membership is never disclosed in aggregate.
+    await seedFillingLeague({ teamCount: 12, filledTeams: 3, isPublicMatchmade: false });
+    // Nobody has joined yet — not "filling", just open.
+    await seedFillingLeague({ teamCount: 12, filledTeams: 0 });
+    // Already full — a room with nobody left to fill is done filling, not filling.
+    await seedFillingLeague({ teamCount: 2, filledTeams: 2 });
+    // Already drafting — a visitor cannot join a room that is no longer `'scheduled'`.
+    await seedFillingLeague({ teamCount: 12, filledTeams: 5, draftStatus: "in_progress" });
 
     const stats = await proofStats(db, deps);
-    expect(stats.draftsNext48h).toBe(4);
+    expect(stats.roomsFillingNow).toBe(3);
   });
 
-  it("hides draftsNext48h below its own floor", async () => {
-    const now = new Date(NOW);
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: now, isPublicMatchmade: true });
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: now, isPublicMatchmade: true });
-    expect(MATCHMAKING_CONFIG.proof.floors.draftsNext48h).toBe(3);
-    expect((await proofStats(db, deps)).draftsNext48h).toBeNull();
+  it("hides roomsFillingNow below its own floor", async () => {
+    await seedFillingLeague({ teamCount: 12, filledTeams: 2 });
+    await seedFillingLeague({ teamCount: 12, filledTeams: 1 });
+    expect(MATCHMAKING_CONFIG.proof.floors.roomsFillingNow).toBe(3);
+    expect((await proofStats(db, deps)).roomsFillingNow).toBeNull();
+  });
+
+  it("counts a when_full room exactly like a scheduled one — this fact never reads start_trigger", async () => {
+    await db.insert(leagues).values({
+      id: "wf_fill",
+      name: "wf_fill",
+      format: "snake",
+      teamCount: 12,
+      isPublicMatchmade: true,
+      commissionerUserId: null,
+      houseRung: "open_12",
+      createdAt: DEFAULT_CREATED_AT,
+    });
+    await db.insert(drafts).values({
+      id: "wf_fill_draft",
+      leagueId: "wf_fill",
+      format: "snake",
+      status: "scheduled",
+      startTrigger: "when_full",
+      kickoffAt: new Date(Date.parse(NOW) + 7 * 24 * 60 * 60 * 1000),
+    });
+    for (let i = 0; i < 3; i += 1) {
+      const userId = `wf_fill_u${i}`;
+      await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: userId }).onConflictDoNothing();
+      await db.insert(teams).values({ id: `wf_fill_t${i}`, leagueId: "wf_fill", userId, name: `wf_fill team ${i}` });
+    }
+    await seedFillingLeague({ teamCount: 12, filledTeams: 4 });
+    await seedFillingLeague({ teamCount: 12, filledTeams: 1 });
+
+    expect((await proofStats(db, deps)).roomsFillingNow).toBe(3);
   });
 });
 
@@ -237,39 +305,30 @@ describe("proofStats — rating", () => {
   });
 });
 
-describe("proofStats — nextDraftAt", () => {
-  it("reports the earliest public scheduled kickoff inside the window, as the instant itself", async () => {
-    const now = new Date(NOW);
-    const in5h = new Date(now.getTime() + 5 * 60 * 60 * 1000);
-    const in10h = new Date(now.getTime() + 10 * 60 * 60 * 1000);
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: in10h, isPublicMatchmade: true });
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: in5h, isPublicMatchmade: true });
-    // A private league's earlier draft never wins: ENFORCED_LEAGUE_SQL keeps a private
-    // calendar out of the aggregate, the identical reasoning draftsNext48hQuery documents.
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: new Date(now.getTime() + 60 * 60 * 1000), isPublicMatchmade: false });
-    // A draft already running is not a "next draft" anybody can still sit down for.
-    await seedLeague({ draftStatus: "in_progress", kickoffAt: new Date(now.getTime() + 30 * 60 * 1000), isPublicMatchmade: true });
-    expect((await proofStats(db, deps)).nextDraftAt).toBe(in5h.toISOString());
+describe("proofStats — tightestRoomSeatsRemaining (storefront review R1)", () => {
+  it("reports the fewest seats remaining among public, still-joinable, genuinely filling rooms", async () => {
+    await seedFillingLeague({ teamCount: 12, filledTeams: 9 }); // 3 remaining
+    await seedFillingLeague({ teamCount: 12, filledTeams: 11 }); // 1 remaining — the tightest
+    // A private league's tighter room never wins: ENFORCED_LEAGUE_SQL keeps a private
+    // membership out of the aggregate, the identical reasoning `roomsFillingNow` documents.
+    await seedFillingLeague({ teamCount: 2, filledTeams: 1, isPublicMatchmade: false }); // 1, hidden
+    // A room already drafting is not a room anybody can still sit down in.
+    await seedFillingLeague({ teamCount: 2, filledTeams: 1, draftStatus: "in_progress" });
+    expect((await proofStats(db, deps)).tightestRoomSeatsRemaining).toBe(1);
   });
 
-  it("omits a next draft beyond MATCHMAKING_CONFIG.proof.nextDraftWithinMs, and keeps the boundary itself", async () => {
-    const now = new Date(NOW);
-    const beyond = new Date(now.getTime() + MATCHMAKING_CONFIG.proof.nextDraftWithinMs + 60 * 60 * 1000);
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: beyond, isPublicMatchmade: true });
-    expect((await proofStats(db, deps)).nextDraftAt).toBeNull();
-
-    const atBoundary = new Date(now.getTime() + MATCHMAKING_CONFIG.proof.nextDraftWithinMs);
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: atBoundary, isPublicMatchmade: true });
-    expect((await proofStats(db, deps)).nextDraftAt).toBe(atBoundary.toISOString());
+  it("is null when nothing is filling, and never counts an empty or already-full room", async () => {
+    await seedFillingLeague({ teamCount: 12, filledTeams: 0 });
+    await seedFillingLeague({ teamCount: 2, filledTeams: 2 });
+    expect((await proofStats(db, deps)).tightestRoomSeatsRemaining).toBeNull();
   });
 
-  it("never lets nextDraftAt alone show the strip: `any` is untouched and ignores it", async () => {
-    const now = new Date(NOW);
-    await seedLeague({ draftStatus: "scheduled", kickoffAt: new Date(now.getTime() + 2 * 60 * 60 * 1000), isPublicMatchmade: true });
+  it("never lets tightestRoomSeatsRemaining alone show the strip: `any` is untouched and ignores it", async () => {
+    await seedFillingLeague({ teamCount: 12, filledTeams: 4 });
     const stats = await proofStats(db, deps);
-    expect(stats.nextDraftAt).not.toBeNull();
-    // One scheduled draft is below every floor — the chip rides a strip other numbers earned,
-    // it never carries the strip itself.
+    expect(stats.tightestRoomSeatsRemaining).not.toBeNull();
+    // One filling room is below every floor — the chip rides a strip other numbers earned, it
+    // never carries the strip itself.
     expect(stats.any).toBe(false);
   });
 });
@@ -277,7 +336,13 @@ describe("proofStats — nextDraftAt", () => {
 describe("proofStats — the whole strip", () => {
   it("hides the whole strip when every stat is below its floor, and says nothing at all", async () => {
     await truncateAll(db);
-    expect(await proofStats(db, deps)).toEqual({ leaguesFilled: null, draftsNext48h: null, rating: null, nextDraftAt: null, any: false });
+    expect(await proofStats(db, deps)).toEqual({
+      leaguesFilled: null,
+      roomsFillingNow: null,
+      rating: null,
+      tightestRoomSeatsRemaining: null,
+      any: false,
+    });
   });
 
   it("shows the strip once even one stat clears its floor", async () => {
@@ -285,7 +350,7 @@ describe("proofStats — the whole strip", () => {
     const stats = await proofStats(db, deps);
     expect(stats.any).toBe(true);
     expect(stats.leaguesFilled).not.toBeNull();
-    expect(stats.draftsNext48h).toBeNull();
+    expect(stats.roomsFillingNow).toBeNull();
     expect(stats.rating).toBeNull();
   });
 

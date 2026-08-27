@@ -178,36 +178,6 @@ describe("listWireItems — league_filled", () => {
   });
 });
 
-describe("listWireItems — draft_tonight", () => {
-  it("reports a chosen public kickoff inside the window with the coarse until-delta, and omits one beyond it", async () => {
-    await seedLeague({ name: "Tonight League", kickoffAt: new Date(nowMs + 5 * MS_PER_HOUR) });
-    await seedLeague({ name: "Next Week League", kickoffAt: new Date(nowMs + MATCHMAKING_CONFIG.wire.windowMs + MS_PER_HOUR) });
-
-    const tonight = ofKind(await listWireItems(db, clock), "draft_tonight");
-    expect(tonight).toEqual([{ kind: "draft_tonight", leagueName: "Tonight League", untilMs: 5 * MS_PER_HOUR }]);
-  });
-
-  it("never advertises a when_full league's placeholder kickoff, but does report one the fill trigger actually set", async () => {
-    await seedLeague({ name: "Placeholder", startTrigger: "when_full", kickoffAt: new Date(nowMs + 2 * MS_PER_HOUR) });
-    await seedLeague({
-      name: "Fired Sit And Go",
-      startTrigger: "when_full",
-      kickoffAt: new Date(nowMs + 5 * 60_000),
-      fillFiredAt: new Date(nowMs - 60_000),
-    });
-
-    const tonight = ofKind(await listWireItems(db, clock), "draft_tonight");
-    expect(tonight.map((item) => item.leagueName)).toEqual(["Fired Sit And Go"]);
-  });
-
-  it("never discloses a private league's kickoff, and skips a draft no longer scheduled", async () => {
-    await seedLeague({ name: "Private Tonight", isPublicMatchmade: false, kickoffAt: new Date(nowMs + 2 * MS_PER_HOUR) });
-    await seedLeague({ name: "Already Running", draftStatus: "in_progress", kickoffAt: new Date(nowMs + 2 * MS_PER_HOUR) });
-
-    expect(ofKind(await listWireItems(db, clock), "draft_tonight")).toEqual([]);
-  });
-});
-
 describe("listWireItems — season_count", () => {
   it("reports the floored season count once it clears the proof floor, exactly once", async () => {
     for (let i = 0; i < MATCHMAKING_CONFIG.proof.floors.leaguesFilled; i += 1) {
@@ -231,17 +201,18 @@ describe("listWireItems — season_count", () => {
 
 /**
  * Phase 4.5, Task 2 — the architecture call's own claim, PINNED rather than trusted:
- * `ENFORCED_LEAGUE_SQL` (`is_public_matchmade = true`) already keeps a mock off three of the
- * wire's four reads BY CONSTRUCTION, because a mock always ships `isPublicMatchmade: false` —
- * every test above already proves that predicate for a PRIVATE league, and a mock is just one
- * more private league to those three queries. This block seeds the identical shape with `isMock:
- * true` explicitly, so a future engineer cannot read the private-league tests above as "not
- * really about mocks" — a mock genuinely produces no wire item through any of the three
- * `ENFORCED_LEAGUE_SQL` reads, and the fourth (`leaguesFilledQuery`'s own `season_count`, the one
- * query that is NOT joined on `ENFORCED_LEAGUE_SQL`) is excluded by its own `NOT is_mock`
- * predicate instead (`@/league-service/proof`).
+ * `ENFORCED_LEAGUE_SQL` (`is_public_matchmade = true`) already keeps a mock off two of the
+ * wire's three reads BY CONSTRUCTION (storefront review R1 retired the wire's fourth read,
+ * `draft_tonight` — see that describe block's own removal note), because a mock always ships
+ * `isPublicMatchmade: false` — every test above already proves that predicate for a PRIVATE
+ * league, and a mock is just one more private league to those two queries. This block seeds the
+ * identical shape with `isMock: true` explicitly, so a future engineer cannot read the
+ * private-league tests above as "not really about mocks" — a mock genuinely produces no wire item
+ * through either `ENFORCED_LEAGUE_SQL` read, and the third (`leaguesFilledQuery`'s own
+ * `season_count`, the one query that is NOT joined on `ENFORCED_LEAGUE_SQL`) is excluded by its
+ * own `NOT is_mock` predicate instead (`@/league-service/proof`).
  */
-describe("listWireItems — a mock league is invisible to every one of the four reads (Phase 4.5, Task 2)", () => {
+describe("listWireItems — a mock league is invisible to every one of the three reads (Phase 4.5, Task 2)", () => {
   it("never reports a mock's seat claim", async () => {
     const mockLeague = await seedLeague({ name: "Practice Room", isMock: true, teamCount: 12, filledTeams: 10 });
     await seedJoinEvent(mockLeague, new Date(nowMs - 5 * MS_PER_MINUTE));
@@ -252,11 +223,6 @@ describe("listWireItems — a mock league is invisible to every one of the four 
     await seedLeague({ name: "Practice Full Scheduled", isMock: true, teamCount: 2, filledTeams: 2, draftStatus: "scheduled" });
     await seedLeague({ name: "Practice Full Live", isMock: true, teamCount: 2, filledTeams: 2, draftStatus: "in_progress" });
     expect(ofKind(await listWireItems(db, clock), "league_filled")).toEqual([]);
-  });
-
-  it("never reports a mock's kickoff as tonight's drafts", async () => {
-    await seedLeague({ name: "Practice Tonight", isMock: true, kickoffAt: new Date(nowMs + 2 * MS_PER_HOUR) });
-    expect(ofKind(await listWireItems(db, clock), "draft_tonight")).toEqual([]);
   });
 
   it("never lets a drafted mock inflate the season count, even sitting right at the floor", async () => {
@@ -276,16 +242,17 @@ describe("listWireItems — the merged wire", () => {
   it("interleaves the kinds rather than clustering them, so the ticker reads as varied activity", async () => {
     const claimed = await seedLeague({ name: "Claimed League" });
     await seedJoinEvent(claimed, new Date(nowMs - MS_PER_MINUTE));
+    const secondClaimed = await seedLeague({ name: "Second Claimed League" });
+    await seedJoinEvent(secondClaimed, new Date(nowMs - 2 * MS_PER_MINUTE));
     await seedLeague({ name: "Filled League", teamCount: 2, filledTeams: 2 });
-    await seedLeague({ name: "Tonight League", kickoffAt: new Date(nowMs + 2 * MS_PER_HOUR) });
 
     const items = await listWireItems(db, clock);
-    expect(items.map((item) => item.kind)).toEqual(["seat_claimed", "league_filled", "draft_tonight"]);
+    expect(items.map((item) => item.kind)).toEqual(["seat_claimed", "league_filled", "seat_claimed"]);
   });
 
   it("caps the merged wire at MATCHMAKING_CONFIG.wire.maxItems", async () => {
     for (let i = 0; i < MATCHMAKING_CONFIG.wire.maxItems; i += 1) {
-      const leagueId = await seedLeague({ teamCount: 2, filledTeams: 2, kickoffAt: new Date(nowMs + MS_PER_HOUR) });
+      const leagueId = await seedLeague({ teamCount: 2, filledTeams: 2 });
       await seedJoinEvent(leagueId, new Date(nowMs - (i + 1) * MS_PER_MINUTE));
     }
     const items = await listWireItems(db, clock);

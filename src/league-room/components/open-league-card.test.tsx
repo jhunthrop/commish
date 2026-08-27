@@ -77,17 +77,14 @@ const card = (league: PublicLeagueSummary, extra: Partial<Parameters<typeof Open
 );
 
 describe("OpenLeagueCard", () => {
-  it("tells a when-full joiner what they are actually agreeing to, in the one sentence that owns it, as reassurance not warning", () => {
+  it("prints a compact 'Drafts when full' value with the full commitment one press away (storefront review E1)", () => {
     render(card(WHEN_FULL));
-    const sentence = screen.getByText(
-      "This one drafts the moment the last seat is taken. We tell you as soon as it fills, and the room opens a few minutes after that. You do not have to wait here.",
-    );
-    expect(sentence).toBeInTheDocument();
-    // E5: `warning` is reserved for a tightening clock; this sentence is reassurance, muted.
-    expect(sentence.className).toContain("text-text-muted");
-    expect(sentence.className).not.toContain("text-warning");
-    // Never both a date and the sentence — the placeholder kickoff is never rendered as if
-    // somebody chose it.
+    expect(screen.getByText("Drafts when full")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is a sit-and-go league?" })).toBeInTheDocument();
+    // The old 30-word paragraph is retired from the column — the fact is one press away instead.
+    expect(screen.queryByText(/This one drafts the moment the last seat is taken/)).not.toBeInTheDocument();
+    // Never both a date and the value — the placeholder kickoff is never rendered as if somebody
+    // chose it.
     expect(screen.queryByText(BASE.draftAt)).not.toBeInTheDocument();
   });
 

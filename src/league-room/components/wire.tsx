@@ -82,13 +82,6 @@ function sentenceOf(
           {item.draftStatus === "in_progress" ? "now" : "soon"}
         </>
       );
-    case "draft_tonight":
-      return (
-        <>
-          <Ink>{item.leagueName}</Ink> drafts in{" "}
-          {formatCoarseDuration(item.untilMs)}
-        </>
-      );
     case "season_count":
       return (
         <>

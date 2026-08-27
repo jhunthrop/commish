@@ -214,22 +214,33 @@ export interface ProofStats {
    *  league merely full and waiting, and never a league from a prior season. `null` below
    *  `MATCHMAKING_CONFIG.proof.floors.leaguesFilled`. */
   readonly leaguesFilled: number | null;
-  /** Scheduled drafts a visitor could still join in the next 48 hours, over public leagues only
-   *  (`ENFORCED_LEAGUE_SQL`) — a private league's calendar is never disclosed in aggregate.
-   *  `null` below `MATCHMAKING_CONFIG.proof.floors.draftsNext48h`. */
-  readonly draftsNext48h: number | null;
+  /**
+   * Storefront review R1: repointed from "scheduled drafts in the next 48 hours" — a fact the
+   * sit-and-go shelf no longer produces by construction (every `HOUSE_CATALOG` rung is
+   * `when_full`; `docs/decisions/formats-and-lobby.md`, "The whole shelf is sit-and-go") — to a
+   * fill-based fact this world actually has: public, still-joinable leagues (`ENFORCED_LEAGUE_SQL`)
+   * with at least one seat taken. A room somebody has already sat down in is this world's live
+   * signal, the way a chosen kickoff inside 48h used to be. `null` below
+   * `MATCHMAKING_CONFIG.proof.floors.roomsFillingNow`.
+   */
+  readonly roomsFillingNow: number | null;
   /** The review average, always beside its own count — an average with no `n` is a slogan, not
    *  a stat. `null` below `MATCHMAKING_CONFIG.proof.floors.reviewCount`, average and count
    *  together or not at all. */
   readonly rating: { readonly average: number; readonly count: number } | null;
-  /** The earliest public `'scheduled'` kickoff, as an ISO instant, over the same privacy join
-   *  as `draftsNext48h` — `null` when nothing is scheduled inside
-   *  `MATCHMAKING_CONFIG.proof.nextDraftWithinMs` (Phase 3.7, Task 7). Real or absent, never
-   *  dressed up. NOT part of `any` below: a lone scheduled draft is a calendar entry, not
-   *  earned proof, so its chip only ever rides a strip the three stats above already earned. */
-  readonly nextDraftAt: string | null;
-  /** `false` exactly when `leaguesFilled`, `draftsNext48h` and `rating` are all `null` — the
-   *  strip's own render switch. Deliberately blind to `nextDraftAt` (see its docblock). */
+  /**
+   * Storefront review R1: repointed from "the earliest scheduled kickoff" (a fact a `when_full`
+   * shelf has none of) to "how few seats are left in the tightest room" — over the SAME
+   * `ENFORCED_LEAGUE_SQL` join, among public leagues with at least one seat taken. A filling room
+   * is this world's version of "next draft": the fewer seats it has left, the sooner it drafts.
+   * `null` when nothing is filling. Real or absent, never dressed up. NOT part of `any` below: a
+   * lone filling room is a fact worth stating, not earned proof, so its chip only ever rides a
+   * strip the two stats above already earned.
+   */
+  readonly tightestRoomSeatsRemaining: number | null;
+  /** `false` exactly when `leaguesFilled`, `roomsFillingNow` and `rating` are all `null` — the
+   *  strip's own render switch. Deliberately blind to `tightestRoomSeatsRemaining` (see its
+   *  docblock). */
   readonly any: boolean;
 }
 
@@ -245,15 +256,24 @@ export interface ProofStats {
  *
  * Every field is a disclosure this interface's siblings already made: `leagueName` names a
  * PUBLIC league (`ENFORCED_LEAGUE_SQL` is in every source read's own WHERE, the same join
- * `draftsNext48h` documents), the seat and season counts are the same capacity facts
+ * `roomsFillingNow` documents), the seat and season counts are the same capacity facts
  * `PublicLeagueSummary.filledTeams`/`teamCount` and `ProofStats.leaguesFilled` already carry,
- * and the two millisecond deltas are COARSE by consumption — the component renders them only
- * through the `formatCoarseDuration` family, never as instants, so no timestamp precision a
- * stranger could correlate against ever reaches the page.
+ * and the one millisecond delta is COARSE by consumption — the component renders it only through
+ * the `formatCoarseDuration` family, never as an instant, so no timestamp precision a stranger
+ * could correlate against ever reaches the page.
  *
- * Deltas rather than instants on purpose: the wire is request-time truth (deferral D4 — no
+ * A delta rather than an instant on purpose: the wire is request-time truth (deferral D4 — no
  * anonymous SSE), computed against the page's ONE `now`, and a delta cannot quietly drift from
  * a second clock read the way a re-parsed instant could.
+ *
+ * Storefront review R1: `draft_tonight` (a chosen public kickoff inside the wire's window) is
+ * RETIRED, never resurrected as a new kind. Every `HOUSE_CATALOG` rung is `when_full`
+ * (`docs/decisions/formats-and-lobby.md`), so a sit-and-go room carries no chosen kickoff to
+ * announce, and the two kinds below already tell this world's own "filling" story honestly:
+ * `seat_claimed` (tinted live the instant a claim leaves a room urgently short of seats — the
+ * SAME `UI_CONFIG.seatMeter.lowSeatsThreshold` gate the ruling asks a `filling_fast` kind to
+ * apply) and `league_filled` (a room that just got to capacity). Reusing this existing vocabulary
+ * rather than adding a fifth, overlapping kind is the ruling's own second option.
  */
 export type WireItem =
   | {
@@ -272,12 +292,6 @@ export type WireItem =
       readonly leagueName: string;
       /** `"in_progress"` reads "drafting now"; `"scheduled"` reads "drafting soon". */
       readonly draftStatus: "scheduled" | "in_progress";
-    }
-  | {
-      readonly kind: "draft_tonight";
-      readonly leagueName: string;
-      /** How long after the page's own `now` the kickoff lands. */
-      readonly untilMs: number;
     }
   | {
       readonly kind: "season_count";

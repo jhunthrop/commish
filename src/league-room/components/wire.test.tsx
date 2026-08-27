@@ -10,13 +10,12 @@ vi.mock("@/design/use-reduced-motion", () => ({ usePrefersReducedMotion: vi.fn((
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 
 const MS_PER_MINUTE = 60_000;
-const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 
-/** One of each kind — the mock's own ticker variety, actor-free per S9. */
+/** One of each kind — the mock's own ticker variety, actor-free per S9. `draft_tonight` is
+ *  retired (storefront review R1): a sit-and-go room has no chosen kickoff to announce. */
 const ITEMS: readonly WireItem[] = [
   { kind: "seat_claimed", leagueName: "Sunday Money", agoMs: 5 * MS_PER_MINUTE, seatsOpen: 6 },
   { kind: "league_filled", leagueName: "Iron Bowl", draftStatus: "in_progress" },
-  { kind: "draft_tonight", leagueName: "Night Draft", untilMs: 3 * MS_PER_HOUR },
   { kind: "season_count", count: 76 },
 ];
 
@@ -34,7 +33,6 @@ describe("Wire", () => {
     expect(listItemTexts(container)).toEqual([
       "A seat was claimed in Sunday Money · 5 minutes ago",
       "Iron Bowl filled · drafting now",
-      "Night Draft drafts in 3 hours",
       "76 leagues filled this season",
     ]);
   });

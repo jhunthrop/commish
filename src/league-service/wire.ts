@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { auditEvents, drafts, leagues, teams } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
@@ -24,7 +24,7 @@ const NOT_A_SEAT_RELEASE = sql`${auditEvents.payload}->>'outcome' is distinct fr
  * `seat_claimed` (Phase 3.7, Task 8): the most recent seats claimed in PUBLIC leagues inside
  * `MATCHMAKING_CONFIG.wire.windowMs` — real `member_joined` audit rows, joined to `leagues` on
  * `ENFORCED_LEAGUE_SQL` (`@/league-service/enforcement`) so a private league's membership
- * activity is never disclosed, the identical privacy join `draftsNext48hQuery`
+ * activity is never disclosed, the identical privacy join `roomsFillingQuery`
  * (`@/league-service/proof`) already applies for the identical reason.
  *
  * The `teams` aggregate rides the same statement so each claim carries the league's open-seat
@@ -91,36 +91,6 @@ export function filledLeaguesQuery(db: Db) {
 }
 
 /**
- * `draft_tonight`: PUBLIC `'scheduled'` kickoffs inside `MATCHMAKING_CONFIG.wire.windowMs`,
- * soonest first — the same enforced-public join and the same window idiom `draftsNext48hQuery`
- * (`@/league-service/proof`) established.
- *
- * A `when_full` league's stored kickoff is a PLACEHOLDER until `fireWhenFullInTx` stamps
- * `fill_fired_at` (`PublicLeagueSummary.startTrigger`'s own docblock walks the model), so the
- * predicate admits a kickoff only when somebody chose it (`start_trigger = 'scheduled'`) or the
- * fill trigger actually set it (`fill_fired_at IS NOT NULL`) — advertising the placeholder as
- * "drafts in 2 hours" would be exactly the dressed-up claim the real-or-absent ruling refuses.
- */
-export function draftsTonightQuery(db: Db, now: Date) {
-  const horizon = new Date(now.getTime() + MATCHMAKING_CONFIG.wire.windowMs);
-  return db
-    .select({ leagueName: leagues.name, kickoffAt: drafts.kickoffAt })
-    .from(drafts)
-    .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
-    .where(
-      and(
-        eq(drafts.status, "scheduled"),
-        or(eq(drafts.startTrigger, "scheduled"), isNotNull(drafts.fillFiredAt)),
-        gte(drafts.kickoffAt, now),
-        lte(drafts.kickoffAt, horizon),
-        ENFORCED_LEAGUE_SQL,
-      ),
-    )
-    .orderBy(asc(drafts.kickoffAt))
-    .limit(MATCHMAKING_CONFIG.wire.maxItems);
-}
-
-/**
  * Round-robin across the four kinds rather than concatenation, so the capped ticker reads as
  * varied activity the way the approved mock's does — a burst of twelve claims never crowds the
  * one season-count item off the wire. Deterministic: source order within a kind is each query's
@@ -150,11 +120,18 @@ function interleave(lists: readonly (readonly WireItem[])[], cap: number): reado
  * `seatCountsAsOfSentence` (`@/league-room/components/public-league-list`) already words for the
  * shelf's seat counts.
  *
- * Four independent reads through ONE `Promise.all` on the same pooled `db` — the identical
- * idiom `proofStats` (`./proof`) uses for its own batched reads. The fourth IS `proofStats`'s
+ * THREE independent reads through ONE `Promise.all` on the same pooled `db` — the identical
+ * idiom `proofStats` (`./proof`) uses for its own batched reads. The third IS `proofStats`'s
  * own `leaguesFilledQuery`, imported rather than respelled, gated by the same
  * `MATCHMAKING_CONFIG.proof.floors.leaguesFilled` floor — the wire and the scoreboard can never
  * state two different season counts because they run one query against one floor.
+ *
+ * Storefront review R1: `draftsTonightQuery`/`draft_tonight` is RETIRED, down from four reads to
+ * three — every `HOUSE_CATALOG` rung is `when_full` now, so a sit-and-go room has no chosen
+ * kickoff for this read to find, and resurrecting a fourth read against a fact the shelf no
+ * longer produces would starve on the exact schedule the review found. `seatClaimed` (already
+ * tinted live the instant a claim leaves a room urgently short of seats) and `leagueFilled`
+ * already tell this world's own "filling" story honestly — see `WireItem`'s own docblock.
  *
  * Returns `[]` rather than padding when the product is quiet — no fabricated item, no
  * placeholder, ever ("no mock data on a real surface"); `Wire` renders nothing at all below
@@ -164,10 +141,9 @@ function interleave(lists: readonly (readonly WireItem[])[], cap: number): reado
 export async function listWireItems(db: Db, clock: Clock = systemClock): Promise<readonly WireItem[]> {
   const now = new Date(clock.now());
 
-  const [claimRows, filledRows, tonightRows, [seasonRow]] = await Promise.all([
+  const [claimRows, filledRows, [seasonRow]] = await Promise.all([
     seatClaimsQuery(db, now),
     filledLeaguesQuery(db),
-    draftsTonightQuery(db, now),
     leaguesFilledQuery(db),
   ]);
 
@@ -184,14 +160,9 @@ export async function listWireItems(db: Db, clock: Clock = systemClock): Promise
     // to the contract's union without a cast.
     draftStatus: row.draftStatus === "in_progress" ? "in_progress" : "scheduled",
   }));
-  const draftTonight: readonly WireItem[] = tonightRows.map((row) => ({
-    kind: "draft_tonight",
-    leagueName: row.leagueName,
-    untilMs: row.kickoffAt.getTime() - now.getTime(),
-  }));
   const seasonCountValue = seasonRow?.count ?? 0;
   const seasonCount: readonly WireItem[] =
     seasonCountValue >= MATCHMAKING_CONFIG.proof.floors.leaguesFilled ? [{ kind: "season_count", count: seasonCountValue }] : [];
 
-  return interleave([seatClaimed, leagueFilled, draftTonight, seasonCount], MATCHMAKING_CONFIG.wire.maxItems);
+  return interleave([seatClaimed, leagueFilled, seasonCount], MATCHMAKING_CONFIG.wire.maxItems);
 }

@@ -355,12 +355,19 @@ describe("ExclusionControl says nothing that breaks the house copy rules", () =>
     expectClean(refusedRender.container, '"u1" is not a user, or is not excluded.');
     refusedRender.unmount();
 
-    const cleared = fixtureAdminDeps({ ok: true, data: { userId: "u1" } });
+    const cleared = fixtureAdminDeps((_url: string, init: RequestInit | undefined) =>
+      (init?.method ?? "GET") === "GET"
+        ? { ok: true, data: { userId: "u1", displayName: "Uno", selfExcludedAt: "2026-05-01T00:00:00.000Z" } }
+        : { ok: true, data: { userId: "u1" } },
+    );
     const clearedRender = renderInAdmin(<ExclusionControl key="cleared" />, cleared.deps);
     fireEvent.change(screen.getByLabelText("Member user id"), { target: { value: "u1" } });
     fireEvent.click(screen.getByRole("button", { name: "Clear self exclusion" }));
+    const dialog = await screen.findByRole("dialog");
+    expectClean(clearedRender.container, "Uno");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Clear exclusion for Uno" }));
     await screen.findByRole("status");
-    expectClean(clearedRender.container);
+    expectClean(clearedRender.container, "Uno");
     clearedRender.unmount();
   });
 });
@@ -575,7 +582,7 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
     );
 
     fireEvent.click(screen.getByRole("button", { name: buttonLabel }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: buttonLabel }));
     await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
     expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner");
   });
@@ -929,23 +936,19 @@ describe("the four trust stubs say nothing that breaks the house copy rules", ()
 
 describe("ProofStrip says nothing that breaks the house copy rules, full and empty", () => {
   it("is clean with every stat present and with none of them", () => {
-    // Both units of the next-draft chip's coarse wording get swept: hours (five ahead) and
-    // minutes (thirty ahead), against the same fixed `nowIso`.
+    // Both the plural and singular tightest-room label get swept (storefront review R1).
     for (const element of [
       <ProofStrip
         key="full"
-        stats={{ leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, nextDraftAt: "2026-09-10T17:00:00.000Z", any: true }}
-        nowIso="2026-09-10T12:00:00.000Z"
+        stats={{ leaguesFilled: 247, roomsFillingNow: 12, rating: { average: 4.8, count: 63 }, tightestRoomSeatsRemaining: 5, any: true }}
       />,
       <ProofStrip
-        key="soon"
-        stats={{ leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, nextDraftAt: "2026-09-10T12:30:00.000Z", any: true }}
-        nowIso="2026-09-10T12:00:00.000Z"
+        key="one-left"
+        stats={{ leaguesFilled: 247, roomsFillingNow: 12, rating: { average: 4.8, count: 63 }, tightestRoomSeatsRemaining: 1, any: true }}
       />,
       <ProofStrip
         key="empty"
-        stats={{ leaguesFilled: null, draftsNext48h: null, rating: null, nextDraftAt: null, any: false }}
-        nowIso="2026-09-10T12:00:00.000Z"
+        stats={{ leaguesFilled: null, roomsFillingNow: null, rating: null, tightestRoomSeatsRemaining: null, any: false }}
       />,
     ]) {
       const { container, unmount } = render(element);
@@ -963,18 +966,18 @@ describe("ProofStrip says nothing that breaks the house copy rules, full and emp
  * are the content subtracted; every remaining word is the wire's own voice.
  */
 describe("Wire says nothing that breaks the house copy rules, across every kind and tone", () => {
+  // `draft_tonight` is retired (storefront review R1) — every kind that remains is swept.
   const WIRE_ITEMS: readonly WireItem[] = [
     { kind: "seat_claimed", leagueName: "Sunday Money", agoMs: 5 * 60_000, seatsOpen: 6 },
     { kind: "seat_claimed", leagueName: "Almost Full", agoMs: 30_000, seatsOpen: 1 },
     { kind: "league_filled", leagueName: "Iron Bowl", draftStatus: "in_progress" },
     { kind: "league_filled", leagueName: "Quiet Room", draftStatus: "scheduled" },
-    { kind: "draft_tonight", leagueName: "Night Draft", untilMs: 3 * 60 * 60_000 },
     { kind: "season_count", count: 76 },
   ];
 
   it("is clean with the full ticker rendered", () => {
     const { container } = render(<Wire items={WIRE_ITEMS} />);
-    expectClean(container, "Sunday Money", "Almost Full", "Iron Bowl", "Quiet Room", "Night Draft");
+    expectClean(container, "Sunday Money", "Almost Full", "Iron Bowl", "Quiet Room");
   });
 });
 

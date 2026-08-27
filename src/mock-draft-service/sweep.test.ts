@@ -66,7 +66,7 @@ async function seedMock(id: string, opts: { readonly completed: boolean }): Prom
     store,
     clock,
     autoStart: async () => [],
-    reconcileHouse: async () => ({ opened: [], refused: [] }),
+    reconcileHouse: async () => ({ opened: [], retired: [], refused: [] }),
   });
   await store.startDraft(fixture.draftId);
   if (opts.completed) {
@@ -299,7 +299,7 @@ describe("the retention sweep (Task 6, Step 4)", () => {
       store,
       clock,
       autoStart: async () => [],
-      reconcileHouse: async () => ({ opened: [], refused: [] }),
+      reconcileHouse: async () => ({ opened: [], retired: [], refused: [] }),
     });
     await ticker.tick();
     expect(await rowCounts(leagueId, draftId)).toEqual(ZERO_ROWS);

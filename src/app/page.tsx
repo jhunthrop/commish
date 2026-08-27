@@ -142,7 +142,7 @@ export default async function Home() {
               </div>
             )}
             <SeatClaimSteps />
-            <ProofStrip stats={stats} nowIso={nowIso} />
+            <ProofStrip stats={stats} />
           </div>
         </section>
 

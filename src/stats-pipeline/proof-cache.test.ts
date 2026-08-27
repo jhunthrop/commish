@@ -9,12 +9,12 @@ const PROOF_CACHE_KEY = "matchmaking:proof";
 
 const STATS: ProofStats = {
   leaguesFilled: 247,
-  draftsNext48h: 12,
+  roomsFillingNow: 12,
   rating: { average: 4.8, count: 63 },
-  nextDraftAt: "2026-09-10T17:00:00.000Z",
+  tightestRoomSeatsRemaining: 5,
   any: true,
 };
-const EMPTY_STATS: ProofStats = { leaguesFilled: null, draftsNext48h: null, rating: null, nextDraftAt: null, any: false };
+const EMPTY_STATS: ProofStats = { leaguesFilled: null, roomsFillingNow: null, rating: null, tightestRoomSeatsRemaining: null, any: false };
 
 /** A connection that throws on every command — models a Redis outage without touching docker. */
 function throwingRedis(): Redis {
@@ -79,10 +79,12 @@ describe("createProofCache", () => {
     await expect(cache.stats(async () => STATS)).resolves.toEqual(STATS);
   });
 
-  // Task 7: `nextDraftAt` joined the contract, so a value cached by the previous deploy (no
-  // such field) fails the shape check and reloads — self-healing across the shape change.
-  it("a cached value from before nextDraftAt existed is treated as a miss and reloaded", async () => {
-    const previousShape = Object.fromEntries(Object.entries(STATS).filter(([key]) => key !== "nextDraftAt"));
+  // Storefront review R1: `draftsNext48h`/`nextDraftAt` renamed to `roomsFillingNow`/
+  // `tightestRoomSeatsRemaining`, so a value cached under the old field names (no
+  // `tightestRoomSeatsRemaining` at all) fails the shape check and reloads — self-healing across
+  // the shape change, the same proof "Task 7" already pinned once for `nextDraftAt` itself.
+  it("a cached value from before the R1 rename is treated as a miss and reloaded", async () => {
+    const previousShape = Object.fromEntries(Object.entries(STATS).filter(([key]) => key !== "tightestRoomSeatsRemaining"));
     await control.set(PROOF_CACHE_KEY, JSON.stringify(previousShape));
     const cache = createProofCache({ redis });
     await expect(cache.stats(async () => STATS)).resolves.toEqual(STATS);

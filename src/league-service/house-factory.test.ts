@@ -4,11 +4,18 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { auditEvents, drafts, leagues, players, scoringSettings, teams, users } from "@/db/schema";
 import type { Db } from "@/db/client";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";
+import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
 import { createDraftStore } from "@/draft-service/store";
-import type { AuditLogger } from "@/integrity-service/audit-logger";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { HOUSE_CATALOG, type HouseRungName } from "@/matchmaking/house-catalog";
-import { ensureHouseCatalog, openHouseLeaguesQuery, type HouseFactoryDeps } from "./house-factory";
+import {
+  ensureHouseCatalog,
+  openHouseLeaguesQuery,
+  spawnHouseLeagueInTx,
+  HOUSE_RECONCILER_ACTOR,
+  type HouseFactoryDeps,
+} from "./house-factory";
 import { joinPublicLeague } from "./join";
 import { rollDueDrafts } from "./roll";
 
@@ -53,6 +60,37 @@ async function fillLeague(target: Db, leagueId: string): Promise<void> {
     const outcome = await joinPublicLeague({ db: target, newId, clock }, { leagueId, userId });
     if (!outcome.ok) throw new Error(outcome.reason);
   }
+}
+
+/**
+ * A house league seeded the way one of the SIX legacy, pre-2026-08-26 shelf slots actually looks
+ * today: spawned directly through `spawnHouseLeagueInTx` — the SAME writer the real reconciler
+ * uses, never a hand-typed row shape — but bypassing `ensureHouseCatalog`'s own `openAtOnce` gate,
+ * because that gate is exactly the thing a legacy row predates. `edition` is the caller's own
+ * choice so a test can seed several in a known creation order (`nextEdition`'s own arithmetic
+ * would otherwise renumber them one at a time).
+ */
+async function seedLegacyHouseLeague(target: Db, rung: HouseRungName, edition: number, opts?: { readonly filledTeams?: number }): Promise<string> {
+  const leagueId = `house_${rung}_${edition}`;
+  const draftId = newId();
+  await target.transaction(async (tx) => {
+    await spawnHouseLeagueInTx(tx, {
+      leagueId,
+      draftId,
+      rung,
+      edition,
+      kickoffAt: new Date(Date.parse(NOW) + 7 * 24 * 60 * 60 * 1000),
+      clock,
+      audit: getAuditLogger(),
+    });
+  });
+  for (let i = 0; i < (opts?.filledTeams ?? 0); i += 1) {
+    const userId = `legacy_filler_${++filler}`;
+    await target.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: userId }).onConflictDoNothing();
+    const outcome = await joinPublicLeague({ db: target, newId, clock }, { leagueId, userId });
+    if (!outcome.ok) throw new Error(outcome.reason);
+  }
+  return leagueId;
 }
 
 async function draftIdOf(target: Db, leagueId: string): Promise<string> {
@@ -410,5 +448,119 @@ describe("the reconciler -> auto-start -> reconciler loop (fix round 1, F2)", ()
     const ids = await leagueIdsOf(db, "open_12");
     expect(ids).toContain(firstLeagueId); // still exists — closed, not deleted
     expect(new Set(ids).size).toBe(rung.openAtOnce + 1); // the original 1, plus #1's replacement
+  });
+});
+
+/**
+ * STOREFRONT REVIEW E13: the reconciler retires surplus, oldest-empty-first, down to
+ * `openAtOnce` — the surplus half of "the lobby is never empty, and never too crowded either",
+ * proven directly against a shelf shaped like the real one: six legacy leagues predating the
+ * 2026-08-26 directive, seeded through the SAME `spawnHouseLeagueInTx` writer the reconciler
+ * itself uses (`seedLegacyHouseLeague`).
+ */
+describe("ensureHouseCatalog retires surplus empties (storefront review E13)", () => {
+  it("retires the surplus empties oldest-first down to openAtOnce, and never touches a seated league", async () => {
+    // Four legacy `open_12` leagues (openAtOnce is 1): #1 and #3 and #4 empty, #2 has a member.
+    // Creation order is the seeded order (editions ascending), so the oldest-first rule says
+    // #1, then #3, then #4 — never #2, whatever its age.
+    await seedLegacyHouseLeague(db, "open_12", 1);
+    await seedLegacyHouseLeague(db, "open_12", 2, { filledTeams: 1 });
+    await seedLegacyHouseLeague(db, "open_12", 3);
+    await seedLegacyHouseLeague(db, "open_12", 4);
+    expect(await openCountOf(db, "open_12")).toBe(4);
+
+    await ensureHouseCatalog(db, deps());
+
+    // The surplus (3, comfortably inside the default retire budget) is gone; the seated league
+    // and exactly one shelf slot's worth remain ON THE SHELF — `leagueIdsOf` would still find a
+    // retired league's ROW (dissolution closes, it never deletes), so "remains open" is read
+    // through `openHouseLeaguesQuery` instead, the same predicate the shelf itself reads by.
+    expect(await openCountOf(db, "open_12")).toBe(1);
+    const stillOpen = (await openHouseLeaguesQuery(db, "open_12", clock.now())).map((row) => row.id);
+    expect(stillOpen).toEqual(["house_open_12_2"]);
+
+    for (const retiredId of ["house_open_12_1", "house_open_12_3", "house_open_12_4"]) {
+      const [draft] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, retiredId));
+      // Closed, never deleted — the SAME "dissolved" mark `dissolveLeague` stamps for an
+      // operator-closed league (`@/money-service/dissolution`).
+      expect(draft?.status).toBe("dissolved");
+
+      const auditRows = await db.select().from(auditEvents).where(eq(auditEvents.chainScope, retiredId));
+      const dissolution = auditRows.find(
+        (row) => row.eventType === "system_action" && (row.payload as { action?: string }).action === "league_dissolved",
+      );
+      expect(dissolution).toBeDefined();
+      expect(dissolution!.actorId).toBeNull();
+      expect(dissolution!.actorType).toBe("system");
+      expect((dissolution!.payload as { operatorUserId?: string }).operatorUserId).toBe(HOUSE_RECONCILER_ACTOR);
+    }
+
+    // The seated league's own draft never left `scheduled` — retirement stopped at the first
+    // league with a member, exactly as the rule requires.
+    const [survivorDraft] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, "house_open_12_2"));
+    expect(survivorDraft?.status).toBe("scheduled");
+  });
+
+  it("never retires a league with even one seated team, whatever the surplus", async () => {
+    await seedLegacyHouseLeague(db, "beginner_12", 1, { filledTeams: 1 });
+    await seedLegacyHouseLeague(db, "beginner_12", 2, { filledTeams: 2 });
+    expect(await openCountOf(db, "beginner_12")).toBe(2);
+
+    await ensureHouseCatalog(db, deps());
+
+    // Both leagues carry a member — a surplus of two seated leagues over `openAtOnce: 1` is left
+    // standing, on purpose (this function's own docblock): a seated manager is never evicted to
+    // make the shelf's width arithmetic come out even.
+    expect(await openCountOf(db, "beginner_12")).toBe(2);
+    for (const leagueId of ["house_beginner_12_1", "house_beginner_12_2"]) {
+      const [draft] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
+      expect(draft?.status).toBe("scheduled");
+    }
+  });
+
+  it("bounds retirement at DRAFT_SERVICE_CONFIG.maxHouseRetiresPerRun per reconcile, finishing on the next tick", async () => {
+    const surplusCount = DRAFT_SERVICE_CONFIG.maxHouseRetiresPerRun + 2;
+    for (let edition = 1; edition <= surplusCount; edition += 1) {
+      await seedLegacyHouseLeague(db, "open_12", edition);
+    }
+    expect(await openCountOf(db, "open_12")).toBe(surplusCount);
+
+    await ensureHouseCatalog(db, deps());
+    // Exactly one tick's worth of retirement happened — the rest is still open, waiting.
+    expect(await openCountOf(db, "open_12")).toBe(surplusCount - DRAFT_SERVICE_CONFIG.maxHouseRetiresPerRun);
+
+    await ensureHouseCatalog(db, deps());
+    // The next tick finishes the job, down to the rung's own width.
+    expect(await openCountOf(db, "open_12")).toBe(HOUSE_CATALOG.rungs.open_12.openAtOnce);
+  });
+
+  it("reports every retired id on the outcome's own retired list", async () => {
+    await seedLegacyHouseLeague(db, "open_12", 1);
+    await seedLegacyHouseLeague(db, "open_12", 2);
+    const outcome = await ensureHouseCatalog(db, deps());
+    expect(outcome.retired).toEqual(["house_open_12_1"]);
+  });
+
+  it("lets a fun-named spawn appear once the legacy surplus clears and the survivor fills (integration through ensureHouseCatalog)", async () => {
+    // Three legacy leagues, all empty — the surplus this test clears in one tick.
+    await seedLegacyHouseLeague(db, "open_12", 1);
+    await seedLegacyHouseLeague(db, "open_12", 2);
+    await seedLegacyHouseLeague(db, "open_12", 3);
+
+    await ensureHouseCatalog(db, deps());
+    expect(await openCountOf(db, "open_12")).toBe(1);
+    const survivorId = await firstOpenHouseLeague(db, "open_12");
+
+    // Fill the survivor so the shelf goes short again — the reconciler's ordinary shortfall path,
+    // unchanged by this task, spawns the replacement with a curated fun name (`houseLeagueName`),
+    // never the retired "Open 12-team League N" shape (founder directive 2026-08-26).
+    await fillLeague(db, survivorId);
+    await ensureHouseCatalog(db, deps());
+
+    const ids = await leagueIdsOf(db, "open_12");
+    const freshSpawnId = ids.find((id) => id !== survivorId && !id.endsWith("_1") && !id.endsWith("_2") && !id.endsWith("_3"));
+    expect(freshSpawnId).toBeDefined();
+    const [spawned] = await db.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, freshSpawnId!));
+    expect(spawned?.name).not.toMatch(/^Open 12-team League \d+$/);
   });
 });
