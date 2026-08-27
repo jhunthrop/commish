@@ -441,7 +441,7 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
 
     // --- Task 11: the mock draft's share-link landing -----------------------------------
     await page.goto(mobile360LinkRoomPath);
-    await expect(page.getByRole("heading", { name: "Join this mock draft" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "You are invited to a mock draft" })).toBeVisible();
     // Manager A is this fixture room's own host (`beforeAll` above), so the real claim door
     // answers a re-entry — "Enter", never "Join" — the same honest server answer every caller
     // gets (`MockShareLanding`'s own docblock).

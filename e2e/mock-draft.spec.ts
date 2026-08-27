@@ -341,7 +341,7 @@ test("a link room's share code, claimed by a second seeded identity, moves the s
   // --- managerA, a second seeded identity in a wholly separate browser context, arrives signed
   // in at the exact share path and claims a seat ---------------------------------------------
   await managerA.goto(sharePath);
-  await expect(managerA.getByRole("heading", { name: "Join this mock draft" })).toBeVisible();
+  await expect(managerA.getByRole("heading", { name: "You are invited to a mock draft" })).toBeVisible();
   await expect(managerA.getByText(`${teamCount} teams`)).toBeVisible();
   await managerA.getByRole("button", { name: "Join this mock draft" }).click();
   await expect(managerA).toHaveURL(/\/app\/drafts\//, { timeout: 20_000 });
