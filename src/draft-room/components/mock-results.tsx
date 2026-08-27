@@ -4,7 +4,7 @@ import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Avatar, EYEBROW, PositionBadge } from "@/components/ui";
 import { BENCH_SLOT } from "@/domain/roster";
-import { playerName, playersById as buildPlayersById } from "../lib/lookups";
+import { playersById as buildPlayersById } from "../lib/lookups";
 import { formatPickFactClause, type PickFactCopy } from "../state/format";
 import { reviewPicks } from "../state/pick-review";
 import { rosterFillRows } from "../state/roster-fill";
