@@ -62,6 +62,8 @@ import { PracticeBanner } from "@/draft-room/components/practice-banner";
 import { RoomTour } from "@/draft-room/components/room-tour";
 import { ShareLinkPanel } from "@/draft-room/components/share-link-panel";
 import { MOCK_RESULTS_COPY, PLAYERS, SNAKE_VIEW, TEAMS } from "@/draft-room/test-fixtures";
+import { formatAbsoluteTime } from "@/league/terms";
+import { formatDraftAbsolute } from "@/league-room/lib/format";
 import { MOCK_COPY } from "@/mock-draft/config";
 import type { MockRoomSummary } from "@/mock-draft-service/lobby";
 import { MockLobby } from "@/league-room/components/mock-lobby";
@@ -1859,6 +1861,23 @@ describe("MockShareLanding says nothing that breaks the house copy rules, joinab
       const { container, unmount } = render(<MockShareLanding code="ABC123" summary={summary} />);
       expectClean(container, "ABC123");
       unmount();
+    }
+  });
+});
+
+/**
+ * Flow analysis C-02 (2026-08-27): one league advertised two different draft DAYS — the
+ * commissioner's hero read the browser's local time with no zone label while the terms panel and
+ * the stranger-facing invite landing rendered UTC. The fix made the hero join the product's own
+ * convention, which leaves TWO functions holding one rule: `formatAbsoluteTime` (`@/league/terms`,
+ * server-only) and `formatDraftAbsolute` (`@/league-room/lib/format`, client-side — the boundary
+ * forbids importing the first). Deliberate duplicates need a drift guard, or the bug returns the
+ * day one of them is edited alone.
+ */
+describe("the draft-time rule is one rule, on both sides of the client boundary", () => {
+  it("formats the identical instant identically, server and client", () => {
+    for (const iso of ["2026-09-05T23:00:00.000Z", "2026-01-01T00:00:00.000Z", "2026-12-31T12:34:00.000Z"]) {
+      expect(formatDraftAbsolute(iso)).toBe(formatAbsoluteTime(iso));
     }
   });
 });
