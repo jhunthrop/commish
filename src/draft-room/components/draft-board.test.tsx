@@ -451,4 +451,19 @@ describe("DraftBoard", () => {
     const faces = Array.from(grid_.querySelectorAll("img"));
     expect(faces.some((img) => (img.getAttribute("src") ?? "").includes("qb1.png"))).toBe(true);
   });
+
+  it("pins the header row to the top of the scrolling grid — deep rounds never lose the column names (founder screenshot)", () => {
+    stubMatchMedia(false);
+    render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} />);
+    const headers = within(grid()).getAllByRole("columnheader");
+    const corner = headers[0]!;
+    expect(corner.className).toContain("sticky");
+    expect(corner.className).toContain("left-0");
+    expect(corner.className).toContain("top-0");
+    for (const header of headers.slice(1)) {
+      expect(header.className).toContain("sticky");
+      expect(header.className).toContain("top-0");
+      expect(header.className).toContain("bg-surface");
+    }
+  });
 });

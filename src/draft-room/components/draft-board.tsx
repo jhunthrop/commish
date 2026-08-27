@@ -328,9 +328,15 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
         <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full overflow-auto">
         <table className="w-full border-separate border-spacing-1 text-left">
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
+          {/* The whole header row is STICKY-TOP (founder screenshot, 2026-08-26): deep in a
+              draft the auto-scroll follows the current pick down the grid, and a static header
+              row slid up under the wire band — the room lost its column names exactly when a
+              reader needs them most. The corner cell pins BOTH axes (it already pinned left for
+              the horizontal scroll); every header cell carries the surface fill so stickers
+              pass beneath, never through. */}
           <thead>
             <tr>
-              <th scope="col" className={`sticky left-0 z-10 bg-surface px-2 py-1 text-text-muted ${HEADER_EYEBROW[variant]}`}>
+              <th scope="col" className={`sticky left-0 top-0 z-30 bg-surface px-2 py-1 text-text-muted ${HEADER_EYEBROW[variant]}`}>
                 Rd
               </th>
               {columnIds.map((teamId, index) => (
@@ -338,7 +344,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
                   key={teamId}
                   scope="col"
                   className={
-                    `${CELL_MIN_WIDTH[variant]} snap-start scroll-ml-10 truncate rounded-sm px-2 py-1 font-display font-semibold leading-display ` +
+                    `${CELL_MIN_WIDTH[variant]} sticky top-0 z-20 bg-surface snap-start scroll-ml-10 truncate rounded-sm px-2 py-1 font-display font-semibold leading-display ` +
                     (teamId === myTeamId ? "ring-2 ring-accent text-accent" : "text-text-primary")
                   }
                 >
