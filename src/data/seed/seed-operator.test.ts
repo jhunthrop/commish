@@ -117,6 +117,11 @@ describe("ruling 15 — no in-product way to grant operator access (a drift trip
       "src/app/browse/page.tsx",
       "src/app/join/[leagueId]/hold/page.tsx",
       "src/app/reviews/page.tsx",
+      // The flow analysis's A4 (2026-08-27): the five operator pages had no door, so the shell
+      // grew an admin-only console nav. It DECLARES `isAdmin` as a prop and READS it to decide
+      // whether to render — it grants nothing, writes nothing, and infers nothing from the
+      // route. Added deliberately, which is what this tripwire exists to force.
+      "src/components/app-shell/admin-console-nav.tsx",
       "src/components/app-shell/app-shell.tsx",
       "src/components/app-shell/top-bar.tsx",
       "src/db/schema.ts",

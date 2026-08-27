@@ -57,7 +57,14 @@ export function formatExpired(iso: string): string {
  *  so a caller can build its own sentence around it (E6: a trade history card names WHEN a
  *  trade was proposed or settled, not only how it stands today). */
 export function formatDate(iso: string): string {
-  return EXPIRED_DATE_FORMAT.format(new Date(iso));
+  // An unparseable instant renders as NOTHING, never as a crash (found by the flow-remediation
+  // battery: `Intl.format` throws `RangeError: Invalid time value` on an invalid Date, and once
+  // a history card rendered a date, one bad timestamp took the whole trades page down with it).
+  // Every real column here is a database timestamp, so this guard should never fire — which is
+  // exactly why it must not be a thrown error when it does.
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  return EXPIRED_DATE_FORMAT.format(at);
 }
 
 /**

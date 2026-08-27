@@ -67,7 +67,7 @@ describe("TradeInbox", () => {
   });
 
   it("opens the composer from the header control too, even when the inbox isn't empty", async () => {
-    const page: TradesPageBody = { ...EMPTY_PAGE, history: [{ ...INBOUND, status: "rejected", settledAt: "x" }] };
+    const page: TradesPageBody = { ...EMPTY_PAGE, history: [{ ...INBOUND, status: "rejected", settledAt: "2026-08-20T00:00:00.000Z" }] };
     const fixture = fixtureLeagueDeps({ ok: true, data: page });
     renderInLeague(<TradeInbox leagueId="l1" context={CONTEXT} />, fixture.deps);
     fireEvent.click(await screen.findByRole("button", { name: "Put an offer together" }));

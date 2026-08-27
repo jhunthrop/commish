@@ -169,7 +169,10 @@ export function TradeCard({
   // identical history cards with no date on any of them. `settledAt` once the trade has one
   // (every terminal state writes it in the same transaction that settles); `proposedAt`
   // otherwise, for a still-open offer.
-  const dateLabel = trade.settledAt === null ? `Proposed ${formatDate(trade.proposedAt)}` : `Settled ${formatDate(trade.settledAt)}`;
+  // The verb only appears when the date does (see `formatDate`'s own guard): "Settled " with an
+  // empty date is worse than saying nothing at all.
+  const dateText = trade.settledAt === null ? formatDate(trade.proposedAt) : formatDate(trade.settledAt);
+  const dateLabel = dateText === "" ? "" : `${trade.settledAt === null ? "Proposed" : "Settled"} ${dateText}`;
 
   return (
     <Card as="article" aria-label={cardLabel}>

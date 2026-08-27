@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { daysUntil, formatDraftAbsolute, formatExpired, formatExpiry, formatPoints, formatRecord, formatWeek } from "./format";
+import { daysUntil, formatDate, formatDraftAbsolute, formatExpired, formatExpiry, formatPoints, formatRecord, formatWeek } from "./format";
 
 describe("league display formatting", () => {
   it("writes a record, dropping ties when there are none", () => {
@@ -78,5 +78,12 @@ describe("formatExpired", () => {
 
   it("carries no em dash or en dash", () => {
     expect(formatExpired("2026-08-18T12:00:00.000Z")).not.toMatch(/[–—]/);
+  });
+
+  it("renders nothing for an unparseable instant instead of throwing (the trades-page crash)", () => {
+    // Intl.format throws RangeError on an invalid Date; once a history card rendered a date, one
+    // bad timestamp took the whole page down. A guard, not a thrown error.
+    expect(formatDate("not-a-date")).toBe("");
+    expect(formatDate("2026-08-20T00:00:00.000Z")).toBe("August 20");
   });
 });
