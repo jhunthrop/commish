@@ -189,6 +189,15 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // Scoped to the message log region (message-list.tsx's `role="log" aria-label="Messages"`),
   // not the whole page, for the same anchoring rigor as the pool assertion above — even though
   // `shout` is a unique, freshly-generated string that could not already be on the page.
+  // FOUNDER DIRECTIVE 2026-08-26 (room-product pass): "the chat feature should be much smaller.
+  // People aren't usually actively chatting during the draft much. The right hand side should be
+  // your roster." The aside now shows `RosterRail` by default and swaps to chat only on demand,
+  // at EVERY width — so both sessions have to open it before one can send and the other can read.
+  // This spec still assumed chat was mounted from first paint, and hung on a composer that was
+  // never going to be there.
+  await watcher.getByRole("button", { name: "League chat" }).click();
+  await picker.getByRole("button", { name: "League chat" }).click();
+
   const shout = `Nice pick ${Date.now()}`;
   await watcher.getByLabel("Message").fill(shout);
   await watcher.getByLabel("Message").press("Enter");
