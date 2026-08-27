@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { Avatar, Panel, PageTitle } from "@/components/ui";
+import { Avatar, ButtonLink, Panel, PageTitle } from "@/components/ui";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { readProfile } from "@/identity-service/profile";
 import { readPreferences } from "@/identity-service/preferences";
@@ -83,6 +83,17 @@ export default async function ProfilePage() {
             <HelpLevelForm helpLevel={preferences.helpLevel} />
           </Panel>
           <NotificationSummary />
+          {/* The wallet's DOOR (self review D1, 2026-08-27): a repo-wide sweep found zero links
+              to /app/wallet — the product's biggest trust surface was unreachable by
+              construction. The member's own place is where their money door belongs. */}
+          <Panel title="Wallet">
+            <div className="flex flex-col items-start gap-2">
+              <p className="text-sm text-text-muted">Every league is free this season, so there is nothing to deposit yet.</p>
+              <ButtonLink href="/app/wallet" variant="secondary">
+                Open your wallet
+              </ButtonLink>
+            </div>
+          </Panel>
           <StandingPanel seasons={completedSeasons} tier={tier} verified={verified} />
           <ThemeSwitcher />
         </section>

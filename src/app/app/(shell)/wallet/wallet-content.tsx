@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { getDb } from "@/db/client";
-import { Panel } from "@/components/ui";
+import { ButtonLink, Panel } from "@/components/ui";
 import { walletAccountFlags, walletSummary } from "@/money-service/read";
 import { moneyIsLive } from "@/money/states";
 import { getSharedPaymentsProvider } from "@/payments-provider/registry";
@@ -68,10 +68,26 @@ async function liveWalletContent(userId: string): Promise<ReactNode> {
  */
 export async function renderWalletContent(userId: string, live: boolean = moneyIsLive()): Promise<ReactNode> {
   if (!live) {
+    // The dark season's honest page, composed rather than orphaned (self review D1/R1,
+    // 2026-08-27): the one sentence stays the headline fact, the story below it is the
+    // free-season trust story said plainly, and the way out is real. Still no balance figure,
+    // no form, no broken control — dark means dark.
     return (
-      <Panel title="Real-money play">
-        <p className="text-sm text-text-muted">{DARK_WALLET_SENTENCE}</p>
-      </Panel>
+      <div className="flex max-w-prose flex-col gap-4">
+        <Panel title="Real-money play">
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-sm text-text-primary">{DARK_WALLET_SENTENCE}</p>
+            <p className="text-sm text-text-muted">
+              When real-money leagues open, this page is where your balance lives: deposits, entry fees, winnings and
+              withdrawals, each shown to the cent. Until then there is nothing to hold here, and no number on this page
+              will ever be an invented one.
+            </p>
+            <ButtonLink href="/browse" variant="secondary">
+              Browse free leagues
+            </ButtonLink>
+          </div>
+        </Panel>
+      </div>
     );
   }
   return liveWalletContent(userId);
