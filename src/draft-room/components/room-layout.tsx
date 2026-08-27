@@ -45,14 +45,19 @@ export function RoomLayout({ rail, pool, stage, dock, aside }: RoomLayoutProps) 
     <div data-testid="room-layout" className="flex min-h-dvh flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
       <div className="order-1">{rail}</div>
       <div className="order-3 flex min-h-0 flex-1 flex-col lg:order-2 lg:flex-row">
-        <div className="order-2 min-w-0 border-line lg:order-1 lg:w-88 lg:shrink-0 lg:overflow-hidden lg:border-r">{pool}</div>
+        {/* Laptop fit (founder question, 2026-08-26): two fixed 352px
+            rails left a 1350px window ~650px of stage for a twelve-column board. One desktop
+            width per rail now: the pool at 320px (players need their names more than the
+            roster rail needs symmetry) and the aside at 288px — together 96px thinner than
+            before, two whole board columns returned to a 1280px laptop. */}
+        <div className="order-2 min-w-0 border-line lg:order-1 lg:w-80 lg:shrink-0 lg:overflow-hidden lg:border-r">{pool}</div>
         {/* overflow-HIDDEN, not auto: the board grid inside the stage is the one horizontal
             scroller. Two nested auto containers rendered two scrollbars stacked on each other. */}
         <div className="order-1 min-w-0 lg:order-2 lg:min-h-0 lg:flex-1 lg:overflow-hidden">{stage}</div>
         {aside === undefined ? null : (
           <div
             data-testid="room-aside"
-            className="order-3 min-w-0 max-w-full border-line lg:order-3 lg:max-w-88 lg:shrink-0 lg:overflow-hidden lg:border-l"
+            className="order-3 min-w-0 max-w-full border-line lg:order-3 lg:max-w-72 lg:shrink-0 lg:overflow-hidden lg:border-l"
           >
             {/* The OPEN/COLLAPSED width still lives on the aside CONTENT (lg:w-88 open, lg:w-12
                 collapsed) so this frame never has to know chat exists. `lg:max-w-88` is this

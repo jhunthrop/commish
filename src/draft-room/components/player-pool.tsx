@@ -166,7 +166,10 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                     and `sm` keeps the row at its fixed `h-11` with no reflow at the 360px floor. */}
                 <Avatar name={row.player.name} avatar={row.player.headshotUrl} size="sm" />
                 <span className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
-                <span className="shrink-0 text-xs text-text-muted">{row.player.nflTeam}</span>
+                {/* The team abbreviation yields to the NAME below xl (laptop fit, 2026-08-26):
+                    at the pool's 320px rail a three-letter code cost long names their last
+                    readable syllable, and the name is what a drafter is scanning for. */}
+                <span className="hidden shrink-0 text-xs text-text-muted xl:inline">{row.player.nflTeam}</span>
                 {row.drafted ? null : (
                   <Button size="sm" variant="ghost" disabled={submitting} aria-label={queueButtonLabel(row.player.name, queued)} onClick={() => onQueue(row.player.id)}>
                     <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>

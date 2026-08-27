@@ -78,10 +78,9 @@ describe("DraftBoard", () => {
     stubMatchMedia(false);
     render(<DraftBoard {...props} view={SNAKE_VIEW} />);
     const header = within(grid()).getByRole("columnheader", { name: /Bay Bandits/ });
-    expect(header.className).toContain("min-w-28");
-    expect(header.className).toContain("lg:min-w-32");
-    expect(header.className).toContain("xl:min-w-40");
-  });
+    expect(header.className).toContain("w-28");
+    expect(header.className).toContain("lg:w-32");
+      });
 
   it("puts each pick in its own team's column and round's row, as a position-colored sticker", () => {
     stubMatchMedia(false);

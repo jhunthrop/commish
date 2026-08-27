@@ -253,6 +253,38 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   expect(pageScroll.h[0], "the mock room's page scrolls vertically at desktop").toBeLessThanOrEqual(pageScroll.h[1]! + 1);
   expect(pageScroll.w[0], "the mock room's page scrolls sideways at desktop").toBeLessThanOrEqual(pageScroll.w[1]! + 1);
 
+  // --- Laptop fit (founder question, 2026-08-26): at 1280x800 — the smallest common laptop —
+  // the page still never scrolls, and the stage shows at least FOUR full board columns (two
+  // fixed rails once squeezed it to ~three; the lg rail step and the xl-only sticker faces are
+  // what this asserts against regression).
+  await managerA.setViewportSize({ width: 1280, height: 800 });
+  await managerA.waitForTimeout(400);
+  const laptop = await managerA.evaluate(() => {
+    const grid = document.querySelector('[data-testid="draft-board-grid"]');
+    // Measured AT REST: the auto-scroll centers the current pick, leaving both edge columns
+    // legitimately partial — the question here is what the composition AFFORDS a laptop, so
+    // count from the board's origin.
+    grid!.scrollLeft = 0;
+    const gridBox = grid!.getBoundingClientRect();
+    const headers = Array.from(grid!.querySelectorAll("thead th")).slice(1);
+    const fullyVisible = headers.filter((th) => {
+      const r = th.getBoundingClientRect();
+      return r.left >= gridBox.left - 1 && r.right <= gridBox.right + 1;
+    }).length;
+    return {
+      fullyVisible,
+      pageScrollH: [document.documentElement.scrollHeight, document.documentElement.clientHeight],
+      pageScrollW: [document.documentElement.scrollWidth, document.documentElement.clientWidth],
+    };
+  });
+  expect(laptop.pageScrollH[0], "the room's page scrolls vertically at 1280x800").toBeLessThanOrEqual(laptop.pageScrollH[1]! + 1);
+  expect(laptop.pageScrollW[0], "the room's page scrolls sideways at 1280x800").toBeLessThanOrEqual(laptop.pageScrollW[1]! + 1);
+  expect(laptop.fullyVisible, "a 1280px laptop sees too few board columns").toBeGreaterThanOrEqual(4);
+  await managerA.setViewportSize({ width: 1280, height: 720 });
+  await managerA.waitForTimeout(300);
+  const short = await managerA.evaluate(() => [document.documentElement.scrollHeight, document.documentElement.clientHeight]);
+  expect(short[0], "the room's page scrolls vertically at 1280x720").toBeLessThanOrEqual(short[1]! + 1);
+
   // --- The human's own real pick — with the board's pick number captured FIRST, so the
   // post-sim assertion below measures movement against the state the human acted from ---------
   const pickNumberBeforeOurTurn = pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText());

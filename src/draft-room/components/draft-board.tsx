@@ -61,7 +61,7 @@ interface BoardRow {
  * the rest of this codebase (and its happy-dom tests) already reasons about.
  */
 const CELL_TEXT: Readonly<Record<DraftBoardVariant, string>> = {
-  room: "text-sm xl:text-md",
+  room: "text-sm",
   tv: "text-display-md",
 };
 
@@ -78,9 +78,15 @@ const CELL_TEXT: Readonly<Record<DraftBoardVariant, string>> = {
  * belt BELOW `lg` (a laptop that is not yet desktop-wide); `lg:min-w-32` and `xl:min-w-40`
  * are the same two sizes this board already had right at wider widths — untouched.
  */
+/** WIDTHS, not min-widths (laptop fit, 2026-08-26): `table-fixed` sizes columns from the
+ *  header row's `width` and ignores `min-width` entirely — the min-w floors this constant
+ *  used to carry silently stopped existing the moment the table went fixed, collapsing twelve
+ *  columns into avatar-only slivers. ONE desktop width (128px) from lg up — measured at
+ *  1280x800, w-36 columns left the fourth column four pixels off-screen; at 128px a laptop
+ *  reads four-plus columns and a 2000px desktop reads ten. */
 const CELL_MIN_WIDTH: Readonly<Record<DraftBoardVariant, string>> = {
-  room: "min-w-28 lg:min-w-32 xl:min-w-40",
-  tv: "min-w-48",
+  room: "w-28 lg:w-32",
+  tv: "w-48",
 };
 
 /**
@@ -206,9 +212,13 @@ function StickerCell({
     const layout = `flex h-full items-center gap-2 px-2 py-2 ${slap ? "animate-sticker-slap" : ""}`;
     const body = (
       <>
-        {/* The real face, initials fallback (founder directive 2026-08-26 — the "until the
-            stats feed brings real headshots" day arrived with players.headshot_url). */}
-        <Avatar name={player?.name ?? cell.pick.playerId} avatar={player?.headshotUrl ?? null} size="sm" className="shrink-0 bg-scrim/20" />
+        {/* The real face, initials fallback (founder directive 2026-08-26) — but only from xl
+            up: on a laptop the avatar widened every sticker ~40px and cost the room two whole
+            columns (founder question, 2026-08-26). Below xl the position color and the name
+            carry the read, exactly as they did before faces existed; the face rejoins where
+            the width is free. `hidden xl:flex` keeps it in the DOM for the row's height math
+            nowhere — display none costs nothing. */}
+        <Avatar name={player?.name ?? cell.pick.playerId} avatar={player?.headshotUrl ?? null} size="sm" className="hidden shrink-0 bg-scrim/20 xl:flex" />
         <div className="flex min-w-0 flex-col justify-center gap-0.5">
           <span className={`truncate font-display font-semibold leading-display ${CELL_TEXT[variant]}`}>
             {player?.name ?? cell.pick.playerId}
@@ -326,7 +336,13 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
       <div className="relative hidden min-h-0 w-full flex-1 sm:block">
         {/* Column snap: a scrolled board always rests on whole stickers, never slivers. */}
         <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full overflow-auto">
-        <table className="w-full border-separate border-spacing-1 text-left">
+        {/* `table-fixed` (laptop fit, 2026-08-26): under auto layout the LONGEST player name
+            set every column's width — the min-w floors and every truncate on the stickers were
+            decorative, and a 1280px laptop saw one full column. Fixed layout makes the header
+            row's widths the law: each team column takes its min-w floor (stretching evenly
+            when the stage is wider than 12 floors), names truncate as always intended, and the
+            Rd column keeps its own narrow width below. */}
+        <table className="w-full table-fixed border-separate border-spacing-1 text-left">
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           {/* The whole header row is STICKY-TOP (founder screenshot, 2026-08-26): deep in a
               draft the auto-scroll follows the current pick down the grid, and a static header
@@ -336,7 +352,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
               pass beneath, never through. */}
           <thead>
             <tr>
-              <th scope="col" className={`sticky left-0 top-0 z-30 bg-surface px-2 py-1 text-text-muted ${HEADER_EYEBROW[variant]}`}>
+              <th scope="col" className={`w-12 sticky left-0 top-0 z-30 bg-surface px-2 py-1 text-text-muted ${HEADER_EYEBROW[variant]}`}>
                 Rd
               </th>
               {columnIds.map((teamId, index) => (

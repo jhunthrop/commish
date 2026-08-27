@@ -81,7 +81,9 @@ describe("RoomLayout", () => {
   it("caps the aside band's own width so it can never push the stage off the viewport", () => {
     render(<RoomLayout rail={<p>rail</p>} pool={<p>pool</p>} stage={<p>stage</p>} dock={<p>dock</p>} aside={<p>aside</p>} />);
     const band = screen.getByTestId("room-aside");
-    expect(band.className).toContain("lg:max-w-88");
+    // One desktop rail width (laptop fit, 2026-08-26): 288px from lg up — the stage keeps the
+    // difference, which is two whole board columns on a 1280px laptop.
+    expect(band.className).toContain("lg:max-w-72");
     expect(band.className).toContain("lg:shrink-0");
   });
 });

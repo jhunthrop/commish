@@ -111,13 +111,13 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
   // for them chat IS the panel — no strip, nothing to toggle back to.
   const aside =
     room.myTeamId === null ? (
-      <div className="flex h-full min-h-0 flex-col lg:w-88">
+      <div className="flex h-full min-h-0 flex-col lg:w-72">
         <div className="min-h-0 flex-1 px-3 pb-3 pt-2">
           <LeagueChat leagueId={room.view.leagueId} />
         </div>
       </div>
     ) : (
-      <div className="flex h-full min-h-0 flex-col lg:w-88">
+      <div className="flex h-full min-h-0 flex-col lg:w-72">
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-2">
           {chatOpen ? (
             <LeagueChat leagueId={room.view.leagueId} />
