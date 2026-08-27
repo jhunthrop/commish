@@ -361,3 +361,10 @@ League N". Migration `0044` is the one-time transition for house leagues that al
 rows — without it a legacy scheduled league would roll forever and hold its shelf slot, and the
 directive would never take effect on a populated database. Legacy open leagues keep their old
 names and drain naturally; the reconciler never deletes a league that exists.
+
+**Q4 follow-on (wave-1 review, 2026-08-27).** Width 6 → 2 also capped the shelf's own maximum
+standing house supply at `openAtOnce` summed across rungs: `open_12` (1) + `beginner_12` (1) = 2,
+`sitandgo_12` retired to 0. `MATCHMAKING_CONFIG.proof.floors.roomsFillingNow` was still `3` —
+a structural ceiling house rooms alone could never cross, not a credibility floor — so it dropped
+to `2`, the highest value this fact can still clear on house supply alone. See
+`src/matchmaking/config.ts`'s own comment for the arithmetic.

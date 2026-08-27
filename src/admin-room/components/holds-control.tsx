@@ -129,10 +129,19 @@ export function HoldsControl() {
       )}
 
       <div className="flex gap-3">
-        <Button type="submit" loading={previewing && confirming === null} disabled={previewing || submitting}>
+        {/* Wave-1 review Q8: while `ConfirmModal` is open, its OWN confirm button is the view's
+            one ink action (`ConfirmModal`'s own docblock, Sunday Standard rule 5) — these two
+            triggers step down to the quiet pill for as long as it is, so the page never shows
+            two loud buttons at once, and step back to their ordinary color the moment it closes. */}
+        <Button type="submit" variant={confirming === null ? "primary" : "secondary"} loading={previewing && confirming === null} disabled={previewing || submitting}>
           Release hold
         </Button>
-        <Button type="button" variant="destructive" disabled={previewing || submitting} onClick={() => void beginConfirm("confiscate")}>
+        <Button
+          type="button"
+          variant={confirming === null ? "destructive" : "secondary"}
+          disabled={previewing || submitting}
+          onClick={() => void beginConfirm("confiscate")}
+        >
           Confiscate hold
         </Button>
       </div>

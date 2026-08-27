@@ -136,6 +136,18 @@ record independent of the task ledger they were made in:
   (`fill_fired_at IS NOT NULL`) — a `when_full` league's placeholder `kickoff_at` never reaches
   either surface dressed up as a real time. The asymmetry with `nextDraftAtQuery`'s identical gate
   is the honest one: advertising a placeholder is the exact class of lie rule 6 exists to refuse.
+
+  **SUPERSEDED (2026-08-26, founder directive — "the whole shelf is sit-and-go"; storefront
+  review R1; Q6, wave-1 review, 2026-08-27).** Both surfaces this gate guarded are retired, and
+  the gate along with them: the scoreboard's third chip and `nextDraftAtQuery` are gone, and
+  `draftsTonightQuery`/`draft_tonight` (the wire item) is gone too (`listWireItems`'s own
+  docblock, `@/league-service/wire.ts` — "down from four reads to three"). Every `HOUSE_CATALOG`
+  rung is `when_full` now, so there is no `'scheduled'`-trigger kickoff left on the shelf for
+  either surface to find. Storefront review R1 repointed the front door's "next draft" fact from a
+  chosen kickoff onto the fullest FILLING room instead
+  (`fullestFillingLeague`/`featuredFillingLeague`, `@/league-room/components/public-league-list`)
+  — see `docs/decisions/formats-and-lobby.md`, "The whole shelf is sit-and-go". This entry is left
+  standing rather than rewritten: it is still the accurate history of what Task 8 built and why.
 - **The caps and accent sweeps are law, not convention (Tasks 3 and 4).** Both landed test-first
   (red, listing every offender the audit had already inventoried by hand; green once the sweep
   swept clean), which is what makes §3 above true as an enforcement claim rather than a style

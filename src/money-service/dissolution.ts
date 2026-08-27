@@ -20,6 +20,13 @@ export const DISSOLUTION_REFUSALS = {
    *  UNIQUE and every league gets one at creation) into the same sentence a genuinely started
    *  draft gets, the identical collapse `RELEASE_REFUSALS.draftStarted` already makes. */
   draftStarted: "This league's draft has already started, so it cannot be dissolved.",
+  /** Wave-1 review A1 — the RETIREMENT caller's own guard. `expectSeatedCount` is re-verified
+   *  INSIDE this transaction, under the `leagues[X] FOR UPDATE` lock already held, against a
+   *  FRESH read of `teams` — never the reconciler's own candidate snapshot, which was read before
+   *  this transaction even opened. A league that gained a seat between that snapshot and this
+   *  call refuses HERE, before the first write, rather than refunding a manager who just joined
+   *  it. The operator door passes no expectation at all and can never reach this refusal. */
+  seatsChanged: "This league's seats changed since it was selected, so it was not dissolved.",
 } as const;
 
 export type DissolutionPreviewResult =
@@ -47,11 +54,23 @@ export async function dissolutionPreview(db: Db, leagueId: string): Promise<Diss
 
 export interface DissolveLeagueInput {
   readonly leagueId: string;
-  /** The operator's own verified id, from `withAdmin`'s session — never from a request body.
-   *  Carried on the platform-visible audit payload for the operator console's own trail; the
-   *  league-wide `system_action` this writer appends stays `actorType: "system"` regardless,
-   *  `SYSTEM_ACTION_CODES`' own construction for every code in that vocabulary. */
+  /** The acting party's own id, carried on the platform-visible audit payload for a human
+   *  console's trail — never rendered to a member (`renderSystemAction` reads only `action`,
+   *  `summary` and `subjectUserId`, `@/integrity/activity-view`). TWO caller classes are legal
+   *  here, and only two (Q2, wave-1 review): an operator's own verified id, from `withAdmin`'s
+   *  session, never from a request body; or the house reconciler's own documented system
+   *  sentinel, `HOUSE_RECONCILER_ACTOR` (`@/league-service/house-factory`) — the one headless
+   *  caller this door accepts, paired with `expectSeatedCount` below. The league-wide
+   *  `system_action` this writer appends stays `actorType: "system"` regardless of which class
+   *  called it, `SYSTEM_ACTION_CODES`' own construction for every code in that vocabulary. */
   readonly operatorUserId: string;
+  /** THE RETIREMENT CALLER'S OWN PROMISE (wave-1 review A1): "the league I selected is still
+   *  empty." Checked INSIDE the transaction, against a fresh re-read of `teams` taken AFTER the
+   *  `leagues[X] FOR UPDATE` lock — never the caller's own pre-transaction snapshot, which cannot
+   *  see a join that landed after it was read. A mismatch refuses via
+   *  `DISSOLUTION_REFUSALS.seatsChanged` before the first write. `undefined` (the operator door's
+   *  own default) skips the check entirely — unchanged behavior for that caller. */
+  readonly expectSeatedCount?: number;
 }
 
 export type DissolveLeagueResult =
@@ -116,9 +135,12 @@ export const LEAGUE_DISSOLVED_SUMMARY = "An operator closed this league because 
  * global lock law, and the identical first lock `joinLeagueInTx`/`releaseSeat` both take, so a
  * concurrent join or release on this league serializes against this dissolution on the same row.
  * The `drafts` read is a plain `SELECT`, no lock beyond what `leagues[X]` already implies for
- * every writer that touches both rows (the branch-wide leagues-before-drafts rule). The guarded
- * `drafts` `UPDATE` locks only the row it writes. Each `refundEntryFeeInTx` call takes its OWN
- * `leagues[X] FOR UPDATE` re-lock (no new edge — this transaction has held it since statement
+ * every writer that touches both rows (the branch-wide leagues-before-drafts rule). The `teams`
+ * read that follows it (`expectSeatedCount`'s own re-check, wave-1 review A1) is likewise a plain
+ * `SELECT` — no new lock, and no new edge, since `leagues[X]` already serializes every writer
+ * that could change this count (`joinLeagueInTx`, `releaseSeat`) against this transaction. The
+ * guarded `drafts` `UPDATE` locks only the row it writes. Each `refundEntryFeeInTx` call takes its
+ * OWN `leagues[X] FOR UPDATE` re-lock (no new edge — this transaction has held it since statement
  * one) and its own sorted `money_accounts FOR UPDATE` pair, then its `entry_fee_refunded` append
  * on this league's chain. The `member_notices` inserts that follow take the ordinary `FOR KEY
  * SHARE` on `leagues` (already held) and each member's `users` row — BEFORE the anchor, per
@@ -127,8 +149,9 @@ export const LEAGUE_DISSOLVED_SUMMARY = "An operator closed this league because 
  * `src/integrity-service/lock-order.test.ts`'s "dissolveLeague vs. joinLeagueInTx" block drives
  * this against a concurrent join on two real connections.
  *
- * NO-WRITE-BEFORE-REFUSAL holds throughout: both refusal branches return before the `drafts`
- * `UPDATE` is ever reached, proven over the whole book AND the whole league surface by
+ * NO-WRITE-BEFORE-REFUSAL holds throughout: all three refusal branches — missing league, draft
+ * already started, and now `expectSeatedCount` mismatch (wave-1 review A1) — return before the
+ * `drafts` `UPDATE` is ever reached, proven over the whole book AND the whole league surface by
  * `expectNoDissolutionTookPlace` in `dissolution.test.ts`.
  */
 export async function dissolveLeague(db: Db, input: DissolveLeagueInput, deps: DissolveLeagueDeps = {}): Promise<DissolveLeagueResult> {
@@ -151,13 +174,20 @@ export async function dissolveLeague(db: Db, input: DissolveLeagueInput, deps: D
       return { ok: false, status: 409, reason: DISSOLUTION_REFUSALS.draftStarted };
     }
 
+    // THE RETIREMENT CALLER'S OWN GUARD (wave-1 review A1) — a FRESH read, taken here so it sees
+    // everything the `leagues[X] FOR UPDATE` lock above has serialized against, never the
+    // caller's own pre-transaction candidate snapshot. `seated` is reused below for the refund
+    // and notice loops rather than read a second time.
+    const seated = await tx.select({ userId: teams.userId }).from(teams).where(eq(teams.leagueId, league.id));
+    if (input.expectSeatedCount !== undefined && seated.length !== input.expectSeatedCount) {
+      return { ok: false, status: 409, reason: DISSOLUTION_REFUSALS.seatsChanged };
+    }
+
     // THE MARK — see "THE MARK" above. `leagues[X] FOR UPDATE` has been held since statement
     // one, so nothing could have raced this guard between the read above and here; it stays
     // anyway, the same belt-and-suspenders discipline every guarded state stamp in this
     // codebase holds to.
     await tx.update(drafts).set({ status: "dissolved" }).where(and(eq(drafts.id, draft.id), eq(drafts.status, "scheduled")));
-
-    const seated = await tx.select({ userId: teams.userId }).from(teams).where(eq(teams.leagueId, league.id));
 
     // THE REFUND, PER SEAT — see "THE REFUND, COMPOSED PER SEAT" above. A free league's loop body
     // never runs, so it posts not one money statement (the free-season law).

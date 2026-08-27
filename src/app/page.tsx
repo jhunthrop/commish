@@ -15,7 +15,7 @@ import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
 import { NextDraftModule } from "@/league-room/components/next-draft-module";
-import { OpenLeagueShelf, featuredScheduledLeague } from "@/league-room/components/public-league-list";
+import { OpenLeagueShelf, featuredFillingLeague } from "@/league-room/components/public-league-list";
 import { ProofStrip } from "@/league-room/components/proof-strip";
 import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
 import { Wire } from "@/league-room/components/wire";
@@ -75,7 +75,7 @@ const NAV: readonly NavLink[] = [
  * gutter below that).
  *
  * 2026-08-25 founder finding, controller-ruled: at xl+, when a league qualifies
- * (`featuredScheduledLeague`), the hero band's headline pairs with `NextDraftModule` in a
+ * (`featuredFillingLeague`), the hero band's headline pairs with `NextDraftModule` in a
  * two-column grid — the SAME merged, capped list the shelf renders, so the module and the
  * shelf's one inked row/card can never disagree about which league is featured
  * (`featuredInHero` tells the shelf to go all-quiet while the module carries that ink instead).
@@ -87,7 +87,7 @@ export default async function Home() {
   const [user, { leagues, house }, stats, wireItems] = await Promise.all([
     getCurrentUser(),
     listPublicLeagues(getDb(), normalizeBrowseFilter({}), clock, { sort: "seats_remaining", whenFullOnly: false }),
-    getProofCache().stats(() => proofStats(getDb(), { clock })),
+    getProofCache().stats(() => proofStats(getDb())),
     // Task 8: the wire's request-time read, on the page's one clock — see `Wire`'s own docblock
     // for the whole request-time-truth account (deferral D4, no anonymous SSE).
     listWireItems(getDb(), clock),
@@ -97,13 +97,16 @@ export default async function Home() {
   // default — see `/browse`'s identical read.
   const helpLevel: HelpLevel = user === null ? "standard" : (await readPreferences(getDb(), user)).helpLevel;
 
-  // 2026-08-25 founder finding, controller-ruled: the SAME capped, merged list the shelf below
+  // 2026-08-25 founder finding, controller-ruled (Q5, wave-1 review: name and comment repointed
+  // to what the sit-and-go shelf actually produces — storefront review R1 retired the
+  // scheduled-kickoff fact this used to describe). The SAME capped, merged list the shelf below
   // renders (house whole, member leagues capped at `shelfCap`) — no second query, no second cap.
-  // `featuredScheduledLeague` is the exact subset of `featuredLeagueId` that is a genuinely
-  // scheduled, ticking draft (never the shelf's own fallback-to-tightest-seats pick), so the hero
-  // module and the shelf's one inked row/card can never point at two different leagues.
+  // `featuredFillingLeague` is the exact subset of `featuredLeagueId` that is genuinely FILLING —
+  // at least one seat taken, never the shelf's own fallback-to-tightest-seats pick a shelf where
+  // nothing has a single seat taken falls back to — so the hero module and the shelf's one inked
+  // row/card can never point at two different leagues.
   const cappedLeagues = leagues.slice(0, UI_CONFIG.frontDoor.shelfCap);
-  const featuredLeague = featuredScheduledLeague([...house, ...cappedLeagues]);
+  const featuredLeague = featuredFillingLeague([...house, ...cappedLeagues]);
 
   return (
     <>

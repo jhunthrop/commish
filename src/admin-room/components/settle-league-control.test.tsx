@@ -126,6 +126,29 @@ describe("SettleLeagueControl", () => {
     expect(screen.getByLabelText("Final standings")).toHaveValue("");
   });
 
+  it("states the preview's own season-completed fact and entry fee in the confirm body (wave-1 review Q7)", async () => {
+    const fixture = fixtureAdminDeps(PREVIEW);
+    renderInAdmin(<SettleLeagueControl />, fixture.deps);
+
+    fireEvent.change(screen.getByLabelText("League id"), { target: { value: "lg_1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Settle league" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Season complete.");
+    expect(dialog).toHaveTextContent("Entry fee: $20.00.");
+  });
+
+  it("warns plainly when settling before the season is complete (wave-1 review Q7)", async () => {
+    const fixture = fixtureAdminDeps({ ok: true, data: { ...PREVIEW.data, seasonCompleted: false } });
+    renderInAdmin(<SettleLeagueControl />, fixture.deps);
+
+    fireEvent.change(screen.getByLabelText("League id"), { target: { value: "lg_1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Settle league" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Season not yet complete. Settling now closes its escrow early.");
+  });
+
   it("cancels back to no dialog with nothing submitted", async () => {
     const fixture = fixtureAdminDeps(PREVIEW);
     renderInAdmin(<SettleLeagueControl />, fixture.deps);

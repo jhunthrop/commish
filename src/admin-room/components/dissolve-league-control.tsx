@@ -113,8 +113,8 @@ export function DissolveLeagueControl() {
           {dissolved.refundedMembers === 0
             ? "This league is dissolved. It had no seated members to refund."
             : dissolved.totalRefundedCents > 0
-              ? `This league is dissolved. ${dissolved.refundedMembers} member(s) were refunded ${formatUsd(dissolved.totalRefundedCents)} in total.`
-              : `This league is dissolved. ${dissolved.refundedMembers} member(s) were notified; there was no fee to refund.`}
+              ? `This league is dissolved. It refunded ${formatUsd(dissolved.totalRefundedCents)} to ${dissolved.refundedMembers} ${dissolved.refundedMembers === 1 ? "member" : "members"} in total.`
+              : `This league is dissolved. It notified ${dissolved.refundedMembers} ${dissolved.refundedMembers === 1 ? "member" : "members"}; there was no fee to refund.`}
         </p>
       )}
 

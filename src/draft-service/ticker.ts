@@ -4,7 +4,7 @@ import { drafts } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import { currentDeadline } from "@/draft-engine";
-import { ensureHouseCatalog, type HouseFactoryDeps, type HouseFactoryOutcome } from "@/league-service/house-factory";
+import { ensureHouseCatalog, rungOfHouseLeagueId, type HouseFactoryDeps, type HouseFactoryOutcome } from "@/league-service/house-factory";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { createMockBotDriver, startDueMockRooms, type MockBotDriveFn, type MockBotDriver, type MockStartOutcome } from "@/mock-draft-service/driver";
 import type { MockLifecycleDeps } from "@/mock-draft-service/claim";
@@ -250,6 +250,14 @@ export function createDraftTicker({
         const outcome = await reconcileHouse(db, { clock, newId: () => crypto.randomUUID() });
         for (const refusal of outcome.refused) {
           reportIfDue({ draftId: `house:${refusal.rung}`, applied: false, reason: refusal.reason }, nowMs);
+        }
+        // Wave-1 review Q3: `dissolveLeague`'s retirement path is the only headless writer in
+        // this codebase that closes a league nobody asked it to close — an operator pressing the
+        // same button leaves a trail on the admin console; this call leaves one here instead, one
+        // line per retired league, so a retirement is never silent just because nobody watched it
+        // happen.
+        for (const leagueId of outcome.retired) {
+          console.log("[house] retired", leagueId, rungOfHouseLeagueId(leagueId) ?? "unknown-rung");
         }
       } catch (error: unknown) {
         console.error("[draft] house reconcile failed", error);

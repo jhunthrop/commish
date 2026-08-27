@@ -187,7 +187,7 @@ export function LeagueHome({
       ) : null}
 
       {promoteLineupEditor ? (
-        <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} helpLevel={helpLevel} />
+        <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} helpLevel={helpLevel} draftStatus={home.draftStatus} />
       ) : null}
 
       <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
@@ -283,7 +283,7 @@ export function LeagueHome({
           it first, right below the header. One rule, read once, at the top of this component;
           there is no second, per-page copy of it down here. */}
       {lineup === null || promoteLineupEditor ? null : (
-        <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} helpLevel={helpLevel} />
+        <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} helpLevel={helpLevel} draftStatus={home.draftStatus} />
       )}
 
       {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}

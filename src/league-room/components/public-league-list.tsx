@@ -62,7 +62,7 @@ export function seatCountsAsOfSentence(asOfTime: string): string {
  * qualifies. Pure and clock-free: "fullest" only ever compares two already-known seat counts,
  * never `now`.
  *
- * Repoints `featuredLeagueId`'s and `featuredScheduledLeague`'s shared first pass from "the
+ * Repoints `featuredLeagueId`'s and `featuredFillingLeague`'s shared first pass from "the
  * nearest SCHEDULED kickoff" — a fact the sit-and-go shelf no longer produces
  * (`docs/decisions/formats-and-lobby.md`, "The whole shelf is sit-and-go") — onto "the room
  * closest to full": a filling room is this world's own version of "next draft", since the fewer
@@ -100,7 +100,7 @@ export function featuredLeagueId(leagues: readonly PublicLeagueSummary[]): strin
  * the module from. `null` (empty shelf, or every room still at zero) tells the hero band to
  * render nothing at all — rule 6, real or absent, never dressed up.
  */
-export function featuredScheduledLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
+export function featuredFillingLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
   return fullestFillingLeague(leagues);
 }
 
@@ -131,7 +131,7 @@ export interface OpenLeagueShelfProps {
   /**
    * 2026-08-25 founder finding, controller-ruled: true when the hero band's own "Next draft"
    * module (`NextDraftModule`) already renders this shelf's featured league — `page.tsx` derives
-   * that league from the SAME `featuredScheduledLeague` this component would otherwise call, so
+   * that league from the SAME `featuredFillingLeague` this component would otherwise call, so
    * passing `true` here (rather than recomputing and comparing) is the one place that decision
    * lives. Rule 5's one-ink-per-view budget means the shelf then marks NOTHING `emphasis="ink"`:
    * the module IS that league's featured rendering, and two inked renderings of the same league

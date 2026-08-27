@@ -189,6 +189,51 @@ describe("dissolveLeague — refusals", () => {
   });
 });
 
+/** The house reconciler's own actor id (`HOUSE_RECONCILER_ACTOR`, `@/league-service/house-factory`)
+ *  — spelled out as a plain literal here rather than imported, so this suite stays about
+ *  `dissolveLeague`'s own contract and never reaches into a sibling service module for a string. */
+const RETIREMENT_CALLER = "house-reconciler";
+
+describe("dissolveLeague — expectSeatedCount (wave-1 review A1)", () => {
+  it("refuses a league seated between the retirement candidate read and this call itself, before any write", async () => {
+    await seedLeague({ id: "lg_race", entryFeeCents: FEE });
+    // The retirement caller's own candidate read happened here, computing filledTeams === 0 —
+    // simulated by seating a team AFTER that read but BEFORE `dissolveLeague`'s own transaction
+    // opens, the exact race `expectSeatedCount` exists to catch.
+    await seedUser("u_racer");
+    await db.insert(teams).values({ id: "lg_race_t0", leagueId: "lg_race", userId: "u_racer", name: "Racer" });
+
+    const before = await snapshotSurface();
+    const outcome = await dissolveLeague(
+      db,
+      { leagueId: "lg_race", operatorUserId: RETIREMENT_CALLER, expectSeatedCount: 0 },
+      { clock, audit, newId },
+    );
+    expect(outcome).toEqual({ ok: false, status: 409, reason: DISSOLUTION_REFUSALS.seatsChanged });
+    // No write at all — not even a refund for the racer who just joined.
+    await expectNoDissolutionTookPlace(before);
+    expect(await draftStatusOf("lg_race")).toBe("scheduled");
+  });
+
+  it("the operator door passes no expectation at all, and dissolving a seated league still works exactly as before", async () => {
+    await seedLeague({ id: "lg_operator_seated", entryFeeCents: FEE, filled: 2, commissionerUserId: "u_commish_seated" });
+    const outcome = await dissolveLeague(db, { leagueId: "lg_operator_seated", operatorUserId: OPERATOR }, { clock, audit, newId });
+    expect(outcome).toMatchObject({ ok: true, refundedMembers: 2 });
+    expect(await draftStatusOf("lg_operator_seated")).toBe("dissolved");
+  });
+
+  it("a retirement call whose seated count still matches the expectation dissolves normally", async () => {
+    await seedLeague({ id: "lg_retire_ok" });
+    const outcome = await dissolveLeague(
+      db,
+      { leagueId: "lg_retire_ok", operatorUserId: RETIREMENT_CALLER, expectSeatedCount: 0 },
+      { clock, audit, newId },
+    );
+    expect(outcome).toEqual({ ok: true, refundedMembers: 0, totalRefundedCents: 0 });
+    expect(await draftStatusOf("lg_retire_ok")).toBe("dissolved");
+  });
+});
+
 describe("dissolveLeague — the mark and the browse shelf", () => {
   it("marks the draft dissolved, one way, guarded", async () => {
     await seedLeague({ id: "lg_mark", commissionerUserId: "u_commish" });

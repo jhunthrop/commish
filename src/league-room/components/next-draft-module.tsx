@@ -5,7 +5,7 @@ import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { OpenLeagueCta, ScheduledDraftValue, useOpenLeagueLive } from "./open-league-shared";
 
 export interface NextDraftModuleProps {
-  /** `page.tsx`'s own `featuredScheduledLeague(merged)` read — the SAME merged house-then-member
+  /** `page.tsx`'s own `featuredFillingLeague(merged)` read — the SAME merged house-then-member
    *  list the shelf below renders, so this module and the shelf's featured row/card can never
    *  disagree about which league is next. */
   readonly league: PublicLeagueSummary;
@@ -16,7 +16,7 @@ export interface NextDraftModuleProps {
  * THE NEXT DRAFT (2026-08-25 founder finding, controller-ruled; repointed by storefront review
  * R1): the hero band's right half at xl+ used to be a dead dark field once the headline went
  * left-aligned — "does the hero left-aligned help with visual hierarchy?" This module fills it
- * with the shelf's own featured league (`featuredScheduledLeague`, `./public-league-list` — now
+ * with the shelf's own featured league (`featuredFillingLeague`, `./public-league-list` — now
  * the FULLEST filling room, never a scheduled-kickoff pick a `when_full` shelf has none of left
  * to make) rather than decoration: the league's name, the SAME gated Drafts value the shelf's row
  * and card render (`ScheduledDraftValue`, extracted there rather than forked here — see its own
@@ -36,7 +36,7 @@ export interface NextDraftModuleProps {
  * name — a second heading of that name would be a strict-mode collision for any query keyed on
  * it. The simplest collision-proof shape is not being a heading at all.
  *
- * `page.tsx` decides WHETHER this renders at all (`featuredScheduledLeague` returning `null`
+ * `page.tsx` decides WHETHER this renders at all (`featuredFillingLeague` returning `null`
  * means nothing is scheduled and ticking, and the hero simply keeps its current shape — rule 6,
  * real or absent, never dressed up); this component itself decides only the xl+ visibility, since
  * below that width the shelf is one scroll away and a stacked duplicate of the same league would

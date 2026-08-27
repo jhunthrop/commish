@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, EYEBROW, PositionBadge, Sticker, Textarea } from "@/components/ui";
-import { positionMutedOnFillTextClass } from "@/components/ui/position-badge";
+import { positionOnFillTextClass } from "@/components/ui/position-badge";
 import { Icon } from "@/components/ui/icon";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { ActivityRow } from "@/integrity/activity-view";
@@ -76,14 +76,12 @@ function TradedPlayerList({ heading, players }: { readonly heading: string; read
                 <Sticker position={player.position} className="flex items-center gap-2 px-2 py-1">
                   <PositionBadge position={player.position} size="sm" />
                   <span className="min-w-0 break-words text-sm font-medium">{player.name}</span>
-                  {/* D2 (operator review): the sticker's OWN on-fill role, muted by opacity
-                      rather than swapped for a page-ground `text-text-muted` — that role assumes
-                      a page surface behind it, and every position's saturated fill measured well
-                      under 3:1 against it, in both themes (1.07:1 dark, 1.15:1 light, QB). Opacity
-                      blends the on-fill color TOWARD the fill it already clears ≥4.5:1 against,
-                      so the result stays in that fill's own designed-contrast family — proven for
-                      all six positions, both themes, in `held-trade-detail.test.tsx`. */}
-                  <span className={`shrink-0 text-xs ${positionMutedOnFillTextClass(player.position)}`}>{player.averagePoints.toFixed(1)} pts/wk</span>
+                  {/* Wave-1 review B1: the sticker's OWN on-fill role, at full strength — this is
+                      12px AA body text (≥4.5:1 required), not a UI boundary, so it is never dimmed
+                      by opacity. Set apart from the name beside it by size and weight alone
+                      (`text-xs`, no `font-medium`), proven ≥4.5:1 for all six positions, both
+                      themes, in `held-trade-detail.test.tsx`. */}
+                  <span className={`shrink-0 text-xs ${positionOnFillTextClass(player.position)}`}>{player.averagePoints.toFixed(1)} pts/wk</span>
                 </Sticker>
               )}
             </li>
@@ -219,15 +217,18 @@ export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLeng
         )}
 
         {/* `gap-4`, matching `TradeCard`'s own Accept/Decline row — the only other irreversible
-            button pair in this product. */}
+            button pair in this product. Wave-1 review Q8: while `ConfirmModal` is open, its OWN
+            confirm button is the view's one ink action (`ConfirmModal`'s own docblock, Sunday
+            Standard rule 5) — both triggers step down to the quiet pill for as long as it is,
+            and step back to their ordinary color the moment it closes. */}
         <div className="mt-4 flex flex-wrap gap-4">
           {decisions.includes("trade_released") ? (
-            <Button onClick={() => setConfirming("trade_released")} disabled={submitting}>
+            <Button variant={confirming === null ? "primary" : "secondary"} onClick={() => setConfirming("trade_released")} disabled={submitting}>
               Release the trade
             </Button>
           ) : null}
           {decisions.includes("trade_blocked") ? (
-            <Button variant="destructive" onClick={() => setConfirming("trade_blocked")} disabled={submitting}>
+            <Button variant={confirming === null ? "destructive" : "secondary"} onClick={() => setConfirming("trade_blocked")} disabled={submitting}>
               Block the trade
             </Button>
           ) : null}

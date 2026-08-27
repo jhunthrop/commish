@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button, Input, Textarea } from "@/components/ui";
+import { formatOrdinal } from "@/domain/format";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { formatUsd } from "@/money/config";
 import { useAdminRoomDeps } from "../hooks/deps";
@@ -49,17 +50,12 @@ interface SettleConfirmState {
   readonly leagueName: string;
   readonly escrowCents: number;
   readonly rows: readonly SettleConfirmRow[];
-}
-
-/** "1st", "2nd", "3rd", "4th"… — a local copy of `formatOrdinal`'s own five-line rule
- *  (`@/draft-room/state/format`), duplicated rather than imported: this file is client boundary
- *  code, and reaching into a sibling room's module for five lines of arithmetic would be a new,
- *  undocumented cross-room dependency for no shared behavior worth coupling over. */
-function ordinal(n: number): string {
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
-  const suffix = n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
-  return `${n}${suffix}`;
+  /** Wave-1 review Q7: the preview's own fetched facts, carried through to the confirm body
+   *  rather than fetched and then dropped — an operator settling early (the season is not over
+   *  yet) is a different, riskier act than settling a finished one, and the fee is what the
+   *  escrow figure above it is actually made of. */
+  readonly seasonCompleted: boolean;
+  readonly entryFeeCents: number;
 }
 
 function parseStandings(text: string): readonly SettleStanding[] {
@@ -120,7 +116,14 @@ export function SettleLeagueControl() {
         setError(envelope.error);
         return;
       }
-      setConfirming({ leagueId: trimmed, leagueName: envelope.data.leagueName, escrowCents: envelope.data.escrowCents, rows: buildConfirmRows(standings, envelope.data) });
+      setConfirming({
+        leagueId: trimmed,
+        leagueName: envelope.data.leagueName,
+        escrowCents: envelope.data.escrowCents,
+        rows: buildConfirmRows(standings, envelope.data),
+        seasonCompleted: envelope.data.seasonCompleted,
+        entryFeeCents: envelope.data.entryFeeCents,
+      });
     } catch {
       setError("We could not reach the server. Check your connection and try again.");
     } finally {
@@ -216,13 +219,19 @@ export function SettleLeagueControl() {
           body={
             <div className="flex flex-col gap-2">
               <p>Pay {confirming.leagueName}&apos;s prize table and close its escrow. This cannot be undone.</p>
+              <p className="text-sm">
+                {confirming.seasonCompleted
+                  ? "Season complete."
+                  : "Season not yet complete. Settling now closes its escrow early."}{" "}
+                Entry fee: {formatUsd(confirming.entryFeeCents)}.
+              </p>
               {confirming.rows.length === 0 ? (
                 <p className="text-sm">No standings were entered. No prize will be paid.</p>
               ) : (
                 <ul className="flex flex-col gap-1 text-sm">
                   {confirming.rows.map((row) => (
                     <li key={row.place}>
-                      {ordinal(row.place)}: {row.displayName}
+                      {formatOrdinal(row.place)}: {row.displayName}
                       {row.knownMember ? null : " (not on this league's roster)"}, {formatUsd(row.amountCents)}
                     </li>
                   ))}

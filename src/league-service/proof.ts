@@ -1,7 +1,6 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
-import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG } from "@/league/config";
 import { ENFORCED_LEAGUE_SQL } from "@/league-service/enforcement";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
@@ -10,12 +9,6 @@ import { reviewAggregate } from "@/review-service/reviews";
 
 /** A draft that actually ran — never `'scheduled'`, which is a room still waiting on a seat. */
 const DRAFTED_STATUSES = ["in_progress", "complete"] as const;
-
-export interface ProofStatsDeps {
-  /** Defaults to the real wall clock. Every test in `proof.test.ts` injects one, per this
-   *  module's own "never `Date.now()` outside the edge" rule. */
-  readonly clock?: Clock;
-}
 
 /**
  * "Leagues filled this season" (Phase 3.6, Task 4) — a claim about rooms that got to draft, not
@@ -139,13 +132,13 @@ export function tightestRoomQuery(db: Db) {
  * display is this module's call to make, the same separation `summarizeRow`
  * (`@/league-service/browse.ts`) draws between a row's raw fields and its derived, rendered ones.
  *
- * `deps.clock` is UNREAD here (storefront review R1: neither "filling" query takes a time window
- * any more, and neither ever did for `leaguesFilledQuery`/`reviewAggregate`) — `ProofStatsDeps`
- * keeps the field anyway rather than breaking every existing caller's `{ clock }` shape over a
- * plumbing change, and `proof.test.ts`'s own `deps` fixture is untouched by it.
+ * TAKES NO CLOCK (wave-1 review LOW, closing the dead-param drift): neither "filling" query takes
+ * a time window any more, and neither ever did for `leaguesFilledQuery`/`reviewAggregate`
+ * (storefront review R1) — the `ProofStatsDeps`/`deps.clock` parameter this function used to
+ * accept, unread, purely for backward call-site compatibility, is gone along with every call site
+ * that still threaded a clock into it for no reason.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for API compatibility, see this function's own docblock
-export async function proofStats(db: Db, _deps: ProofStatsDeps = {}): Promise<ProofStats> {
+export async function proofStats(db: Db): Promise<ProofStats> {
   const floors = MATCHMAKING_CONFIG.proof.floors;
 
   const [[filledRow], [fillingRow], [tightestRow], aggregate] = await Promise.all([

@@ -9,7 +9,7 @@ import { browseQuery } from "./browse";
 import { completedSeasonsFor } from "./participation";
 import { myLeaguesOverview } from "./read";
 import { listWireItems } from "./wire";
-import { leaguesFilledQuery, proofStats, type ProofStatsDeps } from "./proof";
+import { leaguesFilledQuery, proofStats } from "./proof";
 
 const db = createTestDb();
 
@@ -23,7 +23,9 @@ const DEFAULT_CREATED_AT = new Date("2026-08-15T00:00:00.000Z");
 const NOW = "2026-09-10T12:00:00.000Z";
 const DEFAULT_KICKOFF = new Date("2026-09-20T00:00:00.000Z");
 
-const deps: ProofStatsDeps = { clock: fixedAt(NOW) };
+// `proofStats` (wave-1 review LOW) reads no clock of its own any more — `clock` below is still
+// needed by `listWireItems` at the bottom of this file.
+const clock = fixedAt(NOW);
 
 let leagueSeq = 0;
 
@@ -205,7 +207,7 @@ describe("proofStats — leaguesFilled", () => {
     // still fall over. 30 clears the floor (25) so the assertion also proves the floor did not
     // silently swallow a real number.
     await seedLeagues({ drafted: 30, full: 5, filling: 10 });
-    expect((await proofStats(db, deps)).leaguesFilled).toBe(30);
+    expect((await proofStats(db)).leaguesFilled).toBe(30);
   });
 
   it("excludes a league created before this season started, even once its draft has run", async () => {
@@ -215,12 +217,12 @@ describe("proofStats — leaguesFilled", () => {
       createdAt: new Date(new Date(LEAGUE_CONFIG.season.startedAt).getTime() - 24 * 60 * 60 * 1000),
     });
     // Still 30, not 31 — the prior-season league drafted too, and does not count anyway.
-    expect((await proofStats(db, deps)).leaguesFilled).toBe(30);
+    expect((await proofStats(db)).leaguesFilled).toBe(30);
   });
 
   it("hides leaguesFilled below its own floor, rather than printing a small number big", async () => {
     await seedLeagues({ drafted: MATCHMAKING_CONFIG.proof.floors.leaguesFilled - 1, full: 0, filling: 0 });
-    expect((await proofStats(db, deps)).leaguesFilled).toBeNull();
+    expect((await proofStats(db)).leaguesFilled).toBeNull();
   });
 });
 
@@ -240,15 +242,14 @@ describe("proofStats — roomsFillingNow (storefront review R1)", () => {
     // Already drafting — a visitor cannot join a room that is no longer `'scheduled'`.
     await seedFillingLeague({ teamCount: 12, filledTeams: 5, draftStatus: "in_progress" });
 
-    const stats = await proofStats(db, deps);
+    const stats = await proofStats(db);
     expect(stats.roomsFillingNow).toBe(3);
   });
 
   it("hides roomsFillingNow below its own floor", async () => {
     await seedFillingLeague({ teamCount: 12, filledTeams: 2 });
-    await seedFillingLeague({ teamCount: 12, filledTeams: 1 });
-    expect(MATCHMAKING_CONFIG.proof.floors.roomsFillingNow).toBe(3);
-    expect((await proofStats(db, deps)).roomsFillingNow).toBeNull();
+    expect(MATCHMAKING_CONFIG.proof.floors.roomsFillingNow).toBe(2);
+    expect((await proofStats(db)).roomsFillingNow).toBeNull();
   });
 
   it("counts a when_full room exactly like a scheduled one — this fact never reads start_trigger", async () => {
@@ -278,14 +279,14 @@ describe("proofStats — roomsFillingNow (storefront review R1)", () => {
     await seedFillingLeague({ teamCount: 12, filledTeams: 4 });
     await seedFillingLeague({ teamCount: 12, filledTeams: 1 });
 
-    expect((await proofStats(db, deps)).roomsFillingNow).toBe(3);
+    expect((await proofStats(db)).roomsFillingNow).toBe(3);
   });
 });
 
 describe("proofStats — rating", () => {
   it("hides a stat that has not earned belief yet, rather than printing a small number big", async () => {
     await seedReviews(MATCHMAKING_CONFIG.proof.floors.reviewCount - 1);
-    expect((await proofStats(db, deps)).rating).toBeNull();
+    expect((await proofStats(db)).rating).toBeNull();
   });
 
   it("reports the review count beside the average, because an average with no n is a slogan", async () => {
@@ -293,7 +294,7 @@ describe("proofStats — rating", () => {
     // one-decimal precision a stranger would actually read on the front door.
     const ratings = [...Array<number>(51).fill(5), ...Array<number>(12).fill(4)];
     await seedReviews(63, { ratings });
-    expect((await proofStats(db, deps)).rating).toEqual({ average: 4.8, count: 63 });
+    expect((await proofStats(db)).rating).toEqual({ average: 4.8, count: 63 });
   });
 
   it("never lets a removed review nudge the average or the count", async () => {
@@ -301,7 +302,7 @@ describe("proofStats — rating", () => {
     await seedReviews(63, { ratings });
     // A pile of one-star removed reviews that would drag the average down hard if counted.
     await seedReviews(10, { ratings: Array<number>(10).fill(1), removed: true });
-    expect((await proofStats(db, deps)).rating).toEqual({ average: 4.8, count: 63 });
+    expect((await proofStats(db)).rating).toEqual({ average: 4.8, count: 63 });
   });
 });
 
@@ -314,18 +315,18 @@ describe("proofStats — tightestRoomSeatsRemaining (storefront review R1)", () 
     await seedFillingLeague({ teamCount: 2, filledTeams: 1, isPublicMatchmade: false }); // 1, hidden
     // A room already drafting is not a room anybody can still sit down in.
     await seedFillingLeague({ teamCount: 2, filledTeams: 1, draftStatus: "in_progress" });
-    expect((await proofStats(db, deps)).tightestRoomSeatsRemaining).toBe(1);
+    expect((await proofStats(db)).tightestRoomSeatsRemaining).toBe(1);
   });
 
   it("is null when nothing is filling, and never counts an empty or already-full room", async () => {
     await seedFillingLeague({ teamCount: 12, filledTeams: 0 });
     await seedFillingLeague({ teamCount: 2, filledTeams: 2 });
-    expect((await proofStats(db, deps)).tightestRoomSeatsRemaining).toBeNull();
+    expect((await proofStats(db)).tightestRoomSeatsRemaining).toBeNull();
   });
 
   it("never lets tightestRoomSeatsRemaining alone show the strip: `any` is untouched and ignores it", async () => {
     await seedFillingLeague({ teamCount: 12, filledTeams: 4 });
-    const stats = await proofStats(db, deps);
+    const stats = await proofStats(db);
     expect(stats.tightestRoomSeatsRemaining).not.toBeNull();
     // One filling room is below every floor — the chip rides a strip other numbers earned, it
     // never carries the strip itself.
@@ -336,7 +337,7 @@ describe("proofStats — tightestRoomSeatsRemaining (storefront review R1)", () 
 describe("proofStats — the whole strip", () => {
   it("hides the whole strip when every stat is below its floor, and says nothing at all", async () => {
     await truncateAll(db);
-    expect(await proofStats(db, deps)).toEqual({
+    expect(await proofStats(db)).toEqual({
       leaguesFilled: null,
       roomsFillingNow: null,
       rating: null,
@@ -347,7 +348,7 @@ describe("proofStats — the whole strip", () => {
 
   it("shows the strip once even one stat clears its floor", async () => {
     await seedLeagues({ drafted: MATCHMAKING_CONFIG.proof.floors.leaguesFilled, full: 0, filling: 0 });
-    const stats = await proofStats(db, deps);
+    const stats = await proofStats(db);
     expect(stats.any).toBe(true);
     expect(stats.leaguesFilled).not.toBeNull();
     expect(stats.roomsFillingNow).toBeNull();
@@ -357,7 +358,7 @@ describe("proofStats — the whole strip", () => {
   it("defaults to the real wall clock when no clock is injected", async () => {
     // Not asserting a value — only that the edge default exists and the call does not throw,
     // the same smoke-test shape `listPublicLeagues`'s own `clock = systemClock` default gets.
-    await expect(proofStats(db, {})).resolves.toBeDefined();
+    await expect(proofStats(db)).resolves.toBeDefined();
   });
 });
 
@@ -387,7 +388,7 @@ describe("the exclusion suite — a mock draft counts nowhere a real aggregate w
   it("keeps every mock off the wire, the browse shelf and the locker room", async () => {
     const { leagueId, hostUserId } = await seedCompletedMockRoom();
 
-    expect(await listWireItems(db, deps.clock)).toHaveLength(0);
+    expect(await listWireItems(db, clock)).toHaveLength(0);
     expect(await browseQuery(db, EMPTY_BROWSE_FILTER)).toHaveLength(0);
 
     const overview = await myLeaguesOverview(db, hostUserId);

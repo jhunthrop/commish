@@ -117,10 +117,18 @@ export const MATCHMAKING_CONFIG = {
        * Storefront review R1: renamed from `draftsNext48h` — below this, "N rooms filling now"
        * reads as a startup counting its friends, the identical reasoning `leaguesFilled` already
        * carries, applied to the fill-based fact that replaced a scheduled-kickoff count no
-       * `when_full` shelf produces any more. Same threshold, same register: three is still the
-       * floor below which a count reads as a schedule rather than a signal.
+       * `when_full` shelf produces any more.
+       *
+       * DROPPED 3 → 2 (Q4, wave-1 review), THE E13 ARITHMETIC: post-storefront-review-E13, the
+       * house catalog (`HOUSE_CATALOG`, `@/matchmaking/house-catalog`) stands exactly
+       * `openAtOnce: 1` open on `open_12` and `beginner_12` apiece — `sitandgo_12` retired to
+       * `openAtOnce: 0` — so the shelf's own MAXIMUM standing house supply is `1 + 1 = 2`. A
+       * floor of `3` was not a credibility threshold any more, it was a structural ceiling: house
+       * rooms alone could never clear it, and this stat would read `null` on a healthy shelf
+       * exactly as often as an empty one, member-created rooms aside. `2` is the highest floor
+       * this fact can still cross on house supply alone.
        */
-      roomsFillingNow: 3,
+      roomsFillingNow: 2,
       /** Below this, an average rating is one person's mood. */
       reviewCount: 20,
     },

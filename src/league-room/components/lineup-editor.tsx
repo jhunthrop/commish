@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { DraftStatus } from "@/domain/draft";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
 import { Button, InfoTip, Select, SlotChip } from "@/components/ui";
@@ -24,6 +25,7 @@ export function LineupEditor({
   lineup,
   totalWeeks,
   helpLevel,
+  draftStatus,
 }: {
   readonly leagueId: string;
   readonly lineup: LineupBody;
@@ -33,6 +35,12 @@ export function LineupEditor({
   /** Forwarded from `LeagueHome`. Omitted only by tests that don't care about this branch —
    *  `InfoTip` itself defaults to the click-only, non-inline behavior when it's absent. */
   readonly helpLevel?: HelpLevel;
+  /** Wave-1 review Q10, SETTLED: `home.draftStatus`, threaded from both `LeagueHome` call sites
+   *  — the fact itself, not an inference over the lineup's own empty slots. Optional only for a
+   *  caller that genuinely does not know it yet (never true at either real call site); `null` and
+   *  `undefined` both read as "not yet drafted", the defensive-fallback direction only, so an
+   *  absent fact can never hide a lineup a member is actually supposed to be setting. */
+  readonly draftStatus?: DraftStatus | null;
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const [assignments, setAssignments] = useState<Readonly<Record<string, string | null>>>(
@@ -55,10 +63,15 @@ export function LineupEditor({
   // League-life review D2 (2026-08-27): a league whose draft has not run has NOTHING on any
   // roster — and the locked branch below told that first-timer "Week 1 has started, so its
   // lineup cannot change" over nine Empty rows. Week 1 had not started; the slots were empty
-  // because nobody had drafted. A rosterless lineup is exactly the pre-draft state (a drafted
-  // team always holds players), so it gets the honest sentence and no scaffold at all.
-  const rosterless = [...lineup.starters, ...lineup.bench].every((slot) => slot.playerId === null);
-  if (rosterless) {
+  // because nobody had drafted, so it gets the honest sentence and no scaffold at all.
+  //
+  // Wave-1 review Q10, SETTLED: branches on `draftStatus`, the fact itself, threaded from both
+  // `LeagueHome` call sites — never on the lineup's own empty slots any more. The original
+  // fix inferred "pre-draft" from every slot reading `playerId === null`, which happened to be
+  // true whenever the draft had not run, but was never the actual fact being asked about; the
+  // inference is deleted outright, not kept as a fallback, per this ruling.
+  const preDraft = draftStatus !== "in_progress" && draftStatus !== "complete";
+  if (preDraft) {
     return (
       <section id="lineup" className="flex flex-col gap-2">
         <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>

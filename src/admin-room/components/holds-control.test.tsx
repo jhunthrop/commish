@@ -76,6 +76,47 @@ describe("HoldsControl", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("$44.00 confiscated to the platform.");
   });
 
+  it("keeps at most one primary-ink button on screen while a confirm dialog is open (wave-1 review Q8)", async () => {
+    const fixture = fixtureAdminDeps({ ok: true, data: { userId: "u_1", displayName: "Alice", heldCents: 80_00 } });
+    renderInAdmin(<HoldsControl />, fixture.deps);
+
+    const primaryButtonCount = (): number =>
+      screen.getAllByRole("button").filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-text-primary")).length;
+
+    // Before any dialog: "Release hold" is the page's own primary trigger.
+    expect(primaryButtonCount()).toBe(1);
+
+    fireEvent.change(screen.getByLabelText("Member id"), { target: { value: "u_1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Release hold" }));
+    const dialog = await screen.findByRole("dialog");
+
+    // While confirming a RELEASE (the modal's own button is primary), the underlying "Release
+    // hold" trigger has stepped down to secondary — exactly one primary button remains: the
+    // modal's own.
+    expect(primaryButtonCount()).toBe(1);
+    expect(within(dialog).getByRole("button", { name: "Release Alice's hold" }).className).toContain("bg-text-primary");
+    expect(screen.getByRole("button", { name: "Release hold" }).className).not.toContain("bg-text-primary");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    // Closed: the trigger returns to its ordinary ink.
+    expect(primaryButtonCount()).toBe(1);
+  });
+
+  it("leaves zero primary-ink buttons on screen while confirming a confiscate (its own confirm is destructive, not primary)", async () => {
+    const fixture = fixtureAdminDeps({ ok: true, data: { userId: "u_2", displayName: "Bob", heldCents: 44_00 } });
+    renderInAdmin(<HoldsControl />, fixture.deps);
+
+    fireEvent.change(screen.getByLabelText("Member id"), { target: { value: "u_2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confiscate hold" }));
+    await screen.findByRole("dialog");
+
+    const primaryButtons = screen
+      .getAllByRole("button")
+      .filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-text-primary"));
+    expect(primaryButtons).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Release hold" }).className).not.toContain("bg-text-primary");
+  });
+
   it("refuses before opening a dialog when nothing is held", async () => {
     const fixture = fixtureAdminDeps({ ok: true, data: { userId: "u_3", displayName: "Cara", heldCents: 0 } });
     renderInAdmin(<HoldsControl />, fixture.deps);

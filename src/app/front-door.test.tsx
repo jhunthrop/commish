@@ -17,7 +17,7 @@ import { listPublicLeagues } from "@/league-service/browse";
 import { getProofCache } from "@/league-service/proof-cache-instance";
 import { listWireItems } from "@/league-service/wire";
 import { UI_CONFIG } from "@/components/ui/config";
-import { featuredLeagueId, featuredScheduledLeague } from "@/league-room/components/public-league-list";
+import { featuredLeagueId, featuredFillingLeague } from "@/league-room/components/public-league-list";
 import { PUBLIC_LEAGUES } from "@/league-room/test-fixtures";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import Home from "./page";
@@ -60,7 +60,7 @@ const FULLEST_FILLING: PublicLeagueSummary = {
 };
 
 /** Every league at zero seats — the shape under which nothing on the shelf is genuinely
- *  "filling" (storefront review R1), so `featuredScheduledLeague` answers `null` and the hero's
+ *  "filling" (storefront review R1), so `featuredFillingLeague` answers `null` and the hero's
  *  module stays absent. */
 const NOTHING_FILLING: readonly PublicLeagueSummary[] = PUBLIC_LEAGUES.map((league) => ({ ...league, filledTeams: 0 }));
 
@@ -228,9 +228,9 @@ describe("the front door's Next Draft module — page-level wiring (2026-08-25 h
     // `page.tsx` derives ONE feature and threads it to both children, rather than the module and
     // the shelf each computing (and risking disagreeing on) their own.
     const merged = [FULLEST_FILLING, PUBLIC_LEAGUES[1]!];
-    expect(featuredScheduledLeague(merged)?.id).toBe(FULLEST_FILLING.id);
+    expect(featuredFillingLeague(merged)?.id).toBe(FULLEST_FILLING.id);
     expect(featuredLeagueId(merged)).toBe(FULLEST_FILLING.id);
-    expect(within(nextDraftModule).getByText(FULLEST_FILLING.name).textContent).toBe(featuredScheduledLeague(merged)!.name);
+    expect(within(nextDraftModule).getByText(FULLEST_FILLING.name).textContent).toBe(featuredFillingLeague(merged)!.name);
   });
 
   // (4) the paired case: nothing filling means no module at all, and the shelf's OWN featured

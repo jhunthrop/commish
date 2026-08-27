@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, drafts, leagues, players, scoringSettings, teams, users } from "@/db/schema";
+import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
+import { auditEvents, drafts, leagues, moneyAccounts, moneyEntries, moneyTransactions, players, scoringSettings, seatHolds, teams, users } from "@/db/schema";
 import type { Db } from "@/db/client";
 import { autoStartDueDrafts } from "@/draft-service/auto-start";
 import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
@@ -93,6 +93,13 @@ async function seedLegacyHouseLeague(target: Db, rung: HouseRungName, edition: n
   return leagueId;
 }
 
+/** A live or expired seat hold against `leagueId`, keyed by `token` — the shape `liveHoldsFor`
+ *  (`@/league-service/seat-hold.ts`) reads, seeded directly since no visitor-facing door in this
+ *  suite ever claims one. */
+async function seedSeatHold(target: Db, leagueId: string, token: string, expiresAt: string): Promise<void> {
+  await target.insert(seatHolds).values({ token, leagueId, expiresAt: new Date(expiresAt) });
+}
+
 async function draftIdOf(target: Db, leagueId: string): Promise<string> {
   const [row] = await target.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, leagueId));
   if (row === undefined) throw new Error(`no draft for ${leagueId}`);
@@ -101,6 +108,38 @@ async function draftIdOf(target: Db, leagueId: string): Promise<string> {
 
 async function startDraftOf(target: Db, leagueId: string): Promise<void> {
   await target.update(drafts).set({ status: "in_progress" }).where(eq(drafts.leagueId, leagueId));
+}
+
+/** A plain member-created league, `houseRung: null`, 0 seated, `'scheduled'` — the shape
+ *  `retirementCandidates` must never select from, since `open` (its own input) always comes from
+ *  ONE rung's own `openHouseLeaguesQuery` result (LOW, wave-1 review: the negative test that
+ *  proof relies on had no fixture to check itself against before this). */
+async function seedMemberLeague(target: Db, id: string): Promise<void> {
+  const commissionerUserId = `${id}_owner`;
+  await target.insert(users).values({ id: commissionerUserId, email: `${commissionerUserId}@test.local`, displayName: commissionerUserId }).onConflictDoNothing();
+  await target.insert(leagues).values({
+    id,
+    name: id,
+    format: "snake",
+    teamCount: 12,
+    stakeTier: 0,
+    experienceTier: "beginner",
+    isPublicMatchmade: true,
+    commissionerUserId,
+    houseRung: null,
+    entryFeeCents: 0,
+    platformFeeCents: 0,
+    payoutTable: null,
+  });
+  await target.insert(drafts).values({
+    id: `${id}_draft`,
+    leagueId: id,
+    format: "snake",
+    status: "scheduled",
+    kickoffAt: new Date(Date.parse(NOW) + 7 * 24 * 60 * 60 * 1000),
+    auctionBudget: null,
+    startTrigger: "scheduled",
+  });
 }
 
 interface Snapshot {
@@ -121,12 +160,14 @@ async function snapshotOf(target: Db): Promise<Snapshot> {
 
 beforeEach(async () => {
   await truncateAll(db);
+  await truncateMoneyTables(db);
   nextId = 0;
   filler = 0;
 });
 
 afterAll(async () => {
   await truncateAll(db);
+  await truncateMoneyTables(db);
 });
 
 describe("ensureHouseCatalog", () => {
@@ -518,6 +559,40 @@ describe("ensureHouseCatalog retires surplus empties (storefront review E13)", (
     }
   });
 
+  /**
+   * WAVE-1 REVIEW A2: a 0-seated house league is not the same as an UNCLAIMED one — a visitor
+   * mid-claim through `claimSeatHold` has ten minutes on a seat this reconciler must not pull out
+   * from under them. `open_12` (edition 1, oldest) and `beginner_12` are seeded so the surplus
+   * (2 over `openAtOnce: 1`) would otherwise retire edition 1 first; the live hold on it makes
+   * edition 2 — the next oldest empty, hold-free league — the one actually retired instead.
+   */
+  it("never retires a 0-seated league carrying a LIVE seat hold, retiring the next oldest empty league instead", async () => {
+    await seedLegacyHouseLeague(db, "open_12", 1);
+    await seedLegacyHouseLeague(db, "open_12", 2);
+    await seedSeatHold(db, "house_open_12_1", "hold_live", new Date(Date.parse(NOW) + 10 * 60 * 1000).toISOString());
+
+    await ensureHouseCatalog(db, deps());
+
+    const [held] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, "house_open_12_1"));
+    expect(held?.status).toBe("scheduled");
+    const [other] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, "house_open_12_2"));
+    expect(other?.status).toBe("dissolved");
+  });
+
+  it("an EXPIRED hold no longer protects a 0-seated league from retirement", async () => {
+    await seedLegacyHouseLeague(db, "open_12", 1);
+    await seedLegacyHouseLeague(db, "open_12", 2);
+    await seedSeatHold(db, "house_open_12_1", "hold_expired", new Date(Date.parse(NOW) - 60 * 1000).toISOString());
+
+    await ensureHouseCatalog(db, deps());
+
+    // The oldest-first rule reasserts itself the instant the hold no longer counts as live.
+    const [expiredHeld] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, "house_open_12_1"));
+    expect(expiredHeld?.status).toBe("dissolved");
+    const [survivor] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, "house_open_12_2"));
+    expect(survivor?.status).toBe("scheduled");
+  });
+
   it("bounds retirement at DRAFT_SERVICE_CONFIG.maxHouseRetiresPerRun per reconcile, finishing on the next tick", async () => {
     const surplusCount = DRAFT_SERVICE_CONFIG.maxHouseRetiresPerRun + 2;
     for (let edition = 1; edition <= surplusCount; edition += 1) {
@@ -539,6 +614,40 @@ describe("ensureHouseCatalog retires surplus empties (storefront review E13)", (
     await seedLegacyHouseLeague(db, "open_12", 2);
     const outcome = await ensureHouseCatalog(db, deps());
     expect(outcome.retired).toEqual(["house_open_12_1"]);
+  });
+
+  // LOW (wave-1 review): a non-house league is never a candidate, even 0-seated, even alongside
+  // a genuine house surplus in the same tick — `retirementCandidates`' own `open` input always
+  // comes from ONE rung's own `openHouseLeaguesQuery` result, scoped to `leagues.house_rung =
+  // rungName`, so a member league could never even be constructed as a candidate id.
+  it("never retires a non-house league, even 0-seated, alongside a real house surplus", async () => {
+    await seedMemberLeague(db, "member_lg_1");
+    await seedLegacyHouseLeague(db, "open_12", 1);
+    await seedLegacyHouseLeague(db, "open_12", 2);
+
+    await ensureHouseCatalog(db, deps());
+
+    const [memberDraft] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, "member_lg_1"));
+    expect(memberDraft?.status).toBe("scheduled");
+    // The house surplus still retired exactly as every other test in this block proves —
+    // the member league's survival is not because nothing retired this tick.
+    expect(await openCountOf(db, "open_12")).toBe(HOUSE_CATALOG.rungs.open_12.openAtOnce);
+  });
+
+  // LOW (wave-1 review): an empty league's dissolution is a no-op over the money book
+  // (`dissolveLeague`'s own docblock, "the free-season law") — asserted here by TABLE COUNT
+  // across all three money tables, not by inference, so a future regression that posts even one
+  // stray statement for a retirement nobody funded reddens directly.
+  it("writes zero money_* rows for an empty retirement", async () => {
+    await seedLegacyHouseLeague(db, "open_12", 1);
+    await seedLegacyHouseLeague(db, "open_12", 2);
+
+    const outcome = await ensureHouseCatalog(db, deps());
+    expect(outcome.retired.length).toBeGreaterThan(0);
+
+    expect(await db.select().from(moneyAccounts)).toHaveLength(0);
+    expect(await db.select().from(moneyTransactions)).toHaveLength(0);
+    expect(await db.select().from(moneyEntries)).toHaveLength(0);
   });
 
   it("lets a fun-named spawn appear once the legacy surplus clears and the survivor fills (integration through ensureHouseCatalog)", async () => {

@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import type { Position } from "@/domain/player";
-import { blendOver, contrastRatio } from "@/design/test-support";
+import { contrastRatio } from "@/design/test-support";
 import { TOKENS, type ThemeName } from "@/design/tokens";
 import { renderSurface } from "@/components/ui/test-utils";
 import { AdminRoomDepsProvider } from "../hooks/deps";
@@ -138,6 +138,40 @@ describe("HeldTradeDetail", () => {
     expect(fixture.calls).toEqual(["POST /api/admin/flags/flag_1/resolve"]);
   });
 
+  it("keeps at most one primary-ink button on screen while a confirm dialog is open (wave-1 review Q8)", async () => {
+    const fixture = fixtureAdminDeps();
+    renderInAdmin(<HeldTradeDetail flagId="flag_1" subject={SUBJECT} trail={[]} decisions={BOTH_DECISIONS} noteMaxLength={500} />, fixture.deps);
+
+    const primaryButtonCount = (): number =>
+      screen.getAllByRole("button").filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-text-primary")).length;
+
+    // Before any dialog: "Release the trade" is the page's own primary trigger.
+    expect(primaryButtonCount()).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Release the trade" }));
+    await screen.findByRole("dialog");
+    // While confirming a RELEASE (the modal's own confirm is primary), the underlying trigger has
+    // stepped down to secondary — exactly one primary button remains: the modal's own.
+    expect(primaryButtonCount()).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    // Closed: the trigger returns to its ordinary ink.
+    expect(primaryButtonCount()).toBe(1);
+  });
+
+  it("leaves zero primary-ink buttons on screen while confirming a block (its own confirm is destructive, not primary)", async () => {
+    const fixture = fixtureAdminDeps();
+    renderInAdmin(<HeldTradeDetail flagId="flag_1" subject={SUBJECT} trail={[]} decisions={BOTH_DECISIONS} noteMaxLength={500} />, fixture.deps);
+
+    fireEvent.click(screen.getByRole("button", { name: "Block the trade" }));
+    await screen.findByRole("dialog");
+
+    const primaryButtons = screen
+      .getAllByRole("button")
+      .filter((button) => !(button as HTMLButtonElement).disabled && button.className.includes("bg-text-primary"));
+    expect(primaryButtons).toHaveLength(0);
+  });
+
   it("cancels back to no dialog with nothing submitted", () => {
     const fixture = fixtureAdminDeps();
     renderInAdmin(<HeldTradeDetail flagId="flag_1" subject={SUBJECT} trail={[]} decisions={BOTH_DECISIONS} noteMaxLength={500} />, fixture.deps);
@@ -186,25 +220,25 @@ describe("HeldTradeDetail", () => {
   });
 
   /**
-   * D2 (operator review, 2026-08-27): `TradedPlayerList`'s `pts/wk` caption used to carry
-   * `text-text-muted` — a page-ground role — inside a `Sticker`'s own saturated fill, and
-   * measured 1.07:1 in dark and 1.15:1 in light (both on QB), well under WCAG's 3:1 floor for a
-   * UI-adjacent label. The fix mutes the sticker's OWN on-fill role (`positionMutedOnFillTextClass`,
-   * `@/components/ui/position-badge`) by opacity instead of swapping the color family — proven
-   * here for every position, both themes, against the ACTUAL rendered contrast rather than the
-   * un-blended token pair `tokens.test.ts` already checks (`PositionColor.stickerText` alone).
+   * D2 (operator review, 2026-08-27) found `TradedPlayerList`'s `pts/wk` caption carrying
+   * `text-text-muted` — a page-ground role — inside a `Sticker`'s own saturated fill, measuring
+   * 1.07:1 in dark and 1.15:1 in light (both on QB), well under WCAG's floor. The FIRST fix
+   * (opacity-blending the sticker's own on-fill role) only ever cleared a 3:1 UI-boundary floor.
+   * Wave-1 review B1 corrected that: at 12px this caption IS AA body text, not a UI boundary, so
+   * the floor is 4.5:1, and the caption renders the sticker's own on-fill role
+   * (`positionOnFillTextClass`, `@/components/ui/position-badge`) at FULL strength — set apart
+   * from the name beside it by size and weight alone, never by dimming the color. Proven here for
+   * every position, both themes, against the ACTUAL rendered contrast rather than the un-blended
+   * token pair `tokens.test.ts` already checks (`PositionColor.stickerText` alone).
    */
   const ALL_POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
   const THEMES: readonly ThemeName[] = ["dark", "light"];
 
   it.each(THEMES.flatMap((theme) => ALL_POSITIONS.map((position) => ({ theme, position }))))(
-    "keeps the muted pts/wk caption at or above 3:1 against its own sticker fill — $theme $position",
+    "keeps the pts/wk caption at or above 4.5:1 against its own sticker fill — $theme $position",
     ({ theme, position }) => {
       const { sticker, stickerText } = TOKENS.position[theme][position.toLowerCase() as Lowercase<Position>];
-      // The exact math `opacity-80` performs: the on-fill label blended 80% toward itself, 20%
-      // toward the fill behind it — a real CSS `opacity` on an element painted over that fill.
-      const muted = blendOver(stickerText, 0.8, sticker);
-      expect(contrastRatio(muted, sticker)).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(stickerText, sticker)).toBeGreaterThanOrEqual(4.5);
     },
   );
 });

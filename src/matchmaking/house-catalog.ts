@@ -120,14 +120,24 @@ const CANON = {
  * rung — the fields stay on `HouseRung` (a future `"scheduled"` rung would need them again) but
  * nothing reads them as anything but zero today.
  *
- * `sitandgo_12` (`openAtOnce: 0`) — RETIRED. `open_12` IS the sit-and-go now, so the shelf never
- * spawns a `sitandgo_12` league again. The key and its label stay in the catalog and in
- * `HouseRungName` because existing rows in `leagues.house_rung` still carry `'sitandgo_12'`, and
- * dropping the key would leave those rows pointing at a rung `HOUSE_RUNG_LABEL`/`HouseRungName`
- * no longer recognize. `ensureHouseCatalog`'s shortfall arithmetic already treats `openAtOnce: 0`
- * as "never short" without a guard (`rung.openAtOnce * 3` attempt ceiling is `0`, and
- * `open.length >= rung.openAtOnce` is true at zero leagues too), so retiring a rung to zero width
- * needed no new code, only this declaration.
+ * `sitandgo_12` (`openAtOnce: 0`) — RETIRED, AND ACTIVELY DRAINING (Q1, wave-1 review — the
+ * semantics the storefront review's own retirement arm, E13, gave this declaration after it was
+ * first written). `open_12` IS the sit-and-go now, so the shelf never spawns a `sitandgo_12`
+ * league again — that half was true the day this rung dropped to `openAtOnce: 0`, before
+ * `ensureHouseCatalog` retired anything at all (`rung.openAtOnce * 3` attempt ceiling is `0`, and
+ * `open.length >= rung.openAtOnce` is true at zero leagues too, so the shortfall loop needed no
+ * guard). But `openAtOnce: 0` is also `retirementCandidates`' own surplus arithmetic
+ * (`@/league-service/house-factory.ts`): `surplus = open.length - openAtOnce` is `open.length`
+ * itself when `openAtOnce` is zero, so EVERY currently-open `sitandgo_12` league is surplus, not
+ * only future ones. Any that is still empty and holds no live seat claim (wave-1 review A2) is a
+ * retirement candidate on the very next reconcile — the rung does not merely stop growing, it is
+ * walked down to zero, one empty league per tick, bounded by
+ * `DRAFT_SERVICE_CONFIG.maxHouseRetiresPerRun` the same as any other rung's surplus. A league a
+ * member is actually sitting in survives exactly as long as it stays seated, the ordinary
+ * never-evict-a-seated-manager rule. The key and its label stay in the catalog and in
+ * `HouseRungName` regardless of how many rows survive, because existing rows in
+ * `leagues.house_rung` still carry `'sitandgo_12'`, and dropping the key would leave those rows
+ * pointing at a rung `HOUSE_RUNG_LABEL`/`HouseRungName` no longer recognize.
  */
 export const HOUSE_CATALOG = {
   rungs: {

@@ -91,10 +91,12 @@ export function filledLeaguesQuery(db: Db) {
 }
 
 /**
- * Round-robin across the four kinds rather than concatenation, so the capped ticker reads as
- * varied activity the way the approved mock's does — a burst of twelve claims never crowds the
- * one season-count item off the wire. Deterministic: source order within a kind is each query's
- * own `ORDER BY`, and the rotation order is fixed by the caller's list order.
+ * Round-robin across the three kinds (seat claims, filled leagues, the season count — down from
+ * four once storefront review R1 retired `draft_tonight`, see `listWireItems`'s own docblock)
+ * rather than concatenation, so the capped ticker reads as varied activity the way the approved
+ * mock's does — a burst of twelve claims never crowds the one season-count item off the wire.
+ * Deterministic: source order within a kind is each query's own `ORDER BY`, and the rotation
+ * order is fixed by the caller's list order.
  */
 function interleave(lists: readonly (readonly WireItem[])[], cap: number): readonly WireItem[] {
   const merged: WireItem[] = [];

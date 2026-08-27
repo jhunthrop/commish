@@ -28,6 +28,7 @@ import { openQuestionsQuery, pendingFlagQuery } from "@/integrity-service/flags"
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { completedSeasonsQuery } from "@/league-service/participation";
 import { browseQuery, houseShelfQuery } from "@/league-service/browse";
+import { openHouseLeaguesQuery } from "@/league-service/house-factory";
 import { leaguesNeedingAutoSetQuery } from "@/league-service/auto-lineup";
 import { ENFORCED_LEAGUE_SQL } from "@/league-service/enforcement";
 import { dueUnfilledScheduledDraftsQuery } from "@/league-service/roll";
@@ -348,6 +349,21 @@ describe("hot read paths use indexes", () => {
    */
   it("the house shelf reads leagues_house_rung_idx, never a sequential scan of leagues", async () => {
     const plan = await explainPlan(db, houseShelfQuery(db, new Date().toISOString()));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+    expect(indexScanNode(plan, "leagues_house_rung_idx")).toBeDefined();
+  });
+
+  /**
+   * LOW (wave-1 review): the missing counterpart to the shelf's own assertion above.
+   * `openHouseLeaguesQuery` (`@/league-service/house-factory.ts`) is the reconciler's own count —
+   * both the shortfall side (`ensureHouseCatalog`) and the retirement side
+   * (`retirementCandidates`) read it — and it is scoped to `leagues.house_rung = rung` the
+   * identical way `houseShelfQuery` is, so it earns the identical index proof: an index scan on
+   * `leagues_house_rung_idx`, never a sequential scan of the 5,000+ member leagues this rung's
+   * handful of house rows sit among.
+   */
+  it("the reconciler's own open-count (openHouseLeaguesQuery) reads leagues_house_rung_idx too, never a sequential scan of leagues", async () => {
+    const plan = await explainPlan(db, openHouseLeaguesQuery(db, "open_12", new Date().toISOString()));
     expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
     expect(indexScanNode(plan, "leagues_house_rung_idx")).toBeDefined();
   });

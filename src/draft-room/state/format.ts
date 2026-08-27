@@ -3,9 +3,15 @@ import type { Position } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { UI_CONFIG } from "@/components/ui/config";
 import { MINUTES_PER_HOUR, MS_PER_SECOND, formatClockLength, plural } from "@/domain/duration";
+import { formatOrdinal } from "@/domain/format";
 import type { PickReview } from "./pick-review";
 
 export { formatClockLength };
+// Wave-1 review Q9: `formatOrdinal` moved to `@/domain/format` — a shared home both this room
+// and `@/admin-room` may legally import — re-exported here so this module's own existing
+// consumers (`@/league-room/components/mock-setup-form`, this file's own test) need no import
+// path change.
+export { formatOrdinal };
 
 const MS_PER_MINUTE = 60_000;
 
@@ -51,19 +57,6 @@ export function formatPausedUntil(resumeAt: string): string {
     new Date(resumeAt),
   );
   return `Picks are paused until ${clock} Eastern. You can still make yours.`;
-}
-
-/**
- * "1st", "2nd", "3rd", "4th", ... "11th", "21st" — the English ordinal suffix rule, exceptions
- * (11-13) first. Plain arithmetic rather than an `Intl.PluralRules` lookup: a draft board's own
- * player count is a small, closed range, and this room already avoids reaching for a locale API
- * where a five-line rule reads just as clearly (`formatGap`'s own precedent, above).
- */
-export function formatOrdinal(n: number): string {
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
-  const suffix = n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
-  return `${n}${suffix}`;
 }
 
 /**

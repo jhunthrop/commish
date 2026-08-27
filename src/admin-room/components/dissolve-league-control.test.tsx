@@ -73,10 +73,25 @@ describe("DissolveLeagueControl", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Dissolve The Blitz Room" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("This league is dissolved. 2 member(s) were refunded $40.00 in total.");
+    expect(await screen.findByRole("status")).toHaveTextContent("This league is dissolved. It refunded $40.00 to 2 members in total.");
     expect(fixture.calls).toEqual(["GET /api/admin/leagues/lg_1/dissolve", "POST /api/admin/leagues/lg_1/dissolve"]);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByLabelText("League id")).toHaveValue("");
+  });
+
+  it("uses the singular for exactly one member, active voice, matching its sibling sentence (LOW, wave-1 review)", async () => {
+    const fixture = previewThenDissolve(
+      { ok: true, data: { leagueId: "lg_1", leagueName: "The Blitz Room", seatedCount: 1 } },
+      { ok: true, data: { leagueId: "lg_1", refundedMembers: 1, totalRefundedCents: 2000 } },
+    );
+    renderInAdmin(<DissolveLeagueControl />, fixture.deps);
+
+    fireEvent.change(screen.getByLabelText("League id"), { target: { value: "lg_1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Dissolve league" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Dissolve The Blitz Room" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("This league is dissolved. It refunded $20.00 to 1 member in total.");
   });
 
   it("cancels back to no dialog with nothing submitted", async () => {
@@ -104,7 +119,7 @@ describe("DissolveLeagueControl", () => {
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Dissolve Free League" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("This league is dissolved. 3 member(s) were notified; there was no fee to refund.");
+    expect(await screen.findByRole("status")).toHaveTextContent("This league is dissolved. It notified 3 members; there was no fee to refund.");
   });
 
   it("shows the preview door's own refusal sentence when the league does not exist, before any dialog opens", async () => {

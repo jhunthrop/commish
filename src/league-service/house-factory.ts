@@ -1,5 +1,5 @@
 import { and, asc, eq, gt, or, sql, type SQL } from "drizzle-orm";
-import type { Db, DbTx } from "@/db/client";
+import type { Db, DbTx, ReadonlyDb } from "@/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
@@ -9,6 +9,7 @@ import { HOUSE_CATALOG, houseKickoffFor, houseLeagueName, type HouseRung, type H
 import { dissolveLeague } from "@/money-service/dissolution";
 import { MS_PER_DAY } from "./config";
 import { writeLeagueInTx, type CreateLeagueInput } from "./creation";
+import { liveHoldsFor } from "./seat-hold";
 
 /**
  * The reconciler: "the lobby is never empty", made a fact about the database rather than a
@@ -116,21 +117,49 @@ export function openHouseLeaguesQuery(db: Db, rung: HouseRungName, nowIso: strin
  *
  * THE RULE, EXACTLY: when `open.length` exceeds `rung.openAtOnce`, the surplus — oldest first,
  * `open` is already ordered that way — is retired ONE SEAT AT A TIME, but only among leagues
- * NOBODY HAS JOINED (`filledTeams === 0`). A league with even one seated team is never a
- * candidate, belt-and-suspenders: the shelf can carry more than `openAtOnce` leagues indefinitely
- * if every surplus league already has a member in it, and that is correct — a seated manager is
- * never evicted to make the shelf's own width arithmetic come out even.
+ * NOBODY HAS JOINED (`filledTeams === 0`) AND NOBODY IS MID-CLAIMING (wave-1 review A2: no LIVE
+ * seat hold). A league with even one seated team is never a candidate: the shelf can carry more
+ * than `openAtOnce` leagues indefinitely if every surplus league already has a member in it, and
+ * that is correct — a seated manager is never evicted to make the shelf's own width arithmetic
+ * come out even.
+ *
+ * THE HOLD CHECK REUSES THE PRODUCT'S ONE OCCUPANCY RULE, never a second copy of it: `liveHoldsFor`
+ * (`./seat-hold.ts`) is the exact predicate `claimSeatHold` and `joinLeagueInTx` both gate a real
+ * seat on (`hasOpenSeat`, `@/matchmaking/filter`) and the exact one `heldSeatsByLeagueId`
+ * (`./browse.ts`) already re-reads for the public shelf's own "spots left" count — retiring a
+ * league mid-claim would hand a visitor's ten-minute hold a room that no longer exists. An expired
+ * hold is not live by that SAME predicate (`expires_at > now`), so it protects nothing: the league
+ * becomes a candidate again on the very next tick that reads past its expiry.
  */
-function retirementCandidates(
+async function retirementCandidates(
+  db: ReadonlyDb,
+  nowIso: string,
   open: readonly { readonly id: string; readonly createdAt: Date; readonly filledTeams: number }[],
   openAtOnce: number,
-): readonly string[] {
+): Promise<readonly string[]> {
   const surplus = open.length - openAtOnce;
   if (surplus <= 0) return [];
-  return open
-    .filter((league) => league.filledTeams === 0)
-    .slice(0, surplus)
-    .map((league) => league.id);
+  const candidates: string[] = [];
+  for (const league of open) {
+    if (candidates.length >= surplus) break;
+    if (league.filledTeams !== 0) continue;
+    const liveHolds = await liveHoldsFor(db, league.id, nowIso);
+    if (liveHolds > 0) continue;
+    candidates.push(league.id);
+  }
+  return candidates;
+}
+
+/**
+ * The rung encoded in a house league's own id (`house_${rung}_${edition}`, the same shape
+ * `nextEdition` below constructs and reads back) — the one place outside this module allowed to
+ * know that shape, so the ticker's own retirement log (`src/draft-service/ticker.ts`, wave-1
+ * review Q3) never restates the id format itself. `undefined` for anything that is not a real
+ * house league id, rather than throwing — this feeds an operational log line, never a gate.
+ */
+export function rungOfHouseLeagueId(leagueId: string): HouseRungName | undefined {
+  const rungNames = Object.keys(HOUSE_CATALOG.rungs) as HouseRungName[];
+  return rungNames.find((name) => leagueId.startsWith(`house_${name}_`));
 }
 
 /**
@@ -296,10 +325,16 @@ export async function spawnHouseLeagueInTx(
  * row and its history survive exactly as `dissolveLeague`'s own docblock already guarantees for
  * a paid league's members.
  *
- * NEVER RETIRES A SEATED LEAGUE (belt, `retirementCandidates`' own `filledTeams === 0` filter) OR
- * A NON-HOUSE LEAGUE (suspenders: `open` is always this ONE rung's own `openHouseLeaguesQuery`
- * result, which is scoped to `leagues.house_rung = rungName` in its own `WHERE` — this function
- * never receives, and could not construct, a candidate id from any other league).
+ * NEVER RETIRES A SEATED LEAGUE, BELT AND SUSPENDERS, FOR REAL (wave-1 review A1 closed the gap
+ * that made this claim false before): the belt is `retirementCandidates`' own `filledTeams === 0`
+ * filter, read from a snapshot taken BEFORE this function's own transaction ever opens; the
+ * suspenders is `dissolveLeague`'s `expectSeatedCount: 0` passed below, re-verified INSIDE that
+ * transaction against a FRESH read taken under the `leagues[X] FOR UPDATE` lock. A league seated
+ * between the snapshot and the call — the exact race the belt alone could never see — now refuses
+ * there instead of refunding a manager who just joined. NEVER RETIRES A NON-HOUSE LEAGUE either:
+ * `open` is always this ONE rung's own `openHouseLeaguesQuery` result, which is scoped to
+ * `leagues.house_rung = rungName` in its own `WHERE` — this function never receives, and could not
+ * construct, a candidate id from any other league.
  *
  * Never throws past one league's own failure, the identical discipline the spawn loop below
  * holds itself to: a refusal (the draft raced into starting, or the league vanished) is reported
@@ -322,7 +357,7 @@ async function retireSurplusForRung(
     try {
       const result = await dissolveLeague(
         db,
-        { leagueId, operatorUserId: HOUSE_RECONCILER_ACTOR },
+        { leagueId, operatorUserId: HOUSE_RECONCILER_ACTOR, expectSeatedCount: 0 },
         { clock: deps.clock, audit, newId: deps.newId },
       );
       if (result.ok) retired.push(leagueId);
@@ -373,7 +408,7 @@ export async function ensureHouseCatalog(db: Db, deps: HouseFactoryDeps): Promis
     // shortfall loop's own FRESH re-read (below) already sees the narrowed shelf rather than
     // computing against a surplus this same call is about to close.
     const openBeforeRetire = await openHouseLeaguesQuery(db, rungName, deps.clock.now());
-    const candidates = retirementCandidates(openBeforeRetire, rung.openAtOnce);
+    const candidates = await retirementCandidates(db, deps.clock.now(), openBeforeRetire, rung.openAtOnce);
     if (candidates.length > 0) {
       const outcome = await retireSurplusForRung(db, rungName, candidates, deps, audit, retireBudget);
       retired.push(...outcome.retired);

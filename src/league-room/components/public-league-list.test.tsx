@@ -11,7 +11,7 @@ import {
   OPEN_LEAGUE_LEGEND,
   OpenLeagueShelf,
   featuredLeagueId,
-  featuredScheduledLeague,
+  featuredFillingLeague,
   seatCountsAsOfSentence,
 } from "./public-league-list";
 
@@ -108,17 +108,17 @@ describe("featuredLeagueId (D2, repointed by storefront review R1)", () => {
  * back to the tightest-seats pick across an all-empty shelf (or the shelf is empty). The module
  * renders nothing in either `null` case.
  */
-describe("featuredScheduledLeague (2026-08-25 hero finding; repointed by storefront review R1)", () => {
+describe("featuredFillingLeague (2026-08-25 hero finding; repointed by storefront review R1)", () => {
   const fullest: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "fullest", filledTeams: 11 };
   const filling: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "filling", filledTeams: 5 };
   const empty: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "empty", filledTeams: 0 };
 
   it("answers null for an empty shelf", () => {
-    expect(featuredScheduledLeague([])).toBeNull();
+    expect(featuredFillingLeague([])).toBeNull();
   });
 
   it("returns the fullest filling league as the object, not just its id", () => {
-    const result = featuredScheduledLeague([filling, fullest]);
+    const result = featuredFillingLeague([filling, fullest]);
     expect(result).toBe(fullest);
   });
 
@@ -128,17 +128,17 @@ describe("featuredScheduledLeague (2026-08-25 hero finding; repointed by storefr
     // `featuredLeagueId` would answer "tight" here (its own fallback branch); the module must
     // answer null instead — a shelf where nothing is filling has nothing genuinely featured.
     expect(featuredLeagueId([roomier, tighter])).toBe("tight");
-    expect(featuredScheduledLeague([roomier, tighter])).toBeNull();
+    expect(featuredFillingLeague([roomier, tighter])).toBeNull();
   });
 
   it("never features an already-rolled scheduled league, even the fullest one (E4)", () => {
     const rolled: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "rolled", filledTeams: 11, kickoffRolls: 1 };
-    expect(featuredScheduledLeague([rolled, filling])).toBe(filling);
+    expect(featuredFillingLeague([rolled, filling])).toBe(filling);
   });
 
   it("agrees with featuredLeagueId's id whenever something is genuinely filling", () => {
     const merged = [empty, filling, fullest];
-    expect(featuredScheduledLeague(merged)?.id).toBe(featuredLeagueId(merged));
+    expect(featuredFillingLeague(merged)?.id).toBe(featuredLeagueId(merged));
   });
 });
 
