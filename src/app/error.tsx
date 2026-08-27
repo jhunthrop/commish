@@ -31,7 +31,9 @@ export default function AppError({
 }) {
   return (
     <>
-      <PublicBar intent={null} />
+      {/* `false`, not a lookup: this is a client error boundary, so it cannot await a session —
+          and a crash screen is the one surface where offering the way in is never wrong. */}
+      <PublicBar intent={null} signedIn={false} />
       <main className="mx-auto flex min-h-[60vh] max-w-lg items-center px-4">
         <div className="w-full">
           <ErrorState

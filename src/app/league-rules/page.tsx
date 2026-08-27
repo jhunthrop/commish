@@ -1,4 +1,5 @@
 import { GAME_DEFINITION } from "@/league-room/components/first-run-panel";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageTitle } from "@/components/ui";
@@ -57,10 +58,11 @@ const SEASON_SUMMARY =
  * the list of what this product cannot do yet. That paragraph survives (a stranger deciding
  * whether to join is owed the honest limits), it simply no longer gets the last word.
  */
-export default function LeagueRulesPage() {
+export default async function LeagueRulesPage() {
+  const user = await getCurrentUser();
   return (
     <>
-      <PublicBar intent={PAGE_INTENT} />
+      <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
         <PageTitle>How it works</PageTitle>
         <p className="text-lg text-text-primary">{GAME_DEFINITION}</p>

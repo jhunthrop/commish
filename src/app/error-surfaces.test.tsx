@@ -8,6 +8,11 @@ import AppError from "./error";
 import GlobalError, { GlobalErrorContent } from "./global-error";
 import NotFound from "./not-found";
 
+// `not-found.tsx` reads the session now, so its header can say "Your leagues" to somebody who
+// already has some (founder, 2026-08-27) — which makes it an async server component. Signed out is
+// the state these tests assert; the header's other arm is covered in `public-bar.test.tsx`.
+vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn(async () => null) }));
+
 /**
  * `global-error.tsx` renders its own `<html>`/`<body>`, which RTL's default container (a `div`
  * appended to `document.body`) cannot legally hold. happy-dom tolerates the nesting well enough
@@ -109,7 +114,7 @@ describe("app/global-error.tsx", () => {
 
 describe("app/not-found.tsx", () => {
   it("is an empty state, not an error, and offers both ways on, axe-clean", async () => {
-    await renderSurface(<NotFound />, async ({ container }) => {
+    await renderSurface(await NotFound(), async ({ container }) => {
       expect(screen.queryByRole("alert")).toBeNull();
       expect(screen.getByRole("link", { name: "Go to the home page" })).toHaveAttribute("href", "/");
       expect(screen.getByRole("link", { name: "Browse open leagues" })).toHaveAttribute("href", "/browse");
@@ -117,11 +122,11 @@ describe("app/not-found.tsx", () => {
     });
   });
 
-  it("offers a signed-out visitor somewhere they can actually go", () => {
+  it("offers a signed-out visitor somewhere they can actually go", async () => {
     // Today every action on both surfaces points at /app, which for a stranger who followed a bad
     // public link is a bounce straight into hosted sign-in. The way out of a 404 must not require
     // an account.
-    renderSurface(<NotFound />, ({ getByRole }) => {
+    renderSurface(await NotFound(), ({ getByRole }) => {
       expect(getByRole("link", { name: "Browse open leagues" })).toHaveAttribute("href", "/browse");
       expect(getByRole("link", { name: "Go to the home page" })).toHaveAttribute("href", "/");
     });
@@ -129,8 +134,8 @@ describe("app/not-found.tsx", () => {
 
   // F14: same reasoning as `AppError` — renders the honest chrome for an unknown session rather
   // than the "Go to your leagues" bounce a total stranger has no account to follow.
-  it("renders PublicBar unconditionally, for the same reason AppError does", () => {
-    renderSurface(<NotFound />, ({ getByRole }) => {
+  it("renders PublicBar unconditionally, for the same reason AppError does", async () => {
+    renderSurface(await NotFound(), ({ getByRole }) => {
       expect(getByRole("link", { name: "Commish" })).toHaveAttribute("href", "/");
       expect(getByRole("link", { name: "Sign in" })).toBeInTheDocument();
     });

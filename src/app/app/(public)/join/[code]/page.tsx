@@ -91,7 +91,7 @@ export default async function JoinPage({ params }: PageProps) {
 
   return (
     <>
-      {user === null ? <PublicBar intent={pageIntent} /> : null}
+      {user === null ? <PublicBar intent={pageIntent} signedIn={false} /> : null}
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
         <PageTitle>Join a league</PageTitle>
         <InviteLanding

@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
 import { LEAGUE_RULES_GLOSSARY_TERMS } from "./glossary-section";
 import LeagueRulesPage from "./page";
+
+// These pages read the session so their header can say "Your leagues" to somebody who already has
+// some (founder, 2026-08-27), which makes them async server components. Signed out is the state
+// these tests assert against; the header's other arm has its own test in `public-bar.test.tsx`.
+vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn(async () => null) }));
 
 /**
  * E10 (Task 10): the seven terms this page used to hand off to an `InfoTip` click now link
@@ -12,8 +17,8 @@ import LeagueRulesPage from "./page";
  * that each piece renders in isolation.
  */
 describe("LeagueRulesPage", () => {
-  it("wires every TermLink href to a real id rendered on the same page", () => {
-    const { container } = render(<LeagueRulesPage />);
+  it("wires every TermLink href to a real id rendered on the same page", async () => {
+    const { container } = render(await LeagueRulesPage());
     const hrefs = [...container.querySelectorAll("main a[href^='#term-']")].map((a) => a.getAttribute("href"));
     expect(hrefs).toHaveLength(LEAGUE_RULES_GLOSSARY_TERMS.length);
     for (const href of hrefs) {
@@ -21,28 +26,28 @@ describe("LeagueRulesPage", () => {
     }
   });
 
-  it("drops InfoTip from this page's prose — no click-to-reveal trigger left on it", () => {
-    render(<LeagueRulesPage />);
+  it("drops InfoTip from this page's prose — no click-to-reveal trigger left on it", async () => {
+    render(await LeagueRulesPage());
     expect(screen.queryByRole("button", { name: /^What is / })).not.toBeInTheDocument();
   });
 
-  it("reads every one of the seven glossary entries in full, not behind a click", () => {
-    render(<LeagueRulesPage />);
+  it("reads every one of the seven glossary entries in full, not behind a click", async () => {
+    render(await LeagueRulesPage());
     for (const key of LEAGUE_RULES_GLOSSARY_TERMS) {
       expect(screen.getByText(GLOSSARY[key].detail)).toBeInTheDocument();
     }
   });
 
   it("is axe-clean", async () => {
-    const { container } = render(<LeagueRulesPage />);
+    const { container } = render(await LeagueRulesPage());
     expect(await axe(container)).toHaveNoViolations();
   });
 
   // B4 (flow analysis journey J08; finding 3): opens with the plain-language definition and a
   // short season summary, before any format detail — the same sentence `FrontDoorHero` leads
   // the front door with.
-  it("opens with the plain-language definition, verbatim, before the format detail", () => {
-    render(<LeagueRulesPage />);
+  it("opens with the plain-language definition, verbatim, before the format detail", async () => {
+    render(await LeagueRulesPage());
     expect(
       screen.getByText(
         "A league is a group of managers who draft NFL players, then start the ones they think will " +
@@ -52,16 +57,16 @@ describe("LeagueRulesPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("says how a season goes before the format detail, with no hardcoded week count", () => {
-    render(<LeagueRulesPage />);
+  it("says how a season goes before the format detail, with no hardcoded week count", async () => {
+    render(await LeagueRulesPage());
     expect(screen.getByText(/Here is how a season goes/)).toBeInTheDocument();
   });
 
   // B4: ends with a way forward, not a list of absences — the page still states the honest
   // limits (the previous test would fail if that paragraph vanished), it just no longer gets
   // the last word.
-  it("ends with a way forward rather than the list of what this product cannot do yet", () => {
-    render(<LeagueRulesPage />);
+  it("ends with a way forward rather than the list of what this product cannot do yet", async () => {
+    render(await LeagueRulesPage());
     expect(
       screen.getByText(/This product does not yet support a waiver wire/),
     ).toBeInTheDocument();

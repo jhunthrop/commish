@@ -1,4 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// These four pages read the session now, so their header can say "Your leagues" to somebody who
+// already has some (founder, 2026-08-27) — which makes them async server components. Signed out is
+// the case this test cares about: it is checking that every footer link resolves to a page that
+// renders at all, not what the header says.
+vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn(async () => null) }));
 import { render } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { ReactElement } from "react";
@@ -49,7 +55,7 @@ describe("PublicFooter", () => {
    * check.
    */
   it("resolves every link to a real page module that renders", async () => {
-    const PAGE_MODULE_BY_HREF: Readonly<Record<string, () => Promise<{ readonly default: () => ReactElement }>>> = {
+    const PAGE_MODULE_BY_HREF: Readonly<Record<string, () => Promise<{ readonly default: () => Promise<ReactElement> }>>> = {
       "/legal/terms": () => import("@/app/legal/terms/page"),
       "/legal/privacy": () => import("@/app/legal/privacy/page"),
       "/support": () => import("@/app/support/page"),
@@ -59,7 +65,7 @@ describe("PublicFooter", () => {
 
     for (const link of PUBLIC_FOOTER_LINKS) {
       const { default: Page } = await PAGE_MODULE_BY_HREF[link.href]!();
-      const { container, unmount } = render(<Page />);
+      const { container, unmount } = render(await Page());
       expect(container.textContent).not.toBe("");
       unmount();
     }

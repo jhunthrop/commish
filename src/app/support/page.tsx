@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import Link from "next/link";
 import { PageTitle } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
@@ -18,10 +19,11 @@ const PAGE_INTENT = "/support";
  * actually takes today, what it does and does not do, and it names the things that have no path
  * today AS things that have no path today, rather than implying one that does not exist.
  */
-export default function SupportPage() {
+export default async function SupportPage() {
+  const user = await getCurrentUser();
   return (
     <>
-      <PublicBar intent={PAGE_INTENT} />
+      <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
         <PageTitle>Support</PageTitle>
         <p className="text-text-muted">

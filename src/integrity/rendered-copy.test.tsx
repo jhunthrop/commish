@@ -1387,9 +1387,10 @@ describe("SignInLink, PublicBar and PublicFooter say nothing that breaks the hou
     for (const element of [
       <SignInLink key="plain" intent={null} />,
       <SignInLink key="intent" intent="/join/league_1/hold" />,
-      <PublicBar key="bare" intent="/reviews" />,
+      <PublicBar key="bare" intent="/reviews" signedIn={false} />,
       <PublicBar
         key="filled"
+        signedIn={false}
         intent="/"
         nav={[
           { href: "/browse", label: "Open leagues" },

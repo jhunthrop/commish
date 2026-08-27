@@ -5,7 +5,7 @@ import { PublicBar } from "./public-bar";
 
 describe("PublicBar", () => {
   it("renders bare with just the wordmark and a sign-in link, in both themes, axe-clean", async () => {
-    await renderSurface(<PublicBar intent="/reviews" />, async ({ container, getByRole, queryByRole }) => {
+    await renderSurface(<PublicBar intent="/reviews" signedIn={false} />, async ({ container, getByRole, queryByRole }) => {
       expect(getByRole("link", { name: "Commish" })).toHaveAttribute("href", "/");
       expect(getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in?returnTo=%2Freviews");
       expect(queryByRole("navigation")).not.toBeInTheDocument();
@@ -14,14 +14,28 @@ describe("PublicBar", () => {
   });
 
   it("carries the visitor's own intent through its sign-in link, per page", () => {
-    renderSurface(<PublicBar intent="/browse" />, ({ getByRole }) => {
+    renderSurface(<PublicBar intent="/browse" signedIn={false} />, ({ getByRole }) => {
       expect(getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in?returnTo=%2Fbrowse");
     });
   });
 
   it("falls back to a plain sign-in when a caller has no intent worth carrying", () => {
-    renderSurface(<PublicBar intent={null} />, ({ getByRole }) => {
+    renderSurface(<PublicBar intent={null} signedIn={false} />, ({ getByRole }) => {
       expect(getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/sign-in");
+    });
+  });
+
+  /**
+   * FOUNDER 2026-08-27: "when I'm logged in it still says login on the main page." This bar had no
+   * idea who was reading it, so a member standing on the front door, /browse or /reviews was
+   * invited to sign in to the account they were already using. The front door even had the answer
+   * in hand — it awaits `getCurrentUser()` for `helpLevel` — and never passed it to the header.
+   */
+  it("offers the way IN, not a second sign-in, to somebody already signed in", async () => {
+    await renderSurface(<PublicBar intent="/reviews" signedIn />, async ({ container, getByRole, queryByRole }) => {
+      expect(getByRole("link", { name: "Your leagues" })).toHaveAttribute("href", "/app");
+      expect(queryByRole("link", { name: "Sign in" })).toBeNull();
+      expect(await axe(container)).toHaveNoViolations();
     });
   });
 
@@ -29,6 +43,7 @@ describe("PublicBar", () => {
     renderSurface(
       <PublicBar
         intent="/"
+        signedIn={false}
         nav={[
           { href: "/browse", label: "Open leagues" },
           { href: "/league-rules", label: "How it works" },

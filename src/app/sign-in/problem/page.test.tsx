@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import SignInProblemPage from "./page";
+
+// These pages read the session so their header can say "Your leagues" to somebody who already has
+// some (founder, 2026-08-27), which makes them async server components. Signed out is the state
+// these tests assert against; the header's other arm has its own test in `public-bar.test.tsx`.
+vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn(async () => null) }));
 
 describe("SignInProblemPage", () => {
   it("says what happened in plain language, with a way back in and a way to the front door, axe-clean", async () => {

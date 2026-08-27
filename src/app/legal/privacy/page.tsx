@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar } from "@/components/app-shell/public-bar";
@@ -14,10 +15,11 @@ const PAGE_INTENT = "/legal/privacy";
  * A minimal, real stub (Phase 3.6, Task 5, Step 5) — see `legal/terms/page.tsx`'s identical
  * docblock for why this exists now rather than as a placeholder or a redirect.
  */
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+  const user = await getCurrentUser();
   return (
     <>
-      <PublicBar intent={PAGE_INTENT} />
+      <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
         <PageTitle>Privacy</PageTitle>
         <p className="text-text-muted">

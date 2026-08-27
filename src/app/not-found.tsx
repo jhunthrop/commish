@@ -1,4 +1,5 @@
 import { ButtonLink, EmptyState } from "@/components/ui";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { PublicBar } from "@/components/app-shell/public-bar";
 
 /**
@@ -15,10 +16,11 @@ import { PublicBar } from "@/components/app-shell/public-bar";
  * `/reviews`'s own rate-limit refusal already uses. `PublicBar` adds a second way out on top: its
  * wordmark is `/` too, and its `SignInLink` works whether this visitor has an account or not.
  */
-export default function NotFound() {
+export default async function NotFound() {
+  const user = await getCurrentUser();
   return (
     <>
-      <PublicBar intent={null} />
+      <PublicBar intent={null} signedIn={user !== null} />
       <main className="mx-auto flex min-h-[60vh] max-w-lg items-center px-4">
         <EmptyState
           icon="search"

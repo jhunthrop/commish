@@ -55,7 +55,7 @@ export default async function SeatHoldPage({ params }: PageProps) {
   if (user === null) {
     return (
       <>
-        <PublicBar intent={pageIntent(leagueId)} />
+        <PublicBar intent={pageIntent(leagueId)} signedIn={user !== null} />
         <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
           <PageTitle>{preview.name}</PageTitle>
           <SeatMeter filled={preview.filledTeams} total={preview.teamCount} heldSeats={preview.heldSeats} />

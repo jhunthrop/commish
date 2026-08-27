@@ -123,7 +123,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     const wireItems = await listWireItems(getDb(), clock);
     return (
       <>
-        <PublicBar intent={PAGE_INTENT} />
+        <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
         {/* Real events under the nav, per the mock — nothing at all when the product is too
             quiet to earn it (`UI_CONFIG.wire.minItems`). */}
         <Wire items={wireItems} />

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar } from "@/components/app-shell/public-bar";
@@ -17,10 +18,11 @@ const PAGE_INTENT = "/legal/terms";
  * The addendum's Task 21 Step 4 is this page's real owner and may expand it; this task's own
  * scope is making the link true, never a placeholder or a redirect to a 404.
  */
-export default function TermsPage() {
+export default async function TermsPage() {
+  const user = await getCurrentUser();
   return (
     <>
-      <PublicBar intent={PAGE_INTENT} />
+      <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
         <PageTitle>Terms</PageTitle>
         <p className="text-text-muted">

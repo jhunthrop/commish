@@ -125,6 +125,7 @@ export default async function Home() {
     <>
       <PublicBar
         intent={PAGE_INTENT}
+        signedIn={user !== null}
         nav={nav}
         action={
           <ButtonLink href="/browse" variant={featuredLeague === null ? "primary" : "secondary"}>

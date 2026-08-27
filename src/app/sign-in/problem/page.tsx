@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import Link from "next/link";
 import { PageTitle, buttonClassName } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
@@ -34,12 +35,13 @@ const first = (value: string | readonly string[] | undefined): string | null =>
  * a future caller that DOES hold a trustworthy intent can still link here with one.
  */
 export default async function SignInProblemPage({ searchParams }: PageProps) {
+  const user = await getCurrentUser();
   const params = await searchParams;
   const intent = safeReturnTo(first(params.returnTo));
 
   return (
     <>
-      <PublicBar intent={intent} />
+      <PublicBar intent={intent} signedIn={user !== null} />
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
         <PageTitle>Sign-in did not go through</PageTitle>
         <p className="text-text-muted">Something interrupted the attempt. Nothing about your account changed.</p>

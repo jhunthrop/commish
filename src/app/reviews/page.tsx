@@ -55,7 +55,10 @@ export default async function ReviewsPage() {
   if (!browseAllowed((await headers()).get("x-forwarded-for"))) {
     return (
       <>
-        <PublicBar intent={PAGE_INTENT} />
+        {/* `false` on purpose: this refusal returns BEFORE `getCurrentUser()` resolves (see this
+            page's own docblock), and a rate-limited request is not worth a session round trip to
+            personalise a header nobody is reading. */}
+        <PublicBar intent={PAGE_INTENT} signedIn={false} />
         {/* Full-bleed, no `max-w-*` (NEW-2) — matching `AppShell`'s own signed-in `<main>`. */}
         <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">
           <ErrorState
@@ -109,7 +112,7 @@ export default async function ReviewsPage() {
   if (user === null) {
     return (
       <>
-        <PublicBar intent={PAGE_INTENT} />
+        <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
         {/* Full-bleed, no `max-w-*` (NEW-2) — matching `AppShell`'s own signed-in `<main>`. The
             feed itself is dense cards; the one long-form paragraph on this page keeps its own
             `max-w-prose` below, so the reading column stays measured inside the wide frame. */}
