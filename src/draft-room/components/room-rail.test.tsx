@@ -196,6 +196,33 @@ describe("RoomRail", () => {
     expect(screen.getByTestId("turn-label")).toHaveTextContent("Round 3 · Pick 4");
   });
 
+  // N1/A2 (2026-08-27 flow analysis, "the live draft room has no way out"): the rail is the
+  // room's own chrome — the `(room)` layout group declines the app shell on purpose, so this is
+  // the ONLY place a way home can live. Two working links, present regardless of phase or
+  // variant: the wordmark to `/app`, the league name to its own league.
+  describe("the way home (N1/A2)", () => {
+    it.each([
+      ["scheduled" as const, { ...SNAKE_VIEW, phase: "scheduled" as const, ...finished }],
+      ["in_progress" as const, liveView()],
+      ["complete" as const, { ...SNAKE_VIEW, phase: "complete" as const, ...finished }],
+    ])("renders both exits in the %s phase", (_phase, view) => {
+      render(<RoomRail {...props} view={view} myTeamId="t1" />);
+      expect(screen.getByRole("link", { name: "Commish" })).toHaveAttribute("href", "/app");
+      expect(screen.getByRole("link", { name: props.leagueName })).toHaveAttribute("href", `/app/leagues/${view.leagueId}`);
+    });
+
+    it("renders both exits on the TV variant, which owns the only chrome a party screen has", () => {
+      render(<RoomRail {...props} view={liveView()} myTeamId={null} variant="tv" />);
+      expect(screen.getByRole("link", { name: "Commish" })).toHaveAttribute("href", "/app");
+      expect(screen.getByRole("link", { name: props.leagueName })).toHaveAttribute("href", "/app/leagues/l1");
+    });
+
+    it("keeps the league name as the rail's h1, not merely a link beside it", () => {
+      render(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
+      expect(screen.getByRole("heading", { level: 1, name: props.leagueName })).toBeInTheDocument();
+    });
+  });
+
   it("explains a draft that has not started and one that has finished, and drops the turn label", () => {
     const { rerender } = render(<RoomRail {...props} view={{ ...SNAKE_VIEW, phase: "scheduled", ...finished }} myTeamId="t1" />);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "scheduled");

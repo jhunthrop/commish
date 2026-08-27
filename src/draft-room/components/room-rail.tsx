@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
@@ -281,7 +282,23 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
       data-mode={mode}
       className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2 lg:min-h-20 lg:flex-nowrap ${MODE_SKIN[mode]}`}
     >
-      <h1 className={`font-display font-semibold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>{leagueName}</h1>
+      {/* N1/A2 (2026-08-27 flow analysis, "the live draft room has no way out"): the room's own
+          way home, unconditional across phase, width and variant — including the TV board, a
+          party screen with no keyboard shortcut for browser-back. Two links only, both quiet
+          (`text-text-muted`, no weight fight with the turn/clock hierarchy in the rail's right
+          group): the wordmark to `/app`, and the league's own name — already the rail's
+          masthead — to its league home. Nothing else joins this group; a room's one other exit
+          (leaving the draft mid-pick) is a decision this rail does not make for anyone. */}
+      <div className="flex min-w-0 items-baseline gap-2">
+        <Link href="/app" className="shrink-0 text-xs font-medium text-text-muted hover:text-text-primary">
+          Commish
+        </Link>
+        <h1 className={`min-w-0 truncate font-display font-semibold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>
+          <Link href={`/app/leagues/${view.leagueId}`} className="hover:underline">
+            {leagueName}
+          </Link>
+        </h1>
+      </div>
       {/* NEW-3: `basis-full` so that below `lg:` (where the header is still `flex-wrap`, not yet
           `flex-nowrap`), a guided caption growing this span past one line claims a whole wrapped
           line of its own rather than squeezing onto a shared one beside the league name — the
