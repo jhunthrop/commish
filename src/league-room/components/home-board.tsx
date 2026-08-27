@@ -105,7 +105,7 @@ function PreDraftHero({
   return (
     <div data-testid="pre-draft-hero" className="flex flex-col gap-4">
       <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
-        <Crest id={league.id} label={league.name.slice(0, 2).toUpperCase()} size={64} />
+        <Crest id={league.id} name={league.name} size={64} />
         <h2 className="font-display text-2xl font-semibold leading-display text-text-primary">{league.name}</h2>
         {league.startTrigger === "when_full" ? (
           <Meter label="Seats filled" value={league.filledTeams} max={league.teamCount} className="w-full max-w-xs" />

@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
 import { UI_CONFIG } from "@/components/ui/config";
 import { Crest } from "@/components/ui/crest";
-import { initialsFor } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import { SeatMeter } from "@/components/ui/seat-meter";
 import { StatePanel } from "@/components/ui/state-panel";
@@ -393,7 +392,7 @@ export function WaitingRoom({
     const next = items[0]!;
     return (
       <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-surface-elevated p-6 text-center">
-        <Crest id={league.leagueId} label={initialsFor(leagueName)} size={64} />
+        <Crest id={league.leagueId} name={leagueName} size={64} />
         {/* The one place a contraction is deliberate, per C1's own named exception
             (`docs/design-system.md`): the mock's own approved wordmark-adjacent line. */}
         <h2 className="text-lg font-semibold text-text-primary">{`${leagueName} · You're in`}</h2>

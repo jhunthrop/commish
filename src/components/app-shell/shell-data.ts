@@ -17,10 +17,12 @@ import type { LiveState as HomeLiveState } from "@/league-room/contract";
 export type RailLeagueState = "needs-you" | "live" | "quiet";
 
 /**
- * One league as the rail renders it: 40px tiles, never more data than a tile needs. `shortName`
- * is derived by `shortNameFor` below, never stored — a renamed league can never carry a stale
- * initial, and there is no column to migrate (ruling 10). The tile's tone is not carried here at
- * all: `Crest` (`@/components/ui/crest`) derives it deterministically from `id` itself
+ * One league as the rail renders it: 40px tiles, never more data than a tile needs. The tile's
+ * MARK is not carried here: `Crest` derives it from the name it is handed (`shortNameFor`,
+ * `@/components/ui/crest`), because five separate rules for one small mark is how the same league
+ * came to read "O1" in the rail and "OP" beside its own heading (founder, 2026-08-27). Nothing is
+ * stored either way, so a renamed league can never carry a stale initial and there is no column to
+ * migrate (ruling 10). The tile's tone is not carried here at all: `Crest` (`@/components/ui/crest`) derives it deterministically from `id` itself
  * (`crestTone`, Phase 3.6, Task 3), so there is no second value that could ever disagree with it.
  *
  * `needsYouKind` is `state`'s own kind-aware sibling: `state === "needs-you"` collapses TWO
@@ -33,7 +35,6 @@ export type RailLeagueState = "needs-you" | "live" | "quiet";
 export interface RailLeague {
   readonly id: string;
   readonly name: string;
-  readonly shortName: string;
   readonly state: RailLeagueState;
   readonly needsYouKind: "fix-lineup" | "join-draft" | null;
 }
@@ -50,17 +51,6 @@ export type { HomeLiveState as LiveState };
 export interface ShellData {
   readonly rail: readonly RailLeague[];
   readonly liveState: HomeLiveState | null;
-}
-
-/**
- * The first letter of each of the first two words, uppercased — "Bay Bandits" → "BB". Falls
- * back to the first two letters of a one-word name — "Ballers" → "BA" (Step 3's own spec).
- */
-export function shortNameFor(name: string): string {
-  const words = name.trim().split(/\s+/).filter((word) => word.length > 0);
-  if (words.length === 0) return "??";
-  if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
-  return `${words[0]!.charAt(0)}${words[1]!.charAt(0)}`.toUpperCase();
 }
 
 function stateFor(kind: NextActionKind | undefined, weekStatus: WeekStatus): RailLeagueState {
@@ -91,7 +81,6 @@ export async function shellData(db: Db, user: { readonly id: string }, clock?: C
   const rail: readonly RailLeague[] = home.leagues.map((league) => ({
     id: league.id,
     name: league.name,
-    shortName: shortNameFor(league.name),
     state: stateFor(league.nextAction?.kind, league.weekStatus),
     needsYouKind: needsYouKindFor(league.nextAction?.kind),
   }));

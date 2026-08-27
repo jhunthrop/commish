@@ -4,7 +4,7 @@ import type { Clock } from "@/domain/timing";
 import { drafts, lineupSlots, matchups, statWeeks, teams, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { createLeague } from "@/league-service/creation";
-import { shellData, shortNameFor } from "./shell-data";
+import { shellData } from "./shell-data";
 
 const db = createTestDb();
 const clock: Clock = { now: () => "2026-08-23T12:00:00.000Z" };
@@ -46,18 +46,6 @@ async function seedLeague(name: string, userId: string, teamCount = 8): Promise<
   return created.leagueId;
 }
 
-describe("shortNameFor", () => {
-  it("takes the first letter of each of the first two words, uppercased", () => {
-    expect(shortNameFor("Bay Bandits")).toBe("BB");
-    expect(shortNameFor("Thunder Squad")).toBe("TS");
-    expect(shortNameFor("Golden Hawks")).toBe("GH");
-  });
-
-  it("falls back to the first two letters of a one-word name", () => {
-    expect(shortNameFor("Ballers")).toBe("BA");
-  });
-});
-
 describe("shellData", () => {
   it("answers an empty rail for a caller in no leagues", async () => {
     await db.insert(users).values({ id: "u_none", email: "u_none@test.local", displayName: "Nobody" });
@@ -95,7 +83,6 @@ describe("shellData", () => {
     expect(rail).toHaveLength(1);
     expect(rail[0]!.id).toBe(leagueId);
     expect(rail[0]!.name).toBe("Bay Bandits");
-    expect(rail[0]!.shortName).toBe("BB");
     expect(rail[0]!.state).toBe("needs-you");
     // Fix round 1, H1: the rail's own kind, not just its bucket — `LeagueRail` reads this to
     // pick between "Fix your lineup" and "Join the draft".
@@ -114,7 +101,6 @@ describe("shellData", () => {
     const { rail } = await shellData(db, { id: "u_live" });
 
     expect(rail).toHaveLength(1);
-    expect(rail[0]!.shortName).toBe("GH");
     expect(rail[0]!.state).toBe("live");
     expect(rail[0]!.needsYouKind).toBeNull();
   });
@@ -130,7 +116,6 @@ describe("shellData", () => {
     const { rail } = await shellData(db, { id: "u_quiet2" });
 
     expect(rail).toHaveLength(1);
-    expect(rail[0]!.shortName).toBe("TS");
     expect(rail[0]!.state).toBe("quiet");
     expect(rail[0]!.needsYouKind).toBeNull();
   });

@@ -19,9 +19,9 @@ function mockPathname(next: string): void {
 }
 
 const LEAGUES: readonly RailLeague[] = [
-  { id: "lg_bandits", name: "Bay Bandits", shortName: "BB", state: "quiet", needsYouKind: null },
-  { id: "lg_thunder", name: "Thunder Squad", shortName: "TS", state: "needs-you", needsYouKind: "join-draft" },
-  { id: "lg_hawks", name: "Golden Hawks", shortName: "GH", state: "live", needsYouKind: null },
+  { id: "lg_bandits", name: "Bay Bandits", state: "quiet", needsYouKind: null },
+  { id: "lg_thunder", name: "Thunder Squad", state: "needs-you", needsYouKind: "join-draft" },
+  { id: "lg_hawks", name: "Golden Hawks", state: "live", needsYouKind: null },
 ];
 
 describe("LeagueRail", () => {
@@ -39,7 +39,7 @@ describe("LeagueRail", () => {
   it("says 'Fix your lineup', not 'Join the draft', when needsYouKind is fix-lineup", async () => {
     mockPathname("/app");
     const leagues: readonly RailLeague[] = [
-      { id: "lg_volt", name: "Volt Kings", shortName: "VK", state: "needs-you", needsYouKind: "fix-lineup" },
+      { id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "fix-lineup" },
     ];
     await renderSurface(<LeagueRail leagues={leagues} />, () => {
       expect(screen.getByRole("link", { name: "Volt Kings. Fix your lineup." })).toBeInTheDocument();

@@ -154,7 +154,7 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
     return (
       <Panel title="Already a member">
         <div className="flex items-center gap-3">
-          <Crest id={state.leagueId} label={state.name.slice(0, 2).toUpperCase()} size={40} />
+          <Crest id={state.leagueId} name={state.name} size={40} />
           <p className="text-sm text-text-primary">{`You are already a member of ${state.name}.`}</p>
         </div>
         {/* This state's ONE action (rule 5), so it is the view's ink pill. */}

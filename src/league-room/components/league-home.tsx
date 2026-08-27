@@ -175,7 +175,7 @@ export function LeagueHome({
   return (
     <>
       <header className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-elevated p-3 shadow-card">
-        <Crest id={home.leagueId} label={home.name.slice(0, 2).toUpperCase()} size={40} />
+        <Crest id={home.leagueId} name={home.name} size={40} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <PageTitle>{home.name}</PageTitle>
           <p className="text-sm text-text-muted">{headerFacts(home)}</p>

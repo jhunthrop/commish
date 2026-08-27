@@ -97,7 +97,7 @@ export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
             }`}
             style={tileStyle}
           >
-            <Crest id={league.id} label={league.shortName} size={crestSize} />
+            <Crest id={league.id} name={league.name} size={crestSize} />
             {league.state === "quiet" ? null : (
               <span aria-hidden="true" className={`absolute -right-0.5 -top-0.5 size-2.5 rounded-pill border border-surface ${DOT_CLASS[league.state]}`} />
             )}

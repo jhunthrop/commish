@@ -96,7 +96,7 @@ function MarginCell({ league }: { readonly league: HomeLeagueCard }) {
 function LeagueCell({ league }: { readonly league: HomeLeagueCard }) {
   return (
     <div className="flex items-center gap-2">
-      <Crest id={league.id} label={league.name.slice(0, 2).toUpperCase()} size={32} />
+      <Crest id={league.id} name={league.name} size={32} />
       <div className="flex min-w-0 flex-col">
         <Link href={`/app/leagues/${league.id}`} className="min-w-0 truncate font-medium text-text-primary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
           {league.name}

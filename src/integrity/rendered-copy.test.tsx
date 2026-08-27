@@ -1364,7 +1364,7 @@ describe("Panel, Crest, Meter and StatPill say nothing that breaks the house cop
       <Panel key="panel" title="Standings" meta="10 managers, 2 open seats">
         <p>Body content</p>
       </Panel>,
-      <Crest key="crest" id="league_1" label="BB" />,
+      <Crest key="crest" id="league_1" name="Bay Bandits" />,
       <Meter key="meter" label="Seats filled" value={10} max={12} />,
       <StatPill key="pill" label="In progress" tone="accent" glow />,
     ]) {
