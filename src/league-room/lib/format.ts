@@ -92,5 +92,9 @@ const CLOCK_FORMAT = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute:
 
 export function formatDraftAbsolute(iso: string): string {
   const instant = new Date(iso);
+  // The same guard `formatDate` above carries, for the same reason (flow-remediation review
+  // D-2): four `Intl.format` calls on an invalid Date throw `RangeError`, and this one feeds
+  // the more prominent surface of the two.
+  if (Number.isNaN(instant.getTime())) return "";
   return `${WEEKDAY_FORMAT.format(instant)} ${DAY_FORMAT.format(instant)} ${MONTH_FORMAT.format(instant)}, ${CLOCK_FORMAT.format(instant)} UTC`;
 }

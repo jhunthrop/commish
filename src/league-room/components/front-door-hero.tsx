@@ -1,3 +1,4 @@
+import { GAME_DEFINITION } from "./first-run-panel";
 import Link from "next/link";
 import { Rise } from "@/components/ui";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
@@ -29,10 +30,6 @@ const LIVE_MONEY_SENTENCE = "Play free everywhere, or play for real money where 
  * vocabulary (`src/integrity/copy-rules.ts`) — already true of this exact sentence, which is why
  * it survives verbatim rather than being rewritten a second time.
  */
-const GAME_DEFINITION =
-  "A league is a group of managers who draft NFL players, then start the ones they think will " +
-  "score most each week. You play one other manager every week of the NFL season. Your team's " +
-  "score is whatever your starters do in their real games.";
 
 export interface FrontDoorHeroProps {
   /** Defaults to the real `moneyIsLive()` — injectable so a test can exercise the live sentence

@@ -40,9 +40,19 @@ function LiveInvite({
   readonly revoking: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const copy = async (): Promise<void> => {
-    await navigator.clipboard.writeText(invite.url);
+    // Clipboard writes reject in a non-secure context, without focus, or on a denied permission
+    // (review B-2). A copy button that fails silently reproduces C-01's own defect — she shares
+    // something that does not work — so a failure says so and leaves the url selectable.
+    try {
+      await navigator.clipboard.writeText(invite.url);
+    } catch {
+      setCopyFailed(true);
+      return;
+    }
+    setCopyFailed(false);
     setCopied(true);
     setTimeout(() => setCopied(false), COPY_CONFIRMATION_MS);
   };
@@ -52,6 +62,11 @@ function LiveInvite({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-line p-3">
       <Input label="Invite link" value={invite.url} readOnly />
+      {copyFailed ? (
+        <p role="alert" className="text-sm text-negative">
+          Your browser would not let us copy it. The link above is selectable.
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" onClick={() => void copy()}>
           {copied ? "Copied" : "Copy link"}
@@ -182,10 +197,14 @@ export function InvitePanel({ leagueId, leagueName = "" }: { readonly leagueId: 
   };
 
   const share = (invite: InviteBody): void => {
+    // A dismissed share sheet rejects with AbortError — a routine outcome, not an error
+    // (review B-3): swallow it rather than raising an unhandled rejection.
     void navigator.share({
       title: leagueName === "" ? "Join my league on Commish" : `Join ${leagueName} on Commish`,
       text: leagueName === "" ? "You're invited to join my league on Commish." : `You're invited to join ${leagueName} on Commish.`,
       url: invite.url,
+    }).catch(() => {
+      // Dismissal, not failure — nothing to say.
     });
   };
 

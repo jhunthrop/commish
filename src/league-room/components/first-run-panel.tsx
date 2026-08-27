@@ -13,10 +13,16 @@ import { PracticeEntryLink } from "./practice-entry-link";
  * `@/identity/first-run.ts`) only ever signals whether to show it; the words themselves live
  * here, next to the only component that renders them.
  */
-const FIRST_RUN_EXPLAINER =
+/** THE ONE DEFINITION, exported (flow-remediation review E-1): the campaign that built a drift
+ *  test for two duplicated formatters had, in the same wave, three hand-typed copies of the one
+ *  sentence the whole B1 finding exists to deliver. It lives here, beside its oldest consumer,
+ *  and the front door and the rules page import it. */
+export const GAME_DEFINITION =
   "A league is a group of managers who draft NFL players, then start the ones they think will " +
   "score most each week. You play one other manager every week of the NFL season. Your team's " +
   "score is whatever your starters do in their real games.";
+
+const FIRST_RUN_EXPLAINER = GAME_DEFINITION;
 
 /**
  * Every path's real, working control — never a link that only describes what the click would

@@ -1,3 +1,4 @@
+import { GAME_DEFINITION } from "@/league-room/components/first-run-panel";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageTitle } from "@/components/ui";
@@ -23,10 +24,6 @@ const PAGE_INTENT = "/league-rules";
  * auction." was its own first sentence — and never once said what fantasy football IS. A visitor
  * who clicked "How it works" asking that question got a rulebook instead.
  */
-const GAME_DEFINITION =
-  "A league is a group of managers who draft NFL players, then start the ones they think will " +
-  "score most each week. You play one other manager every week of the NFL season. Your team's " +
-  "score is whatever your starters do in their real games.";
 
 /**
  * B4's own "how a season goes" — a short bridge between the one-sentence definition above and
