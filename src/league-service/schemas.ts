@@ -154,6 +154,13 @@ export const acceptInviteSchema = z.object({
   teamName: name.optional(),
 });
 
+/** `DELETE /api/leagues/[leagueId]/invites`'s body (flow analysis C-03): the code to revoke.
+ *  Bounded to the invite alphabet's own length so a wildly malformed value 400s here rather than
+ *  reaching a WHERE clause that simply matches nothing. */
+export const revokeInviteSchema = z.object({
+  code: z.string().length(LEAGUE_CONFIG.invite.codeLength, { message: "That does not look like an invite code." }),
+});
+
 /**
  * One week bound for every week-scoped surface, reads included. The GET half of the lineup
  * route used to accept any `week >= 1` while the PUT half capped it at `maxWeeks`; both

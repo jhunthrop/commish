@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { daysUntil, formatExpired, formatExpiry, formatPoints, formatRecord, formatWeek } from "./format";
+import { daysUntil, formatDraftAbsolute, formatExpired, formatExpiry, formatPoints, formatRecord, formatWeek } from "./format";
 
 describe("league display formatting", () => {
   it("writes a record, dropping ties when there are none", () => {
@@ -49,6 +49,24 @@ describe("formatExpiry", () => {
 
   it("carries no em dash or en dash", () => {
     for (const days of [-1, 0, 1, 3]) expect(formatExpiry(days)).not.toMatch(/[–—]/);
+  });
+});
+
+describe("formatDraftAbsolute", () => {
+  /**
+   * Flow analysis C-02: this must stay byte-identical to `formatAbsoluteTime`
+   * (`@/league/terms.ts`) — the exact literal that module's own test suite
+   * (`league-service/invites.test.ts`'s "answers the exact terms..." case) pins for the same
+   * instant, so `DraftSchedulePanel`'s hero and the league's terms panel can never disagree
+   * about the same draft again.
+   */
+  it("renders the same UTC, zone-labelled sentence every other draft-time surface renders", () => {
+    expect(formatDraftAbsolute("2026-08-24T12:00:00.000Z")).toBe("Monday 24 August, 12:00 PM UTC");
+  });
+
+  it("carries the weekday, day, month and a 12-hour clock, always labelled UTC", () => {
+    expect(formatDraftAbsolute("2026-09-06T00:00:00.000Z")).toBe("Sunday 6 September, 12:00 AM UTC");
+    expect(formatDraftAbsolute("2026-01-01T23:30:00.000Z")).toBe("Thursday 1 January, 11:30 PM UTC");
   });
 });
 

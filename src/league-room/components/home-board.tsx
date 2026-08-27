@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import { Crest, EmptyState, Meter, SeatMeter } from "@/components/ui";
+import { ButtonLink, Crest, EmptyState, Meter, SeatMeter } from "@/components/ui";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { RoomTour } from "@/draft-room/components/room-tour";
 import { actionLabelFor } from "@/draft-room/lib/lookups";
@@ -19,6 +19,26 @@ import { LeagueBoard } from "./league-board";
 import { OpenSeatsPanel } from "./open-seats-panel";
 import { WaitingChecklist } from "./waiting-checklist";
 import { checklistItems } from "./waiting-room";
+
+/**
+ * Flow analysis C-08 (2026-08-27): "creation is a first-class action near the top of /app for a
+ * member with leagues" — the create form itself stays where it is (`StartOrJoinDisclosure`,
+ * `#create-league`), but the ONE thing that was actually broken is where a manager who already
+ * has leagues has to go looking for the door to it: a collapsed `<details>` below the entire
+ * board (measured at y=7,612 of a 7,390px document). `HomeBoard` renders first, directly under
+ * `/app`'s own page title, in every non-empty shape it has — so a real, secondary-weight (never
+ * competing with the view's one ink action, Sunday Standard rule 5) link at the TOP of whichever
+ * shape renders is "near the top of /app" without moving the form itself or re-opening the
+ * disclosure it already lives in. The `#create-league` fragment is the same anchor
+ * `StartOrJoinDisclosure` already opens itself for on mount.
+ */
+function CreateLeagueCta() {
+  return (
+    <ButtonLink href="/app#create-league" variant="secondary" size="sm" className="self-start">
+      Create a league
+    </ButtonLink>
+  );
+}
 
 function someWeekInProgress(body: HomeBody): boolean {
   return body.leagues.some((league) => league.weekStatus === "in_progress");
@@ -76,6 +96,10 @@ function PreDraftHero({
     helpLevel,
     format: league.format,
     onOpenTour: () => setTourOpen(true),
+    // D5: this board never fetches a per-league `slotPreference` (see this hero's own docblock),
+    // but every league it renders is one this manager has a real team in — so the honest fix is a
+    // real link into the room that DOES have the ranking panel, not dead body text.
+    rankHref: `/app/leagues/${league.id}`,
   });
 
   return (
@@ -212,6 +236,7 @@ export function HomeBoard({
   if (preDraftHero !== null) {
     return (
       <div className="flex flex-col gap-6">
+        <CreateLeagueCta />
         <PreDraftHero league={preDraftHero} remainingMs={remainingMs} myTeamName={preDraftHero.myTeamName} helpLevel={helpLevel} />
         {openSeats}
       </div>
@@ -224,6 +249,7 @@ export function HomeBoard({
     const only = body.leagues[0]!;
     return (
       <div className="flex flex-col gap-6">
+        <CreateLeagueCta />
         <div className="flex flex-col gap-3">
           {/* n=1 (Step 1's own test): the board IS the league — a real heading naming it, never
               a sort ("closest first") announced over a list of one. `HomeLeagueCard` below still
@@ -241,6 +267,7 @@ export function HomeBoard({
 
   return (
     <div className="flex flex-col gap-6">
+      <CreateLeagueCta />
       <AttentionQueue items={attentionQueueItemsFrom(body.leagues)} />
       <LeagueBoard leagues={body.leagues} />
       {openSeats}

@@ -320,7 +320,7 @@ export function LeagueHome({
           league's filling state) points here — the one real invite surface a commissioner has. */}
       {home.isCommissioner ? (
         <div id="invite-managers">
-          <InvitePanel leagueId={home.leagueId} />
+          <InvitePanel leagueId={home.leagueId} leagueName={home.name} />
         </div>
       ) : null}
 

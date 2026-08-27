@@ -47,8 +47,16 @@ describe("signed in to an invitable league", () => {
     expect(fixture.calls).toEqual(["POST /api/leagues"]);
     view.unmount();
 
-    fixture.response = { ok: true, data: { code: "SUNDAY12", path: "/app/join/SUNDAY12", expiresAt: "2026-08-31T12:00:00.000Z", maxUses: 32 } };
+    // `InvitePanel` (C-03) loads the league's live invites on mount before it offers anything to
+    // click — an automatic read, never a user gesture, so it does not count against the budget.
+    fixture.response = { ok: true, data: { invites: [] } };
     renderInLeague(<InvitePanel leagueId={created.leagueId} />, fixture.deps);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Create invite link" })).toBeInTheDocument());
+
+    fixture.response = {
+      ok: true,
+      data: { code: "SUNDAY12", path: "/app/join/SUNDAY12", url: "http://localhost/app/join/SUNDAY12", expiresAt: "2026-08-31T12:00:00.000Z", maxUses: 32, uses: 0 },
+    };
     click(screen.getByRole("button", { name: "Create invite link" }));
     await waitFor(() => expect(screen.getByText("SUNDAY12")).toBeInTheDocument());
 

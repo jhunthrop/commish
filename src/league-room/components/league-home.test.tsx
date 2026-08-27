@@ -210,14 +210,17 @@ describe("LeagueHome", () => {
     expect(screen.getByRole("region", { name: "League terms" })).toHaveTextContent(HOME.name);
   });
 
-  it("shows the commissioner's tools only to the commissioner", () => {
+  it("shows the commissioner's tools only to the commissioner", async () => {
+    // `InvitePanel` (C-03) loads the league's live invites on mount before offering anything to
+    // click — the default fixture envelope (`{ ok: true, data: {} }`) carries no `invites` key,
+    // which the panel reads as "none live" (the same defensive merge `ModerationSummary` uses).
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={HOME} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.getByRole("button", { name: "Create invite link" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Create invite link" })).toBeInTheDocument());
   });
 
   it("hides them from everybody else", () => {

@@ -9,6 +9,7 @@ import { Button, Input, SeatMeter } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
 import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
 import { PUBLIC_ROOM_SHORT_REFUSAL, rollNoticeSentence } from "@/matchmaking/roll";
+import { formatDraftAbsolute } from "../lib/format";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { ReleaseSeatControl } from "./release-seat-control";
 
@@ -16,21 +17,17 @@ const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 
 /**
- * "Saturday, September 12, 7:00 PM" — the reader's OWN clock, not the fixed UTC zone
- * `LeagueTerms.draftAt` renders. This panel is already `"use client"` and already reads the
- * wall clock through `useNow` for its own countdown, so showing the commissioner's own local
- * reading of the same instant is free and more useful to someone about to schedule a keyboard
- * time around it. `new Date(iso)` parses a real, GIVEN instant — never the ambient clock — the
- * same precedent `InvitePanel`'s own `new Date(invite.expiresAt).toLocaleDateString()` sets.
+ * "Saturday 12 September, 7:00 PM UTC" — flow analysis C-02's fix. Used to read the browser's
+ * OWN local clock (`toLocaleString`, no zone label) while `LeagueTerms.draftAt` — the exact
+ * string the league's terms panel and the invite landing a stranger reads both already render —
+ * used the fixed, zone-labelled UTC convention: one league, two different calendar days on one
+ * screen. `formatDraftAbsolute` (`../lib/format`) is the SAME formatting rule
+ * `formatAbsoluteTime` (`@/league/terms.ts`) already applies server-side, so this hero now says
+ * the identical sentence every other surface that names this draft's time does. `new Date(iso)`
+ * parses a real, GIVEN instant — never the ambient clock.
  */
 function formatLocal(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatDraftAbsolute(iso);
 }
 
 /**

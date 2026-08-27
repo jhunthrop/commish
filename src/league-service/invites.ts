@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
 import { drafts, leagueInvites, leagues, scoringSettings, teams, users } from "@/db/schema";
@@ -76,6 +76,67 @@ export async function createInvite(
     if (inserted.length > 0) return { ok: true, code, expiresAt: expiresAt.toISOString(), maxUses };
   }
   return { ok: false, reason: "We could not create an invite just now. Please try again." };
+}
+
+/** One invite row, exactly as `listInvites`/the invites route hand it to a commissioner — never
+ *  the DB row itself (no `leagueId`, no `createdByUserId`: a commissioner reads their own
+ *  league's own invites, so neither fact is news). */
+export interface InviteView {
+  readonly code: string;
+  readonly expiresAt: string;
+  readonly maxUses: number;
+  readonly uses: number;
+}
+
+/**
+ * Flow analysis C-03: every invite this league holds that is still LIVE right now — not expired,
+ * not used up — the same two bounds `acceptInvite`'s own `invitePrecondition` checks, read here
+ * rather than written, so a commissioner reloading the page sees the code they already sent
+ * instead of a panel that silently forgot it. Newest first: the code a commissioner most
+ * recently minted is the one they are most likely mid-conversation about.
+ *
+ * A dead code (expired or exhausted) simply stops appearing — this list is never the place a
+ * commissioner reviews history, only the place they find a link that still works.
+ */
+export async function listInvites(db: Db, leagueId: string, clock: Clock = systemClock): Promise<readonly InviteView[]> {
+  const nowMs = Date.parse(clock.now());
+  const rows = await db
+    .select()
+    .from(leagueInvites)
+    .where(eq(leagueInvites.leagueId, leagueId))
+    .orderBy(desc(leagueInvites.createdAt));
+  return rows
+    .filter((row) => row.expiresAt.getTime() > nowMs && row.uses < row.maxUses)
+    .map((row) => ({ code: row.code, expiresAt: row.expiresAt.toISOString(), maxUses: row.maxUses, uses: row.uses }));
+}
+
+export type RevokeInviteResult = { readonly ok: true } | { readonly ok: false; readonly status: number; readonly reason: string };
+
+/**
+ * Flow analysis C-03: the commissioner's own "never mind, that link is dead now" — kills a code
+ * by walking its `expiresAt` one millisecond into the past rather than adding a new column or
+ * state: every reader that already treats expiry as dead (`acceptInvite`'s own precondition,
+ * `invitePreview`, `listInvites` above) refuses a revoked code the identical honest way it
+ * refuses one that simply ran out the clock, with no second "why was this refused" branch
+ * anywhere downstream to keep in sync.
+ *
+ * Scoped to `leagueId` in the WHERE, not just the code: a commissioner of one league can never
+ * revoke a code that happens to belong to a different one, even by guessing — the same
+ * leagueId-bound safety `revokeInvite`'s caller (`DELETE /api/leagues/[leagueId]/invites`)
+ * already gets from `withCommissioner`, held here too rather than trusted to the route alone.
+ */
+export async function revokeInvite(
+  { db, clock }: Pick<InviteDeps, "db" | "clock">,
+  input: { readonly leagueId: string; readonly code: string },
+): Promise<RevokeInviteResult> {
+  const nowMs = Date.parse(clock.now());
+  const revoked = await db
+    .update(leagueInvites)
+    .set({ expiresAt: new Date(nowMs - 1) })
+    .where(and(eq(leagueInvites.code, input.code), eq(leagueInvites.leagueId, input.leagueId)))
+    .returning({ code: leagueInvites.code });
+  if (revoked.length === 0) return { ok: false, status: 404, reason: "That invite link does not exist." };
+  return { ok: true };
 }
 
 /**

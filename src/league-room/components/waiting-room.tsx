@@ -80,6 +80,17 @@ export function checklistItems(params: {
   readonly helpLevel: HelpLevel | undefined;
   readonly format: DraftFormat;
   readonly onOpenTour: () => void;
+  /**
+   * D5 (flow analysis, 2026-08-27): the pre-draft home board (`PreDraftHero`, `./home-board.tsx`)
+   * deliberately does not fetch a per-league `slotPreference` for its cross-league read (its own
+   * docblock) — that caller always has a real team in every league it renders, so its "rank"
+   * item's absent `content` is a cost decision, not a "there is nothing to rank" fact. Passing
+   * this turns the item into a real, working link into the room that DOES have the ranking panel,
+   * rather than dead body text with no action at all. Left `undefined` by `WaitingRoom`'s own call
+   * site: there, a `null` `slotPreference` can genuinely mean "no team here" (a commissioner
+   * without one of their own), for whom a "go rank" link would be a lie.
+   */
+  readonly rankHref?: string;
 }): readonly WaitingChecklistItem[] {
   const tour: WaitingChecklistItem = {
     key: "tour",
@@ -101,9 +112,16 @@ export function checklistItems(params: {
       </div>
     ),
   };
+  // D5: "Name your team" reads as an instruction with no control behind it — no rename endpoint
+  // exists anywhere in this codebase (`docs/research/2026-08-27-journey-commissioner.md`, C-07).
+  // Rephrased away from the imperative rather than left promising an action nobody can take;
+  // the fact itself is unchanged. "Team name", not the possessive "Your team's name": this room
+  // also renders for a house register with zero contractions or possessive apostrophes anywhere
+  // on screen (`waiting-room.test.tsx`'s own sweep, which cannot tell a possessive `'s` apart
+  // from a contraction and is right not to try).
   const name: WaitingChecklistItem = {
     key: "name",
-    heading: "Name your team",
+    heading: "Team name",
     body:
       params.myTeamName === null
         ? "Every team in this room already has a name."
@@ -114,9 +132,13 @@ export function checklistItems(params: {
     heading: "Rank your draft slots",
     body: "A higher choice wins more often than luck alone.",
     content:
-      params.slotPreference === null ? undefined : (
+      params.slotPreference !== null ? (
         <SlotPreferencePanel leagueId={params.leagueId} initialPreference={params.slotPreference} helpLevel={params.helpLevel} />
-      ),
+      ) : params.rankHref !== undefined ? (
+        <Link href={params.rankHref} className="text-sm font-medium text-accent underline">
+          Rank your slots in the league room
+        </Link>
+      ) : undefined,
   };
   const notices: WaitingChecklistItem = {
     key: "notices",

@@ -10,7 +10,7 @@ import { canonicalPairId } from "@/integrity-service/multi-account";
 import { LEAGUE_CONFIG } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { createLeague } from "./creation";
-import { acceptInvite, createInvite, invitePreview } from "./invites";
+import { acceptInvite, createInvite, invitePreview, listInvites, revokeInvite } from "./invites";
 import { DRAFT_ALREADY_STARTED } from "./join";
 import { leagueHome } from "./read";
 
@@ -152,6 +152,95 @@ describe("createInvite", () => {
       ok: false, reason: "We could not create an invite just now. Please try again.",
     });
     expect(await db.select().from(leagueInvites)).toHaveLength(1);
+  });
+});
+
+describe("listInvites", () => {
+  it("returns only live invites, newest first, never an expired or exhausted one", async () => {
+    const created = await league();
+    const alive = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!alive.ok) throw new Error(alive.reason);
+    nowIso = "2026-08-17T12:00:01.000Z";
+    const dies = await createInvite({ db, clock, random: () => 0.9 }, { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!dies.ok) throw new Error(dies.reason);
+    const usedUp = await createInvite({ db, clock, random: () => 0.1 }, { leagueId: created.leagueId, createdByUserId: "u1", maxUses: 1 });
+    if (!usedUp.ok) throw new Error(usedUp.reason);
+    await acceptInvite(writeDeps(), { code: usedUp.code, userId: "u2" });
+
+    // `dies` ages out of relevance for this list without touching `alive`'s own expiry. Relative
+    // to the INJECTED `clock` (`nowIso`), not the real wall clock — `listInvites` below is handed
+    // that same fake clock, so "expired" has to mean "before `nowIso`", not "before whatever
+    // instant the test happens to run at".
+    await db.update(leagueInvites).set({ expiresAt: new Date(Date.parse(nowIso) - 1000) }).where(eq(leagueInvites.code, dies.code));
+
+    const live = await listInvites(db, created.leagueId, clock);
+    expect(live).toEqual([{ code: alive.code, expiresAt: alive.expiresAt, maxUses: alive.maxUses, uses: 0 }]);
+  });
+
+  it("returns nothing for a league with no invites at all", async () => {
+    const created = await league();
+    expect(await listInvites(db, created.leagueId, clock)).toEqual([]);
+  });
+
+  it("is scoped to its own league — never another league's invites", async () => {
+    const first = await league();
+    const second = await createLeague(writeDeps(), {
+      name: "Second League", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Commish B" },
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
+    });
+    if (!second.ok) throw new Error(second.reason);
+    await createInvite(inviteDeps(), { leagueId: first.leagueId, createdByUserId: "u1" });
+
+    expect(await listInvites(db, second.leagueId, clock)).toEqual([]);
+  });
+});
+
+describe("revokeInvite", () => {
+  it("kills a live code — the join path refuses it afterward, the same way it refuses an expired one", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await revokeInvite({ db, clock }, { leagueId: created.leagueId, code: invite.code });
+    expect(result).toEqual({ ok: true });
+
+    expect(await acceptInvite(writeDeps(), { code: invite.code, userId: "u2" })).toEqual({
+      ok: false, status: 410, reason: "That invite link has expired. Ask your commissioner for a new one.",
+    });
+  });
+
+  it("drops a revoked code out of listInvites", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    await revokeInvite({ db, clock }, { leagueId: created.leagueId, code: invite.code });
+    expect(await listInvites(db, created.leagueId, clock)).toEqual([]);
+  });
+
+  it("refuses a code that does not exist", async () => {
+    const created = await league();
+    expect(await revokeInvite({ db, clock }, { leagueId: created.leagueId, code: "NOSUCH12" })).toEqual({
+      ok: false, status: 404, reason: "That invite link does not exist.",
+    });
+  });
+
+  it("never revokes a code that belongs to a DIFFERENT league, even by guessing", async () => {
+    const first = await league();
+    const second = await createLeague(writeDeps(), {
+      name: "Second League", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Commish B" },
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
+    });
+    if (!second.ok) throw new Error(second.reason);
+    const invite = await createInvite(inviteDeps(), { leagueId: first.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await revokeInvite({ db, clock }, { leagueId: second.leagueId, code: invite.code });
+    expect(result).toEqual({ ok: false, status: 404, reason: "That invite link does not exist." });
+    // Still live, from the OTHER league's perspective.
+    expect(await listInvites(db, first.leagueId, clock)).toHaveLength(1);
   });
 });
 
