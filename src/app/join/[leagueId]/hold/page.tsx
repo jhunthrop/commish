@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
@@ -9,6 +9,7 @@ import { shellData } from "@/components/app-shell/shell-data";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
+import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import { publicLeaguePreview } from "@/league-service/browse";
 import { SeatHoldPanel } from "@/league-room/components/seat-hold-panel";
 import { SeatConfirmPanel } from "./seat-confirm-panel";
@@ -70,6 +71,15 @@ export default async function SeatHoldPage({ params }: PageProps) {
 
   const { rail, liveState } = await shellData(getDb(), user);
   const shellUser = { displayName: user.displayName, avatar: user.avatarUrl, isAdmin: user.isAdmin };
+
+  // ALREADY SEATED (flow-remediation review A-3): a member with a team in this league was being
+  // offered "Take your seat", tapped it, and was silently redirected into a league they were
+  // already in — the analysis's own "same fact stated twice, differently" pattern, and a
+  // pointless write-shaped action. A READ decides it here (`resolveLeagueMembership` is a pure
+  // SELECT — this page's no-write-on-render law is untouched) and sends them where they were
+  // going anyway.
+  const membership = await resolveLeagueMembership(getDb(), leagueId, user.id);
+  if (membership.ok && membership.membership.teamId !== null) redirect(`/app/leagues/${leagueId}`);
 
   return (
     <AppShell user={shellUser} rail={rail} liveState={liveState}>
