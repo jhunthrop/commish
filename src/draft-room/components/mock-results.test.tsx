@@ -4,7 +4,7 @@ import { axe } from "vitest-axe";
 import Link from "next/link";
 import type { DraftStateView } from "@/draft-engine";
 import { renderSurface } from "@/components/ui/test-utils";
-import { MOCK_RESULTS_COPY, PLAYERS, SNAKE_VIEW } from "../test-fixtures";
+import { MOCK_RESULTS_COPY, PLAYERS, SNAKE_VIEW, TEAMS } from "../test-fixtures";
 import { MockResults } from "./mock-results";
 
 const COPY = MOCK_RESULTS_COPY;
@@ -23,10 +23,13 @@ const COMPLETE_VIEW: DraftStateView = {
   picks: [
     { pickNumber: 1, round: 1, teamId: "t1", playerId: "rb1", slot: "RB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false },
     { pickNumber: 2, round: 1, teamId: "t2", playerId: "wr1", slot: "RB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:01:00.000Z", auto: false },
+    // qb1 carries the fixture set's ONE real headshot URL — on t1's roster it is what lets the
+    // D1 face assertion below see an <img> rather than the initials fallback.
+    { pickNumber: 3, round: 2, teamId: "t1", playerId: "qb1", slot: "QB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:02:00.000Z", auto: false },
   ],
   rosters: {
     t1: [
-      { slot: "QB", slotIndex: 0, playerId: null },
+      { slot: "QB", slotIndex: 0, playerId: "qb1" },
       { slot: "RB", slotIndex: 0, playerId: "rb1" },
       { slot: "RB", slotIndex: 1, playerId: null },
     ],
@@ -39,30 +42,43 @@ const COMPLETE_VIEW: DraftStateView = {
 };
 
 describe("MockResults", () => {
-  it("states the heading and retention sentence it is given, axe-clean in both themes", async () => {
+  it("states the heading and meta line, restates NO retention (the banner owns it), axe-clean in both themes", async () => {
     await renderSurface(
-      <MockResults view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />,
+      <MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />,
       async ({ container }) => {
         expect(screen.getByRole("heading", { name: COPY.heading, level: 1 })).toBeInTheDocument();
-        expect(screen.getByText(COPY.retentionSentence)).toBeInTheDocument();
+        // E3 (results review): the practice banner directly above this panel already says the
+        // room clears itself — one retention fact per view, so the panel says it zero times.
+        expect(screen.queryByText(COPY.retentionSentence)).not.toBeInTheDocument();
+        // E5: the debrief's meta line — seat, shape, opponents — from data the props held.
+        expect(screen.getByText(/seat \d+ of \d+/)).toBeInTheDocument();
+        expect(screen.getByText(/practice opponents/)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
   });
 
-  it("groups your roster by slot, marking an unfilled slot Open rather than leaving it blank", () => {
-    render(<MockResults view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
+  it("draws the roster with the rail's own row — the player's face and true position, dashed placeholders for open spots (D1/D2)", () => {
+    render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
     const roster = screen.getByRole("list", { name: "Your roster" });
     expect(within(roster).getByText("Marcus Reed")).toBeInTheDocument();
-    expect(within(roster).getAllByText("Open").length).toBeGreaterThan(0);
+    // The shared RosterRow (roster-row.tsx): open spots read as the slot's own chip, exactly
+    // as the rail draws them — the word "Open" was this panel's private idiom and is gone.
+    expect(within(roster).queryByText("Open")).not.toBeInTheDocument();
+    // Faces: qb1's fixture headshot renders when qb1 is on the roster.
+    const rosterImgs = Array.from(roster.querySelectorAll("img"));
+    expect(rosterImgs.length).toBeGreaterThan(0);
   });
 
   it("states each pick's honest board facts — the board's own best available at that position, never a raw rank", () => {
-    render(<MockResults view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
+    render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
     const picks = screen.getByRole("list", { name: "Your picks" });
-    // rb1 (Marcus Reed) is the board's own best available RB at pick 1 — qb1 (a higher overall
-    // rank) is still on the board, but no RB ranked above rb1 is, which is the D3 case exactly.
-    expect(within(picks).getByText("You took Marcus Reed at pick 1. The board's best RB available. RB1 on the board.")).toBeInTheDocument();
+    // rb1 (Marcus Reed) is the board's own best available RB at pick 1 — the D3 case exactly.
+    // Tabular now (E1): number, face, name and the fact clause live in their own cells; the
+    // prose lead-in that named every player twice is gone.
+    expect(within(picks).getByText("Marcus Reed")).toBeInTheDocument();
+    expect(within(picks).getByText(/The board's best RB available\. RB1 on the board\./)).toBeInTheDocument();
+    expect(within(picks).queryByText(/You took/)).not.toBeInTheDocument();
     // Never a letter grade (ruling 5) — no A/B/C/D/F verdict anywhere on the panel.
     expect(screen.queryByText(/grade/i)).not.toBeInTheDocument();
     // Never a bare, un-normalized overall rank either (D3) — the defect this replaces.
@@ -70,17 +86,20 @@ describe("MockResults", () => {
   });
 
   it("never leaves the room a dead end — the three next actions always render", () => {
-    render(<MockResults view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
+    render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
     expect(screen.getByRole("link", { name: COPY.runAgainLabel })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: COPY.openLobbyLabel })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: COPY.browseLeaguesLabel })).toBeInTheDocument();
   });
 
-  it("says only the heading, retention line and actions for a commissioner with no team of their own", () => {
-    render(<MockResults view={COMPLETE_VIEW} players={PLAYERS} myTeamId={null} copy={COPY} actions={ACTIONS} />);
+  it("gives a commissioner with no team the heading, the actions, and the room's own finished board (E7)", () => {
+    render(
+      <MockResults teams={TEAMS} board={<p>the finished board</p>} view={COMPLETE_VIEW} players={PLAYERS} myTeamId={null} copy={COPY} actions={ACTIONS} />,
+    );
     expect(screen.queryByRole("list", { name: "Your roster" })).not.toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Your picks" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: COPY.heading })).toBeInTheDocument();
+    expect(screen.getByText("the finished board")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: COPY.browseLeaguesLabel })).toBeInTheDocument();
   });
 });

@@ -111,6 +111,13 @@ export interface PickFactCopy {
  */
 export function formatPickFact(copy: PickFactCopy, review: PickReview, playerName: string, position: Position): string {
   const took = fillTemplate(copy.took, { name: playerName, pickNumber: String(review.pickNumber) });
+  return `${took} ${formatPickFactClause(copy, review, position)}`;
+}
+
+/** The fact WITHOUT the lead-in — the tabular results row (review E1) already states the pick
+ *  number and the name in their own columns, so repeating them in prose would name every
+ *  player twice, the exact defect the sentence form had. */
+export function formatPickFactClause(copy: PickFactCopy, review: PickReview, position: Position): string {
   const delta =
     review.bestAvailableDelta === 0
       ? copy.bestAvailable
@@ -118,7 +125,7 @@ export function formatPickFact(copy: PickFactCopy, review: PickReview, playerNam
         ? fillTemplate(copy.positionBestAvailable, { position })
         : fillTemplate(copy.rankedHigherAvailable, { count: String(review.bestAvailableDelta) });
   const positionRank = fillTemplate(copy.positionRank, { position, rank: String(review.positionRank) });
-  return `${took} ${delta} ${positionRank}`;
+  return `${delta} ${positionRank}`;
 }
 
 /**

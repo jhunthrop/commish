@@ -61,7 +61,7 @@ import { MockResults } from "@/draft-room/components/mock-results";
 import { PracticeBanner } from "@/draft-room/components/practice-banner";
 import { RoomTour } from "@/draft-room/components/room-tour";
 import { ShareLinkPanel } from "@/draft-room/components/share-link-panel";
-import { MOCK_RESULTS_COPY, PLAYERS, SNAKE_VIEW } from "@/draft-room/test-fixtures";
+import { MOCK_RESULTS_COPY, PLAYERS, SNAKE_VIEW, TEAMS } from "@/draft-room/test-fixtures";
 import { MOCK_COPY } from "@/mock-draft/config";
 import type { MockRoomSummary } from "@/mock-draft-service/lobby";
 import { MockLobby } from "@/league-room/components/mock-lobby";
@@ -1752,7 +1752,7 @@ describe("MockResults says nothing that breaks the house copy rules, with and wi
     };
     for (const myTeamId of ["t1", null]) {
       const { container, unmount } = render(
-        <MockResults view={MOCK_RESULTS_VIEW} players={PLAYERS} myTeamId={myTeamId} copy={MOCK_RESULTS_COPY} actions={actions} />,
+        <MockResults teams={TEAMS} board={null} view={MOCK_RESULTS_VIEW} players={PLAYERS} myTeamId={myTeamId} copy={MOCK_RESULTS_COPY} actions={actions} />,
       );
       expectClean(container, "Marcus Reed");
       unmount();

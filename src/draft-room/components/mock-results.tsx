@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
+import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { EYEBROW, PositionBadge, SlotChip } from "@/components/ui";
+import { Avatar, EYEBROW, PositionBadge } from "@/components/ui";
+import { BENCH_SLOT } from "@/domain/roster";
 import { playerName, playersById as buildPlayersById } from "../lib/lookups";
-import { formatPickFact, type PickFactCopy } from "../state/format";
+import { formatPickFactClause, type PickFactCopy } from "../state/format";
 import { reviewPicks } from "../state/pick-review";
 import { rosterFillRows } from "../state/roster-fill";
-import { SLOT_POSITION } from "./room-dock";
+import { RosterRow } from "./roster-row";
 
 /** Mirrors `MockResultsCopy` (`../contract`) — the wire type this room fetches, forwarded down
  *  as one prop rather than several so `DraftRoom` stays a single pass-through.
@@ -28,6 +30,13 @@ export interface MockResultsCopy {
 
 export interface MockResultsProps {
   readonly view: DraftStateView;
+  /** The seats, for the debrief's meta line (results review E5: your seat, the room's shape,
+   *  who you played) — data `DraftRoom` always held and never passed down. */
+  readonly teams: readonly TeamCard[];
+  /** The room's own finished board (results review R3): `DraftRoom` builds the `DraftBoard` it
+   *  was already rendering ninety seconds earlier and hands it down — the single strongest
+   *  image the product makes, kept at the exact moment it is finally complete. */
+  readonly board: ReactNode;
   /** In the same ranked order `START_DRAFT` snapshots — `GET /api/drafts/[draftId]/players`'s
    *  own docblock — which is what makes the board delta below a fact of THIS draft's own log
    *  rather than a live, still-moving ranking. */
@@ -66,21 +75,23 @@ function RosterSection({
   readonly myTeamId: string;
   readonly copy: MockResultsCopy;
 }) {
+  // THE SAME ROW the rail draws (results review D1/D2): faces, the player's OWN position, the
+  // bench under its hairline — the finisher's team rendered exactly as well as the room
+  // rendered it a minute earlier, because it is literally the same component.
   const rows = rosterFillRows(view.slotConfig, view.rosters[myTeamId] ?? []);
+  const firstBenchIndex = rows.findIndex((row) => row.slot === BENCH_SLOT);
   return (
     <div className="flex flex-col gap-2">
       <h2 className={`${EYEBROW} text-text-muted`}>{copy.rosterHeading}</h2>
       <ul aria-label={copy.rosterHeading} className="flex flex-col gap-1.5">
-        {rows.map((row) => {
-          const position = SLOT_POSITION[row.slot];
-          const name = row.playerId === null ? copy.openSlotLabel : playerName(playersById, row.playerId);
-          return (
-            <li key={`${row.slot}:${row.slotIndex}`} className="flex flex-wrap items-center gap-2">
-              {position === undefined ? <SlotChip slot={row.slot} /> : <PositionBadge position={position} size="sm" />}
-              <span className="text-sm text-text-primary">{name}</span>
-            </li>
-          );
-        })}
+        {rows.map((row, index) => (
+          <RosterRow
+            key={`${row.slot}:${row.slotIndex}`}
+            slot={row.slot}
+            player={row.playerId === null ? null : (playersById.get(row.playerId) ?? null)}
+            className={index === firstBenchIndex ? "mt-1 border-t border-line pt-2" : undefined}
+          />
+        ))}
       </ul>
     </div>
   );
@@ -99,6 +110,9 @@ function PickList({
   readonly myTeamId: string;
   readonly copy: MockResultsCopy;
 }) {
+  // A record, not prose (results review E1): one tabular mono row per pick — number, face,
+  // name, position, then the honest board fact. Weight, never color, marks the extremes (the
+  // R2 register ruling): a best-available pick reads in ink, everything else stays quiet.
   const reviews = reviewPicks(players, view.picks, myTeamId);
   return (
     <div className="flex flex-col gap-2">
@@ -106,14 +120,20 @@ function PickList({
       {reviews.length === 0 ? (
         <p className="text-sm text-text-muted">{copy.noPicksMessage}</p>
       ) : (
-        <ol aria-label={copy.picksHeading} className="flex flex-col gap-1">
+        <ol aria-label={copy.picksHeading} className="flex flex-col">
           {reviews.map((review) => {
             const player = playersById.get(review.playerId);
+            if (player === undefined) return null;
+            const best = review.bestAvailableDelta === 0 || review.positionBestDelta === 0;
             return (
-              <li key={review.pickNumber} className="text-sm text-text-primary">
-                {player === undefined
-                  ? null
-                  : formatPickFact(copy.pickFact, review, playerName(playersById, review.playerId), player.position)}
+              <li key={review.pickNumber} className="flex items-center gap-3 border-t border-line py-2 first:border-t-0">
+                <span className="w-8 shrink-0 font-mono text-xs tabular-nums text-text-muted">{review.pickNumber}</span>
+                <Avatar name={player.name} avatar={player.headshotUrl} size="sm" className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">{player.name}</span>
+                <PositionBadge position={player.position} size="sm" />
+                <span className={`min-w-0 flex-1 truncate text-right font-mono text-xs tabular-nums ${best ? "font-semibold text-text-primary" : "text-text-muted"}`}>
+                  {formatPickFactClause(copy.pickFact, review, player.position)}
+                </span>
               </li>
             );
           })}
@@ -137,24 +157,51 @@ function PickList({
  * rank implies exactly the verdict ruling 5 refuses, and points it backwards for any pick late in
  * a long draft — best-available-at-the-pick never drifts with the round the way raw rank does.
  */
-export function MockResults({ view, players, myTeamId, copy, actions }: MockResultsProps) {
+export function MockResults({ view, teams, board, players, myTeamId, copy, actions }: MockResultsProps) {
   const playersById = buildPlayersById(players);
+  // The debrief's meta line (review E5) — every clause a fact the props already held: your
+  // seat, the room's shape, who you played. Composed only for a caller WITH a seat.
+  const seat = myTeamId === null ? 0 : view.draftOrder.indexOf(myTeamId) + 1;
+  const myName = teams.find((team) => team.id === myTeamId)?.name ?? null;
+  const rounds = view.draftOrder.length === 0 ? 0 : Math.floor(view.picks.length / view.draftOrder.length);
+  const bots = teams.filter((team) => team.isBot === true).length;
   return (
-    <section aria-label="Mock draft results" className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+    // Full-bleed (review E2/R1): the frame spends the screen it is given; the team sheet takes
+    // its own measure as a grid column, the pick log takes the rest, the finished board takes
+    // the width. Mobile order (review E9): team first, the way out before the log — order
+    // utilities re-sequence the single column without duplicating a region.
+    <section aria-label="Mock draft results" className="flex w-full flex-col gap-8 p-6">
       <div className="flex flex-col gap-1">
         <h1 className="font-display text-display-md font-semibold leading-display text-text-primary">{copy.heading}</h1>
-        <p className="text-sm text-text-muted">{copy.retentionSentence}</p>
+        {myTeamId === null || seat === 0 ? null : (
+          <p className="font-mono text-xs tabular-nums text-text-muted">
+            {myName === null ? "" : `${myName} · `}
+            {`seat ${seat} of ${view.draftOrder.length} · ${rounds} rounds · ${bots} practice opponents`}
+          </p>
+        )}
+        {/* ONE retention fact per view (review E3): the practice banner above this panel
+            already says the room clears itself — `copy.retentionSentence` stays on the wire
+            for any chrome-less consumer but is deliberately not restated here. */}
       </div>
-      {myTeamId === null ? null : (
-        <div className="grid gap-6 sm:grid-cols-2">
-          <RosterSection view={view} playersById={playersById} myTeamId={myTeamId} copy={copy} />
-          <PickList view={view} players={players} playersById={playersById} myTeamId={myTeamId} copy={copy} />
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        {myTeamId === null ? null : (
+          <>
+            <div className="order-1">
+              <RosterSection view={view} playersById={playersById} myTeamId={myTeamId} copy={copy} />
+            </div>
+            <div className="order-3 lg:order-2">
+              <PickList view={view} players={players} playersById={playersById} myTeamId={myTeamId} copy={copy} />
+            </div>
+          </>
+        )}
+        <div className="order-2 flex flex-wrap items-center gap-3 border-t border-line pt-4 lg:order-3 lg:col-span-2">
+          {actions.runAgain}
+          {actions.openLobby}
+          {actions.browseLeagues}
         </div>
-      )}
-      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
-        {actions.runAgain}
-        {actions.openLobby}
-        {actions.browseLeagues}
+        {/* The finished board (review R3/E7) — for EVERY caller, including the commissioner
+            with no team, for whom the room's own completed picture is the whole point. */}
+        <div className="order-4 min-h-0 lg:col-span-2">{board}</div>
       </div>
     </section>
   );

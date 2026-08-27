@@ -8,9 +8,12 @@ import type { HelpLevel } from "@/identity/preferences";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { useDraftRoomDeps } from "../hooks/deps";
 import { actionLabelFor, playersById as buildPlayersById } from "../lib/lookups";
+import { DraftBoard } from "./draft-board";
 import { MockResults } from "./mock-results";
+import { PickWire } from "./pick-wire";
 import { PracticeBanner } from "./practice-banner";
 import { RoomTour } from "./room-tour";
+import { RoomRail } from "./room-rail";
 import { RosterRail } from "./roster-rail";
 import { ShareLinkPanel } from "./share-link-panel";
 import { SnakeRoom } from "./snake-room";
@@ -162,31 +165,51 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
       {room.mock?.results ? (
         <>
           {mockChrome}
-          {/* Step 2: the board yields entirely to the results panel once a mock finishes — the
-              room's every next action lives here, never a dead end. */}
+          {/* The debrief (results review, 2026-08-26): the room's own chrome answers D4 — the
+              rail's complete-phase state says "Draft complete", the wire closes the story with
+              the room's last picks (R4) — and the panel below composes the team sheet, the
+              honest pick log, the ONE ink way out (E4: the rematch is the act this page exists
+              to produce), and the finished board itself (R3). */}
+          <RoomRail
+            leagueName={room.leagueName}
+            view={room.view}
+            teams={room.teams}
+            myTeamId={room.myTeamId}
+            playersById={playersById}
+            connection={room.connection}
+            waiting={null}
+          />
+          <PickWire view={room.view} teams={room.teams} playersById={playersById} />
           <MockResults
-          view={room.view}
-          players={room.players}
-          myTeamId={room.myTeamId}
-          copy={room.mock.results}
-          actions={{
-            runAgain: (
-              <ButtonLink href={`${MOCK_LOBBY_PATH}?create=solo`} variant="secondary">
-                {room.mock.results.runAgainLabel}
-              </ButtonLink>
-            ),
-            openLobby: (
-              <ButtonLink href={MOCK_LOBBY_PATH} variant="secondary">
-                {room.mock.results.openLobbyLabel}
-              </ButtonLink>
-            ),
-            browseLeagues: (
-              <ButtonLink href="/browse" variant="secondary">
-                {room.mock.results.browseLeaguesLabel}
-              </ButtonLink>
-            ),
-          }}
-        />
+            view={room.view}
+            teams={room.teams}
+            players={room.players}
+            myTeamId={room.myTeamId}
+            copy={room.mock.results}
+            board={
+              <DraftBoard
+                view={room.view}
+                teams={room.teams}
+                playersById={playersById}
+                myTeamId={room.myTeamId}
+                landedPickNumber={null}
+                mock={{ botMarkerLabel: room.mock.botMarkerLabel, botBadge: room.mock.botBadge }}
+              />
+            }
+            actions={{
+              runAgain: <ButtonLink href={`${MOCK_LOBBY_PATH}?create=solo`}>{room.mock.results.runAgainLabel}</ButtonLink>,
+              openLobby: (
+                <ButtonLink href={MOCK_LOBBY_PATH} variant="secondary">
+                  {room.mock.results.openLobbyLabel}
+                </ButtonLink>
+              ),
+              browseLeagues: (
+                <ButtonLink href="/browse" variant="secondary">
+                  {room.mock.results.browseLeaguesLabel}
+                </ButtonLink>
+              ),
+            }}
+          />
         </>
       ) : (
         // THE ROOM VIEWPORT — owned exactly once (founder screenshot, 2026-08-26): every band
