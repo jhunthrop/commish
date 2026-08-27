@@ -183,7 +183,13 @@ export function OpenLeagueShelf({
   featuredInHero = false,
   live = moneyIsLive(),
 }: OpenLeagueShelfProps) {
-  const merged: readonly PublicLeagueSummary[] = [...house, ...leagues];
+  // DEDUPED BY ID (page-audit harness, 2026-08-27): a league that satisfies both reads — the
+  // house shelf and the open-league list — was rendered TWICE, which showed up first as two ink
+  // pills carrying the identical href (rule 5) and is a duplicate row either way. The house
+  // entry wins, because it is the one carrying the rung's own framing.
+  const merged: readonly PublicLeagueSummary[] = [...house, ...leagues].filter(
+    (league, index, all) => all.findIndex((other) => other.id === league.id) === index,
+  );
   const featuredId = featuredInHero ? null : featuredLeagueId(merged);
   const Heading = headingLevel === 1 ? "h1" : "h2";
 

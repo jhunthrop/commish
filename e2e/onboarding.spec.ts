@@ -67,7 +67,7 @@ test("a manager with zero leagues sees the fork, ordered and explained, and brow
  * sees it lead `/reviews` — proving the feed is both unfiltered by rating and readable by the
  * first-timer persona it's for, who has not signed up yet.
  */
-test("a signed-in manager writes a 1-star review, and it leads the public feed signed out", async ({ managerA, page }) => {
+test("a signed-in manager writes a review, and the public feed shows only real ones", async ({ managerA, page }) => {
   await managerA.goto("/app/profile");
   await managerA.getByRole("radio", { name: "1, poor" }).check();
   await managerA
@@ -79,9 +79,15 @@ test("a signed-in manager writes a 1-star review, and it leads the public feed s
   await managerA.getByRole("button", { name: /Post review|Save changes/ }).click();
   await expect(managerA.getByText("Saved.")).toBeVisible();
 
+  // Flow analysis D3 (2026-08-27) changed what this leg proves. The review written above carries
+  // the e2e signature ("Filed at <epoch>"), which is exactly what `fixture-filter.ts` exists to
+  // keep off a stranger's screen — a founder's public page was leading with one seeded complaint.
+  // So the honest assertion is the inverse of the old one: the author still sees their review in
+  // their own account, and the PUBLIC feed refuses to show test data at all.
+  await expect(managerA.getByLabel("Your review")).toHaveValue(/Filed at \d+/);
+
   await page.goto("/reviews");
   await expect(page.getByRole("heading", { name: "What managers are saying" })).toBeVisible();
-  const firstReview = page.getByRole("listitem").first();
-  await expect(firstReview).toContainText("1 out of 5, poor");
+  await expect(page.getByText(/This league ate my roster overnight/)).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 });

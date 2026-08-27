@@ -376,7 +376,11 @@ export function CreateLeagueForm({
         helpLevel={helpLevel}
       />
 
-      <Button type="submit" loading={submitting} disabled={submitting}>
+      {/* SECONDARY, deliberately (page-audit harness, 2026-08-27): this form lives inside the
+          home's create disclosure, and the home already spends its one ink on the live draft a
+          member can join RIGHT NOW — a draft in progress outranks starting a new league, and
+          rule 5 allows exactly one ink action per view, not per component. */}
+      <Button type="submit" variant="secondary" loading={submitting} disabled={submitting}>
         Create league
       </Button>
     </form>

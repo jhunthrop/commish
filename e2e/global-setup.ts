@@ -762,6 +762,26 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   writeFileSync(MANAGER_SIGNOUT_STATE, storageState(baseURL, signOut.cookie), { mode: 0o600 });
   writeFileSync(MANAGER_D_STATE, storageState(baseURL, d.cookie), { mode: 0o600 });
 
+  // MANAGER ZERO IS RESET TO ZERO LEAGUES, every run (2026-08-27). The comment above this
+  // identity's own constant promises "zero leagues run over run" and calls it "the one thing
+  // `onboarding.spec.ts` needs" — but the promise rested on nothing except every spec agreeing
+  // not to join anything with it, and the moment a persona-journey review drove the real product
+  // as this identity, it joined a league and the fork spec broke on a state no spec had written.
+  // A guarantee an unrelated session can void is not a guarantee: this makes it one. Scoped to
+  // the ONE identity the e2e suite owns end to end (its own minted account, never a seeded
+  // developer or a real user), and it deletes only that account's own team rows.
+  const zeroDb = createDb();
+  try {
+    const zeroUser = await zeroDb.select({ id: users.id }).from(users).where(eq(users.email, MANAGER_ZERO_EMAIL));
+    const zeroUserId = zeroUser[0]?.id;
+    if (zeroUserId !== undefined) {
+      const removed = await zeroDb.delete(teams).where(eq(teams.userId, zeroUserId)).returning({ id: teams.id });
+      if (removed.length > 0) console.log(`[e2e] reset manager zero to zero leagues (${removed.length} membership(s) cleared)`);
+    }
+  } finally {
+    await zeroDb.$client.end();
+  }
+
   const browser = await chromium.launch();
   try {
     for (const state of [MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_C_STATE, MANAGER_ZERO_STATE, MANAGER_SIGNOUT_STATE, MANAGER_D_STATE]) {
