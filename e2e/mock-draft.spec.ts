@@ -243,6 +243,16 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   // "status"` toast — an unscoped locator resolves both once that banner appears.
   await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
 
+  // --- The room viewport is owned once (founder screenshot, 2026-08-26): with the practice
+  // banner mounted, the PAGE itself never scrolls at desktop — a band above the old h-dvh
+  // frame scrolled the whole room by exactly its own height ("the weird scroll border").
+  const pageScroll = await managerA.evaluate(() => ({
+    w: [document.documentElement.scrollWidth, document.documentElement.clientWidth],
+    h: [document.documentElement.scrollHeight, document.documentElement.clientHeight],
+  }));
+  expect(pageScroll.h[0], "the mock room's page scrolls vertically at desktop").toBeLessThanOrEqual(pageScroll.h[1]! + 1);
+  expect(pageScroll.w[0], "the mock room's page scrolls sideways at desktop").toBeLessThanOrEqual(pageScroll.w[1]! + 1);
+
   // --- The human's own real pick — with the board's pick number captured FIRST, so the
   // post-sim assertion below measures movement against the state the human acted from ---------
   const pickNumberBeforeOurTurn = pickNumberFromTurnLabel(await managerA.getByTestId("turn-label").innerText());

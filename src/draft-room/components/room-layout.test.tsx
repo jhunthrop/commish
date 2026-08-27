@@ -25,11 +25,16 @@ describe("RoomLayout", () => {
     });
   });
 
-  it("is a full-height frame the page itself never scrolls", () => {
+  it("fills the viewport frame it is handed, never claiming the viewport itself (the scroll-border fix)", () => {
+    // The founder's screenshot (2026-08-26): when this frame owned lg:h-dvh directly, any band
+    // mounted above it — the practice banner — pushed the whole page into a scroll of exactly
+    // that band's height. DraftRoom's room-viewport wrapper owns the dvh now; this frame flexes.
     render(<RoomLayout {...slots} />);
     const frame = screen.getByTestId("room-layout");
-    expect(frame.className).toContain("lg:h-dvh");
+    expect(frame.className).toContain("lg:flex-1");
+    expect(frame.className).toContain("lg:min-h-0");
     expect(frame.className).toContain("lg:overflow-hidden");
+    expect(frame.className).not.toContain("lg:h-dvh");
   });
 
   it("clips every band and delegates scrolling to the content that owns it", () => {

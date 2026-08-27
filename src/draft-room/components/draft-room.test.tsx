@@ -288,4 +288,16 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     expect(source).not.toMatch(/useState[^\n]*matchMedia/);
     expect(source).not.toMatch(/useState<boolean>\(\(\) =>/);
   });
+
+  it("mounts the practice banner INSIDE the room viewport frame — a band above an h-dvh frame scrolls the page (founder screenshot)", async () => {
+    const fixture = fixtureDeps();
+    fixture.mock = MOCK_ROOM;
+    mount(fixture);
+    await waitFor(() => expect(screen.getByTestId("practice-banner")).toBeInTheDocument());
+    const viewport = screen.getByTestId("room-viewport");
+    expect(viewport.className).toContain("lg:h-dvh");
+    expect(viewport.className).toContain("lg:overflow-hidden");
+    expect(viewport.contains(screen.getByTestId("practice-banner"))).toBe(true);
+    expect(viewport.contains(screen.getByTestId("room-layout"))).toBe(true);
+  });
 });

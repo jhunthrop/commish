@@ -138,7 +138,11 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
 
   // Task 8: a mock room's own honest chrome. `room.mock` is null for every real draft, so none
   // of this branch ever runs there — the real room's own DOM is untouched by this addition.
-  return (
+  // The mock room's honest chrome, composed ONCE and placed per branch: results pages scroll
+  // normally, so it rides plain flow there; the LIVE room owns the viewport, so it rides
+  // INSIDE the frame below — a band above an h-dvh frame is exactly the scroll bug the
+  // founder's screenshot caught (2026-08-26).
+  const mockChrome = (
     <>
       {room.mock ? <PracticeBanner message={room.mock.practiceBanner} /> : null}
       {room.mock?.share ? (
@@ -150,10 +154,17 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
           startsAt={room.mock.share.startsAt}
         />
       ) : null}
+    </>
+  );
+
+  return (
+    <>
       {room.mock?.results ? (
-        // Step 2: the board yields entirely to the results panel once a mock finishes — the
-        // room's every next action lives here, never a dead end.
-        <MockResults
+        <>
+          {mockChrome}
+          {/* Step 2: the board yields entirely to the results panel once a mock finishes — the
+              room's every next action lives here, never a dead end. */}
+          <MockResults
           view={room.view}
           players={room.players}
           myTeamId={room.myTeamId}
@@ -176,15 +187,21 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
             ),
           }}
         />
+        </>
       ) : (
-        <>
+        // THE ROOM VIEWPORT — owned exactly once (founder screenshot, 2026-08-26): every band
+        // the live room wears (the practice banner, the share panel) lives INSIDE this frame,
+        // and `RoomLayout` flexes into what remains. A sibling above an h-dvh frame scrolls
+        // the page by its own height; a child inside it never can.
+        <div data-testid="room-viewport" className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+          {mockChrome}
           <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} actionLabel={actionLabelFor(room.view.format)} />
           {room.view.format === "auction" ? (
             <AuctionRoom room={room} playersById={playersById} onAct={act} aside={aside} helpLevel={helpLevel} />
           ) : (
             <SnakeRoom room={room} playersById={playersById} onAct={act} aside={aside} helpLevel={helpLevel} />
           )}
-        </>
+        </div>
       )}
     </>
   );

@@ -37,7 +37,12 @@ export interface RoomLayoutProps {
  */
 export function RoomLayout({ rail, pool, stage, dock, aside }: RoomLayoutProps) {
   return (
-    <div data-testid="room-layout" className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+    // `lg:flex-1`, never its own `lg:h-dvh` (founder screenshot, 2026-08-26): this frame used
+    // to claim the whole viewport itself, so any band mounted ABOVE it (the practice banner,
+    // a share panel, any future notice) pushed the page into a scroll of exactly that band's
+    // height — the "weird scroll border". The VIEWPORT is owned once, by `DraftRoom`'s
+    // room-viewport wrapper; this frame fills whatever that wrapper hands it.
+    <div data-testid="room-layout" className="flex min-h-dvh flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
       <div className="order-1">{rail}</div>
       <div className="order-3 flex min-h-0 flex-1 flex-col lg:order-2 lg:flex-row">
         <div className="order-2 min-w-0 border-line lg:order-1 lg:w-88 lg:shrink-0 lg:overflow-hidden lg:border-r">{pool}</div>
