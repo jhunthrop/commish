@@ -92,6 +92,24 @@ describe("MockResults", () => {
     expect(screen.getByRole("link", { name: COPY.browseLeaguesLabel })).toBeInTheDocument();
   });
 
+  /**
+   * FOUNDER 2026-08-27: "there's no navigation at the top of a finished mock draft." The actions
+   * were rendering — the test above proves that, and proved it while the defect was live — but on
+   * a desktop they sat below the roster AND a fifteen-round pick list, a full screen of scrolling
+   * away from the headline. PRESENT is not the same as REACHABLE, so this pins the thing that was
+   * actually broken: the way out precedes the log in document order, which is what puts it beside
+   * the headline at every width.
+   */
+  it("puts the way out at the TOP, before the pick log a manager would otherwise scroll past", () => {
+    render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
+
+    const runAgain = screen.getByRole("link", { name: COPY.runAgainLabel });
+    const pickLog = screen.getByRole("list", { name: "Your picks" });
+
+    // Node.compareDocumentPosition: FOLLOWING means the log comes after the action in the DOM.
+    expect(runAgain.compareDocumentPosition(pickLog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("gives a commissioner with no team the heading, the actions, and the room's own finished board (E7)", () => {
     render(
       <MockResults teams={TEAMS} board={<p>the finished board</p>} view={COMPLETE_VIEW} players={PLAYERS} myTeamId={null} copy={COPY} actions={ACTIONS} />,

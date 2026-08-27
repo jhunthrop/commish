@@ -171,17 +171,32 @@ export function MockResults({ view, teams, board, players, myTeamId, copy, actio
     // the width. Mobile order (review E9): team first, the way out before the log — order
     // utilities re-sequence the single column without duplicating a region.
     <section aria-label="Mock draft results" className="flex w-full flex-col gap-8 p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-display-md font-semibold leading-display text-text-primary">{copy.heading}</h1>
-        {myTeamId === null || seat === 0 ? null : (
-          <p className="font-mono text-xs tabular-nums text-text-muted">
-            {myName === null ? "" : `${myName} · `}
-            {`seat ${seat} of ${view.draftOrder.length} · ${rounds} rounds · ${bots} practice opponents`}
-          </p>
-        )}
-        {/* ONE retention fact per view (review E3): the practice banner above this panel
-            already says the room clears itself — `copy.retentionSentence` stays on the wire
-            for any chrome-less consumer but is deliberately not restated here. */}
+      {/* FOUNDER 2026-08-27 ("there's no navigation at the top of a finished mock draft"): the
+          way out rides the headline, not the foot of the page. It used to sit inside the grid
+          below — `order-2` put it above the pick log on a phone, which was right, but
+          `lg:order-3` put it below BOTH the roster and a fifteen-round pick list on a desktop,
+          so finishing a mock left you scrolling a full screen of your own picks to find the
+          thing you actually wanted next. The headline row was carrying nothing but empty space
+          to its right at exactly that width. One block, every width: still before the log on a
+          phone, now beside the headline on a desktop. */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="font-display text-display-md font-semibold leading-display text-text-primary">{copy.heading}</h1>
+          {myTeamId === null || seat === 0 ? null : (
+            <p className="font-mono text-xs tabular-nums text-text-muted">
+              {myName === null ? "" : `${myName} · `}
+              {`seat ${seat} of ${view.draftOrder.length} · ${rounds} rounds · ${bots} practice opponents`}
+            </p>
+          )}
+          {/* ONE retention fact per view (review E3): the practice banner above this panel
+              already says the room clears itself — `copy.retentionSentence` stays on the wire
+              for any chrome-less consumer but is deliberately not restated here. */}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          {actions.runAgain}
+          {actions.openLobby}
+          {actions.browseLeagues}
+        </div>
       </div>
       <div className="grid gap-8 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
         {myTeamId === null ? null : (
@@ -189,19 +204,14 @@ export function MockResults({ view, teams, board, players, myTeamId, copy, actio
             <div className="order-1">
               <RosterSection view={view} playersById={playersById} myTeamId={myTeamId} copy={copy} />
             </div>
-            <div className="order-3 lg:order-2">
+            <div className="order-2">
               <PickList view={view} players={players} playersById={playersById} myTeamId={myTeamId} copy={copy} />
             </div>
           </>
         )}
-        <div className="order-2 flex flex-wrap items-center gap-3 border-t border-line pt-4 lg:order-3 lg:col-span-2">
-          {actions.runAgain}
-          {actions.openLobby}
-          {actions.browseLeagues}
-        </div>
         {/* The finished board (review R3/E7) — for EVERY caller, including the commissioner
             with no team, for whom the room's own completed picture is the whole point. */}
-        <div className="order-4 min-h-0 lg:col-span-2">{board}</div>
+        <div className="order-3 min-h-0 lg:col-span-2">{board}</div>
       </div>
     </section>
   );
