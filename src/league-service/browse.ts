@@ -7,6 +7,7 @@ import type { RosterSlotConfig } from "@/domain/roster";
 import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
+import { envOrUndefined } from "@/lib/env";
 import { describeRosterShape, formatDraftTime, LEAGUE_CONFIG } from "@/league";
 import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { houseKickoffStillAhead } from "./house-factory";
@@ -33,8 +34,23 @@ import { describeScoring, type ScoringRules } from "@/scoring";
  *
  * Exported as the query BUILDER, the same shape `houseKickoffStillAhead`
  * (`@/league-service/house-factory.ts`) already uses for a predicate two different queries share.
+ *
+ * ONE ENVIRONMENT OPTS OUT, and only one: the end-to-end suite's own server. Those specs seed a
+ * league, then join it THROUGH the product's real front door — `/browse`, the Join button, the
+ * waiting room — which is the whole value of the coverage. Hiding fixture leagues from every
+ * public read made that walk impossible: `money-dark.spec.ts` waited sixty seconds for a Join
+ * button on a league the shelf had filtered out from under it, and four other specs timed out the
+ * same way. The suite and the founder's dev server share one database but never one server
+ * process (the suite runs `next start` on :3100, the founder's `next dev` holds :3000), so the
+ * server's own environment is the honest seam: `E2E_SHOW_FIXTURE_LEAGUES=1` is set by
+ * `playwright.config.ts`'s `webServer.env` and by nothing else in this repo.
+ *
+ * Fails CLOSED. Anything other than the literal `"1"` — unset, empty, `"true"`, `"0"` — hides
+ * fixtures, so the founder's shelf and any deploy get the filtered read by default and an
+ * operator has to opt in on purpose to see otherwise.
  */
-export function notAFixtureLeague(): SQL {
+export function notAFixtureLeague(): SQL | undefined {
+  if (envOrUndefined("E2E_SHOW_FIXTURE_LEAGUES") === "1") return undefined;
   // `and()` with two or more defined `SQLWrapper` operands always returns a real `SQL`, never
   // `undefined` — `FIXTURE_LEAGUE_NAME_PREFIXES` is a fixed, non-empty literal array, so this
   // assertion is safe rather than hopeful (the identical shape `houseKickoffStillAhead`'s own

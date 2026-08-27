@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, afterAll } from "vitest";
 import { eq, isNotNull } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
@@ -972,6 +972,51 @@ describe("listPublicLeagues excludes dev/e2e fixture leagues (D1)", () => {
     const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
 
     expect(house.map((l) => l.id)).toEqual(["house_real"]);
+  });
+
+  /**
+   * The ONE opt-out, pinned on both sides. The e2e suite's own `next start` process sets
+   * `E2E_SHOW_FIXTURE_LEAGUES=1` so its specs can join their seeded league through the real
+   * `/browse` shelf; every other process must keep the filter. The fail-CLOSED half is the half
+   * worth a test — a truthy-looking value that is not the literal "1" has to keep hiding
+   * fixtures, or a stray `E2E_SHOW_FIXTURE_LEAGUES=true` in someone's `.env.local` quietly puts
+   * seeded junk back on the founder's shelf.
+   */
+  describe("E2E_SHOW_FIXTURE_LEAGUES", () => {
+    const original = process.env.E2E_SHOW_FIXTURE_LEAGUES;
+    afterEach(() => {
+      if (original === undefined) delete process.env.E2E_SHOW_FIXTURE_LEAGUES;
+      else process.env.E2E_SHOW_FIXTURE_LEAGUES = original;
+    });
+
+    async function seedOneOfEach(): Promise<void> {
+      await seed({
+        id: "gate_fixture", name: "E2E Money Dark 1787678163994", format: "snake", experienceTier: "beginner",
+        stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      });
+      await seed({
+        id: "gate_real", name: "The Longshot League 5", format: "snake", experienceTier: "beginner",
+        stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      });
+    }
+
+    it("lists a fixture league when the suite's own server opts in with the literal 1", async () => {
+      process.env.E2E_SHOW_FIXTURE_LEAGUES = "1";
+      await seedOneOfEach();
+
+      const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
+
+      expect(rows.map((row) => row.id).sort()).toEqual(["gate_fixture", "gate_real"]);
+    });
+
+    it.each(["true", "0", "yes", ""])("keeps hiding fixtures when the value is %o rather than 1", async (value) => {
+      process.env.E2E_SHOW_FIXTURE_LEAGUES = value;
+      await seedOneOfEach();
+
+      const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
+
+      expect(rows.map((row) => row.id)).toEqual(["gate_real"]);
+    });
   });
 });
 

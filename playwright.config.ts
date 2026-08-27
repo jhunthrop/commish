@@ -66,6 +66,11 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: process.env.CI === undefined,
     timeout: 180_000,
-    env: { NEXT_DIST_DIR },
+    // The suite's own leagues are named `E2E …`/`Mobile360…`, which is exactly what
+    // `notAFixtureLeague()` (`@/league-service/browse`) hides from every public read so the
+    // founder's shelf never shows seeded junk. These specs join THROUGH the real front door, so
+    // this server — and only this server — asks to see them. Safe because it is per-process, not
+    // per-database: the founder's `next dev` on :3000 never reads this value.
+    env: { NEXT_DIST_DIR, E2E_SHOW_FIXTURE_LEAGUES: "1" },
   },
 });
