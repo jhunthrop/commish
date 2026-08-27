@@ -52,40 +52,15 @@ test("/sign-in with a hostile returnTo still leaves for AuthKit, and the hostile
 });
 
 /**
- * Re-verifies `e2e/season.spec.ts`'s own sign-out coverage now that the chrome the "Sign out"
- * button lives in moved (`TopBar`'s inner row gained `SessionNotice` beside it, Task 16 Step 5) —
- * deliberately re-run here rather than moved, so `season.spec.ts`'s own regression net over the
- * season lifecycle stays intact. See that file's own docblock for the CSP history this protects:
- * `form-action` must name BOTH `api.workos.com` and the hosted `.authkit.app` domain, or the
- * sign-out chain is silently refused partway through and the next sign-in resumes the old
- * identity.
+ * NO SIGN-OUT TEST LIVES HERE. `managerSignOut` is a SINGLE-USE identity per run — signing out
+ * revokes the session server-side (`support/fixtures.ts`'s own docblock), so the first test to
+ * spend it leaves every later consumer looking at a dead session. A duplicate walk added here
+ * during the Ive campaign did exactly that: it ran first (auth sorts before season), and
+ * `season.spec.ts`'s original sign-out test then failed on `/app` with no "Your leagues"
+ * heading, for eighteen seconds, every run. The chain is covered once, in `season.spec.ts:117`,
+ * which asserts strictly more than this copy did: both WorkOS hops AND the landed-out state.
+ * Verify the Sign out button's own chrome there; never add a second consumer of this identity.
  */
-test("sign-out through managerSignOut still walks the whole WorkOS chain and lands back on our own origin", async ({ managerSignOut }) => {
-  const navigations: string[] = [];
-  managerSignOut.on("request", (request) => {
-    if (request.isNavigationRequest()) navigations.push(new URL(request.url()).host);
-  });
-
-  await managerSignOut.goto("/app");
-  await expect(managerSignOut.getByRole("heading", { name: "Your leagues" })).toBeVisible();
-
-  await managerSignOut.getByRole("button", { name: "Sign out" }).click();
-
-  await expect
-    .poll(() => navigations.includes("api.workos.com"), { message: "the sign-out POST never reached WorkOS's logout endpoint" })
-    .toBe(true);
-  await expect
-    .poll(() => navigations.some((host) => host.endsWith(".authkit.app")), {
-      message: "the WorkOS logout redirect to the hosted AuthKit domain was refused",
-    })
-    .toBe(true);
-
-  // Where hop 4 lands is a WorkOS dashboard setting, not this app's code, so this asserts the
-  // STATE (the session is gone, the product offers the way back in) rather than the destination.
-  await managerSignOut.goto("/browse");
-  await expect(managerSignOut.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
-  await expect(managerSignOut.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-});
 
 // -------------------------------------------------------------------------------------------
 // The hold journey (Phase 3.6, Task 6) — the fourth test A16's own Step 6 ledger note promised

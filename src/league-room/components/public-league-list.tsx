@@ -233,12 +233,22 @@ export function OpenLeagueShelf({
             <ul className="flex flex-col">
               {house.map((league) => (
                 <li key={league.id} className="border-t border-line">
-                  <LeagueRow league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} />
+                  <LeagueRow
+                    league={league}
+                    signedIn={signedIn}
+                    emphasis={league.id === featuredId ? "ink" : "quiet"}
+                    headingLevel={headingLevel === 1 ? 2 : 3}
+                  />
                 </li>
               ))}
               {leagues.map((league) => (
                 <li key={league.id} className="border-t border-line" data-testid="member-league">
-                  <LeagueRow league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} />
+                  <LeagueRow
+                    league={league}
+                    signedIn={signedIn}
+                    emphasis={league.id === featuredId ? "ink" : "quiet"}
+                    headingLevel={headingLevel === 1 ? 2 : 3}
+                  />
                 </li>
               ))}
             </ul>

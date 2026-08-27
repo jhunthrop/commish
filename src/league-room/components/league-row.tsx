@@ -62,6 +62,14 @@ export interface LeagueRowProps {
   /** Rule 5, one ink action per view — which row, if any, earns it is the PARENT's call
    *  (`featuredLeagueId`), exactly as on the card. Quiet by default. */
   readonly emphasis?: "ink" | "quiet";
+  /**
+   * The heading level this row's league name renders at — the PARENT's call, because only the
+   * shelf knows what heading sits above it (page-audit harness, 2026-08-27: `/browse` renders
+   * the shelf under an `<h1>` and every row's hardcoded `<h3>` skipped a level, eleven axe
+   * `heading-order` violations on one page; the front door's shelf sits under an `<h2>`, where
+   * `h3` was right all along). Defaults to the front door's shape.
+   */
+  readonly headingLevel?: 2 | 3;
 }
 
 /**
@@ -79,17 +87,18 @@ export interface LeagueRowProps {
  * reader, verbatim. There is no `helpLevel` prop at all: guided captions never print inline in
  * a row, regardless of the member's stored preference — the InfoTips stay click-only.
  */
-export function LeagueRow({ league, signedIn, emphasis = "quiet" }: LeagueRowProps) {
+export function LeagueRow({ league, signedIn, emphasis = "quiet", headingLevel = 3 }: LeagueRowProps) {
   const { remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
+  const NameHeading = headingLevel === 2 ? "h2" : "h3";
 
   return (
     <div className={`${LEAGUE_ROW_GRID} py-3`}>
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         {/* The ledger-card register (16.5/600, sentence case) — the same heading element the
             card renders, so every heading-role read of the shelf survives the form change. */}
-        <h3 className="min-w-0 break-words font-display text-lg font-semibold leading-display text-text-primary">
+        <NameHeading className="min-w-0 break-words font-display text-lg font-semibold leading-display text-text-primary">
           {league.name}
-        </h3>
+        </NameHeading>
         {liveChipLabel === null ? null : <LiveChip label={liveChipLabel} />}
         {stakeBadge(league)}
       </div>
