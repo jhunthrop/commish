@@ -78,6 +78,22 @@ function createEventStream(request: Request, userId: string, streamKey: string):
     async start(sink) {
       let keepalive: ReturnType<typeof setInterval> | undefined;
       let redis: ReturnType<typeof createRedisConnection> | undefined;
+      // THE OPENING BYTE, before anything that can block. An `EventSource` does not fire `open`
+      // — and a fetch does not resolve its response — until the first chunk of the body arrives,
+      // and this body's next write was the keepalive fifteen seconds later: `subscribe()` blocks
+      // on XREAD and a quiet league has nothing to say. So every room in this product spent its
+      // first fifteen seconds telling the manager the connection was "Connecting…", or
+      // "Reconnecting…" if the tab had ever dropped the stream before (`league-stream.ts` latches
+      // that state and replays it to the next subscriber). FOUNDER 2026-08-27, of a mock draft:
+      // "why does it always show reconnecting here?" — always, because the delay is a constant,
+      // and loudest in a mock because you land in a live room and start drafting inside those
+      // same fifteen seconds.
+      //
+      // A comment frame is the right opener: the SSE wire format ignores `:` lines, so this
+      // carries no event and cannot be mistaken for one — it exists only to complete the
+      // response head and flip the client to open. Enqueued before `createRedisConnection()`,
+      // which can itself take a moment on a cold socket.
+      sink.enqueue(KEEPALIVE);
       try {
         redis = createRedisConnection();
         keepalive = setInterval(() => {

@@ -68,25 +68,45 @@ interface Pigments {
  * the gates that never moved.
  */
 const dark: Palette = {
-  surface: "#0D0D0F", // graphite — the ground, the mock's --bg
-  surfaceElevated: "#161619", // card — a panel, the mock's --card
-  // Derived: one hairline step brighter than surfaceElevated, keeping the four-step depth model
+  /**
+   * THE GROUND, LIFTED — founder ruling 2026-08-27, from the four-candidate study
+   * (`docs/design/2026-08-27-dark-ground-study.md`): "the dark mode is too dark", candidate C.
+   *
+   * The v3 mock specified #0D0D0F, and shipping it taught us what the mock could not: at that
+   * floor the four-step depth model spans fifteen points of luminance, which nobody sees. Paired
+   * with rule 4 (hairlines, not boxes) every surface collapsed onto one plane and the room read
+   * as an absence rather than a designed ground — the founder's word for it was a void, looking
+   * at a finished mock draft.
+   *
+   * The fix is the RAMP more than the floor: this lifts the ground thirteen points but doubles
+   * the ground-to-raised span to thirty, so a panel reads as a panel without becoming a box. The
+   * near-monochrome identity is untouched — colour still means money (`accent`) and live
+   * (`negative`), and nothing here spreads pigment across the surface.
+   *
+   * Text softens with it (`textPrimary` #F4F4F6 → #EAEAF0): #F4F4F6 on this ground is 15.7:1,
+   * roughly twice what AAA asks, and that surplus reads as harsh rather than crisp — it halates
+   * on OLED. Every role below still clears its own gate in `tokens.test.ts`, which is the
+   * authority on that claim, not this comment.
+   */
+  surface: "#1A1A21", // slate — the ground
+  surfaceElevated: "#26262F", // card — a panel
+  // Derived: one step brighter than surfaceElevated, keeping the four-step depth model
   // (ground darkest, then the inset well, then the panel, then a raised row/tile closest to the
-  // viewer) legible without the mock naming this step directly.
-  surfaceRaised: "#1C1C20",
-  surfaceInset: "#111114", // track, well, unfilled meter, the wire's band
-  line: "#242428", // the decorative hairline between two surfaces
+  // viewer) legible — and now actually visible, which was the whole point of the ruling.
+  surfaceRaised: "#2F2F39",
+  surfaceInset: "#1F1F27", // track, well, unfilled meter, the wire's band
+  line: "#3B3B47", // the decorative hairline between two surfaces
   // Derived: a quiet, near-neutral gray (same cool family as textMuted) tuned so it clears
   // WCAG 1.4.11's 3:1 against all three surfaces a control can sit on — the mock has no
   // control-boundary value of its own.
-  edge: "#6A6A71",
-  textPrimary: "#F4F4F6",
-  textMuted: "#98989F",
+  edge: "#7A7A80", // lifted with the ground (2026-08-27 slate ruling); minimal hue-preserving bump to clear its gate
+  textPrimary: "#EAEAF0",
+  textMuted: "#9EA0AD",
   // Derived: the mock's --faint (#5D5D66) is a night-appropriate gray but too dark to clear
   // 4.5:1 against surfaceRaised (the brightest of the four surfaces textFaint is used on) —
   // brightened, same hue family, until it clears the floor on all four. The token moves, the
   // threshold does not.
-  textFaint: "#85858F",
+  textFaint: "#9898A0", // lifted with the ground (2026-08-27 slate ruling); minimal hue-preserving bump to clear its gate
   accent: "#3ECF8E", // money — links, focus rings, seat segments
   // Derived: a label ≥4.5:1 on the money fill. Money is never a button fill in v3, but the role
   // keeps a valid pair.
@@ -104,10 +124,10 @@ const dark: Palette = {
   // Derived: a quiet amber, same hue family as v2's, resaturated down and retuned to clear
   // 4.5:1 as text on the new (darker) grounds. v3 demotes warning's USAGE (E5) so the clock
   // tightening keeps a voice without the shelf glowing — the role survives, quieter.
-  warning: "#AD7E0E",
+  warning: "#BA9335", // lifted with the ground (2026-08-27 slate ruling); minimal hue-preserving bump to clear its gate
   warningGlow: "rgba(173, 126, 14, 0.12)",
   // Derived: a quiet blue, same hue family as v2's, retuned for notices and the WR pigment.
-  info: "#3E84EF",
+  info: "#5F99F2", // lifted with the ground (2026-08-27 slate ruling); minimal hue-preserving bump to clear its gate
   scrim: "#000000",
 };
 
@@ -179,7 +199,7 @@ const light: Palette = {
 
 /**
  * The Poster Board's marker set, one pack per theme, each re-derived against its own ground
- * (`dark.surface` #0D0D0F, `light.surface` #FBFBFA).
+ * (`dark.surface` #1A1A21, `light.surface` #FBFBFA).
  *
  * RETONED (LED-2, founder-delegated design ruling, 2026-08-24, persona-adjudicated) then
  * RE-DERIVED for v3's Sunday Standard grounds, same date: these six used to be a straight
@@ -223,8 +243,8 @@ const light: Palette = {
 const darkPigments: Pigments = {
   whistle: "#DF867E", // v3 dark.negative #FF6B5E, 60% saturation, same hue/lightness
   leaf: "#5BB28B", // v3 dark.accent/positive #3ECF8E, 60% saturation, same hue/lightness
-  marker: "#618BCC", // v3 dark.info #3E84EF, 60% saturation, same hue/lightness
-  clay: "#9C7D32", // v3 dark.warning #AD7E0E, 60%-family saturation, lightness retuned to clear 4.5:1
+  marker: "#6790CE", // v3 dark.info #5F99F2, 60%-family saturation, lightness retuned for the slate ground
+  clay: "#A78C4A", // v3 dark.warning #BA9335, 60%-family saturation, lightness retuned to clear 4.5:1
   grape: "#C2A2E8", // independent purple, unchanged — already clears v3's grounds
   slate: "#3E4A5C", // unchanged — already the quiet one, already clears v3's grounds
 };

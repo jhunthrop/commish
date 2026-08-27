@@ -71,19 +71,19 @@ never leaves it stale. As shipped (Task 1, plus fix round 1's WCAG corrections):
 
 | the mock's word | role(s) | dark (night) | light (daylight) |
 |---|---|---|---|
-| graphite / paper | `surface` | `#0D0D0F` | `#FBFBFA` |
-| card | `surfaceElevated` | `#161619` | `#FFFFFF` |
-| — (derived) | `surfaceRaised` | `#1C1C20` | `#F8F8F6` |
-| tickbg / — | `surfaceInset` | `#111114` | `#F3F3F1` |
-| hairline | `line` | `#242428` | `#E8E8EA` |
-| — (derived, no mock value) | `edge` | `#6A6A71` | `#8B8B91` |
-| ink | `textPrimary` | `#F4F4F6` | `#1A1A1E` |
-| quiet | `textMuted` | `#98989F` | `#68686D` |
-| faint (retuned, see below) | `textFaint` | `#85858F` | `#6D6D76` |
+| slate / paper | `surface` | `#1A1A21` | `#FBFBFA` |
+| card | `surfaceElevated` | `#26262F` | `#FFFFFF` |
+| — (derived) | `surfaceRaised` | `#2F2F39` | `#F8F8F6` |
+| tickbg / — | `surfaceInset` | `#1F1F27` | `#F3F3F1` |
+| hairline | `line` | `#3B3B47` | `#E8E8EA` |
+| — (derived, no mock value) | `edge` | `#7A7A80` | `#8B8B91` |
+| ink | `textPrimary` | `#EAEAF0` | `#1A1A1E` |
+| quiet | `textMuted` | `#9EA0AD` | `#68686D` |
+| faint (retuned, see below) | `textFaint` | `#9898A0` | `#6D6D76` |
 | money | `accent` / `positive` | `#3ECF8E` | `#0B6B43` |
 | live | `negative` | `#FF6B5E` | `#C23228` (retuned, see below) |
-| — (retuned, demoted usage) | `warning` | `#AD7E0E` | `#846315` (retuned) |
-| — (retuned, unnamed by the mock) | `info` | `#3E84EF` | `#4C69CD` |
+| — (retuned, demoted usage) | `warning` | `#BA9335` | `#846315` (retuned) |
+| — (retuned, unnamed by the mock) | `info` | `#5F99F2` | `#4C69CD` |
 
 Two corrections during Task 1's fix round, the same class of gap v2's own contrast corrections
 were: `light.textMuted` and `light.negative`/`warning` measured a hair under 4.5:1 once composited

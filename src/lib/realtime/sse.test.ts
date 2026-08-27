@@ -41,6 +41,57 @@ describe("resumeCursor — Last-Event-ID is attacker-controlled text on its way 
   });
 });
 
+/**
+ * FOUNDER 2026-08-27, looking at a live mock draft: "why does it always show reconnecting here?"
+ *
+ * ALWAYS, because the delay was a constant. An `EventSource` fires `open` only once the first
+ * chunk of the response BODY arrives, and this body's first write used to be the keepalive —
+ * `REALTIME_CONFIG.keepaliveMs` later — because `subscribe()` blocks on XREAD and a quiet league
+ * has nothing to say. Every room in the product therefore opened into fifteen seconds of
+ * "Connecting…", or "Reconnecting…" on any tab that had dropped the stream once before
+ * (`league-stream.ts` latches that state and replays it to the next subscriber).
+ *
+ * The regression this guards is a silent one: the stream still WORKS without the opening frame,
+ * it just lies to the manager for fifteen seconds first, which no other test in this file could
+ * see.
+ */
+describe("createLeagueEventStream — the opening frame", () => {
+  const controllers: AbortController[] = [];
+
+  beforeEach(() => {
+    vi.stubEnv("REDIS_URL", process.env.REDIS_URL ?? "redis://localhost:6379");
+  });
+
+  afterEach(async () => {
+    for (const controller of controllers) controller.abort();
+    controllers.length = 0;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    vi.unstubAllEnvs();
+  });
+
+  it("writes a comment frame immediately, without waiting out the keepalive interval", async () => {
+    const controller = new AbortController();
+    controllers.push(controller);
+    const response = createLeagueEventStream(
+      new Request("http://localhost/x", { signal: controller.signal }),
+      "league_sse_open_test",
+      "user_sse_open",
+    );
+
+    const reader = response.body!.getReader();
+    // Deliberately far below `keepaliveMs`: passing this by waiting for the keepalive is exactly
+    // the bug, so the budget has to be too small for that to be possible.
+    const first = await Promise.race([
+      reader.read().then((r) => new TextDecoder().decode(r.value)),
+      new Promise<string>((resolve) => setTimeout(() => resolve("TIMED OUT"), 1_000)),
+    ]);
+
+    expect(first).toBe(": keepalive\n\n");
+    expect(REALTIME_CONFIG.keepaliveMs).toBeGreaterThan(1_000);
+    await reader.cancel();
+  });
+});
+
 describe("createLeagueEventStream — per-user connection ceiling", () => {
   const controllers: AbortController[] = [];
 
