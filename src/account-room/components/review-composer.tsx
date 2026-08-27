@@ -150,7 +150,10 @@ export function ReviewComposer({ myReview, onSubmitted }: ReviewComposerProps) {
       )}
 
       <div className="flex items-center gap-3">
-        <Button type="submit" loading={saving} disabled={saving}>
+        {/* SECONDARY (page-audit harness, 2026-08-27): the account room already spends its one
+            ink on the identity card's own Save — who you are outranks what you thought of us,
+            and rule 5 counts per view, not per form. */}
+        <Button variant="secondary" type="submit" loading={saving} disabled={saving}>
           {existingReview === null ? "Post review" : "Save changes"}
         </Button>
         <span role="status" className="text-sm text-positive">

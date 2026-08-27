@@ -41,7 +41,11 @@ interface AxeViolation {
 /** The ink pill's own class (`buttonClassName`'s `primary` variant, `src/components/ui/button.tsx`)
  *  — counted in the DOM rather than grepped in a file, which is the whole point of this audit. */
 async function inkActionCount(page: Page): Promise<number> {
-  return page.evaluate(() => document.querySelectorAll(".bg-text-primary").length);
+  // VISIBLE ink only: the responsive row idiom renders a desktop and a mobile variant of the
+  // same control, one of them `display:none` at any width, and rule 5 governs what a person
+  // SEES. Counting the DOM alone reported two pills where one is on screen (found on its own
+  // first run against /browse).
+  return page.evaluate(() => Array.from(document.querySelectorAll(".bg-text-primary")).filter((el) => (el as HTMLElement).offsetParent !== null).length);
 }
 
 async function axeViolations(page: Page): Promise<readonly AxeViolation[]> {

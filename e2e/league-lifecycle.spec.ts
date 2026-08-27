@@ -59,8 +59,12 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
 
   // --- Invite ------------------------------------------------------------------------------
   await managerA.getByRole("button", { name: "Create invite link" }).click();
+  // ABSOLUTE now (flow analysis C-01, 2026-08-27): the panel used to render the invite's PATH,
+  // so a commissioner texted her friends `/app/join/ABC123` — a string that opens nothing. The
+  // value is the real url a person can paste anywhere, and `managerB.goto` below still follows
+  // it exactly as a recipient would.
   const invitePath = await managerA.getByLabel("Invite link").inputValue();
-  expect(invitePath).toMatch(/^\/app\/join\//);
+  expect(invitePath).toMatch(/^https?:\/\/[^/]+\/app\/join\//);
 
   // --- Join, as a genuinely different person ----------------------------------------------
   await managerB.goto(invitePath);

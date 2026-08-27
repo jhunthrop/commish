@@ -89,5 +89,7 @@ test("a signed-in manager writes a review, and the public feed shows only real o
   await page.goto("/reviews");
   await expect(page.getByRole("heading", { name: "What managers are saying" })).toBeVisible();
   await expect(page.getByText(/This league ate my roster overnight/)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  // `exact` (2026-08-27): with the fixture review filtered, the page's honest empty state adds
+  // "Sign in to write the first review" — a second link whose name contains this one's.
+  await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
 });
