@@ -30,3 +30,4 @@ export { Crest, crestTone } from "./crest";
 export { SeatMeter } from "./seat-meter";
 export { Meter } from "./meter";
 export { StatPill } from "./stat-pill";
+export { Stat, magnitudeStep, type StatComparison, type StatSize } from "./stat";
