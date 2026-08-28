@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import Link from "next/link";
-import { PageTitle, buttonClassName } from "@/components/ui";
+import { buttonClassName } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { PublicBar } from "@/components/app-shell/public-bar";
-import { PublicFooter } from "@/components/app-shell/public-footer";
+import { ReadingFrame } from "@/components/app-shell/reading-frame";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { safeReturnTo } from "@/lib/auth/return-to";
 
@@ -40,26 +39,28 @@ export default async function SignInProblemPage({ searchParams }: PageProps) {
   const intent = safeReturnTo(first(params.returnTo));
 
   return (
-    <>
-      <PublicBar intent={intent} signedIn={user !== null} />
-      <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
-        <PageTitle>Sign-in did not go through</PageTitle>
-        <p className="text-text-muted">Something interrupted the attempt. Nothing about your account changed.</p>
-        <div className="flex flex-wrap gap-3">
-          {/* This page's ONE action (rule 5), so it is the view's ink pill; the front-door
-              escape below stays a plain text link. */}
+    // GAMEDAY (2026-08-28): the same `ReadingFrame` the four measured-paragraph pages use. This
+    // page is a title, one sentence and one act, which is exactly the frame's masthead — a fifth
+    // hand-rolled `mx-auto max-w-md` column was the reason this surface looked like nobody's
+    // product. It carries no prose column at all: there is nothing more to say.
+    <ReadingFrame
+      title="Sign-in did not go through"
+      kicker="Sign in"
+      lede="Something interrupted the attempt. Nothing about your account changed."
+      intent={intent}
+      signedIn={user !== null}
+      action={
+        <>
+          {/* This page's ONE action (law 5), so it is the view's ink pill; the front-door escape
+              beside it stays a plain text link. */}
           <SignInLink intent={intent} className={buttonClassName("primary", "md")}>
             Try again
           </SignInLink>
-          <Link
-            href="/"
-            className="inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-text-primary underline"
-          >
+          <Link href="/" className="text-sm font-medium text-text-muted underline transition-colors hover:text-text-primary">
             Go to the front door
           </Link>
-        </div>
-      </main>
-      <PublicFooter />
-    </>
+        </>
+      }
+    />
   );
 }

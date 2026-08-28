@@ -7,7 +7,7 @@ import { ErrorState, PageTitle } from "@/components/ui";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { listReviews, myReview } from "@/review-service/reviews";
@@ -58,7 +58,7 @@ export default async function ReviewsPage() {
         {/* `false` on purpose: this refusal returns BEFORE `getCurrentUser()` resolves (see this
             page's own docblock), and a rate-limited request is not worth a session round trip to
             personalise a header nobody is reading. */}
-        <PublicBar intent={PAGE_INTENT} signedIn={false} />
+        <PublicBar intent={PAGE_INTENT} signedIn={false} nav={STOREFRONT_NAV} />
         {/* Full-bleed, no `max-w-*` (NEW-2) — matching `AppShell`'s own signed-in `<main>`. */}
         <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">
           <ErrorState
@@ -112,7 +112,7 @@ export default async function ReviewsPage() {
   if (user === null) {
     return (
       <>
-        <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
+        <PublicBar intent={PAGE_INTENT} signedIn={user !== null} nav={STOREFRONT_NAV} />
         {/* Full-bleed, no `max-w-*` (NEW-2) — matching `AppShell`'s own signed-in `<main>`. The
             feed itself is dense cards; the one long-form paragraph on this page keeps its own
             `max-w-prose` below, so the reading column stays measured inside the wide frame. */}

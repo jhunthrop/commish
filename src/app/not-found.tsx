@@ -1,6 +1,6 @@
 import { ButtonLink, EmptyState } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
 
 /**
  * A wrong URL is not a failure, so this is an `EmptyState` and not an `ErrorState`: no
@@ -20,7 +20,7 @@ export default async function NotFound() {
   const user = await getCurrentUser();
   return (
     <>
-      <PublicBar intent={null} signedIn={user !== null} />
+      <PublicBar intent={null} signedIn={user !== null} nav={STOREFRONT_NAV} />
       <main className="mx-auto flex min-h-[60vh] max-w-lg items-center px-4">
         <EmptyState
           icon="search"

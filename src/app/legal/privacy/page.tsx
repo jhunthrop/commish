@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { PageTitle } from "@/components/ui";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { PublicBar } from "@/components/app-shell/public-bar";
-import { PublicFooter } from "@/components/app-shell/public-footer";
+import { ReadingFrame } from "@/components/app-shell/reading-frame";
 
 // A5.
 export const metadata: Metadata = pageTitle("Privacy");
@@ -18,31 +16,27 @@ const PAGE_INTENT = "/legal/privacy";
 export default async function PrivacyPage() {
   const user = await getCurrentUser();
   return (
-    <>
-      <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
-      <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
-        <PageTitle>Privacy</PageTitle>
-        <p className="text-text-muted">
-          Commish signs you in through WorkOS, not a password this platform stores itself.
-          Signing in gives us your email address and, if you sign in with a provider like Google,
-          the name and avatar that provider shares.
-        </p>
-        <p className="text-text-muted">
+    <ReadingFrame
+      title="Privacy"
+      kicker="Legal"
+      lede="Commish signs you in through WorkOS, not a password this platform stores itself. Signing in gives us your email address and, if you sign in with a provider like Google, the name and avatar that provider shares."
+      intent={PAGE_INTENT}
+      signedIn={user !== null}
+    >
+        <p>
           Inside a league, the members you share it with can see your display name, your team,
           and the moves you make: a draft pick, a lineup, a trade. A stranger browsing the open
           leagues below sees only facts about the league itself, never a name of anyone already
           in it.
         </p>
-        <p className="text-text-muted">
+        <p>
           A review you write is shown with your name attached, unedited, next to every other
           member&apos;s review. This platform does not sell personal information to anyone.
         </p>
-        <p className="text-text-muted">
+        <p>
           This platform is a preview, and this page will grow into a fuller policy as the product
           does.
         </p>
-      </main>
-      <PublicFooter />
-    </>
+    </ReadingFrame>
   );
 }
