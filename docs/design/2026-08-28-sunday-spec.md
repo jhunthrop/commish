@@ -154,15 +154,15 @@ next person tuning this ramp should not have to rediscover them.
 
 | Role | Dark | Light |
 |---|---|---|
-| `surface` | `#05070C` | `#FFFFFF` |
-| `surfaceElevated` | `#0B1019` | `#F7F8FA` |
+| `surface` | `#05070C` | `#F4F5F7` |
+| `surfaceElevated` | `#0B1019` | `#FAFBFC` |
 | `surfaceRaised` | `#101724` | `#FFFFFF` |
-| `surfaceInset` | `#0A0F17` | `#EDEFF3` |
+| `surfaceInset` | `#0A0F17` | `#E8EBEF` |
 | `line` | `#1B2331` | `#DDE1E8` |
 | `edge` (control boundary, 3:1) | `#5A6C87` **re-solved** | `#767F8E` |
 | `textPrimary` | `#FFFFFF` (17.95) | `#0A0D12` (16.90) |
-| `textMuted` | `#8794A8` (5.84) | `#606E80` (4.52) |
-| `textFaint` (3:1, non-text) | `#5A6678` (3.08) | `#818A98` (3.03) |
+| `textMuted` | `#8794A8` (5.84) | `#5E6B7D` (4.53) **re-solved** |
+| `textFaint` (3:1, non-text) | `#5A6678` (3.08) | `#7E8895` (3.01) **re-solved** |
 
 `edge` at `#4A5872` measured 2.50 and failed WCAG 1.4.11. A control boundary a person must find
 is not decorative, so it is held to 3:1 and was re-solved.
@@ -171,10 +171,10 @@ is not decorative, so it is held to 3:1 and was re-solved.
 
 | Channel | Dark | Light |
 |---|---|---|
-| `accent` — furniture, you, the verb | `#FFB627` (10.23) | `#9D5707` (4.80) |
+| `accent` — furniture, you, the verb | `#FFB627` (10.23) | `#9D5707` (4.62) |
 | `accentText` — on accent | `#1A1200` (10.59) | `#FFFFFF` (5.53) |
-| `positive` — we rate him higher | `#00E5FF` (11.67) | `#004B66` (8.30) |
-| `negative` — we rate him lower | `#FF6B5B` (6.42) | `#BF3122` (4.96) |
+| `positive` — we rate him higher | `#00E5FF` (11.67) | `#004B66` (7.99) |
+| `negative` — we rate him lower | `#FF6B5B` (6.42) | `#BF3122` (4.77) |
 | `live` — happening now, nothing else | `#FF2D2D` (4.84) | `#CA1616` (5.01) |
 | `liveText` — on live | `#1A0303` (5.35) **re-solved** | `#FFFFFF` (5.77) |
 | `warning` — a tightening clock | `#FF843D` (7.37) | `#AA420E` (5.22) |
@@ -191,7 +191,7 @@ own furniture and must never be mistaken for a verdict about time.
 | Theme | positive | negative | gap |
 |---|---|---|---|
 | Dark | 11.67 | 6.42 | **5.25** |
-| Light | 8.30 | 4.96 | **3.34** |
+| Light | 7.99 | 4.77 | **3.22** |
 
 Light needed two passes. With `positive` at `#006185` the pair sat 1.73 apart while `negative`
 could not simultaneously clear 4.5:1 — the two constraints were in direct conflict. `positive`
@@ -204,11 +204,11 @@ Strictly decreasing in contrast in both themes, so it survives with the hue chan
 
 | Step | Dark | (ratio) | Light | (ratio) |
 |---|---|---|---|---|
-| `strong` | `#34E4FF` | 11.70 | `#004B66` | 8.30 |
-| `good` | `#69C5D3` | 9.00 | `#205A6F` | 6.63 |
+| `strong` | `#34E4FF` | 11.70 | `#004B66` | 7.99 |
+| `good` | `#69C5D3` | 9.00 | `#205A6F` | 6.38 |
 | `neutral` | `#FFFFFF` | — | `#0A0D12` | — |
-| `weak` | `#FF7A59` | 6.99 | `#A04028` | 5.60 |
-| `bad` | `#F05543` | 5.20 | `#C93121` | 4.62 |
+| `weak` | `#FF7A59` | 6.99 | `#A04028` | 5.39 |
+| `bad` | `#F05543` | 5.20 | `#C63120` | 4.55 **re-solved** |
 
 **Both themes failed the ordering on the first pass** and were re-solved. Dark had `good` at 8.99
 against `weak` at 8.98 — a collision invisible to anyone with normal colour vision and total for
@@ -247,3 +247,17 @@ Tier B at `#6E7B8F` measured 4.29 with a white letter and failed.
 `Saira Condensed` (600/700/800) for every name, number and label. `Saira` (400/500/600) for the
 few sentences the product still has. Condensed is load-bearing under law 3, not decorative: it is
 what buys ten columns at 18px.
+
+### Correction, same day: the light ladder was wrong
+
+The first draft of this appendix gave light `surface` and `surfaceRaised` both as `#FFFFFF`,
+collapsing two of the four depth steps. The corrected ladder is a newsprint register —
+`#F4F5F7` ground, `#FAFBFC` elevated, `#FFFFFF` raised, `#E8EBEF` inset.
+
+That moved the binding ground from `#EDEFF3` to the dimmer `#E8EBEF`, and **three values that had
+passed then failed**: `textMuted` at 4.35, `textFaint` at 2.92, and the ramp's `bad` step at 4.45.
+All three were re-solved and are marked above.
+
+This is the third time in two design systems that the binding ground has been the thing that
+caught a value, which is why it is stated twice in this document. Change a surface and every
+chroma value against it is unverified until re-measured.
