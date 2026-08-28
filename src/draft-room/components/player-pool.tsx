@@ -6,7 +6,7 @@ import type { DraftStateView } from "@/draft-engine";
 import { Badge, Button, EmptyState, Input, PlayerRow, PositionBadge, TierDivider } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { queueButtonLabel } from "../lib/lookups";
-import { formatAdp, poolTiers } from "../lib/tiers";
+import { formatAdp, poolTiers, positionRanks } from "../lib/tiers";
 import { verdictFor, verdictPopulation } from "../lib/verdict";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { VerdictChip } from "./verdict-chip";
@@ -163,6 +163,10 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
   // the room's own seat count, because a consensus round is a fact about a room of that size.
   const seats = view.draftOrder.length > 0 ? view.draftOrder.length : teamCount;
   const tiers = useMemo(() => poolTiers(players, seats), [players, seats]);
+  // "RB4" on the sticker rather than a rank column: the board is already ranked best-first, so the
+  // fourth running back down it IS this board's RB4, and the fact costs no width to say. Built
+  // over the whole board, never the filtered view — see `positionRanks`.
+  const ranks = useMemo(() => positionRanks(players), [players]);
 
   // Law 2, in the one place the pool has an honest number for it: how many players the filter
   // currently leaves standing. `filtered.length`, not the pool size — the figure answers the
@@ -261,6 +265,7 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                 <li data-pool-row="true" className={`shrink-0 ${row.drafted ? "opacity-60" : ""}`}>
                   <PlayerRow
                     player={row.player}
+                    positionRank={ranks.get(row.player.id)}
                     highlight={queued && !row.drafted}
                     meta={
                       <>

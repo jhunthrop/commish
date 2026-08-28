@@ -5,6 +5,10 @@ import { PositionBadge } from "./position-badge";
 
 export interface PlayerRowProps {
   readonly player: Player;
+  /** This player's rank among his own position on the board rendering him — the "4" in "RB4",
+   *  printed on the sticker rather than in a column of its own. Omitted by every surface with no
+   *  ranked board behind it, which is most of them. */
+  readonly positionRank?: number;
   /** The facts after the position sticker: "IND · Bye 13 · RB4". A node, not a string, so a
    *  caller can put a live chip or a kickoff time in the run without this file learning about
    *  either. */
@@ -78,7 +82,7 @@ const SKIN: Readonly<Record<"plain" | "highlight", string>> = {
  * name, and wrapping a second click target around it is how a board ends up with two ways to draft
  * the wrong man.
  */
-export function PlayerRow({ player, meta, verdict, action, highlight = false, className = "" }: PlayerRowProps) {
+export function PlayerRow({ player, positionRank, meta, verdict, action, highlight = false, className = "" }: PlayerRowProps) {
   return (
     <div
       data-highlight={highlight ? "true" : undefined}
@@ -104,7 +108,7 @@ export function PlayerRow({ player, meta, verdict, action, highlight = false, cl
             a team code, a bye week, a positional rank — and mono keeps those columns aligned as
             the eye runs down sixty rows. */}
         <span className="flex min-w-0 items-center gap-1.5 font-mono text-xs text-text-muted">
-          <PositionBadge position={player.position} size="sm" />
+          <PositionBadge position={player.position} rank={positionRank} size="sm" />
           {meta === undefined ? null : <span className="truncate">{meta}</span>}
         </span>
       </div>

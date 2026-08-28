@@ -43,4 +43,33 @@ describe("PositionBadge", () => {
     render(<PositionBadge position="TE" />);
     expect(screen.getByText("TE").className).toContain("font-display");
   });
+
+  /**
+   * TWO FACTS, ONE STICKER. The rank costs no extra eye stop and no extra column, and it is the
+   * question a manager scanning a board is actually asking. Optional, so every surface with no
+   * ranked board behind it renders exactly what it rendered before.
+   */
+  describe("the positional rank", () => {
+    it("prints the rank on the sticker, in both themes, with no axe violations", async () => {
+      await renderSurface(<PositionBadge position="RB" rank={4} />, async ({ container }) => {
+        expect(screen.getByText("RB4")).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      });
+    });
+
+    it("renders the plain position when no caller states a rank", () => {
+      render(<PositionBadge position="RB" />);
+      expect(screen.getByText("RB")).toBeInTheDocument();
+    });
+
+    it("costs the rank rather than printing a lie when the number is not a real ordinal", () => {
+      // A caller bug — a zero, a negative, a fraction off some average — must never reach a
+      // manager as "RB0" or "RB1.5", which he would read as a fact. The sticker is still correct.
+      for (const rank of [0, -3, 1.5, Number.NaN]) {
+        const { unmount } = render(<PositionBadge position="WR" rank={rank} />);
+        expect(screen.getByText("WR")).toBeInTheDocument();
+        unmount();
+      }
+    });
+  });
 });

@@ -4,6 +4,21 @@ export type PositionBadgeSize = "sm" | "md";
 
 export interface PositionBadgeProps {
   readonly position: Position;
+  /**
+   * Where this player ranks AMONG HIS OWN POSITION on whatever board is rendering him — the "4"
+   * in "RB4". Optional, and every existing caller omits it, because most surfaces have no ranked
+   * board behind them and an invented rank is worse than an absent one for the reason
+   * `PlayerFace` refuses an invented jersey number: a manager reads it as a fact.
+   *
+   * TWO FACTS IN ONE STICKER, which is the whole point. "RB" and "RB4" cost the same pixels and
+   * the same eye stop, and the second one answers the question a manager scanning a board is
+   * actually asking. The sticker was already the position's one address in this product, so the
+   * rank rides it rather than earning a column of its own.
+   *
+   * Non-positive or non-integer ranks render as a plain position rather than "RB0" or "RB1.5" —
+   * a caller bug should cost the rank, never print a lie.
+   */
+  readonly rank?: number;
   readonly size?: PositionBadgeSize;
   readonly className?: string;
 }
@@ -75,7 +90,13 @@ export function positionOnFillTextClass(position: Position): string {
   return ON_FILL_TEXT[position];
 }
 
-export function PositionBadge({ position, size = "md", className = "" }: PositionBadgeProps) {
+/** A rank is printable only if it is a real ordinal. Anything else costs the rank rather than
+ *  printing "RB0", and the caller still gets a correct sticker. */
+function isOrdinal(rank: number | undefined): rank is number {
+  return rank !== undefined && Number.isInteger(rank) && rank > 0;
+}
+
+export function PositionBadge({ position, rank, size = "md", className = "" }: PositionBadgeProps) {
   return (
     <span
       className={
@@ -83,7 +104,7 @@ export function PositionBadge({ position, size = "md", className = "" }: Positio
         `leading-display tracking-wide ${FILL[position]} ${SIZE[size]} ${className}`
       }
     >
-      {position}
+      {isOrdinal(rank) ? `${position}${rank}` : position}
     </span>
   );
 }
