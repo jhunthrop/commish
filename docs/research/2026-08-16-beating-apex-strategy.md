@@ -105,9 +105,76 @@ New Jersey (19.75% tax, nearly doubled July 2025), Pennsylvania ($50K + bond), D
 **Tier 4 — Avoid entirely at launch:**
 Nevada (requires a full gaming license — DraftKings/FanDuel never pursued this and simply don't operate there), Washington (Class C felony exposure, no carve-out has ever existed), Hawaii (near-total ban, no skill defense available), Oregon (Nov 2025 AG opinion reclassified fantasy sports as illegal gambling with no carve-out), California (July 2025 AG opinion reached the same conclusion — advisory and currently unenforced, but real exposure), Idaho (binding 2016 shutdown agreement), Montana (statute bans *internet* wagering specifically — structurally incompatible with an online product even though in-person leagues are authorized), Utah (general ban, tightening further in 2026), Texas (2016 AG opinion never retracted — high-population, high-value, but get counsel before entering), New Mexico (Jan 2026 AG opinion explicitly declined to resolve the question), Connecticut (licenses restricted to three named entities — no application path for an independent operator), Florida (active enforcement history against pick'em operators; no statutory safe harbor for anyone).
 
+### 2.2a Corrections, 27 August 2026
+
+Two findings from a later research pass that the matrix above does not account for. Both land in
+Tier 1, which is why they are recorded here rather than in a chat log.
+
+**GEORGIA CARRIES AN ADVERSE AG OPINION, AND TIER 1 DOES NOT SAY SO.** A 2016 Georgia Attorney
+General advisory opinion concluded that paid fantasy contests are illegal under state law. Georgia
+has no statute authorising or regulating them, so operators run there anyway and have done for
+years without visible enforcement — which is exactly the posture this document already takes for
+Texas, and Texas is in Tier 4. Two things soften it: the opinion addressed DAILY fantasy, and a
+season-long roster contest carries the stronger skill argument (§2.1). But an unmentioned adverse
+opinion in a launch state is a risk we are carrying unknowingly rather than deliberately.
+*Ruling: leave Georgia in Tier 1, flag it as the one Tier 1 state with adverse authority, and put
+it in the first counsel review.* Honest count if it moves: 12 states + DC.
+
+Related precision, for when this list goes in front of counsel: **Maryland is a registration, not
+an absence of one.** The $100 fee is trivial and the placement is right, but "no licence" is the
+wrong phrase for it.
+
+**THE AUTO-DRAFT CLAIM IS WRONG, AND ARKANSAS IS WHERE IT BITES.** Tier 2 records that Tennessee
+"explicitly bans auto-draft/pre-selected-team contests — matches our own product design anyway."
+The second half is not true, and the restriction is not only Tennessee's: **Arkansas** — the
+friendliest regime in the country and our first launch state — bars contests "that involve
+automatic drafts requiring no input from users" (Ark. Code § 23-116-101 et seq.).
+
+Our product auto-picks when the pick clock expires. A manager who never appears has their entire
+roster drafted from the queue, or from best-available if they set no queue. In a mock that is the
+feature working. In a paid Arkansas league it is a participant who provided no input to a contest
+that is required to be one of skill.
+
+The narrow reading is that the statute targets a contest FORMAT — "instant" leagues where the
+platform drafts for you and you watch — not a timeout failsafe inside a real draft. That reading is
+probably right, and it is not ours to rely on without counsel.
+
+*Ruling: make meaningful input structural rather than optional.* The mitigation that survives
+every reading is a **pre-draft input gate**: no seat in a paid league without a saved queue or
+ranking. Then even a fully auto-executed roster reflects that participant's own submitted
+preferences, and the "no input" branch never applies to anybody. Everything else — pausing for an
+absent manager, extending the clock, backfilling an unresponsive seat before kickoff — is good
+product design and reduces how often the question arises, but only the input gate answers it
+structurally. See §2.3a.
+
 ### 2.3 Recommendation
 
 Tier 1 alone is 13 states plus DC — a genuine multi-state footprint, not a single-state pilot, and it validates the entire architecture (geofencing, per-state tax ledger, multi-jurisdiction legal review process) at effectively zero licensing cost. Add Tier 2 states as revenue funds the fees. Treat Tier 3 as "when we're big enough that the fixed costs are rounding errors." Treat Tier 4 as off-limits until a gaming attorney says otherwise — several of those states carry felony exposure, not just a fine.
+
+### 2.3a The absent-manager problem
+
+Directly downstream of §2.2a, and a product decision before it is a legal one. Four mechanisms,
+which compose rather than compete:
+
+1. **A pre-draft input gate (required).** A paid seat is not confirmed until the manager saves a
+   queue or a ranking. This is the only mechanism that satisfies the Arkansas and Tennessee
+   restrictions no matter who shows up, because it makes "no input from users" impossible by
+   construction. It also improves auto-picks for everyone, since the failsafe now has real
+   preferences to read instead of falling back to best-available.
+2. **Pause and notify (what Apex appears to do).** Hold the clock, alert the manager, resume when
+   they arrive or after a capped delay. This is primarily a QUALITY mechanism — nobody wants a
+   roster they did not pick — and it is unavailable to a house league in the same form, since
+   there is no commissioner watching. Ours would be automated with a hard cap, or the room stalls
+   forever on one absent seat.
+3. **Backfill before kickoff.** A manager who has not checked in by the draft's start is refunded
+   and the seat is re-offered. Cleanest outcome for the other eleven, and it is the sit-and-go
+   machinery we already have.
+4. **Slow drafts.** An eight-hour clock makes absence a non-event. Worth offering as a format
+   regardless.
+
+Note that (2) alone does not answer the statute: pause long enough and you still end up either
+auto-drafting or removing the manager. It buys time, not compliance. (1) is the load-bearing one.
+
 
 ### 2.4 A specific rule for public leagues
 
