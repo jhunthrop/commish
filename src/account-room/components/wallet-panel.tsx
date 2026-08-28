@@ -1,4 +1,4 @@
-import { Panel, Stat } from "@/components/ui";
+import { EYEBROW, Panel, Stat } from "@/components/ui";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import type { WalletSummary } from "@/money-service/read";
 import { formatUsd } from "@/money/config";
@@ -66,7 +66,8 @@ function figureText(summary: WalletSummary | null, key: keyof WalletSummary): st
  *
  * The three reasons the rest of the money is not available stay dense hairline rows beneath it,
  * because they are read down a column (law 3's amended test: *a thing you act on or compare
- * against its neighbours may be a card; a thing you read down a column stays a row*).
+ * against its neighbours may be a card; a thing you read down a column stays a row*). The dormant
+ * hero is deliberately not a `Stat` at all — see the branch's own comment below.
  *
  * NO MAGNITUDE TINT, EVER. A balance has no population to be judged against — "top 12% of
  * balances" is a comparison this product does not hold and would be inventing, and it would be
@@ -84,7 +85,26 @@ function figureText(summary: WalletSummary | null, key: keyof WalletSummary): st
 export function WalletPanel({ summary }: WalletPanelProps) {
   return (
     <Panel title="Balance">
-      <Stat label="Available" value={figureText(summary, "availableCents")} size="lg" className="font-mono" />
+      {summary === null ? (
+        // THE DORMANT HERO IS NOT A `Stat`, AND THAT IS THE POINT. `Stat` is the primitive for a
+        // NUMBER, and its `neutral` step is `textPrimary` by deliberate design — an uncompared
+        // number must be indistinguishable from ordinary ink. Rendered, a dash in that ink at
+        // 44px is not a dash: it is a solid bar the width of an em, and on the light theme it
+        // reads as a redaction over the reader's own balance, which is the opposite of what it
+        // says. The same eyebrow, the same display size, faint ink — an absence drawn as an
+        // absence. Both branches keep `Stat`'s own label-over-number order so the two states are
+        // the same block at the same place, which is the whole reason the dormant page renders
+        // this panel at all.
+        <div className="flex flex-col gap-1">
+          <span className={`${EYEBROW} text-text-faint`}>Available</span>
+          <span aria-hidden="true" className="font-display text-display-lg leading-display text-text-faint">
+            {NOT_STARTED_DASH}
+          </span>
+          <span className="sr-only">No balance yet.</span>
+        </div>
+      ) : (
+        <Stat label="Available" value={formatUsd(summary.availableCents)} size="lg" className="font-mono" />
+      )}
       <p className="text-sm text-text-muted">{AVAILABLE_EXPLANATION}</p>
       <dl className="flex flex-col">
         {SECONDARY_FIGURES.map((figure) => (

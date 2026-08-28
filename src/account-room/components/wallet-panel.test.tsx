@@ -37,11 +37,23 @@ describe("WalletPanel", () => {
     // A magnitude tint needs a stated population (`Stat`'s own contract). "Top 12% of balances"
     // is a comparison this product does not hold, and it would be a judgement about a person's
     // money besides. `Stat` stamps the step it resolved; `neutral` IS `textPrimary`.
-    for (const summary of [SUMMARY, null]) {
-      await renderSurface(<WalletPanel summary={summary} />, ({ container }) => {
-        expect(container.querySelector("[data-magnitude]")?.getAttribute("data-magnitude")).toBe("neutral");
-      });
-    }
+    await renderSurface(<WalletPanel summary={SUMMARY} />, ({ container }) => {
+      expect(container.querySelector("[data-magnitude]")?.getAttribute("data-magnitude")).toBe("neutral");
+    });
+  });
+
+  it("draws the dormant hero as an absence rather than as ink", async () => {
+    // `Stat`'s neutral step is `textPrimary` by design, and at 44px a dash in that ink is not a
+    // dash — it is a solid bar an em wide, which in daylight reads as a redaction over the
+    // reader's own balance. So the no-balance branch is deliberately NOT a `Stat`: same eyebrow,
+    // same display size, faint ink, and the absence said in words for a screen reader, which
+    // hears nothing at all from a bare glyph.
+    await renderSurface(<WalletPanel summary={null} />, ({ container, getByText }) => {
+      expect(container.querySelector("[data-magnitude]")).toBeNull();
+      expect(getByText("No balance yet.")).toBeInTheDocument();
+      const hero = container.querySelector(".text-display-lg");
+      expect(hero?.className).toContain("text-text-faint");
+    });
   });
 
   it("gives every figure its own one-line plain explanation, escrow's worded exactly", async () => {
