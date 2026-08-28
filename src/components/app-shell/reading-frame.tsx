@@ -17,6 +17,37 @@ import { PublicFooter } from "./public-footer";
  */
 const COLUMN = "flex w-full max-w-3xl flex-col px-4 sm:px-10";
 
+export interface ReadingMastheadProps {
+  readonly title: string;
+  readonly lede: string;
+  readonly kicker?: string;
+  readonly action?: ReactNode;
+}
+
+/**
+ * The storefront's page head, on its own ground: a full-bleed band on `surfaceElevated` bounded by
+ * a hairline, carrying the mono kicker, the `<h1>` and the ink lede.
+ *
+ * Exported separately from `ReadingFrame` for the ONE surface that needs the head without the
+ * measured column: `/reviews`, whose body is a wide feed of dense cards rather than paragraphs,
+ * and which renders inside `AppShell` for a member and its own public chrome for a stranger. That
+ * page had a bare `PageTitle` with a 13px line under it and read as unfinished next to its four
+ * siblings; a page-local copy of this band would have been the page-local mapping the standing
+ * rule forbids, so the band moved here rather than being written twice.
+ */
+export function ReadingMasthead({ title, lede, kicker, action }: ReadingMastheadProps) {
+  return (
+    <div className="w-full border-b border-line bg-surface-elevated">
+      <div className={`${COLUMN} gap-3 py-8 sm:py-10`}>
+        {kicker === undefined ? null : <p className={`${MICRO_LABEL} text-text-faint`}>{kicker}</p>}
+        <PageTitle>{title}</PageTitle>
+        <p className="max-w-prose text-lg leading-relaxed text-text-primary">{lede}</p>
+        {action === null || action === undefined ? null : <div className="flex flex-wrap items-center gap-3 pt-1">{action}</div>}
+      </div>
+    </div>
+  );
+}
+
 export interface ReadingFrameProps {
   /** The page's own `<h1>`, and the same string its `metadata` title uses (A5). */
   readonly title: string;
@@ -82,14 +113,7 @@ export function ReadingFrame({ title, lede, kicker, intent, signedIn, action, ch
     <>
       <PublicBar intent={intent} signedIn={signedIn} nav={STOREFRONT_NAV} />
       <main className="flex w-full flex-col">
-        <div className="w-full border-b border-line bg-surface-elevated">
-          <div className={`${COLUMN} gap-3 py-8 sm:py-10`}>
-            {kicker === undefined ? null : <p className={`${MICRO_LABEL} text-text-faint`}>{kicker}</p>}
-            <PageTitle>{title}</PageTitle>
-            <p className="max-w-prose text-lg leading-relaxed text-text-primary">{lede}</p>
-            {action === null || action === undefined ? null : <div className="flex flex-wrap items-center gap-3 pt-1">{action}</div>}
-          </div>
-        </div>
+        <ReadingMasthead title={title} lede={lede} kicker={kicker} action={action} />
         {/* The measured column. `leading-relaxed` is the one concession law 4's tight leading
             makes: density is respect on a Sunday board of numbers, and a paragraph a person reads
             line by line is the other kind of surface entirely. */}
