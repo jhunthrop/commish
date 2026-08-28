@@ -89,3 +89,79 @@ describe("resolveAll — an unmatched player is REPORTED, never dropped", () => 
     expect(buildCrosswalk(ROSTER).resolveAll([]).resolutionRate).toBeNull();
   });
 });
+
+describe("the surname fallback — one man, two given names", () => {
+  const roster = [
+    player("1", "Joshua Palmer", "WR", "BUF"),
+    player("2", "Kenny Gainwell", "RB", "TB"),
+    player("3", "Chig Okonkwo", "TE", "WSH"),
+    // Two receivers, same surname, same initial — the case the fallback must refuse.
+    player("4", "Mike Evans", "WR", "TB"),
+    player("5", "Miles Evans", "WR", "NYJ"),
+  ];
+  const crosswalk = buildCrosswalk(roster);
+
+  it("matches a short given name to its long one, and back", () => {
+    expect(crosswalk.resolve({ name: "Josh Palmer", position: "WR", team: "LAC" })).toBe("1");
+    expect(crosswalk.resolve({ name: "Kenneth Gainwell", position: "RB", team: "PHI" })).toBe("2");
+    expect(crosswalk.resolve({ name: "Chigoziem Okonkwo", position: "TE", team: "TEN" })).toBe("3");
+  });
+
+  it("refuses a true nickname, which shares no initial and would be a guess", () => {
+    const nicknamed = buildCrosswalk([player("9", "Hollywood Brown", "WR", "PHI")]);
+    expect(nicknamed.resolve({ name: "Marquise Brown", position: "WR", team: "ARI" })).toBeNull();
+  });
+
+  it("still refuses two men it cannot tell apart by team", () => {
+    expect(crosswalk.resolve({ name: "M Evans", position: "WR", team: "LAR" })).toBeNull();
+  });
+
+  it("breaks that tie when the team does separate them", () => {
+    expect(crosswalk.resolve({ name: "M Evans", position: "WR", team: "NYJ" })).toBe("5");
+  });
+
+  it("never reaches the fallback when a full name already matched", () => {
+    // `Mike Evans` matches exactly; the fallback would have found two candidates and refused.
+    expect(crosswalk.resolve({ name: "Mike Evans", position: "WR", team: "TB" })).toBe("4");
+  });
+});
+
+describe("the collision guard — two people may not become one player", () => {
+  it("refuses both when a looser rule marries two different men to one roster entry", () => {
+    // Only `Mike Evans` is on the roster. Both `M Evans` and `Marcus Evans` reach him by surname
+    // and initial, from different teams — so neither is safe, and picking one would write a whole
+    // season of somebody else's snaps onto him.
+    const crosswalk = buildCrosswalk([player("1", "Mike Evans", "WR", "TB")]);
+    const result = crosswalk.resolveAll([
+      { name: "M Evans", position: "WR", team: "TB" },
+      { name: "Marcus Evans", position: "WR", team: "NYJ" },
+    ]);
+
+    expect(result.resolved.size).toBe(0);
+    expect(result.unresolved.map((row) => row.reason)).toEqual(["ambiguous", "ambiguous"]);
+  });
+
+  it("lets the strictest rule win when only the loose one collides", () => {
+    const crosswalk = buildCrosswalk([player("1", "Mike Evans", "WR", "TB")]);
+    const result = crosswalk.resolveAll([
+      { name: "Mike Evans", position: "WR", team: "TB" },
+      { name: "Marcus Evans", position: "WR", team: "NYJ" },
+    ]);
+
+    expect([...result.resolved.values()]).toEqual(["1"]);
+    expect(result.unresolved).toEqual([
+      { name: "Marcus Evans", position: "WR", team: "NYJ", reason: "ambiguous", occurrences: 1 },
+    ]);
+  });
+
+  it("still lets ONE man arrive under several identities — a midseason trade changes his team", () => {
+    const crosswalk = buildCrosswalk([player("1", "Amari Cooper", "WR", "BUF")]);
+    const result = crosswalk.resolveAll([
+      { name: "Amari Cooper", position: "WR", team: "CLE" },
+      { name: "Amari Cooper", position: "WR", team: "BUF" },
+    ]);
+
+    expect(result.resolved.size).toBe(2);
+    expect(result.unresolved).toEqual([]);
+  });
+});

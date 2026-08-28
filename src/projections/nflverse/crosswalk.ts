@@ -89,6 +89,24 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
+/**
+ * Surname plus first initial — `joshua palmer` and `josh palmer` both become `palmer|j`.
+ *
+ * The last resort, and it exists because measurement demanded it: the four largest unresolved
+ * groups in a full 2023 backfill were all one person under two given names (Josh/Joshua Palmer,
+ * Kenny/Kenneth Gainwell, Chig/Chigoziem Okonkwo) — feeds disagree about whether to print the
+ * name on the birth certificate or the one on the jersey. It stays SAFE because it is only ever
+ * consulted after both full-name lookups have found nobody, and because it still refuses when it
+ * finds more than one candidate the team cannot separate. What it deliberately does not catch is a
+ * true nickname (`Hollywood` for `Marquise`), which shares no initial and would need an alias
+ * table — guessing there would be guessing, and this file does not guess.
+ */
+function surnameKey(name: string): string {
+  const parts = normalizeName(name).split(" ");
+  const surname = parts.length > 1 ? parts[parts.length - 1]! : parts[0]!;
+  return `${surname}|${parts[0]!.charAt(0)}`;
+}
+
 /** The identity of a candidate, for de-duplicating the unresolved report. */
 function candidateKey({ name, position, team }: CrosswalkCandidate): string {
   return `${normalizeName(name)}|${position}|${team}`;
@@ -97,12 +115,23 @@ function candidateKey({ name, position, team }: CrosswalkCandidate): string {
 export function buildCrosswalk(roster: readonly CrosswalkPlayer[]): Crosswalk {
   const byNameAndPosition = new Map<string, CrosswalkPlayer[]>();
   const byName = new Map<string, CrosswalkPlayer[]>();
+  const bySurnameAndPosition = new Map<string, CrosswalkPlayer[]>();
+  const push = (index: Map<string, CrosswalkPlayer[]>, key: string, entry: CrosswalkPlayer) => {
+    (index.get(key) ?? index.set(key, []).get(key)!).push(entry);
+  };
   for (const entry of roster) {
     const name = normalizeName(entry.name);
-    const withPosition = `${name}|${entry.position}`;
-    (byNameAndPosition.get(withPosition) ?? byNameAndPosition.set(withPosition, []).get(withPosition)!).push(entry);
-    (byName.get(name) ?? byName.set(name, []).get(name)!).push(entry);
+    push(byNameAndPosition, `${name}|${entry.position}`, entry);
+    push(byName, name, entry);
+    push(bySurnameAndPosition, `${surnameKey(entry.name)}|${entry.position}`, entry);
   }
+
+  /**
+   * A lookup's answer plus WHICH rule produced it, strictest first (0 = full name and position,
+   * 1 = full name alone, 2 = surname and initial). `resolveAll` needs the tier to arbitrate when
+   * two candidates claim the same person — a looser rule must never outrank a stricter one.
+   */
+  type Lookup = ({ readonly id: string } | { readonly reason: UnresolvedReason }) & { readonly tier: number };
 
   /** One candidate list narrowed to a single answer, or the reason it could not be. */
   const pick = (
@@ -116,16 +145,20 @@ export function buildCrosswalk(roster: readonly CrosswalkPlayer[]): Crosswalk {
   };
 
   /**
-   * Position first, then name alone. The order matters: trying the name alone first would let a
-   * receiver and a defensive back who happen to share a name resolve to each other, while trying
-   * it SECOND means it only ever runs when the position-qualified lookup found nobody — which is
-   * precisely the position-drift case it exists for.
+   * Three lookups, strictest first: full name with position, full name alone, then surname with
+   * first initial and position. The ORDER is the safety property. Trying the name alone first would
+   * let a receiver and a defensive back who happen to share a name resolve to each other; trying
+   * the surname first would marry two brothers. Each step only ever runs when the stricter one
+   * above it found nobody at all, so a looser rule can widen coverage but can never overrule a
+   * better match.
    */
-  const lookup = (candidate: CrosswalkCandidate): { readonly id: string } | { readonly reason: UnresolvedReason } => {
+  const lookup = (candidate: CrosswalkCandidate): Lookup => {
     const name = normalizeName(candidate.name);
     const exact = byNameAndPosition.get(`${name}|${candidate.position}`) ?? [];
-    if (exact.length > 0) return pick(exact, candidate.team);
-    return pick(byName.get(name) ?? [], candidate.team);
+    if (exact.length > 0) return { ...pick(exact, candidate.team), tier: 0 };
+    const anyPosition = byName.get(name) ?? [];
+    if (anyPosition.length > 0) return { ...pick(anyPosition, candidate.team), tier: 1 };
+    return { ...pick(bySurnameAndPosition.get(`${surnameKey(candidate.name)}|${candidate.position}`) ?? [], candidate.team), tier: 2 };
   };
 
   return {
@@ -137,21 +170,67 @@ export function buildCrosswalk(roster: readonly CrosswalkPlayer[]): Crosswalk {
     resolveAll(candidates) {
       const resolved = new Map<string, string>();
       const unresolved = new Map<string, UnresolvedPlayer>();
-      for (const candidate of candidates) {
+      /** Every candidate identity that claimed a roster player, with the rule that got it there. */
+      const claims = new Map<string, { readonly candidate: CrosswalkCandidate; readonly id: string; readonly tier: number; occurrences: number }>();
+
+      const reject = (candidate: CrosswalkCandidate, reason: UnresolvedReason, occurrences: number) => {
         const key = candidateKey(candidate);
-        const outcome = lookup(candidate);
-        if ("id" in outcome) {
-          resolved.set(key, outcome.id);
-          continue;
-        }
         const already = unresolved.get(key);
         unresolved.set(
           key,
           already === undefined
-            ? { ...candidate, reason: outcome.reason, occurrences: 1 }
-            : { ...already, occurrences: already.occurrences + 1 },
+            ? { ...candidate, reason, occurrences }
+            : { ...already, occurrences: already.occurrences + occurrences },
         );
+      };
+
+      for (const candidate of candidates) {
+        const key = candidateKey(candidate);
+        const existing = claims.get(key);
+        if (existing !== undefined) {
+          existing.occurrences += 1;
+          continue;
+        }
+        if (unresolved.has(key)) {
+          reject(candidate, unresolved.get(key)!.reason, 1);
+          continue;
+        }
+        const outcome = lookup(candidate);
+        if ("id" in outcome) claims.set(key, { candidate, id: outcome.id, tier: outcome.tier, occurrences: 1 });
+        else reject(candidate, outcome.reason, 1);
       }
+
+      /**
+       * THE COLLISION GUARD, and the reason `resolveAll` exists rather than a bare `resolve` in a
+       * loop: each lookup answers in isolation, so two DIFFERENT people can both land on one roster
+       * player — and that is not a near-miss, it is a whole season of one man's snaps written onto
+       * another. It was found the only way such a thing ever is: a full-season backfill tripped the
+       * store's own coherence check with one player holding two different snap counts for one week.
+       *
+       * One person legitimately produces several candidate identities (a midseason trade changes
+       * his team, and the team is part of the identity), so a shared id is only a collision when the
+       * NAMES differ. When they do, the strictest rule that reached the player wins and everything
+       * looser is rejected; if the strictest tier is itself contested, nobody wins. Refusing both is
+       * the only safe answer — a wrong join is invisible forever after, while a rejection is printed.
+       */
+      const byPlayerId = new Map<string, (typeof claims extends Map<string, infer V> ? V : never)[]>();
+      for (const claim of claims.values()) {
+        (byPlayerId.get(claim.id) ?? byPlayerId.set(claim.id, []).get(claim.id)!).push(claim);
+      }
+      for (const contenders of byPlayerId.values()) {
+        const names = new Set(contenders.map((claim) => normalizeName(claim.candidate.name)));
+        if (names.size <= 1) continue;
+        const strictest = Math.min(...contenders.map((claim) => claim.tier));
+        const winners = contenders.filter((claim) => claim.tier === strictest);
+        const winnerNames = new Set(winners.map((claim) => normalizeName(claim.candidate.name)));
+        for (const claim of contenders) {
+          if (winnerNames.size === 1 && claim.tier === strictest) continue;
+          claims.delete(candidateKey(claim.candidate));
+          reject(claim.candidate, "ambiguous", claim.occurrences);
+        }
+      }
+
+      for (const [key, claim] of claims) resolved.set(key, claim.id);
       // Rate is over DISTINCT people, not over rows: a star who appears in eighteen weekly rows
       // would otherwise weigh eighteen times as much as a backup in the one number the plan's stop
       // condition is checked against, and the question that condition asks is "how much of the
