@@ -12,14 +12,19 @@ things: money (seats filling, a good outcome) and live (a clock, a failure). Six
 every surface this doc describes; they are the spine the rest of this document hangs off:
 
 1. **Color is meaning.** Green is money and seats filling, red is live and clocks, everything
-   else is ink and paper.
+   else is ink and paper. **Amended 2026-08-27** — it also means magnitude, tier grade and team
+   identity; see "The fun-pass amendments" below, which carries the colourblind gate that ships
+   with magnitude.
 2. **One face, earned weights.** Geist only; hierarchy from size and weight, not from a second
    typeface.
 3. **No capitals anywhere.** Every `text-transform: uppercase` is gone — league names, eyebrows,
    section labels, all of it. `src/design/no-uppercase.source.test.ts` is the gate.
 4. **Hairlines, not boxes.** Structure comes from thin rules and space, not card borders.
+   **Amended 2026-08-27** with a stated test for when a thing earns a card anyway: *act on or
+   compare = card; read down a column = row.*
 5. **One ink action per view.** One solid pill (ink fill, ground text) per view; every other
-   action is a quiet outlined pill. `src/design/accent-budget.source.test.ts` is the gate on the
+   action is a quiet outlined pill. **Amended 2026-08-27** with named exceptions for surfaces
+   whose whole purpose is repeated action (the draft room; later waivers and trades). `src/design/accent-budget.source.test.ts` is the gate on the
    two pill spellings; the *count* per view is a component-test/review law (see "Pill discipline"
    below).
 6. **Only true things move.** The wire, draft clocks, seat meters and live pulses animate because
@@ -45,6 +50,90 @@ dark`) is untouched by any of this; only the palette each theme paints with move
   below for v3's ramp.
 
 Default theme is still `system`; both themes are designed and tested.
+
+## The fun-pass amendments (2026-08-27) — three rules move, three hold
+
+Founder, 2026-08-27: *"I like the cleanliness of the UI but it doesn't feel like 'fun' you know?"*
+Then, precisely: **"It feels like a legal website and not a fantasy site."** And on scope, when an
+earlier draft of the spec narrowed to one screen: *"I wanted to reshape the entire site to be fun
+like flock fantasy."* The full argument is `docs/design/2026-08-27-fun-pass-spec.md`; the program
+is `docs/superpowers/plans/2026-08-27-fun-pass.md`. What follows is the binding record of what
+changed in the six rules and what did not.
+
+**Rule 1 — colour is meaning — gains three meanings, product-wide.**
+
+- **Magnitude.** A number may be coloured by where it falls in a real comparison set. This is the
+  heat map and it is the largest single change in the pass: four causes were diagnosed for why the
+  product reads as a contract, and "every number is the same colour" was the one the first draft
+  missed. It is permitted **only where the comparison is genuine and stated** — a percentile within
+  a defined population, never a designer's feeling about whether 14.2 is a good number. Tokens:
+  `TOKENS.magnitude`, five steps (`strong · good · neutral · weak · bad`), Tailwind `text-mag-*`.
+  Renderer: `Stat` (`src/components/ui/stat.tsx`), and **only** `Stat` —
+  `src/design/magnitude-budget.source.test.ts` fails any other file in the seven swept directories
+  that names a magnitude colour, in any spelling.
+  - **Magnitude may never appear on a control.** That is what keeps "green fill = action" intact.
+    A `Stat` renders a `<span>`, so magnitude cannot reach a control without first reaching a file
+    the sweep reddens.
+  - **`neutral` IS `textPrimary`**, the same deliberate doubling as `accent`/`positive`. A number
+    with no comparison behind it must be indistinguishable from ordinary text; give the no-verdict
+    step a pigment of its own and every uncompared number starts reading as a judgement.
+- **Tier grade.** S/A/B bands as coloured bars, once the projection engine makes tiers real. Parked
+  until then; this amendment already covers it, so no second ruling is needed when it lands.
+- **Team identity.** A team's own colour, behind a player's face only. Never on a surface, never
+  behind text.
+
+Green still means money and red still means live. Magnitude reuses those hues deliberately — good
+is green because good is the same feeling as money.
+
+**The colourblind rule, which is a gate and not a nicety.** Green versus red is the worst available
+pair for deuteranopia, which affects roughly one man in twelve, and this product's audience is
+overwhelmingly men. The reference product's heat map fails this and we do not copy the failure.
+**Magnitude colour is never the only channel.** Every heat-coloured value carries a second
+encoding: its own numeric value read plainly, and — where the value is judged rather than merely
+reported — a caret naming which side of the population it fell on and a weight step naming how far.
+A manager who sees no colour at all must still rank the column correctly. Three enforcements, at
+three levels:
+
+1. `stat.test.tsx` asserts the value renders as text in every state, that each verdict step carries
+   its caret and its weight step, and that a neutral carries neither.
+2. `tokens.test.ts` orders the ramp by **contrast against the ground** rather than by hue, so the
+   sequence survives with the hue channel switched off entirely. (Ordering by contrast is also
+   direction-free across themes: louder is brighter at night and darker in daylight.)
+3. `tokens.test.ts` also holds every step to 4.5:1 on **all four** surfaces in both themes, not the
+   two the semantic roles are checked against — a heat-coloured number lands in a table row and an
+   inset well as readily as on the page ground.
+
+A heat map that fails this is worse than no heat map, because it silently misinforms one manager in
+twelve.
+
+**Rule 4 — hairlines, not boxes — gains a stated test.** **A thing you act on or compare against
+its neighbours may be a card; a thing you read down a column stays a row.** Player pool rows,
+league cards and matchup cards become cards. Standings tables, pick logs and rosters stay
+hairline-separated rows, because scanning a column is what they are for. In code this is `Card`'s
+`interactive` prop, which spends `surfaceRaised` on `hover`/`focus-within` — depth, never a heavier
+line, so rule 4's original claim is untouched. `line` stays decorative and `edge` stays a control
+boundary; a card takes no `role` and no `tabindex`, so the action inside it is still the view's one
+ink action.
+
+**Rule 5 — one ink action per view — holds everywhere except surfaces whose entire purpose is
+repeated action:** the draft room, and later waivers and trades. Named exceptions, not a general
+relaxation. `e2e/page-audit.spec.ts` keeps enforcing the rule on every audited route, and those
+routes do not change.
+
+**The three that hold.** One typeface at ≤600 weight; no capitals; only true things move.
+
+- The **weight cap does not move**, and it stopped being a promise: `weight-cap.source.test.ts`
+  bans `font-bold`/`font-extrabold`/`font-black` across the same seven directories, no allowlist.
+  What widened instead is the **size** range — `2xl 82` and `3xl 116` on the display scale, taking
+  a number-over-label pairing from 4.8x to ~10x. Dynamic range comes from scale, never from a
+  heavier face.
+- The **caps charter is untouched**; `no-uppercase.source.test.ts` is unchanged.
+- **Rule 6 is finally spent rather than merely obeyed:** a clock pulses because it is running out,
+  a score moves because it changed, a card lifts because there is something in it to press. A
+  change that makes a screen louder without making a true thing more legible is decoration, and
+  rule 6 rejects it. The complaint was that the product reads as a contract, not that it lacks
+  ornament.
+
 
 ## Principles
 - **Delightful, not merely functional.** The product thesis (strategy doc §4) is that this category feels flat and we won't. Optimistic UI, celebration moments, motion with intent (rule 6).
@@ -749,6 +838,6 @@ ticker on an anonymous surface names a league, a count, or a duration, never a p
 on a board, never a color, a badge or an animation.
 
 ## Checklist for every UI step (from `docs/conventions.md`)
-Design review against this doc · light + dark verified · loading/empty/error/success states exist · `axe` clean + keyboard walkthrough · copy review · works at 360px · no `uppercase` outside the two allowlisted files · at most one ink pill per view.
+Design review against this doc · light + dark verified · loading/empty/error/success states exist · `axe` clean + keyboard walkthrough · copy review (**assert, do not explain** — see "Copy") · works at 360px · no `uppercase` outside the two allowlisted files · nothing heavier than `font-semibold` · at most one ink pill per view · **any heat-coloured number also reads plainly as its own number, and a judged one carries its caret and weight step**.
 
 Component tests run in happy-dom without a stylesheet, so the "both themes + axe" checks in `*.test.tsx` verify structural a11y (roles, labels, ARIA attributes) in each theme, not actual rendered color; real color contrast is verified numerically by `src/design/tokens.test.ts` — which covers the semantic roles, the translucent-band composites, and all fifteen sticker pairs in both themes — and browser-based visual contrast checks land with the e2e plan (Task 12's contrast spot-verification).
