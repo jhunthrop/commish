@@ -279,13 +279,13 @@ function sectionA(
     },
   ];
   const overallSd = standardDeviation(overlap.map((subject) => subject.actual));
-  console.log(`\n  A. THE BAND, CUT FOUR WAYS — ${label}, like for like on ${overlap.length} players`);
+  console.log(`\n  A. THE BAND, CUT FOUR WAYS: ${label}, like for like on ${overlap.length} players`);
   console.log(`     outcome SD over the whole overlap: ${overallSd === null ? "n/a" : overallSd.toFixed(1)} points`);
   for (const cut of cuts) {
     const bands = bandsOf(overlap, cut);
     const parts = RANK_BANDS.map((band) => {
       const members = bands.get(band.name)!;
-      if (members.length < 2) return `${band.name} —`;
+      if (members.length < 2) return `${band.name}: too few to report`;
       const ours = rhoOf(members, (subject) => subject.projected);
       const theirs = rhoOf(members, (subject) => -benchmark.get(subject.playerId)!);
       const difference = ours === null || theirs === null ? null : ours - theirs;
@@ -334,7 +334,7 @@ function sectionB(subjects: readonly Subject[], benchmark: ReadonlyMap<string, n
   const overlap = subjects.filter((subject) => benchmark.has(subject.playerId));
   if (overlap.length === 0) return;
   const bands = bandsOf(overlap, { name: label, rankOf: (subject) => benchmark.get(subject.playerId)! });
-  console.log(`\n  B. WHICH HALF OF (games x per-game) IS WRONG — bands cut by ${label}'s rank`);
+  console.log(`\n  B. WHICH HALF OF (games x per-game) IS WRONG: bands cut by ${label}'s rank`);
   const rows: { readonly name: string; readonly value: (subject: Subject) => number }[] = [
     { name: `${label} (the arm to beat)`, value: (subject) => -benchmark.get(subject.playerId)! },
     { name: "the board, as shipped", value: (subject) => subject.projected },
@@ -439,7 +439,7 @@ function sectionD(subjects: readonly Subject[], adp: ReadonlyMap<string, number>
     [...priced].sort((a, b) => b.actual - a.actual).map((subject, index) => [subject.playerId, index + 1] as const),
   );
 
-  console.log(`\n  D. WHERE THE MARKET IS SYSTEMATICALLY WRONG — ${priced.length} priced players`);
+  console.log(`\n  D. WHERE THE MARKET IS SYSTEMATICALLY WRONG: ${priced.length} priced players`);
   console.log(`     residual = mean(market rank - outcome rank); positive means the market was TOO LOW on the segment`);
   const segments: { readonly name: string; readonly members: readonly Subject[] }[] = [
     ...SCORED.map((position) => ({ name: position as string, members: priced.filter((subject) => subject.position === position) })),
@@ -591,7 +591,7 @@ async function main(): Promise<void> {
     const ecr = ranks.get("ecr") ?? new Map<string, number>();
     const adp = ranks.get("adp") ?? new Map<string, number>();
     console.log(`\n${"=".repeat(112)}`);
-    console.log(`${season} DIAGNOSIS — ${subjects.length} of ${everyone.length} board players with an outcome, ${ecr.size} ECR ranks, ${adp.size} ADP prices`);
+    console.log(`${season} DIAGNOSIS: ${subjects.length} of ${everyone.length} board players with an outcome, ${ecr.size} ECR ranks, ${adp.size} ADP prices`);
     console.log(`${"=".repeat(112)}`);
 
     sectionA(subjects, ecr, "ECR", adp.size > 0 ? adp : null);
