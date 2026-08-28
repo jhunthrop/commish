@@ -1,7 +1,7 @@
 import { parseAvatarRef, type AvatarTone } from "@/identity/avatars";
 import { Icon } from "./icon";
 
-export type AvatarSize = "sm" | "md" | "lg";
+export type AvatarSize = "sm" | "md" | "lg" | "xl";
 
 export interface AvatarProps {
   /** The person's display name — the source of the initials fallback. */
@@ -14,16 +14,23 @@ export interface AvatarProps {
   readonly className?: string;
 }
 
+/**
+ * `xl` is the ONE step that is not a list row: it is a person's own header, where the face is the
+ * subject of the screen rather than a marker beside a name. Nothing else may reach for it — a
+ * 96px tile inside a row is how a dense board turns back into a directory of cards.
+ */
 const SIZE: Readonly<Record<AvatarSize, string>> = {
   sm: "size-6 text-xs",
   md: "size-8 text-sm",
   lg: "size-12 text-lg",
+  xl: "size-24 text-3xl",
 };
 
 const ICON_SIZE: Readonly<Record<AvatarSize, number>> = {
   sm: 14,
   md: 18,
   lg: 26,
+  xl: 48,
 };
 
 /**

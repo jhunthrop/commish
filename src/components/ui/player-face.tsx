@@ -3,13 +3,15 @@ import { TOKENS } from "@/design/tokens";
 import { Avatar, type AvatarSize } from "./avatar";
 
 /**
- * How large the face reads. Three steps because three surfaces need it and no more: `sm` is a
+ * How large the face reads. Four steps because four surfaces need it and no more: `sm` is a
  * dense list row (the draft room's pool, sixty of them in a 320px rail — the size this component
- * shipped at when it lived in that room), `md` is a card or a roster slot, `lg` is a player's own
- * header. The tile is always a few pixels larger than the `Avatar` inside it, which is what makes
- * the club colour read as a FRAME rather than as a ground the headshot has to survive.
+ * shipped at when it lived in that room), `md` is a card or a roster slot, `lg` is a heading a
+ * player shares with other content, and `xl` is a player's OWN screen, where the face is the
+ * subject rather than a marker. The tile is always a few pixels larger than the `Avatar` inside
+ * it, which is what makes the club colour read as a FRAME rather than as a ground the headshot
+ * has to survive.
  */
-export type PlayerFaceSize = "sm" | "md" | "lg";
+export type PlayerFaceSize = "sm" | "md" | "lg" | "xl";
 
 export interface PlayerFaceProps {
   readonly player: Player;
@@ -27,6 +29,10 @@ const SIZE: Readonly<Record<PlayerFaceSize, { readonly tile: string; readonly av
   sm: { tile: "size-8", avatar: "sm" },
   md: { tile: "size-11", avatar: "md" },
   lg: { tile: "size-14", avatar: "lg" },
+  // The frame widens with the tile rather than staying 8px: at 112px a hairline of colour reads
+  // as a rendering artefact, and the whole point of the step is that the club is the ground the
+  // player stands on.
+  xl: { tile: "size-28", avatar: "xl" },
 };
 
 /**

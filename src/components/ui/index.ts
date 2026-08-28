@@ -39,6 +39,9 @@ export { Stat, magnitudeStep, type StatComparison, type StatSize } from "./stat"
  *  union, `TierGrade`'s home is `@/design/tokens` so it is NOT re-exported here. */
 export { PlayerFace } from "./player-face";
 export { PlayerRow } from "./player-row";
+
+/** THE PLAYER SCREEN (2026-08-28). The player as an object at the size of his own screen. */
+export { PlayerObject, splitName } from "./player-object";
 export { TierDivider } from "./tier-divider";
 export { Scoreboard } from "./scoreboard";
 export { PointsShareBar } from "./points-share-bar";
