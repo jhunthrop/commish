@@ -15,6 +15,7 @@ import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/doma
 import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring/compute";
 import { allPositions } from "@/projections/backtest";
+import { emptyTeamContext } from "@/projections/team-context";
 import { naiveProjection } from "@/projections/benchmarks/naive";
 import type { DraftCandidate } from "@/projections/decide/draft";
 import type { LineupCandidate } from "@/projections/decide/lineup";
@@ -296,11 +297,18 @@ async function reportLineups(
     const span = { season, week: { from: 1, to: week - 1 }, asOf } as const;
     const seasonSoFar = week === 1 ? [] : await statLinesAsOf(db, span);
     const usageSoFar = week === 1 ? [] : await usageAsOf(db, span);
-
     const projected = modelProjection({
       season,
       week,
       asOf,
+      // EMPTY ON PURPOSE, and it is a measurement decision rather than a stub. Phase 3 made team
+      // context a required input AFTER this harness produced the numbers in
+      // `docs/research/2026-08-27-decision-quality.md`. Feeding it real context now would leave
+      // the script and its own published findings describing different runs, which is the quiet
+      // way a research doc stops being true. Re-running the whole harness against Phase 3's
+      // context (and Phase 6's preseason board) is the doc's own top recommendation, and it is a
+      // deliberate follow-up rather than a line changed in passing.
+      teamContext: emptyTeamContext,
       history: [...inputs.priorHistory, ...seasonSoFar],
       usage: [...inputs.priorUsage, ...usageSoFar],
       positions: inputs.positions,
@@ -384,6 +392,9 @@ async function main(): Promise<void> {
         season,
         week: 1,
         asOf: inputs.preseasonMoment,
+        // Empty for the same reason as above, and doubly honest here: at a preseason moment there
+        // is no in-season team context to read yet.
+        teamContext: emptyTeamContext,
         history: inputs.priorHistory,
         usage: inputs.priorUsage,
         positions: inputs.positions,
