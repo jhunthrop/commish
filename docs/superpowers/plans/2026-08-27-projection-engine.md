@@ -86,6 +86,37 @@
 - [ ] **Step 4: Green + full battery** `npx vitest run` (whole repo) + tsc + eslint.
 - [ ] **Step 5: Commit** `feat(projections): backtest replay and the naive benchmark — the floor everything must clear`
 
+### Task 4b: The capture job — URGENT, and the only irreversible task in this plan
+
+**Why this jumped the queue.** Most of the engine's inputs can be backfilled whenever we like:
+nflverse publishes historical archives, so play-by-play and participation are always retrievable.
+These cannot:
+
+- **Injury designations** — Tank01's injury list is a CURRENT snapshot. There is no history endpoint.
+- **Depth charts** — current only.
+- **ADP drift** through the offseason and preseason — the market's opinion changes and is not archived.
+- **DFS salaries** per week — the weekly market consensus, published then gone.
+- **Betting odds / implied totals** as they stood before kickoff — the layer 4 game-script input.
+- **News and headlines** — current.
+
+Every one of those is a point-in-time input the model wants, and none has an archive we can fetch
+later. **Every week this job does not run is a week of training data that cannot be recovered**, and
+the season starts in days. This is the only task here where waiting has a permanent cost.
+
+**Files:**
+- Create: `src/projections/capture.ts` + test
+- Modify: `src/stats-pipeline/index.ts` / `src/instrumentation.ts` ONLY if wiring a second scheduled job is genuinely cleaner than extending the existing worker — read `src/stats-pipeline/worker.ts` first and prefer extending it. It already owns a poll interval, a background pool budget and a correction path.
+
+**Interfaces:**
+- Consumes: the Tank01 client already in `src/stats/tank01/`, plus its Changelog endpoint (stat corrections must be timestamped or the point-in-time store quietly becomes dishonest).
+- Produces: rows in the Task 1 observation store, each stamped `as_of = the moment we fetched it`. NOT the moment the fact became true — we can only ever honestly claim to have known something when we saw it.
+
+- [ ] **Step 1: Failing test** — a capture run writes observations stamped with the injected clock, and a second run over unchanged data does not duplicate rows (idempotent per source+metric+as_of window).
+- [ ] **Step 2: RED.**
+- [ ] **Step 3: Implement.** Cadence: injuries and depth charts daily; odds and DFS salaries on game days; ADP weekly. Respect the existing budget accounting in `src/stats-pipeline/budget.ts` — this must not silently eat the request quota the live scoring path depends on.
+- [ ] **Step 4: Green + battery** including `src/stats-pipeline`.
+- [ ] **Step 5: Commit** `feat(projections): capture the ephemeral inputs — they have no archive to backfill from`
+
 ### Task 5: Report the first result
 
 **Files:**
