@@ -1,6 +1,8 @@
-import type { Position } from "@/domain/player";
+import type { Position, StatLine } from "@/domain/player";
+import type { SeasonStatLine } from "../lines";
 import { meanAbsoluteError, rootMeanSquaredError, spearman, type Observation } from "../metrics";
 import type { PlayerWeekUsage } from "../usage";
+import { RATES, type EfficiencyPriors, type RateName } from "./efficiency";
 import { lastObservedPriors, predictOpportunity, type OpportunityPriors, type RolePrior } from "./opportunity";
 
 /**
@@ -257,5 +259,173 @@ export function fitOpportunityPriors(input: FitInput): OpportunityFit {
     priors: best!,
     fitted: scoreShares(opportunityObservations(input, best!)),
     baseline: scoreShares(opportunityObservations(input, lastObservedPriors(best!))),
+  };
+}
+
+/**
+ * THE EFFICIENCY FIT — position mean rates, and how many opportunities of prior each rate is worth.
+ *
+ * A VARIANCE RATIO rather than a grid search, and the reason is specific rather than stylistic.
+ * The direct objective for layer 1 (next-week share error) is learnable, so a search against it
+ * finds something. Next-week TOUCHDOWN error is not: touchdowns are close to a coin flip at the
+ * weekly level, so a search would be fitting noise and would land wherever the noise happened to
+ * fall. The variance decomposition asks the question actually being asked — how much of the spread
+ * between players is real difference and how much is sampling — and answers it in closed form.
+ *
+ * The model behind it is the standard one: a player's true rate is drawn from a population with
+ * variance tau-squared, and his observed rate over n opportunities carries sampling variance
+ * sigma-squared over n. The shrinkage constant is then sigma-squared over tau-squared, in
+ * OPPORTUNITIES, and that is what makes the constants comparable across rates — which is what makes
+ * the touchdown assertion an apples-to-apples measurement rather than an assertion.
+ */
+
+/** Weekly outcomes joined to weekly opportunities. Only weeks carrying both can teach a rate. */
+export interface EfficiencyFitInput extends FitInput {
+  readonly history: readonly SeasonStatLine[];
+}
+
+/**
+ * The fewest opportunities a player must have before his own rate is allowed to inform the
+ * BETWEEN-player variance. Below this his observed rate is almost entirely sampling noise, and
+ * including him inflates the apparent spread between players — which would shrink the regression
+ * constant, which is the wrong direction. Twenty-five is roughly two games of a starter's targets.
+ */
+const MIN_OPPORTUNITIES_FOR_SPREAD = 25;
+
+/**
+ * The largest regression constant reported, in opportunities. Reached only when the measurement
+ * finds NO real spread between players at all — the honest reading of which is "regress this rate
+ * entirely to its role", and a finite number says that without producing an infinity that would
+ * propagate into every composed stat line.
+ */
+const MAX_REGRESSION = 10_000;
+
+interface RateWeek {
+  readonly playerId: string;
+  readonly position: Position;
+  readonly opportunities: number;
+  readonly rate: number;
+}
+
+function rateWeeks(input: EfficiencyFitInput, name: RateName): readonly RateWeek[] {
+  const allowed = new Set(input.seasons);
+  const lines = new Map<string, StatLine>();
+  for (const row of input.history) {
+    if (!allowed.has(row.season)) continue;
+    lines.set(`${row.season}|${row.line.week}|${row.line.playerId}`, row.line);
+  }
+  const spec = RATES[name];
+  const weeks: RateWeek[] = [];
+  for (const row of input.usage) {
+    if (!allowed.has(row.season)) continue;
+    const line = lines.get(`${row.season}|${row.week}|${row.playerId}`);
+    const position = input.positions.get(row.playerId);
+    if (line === undefined || position === undefined) continue;
+    const opportunities =
+      spec.denominator === "plays" ? row.targets + row.carries + row.passAttempts : row[spec.denominator];
+    if (opportunities <= 0) continue;
+    weeks.push({ playerId: row.playerId, position, opportunities, rate: line[spec.numerator] / opportunities });
+  }
+  return weeks;
+}
+
+/** A player's own rate over the whole fit window, and how many opportunities it rests on. */
+interface PlayerRate {
+  readonly position: Position;
+  readonly opportunities: number;
+  readonly rate: number;
+  readonly weeks: readonly RateWeek[];
+}
+
+function byPlayer(weeks: readonly RateWeek[]): readonly PlayerRate[] {
+  const grouped = new Map<string, RateWeek[]>();
+  for (const week of weeks) {
+    (grouped.get(week.playerId) ?? grouped.set(week.playerId, []).get(week.playerId)!).push(week);
+  }
+  return [...grouped.values()].map((playerWeeks) => {
+    const opportunities = playerWeeks.reduce((sum, week) => sum + week.opportunities, 0);
+    const numerator = playerWeeks.reduce((sum, week) => sum + week.rate * week.opportunities, 0);
+    return { position: playerWeeks[0]!.position, opportunities, rate: numerator / opportunities, weeks: playerWeeks };
+  });
+}
+
+/**
+ * How many opportunities of prior one rate is worth: sampling variance over between-player variance.
+ *
+ * Sampling variance comes from WITHIN-player weekly deviations, weighted by the opportunities each
+ * week carried — a nine-target week says more about a receiver's catch rate than a one-target week
+ * does, and an unweighted variance would let the one-target weeks dominate.
+ *
+ * Between-player variance is measured WITHIN each position and then pooled. Measuring it across
+ * positions would count the gap between a quarterback's and a receiver's rushing efficiency as
+ * evidence that players differ, inflate the spread, and shrink the constant — regressing every rate
+ * less than it should be, which is the failure this whole layer exists to prevent.
+ */
+export function fitRegressionConstant(input: EfficiencyFitInput, name: RateName): number {
+  const players = byPlayer(rateWeeks(input, name));
+
+  let withinSum = 0;
+  let withinDegreesOfFreedom = 0;
+  for (const player of players) {
+    if (player.weeks.length < 2) continue;
+    for (const week of player.weeks) {
+      withinSum += week.opportunities * (week.rate - player.rate) ** 2;
+    }
+    withinDegreesOfFreedom += player.weeks.length - 1;
+  }
+  if (withinDegreesOfFreedom === 0) return MAX_REGRESSION;
+  const samplingVariance = withinSum / withinDegreesOfFreedom;
+
+  const established = players.filter((player) => player.opportunities >= MIN_OPPORTUNITIES_FOR_SPREAD);
+  if (established.length < 2) return MAX_REGRESSION;
+  const byPosition = new Map<Position, PlayerRate[]>();
+  for (const player of established) {
+    (byPosition.get(player.position) ?? byPosition.set(player.position, []).get(player.position)!).push(player);
+  }
+  let spreadSum = 0;
+  let spreadCount = 0;
+  let inverseOpportunities = 0;
+  for (const group of byPosition.values()) {
+    if (group.length < 2) continue;
+    const groupMean = mean(group.map((player) => player.rate));
+    for (const player of group) {
+      spreadSum += (player.rate - groupMean) ** 2;
+      inverseOpportunities += 1 / player.opportunities;
+      spreadCount += 1;
+    }
+  }
+  if (spreadCount < 2) return MAX_REGRESSION;
+  // The observed spread between players is real difference PLUS the sampling noise each player's
+  // own estimate carries. Subtracting the second is the whole method; skipping it would credit the
+  // noise as signal and under-regress every rate.
+  const trueVariance = spreadSum / spreadCount - (samplingVariance * inverseOpportunities) / spreadCount;
+  if (trueVariance <= 0) return MAX_REGRESSION;
+  return Math.min(MAX_REGRESSION, samplingVariance / trueVariance);
+}
+
+export function fitEfficiencyPriors(input: EfficiencyFitInput): EfficiencyPriors {
+  assertHeldOut(input);
+  const names = Object.keys(RATES) as RateName[];
+
+  const byPosition = Object.fromEntries(
+    POSITIONS.map((position) => [
+      position,
+      Object.fromEntries(
+        names.map((name) => {
+          // Ratio of sums, as in the role priors and for the same reason: a mean of per-week ratios
+          // lets a one-target week weigh as much as a twelve-target one and one lucky row move a
+          // whole position's prior.
+          const weeks = rateWeeks(input, name).filter((week) => week.position === position);
+          const opportunities = weeks.reduce((sum, week) => sum + week.opportunities, 0);
+          const numerator = weeks.reduce((sum, week) => sum + week.rate * week.opportunities, 0);
+          return [name, opportunities === 0 ? 0 : numerator / opportunities];
+        }),
+      ) as Record<RateName, number>,
+    ]),
+  ) as Record<Position, Record<RateName, number>>;
+
+  return {
+    byPosition,
+    regression: Object.fromEntries(names.map((name) => [name, fitRegressionConstant(input, name)])) as Record<RateName, number>,
   };
 }

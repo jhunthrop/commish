@@ -1,3 +1,4 @@
+import type { EfficiencyPriors } from "./efficiency";
 import type { OpportunityPriors } from "./opportunity";
 
 /**
@@ -32,4 +33,91 @@ export const FITTED_OPPORTUNITY_PRIORS: OpportunityPriors = {
   },
   shrinkage: { season: 2, inSeason: 0.25, teamVolume: 4 },
   leagueTeamVolume: { targets: 32.5891, carries: 26.9490, passAttempts: 33.8970 },
+};
+
+export const FITTED_EFFICIENCY_PRIORS: EfficiencyPriors = {
+  byPosition: {
+    QB: {
+      receptionsPerTarget: 0.800000,
+      receivingYardsPerTarget: 0.866667,
+      receivingTouchdownsPerTarget: 0.066667,
+      rushingYardsPerCarry: 4.377269,
+      rushingTouchdownsPerCarry: 0.043557,
+      passingYardsPerAttempt: 7.057624,
+      passingTouchdownsPerAttempt: 0.043123,
+      interceptionsPerAttempt: 0.023176,
+      fumblesLostPerPlay: 0.005614,
+    },
+    RB: {
+      receptionsPerTarget: 0.771882,
+      receivingYardsPerTarget: 5.728193,
+      receivingTouchdownsPerTarget: 0.029932,
+      rushingYardsPerCarry: 4.331284,
+      rushingTouchdownsPerCarry: 0.030787,
+      passingYardsPerAttempt: 3.642857,
+      passingTouchdownsPerAttempt: 0.214286,
+      interceptionsPerAttempt: 0.214286,
+      fumblesLostPerPlay: 0.004270,
+    },
+    WR: {
+      receptionsPerTarget: 0.631561,
+      receivingYardsPerTarget: 7.910832,
+      receivingTouchdownsPerTarget: 0.046299,
+      rushingYardsPerCarry: 6.179431,
+      rushingTouchdownsPerCarry: 0.051422,
+      passingYardsPerAttempt: 11.113636,
+      passingTouchdownsPerAttempt: 0.113636,
+      interceptionsPerAttempt: 0.045455,
+      fumblesLostPerPlay: 0.004191,
+    },
+    TE: {
+      receptionsPerTarget: 0.688322,
+      receivingYardsPerTarget: 7.266174,
+      receivingTouchdownsPerTarget: 0.053960,
+      rushingYardsPerCarry: 4.978261,
+      rushingTouchdownsPerCarry: 0.082609,
+      passingYardsPerAttempt: 7.858065,
+      passingTouchdownsPerAttempt: 0.038710,
+      interceptionsPerAttempt: 0.038710,
+      fumblesLostPerPlay: 0.003063,
+    },
+    K: {
+      receptionsPerTarget: 0.000000,
+      receivingYardsPerTarget: 0.000000,
+      receivingTouchdownsPerTarget: 0.000000,
+      rushingYardsPerCarry: 0.000000,
+      rushingTouchdownsPerCarry: 0.000000,
+      passingYardsPerAttempt: 0.000000,
+      passingTouchdownsPerAttempt: 0.000000,
+      interceptionsPerAttempt: 0.000000,
+      fumblesLostPerPlay: 0.000000,
+    },
+    DEF: {
+      receptionsPerTarget: 0.000000,
+      receivingYardsPerTarget: 0.000000,
+      receivingTouchdownsPerTarget: 0.000000,
+      rushingYardsPerCarry: 0.000000,
+      rushingTouchdownsPerCarry: 0.000000,
+      passingYardsPerAttempt: 0.000000,
+      passingTouchdownsPerAttempt: 0.000000,
+      interceptionsPerAttempt: 0.000000,
+      fumblesLostPerPlay: 0.000000,
+    },
+  },
+  /**
+   * How many OPPORTUNITIES of prior each rate is worth. Every touchdown rate is far above every
+   * other, which is the measurement rather than the assumption — `efficiency.test.ts` pins it, so a
+   * refit that produced a confident touchdown rate fails the suite instead of quietly shipping.
+   */
+  regression: {
+    receptionsPerTarget: 108.72,
+    receivingYardsPerTarget: 217.54,
+    receivingTouchdownsPerTarget: 1123.46,
+    rushingYardsPerCarry: 88.41,
+    rushingTouchdownsPerCarry: 10000.00,
+    passingYardsPerAttempt: 251.92,
+    passingTouchdownsPerAttempt: 10000.00,
+    interceptionsPerAttempt: 1103.93,
+    fumblesLostPerPlay: 10000.00,
+  },
 };
