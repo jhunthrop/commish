@@ -45,6 +45,7 @@ export { PlayerRow } from "./player-row";
  *  it is the whole contract: a number, or the honest absence of one. */
 export { PlayerObject, splitName } from "./player-object";
 export { SourceStrip, type SourceValue } from "./source-strip";
+export { SeasonBars, type SeasonWeek } from "./season-bars";
 export { TierDivider } from "./tier-divider";
 export { Scoreboard } from "./scoreboard";
 export { PointsShareBar } from "./points-share-bar";

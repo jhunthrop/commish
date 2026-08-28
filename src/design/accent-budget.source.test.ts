@@ -67,7 +67,27 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
  * sanctioned element by name, so a future inline spelling there is a refactor of the map's
  * home, not a violation.
  */
-const INK_PILL_ALLOWLIST: readonly string[] = ["src/components/ui/button.tsx", "src/components/ui/button-link.tsx"];
+const INK_PILL_ALLOWLIST: readonly string[] = [
+  "src/components/ui/button.tsx",
+  "src/components/ui/button-link.tsx",
+  // THE SEASON CHART'S LOUDEST BAR (2026-08-28), earning its entry the way this file's own
+  // docblock asks — in review, with a reason.
+  //
+  // The ban's target is stated in rule 2 above: *"the ink pill's own fill … the pill the mock
+  // ships can never be hand-rolled back into a call site the way the accent CTA was."* It is a
+  // rule about a CONTROL wearing the ink fill. `SeasonBars` draws no control: seventeen
+  // `aria-hidden` rectangles with no text on them, no radius-pill, no handler and no focus stop.
+  //
+  // Why it needs the role at all: the chart bands a week as big, ordinary or bust, and a band is
+  // only readable if its three steps are separable IN BOTH THEMES. The neutral ladder has exactly
+  // three that are — `text-primary`, `text-muted`, `edge` — and it is strictly decreasing in
+  // contrast against the ground in each theme, which is what carries the band with the hue
+  // channel switched off. The step below `edge` is `line`, which measures about 1.15:1 on a
+  // daylight card and would draw a bust week as nothing at all. The heat map's own pigments are
+  // the obvious alternative and are not available: `magnitude-budget.source.test.ts` makes `Stat`
+  // the only file allowed to name one, and the number above each bar is where they render.
+  "src/components/ui/season-bars.tsx",
+];
 
 const REPO_ROOT = process.cwd();
 
