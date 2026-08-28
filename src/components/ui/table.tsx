@@ -145,7 +145,7 @@ function JudgedHead<T>({ column }: { readonly column: TableJudgedColumn<T> }) {
   return (
     <span className="flex flex-col items-end gap-0.5">
       <span>{column.header}</span>
-      <span className={`${MICRO_LABEL} font-normal normal-case tracking-normal text-text-faint`}>
+      <span className="normal-case tracking-normal text-text-faint">
         {direction === "lower-is-better" ? `vs ${set}, lower is better` : `vs ${set}`}
       </span>
     </span>
@@ -281,7 +281,18 @@ export function Table<T>({
                 // header cell (not only `Record`'s) is a no-op for the common case — same-height
                 // cells look identical top- or middle-aligned — and is what keeps the row's other
                 // labels flush with `Record`'s own top edge the one time a cell actually grows.
-                className={`${columnClass(column)}px-3 ${cellPaddingClass} align-top font-medium text-text-muted`}
+                //
+                // ONE HEAD REGISTER FOR EVERY TABLE (2026-08-28). `MICRO_LABEL` — the caps
+                // charter's single sanctioned all-caps address, "where every sports interface has
+                // always put it" — was already what `league-board.tsx` wrapped each of its six
+                // heads in by hand, precisely because this default (sentence case, body face) is
+                // what made that board read as a spreadsheet of prose. One board hand-rolling the
+                // right answer while four other tables kept the wrong one is two registers for one
+                // job, and the judged column is what made that visible: its head is a plain string
+                // this file renders, so it had nowhere to hand-roll. The treatment moves here, the
+                // board's own `Head` wrapper is deleted, and a head that carries an `InfoTip`
+                // caption re-normalises the case around it (`standings-table.tsx`).
+                className={`${columnClass(column)}px-3 ${cellPaddingClass} align-top ${MICRO_LABEL} font-normal text-text-faint`}
               >
                 {isJudged(column) ? <JudgedHead column={column} /> : column.header}
               </th>

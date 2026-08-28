@@ -129,7 +129,9 @@ describe("LeagueBoard", () => {
   it("folds the opponent, the state and the verb under the score at 360px", async () => {
     await renderSurface(<LeagueBoard leagues={live} />, ({ getByText, getByRole }) => {
       expect(getByRole("columnheader", { name: /^Your score/ }).className).not.toMatch(/hidden/);
-      for (const dropped of ["Opponent", "Margin", "State", "Action"]) {
+      // A regex, not an exact name: Margin is a JUDGED column now, so its accessible name is the
+      // label plus the comparison set it states beneath ("Margin vs your leagues this week").
+      for (const dropped of [/^Opponent/, /^Margin/, /^State/, /^Action/]) {
         expect(getByRole("columnheader", { name: dropped }).className).toMatch(/hidden/);
       }
       // The dropped opponent, state and VERB, folded into the score cell for the narrow viewport
@@ -213,37 +215,17 @@ describe("LeagueBoard", () => {
   // The fix removes the wrap outright rather than chasing a per-theme pixel budget; this asserts
   // the structural property that let the two themes diverge — the nowrap class on the badge and
   // on the figure beside the bar — holds identically in BOTH themes, so a future change that
-  // reintroduces a theme-only text style cannot silently reopen the gap. Gameday swapped `Meter`
-  // for `PointsShareBar` here, which keeps the same contract: the name truncates, the number
-  // never wraps.
-  it("never lets the State badge or the share figure wrap, in either theme (LED-11)", async () => {
+  // reintroduces a theme-only text style cannot silently reopen the gap.
+  //
+  // THE SHARE-FIGURE HALF OF THIS TEST WENT WITH THE BAR (2026-08-28). `PointsShareBar` is no
+  // longer on this board at all: the two scores are already two columns, the signed margin is a
+  // third, and the bar restated both as a percentage split on every row. Nothing can wrap where
+  // nothing renders, so the assertion is deleted rather than kept green against a stand-in. The
+  // badge half is the half that still has something to defend.
+  it("never lets the State badge wrap, in either theme (LED-11)", async () => {
     await renderSurface(<LeagueBoard leagues={[ORDINARY]} />, ({ getAllByText }) => {
       expect(getAllByText("Watch the scores").length).toBe(2);
       expect(getAllByText("Live")[0]!.className).toMatch(/whitespace-nowrap/);
-    });
-    const wideMargin: readonly HomeLeagueCard[] = [
-      {
-        ...BASE,
-        id: "l_wide_margin",
-        name: "Wide Margin League",
-        myTeamId: "home_team",
-        matchup: {
-          weekNumber: 4,
-          homeTeamId: "home_team",
-          awayTeamId: "away_team",
-          homeTeamName: "Iron Owls",
-          awayTeamName: "Comet Crew",
-          homeScore: 100,
-          awayScore: 50,
-          final: false,
-          weekStatus: "in_progress",
-        },
-        nextAction: { kind: "watch-scores", label: "Watch the scores" },
-      },
-    ];
-    await renderSurface(<LeagueBoard leagues={wideMargin} />, ({ getByText }) => {
-      expect(getByText("67%").className).toMatch(/whitespace-nowrap/);
-      expect(getByText("33%").className).toMatch(/whitespace-nowrap/);
     });
   });
 

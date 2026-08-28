@@ -211,17 +211,26 @@ describe("StandingsTable", () => {
 
     it("ranks points for against the league, and says which population it used", () => {
       render(<StandingsTable rows={SIX} myTeamId="x0" />);
-      expect(screen.getByText("Top 8% of teams by points for.")).toBeInTheDocument();
-      expect(screen.getByText("Bottom 8% of teams by points for.")).toBeInTheDocument();
+      // The set is named once in the column head, on screen, and once per cell to assistive tech.
+      // Both readings say the same thing because both are built from the one `set` phrase.
+      expect(screen.getByRole("columnheader", { name: /Points for/ })).toHaveTextContent("vs the league");
+      // Two of each: both columns rank inside the same league, and the team scoring most also
+      // allows most, so points-for's best and points-against's best land on different rows.
+      expect(screen.getAllByText("Top 8% of the league.")).toHaveLength(2);
+      expect(screen.getAllByText("Bottom 8% of the league.")).toHaveLength(2);
     });
 
     it("reads points against in the direction it is actually judged, where the biggest number is the worst", () => {
       render(<StandingsTable rows={SIX} myTeamId="x0" />);
-      // `x0` allows the FEWEST (900) and therefore sits at the top of a population named for that
-      // direction. A ramp that ranked it by raw size would paint the best defense in the league
-      // as its worst number.
-      expect(screen.getByText("Top 8% of teams by fewest points allowed.")).toBeInTheDocument();
-      expect(screen.getByText("Bottom 8% of teams by fewest points allowed.")).toBeInTheDocument();
+      // `x0` allows the FEWEST (900) and therefore sits at the TOP of the ramp. A ramp that
+      // ranked it by raw size would paint the best defense in the league as its worst number.
+      // The direction used to be smuggled into the population's own wording ("teams by fewest
+      // points allowed"); the head states it in three words instead, and the spoken sentence is
+      // the same phrase both columns use.
+      expect(screen.getByRole("columnheader", { name: /Points against/ })).toHaveTextContent("vs the league, lower is better");
+      const spoken = screen.getAllByText("Top 8% of the league.");
+      expect(spoken).toHaveLength(2);
+      expect(screen.getAllByText("Bottom 8% of the league.")).toHaveLength(2);
     });
 
     it("leaves the record alone, because the row order already ranks it", () => {
