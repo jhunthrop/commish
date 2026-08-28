@@ -41,7 +41,10 @@
     "e2e": "npm run e2e:build && dotenv -e .env.local -v STATS_PROVIDER=mock -- playwright test",
     "e2e:ui": "npm run e2e:build && dotenv -e .env.local -v STATS_PROVIDER=mock -- playwright test --ui",
     "e2e:install": "playwright install --with-deps chromium",
-    "projections:decisions": "dotenv -e .env.local -- tsx scripts/decision-report.ts"
+    "projections:decisions": "dotenv -e .env.local -- tsx scripts/decision-report.ts",
+    "projections:preseason:ingest": "dotenv -e .env.local -- tsx scripts/preseason-ingest.ts",
+    "projections:preseason:fit": "dotenv -e .env.local -- tsx scripts/preseason-fit.ts",
+    "projections:preseason": "dotenv -e .env.local -- tsx scripts/preseason-report.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
