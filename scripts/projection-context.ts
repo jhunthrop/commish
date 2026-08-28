@@ -14,7 +14,7 @@
 // nflverse is free, so this spends no upstream request budget.
 import { createDb } from "@/db/client";
 import { createNflverseClient } from "@/projections/nflverse/client";
-import { ingestCoaches, ingestOpponentDefence, ingestPlayByPlay, ingestSchedule } from "@/projections/nflverse/ingest";
+import { ingestCoaches, ingestInjuryReports, ingestOpponentDefence, ingestPlayByPlay, ingestSchedule } from "@/projections/nflverse/ingest";
 
 const FIRST_SEASON = Number(process.argv[2] ?? 2020);
 const LAST_SEASON = Number(process.argv[3] ?? 2024);
@@ -57,6 +57,15 @@ async function main(): Promise<void> {
   // Also last, and for the same reason: a defence can only be rated once what it allowed is stored.
   const opponentRows = await ingestOpponentDefence(db, seasons);
   console.log(`opponent adjustment: ${opponentRows} new team-week observations`);
+
+  // The news pass's retrieval. Under a megabyte a season against the play-by-play's hundred, and the
+  // only feed here whose stamps come from a publisher rather than from a game's date.
+  for (const report of await ingestInjuryReports(db, client, seasons)) {
+    console.log(
+      `${report.season}: ${report.reportRows} injury report rows -> ${report.observationsWritten} new observations` +
+        (report.unknownPlayers === 0 ? "" : `, ${report.unknownPlayers} listed players the universe does not project`),
+    );
+  }
 
   await db.$client.end();
 }

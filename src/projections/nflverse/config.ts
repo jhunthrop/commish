@@ -27,6 +27,14 @@ export const NFLVERSE_CONFIG = {
      * because retired players are genuinely absent from a roster. See `players.ts`.
      */
     players: "players",
+    /**
+     * THE OFFICIAL INJURY REPORT, back to 2009, with the league's own filing timestamp on every row.
+     *
+     * The one feed here whose facts become knowable BEFORE the game they describe, which is what
+     * makes a news pass possible at all. Every other source in this adapter is a record of something
+     * that has already happened.
+     */
+    injuries: "injuries",
   },
   /** Asset names. Only the universe's is fixed; the other two carry a season. */
   files: {

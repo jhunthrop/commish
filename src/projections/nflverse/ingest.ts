@@ -12,6 +12,7 @@ import { mapParticipation, participationObservations, weekAsOfFromSnapCounts } f
 import { PlayByPlayAggregator, playProfileObservations, PBP_COLUMNS } from "./pbp";
 import { PlayerPlayAggregator, playerTouchObservations, PBP_PLAYER_COLUMNS } from "./pbp-players";
 import { allPositions } from "../backtest";
+import { mapInjuries } from "../news/retrieve";
 import { buildPlayerUniverse, mapNflPlayers, nflPlayerRows, type PlayerUniverse } from "./players";
 import { kickoffAsOf, mapSchedule, scheduleObservations, SCHEDULE_SOURCE_CONFIG } from "./schedule";
 import { mapStatLines, statLineObservations } from "./stat-lines";
@@ -264,4 +265,41 @@ export async function ingestOpponentDefence(db: Db, seasons: readonly number[], 
   }));
 
   return await recordTeamObservations(db, opponentDefenceObservations(games, defenceWeeks, seasons));
+}
+
+/**
+ * THE NEWS PASS'S RETRIEVAL — the official injury report, stamped when the league filed it.
+ *
+ * A separate step from the play-by-play because it is a different kind of fact and a very much
+ * smaller file: under a megabyte a season, against a hundred. It is also the only ingestion in the
+ * engine whose stamps are not derived from a game's date, which is the whole reason the news pass
+ * exists — see `news/retrieve.ts`.
+ *
+ * The universe is read once and reused across seasons, exactly as the play-by-play ingestion does.
+ */
+export interface NewsIngestReport {
+  readonly season: number;
+  readonly reportRows: number;
+  readonly observationsWritten: number;
+  readonly unknownPlayers: number;
+}
+
+export async function ingestInjuryReports(
+  db: Db,
+  client: NflverseClient,
+  seasons: readonly number[],
+): Promise<readonly NewsIngestReport[]> {
+  const projected = new Set((await allPositions(db)).keys());
+  const reports: NewsIngestReport[] = [];
+  for (const season of seasons) {
+    const rows = await client.getCsv(NFLVERSE_CONFIG.releases.injuries, `injuries_${season}.csv`);
+    const mapped = mapInjuries(rows, projected);
+    reports.push({
+      season,
+      reportRows: rows.length,
+      observationsWritten: await recordObservations(db, mapped.observations),
+      unknownPlayers: mapped.unknownPlayers.length,
+    });
+  }
+  return reports;
 }

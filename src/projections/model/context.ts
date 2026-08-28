@@ -14,6 +14,7 @@ import type { LinePriors } from "./line-fit";
 import type { PredictedOpportunity } from "./opportunity";
 import type { RedZonePriors } from "../features/red-zone";
 import type { TargetDepthPriors } from "../features/target-depth";
+import { applyNews, newsAdjustments, type NewsPriors } from "../news/adjust";
 import type { RedistributionPriors } from "./redistribution-fit";
 import type { SchemePriors, SchemeVolumeElasticity } from "./scheme-fit";
 import { detectTransactions } from "./transactions";
@@ -41,6 +42,7 @@ export interface ContextPriors {
   readonly gameContext: GameContextPriors;
   readonly redZone: RedZonePriors;
   readonly targetDepth: TargetDepthPriors;
+  readonly news: NewsPriors;
 }
 
 /**
@@ -330,4 +332,26 @@ export function redistributeOpportunity(
 /** A share is a fraction; nothing downstream is prepared for one that is not. Mirrors layer 1's own. */
 function clampShare(value: number): number {
   return Math.min(1, Math.max(0, value));
+}
+
+/**
+ * THE NEWS PASS, applied to opportunity and to nothing else.
+ *
+ * Last in the chain on purpose. The scheme sizes the pie, redistribution decides who eats it, and
+ * this removes the men who are not at the table — which is the order the three actually happen in.
+ * Running it earlier would redistribute a share to a player the news had already ruled out.
+ *
+ * Everything the contract enforces is enforced inside `applyNews`; this function's whole job is to
+ * hand it the rows the as-of gate admitted and the moment to judge expiry against. `input.asOf` is
+ * that moment rather than the wall clock, so a backtest of October 2023 applies exactly the
+ * adjustments that were live in October 2023.
+ */
+export function applyNewsToOpportunity(
+  opportunity: ReadonlyMap<string, PredictedOpportunity>,
+  input: ProjectionInput,
+  features: FeatureFlags,
+  priors: ContextPriors,
+): ReadonlyMap<string, PredictedOpportunity> {
+  if (!features.news || input.news.length === 0) return opportunity;
+  return applyNews(opportunity, newsAdjustments(input.news, priors.news), input.asOf).opportunity;
 }

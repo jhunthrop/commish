@@ -35,6 +35,11 @@ export interface FeatureFlags {
    * checkdown back and a field-stretcher can take the same target share of the same offence.
    */
   readonly targetDepth: boolean;
+  /**
+   * Phase 4 — the news pass. Bounded, cited, expiring adjustments to opportunity, derived from the
+   * official injury report and never generated. Off unless a measurement says otherwise.
+   */
+  readonly news: boolean;
 }
 
 /** Model v1 exactly: three layers, no context. The `before` arm of every ablation. */
@@ -45,6 +50,7 @@ export const NO_FEATURES: FeatureFlags = {
   gameContext: false,
   redZone: false,
   targetDepth: false,
+  news: false,
 };
 
 /** Every group at once. The headline number, and explicitly NOT an ablation of anything. */
@@ -55,6 +61,7 @@ export const ALL_FEATURES: FeatureFlags = {
   gameContext: true,
   redZone: true,
   targetDepth: true,
+  news: true,
 };
 
 /**

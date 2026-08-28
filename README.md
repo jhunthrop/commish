@@ -65,12 +65,14 @@ npm run projections:backfill  # ingest the historical player universe and a span
                           # (defaults to exactly that). Prints per-season resolution and exits
                           # non-zero if any season lands below 95%, because a player the universe
                           # cannot place is indistinguishable from one who did not play.
-npm run projections:context  # ingest the TEAM-level context store: the schedule (opponent, rest,
-                          # venue, and the kickoff-stamped closing line), play-by-play reduced to
-                          # team-week facts as it streams, the head-coach table and the opponent
-                          # adjustment. npm run projections:context -- 2016 2024. Separate from the
-                          # backfill because play-by-play is a hundred megabytes a season; nothing
-                          # is held in memory and nine seasons take about seventy seconds.
+npm run projections:context  # ingest the context store: the schedule (opponent, rest, venue, and
+                          # the kickoff-stamped closing line), play-by-play reduced to team-week
+                          # facts (pace, line, what each defence allowed) AND player-week facts
+                          # (red-zone touches, air yards) on one pass, the head-coach table, the
+                          # opponent adjustment, and the official injury report stamped when the
+                          # league filed it. npm run projections:context -- 2016 2024. Separate from
+                          # the backfill because play-by-play is a hundred megabytes a season;
+                          # nothing is held in memory and five seasons take about a minute.
 npm run projections:fit   # refit the model's parameters on the FIT seasons and regenerate
                           # src/projections/model/fitted.ts. Refuses to fit on a held-out season.
                           # The generated file is committed, so a published scoreboard can always be
@@ -81,10 +83,12 @@ npm run projections:report  # replay a season and print the scoreboard: layer 1'
                           # npm run projections:report 2023. See docs/research/2026-08-27-model-v1.md.
 npm run projections:ablate  # measure ONE feature group on the held-out seasons and print
                           # `rho before -> rho after`, overall, by rank band and week by week:
-                          # npm run projections:ablate line|scheme|redistribution|context|shipped.
-                          # `shares` prints layer 1 on its own terms instead. Reads the store and
-                          # never the network, so an ablation is fifteen seconds rather than a
-                          # download. See docs/research/2026-08-27-model-v2.md.
+                          # line|scheme|redistribution|context|red-zone|target-depth|news|shipped.
+                          # `shares` prints layer 1 on its own terms instead. Add --at=game-week to
+                          # replay from the morning of the week's first game rather than from the
+                          # Tuesday; the news pass is the one feature whose value depends on which
+                          # is asked. Reads the store and never the network, so an ablation is
+                          # minutes rather than a download. See docs/research/2026-08-27-model-v3.md.
 npm run e2e:install       # one-time: download the Playwright browser
 npm run e2e               # browser end-to-end suite (needs a build + a WorkOS test key)
 npm run e2e:ui            # same suite, in Playwright's interactive UI mode

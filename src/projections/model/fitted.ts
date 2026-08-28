@@ -5,6 +5,7 @@ import type { GameContextPriors } from "./context-fit";
 import type { RedistributionPriors } from "./redistribution-fit";
 import type { RedZonePriors } from "../features/red-zone";
 import type { TargetDepthPriors } from "../features/target-depth";
+import type { NewsPriors } from "../news/adjust";
 import type { SchemePriors } from "./scheme-fit";
 
 /**
@@ -253,4 +254,32 @@ export const FITTED_TARGET_DEPTH_PRIORS: TargetDepthPriors = {
   shrinkage: 120,
   yardsElasticity: 0.165250,
   receptionsElasticity: -0.070576,
+};
+
+/**
+ * PHASE 4 — WHAT A PUBLISHED DESIGNATION IS WORTH, measured against layer 1's own prediction.
+ *
+ * Everybody knows "Out" means no snaps. Nobody knows what "Questionable" means, and these are the
+ * measured answers: the fraction of the snaps layer 1 predicted that players carrying each
+ * designation actually took, over the fit seasons. A missing player-week counts as zero here and
+ * nowhere else in the engine — the injury report is filed for one game, so a player on it with no
+ * snap row did not play, and skipping him would fit on the injured players who turned out fine.
+ *
+ * The confidence is the evidence behind each number, not a feeling about it, and the contract in
+ * `news/adjust.ts` uses it to pull the multiplier toward doing nothing.
+ */
+export const FITTED_NEWS_PRIORS: NewsPriors = {
+  /** Game status: 1 Questionable, 2 Doubtful, 3 Out. */
+  reportStatus: {
+    "1": { multiplier: 0.675804, confidence: 0.946467 }, // measured 0.6758 over 884 player-weeks
+    "2": { multiplier: 0.000000, confidence: 0.685535 }, // measured 0.0000 over 109 player-weeks
+    "3": { multiplier: 0.003785, confidence: 0.924242 }, // measured 0.0038 over 610 player-weeks
+  },
+  /** Practice participation, used only where no game status was published: 1 Full, 2 Limited, 3 Did not participate. */
+  practiceStatus: {
+    "1": { multiplier: 0.958805, confidence: 0.960723 }, // measured 0.9588 over 1223 player-weeks
+    "2": { multiplier: 0.935089, confidence: 0.840764 }, // measured 0.9351 over 264 player-weeks
+    "3": { multiplier: 0.792242, confidence: 0.813433 }, // measured 0.7922 over 218 player-weeks
+  },
+  validityHours: 240,
 };

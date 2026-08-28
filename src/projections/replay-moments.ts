@@ -1,4 +1,4 @@
-import { eq, max } from "drizzle-orm";
+import { and, eq, inArray, max, min } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
 import { playerWeekObservations } from "@/db/schema";
 
@@ -53,4 +53,87 @@ export async function replayMomentsFor(db: ReadonlyDb, season: number): Promise<
   }
   const priorSeasonEnd = new Date(Math.max(...[...prior.values()].map((date) => date.getTime())));
   return (week: number): Date => target.get(week - 1) ?? priorSeasonEnd;
+}
+
+/**
+ * THE PARTICIPATION SOURCES — the feeds whose stamps mark when a WEEK'S GAMES became knowable.
+ *
+ * Named explicitly rather than taken as "everything in the table", because the news pass writes
+ * player-week rows too and they are stamped when a publisher filed them, days BEFORE the games. A
+ * minimum taken over the whole table would therefore return an injury report's own timestamp, and a
+ * replay moment derived from it would be defined in terms of the very rows it is meant to gate.
+ */
+const GAME_RESULT_SOURCES: readonly string[] = ["nflverse_snap_counts", "nflverse_player_week"];
+
+/**
+ * How far before the FIRST fact about a week the game-week moment sits.
+ *
+ * Thirty-six hours, and the number is a consequence of the stamping arithmetic rather than a taste.
+ * `gameDayAsOf` stamps a game at the end of its UTC calendar day plus a 24-hour publication lag, so
+ * the earliest stamp for a week is midnight UTC on the day after that week's first game, plus a day.
+ * Subtracting thirty-six hours lands at noon UTC on the morning of that first game — seven in the
+ * morning, Eastern — which is before any kickoff the NFL schedules, including a Thursday night one.
+ *
+ * Conservative in the only direction that matters. Being early costs the layer some legitimately
+ * knowable data; being late would put a game's own result inside the moment it is projected from,
+ * and every number the harness has ever produced would become suspect.
+ */
+const GAME_WEEK_ADVANCE_HOURS = 36;
+
+const MILLISECONDS_PER_HOUR = 3_600_000;
+
+/**
+ * The replay moment for a week set as late as a WHOLE-WEEK replay can honestly be: the morning of
+ * the week's first game.
+ *
+ * The standard moment is "when the previous week's numbers landed", which is the Tuesday. That is
+ * the right moment for a waiver decision and the wrong one for a start-and-sit, and it is
+ * specifically too early to see anything a publisher files during the game week — which is the whole
+ * of what the news pass exists to read. This is the other end of the same window.
+ *
+ * IT IS STILL A WHOLE-WEEK MOMENT, and that is its limit rather than a defect to be tuned away. Every
+ * player in the week is projected from one instant, so that instant must precede the EARLIEST
+ * kickoff of the week, which is Thursday night. A designation the league files on the Friday is
+ * therefore unreachable here no matter how the constant is set, and the fix is not a later moment —
+ * it is a PER-PLAYER moment, his own game's kickoff, which is a change to the harness and not to a
+ * number. See `docs/research/2026-08-27-model-v3.md`.
+ *
+ * The guarantee is checked rather than argued. The returned moment is asserted to be strictly
+ * earlier than the first stored result for the week being projected, so no fact produced BY that
+ * week's games can pass the as-of gate. That is the guarantee the store can actually make; whether
+ * the moment also precedes the first kickoff follows from the stamping arithmetic above and from
+ * the fact that the NFL schedules no game before Thursday evening.
+ */
+export async function gameWeekMomentsFor(db: ReadonlyDb, season: number): Promise<(week: number) => Date> {
+  const rows = await db
+    .select({ week: playerWeekObservations.week, asOf: min(playerWeekObservations.asOf) })
+    .from(playerWeekObservations)
+    .where(
+      and(
+        eq(playerWeekObservations.season, season),
+        inArray(playerWeekObservations.source, [...GAME_RESULT_SOURCES]),
+      ),
+    )
+    .groupBy(playerWeekObservations.week);
+  const earliest = new Map(
+    rows
+      .filter((row): row is { week: number; asOf: Date } => row.asOf !== null)
+      .map((row) => [row.week, row.asOf] as const),
+  );
+  if (earliest.size === 0) {
+    throw new Error(`The store holds no game results for ${season}; run \`npm run projections:backfill\` before replaying it.`);
+  }
+  return (week: number): Date => {
+    const first = earliest.get(week);
+    if (first === undefined) {
+      throw new Error(`The store holds no game results for ${season} week ${week}, so it has no game-week moment.`);
+    }
+    const moment = new Date(first.getTime() - GAME_WEEK_ADVANCE_HOURS * MILLISECONDS_PER_HOUR);
+    if (moment.getTime() >= first.getTime()) {
+      throw new Error(
+        `The game-week moment for ${season} week ${week} (${moment.toISOString()}) is not earlier than that week's first result (${first.toISOString()}). A replay moment that can see the games it is projecting is not a replay moment.`,
+      );
+    }
+    return moment;
+  };
 }

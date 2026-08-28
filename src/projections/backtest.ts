@@ -5,10 +5,11 @@ import { projectedPosition } from "./nflverse/players";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { statLinesAsOf, type SeasonStatLine } from "./lines";
 import { predictOpportunity, type OpportunityPriors } from "./model/opportunity";
-import { LAST_POSSIBLE_WEEK } from "./store";
+import { observationsAsOf, LAST_POSSIBLE_WEEK, type PlayerWeekObservation } from "./store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "./team-store";
 import type { TeamContext } from "./team-context";
 import { usageAsOf, type PlayerWeekUsage } from "./usage";
+import { INJURY_SOURCE } from "./news/retrieve";
 import { rankBandFor, scoreCard, RANK_BANDS, type Observation, type RankBandName, type ScoreCard } from "./metrics";
 
 /**
@@ -54,6 +55,22 @@ export interface ProjectionInput {
    * source that opened its own connection would be a second path from the store into a projection.
    */
   readonly teamContext: TeamContext;
+  /**
+   * PLAYER-LEVEL FACTS ABOUT THE WEEK BEING PREDICTED that a publisher filed before it — the news
+   * pass reads this and nothing else reads it.
+   *
+   * The only place in this instrument where a source is shown a row carrying the TARGET week's own
+   * number, and the justification is exactly the one `teamContext.teamObservations` already relies
+   * on: an injury designation is a fact ABOUT the coming game, published before it, and the `as_of`
+   * gate is what separates that from a fact produced BY it. Bounded by the gate alone, with no week
+   * bound, because a week bound would hide the only rows that make the feature possible.
+   *
+   * Narrowed to the injury feed rather than left open. Every other player-level source in the store
+   * is a record of a game that has been played, and admitting them here without a week bound would
+   * be a second path for a result to reach a projection — the one failure this module exists to make
+   * impossible.
+   */
+  readonly news: readonly PlayerWeekObservation[];
 }
 
 export interface ProjectionSource {
@@ -255,7 +272,8 @@ async function replayWeeks(
       return points;
     };
 
-    const input: ProjectionInput = { season, week, asOf, history, usage, positions, teamContext };
+    const news = await observationsAsOf(db, { season, week, asOf, source: INJURY_SOURCE });
+    const input: ProjectionInput = { season, week, asOf, history, usage, positions, teamContext, news };
     const projected: ReadonlyMap<string, number>[] = [];
     for (const source of sources) {
       projected.push(asPoints(await source.project(input)));

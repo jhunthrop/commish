@@ -301,6 +301,10 @@ async function reportLineups(
       season,
       week,
       asOf,
+      // Empty for the same reason the team context is: the news pass arrived after these numbers
+      // were produced, it ships disabled, and a decision report that quietly used a different model
+      // from the one it documents would be worse than one that uses a slightly older model.
+      news: [],
       // EMPTY ON PURPOSE, and it is a measurement decision rather than a stub. Phase 3 made team
       // context a required input AFTER this harness produced the numbers in
       // `docs/research/2026-08-27-decision-quality.md`. Feeding it real context now would leave
@@ -392,6 +396,7 @@ async function main(): Promise<void> {
         season,
         week: 1,
         asOf: inputs.preseasonMoment,
+        news: [],
         // Empty for the same reason as above, and doubly honest here: at a preseason moment there
         // is no in-season team context to read yet.
         teamContext: emptyTeamContext,

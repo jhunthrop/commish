@@ -25,6 +25,9 @@ import { fitRedistributionPriors, type RedistributionPriors } from "@/projection
 import { fitGameContextPriors, type GameContextPriors } from "@/projections/model/context-fit";
 import { fitRedZonePriors, type RedZoneFitReport } from "@/projections/model/red-zone-fit";
 import { fitTargetDepthPriors, type TargetDepthFitReport } from "@/projections/model/target-depth-fit";
+import { fitNewsPriors, type NewsFitReport } from "@/projections/model/news-fit";
+import { observationsAsOf, type PlayerWeekObservation } from "@/projections/store";
+import { INJURY_SOURCE } from "@/projections/news/retrieve";
 import { projectedPosition } from "@/projections/nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "@/projections/team-store";
@@ -249,6 +252,40 @@ ${["QB", "RB", "WR", "TE", "K", "DEF"].map(rates).join("\n")}
 `;
 }
 
+function renderNews(report: NewsFitReport): string {
+  const effects = (fits: NewsFitReport["reportStatus"]) =>
+    fits
+      .map(
+        (fit) =>
+          `    "${fit.designation}": { multiplier: ${fit.multiplier.toFixed(6)}, confidence: ${fit.confidence.toFixed(6)} }, // measured ${fit.measured.toFixed(4)} over ${fit.playerWeeks} player-weeks`,
+      )
+      .join("\n");
+  return `/**
+ * PHASE 4 — WHAT A PUBLISHED DESIGNATION IS WORTH, measured against layer 1's own prediction.
+ *
+ * Everybody knows "Out" means no snaps. Nobody knows what "Questionable" means, and these are the
+ * measured answers: the fraction of the snaps layer 1 predicted that players carrying each
+ * designation actually took, over the fit seasons. A missing player-week counts as zero here and
+ * nowhere else in the engine — the injury report is filed for one game, so a player on it with no
+ * snap row did not play, and skipping him would fit on the injured players who turned out fine.
+ *
+ * The confidence is the evidence behind each number, not a feeling about it, and the contract in
+ * \`news/adjust.ts\` uses it to pull the multiplier toward doing nothing.
+ */
+export const FITTED_NEWS_PRIORS: NewsPriors = {
+  /** Game status: 1 Questionable, 2 Doubtful, 3 Out. */
+  reportStatus: {
+${effects(report.reportStatus)}
+  },
+  /** Practice participation, used only where no game status was published: 1 Full, 2 Limited, 3 Did not participate. */
+  practiceStatus: {
+${effects(report.practiceStatus)}
+  },
+  validityHours: ${report.priors.validityHours},
+};
+`;
+}
+
 function renderTargetDepth(report: TargetDepthFitReport): string {
   const priors = report.priors;
   const depth = (position: string) => `    ${position}: ${priors.league[position as Position].toFixed(6)},`;
@@ -286,6 +323,7 @@ function render(
   gameContext: GameContextPriors,
   redZone: RedZoneFitReport,
   targetDepth: TargetDepthFitReport,
+  news: NewsFitReport,
   generatedFrom: readonly number[],
 ): string {
   const { priors } = fit;
@@ -300,6 +338,7 @@ import type { GameContextPriors } from "./context-fit";
 import type { RedistributionPriors } from "./redistribution-fit";
 import type { RedZonePriors } from "../features/red-zone";
 import type { TargetDepthPriors } from "../features/target-depth";
+import type { NewsPriors } from "../news/adjust";
 import type { SchemePriors } from "./scheme-fit";
 
 /**
@@ -337,7 +376,8 @@ ${renderScheme(scheme)}
 ${renderRedistribution(redistribution)}
 ${renderGameContext(gameContext)}
 ${renderRedZone(redZone)}
-${renderTargetDepth(targetDepth)}`;
+${renderTargetDepth(targetDepth)}
+${renderNews(news)}`;
 }
 
 async function main(): Promise<void> {
@@ -455,9 +495,30 @@ async function main(): Promise<void> {
       `  receptions elasticity ${targetDepth.priors.receptionsElasticity.toFixed(4)}`,
   );
 
+  const injuries: PlayerWeekObservation[] = [];
+  for (const season of [...HISTORY_SEASONS, ...FIT_SEASONS]) {
+    injuries.push(
+      ...(await observationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FINAL, source: INJURY_SOURCE })),
+    );
+  }
+  const news = fitNewsPriors({
+    usage,
+    news: injuries,
+    positions,
+    opportunity: fit.priors,
+    seasons: [...FIT_SEASONS],
+    heldOut: [...HELD_OUT_SEASONS],
+  });
+  const designation = (name: string, fits: NewsFitReport["reportStatus"]) =>
+    fits.map((entry) => `  ${name} ${entry.designation}: x${entry.multiplier.toFixed(4)} (measured ${entry.measured.toFixed(4)}) confidence ${entry.confidence.toFixed(3)} over ${entry.playerWeeks} player-weeks`).join("\n");
+  console.log(
+    `\nnews pass, fitted on ${FIT_SEASONS.join(", ")} against layer 1's own prediction:\n` +
+      `${designation("report  ", news.reportStatus)}\n${designation("practice", news.practiceStatus)}`,
+  );
+
   writeFileSync(
     OUTPUT,
-    render(fit, efficiency, linePriors, schemePriors, redistributionPriors, gameContextPriors, redZone, targetDepth, FIT_SEASONS),
+    render(fit, efficiency, linePriors, schemePriors, redistributionPriors, gameContextPriors, redZone, targetDepth, news, FIT_SEASONS),
   );
   console.log(`\nwrote ${OUTPUT}`);
 

@@ -1,10 +1,10 @@
 import type { StatLine } from "@/domain/player";
 import type { ProjectionInput, ProjectionSource } from "../backtest";
 import { composeStatLine } from "./compose";
-import { contextualiseOpportunity, contextualiseRates, redistributeOpportunity, type ContextPriors } from "./context";
+import { applyNewsToOpportunity, contextualiseOpportunity, contextualiseRates, redistributeOpportunity, type ContextPriors } from "./context";
 import { predictRates, type EfficiencyPriors } from "./efficiency";
 import { SHIPPED_FEATURES, type FeatureFlags } from "./features";
-import { FITTED_EFFICIENCY_PRIORS, FITTED_LINE_PRIORS, FITTED_OPPORTUNITY_PRIORS, FITTED_GAME_CONTEXT_PRIORS, FITTED_REDISTRIBUTION_PRIORS, FITTED_RED_ZONE_PRIORS, FITTED_SCHEME_PRIORS, FITTED_TARGET_DEPTH_PRIORS } from "./fitted";
+import { FITTED_EFFICIENCY_PRIORS, FITTED_LINE_PRIORS, FITTED_OPPORTUNITY_PRIORS, FITTED_GAME_CONTEXT_PRIORS, FITTED_REDISTRIBUTION_PRIORS, FITTED_NEWS_PRIORS, FITTED_RED_ZONE_PRIORS, FITTED_SCHEME_PRIORS, FITTED_TARGET_DEPTH_PRIORS } from "./fitted";
 import { predictOpportunity, type OpportunityPriors } from "./opportunity";
 
 /**
@@ -47,6 +47,7 @@ export const FITTED_MODEL: ModelPriors = {
     gameContext: FITTED_GAME_CONTEXT_PRIORS,
     redZone: FITTED_RED_ZONE_PRIORS,
     targetDepth: FITTED_TARGET_DEPTH_PRIORS,
+    news: FITTED_NEWS_PRIORS,
   },
 };
 
@@ -58,9 +59,17 @@ export function modelProjection(
   const { season, week, history, usage, positions } = input;
   // Scheme sizes the pie, then redistribution decides who eats it. The other order would apply a
   // redistribution to a volume it was never measured against.
-  const opportunity = redistributeOpportunity(
-    contextualiseOpportunity(
-      predictOpportunity(usage, { season, week, positions }, priors.opportunity),
+  // Scheme sizes the pie, redistribution decides who eats it, and the news pass removes the men who
+  // are not at the table. Any other order would apply one of the three to a quantity it was never
+  // measured against.
+  const opportunity = applyNewsToOpportunity(
+    redistributeOpportunity(
+      contextualiseOpportunity(
+        predictOpportunity(usage, { season, week, positions }, priors.opportunity),
+        input,
+        features,
+        priors.context,
+      ),
       input,
       features,
       priors.context,

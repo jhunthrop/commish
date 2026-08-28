@@ -25,7 +25,7 @@ import { detectTransactions } from "@/projections/model/transactions";
 import { predictOpportunity } from "@/projections/model/opportunity";
 import type { ProjectionInput } from "@/projections/backtest";
 import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
-import { replayMomentsFor } from "@/projections/replay-moments";
+import { gameWeekMomentsFor, replayMomentsFor } from "@/projections/replay-moments";
 
 const LAST_REGULAR_WEEK = 18;
 
@@ -56,6 +56,7 @@ const VARIANTS: Readonly<Record<string, { readonly before: FeatureFlags; readonl
     after: { ...NO_FEATURES, targetDepth: true },
     label: "depth of target on the receiving rates",
   },
+  news: { before: NO_FEATURES, after: { ...NO_FEATURES, news: true }, label: "the news pass — bounded, cited, expiring" },
   all: { before: NO_FEATURES, after: ALL_FEATURES, label: "every feature group at once (headline, not an ablation)" },
   /** What the engine actually ships against model v1. The headline for the research document. */
   shipped: { before: NO_FEATURES, after: SHIPPED_FEATURES, label: "model v1 against everything that earned its place" },
@@ -153,11 +154,32 @@ async function reportShares(db: ReturnType<typeof createDb>, seasons: readonly n
   }
 }
 
+/**
+ * WHICH MOMENT OF THE WEEK A REPLAY IS MADE FROM, chosen by the operator.
+ *
+ * `results` is the standard one every Phase 3 number was measured at: the Tuesday, when the previous
+ * week's numbers landed. `game-week` is the latest a whole-week replay can honestly be made from,
+ * the morning of the week's first game. They answer different questions — a waiver decision and a
+ * start-and-sit — and the news pass is the first feature whose value depends on which is being
+ * asked, because it is the first one reading facts a publisher files during the week.
+ *
+ * Numbers from the two are NOT comparable to each other. Each ablation compares two arms at ONE
+ * moment, which is the comparison that means something.
+ */
+const MOMENTS = { results: replayMomentsFor, "game-week": gameWeekMomentsFor } as const;
+type MomentName = keyof typeof MOMENTS;
+
 async function main(): Promise<void> {
-  const feature = process.argv[2] ?? "all";
+  const argv = process.argv.slice(2).filter((argument) => !argument.startsWith("--at="));
+  const requested = (process.argv.find((argument) => argument.startsWith("--at=")) ?? "--at=results").slice("--at=".length);
+  if (!(requested in MOMENTS)) {
+    throw new Error(`Unknown replay moment "${requested}". Known moments: ${Object.keys(MOMENTS).join(", ")}.`);
+  }
+  const momentsFor = MOMENTS[requested as MomentName];
+  const feature = argv[0] ?? "all";
   if (feature === "shares") {
     const db = createDb(requireEnv("DATABASE_URL"));
-    const seasons = process.argv.slice(3).map(Number);
+    const seasons = argv.slice(1).map(Number);
     await reportShares(
       db,
       seasons.length > 0 ? seasons : [...HELD_OUT_SEASONS],
@@ -170,24 +192,24 @@ async function main(): Promise<void> {
   if (variant === undefined) {
     throw new Error(`Unknown feature group "${feature}". Known groups: ${Object.keys(VARIANTS).join(", ")}.`);
   }
-  const seasons = process.argv.slice(3).map(Number);
+  const seasons = argv.slice(1).map(Number);
   const targets = seasons.length > 0 ? seasons : [2024, 2023];
   // Only the redistribution feature has a situation narrow enough to need one, and it is the one
   // the founder named. Everything else is measured over everybody.
   const segment = feature === "redistribution" ? postTransactionSegment : undefined;
   if (targets.some((season) => !Number.isInteger(season))) {
-    throw new Error(`Seasons must be whole numbers; got ${process.argv.slice(3).join(", ")}.`);
+    throw new Error(`Seasons must be whole numbers; got ${argv.slice(1).join(", ")}.`);
   }
 
   const db = createDb(requireEnv("DATABASE_URL"));
   const weeks = Array.from({ length: LAST_REGULAR_WEEK }, (_, index) => index + 1);
 
   console.log(`ABLATION: ${variant.label}`);
-  console.log("  measured on seasons no fit has ever seen, like for like against the naive floor");
+  console.log(`  measured on seasons no fit has ever seen, like for like against the naive floor, at the ${requested} moment`);
   console.log(segment === undefined ? "" : "  RESTRICTED TO THE POST-TRANSACTION SEGMENT\n");
 
   for (const season of targets) {
-    const asOfForWeek = await replayMomentsFor(db, season);
+    const asOfForWeek = await momentsFor(db, season);
     const naive: ProjectionSource = {
       name: NAIVE_SOURCE_NAME,
       project: ({ history, season: replaySeason, week }) => naiveProjection(history, { season: replaySeason, week }),

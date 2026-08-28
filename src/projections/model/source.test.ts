@@ -120,6 +120,7 @@ describe("the model as a projection source", () => {
       asOf: REPLAY_MOMENT(3),
       history: [],
       usage: [],
+      news: [],
       positions: new Map(ROSTER),
       teamContext: emptyTeamContext,
     });
