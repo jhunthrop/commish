@@ -46,9 +46,43 @@ describe("ReconcileDriftPanel", () => {
     expect(status).toHaveTextContent("Drift");
     expect(status).toHaveTextContent("$0.00");
 
-    // Three real rows, not one prose sentence — and every value is mono.
+    // Three real figures, not one prose sentence — and every value is mono.
     const monoValues = status.querySelectorAll(".font-mono");
     expect(monoValues.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("gives drift the display scale, because it is the one number this tool exists to report", async () => {
+    // The spec withholds Gameday's drama from the operator surfaces and this is the single place
+    // it is spent on this page: an operator opens money reconciliation to learn whether the book
+    // agrees with the bank, and the answer used to render at the same 13px as the two figures it
+    // is derived FROM. The verdict rides beside it as a WORD, so a screen reader and a
+    // colourblind operator both get it — a green zero states nothing to either.
+    const fixture = fixtureAdminDeps({ ok: true, data: balancedReport });
+    renderInAdmin(<ReconcileDriftPanel />, fixture.deps);
+
+    const status = await screen.findByRole("status");
+    const drift = status.querySelector("[data-magnitude]");
+    expect(drift?.textContent).toContain("$0.00");
+    expect(drift?.querySelector(".text-display-lg")).not.toBeNull();
+    // Never tinted: a drift has no population to be judged against, so `Stat` resolves neutral.
+    expect(drift?.getAttribute("data-magnitude")).toBe("neutral");
+    expect(status).toHaveTextContent("Agrees");
+  });
+
+  it("names a non-zero drift as off the bank, in a word rather than only a colour", async () => {
+    const fixture = fixtureAdminDeps({ ok: true, data: { ...balancedReport, drift: -10_00 } });
+    renderInAdmin(<ReconcileDriftPanel />, fixture.deps);
+    expect(await screen.findByRole("status")).toHaveTextContent("Off the bank");
+  });
+
+  it("keeps Refresh quiet, because a re-read is not an act (law 5)", async () => {
+    // `bg-text-primary` is the ink pill's own fill and it belongs to ACTS. "Refresh" moves no
+    // money and decides nothing — it reruns the same GET — so this page ships with no ink action
+    // at all, which is the right answer for a tool whose whole job is to state a fact.
+    const fixture = fixtureAdminDeps({ ok: true, data: balancedReport });
+    renderInAdmin(<ReconcileDriftPanel />, fixture.deps);
+    await screen.findByRole("status");
+    expect(screen.getByRole("button", { name: "Refresh" }).className).not.toContain("bg-text-primary");
   });
 
   it("stamps the instant the report was received", async () => {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { PageTitle } from "@/components/ui";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { SettleLeagueControl } from "@/admin-room/components/settle-league-control";
+import { OperatorTool } from "@/admin-room/components/operator-tool";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
@@ -17,16 +17,12 @@ export const metadata: Metadata = pageTitle("Settle league");
 export default async function AdminSettleLeaguePage() {
   return withAdmin(async () => {
     return (
-      <>
-        <header className="flex flex-col gap-1">
-          <PageTitle>Settle league</PageTitle>
-          <p className="text-sm text-text-muted">
-            Pay a finished league&apos;s published prize table and close its escrow at zero. Winners with an open review get their payout held instead.
-          </p>
-        </header>
-
+      <OperatorTool
+        title="Settle league"
+        intent={"Pay a finished league's published prize table and close its escrow at zero. Winners with an open review get their payout held instead."}
+      >
         <SettleLeagueControl />
-      </>
+      </OperatorTool>
     );
   });
 }

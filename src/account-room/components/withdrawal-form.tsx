@@ -153,7 +153,15 @@ export function WithdrawalForm({ bankMethod }: WithdrawalFormProps) {
         )}
 
         <div>
-          <Button type="submit" loading={submitting} disabled={submitting}>
+          {/* GAMEDAY, LAW 1: *"money is also the fill of the verb, because pressing it is how
+              money moves."* Moving money in or out is the literal case that clause names, so both
+              of the wallet's money verbs take `verb` (the money fill) rather than the ink pill.
+              That is also what makes law 5 hold on the live wallet, which used to render THREE
+              ink pills at once — add, withdraw and verify — and force a reader to choose between
+              three loud things on the one surface where being sure matters most. The single ink
+              action left on the page is `KycPanel`'s, which is the one ceremonial act here: the
+              gate you pass once before any of this is available to you at all. */}
+          <Button type="submit" variant="verb" loading={submitting} disabled={submitting}>
             Withdraw
           </Button>
         </div>

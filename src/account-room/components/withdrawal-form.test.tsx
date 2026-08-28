@@ -103,4 +103,15 @@ describe("WithdrawalForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
     expect(await screen.findByText(MONEY_REFUSALS.withdrawalSettledInFull)).toBeInTheDocument();
   });
+
+  it("fills the money verb with money, leaving the wallet one ink action (laws 1 and 5)", () => {
+    // The mirror of `DepositForm`'s own assertion, and both are needed: law 5 is a count across a
+    // VIEW, so a single form passing on its own proves nothing — it is the pair that has to be
+    // quiet for the live wallet to carry one ink action. Law 1: "money is also the fill of the
+    // verb, because pressing it is how money moves."
+    renderInAccount(<WithdrawalForm bankMethod={BANK} />, fixtureAccountDeps().deps);
+    const button = screen.getByRole("button", { name: "Withdraw" });
+    expect(button.className).toContain("bg-accent");
+    expect(button.className).not.toContain("bg-text-primary");
+  });
 });

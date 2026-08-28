@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { PageTitle } from "@/components/ui";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { DissolveLeagueControl } from "@/admin-room/components/dissolve-league-control";
+import { OperatorTool } from "@/admin-room/components/operator-tool";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
@@ -19,16 +19,12 @@ export const metadata: Metadata = pageTitle("Dissolve league");
 export default async function AdminDissolveLeaguePage() {
   return withAdmin(async () => {
     return (
-      <>
-        <header className="flex flex-col gap-1">
-          <PageTitle>Dissolve league</PageTitle>
-          <p className="text-sm text-text-muted">
-            Close a league that did not fill before its draft. Every seated member is refunded their entry fee and told why.
-          </p>
-        </header>
-
+      <OperatorTool
+        title="Dissolve league"
+        intent={"Close a league that did not fill before its draft. Every seated member is refunded their entry fee and told why."}
+      >
         <DissolveLeagueControl />
-      </>
+      </OperatorTool>
     );
   });
 }

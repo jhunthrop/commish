@@ -32,16 +32,24 @@ async function liveWalletContent(userId: string): Promise<ReactNode> {
   const bankMethod = methods.find((descriptor) => descriptor.method === "bank");
   if (bankMethod === undefined) throw new Error('liveWalletContent: the payments provider named no "bank" method descriptor.');
 
+  // LAW 4 ON THE MONEY SURFACE: the balance is the column a reader keeps coming back to, so it
+  // stays put on the left while the four things you DO with money sit beside it, two per row.
+  // The old shape stacked five full-width rows, which put the balance off screen the moment a
+  // reader scrolled to the form that spends it.
   return (
-    <div className="flex flex-col gap-6">
-      <WalletPanel summary={summary} />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <DepositForm methods={methods} />
-        <WithdrawalForm bankMethod={bankMethod} />
+    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+      <div className="lg:sticky lg:top-4">
+        <WalletPanel summary={summary} />
       </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <KycPanel status={flags.kycStatus} />
-        <ExclusionPanel selfExcludedAt={flags.selfExcludedAt} />
+      <div className="flex flex-col gap-4 lg:col-span-2">
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+          <DepositForm methods={methods} />
+          <WithdrawalForm bankMethod={bankMethod} />
+        </div>
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+          <KycPanel status={flags.kycStatus} />
+          <ExclusionPanel selfExcludedAt={flags.selfExcludedAt} />
+        </div>
       </div>
     </div>
   );
@@ -70,12 +78,21 @@ export async function renderWalletContent(userId: string, live: boolean = moneyI
   if (!live) {
     // The dark season's honest page, composed rather than orphaned (self review D1/R1,
     // 2026-08-27): the one sentence stays the headline fact, the story below it is the
-    // free-season trust story said plainly, and the way out is real. Still no balance figure,
-    // no form, no broken control — dark means dark.
+    // free-season trust story said plainly, and the way out is real.
+    //
+    // GAMEDAY (law 4, and the spec's own dash rule) CHANGES ONE THING AND KEEPS THE CONTRACT.
+    // What shipped before was a single 655px panel stranded in the top-left of a 1440px page —
+    // 87% of the wallet was empty, on the surface a reader arrives at anxiously. The fix is NOT
+    // to invent a balance: `WalletPanel` renders the same four figures it will render when money
+    // is live, every one of them `NOT_STARTED_DASH`, because *"a dash is not a zero"* is the
+    // spec's own rule for a fact that has not happened yet. Still no form, no broken control, no
+    // invented number — dark still means dark. What a reader now learns is the SHAPE of the page
+    // they will read later, which is the honest thing a dormant money surface can teach.
     return (
-      <div className="flex max-w-prose flex-col gap-4">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        <WalletPanel summary={null} />
         <Panel title="Real-money play">
-          <div className="flex flex-col items-start gap-3">
+          <div className="flex max-w-prose flex-col items-start gap-3">
             <p className="text-sm text-text-primary">{DARK_WALLET_SENTENCE}</p>
             <p className="text-sm text-text-muted">
               When real-money leagues open, this page is where your balance lives: deposits, entry fees, winnings and
