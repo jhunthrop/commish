@@ -22,6 +22,21 @@ export interface StatComparison {
  */
 export type StatSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 
+/**
+ * Which way the number-over-label pairing runs.
+ *
+ * `stacked` is the shape the display scale exists for and stays the default: a huge number over a
+ * tiny label, which is where the ~10x of dynamic range actually gets spent.
+ *
+ * `inline` turns it on its side for a chip in a row — the fun pass's verdict chip ("+11 steal"),
+ * which has to be a `Stat` because `Stat` is the only file allowed to name a magnitude colour
+ * (`magnitude-budget.source.test.ts`), but renders in a dense pool row, a one-line pick wire and
+ * a tabular pick log, none of which have room for a stacked pairing. It renders a `<span>` rather
+ * than a `<div>` for the wire specifically: that band is a single truncating line of inline
+ * items, and a block-level chip inside it breaks the line box.
+ */
+export type StatOrientation = "stacked" | "inline";
+
 export interface StatProps {
   /** What the number is. Always announced, always on screen. */
   readonly label: string;
@@ -34,6 +49,7 @@ export interface StatProps {
   /** Omit and the number renders as ordinary ink. There is no other way to get a neutral. */
   readonly comparison?: StatComparison;
   readonly size?: StatSize;
+  readonly orientation?: StatOrientation;
   readonly className?: string;
 }
 
@@ -140,23 +156,31 @@ const SIZE_CLASS: Readonly<Record<StatSize, string>> = {
  * The population is stated to assistive tech in one sentence; a surface with room states it
  * visibly in its own column header, which is where a sports table has always put it.
  */
-export function Stat({ label, value, comparison, size = "md", className = "" }: StatProps) {
+export function Stat({ label, value, comparison, size = "md", orientation = "stacked", className = "" }: StatProps) {
   const step = magnitudeStep(comparison);
   const caret = MAGNITUDE_CARET[step];
+  const inline = orientation === "inline";
+  const Root = inline ? "span" : "div";
+  const number = (
+    // `items-baseline`: the caret sits on the number's own baseline at eyebrow size, so it
+    // annotates the value without competing with it at `display-xl`.
+    <span className={`flex items-baseline gap-1 font-display leading-display tabular-nums ${SIZE_CLASS[size]} ${MAGNITUDE_INK[step]} ${MAGNITUDE_WEIGHT[step]}`}>
+      {caret === null ? null : (
+        <span aria-hidden="true" className="text-xs">
+          {caret}
+        </span>
+      )}
+      <span>{value}</span>
+    </span>
+  );
+  const eyebrow = <span className={`${EYEBROW} text-text-faint`}>{label}</span>;
   return (
-    <div data-magnitude={step} className={`flex flex-col gap-1 ${className}`}>
-      <span className={`${EYEBROW} text-text-faint`}>{label}</span>
-      {/* `items-baseline`: the caret sits on the number's own baseline at eyebrow size, so it
-          annotates the value without competing with it at `display-xl`. */}
-      <span className={`flex items-baseline gap-1 font-display leading-display tabular-nums ${SIZE_CLASS[size]} ${MAGNITUDE_INK[step]} ${MAGNITUDE_WEIGHT[step]}`}>
-        {caret === null ? null : (
-          <span aria-hidden="true" className="text-xs">
-            {caret}
-          </span>
-        )}
-        <span>{value}</span>
-      </span>
+    // Inline reads value-then-label ("+11 steal"), which is the order the phrase is spoken in;
+    // stacked reads label-then-value, because a column header sits above its column.
+    <Root data-magnitude={step} className={`${inline ? "inline-flex items-baseline gap-1.5" : "flex flex-col gap-1"} ${className}`}>
+      {inline ? number : eyebrow}
+      {inline ? eyebrow : number}
       {isStated(comparison) ? <span className="sr-only">{comparisonSentence(comparison)}</span> : null}
-    </div>
+    </Root>
   );
 }

@@ -147,6 +147,46 @@ describe("Stat", () => {
     });
   });
 
+  /**
+   * THE INLINE ORIENTATION (the fun pass, Task 7). The verdict chip — "+11 steal" on a pick —
+   * is a magnitude-coloured number and therefore has to be a `Stat`: `Stat` is the only file in
+   * the product allowed to name a magnitude colour (`magnitude-budget.source.test.ts`), and that
+   * budget is what keeps green meaning "press this" everywhere else. But the surfaces it renders
+   * on are a dense pool row, a one-line pick wire and a tabular pick log, none of which have room
+   * for a stacked label above a number.
+   *
+   * So the pairing turns on its side rather than a second renderer appearing beside this one. It
+   * is a `<span>` in that orientation, deliberately: the pick wire is a single truncating line of
+   * inline items, and a block-level chip inside it would break the line box outright.
+   */
+  it("turns the label beside the number, as a span, for a chip in a row", async () => {
+    await renderSurface(<Stat label="steal" value="+11" size="sm" orientation="inline" comparison={RB_WEEK} />, ({ container, getByText }) => {
+      const root = container.querySelector("[data-magnitude]")!;
+      expect(root.tagName).toBe("SPAN");
+      expect(root.className).toContain("inline-flex");
+      expect(getByText("+11")).toBeInTheDocument();
+      expect(getByText("steal")).toBeInTheDocument();
+    });
+  });
+
+  it("keeps every channel in the inline orientation — the colourblind gate does not bend for a chip", async () => {
+    await renderSurface(<Stat label="steal" value="+11" size="sm" orientation="inline" comparison={{ ...RB_WEEK, percentile: 0.97 }} />, ({ container }) => {
+      const root = container.querySelector("[data-magnitude]")!;
+      expect(root.getAttribute("data-magnitude")).toBe("strong");
+      expect(root.textContent).toContain("▲");
+      expect(container.querySelector(".font-semibold")).not.toBeNull();
+      expect(container.innerHTML).toContain("text-mag-strong");
+    });
+  });
+
+  it("stays a stacked div by default, so no existing caller changes shape", async () => {
+    await renderSurface(<Stat label="Projection" value="14.2" />, ({ container }) => {
+      const root = container.querySelector("[data-magnitude]")!;
+      expect(root.tagName).toBe("DIV");
+      expect(root.className).toContain("flex-col");
+    });
+  });
+
   it("is axe-clean in both themes, coloured and uncoloured", async () => {
     await renderSurface(<Stat label="Projection" value="14.2" comparison={RB_WEEK} />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();

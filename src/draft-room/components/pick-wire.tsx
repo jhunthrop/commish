@@ -6,7 +6,9 @@ import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { PositionBadge } from "@/components/ui";
 import type { PositionBadgeSize } from "@/components/ui/position-badge";
 import { teamsById, teamName } from "../lib/lookups";
+import { verdictForPick, verdictPopulation } from "../lib/verdict";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
+import { VerdictChip } from "./verdict-chip";
 
 export type PickWireVariant = "room" | "tv";
 
@@ -14,6 +16,13 @@ export interface PickWireProps {
   readonly view: DraftStateView;
   readonly teams: readonly TeamCard[];
   readonly playersById: ReadonlyMap<string, Player>;
+  /**
+   * The pool's own ranked snapshot order, for the newest pick's verdict (Task 7). Required
+   * rather than derived from `playersById`: a `Map`'s insertion order happens to carry the same
+   * ranking today, and a board rank is far too load-bearing a fact to rest on that happening to
+   * stay true.
+   */
+  readonly players: readonly Player[];
   /** @default "room" */
   readonly variant?: PickWireVariant;
 }
@@ -69,9 +78,13 @@ function wireEntries(picks: readonly CompletedPick[], playersById: ReadonlyMap<s
  * on the very first pick, the exact reflow the room forbids. `data-testid="pick-wire"` always
  * renders at a fixed `h-8`; only its content is conditional on `view.picks` being nonempty.
  */
-export function PickWire({ view, teams, playersById, variant = "room" }: PickWireProps) {
+export function PickWire({ view, teams, playersById, players, variant = "room" }: PickWireProps) {
   const entries = wireEntries(view.picks, playersById);
   const teamsMap = teamsById(teams);
+  // Task 7: the verdict rides the NEWEST pick only. That item is already the one carrying ink
+  // (this band's own "one fact stands out" rule), it is the one that just happened, and a chip
+  // on all six would turn a quiet one-line history into a scoreboard the band has no width for.
+  const population = verdictPopulation(players, view.picks);
 
   return (
     <div
@@ -83,9 +96,18 @@ export function PickWire({ view, teams, playersById, variant = "room" }: PickWir
           {entries.map(({ pick, player }, index) => (
             <li key={pick.pickNumber} className="inline">
               {index > 0 ? <span aria-hidden="true"> · </span> : null}
-              {`#${pick.pickNumber} ${teamName(teamsMap, pick.teamId)} — `}
+              {/* A colon, not the em dash this band used to carry: the house copy rule bans both
+                  dash characters outright (`@/integrity/copy-rules`), and a wire item reads as a
+                  label and its value anyway. */}
+              {`#${pick.pickNumber} ${teamName(teamsMap, pick.teamId)}: `}
               <span className={index === 0 ? "font-semibold text-text-primary" : undefined}>{player.name}</span>{" "}
               <PositionBadge position={player.position} size={BADGE_SIZE[variant]} />
+              {index === 0 ? (
+                <>
+                  {" "}
+                  <VerdictChip verdict={verdictForPick(population, pick)} />
+                </>
+              ) : null}
             </li>
           ))}
         </ul>

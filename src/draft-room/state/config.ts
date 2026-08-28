@@ -30,6 +30,22 @@ export const DRAFT_ROOM_CONFIG = {
     near: "min-h-12 border-line",
   },
   /**
+   * THE VERDICT (the fun pass, Task 7 — `docs/design/2026-08-27-fun-pass-spec.md`).
+   *
+   * `evenBandPicks` is how far a pick may land from the player's own board rank, in either
+   * direction, and still be neither a steal nor a reach. Half a round in a twelve-team league:
+   * inside that, the board and the draft simply agree, and calling it a verdict would be
+   * manufacturing one.
+   *
+   * A tunable, never a literal in a component (`../lib/verdict` reads it and nothing else does):
+   * these picks ARE the difference between "a steal" and "a fine pick", and that judgement
+   * belongs somewhere a persona review can find it in one file rather than inside whichever
+   * surface rendered a chip first.
+   */
+  verdict: {
+    evenBandPicks: 6,
+  },
+  /**
    * `PickWire`'s own tunable (2026-08-26 design review, R1): how many of the draft's most
    * recent picks the band shows, newest first. One number, read by both the room's `text-xs`
    * band and the TV's `text-base` one, so a future retune never drifts between the two.

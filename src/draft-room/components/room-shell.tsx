@@ -121,7 +121,7 @@ export function RoomShell({
           {/* R1 (2026-08-26 design review): the room's own history, one quiet mono line above
               the board it never moves — same fixed-height reasoning as the notices slot above,
               just reserved unconditionally rather than only while something is speaking. */}
-          <PickWire view={view} teams={room.teams} playersById={playersById} />
+          <PickWire view={view} teams={room.teams} playersById={playersById} players={room.players} />
           <DraftBoard
             view={view}
             teams={room.teams}

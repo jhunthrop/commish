@@ -179,7 +179,7 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
             connection={room.connection}
             waiting={null}
           />
-          <PickWire view={room.view} teams={room.teams} playersById={playersById} />
+          <PickWire view={room.view} teams={room.teams} playersById={playersById} players={room.players} />
           <MockResults
             view={room.view}
             teams={room.teams}
