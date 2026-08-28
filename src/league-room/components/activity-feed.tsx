@@ -22,21 +22,33 @@ function ActivityRowItem({ row }: { readonly row: ActivityRow }) {
   // reader who may never have seen an autopick before.
   const isQueueAutopick = row.icon === "clock";
   return (
-    <li className="flex items-start gap-3 border-b border-line py-4 last:border-b-0">
-      <Icon name={row.icon} size={20} className="mt-0.5 shrink-0 text-text-muted" />
+    // GAMEDAY, LAW 4. This row was `py-4` around a three-line stack — icon, headline, detail, and
+    // the timestamp last, at the bottom of a block whose height depended on how long the sentence
+    // was. Three lines and 64px to say "You set your week 14 lineup", forty of them down a page,
+    // is a history you scroll rather than one you read. The stamp leads its own fixed column at
+    // `sm` and up, so the times line up and the sentences start together; below `sm` it drops
+    // back under the sentence, because a 40-character timestamp column on a 360px phone would
+    // leave the sentence nothing to live in.
+    <li className="flex flex-col gap-0.5 border-b border-line py-2 last:border-b-0 sm:flex-row sm:items-baseline sm:gap-3">
+      {/* The stamp gets its own fixed column at `sm` and up, so every timestamp in the feed
+          starts at the same x and a reader runs their eye down ONE column of times instead of
+          hunting for each at the end of a different-length sentence. Literal classes, never a
+          template: Tailwind's scanner reads source text, and a width built from a variable ships
+          no rule at all. */}
+      <time dateTime={row.occurredAt} className="order-last font-mono text-xs text-text-faint sm:order-first sm:w-40 sm:shrink-0">
+        {formatOccurredAt(row.occurredAt)}
+      </time>
+      <Icon name={row.icon} size={14} className="hidden shrink-0 self-center text-text-faint sm:block" />
       {/* `min-w-0` on the flex item plus `break-words` on the text: a headline carries user
           content (a league name, a manager's name, a team name) that can be one long unbroken
           run with nowhere to wrap, and a flex item will not shrink below its min-content width
           without this. Same pair, same reason, as `HomeLeagueCard`'s heading. */}
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <p className="text-md break-words text-text-primary">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <p className="break-words text-sm text-text-primary">
           {row.headline}
           {isQueueAutopick ? <InfoTip term="queue" className="ml-1" /> : null}
         </p>
         {row.detail === null ? null : <p className="break-words text-sm text-text-muted">{row.detail}</p>}
-        <time dateTime={row.occurredAt} className="text-xs text-text-muted">
-          {formatOccurredAt(row.occurredAt)}
-        </time>
       </div>
     </li>
   );

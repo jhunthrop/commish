@@ -520,6 +520,20 @@ export interface TradeRosterPlayer {
   readonly playerId: string;
   readonly name: string;
   readonly position: Position;
+  /**
+   * GAMEDAY, LAW 3, the same three fields the matchup and lineup wires carry. A trade is the one
+   * place in this product where a manager is comparing PEOPLE, and the card drew a position chip
+   * beside a string. These arrive from the SAME `matchupWeek` read this context is already built
+   * from (`rosterOf`, the trades page), so they cost nothing beyond three fields on a shape that
+   * was already crossing the boundary.
+   *
+   * NOT folded into `ValuedPlayer` (`@/trades/fairness`), which is the fairness engine's own
+   * currency type: a headshot is not a valuation input, and widening a domain type so a card can
+   * draw a face is how a display concern ends up inside a collusion sweep.
+   */
+  readonly nflTeam: string;
+  readonly headshotUrl: string | null;
+  readonly adp: number | null;
 }
 
 /** One team a manager could open a trade with: enough to fill the composer's counterparty `Select`. */

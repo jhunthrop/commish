@@ -129,6 +129,17 @@ export interface OpenLeagueShelfProps {
    *  and `/browse` is the full, filterable lobby. */
   readonly filters?: ReactNode;
   /**
+   * A quiet control that belongs on the shelf's own head line — `/browse`'s practice invitation
+   * today, and nothing else so far.
+   *
+   * IT IS A SLOT BECAUSE OF HEADING ORDER, not for flexibility. `/browse` used to render this
+   * control as a SIBLING ABOVE the shelf, which put an interactive element ahead of the page's
+   * only `<h1>` — a real heading-order defect the page audit gates on, and one no amount of care
+   * inside this component could fix while the control lived outside it. Rendered here it is
+   * structurally incapable of preceding the heading, whatever a future caller does.
+   */
+  readonly aside?: ReactNode;
+  /**
    * 2026-08-25 founder finding, controller-ruled: true when the hero band's own "Next draft"
    * module (`NextDraftModule`) already renders this shelf's featured league — `page.tsx` derives
    * that league from the SAME `featuredFillingLeague` this component would otherwise call, so
@@ -191,6 +202,7 @@ export function OpenLeagueShelf({
   headingLevel = 2,
   intro,
   filters,
+  aside,
   featuredInHero = false,
   live = moneyIsLive(),
 }: OpenLeagueShelfProps) {
@@ -206,22 +218,38 @@ export function OpenLeagueShelf({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2">
         <Heading className="min-w-0 [overflow-wrap:anywhere] font-display text-2xl font-semibold leading-display text-text-primary">
           Open leagues
         </Heading>
-        <p className="text-sm text-text-muted">{seatCountsAsOfSentence(asOfTime)}</p>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+          <p className="text-sm text-text-muted">{seatCountsAsOfSentence(asOfTime)}</p>
+          {aside}
+        </div>
       </div>
 
-      {/* F2 kept, collapsed (Task 13): ONE full-row muted sentence, never a stack. Rendered only
-          while the factory actually has leagues on the shelf — an unreconciled database never
-          prints a promise about leagues that are not there. The `InfoTip` keeps the glossary
-          definition one press away exactly as the legend line advertises, and deliberately does
-          NOT take this surface's `helpLevel`: its guided caption was the stacked duplicate the
-          founder cut, so here the trigger stays click-only for everyone. */}
-      {house.length > 0 ? (
+      {/* F2 kept, collapsed (Task 13) and collapsed AGAIN (Gameday): ONE full-row muted sentence,
+          never a stack. The founder cut the shelf head from three stacked explainer sentences to
+          one on 2026-08-24, and it had drifted back to three — the house promise, the page's own
+          lede, and the legend line, in three separate paragraphs above the first league. The house
+          promise and the legend are the same KIND of thing (quiet guidance about how to read the
+          shelf), so they are one line with one separator; the page's `intro` stays its own
+          paragraph because it carries a real link a visitor acts on, which is a different kind.
+
+          Rendered only while the factory actually has leagues on the shelf — an unreconciled
+          database never prints a promise about leagues that are not there. The `InfoTip` keeps the
+          glossary definition one press away exactly as the legend advertises, and deliberately
+          does NOT take this surface's `helpLevel`: its guided caption was the stacked duplicate
+          the founder cut, so here the trigger stays click-only for everyone. */}
+      {house.length > 0 || merged.length > 0 ? (
         <p className="max-w-prose text-sm text-text-muted">
-          {HOUSE_SHELF_SENTENCE} <InfoTip term="house-league" />
+          {house.length > 0 ? (
+            <>
+              {HOUSE_SHELF_SENTENCE} <InfoTip term="house-league" />
+              {merged.length > 0 ? " · " : null}
+            </>
+          ) : null}
+          {merged.length > 0 ? OPEN_LEAGUE_LEGEND : null}
         </p>
       ) : null}
 
@@ -230,7 +258,6 @@ export function OpenLeagueShelf({
 
       {merged.length > 0 ? (
         <>
-          <p className="text-sm text-text-muted">{OPEN_LEAGUE_LEGEND}</p>
           {/* Task 13 (FOUNDER-ORDERED): on lg+ the shelf is a hairline-separated ROW stack —
               horizontal rows, one league each, under one eyebrow column header — because a grid
               of cards gave the eye nowhere to land. The `data-testid="member-league"` scoping

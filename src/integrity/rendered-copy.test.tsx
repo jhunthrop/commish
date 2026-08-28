@@ -45,6 +45,7 @@ import { ThemeSwitcher } from "@/account-room/components/theme-switcher";
 import { ThemeProvider } from "@/design/theme-provider";
 import type { ReviewsPage, ReviewView } from "@/reviews/contract";
 import { Crest } from "@/components/ui/crest";
+import { NOT_STARTED_DASH } from "@/components/ui";
 import { Meter } from "@/components/ui/meter";
 import { Panel } from "@/components/ui/panel";
 import { SeatMeter } from "@/components/ui/seat-meter";
@@ -778,8 +779,8 @@ const TRADE_CONTEXT: TradeRoomContext = {
   myTeamId: "me",
   counterparties: [{ teamId: "them", teamName: "Iron Owls" }],
   rostersByTeamId: {
-    me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" }],
-    them: [{ playerId: "p2", name: "Puka Nacua", position: "WR" }],
+    me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB", nflTeam: "ATL", headshotUrl: null, adp: null }],
+    them: [{ playerId: "p2", name: "Puka Nacua", position: "WR", nflTeam: "ATL", headshotUrl: null, adp: null }],
   },
   leagueName: "Sunday Money",
 };
@@ -1170,6 +1171,17 @@ describe("LeagueHome says nothing that breaks the house copy rules, including ev
         home.terms.commissionerName,
         ...home.teams.map((team) => team.name),
         ...home.teams.map((team) => team.ownerDisplayName),
+        // NOT_STARTED_DASH, subtracted for the same reason a league's own name is: it is DATA
+        // handed to the surface, not copy the surface wrote. Gameday's week band renders the
+        // shared `Scoreboard`, whose projected-final slot has no number to print — no weekly
+        // per-player projection reaches the league layer — so it prints the product's one glyph
+        // for "there is no number yet". `game-state-chip.tsx`'s own docblock is where that ruling
+        // lives: *"the em-dash here is DATA, not copy — the product's no-em-dashes-in-prose rule
+        // is about sentences a manager reads, and this is the absence of a number in a numeric
+        // column."* The rule engine is untouched and every SENTENCE on this page is still swept;
+        // what is excluded is two characters standing where two numbers will stand.
+        NOT_STARTED_DASH,
+        NOT_STARTED_DASH,
       );
       unmount();
     }
