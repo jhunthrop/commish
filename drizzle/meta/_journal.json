@@ -351,6 +351,13 @@
       "when": 1787919980738,
       "tag": "0049_rapid_jazinda",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1787925872694,
+      "tag": "0050_nostalgic_titania",
+      "breakpoints": true
     }
   ]
 }

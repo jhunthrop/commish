@@ -1,0 +1,136 @@
+import { and, asc, desc, eq, lte } from "drizzle-orm";
+import type { Db, ReadonlyDb } from "@/db/client";
+import { preseasonRankings, preseasonRosters } from "@/db/schema";
+import type { PreseasonRosterEntry, RosterStatus } from "../nflverse/rosters";
+
+/**
+ * THE PRESEASON HALF OF THE POINT-IN-TIME STORE — the same discipline as `store.ts`, over the two
+ * kinds of fact that exist before a season rather than during one.
+ *
+ * Both readers carry the `as_of <=` predicate for the same reason every read in this engine does:
+ * a board for 2023 must be unable to reach a 2024 file, and the only thing standing between those
+ * two is the gate. The preseason case is the DANGEROUS one — offseason data is messy, most of it
+ * arrives in one undated dump, and a roster or a consensus ranking that quietly carried today's
+ * date would make a backtest look like clairvoyance.
+ *
+ * Nothing here interprets. `availability.ts` decides what a reserve designation means and
+ * `rookies.ts` decides what a draft pick implies; this module only decides what was knowable when.
+ */
+
+const INSERT_CHUNK_ROWS = 2_000;
+
+/** One man's week-one roster row, as it was known at a moment. */
+export interface PreseasonRosterRow {
+  readonly season: number;
+  readonly team: string;
+  readonly playerId: string;
+  readonly position: string;
+  readonly status: RosterStatus;
+  readonly birthDate: string | null;
+  readonly draftYear: number | null;
+  readonly draftPick: number | null;
+  readonly draftClub: string | null;
+  readonly asOf: Date;
+}
+
+/** One source's published ranking of one player before one season. */
+export interface PreseasonRankingRow {
+  readonly season: number;
+  /** `ffc_adp_ppr_12`, `fantasypros_ecr_ppr`. */
+  readonly source: string;
+  readonly playerId: string;
+  /** Lower is better, in whatever unit the source publishes. */
+  readonly rank: number;
+  readonly asOf: Date;
+}
+
+/**
+ * Writes week-one rosters, idempotently, returning how many rows were ACTUALLY new.
+ *
+ * `onConflictDoNothing` and never `DoUpdate`, matching `recordObservations`: a roster as it stood at
+ * a stated moment is immutable. A corrected file says something different at a LATER moment, which
+ * is a new row and a new stamp, not an overwrite of the old belief.
+ */
+export async function recordPreseasonRosters(db: Db, rows: readonly PreseasonRosterEntry[]): Promise<number> {
+  let written = 0;
+  for (let start = 0; start < rows.length; start += INSERT_CHUNK_ROWS) {
+    const chunk = rows.slice(start, start + INSERT_CHUNK_ROWS).map((row) => ({ ...row }));
+    const inserted = await db
+      .insert(preseasonRosters)
+      .values(chunk)
+      .onConflictDoNothing()
+      .returning({ id: preseasonRosters.id });
+    written += inserted.length;
+  }
+  return written;
+}
+
+export async function recordPreseasonRankings(db: Db, rows: readonly PreseasonRankingRow[]): Promise<number> {
+  let written = 0;
+  for (let start = 0; start < rows.length; start += INSERT_CHUNK_ROWS) {
+    const chunk = rows.slice(start, start + INSERT_CHUNK_ROWS).map((row) => ({ ...row }));
+    const inserted = await db
+      .insert(preseasonRankings)
+      .values(chunk)
+      .onConflictDoNothing()
+      .returning({ id: preseasonRankings.id });
+    written += inserted.length;
+  }
+  return written;
+}
+
+/**
+ * The week-one roster for a season as it was knowable at `asOf`, one row per player.
+ *
+ * `DISTINCT ON (player_id)` ordered by descending `as_of` picks the latest statement at or before
+ * the moment, exactly as `observationsAsOf` does. Ordering is by player id so a board built from
+ * this is reproducible run to run — the same requirement rank correlation puts on every read in the
+ * engine, since tie ordering moves the number.
+ */
+export async function preseasonRostersAsOf(
+  db: ReadonlyDb,
+  { season, asOf }: { readonly season: number; readonly asOf: Date },
+): Promise<readonly PreseasonRosterRow[]> {
+  const rows = await db
+    .selectDistinctOn([preseasonRosters.playerId], {
+      season: preseasonRosters.season,
+      team: preseasonRosters.team,
+      playerId: preseasonRosters.playerId,
+      position: preseasonRosters.position,
+      status: preseasonRosters.status,
+      birthDate: preseasonRosters.birthDate,
+      draftYear: preseasonRosters.draftYear,
+      draftPick: preseasonRosters.draftPick,
+      draftClub: preseasonRosters.draftClub,
+      asOf: preseasonRosters.asOf,
+    })
+    .from(preseasonRosters)
+    .where(and(eq(preseasonRosters.season, season), lte(preseasonRosters.asOf, asOf)))
+    .orderBy(asc(preseasonRosters.playerId), desc(preseasonRosters.asOf));
+  return rows.map((row) => ({ ...row, status: row.status as RosterStatus }));
+}
+
+/** One source's whole published board for a season, as it was knowable at `asOf`. */
+export async function preseasonRankingsAsOf(
+  db: ReadonlyDb,
+  { season, source, asOf }: { readonly season: number; readonly source: string; readonly asOf: Date },
+): Promise<readonly PreseasonRankingRow[]> {
+  const rows = await db
+    .selectDistinctOn([preseasonRankings.playerId], {
+      season: preseasonRankings.season,
+      source: preseasonRankings.source,
+      playerId: preseasonRankings.playerId,
+      rank: preseasonRankings.rank,
+      asOf: preseasonRankings.asOf,
+    })
+    .from(preseasonRankings)
+    .where(
+      and(
+        eq(preseasonRankings.season, season),
+        eq(preseasonRankings.source, source),
+        lte(preseasonRankings.asOf, asOf),
+      ),
+    )
+    .orderBy(asc(preseasonRankings.playerId), desc(preseasonRankings.asOf));
+  return rows;
+}

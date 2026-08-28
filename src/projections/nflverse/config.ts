@@ -28,13 +28,21 @@ export const NFLVERSE_CONFIG = {
      */
     players: "players",
     /**
+    /**
      * THE OFFICIAL INJURY REPORT, back to 2009, with the league's own filing timestamp on every row.
      *
-     * The one feed here whose facts become knowable BEFORE the game they describe, which is what
-     * makes a news pass possible at all. Every other source in this adapter is a record of something
-     * that has already happened.
+     * One of only two sources here whose facts become knowable BEFORE the game they describe, which
+     * is what makes a news pass possible at all. Everything else in this adapter is a record of
+     * something that already happened.
      */
     injuries: "injuries",
+    /**
+     * WEEK-ONE ROSTERS — the only source whose facts predate the SEASON they describe. Cutdown to
+     * fifty-three is a league-wide deadline in late August, so a week-1 roster is knowable before
+     * the opener, and it is the only way a preseason board can know that a receiver changed teams
+     * in March. See `rosters.ts` for what is deliberately discarded.
+     */
+    weeklyRosters: "weekly_rosters",
   },
   /** Asset names. Only the universe's is fixed; the other two carry a season. */
   files: {

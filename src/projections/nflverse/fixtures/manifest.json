@@ -20,6 +20,12 @@
       "release": "player_stats",
       "asset": "stats_player_week_2024.csv",
       "filtered": "season=2024, season_type=REG, week in 1..3, team=BUF"
+    },
+    {
+      "file": "roster_weekly_2024_buf_w1.csv",
+      "release": "weekly_rosters",
+      "asset": "roster_weekly_2024.csv",
+      "filtered": "season=2024, week=1, team=BUF. Week one only, because week one is the only weekly roster whose knowable-before-the-opener claim is true (the league's cutdown to fifty-three is a deadline in late August) and the only one `preseason_rosters` stores. The slice keeps every status the release emits for one club, so the coarsening in `rosterStatusOf` has an active list, a reserve list, a practice squad and a cut list to be tested against rather than only the happy path."
     }
   ]
 }
