@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { ButtonLink } from "@/components/ui";
-import { UI_CONFIG } from "@/components/ui/config";
+import { MICRO_LABEL, UI_CONFIG } from "@/components/ui/config";
 import { PublicBar, STOREFRONT_NAV, type NavLink } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import type { HelpLevel } from "@/identity/preferences";
@@ -180,21 +179,38 @@ export default async function Home() {
               See every open league
             </ButtonLink>
           </div>
+        </section>
 
-          {/* The gauntlet's MEDIUM, re-framed by rule 4 (hairlines, not boxes): "Start your own"
-              keeps its own row below the shelf it is not competing with, structured by a thin
-              rule and space rather than the bordered card it used to wear. Copy unchanged. */}
-          <div className="flex flex-col items-start gap-2 border-t border-line pt-6">
-            <h3 className="font-display text-lg font-semibold leading-display text-text-primary">Start your own league</h3>
-            <p className="max-w-prose text-sm text-text-muted">
-              Your rules, your people. The platform still runs the chores: the draft room, the
-              schedule, and the scoring. Snake or auction, any scoring preset, private or public.
-            </p>
-            {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
-                first rather than an error, exactly like the shelf's own identical link. */}
-            <Link href="/app#create-league" className="text-sm font-medium text-accent underline">
+        {/*
+          THE CLOSING BAND (Gameday, 2026-08-28). The gauntlet's MEDIUM put "Start your own" in a
+          row below the shelf, structured by a hairline instead of the bordered card it used to
+          wear, and that was right about the box and wrong about the weight: an `h3` at `text-lg`
+          with an underlined text link under it is how the last thing a stranger reads on the
+          storefront ended up being the quietest thing on the page. Copy is UNCHANGED — what moved
+          is that it is a real band on its own ground (the shelf's own last row is a hairline away,
+          and two hairlines a few pixels apart read as a rendering accident), the heading takes a
+          display size, and the way in is the same quiet pill the shelf's own doorway uses rather
+          than a third spelling of "a link that is really a button".
+
+          Still quiet, deliberately: this page's one ink action belongs to the seat (E2), and a
+          commissioner recruiting their own group is not the visitor this door is built for.
+
+          `/app` is auth-gated by `middleware.ts`, so a signed-out visitor lands at sign-in first
+          rather than an error, exactly like the shelf's own identical link.
+        */}
+        <section className="w-full border-t border-line bg-surface-elevated">
+          <div className="flex w-full flex-col gap-6 px-4 py-10 sm:px-10 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex max-w-prose flex-col gap-2">
+              <p className={`${MICRO_LABEL} text-text-faint`}>Your own group</p>
+              <h2 className="font-display text-display-md font-semibold leading-display text-text-primary">Start your own league</h2>
+              <p className="text-text-muted">
+                Your rules, your people. The platform still runs the chores: the draft room, the
+                schedule, and the scoring. Snake or auction, any scoring preset, private or public.
+              </p>
+            </div>
+            <ButtonLink href="/app#create-league" variant="secondary" className="shrink-0">
               Create a league
-            </Link>
+            </ButtonLink>
           </div>
         </section>
       </main>
