@@ -137,3 +137,73 @@ Two smaller findings from the same measurement, both now fixed and tested:
   coherence check caught it: one player, two different snap counts, one week. `resolveAll` now
   refuses both when a shared player id is claimed by two different names, and lets the strictest
   matching rule win when only the loose one collides.
+
+---
+
+## Phase 2 addendum: the historical universe, and the backfill it made possible
+
+**Measured 2026-08-27, after Phase 2 Task 1.** Reproduce with `npm run projections:backfill 2020 2024`.
+Everything above this line is Phase 1's measurement and is left exactly as it was recorded.
+
+The fix the section above named — "resolve against a *historical* player universe rather than
+today's roster" — is done. nflverse publishes a `players` release covering everyone back to 1999
+with the NFL's own `gsis_id` and Pro Football Reference's `pfr_id`, and both files we ingest already
+carry one of those. Identity is now an **id join**: `stats_player_week` on `gsis_id`,
+`snap_counts` on `pfr_id`, cross-referenced through the release. The name join is deleted.
+
+### Resolution, per season, over distinct skill-position people
+
+| season | participation | weekly stats | before (name join) |
+|---|---|---|---|
+| 2020 | 99.7% | 100.0% | not measured |
+| 2021 | 99.9% | 100.0% | not measured |
+| 2022 | 99.8% | 100.0% | not measured |
+| 2023 | 99.8% | 100.0% | 87.1% / 89.2% |
+| 2024 | 99.5% | 100.0% | 98.1% / 99.0% |
+
+**The decay going backwards is gone.** 2020 now resolves better than 2024 did under the name join,
+and the ten-point-per-season slide that made a deep backfill worthless has no mechanism left: an id
+does not retire. Weekly stats resolve completely in every season, because the file's own
+`player_id` IS the universe's key — there is nothing left to miss.
+
+What remains unresolved is a handful of practice-squad call-ups the players release genuinely does
+not carry (Cody White, Rodney Williams, John Lovett, John Samuel Shenker). They are reported by name
+and count rather than dropped, for the reason Phase 1 gave: an absent player is otherwise
+indistinguishable from one who did not play.
+
+### What is in the store
+
+| season | observations |
+|---|---|
+| 2020 | 128,886 |
+| 2021 | 137,064 |
+| 2022 | 135,392 |
+| 2023 | 135,548 |
+| 2024 | 136,428 |
+| **total** | **673,318** |
+
+Plus 25,064 people in `nfl_players`, the universe itself. Per season that is roughly 6,840
+participation rows and 5,840 stat lines, carrying twenty-two metrics per player-week: the fourteen
+`StatLine` fields, plus four opportunity numerators (snaps, targets, carries, pass attempts) and
+their four team denominators.
+
+**Team totals ride on each player's own row** rather than in a table of their own, because the store
+has no team column. That is deliberate and it is worth more than the column would be: a player
+traded in October carries his new offence's volume with him automatically, and a team-keyed table
+would get exactly those players wrong — the ones a model most needs to be right about.
+
+### Why five seasons and not six
+
+`stats_player_week_2019.csv` is **not published**. The `player_stats` release carries every season
+from 1999 to 2024 under that name except 2002 and 2019. The legacy `player_stats_2019.csv` exists
+but has a different schema (53 columns against 114, with `recent_team` for `team` and
+`interceptions` for `passing_interceptions`), and translating between the two would put a
+hand-written column mapping in the one place the engine cannot afford a silent mistake. Five seasons
+is the plan's own floor — enough to fit on three and hold two entirely out — so the honest answer
+was to take the five and say why, rather than to build a schema adapter nobody can test.
+
+### What this does NOT fix
+
+`nfl_players` is deliberately not linked to `players`. The engine models NFL players; mapping those
+onto the roster the product drafts from is a separate concern, and whichever phase first renders a
+projection to a manager owns it. Until then there is no seam to keep honest.

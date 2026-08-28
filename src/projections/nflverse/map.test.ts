@@ -74,6 +74,24 @@ describe("mapParticipation", () => {
     expect(participation.filter((row) => row.playerId === ALLEN)).toHaveLength(3);
   });
 
+  it("reads the other two opportunity numerators — carries and pass attempts", () => {
+    expect(participationFor(COOK, 1)?.carries).toBe(19);
+    expect(participationFor(ALLEN, 3)?.passAttempts).toBe(30);
+    expect(participationFor(SHAKIR, 3)?.carries).toBe(0);
+  });
+
+  it("carries the team denominator for every share, not just for snaps", () => {
+    // A share needs its own denominator. Team totals ride on each player's row rather than living
+    // in a table of their own because the store has no team column — and that is a feature, not a
+    // gap: a player traded midseason takes his new team's volume with him automatically, which a
+    // team-keyed table would get wrong for exactly the players a model most needs to be right about.
+    const cook = participationFor(COOK, 1)!;
+    expect(cook.teamTargets).toBe(23);
+    expect(cook.teamCarries).toBe(33);
+    expect(cook.teamPassAttempts).toBe(23);
+    expect(participationFor(SHAKIR, 3)?.teamTargets).toBe(30);
+  });
+
   it("reports routes run as null rather than zero — nflverse does not publish it", () => {
     expect(participationFor(SHAKIR, 1)?.routesRun).toBeNull();
   });
@@ -136,6 +154,11 @@ describe("participationObservations", () => {
         }),
         expect.objectContaining({ metric: "team_offensive_snaps", value: 64 }),
         expect.objectContaining({ metric: "targets", value: 6 }),
+        expect.objectContaining({ metric: "team_targets", value: 30 }),
+        expect.objectContaining({ metric: "carries", value: 0 }),
+        expect.objectContaining({ metric: "team_carries", value: 29 }),
+        expect.objectContaining({ metric: "pass_attempts", value: 0 }),
+        expect.objectContaining({ metric: "team_pass_attempts", value: 31 }),
       ]),
     );
   });
