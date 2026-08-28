@@ -1,7 +1,16 @@
 import type { HTMLAttributes } from "react";
 
+/** How much room a card gives its contents. `comfortable` is the default panel-sized card;
+ *  `compact` is a card that is also a ROW in a dense list — the draft room's player pool, sixty
+ *  of them in a 320px rail, where the panel's own padding would fit eight. Longhand `px`/`py`
+ *  rather than a second `p-*`: Tailwind emits the shorthand before the longhands, so this
+ *  reliably overrides `BASE`'s padding instead of racing it in the stylesheet. */
+export type CardPadding = "comfortable" | "compact";
+
 export interface CardProps extends HTMLAttributes<HTMLElement> {
-  readonly as?: "div" | "section" | "article";
+  /** `li` is here for a list of cards — a `<ul>`/`<ol>` may only contain `<li>` children, so a
+   *  card that IS a list row has to be able to be one rather than sit inside a second wrapper. */
+  readonly as?: "div" | "section" | "article" | "li";
   /**
    * RULE 4'S AMENDED TEST, in code (`docs/design/2026-08-27-fun-pass-spec.md`, founder-approved
    * 2026-08-27): **a thing you act on or compare against its neighbours may be a card; a thing
@@ -14,6 +23,8 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
    * click target the view's one-ink-action law (rule 5) never counted.
    */
   readonly interactive?: boolean;
+  /** @default "comfortable" */
+  readonly padding?: CardPadding;
 }
 
 /**
@@ -33,10 +44,15 @@ const INTERACTIVE = "transition-colors hover:bg-surface-raised focus-within:bg-s
 
 const BASE = "rounded-lg border border-line bg-surface-elevated p-4 shadow-card";
 
-export function Card({ as: Tag = "div", interactive = false, className = "", children, ...rest }: CardProps) {
+const PADDING: Readonly<Record<CardPadding, string>> = {
+  comfortable: "",
+  compact: "px-2 py-1.5",
+};
+
+export function Card({ as: Tag = "div", interactive = false, padding = "comfortable", className = "", children, ...rest }: CardProps) {
   // Joined from the non-empty fragments rather than interpolated: a `${cond ? x : ""}` slot
   // leaves a double space in the rendered `class` attribute on every quiet card in the product.
-  const classes = [BASE, interactive ? INTERACTIVE : "", className].filter((part) => part !== "").join(" ");
+  const classes = [BASE, PADDING[padding], interactive ? INTERACTIVE : "", className].filter((part) => part !== "").join(" ");
   return (
     <Tag className={classes} {...rest}>
       {children}

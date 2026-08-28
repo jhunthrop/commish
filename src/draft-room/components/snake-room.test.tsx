@@ -108,14 +108,27 @@ describe("SnakeRoom", () => {
     expect(onAct).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "qb1" });
   });
 
-  // D3 (2026-08-26 design review, rule 5): the room's peak state — you on the clock, a full
-  // pool — is exactly when the one-ink law matters most. The dock's confirmed pick affordance
-  // is the ONE ink pill; sixty pool rows beside it stay quiet. Counted on the rendered room,
-  // not one component, so a future call site can't quietly reintroduce a second pill.
-  it("shows at most one ink pill in the whole room, even on your turn (D3, rule 5)", () => {
+  /**
+   * RULE 5'S NAMED EXCEPTION (the fun pass, 2026-08-27 — `docs/design-system.md`, "The fun-pass
+   * amendments"). This test used to assert at most ONE ink pill in the whole room, on D3's
+   * 2026-08-26 reading that the one-ink law bound here. It does not any more: rule 5 now holds
+   * everywhere *except surfaces whose entire purpose is repeated action*, and the draft room is
+   * the first surface the amendment names. A room where the act lives on the row you are already
+   * looking at, rather than in a dock you have to find, is the point of the exception.
+   *
+   * What is still checked, and is what actually keeps the exception from becoming a general
+   * relaxation: the ink belongs to ACTS ONLY. Every filter, every toggle, every way out stays
+   * quiet, and `e2e/page-audit.spec.ts` keeps enforcing the unamended rule on every route it
+   * audits — the draft room is deliberately not one of them, and that list does not change.
+   */
+  it("gives ink to the acts and to nothing else, on your turn (rule 5's named exception)", () => {
     const { container } = renderRoom();
     expect(screen.getByRole("button", { name: "Draft Marcus Reed" })).toBeInTheDocument();
-    expect(container.querySelectorAll(".bg-text-primary").length).toBeLessThanOrEqual(1);
+    const ink = [...container.querySelectorAll(".bg-text-primary")];
+    expect(ink.length).toBeGreaterThan(1);
+    for (const pill of ink) {
+      expect(pill.textContent ?? "").toMatch(/Draft|Confirm/);
+    }
   });
 
   // D2 (2026-08-26 design review): every landing pick used to shove the whole board ~64px

@@ -159,19 +159,125 @@ describe("PlayerPool", () => {
     expect(onAct).toHaveBeenCalledWith("qb1");
   });
 
-  // D3 (2026-08-26 design review, rule 5): on your turn the pool used to fill the view with
-  // up to sixty solid ink "Draft" pills against a one-ink law — the row act button, the "All"
-  // filter and the empty-state button all took `Button`'s default primary. The pool is now
-  // quiet by construction: the dock's one confirmed pick affordance is the room's single ink
-  // action, and nothing in this component may ever wear the ink fill.
-  it("keeps every pool control quiet — no ink pill ever renders here, even on your turn (D3)", () => {
+  /**
+   * THE INK MOVED (the fun pass, Task 8). This test used to be "keeps every pool control quiet —
+   * no ink pill ever renders here, even on your turn (D3)". D3 (2026-08-26) read rule 5 as
+   * binding on this surface and made the row's own act button `secondary` so it would not shout
+   * over the dock. Rule 5 was amended on 2026-08-27 (`docs/design-system.md`, "The fun-pass
+   * amendments") to hold everywhere EXCEPT surfaces whose entire purpose is repeated action, and
+   * the draft room is the first surface it names. The row is where a manager drafts, so the row
+   * is where the ink goes.
+   *
+   * What did NOT change, and is what the second half still pins: every OTHER control here stays
+   * quiet. The filters and the empty state are not the act, and rule 5 still binds them.
+   */
+  it("gives the row's own Draft button the ink, and nothing else in the pool", () => {
     const { container } = render(<PlayerPool {...props} />);
-    expect(screen.getAllByRole("button", { name: "Draft" }).length).toBeGreaterThan(0);
-    expect(container.querySelector(".bg-text-primary")).toBeNull();
+    const draft = screen.getAllByRole("button", { name: "Draft" })[0]!;
+    expect(draft.className).toMatch(/bg-text-primary/);
 
     fireEvent.change(screen.getByLabelText("Search players"), { target: { value: "zzzz" } });
     expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
     expect(container.querySelector(".bg-text-primary")).toBeNull();
+  });
+
+  it("keeps the position filters quiet — a filter is not the act, and rule 5 still binds them", () => {
+    const { container } = render(<PlayerPool {...props} canAct={false} />);
+    // Nobody's turn: no act button at all, so nothing in the pool may wear ink.
+    expect(container.querySelector(".bg-text-primary")).toBeNull();
+  });
+
+  /**
+   * RULE 4'S AMENDED TEST, at the row: *a thing you act on or compare against its neighbours may
+   * be a card.* A pool row is both. `interactive` is the depth response — never a heavier line,
+   * and never a `role` or `tabindex`, so the card does not become a second click target beside
+   * the button inside it.
+   */
+  describe("the row is a card (Task 8)", () => {
+    it("carries the card's own surface and its interactive depth", () => {
+      render(<PlayerPool {...props} />);
+      const row = rowFor("Jalen Croft");
+      expect(row.className).toMatch(/bg-surface-elevated/);
+      expect(row.className).toMatch(/shadow-card/);
+      expect(row.className).toMatch(/hover:bg-surface-raised/);
+      expect(row.className).toMatch(/focus-within:bg-surface-raised/);
+    });
+
+    it("is still a list item, and still not a control of its own", () => {
+      render(<PlayerPool {...props} />);
+      const row = rowFor("Jalen Croft");
+      expect(row.tagName).toBe("LI");
+      expect(row).not.toHaveAttribute("role");
+      expect(row).not.toHaveAttribute("tabindex");
+    });
+
+    it("does not lift a drafted row — there is nothing there to act on", () => {
+      render(<PlayerPool {...props} view={{ ...SNAKE_VIEW, availablePlayerIds: ["rb1", "rb2", "wr1"] }} />);
+      fireEvent.click(screen.getByLabelText("Show drafted players"));
+      expect(rowFor("Jalen Croft").className).not.toMatch(/hover:bg-surface-raised/);
+    });
+  });
+
+  /**
+   * RULE 1'S TEAM-IDENTITY AMENDMENT: a club's colour, behind a face and nowhere else. The tile
+   * is decorative and `aria-hidden`; the team code two lines below is the same fact in text,
+   * which is what keeps it from being colour-only information.
+   */
+  describe("the face on the club's colour (Task 8)", () => {
+    it("puts a team-coloured tile behind the face, and nothing behind the name", () => {
+      render(<PlayerPool {...props} />);
+      const row = rowFor("Jalen Croft");
+      const tile = within(row).getByTestId("player-face-team");
+      expect(tile).toHaveAttribute("data-team", "KC");
+      expect(tile).toHaveAttribute("aria-hidden", "true");
+      expect(tile.getAttribute("style")).toMatch(/background-color/);
+      // The name is the row's own ink on the row's own surface, never on a club colour.
+      expect(tile).not.toContainElement(within(row).getByTestId("pool-player-name"));
+    });
+
+    it("renders a bare face for a team it has no colour for, rather than a grey rectangle", () => {
+      const free = [{ id: "fa1", name: "Rory Vance", position: "WR" as const, nflTeam: "FA", headshotUrl: null }];
+      render(<PlayerPool {...props} players={free} view={{ ...SNAKE_VIEW, availablePlayerIds: ["fa1"] }} />);
+      expect(within(rowFor("Rory Vance")).queryByTestId("player-face-team")).toBeNull();
+      expect(within(rowFor("Rory Vance")).getByText("RV")).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * TASK 7, THE VERDICT, in the pool. Steals only: at any slot everybody ranked below it is
+   * trivially a "reach", so sixty red chips would say nothing sixty times. A player still
+   * sitting there LATER than his own rank is the fact a manager scanning the pool is hunting for.
+   */
+  describe("the verdict on a prospect (Task 7)", () => {
+    // Three picks straight down the board, then the room is at pick 12 with wr1 (board rank 4)
+    // still available: eight picks later than his rank.
+    const picks = [
+      { pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1", slot: "QB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false },
+      { pickNumber: 2, round: 1, teamId: "t2", playerId: "rb1", slot: "RB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false },
+      { pickNumber: 3, round: 1, teamId: "t1", playerId: "rb2", slot: "RB" as const, slotIndex: 1, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false },
+    ];
+    const view = { ...SNAKE_VIEW, picks, pickNumber: 12, availablePlayerIds: ["wr1"] };
+
+    it("calls out the player who has lasted past his own rank", () => {
+      render(<PlayerPool {...props} view={view} />);
+      const row = rowFor("Andre Salas");
+      expect(within(row).getByText("+8")).toBeInTheDocument();
+      expect(within(row).getByText("steal")).toBeInTheDocument();
+    });
+
+    it("says nothing about a prospect who is merely ranked below the slot", () => {
+      // At pick 1 nobody has lasted anywhere; every row below the slot is a trivial "reach" and
+      // none of them earns a chip.
+      render(<PlayerPool {...props} view={{ ...SNAKE_VIEW, pickNumber: 1 }} />);
+      expect(screen.queryByText("reach")).toBeNull();
+      expect(screen.queryByText("steal")).toBeNull();
+    });
+
+    it("judges nothing at all before the draft has started", () => {
+      const scheduled = { ...SNAKE_VIEW, phase: "scheduled" as const, availablePlayerIds: [], onClockTeamId: null, pickNumber: 0 };
+      render(<PlayerPool {...props} view={scheduled} canAct={false} />);
+      expect(screen.queryByText("steal")).toBeNull();
+    });
   });
 
   it("shows the in-flight player as pending", () => {
