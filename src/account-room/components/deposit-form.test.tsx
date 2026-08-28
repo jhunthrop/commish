@@ -110,4 +110,16 @@ describe("DepositForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add money" }));
     expect(await screen.findByText(MONEY_REFUSALS.stateNotEnabled)).toBeInTheDocument();
   });
+
+  it("fills the money verb with money, leaving the wallet one ink action (laws 1 and 5)", () => {
+    // The live wallet used to render three ink pills at once — add, withdraw and verify — and
+    // force a reader to choose between three loud things on the one surface where being sure
+    // matters most. Law 1: "money is also the fill of the verb, because pressing it is how money
+    // moves." `bg-text-primary` is the ink pill's own fill and belongs to the one ceremonial act
+    // on a view, which here is the identity gate, not a transfer.
+    renderInAccount(<DepositForm methods={METHODS} />, fixtureAccountDeps().deps);
+    const button = screen.getByRole("button", { name: "Add money" });
+    expect(button.className).toContain("bg-accent");
+    expect(button.className).not.toContain("bg-text-primary");
+  });
 });
