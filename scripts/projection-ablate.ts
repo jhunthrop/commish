@@ -216,9 +216,20 @@ async function main(): Promise<void> {
       const inRange = result.weeks.filter((week) => week.week >= from && week.week <= to);
       return inRange.reduce((sum, week) => sum + (week.overall.rankCorrelation ?? 0), 0) / inRange.length;
     };
+    // The decay curve, week by week. The single most informative result the harness produces: the
+    // naive floor decays through a season because it never stops reading January, and whether a
+    // model FLATTENS that curve is the direct test of whether its in-season features do anything.
+    console.log("  weekly decay (floor | before -> after)");
+    for (const week of floorScore!.weeks) {
+      const ours = afterScore!.weeks.find((candidate) => candidate.week === week.week)!;
+      const previous = beforeScore!.weeks.find((candidate) => candidate.week === week.week)!;
+      console.log(
+        `    week ${String(week.week).padStart(2)}   ${rho(week.overall)} | ${rho(previous.overall)} -> ${rho(ours.overall)}`,
+      );
+    }
     console.log(
-      `  weeks 1-9    ${half(beforeScore!, 1, 9).toFixed(4)} -> ${half(afterScore!, 1, 9).toFixed(4)}\n` +
-        `  weeks 10-18  ${half(beforeScore!, 10, 18).toFixed(4)} -> ${half(afterScore!, 10, 18).toFixed(4)}\n`,
+      `  weeks 1-9    floor ${half(floorScore!, 1, 9).toFixed(4)}   ${half(beforeScore!, 1, 9).toFixed(4)} -> ${half(afterScore!, 1, 9).toFixed(4)}\n` +
+        `  weeks 10-18  floor ${half(floorScore!, 10, 18).toFixed(4)}   ${half(beforeScore!, 10, 18).toFixed(4)} -> ${half(afterScore!, 10, 18).toFixed(4)}\n`,
     );
   }
 
