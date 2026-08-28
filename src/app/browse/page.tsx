@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import type { HelpLevel } from "@/identity/preferences";
 import { readPreferences } from "@/identity-service/preferences";
@@ -123,7 +123,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     const wireItems = await listWireItems(getDb(), clock);
     return (
       <>
-        <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
+        <PublicBar intent={PAGE_INTENT} signedIn={user !== null} nav={STOREFRONT_NAV} />
         {/* Real events under the nav, per the mock — nothing at all when the product is too
             quiet to earn it (`UI_CONFIG.wire.minItems`). */}
         <Wire items={wireItems} />

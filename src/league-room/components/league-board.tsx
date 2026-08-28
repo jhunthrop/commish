@@ -1,10 +1,15 @@
 import Link from "next/link";
 import type { HomeLeagueCard } from "../contract";
-import { ButtonLink, Crest, EYEBROW, Meter, Stat, Table, type TableColumn } from "@/components/ui";
+import { ButtonLink, Crest, EYEBROW, NOT_STARTED_DASH, PointsShareBar, Stat, Table, type TableColumn } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { comparisonWithin } from "../lib/population";
 import { actionHref } from "../lib/action-href";
 import { formatPoints, formatRecord, formatWeek } from "../lib/format";
 import { WeekStatusBadge } from "./week-status-badge";
+
+/** The crest tile, px. One step under the rail's own 40px tile: the same league reads as the same
+ *  object in both places, and law 3 says a league IS an object — a 32px chip was a bullet point. */
+const CREST_SIZE_PX = 36;
 
 /** The needs-you set the board sorts to the top — the SAME two kinds the rail's own `stateFor`
  *  (`@/components/app-shell/shell-data`) treats as needs-you (F1). */
@@ -34,46 +39,125 @@ export function sortLeagues(leagues: readonly HomeLeagueCard[]): readonly HomeLe
   });
 }
 
+/**
+ * This manager's end of a matchup and the opponent's, resolved ONCE per row.
+ *
+ * Every cell on the row used to re-derive `homeTeamId === myTeamId` for itself, which is how the
+ * matchup cell ended up printing home-then-away (the league's order) while the margin cell printed
+ * mine-then-theirs (the manager's order) — two orders for one fact, on one row. A board this
+ * screen is the daily landing for has exactly one point of view: the manager's.
+ */
+interface Sides {
+  readonly mineName: string;
+  readonly mineScore: number | null;
+  readonly theirsName: string;
+  readonly theirsScore: number | null;
+}
+
+function sidesOf(league: HomeLeagueCard): Sides | null {
+  const matchup = league.matchup;
+  if (matchup === null) return null;
+  const iAmHome = matchup.homeTeamId === league.myTeamId;
+  return {
+    mineName: iAmHome ? matchup.homeTeamName : matchup.awayTeamName,
+    mineScore: iAmHome ? matchup.homeScore : matchup.awayScore,
+    theirsName: iAmHome ? matchup.awayTeamName : matchup.homeTeamName,
+    theirsScore: iAmHome ? matchup.awayScore : matchup.homeScore,
+  };
+}
+
 /** "+4.52" for the manager's own team leading, "-4.52" trailing — a plain, signed subtraction,
  *  never a probability (D1 defers the model this would need). `null` when there is no live
  *  score to measure a margin from at all. */
 function myMargin(league: HomeLeagueCard): number | null {
-  const matchup = league.matchup;
-  if (matchup === null || matchup.homeScore === null || matchup.awayScore === null) return null;
-  const mine = matchup.homeTeamId === league.myTeamId ? matchup.homeScore : matchup.awayScore;
-  const theirs = matchup.homeTeamId === league.myTeamId ? matchup.awayScore : matchup.homeScore;
-  return mine - theirs;
+  const sides = sidesOf(league);
+  if (sides === null || sides.mineScore === null || sides.theirsScore === null) return null;
+  return sides.mineScore - sides.theirsScore;
 }
 
 function formatMargin(margin: number): string {
   return `${margin >= 0 ? "+" : ""}${margin.toFixed(2)}`;
 }
 
-/** The matchup cell: the two scores, the leader's name carrying full ink — the SAME leader
- *  convention `MatchupScoreboard` uses — plus, for a median league, the SECOND result as a
- *  median line rather than the mock's own reused head-to-head vs-block (locker-room-panel.md,
- *  MEDIUM: that reused block read as a team called LEAGUE MEDIAN at a glance). */
-function MatchupCell({ league }: { readonly league: HomeLeagueCard }) {
-  const matchup = league.matchup;
-  if (matchup === null) {
-    return <p className="text-sm text-text-muted">{`${formatWeek(league.weekNumber)}: no matchup.`}</p>;
-  }
-  const homeLeads = matchup.homeScore !== null && matchup.awayScore !== null && matchup.homeScore > matchup.awayScore;
-  const awayLeads = matchup.homeScore !== null && matchup.awayScore !== null && matchup.awayScore > matchup.homeScore;
-  const side = (name: string, score: number | null, leads: boolean) => (
-    <span className={leads ? "font-semibold text-text-primary" : "text-text-muted"}>
-      {name} {score === null ? "Not yet scored" : formatPoints(score)}
-    </span>
-  );
+/**
+ * A score, drawn the way a scoreboard draws one (law 2): the figure over its own micro-label,
+ * tabular, in the display face. `null` is the DASH, never a zero — "has not played" and "played
+ * and scored nothing" are different facts, and folding the first into the second is the lie
+ * `NOT_STARTED_DASH` exists to stop ("A player who has not played reads as a dash", the Gameday
+ * spec's own words, applied to a team total for the same reason).
+ *
+ * `leading` is the only ink this component spends, and it is deliberately NOT magnitude colour:
+ * the population a head-to-head has to hand is a PAIR, and a percentile inside a set of two is
+ * fully determined by who is ahead — see `Scoreboard`'s own refusal, which this follows verbatim.
+ * Being ahead is carried by the size of the figure and by full ink, which a monochrome eye reads.
+ */
+function Score({ label, points, size, leading }: { readonly label: string; readonly points: number | null; readonly size: string; readonly leading: boolean }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <div className="flex flex-wrap items-center gap-1 text-sm">
-        {side(matchup.homeTeamName, matchup.homeScore, homeLeads)}
-        <span aria-hidden="true" className="text-text-muted">
-          vs
-        </span>
-        {side(matchup.awayTeamName, matchup.awayScore, awayLeads)}
+      <span
+        className={`font-display leading-display tabular-nums ${size} ${leading ? "font-semibold text-text-primary" : "text-text-muted"}`}
+      >
+        {points === null ? NOT_STARTED_DASH : formatPoints(points)}
+      </span>
+      <span className={`${MICRO_LABEL} block max-w-28 truncate text-text-faint sm:max-w-40`}>{label}</span>
+    </div>
+  );
+}
+
+/**
+ * The manager's own score — the loudest thing on its row, which is what law 2 asks a board for.
+ *
+ * BELOW `sm` this cell absorbs the columns that are dropped there. A 390px viewport cannot hold
+ * six columns, and the version that tried pushed the score itself half off the edge: the table
+ * scrolled inside its own wrapper as designed, so nothing overflowed the page, but a manager on a
+ * phone read "138" and had to swipe for the rest of their own score, and swipe further still for
+ * the verb. Three facts survive at that width — who you are playing, what the week is doing, and
+ * the act — and they fold in HERE rather than off screen. A verb a manager cannot see on a phone
+ * on a Sunday is not an obvious verb, whatever law 5 says about the desktop.
+ *
+ * The badge and the verb each exist twice in the DOM with exactly one of the pair `display: none`
+ * at any width, which is the responsive-row idiom `OpenLeagueShelf` already uses: `display: none`
+ * removes a node from the accessibility tree, so nothing is announced twice, and the page audit's
+ * own ink count is written against the same property (it filters on `offsetParent`).
+ */
+function MyScoreCell({ league }: { readonly league: HomeLeagueCard }) {
+  const sides = sidesOf(league);
+  const leads = sides !== null && sides.mineScore !== null && sides.theirsScore !== null && sides.mineScore > sides.theirsScore;
+  return (
+    <div className="flex flex-col gap-1">
+      {sides === null ? (
+        <span className="text-sm text-text-muted">No matchup</span>
+      ) : (
+        <Score label={sides.mineName} points={sides.mineScore} size="text-display-md" leading={leads} />
+      )}
+      {/* The narrow fold-in renders for EVERY row, matchup or not: a league on a bye still has a
+          state and still has an act, and dropping the verb with the score would have hidden it on
+          exactly the rows a manager most needs to press (a draft to join, a lineup to fix, both of
+          which happen before a matchup exists). */}
+      <div className="flex max-w-36 flex-wrap items-center gap-2 sm:max-w-none sm:hidden">
+        {sides === null ? null : (
+          <p className="max-w-32 truncate text-xs text-text-muted sm:max-w-none">
+            {`vs ${sides.theirsName} ${sides.theirsScore === null ? NOT_STARTED_DASH : formatPoints(sides.theirsScore)}`}
+          </p>
+        )}
+        <WeekStatusBadge status={league.weekStatus} />
+        <Verb league={league} />
       </div>
+    </div>
+  );
+}
+
+/** The opponent, one step down the display scale — the same pairing, quieter, so the eye reads
+ *  the row in the order the manager cares about. A median league's second result rides here
+ *  rather than in the mock's reused vs-block, which read as a team called LEAGUE MEDIAN at a
+ *  glance (locker-room-panel.md, MEDIUM). */
+function OpponentCell({ league }: { readonly league: HomeLeagueCard }) {
+  const sides = sidesOf(league);
+  if (sides === null) return null;
+  const leads = sides.mineScore !== null && sides.theirsScore !== null && sides.theirsScore > sides.mineScore;
+  return (
+    <div className="flex flex-col gap-1">
+      <Score label={sides.theirsName} points={sides.theirsScore} size="text-display-sm" leading={leads} />
       {league.medianGame && league.medianScore !== null ? (
         <p className="text-xs text-text-muted">{`League median ${league.medianScore}`}</p>
       ) : null}
@@ -81,81 +165,131 @@ function MatchupCell({ league }: { readonly league: HomeLeagueCard }) {
   );
 }
 
-/** The margin `Meter` (Step 2): its label IS the signed subtraction ("+4.52"), never a
- *  probability, and its value/max is this manager's own share of the combined score — the bar
- *  is the glance, the label is the decision (`Meter`'s own contract). `null` when there is no
- *  live score to measure a margin from at all (a bye, or a week that has not started). */
+/**
+ * The margin, and how close it is.
+ *
+ * THE ONE NUMBER THIS ROW IS ABOUT (the fun pass, 2026-08-28). The population is THIS BOARD'S own
+ * margins: the leagues you are playing this week, which is the only pool the page actually holds
+ * and the one a manager compares in their head anyway ("I am getting beaten worse here than
+ * there"). It refuses below `heatMinPopulation`, so a manager in two leagues gets plain ink rather
+ * than a percentile across two numbers, which would be arithmetic dressed as a fact.
+ *
+ * The bar beneath it is `PointsShareBar`, not `Meter`: it answers the different question ("how
+ * close", against a named opponent) and it names both sides, so the row no longer needs a "Share
+ * of points" caption restating the label of the number directly above it. Its docblock is also the
+ * one place that says out loud what the bar is NOT — a win probability this product cannot
+ * compute.
+ */
 function MarginCell({ league, margins }: { readonly league: HomeLeagueCard; readonly margins: readonly number[] }) {
   const margin = myMargin(league);
-  if (margin === null) return <span className="text-sm text-text-muted">No score yet</span>;
-  const matchup = league.matchup!;
-  const mine = matchup.homeTeamId === league.myTeamId ? matchup.homeScore! : matchup.awayScore!;
-  const combined = matchup.homeScore! + matchup.awayScore!;
+  const sides = sidesOf(league);
+  if (margin === null || sides === null || sides.mineScore === null || sides.theirsScore === null) {
+    return <span className="text-sm text-text-muted">No score yet</span>;
+  }
   return (
-    <div className="flex min-w-[8rem] flex-col gap-1">
-      {/* THE ONE NUMBER THIS ROW IS ABOUT (the fun pass, 2026-08-28). This page is the first
-          screen a signed-in manager sees and it was excluded from every phase of the pass — the
-          margin sat at label size, in muted ink, saying nothing about whether it was a good
-          Sunday. It is a `Stat` now, which buys the size AND the meaning in one move.
-
-          The population is THIS BOARD'S own margins: the leagues you are playing this week, which
-          is the only pool the page actually holds and the one a manager compares in their head
-          anyway ("I am getting beaten worse here than there"). It refuses below
-          `heatMinPopulation`, so a manager in two leagues gets plain ink rather than a percentile
-          across two numbers, which would be arithmetic dressed as a fact. */}
-      <Stat
-        label="Margin"
-        srOnlyLabel
-        value={formatMargin(margin)}
-        comparison={comparisonWithin(margins, margin, "your leagues this week")}
-      />
-      {/* The bar keeps its own separate job — share of the combined score, which is "how close",
-          a different question from "how far ahead". Its label names that job now rather than
-          restating the number directly above it. */}
-      <Meter label="Share of points" value={mine} max={combined <= 0 ? 1 : combined} />
+    <div className="flex min-w-40 flex-col gap-1.5">
+      <Stat label="Margin" srOnlyLabel value={formatMargin(margin)} comparison={comparisonWithin(margins, margin, "your leagues this week")} />
+      <PointsShareBar mineLabel="You" theirsLabel={sides.theirsName} mine={sides.mineScore} theirs={sides.theirsScore} />
     </div>
   );
 }
 
+/** The league as an object (law 3): its crest, its name, and the record beneath — mono and
+ *  tabular now, so seven records line up as a column a manager can read down rather than seven
+ *  independently-set strings. D5 still holds: a record may carry ONE step of extra type scale and
+ *  a weight step, and nothing else — no color, no badge, no animation. */
 function LeagueCell({ league }: { readonly league: HomeLeagueCard }) {
   return (
-    <div className="flex items-center gap-2">
-      <Crest id={league.id} name={league.name} size={32} />
-      <div className="flex min-w-0 flex-col">
-        <Link href={`/app/leagues/${league.id}`} className="min-w-0 truncate font-medium text-text-primary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+    <div className="flex items-center gap-2.5">
+      <Crest id={league.id} name={league.name} size={CREST_SIZE_PX} />
+      {/* Capped at narrow so this cell cannot monopolise the row and push the manager's own score
+          off the edge of a phone — a league name is user content and can be any length. The cap
+          lifts at `sm`, where there is room for the full name. */}
+      <div className="flex min-w-0 max-w-28 flex-col sm:max-w-none">
+        <Link
+          href={`/app/leagues/${league.id}`}
+          className="min-w-0 truncate font-display text-base font-medium text-text-primary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
           {league.name}
         </Link>
         {league.record === null ? null : (
-          // D5: a record may carry ONE step of extra type-scale weight and nothing else — no
-          // color, no badge, no animation, no second row.
-          <span className="text-base font-semibold tabular-nums text-text-primary">{formatRecord(league.record)}</span>
+          <span className="font-mono text-base font-semibold tabular-nums text-text-primary">{formatRecord(league.record)}</span>
         )}
       </div>
     </div>
   );
 }
 
-function ActionCell({ league }: { readonly league: HomeLeagueCard }) {
+/**
+ * LAW 5, THE VERB IS OBVIOUS. This used to be a quiet pill, on the reasoning that "ten rows must
+ * never mean ten ink pills" — and that reasoning was v3 rule 5, which Gameday reverses by name:
+ * *"the action a screen exists for is the loudest thing on it, however many times it repeats"*,
+ * and *"a board of forty rows cannot spend its one ink pill on row one and leave thirty-nine quiet
+ * outlines behind it"*. This board is the leagues index: setting a lineup and joining a draft is
+ * the entire reason a manager opened it, and every row offered the same act in the same whisper.
+ *
+ * `verb`, not `primary`: money-filled and `rounded-md`, which is the variant Gameday added for
+ * exactly this and which `page-audit.spec.ts` correctly does not count as ink — the ceremonial ink
+ * pill stays available, unspent, for a surface that genuinely does one thing once.
+ */
+function Verb({ league }: { readonly league: HomeLeagueCard }) {
   if (league.nextAction === null) return null;
   return (
-    // Quiet pill (rule 5): ten rows must never mean ten ink pills — the board's actions are
-    // peers, and none of them is the view's one ink action.
-    <ButtonLink href={actionHref(league)} aria-label={`${league.nextAction.label} for ${league.name}`} variant="secondary" size="sm">
+    <ButtonLink href={actionHref(league)} aria-label={`${league.nextAction.label} for ${league.name}`} variant="verb" size="sm">
       {league.nextAction.label}
     </ButtonLink>
   );
 }
 
-// Persona panel, Step 5 (the phone user): the score and the state badge stay INTACT at 360px —
-// only `margin` (supplementary detail, already restated by the matchup cell's own leader mark)
-// drops below `sm`. `WeekStatusBadge` never hides.
-function columnsFor(margins: readonly number[]): readonly TableColumn<HomeLeagueCard>[] {
+/**
+ * The week's own state, and WHICH week it is — the fact the board carried in its data and never
+ * printed, so a manager reading seven rows had to take on faith they were all the same week.
+ *
+ * The per-row week renders ONLY when the board disagrees with itself. Seven identical "Week 14"
+ * labels down a column is the draft board's refused tally in another costume (`docs/design-system
+ * .md`: *"48 mono digits at 12-team density read as texture, not information"*) — law 4 asks for
+ * more true facts per screen, and the same fact restated seven times is not seven facts. When
+ * every league agrees, the week is stated once, in the score column's own head.
+ */
+function StateCell({ league, sharedWeek }: { readonly league: HomeLeagueCard; readonly sharedWeek: number | null }) {
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <WeekStatusBadge status={league.weekStatus} />
+      {sharedWeek === null ? <span className={`${MICRO_LABEL} text-text-faint`}>{formatWeek(league.weekNumber)}</span> : null}
+    </div>
+  );
+}
+
+/** The one week every league on this board is playing, or `null` when they disagree. */
+function sharedWeekOf(leagues: readonly HomeLeagueCard[]): number | null {
+  const first = leagues[0];
+  if (first === undefined) return null;
+  return leagues.every((league) => league.weekNumber === first.weekNumber) ? first.weekNumber : null;
+}
+
+/** A column header, in the one register the caps charter sanctions for a shouted key beside data
+ *  (`MICRO_LABEL`). A scoreboard has always set its column heads this way, and `Table`'s own
+ *  default — sentence case, body face — is what made this board read as a spreadsheet of prose. */
+function Head({ children }: { readonly children: string }) {
+  return <span className={`${MICRO_LABEL} text-text-faint`}>{children}</span>;
+}
+
+// Persona panel, Step 5 (the phone user): below `sm` the board is TWO columns — the league, and
+// the manager's own score with the opponent, the week's state and the verb folded under it
+// (`MyScoreCell`). Nothing true leaves with the four dropped columns except the margin, which is
+// the one supplementary judgement on the row and the only thing a phone genuinely gives up.
+function columnsFor(margins: readonly number[], sharedWeek: number | null): readonly TableColumn<HomeLeagueCard>[] {
   return [
-  { key: "league", header: "League", cell: (league) => <LeagueCell league={league} /> },
-  { key: "matchup", header: "Matchup", cell: (league) => <MatchupCell league={league} /> },
-  { key: "margin", header: "Margin", cell: (league) => <MarginCell league={league} margins={margins} />, hideOnNarrow: true },
-  { key: "action", header: "Action", cell: (league) => <ActionCell league={league} /> },
-  { key: "state", header: "State", cell: (league) => <WeekStatusBadge status={league.weekStatus} /> },
+    { key: "league", header: <Head>League</Head>, cell: (league) => <LeagueCell league={league} /> },
+    {
+      key: "mine",
+      header: <Head>{sharedWeek === null ? "Your score" : `Your score · ${formatWeek(sharedWeek)}`}</Head>,
+      cell: (league) => <MyScoreCell league={league} />,
+    },
+    { key: "opponent", header: <Head>Opponent</Head>, cell: (league) => <OpponentCell league={league} />, hideOnNarrow: true },
+    { key: "margin", header: <Head>Margin</Head>, cell: (league) => <MarginCell league={league} margins={margins} />, hideOnNarrow: true },
+    { key: "state", header: <Head>State</Head>, cell: (league) => <StateCell league={league} sharedWeek={sharedWeek} />, hideOnNarrow: true },
+    { key: "action", header: <Head>Action</Head>, cell: (league) => <Verb league={league} />, hideOnNarrow: true },
   ];
 }
 
@@ -164,16 +298,27 @@ export interface LeagueBoardProps {
 }
 
 /**
- * The multi-league board (Phase 3.6, Task 10, Step 2): crest, league name with its record and
- * this week's matchup, the margin, the one next action, and the week's own state — every column
- * a fact this product actually holds. The mock's win-probability column, moments column and
- * season projection are NOT rendered (deferrals D1, D2, D3 name the data each would require);
- * the action column replaces them, and it is real, already computed by `nextActionFor`.
+ * The multi-league board — the screen a signed-in manager actually lands on.
  *
- * Sorted by whether the manager is needed, then by margin — never a probability. `Table` now
- * defaults to `density="dense"` itself (Task 12 Step 3c's closeout, once every consumer in the
- * product wanted it), so this page no longer opts in explicitly — see `table.tsx`'s own
- * DENSITY-DEFAULT DECISION docblock.
+ * GAMEDAY (2026-08-28). The founder's verdict on the previous pass was a screenshot of THIS page
+ * with the words "I don't see any changes", and the board is why: every fact on it was true and
+ * every one of them was set at 13px inside a sentence. The scores lived in the middle of "Dev
+ * Manager 04 15.00 vs Commish Lab's team 10.00", the largest thing on the screen was the page
+ * title, and the one act the page exists for repeated seven times in a whisper. Four laws, spent:
+ *
+ * - **Law 2.** The manager's own score is the row's hero at `display-md` over an 11px micro-label,
+ *   and the opponent's sits one step down at `display-sm`. The scores now stack into columns that
+ *   line up down the board instead of floating at different offsets inside seven sentences.
+ * - **Law 1.** Unchanged where it was already right (the margin's magnitude ramp against a stated
+ *   population, `WeekStatusBadge`'s live red) and not extended to the score, for the reason
+ *   `Scoreboard` states: a pair is not a population.
+ * - **Law 4.** Mono micro-label column heads, the week printed rather than assumed, and the
+ *   margin's redundant "Share of points" caption replaced by a bar that names both sides.
+ * - **Law 5.** The action is the money-filled `verb`, on every row that has one.
+ *
+ * Sorted by whether the manager is needed, then by margin — never a probability. The mock's
+ * win-probability, moments and season-projection columns are still NOT rendered (deferrals D1, D2,
+ * D3 name the data each would require).
  */
 export function LeagueBoard({ leagues }: LeagueBoardProps) {
   const sorted = sortLeagues(leagues);
@@ -183,7 +328,7 @@ export function LeagueBoard({ leagues }: LeagueBoardProps) {
   return (
     <Table
       caption="Your leagues"
-      columns={columnsFor(margins)}
+      columns={columnsFor(margins, sharedWeekOf(sorted))}
       rows={sorted}
       rowKey={(league) => league.id}
       empty={<p className={`${EYEBROW} text-text-muted`}>No leagues yet.</p>}

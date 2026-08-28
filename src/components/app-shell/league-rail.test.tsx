@@ -83,6 +83,38 @@ describe("LeagueRail", () => {
     });
   });
 
+  /**
+   * LAW 1, COLOUR IS A LEGEND. The rail is the product's most persistent navigation, so whatever
+   * legend it teaches is the legend a manager learns. It taught the wrong one twice over: a live
+   * game wore money-green (`positive`), which is the pigment of seats filling and of an action,
+   * and a league waiting on the manager wore amber (`warning`), whose usage law 1 demotes to a
+   * clock that is genuinely tightening. Live is the red family everywhere else in this product
+   * (`WeekStatusBadge`, `GameStateChip`, `Countdown`'s hot tone); an act is money.
+   */
+  it("paints a live game in the live family and a needs-you league in money, never amber", () => {
+    mockPathname("/app");
+    const { container } = render(<LeagueRail leagues={LEAGUES} />);
+    const dots = Array.from(container.querySelectorAll("span[aria-hidden='true'].rounded-pill")).map((n) => n.className);
+    expect(dots.some((c) => c.includes("bg-negative"))).toBe(true);
+    expect(dots.some((c) => c.includes("bg-accent"))).toBe(true);
+    expect(dots.some((c) => c.includes("bg-warning"))).toBe(false);
+    expect(dots.some((c) => c.includes("bg-positive"))).toBe(false);
+  });
+
+  /**
+   * LAW 6, MOTION REPORTS, NEVER PERFORMS. Only the live dot moves, because only it has something
+   * genuinely happening behind it; a needs-you dot is a standing fact and stays still. The
+   * reduced-motion branch is asserted in `use-reduced-motion`'s own suite — here the point is that
+   * the two states differ at all, so a future change cannot quietly make every dot breathe.
+   */
+  it("breathes only on the dot with a live game behind it", () => {
+    mockPathname("/app");
+    const { container } = render(<LeagueRail leagues={LEAGUES} />);
+    const breathing = Array.from(container.querySelectorAll("span.animate-pulse-live")).map((n) => n.className);
+    expect(breathing.length).toBe(1);
+    expect(breathing[0]).toContain("bg-negative");
+  });
+
   it("stays reachable at 360px as a horizontal strip — overflow-x-auto, never hidden", async () => {
     mockPathname("/app");
     await renderSurface(<LeagueRail leagues={LEAGUES} />, ({ getByTestId }) => {

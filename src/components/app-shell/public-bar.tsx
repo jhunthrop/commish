@@ -7,6 +7,25 @@ export interface NavLink {
   readonly label: string;
 }
 
+/**
+ * THE STOREFRONT NAV, once (Gameday, 2026-08-28).
+ *
+ * The front door defined these two links privately and every OTHER public surface rendered this
+ * bar bare — so a stranger who landed on `/support`, `/legal/terms` or `/league-rules` from a
+ * search result had exactly one door back into the product, and it was the wordmark. The links
+ * are the same two the front door always shipped; what changed is that they belong to the bar
+ * rather than to one page, so a reading page cannot be built without them.
+ *
+ * "How it works" points at `/league-rules`, whose own `<h1>` reads "How it works" — a signed-in
+ * manager and a stranger see one name for one page (N15's rule, applied to the second surface it
+ * was always about). The front door appends its conditional "Reviews" entry to THIS list rather
+ * than keeping a third copy of the base.
+ */
+export const STOREFRONT_NAV: readonly NavLink[] = [
+  { href: "/browse", label: "Open leagues" },
+  { href: "/league-rules", label: "How it works" },
+];
+
 export interface PublicBarProps {
   /** Where THIS bar's own `SignInLink` should return the visitor once they are signed in — every
    *  caller makes an explicit choice, the same reasoning `TopBar`'s `isAdmin` prop states: a page

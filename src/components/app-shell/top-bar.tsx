@@ -110,17 +110,25 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
             </Link>
           )}
           <NoticeInbox />
+          {/* GAMEDAY (2026-08-28): the manager, in ink. *"The manager's own identity present on
+              every screen"* is one of the four things the razor names as REAL aliveness, and this
+              is the one place the product says who you are on every signed-in page — it was the
+              quietest thing in the row. */}
           <Link
             href="/app/profile"
-            className="flex items-center gap-1 rounded-md text-sm text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="flex items-center gap-1.5 rounded-md text-sm font-medium text-text-primary transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <Avatar name={displayName} avatar={avatar} size="sm" />
             {displayName}
           </Link>
           <form action="/sign-out" method="post">
+            {/* GAMEDAY: quiet, like every other utility in this row. Full ink made the loudest
+                control on every signed-in surface in the product the way OUT of it — law 5's own
+                discipline ("a filter, a toggle, a sort control and a way out are quiet on every
+                surface") applied to the chrome, which is where it had never been read. */}
             <button
               type="submit"
-              className="rounded-md px-2 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="rounded-md px-2 py-1.5 text-sm text-text-muted transition-colors hover:bg-surface-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               Sign out
             </button>

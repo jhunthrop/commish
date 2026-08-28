@@ -51,6 +51,14 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   "src/components/ui/avatar.tsx",
   "src/components/ui/button.tsx",
   "src/draft-room/components/budget-table.tsx",
+  // GAMEDAY (2026-08-28), law 1. The rail's needs-you dot, earning its entry the way this
+  // docblock asks — in review, with a reason. It used to be `bg-warning`, and law 1 demotes
+  // amber's USAGE to a clock that is genuinely tightening: a league waiting on your lineup is
+  // not a caution, it is an act, and money is this product's pigment for an act (the same clause
+  // that makes `Button`'s `verb` variant legal). This is the "seat dot" case the list above
+  // already names as a place where green MEANS something, in the one file that draws it. The
+  // dot's live sibling is `bg-negative` and needs no exemption.
+  "src/components/app-shell/league-rail.tsx",
 ];
 
 /**

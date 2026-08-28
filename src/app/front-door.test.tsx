@@ -216,12 +216,24 @@ describe("the front door (Task 5)", () => {
     expect(screen.queryByRole("list", { name: "Recent activity" })).not.toBeInTheDocument();
   });
 
-  it("frames 'Start your own league' as a hairline-topped row, never a box (rule 4)", async () => {
+  /**
+   * The gauntlet's MEDIUM said "a hairline-topped row, never a box", and that stays true: the
+   * closing block is still bounded by a rule rather than wearing a card. GAMEDAY (2026-08-28)
+   * moved the rule from a nested `<div>` inside the shelf section onto the block's own `<section>`
+   * band — two hairlines a few pixels apart read as a rendering accident — and gave the heading a
+   * display size, because the last thing a stranger reads on the storefront was the quietest thing
+   * on the page. Copy is unchanged, and the way in is still QUIET: this page's one ink action
+   * belongs to the seat (E2).
+   */
+  it("closes on a hairline-topped band, never a box, and never a second ink action (rule 4, law 5)", async () => {
     await renderHome();
     const heading = screen.getByRole("heading", { name: "Start your own league" });
-    const row = heading.closest("div");
-    expect(row?.className).toContain("border-t");
-    expect(row?.className).not.toContain("rounded");
+    const band = heading.closest("section");
+    expect(band?.className).toContain("border-t");
+    expect(band?.className).not.toContain("rounded");
+    const create = screen.getByRole("link", { name: "Create a league" });
+    expect(create.className).not.toContain("bg-text-primary");
+    expect(create.className).not.toContain("bg-accent");
   });
 });
 

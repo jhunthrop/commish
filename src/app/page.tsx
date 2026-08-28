@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { ButtonLink } from "@/components/ui";
-import { UI_CONFIG } from "@/components/ui/config";
-import { PublicBar, type NavLink } from "@/components/app-shell/public-bar";
+import { MICRO_LABEL, UI_CONFIG } from "@/components/ui/config";
+import { PublicBar, STOREFRONT_NAV, type NavLink } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import type { HelpLevel } from "@/identity/preferences";
 import { readPreferences } from "@/identity-service/preferences";
@@ -28,22 +27,19 @@ export const dynamic = "force-dynamic";
 const PAGE_INTENT = "/";
 
 /**
- * The mock's nav links (Task 16, F5) — `PublicBar` renders bare on every other public surface
- * (`/browse`, `/reviews`, `/app/join/[code]`); the front door alone fills these in. "How it
- * works" points at `/league-rules` (the addendum's Task 21 Step 4 page, stubbed real by this
- * task — see `src/app/league-rules/page.tsx`): a nav item pointing at a route nobody created is
- * the footer-to-a-404 failure with a bigger font.
+ * The nav links (Task 16, F5). GAMEDAY (2026-08-28): the base pair moved to `STOREFRONT_NAV`
+ * (`@/components/app-shell/public-bar`) — the front door used to be the only public surface that
+ * filled `nav` in at all, so a stranger who landed on `/support`, `/legal/terms` or
+ * `/league-rules` from a search result had one door back into the product and it was the
+ * wordmark. Every public surface carries the same two links now, and this page appends its own
+ * conditional third rather than owning a private copy of the base.
  *
  * D3 (flow analysis; storefront review): "Reviews" is appended ONLY once the feed genuinely has
  * something to show — `hasRealReviews` below reads the SAME fixture-exclusion `/reviews` itself
  * applies (`excludeFixtureReviews`, `./reviews/fixture-filter`), so the nav never advertises a
  * room this task already knows is empty (the site's one review today is a fixture, filed by the
- * onboarding e2e spec). `NAV_BASE` is what every build ships regardless.
+ * onboarding e2e spec).
  */
-const NAV_BASE: readonly NavLink[] = [
-  { href: "/browse", label: "Open leagues" },
-  { href: "/league-rules", label: "How it works" },
-];
 const REVIEWS_NAV_LINK: NavLink = { href: "/reviews", label: "Reviews" };
 
 /**
@@ -119,7 +115,7 @@ export default async function Home() {
   const featuredLeague = featuredFillingLeague([...house, ...cappedLeagues]);
 
   const hasRealReviews = excludeFixtureReviews(reviewsPage.reviews).length > 0;
-  const nav: readonly NavLink[] = hasRealReviews ? [...NAV_BASE, REVIEWS_NAV_LINK] : NAV_BASE;
+  const nav: readonly NavLink[] = hasRealReviews ? [...STOREFRONT_NAV, REVIEWS_NAV_LINK] : STOREFRONT_NAV;
 
   return (
     <>
@@ -183,21 +179,38 @@ export default async function Home() {
               See every open league
             </ButtonLink>
           </div>
+        </section>
 
-          {/* The gauntlet's MEDIUM, re-framed by rule 4 (hairlines, not boxes): "Start your own"
-              keeps its own row below the shelf it is not competing with, structured by a thin
-              rule and space rather than the bordered card it used to wear. Copy unchanged. */}
-          <div className="flex flex-col items-start gap-2 border-t border-line pt-6">
-            <h3 className="font-display text-lg font-semibold leading-display text-text-primary">Start your own league</h3>
-            <p className="max-w-prose text-sm text-text-muted">
-              Your rules, your people. The platform still runs the chores: the draft room, the
-              schedule, and the scoring. Snake or auction, any scoring preset, private or public.
-            </p>
-            {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
-                first rather than an error, exactly like the shelf's own identical link. */}
-            <Link href="/app#create-league" className="text-sm font-medium text-accent underline">
+        {/*
+          THE CLOSING BAND (Gameday, 2026-08-28). The gauntlet's MEDIUM put "Start your own" in a
+          row below the shelf, structured by a hairline instead of the bordered card it used to
+          wear, and that was right about the box and wrong about the weight: an `h3` at `text-lg`
+          with an underlined text link under it is how the last thing a stranger reads on the
+          storefront ended up being the quietest thing on the page. Copy is UNCHANGED — what moved
+          is that it is a real band on its own ground (the shelf's own last row is a hairline away,
+          and two hairlines a few pixels apart read as a rendering accident), the heading takes a
+          display size, and the way in is the same quiet pill the shelf's own doorway uses rather
+          than a third spelling of "a link that is really a button".
+
+          Still quiet, deliberately: this page's one ink action belongs to the seat (E2), and a
+          commissioner recruiting their own group is not the visitor this door is built for.
+
+          `/app` is auth-gated by `middleware.ts`, so a signed-out visitor lands at sign-in first
+          rather than an error, exactly like the shelf's own identical link.
+        */}
+        <section className="w-full border-t border-line bg-surface-elevated">
+          <div className="flex w-full flex-col gap-6 px-4 py-10 sm:px-10 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex max-w-prose flex-col gap-2">
+              <p className={`${MICRO_LABEL} text-text-faint`}>Your own group</p>
+              <h2 className="font-display text-display-md font-semibold leading-display text-text-primary">Start your own league</h2>
+              <p className="text-text-muted">
+                Your rules, your people. The platform still runs the chores: the draft room, the
+                schedule, and the scoring. Snake or auction, any scoring preset, private or public.
+              </p>
+            </div>
+            <ButtonLink href="/app#create-league" variant="secondary" className="shrink-0">
               Create a league
-            </Link>
+            </ButtonLink>
           </div>
         </section>
       </main>

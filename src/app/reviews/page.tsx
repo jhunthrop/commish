@@ -7,7 +7,8 @@ import { ErrorState, PageTitle } from "@/components/ui";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
+import { ReadingMasthead } from "@/components/app-shell/reading-frame";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { listReviews, myReview } from "@/review-service/reviews";
@@ -22,6 +23,11 @@ export const metadata: Metadata = pageTitle("Reviews");
 
 /** This page's own path — every signed-out `SignInLink` on it returns here (Task 16, F6). */
 const PAGE_INTENT = "/reviews";
+
+/** The page's own name and its one lede sentence, named once so the storefront masthead and the
+ *  signed-in shell head can never drift into two descriptions of the same feed. */
+const REVIEWS_TITLE = "What managers are saying";
+const REVIEWS_LEDE = "Every review, ordered by when it was written. Nothing here is filtered by rating.";
 
 /**
  * The unfiltered public review feed — this product's second unauthenticated read, after
@@ -58,7 +64,7 @@ export default async function ReviewsPage() {
         {/* `false` on purpose: this refusal returns BEFORE `getCurrentUser()` resolves (see this
             page's own docblock), and a rate-limited request is not worth a session round trip to
             personalise a header nobody is reading. */}
-        <PublicBar intent={PAGE_INTENT} signedIn={false} />
+        <PublicBar intent={PAGE_INTENT} signedIn={false} nav={STOREFRONT_NAV} />
         {/* Full-bleed, no `max-w-*` (NEW-2) — matching `AppShell`'s own signed-in `<main>`. */}
         <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">
           <ErrorState
@@ -97,30 +103,37 @@ export default async function ReviewsPage() {
       <ReviewComposer myReview={mine} />
     );
 
-  const content = (
-    <>
-      <div className="flex flex-col gap-1">
-        <PageTitle>What managers are saying</PageTitle>
-        <p className="max-w-prose text-sm text-text-muted">
-          Every review, ordered by when it was written. Nothing here is filtered by rating.
-        </p>
-      </div>
-      <ReviewFeed initialPage={page} emptyAction={emptyAction} />
-    </>
-  );
+  const feed = <ReviewFeed initialPage={page} emptyAction={emptyAction} />;
 
   if (user === null) {
     return (
       <>
-        <PublicBar intent={PAGE_INTENT} signedIn={user !== null} />
-        {/* Full-bleed, no `max-w-*` (NEW-2) — matching `AppShell`'s own signed-in `<main>`. The
-            feed itself is dense cards; the one long-form paragraph on this page keeps its own
-            `max-w-prose` below, so the reading column stays measured inside the wide frame. */}
-        <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">{content}</main>
+        <PublicBar intent={PAGE_INTENT} signedIn={user !== null} nav={STOREFRONT_NAV} />
+        {/* GAMEDAY (2026-08-28): signed out, this IS a storefront page and it wears the storefront
+            head — the same `ReadingMasthead` band `/support` and the legal pages carry, rather
+            than the bare `PageTitle` plus a 13px line that made it read as unfinished beside its
+            four siblings. Only the HEAD is shared: the body stays full-bleed, because this one is
+            a wide feed of dense cards rather than a measured paragraph column. */}
+        <main className="flex w-full min-w-0 flex-col">
+          <ReadingMasthead title={REVIEWS_TITLE} kicker="Reviews" lede={REVIEWS_LEDE} />
+          <div className="flex w-full min-w-0 flex-col gap-6 px-4 py-8 sm:px-10">{feed}</div>
+        </main>
         <PublicFooter />
       </>
     );
   }
+
+  // Signed in, the shell is the chrome and the page returns its content alone — a storefront
+  // masthead inside `AppShell`'s own padded `<main>` would read as a panel, not a page head.
+  const content = (
+    <>
+      <div className="flex flex-col gap-1">
+        <PageTitle>{REVIEWS_TITLE}</PageTitle>
+        <p className="max-w-prose text-sm text-text-muted">{REVIEWS_LEDE}</p>
+      </div>
+      {feed}
+    </>
+  );
 
   const { rail, liveState } = await shellData(getDb(), user);
   return (
