@@ -32,9 +32,11 @@ Against the real market, Fantasy Football Calculator's twelve-team PPR average d
 | our board, previous document | 0.4701 | 0.4036 |
 | **our board, now** | **0.4759** | 0.4186 |
 
-**We beat the market in 2023 and we still lose it in 2024**, by 0.0086 where the previous document
-lost by 0.0236. The direction is reversed: the last document went backwards against ADP on both
-seasons and this one goes forwards on both.
+**2023 is now level with the market and 2024 is still a loss**, by 0.0086 where the previous document
+lost by 0.0236. The 2023 figure is nominally ahead by 0.0007 on 173 players, which is not a win and
+is not claimed as one — a different half-dozen players would decide it. What IS a result is the
+direction: the last document went backwards against ADP on both seasons and this one goes forwards
+on both, by 0.0058 and 0.0150.
 
 And the band the whole document is about, banded by the benchmark's own rank:
 
@@ -337,7 +339,7 @@ on a measurement error.
 **What was exploitable was our own bias, not theirs.** On the career axis both sources are
 pessimistic about young players and the market is pessimistic by a third as much as we were; on old
 players the market is roughly neutral and we were optimistic. Closing our own gap on that axis is
-what moved the market population by +0.0062 and +0.0194 and flipped 2023 from a loss to a win. We did
+what moved the market population by +0.0062 and +0.0194 and took 2023 from a loss to level. We did
 not find a market inefficiency; we found ours.
 
 The remaining 2024 deficit of 0.0086 is almost entirely the elite band, where we score 0.0616 against
@@ -373,7 +375,8 @@ own history is the stale thing.
 
 **One correction for it improves the starter band on both held-out seasons**, by 0.015 and 0.040,
 takes the market comparison forwards on both after a document that took it backwards on both, and
-does nothing at all to the pooled 2024 figure.
+does nothing at all to the pooled 2024 figure. It does not beat the market: 2023 is level and 2024
+is still behind.
 
 **And against consensus we still lose**, by 0.0728 and 0.0127. One diagnosis in this document was an
 artifact of its own measurement and is written up as one. One change measured at zero and is shipped
