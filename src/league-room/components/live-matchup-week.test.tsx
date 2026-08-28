@@ -43,12 +43,14 @@ describe("LiveMatchupWeek", () => {
     expect(screen.getByText("Live")).toBeInTheDocument();
   });
 
-  // E1(a)+(c): the margin and the week's own games-final count, composed onto the caller's own
-  // matchup from data this component already threads — `t1` (home, "You") leads 10.50 to 8.75.
-  it("prints the margin and the games-final count on the caller's own matchup", () => {
+  // E1(a)+(c), as Gameday splits them: the margin belongs to the caller's own matchup (`t1`,
+  // home, "You", leading 10.50 to 8.75) and the games-final count is a WEEK-WIDE fact stated once
+  // in the week band above every panel, never appended to six identical sentences.
+  it("prints the margin on the caller's own matchup and the games-final count once for the week", () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: WEEK_BODY });
     renderInLeague(<LiveMatchupWeek leagueId="l1" body={WEEK_BODY} />, fixture.deps);
-    expect(screen.getByText("You are up 1.75. 3 of 8 games final.")).toBeInTheDocument();
+    expect(screen.getByText("You are up 1.75.")).toBeInTheDocument();
+    expect(screen.getAllByText("3 of 8 games final")).toHaveLength(1);
   });
 
   // E3: one honest sentence for the whole page while the week is still mid-games, never repeated

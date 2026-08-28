@@ -5,6 +5,8 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { leagueHome, matchupWeek } from "@/league-service";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
+import type { TeamStandingsRow } from "@/league-room/contract";
+import type { RecordsByTeamId } from "@/league-room/components/matchup-hero";
 import { LiveMatchupWeek } from "@/league-room/components/live-matchup-week";
 import { WeekNav } from "@/league-room/components/week-nav";
 import { formatWeek } from "@/league-room/lib/format";
@@ -57,9 +59,27 @@ export default async function MatchupWeekPage({ params }: PageProps) {
       {body.matchups.length === 0 ? (
         <p className="text-text-muted">There are no matchups in this week yet.</p>
       ) : (
-        <LiveMatchupWeek leagueId={leagueId} body={body} />
+        <LiveMatchupWeek leagueId={leagueId} body={body} records={recordsFrom(home.standings)} />
       )}
       <p className="text-sm text-text-muted">{liveScoringCopy()}</p>
     </>
   );
+}
+
+/**
+ * Every team's win-loss-tie line, keyed by team id, for the matchup hero.
+ *
+ * A RECORD IS THE FIRST THING A SCOREBOARD PRINTS UNDER A TEAM NAME, and `Scoreboard` has always
+ * had the slot for it — this page simply never filled it. The fact costs nothing new: `leagueHome`
+ * is already read above, for membership and the league's own name, and its standings carry every
+ * team's record. Joining the two reads is work only this page can do; `matchupWeek` reads
+ * fixtures and stat lines and has no view of the season's results, so widening ITS wire would
+ * mean a second query for something already in hand.
+ */
+function recordsFrom(standings: readonly TeamStandingsRow[]): RecordsByTeamId {
+  const records: Record<string, { wins: number; losses: number; ties: number }> = {};
+  for (const row of standings) {
+    records[row.teamId] = { wins: row.wins, losses: row.losses, ties: row.ties };
+  }
+  return records;
 }

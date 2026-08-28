@@ -1,6 +1,7 @@
 import type { MatchupSummary } from "../contract";
 import { Card, EYEBROW } from "@/components/ui";
 import { formatPoints } from "../lib/format";
+import { marginSentence } from "../lib/matchup-facts";
 import { WeekStatusBadge } from "./week-status-badge";
 
 export interface MatchupScoreboardProps {
@@ -33,32 +34,15 @@ const SCORE_SIZE: Readonly<Record<"card" | "hero", string>> = {
   hero: "text-display-xl sm:text-display-2xl",
 };
 
-/** E1(a)+(c): "You are up 7.40. 6 of 13 games final." — the two facts the review named
- *  (`docs/research/2026-08-27-competition-review.md`, D2/E3) composed into one sentence, from
- *  data already on the wire: the margin is a plain subtraction of the two scores already on
- *  screen (the same arithmetic `league-board.tsx`'s own Margin column does), and the games-final
- *  count is the SAME pair `ScoreUpdatePayload` carries on every live frame. `null` when either
- *  score is not in yet — a margin needs two real numbers, never a guess against a `—`. */
+/** E1(a)+(c): "You are up 7.40. 6 of 13 games final." — the two facts the competition review
+ *  named (`docs/research/2026-08-27-competition-review.md`, D2/E3) composed into one sentence,
+ *  from data already on the wire. The margin itself is `marginSentence` (`../lib/matchup-facts`),
+ *  shared with the matchup hero since Gameday so the two surfaces cannot word the same
+ *  subtraction two ways; this function adds only the games-final clause, which is the fact this
+ *  caller has and the hero's page states once for the whole week instead. */
 function honestLine(matchup: MatchupSummary, myTeamId: string | null, gamesFinal: number | undefined, gamesTotal: number | undefined): string | null {
-  const { homeScore, awayScore, homeTeamId, awayTeamId, homeTeamName, awayTeamName } = matchup;
-  if (homeScore === null || awayScore === null) return null;
-  const margin = formatPoints(Math.abs(homeScore - awayScore));
-  const iAmHome = myTeamId === homeTeamId;
-  const iAmAway = myTeamId === awayTeamId;
-
-  let lead: string;
-  if (homeScore === awayScore) {
-    lead = iAmHome || iAmAway ? `You are tied at ${formatPoints(homeScore)}.` : `Tied at ${formatPoints(homeScore)} apiece.`;
-  } else {
-    const homeLeads = homeScore > awayScore;
-    if (iAmHome || iAmAway) {
-      const winning = (iAmHome && homeLeads) || (iAmAway && !homeLeads);
-      lead = winning ? `You are up ${margin}.` : `You are down ${margin}.`;
-    } else {
-      lead = `${homeLeads ? homeTeamName : awayTeamName} leads by ${margin}.`;
-    }
-  }
-
+  const lead = marginSentence(matchup, myTeamId);
+  if (lead === null) return null;
   // `gamesTotal === 0` reads the same as "not provided" — a week with no `stat_weeks` row yet
   // has nothing honest to say about how many of zero games are final.
   if (gamesTotal === undefined || gamesTotal === 0) return lead;
