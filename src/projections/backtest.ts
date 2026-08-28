@@ -157,21 +157,42 @@ export async function allPositions(db: ReadonlyDb): Promise<ReadonlyMap<string, 
   );
 }
 
-export async function replay(
+/** One replayed week, before any scoring: what each source said, and what really happened. */
+interface WeekOutcome {
+  readonly week: number;
+  readonly asOf: Date;
+  /** Projected points per player, one map per source, in the order the sources were given. */
+  readonly projected: readonly ReadonlyMap<string, number>[];
+  readonly actual: ReadonlyMap<string, number>;
+}
+
+/**
+ * Replays every week once, showing EVERY source the identical history.
+ *
+ * One pass rather than one pass per source, and that is not only an optimisation: two sources
+ * scored from two separate passes could in principle be shown different data — a store written
+ * between the passes, a clock read twice — and the whole point of a head-to-head is that the only
+ * difference between the two columns is the model.
+ */
+async function replayWeeks(
   db: ReadonlyDb,
-  { season, weeks, source, rules, asOfForWeek, historySeasons = DEFAULT_HISTORY_SEASONS }: ReplayOptions,
-): Promise<ReplayResult> {
+  season: number,
+  weeks: readonly number[],
+  sources: readonly ProjectionSource[],
+  rules: ScoringRules,
+  asOfForWeek: (week: number) => Date,
+  historySeasons: number,
+): Promise<readonly WeekOutcome[]> {
   // Ascending, whatever order the caller listed them in: a replay that ran week 3 before week 2
   // would still be leak-free (each week's own as-of gate holds) but the scoreboard would read as
   // though the season happened out of order, and a stateful source would be shown history backwards.
   const inOrder = [...weeks].sort((a, b) => a - b);
   const earliestSeason = season - historySeasons + 1;
-  const weekReplays: WeekReplay[] = [];
-  const pooled: BandedObservation[] = [];
   // Read once, outside the loop. Position is the one fact in this instrument that carries no as-of
   // and never will: a man's position is not restated by a Sunday-night stat correction, and reading
   // it per week would be eighteen identical queries pretending to be a point-in-time read.
   const positions = await allPositions(db);
+  const outcomes: WeekOutcome[] = [];
 
   for (const week of inOrder) {
     const asOf = asOfForWeek(week);
@@ -192,41 +213,119 @@ export async function replay(
       usage.push(...(await usageAsOf(db, span)));
     }
 
-    const projected = await source.project({ season, week, asOf, history, usage, positions });
-    const actuals = await statLinesAsOf(db, { season, week, asOf: FINAL_OUTCOME });
-
     const pointsOf = (line: StatLine): number | null => {
       const position = positions.get(line.playerId);
       return position === undefined ? null : computeFantasyPoints(line, position, rules);
     };
+    const asPoints = (lines: readonly StatLine[]): ReadonlyMap<string, number> => {
+      const points = new Map<string, number>();
+      for (const line of lines) {
+        const value = pointsOf(line);
+        if (value !== null) points.set(line.playerId, value);
+      }
+      return points;
+    };
 
-    const actualPoints = new Map<string, number>();
-    for (const { line } of actuals) {
-      const points = pointsOf(line);
-      if (points !== null) actualPoints.set(line.playerId, points);
+    const projected: ReadonlyMap<string, number>[] = [];
+    for (const source of sources) {
+      projected.push(asPoints(await source.project({ season, week, asOf, history, usage, positions })));
     }
+    const actuals = await statLinesAsOf(db, { season, week, asOf: FINAL_OUTCOME });
+    outcomes.push({ week, asOf, projected, actual: asPoints(actuals.map((row) => row.line)) });
+  }
+  return outcomes;
+}
 
-    const projectedPoints = projected
-      .map((line) => ({ playerId: line.playerId, points: pointsOf(line) }))
-      .filter((entry): entry is { playerId: string; points: number } => entry.points !== null);
+/**
+ * Scores one source over the weeks already replayed, optionally narrowed to a set of players.
+ *
+ * `eligible` is what makes a head-to-head fair. Without it, a source that has an opinion about more
+ * players is scored over a different population than the one it is being compared to — and since
+ * the extra players are overwhelmingly low scorers who are easy to order correctly, a broader source
+ * can post a higher rank correlation on breadth alone. Both numbers are worth having, so both are
+ * reported; neither is worth having on its own.
+ */
+function scoreSource(
+  name: string,
+  outcomes: readonly WeekOutcome[],
+  index: number,
+  eligible?: (outcome: WeekOutcome) => ReadonlySet<string>,
+): ReplayResult {
+  const weekReplays: WeekReplay[] = [];
+  const pooled: BandedObservation[] = [];
+
+  for (const outcome of outcomes) {
+    const allowed = eligible?.(outcome);
+    const projectedPoints = [...outcome.projected[index]!.entries()]
+      .filter(([playerId]) => allowed === undefined || allowed.has(playerId))
+      .map(([playerId, points]) => ({ playerId, points }));
     const bands = bandByProjectedRank(projectedPoints);
 
     // Only players with BOTH a projection and an outcome are scored, and `sampleSize` carries how
     // many that was. Scoring a source over the players it chose to have an opinion about is what
     // stops a narrow, cautious source looking better than a comprehensive one.
     const entries: BandedObservation[] = projectedPoints
-      .filter((entry) => actualPoints.has(entry.playerId))
+      .filter((entry) => outcome.actual.has(entry.playerId))
       .map((entry) => ({
         predicted: entry.points,
-        actual: actualPoints.get(entry.playerId)!,
+        actual: outcome.actual.get(entry.playerId)!,
         band: bands.get(entry.playerId)!,
       }));
 
     pooled.push(...entries);
-    weekReplays.push({ week, asOf, ...scoreBanded(entries) });
+    weekReplays.push({ week: outcome.week, asOf: outcome.asOf, ...scoreBanded(entries) });
   }
 
-  return { source: source.name, weeks: weekReplays, ...scoreBanded(pooled) };
+  return { source: name, weeks: weekReplays, ...scoreBanded(pooled) };
+}
+
+export async function replay(
+  db: ReadonlyDb,
+  { season, weeks, source, rules, asOfForWeek, historySeasons = DEFAULT_HISTORY_SEASONS }: ReplayOptions,
+): Promise<ReplayResult> {
+  const outcomes = await replayWeeks(db, season, weeks, [source], rules, asOfForWeek, historySeasons);
+  return scoreSource(source.name, outcomes, 0);
+}
+
+export interface HeadToHeadOptions extends Omit<ReplayOptions, "source"> {
+  /** Two or more sources, shown identical history and scored by identical code. */
+  readonly sources: readonly ProjectionSource[];
+}
+
+export interface HeadToHead {
+  /** Each source over the players IT had an opinion about — the number it earns on its own terms. */
+  readonly full: readonly ReplayResult[];
+  /** Each source over only the players EVERY source projected — the like-for-like comparison. */
+  readonly common: readonly ReplayResult[];
+}
+
+/**
+ * Two or more sources over one season, scored both on their own terms and like for like.
+ *
+ * The like-for-like column exists because breadth flatters rank correlation. A model that projects
+ * every player who has taken a snap is scored over hundreds of extra low-scoring player-weeks that
+ * are easy to order correctly, and posts a better number than a narrower source without being
+ * better at anything a manager cares about. Restricting to the intersection removes that advantage
+ * entirely; reporting only the restricted number would hide a real one (coverage IS worth
+ * something). So both are computed, from one pass, and the difference between them is itself a
+ * result worth reading.
+ */
+export async function replayHeadToHead(
+  db: ReadonlyDb,
+  { season, weeks, sources, rules, asOfForWeek, historySeasons = DEFAULT_HISTORY_SEASONS }: HeadToHeadOptions,
+): Promise<HeadToHead> {
+  if (sources.length < 2) {
+    throw new Error("A head-to-head needs at least two sources; one source is a replay.");
+  }
+  const outcomes = await replayWeeks(db, season, weeks, sources, rules, asOfForWeek, historySeasons);
+  const intersection = (outcome: WeekOutcome): ReadonlySet<string> => {
+    const [first, ...rest] = outcome.projected;
+    return new Set([...first!.keys()].filter((playerId) => rest.every((other) => other.has(playerId))));
+  };
+  return {
+    full: sources.map((source, index) => scoreSource(source.name, outcomes, index)),
+    common: sources.map((source, index) => scoreSource(source.name, outcomes, index, intersection)),
+  };
 }
 
 /** The four shares the opportunity model predicts, as they are keyed on `PlayerWeekUsage`. */

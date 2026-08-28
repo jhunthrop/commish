@@ -13,12 +13,13 @@
 // operator runs and never anything the product calls.
 import { createDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
-import { replay, replayOpportunity, SHARE_FIELDS, type ProjectionSource } from "@/projections/backtest";
+import { replayHeadToHead, replayOpportunity, SHARE_FIELDS, type ProjectionSource, type ReplayResult } from "@/projections/backtest";
 import { naiveProjection, NAIVE_SOURCE_NAME } from "@/projections/benchmarks/naive";
 import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
 import { scoreShares } from "@/projections/model/fit";
 import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
 import { lastObservedPriors } from "@/projections/model/opportunity";
+import { modelSource } from "@/projections/model/source";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ingestPlayerUniverse, ingestSeason } from "@/projections/nflverse/ingest";
 
@@ -116,18 +117,61 @@ async function main(): Promise<void> {
     console.log(`\nOPPORTUNITY: ${TARGET_SEASON} is a FIT season; its share numbers would be a description, not a measurement. Skipped.`);
   }
 
-  const source: ProjectionSource = {
+  const naive: ProjectionSource = {
     name: NAIVE_SOURCE_NAME,
     project: ({ history, season, week }) => naiveProjection(history, { season, week }),
   };
-  const result = await replay(db, { season: TARGET_SEASON, weeks, source, rules: PPR_SCORING, asOfForWeek });
+  const headToHead = await replayHeadToHead(db, {
+    season: TARGET_SEASON,
+    weeks,
+    sources: [naive, modelSource()],
+    rules: PPR_SCORING,
+    asOfForWeek,
+  });
+  const [floor, model] = headToHead.full;
 
-  console.log(`\n${result.source} over ${TARGET_SEASON}, PPR, scored against actual weekly outcomes\n`);
-  console.log("BY WEEK");
-  for (const week of result.weeks) console.log(`  ${card(`week ${week.week}`, week.overall)}`);
-  console.log("\nBY RANK BAND (pooled over every replayed week, banded by the benchmark's own projected rank)");
-  for (const band of RANK_BANDS) console.log(`  ${card(band.name, result.byRankBand[band.name])}`);
-  console.log(`\n  ${card("OVERALL", result.overall)}`);
+  console.log(`\nPOINTS, ${TARGET_SEASON}, PPR, scored against actual weekly outcomes`);
+  console.log(`  ${model!.source} against the floor, ${floor!.source}\n`);
+  for (const result of [floor!, model!]) {
+    console.log(`${result.source}`);
+    console.log("  BY WEEK");
+    for (const week of result.weeks) console.log(`    ${card(`week ${week.week}`, week.overall)}`);
+    console.log("  BY RANK BAND (banded by each source's OWN projected rank — see the caveat in the research doc)");
+    for (const band of RANK_BANDS) console.log(`    ${card(band.name, result.byRankBand[band.name])}`);
+    console.log(`    ${card("OVERALL", result.overall)}\n`);
+  }
+
+  // The single most informative line in the phase: the naive floor decays through a season because
+  // it never stops reading January. Whether the model FLATTENS that curve is the direct test of
+  // whether its in-season features are doing anything at all.
+  // LIKE FOR LIKE. The model projects everyone with usage history, including rookies the naive
+  // benchmark is structurally blind to, and those extra player-weeks are overwhelmingly low scorers
+  // that are easy to order correctly. Restricting to the players BOTH sources projected removes
+  // that advantage; the gap between this block and the one above is how much of the headline was
+  // coverage rather than accuracy.
+  console.log("SAME PLAYERS ONLY (every player both sources projected)");
+  for (const result of headToHead.common) {
+    console.log(`  ${result.source}`);
+    for (const band of RANK_BANDS) console.log(`    ${card(band.name, result.byRankBand[band.name])}`);
+    console.log(`    ${card("OVERALL", result.overall)}`);
+  }
+
+  console.log("\nWEEKLY DECAY (rank correlation), floor -> model");
+  for (const week of floor!.weeks) {
+    const ours = model!.weeks.find((candidate) => candidate.week === week.week)!;
+    const delta = (ours.overall.rankCorrelation ?? 0) - (week.overall.rankCorrelation ?? 0);
+    console.log(
+      `  week ${String(week.week).padStart(2)}   ${(week.overall.rankCorrelation ?? 0).toFixed(3)} -> ${(ours.overall.rankCorrelation ?? 0).toFixed(3)}   ${delta >= 0 ? "+" : ""}${delta.toFixed(3)}`,
+    );
+  }
+  const half = (result: ReplayResult, from: number, to: number) => {
+    const weeksInRange = result.weeks.filter((week) => week.week >= from && week.week <= to);
+    return weeksInRange.reduce((sum, week) => sum + (week.overall.rankCorrelation ?? 0), 0) / weeksInRange.length;
+  };
+  console.log(
+    `  weeks 1-9    floor ${half(floor!, 1, 9).toFixed(3)}  model ${half(model!, 1, 9).toFixed(3)}\n` +
+      `  weeks 10-18  floor ${half(floor!, 10, 18).toFixed(3)}  model ${half(model!, 10, 18).toFixed(3)}`,
+  );
 
   await db.$client.end();
 }

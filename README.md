@@ -60,6 +60,19 @@ npm run money:reconcile   # the ledger's pooled balance against the bank's, plus
                           # each drift to the cent; a clean run says so plainly. Level-triggered,
                           # no scheduler (this and the admin-room drift panel's own "Refresh"
                           # button, /app/admin/money/reconcile, are the only two callers).
+npm run projections:backfill  # ingest the historical player universe and a span of nflverse seasons
+                          # into the point-in-time store: npm run projections:backfill -- 2020 2024
+                          # (defaults to exactly that). Prints per-season resolution and exits
+                          # non-zero if any season lands below 95%, because a player the universe
+                          # cannot place is indistinguishable from one who did not play.
+npm run projections:fit   # refit the model's parameters on the FIT seasons and regenerate
+                          # src/projections/model/fitted.ts. Refuses to fit on a held-out season.
+                          # The generated file is committed, so a published scoreboard can always be
+                          # traced back to the parameters that produced it. Takes about two minutes.
+npm run projections:report  # replay a season and print the scoreboard: layer 1's shares against
+                          # "last week's share", then points for the model against the naive floor,
+                          # like-for-like and by rank band, plus the weekly decay curve.
+                          # npm run projections:report 2023. See docs/research/2026-08-27-model-v1.md.
 npm run e2e:install       # one-time: download the Playwright browser
 npm run e2e               # browser end-to-end suite (needs a build + a WorkOS test key)
 npm run e2e:ui            # same suite, in Playwright's interactive UI mode
