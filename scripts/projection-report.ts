@@ -13,9 +13,12 @@
 // operator runs and never anything the product calls.
 import { createDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
-import { replay, type ProjectionSource } from "@/projections/backtest";
+import { replay, replayOpportunity, SHARE_FIELDS, type ProjectionSource } from "@/projections/backtest";
 import { naiveProjection, NAIVE_SOURCE_NAME } from "@/projections/benchmarks/naive";
 import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
+import { scoreShares } from "@/projections/model/fit";
+import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
+import { lastObservedPriors } from "@/projections/model/opportunity";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ingestPlayerUniverse, ingestSeason } from "@/projections/nflverse/ingest";
 
@@ -81,11 +84,42 @@ async function main(): Promise<void> {
   const priorSeasonEnd = new Date(Math.max(...[...prior.values()].map((date) => date.getTime())));
   const asOfForWeek = (week: number): Date => target.get(week - 1) ?? priorSeasonEnd;
 
+  /**
+   * LAYER 1 ON ITS OWN TERMS, printed before any points scoreboard.
+   *
+   * If predicted target share is not better than "whatever his share was last week", nothing
+   * composed on top of it can be — and that failure is invisible in a points table, where an
+   * efficiency error and an opportunity error look identical.
+   */
+  const weeks = Array.from({ length: LAST_REGULAR_WEEK }, (_, index) => index + 1);
+  if (!(FIT_SEASONS as readonly number[]).includes(TARGET_SEASON)) {
+    const model = await replayOpportunity(db, { season: TARGET_SEASON, weeks, asOfForWeek, priors: FITTED_OPPORTUNITY_PRIORS });
+    const floor = await replayOpportunity(db, {
+      season: TARGET_SEASON,
+      weeks,
+      asOfForWeek,
+      priors: lastObservedPriors(FITTED_OPPORTUNITY_PRIORS),
+    });
+    console.log(`\nOPPORTUNITY (layer 1), ${TARGET_SEASON}, predicted share against observed share`);
+    console.log(`  parameters fitted on ${FIT_SEASONS.join(", ")}; held out: ${HELD_OUT_SEASONS.join(", ")}`);
+    const shareLine = (name: string, observations: Parameters<typeof scoreShares>[0]) => {
+      const score = scoreShares(observations);
+      return `  ${name.padEnd(20)} rho ${(score.rankCorrelation ?? 0).toFixed(4)}   MAE ${(score.meanAbsoluteError ?? 0).toFixed(5)}   RMSE ${(score.rootMeanSquaredError ?? 0).toFixed(5)}   n=${score.sampleSize}`;
+    };
+    for (const field of SHARE_FIELDS) {
+      console.log(shareLine(`${field} model`, model.byShare[field]));
+      console.log(shareLine(`${field} last-week`, floor.byShare[field]));
+    }
+    console.log(shareLine("POOLED model", model.pooled));
+    console.log(shareLine("POOLED last-week", floor.pooled));
+  } else {
+    console.log(`\nOPPORTUNITY: ${TARGET_SEASON} is a FIT season; its share numbers would be a description, not a measurement. Skipped.`);
+  }
+
   const source: ProjectionSource = {
     name: NAIVE_SOURCE_NAME,
     project: ({ history, season, week }) => naiveProjection(history, { season, week }),
   };
-  const weeks = Array.from({ length: LAST_REGULAR_WEEK }, (_, index) => index + 1);
   const result = await replay(db, { season: TARGET_SEASON, weeks, source, rules: PPR_SCORING, asOfForWeek });
 
   console.log(`\n${result.source} over ${TARGET_SEASON}, PPR, scored against actual weekly outcomes\n`);

@@ -76,6 +76,23 @@ export function targetShare(playerTargets: number, teamTargets: number): number 
   return share(playerTargets, teamTargets, "player targets", "team targets");
 }
 
+/** The fraction of his team's rushing attempts he took. The back's equivalent of a target share. */
+export function carryShare(playerCarries: number, teamCarries: number): number | null {
+  return share(playerCarries, teamCarries, "player carries", "team carries");
+}
+
+/**
+ * The fraction of his offence's throws a quarterback made.
+ *
+ * Near 1 for any starter, and that is exactly what makes it worth computing rather than obviously
+ * redundant: the question a quarterback projection turns on is whether he is THE quarterback this
+ * week, not by how much. A backup who took nine of forty-one throws in a blowout reads as 0.22 here
+ * and as a full week's work in any counting stat.
+ */
+export function passAttemptShare(playerAttempts: number, teamAttempts: number): number | null {
+  return share(playerAttempts, teamAttempts, "player pass attempts", "team pass attempts");
+}
+
 /**
  * Targets per route run — the sharpest available measure of how much a quarterback looks for a
  * receiver, independent of how often the offense threw.
@@ -96,10 +113,21 @@ export interface WeeklyValue {
 }
 
 export interface RollingOptions {
-  /** How many weeks back to look, counted in CALENDAR weeks from the most recent one. */
+  /** How many weeks back to look, counted in CALENDAR weeks from the anchor. */
   readonly window: number;
   /** Defaults to `OPPORTUNITY_CONFIG.recencyDecay`. */
   readonly decay?: number;
+  /**
+   * The week distance is measured from. Defaults to the most recent week that carries a value,
+   * which is what a "current form" read wants.
+   *
+   * A PREDICTOR must pass the week it is predicting instead, and the difference is not cosmetic: a
+   * player returning from a three-week absence has form that is three weeks stale, and anchoring on
+   * his own last game would present it as though it were last Sunday. That is precisely the segment
+   * — returning starters — the engine most needs to be right about, so the choice is a parameter
+   * rather than a convention.
+   */
+  readonly anchorWeek?: number;
 }
 
 /**
@@ -117,7 +145,7 @@ export interface RollingOptions {
  */
 export function rollingOpportunity(
   history: readonly WeeklyValue[],
-  { window, decay = OPPORTUNITY_CONFIG.recencyDecay }: RollingOptions,
+  { window, decay = OPPORTUNITY_CONFIG.recencyDecay, anchorWeek }: RollingOptions,
 ): number | null {
   if (!Number.isInteger(window) || window < 1) {
     throw new Error(`A rolling window must be a positive whole number of weeks; got ${window}.`);
@@ -131,15 +159,42 @@ export function rollingOpportunity(
   const known = history.filter((entry): entry is { week: number; value: number } => entry.value !== null);
   if (known.length === 0) return null;
 
-  const mostRecent = Math.max(...known.map((entry) => entry.week));
+  const anchor = anchorWeek ?? Math.max(...known.map((entry) => entry.week));
   let weighted = 0;
   let weights = 0;
   for (const { week, value } of known) {
-    const weeksAgo = mostRecent - week;
-    if (weeksAgo >= window) continue;
+    const weeksAgo = anchor - week;
+    // A week at or after the anchor is not evidence a predictor may use — it is the future. The
+    // guard is here rather than left to callers because this is the function every layer reads
+    // form through, and one caller forgetting it would be invisible in every number downstream.
+    if (weeksAgo < 0 || weeksAgo >= window) continue;
     const weight = decay ** weeksAgo;
     weighted += weight * assertFinite(value, `week ${week} value`);
     weights += weight;
   }
   return weights === 0 ? null : weighted / weights;
+}
+
+/**
+ * The total weight `rollingOpportunity` gave — how many GAMES of evidence its answer rests on,
+ * discounted for age.
+ *
+ * A mean says nothing about its own confidence, and a shrinkage estimator needs exactly that: one
+ * week of 40% target share and eight weeks of it are the same average and completely different
+ * evidence. Returning it separately rather than bundling it keeps `rollingOpportunity` a mean.
+ */
+export function rollingWeight(
+  history: readonly WeeklyValue[],
+  { window, decay = OPPORTUNITY_CONFIG.recencyDecay, anchorWeek }: RollingOptions,
+): number {
+  const known = history.filter((entry) => entry.value !== null);
+  if (known.length === 0) return 0;
+  const anchor = anchorWeek ?? Math.max(...known.map((entry) => entry.week));
+  let weights = 0;
+  for (const { week } of known) {
+    const weeksAgo = anchor - week;
+    if (weeksAgo < 0 || weeksAgo >= window) continue;
+    weights += decay ** weeksAgo;
+  }
+  return weights;
 }

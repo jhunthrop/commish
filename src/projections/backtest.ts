@@ -1,11 +1,12 @@
-import { eq, inArray } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
 import { nflPlayers } from "@/db/schema";
 import type { Position, StatLine } from "@/domain/player";
 import { projectedPosition } from "./nflverse/players";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { statLinesAsOf, type SeasonStatLine } from "./lines";
+import { predictOpportunity, type OpportunityPriors } from "./model/opportunity";
 import { LAST_POSSIBLE_WEEK } from "./store";
+import { usageAsOf, type PlayerWeekUsage } from "./usage";
 import { rankBandFor, scoreCard, RANK_BANDS, type Observation, type RankBandName, type ScoreCard } from "./metrics";
 
 /**
@@ -33,6 +34,18 @@ export interface ProjectionInput {
   readonly asOf: Date;
   /** Every outcome knowable at `asOf`, this season and the seasons before it. */
   readonly history: readonly SeasonStatLine[];
+  /**
+   * Every player's OPPORTUNITY knowable at `asOf`, over the same span — snap, target, carry and
+   * pass-attempt shares beside the team volumes they were taken against.
+   *
+   * Read here rather than by the source, and through `usageAsOf`, so that the single as-of gate
+   * still governs everything a source can see. A source that opened its own connection would be a
+   * second path from the store into a projection, and a leak on a second path looks exactly like a
+   * very good model.
+   */
+  readonly usage: readonly PlayerWeekUsage[];
+  /** From `nfl_players`, narrowed. A player absent here is one the engine cannot score. */
+  readonly positions: ReadonlyMap<string, Position>;
 }
 
 export interface ProjectionSource {
@@ -135,12 +148,8 @@ function bandByProjectedRank(projections: readonly { playerId: string; points: n
  * and omission here means excluded from BOTH the projections and the actuals, so the comparison
  * stays over the same set of people.
  */
-async function positionsOf(db: ReadonlyDb, playerIds: readonly string[]): Promise<ReadonlyMap<string, Position>> {
-  if (playerIds.length === 0) return new Map();
-  const rows = await db
-    .select({ id: nflPlayers.id, position: nflPlayers.position })
-    .from(nflPlayers)
-    .where(playerIds.length === 1 ? eq(nflPlayers.id, playerIds[0]!) : inArray(nflPlayers.id, playerIds));
+export async function allPositions(db: ReadonlyDb): Promise<ReadonlyMap<string, Position>> {
+  const rows = await db.select({ id: nflPlayers.id, position: nflPlayers.position }).from(nflPlayers);
   return new Map(
     rows
       .map((row) => [row.id, projectedPosition(row.position)] as const)
@@ -159,6 +168,10 @@ export async function replay(
   const earliestSeason = season - historySeasons + 1;
   const weekReplays: WeekReplay[] = [];
   const pooled: BandedObservation[] = [];
+  // Read once, outside the loop. Position is the one fact in this instrument that carries no as-of
+  // and never will: a man's position is not restated by a Sunday-night stat correction, and reading
+  // it per week would be eighteen identical queries pretending to be a point-in-time read.
+  const positions = await allPositions(db);
 
   for (const week of inOrder) {
     const asOf = asOfForWeek(week);
@@ -170,18 +183,18 @@ export async function replay(
     // and nothing stamped after the replay moment. Both bounds matter — the as-of gate alone would
     // still admit a pre-kickoff fact about this week, which is not what "history" means.
     const history: SeasonStatLine[] = [];
+    const usage: PlayerWeekUsage[] = [];
     for (let historySeason = earliestSeason; historySeason <= season; historySeason += 1) {
       const upTo = historySeason === season ? week - 1 : LAST_POSSIBLE_WEEK;
       if (upTo < 1) continue;
-      history.push(...(await statLinesAsOf(db, { season: historySeason, week: { from: 1, to: upTo }, asOf })));
+      const span = { season: historySeason, week: { from: 1, to: upTo }, asOf } as const;
+      history.push(...(await statLinesAsOf(db, span)));
+      usage.push(...(await usageAsOf(db, span)));
     }
 
-    const projected = await source.project({ season, week, asOf, history });
+    const projected = await source.project({ season, week, asOf, history, usage, positions });
     const actuals = await statLinesAsOf(db, { season, week, asOf: FINAL_OUTCOME });
 
-    const positions = await positionsOf(db, [
-      ...new Set([...projected.map((line) => line.playerId), ...actuals.map((row) => row.line.playerId)]),
-    ]);
     const pointsOf = (line: StatLine): number | null => {
       const position = positions.get(line.playerId);
       return position === undefined ? null : computeFantasyPoints(line, position, rules);
@@ -214,4 +227,74 @@ export async function replay(
   }
 
   return { source: source.name, weeks: weekReplays, ...scoreBanded(pooled) };
+}
+
+/** The four shares the opportunity model predicts, as they are keyed on `PlayerWeekUsage`. */
+export const SHARE_FIELDS = ["snapShare", "targetShare", "carryShare", "passAttemptShare"] as const;
+export type ShareField = (typeof SHARE_FIELDS)[number];
+
+export interface OpportunityReplayOptions {
+  readonly season: number;
+  readonly weeks: readonly number[];
+  readonly asOfForWeek: (week: number) => Date;
+  readonly priors: OpportunityPriors;
+  readonly historySeasons?: number;
+}
+
+export interface OpportunityReplayResult {
+  /** Predicted share against observed share, per share and pooled over all of them. */
+  readonly byShare: Readonly<Record<ShareField, readonly Observation[]>>;
+  readonly pooled: readonly Observation[];
+}
+
+/**
+ * SCORING LAYER 1 ON ITS OWN TERMS, before it has touched a single fantasy point.
+ *
+ * This is the measurement that has to come first. If predicted target share is not better than
+ * "whatever his share was last week", nothing composed on top of it can be — and the failure would
+ * be invisible in a points scoreboard, where an efficiency error and an opportunity error look
+ * identical. Separating them is the only way to know which half is wrong.
+ *
+ * Point-in-time throughout, exactly as `replay` is: each week's prediction is made from usage read
+ * through the as-of gate at that week's replay moment, and scored against the FINAL, corrected
+ * usage. Evaluating against a flat season-long read would let a stat correction published in
+ * December inform an October prediction — a small leak, but the small ones are the ones that
+ * survive review.
+ */
+export async function replayOpportunity(
+  db: ReadonlyDb,
+  { season, weeks, asOfForWeek, priors, historySeasons = DEFAULT_HISTORY_SEASONS }: OpportunityReplayOptions,
+): Promise<OpportunityReplayResult> {
+  const positions = await allPositions(db);
+  const earliestSeason = season - historySeasons + 1;
+  const byShare: Record<ShareField, Observation[]> = {
+    snapShare: [],
+    targetShare: [],
+    carryShare: [],
+    passAttemptShare: [],
+  };
+
+  for (const week of [...weeks].sort((a, b) => a - b)) {
+    const asOf = asOfForWeek(week);
+    const history: PlayerWeekUsage[] = [];
+    for (let historySeason = earliestSeason; historySeason <= season; historySeason += 1) {
+      const upTo = historySeason === season ? week - 1 : LAST_POSSIBLE_WEEK;
+      if (upTo < 1) continue;
+      history.push(...(await usageAsOf(db, { season: historySeason, week: { from: 1, to: upTo }, asOf })));
+    }
+    const predictions = predictOpportunity(history, { season, week, positions }, priors);
+    const actuals = await usageAsOf(db, { season, week, asOf: FINAL_OUTCOME });
+
+    for (const actual of actuals) {
+      const predicted = predictions.get(actual.playerId);
+      if (predicted === undefined) continue;
+      for (const field of SHARE_FIELDS) {
+        const observed = actual[field];
+        if (observed === null) continue;
+        byShare[field].push({ predicted: predicted[field], actual: observed });
+      }
+    }
+  }
+
+  return { byShare, pooled: SHARE_FIELDS.flatMap((field) => byShare[field]) };
 }
