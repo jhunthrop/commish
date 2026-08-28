@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, LedgerRow } from "@/components/ui";
+import { Badge, Button, LedgerRow, Stat } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { formatUsd } from "@/money/config";
 import { useAdminRoomDeps } from "../hooks/deps";
@@ -82,12 +82,6 @@ export function ReconcileDriftPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <Button type="button" loading={state.status === "loading"} disabled={state.status === "loading"} onClick={() => void load()}>
-          Refresh
-        </Button>
-      </div>
-
       {state.status === "error" ? (
         <p role="alert" className="text-sm text-negative">
           {state.message}
@@ -96,17 +90,28 @@ export function ReconcileDriftPanel() {
 
       {state.status === "ready" ? (
         <div role="status" className="flex flex-col gap-3">
+          {/* THE ONE NUMBER THIS TOOL EXISTS TO REPORT, at the size of the question it answers.
+              An operator opens money reconciliation to learn one thing: does the book agree with
+              the bank. Drift used to render at 13px as the third of three identical rows, so the
+              answer was the same size as the two figures it is derived FROM. This is the single
+              place the spec's "laws 2 and 6 are spent sparingly here" gets spent on this page —
+              one figure, no motion, and the two inputs stay dense rows below it.
+
+              `Stat` takes no `comparison`, so the figure is never tinted: a drift has no
+              population to be judged against, and green-for-zero would be a verdict the `Badge`
+              beside it already states in a word (and states for a screen reader too, where a
+              colour states nothing). */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Stat label="Drift" value={formatUsd(state.report.drift)} size="lg" className="font-mono" />
+            <Badge tone={state.report.drift === 0 ? "neutral" : "negative"}>{state.report.drift === 0 ? "Agrees" : "Off the bank"}</Badge>
+          </div>
+
           <div className="flex flex-col">
             <LedgerRow label="Ledger pooled balance">
               <span className="font-mono text-text-primary">{formatUsd(state.report.ledgerFboPoolCents)}</span>
             </LedgerRow>
             <LedgerRow label="Bank pooled balance">
               <span className="font-mono text-text-primary">{formatUsd(state.report.providerPooledBalanceCents)}</span>
-            </LedgerRow>
-            <LedgerRow label="Drift">
-              <span className={`font-mono font-semibold ${state.report.drift === 0 ? "text-text-primary" : "text-negative"}`}>
-                {formatUsd(state.report.drift)}
-              </span>
             </LedgerRow>
           </div>
 
@@ -126,9 +131,28 @@ export function ReconcileDriftPanel() {
             </ul>
           )}
 
-          <p className="text-xs text-text-muted">
-            As of <time dateTime={state.asOf}>{formatInstant(state.asOf)}</time>.
-          </p>
+          {/* The re-read, and the page's quietest control by design (law 5: the loud action
+              belongs to ACTS only). "Refresh" moves no money and decides nothing — it reruns the
+              same `GET` — so it is a quiet pill sitting with the timestamp it replaces, rather
+              than the ink pill standing above the report it used to introduce. That leaves this
+              operator page with no ink action at all, which is the correct answer for a tool
+              whose whole job is to state a fact. */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2">
+            <p className="text-xs text-text-muted">
+              As of <time dateTime={state.asOf}>{formatInstant(state.asOf)}</time>.
+            </p>
+            <Button type="button" variant="secondary" size="sm" onClick={() => void load()}>
+              Refresh
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {state.status !== "ready" ? (
+        <div>
+          <Button type="button" variant="secondary" size="sm" loading={state.status === "loading"} disabled={state.status === "loading"} onClick={() => void load()}>
+            Refresh
+          </Button>
         </div>
       ) : null}
     </div>

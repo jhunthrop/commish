@@ -338,11 +338,20 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
               {evidenceEntries.length === 0 ? (
                 <p className="mt-2 text-sm text-text-muted">No evidence recorded for this flag.</p>
               ) : (
-                <dl className="mt-2 flex flex-col gap-1">
+                /* GAMEDAY, LAWS 1 AND 4, SPENT AS SPARINGLY AS THE OPERATOR RULING ASKS. The
+                   keys stay verbatim and every value stays `JSON.stringify`d — an evidence dump's
+                   whole worth is that it is the record, not a translation of it, and a per-key
+                   label table would be this page deciding which machine facts an operator is
+                   allowed to read. What changes is the register: values render mono, which is the
+                   product's own face for a machine value and (via `globals.css`) carries
+                   `tabular-nums`, so a gap of 20.89 and a threshold of 20 line up on the decimal
+                   an operator is comparing them at. Rows are hairline-separated and tight rather
+                   than floating on a gap, because this is read down a column. */
+                <dl className="mt-2 flex flex-col">
                   {evidenceEntries.map(([key, value]) => (
-                    <div key={key} className="flex justify-between gap-3 text-sm">
-                      <dt className="text-text-muted">{key}</dt>
-                      <dd className="break-all text-text-primary">{JSON.stringify(value)}</dd>
+                    <div key={key} className="flex items-baseline justify-between gap-3 border-t border-line py-1.5 text-sm">
+                      <dt className="shrink-0 text-text-muted">{key}</dt>
+                      <dd className="min-w-0 break-all text-right font-mono text-text-primary">{JSON.stringify(value)}</dd>
                     </div>
                   ))}
                 </dl>

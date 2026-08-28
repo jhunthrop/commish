@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { PageTitle } from "@/components/ui";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { HoldsControl } from "@/admin-room/components/holds-control";
+import { OperatorTool } from "@/admin-room/components/operator-tool";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
@@ -17,16 +17,12 @@ export const metadata: Metadata = pageTitle("Held payouts");
 export default async function AdminHoldsPage() {
   return withAdmin(async () => {
     return (
-      <>
-        <header className="flex flex-col gap-1">
-          <PageTitle>Held payouts</PageTitle>
-          <p className="text-sm text-text-muted">
-            Resolve a payout held at settlement. Release pays it to the member&apos;s wallet; confiscate forfeits it to the platform. Both are one-way.
-          </p>
-        </header>
-
+      <OperatorTool
+        title="Held payouts"
+        intent={"Resolve a payout held at settlement. Release pays it to the member's wallet; confiscate forfeits it to the platform. Both are one-way."}
+      >
         <HoldsControl />
-      </>
+      </OperatorTool>
     );
   });
 }

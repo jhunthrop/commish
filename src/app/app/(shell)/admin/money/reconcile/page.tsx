@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { PageTitle } from "@/components/ui";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { ReconcileDriftPanel } from "@/admin-room/components/reconcile-drift-panel";
+import { OperatorTool } from "@/admin-room/components/operator-tool";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
@@ -18,16 +18,12 @@ export const metadata: Metadata = pageTitle("Money reconciliation");
 export default async function AdminMoneyReconcilePage() {
   return withAdmin(async () => {
     return (
-      <>
-        <header className="flex flex-col gap-1">
-          <PageTitle>Money reconciliation</PageTitle>
-          <p className="text-sm text-text-muted">
-            The ledger&apos;s pooled balance against the bank&apos;s own, plus the internal checks a healthy book always passes. Recomputed fresh on every load.
-          </p>
-        </header>
-
+      <OperatorTool
+        title="Money reconciliation"
+        intent={"The ledger's pooled balance against the bank's own, plus the internal checks a healthy book always passes. Recomputed fresh on every load."}
+      >
         <ReconcileDriftPanel />
-      </>
+      </OperatorTool>
     );
   });
 }

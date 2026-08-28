@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { PageTitle } from "@/components/ui";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { ExclusionControl } from "@/admin-room/components/exclusion-control";
+import { OperatorTool } from "@/admin-room/components/operator-tool";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
@@ -19,16 +19,12 @@ export const metadata: Metadata = pageTitle("Self exclusion");
 export default async function AdminExclusionsPage() {
   return withAdmin(async () => {
     return (
-      <>
-        <header className="flex flex-col gap-1">
-          <PageTitle>Self exclusion</PageTitle>
-          <p className="text-sm text-text-muted">
-            Clear self exclusion for a member who asked support to reopen paid play. This is recorded on the platform record.
-          </p>
-        </header>
-
+      <OperatorTool
+        title="Self exclusion"
+        intent={"Clear self exclusion for a member who asked support to reopen paid play. This is recorded on the platform record."}
+      >
         <ExclusionControl />
-      </>
+      </OperatorTool>
     );
   });
 }
