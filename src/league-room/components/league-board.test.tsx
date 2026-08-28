@@ -95,7 +95,7 @@ const medianLeague: readonly HomeLeagueCard[] = [
 describe("LeagueBoard", () => {
   it("puts the league that needs the manager first, and says why in words", async () => {
     await renderSurface(<LeagueBoard leagues={mixed} />, ({ getAllByRole }) => {
-      expect(within(getAllByRole("row")[1]!).getByText("Fix your lineup")).toBeInTheDocument();
+      expect(within(getAllByRole("row")[1]!).getAllByText("Fix your lineup").length).toBe(2);
     });
   });
 
@@ -118,24 +118,27 @@ describe("LeagueBoard", () => {
   });
 
   it("renders the crest, record, action and state for an ordinary row", async () => {
-    await renderSurface(<LeagueBoard leagues={[ORDINARY]} />, ({ getByText, getByRole }) => {
+    await renderSurface(<LeagueBoard leagues={[ORDINARY]} />, ({ getByText, getAllByRole }) => {
       expect(getByText("5-2")).toBeInTheDocument();
-      expect(getByRole("link", { name: /Watch the scores/ })).toBeInTheDocument();
+      expect(getAllByRole("link", { name: /Watch the scores for/ }).length).toBe(2);
     });
   });
 
-  // Persona panel, Step 5 (the phone user): the manager's own score, the state badge and the verb
-  // stay intact at 360px. The opponent and margin columns drop below `sm` — and the opponent's
-  // line is restated inside the score cell there, so nothing true leaves with the column.
-  it("keeps the score, the state badge and the verb at 360px, and hides only what it restates", async () => {
+  // Persona panel, Step 5 (the phone user): below `sm` the board is TWO columns, and the score
+  // cell carries the opponent, the state and the verb underneath the manager's own number.
+  it("folds the opponent, the state and the verb under the score at 360px", async () => {
     await renderSurface(<LeagueBoard leagues={live} />, ({ getByText, getByRole }) => {
-      expect(getByText("Live").closest("td")?.className).not.toMatch(/hidden/);
-      expect(getByRole("columnheader", { name: "State" }).className).not.toMatch(/hidden/);
       expect(getByRole("columnheader", { name: /^Your score/ }).className).not.toMatch(/hidden/);
-      expect(getByRole("columnheader", { name: "Margin" }).className).toMatch(/hidden/);
-      expect(getByRole("columnheader", { name: "Opponent" }).className).toMatch(/hidden/);
-      // The dropped opponent, restated inside the score cell for the narrow viewport only.
-      expect(getByText("vs Comet Crew 108.00").className).toMatch(/sm:hidden/);
+      for (const dropped of ["Opponent", "Margin", "State", "Action"]) {
+        expect(getByRole("columnheader", { name: dropped }).className).toMatch(/hidden/);
+      }
+      // The dropped opponent, state and VERB, folded into the score cell for the narrow viewport
+      // rather than pushed off the edge of a phone. A verb a manager cannot see on a Sunday is
+      // not an obvious verb, whatever law 5 says about the desktop.
+      const narrow = getByText("vs Comet Crew 108.00").closest("div");
+      expect(narrow?.className).toMatch(/sm:hidden/);
+      expect(within(narrow!).getByText("Live")).toBeInTheDocument();
+      expect(within(narrow!).getByRole("link", { name: /Watch the scores for/ })).toBeInTheDocument();
     });
   });
 
@@ -147,8 +150,10 @@ describe("LeagueBoard", () => {
    */
   it("gives every row the money-filled verb, not a quiet outline", async () => {
     await renderSurface(<LeagueBoard leagues={mixed} />, ({ getAllByRole }) => {
+      // Two rows, each rendering its verb twice — the wide cell and the narrow fold-in, exactly
+      // one of which is displayed at any width.
       const actions = getAllByRole("link", { name: /^(Fix your lineup|Watch the scores) for/ });
-      expect(actions.length).toBe(2);
+      expect(actions.length).toBe(4);
       for (const action of actions) {
         expect(action.className).toMatch(/bg-accent/);
         expect(action.className).not.toMatch(/bg-text-primary/);
@@ -212,9 +217,9 @@ describe("LeagueBoard", () => {
   // for `PointsShareBar` here, which keeps the same contract: the name truncates, the number
   // never wraps.
   it("never lets the State badge or the share figure wrap, in either theme (LED-11)", async () => {
-    await renderSurface(<LeagueBoard leagues={[ORDINARY]} />, ({ getByText }) => {
-      expect(getByText("Watch the scores")).toBeInTheDocument();
-      expect(getByText("Live").className).toMatch(/whitespace-nowrap/);
+    await renderSurface(<LeagueBoard leagues={[ORDINARY]} />, ({ getAllByText }) => {
+      expect(getAllByText("Watch the scores").length).toBe(2);
+      expect(getAllByText("Live")[0]!.className).toMatch(/whitespace-nowrap/);
     });
     const wideMargin: readonly HomeLeagueCard[] = [
       {

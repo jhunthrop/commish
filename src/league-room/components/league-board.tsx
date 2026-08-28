@@ -99,26 +99,50 @@ function Score({ label, points, size, leading }: { readonly label: string; reado
       >
         {points === null ? NOT_STARTED_DASH : formatPoints(points)}
       </span>
-      <span className={`${MICRO_LABEL} block max-w-36 truncate text-text-faint`}>{label}</span>
+      <span className={`${MICRO_LABEL} block max-w-28 truncate text-text-faint sm:max-w-40`}>{label}</span>
     </div>
   );
 }
 
-/** The manager's own score — the loudest thing on its row, which is what law 2 asks a board for.
- *  Below `sm` it also carries the opponent's line, because the opponent column is dropped there
- *  and a score with nothing to beat is not a matchup. */
+/**
+ * The manager's own score — the loudest thing on its row, which is what law 2 asks a board for.
+ *
+ * BELOW `sm` this cell absorbs the columns that are dropped there. A 390px viewport cannot hold
+ * six columns, and the version that tried pushed the score itself half off the edge: the table
+ * scrolled inside its own wrapper as designed, so nothing overflowed the page, but a manager on a
+ * phone read "138" and had to swipe for the rest of their own score, and swipe further still for
+ * the verb. Three facts survive at that width — who you are playing, what the week is doing, and
+ * the act — and they fold in HERE rather than off screen. A verb a manager cannot see on a phone
+ * on a Sunday is not an obvious verb, whatever law 5 says about the desktop.
+ *
+ * The badge and the verb each exist twice in the DOM with exactly one of the pair `display: none`
+ * at any width, which is the responsive-row idiom `OpenLeagueShelf` already uses: `display: none`
+ * removes a node from the accessibility tree, so nothing is announced twice, and the page audit's
+ * own ink count is written against the same property (it filters on `offsetParent`).
+ */
 function MyScoreCell({ league }: { readonly league: HomeLeagueCard }) {
   const sides = sidesOf(league);
-  if (sides === null) {
-    return <span className="text-sm text-text-muted">No matchup</span>;
-  }
-  const leads = sides.mineScore !== null && sides.theirsScore !== null && sides.mineScore > sides.theirsScore;
+  const leads = sides !== null && sides.mineScore !== null && sides.theirsScore !== null && sides.mineScore > sides.theirsScore;
   return (
     <div className="flex flex-col gap-1">
-      <Score label={sides.mineName} points={sides.mineScore} size="text-display-md" leading={leads} />
-      <p className="text-xs text-text-muted sm:hidden">
-        {`vs ${sides.theirsName} ${sides.theirsScore === null ? NOT_STARTED_DASH : formatPoints(sides.theirsScore)}`}
-      </p>
+      {sides === null ? (
+        <span className="text-sm text-text-muted">No matchup</span>
+      ) : (
+        <Score label={sides.mineName} points={sides.mineScore} size="text-display-md" leading={leads} />
+      )}
+      {/* The narrow fold-in renders for EVERY row, matchup or not: a league on a bye still has a
+          state and still has an act, and dropping the verb with the score would have hidden it on
+          exactly the rows a manager most needs to press (a draft to join, a lineup to fix, both of
+          which happen before a matchup exists). */}
+      <div className="flex max-w-36 flex-wrap items-center gap-2 sm:max-w-none sm:hidden">
+        {sides === null ? null : (
+          <p className="max-w-32 truncate text-xs text-text-muted sm:max-w-none">
+            {`vs ${sides.theirsName} ${sides.theirsScore === null ? NOT_STARTED_DASH : formatPoints(sides.theirsScore)}`}
+          </p>
+        )}
+        <WeekStatusBadge status={league.weekStatus} />
+        <Verb league={league} />
+      </div>
     </div>
   );
 }
@@ -178,7 +202,10 @@ function LeagueCell({ league }: { readonly league: HomeLeagueCard }) {
   return (
     <div className="flex items-center gap-2.5">
       <Crest id={league.id} name={league.name} size={CREST_SIZE_PX} />
-      <div className="flex min-w-0 flex-col">
+      {/* Capped at narrow so this cell cannot monopolise the row and push the manager's own score
+          off the edge of a phone — a league name is user content and can be any length. The cap
+          lifts at `sm`, where there is room for the full name. */}
+      <div className="flex min-w-0 max-w-28 flex-col sm:max-w-none">
         <Link
           href={`/app/leagues/${league.id}`}
           className="min-w-0 truncate font-display text-base font-medium text-text-primary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -205,7 +232,7 @@ function LeagueCell({ league }: { readonly league: HomeLeagueCard }) {
  * exactly this and which `page-audit.spec.ts` correctly does not count as ink — the ceremonial ink
  * pill stays available, unspent, for a surface that genuinely does one thing once.
  */
-function ActionCell({ league }: { readonly league: HomeLeagueCard }) {
+function Verb({ league }: { readonly league: HomeLeagueCard }) {
   if (league.nextAction === null) return null;
   return (
     <ButtonLink href={actionHref(league)} aria-label={`${league.nextAction.label} for ${league.name}`} variant="verb" size="sm">
@@ -247,9 +274,10 @@ function Head({ children }: { readonly children: string }) {
   return <span className={`${MICRO_LABEL} text-text-faint`}>{children}</span>;
 }
 
-// Persona panel, Step 5 (the phone user): the score, the state badge and the verb stay INTACT at
-// 360px. `opponent` and `margin` drop below `sm` — the opponent's line is restated inside the
-// score cell there (`MyScoreCell`), so nothing true leaves with the column.
+// Persona panel, Step 5 (the phone user): below `sm` the board is TWO columns — the league, and
+// the manager's own score with the opponent, the week's state and the verb folded under it
+// (`MyScoreCell`). Nothing true leaves with the four dropped columns except the margin, which is
+// the one supplementary judgement on the row and the only thing a phone genuinely gives up.
 function columnsFor(margins: readonly number[], sharedWeek: number | null): readonly TableColumn<HomeLeagueCard>[] {
   return [
     { key: "league", header: <Head>League</Head>, cell: (league) => <LeagueCell league={league} /> },
@@ -260,8 +288,8 @@ function columnsFor(margins: readonly number[], sharedWeek: number | null): read
     },
     { key: "opponent", header: <Head>Opponent</Head>, cell: (league) => <OpponentCell league={league} />, hideOnNarrow: true },
     { key: "margin", header: <Head>Margin</Head>, cell: (league) => <MarginCell league={league} margins={margins} />, hideOnNarrow: true },
-    { key: "state", header: <Head>State</Head>, cell: (league) => <StateCell league={league} sharedWeek={sharedWeek} /> },
-    { key: "action", header: <Head>Action</Head>, cell: (league) => <ActionCell league={league} /> },
+    { key: "state", header: <Head>State</Head>, cell: (league) => <StateCell league={league} sharedWeek={sharedWeek} />, hideOnNarrow: true },
+    { key: "action", header: <Head>Action</Head>, cell: (league) => <Verb league={league} />, hideOnNarrow: true },
   ];
 }
 
