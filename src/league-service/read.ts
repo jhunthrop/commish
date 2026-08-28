@@ -409,6 +409,14 @@ export async function matchupWeek(
       playerId: slot.playerId,
       playerName: player?.name ?? null,
       position: player?.position ?? null,
+      // Gameday law 3 ("a player is an object"): the club code and the headshot the season
+      // surfaces draw a player WITH. Free — `playerById` above already holds the whole row, so
+      // this is three more fields off a map lookup that had already happened, not a fourth read.
+      // `adp` rides with them because `Player` (`@/domain/player`) requires it, and a surface
+      // that wants to hand this entry to `PlayerFace`/`PlayerRow` needs a whole `Player`.
+      nflTeam: player?.nflTeam ?? null,
+      headshotUrl: player?.headshotUrl ?? null,
+      adp: player?.adp ?? null,
       // D4: "has not played" and "played and scored nothing" are different facts — the SAME
       // rule `MatchupSide.score` already honors at the team level (`null` for no live value
       // yet), stated one layer up by `initialScores`' own docblock (`live-matchup-week.tsx`).

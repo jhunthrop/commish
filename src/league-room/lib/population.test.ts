@@ -17,6 +17,9 @@ const entry = (overrides: Partial<MatchupLineupEntry>): MatchupLineupEntry => ({
   playerId: "p1",
   playerName: "A Passer",
   position: "QB",
+  nflTeam: "BUF",
+  headshotUrl: null,
+  adp: null,
   points: 10,
   ...overrides,
 });

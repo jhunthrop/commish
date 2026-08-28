@@ -368,6 +368,25 @@ export interface MatchupLineupEntry {
   readonly playerName: string | null;
   readonly position: Position | null;
   /**
+   * GAMEDAY, LAW 3 — *"a player is an object: face, team colour, position, number."* These three
+   * fields are what let a season surface draw one. Every value here was ALREADY in hand: the
+   * `matchupWeek` read (`@/league-service/read.ts`) loads the whole `players` table into
+   * `playerById` to resolve names and positions, so a club code and a headshot cost this wire
+   * three columns and zero queries.
+   *
+   * They are REQUIRED, not optional, for the reason `Player.headshotUrl` states on the domain
+   * type: a caller must never have to guess whether an absent field means "this player has none"
+   * or "whoever built this entry forgot". `null` on all three is the one spelling of an EMPTY
+   * SLOT — no player, so no club, no face and no draft position.
+   *
+   * The fourth of law 3's attributes, the jersey number, is not here because it is nowhere in the
+   * feed this product maps (`PlayerFace`'s own docblock carries the full argument). An invented
+   * number is worse than an absent one.
+   */
+  readonly nflTeam: string | null;
+  readonly headshotUrl: string | null;
+  readonly adp: number | null;
+  /**
    * `null` when this player has no stat line for the week yet — "has not played" and "played
    * and scored nothing" are different facts (`MatchupSide.score`'s own team-level rule, and
    * `initialScores`' docblock, `live-matchup-week.tsx`), and coalescing the first into the

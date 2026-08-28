@@ -22,12 +22,12 @@ const WEEK_BODY: MatchupWeekBody = {
       median: null,
       home: {
         teamId: "t1", teamName: "Bay Bandits", score: 10.5,
-        starters: [{ slot: "QB", slotIndex: 0, playerId: "qb1", playerName: "Josh Allen", position: "QB", points: 3.5 }],
+        starters: [{ slot: "QB", slotIndex: 0, playerId: "qb1", playerName: "Josh Allen", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null, points: 3.5 }],
         bench: [],
       },
       away: {
         teamId: "t2", teamName: "Iron Owls", score: 8.75,
-        starters: [{ slot: "QB", slotIndex: 0, playerId: "qb2", playerName: "Marcus Reed", position: "QB", points: 2.25 }],
+        starters: [{ slot: "QB", slotIndex: 0, playerId: "qb2", playerName: "Marcus Reed", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null, points: 2.25 }],
         bench: [],
       },
     },
