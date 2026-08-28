@@ -44,24 +44,4 @@ export const LEAGUE_ROOM_CONFIG = {
    * this is what the FOLD shows before asking).
    */
   mockHistoryVisibleCount: 8,
-  /**
-   * The heat map's own floor (the fun pass, Tasks 9 and 10 — `docs/design/2026-08-27-fun-pass-
-   * spec.md`, rule 1's magnitude amendment): how many real values a comparison set must hold
-   * before `comparisonWithin` (`./lib/population.ts`) will rank anything inside it. Below this
-   * the set is not a population, it is a handful of numbers, and a percentile across it is
-   * arithmetic dressed as a fact — exactly the "designer's feeling about whether 14.2 is a good
-   * number" the amendment forbids.
-   *
-   * Four is the smallest set where the five-step ramp can put two values either side of the
-   * middle and still mean it. It also decides when heat APPEARS on a Sunday: the matchup page
-   * pools only players who have already played, so a position stays plain ink until four of them
-   * have a stat line. A tunable, never a literal in a component, for the same reason
-   * `UI_CONFIG.stat.percentileFloors` is one: this number is the difference between an honest
-   * heat map and a decorative one, and a persona review should find it in one file.
-   *
-   * Flat, not nested under a `heat` object, so `config.test.ts`'s "every tunable is a positive
-   * number" sweep keeps covering it — the same shape `mockLobbyPollIntervalMs` and its sibling
-   * already use to group by prefix instead of by nesting.
-   */
-  heatMinPopulation: 4,
 } as const;

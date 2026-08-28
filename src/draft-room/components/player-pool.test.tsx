@@ -130,9 +130,11 @@ describe("PlayerPool", () => {
     expect(within(row).getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument();
   });
 
-  it("shows each player's position as its sticker, not as bare text", () => {
+  it("shows each player's position and his rank inside it as one sticker, not as bare text", () => {
+    // "QB1", not "QB". The board arrives server-ranked best-first, so the first quarterback down
+    // it IS this board's QB1, and the fact rides the sticker rather than earning a column.
     render(<PlayerPool {...props} />);
-    expect(within(rowFor("Jalen Croft")).getByText("QB").className).toContain("bg-pos-qb");
+    expect(within(rowFor("Jalen Croft")).getByText("QB1").className).toContain("bg-pos-qb");
   });
 
   // Founder directive 2026-08-26 ("why aren't we showing the players picture?"): qb1 (Jalen

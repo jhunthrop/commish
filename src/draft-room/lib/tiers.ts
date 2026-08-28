@@ -122,3 +122,26 @@ export function poolTiers(players: readonly Player[], teamCount: number): Readon
 export function formatAdp(adp: number | null): string | null {
   return adp === null ? null : `ADP ${adp.toFixed(1)}`;
 }
+
+/**
+ * Each player's rank AMONG HIS OWN POSITION on this board — the "4" in "RB4", keyed by player id.
+ *
+ * Derived from the board's own order and nothing else, which is what makes it honest: `players`
+ * arrives server-ranked, best first, so the fourth running back in that list IS this board's RB4.
+ * There is no positional-rank column on the feed and inventing one from a projection would be a
+ * different, weaker claim than the one the pool already displays by putting him fourth.
+ *
+ * Computed over the WHOLE board rather than the filtered view, for the same reason `poolTiers`
+ * is: filter to running backs and RB4 must still be RB4. A rank that renumbered itself as a
+ * manager typed into the search box would be describing the search box.
+ */
+export function positionRanks(players: readonly Player[]): ReadonlyMap<string, number> {
+  const seen = new Map<string, number>();
+  const ranks = new Map<string, number>();
+  for (const player of players) {
+    const next = (seen.get(player.position) ?? 0) + 1;
+    seen.set(player.position, next);
+    ranks.set(player.id, next);
+  }
+  return ranks;
+}

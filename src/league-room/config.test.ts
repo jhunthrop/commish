@@ -10,9 +10,12 @@ describe("LEAGUE_ROOM_CONFIG", () => {
       "attentionQueueCap",
       "mockLobbyPollIntervalMs",
       "mockHistoryVisibleCount",
-      // The fun pass, Tasks 9 and 10: the heat map's own floor. Flat rather than nested under a
-      // `heat` object precisely so this sweep keeps covering it.
-      "heatMinPopulation",
+      // `heatMinPopulation` LEFT THIS CONFIG on 2026-08-28 and is now `UI_CONFIG.stat
+      // .minPopulation` (`@/components/ui/config`), moved with the arithmetic it governs when
+      // `Table` learned to judge a column. A draft-room table asking a league-room config how
+      // many numbers make a population was the wrong shape, and a second copy of the four would
+      // have been worse. Named here so this list reads as a deletion with a destination rather
+      // than as a tunable somebody dropped.
     ];
     expect(Object.keys(LEAGUE_ROOM_CONFIG).sort()).toEqual([...keys].sort());
     for (const key of keys) {

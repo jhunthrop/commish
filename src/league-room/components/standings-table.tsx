@@ -2,10 +2,9 @@
 
 import { useMemo, useState } from "react";
 import type { TeamStandingsRow } from "../contract";
-import { Avatar, Badge, Button, EmptyState, InfoTip, Stat, Table, type TableColumn } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, InfoTip, Table, type TableColumn } from "@/components/ui";
 import type { HelpLevel } from "@/identity/preferences";
 import { formatPoints, formatRecord } from "../lib/format";
-import { comparisonWithin } from "../lib/population";
 
 type SortKey = "rank" | "pointsFor" | "pointsAgainst";
 
@@ -23,13 +22,17 @@ const ORDER_BY: Readonly<Record<SortKey, (row: TeamStandingsRow) => number>> = {
 };
 
 /**
- * The two populations this table can honestly name, in the words a manager would use — `Stat`
- * builds a sentence around them verbatim ("Top 8% of teams by points for."), so they are noun
- * phrases and the second one carries its own direction. A league is the whole population here:
- * unlike the matchup page, there is nothing wider to compare a team's season against.
+ * The comparison set both judged columns rank inside, in the words a manager would use. It is one
+ * phrase in two registers — the column head prints "vs the league" and `Stat` speaks "Top 8% of
+ * the league." — which is why it is a bare noun phrase and not a sentence.
+ *
+ * A league IS the whole population here: unlike the matchup page, there is nothing wider to
+ * compare a team's season against. The direction is what separates the two columns, and `Table`
+ * states it out loud ("lower is better") rather than smuggling it into the phrase — points against
+ * used to be named "teams by fewest points allowed", which was a true sentence doing a job the
+ * column head can do in three words.
  */
-const POINTS_FOR_POPULATION = "teams by points for";
-const POINTS_AGAINST_POPULATION = "teams by fewest points allowed";
+const LEAGUE_POPULATION = "the league";
 
 export interface StandingsTableProps {
   readonly rows: readonly TeamStandingsRow[];
@@ -80,12 +83,10 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false, 
   const showClinchBadges = rows.length > 0 && rows.some((row) => !row.clinched);
   const firstOutId = firstTeamOutId(rows, playoffTeams);
 
-  // The heat map's two populations (the fun pass, Task 10). Read off `rows` — the whole league,
-  // in the server's own ranking — never off `ordered`: a re-sort reshuffles what the reader sees
-  // and changes nothing about where a number stands among its peers, and a percentile that moved
-  // when you pressed "Sort by points against" would be telling you about the sort, not the season.
-  const pointsFor = useMemo(() => rows.map((row) => row.pointsFor), [rows]);
-  const pointsAgainst = useMemo(() => rows.map((row) => row.pointsAgainst), [rows]);
+  // The two population arrays this component used to memoise are gone: `Table` builds a judged
+  // column's set from the rows it is handed. A re-sort cannot move a percentile, because a
+  // percentile is order-independent and `ordered` holds the same twelve numbers `rows` does —
+  // which is the property the old comment was defending by hand.
 
   const sortable = (key: SortKey, label: string) => (
     <button type="button" className="underline" onClick={() => setSort(key)}>
@@ -115,55 +116,37 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false, 
               Two literal branches, never a dynamic `term={medianGame ? … : …}` expression:
               `glossary.source.test.ts`'s wiring scan is a static regex over `term="…"` string
               literals, so a computed prop value renders correctly but reads as unwired (A15). */}
-          {medianGame ? <InfoTip term="median-game" helpLevel={helpLevel} /> : <InfoTip term="standings-record" helpLevel={helpLevel} />}
+          {/* `normal-case` because a guided reader's `InfoTip` renders its whole caption inline
+              inside this header, and `Table`'s heads are now the caps charter's micro-label
+              register — without this, "Wins, losses, and ties so far this season." would arrive
+              shouted. The LABEL beside it still takes the register; only the sentence opts out,
+              which is the charter's own line: caps in a micro-label, sentence case in prose. */}
+          <span className="normal-case tracking-normal">
+            {medianGame ? <InfoTip term="median-game" helpLevel={helpLevel} /> : <InfoTip term="standings-record" helpLevel={helpLevel} />}
+          </span>
         </span>
       ),
       cell: (row) => <span className="font-mono">{formatRecord(row)}</span>,
     },
-    // THE HEAT MAP (the fun pass, Task 10). The two columns a reader cannot get from the row
-    // order — the record above is what the table is sorted BY, so tinting it would spend the heat
-    // on a fact position already tells, which is the "louder without making a true thing more
-    // legible" failure rule 6 rejects.
+    // THE HEAT MAP (the fun pass, Task 10; declarative since 2026-08-28). The two columns a reader
+    // cannot get from the row order — the record above is what the table is sorted BY, so tinting
+    // it would spend the heat on a fact position already tells, which is the "louder without
+    // making a true thing more legible" failure rule 6 rejects.
     //
-    // `srOnlyLabel`: the `<th>` is the column's label, on screen and announced, and a caption
-    // under each of twelve numbers would be the document grammar this pass exists to undo.
-    // `items-end` aligns the `Stat`'s flex column inside a `numeric` (right-aligned) cell.
-    // Tabular alignment survives the change — `Stat` carries `tabular-nums` on the display face
-    // where these cells used to carry `font-mono` (which is tabular by construction, see
-    // `docs/design-system.md`'s "Type" section), so a re-sort still never shifts digits sideways.
+    // `judged` rather than a hand-built `Stat` per cell: the comparison set is the column, `Table`
+    // builds it once from the rows it was handed, and the head prints what it is. Twenty-two lines
+    // of per-cell wiring — the label, the `srOnlyLabel`, the `items-end`, the two memoised
+    // population arrays — became these six, and the two columns can no longer drift apart.
     {
       key: "pointsFor",
       header: "Points for",
-      cell: (row) => (
-        <Stat
-          label="Points for"
-          srOnlyLabel
-          size="sm"
-          value={formatPoints(row.pointsFor)}
-          comparison={comparisonWithin(pointsFor, row.pointsFor, POINTS_FOR_POPULATION)}
-          className="items-end"
-        />
-      ),
-      numeric: true,
+      judged: { value: (row) => row.pointsFor, format: formatPoints, set: LEAGUE_POPULATION },
     },
     {
       key: "pointsAgainst",
       header: "Points against",
-      // The one column in this product where the biggest number is the worst one. The population
-      // is NAMED in the direction the ramp reads ("teams by fewest points allowed") because
-      // `Stat` speaks it out loud — "Top 8% of teams by points against" would be a true tint
-      // under a false sentence.
-      cell: (row) => (
-        <Stat
-          label="Points against"
-          srOnlyLabel
-          size="sm"
-          value={formatPoints(row.pointsAgainst)}
-          comparison={comparisonWithin(pointsAgainst, row.pointsAgainst, POINTS_AGAINST_POPULATION, "lower-is-better")}
-          className="items-end"
-        />
-      ),
-      numeric: true,
+      // The one column in this product where the biggest number is the worst one.
+      judged: { value: (row) => row.pointsAgainst, format: formatPoints, set: LEAGUE_POPULATION, direction: "lower-is-better" },
       hideOnNarrow: true,
     },
   ];
@@ -177,9 +160,13 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false, 
       </div>
       {/* No explicit `density`: `Table` defaults to `"dense"` itself since Task 12 Step 3c's
           closeout (`table.tsx`'s own DENSITY-DEFAULT DECISION docblock). */}
+      {/* The caption is the table's accessible name and nothing more (2026-08-28). It used to
+          print "League standings" above a standings table that sits under a league's own name, on
+          a league's own page, beside three controls that all say "Sort by …" — a label restating
+          what the reader is already looking at. The two judged column heads now state the only
+          fact the caption was carrying that the page did not. */}
       <Table
         caption="League standings"
-        captionVisible
         columns={columns}
         rows={ordered}
         rowKey={(row) => row.teamId}

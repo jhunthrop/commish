@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Player } from "@/domain/player";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
-import { formatAdp, poolTiers } from "./tiers";
+import type { Position } from "@/domain/player";
+import { formatAdp, poolTiers, positionRanks } from "./tiers";
 
 const TEAMS = 12;
 
@@ -84,5 +85,35 @@ describe("formatAdp", () => {
 
   it("says nothing at all for a player the feed does not rank", () => {
     expect(formatAdp(null)).toBeNull();
+  });
+});
+
+/**
+ * THE RANK IS THE BOARD'S OWN ORDER, restated. `players` arrives server-ranked, best first, so the
+ * fourth running back down it IS this board's RB4 — no projection, no second ranking of ours, and
+ * nothing the feed would have to start carrying.
+ */
+describe("positionRanks", () => {
+  function at(position: Position, id: string): Player {
+    return { id, name: id, position, nflTeam: "BAL", headshotUrl: null, adp: null };
+  }
+
+  it("counts each position separately, down the board's own order", () => {
+    const board = [at("QB", "q1"), at("RB", "r1"), at("RB", "r2"), at("WR", "w1"), at("RB", "r3")];
+    const ranks = positionRanks(board);
+    expect(ranks.get("q1")).toBe(1);
+    expect(ranks.get("r1")).toBe(1);
+    expect(ranks.get("r2")).toBe(2);
+    expect(ranks.get("r3")).toBe(3);
+    expect(ranks.get("w1")).toBe(1);
+  });
+
+  it("answers nothing for a player who is not on the board at all", () => {
+    expect(positionRanks([at("TE", "t1")]).get("someone-else")).toBeUndefined();
+  });
+
+  it("has an answer for every player it was handed, so no row can render a half-empty sticker", () => {
+    const board = [at("K", "k1"), at("DEF", "d1"), at("K", "k2")];
+    expect(positionRanks(board).size).toBe(board.length);
   });
 });

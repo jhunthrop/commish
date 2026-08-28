@@ -91,6 +91,25 @@ export const UI_CONFIG = {
      * it in one file rather than inside whichever surface rendered it first.
      */
     percentileFloors: { strong: 0.85, good: 0.65, neutral: 0.35, weak: 0.15 },
+    /**
+     * The heat map's own floor: how many real values a comparison set must hold before
+     * `comparisonWithin` (`./magnitude.ts`) will rank anything inside it. Below this the set is
+     * not a population, it is a handful of numbers, and a percentile across it is arithmetic
+     * dressed as a fact — exactly the "designer's feeling about whether 14.2 is a good number"
+     * rule 1's magnitude amendment forbids.
+     *
+     * Four is the smallest set where the five-step ramp can put two values either side of the
+     * middle and still mean it. It also decides when heat APPEARS on a Sunday: the matchup page
+     * pools only players who have already played, so a position stays plain ink until four of
+     * them have a stat line.
+     *
+     * MOVED HERE FROM `LEAGUE_ROOM_CONFIG.heatMinPopulation` (2026-08-28) with the arithmetic it
+     * governs, when `Table` learned to judge a column: a draft-room table asking a league-room
+     * config how many numbers make a population was the wrong shape, and duplicating the four
+     * would have been worse. It sits beside `percentileFloors` because the two are one decision —
+     * where the ramp's steps begin, and whether the ramp may be drawn at all.
+     */
+    minPopulation: 4,
   },
   seatMeter: {
     /**

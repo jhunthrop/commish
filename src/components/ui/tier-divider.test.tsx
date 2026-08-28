@@ -36,9 +36,13 @@ describe("TierDivider", () => {
     for (const grade of TIER_GRADES) {
       const key = grade.toLowerCase();
       const { unmount } = render(<TierDivider grade={grade} label="Round 3 targets" />);
-      const badge = screen.getByText(grade);
-      expect(badge.className).toContain(`bg-tier-${key}`);
-      expect(badge.className).toContain(`text-tier-${key}-on`);
+      // The PLATE carries the pair now, and the letter and the label both sit on it — the band
+      // is filled across its own words rather than being a stamp beside grey text. The pairing is
+      // unchanged, which is what lets this keep asserting the two proven token roles together.
+      const plate = screen.getByText(grade).parentElement!;
+      expect(plate.className).toContain(`bg-tier-${key}`);
+      expect(plate.className).toContain(`text-tier-${key}-on`);
+      expect(plate).toHaveTextContent("Round 3 targets");
       unmount();
     }
   });

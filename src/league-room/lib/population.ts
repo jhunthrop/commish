@@ -1,7 +1,7 @@
 import type { Position } from "@/domain/player";
 import type { StatComparison } from "@/components/ui";
+import { comparisonWithin } from "@/components/ui";
 import type { MatchupDetail } from "../contract";
-import { LEAGUE_ROOM_CONFIG } from "../config";
 
 /**
  * THE COMPARISON SETS THE SEASON SURFACES HAVE.
@@ -30,55 +30,12 @@ export const POSITION_POPULATION: Readonly<Record<Position, string>> = {
 };
 
 /**
- * Percentile RANK with ties split down the middle: (how many the value beats, plus half of the
- * ones it equals) over the whole population. The value is a member of its own population, so the
- * best number in a set of twelve lands at ~0.96 rather than at 1.0 — "top of this week" and
- * "perfect" are different claims and the ramp should not conflate them. Twelve identical numbers
- * all land at 0.5, which is the honest answer: nothing separates them.
- *
- * An empty population answers 0.5 rather than `NaN`. `comparisonWithin` below is what actually
- * refuses a set too small to rank inside; this function's only job is to never hand `Stat` a
- * number that would tint on a divide-by-zero.
+ * The ranking arithmetic and its refusal now live one layer down, in `@/components/ui/magnitude`,
+ * because `Table` judges a column with the same two functions and a UI primitive cannot reach into
+ * a room. Re-exported rather than re-implemented: this module stays the address the season
+ * surfaces already import from, and there is still exactly one percentile in the product.
  */
-export function percentileWithin(values: readonly number[], value: number): number {
-  if (values.length === 0) return 0.5;
-  let below = 0;
-  let equal = 0;
-  for (const other of values) {
-    if (other < value) below += 1;
-    else if (other === value) equal += 1;
-  }
-  return (below + equal / 2) / values.length;
-}
-
-/** Which end of the ramp the biggest number belongs on. Points for is `higher-is-better`; points
- *  against is the standings' one column where the biggest number is the worst one. */
-export type HeatDirection = "higher-is-better" | "lower-is-better";
-
-/**
- * A stated comparison, or `undefined` when there is nothing honest to state.
- *
- * `undefined` in three cases, and every one of them is a refusal rather than a fallback:
- * the value is not a real number, the population is smaller than
- * `LEAGUE_ROOM_CONFIG.heatMinPopulation`, or the population is empty. A percentile across three
- * scored quarterbacks is arithmetic dressed as a fact, and `Stat` renders an uncompared number as
- * ordinary ink — so refusing costs a tint and buys the claim being true.
- *
- * `population` is the caller's sentence, and for `lower-is-better` it must be phrased in the
- * direction the ramp reads ("teams by fewest points allowed"), because the sentence `Stat` speaks
- * out loud is built from it verbatim.
- */
-export function comparisonWithin(
-  values: readonly number[],
-  value: number,
-  population: string,
-  direction: HeatDirection = "higher-is-better",
-): StatComparison | undefined {
-  if (!Number.isFinite(value)) return undefined;
-  if (values.length < LEAGUE_ROOM_CONFIG.heatMinPopulation) return undefined;
-  const rank = percentileWithin(values, value);
-  return { percentile: direction === "lower-is-better" ? 1 - rank : rank, population };
-}
+export { percentileWithin, comparisonWithin, type HeatDirection } from "@/components/ui";
 
 /**
  * Every point total a STARTER put on the board this week, pooled by position, across both sides

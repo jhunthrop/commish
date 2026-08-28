@@ -58,19 +58,32 @@ const TIER_CLASS: Readonly<Record<TierGrade, string>> = {
 export function TierDivider({ grade, label, className = "" }: TierDividerProps) {
   return (
     <div data-grade={grade} className={`flex items-center gap-2 ${className}`}>
-      {/* A square, not a pill: a grade is a stamp on the board, and the shape is the one thing
-          telling it apart from the position sticker sitting a few pixels below it in every row.
-          `leading-display` keeps the letter optically centred at 20px without the line box
-          pushing it off the tile's own baseline. */}
+      {/* THE BAND IS A FILLED PLATE, NOT A LETTER BESIDE A LINE (2026-08-28). Rendered rather
+          than read, the old shape was a 20px stamp, a grey micro-label and a hairline running to
+          the edge — and at sixty rows the hairline was the loudest part of it, so the ladder read
+          as a series of separators rather than as bands with names. The reference product the
+          founder pointed at fills its break across the name column and it reads instantly.
+
+          So the letter and the label sit on ONE tier-coloured plate, sized to the words. That is
+          not a new ground and needs no new contrast solve: `bg-tier-*` with `text-tier-*-on` is
+          the exact pairing `tokens.test.ts` already proves at AA body contrast (≥4.5:1) in both
+          themes for all four grades, and the label takes the same role the letter does at the
+          same size. What changes is how much of it there is.
+
+          It does not get louder than the data it divides. The plate stops at its own text — it
+          never spans the row, never repeats per row, and is one 20px line between bands of ten.
+          `rounded-sm` and a square-cornered letter keep it a stamp rather than a pill, which is
+          still what tells it apart from the position sticker a few pixels below. */}
       <span
-        className={`inline-flex size-5 shrink-0 items-center justify-center rounded-sm font-display text-xs font-semibold leading-display ${TIER_CLASS[grade]}`}
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm px-1.5 py-0.5 font-display leading-display ${TIER_CLASS[grade]}`}
       >
-        {grade}
+        <span className="text-xs font-semibold">{grade}</span>
+        <span className={MICRO_LABEL}>{label}</span>
       </span>
-      <span className={`${MICRO_LABEL} shrink-0 text-text-muted`}>{label}</span>
       {/* Law 4: the rule takes the leftover width so the band separates two KINDS of thing
-          without spending vertical space on a heading block. `h-px` and the decorative `line`
-          role, never `edge` — nothing here is a control. */}
+          without spending vertical space on a heading block. It stays, quietly, because the plate
+          alone floats — but it is now the band's tail rather than its body. `h-px` and the
+          decorative `line` role, never `edge` — nothing here is a control. */}
       <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-line" />
     </div>
   );

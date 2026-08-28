@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MatchupDetail, MatchupLineupEntry } from "../contract";
-import { LEAGUE_ROOM_CONFIG } from "../config";
+import { UI_CONFIG } from "@/components/ui/config";
 import { POSITION_POPULATION, comparisonWithin, percentileWithin, starterComparison, startedPointsByPosition } from "./population";
 
 /**
@@ -69,9 +69,9 @@ describe("comparisonWithin", () => {
     // Three scored quarterbacks is not "the league this week", it is three quarterbacks. A
     // percentile computed across them would be arithmetic dressed as a fact, which is precisely
     // what the amendment forbids — so the caller gets `undefined` and `Stat` renders plain ink.
-    const tooFew = new Array(LEAGUE_ROOM_CONFIG.heatMinPopulation - 1).fill(10);
+    const tooFew = new Array(UI_CONFIG.stat.minPopulation - 1).fill(10);
     expect(comparisonWithin(tooFew, 10, population)).toBeUndefined();
-    const enough = new Array(LEAGUE_ROOM_CONFIG.heatMinPopulation).fill(10);
+    const enough = new Array(UI_CONFIG.stat.minPopulation).fill(10);
     expect(comparisonWithin(enough, 10, population)).not.toBeUndefined();
   });
 

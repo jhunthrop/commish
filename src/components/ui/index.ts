@@ -33,6 +33,10 @@ export { StatPill } from "./stat-pill";
 /** The heat map's one renderer (the fun pass, Task 1). `StatComparison` rides the barrel with it
  *  because a caller that cannot name a population cannot use the component at all. */
 export { Stat, magnitudeStep, type StatComparison, type StatSize } from "./stat";
+/** The arithmetic that BUILDS a `StatComparison`, and the refusal below `UI_CONFIG.stat
+ *  .minPopulation` that keeps one honest. Beside `Stat` on the barrel because the two are one
+ *  bargain: name a real population or render ordinary ink. */
+export { percentileWithin, comparisonWithin, type HeatDirection } from "./magnitude";
 
 /** GAMEDAY (v4) — the primitives the two approved compositions are built from. Each rides the
  *  barrel with the type a caller cannot use it without: `GameState` because the chip is a closed

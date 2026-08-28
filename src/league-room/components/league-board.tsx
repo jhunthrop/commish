@@ -1,8 +1,7 @@
 import Link from "next/link";
 import type { HomeLeagueCard } from "../contract";
-import { ButtonLink, Crest, EYEBROW, NOT_STARTED_DASH, PointsShareBar, Stat, Table, type TableColumn } from "@/components/ui";
+import { ButtonLink, Crest, EYEBROW, NOT_STARTED_DASH, Table, type TableColumn } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { comparisonWithin } from "../lib/population";
 import { actionHref } from "../lib/action-href";
 import { formatPoints, formatRecord, formatWeek } from "../lib/format";
 import { WeekStatusBadge } from "./week-status-badge";
@@ -165,34 +164,12 @@ function OpponentCell({ league }: { readonly league: HomeLeagueCard }) {
   );
 }
 
-/**
- * The margin, and how close it is.
- *
- * THE ONE NUMBER THIS ROW IS ABOUT (the fun pass, 2026-08-28). The population is THIS BOARD'S own
- * margins: the leagues you are playing this week, which is the only pool the page actually holds
- * and the one a manager compares in their head anyway ("I am getting beaten worse here than
- * there"). It refuses below `heatMinPopulation`, so a manager in two leagues gets plain ink rather
- * than a percentile across two numbers, which would be arithmetic dressed as a fact.
- *
- * The bar beneath it is `PointsShareBar`, not `Meter`: it answers the different question ("how
- * close", against a named opponent) and it names both sides, so the row no longer needs a "Share
- * of points" caption restating the label of the number directly above it. Its docblock is also the
- * one place that says out loud what the bar is NOT — a win probability this product cannot
- * compute.
- */
-function MarginCell({ league, margins }: { readonly league: HomeLeagueCard; readonly margins: readonly number[] }) {
-  const margin = myMargin(league);
-  const sides = sidesOf(league);
-  if (margin === null || sides === null || sides.mineScore === null || sides.theirsScore === null) {
-    return <span className="text-sm text-text-muted">No score yet</span>;
-  }
-  return (
-    <div className="flex min-w-40 flex-col gap-1.5">
-      <Stat label="Margin" srOnlyLabel value={formatMargin(margin)} comparison={comparisonWithin(margins, margin, "your leagues this week")} />
-      <PointsShareBar mineLabel="You" theirsLabel={sides.theirsName} mine={sides.mineScore} theirs={sides.theirsScore} />
-    </div>
-  );
-}
+/** The comparison set the margin column ranks inside: the leagues you are playing this week,
+ *  which is the only pool this page actually holds and the one a manager compares in his head
+ *  anyway ("I am getting beaten worse here than there"). Below `UI_CONFIG.stat.minPopulation` the
+ *  column refuses and every margin is plain ink — a manager in two leagues does not get a
+ *  percentile across two numbers. Phrased to read after both "vs " and "Top 8% of ". */
+const BOARD_POPULATION = "your leagues this week";
 
 /** The league as an object (law 3): its crest, its name, and the record beneath — mono and
  *  tabular now, so seven records line up as a column a manager can read down rather than seven
@@ -267,29 +244,38 @@ function sharedWeekOf(leagues: readonly HomeLeagueCard[]): number | null {
   return leagues.every((league) => league.weekNumber === first.weekNumber) ? first.weekNumber : null;
 }
 
-/** A column header, in the one register the caps charter sanctions for a shouted key beside data
- *  (`MICRO_LABEL`). A scoreboard has always set its column heads this way, and `Table`'s own
- *  default — sentence case, body face — is what made this board read as a spreadsheet of prose. */
-function Head({ children }: { readonly children: string }) {
-  return <span className={`${MICRO_LABEL} text-text-faint`}>{children}</span>;
-}
+/* `Head` DELETED (2026-08-28). This board hand-wrapped each of its six column heads in
+   `MICRO_LABEL` because `Table`'s old default — sentence case, body face — is what made it read
+   as a spreadsheet of prose. That argument was right and it was never board-specific, so the
+   treatment moved into `Table` itself and every table in the product now shares it. The heads
+   below are plain strings again. */
 
 // Persona panel, Step 5 (the phone user): below `sm` the board is TWO columns — the league, and
 // the manager's own score with the opponent, the week's state and the verb folded under it
 // (`MyScoreCell`). Nothing true leaves with the four dropped columns except the margin, which is
 // the one supplementary judgement on the row and the only thing a phone genuinely gives up.
-function columnsFor(margins: readonly number[], sharedWeek: number | null): readonly TableColumn<HomeLeagueCard>[] {
+function columnsFor(sharedWeek: number | null): readonly TableColumn<HomeLeagueCard>[] {
   return [
-    { key: "league", header: <Head>League</Head>, cell: (league) => <LeagueCell league={league} /> },
+    { key: "league", header: "League", cell: (league) => <LeagueCell league={league} /> },
     {
       key: "mine",
-      header: <Head>{sharedWeek === null ? "Your score" : `Your score · ${formatWeek(sharedWeek)}`}</Head>,
+      header: sharedWeek === null ? "Your score" : `Your score · ${formatWeek(sharedWeek)}`,
       cell: (league) => <MyScoreCell league={league} />,
     },
-    { key: "opponent", header: <Head>Opponent</Head>, cell: (league) => <OpponentCell league={league} />, hideOnNarrow: true },
-    { key: "margin", header: <Head>Margin</Head>, cell: (league) => <MarginCell league={league} margins={margins} />, hideOnNarrow: true },
-    { key: "state", header: <Head>State</Head>, cell: (league) => <StateCell league={league} sharedWeek={sharedWeek} />, hideOnNarrow: true },
-    { key: "action", header: <Head>Action</Head>, cell: (league) => <Verb league={league} />, hideOnNarrow: true },
+    { key: "opponent", header: "Opponent", cell: (league) => <OpponentCell league={league} />, hideOnNarrow: true },
+    // THE ONE NUMBER THIS ROW IS ABOUT, now a judged column: `Table` pools the board's own margins
+    // and ranks each row inside them. A league with no live score contributes no number and shows
+    // the dash — padding the pool with a zero would tell a manager he is mid-table when he is not
+    // playing.
+    {
+      key: "margin",
+      header: "Margin",
+      judged: { value: myMargin, format: formatMargin, set: BOARD_POPULATION },
+      absent: <span className="text-sm text-text-muted">No score yet</span>,
+      hideOnNarrow: true,
+    },
+    { key: "state", header: "State", cell: (league) => <StateCell league={league} sharedWeek={sharedWeek} />, hideOnNarrow: true },
+    { key: "action", header: "Action", cell: (league) => <Verb league={league} />, hideOnNarrow: true },
   ];
 }
 
@@ -312,8 +298,13 @@ export interface LeagueBoardProps {
  * - **Law 1.** Unchanged where it was already right (the margin's magnitude ramp against a stated
  *   population, `WeekStatusBadge`'s live red) and not extended to the score, for the reason
  *   `Scoreboard` states: a pair is not a population.
- * - **Law 4.** Mono micro-label column heads, the week printed rather than assumed, and the
- *   margin's redundant "Share of points" caption replaced by a bar that names both sides.
+ * - **Law 4.** Mono micro-label column heads, the week printed rather than assumed, and — since
+ *   2026-08-28 — no bar under the margin at all. The `PointsShareBar` that used to sit there was
+ *   the third telling of one fact: the two scores are already the two columns to its left, the
+ *   signed margin is the figure directly above it, and the bar restated both as a percentage
+ *   split plus two more labels, on every row. Once the margin is tinted against the board's own
+ *   margins, the shape of that column IS the answer to "how am I doing", and seven bars were
+ *   seven rows of chrome saying it again. Deleting them is most of why the board reads calmer.
  * - **Law 5.** The action is the money-filled `verb`, on every row that has one.
  *
  * Sorted by whether the manager is needed, then by margin — never a probability. The mock's
@@ -322,13 +313,10 @@ export interface LeagueBoardProps {
  */
 export function LeagueBoard({ leagues }: LeagueBoardProps) {
   const sorted = sortLeagues(leagues);
-  // Built from every league that HAS a live margin — a league on a bye contributes no number, and
-  // padding the pool with a zero would tell a manager they are mid-table when they are not playing.
-  const margins = sorted.map(myMargin).filter((margin): margin is number => margin !== null);
   return (
     <Table
       caption="Your leagues"
-      columns={columnsFor(margins, sharedWeekOf(sorted))}
+      columns={columnsFor(sharedWeekOf(sorted))}
       rows={sorted}
       rowKey={(league) => league.id}
       empty={<p className={`${EYEBROW} text-text-muted`}>No leagues yet.</p>}
