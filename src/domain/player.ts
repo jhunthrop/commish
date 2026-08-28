@@ -13,6 +13,27 @@ export interface Player {
    * means "not fetched yet" or "genuinely has none" (founder directive 2026-08-26).
    */
   readonly headshotUrl: string | null;
+  /**
+   * Average Draft Position from the configured stats provider's ADP feed, or `null` for a player
+   * the feed does not rank. Lower is earlier, and the value is fractional ("1.6", "12.8") because
+   * that is what a consensus of real drafts produces.
+   *
+   * DECLARED HERE BECAUSE IT ALREADY SHIPS. `rankedPlayers` (`src/draft-service/pool.ts`) returns
+   * drizzle `players` rows straight through as `readonly Player[]` — a structural widening
+   * TypeScript permits — so this column has been crossing the wire to the draft room since
+   * migration 0041 while the type said it did not exist. The room could not read it without
+   * asserting past its own contract, which is the same thing as not having it.
+   *
+   * WHAT BREAKS WITHOUT IT: the pool has an ORDERING but no VALUES, and you cannot find a cliff in
+   * 1,2,3,4. A tier band is a gap between adjacent ADPs; with only a rank there is no gap to
+   * measure and the only honest tier ladder is none at all.
+   *
+   * REQUIRED, not optional, for the same reason `headshotUrl` is: a caller must never have to
+   * guess whether an absent field means "unranked" or "this Player was built somewhere that
+   * forgot". `null` is the one spelling of "the feed does not rank him", and the pool sorts those
+   * players below every ranked one.
+   */
+  readonly adp: number | null;
 }
 
 export interface StatLine {

@@ -3,8 +3,8 @@ import type { Player } from "@/domain/player";
 import type { CompletedPick } from "@/draft-engine";
 import { reviewPicks } from "./pick-review";
 
-function player(id: string, position: Player["position"]): Player {
-  return { id, name: id, position, nflTeam: "KC", headshotUrl: null };
+function player(id: string, position: Player["position"], adp: number | null = null): Player {
+  return { id, name: id, position, nflTeam: "KC", headshotUrl: null, adp };
 }
 
 function pick(overrides: Partial<CompletedPick> & Pick<CompletedPick, "pickNumber" | "teamId" | "playerId">): CompletedPick {

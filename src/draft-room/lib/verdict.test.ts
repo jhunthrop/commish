@@ -5,13 +5,14 @@ import { magnitudeStep } from "@/components/ui/stat";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { slipOf, verdictFor, verdictForPick, verdictKindOf, verdictPopulation } from "./verdict";
 
-function player(id: string): Player {
-  return { id, name: id, position: "RB", nflTeam: "KC", headshotUrl: null };
+function player(id: string, adp: number | null = null): Player {
+  return { id, name: id, position: "RB", nflTeam: "KC", headshotUrl: null, adp };
 }
 
 /** Twenty ranked players, so a board rank and a pick slot can be far enough apart to be a
- *  verdict rather than rounding. */
-const POOL: readonly Player[] = Array.from({ length: 20 }, (_, index) => player(`p${index + 1}`));
+ *  verdict rather than rounding. ADP matches the index, so the array order the verdict reads as
+ *  board rank is the order `rankedPlayers` would sort these into. */
+const POOL: readonly Player[] = Array.from({ length: 20 }, (_, index) => player(`p${index + 1}`, index + 1));
 
 function pick(pickNumber: number, playerId: string, teamId = "me"): CompletedPick {
   return { pickNumber, round: 1, teamId, playerId, slot: "BENCH", slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false };

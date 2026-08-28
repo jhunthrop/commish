@@ -18,9 +18,9 @@ afterAll(async () => {
 const GRANTING_BUDGET = { reserveBackfill: async () => ({ granted: true as const }) };
 
 const ROSTER = [
-  { id: "adp_a", name: "Player A", position: "QB" as const, nflTeam: "SF", headshotUrl: null },
-  { id: "adp_b", name: "Player B", position: "RB" as const, nflTeam: "SEA", headshotUrl: null },
-  { id: "adp_c", name: "Player C", position: "WR" as const, nflTeam: "KC", headshotUrl: null },
+  { id: "adp_a", name: "Player A", position: "QB" as const, nflTeam: "SF", headshotUrl: null, adp: null },
+  { id: "adp_b", name: "Player B", position: "RB" as const, nflTeam: "SEA", headshotUrl: null, adp: null },
+  { id: "adp_c", name: "Player C", position: "WR" as const, nflTeam: "KC", headshotUrl: null, adp: null },
 ];
 
 async function seedRoster(): Promise<void> {
@@ -85,7 +85,7 @@ describe("ingestAdp", () => {
     // the row. The UPDATE simply lands on nothing — but the counts must SAY so, or a permanently
     // short update count would be indistinguishable from a healthy run.
     await seedRoster();
-    const rosterPlusRookie = [...ROSTER, { id: "adp_rookie", name: "Rookie", position: "WR" as const, nflTeam: "DAL", headshotUrl: null }];
+    const rosterPlusRookie = [...ROSTER, { id: "adp_rookie", name: "Rookie", position: "WR" as const, nflTeam: "DAL", headshotUrl: null, adp: null }];
     const provider = fakeStatsProvider({
       players: rosterPlusRookie,
       games: {},

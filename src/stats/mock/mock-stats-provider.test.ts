@@ -7,7 +7,7 @@ import { PLAYER_COUNT, type Dataset } from "./generate-dataset";
 import { describeStatsProviderContract } from "../test-support";
 
 function player(id: string, nflTeam: string): Player {
-  return { id, name: id, position: "WR", nflTeam, headshotUrl: null };
+  return { id, name: id, position: "WR", nflTeam, headshotUrl: null, adp: null };
 }
 
 function line(playerId: string, week: number): StatLine {

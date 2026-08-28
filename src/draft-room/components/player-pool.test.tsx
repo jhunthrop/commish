@@ -236,7 +236,7 @@ describe("PlayerPool", () => {
     });
 
     it("renders a bare face for a team it has no colour for, rather than a grey rectangle", () => {
-      const free = [{ id: "fa1", name: "Rory Vance", position: "WR" as const, nflTeam: "FA", headshotUrl: null }];
+      const free = [{ id: "fa1", name: "Rory Vance", position: "WR" as const, nflTeam: "FA", headshotUrl: null, adp: null }];
       render(<PlayerPool {...props} players={free} view={{ ...SNAKE_VIEW, availablePlayerIds: ["fa1"] }} />);
       expect(within(rowFor("Rory Vance")).queryByTestId("player-face-team")).toBeNull();
       expect(within(rowFor("Rory Vance")).getByText("RV")).toBeInTheDocument();
@@ -282,7 +282,7 @@ describe("PlayerPool", () => {
      */
     it("never paints a reach down the rail, however far below the slot a prospect is ranked", () => {
       // Deep enough that every visible row is more than the even band below pick 1.
-      const deep = Array.from({ length: 30 }, (_, index) => ({ id: `d${index}`, name: `Deep ${index}`, position: "WR" as const, nflTeam: "DAL", headshotUrl: null }));
+      const deep = Array.from({ length: 30 }, (_, index) => ({ id: `d${index}`, name: `Deep ${index}`, position: "WR" as const, nflTeam: "DAL", headshotUrl: null, adp: index + 1 }));
       const view = { ...SNAKE_VIEW, pickNumber: 1, availablePlayerIds: deep.map((player) => player.id), picks: [] };
       const { container } = render(<PlayerPool {...props} players={deep} view={view} />);
       expect(screen.queryByText("reach")).toBeNull();
@@ -307,7 +307,7 @@ describe("PlayerPool", () => {
   });
 
   it("tells you when results are capped, and by how much, so narrowing the search isn't a mystery", () => {
-    const manyPlayers = Array.from({ length: 75 }, (_, index) => ({ id: `p${index}`, name: `Player ${index}`, position: "WR" as const, nflTeam: "DAL", headshotUrl: null }));
+    const manyPlayers = Array.from({ length: 75 }, (_, index) => ({ id: `p${index}`, name: `Player ${index}`, position: "WR" as const, nflTeam: "DAL", headshotUrl: null, adp: index + 1 }));
     const view = { ...SNAKE_VIEW, availablePlayerIds: manyPlayers.map((player) => player.id) };
     render(<PlayerPool {...props} players={manyPlayers} view={view} />);
     expect(screen.getByText("Showing the top 60 of 75. Narrow your search to see more.")).toBeInTheDocument();
