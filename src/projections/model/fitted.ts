@@ -3,6 +3,7 @@ import type { LinePriors } from "./line-fit";
 import type { OpportunityPriors } from "./opportunity";
 import type { GameContextPriors } from "./context-fit";
 import type { RedistributionPriors } from "./redistribution-fit";
+import type { RedZonePriors } from "../features/red-zone";
 import type { SchemePriors } from "./scheme-fit";
 
 /**
@@ -192,4 +193,35 @@ export const FITTED_GAME_CONTEXT_PRIORS: GameContextPriors = {
   rushing: { opponent: 0.589490, rest: -0.018239 },
   leaguePassingYardsPerAttempt: 7.064554,
   leagueRushingYardsPerCarry: 4.400851,
+};
+
+/**
+ * PHASE 5 — RED-ZONE LEVERAGE, the first group that separates a man from his own teammates.
+ *
+ * Fitted by maximum Poisson likelihood over 4448 player-weeks carrying
+ * 984 rushing touchdowns and 8570 carrying
+ * 1573 receiving ones, on the fit seasons only. Least squares in log space
+ * cannot be used here: a player's touchdowns in a week are zero far more often than not, and every
+ * way of forcing that into a log destroys the thing being measured. The shrinkage constants are
+ * fitted on the same likelihood rather than chosen, because "how many carries of prior is a
+ * player's own red-zone rate worth" has an answer in the data and none in anybody's intuition.
+ *
+ * The leverage for a player-week is computed from the weeks BEFORE it, exactly as the model computes
+ * it at prediction time — a goal-line carry and the touchdown it produced are in large part the same
+ * play, so a leverage that saw its own week would fit an elasticity several times too large.
+ */
+export const FITTED_RED_ZONE_PRIORS: RedZonePriors = {
+  league: {
+    QB: { insideTenCarriesPerCarry: 0.161201, redZoneTargetsPerTarget: 0.400000 },
+    RB: { insideTenCarriesPerCarry: 0.083312, redZoneTargetsPerTarget: 0.132127 },
+    WR: { insideTenCarriesPerCarry: 0.055066, redZoneTargetsPerTarget: 0.125893 },
+    TE: { insideTenCarriesPerCarry: 0.169811, redZoneTargetsPerTarget: 0.158926 },
+    K: { insideTenCarriesPerCarry: 0.000000, redZoneTargetsPerTarget: 0.000000 },
+    DEF: { insideTenCarriesPerCarry: 0.000000, redZoneTargetsPerTarget: 0.000000 },
+  },
+  recencyDecay: 0.95,
+  carryShrinkage: 320,
+  targetShrinkage: 5,
+  rushingElasticity: 1.208067,
+  receivingElasticity: 0.177008,
 };

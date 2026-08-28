@@ -4,7 +4,7 @@ import { composeStatLine } from "./compose";
 import { contextualiseOpportunity, contextualiseRates, redistributeOpportunity, type ContextPriors } from "./context";
 import { predictRates, type EfficiencyPriors } from "./efficiency";
 import { SHIPPED_FEATURES, type FeatureFlags } from "./features";
-import { FITTED_EFFICIENCY_PRIORS, FITTED_LINE_PRIORS, FITTED_OPPORTUNITY_PRIORS, FITTED_GAME_CONTEXT_PRIORS, FITTED_REDISTRIBUTION_PRIORS, FITTED_SCHEME_PRIORS } from "./fitted";
+import { FITTED_EFFICIENCY_PRIORS, FITTED_LINE_PRIORS, FITTED_OPPORTUNITY_PRIORS, FITTED_GAME_CONTEXT_PRIORS, FITTED_REDISTRIBUTION_PRIORS, FITTED_RED_ZONE_PRIORS, FITTED_SCHEME_PRIORS } from "./fitted";
 import { predictOpportunity, type OpportunityPriors } from "./opportunity";
 
 /**
@@ -40,7 +40,13 @@ export interface ModelPriors {
 export const FITTED_MODEL: ModelPriors = {
   opportunity: FITTED_OPPORTUNITY_PRIORS,
   efficiency: FITTED_EFFICIENCY_PRIORS,
-  context: { line: FITTED_LINE_PRIORS, scheme: FITTED_SCHEME_PRIORS, redistribution: FITTED_REDISTRIBUTION_PRIORS, gameContext: FITTED_GAME_CONTEXT_PRIORS },
+  context: {
+    line: FITTED_LINE_PRIORS,
+    scheme: FITTED_SCHEME_PRIORS,
+    redistribution: FITTED_REDISTRIBUTION_PRIORS,
+    gameContext: FITTED_GAME_CONTEXT_PRIORS,
+    redZone: FITTED_RED_ZONE_PRIORS,
+  },
 };
 
 export function modelProjection(

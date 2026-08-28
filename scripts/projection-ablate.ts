@@ -46,6 +46,11 @@ const VARIANTS: Readonly<Record<string, { readonly before: FeatureFlags; readonl
     label: "opportunity redistribution",
   },
   context: { before: NO_FEATURES, after: { ...NO_FEATURES, gameContext: true }, label: "game context" },
+  "red-zone": {
+    before: NO_FEATURES,
+    after: { ...NO_FEATURES, redZone: true },
+    label: "red-zone leverage on the touchdown rates",
+  },
   all: { before: NO_FEATURES, after: ALL_FEATURES, label: "every feature group at once (headline, not an ablation)" },
   /** What the engine actually ships against model v1. The headline for the research document. */
   shipped: { before: NO_FEATURES, after: SHIPPED_FEATURES, label: "model v1 against everything that earned its place" },

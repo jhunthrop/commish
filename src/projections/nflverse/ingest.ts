@@ -10,6 +10,8 @@ import { createNflverseClient, type NflverseClient } from "./client";
 import { NFLVERSE_CONFIG } from "./config";
 import { mapParticipation, participationObservations, weekAsOfFromSnapCounts } from "./map";
 import { PlayByPlayAggregator, playProfileObservations, PBP_COLUMNS } from "./pbp";
+import { PlayerPlayAggregator, playerTouchObservations, PBP_PLAYER_COLUMNS } from "./pbp-players";
+import { allPositions } from "../backtest";
 import { buildPlayerUniverse, mapNflPlayers, nflPlayerRows, type PlayerUniverse } from "./players";
 import { kickoffAsOf, mapSchedule, scheduleObservations, SCHEDULE_SOURCE_CONFIG } from "./schedule";
 import { mapStatLines, statLineObservations } from "./stat-lines";
@@ -127,7 +129,11 @@ export interface ContextIngestReport {
   readonly season: number;
   readonly playsRead: number;
   readonly teamWeeks: number;
+  /** Player-weeks of red-zone and air-yard counts written beside the team-week facts. */
+  readonly playerWeeks: number;
   readonly observationsWritten: number;
+  /** Everyone the play-by-play attributed a touch to that the universe does not project. */
+  readonly unknownPlayers: number;
 }
 
 /** The schedule repository is a different host from the release assets — see `schedule.ts`. */
@@ -147,26 +153,49 @@ export async function ingestSchedule(db: Db, seasons: readonly number[], client 
 }
 
 /**
- * One season of play-by-play, streamed and reduced to team-week facts as it arrives.
+ * One season of play-by-play, streamed and reduced to team-week AND player-week facts as it
+ * arrives.
  *
  * Stamped from the game's own date, on exactly the arithmetic `gameDayAsOf` uses for a box score:
  * end of the game's UTC calendar day plus the publication lag. A pace number is knowable when the
  * game that produced it has finished and not before.
+ *
+ * ONE STREAM, TWO AGGREGATORS. A season is a hundred megabytes, so a second pass to collect the
+ * red-zone counts would double the cost of a backfill to read the same rows a second time. The two
+ * accumulators are independent — neither reads the other's state — so feeding both from one loop is
+ * a saving with no coupling attached.
  */
 export async function ingestPlayByPlay(db: Db, client: NflverseClient, season: number): Promise<ContextIngestReport> {
-  const aggregator = new PlayByPlayAggregator();
-  const playsRead = await client.streamCsv("pbp", `play_by_play_${season}.csv`, PBP_COLUMNS, (row) => {
-    aggregator.add(row);
+  const teams = new PlayByPlayAggregator();
+  const players = new PlayerPlayAggregator();
+  const columns = [...new Set([...PBP_COLUMNS, ...PBP_PLAYER_COLUMNS])];
+  const playsRead = await client.streamCsv("pbp", `play_by_play_${season}.csv`, columns, (row) => {
+    teams.add(row);
+    players.add(row);
   });
-  const profiles = aggregator.profiles();
+  const profiles = teams.profiles();
   const observations = playProfileObservations(profiles, (profile) =>
     kickoffAsOf(profile.gameDate, NFLVERSE_CONFIG.publicationLagHours),
   );
+
+  // The universe decides who is storable, exactly as it does for the participation feed: the store
+  // is keyed on a player the backtest can score through, and a touch attributed to a punter or to
+  // an id the release does not carry has nowhere to go. Reported rather than dropped in silence.
+  const projected = new Set((await allPositions(db)).keys());
+  const touches = playerTouchObservations(
+    players.touches(),
+    (touch) => kickoffAsOf(touch.gameDate, NFLVERSE_CONFIG.publicationLagHours),
+    projected,
+  );
+
   return {
     season,
     playsRead,
     teamWeeks: profiles.length,
-    observationsWritten: await recordTeamObservations(db, observations),
+    playerWeeks: touches.observations.length === 0 ? 0 : new Set(touches.observations.map((row) => `${row.week}|${row.playerId}`)).size,
+    observationsWritten:
+      (await recordTeamObservations(db, observations)) + (await recordObservations(db, touches.observations)),
+    unknownPlayers: touches.unknownPlayers.length,
   };
 }
 

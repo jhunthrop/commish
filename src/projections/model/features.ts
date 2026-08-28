@@ -24,6 +24,12 @@ export interface FeatureFlags {
   readonly redistribution: boolean;
   /** Task 4 — opponent adjusted for offences faced, game script, weather and rest. */
   readonly gameContext: boolean;
+  /**
+   * Phase 5 — red-zone leverage on the touchdown rates. The first group that separates a man from
+   * his own TEAMMATES rather than moving a whole offence together, which is what model v2's closing
+   * lesson said would be needed to move a ranking.
+   */
+  readonly redZone: boolean;
 }
 
 /** Model v1 exactly: three layers, no context. The `before` arm of every ablation. */
@@ -32,6 +38,7 @@ export const NO_FEATURES: FeatureFlags = {
   scheme: false,
   redistribution: false,
   gameContext: false,
+  redZone: false,
 };
 
 /** Every group at once. The headline number, and explicitly NOT an ablation of anything. */
@@ -40,6 +47,7 @@ export const ALL_FEATURES: FeatureFlags = {
   scheme: true,
   redistribution: true,
   gameContext: true,
+  redZone: true,
 };
 
 /**

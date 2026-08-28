@@ -23,6 +23,7 @@ import { fitLinePriors, type LinePriors } from "@/projections/model/line-fit";
 import { fitSchemePriors, type SchemePriors } from "@/projections/model/scheme-fit";
 import { fitRedistributionPriors, type RedistributionPriors } from "@/projections/model/redistribution-fit";
 import { fitGameContextPriors, type GameContextPriors } from "@/projections/model/context-fit";
+import { fitRedZonePriors, type RedZoneFitReport } from "@/projections/model/red-zone-fit";
 import { projectedPosition } from "@/projections/nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "@/projections/team-store";
@@ -212,6 +213,41 @@ ${names.map((name) => `    ${name}: ${efficiency.regression[name].toFixed(2)},`)
 `;
 }
 
+
+function renderRedZone(report: RedZoneFitReport): string {
+  const priors = report.priors;
+  const rates = (position: string) => {
+    const entry = priors.league[position as Position];
+    return `    ${position}: { insideTenCarriesPerCarry: ${entry.insideTenCarriesPerCarry.toFixed(6)}, redZoneTargetsPerTarget: ${entry.redZoneTargetsPerTarget.toFixed(6)} },`;
+  };
+  return `/**
+ * PHASE 5 — RED-ZONE LEVERAGE, the first group that separates a man from his own teammates.
+ *
+ * Fitted by maximum Poisson likelihood over ${report.rushingPlayerWeeks} player-weeks carrying
+ * ${report.rushingTouchdowns} rushing touchdowns and ${report.receivingPlayerWeeks} carrying
+ * ${report.receivingTouchdowns} receiving ones, on the fit seasons only. Least squares in log space
+ * cannot be used here: a player's touchdowns in a week are zero far more often than not, and every
+ * way of forcing that into a log destroys the thing being measured. The shrinkage constants are
+ * fitted on the same likelihood rather than chosen, because "how many carries of prior is a
+ * player's own red-zone rate worth" has an answer in the data and none in anybody's intuition.
+ *
+ * The leverage for a player-week is computed from the weeks BEFORE it, exactly as the model computes
+ * it at prediction time — a goal-line carry and the touchdown it produced are in large part the same
+ * play, so a leverage that saw its own week would fit an elasticity several times too large.
+ */
+export const FITTED_RED_ZONE_PRIORS: RedZonePriors = {
+  league: {
+${["QB", "RB", "WR", "TE", "K", "DEF"].map(rates).join("\n")}
+  },
+  recencyDecay: ${priors.recencyDecay},
+  carryShrinkage: ${priors.carryShrinkage},
+  targetShrinkage: ${priors.targetShrinkage},
+  rushingElasticity: ${priors.rushingElasticity.toFixed(6)},
+  receivingElasticity: ${priors.receivingElasticity.toFixed(6)},
+};
+`;
+}
+
 function render(
   fit: ReturnType<typeof fitOpportunityPriors>,
   efficiency: EfficiencyPriors,
@@ -219,6 +255,7 @@ function render(
   scheme: SchemePriors,
   redistribution: RedistributionPriors,
   gameContext: GameContextPriors,
+  redZone: RedZoneFitReport,
   generatedFrom: readonly number[],
 ): string {
   const { priors } = fit;
@@ -231,6 +268,7 @@ import type { LinePriors } from "./line-fit";
 import type { OpportunityPriors } from "./opportunity";
 import type { GameContextPriors } from "./context-fit";
 import type { RedistributionPriors } from "./redistribution-fit";
+import type { RedZonePriors } from "../features/red-zone";
 import type { SchemePriors } from "./scheme-fit";
 
 /**
@@ -266,7 +304,8 @@ ${renderEfficiency(efficiency)}
 ${renderLine(line)}
 ${renderScheme(scheme)}
 ${renderRedistribution(redistribution)}
-${renderGameContext(gameContext)}`;
+${renderGameContext(gameContext)}
+${renderRedZone(redZone)}`;
 }
 
 async function main(): Promise<void> {
@@ -354,9 +393,24 @@ async function main(): Promise<void> {
       `  rushing  opponent ${gameContextPriors.rushing.opponent.toFixed(4)}  rest ${gameContextPriors.rushing.rest.toFixed(4)}`,
   );
 
+  const redZone = fitRedZonePriors({
+    usage,
+    history,
+    positions,
+    efficiency,
+    seasons: [...FIT_SEASONS],
+    heldOut: [...HELD_OUT_SEASONS],
+  });
+  console.log(
+    `\nred-zone leverage, fitted on ${FIT_SEASONS.join(", ")} by Poisson likelihood:\n` +
+      `  decay ${redZone.priors.recencyDecay} per week, chosen on both sides' likelihoods together\n` +
+      `  rushing    elasticity ${redZone.priors.rushingElasticity.toFixed(4)}  over ${redZone.rushingPlayerWeeks} player-weeks and ${redZone.rushingTouchdowns} touchdowns, ${redZone.priors.carryShrinkage} carries of prior\n` +
+      `  receiving  elasticity ${redZone.priors.receivingElasticity.toFixed(4)}  over ${redZone.receivingPlayerWeeks} player-weeks and ${redZone.receivingTouchdowns} touchdowns, ${redZone.priors.targetShrinkage} targets of prior`,
+  );
+
   writeFileSync(
     OUTPUT,
-    render(fit, efficiency, linePriors, schemePriors, redistributionPriors, gameContextPriors, FIT_SEASONS),
+    render(fit, efficiency, linePriors, schemePriors, redistributionPriors, gameContextPriors, redZone, FIT_SEASONS),
   );
   console.log(`\nwrote ${OUTPUT}`);
 

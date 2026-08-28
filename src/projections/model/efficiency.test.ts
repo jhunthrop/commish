@@ -39,6 +39,7 @@ function usage(season: number, week: number, playerId: string, over: Partial<Pla
     teamTargets: 35,
     teamCarries: 26,
     teamPassAttempts: 35,
+    touches: null,
     asOf: new Date("2024-09-10T00:00:00.000Z"),
     ...over,
   };

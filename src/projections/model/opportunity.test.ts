@@ -34,6 +34,7 @@ function usage(over: Partial<PlayerWeekUsage> & Pick<PlayerWeekUsage, "season" |
     teamTargets: 35,
     teamCarries: 25,
     teamPassAttempts: 35,
+    touches: null,
     asOf: new Date("2024-09-10T00:00:00.000Z"),
     ...over,
   };

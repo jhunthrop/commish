@@ -34,6 +34,7 @@ function usageRow(playerId: string, week: number, targetShare: number): PlayerWe
     teamTargets: 35,
     teamCarries: 25,
     teamPassAttempts: 35,
+    touches: null,
     asOf: AS_OF,
   };
 }

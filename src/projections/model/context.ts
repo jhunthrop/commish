@@ -1,5 +1,6 @@
 import { gameContextFor } from "../features/context";
 import { lineComposite, lineWindow } from "../features/line";
+import { redZoneLeverage, redZoneMultiplier, redZoneTotals, NO_LEVERAGE } from "../features/red-zone";
 import { redistributeShares, type ShareDelta } from "../features/redistribution";
 import { schemeEstimate, schemeRatios } from "../features/scheme";
 import { indexTeamMetrics, latestTeams } from "../team-context";
@@ -10,6 +11,7 @@ import type { FeatureFlags } from "./features";
 import type { GameContextPriors } from "./context-fit";
 import type { LinePriors } from "./line-fit";
 import type { PredictedOpportunity } from "./opportunity";
+import type { RedZonePriors } from "../features/red-zone";
 import type { RedistributionPriors } from "./redistribution-fit";
 import type { SchemePriors, SchemeVolumeElasticity } from "./scheme-fit";
 import { detectTransactions } from "./transactions";
@@ -35,6 +37,7 @@ export interface ContextPriors {
   readonly scheme: SchemePriors;
   readonly redistribution: RedistributionPriors;
   readonly gameContext: GameContextPriors;
+  readonly redZone: RedZonePriors;
 }
 
 /**
@@ -67,7 +70,7 @@ export function contextualiseRates(
   features: FeatureFlags,
   priors: ContextPriors,
 ): ReadonlyMap<string, PlayerRates> {
-  if (!features.line && !features.gameContext) return rates;
+  if (!features.line && !features.gameContext && !features.redZone) return rates;
 
   const metrics = indexTeamMetrics(input.teamContext);
   const teams = latestTeams(input.teamContext);
@@ -100,13 +103,48 @@ export function contextualiseRates(
     return fresh;
   };
 
+  /**
+   * Every player's red-zone totals over the history he is being projected from, indexed once.
+   *
+   * `input.usage` is ALREADY the visible window — `replayWeeks` reads it through the as-of gate and
+   * bounds it at the week before the one being predicted — so summing all of a player's rows is the
+   * point-in-time answer with no further filtering. Grouped in one pass rather than filtered per
+   * player: the usage array is tens of thousands of rows and there are hundreds of players a week.
+   */
+  const touchesByPlayer = new Map<string, ReturnType<typeof redZoneTotals>>();
+  if (features.redZone) {
+    const rows = new Map<string, (typeof input.usage)[number][]>();
+    for (const row of input.usage) {
+      (rows.get(row.playerId) ?? rows.set(row.playerId, []).get(row.playerId)!).push(row);
+    }
+    const window = { season: input.season, week: input.week, decay: priors.redZone.recencyDecay };
+    for (const [playerId, playerRows] of rows) touchesByPlayer.set(playerId, redZoneTotals(playerRows, window));
+  }
+  const leverageFor = (playerId: string): ReturnType<typeof redZoneLeverage> => {
+    if (!features.redZone) return NO_LEVERAGE;
+    const position = input.positions.get(playerId);
+    const totals = touchesByPlayer.get(playerId);
+    if (position === undefined || totals === undefined) return NO_LEVERAGE;
+    return redZoneLeverage(totals, position, priors.redZone);
+  };
+
   const adjusted = new Map<string, PlayerRates>();
   for (const [playerId, playerRates] of rates) {
+    const leverage = leverageFor(playerId);
+    // The touchdown multipliers are applied whether or not the player's TEAM is known, unlike every
+    // other group here: red-zone leverage is a fact about the man, and a player whose offence we
+    // cannot name still had his own carries near the goal line.
+    const touchdowns = {
+      rushingTouchdownsPerCarry:
+        playerRates.rushingTouchdownsPerCarry * redZoneMultiplier(leverage.rushing, priors.redZone.rushingElasticity),
+      receivingTouchdownsPerTarget:
+        playerRates.receivingTouchdownsPerTarget * redZoneMultiplier(leverage.receiving, priors.redZone.receivingElasticity),
+    };
     const team = teams.get(playerId);
     if (team === undefined) {
       // No known offence means no composite. The model without the feature is the right answer,
       // never a league-average one — an unknown team is not an average team, it is an unknown.
-      adjusted.set(playerId, playerRates);
+      adjusted.set(playerId, { ...playerRates, ...touchdowns });
       continue;
     }
     const composite = features.line ? compositeFor(team) : null;
@@ -121,6 +159,7 @@ export function contextualiseRates(
     const matchup = features.gameContext ? matchupFor(team) : { rushing: 1, passing: 1 };
     adjusted.set(playerId, {
       ...playerRates,
+      ...touchdowns,
       rushingYardsPerCarry: playerRates.rushingYardsPerCarry * rushing * matchup.rushing,
       // Receiving yards move with the passing matchup too: they are the same throws seen from the
       // other end, and adjusting one without the other would say a defence can be soft against a

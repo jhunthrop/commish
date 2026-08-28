@@ -1,5 +1,6 @@
-// Backfills the TEAM-level context store: the schedule, and a season of play-by-play reduced to
-// team-week facts. Run: npm run projections:context [firstSeason] [lastSeason]
+// Backfills the context store: the schedule, and a season of play-by-play reduced to team-week
+// facts (pace, line, what each defence allowed) and player-week facts (red-zone touches, air
+// yards). Run: npm run projections:context [firstSeason] [lastSeason]
 // (dotenv -e .env.local -- tsx scripts/projection-context.ts 2020 2024)
 //
 // Separate from `projection-backfill.ts` because the costs are two orders of magnitude apart. A
@@ -42,8 +43,9 @@ async function main(): Promise<void> {
     const started = Date.now();
     const report = await ingestPlayByPlay(db, client, season);
     console.log(
-      `${season}: ${report.playsRead} plays -> ${report.teamWeeks} team-weeks, ` +
-        `${report.observationsWritten} new observations in ${((Date.now() - started) / 1000).toFixed(0)}s`,
+      `${season}: ${report.playsRead} plays -> ${report.teamWeeks} team-weeks and ${report.playerWeeks} player-weeks, ` +
+        `${report.observationsWritten} new observations in ${((Date.now() - started) / 1000).toFixed(0)}s` +
+        (report.unknownPlayers === 0 ? "" : `, ${report.unknownPlayers} touch-takers the universe does not project`),
     );
   }
 
