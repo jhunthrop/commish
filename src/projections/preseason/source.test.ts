@@ -6,8 +6,15 @@ import { week1RosterAsOf } from "../nflverse/rosters";
 import { STAT_LINE_SOURCE, statMetricName } from "../lines";
 import { recordObservations, type PlayerWeekObservation } from "../store";
 import { recordPreseasonRosters } from "./store";
+import { recordTeamObservations } from "../team-store";
+import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { FITTED_MODEL } from "../model/source";
-import { FITTED_AVAILABILITY_PRIORS, FITTED_DEPTH_PRIORS, FITTED_ROOKIE_PRIORS } from "./fitted";
+import {
+  FITTED_AVAILABILITY_PRIORS,
+  FITTED_CAREER_PRIORS,
+  FITTED_DEPTH_PRIORS,
+  FITTED_ROOKIE_PRIORS,
+} from "./fitted";
 import {
   ALL_PRESEASON_FEATURES,
   loadPreseason,
@@ -36,6 +43,7 @@ const PRIORS: PreseasonPriors = {
   availability: FITTED_AVAILABILITY_PRIORS,
   rookies: FITTED_ROOKIE_PRIORS,
   depth: FITTED_DEPTH_PRIORS,
+  career: FITTED_CAREER_PRIORS,
 };
 
 const VETERAN = "00-0000001";
@@ -180,6 +188,46 @@ describe("the leakage guarantee", () => {
 
     const after = preseasonCandidates(await loadPreseason(db, 2024), ALL_PRESEASON_FEATURES, PRIORS);
     expect(after).toEqual(before);
+  });
+});
+
+describe("this season's closing line, which the docblock has always said is refused", () => {
+  it("REFUSES a kickoff-stamped fact about the target season even when the gate would admit it", async () => {
+    // The gate alone does not deliver this and never did. The preseason moment is one millisecond
+    // before the earliest GAME-DERIVED player observation, a box score is stamped a day and a half
+    // after its game, and a closing line is stamped AT kickoff — so on every real season the
+    // Thursday opener's lines sit inside the moment. Nothing consumed them, so nothing failed; the
+    // injury feed was in exactly that state when it silently gated itself out of every board this
+    // engine had built. The refusal is now by source rather than by arithmetic.
+    const kickoff = new Date(TARGET_SEASON_LANDED.getTime() - 36 * 60 * 60 * 1000);
+    await recordTeamObservations(db, [
+      {
+        season: 2024,
+        week: 1,
+        team: "BUF",
+        source: SCHEDULE_SOURCE.kickoff,
+        metric: SCHEDULE_METRICS.pointSpread,
+        value: -3,
+        asOf: kickoff,
+      },
+      {
+        season: 2024,
+        week: 1,
+        team: "BUF",
+        source: SCHEDULE_SOURCE.schedule,
+        metric: SCHEDULE_METRICS.restDays,
+        value: 7,
+        asOf: new Date("2024-05-20T00:00:00.000Z"),
+      },
+    ]);
+
+    const inputs = await loadPreseason(db, 2024);
+    // The kickoff stamp really is inside the gate, which is what makes the refusal load-bearing
+    // rather than decorative.
+    expect(kickoff.getTime()).toBeLessThan(inputs.moment.getTime());
+    expect(inputs.teamObservations.some((row) => row.source === SCHEDULE_SOURCE.kickoff)).toBe(false);
+    // And the May-stamped schedule fact, which a board IS allowed to read, still arrives.
+    expect(inputs.teamObservations.some((row) => row.source === SCHEDULE_SOURCE.schedule)).toBe(true);
   });
 });
 

@@ -161,19 +161,37 @@ export interface AvailabilityPriors {
    */
   readonly baseline: Readonly<Record<Position, Readonly<Record<RoleBracket, number>>>>;
   /**
-   * Age as a multiplier on the role cell rather than a second table.
+   * Age as a multiplier ON THE SHRUNK RATE rather than a second table.
    *
    * Sixteen role cells times four age brackets would be sixty-four cells over eighteen hundred
    * player-seasons, and the thin ones would assert things the position as a whole contradicts. Age
    * and role are close enough to independent that a multiplier is the honest simplification: a
    * thirty-two-year-old featured back and a thirty-two-year-old rotation back lose a similar SHARE
    * of their season to the same wear.
+   *
+   * APPLIED AFTER THE SHRINKAGE, WHICH IS A CHANGE, and the reason is measured rather than
+   * aesthetic. Applied to the PRIOR, the term is diluted by however much of the prediction the
+   * player's own record accounts for — and a player's own record carries the age signal back in,
+   * because an old player's record is a run of full seasons and a young player's is a rookie year
+   * spent behind somebody. `docs/research/2026-08-28-starter-band.md` measures what that left on the
+   * board: on four seasons the model gave players of 24 and under between 1.2 and 2.1 games fewer
+   * than they played, and players of 29 and over between 0.6 and 1.6 more. A multiplier on the
+   * quantity it is fitted against cannot drift like that.
    */
   readonly ageMultiplier: Readonly<Record<Position, Readonly<Record<AgeBracket, number>>>>;
   /**
-   * A multiplier on the baseline for each cutdown status. `active` is 1 by construction — the
+   * A multiplier on the SHRUNK RATE for each cutdown status. `active` is 1 by construction — the
    * baseline is estimated over active players — and the others are what the fit seasons measured
    * relative to them.
+   *
+   * THE SAME CORRECTION AS THE AGE TERM AND THE SAME BUG BEFORE IT, only much larger. The
+   * multiplier was fitted as the reserve group's actual availability over its BASELINE and then
+   * applied to its SHRUNK rate, and those are not the same number: a man his club puts on a reserve
+   * list in week one is overwhelmingly an established starter, so his record pulls his shrunk rate
+   * far above the role cell, and multiplying by a ratio measured against the role cell punished him
+   * twice. Measured on four seasons the reserve cell came out between 3.1 and 4.9 games below what
+   * those players actually played — the worst-calibrated cell in the model, and it lands on exactly
+   * the players a manager is deciding about.
    */
   readonly statusMultiplier: Readonly<Record<RosterStatus, number>>;
   /**
@@ -289,36 +307,20 @@ function recentHistory(history: readonly SeasonAvailability[], seasons: number):
 }
 
 /**
- * EXPECTED GAMES PLAYED, as a distribution.
+ * THE RATE BEFORE THE TWO CORRECTIONS: a role prior blended with the player's own record.
  *
- * The rate is a shrinkage exactly like layer 1's: a position-and-age baseline, then the player's
- * own recency-weighted record pulled toward it in proportion to how many games that record covers.
- * A man with one season of evidence moves the baseline about a fifth of the way; a man with four
- * moves it half. The cutdown status multiplies the result, and it is the only input here that is
- * about THIS season rather than the ones before it.
- *
- * The spread narrows with the length of the record rather than with the mean, which is what makes a
- * rookie's distribution honestly wider than a veteran's without a rule that says "rookies are
- * uncertain". See `AvailabilityPriors.concentrationPerSeason`.
+ * Exported because the FIT has to see it. Both multipliers below are ratios of what a group
+ * actually played to what the model told it to expect, and a ratio is only a correction if the
+ * denominator is the number it will later multiply. Fitting against one quantity and applying to
+ * another is how the reserve cell came to be three games wrong on four consecutive seasons.
  */
-export function expectedGamesPlayed(
-  input: AvailabilityInput,
-  { season, priors }: { readonly season: number; readonly priors: AvailabilityPriors },
-): GamesPlayedOutlook {
-  const teamGames = teamGamesIn(season);
-  // Role and age adjust the PRIOR, never the evidence. A player's own record already reflects the
-  // role he held; applying the role table to it as well would count the same fact twice.
+export function shrunkAvailabilityRate(input: AvailabilityInput, priors: AvailabilityPriors): number {
+  // Role adjusts the PRIOR, never the evidence. A player's own record already reflects the role he
+  // held; applying the role table to it as well would count the same fact twice.
   const baseline =
     input.baselineRate !== null
       ? Math.min(1, Math.max(0, input.baselineRate))
-      : Math.min(
-          1,
-          Math.max(
-            0,
-            priors.baseline[input.position][roleBracketFor(input.projectedSnapShare)] *
-              priors.ageMultiplier[input.position][ageBracketFor(input.age)],
-          ),
-        );
+      : Math.min(1, Math.max(0, priors.baseline[input.position][roleBracketFor(input.projectedSnapShare)]));
   const history = recentHistory(input.history, priors.historySeasons);
 
   let evidenceGames = 0;
@@ -330,12 +332,40 @@ export function expectedGamesPlayed(
     evidencePlayed += weight * Math.min(entry.gamesPlayed, entry.teamGames);
   });
 
-  const shrunk =
-    evidenceGames > 0
-      ? (priors.priorGames * baseline + evidencePlayed) / (priors.priorGames + evidenceGames)
-      : baseline;
-  const rate = Math.min(1, Math.max(0, shrunk * priors.statusMultiplier[input.status]));
+  return evidenceGames > 0
+    ? (priors.priorGames * baseline + evidencePlayed) / (priors.priorGames + evidenceGames)
+    : baseline;
+}
 
+/**
+ * EXPECTED GAMES PLAYED, as a distribution.
+ *
+ * The rate is a shrinkage exactly like layer 1's: a position-and-role baseline, then the player's
+ * own recency-weighted record pulled toward it in proportion to how many games that record covers.
+ * A man with one season of evidence moves the baseline about a fifth of the way; a man with four
+ * moves it half. AGE AND THE CUTDOWN STATUS THEN MULTIPLY THE RESULT, in that order and both after
+ * the shrinkage, because both are fitted as ratios against exactly that quantity.
+ *
+ * The spread narrows with the length of the record rather than with the mean, which is what makes a
+ * rookie's distribution honestly wider than a veteran's without a rule that says "rookies are
+ * uncertain". See `AvailabilityPriors.concentrationPerSeason`.
+ */
+export function expectedGamesPlayed(
+  input: AvailabilityInput,
+  { season, priors }: { readonly season: number; readonly priors: AvailabilityPriors },
+): GamesPlayedOutlook {
+  const teamGames = teamGamesIn(season);
+  const shrunk = shrunkAvailabilityRate(input, priors);
+  const rate = Math.min(
+    1,
+    Math.max(
+      0,
+      shrunk *
+        priors.ageMultiplier[input.position][ageBracketFor(input.age)] *
+        priors.statusMultiplier[input.status],
+    ),
+  );
+  const history = recentHistory(input.history, priors.historySeasons);
   return outlookFromRate(teamGames, rate, priors.concentration + priors.concentrationPerSeason * history.length);
 }
 

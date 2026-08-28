@@ -15,10 +15,16 @@ import { createDb } from "@/db/client";
 import { FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
 import { FITTED_MODEL } from "@/projections/model/source";
 import { AGE_BRACKETS, ROLE_BRACKETS, expectedGamesPlayed } from "@/projections/preseason/availability";
-import { fitAvailabilityPriors, fitDepthPriors, fitRookiePriors } from "@/projections/preseason/fit";
+import { fitAvailabilityPriors, fitCareerPriors, fitDepthPriors, fitRookiePriors } from "@/projections/preseason/fit";
 import { DEPTH_RANKS, depthMultiplier } from "@/projections/preseason/depth";
+import { EXPERIENCE_BANDS, careerMultiplier } from "@/projections/preseason/career";
 import { DRAFT_BUCKETS } from "@/projections/preseason/rookies";
-import { loadAvailabilityObservations, loadDepthObservations, loadRookieObservations } from "@/projections/preseason/source";
+import {
+  loadAvailabilityObservations,
+  loadCareerObservations,
+  loadDepthObservations,
+  loadRookieObservations,
+} from "@/projections/preseason/source";
 
 const OUTPUT = "src/projections/preseason/fitted.ts";
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
@@ -33,6 +39,7 @@ function requireEnv(name: string): string {
 
 function header(): string {
   return `import type { AvailabilityPriors } from "./availability";
+import type { CareerPriors } from "./career";
 import type { DepthPriors } from "./depth";
 import type { RookiePriors } from "./rookies";
 
@@ -63,6 +70,17 @@ async function main(): Promise<void> {
 
   const depthObservations = await loadDepthObservations(db, FIT_SEASONS, FITTED_MODEL);
   const depth = fitDepthPriors(depthObservations, { heldOutSeasons: HELD_OUT_SEASONS });
+
+  // LAST, and it has to be: the career curve is fitted against the board this fit has just produced
+  // with every other feature on and the curve off. Fitting it against a bare model would measure the
+  // residual of a board nobody publishes.
+  const careerObservations = await loadCareerObservations(db, FIT_SEASONS, {
+    model: FITTED_MODEL,
+    availability,
+    rookies,
+    depth,
+  });
+  const career = fitCareerPriors(careerObservations, { heldOutSeasons: HELD_OUT_SEASONS });
 
   console.log(`AVAILABILITY, fitted on ${availabilityObservations.length} player-seasons\n`);
   console.log(`  share of the season played, by ROLE`);
@@ -139,6 +157,18 @@ async function main(): Promise<void> {
     );
   }
 
+  console.log(`\nCAREER STAGE, fitted on ${careerObservations.length} player-seasons (absentees at zero)`);
+  console.log(`  a multiplier on projected per-game production, normalised within the position`);
+  console.log(`  ${"".padEnd(4)} ${EXPERIENCE_BANDS.map((band) => band.padStart(14)).join(" ")}`);
+  for (const position of POSITIONS) {
+    const counts = EXPERIENCE_BANDS.map(
+      (band) => careerObservations.filter((o) => o.position === position && o.band === band).length,
+    );
+    console.log(
+      `  ${position.padEnd(4)} ${EXPERIENCE_BANDS.map((band, index) => `${careerMultiplier(position, band, career).toFixed(3)} (n=${String(counts[index]).padStart(3)})`.padStart(14)).join(" ")}`,
+    );
+  }
+
   writeFileSync(
     OUTPUT,
     `${header()}
@@ -147,6 +177,8 @@ export const FITTED_AVAILABILITY_PRIORS: AvailabilityPriors = ${JSON.stringify(a
 export const FITTED_ROOKIE_PRIORS: RookiePriors = ${JSON.stringify(rookies, null, 2)};
 
 export const FITTED_DEPTH_PRIORS: DepthPriors = ${JSON.stringify(depth, null, 2)};
+
+export const FITTED_CAREER_PRIORS: CareerPriors = ${JSON.stringify(career, null, 2)};
 `,
   );
   console.log(`\nwrote ${OUTPUT}`);

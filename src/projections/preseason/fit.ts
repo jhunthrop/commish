@@ -1,6 +1,7 @@
 import type { Position } from "@/domain/player";
 import type { RosterStatus } from "../nflverse/rosters";
 import { ROSTER_STATUSES } from "../nflverse/rosters";
+import { EXPERIENCE_BANDS, type CareerPriors, type ExperienceBand } from "./career";
 import { DEPTH_RANKS, type DepthPriors, type DepthRank } from "./depth";
 import { DRAFT_BUCKETS, draftBucketFor, type DraftBucket, type RookiePriors, type RookieShares } from "./rookies";
 import {
@@ -9,6 +10,7 @@ import {
   ageBracketFor,
   expectedGamesPlayed,
   roleBracketFor,
+  shrunkAvailabilityRate,
   teamGamesIn,
   type AgeBracket,
   type AvailabilityInput,
@@ -48,6 +50,16 @@ const ALL_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"] as const;
  * without flattening a cell that has hundreds of rows behind it.
  */
 const CELL_PRIOR_SEASONS = 40;
+
+/**
+ * How far one age cell is allowed to move the shrunk rate.
+ *
+ * Wider than the [0.7, 1.15] the term carried while it multiplied the PRIOR, because a correction
+ * applied after the shrinkage has to carry the whole effect rather than the share of it the prior's
+ * weight let through. It is a guard against a thin cell rather than a tuned parameter, and it binds
+ * on none of the cells this fit produces — `preseason-fit.ts` prints every one of them.
+ */
+const AGE_MULTIPLIER_BOUND = { min: 0.6, max: 1.35 } as const;
 
 /** What one player-season contributes to the fit. */
 export interface AvailabilityObservation {
@@ -131,19 +143,56 @@ function enforceRoleOrdering(cells: Record<RoleBracket, number>): Record<RoleBra
 }
 
 /**
- * AGE, as a multiplier on the role cell.
+ * The shrinkage half of the model, as the two multipliers below have to see it.
  *
- * Measured on the RESIDUAL of the role table, never on the raw rate, so it explains what role could
- * not rather than re-explaining what role already did — the discipline Phase 3 held its scheme
- * feature to when it fitted against layer 1's residual instead of against raw volume. Without it,
- * the age term would mostly re-measure the fact that older players are more often backups.
+ * Both are ratios of what a group played to what the model expected of it, and the denominator has
+ * to be THE NUMBER THEY MULTIPLY or the ratio is not a correction. `shrunkAvailabilityRate` is that
+ * number: the role prior blended with the player's own record, before either multiplier.
+ */
+function shrunkFor(
+  observation: AvailabilityObservation,
+  priors: Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason">,
+): number {
+  return shrunkAvailabilityRate(observation, { ...priors, concentration: 1, concentrationPerSeason: 0 });
+}
+
+/** A neutral parameter set: the shrinkage as it stands, with both multipliers switched off. */
+function withoutMultipliers(
+  baseline: AvailabilityPriors["baseline"],
+  priorGames: number,
+  recencyDecay: number,
+  historySeasons: number,
+): Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason"> {
+  const ones = Object.fromEntries(
+    ALL_POSITIONS.map((position) => [position, Object.fromEntries(AGE_BRACKETS.map((bracket) => [bracket, 1]))]),
+  ) as AvailabilityPriors["ageMultiplier"];
+  const flat = Object.fromEntries(ROSTER_STATUSES.map((status) => [status, 1])) as AvailabilityPriors["statusMultiplier"];
+  return { baseline, ageMultiplier: ones, statusMultiplier: flat, priorGames, recencyDecay, historySeasons };
+}
+
+/**
+ * AGE, as a multiplier on the shrunk rate.
+ *
+ * Measured on the RESIDUAL of everything below it, never on the raw rate, so it explains what role
+ * and the player's own record could not rather than re-explaining what they already did — the
+ * discipline Phase 3 held its scheme feature to when it fitted against layer 1's residual instead
+ * of against raw volume.
+ *
+ * IT USED TO BE FITTED AGAINST THE ROLE CELL AND APPLIED TO THE PRIOR, which is the mismatch
+ * `availability.ts` now documents: the record then carried the age signal straight back in, because
+ * an old player's record is a run of full seasons and a young player's is a rookie year spent
+ * behind somebody. Fitted here against the quantity it multiplies, it corrects the residual instead
+ * of a quantity nothing downstream computes.
  *
  * Shrunk toward one on thin cells, and bounded, because a cell of forty player-seasons that says
  * thirty-year-old tight ends play half a season is noise and would fade a real starter off a board.
+ * The bound is wider than it was — a correction applied after the shrinkage has to carry the whole
+ * effect rather than the fraction of it the prior's weight lets through — and it is not
+ * load-bearing: it binds on no cell the fit produces.
  */
 function fitAgeMultipliers(
   observations: readonly AvailabilityObservation[],
-  baseline: AvailabilityPriors["baseline"],
+  priors: Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason">,
 ): AvailabilityPriors["ageMultiplier"] {
   const active = observations.filter((observation) => observation.status === "active");
   const table = {} as Record<Position, Record<AgeBracket, number>>;
@@ -153,10 +202,10 @@ function fitAgeMultipliers(
     for (const bracket of AGE_BRACKETS) {
       const inCell = atPosition.filter((observation) => ageBracketFor(observation.age) === bracket);
       const actual = mean(inCell.map(rateOf));
-      const expected = mean(inCell.map((observation) => baseline[position][roleBracketFor(observation.projectedSnapShare)]));
+      const expected = mean(inCell.map((observation) => shrunkFor(observation, priors)));
       const raw = actual === null || expected === null || expected <= 0 ? 1 : actual / expected;
       const weight = inCell.length / (CELL_PRIOR_SEASONS + inCell.length);
-      cells[bracket] = Math.min(1.15, Math.max(0.7, 1 * (1 - weight) + raw * weight));
+      cells[bracket] = Math.min(AGE_MULTIPLIER_BOUND.max, Math.max(AGE_MULTIPLIER_BOUND.min, 1 * (1 - weight) + raw * weight));
     }
     table[position] = cells;
   }
@@ -164,20 +213,24 @@ function fitAgeMultipliers(
 }
 
 /**
- * What each cutdown status is worth, as a multiplier on the active baseline.
+ * What each cutdown status is worth, as a multiplier on the shrunk rate with age already applied.
  *
  * A ratio rather than a separate table because status and age are close to independent: a man on
  * injured reserve in week 1 misses a similar SHARE of the season whether he is 24 or 32, and a full
  * status-by-position-by-age table would be sixty-four cells estimated from eight hundred rows.
+ *
+ * THE DENOMINATOR IS THE FIX. It used to be the role-and-age BASELINE while the multiplier was
+ * applied to the SHRUNK rate, and for this population those differ by a factor of three: a club
+ * does not put a camp body on a reserve list in week one, it puts a starter there, and a starter's
+ * own record pulls his shrunk rate far above his role cell. The old ratio therefore charged him for
+ * the gap between the two on top of the designation itself.
  */
 function fitStatusMultipliers(
   observations: readonly AvailabilityObservation[],
-  baseline: AvailabilityPriors["baseline"],
-  ageMultiplier: AvailabilityPriors["ageMultiplier"],
+  priors: Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason">,
 ): AvailabilityPriors["statusMultiplier"] {
   const expectedFor = (observation: AvailabilityObservation): number =>
-    baseline[observation.position][roleBracketFor(observation.projectedSnapShare)] *
-    ageMultiplier[observation.position][ageBracketFor(observation.age)];
+    shrunkFor(observation, priors) * priors.ageMultiplier[observation.position][ageBracketFor(observation.age)];
   const multipliers = {} as Record<RosterStatus, number>;
   for (const status of ROSTER_STATUSES) {
     if (status === "active") {
@@ -293,14 +346,19 @@ export function fitAvailabilityPriors(
   }
 
   const baseline = fitBaseline(fittable);
-  const ageMultiplier = fitAgeMultipliers(fittable, baseline);
-  const statusMultiplier = fitStatusMultipliers(fittable, baseline, ageMultiplier);
   const historySeasons = 3;
 
+  // BOTH MULTIPLIERS ARE REFITTED INSIDE THE GRID, and they have to be. Each is a ratio against the
+  // shrunk rate, and the shrunk rate is what the two searched parameters decide — so a table fitted
+  // once outside the loop would be a correction to a model the search then walks away from. This is
+  // the same self-consistency the apply side now has, on the fit side.
   let best: Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason"> | null = null;
   let bestError = Infinity;
   for (const priorGames of priorGamesGrid) {
     for (const recencyDecay of recencyDecayGrid) {
+      const bare = withoutMultipliers(baseline, priorGames, recencyDecay, historySeasons);
+      const ageMultiplier = fitAgeMultipliers(fittable, bare);
+      const statusMultiplier = fitStatusMultipliers(fittable, { ...bare, ageMultiplier });
       const candidate = { baseline, ageMultiplier, statusMultiplier, priorGames, recencyDecay, historySeasons };
       const error = rootMeanSquare(fittable, { ...candidate, concentration: 1, concentrationPerSeason: 0 });
       if (error < bestError) {
@@ -585,5 +643,95 @@ function ratioOf(observations: readonly DepthObservation[]): number | null {
   if (observations.length === 0) return null;
   const projected = observations.reduce((sum, observation) => sum + observation.projectedSnapShare, 0);
   const actual = observations.reduce((sum, observation) => sum + observation.actualSnapShare, 0);
+  return projected <= 0 ? null : actual / projected;
+}
+
+/** What one player-season contributes to the career-stage fit. */
+export interface CareerObservation {
+  readonly season: number;
+  readonly playerId: string;
+  readonly position: Position;
+  /** Which stage of a career he was in, or null where the release carries no entry year. */
+  readonly band: ExperienceBand | null;
+  /**
+   * The board's own projected season points for him, with every other feature on and this one off.
+   * Fitted against the number it will later multiply, following `fitStatusMultipliers`' correction.
+   */
+  readonly projectedPoints: number;
+  /** What he actually scored over the regular season. ZERO for a man who never dressed. */
+  readonly actualPoints: number;
+}
+
+export interface CareerFitOptions {
+  readonly heldOutSeasons: readonly number[];
+  /** Chosen, not fitted. See `CareerPriors.bound`. */
+  readonly bound?: number;
+}
+
+/**
+ * How many player-seasons of "a career stage says nothing" each cell is shrunk toward.
+ *
+ * Twenty cells over two fit seasons leaves the thinnest (a third-year quarterback) at a few dozen,
+ * and an unshrunk cell of that size would assert a curve from the handful of men in it. Shrinking
+ * toward one — the null hypothesis that career stage adds nothing — is the conservative direction:
+ * a cell has to earn its correction. Larger than the depth chart's twenty because a career band is
+ * a much weaker claim about any one player than his club's own published ordering is.
+ */
+const CAREER_CELL_PRIOR = 40;
+
+/**
+ * THE CAREER CURVE, fitted on the fit seasons and normalised within the position.
+ *
+ * THE POPULATION IS EVERY MAN THE BOARD PROJECTS, WITH ABSENTEES AT ZERO, and that is the whole
+ * methodology. The first version of this diagnosis measured the same quantity over players who
+ * appeared in a box score and found a reserve-list cell three games out of true; the cell was fine
+ * and the measurement was conditioning on the outcome, because a man who never played has no line
+ * to be measured on and drops out. `news/adjust.ts` made the same call for the same reason and it is
+ * the difference between a correction and a selection effect. Here the absent man scores zero,
+ * which is what he scored.
+ *
+ * A RATIO OF TOTALS RATHER THAN A MEAN OF RATIOS, because a ratio of one man's points to his
+ * projection is unbounded when the projection is small and the cell would then be decided by the
+ * noisiest rows in it. The totals ratio asks the question a board is actually judged on: did this
+ * cohort take the share of the position's points the board gave it.
+ */
+export function fitCareerPriors(
+  observations: readonly CareerObservation[],
+  { heldOutSeasons, bound = 0.35 }: CareerFitOptions,
+): CareerPriors {
+  const forbidden = new Set(heldOutSeasons);
+  for (const observation of observations) {
+    if (forbidden.has(observation.season)) {
+      throw new Error(
+        `The career-stage fit was handed ${observation.season}, which is held out. A parameter fitted on a season it is later scored on is not a measurement.`,
+      );
+    }
+  }
+
+  const byExperience = {} as Record<Position, Record<ExperienceBand, number>>;
+  for (const position of ALL_POSITIONS) {
+    const atPosition = observations.filter((observation) => observation.position === position);
+    // The position's own overall correction, divided out below so only the RELATIVE claim survives.
+    // A curve that levelled a whole position against the others would be papering over a defect in
+    // layer 3, which is that layer's to fix and not this table's to hide.
+    const positionRatio = pointsRatioOf(atPosition);
+    const cells = {} as Record<ExperienceBand, number>;
+    for (const band of EXPERIENCE_BANDS) {
+      const inCell = atPosition.filter((observation) => observation.band === band);
+      const cellRatio = pointsRatioOf(inCell);
+      const weight = inCell.length / (CAREER_CELL_PRIOR + inCell.length);
+      const relative = cellRatio === null || positionRatio === null || positionRatio <= 0 ? 1 : cellRatio / positionRatio;
+      cells[band] = 1 * (1 - weight) + relative * weight;
+    }
+    byExperience[position] = cells;
+  }
+  return { byExperience, bound };
+}
+
+/** Total actual points over total projected points, or null where the group says nothing. */
+function pointsRatioOf(observations: readonly CareerObservation[]): number | null {
+  if (observations.length === 0) return null;
+  const projected = observations.reduce((sum, observation) => sum + observation.projectedPoints, 0);
+  const actual = observations.reduce((sum, observation) => sum + observation.actualPoints, 0);
   return projected <= 0 ? null : actual / projected;
 }

@@ -17,6 +17,7 @@ import type { TeamContext } from "../team-context";
 import { usageAsOf, type PlayerWeekUsage } from "../usage";
 import { projectedPosition } from "../nflverse/players";
 import { COACH_METRICS } from "../nflverse/coaches";
+import { SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { indexTeamMetrics } from "../team-context";
 import {
   ageAtSeason,
@@ -26,10 +27,13 @@ import {
   type AvailabilityPriors,
   type SeasonAvailability,
 } from "./availability";
-import type { BoardCandidate, BoardReason } from "./board";
-import type { AvailabilityObservation, DepthObservation, RookieObservation } from "./fit";
+import { scaleStatLine, type BoardCandidate, type BoardReason } from "./board";
+import { PPR_SCORING } from "@/domain/scoring";
+import { computeFantasyPoints } from "@/scoring/compute";
+import type { AvailabilityObservation, CareerObservation, DepthObservation, RookieObservation } from "./fit";
 import { INJURY_SOURCE } from "../news/retrieve";
 import { observationsAsOf } from "../store";
+import { applyCareerStage, experienceBandFor, NEUTRAL_CAREER_PRIORS, type CareerPriors } from "./career";
 import {
   applyDepthChart,
   depthRankFor,
@@ -118,6 +122,8 @@ export interface PreseasonFeatures {
   readonly rookiePickCurve: boolean;
   /** The published week-one depth chart, applied to layer 1's belief about who plays. */
   readonly depthChart: boolean;
+  /** The career-stage curve, applied to the composed per-game line. See `career.ts`. */
+  readonly careerStage: boolean;
 }
 
 /** What a board looks like with none of this phase's work in it: the `before` arm of every ablation. */
@@ -128,6 +134,7 @@ export const NO_PRESEASON_FEATURES: PreseasonFeatures = {
   rookieLanding: false,
   rookiePickCurve: false,
   depthChart: false,
+  careerStage: false,
 };
 export const ALL_PRESEASON_FEATURES: PreseasonFeatures = {
   availability: true,
@@ -136,6 +143,7 @@ export const ALL_PRESEASON_FEATURES: PreseasonFeatures = {
   rookieLanding: true,
   rookiePickCurve: true,
   depthChart: true,
+  careerStage: true,
 };
 
 /**
@@ -198,6 +206,20 @@ export const SHIPPED_PRESEASON_FEATURES: PreseasonFeatures = {
    * document for what it measured on the band it targets.
    */
   depthChart: true,
+  /**
+   * ON, and it is the first thing this board has ever shipped that moved the STARTER band on both
+   * held-out seasons. Measured on top of everything else, `docs/research/2026-08-28-starter-band.md`:
+   * the starter band goes 0.2339 -> 0.2485 in 2023 and 0.2290 -> 0.2685 in 2024, the market
+   * population goes 0.4697 -> 0.4759 and 0.3992 -> 0.4186, and the consensus population goes
+   * 0.6489 -> 0.6659 and 0.7594 -> 0.7598.
+   *
+   * WHAT IT IS NOT, stated here because the headline is better than the whole truth. On the FULL
+   * board — every man the engine projects, not the four hundred a benchmark also ranked — the
+   * pooled figure is +0.0117 in 2023 and -0.0001 in 2024. It is a band-level effect on the players
+   * a manager actually drafts, exactly as model v3 found the news pass to be, and it does not move
+   * a five-hundred-row pooled correlation in 2024 at all. The elite and fringe bands are mixed.
+   */
+  careerStage: true,
 };
 
 export interface PreseasonPriors {
@@ -205,6 +227,7 @@ export interface PreseasonPriors {
   readonly availability: AvailabilityPriors;
   readonly rookies: RookiePriors;
   readonly depth: DepthPriors;
+  readonly career: CareerPriors;
 }
 
 /** Everything one season's board is built from, read once, all through the same gate. */
@@ -348,12 +371,24 @@ export async function loadPreseason(db: ReadonlyDb, season: number): Promise<Pre
     priorPlayerTeams.push(...(await playerTeamsAsOf(db, span)));
     teamObservations.push(...(await teamObservationsAsOf(db, span)));
   }
-  // The target season's own team facts, bounded by the gate alone. Everything the schedule
-  // published in May passes; everything stamped at kickoff does not. That asymmetry is the entire
-  // reason `team_week_observations.as_of` exists, and it is what carries a new head coach onto the
-  // board without carrying his week-one closing line with him.
+  // The target season's own team facts. Everything the schedule published in May passes; the
+  // closing lines stamped at kickoff are refused BY SOURCE, and that refusal is code rather than
+  // arithmetic on purpose.
+  //
+  // A SECOND LEAKAGE DEFECT OF THE SAME SHAPE AS THE FIRST, found by auditing rather than by a
+  // failure. The docblock above has always said a board may not see this season's closing lines,
+  // and the gate alone did not deliver it: the preseason moment is one millisecond before the
+  // earliest GAME-DERIVED stamp, a box score is stamped a day and a half after its game, and a
+  // closing line is now stamped at kickoff — so the moment lands on the SATURDAY and the Thursday
+  // opener's two closing lines sit comfortably inside it. Nothing reads them today, because
+  // `features/context.ts` builds its game context from the opponent's defensive rating and rest
+  // days, which is exactly why nothing failed. It is also exactly the state the injury feed was in
+  // when it silently gated itself out of every board this engine had ever built, and the betting
+  // line is the next feature this board is meant to grow.
   teamObservations.push(
-    ...(await teamObservationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: moment })),
+    ...(await teamObservationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: moment })).filter(
+      (observation) => observation.source !== SCHEDULE_SOURCE.kickoff,
+    ),
   );
 
   return {
@@ -619,7 +654,14 @@ export function preseasonCandidates(
     const roster = rosterByPlayer.get(playerId);
     if (roster === undefined || roster.status === "off_roster") return;
     const playerRates = rates.get(playerId) ?? priors.model.efficiency.byPosition[position];
-    const perGame: StatLine = composeStatLine(playerId, week, predicted, playerRates);
+    const composed: StatLine = composeStatLine(playerId, week, predicted, playerRates);
+    // LAST of the per-game corrections and BEFORE availability reads the snap share, which is the
+    // only order that does not double-count. The curve is a statement about production per game;
+    // the availability model is fitted on games; letting the curve move the games would apply a
+    // career stage twice. `predicted.snapShare` is untouched below for exactly that reason.
+    const perGame: StatLine = features.careerStage
+      ? applyCareerStage(composed, position, experienceBandFor(inputs.season, roster.draftYear), priors.career)
+      : composed;
     const games = features.availability
       ? expectedGamesPlayed(
           {
@@ -899,3 +941,75 @@ export async function loadDepthObservations(
   }
   return observations;
 }
+
+/**
+ * One season of career-stage labels: what the board projected for a man before this curve existed,
+ * and what he then scored.
+ *
+ * THE `before` ARM IS THE BOARD WITH EVERY OTHER SHIPPED FEATURE ON AND THIS ONE OFF, which is the
+ * correction `fitStatusMultipliers` needed too: a multiplier is only a correction if it is fitted
+ * against the number it multiplies. Fitting against a bare model would measure the residual of a
+ * board nobody publishes.
+ *
+ * THE POPULATION IS EVERY MAN THE BOARD PROJECTS AND THE ABSENT ONES SCORE ZERO. A career curve
+ * fitted over the players who appeared would be fitted on the subset of each cohort that turned out
+ * to be good, and the rookie cell — the one with the most to gain from that selection — would be
+ * the most inflated. `fit.ts` states the same thing from the other side.
+ */
+export async function loadCareerObservations(
+  db: ReadonlyDb,
+  seasons: readonly number[],
+  priors: Omit<PreseasonPriors, "career">,
+): Promise<readonly CareerObservation[]> {
+  const observations: CareerObservation[] = [];
+  for (const season of seasons) {
+    const inputs = await loadPreseason(db, season);
+    const candidates = preseasonCandidates(
+      inputs,
+      { ...SHIPPED_PRESEASON_FEATURES, careerStage: false },
+      { ...priors, career: NEUTRAL_CAREER_PRIORS },
+    );
+    const actual = await seasonPointsFor(db, season, inputs.positions);
+    const draftYear = new Map(inputs.roster.map((row) => [row.playerId, row.draftYear] as const));
+    for (const candidate of candidates) {
+      observations.push({
+        season,
+        playerId: candidate.playerId,
+        position: candidate.position,
+        band: experienceBandFor(season, draftYear.get(candidate.playerId) ?? null),
+        projectedPoints: computeFantasyPoints(
+          scaleStatLine(candidate.perGame, candidate.games.expected),
+          candidate.position,
+          PPR_SCORING,
+        ),
+        actualPoints: actual.get(candidate.playerId) ?? 0,
+      });
+    }
+  }
+  return observations;
+}
+
+/**
+ * What every player actually scored over one completed regular season, in the league the board is
+ * measured in. Read at `FINAL_OUTCOME`, like every other label a fit reads: a fit is not predicting.
+ */
+async function seasonPointsFor(
+  db: ReadonlyDb,
+  season: number,
+  positions: ReadonlyMap<string, Position>,
+): Promise<ReadonlyMap<string, number>> {
+  const rows = await statLinesAsOf(db, { season, week: { from: 1, to: LAST_REGULAR_WEEK }, asOf: FINAL_OUTCOME });
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    const position = positions.get(row.line.playerId);
+    if (position === undefined) continue;
+    totals.set(row.line.playerId, (totals.get(row.line.playerId) ?? 0) + computeFantasyPoints(row.line, position, PPR_SCORING));
+  }
+  return totals;
+}
+
+/**
+ * The last week of the regular season. The span a board is scored over, and the span its labels are
+ * read over, held in one place so the two can never disagree.
+ */
+const LAST_REGULAR_WEEK = 18;

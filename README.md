@@ -90,6 +90,23 @@ npm run projections:ablate  # measure ONE feature group on the held-out seasons 
                           # Tuesday; the news pass is the one feature whose value depends on which
                           # is asked. Reads the store and never the network, so an ablation is
                           # minutes rather than a download. See docs/research/2026-08-27-model-v3.md.
+npm run projections:preseason:ingest  # fetch the week-one rosters, the published depth charts and
+                          # the two benchmark boards (FantasyPros ECR, Fantasy Football Calculator
+                          # ADP) into the point-in-time store, dated when they were published:
+                          # npm run projections:preseason:ingest -- 2021 2024. Needs the network.
+npm run projections:preseason:fit  # refit the preseason model's own parameters — availability,
+                          # rookies, the depth-chart correction and the career-stage curve — on the
+                          # FIT seasons only, and regenerate the committed
+                          # src/projections/preseason/fitted.ts. Throws if handed a held-out season.
+npm run projections:preseason  # build the preseason board at the gated August moment and score it
+                          # against the outcome, the market and expert consensus, with an ablation
+                          # per feature group. Defaults to the held-out seasons; pass seasons to
+                          # override. See docs/research/2026-08-28-starter-band.md.
+npm run projections:preseason:diagnose  # ask WHY a band is lost, before changing anything: the same
+                          # population cut four ways so a range-restriction artifact cannot be
+                          # mistaken for a defect, an oracle decomposition of games against per-game
+                          # rate, the players consensus placed well and we did not, and where the
+                          # market is systematically biased. Reads the store, writes nothing.
 npm run e2e:install       # one-time: download the Playwright browser
 npm run e2e               # browser end-to-end suite (needs a build + a WorkOS test key)
 npm run e2e:ui            # same suite, in Playwright's interactive UI mode

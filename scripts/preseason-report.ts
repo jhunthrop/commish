@@ -23,7 +23,12 @@ import { RANK_BANDS, scoreCard, type Observation, type RankBandName, type ScoreC
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { overlapTiers, preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
-import { FITTED_AVAILABILITY_PRIORS, FITTED_DEPTH_PRIORS, FITTED_ROOKIE_PRIORS } from "@/projections/preseason/fitted";
+import {
+  FITTED_AVAILABILITY_PRIORS,
+  FITTED_CAREER_PRIORS,
+  FITTED_DEPTH_PRIORS,
+  FITTED_ROOKIE_PRIORS,
+} from "@/projections/preseason/fitted";
 import {
   SHIPPED_PRESEASON_FEATURES,
   loadPreseason,
@@ -62,6 +67,7 @@ const PRIORS: PreseasonPriors = {
   availability: FITTED_AVAILABILITY_PRIORS,
   rookies: FITTED_ROOKIE_PRIORS,
   depth: FITTED_DEPTH_PRIORS,
+  career: FITTED_CAREER_PRIORS,
 };
 
 /**
@@ -79,6 +85,7 @@ const ABLATIONS: readonly { readonly name: string; readonly features: PreseasonF
   { name: "rookie landing", features: { ...SHIPPED_PRESEASON_FEATURES, rookieLanding: true }, segment: "rookies" },
   { name: "rookie pick curve", features: { ...SHIPPED_PRESEASON_FEATURES, rookiePickCurve: false }, segment: "rookies" },
   { name: "depth chart", features: { ...SHIPPED_PRESEASON_FEATURES, depthChart: false }, segment: "everyone" },
+  { name: "career stage", features: { ...SHIPPED_PRESEASON_FEATURES, careerStage: false }, segment: "everyone" },
 ];
 
 function requireEnv(name: string): string {
@@ -278,6 +285,18 @@ async function main(): Promise<void> {
         `  ${ablation.name.padEnd(14)} on ${ablation.segment.padEnd(18)} ${rho(before.overall)} -> ${rho(after.overall)}  ` +
           `${delta(before.overall, after.overall)}   n=${after.overall.sampleSize} (before n=${before.overall.sampleSize})` +
           `${ablation.name === "rookies" ? "  [before = draft capital alone]" : ""}`,
+      );
+      // BAND BY BAND UNDER THE ABLATION TOO, because a pooled figure over five hundred players is
+      // the number model v3 recorded the news pass at zero on while it moved the two bands a manager
+      // decides in by the largest margins in the project. A group is allowed to be worth nothing
+      // overall and worth something where the product lives, and a report that could not show the
+      // difference would keep hiding it.
+      console.log(
+        `  ${"".padEnd(14)}    ` +
+          RANK_BANDS.map(
+            (band) =>
+              `${band.name} ${rho(before.byBand[band.name])}->${rho(after.byBand[band.name])} ${delta(before.byBand[band.name], after.byBand[band.name])}`,
+          ).join("  "),
       );
     }
 

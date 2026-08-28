@@ -1,4 +1,5 @@
 import type { AvailabilityPriors } from "./availability";
+import type { CareerPriors } from "./career";
 import type { DepthPriors } from "./depth";
 import type { RookiePriors } from "./rookies";
 
@@ -55,28 +56,28 @@ export const FITTED_AVAILABILITY_PRIORS: AvailabilityPriors = {
   },
   "ageMultiplier": {
     "QB": {
-      "under25": 1.0301464974495023,
-      "25to27": 0.8702571671618722,
-      "28to30": 1.0361380694574847,
-      "over30": 1.008490914843851
+      "under25": 0.9978430002412695,
+      "25to27": 0.8836474845344497,
+      "28to30": 1.040964292145889,
+      "over30": 0.9888422579924734
     },
     "RB": {
-      "under25": 1.0575168996263264,
-      "25to27": 1.0043051143650668,
-      "28to30": 0.9017058520259502,
-      "over30": 0.9898645978006289
+      "under25": 1.0360686937396408,
+      "25to27": 0.9913224883974984,
+      "28to30": 0.900708322724914,
+      "over30": 0.9955018049043335
     },
     "WR": {
-      "under25": 0.9831138808051549,
-      "25to27": 1.0466735182707962,
-      "28to30": 0.9832577940795233,
-      "over30": 0.9875928251883981
+      "under25": 0.9777437250747509,
+      "25to27": 1.0309394135567467,
+      "28to30": 0.9767142271088366,
+      "over30": 0.9817851656011154
     },
     "TE": {
-      "under25": 1.0066338739194962,
-      "25to27": 1.0023424196942219,
-      "28to30": 0.995153334059289,
-      "over30": 1.0089017244447949
+      "under25": 1.0176394418440982,
+      "25to27": 1.021907965780076,
+      "28to30": 1.0026701634380117,
+      "over30": 0.9905992502475507
     },
     "K": {
       "under25": 1,
@@ -93,14 +94,14 @@ export const FITTED_AVAILABILITY_PRIORS: AvailabilityPriors = {
   },
   "statusMultiplier": {
     "active": 1,
-    "reserve": 0.197750025998733,
-    "practice_squad": 0.21346105488350064,
-    "off_roster": 0.05107779779676493
+    "reserve": 0.20700769217643455,
+    "practice_squad": 0.23418862478962155,
+    "off_roster": 0.058012434990280505
   },
   "priorGames": 25,
-  "recencyDecay": 0.6,
+  "recencyDecay": 0.7,
   "historySeasons": 3,
-  "concentration": 1.8742842983216088,
+  "concentration": 1.938315267549189,
   "concentrationPerSeason": 0
 };
 
@@ -441,4 +442,52 @@ export const FITTED_DEPTH_PRIORS: DepthPriors = {
     }
   },
   "bound": 1
+};
+
+export const FITTED_CAREER_PRIORS: CareerPriors = {
+  "byExperience": {
+    "QB": {
+      "year1": 0.9656447010780852,
+      "year2": 1.0371963947832357,
+      "year3": 0.9819819585188347,
+      "year4to6": 1.0036649974636638,
+      "year7plus": 0.9961849461587898
+    },
+    "RB": {
+      "year1": 1.607751956333812,
+      "year2": 0.9371617859640574,
+      "year3": 0.9376662440003217,
+      "year4to6": 0.9805470652845814,
+      "year7plus": 0.9328821246318038
+    },
+    "WR": {
+      "year1": 1.4496353300520466,
+      "year2": 1.1274483691779347,
+      "year3": 1.001757717371134,
+      "year4to6": 0.9484996338276397,
+      "year7plus": 0.8994823177652965
+    },
+    "TE": {
+      "year1": 1.6020785457348117,
+      "year2": 1.0411345176006348,
+      "year3": 1.0397725253099304,
+      "year4to6": 0.991116548800593,
+      "year7plus": 0.8760349418530686
+    },
+    "K": {
+      "year1": 1,
+      "year2": 1,
+      "year3": 1,
+      "year4to6": 1,
+      "year7plus": 1
+    },
+    "DEF": {
+      "year1": 1,
+      "year2": 1,
+      "year3": 1,
+      "year4to6": 1,
+      "year7plus": 1
+    }
+  },
+  "bound": 0.35
 };
