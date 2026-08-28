@@ -175,7 +175,7 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
           of session: a signed-out visitor deciding whether to sign in benefits from knowing what
           they are signing up for too. */}
       <p className="text-sm text-text-muted">
-        {"Joining puts you in the draft and the season that follows. You will set a lineup every week."}
+        {"You are in the draft, then the season. Set a lineup every week."}
       </p>
       <LeagueTermsPanel terms={state.terms} helpLevel={helpLevel} />
       {signedIn ? (

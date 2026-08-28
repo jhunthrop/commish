@@ -275,7 +275,9 @@ describe("LeagueHome", () => {
   it("tells the commissioner scores run themselves now, in both themes, axe-clean", async () => {
     await renderSurface(wrap(), async ({ container }) => {
       expect(
-        screen.getByText("Scores update automatically as games finish. There is nothing to run by hand."),
+        // Fun pass, Task 4: "There is nothing to run by hand" reassured a commissioner about a
+        // button this product removed. Nobody is looking for it.
+        screen.getByText("Scores update as games finish."),
       ).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -502,7 +504,7 @@ describe("LeagueHome", () => {
       fixtureLeagueDeps().deps,
     );
     expect(
-      screen.queryByText("Joining puts you in the draft and the season that follows. You will set a lineup every week."),
+      screen.queryByText("You are in the draft, then the season. Set a lineup every week."),
     ).not.toBeInTheDocument();
   });
 

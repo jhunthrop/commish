@@ -148,7 +148,7 @@ describe("TradeComposer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Propose trade" }));
 
     expect(await screen.findByText("Trade proposed.")).toBeInTheDocument();
-    expect(screen.getByText(`Expires in ${TRADE_CONFIG.proposalTtlHours / 24} days. If nobody answers by then, it expires on its own and neither roster changes.`)).toBeInTheDocument();
+    expect(screen.getByText(`Expires in ${TRADE_CONFIG.proposalTtlHours / 24} days. If nobody answers, it expires and neither roster changes.`)).toBeInTheDocument();
   });
 
   it("shows the server's reason when a proposal is refused", async () => {

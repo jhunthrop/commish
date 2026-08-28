@@ -103,7 +103,7 @@ export function checklistItems(params: {
   const tour: WaitingChecklistItem = {
     key: "tour",
     heading: "See how the draft room works",
-    body: "A quick look at the clock, the queue and how a pick actually happens, before it is your turn for real.",
+    body: "The clock, the queue and a pick, before any of it counts.",
     // Task 9, Step 1 (row 18's ask): a guided preview of THIS room, and a real mock draft
     // against seeded bots, side by side — the tour describes the room, the practice link lets a
     // manager actually run one before it counts. `/app/mock-drafts?create=solo` is `DraftRoom`'s
@@ -132,7 +132,7 @@ export function checklistItems(params: {
     heading: "Team name",
     body:
       params.myTeamName === null
-        ? "Every team in this room already has a name."
+        ? "Every team here is named."
         : `Your team is named ${params.myTeamName}. That is what the rest of the room will call you all season.`,
   };
   const rank: WaitingChecklistItem = {
@@ -151,7 +151,7 @@ export function checklistItems(params: {
   const notices: WaitingChecklistItem = {
     key: "notices",
     heading: "Turn on notices",
-    body: "In-app notices are already on for every league you are in.",
+    body: "Already on for every league you are in.",
     content: (
       <Link href="/app/profile#notifications-heading" className="text-sm font-medium text-accent underline">
         See what you will hear about

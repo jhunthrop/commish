@@ -274,7 +274,7 @@ export function DraftSchedulePanel({
     schedule.status !== "scheduled" ? null : schedule.isPublicMatchmade ? (
       <p className="text-sm text-text-muted">If nobody starts it, we will start it at the scheduled time.</p>
     ) : isCommissioner ? (
-      <p className="text-sm text-text-muted">{"Nothing starts this automatically. Press Start the draft when everyone is ready."}</p>
+      <p className="text-sm text-text-muted">{"Press Start the draft when everyone is ready."}</p>
     ) : null;
 
   // Task 7 (F12/F21): only a SCHEDULED draft ever rolls (Step 2's own model ruling), so this
@@ -351,7 +351,7 @@ export function DraftSchedulePanel({
   // constraint `RoomRail`'s own `formatTightening`/`formatYourTurn` note.
   const overnightPauseNotice = schedule.status !== "scheduled" || startingSoon ? null : (
     <p className="text-sm text-text-muted">
-      Picks pause automatically between 2:00 AM and 5:00 AM Eastern once the clock reaches an hour or longer, and resume right after.
+      Picks pause 2:00 AM to 5:00 AM Eastern on clocks of an hour or longer.
     </p>
   );
 

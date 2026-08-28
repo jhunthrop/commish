@@ -38,7 +38,7 @@ test("a manager sets a lineup, and sees the week's real state and the standings 
   // without it, a regression that removed all three states would silently skip past both `if`
   // branches below and still pass.
   const notStarted = managerA.getByText("Not started");
-  const inProgress = managerA.getByText("In progress");
+  const inProgress = managerA.getByText("Live");
   const final = managerA.getByText("Final", { exact: true });
   await expect(notStarted.or(inProgress).or(final).first()).toBeVisible();
   await expect(managerA.getByRole("button", { name: /^Score Week/ })).toHaveCount(0);

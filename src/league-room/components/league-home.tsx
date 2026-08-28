@@ -256,7 +256,7 @@ export function LeagueHome({
             gone, and this is what replaced it — an explanation of why, not a silent absence. */}
         {home.isCommissioner ? (
           <p className="text-sm text-text-muted">
-            {"Scores update automatically as games finish. There is nothing to run by hand."}
+            {"Scores update as games finish."}
           </p>
         ) : null}
       </section>

@@ -451,7 +451,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
         ))}
         {listRows.length === 0 ? (
           <li className="rounded-sm border border-dashed border-line p-4 text-sm text-text-muted">
-            The board fills in as picks land. Nothing has been drafted yet.
+            Nothing drafted yet.
           </li>
         ) : null}
       </ol>

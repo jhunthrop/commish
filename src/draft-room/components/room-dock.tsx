@@ -132,7 +132,7 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
       // the target must exist whether or not a manager has queued anyone yet, so opening the
       // tour with an empty queue still anchors instead of falling back to the modal.
       <p id="dock-queue" className="min-w-0 basis-full flex-1 self-center text-sm text-text-muted lg:basis-auto">
-        Star players in the pool to build your queue. The room picks for you from your queue if your clock runs out.
+        Star players in the pool. The room picks for you from your queue if your clock runs out.
       </p>
     );
   }
@@ -310,7 +310,7 @@ function PrimarySlot({
     // buttons are what actually makes the pick; this is the standing answer to "what now?".
     return (
       <p data-testid="dock-owed-pick" className="basis-full self-center font-display text-display-sm font-semibold leading-display text-warning lg:basis-auto lg:shrink-0">
-        Your pick passed while you were away. Make it whenever you are ready.
+        Your pick passed. Take it now.
       </p>
     );
   }

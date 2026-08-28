@@ -13,14 +13,16 @@ import { useLeagueRoomDeps } from "../hooks/deps";
  * it without hand-retyping a second copy that could drift from what actually renders.
  */
 export const SLOT_PREFERENCE_EXPLAINER =
-  "Rank the slots you want. At draft start we draw a random order and give each manager their highest choice that is still free.";
+  "Rank the slots you want. We draw a random order at draft start and give you your highest free choice.";
 
 /**
- * Phase 3.6, Task 9, Step 5: the worked example the mock asked for and never got. One concrete
- * walk-through beats a second abstract restatement of the rule above it.
+ * The worked example ("For example: rank 4, then 1, then 7...") is GONE (fun pass, Task 4). It
+ * was added in Phase 3.6 on the reasoning that a concrete walk-through beats an abstract
+ * restatement, and that reasoning was sound about the sentence and wrong about the panel: it
+ * shipped TWO stacked paragraphs of procedure above a set of tiles a manager can simply drag. A
+ * fantasy site states the rule once and lets the control teach the rest; the `draft-slot`
+ * `InfoTip` beside the heading is still one press away for anyone who wants the long version.
  */
-export const SLOT_PREFERENCE_WORKED_EXAMPLE =
-  "For example: rank 4, then 1, then 7. If the draw puts another manager into slot 4 first, you get slot 1 instead, as long as it is still free.";
 
 /** Moves `slot` one position within `ranking` — the same "swap with a neighbor, clamp at the
  *  ends" shape `moveInQueue` (`@/draft-room/state/queue`) uses for player ids, kept as its own
@@ -39,7 +41,7 @@ function moveRank(ranking: readonly number[], slot: number, delta: number): read
 /** "Saved. You ranked: 4, then 1, then 7." — a save that says what it saved, in the exact order
  *  it was saved in. The empty-ranking case gets its own sentence rather than an empty list. */
 function savedMessageFor(ranking: readonly number[]): string {
-  if (ranking.length === 0) return "Saved. You did not rank any slots, and that is fine.";
+  if (ranking.length === 0) return "Saved. We will draw you a slot at random.";
   return `Saved. You ranked: ${ranking.join(", then ")}.`;
 }
 
@@ -134,11 +136,10 @@ export function SlotPreferencePanel({ leagueId, initialPreference, helpLevel }: 
         <InfoTip term="draft-slot" helpLevel={helpLevel} />
       </div>
       <p className="text-sm text-text-muted">{SLOT_PREFERENCE_EXPLAINER}</p>
-      <p className="text-sm text-text-muted">{SLOT_PREFERENCE_WORKED_EXAMPLE}</p>
 
       {ranking.length === 0 ? (
         <p className="text-sm text-text-muted">
-          You have not ranked any slots, and that is fine. We will draw you a random one when the draft starts.
+          No ranking yet. We will draw you a slot at random.
         </p>
       ) : (
         <ol aria-label="Your ranked slots" className="flex flex-wrap items-center gap-2">

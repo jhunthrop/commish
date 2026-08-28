@@ -97,7 +97,7 @@ export const START_TRIGGERS = [
   { value: "scheduled", label: "On a schedule I set later" },
   { value: "when_full", label: "Starts as soon as it fills" },
 ];
-export const START_TRIGGER_HINT = `A sit-and-go league starts on its own about ${SIT_AND_GO_GRACE_MINUTES} minutes after its last seat fills, so everyone has time to open the room first.`;
+export const START_TRIGGER_HINT = `A sit-and-go league starts on its own about ${SIT_AND_GO_GRACE_MINUTES} minutes after its last seat fills.`;
 /**
  * Named once, so the drawer's own summary and the fields it actually contains can never say two
  * different things — the defect this task exists to close (the old summary named three of the

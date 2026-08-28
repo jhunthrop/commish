@@ -677,7 +677,41 @@ Plain language, active voice, specific. Errors say what happened and what to do 
 exception/DB text ever reaches a user. Five surfaces phrasing one promise five ways is a
 design-system failure, not a writing one — the rules below exist so nobody has to re-derive a
 sentence this product already decided on. **Unchanged by v3** — the caps and pill rules govern
-typography and layout, never the words themselves.
+typography and layout, never the words themselves. **Amended by the fun pass (Task 4), which is
+the one place the words themselves moved.**
+
+### Assert, do not explain (the fun pass, 2026-08-27)
+
+The founder's *"it feels like a legal website and not a fantasy site"* is a copy complaint at
+least as much as a visual one, and it is the cheapest half of the fix. The spec's second named
+cause: *"The copy is written like terms. 'This team must make its pick before time runs out.' is a
+compliance sentence. A fantasy product says 'You're on the clock' and stops talking."*
+
+**Name the moment, then stop.** Four tells, each of which had shipped on more than one surface
+before Task 4 swept them:
+
+1. **Explaining a mechanic the screen is already showing.** A tour stop that narrates a countdown
+   the reader is watching, a board empty state that explains that boards fill up.
+2. **The lawyerly softener** — a second sentence whose only job is to reassure, absolve or grant
+   permission. *"and that is fine"*, *"Clear it whenever you like"*, *"Make it whenever you are
+   ready"*, *"There is nothing to run by hand"*. All gone. The first sentence was already kind.
+3. **The stacked restatement** — a rule, then a worked example of the same rule, above a control
+   that teaches it faster than either. The slot panel's example was deleted outright; the
+   `InfoTip` beside the heading is the long version for whoever presses it.
+4. **The administrative noun where a sports word exists.** The clearest instance: a week that is
+   happening now reads **"Live"**, not "In progress".
+
+**What this rule does NOT license.** Money, seats, refunds, fairness and moderation sentences are
+load-bearing and stay long if long is what makes them true — `seatCountsAsOfSentence`'s second
+sentence is the thing that makes its first one honest. Screen-reader sentences are never trimmed:
+the visible digits of a clock are `aria-hidden` and the `sr-only` sentence beside them is the only
+spoken form there is. And C3's sanctioned safety-net phrase, **"the room picks for you from your
+queue"**, is still quoted verbatim by every surface that reassures a member about missing a draft.
+Cutting a sentence is only an improvement when nothing true leaves with it.
+
+Everything above this line still binds: expanded register (no contractions, C1), no em-dashes or
+en-dashes, no accusatory terms, no passive constructions, no forbidden vocabulary — all five
+mechanically enforced by `copyViolations` (`src/integrity/copy-rules.ts`) through four sweeps.
 
 **The register is expanded: no contractions** (C1, ruled). "You do not have to wait here," never
 "You don't." This product tells people things about money, seats and fairness, and the expanded

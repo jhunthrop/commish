@@ -25,11 +25,11 @@ test("a week in progress shows on the home card, locks the league page's lineup,
   // carry `role="row"`, not `role="article"` — the bare `article` role this assertion used to
   // scope to no longer exists on this page at all for an account this size.
   const seasonRow = managerA.getByRole("row").filter({ has: managerA.getByRole("link", { name: SEASON_LEAGUE_NAME, exact: true }) });
-  await expect(seasonRow.getByText("In progress")).toBeVisible();
+  await expect(seasonRow.getByText("Live")).toBeVisible();
   await expect(seasonRow.getByRole("link", { name: /Watch the scores/i })).toBeVisible();
 
   await managerA.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`);
-  await expect(managerA.getByText("In progress")).toBeVisible();
+  await expect(managerA.getByText("Live")).toBeVisible();
   // The plain-language lock, in the manager's own words — not "the button is gone", which a
   // regression that broke lineup-fetching entirely would also produce. COPY MOVE, followed
   // deliberately: the design-v2 gauntlet wave (8f7b8f9) retoned the lock sentence from "can't

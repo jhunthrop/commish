@@ -44,7 +44,7 @@ describe("MatchupScoreboard", () => {
   // reads `weekStatus` instead, so a week mid-games says so rather than reading "Not started".
   it("shows the week as in progress from weekStatus, not from final", () => {
     render(<MatchupScoreboard matchup={{ ...FINAL, final: false, weekStatus: "in_progress" }} myTeamId="t1" />);
-    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.queryByText("Not started")).not.toBeInTheDocument();
     expect(screen.queryByText("Final")).not.toBeInTheDocument();
   });

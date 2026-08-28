@@ -212,7 +212,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
       {nothingHere ? (
         <EmptyState
           title="No trades yet."
-          description="Build an offer to a leaguemate whenever you are ready."
+          description="Build an offer to a leaguemate."
           action={<Button onClick={() => setComposing(true)}>Put an offer together</Button>}
         />
       ) : (

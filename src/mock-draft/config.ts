@@ -261,7 +261,7 @@ export const MOCK_COPY = {
    * start has its own trigger (the fill window), so it gets its own honest sentence.
    */
   waitingDetail:
-    "This mock draft starts when the countdown ends. Practice opponents fill any open seats.",
+    "Practice opponents fill any open seats.",
   /** The results page heading. Deliberately not a grade or a score against the room: this
    *  product invents no draft-grade authority (founder self-ruling), only confirms the practice
    *  round is over. */

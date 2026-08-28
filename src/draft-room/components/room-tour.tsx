@@ -43,7 +43,7 @@ interface TourStop {
  */
 const CLOSING_STOP: TourStop = {
   heading: "Practice anytime",
-  body: "Even if you miss your pick, the room picks for you from your queue. Start a mock draft anytime to practice first.",
+  body: "Run a mock draft first. Same room, practice opponents, nothing counts.",
 };
 
 /**
@@ -62,12 +62,12 @@ function tourStops(actionLabel: string): readonly TourStop[] {
   return [
     {
       heading: "The clock",
-      body: "Counts down whoever is on the clock, including you. When it reaches zero, the room picks for you from your queue so the draft never stalls.",
+      body: "When it hits zero, the room picks for you from your queue.",
     },
-    { heading: "The queue", body: "Your own list of players, in order. The room picks for you from your queue whenever you miss your turn." },
+    { heading: "The queue", body: "Stack the players you want. The room picks for you from your queue whenever you miss your turn." },
     {
       heading: "Taking your turn",
-      body: `When it is your turn, click ${actionLabel} next to the player you want. Do it before the clock runs out, or the room picks for you from your queue.`,
+      body: `${actionLabel} the player you want before the clock runs out. Miss it and the room picks for you from your queue.`,
     },
     CLOSING_STOP,
   ];

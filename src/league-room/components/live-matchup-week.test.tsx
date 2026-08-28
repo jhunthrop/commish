@@ -40,7 +40,7 @@ describe("LiveMatchupWeek", () => {
     renderInLeague(<LiveMatchupWeek leagueId="l1" body={WEEK_BODY} />, fixture.deps);
     expect(screen.getByText("10.50")).toBeInTheDocument();
     expect(screen.getByText("8.75")).toBeInTheDocument();
-    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
   });
 
   // E1(a)+(c): the margin and the week's own games-final count, composed onto the caller's own
@@ -91,7 +91,7 @@ describe("LiveMatchupWeek", () => {
   it("updates the badge when a frame moves the week to final", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: WEEK_BODY });
     renderInLeague(<LiveMatchupWeek leagueId="l1" body={WEEK_BODY} />, fixture.deps);
-    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
 
     act(() =>
       fixture.emit("score.update", {
@@ -100,6 +100,6 @@ describe("LiveMatchupWeek", () => {
       }),
     );
     await waitFor(() => expect(screen.getByText("Final")).toBeInTheDocument());
-    expect(screen.queryByText("In progress")).not.toBeInTheDocument();
+    expect(screen.queryByText("Live")).not.toBeInTheDocument();
   });
 });

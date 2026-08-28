@@ -6,13 +6,13 @@ import { renderSurface } from "@/components/ui/test-utils";
 import type { SlotPreferenceView } from "../contract";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
-import { SLOT_PREFERENCE_EXPLAINER, SLOT_PREFERENCE_WORKED_EXAMPLE, SlotPreferencePanel } from "./slot-preference-panel";
+import { SLOT_PREFERENCE_EXPLAINER, SlotPreferencePanel } from "./slot-preference-panel";
 
 const EMPTY: SlotPreferenceView = { slotCount: 12, ranking: [], assignedSlot: null, canEdit: true };
 const PARTIAL: SlotPreferenceView = { slotCount: 3, ranking: [2, 1], assignedSlot: null, canEdit: true };
 
 describe("SlotPreferencePanel", () => {
-  it("renders the worked-example explainer and an editable empty state, in both themes, axe-clean", async () => {
+  it("renders the explainer and an editable empty state, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps();
     await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
@@ -20,16 +20,25 @@ describe("SlotPreferencePanel", () => {
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText(SLOT_PREFERENCE_EXPLAINER)).toBeInTheDocument();
-        expect(screen.getByText(/You have not ranked any slots, and that is fine/)).toBeInTheDocument();
+        expect(screen.getByText(/No ranking yet/)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
   });
 
-  // Phase 3.6, Task 9, Step 5: the worked example the mock asked for and never got.
-  it("gains the worked example beside the explainer", () => {
+  /**
+   * The worked example is GONE (fun pass, Task 4) and this asserts its absence rather than
+   * merely dropping the old test, because a deleted assertion is indistinguishable from a
+   * forgotten one. Phase 3.6 added it on the reasoning that a concrete walk-through beats an
+   * abstract restatement — sound about the sentence, wrong about the panel, which ended up
+   * stacking two paragraphs of procedure above a set of tiles a manager can just drag. One
+   * sentence states the rule; the `draft-slot` `InfoTip` carries the long version for whoever
+   * presses it.
+   */
+  it("states the rule once and lets the tiles teach the rest", () => {
     renderInLeague(<SlotPreferencePanel leagueId="league_1" initialPreference={EMPTY} />, fixtureLeagueDeps().deps);
-    expect(screen.getByText(SLOT_PREFERENCE_WORKED_EXAMPLE)).toBeInTheDocument();
+    expect(screen.getByText(SLOT_PREFERENCE_EXPLAINER)).toBeInTheDocument();
+    expect(screen.queryByText(/For example: rank 4/)).toBeNull();
   });
 
   it("offers every one of the league's slots to add, when nothing is ranked yet", () => {
@@ -93,7 +102,9 @@ describe("SlotPreferencePanel", () => {
     };
     renderInLeague(<SlotPreferencePanel leagueId="league_1" initialPreference={{ ...EMPTY, slotCount: 3 }} />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Save ranking" }));
-    expect(await screen.findByText("Saved. You did not rank any slots, and that is fine.")).toBeInTheDocument();
+    expect(// Fun pass, Task 4: "and that is fine" is absolution for a choice nobody needed
+    // forgiving. The confirmation says what was saved and what happens next.
+    await screen.findByText("Saved. We will draw you a slot at random.")).toBeInTheDocument();
   });
 
   it("shows the server's refusal verbatim when a save is rejected", async () => {
