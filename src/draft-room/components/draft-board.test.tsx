@@ -89,7 +89,9 @@ describe("DraftBoard", () => {
     // rows[0] is the header; rows[1] is round 1.
     const roundOne = within(rows[1]!).getAllByRole("cell");
     expect(roundOne[0]).toHaveTextContent("Jalen Croft");
-    expect(roundOne[0]).toHaveTextContent("QB · KC");
+    // Gameday, law 4: the pick's own number leads the meta line on a cell that got taller once
+    // the round horizon reclaimed the stage.
+    expect(roundOne[0]).toHaveTextContent("#1 · QB · KC");
     expect(roundOne[1]).toHaveTextContent("Marcus Reed");
     expect(roundOne[0]!.querySelector(".bg-pos-qb")).not.toBeNull();
     expect(roundOne[1]!.querySelector(".bg-pos-rb")).not.toBeNull();
@@ -224,7 +226,7 @@ describe("DraftBoard", () => {
     stubMatchMedia(false);
     const onClockView: DraftStateView = { ...SNAKE_VIEW, picks: SERPENTINE, onClockTeamId: "t1", pickNumber: 5 };
     render(<DraftBoard {...props} view={onClockView} variant="tv" />);
-    expect(within(grid()).getByText("QB · KC").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+    expect(within(grid()).getByText(/QB · KC/).className).not.toMatch(/(^|\s)text-xs(\s|$)/);
     expect(within(grid()).getByText("Rd").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
     const myColumnHeader = within(grid()).getByRole("columnheader", { name: /Bay Bandits/ });
     expect(within(myColumnHeader).getByText("1").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
@@ -346,9 +348,14 @@ describe("DraftBoard", () => {
       stubMatchMedia(false);
       render(<DraftBoard {...props} view={FIFTEEN_ROUND_VIEW} />);
       const rows = within(grid()).getAllByRole("row");
-      // Round 1 (rows[1]) is the active round — "near". Round 15 (rows[15]) is far past it.
+      // Round 1 (rows[1]) is the active round — "near". The DEEPEST drawn round is the far one:
+      // Gameday's horizon collapses everything past `activeRound + boardFutureRoundsShown.room`,
+      // so the far-future case is that last body row rather than round 15. Indexed rather than
+      // taken from the end, because `getAllByRole("row")` also returns the tfoot summary line.
       const nearCell = within(rows[1]!).getAllByRole("cell")[1]!.querySelector('[aria-hidden="true"]')!;
-      const farCell = within(rows[15]!).getAllByRole("cell")[1]!.querySelector('[aria-hidden="true"]')!;
+      const farCell = within(rows[1 + DRAFT_ROOM_CONFIG.boardFutureRoundsShown.room]!)
+        .getAllByRole("cell")[1]!
+        .querySelector('[aria-hidden="true"]')!;
       expect(nearCell.className).toContain("border-line");
       expect(farCell.className).toContain("border-line");
       expect(nearCell.className).not.toMatch(/border-line\//);
@@ -410,9 +417,10 @@ describe("DraftBoard", () => {
       const roundHeaders = within(grid())
         .getAllByRole("rowheader")
         .map((header) => header.textContent);
-      // Active round 1, plus DRAFT_ROOM_CONFIG.tv.futureRoundsShown (2) more: rounds 1-3.
-      expect(roundHeaders).toEqual(["1", "2", "3"]);
-      const summary = within(grid()).getByText("7 rounds ahead");
+      // Active round 1, plus DRAFT_ROOM_CONFIG.boardFutureRoundsShown.tv more.
+      const shown = 1 + DRAFT_ROOM_CONFIG.boardFutureRoundsShown.tv;
+      expect(roundHeaders).toEqual(Array.from({ length: shown }, (_, index) => String(index + 1)));
+      const summary = within(grid()).getByText(`${10 - shown} rounds ahead`);
       // The voice classes live on the td; the inner span is the sticky pin that keeps the
       // label inside the viewport while the board auto-scrolls (closing visual pass).
       expect(summary.className).toContain("sticky");
@@ -422,23 +430,33 @@ describe("DraftBoard", () => {
       expect(cell.className).toMatch(/border-t/);
     });
 
-    it("renders every round on the room variant, with no summary line at all", () => {
+    /**
+     * GAMEDAY REVERSED THIS. E7 gave the horizon to the TV alone on 2026-08-26, and the room kept
+     * every round; the first Gameday screenshot of a live room showed twelve of fifteen rows
+     * carrying nothing but dashes — roughly 55% of the room's hero region with no fact on it,
+     * which is exactly what law 4 forbids. Both variants now collapse; only the DISTANCE differs,
+     * because a manager plans against the next few rounds and a party across a room does not.
+     */
+    it("collapses the room variant too, at its own longer horizon", () => {
       stubMatchMedia(false);
       render(<DraftBoard {...props} view={TEN_ROUND_VIEW} />);
-      expect(within(grid()).getAllByRole("rowheader")).toHaveLength(10);
-      expect(screen.queryByText(/rounds ahead/)).toBeNull();
+      const shown = 1 + DRAFT_ROOM_CONFIG.boardFutureRoundsShown.room;
+      expect(within(grid()).getAllByRole("rowheader")).toHaveLength(shown);
+      expect(within(grid()).getByText(`${10 - shown} rounds ahead`)).toBeInTheDocument();
     });
 
     it("says '1 round ahead' in the singular for exactly one collapsed round", () => {
       stubMatchMedia(false);
-      const view: DraftStateView = { ...TEN_ROUND_VIEW, slotConfig: [{ slot: "QB", count: 4, eligiblePositions: ["QB"] }] };
+      const count = 1 + DRAFT_ROOM_CONFIG.boardFutureRoundsShown.tv + 1;
+      const view: DraftStateView = { ...TEN_ROUND_VIEW, slotConfig: [{ slot: "QB", count, eligiblePositions: ["QB"] }] };
       render(<DraftBoard {...props} view={view} variant="tv" />);
       expect(within(grid()).getByText("1 round ahead")).toBeInTheDocument();
     });
 
     it("shows no summary line at all when there is nothing left to collapse", () => {
       stubMatchMedia(false);
-      const view: DraftStateView = { ...TEN_ROUND_VIEW, slotConfig: [{ slot: "QB", count: 3, eligiblePositions: ["QB"] }] };
+      const count = 1 + DRAFT_ROOM_CONFIG.boardFutureRoundsShown.tv;
+      const view: DraftStateView = { ...TEN_ROUND_VIEW, slotConfig: [{ slot: "QB", count, eligiblePositions: ["QB"] }] };
       render(<DraftBoard {...props} view={view} variant="tv" />);
       expect(screen.queryByText(/rounds ahead/)).toBeNull();
     });

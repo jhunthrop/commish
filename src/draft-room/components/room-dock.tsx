@@ -6,8 +6,10 @@ import type { Player, Position } from "@/domain/player";
 import type { RosterSlotType } from "@/domain/roster";
 import type { DraftStateView } from "@/draft-engine";
 import { Button, EYEBROW, PositionBadge, SlotChip } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { formatYourTurn } from "../state/format";
 import { playerName, queueButtonLabel } from "../lib/lookups";
 import { moveInQueue, removeFromQueue } from "../state/queue";
@@ -222,6 +224,51 @@ function DockClock({
   );
 }
 
+/**
+ * WHO IS BETWEEN YOU AND YOUR PICK (Gameday, law 4). `view.upcoming` is the engine's own
+ * lookahead — the same list `picksUntilYours` and `formatYourTurn` already read — and until now
+ * the room spent it entirely on one sentence ("You're up in 6 picks"). The order itself is the
+ * fact a veteran is actually watching: it is how you know whether the two managers ahead of you
+ * are the ones who take running backs.
+ *
+ * `upcoming[0]` is the seat currently ON the clock (`picksUntilYours` returns 0 for it), so the
+ * strip starts at index 1 and numbers each seat from `view.pickNumber`. Your own seat carries ink
+ * against everyone else's muted; nothing here is coloured, because a turn order is a sequence and
+ * not a magnitude.
+ *
+ * Desktop only. Below `lg` the dock is already carrying the clock echo, the primary slot and the
+ * queue in a wrapping row, and a seventh band there would be the D1 overflow class all over again.
+ */
+function OnDeck({
+  view,
+  teams,
+  myTeamId,
+}: {
+  readonly view: DraftStateView;
+  readonly teams: readonly TeamCard[];
+  readonly myTeamId: string | null;
+}) {
+  if (view.phase !== "in_progress") return null;
+  const byId = new Map(teams.map((team) => [team.id, team] as const));
+  const next = view.upcoming.slice(1, 1 + DRAFT_ROOM_CONFIG.dock.onDeckSeats);
+  if (next.length === 0) return null;
+  return (
+    <div data-testid="on-deck" className="hidden min-w-0 flex-col gap-0.5 lg:flex">
+      <span className={`${MICRO_LABEL} text-text-faint`}>On deck</span>
+      <ol className="flex min-w-0 items-center gap-3">
+        {next.map((teamId, index) => (
+          <li key={`${teamId}:${index}`} className="flex min-w-0 items-baseline gap-1.5">
+            <span className="shrink-0 font-mono text-xs tabular-nums text-text-faint">{`#${view.pickNumber + index + 1}`}</span>
+            <span className={`min-w-0 max-w-32 truncate text-sm ${teamId === myTeamId ? "font-semibold text-text-primary" : "text-text-muted"}`}>
+              {byId.get(teamId)?.name ?? "Someone"}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 /** The pool's own root (`PlayerPool`'s outermost `<section>`) — the one scroll target this
  *  button and the pool ever need to agree on. */
 const POOL_TARGET_ID = "player-pool";
@@ -281,7 +328,10 @@ function PrimarySlot({
 }) {
   if (canAct && targetId !== null) {
     return (
-      <Button size="lg" loading={submitting} className="max-w-80 shrink-0 truncate" onClick={() => onAct(targetId)}>
+      // `verb`, not the ceremonial ink pill (Gameday, law 5): this is the same act the pool
+      // repeats on every row, spelled once more at the size the moment deserves. `primary` is
+      // *"the thing a page exists to do once"*, and a draft is sixteen of these.
+      <Button size="lg" variant="verb" loading={submitting} className="max-w-80 shrink-0 truncate" onClick={() => onAct(targetId)}>
         {actionLabel} {targetName}
       </Button>
     );
@@ -385,6 +435,7 @@ export function RoomDock({
           yourTurn={standingLine}
         />
       )}
+      <OnDeck view={view} teams={teams} myTeamId={myTeamId} />
       <DockClock view={view} teams={teams} playersById={playersById} myTeamId={myTeamId} />
       {canAct ? <JumpToPoolButton /> : null}
       <QueueChips queue={queue} playersById={playersById} draftedIds={draftedIds} busy={submitting} onChange={onQueueChange} />

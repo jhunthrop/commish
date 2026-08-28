@@ -61,7 +61,7 @@ interface BoardRow {
  * the rest of this codebase (and its happy-dom tests) already reasons about.
  */
 const CELL_TEXT: Readonly<Record<DraftBoardVariant, string>> = {
-  room: "text-sm",
+  room: "text-md",
   tv: "text-display-md",
 };
 
@@ -223,8 +223,14 @@ function StickerCell({
           <span className={`truncate font-display font-semibold leading-display ${CELL_TEXT[variant]}`}>
             {player?.name ?? cell.pick.playerId}
           </span>
+          {/* Law 4, on a cell that got taller once the round horizon reclaimed the stage: the
+              pick's own NUMBER leads the meta line. It is the fact a manager asks about a
+              sticker he is looking at ("when did that go?"), it is already on the payload, and
+              it costs three characters of a line that was carrying two facts in a cell with room
+              for three. Mono, because it is a figure in a run of labels. */}
           <span className={`truncate font-medium ${META_TEXT[variant]}`}>
-            {player?.position ?? cell.pick.slot} · {player?.nflTeam ?? cell.pick.slot}
+            <span className="font-mono tabular-nums">{`#${cell.pick.pickNumber}`}</span>
+            {` · ${player?.position ?? cell.pick.slot} · ${player?.nflTeam ?? cell.pick.slot}`}
             {cell.pick.price === null ? "" : ` · $${cell.pick.price}`}
           </span>
         </div>
@@ -290,12 +296,15 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
   const { rows, activeRound } = buildRows(view, columnIds);
   const slapPickNumber = reduced ? null : landedPickNumber;
 
-  // E7 (2026-08-26 design review): the TV variant draws only the active round plus
-  // `DRAFT_ROOM_CONFIG.tv.futureRoundsShown` beyond it — far-future rounds collapse into one
-  // quiet summary line instead of ~60% of the stage sitting bare. The room variant renders
-  // every row exactly as before (its own sliver recede is a separate, untouched mechanism).
-  const tvCutoff = activeRound + DRAFT_ROOM_CONFIG.tv.futureRoundsShown;
-  const wideRows = variant === "tv" ? rows.filter((row) => row.round <= tvCutoff) : rows;
+  // THE ROUND HORIZON, NOW ON BOTH VARIANTS (Gameday, law 4). E7 gave the TV a horizon in
+  // 2026-08-26 and left the room without one; the first Gameday screenshot of the live room
+  // showed why that was a mistake — at round 3 of 15, twelve of fifteen rows were empty dashed
+  // rectangles and roughly 55% of the room's hero region carried no fact at all. Beyond the
+  // horizon the season's shape is one honest line ("N rounds ahead"), which is the whole of what
+  // an unreached round has to say. The room keeps a longer horizon than the TV because a manager
+  // plans against the next few rounds; a party across a room only reads what is happening now.
+  const cutoff = activeRound + DRAFT_ROOM_CONFIG.boardFutureRoundsShown[variant];
+  const wideRows = rows.filter((row) => row.round <= cutoff);
   const collapsedRoundCount = rows.length - wideRows.length;
 
   const gridRef = useRef<HTMLDivElement | null>(null);
@@ -342,7 +351,13 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
             row's widths the law: each team column takes its min-w floor (stretching evenly
             when the stage is wider than 12 floors), names truncate as always intended, and the
             Rd column keeps its own narrow width below. */}
-        <table className="w-full table-fixed border-separate border-spacing-1 text-left">
+        {/* `h-full` (Gameday, law 4): with the horizon above collapsing the unreached rounds,
+            the board no longer has fifteen rows to spend the stage on, and a short table left a
+            void under it that says even less than the dashed cells did. Filling the stage hands
+            the reclaimed pixels back to the ROWS — the same picks, drawn larger — so the board
+            reads as a scoreboard rather than a spreadsheet. Rows still grow past the stage on a
+            deep board, and the container above is the scroller, exactly as before. */}
+        <table className="h-full w-full table-fixed border-separate border-spacing-1 text-left">
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           {/* The whole header row is STICKY-TOP (founder screenshot, 2026-08-26): deep in a
               draft the auto-scroll follows the current pick down the grid, and a static header

@@ -18,22 +18,44 @@ const props = {
   onQueue: () => {},
 };
 
-const poolRows = () => within(screen.getByRole("list", { name: /available players/i })).getAllByRole("listitem");
+/**
+ * The PLAYER rows, never the tier dividers between them. Gameday's ladder puts a `TierDivider`
+ * in its own `<li>` wherever the consensus board steps down (`../lib/tiers`), so "every list item
+ * in the pool" stopped meaning "every player" — `data-pool-row` is the hook the component carries
+ * for exactly this distinction.
+ */
+const poolRows = () =>
+  [...screen.getByRole("list", { name: /available players/i }).querySelectorAll<HTMLLIElement>("[data-pool-row]")];
 const rowFor = (name: string) => screen.getByText(name).closest("li")!;
 
 describe("PlayerPool", () => {
   it("lists every player in ranked order and is axe-clean in both themes", async () => {
     await renderSurface(<PlayerPool {...props} />, async ({ container }) => {
       expect(poolRows().map((row) => within(row).getByRole("button", { name: /queue/i }).closest("li")!.textContent)).toHaveLength(4);
+      expect(poolRows()).toHaveLength(4);
       expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
       expect(screen.getByText("Andre Salas")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
   });
 
-  it("keeps the server's ranking, numbered, without re-ranking anything", () => {
+  /**
+   * The rank ORDINAL is gone and the ordering it stood for is not. Gameday replaced the 12px
+   * "37" in the row's left gutter with the player's own ADP, which is the number a manager
+   * actually reasons with (a rank is a restatement of the row's position; a consensus ADP is a
+   * fact about the rest of the world). What still has to hold is that this component never
+   * re-ranks — the order it paints is the order the server sent.
+   */
+  it("keeps the server's ranking without re-ranking anything", () => {
     render(<PlayerPool {...props} />);
-    expect(poolRows().map((row) => within(row).getByText(/^[0-9]+$/).textContent)).toEqual(["1", "2", "3", "4"]);
+    const names = PLAYERS.map((player) => player.name);
+    expect(poolRows().map((row) => names.find((name) => (row.textContent ?? "").includes(name)))).toEqual(names);
+  });
+
+  it("prints each player's own consensus ADP, and nothing at all for one the feed does not rank", () => {
+    render(<PlayerPool {...props} players={[{ ...PLAYERS[0]!, adp: 12.84 }, { ...PLAYERS[1]!, adp: null }]} />);
+    expect(within(rowFor(PLAYERS[0]!.name)).getByText(/ADP 12\.8/)).toBeInTheDocument();
+    expect(within(rowFor(PLAYERS[1]!.name)).queryByText(/ADP/)).toBeNull();
   });
 
   it("filters by name as you type", () => {
@@ -79,7 +101,7 @@ describe("PlayerPool", () => {
 
   it("shows drafted players behind the toggle, marked and inert", () => {
     render(<PlayerPool {...props} view={{ ...SNAKE_VIEW, availablePlayerIds: ["rb1", "rb2", "wr1"] }} />);
-    fireEvent.click(screen.getByLabelText("Show drafted players"));
+    fireEvent.click(screen.getByRole("button", { name: "Show drafted players" }));
     const row = rowFor("Jalen Croft");
     expect(within(row).getByText("Drafted")).toBeInTheDocument();
     expect(within(row).queryByRole("button")).toBeNull();
@@ -139,12 +161,12 @@ describe("PlayerPool", () => {
     expect(nameRow).not.toContainElement(draftButton);
   });
 
-  it("shows the team code on its own meta line under the name, unconditionally rather than gated on a wide viewport", () => {
+  it("shows the team code under the name, unconditionally rather than gated on a wide viewport", () => {
     render(<PlayerPool {...props} canAct />);
-    const nameRow = screen.getByText("Jalen Croft").closest("div")!;
     const teamCode = screen.getByText(PLAYERS[0]!.nflTeam);
-    expect(nameRow).not.toContainElement(teamCode);
     expect(teamCode.className).not.toMatch(/\bhidden\b/);
+    // The meta line, not the name line: the name owns its own baseline in `PlayerRow`.
+    expect(teamCode.closest("[data-pool-row]")).toBe(rowFor("Jalen Croft"));
   });
 
   it("shows no act button while waiting — the star is the action — and reports the player on your turn", () => {
@@ -171,36 +193,38 @@ describe("PlayerPool", () => {
    * What did NOT change, and is what the second half still pins: every OTHER control here stays
    * quiet. The filters and the empty state are not the act, and rule 5 still binds them.
    */
-  it("gives the row's own Draft button the ink, and nothing else in the pool", () => {
+  it("gives the row's own Draft button the money-filled verb, and never the ceremonial ink pill", () => {
     const { container } = render(<PlayerPool {...props} />);
     const draft = screen.getAllByRole("button", { name: "Draft" })[0]!;
-    expect(draft.className).toMatch(/bg-text-primary/);
+    expect(draft.className).toMatch(/bg-accent/);
+    // `primary` is one per view, the thing a page exists to do once. A pool does this sixty times.
+    expect(container.querySelector(".bg-text-primary")).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Search players"), { target: { value: "zzzz" } });
     expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
-    expect(container.querySelector(".bg-text-primary")).toBeNull();
+    expect(container.querySelector(".bg-accent")).toBeNull();
   });
 
-  it("keeps the position filters quiet — a filter is not the act, and rule 5 still binds them", () => {
+  it("keeps every other pool control quiet — a filter is not an act, and law 5 still binds them", () => {
     const { container } = render(<PlayerPool {...props} canAct={false} />);
-    // Nobody's turn: no act button at all, so nothing in the pool may wear ink.
+    // Nobody's turn: no act button at all, so nothing in the pool may wear a loud fill of either
+    // kind. The selected filter's own signal is a ring, which is not a fill.
     expect(container.querySelector(".bg-text-primary")).toBeNull();
+    expect(container.querySelector(".bg-accent")).toBeNull();
   });
 
   /**
-   * RULE 4'S AMENDED TEST, at the row: *a thing you act on or compare against its neighbours may
-   * be a card.* A pool row is both. `interactive` is the depth response — never a heavier line,
-   * and never a `role` or `tabindex`, so the card does not become a second click target beside
-   * the button inside it.
+   * LAW 3 AT THE ROW: a player is an object, drawn as a thing. The pool's row is `PlayerRow` — the
+   * shared atom — rather than a `Card` this surface dresses itself, which is what stops the pool
+   * and every other board in the product drifting apart. It is still a list item and still not a
+   * control: the thing you press is the button inside it.
    */
-  describe("the row is a card (Task 8)", () => {
-    it("carries the card's own surface and its interactive depth", () => {
+  describe("the row is the shared player object", () => {
+    it("carries the atom's own skin rather than a surface this file spells", () => {
       render(<PlayerPool {...props} />);
-      const row = rowFor("Jalen Croft");
-      expect(row.className).toMatch(/bg-surface-elevated/);
-      expect(row.className).toMatch(/shadow-card/);
-      expect(row.className).toMatch(/hover:bg-surface-raised/);
-      expect(row.className).toMatch(/focus-within:bg-surface-raised/);
+      const object = rowFor("Jalen Croft").firstElementChild!;
+      expect(object.className).toMatch(/bg-surface-elevated/);
+      expect(object.className).toMatch(/border-line/);
     });
 
     it("is still a list item, and still not a control of its own", () => {
@@ -211,10 +235,48 @@ describe("PlayerPool", () => {
       expect(row).not.toHaveAttribute("tabindex");
     });
 
-    it("does not lift a drafted row — there is nothing there to act on", () => {
+    it("marks a starred player as the row a manager plans to act on", () => {
+      render(<PlayerPool {...props} queuedPlayerIds={new Set(["qb1"])} />);
+      expect(rowFor("Jalen Croft").querySelector("[data-highlight]")).not.toBeNull();
+      expect(rowFor("Marcus Reed").querySelector("[data-highlight]")).toBeNull();
+    });
+
+    it("offers nothing to press on a drafted row — there is nothing there to act on", () => {
       render(<PlayerPool {...props} view={{ ...SNAKE_VIEW, availablePlayerIds: ["rb1", "rb2", "wr1"] }} />);
-      fireEvent.click(screen.getByLabelText("Show drafted players"));
-      expect(rowFor("Jalen Croft").className).not.toMatch(/hover:bg-surface-raised/);
+      fireEvent.click(screen.getByRole("button", { name: "Show drafted players" }));
+      expect(within(rowFor("Jalen Croft")).queryByRole("button")).toBeNull();
+      expect(rowFor("Jalen Croft").querySelector("[data-highlight]")).toBeNull();
+    });
+  });
+
+  /**
+   * LAW 1'S GRADE CHANNEL: the tier ladder, drawn only where `players.adp` says the consensus
+   * board actually steps down, and never invented for a player the feed does not rank.
+   */
+  describe("the tier ladder (Gameday, law 1)", () => {
+    // Four ranked players in one unbroken run, then a cliff wide enough to open a second band.
+    const ranked = Array.from({ length: 8 }, (_, index) => ({
+      id: `t${index}`,
+      name: `Tiered ${index}`,
+      position: "WR" as const,
+      nflTeam: "DAL",
+      headshotUrl: null,
+      adp: index < 4 ? index + 1 : index + 40,
+    }));
+    const view = { ...SNAKE_VIEW, availablePlayerIds: ranked.map((player) => player.id) };
+
+    it("opens a band where the board steps down, and grades it with a letter", () => {
+      render(<PlayerPool {...props} players={ranked} view={view} />);
+      const bands = [...document.querySelectorAll("[data-grade]")];
+      expect(bands.length).toBeGreaterThan(1);
+      // The letter is the colourblind channel and is always text on the badge.
+      for (const band of bands) expect(band.textContent).toMatch(/^[SABC]/);
+    });
+
+    it("draws no band at all for players the ADP feed does not rank", () => {
+      const unranked = ranked.map((player) => ({ ...player, adp: null }));
+      render(<PlayerPool {...props} players={unranked} view={view} />);
+      expect(document.querySelectorAll("[data-grade]")).toHaveLength(0);
     });
   });
 
@@ -232,7 +294,7 @@ describe("PlayerPool", () => {
       expect(tile).toHaveAttribute("aria-hidden", "true");
       expect(tile.getAttribute("style")).toMatch(/background-color/);
       // The name is the row's own ink on the row's own surface, never on a club colour.
-      expect(tile).not.toContainElement(within(row).getByTestId("pool-player-name"));
+      expect(tile).not.toContainElement(within(row).getByText("Jalen Croft"));
     });
 
     it("renders a bare face for a team it has no colour for, rather than a grey rectangle", () => {
