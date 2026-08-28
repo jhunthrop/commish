@@ -77,6 +77,29 @@ changed in the six rules and what did not.
   - **`neutral` IS `textPrimary`**, the same deliberate doubling as `accent`/`positive`. A number
     with no comparison behind it must be indistinguishable from ordinary text; give the no-verdict
     step a pigment of its own and every uncompared number starts reading as a judgement.
+  - **The populations in use, and where they are built.** Every sanctioned comparison set on the
+    season surfaces lives in one pure module, `src/league-room/lib/population.ts`, so a new heat
+    column starts by naming its population there rather than inventing one at a call site. There
+    are three, all built from numbers the surface already holds — no heat column has ever cost a
+    query:
+    - *"starting quarterbacks this week"* (and the five sibling positions), on the matchup page's
+      player lines. Started players only, both sides of every matchup in the week; a player with no
+      stat line yet keeps a dash and stays out of the pool, because folding "has not played" in as
+      a zero drags every real score up the ramp on a Sunday morning.
+    - *"teams by points for"*, on the standings.
+    - *"teams by fewest points allowed"*, on the standings. Named in the direction it is judged,
+      because `Stat` speaks the population out loud: ranking it by raw size would paint the best
+      defense in the league as its worst number, under a sentence that agreed.
+  - **A population has a floor.** `LEAGUE_ROOM_CONFIG.heatMinPopulation` (4) is how many real
+    values a set must hold before anything is ranked inside it. Below it the module returns no
+    comparison at all and the number renders as ordinary ink. A percentile across three
+    quarterbacks is arithmetic dressed as a fact, which is the thing this amendment exists to
+    forbid.
+  - **Where magnitude is deliberately NOT spent.** A matchup's score, because it already carries an
+    ink meaning (a decided matchup's loser recedes) and a number cannot say two things with one
+    channel. A standings record, because the table is sorted by it and position already says it.
+    Anything on the storefront, because a shelf has no honest population to rank a league inside —
+    colouring an empty room red would be a judgement about a league rather than a fact about one.
 - **Tier grade.** S/A/B bands as coloured bars, once the projection engine makes tiers real. Parked
   until then; this amendment already covers it, so no second ruling is needed when it lands.
 - **Team identity.** A team's own colour, behind a player's face only. Never on a surface, never
@@ -114,6 +137,13 @@ hairline-separated rows, because scanning a column is what they are for. In code
 line, so rule 4's original claim is untouched. `line` stays decorative and `edge` stays a control
 boundary; a card takes no `role` and no `tabindex`, so the action inside it is still the view's one
 ink action.
+
+**The amendment says MAY, and a founder ruling outranks a permission.** The open-league shelf reads
+as horizontal rows at lg+ because the founder ordered exactly that on 2026-08-24 ("horizontal row
+elements instead of these cards - my eyes don't know where to focus"). The amendment does not
+reopen it. What it buys that shelf is the card response below lg, where the card is the form that
+fits 360px. Read a "may" as a licence to relitigate a ruling and this document stops being a record
+of decisions.
 
 **Rule 5 — one ink action per view — holds everywhere except surfaces whose entire purpose is
 repeated action:** the draft room, and later waivers and trades. Named exceptions, not a general

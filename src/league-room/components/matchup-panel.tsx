@@ -12,6 +12,28 @@ import { MedianResultLine } from "./median-result";
 export type PositionPoints = ReadonlyMap<Position, readonly number[]>;
 
 /**
+ * One scored starter's points, as a heat-coloured number (the fun pass, Task 9). Takes `points`
+ * separately from `row` so the not-yet-played case is settled by the caller and this function is
+ * never handed a `null` to assert away.
+ *
+ * `srOnlyLabel`: the `<th>` above already says "Points", on screen and in the accessibility tree,
+ * for every cell in this column. `items-end` because a `Stat` is a flex column and this one lives
+ * in a `numeric` (right-aligned) cell.
+ */
+function pointsStat(row: MatchupSide["starters"][number], points: number, positionPoints: PositionPoints | undefined) {
+  return (
+    <Stat
+      label="Points"
+      srOnlyLabel
+      size="sm"
+      value={formatPoints(points)}
+      comparison={positionPoints === undefined ? undefined : starterComparison(positionPoints, row.position, points)}
+      className="items-end"
+    />
+  );
+}
+
+/**
  * NEW-10 (gauntlet fix wave): `Slot` and `Pos` used to be two columns for one fact — identical
  * for every row but FLEX, at ~15% of the table's width each. `Slot` is the one that survives:
  * `LineupEditor`'s own roster table (`lineup-editor.tsx`) already shows only the slot, the same
@@ -19,26 +41,10 @@ export type PositionPoints = ReadonlyMap<Position, readonly number[]>;
  * starting position — the one thing `Pos` (`PositionBadge`) added beyond `Slot` for six of nine
  * rows was nothing.
  *
- * THE HEAT MAP lives in the Points column (the fun pass, Task 9). The columns are built per
- * render rather than hoisted to a module constant because the cell needs the week's population,
- * which is a prop — and a population is the ONLY thing that can tint a number here.
+ * THE HEAT MAP lives in the Points column (the fun pass, Task 9). Built per render rather than
+ * hoisted to a module constant because the cell needs the week's population, which is a prop —
+ * and a population is the ONLY thing that can tint a number here.
  */
-function pointsStat(row: MatchupSide["starters"][number], positionPoints: PositionPoints | undefined) {
-  // `srOnlyLabel`: the `<th>` above already says "Points", on screen and in the accessibility
-  // tree, for every cell in this column. `items-end` because a `Stat` is a flex column and this
-  // one lives in a `numeric` (right-aligned) cell.
-  return (
-    <Stat
-      label="Points"
-      srOnlyLabel
-      size="sm"
-      value={formatPoints(row.points!)}
-      comparison={positionPoints === undefined ? undefined : starterComparison(positionPoints, row.position, row.points)}
-      className="items-end"
-    />
-  );
-}
-
 function columnsFor(positionPoints: PositionPoints | undefined): readonly TableColumn<MatchupSide["starters"][number]>[] {
   return [
     { key: "slot", header: "Slot", cell: (row) => <SlotChip slot={row.slot} /> },
@@ -50,7 +56,7 @@ function columnsFor(positionPoints: PositionPoints | undefined): readonly TableC
       // silent zero. The same dash the team-level score already renders for the identical fact,
       // and the one case that renders no `Stat` at all: a dash is not a number, and a number that
       // does not exist cannot be ranked against anything.
-      cell: (row) => (row.points === null ? "—" : pointsStat(row, positionPoints)),
+      cell: (row) => (row.points === null ? "—" : pointsStat(row, row.points, positionPoints)),
       numeric: true,
     },
   ];
