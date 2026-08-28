@@ -1,10 +1,16 @@
 import type { HTMLAttributes } from "react";
 
-/** How much room a card gives its contents. `comfortable` is the default panel-sized card;
- *  `compact` is a card that is also a ROW in a dense list — the draft room's player pool, sixty
- *  of them in a 320px rail, where the panel's own padding would fit eight. Longhand `px`/`py`
- *  rather than a second `p-*`: Tailwind emits the shorthand before the longhands, so this
- *  reliably overrides `BASE`'s padding instead of racing it in the stylesheet. */
+/**
+ * How much room a card gives its contents. `comfortable` is the default panel-sized card;
+ * `compact` is a card that is also a ROW in a dense list — the draft room's player pool, sixty of
+ * them in a 320px rail, where the panel's own padding fits eight.
+ *
+ * The padding lives HERE and not in `BASE`, and that is a correctness choice rather than
+ * tidiness. `BASE` carried `p-4` and the first cut of this prop layered `px-2 py-1.5` on top of
+ * it, which only works if Tailwind reliably emits every shorthand ahead of its longhands — a bet
+ * on stylesheet ORDER, decided by the framework's sort rather than by anything stated here. One
+ * padding declaration per card, chosen by name, races nothing and needs no bet.
+ */
 export type CardPadding = "comfortable" | "compact";
 
 export interface CardProps extends HTMLAttributes<HTMLElement> {
@@ -42,10 +48,10 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
  */
 const INTERACTIVE = "transition-colors hover:bg-surface-raised focus-within:bg-surface-raised";
 
-const BASE = "rounded-lg border border-line bg-surface-elevated p-4 shadow-card";
+const BASE = "rounded-lg border border-line bg-surface-elevated shadow-card";
 
 const PADDING: Readonly<Record<CardPadding, string>> = {
-  comfortable: "",
+  comfortable: "p-4",
   compact: "px-2 py-1.5",
 };
 
