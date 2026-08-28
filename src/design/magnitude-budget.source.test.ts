@@ -23,6 +23,26 @@ import { sourceFilesIn, stripCommentsPreservingLines, bannedLines } from "./test
  * `bg-mag-strong` and `hover:border-mag-bad` alike. A new magnitude use starts its life by
  * earning an allowlist entry here, in review, with a reason — the same bargain
  * `accent-budget.source.test.ts` strikes next door, whose stripper this shares.
+ *
+ * THE TABLE PATH (2026-08-28), and why the allowlist did NOT grow to admit it.
+ *
+ * `Table` learned to judge a column on 2026-08-28 (`table.tsx`'s JUDGED COLUMNS docblock): every
+ * numeric cell in a declared column is now ranked against the rest of its column and tinted. That
+ * is a second surface spending the magnitude budget, and the obvious way to ship it was a second
+ * allowlist entry for `table.tsx`.
+ *
+ * It does not get one, and the reason is worth more than the convenience. The budget's real job
+ * is not to keep a class string out of a file; it is to keep the ramp's THREE channels together.
+ * `Stat` is the only place where the pigment, the caret and the weight step are chosen as one
+ * decision, and a manager with deuteranopia is reading the second and third. A `table.tsx` free to
+ * spell `text-mag-good` could paint a perfectly correct column that is invisible to one man in
+ * twelve, and no test in this repo would notice. So `Table` builds a `Stat` and hands it the
+ * comparison instead — the tint arrives with its own redundancy attached, by construction.
+ *
+ * The two assertions below are what make that a decision rather than an accident: `table.tsx` is
+ * swept like every other file (it must name no magnitude colour), AND it must still route through
+ * `Stat`, so a future refactor cannot quietly turn the judged column into a plain `<span>` that
+ * happens to look right in the light theme.
  */
 
 const SWEPT_DIRS = ["src/components", "src/league-room", "src/draft-room", "src/chat-room", "src/account-room", "src/admin-room", "src/app"];
@@ -58,6 +78,17 @@ describe("nothing but Stat spends the magnitude budget", () => {
       expect(files).toContain(file);
       expect(stripCommentsPreservingLines(readFileSync(join(REPO_ROOT, file), "utf8"))).toContain(MAGNITUDE_CLASS);
     }
+  });
+
+  /** The table path, pinned in both directions — see THE TABLE PATH above. */
+  it("keeps Table spending the budget through Stat rather than through an allowlist entry", () => {
+    const table = "src/components/ui/table.tsx";
+    expect(sweptFiles).toContain(table);
+    const source = stripCommentsPreservingLines(readFileSync(join(REPO_ROOT, table), "utf8"));
+    expect(source).not.toContain(MAGNITUDE_CLASS);
+    // The redundancy the pigment must never travel without: a judged cell IS a `Stat`.
+    expect(source).toContain('from "./stat"');
+    expect(source).toContain("<Stat");
   });
 
   it.each(sweptFiles)("%s names no magnitude colour", (file) => {
