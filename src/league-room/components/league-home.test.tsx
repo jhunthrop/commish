@@ -604,4 +604,45 @@ describe("LeagueHome", () => {
       expect(screen.queryByTestId("draft-complete-arrival")).toBeNull();
     });
   });
+
+  /**
+   * THE WEEK, LOUD ENOUGH TO READ AT A GLANCE (the fun pass, Task 11 — `docs/design/
+   * 2026-08-27-fun-pass-spec.md`). The league home is where a manager spends seventeen weeks, and
+   * the two things they came for — which week it is and what happened in it — rendered at the
+   * same 18px as the trade inbox link beside them.
+   */
+  describe("the week band", () => {
+    const render = (home: LeagueHomeBody) =>
+      renderInLeague(
+        <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+          <LeagueHome home={home} lineup={LINEUP} />
+        </ChatRoomDepsProvider>,
+        fixtureLeagueDeps().deps,
+      );
+
+    it("puts the week on the display scale, and the score at the register a scoreboard has", () => {
+      render(HOME);
+      expect(screen.getByRole("heading", { level: 2, name: "Week 3" }).className).toContain("font-display");
+      // The manager's own matchup is this page's subject, so it takes the hero register the
+      // matchup page uses, not the tile register a shelf of league cards uses.
+      expect(screen.getByText("112.50").className).toContain("sm:text-display-2xl");
+    });
+
+    it("takes its range from size, never from a heavier face", () => {
+      const { container } = render(HOME);
+      expect(container.innerHTML).not.toContain("font-bold");
+    });
+
+    it("says what state the week is in even on a bye, where no scoreboard is there to say it", () => {
+      // A manager with no matchup this week used to be told nothing at all about the week: the
+      // status badge lives inside the scoreboard, and on a bye there is no scoreboard.
+      render({ ...HOME, myMatchup: null, weekStatus: "in_progress" });
+      expect(screen.getByText("Live")).toBeInTheDocument();
+    });
+
+    it("does not say the week's state twice when the scoreboard is already saying it", () => {
+      render({ ...HOME, weekStatus: "final" });
+      expect(screen.getAllByText("Final")).toHaveLength(1);
+    });
+  });
 });

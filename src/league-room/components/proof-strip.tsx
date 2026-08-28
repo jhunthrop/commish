@@ -15,11 +15,32 @@ interface ScoreChipProps {
   readonly label: ReactNode;
 }
 
-/** One of the mock's score chips: hairline border, mono tabular number, quiet label. */
+/**
+ * One of the mock's score chips: hairline border, tabular number, quiet label — the number OVER
+ * the label at the display scale, which is the shape a scoreboard has and the shape this strip
+ * did not have (the fun pass, Task 12).
+ *
+ * Before the fun pass these numbers were 22px beside a 14px label. That is 1.6x, against a spec
+ * whose third named cause of "it feels like a legal website" is "sports interfaces live on
+ * roughly 10x scale contrast — a huge number, a tiny label." These are the only numbers on the
+ * front door, and they are the ones a stranger is being asked to believe. Range from SIZE alone:
+ * `font-semibold` is 600 and rule 2's cap did not move. Responsive, because 44px is a desktop
+ * scoreboard and never a 360px phone.
+ *
+ * NOT a `Stat`, and the reason is worth stating because `Stat` is otherwise this pass's one way
+ * to set a number. Two things rule it out. These numbers have no comparison set at all — there is
+ * nothing to rank "247 leagues filled" inside — and a `Stat` with no comparison is correct but
+ * carries no more than this does. And one of them is genuinely LIVE, which rule 1 paints in the
+ * red family; a `Stat`'s ink is reserved for magnitude, so routing this chip through it would
+ * either drop that meaning or put two different meanings on one strip's hues. The FACE is shared
+ * either way: display, tabular, sentence case.
+ */
 function ScoreChip({ number, numberTone = "ink", label }: ScoreChipProps) {
   return (
-    <p className="flex items-baseline gap-2 rounded-lg border border-line bg-surface-elevated px-4 py-2.5">
-      <span className={`font-mono text-2xl font-semibold tabular-nums ${numberTone === "live" ? "text-negative" : "text-text-primary"}`}>
+    <p className="flex min-w-0 flex-col gap-0.5 rounded-lg border border-line bg-surface-elevated px-4 py-2.5">
+      <span
+        className={`font-display text-display-md font-semibold leading-display tabular-nums sm:text-display-lg ${numberTone === "live" ? "text-negative" : "text-text-primary"}`}
+      >
         {number}
       </span>
       <span className="text-sm text-text-muted">{label}</span>

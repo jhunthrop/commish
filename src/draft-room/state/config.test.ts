@@ -15,7 +15,7 @@ import { DRAFT_ROOM_CONFIG } from "./config";
 describe("DRAFT_ROOM_CONFIG", () => {
   it("defines every numeric tunable as a positive number", () => {
     const numericKeys: readonly (keyof typeof DRAFT_ROOM_CONFIG)[] = ["poolPageSize", "celebrationMs"];
-    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire", "tv"] as const;
+    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire", "tv", "verdict"] as const;
     expect(Object.keys(DRAFT_ROOM_CONFIG).sort()).toEqual([...allKeys].sort());
     for (const key of numericKeys) {
       expect(Number.isFinite(DRAFT_ROOM_CONFIG[key])).toBe(true);
@@ -40,6 +40,14 @@ describe("DRAFT_ROOM_CONFIG", () => {
     expect(DRAFT_ROOM_CONFIG.tv.hotThresholdMs).toBeGreaterThan(0);
     expect(Number.isFinite(DRAFT_ROOM_CONFIG.tv.futureRoundsShown)).toBe(true);
     expect(DRAFT_ROOM_CONFIG.tv.futureRoundsShown).toBeGreaterThan(0);
+  });
+
+  // Task 7 (the fun pass): the even band has to be a positive count of picks, or every pick in
+  // every room becomes a verdict — a zero band makes "took him one slot early" a reach, which is
+  // the manufactured judgement the band exists to prevent.
+  it("keeps the verdict's even band a positive number of picks", () => {
+    expect(Number.isFinite(DRAFT_ROOM_CONFIG.verdict.evenBandPicks)).toBe(true);
+    expect(DRAFT_ROOM_CONFIG.verdict.evenBandPicks).toBeGreaterThan(0);
   });
 
   // `DraftBoard`'s empty-cell recede: a future round's border may shrink, never dim past

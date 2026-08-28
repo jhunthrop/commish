@@ -77,10 +77,41 @@ changed in the six rules and what did not.
   - **`neutral` IS `textPrimary`**, the same deliberate doubling as `accent`/`positive`. A number
     with no comparison behind it must be indistinguishable from ordinary text; give the no-verdict
     step a pigment of its own and every uncompared number starts reading as a judgement.
+  - **The populations in use, and where they are built.** Every sanctioned comparison set on the
+    season surfaces lives in one pure module, `src/league-room/lib/population.ts`, so a new heat
+    column starts by naming its population there rather than inventing one at a call site. There
+    are three, all built from numbers the surface already holds — no heat column has ever cost a
+    query:
+    - *"starting quarterbacks this week"* (and the five sibling positions), on the matchup page's
+      player lines. Started players only, both sides of every matchup in the week; a player with no
+      stat line yet keeps a dash and stays out of the pool, because folding "has not played" in as
+      a zero drags every real score up the ramp on a Sunday morning.
+    - *"teams by points for"*, on the standings.
+    - *"teams by fewest points allowed"*, on the standings. Named in the direction it is judged,
+      because `Stat` speaks the population out loud: ranking it by raw size would paint the best
+      defense in the league as its worst number, under a sentence that agreed.
+  - **A population has a floor.** `LEAGUE_ROOM_CONFIG.heatMinPopulation` (4) is how many real
+    values a set must hold before anything is ranked inside it. Below it the module returns no
+    comparison at all and the number renders as ordinary ink. A percentile across three
+    quarterbacks is arithmetic dressed as a fact, which is the thing this amendment exists to
+    forbid.
+  - **Where magnitude is deliberately NOT spent.** A matchup's score, because it already carries an
+    ink meaning (a decided matchup's loser recedes) and a number cannot say two things with one
+    channel. A standings record, because the table is sorted by it and position already says it.
+    Anything on the storefront, because a shelf has no honest population to rank a league inside —
+    colouring an empty room red would be a judgement about a league rather than a fact about one.
 - **Tier grade.** S/A/B bands as coloured bars, once the projection engine makes tiers real. Parked
   until then; this amendment already covers it, so no second ruling is needed when it lands.
 - **Team identity.** A team's own colour, behind a player's face only. Never on a surface, never
-  behind text.
+  behind text. Tokens: `TOKENS.team`, thirty-two club colours keyed by the abbreviation the stats
+  feed emits, theme-independent (a club's colour is the club's, in daylight and at night alike).
+  Renderer: `PlayerFace` (`src/draft-room/components/player-face.tsx`) — one decorative,
+  `aria-hidden` tile exactly the size of the face, with the `Avatar` on top of it. It is the one
+  palette here that reaches the DOM as an inline `style` rather than a CSS variable, because it is
+  keyed by DATA and a Tailwind class the static scanner cannot see ships no rule at all; that is
+  also why the values live in `tokens.ts`, the one file allowed to hold a colour literal. A team
+  we have no colour for renders the bare face rather than a grey rectangle pretending to be
+  somebody's colours.
 
 Green still means money and red still means live. Magnitude reuses those hues deliberately — good
 is green because good is the same feeling as money.
@@ -115,10 +146,23 @@ line, so rule 4's original claim is untouched. `line` stays decorative and `edge
 boundary; a card takes no `role` and no `tabindex`, so the action inside it is still the view's one
 ink action.
 
+**The amendment says MAY, and a founder ruling outranks a permission.** The open-league shelf reads
+as horizontal rows at lg+ because the founder ordered exactly that on 2026-08-24 ("horizontal row
+elements instead of these cards - my eyes don't know where to focus"). The amendment does not
+reopen it. What it buys that shelf is the card response below lg, where the card is the form that
+fits 360px. Read a "may" as a licence to relitigate a ruling and this document stops being a record
+of decisions.
+
 **Rule 5 — one ink action per view — holds everywhere except surfaces whose entire purpose is
 repeated action:** the draft room, and later waivers and trades. Named exceptions, not a general
 relaxation. `e2e/page-audit.spec.ts` keeps enforcing the rule on every audited route, and those
 routes do not change.
+
+Spent once so far (Task 8): the player pool's per-row act button took the ink back, reversing D3's
+2026-08-26 ruling that made it `secondary`. The exception is narrower than "the draft room may be
+loud" — the ink belongs to ACTS only, and `snake-room.test.tsx` asserts exactly that by walking
+every ink pill in the rendered room and requiring each one to be a Draft or a Confirm. Every
+filter, toggle and way out in that room stays quiet.
 
 **The three that hold.** One typeface at ≤600 weight; no capitals; only true things move.
 
@@ -729,6 +773,10 @@ No z-index scale yet — three sanctioned layers exist by convention: a sticky b
 - **`SeatMeter`** (`filled`, `total`, `heldSeats?`, `srOnlySentence?`) — THE seat sentence for the whole product (F17): "9 of 12 seated", gaining a low-seats clause and a held-seats clause as each becomes true, composed rather than concatenated so a screen reader takes one pause, not several — **unchanged by v3, verbatim**. What changed is the visual bar beside it: v3 (Task 5) redesigned it from dots to the mock's segment bar — `total` equal flex segments, `filled` of them `bg-accent` (money = seats filling, rule 1), the rest `bg-surface-inset`, still `aria-hidden` beside the same sentence. `srOnlySentence` (Task 13) lets `LeagueRow` print its own visible tabular "{n} of {t} open" value while the one product seat sentence still speaks to assistive tech underneath it. Nine-plus callers, including `OpenLeagueCard`, `LeagueRow` and `WaitingRoom`.
 - **`Meter`** (`label`, `value`, `max`) — a labeled fill bar that cannot be constructed without its own number beside it. Two callers today (`home-board.tsx`, `league-board.tsx`, both a matchup margin).
 - **`StatPill`** (`label`, `tone?`, `glow?`) — a `Badge`, for the state-chip vocabulary (Live / Final / Fix lineup). v3 (Task 3) dropped its forced `uppercase` — the chips now read sentence case, the caps charter applied to a primitive that used to force the transform itself.
+
+**`Stat`** (`label`, `value`, `comparison?`, `size?`, `orientation?`) — the fun pass's own primitive (Task 1) and the **only** renderer of magnitude colour in the product. `comparison` is a `{ percentile, population }` pair and the sole route to a tint; omit it, or state it badly (an unnamed population, a percentile off the scale), and the number renders as ordinary ink. Three channels ship together so the ramp survives with hue switched off: the value as text, a caret naming which side of the population it fell on, and a weight step naming how far. `size` walks the display scale (`sm`…`3xl`); `orientation` is `stacked` (default, a `<div>`: the number-over-label pairing the ~10x range exists for) or `inline` (a `<span>`, value then label — added by Task 7 for the verdict chip, which renders in a dense pool row, a one-line pick wire and a tabular pick log, none of which have room for a stacked pairing). Free-standing `magnitudeStep(comparison)` answers the same question without rendering.
+
+`Card` also takes `padding` (`comfortable` default, `compact` — a card that is also a ROW in a dense list, added by Task 8 for the draft room's player pool) and accepts `as="li"`, since an `<ol>` may only hold list items and a card that IS a list row must be able to be one rather than sit inside a second wrapper.
 
 Two free-standing exports beside `Countdown` itself: `useCountdown(deadlineAt)` (the ticking hook — `UI_CONFIG.countdown.tickMs`, slowed to `reducedMotionTickMs` under reduced motion) and `formatCoarseDuration`/`formatCoarseRemaining` (the "5 minutes" / "About 2 hours left" building blocks a caller with its own sentence to build — `WaitingRoom`'s "Starts in …" and the wire's own item sentences both reuse this directly rather than writing a second minute/hour formatter).
 

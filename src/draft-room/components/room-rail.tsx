@@ -5,12 +5,13 @@ import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { WaitingInfo } from "../contract";
-import { Avatar, Badge, EYEBROW, InfoTip } from "@/components/ui";
+import { Avatar, Badge, EYEBROW, InfoTip, Stat } from "@/components/ui";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SessionNotice } from "@/components/app-shell/session-notice";
+import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import type { TermKey } from "@/help/glossary";
 import type { HelpLevel } from "@/identity/preferences";
-import { formatClockLength, formatPausedUntil, formatTightening } from "../state/format";
+import { formatClockLength, formatPausedUntil, formatTightening, picksUntilYours } from "../state/format";
 import { playerName, teamName, teamsById } from "../lib/lookups";
 import type { ConnectionStatus } from "../hooks/use-draft-room";
 import { ConnectionBanner } from "./connection-banner";
@@ -83,11 +84,38 @@ const TIGHTENING_TEXT: Readonly<Record<RoomRailVariant, string>> = {
   tv: "text-sm",
 };
 
-/** Task 12 Step 3: the TV variant takes the largest countdown — the room's own headline size
- *  everywhere else in the product stays `lg`. */
+/** Task 12 Step 3: the TV variant takes the largest KICKOFF countdown — the room's own headline
+ *  size everywhere else in the product stays `lg`. The live pick clock reads
+ *  `LIVE_COUNTDOWN_SIZE` below instead, which is keyed on whose turn it is rather than on the
+ *  variant, because the TV never renders a pick clock in the rail at all (E5's one-clock rule:
+ *  `TvBoard`'s spotlight band owns the party's clock). */
 const RAIL_COUNTDOWN_SIZE: Readonly<Record<RoomRailVariant, CountdownSize>> = {
   room: "lg",
   tv: "xl",
+};
+
+/**
+ * TASK 6, THE ON-CLOCK BAND (the fun pass, `docs/design/2026-08-27-fun-pass-spec.md`): the pick
+ * clock steps up a full display size the moment the turn is yours.
+ *
+ * The spec's third named cause of "it feels like a legal website and not a fantasy site" is that
+ * this product has almost no typographic dynamic range, and this rail was a clean example of it:
+ * your own sixty seconds rendered at exactly the size somebody else's did. Now the moment owns
+ * the top of the room. Range comes from SIZE and only from size — rule 2's ≤600 weight cap does
+ * not move, and `weight-cap.source.test.ts` is what keeps the next author from reaching for a
+ * heavier face instead of a bigger one.
+ */
+const LIVE_COUNTDOWN_SIZE: Readonly<Record<"mine" | "theirs", CountdownSize>> = {
+  mine: "xl",
+  theirs: "lg",
+};
+
+/** The same step applied to the subject beside the clock — the manager whose turn it is. A name
+ *  at 28px over a 12px eyebrow is the number-over-label pairing the display scale exists for;
+ *  20px over 12px was the ~2x uniformity the spec measured and rejected. */
+const TURN_SUBJECT_TEXT: Readonly<Record<"mine" | "theirs", string>> = {
+  mine: "text-display-md",
+  theirs: "text-display-sm",
 };
 
 /**
@@ -275,6 +303,18 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
   const myTeamName = personalId === null ? null : teamName(teamsById(teams), personalId, "Your team");
   const turnWhere = turnLabel(view);
   const pending = pendingPickCount(view);
+  // Task 6: the on-clock band's two new facts. `turnKey` is the one branch every size in the
+  // band reads, so the clock, the name and the pulse can never disagree about whose moment this
+  // is. `untilYours` is the engine's own lookahead as a number (`picksUntilYours`) — null for a
+  // spectator, for the TV (no `personalId`, so nobody is "you"), and for a seat the lookahead
+  // does not reach; zero while the turn is already yours, which the band says with the clock
+  // rather than with a count.
+  const turnKey = turn.mine ? "mine" : "theirs";
+  const untilYours = picksUntilYours(view.upcoming, personalId);
+  // A real BRANCH, not a cosmetic one — the same idiom `useCountdown`'s tick rate already uses.
+  // `globals.css`'s reduced-motion block would flatten the animation anyway; not emitting the
+  // class at all is what makes the intent legible in the markup rather than only in a stylesheet.
+  const reducedMotion = usePrefersReducedMotion();
 
   return (
     <header
@@ -363,6 +403,17 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
               )}
               <div className="flex min-w-0 flex-col">
                 <span className={`inline-flex items-center gap-1 ${RAIL_EYEBROW[variant]} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
+                  {/* Rule 6, finally spent rather than merely obeyed (the spec's own words): the
+                      clock genuinely is running out, and it is running out on YOU. The dot is
+                      the product's existing live vocabulary (`animate-pulse-live`, built for the
+                      live chip) rather than a new animation, it is decorative and `aria-hidden`
+                      because the label right beside it already says the same thing in words, and
+                      it never pulses the digits themselves — a breathing opacity on the number a
+                      manager is reading would trade legibility for energy, which is the exact
+                      swap the spec's own test rejects. */}
+                  {turn.mine && !reducedMotion ? (
+                    <span data-testid="on-clock-pulse" aria-hidden="true" className="size-1.5 shrink-0 rounded-pill bg-negative animate-pulse-live" />
+                  ) : null}
                   {turn.label}
                   {/* An auction's "Live bid"/"Nominating" states aren't the on-the-clock rule
                       this term defines, so the tip only joins the snake-format turn label. The
@@ -370,9 +421,21 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                       controls at all. */}
                   {view.format === "auction" || variant !== "room" ? null : <InfoTip term="on-the-clock" helpLevel={helpLevel} />}
                 </span>
-                <span className="truncate font-display text-display-sm font-semibold leading-display text-text-primary">{turn.subject}</span>
+                <span className={`truncate font-display font-semibold leading-display text-text-primary ${TURN_SUBJECT_TEXT[turnKey]}`}>{turn.subject}</span>
               </div>
             </div>
+            {/* Task 6: "when am I up?", answered by a digit. The dock still says it in a full
+                sentence (`formatYourTurn`, the anxiety-killer) — this is the same lookup at a
+                glance, in the band a manager is already watching. Absent the moment the turn is
+                yours: zero picks until yours is not a fact anybody needs while their own clock is
+                ticking, and the clock beside it is already the loudest thing on the screen. No
+                `comparison`, so `Stat` renders it as ordinary ink — there is no population a
+                pick count falls inside, and a number is never coloured for looking big. */}
+            {untilYours === null || untilYours === 0 ? null : (
+              <div data-testid="picks-until-yours" className="shrink-0">
+                <Stat label={untilYours === 1 ? "Pick until yours" : "Picks until yours"} value={String(untilYours)} size="sm" />
+              </div>
+            )}
             {/* `id="room-clock"` (Task 4, R3): the anchored `RoomTour`'s "The clock" stop points
                 here — the one wrapper that's always present for every in-progress/hot state
                 regardless of which of paused/counting/tightening is showing inside it. Absent
@@ -389,7 +452,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                 // the TV board's spotlight band now owns the party's one clock (`TvBoard`, its
                 // own `hotThresholdMs` rule), and a second ticking clock beside it would be the
                 // exact "one clock per screen" violation E5/E6 called out.
-                <Countdown remainingMs={remainingMs} size={RAIL_COUNTDOWN_SIZE[variant]} tone={turn.mine ? "hot" : "default"} data-testid="countdown" />
+                <Countdown remainingMs={remainingMs} size={LIVE_COUNTDOWN_SIZE[turnKey]} tone={turn.mine ? "hot" : "default"} data-testid="countdown" />
               )}
               {tightening === null ? null : <span className={`${TIGHTENING_TEXT[variant]} text-warning`}>{tightening}</span>}
             </div>

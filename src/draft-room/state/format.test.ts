@@ -15,6 +15,7 @@ import {
   formatPickFact,
   formatTightening,
   formatYourTurn,
+  picksUntilYours,
   rosterSpots,
   type PickFactCopy,
 } from "./format";
@@ -82,6 +83,36 @@ describe("formatPausedUntil", () => {
     // 2026-03-08T09:30:00.000Z is 5:30 AM EDT — spring-forward morning, after the shortened
     // freeze window pin in `pause.test.ts`.
     expect(formatPausedUntil("2026-03-08T09:30:00.000Z")).toBe("Picks are paused until 5:30 AM Eastern. You can still make yours.");
+  });
+});
+
+/**
+ * Task 6 (the fun pass, the on-clock band): the same index lookup `formatYourTurn` already made,
+ * pulled out as a NUMBER so the rail can render it at display scale. The band's whole job is that
+ * "when am I up?" is answered by a big digit rather than by a sentence a manager has to read, and
+ * a component may never re-derive a turn-order fact of its own.
+ */
+describe("picksUntilYours", () => {
+  const UPCOMING = ["t3", "t4", "t1", "t2", "t3"];
+
+  it("counts the turns between now and yours", () => {
+    expect(picksUntilYours(UPCOMING, "t1")).toBe(2);
+    expect(picksUntilYours(UPCOMING, "t2")).toBe(3);
+  });
+
+  it("answers zero while the turn is already yours — never a count of one", () => {
+    expect(picksUntilYours(UPCOMING, "t3")).toBe(0);
+  });
+
+  it("says nothing for a spectator, and nothing for a team the lookahead does not reach", () => {
+    expect(picksUntilYours(UPCOMING, null)).toBeNull();
+    expect(picksUntilYours(UPCOMING, "t9")).toBeNull();
+    expect(picksUntilYours([], "t1")).toBeNull();
+  });
+
+  it("is the same lookup formatYourTurn states in words, so the two can never disagree", () => {
+    expect(picksUntilYours(UPCOMING, "t1")).toBe(2);
+    expect(formatYourTurn(UPCOMING, "t1", 600)).toBe("You're up in 2 picks (~20m).");
   });
 });
 

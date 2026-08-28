@@ -67,7 +67,14 @@ export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet"
   const badge = stakeBadge(league);
 
   return (
-    <Card as="article" className="flex h-full flex-col gap-3">
+    // `interactive` (the fun pass, Task 12): rule 4's amended test names this exact surface — "a
+    // thing you act on or compare against its neighbours may be a card", and a shelf of open
+    // leagues is both. The variant has existed since Task 2 and was spent on nothing, which is a
+    // real part of what "it feels like a legal website" was describing: a shelf a manager is
+    // meant to compare and then join sat as still as a page of terms. Depth only — the card takes
+    // no role and no tabindex, so `OpenLeagueCta` below stays the only thing on it you can press
+    // and rule 5's one-ink-action accounting is untouched.
+    <Card as="article" interactive className="flex h-full flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         {/* `min-w-0 break-words`: see `HomeLeagueCard`'s identical heading — a grid item's
             default `min-width: auto` otherwise lets a long league name widen the item past its

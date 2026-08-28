@@ -2,13 +2,15 @@ import type { ReactNode } from "react";
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Avatar, EYEBROW, PositionBadge } from "@/components/ui";
+import { Avatar, EYEBROW, PositionBadge, Stat } from "@/components/ui";
 import { BENCH_SLOT } from "@/domain/roster";
 import { playersById as buildPlayersById } from "../lib/lookups";
+import { verdictFor, verdictPopulation, type Verdict } from "../lib/verdict";
 import { formatPickFactClause, type PickFactCopy } from "../state/format";
 import { reviewPicks } from "../state/pick-review";
 import { rosterFillRows } from "../state/roster-fill";
 import { RosterRow } from "./roster-row";
+import { VerdictChip } from "./verdict-chip";
 
 /** Mirrors `MockResultsCopy` (`../contract`) — the wire type this room fetches, forwarded down
  *  as one prop rather than several so `DraftRoom` stays a single pass-through.
@@ -97,33 +99,95 @@ function RosterSection({
   );
 }
 
+/** One row of the pick log, paired with the verdict its own board rank earns (Task 7). */
+interface JudgedPick {
+  readonly review: ReturnType<typeof reviewPicks>[number];
+  readonly player: Player;
+  readonly verdict: Verdict;
+}
+
+/**
+ * Every pick the caller made, each carrying the honest facts it always carried AND the verdict
+ * those facts add up to. `verdictPopulation` is built once from the whole draft — every seat's
+ * picks, not only this manager's — because "was that good?" is a question about the room, and a
+ * manager who compared their own picks only to their own picks would be grading on a curve of
+ * one.
+ */
+function judgedPicks(view: DraftStateView, players: readonly Player[], playersById: ReadonlyMap<string, Player>, myTeamId: string): readonly JudgedPick[] {
+  const population = verdictPopulation(players, view.picks);
+  const judged: JudgedPick[] = [];
+  for (const review of reviewPicks(players, view.picks, myTeamId)) {
+    const player = playersById.get(review.playerId);
+    const boardRank = population.boardRanks.get(review.playerId);
+    if (player === undefined || boardRank === undefined) continue;
+    judged.push({ review, player, verdict: verdictFor(population, boardRank, review.pickNumber) });
+  }
+  return judged;
+}
+
+/**
+ * THE DEBRIEF (Task 13). The plan's own words: *"the results debrief is where the verdict chips
+ * accumulate into a story about how you drafted."* Three facts, at display scale, above the log
+ * they are counted from: how many picks beat the board, how many did not, and the single best
+ * one.
+ *
+ * The two counts carry NO comparison, on purpose — there is no stated population a count of
+ * steals falls inside, and rule 1 permits a tint only where the comparison is genuine. They are
+ * big because they matter, not coloured because they are good. The best pick's own chip IS
+ * coloured, because that number has a real population behind it (the picks this room made).
+ *
+ * The labels live here rather than in `MOCK_COPY`: the verdict vocabulary is the draft ROOM's own
+ * language, rendered in the pool and the wire of every league whether or not it is a practice
+ * room, and `MOCK_COPY` is for words that are specifically about mock drafts. The house copy
+ * rules still bind — `rendered-copy.test.tsx` mounts this component and sweeps every string it
+ * paints.
+ */
+function Debrief({ judged }: { readonly judged: readonly JudgedPick[] }) {
+  const steals = judged.filter((entry) => entry.verdict.kind === "steal");
+  const reaches = judged.filter((entry) => entry.verdict.kind === "reach");
+  // The single pick that beat the board by most. Absent for a manager who never beat it, which
+  // is an honest silence rather than a "best" that was merely least bad.
+  const best = steals.reduce<JudgedPick | null>((leader, entry) => (leader === null || entry.verdict.slip > leader.verdict.slip ? entry : leader), null);
+  return (
+    <div data-testid="mock-debrief" className="flex flex-wrap items-end gap-x-10 gap-y-4">
+      <Stat label={steals.length === 1 ? "Steal" : "Steals"} value={String(steals.length)} size="lg" />
+      <Stat label={reaches.length === 1 ? "Reach" : "Reaches"} value={String(reaches.length)} size="lg" />
+      {best === null ? null : (
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className={`${EYEBROW} text-text-faint`}>Best pick</span>
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="min-w-0 truncate font-display text-display-sm font-semibold leading-display text-text-primary">{best.player.name}</span>
+            <VerdictChip verdict={best.verdict} />
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PickList({
-  view,
-  players,
-  playersById,
-  myTeamId,
+  judged,
   copy,
 }: {
-  readonly view: DraftStateView;
-  readonly players: readonly Player[];
-  readonly playersById: ReadonlyMap<string, Player>;
-  readonly myTeamId: string;
+  readonly judged: readonly JudgedPick[];
   readonly copy: MockResultsCopy;
 }) {
   // A record, not prose (results review E1): one tabular mono row per pick — number, face,
-  // name, position, then the honest board fact. Weight, never color, marks the extremes (the
-  // R2 register ruling): a best-available pick reads in ink, everything else stays quiet.
-  const reviews = reviewPicks(players, view.picks, myTeamId);
+  // name, position, the verdict, then the honest board fact. Weight, never color, marks the
+  // extremes of the FACT column (the R2 register ruling); colour belongs only to the chip, which
+  // is a `Stat` and therefore the one thing here allowed to carry it.
+  //
+  // Still a hairline-separated list rather than a stack of cards: rule 4's amended test says a
+  // thing you read down a column stays a row, and a finished pick log is exactly that — nothing
+  // here is acted on, and the whole point is to scan the column.
   return (
     <div className="flex flex-col gap-2">
       <h2 className={`${EYEBROW} text-text-muted`}>{copy.picksHeading}</h2>
-      {reviews.length === 0 ? (
+      {judged.length === 0 ? (
         <p className="text-sm text-text-muted">{copy.noPicksMessage}</p>
       ) : (
         <ol aria-label={copy.picksHeading} className="flex flex-col">
-          {reviews.map((review) => {
-            const player = playersById.get(review.playerId);
-            if (player === undefined) return null;
+          {judged.map(({ review, player, verdict }) => {
             const best = review.bestAvailableDelta === 0 || review.positionBestDelta === 0;
             return (
               <li key={review.pickNumber} className="flex items-center gap-3 border-t border-line py-2 first:border-t-0">
@@ -131,6 +195,7 @@ function PickList({
                 <Avatar name={player.name} avatar={player.headshotUrl} size="sm" className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">{player.name}</span>
                 <PositionBadge position={player.position} size="sm" />
+                <VerdictChip verdict={verdict} />
                 <span className={`min-w-0 flex-1 truncate text-right font-mono text-xs tabular-nums ${best ? "font-semibold text-text-primary" : "text-text-muted"}`}>
                   {formatPickFactClause(copy.pickFact, review, player.position)}
                 </span>
@@ -165,6 +230,9 @@ export function MockResults({ view, teams, board, players, myTeamId, copy, actio
   const myName = teams.find((team) => team.id === myTeamId)?.name ?? null;
   const rounds = view.draftOrder.length === 0 ? 0 : Math.floor(view.picks.length / view.draftOrder.length);
   const bots = teams.filter((team) => team.isBot === true).length;
+  // Built once, read twice: the debrief counts them and the log lists them. Two derivations of
+  // one verdict is how a page ends up saying "3 steals" over a list that shows four.
+  const judged = myTeamId === null ? [] : judgedPicks(view, players, playersById, myTeamId);
   return (
     // Full-bleed (review E2/R1): the frame spends the screen it is given; the team sheet takes
     // its own measure as a grid column, the pick log takes the rest, the finished board takes
@@ -191,6 +259,9 @@ export function MockResults({ view, teams, board, players, myTeamId, copy, actio
           {/* ONE retention fact per view (review E3): the practice banner above this panel
               already says the room clears itself — `copy.retentionSentence` stays on the wire
               for any chrome-less consumer but is deliberately not restated here. */}
+          {/* TASK 13: the story, above the record. Only for a caller who actually drafted — a
+              commissioner watching a mock with no seat has no picks to have a story about. */}
+          {judged.length === 0 ? null : <Debrief judged={judged} />}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           {actions.runAgain}
@@ -205,7 +276,7 @@ export function MockResults({ view, teams, board, players, myTeamId, copy, actio
               <RosterSection view={view} playersById={playersById} myTeamId={myTeamId} copy={copy} />
             </div>
             <div className="order-2">
-              <PickList view={view} players={players} playersById={playersById} myTeamId={myTeamId} copy={copy} />
+              <PickList judged={judged} copy={copy} />
             </div>
           </>
         )}

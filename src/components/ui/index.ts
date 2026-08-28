@@ -30,3 +30,6 @@ export { Crest, crestTone } from "./crest";
 export { SeatMeter } from "./seat-meter";
 export { Meter } from "./meter";
 export { StatPill } from "./stat-pill";
+/** The heat map's one renderer (the fun pass, Task 1). `StatComparison` rides the barrel with it
+ *  because a caller that cannot name a population cannot use the component at all. */
+export { Stat, magnitudeStep, type StatComparison, type StatSize } from "./stat";

@@ -1,9 +1,37 @@
+import type { Position } from "@/domain/player";
 import type { MedianResult, WeekStatus } from "@/league";
 import type { MatchupDetail, MatchupSide } from "../contract";
-import { Card, EYEBROW, InfoTip, SlotChip, Table, type TableColumn } from "@/components/ui";
+import { Card, EYEBROW, InfoTip, SlotChip, Stat, Table, type TableColumn } from "@/components/ui";
 import { formatPoints } from "../lib/format";
+import { starterComparison } from "../lib/population";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 import { MedianResultLine } from "./median-result";
+
+/** Every point total a starter put up this week, pooled by position — `startedPointsByPosition`
+ *  (`../lib/population.ts`), built once by the page that can actually see the whole week. */
+export type PositionPoints = ReadonlyMap<Position, readonly number[]>;
+
+/**
+ * One scored starter's points, as a heat-coloured number (the fun pass, Task 9). Takes `points`
+ * separately from `row` so the not-yet-played case is settled by the caller and this function is
+ * never handed a `null` to assert away.
+ *
+ * `srOnlyLabel`: the `<th>` above already says "Points", on screen and in the accessibility tree,
+ * for every cell in this column. `items-end` because a `Stat` is a flex column and this one lives
+ * in a `numeric` (right-aligned) cell.
+ */
+function pointsStat(row: MatchupSide["starters"][number], points: number, positionPoints: PositionPoints | undefined) {
+  return (
+    <Stat
+      label="Points"
+      srOnlyLabel
+      size="sm"
+      value={formatPoints(points)}
+      comparison={positionPoints === undefined ? undefined : starterComparison(positionPoints, row.position, points)}
+      className="items-end"
+    />
+  );
+}
 
 /**
  * NEW-10 (gauntlet fix wave): `Slot` and `Pos` used to be two columns for one fact — identical
@@ -12,19 +40,27 @@ import { MedianResultLine } from "./median-result";
  * precedent this table now matches, and `SlotChip` alone still tells FLEX and BENCH apart from a
  * starting position — the one thing `Pos` (`PositionBadge`) added beyond `Slot` for six of nine
  * rows was nothing.
+ *
+ * THE HEAT MAP lives in the Points column (the fun pass, Task 9). Built per render rather than
+ * hoisted to a module constant because the cell needs the week's population, which is a prop —
+ * and a population is the ONLY thing that can tint a number here.
  */
-const COLUMNS: readonly TableColumn<MatchupSide["starters"][number]>[] = [
-  { key: "slot", header: "Slot", cell: (row) => <SlotChip slot={row.slot} /> },
-  { key: "player", header: "Player", cell: (row) => row.playerName ?? "Empty" },
-  {
-    key: "points",
-    header: "Points",
-    // D4: `null` means this player has no stat line for the week yet — not-yet-played, never a
-    // silent zero. The same dash the team-level score already renders for the identical fact.
-    cell: (row) => (row.points === null ? "—" : formatPoints(row.points)),
-    numeric: true,
-  },
-];
+function columnsFor(positionPoints: PositionPoints | undefined): readonly TableColumn<MatchupSide["starters"][number]>[] {
+  return [
+    { key: "slot", header: "Slot", cell: (row) => <SlotChip slot={row.slot} /> },
+    { key: "player", header: "Player", cell: (row) => row.playerName ?? "Empty" },
+    {
+      key: "points",
+      header: "Points",
+      // D4: `null` means this player has no stat line for the week yet — not-yet-played, never a
+      // silent zero. The same dash the team-level score already renders for the identical fact,
+      // and the one case that renders no `Stat` at all: a dash is not a number, and a number that
+      // does not exist cannot be ranked against anything.
+      cell: (row) => (row.points === null ? "—" : pointsStat(row, row.points, positionPoints)),
+      numeric: true,
+    },
+  ];
+}
 
 /** One side's own median line, or `null` when there's nothing to say yet — the toggle is off,
  *  or this week hasn't settled, or (defensively) this side has no score despite a median
@@ -43,10 +79,12 @@ function Side({
   side,
   myTeamId,
   median,
+  positionPoints,
 }: {
   readonly side: MatchupSide;
   readonly myTeamId: string | null;
   readonly median: { readonly score: number; readonly medianScore: number; readonly result: MedianResult } | null;
+  readonly positionPoints: PositionPoints | undefined;
 }) {
   // The score lives on the scoreboard above; down here the roster is the story.
   return (
@@ -65,7 +103,7 @@ function Side({
           closeout (`table.tsx`'s own DENSITY-DEFAULT DECISION docblock). */}
       <Table
         caption={`${side.teamName} starters`}
-        columns={COLUMNS}
+        columns={columnsFor(positionPoints)}
         rows={side.starters}
         rowKey={(row) => `${row.slot}:${row.slotIndex}`}
         empty={<p className="text-sm text-text-muted">No starters set.</p>}
@@ -97,10 +135,19 @@ export function MatchupPanel({
   weekStatus,
   gamesFinal,
   gamesTotal,
+  positionPoints,
 }: {
   readonly matchup: MatchupDetail;
   readonly myTeamId: string | null;
   readonly weekStatus: WeekStatus;
+  /**
+   * The week's own starters pooled by position (the fun pass, Task 9) — built by `LiveMatchupWeek`,
+   * which is the only thing on this route that can see every matchup at once. Omit it and every
+   * points cell renders as ordinary ink: rule 1's amendment permits magnitude only against a
+   * population that genuinely exists, and one matchup is not a population. Optional so the panel's
+   * other callers (and every test that does not care) render exactly as they did before.
+   */
+  readonly positionPoints?: PositionPoints;
   /** E1(a)/D2: the week's own `stat_weeks.games_final`/`games_total`, live-folded upstream
    *  (`LiveMatchupWeek`) — optional so every OTHER existing caller of this panel is unaffected;
    *  the matchup page (the one production caller) always supplies both. */
@@ -136,10 +183,11 @@ export function MatchupPanel({
         myTeamId={myTeamId}
         gamesFinal={gamesFinal}
         gamesTotal={gamesTotal}
+        size="hero"
       />
       <div className="grid gap-3 lg:grid-cols-2">
-        <Side side={matchup.home} myTeamId={myTeamId} median={medianLineFor(matchup, "home")} />
-        <Side side={matchup.away} myTeamId={myTeamId} median={medianLineFor(matchup, "away")} />
+        <Side side={matchup.home} myTeamId={myTeamId} median={medianLineFor(matchup, "home")} positionPoints={positionPoints} />
+        <Side side={matchup.away} myTeamId={myTeamId} median={medianLineFor(matchup, "away")} positionPoints={positionPoints} />
       </div>
     </section>
   );
