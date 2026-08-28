@@ -59,7 +59,7 @@ const SEASON_SUMMARY =
 export default async function LeagueRulesPage() {
   const user = await getCurrentUser();
   return (
-    <ReadingFrame title="How it works" lede={GAME_DEFINITION} intent={PAGE_INTENT} signedIn={user !== null}>
+    <ReadingFrame title="How it works" kicker="Formats and scoring" lede={GAME_DEFINITION} intent={PAGE_INTENT} signedIn={user !== null}>
         <p>{SEASON_SUMMARY}</p>
         <p>
           Every league on Commish drafts either <TermLink term="snake-draft">snake</TermLink> or{" "}
