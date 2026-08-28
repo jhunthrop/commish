@@ -24,8 +24,14 @@ export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
  * Used where read-only is a CONSTRAINT rather than a habit: the AI advisor is advisory-only by
  * law (strategy doc §4.2), and this is what makes `tsc` the thing enforcing it instead of a
  * grep over the directory.
+ *
+ * `selectDistinctOn` joined `select` when the projection engine's point-in-time reader needed it
+ * (`observationsAsOf`, `src/projections/store.ts`): it is exactly as read-only as `select` — a
+ * `SELECT DISTINCT ON` — and leaving it out would have forced that reader to take a full `Db` and
+ * give up the guarantee for a query that never writes. `advisory-only.test.ts` pins that no WRITE
+ * verb has crept in, which is the property that actually matters.
  */
-export type ReadonlyDb = Pick<Db, "select">;
+export type ReadonlyDb = Pick<Db, "select" | "selectDistinctOn">;
 
 export interface DbOptions {
   /** Pool size. Defaults to `DB_POOL_CONFIG.defaultMaxConnections`. */
