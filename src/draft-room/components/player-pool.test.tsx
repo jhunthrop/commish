@@ -16,6 +16,7 @@ const props = {
   onAct: () => {},
   queuedPlayerIds: new Set<string>(),
   onQueue: () => {},
+  teamCount: 12,
 };
 
 /**

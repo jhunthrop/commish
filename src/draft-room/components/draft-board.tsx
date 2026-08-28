@@ -356,8 +356,14 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
             void under it that says even less than the dashed cells did. Filling the stage hands
             the reclaimed pixels back to the ROWS — the same picks, drawn larger — so the board
             reads as a scoreboard rather than a spreadsheet. Rows still grow past the stage on a
-            deep board, and the container above is the scroller, exactly as before. */}
-        <table className="h-full w-full table-fixed border-separate border-spacing-1 text-left">
+            deep board, and the container above is the scroller, exactly as before.
+
+            ONLY ONCE THERE IS A PICK TO DRAW, though. Before kickoff every cell is empty by
+            construction, and stretching three empty rounds across the whole stage inflates 175px
+            dashed rectangles — the exact defect the horizon was added to fix, arrived at from the
+            other direction. A board with nothing on it takes its natural height and lets the
+            waiting room breathe. */}
+        <table className={`w-full table-fixed border-separate border-spacing-1 text-left ${view.picks.length === 0 ? "" : "h-full"}`}>
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           {/* The whole header row is STICKY-TOP (founder screenshot, 2026-08-26): deep in a
               draft the auto-scroll follows the current pick down the grid, and a static header

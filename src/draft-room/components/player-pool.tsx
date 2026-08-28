@@ -33,6 +33,14 @@ export interface PlayerPoolProps {
   readonly onAct: (playerId: string) => void;
   readonly queuedPlayerIds: ReadonlySet<string>;
   readonly onQueue: (playerId: string) => void;
+  /**
+   * The league's own seat count, for the tier ladder's grades (a consensus ROUND is a fact about
+   * a room of a given size — see `../lib/tiers`). Passed rather than read off
+   * `view.draftOrder.length` alone because the draft order does not exist until the draft starts,
+   * and the pre-kickoff room is exactly when a manager is studying the board. The view's order
+   * still wins once it exists: it is the seating this draft actually drew.
+   */
+  readonly teamCount: number;
 }
 
 interface PoolRow {
@@ -119,7 +127,7 @@ function PositionFilters({ value, onChange }: { readonly value: string; readonly
  * The star is the queue toggle; the button beside it is the act. Both are real, named controls,
  * so the whole pool is walkable from the keyboard.
  */
-export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, actionLabel, submitting, onAct, queuedPlayerIds, onQueue }: PlayerPoolProps) {
+export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, actionLabel, submitting, onAct, queuedPlayerIds, onQueue, teamCount }: PlayerPoolProps) {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(ALL);
   // Task 5: a team that owes a pick may make it any time, so the row-level Draft button below
@@ -153,7 +161,8 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
   const verdicts = useMemo(() => verdictPopulation(players, view.picks), [players, view.picks]);
   // The ladder, over the WHOLE board rather than the filtered view — see the docblock. Keyed on
   // the room's own seat count, because a consensus round is a fact about a room of that size.
-  const tiers = useMemo(() => poolTiers(players, view.draftOrder.length), [players, view.draftOrder.length]);
+  const seats = view.draftOrder.length > 0 ? view.draftOrder.length : teamCount;
+  const tiers = useMemo(() => poolTiers(players, seats), [players, seats]);
 
   // Law 2, in the one place the pool has an honest number for it: how many players the filter
   // currently leaves standing. `filtered.length`, not the pool size — the figure answers the

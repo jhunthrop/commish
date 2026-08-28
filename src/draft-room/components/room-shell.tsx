@@ -69,6 +69,7 @@ export function RoomShell({
       onAct={onAct}
       queuedPlayerIds={queuedPlayerIds}
       onQueue={onQueueToggle}
+      teamCount={room.teams.length}
     />
   );
 
