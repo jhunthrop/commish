@@ -330,6 +330,13 @@
       "when": 1787881954809,
       "tag": "0046_projection_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1787884032586,
+      "tag": "0047_capture_snapshots",
+      "breakpoints": true
     }
   ]
 }

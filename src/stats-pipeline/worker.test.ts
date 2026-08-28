@@ -1578,3 +1578,65 @@ describe("examinationWindow", () => {
     expect(examinationWindow([live(17)], { lastWeek: 17, maxWeeks: 2, widen: true }).weeks).toEqual([17]);
   });
 });
+
+/**
+ * Task 4b. The capture pass is the projection engine's, but it runs on THIS worker's tick, so the
+ * properties that make that safe — it runs even when the scoring half has nothing to do, one
+ * feed's failure never breaks the tick — belong to the worker and are asserted here.
+ */
+describe("the ephemeral-feed capture rides on the tick", () => {
+  const noFeeds = { feeds: [] as const };
+
+  it("runs the capture on every tick", async () => {
+    const capture = vi.fn(async () => noFeeds);
+    const provider = fakeStatsProvider({ games: {} });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, capture });
+
+    await worker.tick();
+
+    expect(capture).toHaveBeenCalledTimes(1);
+  });
+
+  it("still runs it on a tick the scoring half gives up on — the preseason is when it matters most", async () => {
+    // Every week final: `runScoringTick` returns early with "nothing to examine". The capture must
+    // not be behind that return, because ADP drift and injuries are exactly what a dead scoring
+    // week still needs recording.
+    await db.insert(statWeeks).values(
+      Array.from({ length: 18 }, (_, index) => ({ week: index + 1, status: "final" as const })),
+    );
+    const capture = vi.fn(async () => noFeeds);
+    const provider = fakeStatsProvider({ games: {} });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, capture });
+
+    const outcomes = await worker.tick();
+
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(outcomes.some((outcome) => outcome.reason?.includes("Nothing to examine"))).toBe(true);
+  });
+
+  it("reports a failed feed and carries on ingesting", async () => {
+    const capture = vi.fn(async () => ({
+      feeds: [
+        { source: "tank01_depth_charts", status: "failed" as const, requests: 1, reason: "HTTP 404" },
+        { source: "tank01_news", status: "captured" as const, requests: 1 },
+      ],
+    }));
+    const provider = fakeStatsProvider({ games: {} });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, capture });
+
+    const outcomes = await worker.tick();
+
+    expect(outcomes.some((outcome) => outcome.reason?.includes("tank01_depth_charts") === true)).toBe(true);
+    expect(outcomes.some((outcome) => outcome.reason?.includes("tank01_news") === true)).toBe(false);
+  });
+
+  it("a capture that throws never takes the ingestion tick down with it", async () => {
+    const capture = vi.fn(async () => {
+      throw new Error("redis is gone");
+    });
+    const provider = fakeStatsProvider({ games: {} });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, capture });
+
+    await expect(worker.tick()).resolves.toBeDefined();
+  });
+});

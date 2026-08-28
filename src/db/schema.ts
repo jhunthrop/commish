@@ -1621,3 +1621,51 @@ export const playerWeekObservations = pgTable(
     index("player_week_observations_as_of_idx").on(t.season, t.week, t.asOf),
   ],
 );
+
+/**
+ * THE EPHEMERAL FEEDS, CAPTURED RAW — the one table in this product where waiting has a permanent
+ * cost (Phase 1, Task 4b).
+ *
+ * Most of the projection engine's inputs can be backfilled whenever we like: nflverse publishes
+ * historical archives, so participation, snap counts and play-by-play are always retrievable. These
+ * cannot. Injury designations, depth charts, ADP as it drifts through the preseason, weekly DFS
+ * salaries, the betting line as it stood before kickoff, the news wire — every one is a CURRENT
+ * snapshot with no history endpoint anywhere. Not ours, not the vendor's. A week this job does not
+ * run is a week of training data that does not exist and cannot be bought later.
+ *
+ * WHY THE RAW BODY AND NOT PARSED FEATURES. The irreversible thing is the observation, never the
+ * interpretation: a mapper written today against a shape nobody has seen (there is no API key yet)
+ * would produce confident garbage, while the bytes it misread would still be right here to remap
+ * the day the key arrives. Storing the response verbatim decouples "do not lose this" — which is
+ * urgent — from "decide what it means", which is not. `player_week_observations` is derived from
+ * this table and can be rebuilt from it; that is the same append-only-source-of-truth convention
+ * `stat_weeks` follows over `player_stat_lines`.
+ *
+ * `captured_at` is when WE FETCHED IT, from the worker's injected clock — never the timestamp the
+ * vendor puts inside the payload. We can only honestly claim to have known something at the moment
+ * we saw it, and a vendor's own "as of" is a claim about their pipeline, not about our knowledge.
+ *
+ * A row is written only when the payload's `digest` differs from the most recent row for that
+ * source, so a daily poll of an unchanged injury report writes nothing. That loses no knowledge: a
+ * point-in-time read asks for the latest snapshot at or before a moment, and an unchanged feed is
+ * still correctly answered by the snapshot before it.
+ */
+export const captureSnapshots = pgTable(
+  "capture_snapshots",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** Which feed — `tank01_injuries`, `tank01_betting_odds`. Matches `CAPTURE_FEEDS`. */
+    source: text("source").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    /** SHA-256 of the canonical payload. The change detector, and cheaper than comparing jsonb. */
+    digest: text("digest").notNull(),
+    /** The upstream response, verbatim. `jsonb` rather than `text`: the same bytes, but queryable
+     *  when a later phase writes the mapper, which is the entire point of keeping them. */
+    payload: jsonb("payload").notNull(),
+  },
+  (t) => [
+    /** Both reads this table has: "what is the newest snapshot for this source" (the change
+     *  detector, every tick) and "what did we know as of a moment" (every future mapper). */
+    index("capture_snapshots_source_captured_idx").on(t.source, t.capturedAt),
+  ],
+);

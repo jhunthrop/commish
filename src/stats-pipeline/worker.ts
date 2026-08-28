@@ -8,6 +8,7 @@ import type { Clock } from "@/domain/timing";
 import { isLineupLocked, weekStatusFromGames } from "@/league";
 import { autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import type { PublishFn } from "@/lib/realtime/publish";
+import type { CaptureResult } from "@/projections/capture";
 import type { GameSummary, StatsProvider } from "@/stats/provider";
 import { affectedTeams } from "./affected";
 import { STATS_INGESTION_CONFIG, type IngestionMode } from "./config";
@@ -75,6 +76,17 @@ interface WorkerDeps {
    * it or force its failure without a real transaction underneath.
    */
   readonly autoSet?: typeof autoSetLineupsForWeek;
+  /**
+   * One pass of the projection engine's ephemeral-feed capture (`@/projections/capture`), run
+   * inside this tick rather than on a scheduler of its own.
+   *
+   * It rides here because this worker already owns the three things the capture must not
+   * duplicate: the poll interval, the cross-instance lease, and — above all — the monthly upstream
+   * request ledger. A second scheduler would be a second spender against one paid quota with no
+   * idea what the first was doing, and the day that mattered would be the Sunday it took live
+   * scoring down. Optional, so every existing test constructs a worker that captures nothing.
+   */
+  readonly capture?: () => Promise<CaptureResult>;
 }
 
 const defaultOnOutcome = (outcome: TickOutcome): void => {
@@ -259,6 +271,7 @@ export function createIngestionWorker({
   wedgedWeekTicks = STATS_INGESTION_CONFIG.wedgedWeekTicks,
   onOutcome = defaultOnOutcome,
   autoSet = autoSetLineupsForWeek,
+  capture,
 }: WorkerDeps): IngestionWorker {
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
@@ -705,7 +718,42 @@ export function createIngestionWorker({
     }
   }
 
+  /**
+   * The capture pass, folded into the tick's outcomes.
+   *
+   * Runs BEFORE the scoring tick and outside its early returns, deliberately: the scoring half
+   * gives up when every week is final, and the preseason — when no week is live at all — is
+   * exactly when ADP drift and injury designations are most worth having. A capture that only ran
+   * when a game was in progress would miss the entire window it exists for.
+   *
+   * Only failures and a refused pass are reported. An ordinary skip (still fresh, nothing changed,
+   * not a game day) is the normal state of nearly every feed on nearly every tick, and logging it
+   * would bury the one line that matters under a hundred that never do.
+   */
+  async function runCapture(nowMs: number): Promise<readonly TickOutcome[]> {
+    if (capture === undefined) return [];
+    const outcomes: TickOutcome[] = [];
+    try {
+      const result = await capture();
+      if (result.reason !== undefined) outcomes.push({ week: 0, applied: false, reason: result.reason });
+      for (const feed of result.feeds) {
+        if (feed.status !== "failed") continue;
+        outcomes.push({ week: 0, applied: false, reason: `Capture of ${feed.source} failed: ${feed.reason ?? "unknown"}` });
+      }
+    } catch (error: unknown) {
+      console.error("[stats-pipeline] capture pass failed", error);
+      outcomes.push({ week: 0, applied: false, reason: "The ephemeral-feed capture pass failed." });
+    }
+    for (const outcome of outcomes) reportIfDue(outcome, nowMs);
+    return outcomes;
+  }
+
   async function runTick(): Promise<readonly TickOutcome[]> {
+    const captureOutcomes = await runCapture(Date.parse(clock.now()));
+    return [...captureOutcomes, ...(await runScoringTick())];
+  }
+
+  async function runScoringTick(): Promise<readonly TickOutcome[]> {
     const nowIso = clock.now();
     const nowMs = Date.parse(nowIso);
     // The whole table, not a single-row query: it holds at most one row per week of a season
