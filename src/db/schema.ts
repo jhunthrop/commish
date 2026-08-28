@@ -5,6 +5,7 @@ import {
   char,
   integer,
   real,
+  doublePrecision,
   boolean,
   timestamp,
   jsonb,
@@ -1553,5 +1554,118 @@ export const paymentTransferIntents = pgTable(
     /** The wallet's "your pending deposits" read, and Task 11's reconcile sweep: one user's
      *  intents in time order. */
     index("payment_transfer_intents_user_created_idx").on(t.userId, t.createdAt),
+  ],
+);
+
+/**
+ * THE POINT-IN-TIME STORE the projection engine rests on (Phase 1, Task 1 —
+ * `docs/design/2026-08-27-projection-engine-spec.md`). Every fact the engine will ever learn from
+ * lands here first, and `as_of` is why: it is the moment that fact became KNOWABLE, not the moment
+ * we happened to write it down. A backtest replaying week 7 filters `as_of <= <kickoff>` and is
+ * therefore structurally unable to read a number that did not exist yet.
+ *
+ * This is the one thing in the engine that cannot be retrofitted. Leakage is how projection work
+ * fools itself — a single end-of-season column reachable from a mid-season replay makes the model
+ * look brilliant and be worthless — and by the time the numbers look too good, every measurement
+ * ever taken is suspect. Retrofitting `as_of` means rebuilding the store and re-ingesting
+ * everything, because the stamp is not recoverable after the fact.
+ *
+ * NARROW AND TALL (one row per player-week-source-metric), not a wide per-week row, deliberately:
+ * metrics arrive from different sources at different times — snap counts on Tuesday, a box score on
+ * Sunday night, a stat correction the following Thursday — and a wide row forces a writer to know
+ * every column at once, which it never does. It also means adding a metric is an INSERT rather than
+ * a migration, and the engine is going to add metrics for years.
+ *
+ * A RESTATEMENT IS A NEW ROW, never an UPDATE. Tank01's Changelog corrects stat lines days later;
+ * so does the NFL. Overwriting the original would quietly rewrite history and make every backtest
+ * that ran before the correction unreproducible — the dishonest kind of quiet. Two rows, two
+ * `as_of` stamps, and the reader picks the latest one it was allowed to see.
+ */
+export const playerWeekObservations = pgTable(
+  "player_week_observations",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season: integer("season").notNull(),
+    week: integer("week").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** Which feed said it (`nflverse_snap_counts`, `nflverse_player_week`, `tank01`) — provenance,
+     *  and the axis an ablation holds a whole source out on. */
+    source: text("source").notNull(),
+    /** Snake_case name of the quantity (`offensive_snaps`, `targets`, `receiving_yards`). Free
+     *  text on purpose: see the narrow/tall note above. */
+    metric: text("metric").notNull(),
+    /** `double precision`, not `real`: this column holds counts, yards, shares and rates alike, and
+     *  float4's ~7 significant digits are enough to make a share computed here disagree in the
+     *  seventh place with the same share computed in TypeScript. A store the harness measures
+     *  against should not introduce error of its own. */
+    value: doublePrecision("value").notNull(),
+    /** THE STAMP. When the fact became knowable — game end for a box score, release time for a
+     *  weekly file, publication for a correction. NEVER `defaultNow()`: a default would silently
+     *  stamp a backfill of 2019 with today, which is precisely the leak this table exists to
+     *  prevent, so every writer must state it. */
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    /** When we wrote it down. Operational only — never a filter in a backtest. The gap between
+     *  this and `as_of` is how far behind the ingestion is running. */
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** Identity of a fact: this player's this metric from this source, as known at this moment.
+     *  Re-running an ingestion is therefore a no-op rather than a duplicate, and `recordObservations`
+     *  leans on it for idempotency instead of asking the caller to track what it already sent. */
+    uniqueIndex("player_week_observations_fact_idx").on(t.season, t.week, t.playerId, t.source, t.metric, t.asOf),
+    /** The hottest read in the engine by a wide margin: `observationsAsOf` scans exactly this range
+     *  — one season, a week or a span of them, everything stamped at or before a moment — once per
+     *  replayed week, and a backtest replays every week of every season it can reach. */
+    index("player_week_observations_as_of_idx").on(t.season, t.week, t.asOf),
+  ],
+);
+
+/**
+ * THE EPHEMERAL FEEDS, CAPTURED RAW — the one table in this product where waiting has a permanent
+ * cost (Phase 1, Task 4b).
+ *
+ * Most of the projection engine's inputs can be backfilled whenever we like: nflverse publishes
+ * historical archives, so participation, snap counts and play-by-play are always retrievable. These
+ * cannot. Injury designations, depth charts, ADP as it drifts through the preseason, weekly DFS
+ * salaries, the betting line as it stood before kickoff, the news wire — every one is a CURRENT
+ * snapshot with no history endpoint anywhere. Not ours, not the vendor's. A week this job does not
+ * run is a week of training data that does not exist and cannot be bought later.
+ *
+ * WHY THE RAW BODY AND NOT PARSED FEATURES. The irreversible thing is the observation, never the
+ * interpretation: a mapper written today against a shape nobody has seen (there is no API key yet)
+ * would produce confident garbage, while the bytes it misread would still be right here to remap
+ * the day the key arrives. Storing the response verbatim decouples "do not lose this" — which is
+ * urgent — from "decide what it means", which is not. `player_week_observations` is derived from
+ * this table and can be rebuilt from it; that is the same append-only-source-of-truth convention
+ * `stat_weeks` follows over `player_stat_lines`.
+ *
+ * `captured_at` is when WE FETCHED IT, from the worker's injected clock — never the timestamp the
+ * vendor puts inside the payload. We can only honestly claim to have known something at the moment
+ * we saw it, and a vendor's own "as of" is a claim about their pipeline, not about our knowledge.
+ *
+ * A row is written only when the payload's `digest` differs from the most recent row for that
+ * source, so a daily poll of an unchanged injury report writes nothing. That loses no knowledge: a
+ * point-in-time read asks for the latest snapshot at or before a moment, and an unchanged feed is
+ * still correctly answered by the snapshot before it.
+ */
+export const captureSnapshots = pgTable(
+  "capture_snapshots",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** Which feed — `tank01_injuries`, `tank01_betting_odds`. Matches `CAPTURE_FEEDS`. */
+    source: text("source").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    /** SHA-256 of the canonical payload. The change detector, and cheaper than comparing jsonb. */
+    digest: text("digest").notNull(),
+    /** The upstream response, verbatim. `jsonb` rather than `text`: the same bytes, but queryable
+     *  when a later phase writes the mapper, which is the entire point of keeping them. */
+    payload: jsonb("payload").notNull(),
+  },
+  (t) => [
+    /** Both reads this table has: "what is the newest snapshot for this source" (the change
+     *  detector, every tick) and "what did we know as of a moment" (every future mapper). */
+    index("capture_snapshots_source_captured_idx").on(t.source, t.capturedAt),
   ],
 );

@@ -22,6 +22,23 @@ export const TANK01_CONFIG = {
     gamesForWeek: "/getNFLGamesForWeek",
     boxScore: "/getNFLBoxScore",
     adp: "/getNFLADP",
+    /**
+     * The ephemeral feeds the capture job polls (`src/projections/capture-feeds.ts`). They live
+     * here with the rest of the Tank01 surface so there is one place a path is written down.
+     *
+     * UNVERIFIED against the live API, unlike everything above them: `TANK01_API_KEY` is still
+     * empty, so these are taken from the published endpoint list rather than from a probe. That is
+     * survivable BECAUSE of how the capture treats them — a feed whose request fails is reported
+     * and skipped, never fatal, so a wrong path shows up in the tick log as one dead feed on the
+     * day a key arrives while the other six keep capturing. Confirm them with
+     * `npm run stats:tank01:record` then, and correct any that are wrong.
+     */
+    teamRoster: "/getNFLTeamRoster",
+    depthCharts: "/getNFLDepthCharts",
+    changelog: "/getNFLChangelog",
+    news: "/getNFLNews",
+    bettingOdds: "/getNFLBettingOdds",
+    dfs: "/getNFLDFS",
   },
   /**
    * Which ADP market `/getNFLADP` answers with (`adpType` query parameter). `PPR` because it is

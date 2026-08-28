@@ -1,0 +1,19 @@
+{
+  "provenance": "recorded-from-live-release",
+  "recordedAt": "2026-08-27",
+  "note": "Real slices of real nflverse release assets, byte-for-byte as published, narrowed to Buffalo's weeks 1-3 of the 2024 regular season so the whole corpus stays a few tens of kilobytes. One team over three weeks is deliberate: it carries a full offensive-snap denominator (a lineman at 100% of snaps), a quarterback, backs and receivers with real target shares, players who appear in one file and not the other, and enough weeks for a rolling window and a backtest replay to have something to walk. Every column the upstream release publishes is kept, including the ones no mapper reads yet, so a schema change upstream is visible here as a diff rather than as a silent drop.",
+  "entries": [
+    {
+      "file": "snap_counts_2024_buf_w1-3.csv",
+      "release": "snap_counts",
+      "asset": "snap_counts_2024.csv",
+      "filtered": "season=2024, game_type=REG, week in 1..3, team=BUF"
+    },
+    {
+      "file": "stats_player_week_2024_buf_w1-3.csv",
+      "release": "player_stats",
+      "asset": "stats_player_week_2024.csv",
+      "filtered": "season=2024, season_type=REG, week in 1..3, team=BUF"
+    }
+  ]
+}

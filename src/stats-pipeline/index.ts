@@ -1,4 +1,11 @@
-import { createDb } from "@/db/client";
+import { asc, ne } from "drizzle-orm";
+import { createDb, type Db } from "@/db/client";
+import { statWeeks } from "@/db/schema";
+import { envOrUndefined } from "@/lib/env";
+import { captureOnce, type CaptureResult } from "@/projections/capture";
+import { NFL_TEAM_ABBREVIATIONS } from "@/projections/capture-feeds";
+import { createTank01Client } from "@/stats/tank01/client";
+import { TANK01_CONFIG } from "@/stats/tank01/config";
 import { DB_POOL_CONFIG } from "@/db/config";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { getPublisher } from "@/lib/realtime/publisher";
@@ -97,6 +104,64 @@ export function getIngestionBudget(): RequestBudget {
 }
 
 /**
+ * The projection engine's ephemeral-feed capture, bound to this process's real dependencies — or
+ * `undefined` when there is nothing to capture.
+ *
+ * `undefined` for any provider but Tank01, and that is not a shortcut: the feeds are Tank01
+ * endpoints, and the mock provider answers out of a committed JSON file with no injury report, no
+ * betting line and no ADP drift to preserve. Capturing a fixture every day would fill the table
+ * with one unchanging row and teach nobody anything.
+ *
+ * The freshness keys go through `getSharedRedis()` — `EXISTS` and `SET EX` only, never a blocking
+ * read, which is that module's rule for sharing. The budget is the SAME ledger instance live
+ * scoring reserves against, deliberately: one paid quota, one counter, and the capture takes its
+ * share through the same door rather than beside it.
+ */
+export function getCapture(db: Db): (() => Promise<CaptureResult>) | undefined {
+  if (getStatsProvider().requestCost !== "metered") return undefined;
+  const apiKey = envOrUndefined(TANK01_CONFIG.envVars.apiKey);
+  if (apiKey === undefined) return undefined;
+  const client = createTank01Client({ apiKey });
+  const redis = getSharedRedis();
+  const budget = getIngestionBudget();
+  const seasonSetting = envOrUndefined(TANK01_CONFIG.envVars.season);
+  const season = seasonSetting === undefined ? TANK01_CONFIG.defaultSeason : Number(seasonSetting);
+
+  return async () =>
+    captureOnce({
+      db,
+      client,
+      clock: systemClock,
+      budget,
+      season,
+      // Read per pass, not captured at wiring time: this process lives for months and the week
+      // it was constructed in is not the week it is capturing in.
+      week: await currentNflWeek(db),
+      teams: NFL_TEAM_ABBREVIATIONS,
+      isFresh: async (key) => (await redis.exists(key)) === 1,
+      markFresh: async (key, ttlSeconds) => {
+        await redis.set(key, "1", "EX", ttlSeconds);
+      },
+    });
+}
+
+/**
+ * The earliest week not yet final — the week the odds and salary feeds are asking about.
+ *
+ * Falls back to week 1 when `stat_weeks` is empty, which is the preseason: exactly when ADP drift
+ * and injury designations matter most and the scoring half of the tick has nothing to do at all.
+ */
+async function currentNflWeek(db: Db): Promise<number> {
+  const [row] = await db
+    .select({ week: statWeeks.week })
+    .from(statWeeks)
+    .where(ne(statWeeks.status, "final"))
+    .orderBy(asc(statWeeks.week))
+    .limit(1);
+  return row?.week ?? 1;
+}
+
+/**
  * Mirrors `src/draft-service/index.ts`: a module singleton, a system clock at the outermost
  * edge, publishing via `getPublisher()`. The one deliberate difference: this constructs its OWN
  * `createDb(undefined, ingestionPoolOptions())` rather than calling `getDb()`, because sharing
@@ -112,8 +177,10 @@ export function getIngestionBudget(): RequestBudget {
  */
 export function getIngestionWorker(): IngestionWorker {
   const settings = getIngestionSettings();
+  const db = createDb(undefined, ingestionPoolOptions());
   globalIngestion.__commishIngestionWorker ??= createIngestionWorker({
-    db: createDb(undefined, ingestionPoolOptions()),
+    db,
+    capture: getCapture(db),
     provider: getStatsProvider(),
     redis: getSharedRedis(),
     publish: publishViaSharedPublisher,
