@@ -69,6 +69,16 @@ export interface CaptureRequest {
 export interface CaptureFeedContext {
   readonly season: number;
   readonly week: number;
+  /**
+   * Today, as `YYYYMMDD`.
+   *
+   * Two feeds are addressed by DATE and not by week, and both were shipped asking for a week —
+   * which Tank01 answers `200` to, with the refusal in the body rather than the status. They wrote
+   * nothing for a day before the log was read: "Need to pass gameID or gameDate as parameter" and
+   * "Invalid date. Date must be in format YYYYMMDD". A 200 that carries a refusal is the failure
+   * mode this whole capture exists to avoid, because the feeds it silences cannot be backfilled.
+   */
+  readonly day: string;
   /** All 32 NFL team abbreviations, for the feeds that are fetched a team at a time. */
   readonly teams: readonly string[];
 }
@@ -124,17 +134,16 @@ export const CAPTURE_FEEDS: readonly CaptureFeed[] = [
     source: "tank01_betting_odds",
     cadence: "game-day",
     irrecoverable: "The line as it stood before kickoff. Afterwards only the closing line survives, and layer 4 wants the pre-game one.",
-    requests: ({ season, week }) => [
-      { path: TANK01_CONFIG.paths.bettingOdds, query: { gameWeek: String(week), season: String(season) } },
-    ],
+    // Addressed by DAY, not by week: the endpoint takes `gameDate` or `gameID` and refuses a
+    // `gameWeek` with a 200 whose body carries the complaint.
+    requests: ({ day }) => [{ path: TANK01_CONFIG.paths.bettingOdds, query: { gameDate: day } }],
   },
   {
     source: "tank01_dfs_salaries",
     cadence: "game-day",
     irrecoverable: "The only weekly market consensus there is, published for a week and then gone.",
-    requests: ({ season, week }) => [
-      { path: TANK01_CONFIG.paths.dfs, query: { week: String(week), season: String(season) } },
-    ],
+    // Same shape as the odds feed: a `YYYYMMDD` date, and a 200-with-a-refusal for anything else.
+    requests: ({ day }) => [{ path: TANK01_CONFIG.paths.dfs, query: { date: day } }],
   },
   {
     source: "tank01_adp",

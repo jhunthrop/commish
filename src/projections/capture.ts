@@ -145,7 +145,12 @@ async function dueFeeds(
 export async function captureOnce(deps: CaptureDeps): Promise<CaptureResult> {
   const { db, client, clock, budget, season, week, teams, markFresh, feeds = CAPTURE_FEEDS } = deps;
   const capturedAt = new Date(clock.now());
-  const context: CaptureFeedContext = { season, week, teams };
+  // Derived from the SAME moment the snapshots are stamped with, never from a second clock read.
+  // Two feeds are addressed by day, and a capture whose request said one date while its rows said
+  // another would be unreadable exactly at a midnight boundary — which is a real moment, since the
+  // pipeline ticks around the clock.
+  const day = capturedAt.toISOString().slice(0, 10).replace(/-/g, "");
+  const context: CaptureFeedContext = { season, week, day, teams };
 
   const { due, skipped } = await dueFeeds(feeds, deps, capturedAt);
   if (due.length === 0) return { feeds: skipped };

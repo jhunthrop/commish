@@ -85,8 +85,34 @@ describe("cadence rules", () => {
     expect(freshnessSeconds("daily")).toBeGreaterThan(12 * 3600);
   });
 
+  /**
+   * THE 200-WITH-A-REFUSAL (2026-08-28). Both game-day feeds shipped asking for a `gameWeek`, and
+   * Tank01 answers that with HTTP 200 and the complaint in the BODY: "Need to pass gameID or
+   * gameDate as parameter", "Invalid date. Date must be in format YYYYMMDD". Nothing threw,
+   * nothing was captured, and the two feeds that cannot be backfilled were the two that stayed
+   * silent — for a day, until the server log was read.
+   *
+   * Both are addressed by DATE. Pinning the parameter names is cheap insurance against a class of
+   * failure this capture cannot afford, because a feed that quietly writes nothing is
+   * indistinguishable from a feed with nothing to say, and the difference is a day of data that
+   * does not exist anywhere else.
+   */
+  it("addresses the two game-day feeds by date, because a week is a 200 with a refusal in it", () => {
+    const context = { season: 2026, week: 2, day: "20260912", teams: ["BUF"] };
+    const queried = (source: string): Readonly<Record<string, string>> =>
+      CAPTURE_FEEDS.find((feed) => feed.source === source)!.requests(context)[0]!.query;
+
+    expect(queried("tank01_betting_odds")).toEqual({ gameDate: "20260912" });
+    expect(queried("tank01_dfs_salaries")).toEqual({ date: "20260912" });
+    // The failure that started this: neither may ask for a week.
+    for (const source of ["tank01_betting_odds", "tank01_dfs_salaries"]) {
+      expect(Object.keys(queried(source))).not.toContain("gameWeek");
+      expect(Object.keys(queried(source))).not.toContain("week");
+    }
+  });
+
   it("prices a whole pass, counting the injury feed's fan-out over teams", () => {
-    const context = { season: 2026, week: 2, teams: ["BUF", "KC", "SF"] };
+    const context = { season: 2026, week: 2, day: "20260912", teams: ["BUF", "KC", "SF"] };
     expect(requestCostOf(CAPTURE_FEEDS, context)).toBe(CAPTURE_FEEDS.length - 1 + 3);
   });
 
