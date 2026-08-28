@@ -136,6 +136,22 @@ export interface AvailabilityInput {
   readonly projectedSnapShare: number;
   /** Prior seasons, in any order. Only the most recent `historySeasons` are weighed. */
   readonly history: readonly SeasonAvailability[];
+  /**
+   * A BASELINE THAT REPLACES THE POSITION-AND-ROLE TABLE, or null to use it. Set for rookies.
+   *
+   * The table below reads a player's role through layer 1's predicted snap share, and layer 1 emits
+   * nothing at all for a man with no usage history. A drafted rookie therefore arrives here with a
+   * snap share invented by `rookies.ts` from a table that is CONDITIONAL ON PLAYING — which is the
+   * right per-game number and exactly the wrong role signal, because it says a seventh-round
+   * quarterback is a featured starter when what it means is "the seventh-round quarterbacks who
+   * played were starting".
+   *
+   * A rookie's draft capital IS his record, so it supplies his baseline directly. Everything else
+   * about him runs through the same machinery: the cutdown status still multiplies, the
+   * beta-binomial still gives him a floor and a ceiling, and his empty history still makes that
+   * spread the widest on the board.
+   */
+  readonly baselineRate: number | null;
 }
 
 export interface AvailabilityPriors {
@@ -292,14 +308,17 @@ export function expectedGamesPlayed(
   const teamGames = teamGamesIn(season);
   // Role and age adjust the PRIOR, never the evidence. A player's own record already reflects the
   // role he held; applying the role table to it as well would count the same fact twice.
-  const baseline = Math.min(
-    1,
-    Math.max(
-      0,
-      priors.baseline[input.position][roleBracketFor(input.projectedSnapShare)] *
-        priors.ageMultiplier[input.position][ageBracketFor(input.age)],
-    ),
-  );
+  const baseline =
+    input.baselineRate !== null
+      ? Math.min(1, Math.max(0, input.baselineRate))
+      : Math.min(
+          1,
+          Math.max(
+            0,
+            priors.baseline[input.position][roleBracketFor(input.projectedSnapShare)] *
+              priors.ageMultiplier[input.position][ageBracketFor(input.age)],
+          ),
+        );
   const history = recentHistory(input.history, priors.historySeasons);
 
   let evidenceGames = 0;
@@ -317,12 +336,14 @@ export function expectedGamesPlayed(
       : baseline;
   const rate = Math.min(1, Math.max(0, shrunk * priors.statusMultiplier[input.status]));
 
-  const concentration = priors.concentration + priors.concentrationPerSeason * history.length;
-  const probabilities = gamesPlayedProbabilities(teamGames, rate, concentration);
-  const expected = probabilities.reduce((sum, probability, games) => sum + probability * games, 0);
+  return outlookFromRate(teamGames, rate, priors.concentration + priors.concentrationPerSeason * history.length);
+}
 
+/** One rate turned into the distribution every consumer reads. The one place quantiles are taken. */
+export function outlookFromRate(teamGames: number, rate: number, concentration: number): GamesPlayedOutlook {
+  const probabilities = gamesPlayedProbabilities(teamGames, rate, concentration);
   return {
-    expected,
+    expected: probabilities.reduce((sum, probability, games) => sum + probability * games, 0),
     rate,
     distribution: {
       floor: quantileOf(probabilities, 0.1),

@@ -3,6 +3,9 @@ import { nflPlayers } from "@/db/schema";
 import { createNflverseClient, type NflverseClient } from "../nflverse/client";
 import { NFLVERSE_CONFIG } from "../nflverse/config";
 import { mapWeek1Rosters, ROSTER_SOURCE_CONFIG } from "../nflverse/rosters";
+import { allPositions } from "../backtest";
+import { recordObservations } from "../store";
+import { firstKickoffFor, mapDepthChart } from "./depth";
 import { recordPreseasonRosters } from "./store";
 
 /**
@@ -66,4 +69,44 @@ export async function ingestWeek1Rosters(
 async function knownPlayerIds(db: ReadonlyDb): Promise<ReadonlySet<string>> {
   const rows = await db.select({ id: nflPlayers.id }).from(nflPlayers);
   return new Set(rows.map((row) => row.id));
+}
+
+/** What one season's depth-chart ingestion reports about itself. */
+export interface DepthChartIngestReport {
+  readonly season: number;
+  /** Week-one offensive entries the release carried, before the universe was consulted. */
+  readonly entriesRead: number;
+  /** How many were written. A re-run of a landed ingestion reports 0. */
+  readonly written: number;
+  /** The stamp every row carries. Printed so an operator can check the claim rather than trust it. */
+  readonly asOf: Date;
+  /** Depth-chart rows naming a player the universe does not project. */
+  readonly unknownToUniverse: number;
+}
+
+/**
+ * Reads one season's WEEK-ONE depth chart into the store, stamped before the season's first game.
+ *
+ * Here rather than in `nflverse/ingest.ts` for the reason the roster ingestion above is: every row
+ * that file writes is a fact a game produced, and this one is a claim about what was knowable before
+ * any game was played. `firstGameDayFor` derives the stamp and `depth.ts` documents what it may and
+ * may not claim.
+ */
+export async function ingestDepthCharts(
+  db: Db,
+  season: number,
+  client: NflverseClient = createNflverseClient(),
+): Promise<DepthChartIngestReport> {
+  const rows = await client.getCsv(NFLVERSE_CONFIG.releases.depthCharts, `depth_charts_${season}.csv`);
+  const asOf = new Date((await firstKickoffFor(db, season)).getTime() - 1);
+  // The universe of PROJECTED players, exactly as `ingestInjuryReports` narrows: a lineman's
+  // place on a depth chart has nowhere to go, and the store is keyed on a player the board carries.
+  const mapped = mapDepthChart(rows, new Set((await allPositions(db)).keys()), season, asOf);
+  return {
+    season,
+    entriesRead: mapped.observations.length + mapped.unknownPlayers.length,
+    written: await recordObservations(db, mapped.observations),
+    asOf,
+    unknownToUniverse: mapped.unknownPlayers.length,
+  };
 }

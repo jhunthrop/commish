@@ -43,6 +43,14 @@ export const NFLVERSE_CONFIG = {
      * in March. See `rosters.ts` for what is deliberately discarded.
      */
     weeklyRosters: "weekly_rosters",
+    /**
+     * PUBLISHED DEPTH CHARTS, back to 2019, one file a season keyed on season, week and club.
+     *
+     * The second source whose facts predate the games they describe, and the only one in this
+     * adapter that carries NO DATE of its own — see `preseason/depth.ts` for how its stamp is
+     * derived and what that derivation is allowed to claim.
+     */
+    depthCharts: "depth_charts",
   },
   /** Asset names. Only the universe's is fixed; the other two carry a season. */
   files: {

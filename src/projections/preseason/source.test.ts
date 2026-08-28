@@ -7,7 +7,7 @@ import { STAT_LINE_SOURCE, statMetricName } from "../lines";
 import { recordObservations, type PlayerWeekObservation } from "../store";
 import { recordPreseasonRosters } from "./store";
 import { FITTED_MODEL } from "../model/source";
-import { FITTED_AVAILABILITY_PRIORS, FITTED_ROOKIE_PRIORS } from "./fitted";
+import { FITTED_AVAILABILITY_PRIORS, FITTED_DEPTH_PRIORS, FITTED_ROOKIE_PRIORS } from "./fitted";
 import {
   ALL_PRESEASON_FEATURES,
   loadPreseason,
@@ -35,6 +35,7 @@ const PRIORS: PreseasonPriors = {
   model: FITTED_MODEL,
   availability: FITTED_AVAILABILITY_PRIORS,
   rookies: FITTED_ROOKIE_PRIORS,
+  depth: FITTED_DEPTH_PRIORS,
 };
 
 const VETERAN = "00-0000001";
@@ -139,7 +140,7 @@ describe("preseasonMomentFor", () => {
   });
 
   it("refuses a season the store does not hold rather than defaulting to a date", async () => {
-    await expect(preseasonMomentFor(db, 2019)).rejects.toThrow(/holds no observations for 2019/);
+    await expect(preseasonMomentFor(db, 2019)).rejects.toThrow(/holds no game-derived observations for 2019/);
   });
 });
 

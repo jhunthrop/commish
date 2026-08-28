@@ -18,7 +18,7 @@ import { nflPlayers } from "@/db/schema";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ROSTER_SOURCE_CONFIG } from "@/projections/nflverse/rosters";
 import { BENCHMARK_SOURCES, resolveRankings, type RosterIdentity } from "@/projections/preseason/benchmarks";
-import { ingestWeek1Rosters } from "@/projections/preseason/ingest";
+import { ingestDepthCharts, ingestWeek1Rosters } from "@/projections/preseason/ingest";
 import { fetchAverageDraftPosition, fetchExpertConsensus, type PublishedBoard } from "@/projections/preseason/publishers";
 import { preseasonRostersAsOf, recordPreseasonRankings } from "@/projections/preseason/store";
 
@@ -100,6 +100,12 @@ async function main(): Promise<void> {
       `${season}: ${rosters.entriesRead} week-one roster entries, ${rosters.written} new, ` +
         `${rosters.unknownToUniverse} not in the universe`,
     );
+    const depth = await ingestDepthCharts(db, season, client);
+    console.log(
+      `${season}: ${depth.entriesRead} week-one offensive depth-chart entries, ${depth.written} new, ` +
+        `${depth.unknownToUniverse} not in the universe, stamped ${depth.asOf.toISOString()}`,
+    );
+
     const identities = await rosterIdentities(db, season);
 
     for (const [source, load] of [

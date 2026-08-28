@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { DRAFT_BUCKETS, draftBucketFor, landingMultiplier, rookieOpportunity, type RookieInput } from "./rookies";
+import {
+  capitalShares,
+  DRAFT_BUCKETS,
+  draftBucketFor,
+  landingMultiplier,
+  rookieOpportunity,
+  UNDRAFTED_PICK,
+  type RookieFeatures,
+  type RookieInput,
+} from "./rookies";
 import { FITTED_ROOKIE_PRIORS } from "./fitted";
 
 /**
@@ -81,24 +90,28 @@ describe("landingMultiplier", () => {
 
 describe("rookieOpportunity", () => {
   const priors = FITTED_ROOKIE_PRIORS;
+  /** What the board ships: the landing term off, the capital curve on. */
+  const SHIPPED: RookieFeatures = { landingSpot: false, pickCurve: true };
+  /** The rejected arm, kept because the two landing cases below are what it exists to do. */
+  const WITH_LANDING: RookieFeatures = { landingSpot: true, pickCurve: true };
 
   it("PINS THE PLAN'S CASE: a first-round back projects materially more than a fifth-round back on the same depth chart", () => {
-    const first = rookieOpportunity(rookie({ overallPick: 8 }), priors);
-    const fifth = rookieOpportunity(rookie({ overallPick: 150 }), priors);
+    const first = rookieOpportunity(rookie({ overallPick: 8 }), priors, SHIPPED);
+    const fifth = rookieOpportunity(rookie({ overallPick: 150 }), priors, SHIPPED);
     expect(first.carryShare).toBeGreaterThan(fifth.carryShare);
     expect(first.snapShare).toBeGreaterThan(fifth.snapShare);
   });
 
   it("PINS THE PLAN'S SECOND CASE: the same player behind an entrenched starter projects less", () => {
     const typical = priors.typicalIncumbentClaim.RB;
-    const openRoom = rookieOpportunity(rookie({ incumbentClaim: typical * 0.2 }), priors);
-    const crowded = rookieOpportunity(rookie({ incumbentClaim: typical * 1.8 }), priors);
+    const openRoom = rookieOpportunity(rookie({ incumbentClaim: typical * 0.2 }), priors, WITH_LANDING);
+    const crowded = rookieOpportunity(rookie({ incumbentClaim: typical * 1.8 }), priors, WITH_LANDING);
     expect(crowded.carryShare).toBeLessThan(openRoom.carryShare);
     expect(crowded.snapShare).toBeLessThan(openRoom.snapShare);
   });
 
   it("emits the SAME SHAPE layer 1 emits for everybody else, so nothing downstream forks on rookies", () => {
-    const predicted = rookieOpportunity(rookie(), priors);
+    const predicted = rookieOpportunity(rookie(), priors, SHIPPED);
     expect(predicted.playerId).toBe("rookie");
     for (const share of [predicted.snapShare, predicted.targetShare, predicted.carryShare, predicted.passAttemptShare]) {
       expect(share).toBeGreaterThanOrEqual(0);
@@ -111,14 +124,54 @@ describe("rookieOpportunity", () => {
     // The bucket prior already encodes that a first-round quarterback starts and a sixth-round one
     // does not. Multiplying by the incumbent claim as well would rate a rookie behind a franchise
     // starter at a share the bucket has already set near zero.
-    const behindAStarter = rookieOpportunity(rookie({ position: "QB", incumbentClaim: 10 }), priors);
-    const emptyRoom = rookieOpportunity(rookie({ position: "QB", incumbentClaim: 0 }), priors);
+    const behindAStarter = rookieOpportunity(rookie({ position: "QB", incumbentClaim: 10 }), priors, WITH_LANDING);
+    const emptyRoom = rookieOpportunity(rookie({ position: "QB", incumbentClaim: 0 }), priors, WITH_LANDING);
     expect(behindAStarter.passAttemptShare).toBe(emptyRoom.passAttemptShare);
   });
 
   it("gives an undrafted rookie the least of anybody, which is what nobody spending a pick means", () => {
-    const undrafted = rookieOpportunity(rookie({ overallPick: null }), priors);
-    const last = rookieOpportunity(rookie({ overallPick: 250 }), priors);
+    const undrafted = rookieOpportunity(rookie({ overallPick: null }), priors, SHIPPED);
+    const last = rookieOpportunity(rookie({ overallPick: 250 }), priors, SHIPPED);
     expect(undrafted.snapShare).toBeLessThanOrEqual(last.snapShare);
+  });
+});
+
+describe("capitalShares", () => {
+  const priors = FITTED_ROOKIE_PRIORS;
+  const CURVE: RookieFeatures = { landingSpot: false, pickCurve: true };
+  const BUCKETS: RookieFeatures = { landingSpot: false, pickCurve: false };
+
+  it("ORDERS A CLASS BY DRAFT CAPITAL, which six flat buckets cannot", () => {
+    // Six cells hand a whole round one number: the fourth pick and the thirtieth are both "round 1"
+    // and a bucket table cannot tell them apart. That is the defect the curve exists for.
+    const share = (pick: number, features: RookieFeatures): number =>
+      capitalShares("RB", pick, priors, features).carryShare;
+    expect(share(4, BUCKETS)).toBe(share(30, BUCKETS));
+    expect(share(4, CURVE)).toBeGreaterThan(share(30, CURVE));
+  });
+
+  it("is monotone in the pick across the whole draft, never rewarding a later pick", () => {
+    for (const position of ["QB", "RB", "WR", "TE"] as const) {
+      for (let pick = 2; pick <= UNDRAFTED_PICK; pick += 1) {
+        const above = capitalShares(position, pick - 1, priors, CURVE);
+        const below = capitalShares(position, pick, priors, CURVE);
+        expect(below.snapShare).toBeLessThanOrEqual(above.snapShare + 1e-12);
+        expect(below.carryShare).toBeLessThanOrEqual(above.carryShare + 1e-12);
+        expect(below.targetShare).toBeLessThanOrEqual(above.targetShare + 1e-12);
+      }
+    }
+  });
+
+  it("LEAVES EVERY FITTED MEAN WHERE THE FIT PUT IT, at the middle of its own bucket", () => {
+    // The curve interpolates between the measured cells and invents no level of its own. Checked at
+    // each bucket's own anchor, which is the only place a bucket mean is claimed to hold exactly.
+    for (const [bucket, anchor] of [["round2", 48.5], ["round3", 84.5], ["rounds4to5", 142.5]] as const) {
+      const curved = capitalShares("WR", anchor, priors, CURVE);
+      expect(curved.targetShare).toBeCloseTo(priors.byBucket.WR[bucket].targetShare, 12);
+    }
+  });
+
+  it("puts an undrafted man on the undrafted cell rather than anywhere on the curve", () => {
+    expect(capitalShares("WR", null, priors, CURVE)).toEqual(priors.byBucket.WR.undrafted);
   });
 });

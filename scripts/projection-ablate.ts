@@ -12,7 +12,7 @@
 // an ablation that gets skipped. The replay moments come from `replayMomentsFor`, which reads back
 // the very stamps the ingestion wrote, so a number printed here and a number printed there are
 // comparable by construction.
-import { createDb } from "@/db/client";
+import { createDb, type ReadonlyDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
 import { replayHeadToHead, replayOpportunity, SHARE_FIELDS, type ProjectionSource } from "@/projections/backtest";
 import { naiveProjection, NAIVE_SOURCE_NAME } from "@/projections/benchmarks/naive";
@@ -25,7 +25,7 @@ import { detectTransactions } from "@/projections/model/transactions";
 import { predictOpportunity } from "@/projections/model/opportunity";
 import type { ProjectionInput } from "@/projections/backtest";
 import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
-import { gameWeekMomentsFor, replayMomentsFor } from "@/projections/replay-moments";
+import { gameWeekMomentsFor, playerGameMomentsFor, replayMomentsFor } from "@/projections/replay-moments";
 
 const LAST_REGULAR_WEEK = 18;
 
@@ -177,7 +177,26 @@ async function reportShares(db: ReturnType<typeof createDb>, seasons: readonly n
  * Numbers from the two are NOT comparable to each other. Each ablation compares two arms at ONE
  * moment, which is the comparison that means something.
  */
-const MOMENTS = { results: replayMomentsFor, "game-week": gameWeekMomentsFor } as const;
+const MOMENTS = {
+  results: async (db: ReadonlyDb, season: number) => ({
+    asOfForWeek: await replayMomentsFor(db, season),
+    asOfForPlayerGame: undefined,
+  }),
+  "game-week": async (db: ReadonlyDb, season: number) => ({
+    asOfForWeek: await gameWeekMomentsFor(db, season),
+    asOfForPlayerGame: undefined,
+  }),
+  /**
+   * `per-player` is `game-week` with the pre-game feeds gated at each man's OWN kickoff instead of
+   * the week's earliest. The history a source reasons from is identical to `game-week`'s, so the
+   * two are directly comparable and the difference between them is exactly the reachability model
+   * v3 measured at fifteen to nineteen percent.
+   */
+  "per-player": async (db: ReadonlyDb, season: number) => ({
+    asOfForWeek: await gameWeekMomentsFor(db, season),
+    asOfForPlayerGame: await playerGameMomentsFor(db, season),
+  }),
+} as const;
 type MomentName = keyof typeof MOMENTS;
 
 async function main(): Promise<void> {
@@ -220,7 +239,7 @@ async function main(): Promise<void> {
   console.log(segment === undefined ? "" : "  RESTRICTED TO THE POST-TRANSACTION SEGMENT\n");
 
   for (const season of targets) {
-    const asOfForWeek = await momentsFor(db, season);
+    const { asOfForWeek, asOfForPlayerGame } = await momentsFor(db, season);
     const naive: ProjectionSource = {
       name: NAIVE_SOURCE_NAME,
       project: ({ history, season: replaySeason, week }) => naiveProjection(history, { season: replaySeason, week }),
@@ -233,6 +252,7 @@ async function main(): Promise<void> {
       sources: [naive, before, after],
       rules: PPR_SCORING,
       asOfForWeek,
+      asOfForPlayerGame,
       segment,
     });
     const [floorScore, beforeScore, afterScore] = headToHead.common;

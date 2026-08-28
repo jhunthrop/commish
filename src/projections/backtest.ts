@@ -7,7 +7,7 @@ import { statLinesAsOf, type SeasonStatLine } from "./lines";
 import { predictOpportunity, type OpportunityPriors } from "./model/opportunity";
 import { observationsAsOf, LAST_POSSIBLE_WEEK, type PlayerWeekObservation } from "./store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "./team-store";
-import type { TeamContext } from "./team-context";
+import { latestTeams, type TeamContext } from "./team-context";
 import { usageAsOf, type PlayerWeekUsage } from "./usage";
 import { INJURY_SOURCE } from "./news/retrieve";
 import { rankBandFor, scoreCard, RANK_BANDS, type Observation, type RankBandName, type ScoreCard } from "./metrics";
@@ -94,6 +94,26 @@ export interface ReplayOptions {
    * the one parameter in the engine where a plausible-looking guess is worse than no answer.
    */
   readonly asOfForWeek: (week: number) => Date;
+  /**
+   * THE PER-PLAYER MOMENT, optional: when HIS OWN game kicks off, by the club he plays for.
+   *
+   * `asOfForWeek` above gates the history — the completed weeks a source reasons from — and one
+   * instant is the right shape for that, because week W-1's numbers land on the Tuesday and every
+   * player in week W sees the same ones. It is the wrong shape for a fact filed DURING the week.
+   * A whole-week moment must precede Thursday night's kickoff, the league files most of its injury
+   * report on the Friday, and `docs/research/2026-08-27-model-v3.md` measured what that costs: four
+   * fifths of the wire is unreachable by any whole-week moment whatsoever.
+   *
+   * So the pre-game feeds are gated per player instead, at the morning of the game HE plays in.
+   * Nothing stamped after that instant reaches his projection, which is the same guarantee as
+   * before, drawn where the real world draws it. Omitted, every player is gated at the week moment
+   * and the harness behaves exactly as it did.
+   *
+   * A club with no game that week returns null and its players fall back to the week moment, and
+   * the player moment is never allowed to be EARLIER than the week moment, so no arm of an ablation
+   * can be made worse off by turning this on.
+   */
+  readonly asOfForPlayerGame?: (week: number, team: string) => Date | null;
   /** How many seasons back a source may look, counting the season being replayed. Default 2. */
   readonly historySeasons?: number;
 }
@@ -200,6 +220,114 @@ interface WeekOutcome {
 }
 
 /**
+ * THE TARGET WEEK'S TEAM FACTS, gated per CLUB at that club's own kickoff.
+ *
+ * The other half of the per-player moment, and the half that makes the closing line measurable at
+ * all. `schedule.ts` stamps a line at the instant its game kicks off, so a whole-week moment — which
+ * must precede the week's earliest kickoff — can never see ANY line for the week it is projecting.
+ * Phase 3 recorded the betting line as unmeasurable for exactly that reason and refused to fake a
+ * date rather than move the moment.
+ *
+ * Gated per club rather than per player because a line is a fact about a GAME, and every player in
+ * that game shares its kickoff. What a reader should hold against this: the list handed to a source
+ * is flat, so a club whose game kicks off on Thursday can in principle see a Sunday club's line
+ * inside it. No layer reads another club's kickoff fact — the game-context layer reads the player's
+ * own line and the opponent's defensive rating, and the latter is built from completed weeks — but
+ * the bound is stated rather than assumed away.
+ */
+async function teamFactsForTargetWeek(
+  db: ReadonlyDb,
+  season: number,
+  week: number,
+  weekMoment: Date,
+  asOfForPlayerGame: ((week: number, team: string) => Date | null) | undefined,
+): Promise<readonly TeamContext["teamObservations"][number][]> {
+  const span = { season, week: { from: week, to: week } } as const;
+  const atWeekMoment = await teamObservationsAsOf(db, { ...span, asOf: weekMoment });
+  if (asOfForPlayerGame === undefined) return atWeekMoment;
+
+  // Every club with a game this week is already visible here: the schedule half of its row was
+  // published in May, months before any replay moment.
+  const momentOf = (team: string): number => {
+    const kickoff = asOfForPlayerGame(week, team);
+    return kickoff === null ? weekMoment.getTime() : Math.max(weekMoment.getTime(), kickoff.getTime());
+  };
+  const moments = new Set(atWeekMoment.map((row) => momentOf(row.team)));
+
+  const facts: TeamContext["teamObservations"][number][] = [];
+  for (const moment of [...moments].sort((a, b) => a - b)) {
+    const rows = await teamObservationsAsOf(db, { ...span, asOf: new Date(moment) });
+    for (const row of rows) {
+      if (momentOf(row.team) !== moment) continue;
+      if (row.asOf.getTime() > moment) {
+        throw new Error(
+          `A ${season} week ${week} projection would see a ${row.team} fact stamped ${row.asOf.toISOString()}, after that club's own kickoff ${new Date(moment).toISOString()}.`,
+        );
+      }
+      facts.push(row);
+    }
+  }
+  return facts;
+}
+
+/**
+ * THE INJURY WIRE, GATED PER PLAYER at the morning of his own game.
+ *
+ * Read once per DISTINCT moment rather than once at the latest of them and filtered afterwards, and
+ * the difference is not an optimisation. `observationsAsOf` returns the latest statement of a fact
+ * at or before the moment it is given: reading at Sunday and discarding a row for a Thursday player
+ * would discard his SUNDAY statement and leave him with nothing, when the honest answer is his
+ * Thursday one. There are at most a handful of distinct kickoff days in a week, so this is a
+ * handful of queries and the only construction that is correct.
+ *
+ * A player's club is the latest one his own history carries, which is what every other layer here
+ * uses and the only answer knowable before kickoff — this season's week-`week` team row is stamped
+ * from the game that has not been played yet.
+ */
+async function newsPerPlayer(
+  db: ReadonlyDb,
+  season: number,
+  week: number,
+  weekMoment: Date,
+  asOfForPlayerGame: ((week: number, team: string) => Date | null) | undefined,
+  teamContext: TeamContext,
+): Promise<readonly PlayerWeekObservation[]> {
+  if (asOfForPlayerGame === undefined) {
+    return observationsAsOf(db, { season, week, asOf: weekMoment, source: INJURY_SOURCE });
+  }
+
+  const teams = latestTeams(teamContext);
+  const momentOf = (playerId: string): number => {
+    const team = teams.get(playerId);
+    const kickoff = team === undefined ? null : asOfForPlayerGame(week, team);
+    // Never earlier than the whole-week moment, so switching this on cannot take data away from an
+    // arm that had it. A club with no game this week has no kickoff of its own to be gated at.
+    return kickoff === null ? weekMoment.getTime() : Math.max(weekMoment.getTime(), kickoff.getTime());
+  };
+
+  const moments = new Set<number>([weekMoment.getTime()]);
+  for (const playerId of teams.keys()) moments.add(momentOf(playerId));
+
+  const wire: PlayerWeekObservation[] = [];
+  for (const moment of [...moments].sort((a, b) => a - b)) {
+    const rows = await observationsAsOf(db, { season, week, asOf: new Date(moment), source: INJURY_SOURCE });
+    for (const row of rows) {
+      if (momentOf(row.playerId) !== moment) continue;
+      // The guarantee, asserted rather than argued: nothing a player is shown may be stamped after
+      // his own kickoff. `observationsAsOf` already enforces it; this is the second lock, because a
+      // leak here would not fail anything, it would simply make the news pass look better.
+      if (row.asOf.getTime() > moment) {
+        throw new Error(
+          `A ${season} week ${week} projection for ${row.playerId} would see a designation stamped ${row.asOf.toISOString()}, after his own game moment ${new Date(moment).toISOString()}.`,
+        );
+      }
+      wire.push(row);
+    }
+  }
+  return wire;
+}
+
+/**
  * Replays every week once, showing EVERY source the identical history.
  *
  * One pass rather than one pass per source, and that is not only an optimisation: two sources
@@ -214,6 +342,7 @@ async function replayWeeks(
   sources: readonly ProjectionSource[],
   rules: ScoringRules,
   asOfForWeek: (week: number) => Date,
+  asOfForPlayerGame: ((week: number, team: string) => Date | null) | undefined,
   historySeasons: number,
   segment?: (input: ProjectionInput) => ReadonlySet<string>,
 ): Promise<readonly WeekOutcome[]> {
@@ -251,11 +380,20 @@ async function replayWeeks(
       }
       // Team facts reach into the week being predicted and are bounded by the as-of gate alone.
       // The schedule half of them was published in May and is genuinely knowable; the kickoff half
-      // cannot pass the gate. See `TeamContext` for why a week bound here would have hidden both.
-      const contextTo = historySeason === season ? week : LAST_POSSIBLE_WEEK;
-      teamObservations.push(
-        ...(await teamObservationsAsOf(db, { season: historySeason, week: { from: 1, to: contextTo }, asOf })),
-      );
+      // is gated per club by `teamFactsForTargetWeek`. See `TeamContext` for why a week bound here
+      // would have hidden both.
+      if (historySeason === season) {
+        if (week > 1) {
+          teamObservations.push(
+            ...(await teamObservationsAsOf(db, { season, week: { from: 1, to: week - 1 }, asOf })),
+          );
+        }
+        teamObservations.push(...(await teamFactsForTargetWeek(db, season, week, asOf, asOfForPlayerGame)));
+      } else {
+        teamObservations.push(
+          ...(await teamObservationsAsOf(db, { season: historySeason, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf })),
+        );
+      }
     }
     const teamContext: TeamContext = { playerTeams, teamObservations };
 
@@ -272,7 +410,7 @@ async function replayWeeks(
       return points;
     };
 
-    const news = await observationsAsOf(db, { season, week, asOf, source: INJURY_SOURCE });
+    const news = await newsPerPlayer(db, season, week, asOf, asOfForPlayerGame, teamContext);
     const input: ProjectionInput = { season, week, asOf, history, usage, positions, teamContext, news };
     const projected: ReadonlyMap<string, number>[] = [];
     for (const source of sources) {
@@ -335,9 +473,9 @@ function scoreSource(
 
 export async function replay(
   db: ReadonlyDb,
-  { season, weeks, source, rules, asOfForWeek, historySeasons = DEFAULT_HISTORY_SEASONS }: ReplayOptions,
+  { season, weeks, source, rules, asOfForWeek, asOfForPlayerGame, historySeasons = DEFAULT_HISTORY_SEASONS }: ReplayOptions,
 ): Promise<ReplayResult> {
-  const outcomes = await replayWeeks(db, season, weeks, [source], rules, asOfForWeek, historySeasons);
+  const outcomes = await replayWeeks(db, season, weeks, [source], rules, asOfForWeek, asOfForPlayerGame, historySeasons);
   return scoreSource(source.name, outcomes, 0);
 }
 
@@ -376,12 +514,12 @@ export interface HeadToHead {
  */
 export async function replayHeadToHead(
   db: ReadonlyDb,
-  { season, weeks, sources, rules, asOfForWeek, historySeasons = DEFAULT_HISTORY_SEASONS, segment }: HeadToHeadOptions,
+  { season, weeks, sources, rules, asOfForWeek, asOfForPlayerGame, historySeasons = DEFAULT_HISTORY_SEASONS, segment }: HeadToHeadOptions,
 ): Promise<HeadToHead> {
   if (sources.length < 2) {
     throw new Error("A head-to-head needs at least two sources; one source is a replay.");
   }
-  const outcomes = await replayWeeks(db, season, weeks, sources, rules, asOfForWeek, historySeasons, segment);
+  const outcomes = await replayWeeks(db, season, weeks, sources, rules, asOfForWeek, asOfForPlayerGame, historySeasons, segment);
   const intersection = (outcome: WeekOutcome): ReadonlySet<string> => {
     const [first, ...rest] = outcome.projected;
     return new Set(

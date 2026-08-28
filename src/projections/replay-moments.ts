@@ -1,6 +1,7 @@
 import { and, eq, inArray, max, min } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
-import { playerWeekObservations } from "@/db/schema";
+import { playerWeekObservations, teamWeekObservations } from "@/db/schema";
+import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "./nflverse/schedule";
 
 /**
  * WHEN EACH WEEK BECAME KNOWABLE, read back out of the store rather than recomputed from a download.
@@ -136,4 +137,63 @@ export async function gameWeekMomentsFor(db: ReadonlyDb, season: number): Promis
     }
     return moment;
   };
+}
+
+/**
+ * THE PER-PLAYER MOMENT: every man replayed at the morning of HIS OWN game.
+ *
+ * `gameWeekMomentsFor` above is as late as a WHOLE-WEEK replay can honestly be, and its own docblock
+ * names the wall it hits: one instant for the whole week must precede the week's earliest kickoff,
+ * which is Thursday night, so a designation the league files on the Friday is unreachable no matter
+ * how the constant is set. `docs/research/2026-08-27-model-v3.md` measured the cost of that wall —
+ * only fifteen to nineteen percent of the injury wire was reachable by any whole-week moment — and
+ * named the fix as a change to the harness rather than to a number. This is that change.
+ *
+ * A Sunday player is projected from Sunday morning and a Thursday player from Thursday morning, so
+ * the Friday filing about the Sunday player is READ, and the Friday filing about the Thursday player
+ * is still refused, because his game was already played. That is the honest line and it is drawn per
+ * player because that is where the real world draws it.
+ *
+ * THE MOMENT IS THE KICKOFF ITSELF, read from the schedule's own start time. `schedule.ts` stamps
+ * the closing line at `kickoffInstant`, so the minimum of a club's kickoff-stamped line facts IS
+ * that club's kickoff, and there is no arithmetic left to get wrong. A fact stamped at that instant
+ * is admitted, which is the intent rather than an accident: the closing line is settled at kickoff
+ * and a manager setting a lineup has it. A fact stamped one millisecond later is refused.
+ *
+ * Returns null for a club with no scheduled game that week, and the caller falls back to the
+ * whole-week moment rather than inventing one.
+ */
+export async function playerGameMomentsFor(
+  db: ReadonlyDb,
+  season: number,
+): Promise<(week: number, team: string) => Date | null> {
+  const rows = await db
+    .select({
+      week: teamWeekObservations.week,
+      team: teamWeekObservations.team,
+      asOf: min(teamWeekObservations.asOf),
+    })
+    .from(teamWeekObservations)
+    .where(
+      and(
+        eq(teamWeekObservations.season, season),
+        eq(teamWeekObservations.source, SCHEDULE_SOURCE.kickoff),
+        // The LINE specifically. The same source also carries the recorded weather, which keeps the
+        // publication-lag stamp because it is an observation taken during the game rather than at
+        // its start, and a minimum over both would return a number that is not a kickoff.
+        eq(teamWeekObservations.metric, SCHEDULE_METRICS.pointSpread),
+      ),
+    )
+    .groupBy(teamWeekObservations.week, teamWeekObservations.team);
+  const kickoffs = new Map(
+    rows
+      .filter((row): row is { week: number; team: string; asOf: Date } => row.asOf !== null)
+      .map((row) => [`${row.week}|${row.team}`, row.asOf] as const),
+  );
+  if (kickoffs.size === 0) {
+    throw new Error(
+      `The store holds no kickoff-stamped facts for ${season}, so no player can be replayed at his own game. Run \`npm run projections:context\` before replaying it.`,
+    );
+  }
+  return (week: number, team: string): Date | null => kickoffs.get(`${week}|${team}`) ?? null;
 }

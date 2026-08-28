@@ -35,7 +35,7 @@ const FLAT: AvailabilityPriors = {
 };
 
 function player(overrides: Partial<AvailabilityInput> = {}): AvailabilityInput {
-  return { position: "RB", age: 26, status: "active", projectedSnapShare: 0.6, history: [], ...overrides };
+  return { position: "RB", age: 26, status: "active", projectedSnapShare: 0.6, history: [], baselineRate: null, ...overrides };
 }
 
 const at2024 = { season: 2024, priors: FITTED_AVAILABILITY_PRIORS } as const;

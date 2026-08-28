@@ -1,4 +1,4 @@
-import { and, eq, min } from "drizzle-orm";
+import { and, eq, min, notInArray } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
 import type { Position, StatLine } from "@/domain/player";
 import { playerWeekObservations } from "@/db/schema";
@@ -27,9 +27,26 @@ import {
   type SeasonAvailability,
 } from "./availability";
 import type { BoardCandidate, BoardReason } from "./board";
-import type { AvailabilityObservation, RookieObservation } from "./fit";
+import type { AvailabilityObservation, DepthObservation, RookieObservation } from "./fit";
+import { INJURY_SOURCE } from "../news/retrieve";
+import { observationsAsOf } from "../store";
+import {
+  applyDepthChart,
+  depthRankFor,
+  DEPTH_METRIC,
+  DEPTH_SOURCE,
+  type DepthChart,
+  type DepthPriors,
+} from "./depth";
 import { changedSituationSegment, offseasonDeltas, type OffseasonMove } from "./offseason";
-import { draftBucketFor, landingMultiplier, rookieOpportunity, type RookiePriors } from "./rookies";
+import {
+  capitalGameRate,
+  draftBucketFor,
+  landingMultiplier,
+  rookieOpportunity,
+  type RookieFeatures,
+  type RookiePriors,
+} from "./rookies";
 import { preseasonRostersAsOf, type PreseasonRosterRow } from "./store";
 
 /**
@@ -93,13 +110,33 @@ export interface PreseasonFeatures {
   readonly availability: boolean;
   /** Task 2 — the offseason transaction log, composed through Phase 3's redistribution. */
   readonly offseason: boolean;
-  /** Task 3 — rookies, from draft capital and landing spot. Without it they are simply absent. */
+  /** Task 3 — rookies, from draft capital. Without it they are simply absent from the board. */
   readonly rookies: boolean;
+  /** The rookie landing-spot term. Measured worse than draft capital alone; OFF on the board. */
+  readonly rookieLanding: boolean;
+  /** The rookie capital table interpolated on the pick axis, so a class orders by draft capital. */
+  readonly rookiePickCurve: boolean;
+  /** The published week-one depth chart, applied to layer 1's belief about who plays. */
+  readonly depthChart: boolean;
 }
 
 /** What a board looks like with none of this phase's work in it: the `before` arm of every ablation. */
-export const NO_PRESEASON_FEATURES: PreseasonFeatures = { availability: false, offseason: false, rookies: false };
-export const ALL_PRESEASON_FEATURES: PreseasonFeatures = { availability: true, offseason: true, rookies: true };
+export const NO_PRESEASON_FEATURES: PreseasonFeatures = {
+  availability: false,
+  offseason: false,
+  rookies: false,
+  rookieLanding: false,
+  rookiePickCurve: false,
+  depthChart: false,
+};
+export const ALL_PRESEASON_FEATURES: PreseasonFeatures = {
+  availability: true,
+  offseason: true,
+  rookies: true,
+  rookieLanding: true,
+  rookiePickCurve: true,
+  depthChart: true,
+};
 
 /**
  * WHAT THE BOARD ACTUALLY SHIPS WITH, and what each group measured to earn or fail to earn it.
@@ -127,25 +164,47 @@ export const SHIPPED_PRESEASON_FEATURES: PreseasonFeatures = {
    */
   offseason: true,
   /**
-   * ON, DESPITE MEASURING WORSE THAN THE THING IT REPLACES, and this is the one flag in the engine
-   * that ships on a negative number. Judged on the rookie segment against ranking the class by
-   * draft pick alone it measured `0.6374 -> 0.3733` in 2023 and `0.6790 -> 0.6459` in 2024: worse
-   * on both seasons, badly so on one.
-   *
-   * It ships because the alternative is not "rank rookies by draft capital", it is "have no rookies
-   * on the board at all" — `modelProjection` cannot emit a line for a player with no usage history,
-   * so switching this off removes the entire class. A board a manager cannot draft Bijan Robinson
-   * from is not usable at any accuracy. The honest statement is that rookies are ON the board and
-   * ORDERED BADLY, the research document says so in bold, and the fix named there is to be measured
-   * on the fit seasons before the held-out ones are looked at again.
+   * ON, and it has to be: switching it off does not fall back to some other rookie ordering, it
+   * removes the entire class from the board, because `modelProjection` cannot emit a line for a
+   * player with no usage history. A board a manager cannot draft Bijan Robinson from is not usable
+   * at any accuracy. What the two flags below decide is HOW the class is ordered.
    */
   rookies: true,
+  /**
+   * OFF, and it is the only flag in this engine turned off by a measurement rather than never
+   * turned on. Judged on the rookie segment against ranking the class by draft pick alone, the
+   * board carrying this term scored `0.6374 -> 0.3733` in 2023 and `0.6790 -> 0.6459` in 2024:
+   * worse on both held-out seasons, badly so on one.
+   *
+   * The argument for it was never silly — a back landing behind a three-hundred-carry starter is
+   * not the same asset as one walking into an empty room — but the term is bounded to half in
+   * either direction, which is enough to move a first-round back below a third-round one, and the
+   * measurement says that reordering destroys more information than it adds. The mechanism is kept,
+   * behind this flag, so the next attempt at it starts from a working implementation and a number.
+   */
+  rookieLanding: false,
+  /**
+   * ON. The fitted table has six cells and a draft has two hundred and sixty picks, and the fit's
+   * own monotonicity cap flattens neighbouring cells into exact ties, so a bucket-only board hands
+   * a whole round one number and lets the availability model break it. Interpolating the fitted
+   * means on the pick axis restores the ordering the counterfactual uses, changes no fitted value,
+   * and is developed on the fit seasons. See the research document for what it measured.
+   */
+  rookiePickCurve: true,
+  /**
+   * ON, and it is the answer to the deep band. `docs/research/2026-08-27-preseason-board.md` lost
+   * ranks 151 to 400 on both held-out seasons and named published depth charts as one of the three
+   * things consensus reads that we did not. See `depth.ts` for the mechanism and the research
+   * document for what it measured on the band it targets.
+   */
+  depthChart: true,
 };
 
 export interface PreseasonPriors {
   readonly model: ModelPriors;
   readonly availability: AvailabilityPriors;
   readonly rookies: RookiePriors;
+  readonly depth: DepthPriors;
 }
 
 /** Everything one season's board is built from, read once, all through the same gate. */
@@ -161,55 +220,88 @@ export interface PreseasonInputs {
   readonly teamObservations: readonly TeamWeekObservation[];
   /** Games appeared in, per prior season, per player. The availability model's evidence. */
   readonly gamesPlayed: ReadonlyMap<number, ReadonlyMap<string, number>>;
+  /** Where each club put each man on its published week-one depth chart. Empty before ingestion. */
+  readonly depthChart: DepthChart;
 }
 
 /** How many prior seasons of usage and outcomes a preseason board reads. */
 export const HISTORY_SEASONS = 3;
 
 /**
- * THE PRESEASON MOMENT: the last instant before anything about `season` was knowable.
+ * THE FEEDS WHOSE FACTS PRECEDE THE GAMES THEY DESCRIBE, and which therefore cannot define the
+ * preseason moment.
  *
- * One millisecond before the earliest stamp the season carries, rather than at it. Phase 5's replay
- * used the earliest stamp itself, which admits the first game's numbers — a single game out of two
- * hundred and seventy, so it made no measurable difference there, but "the board may see nothing
- * dated after the opener" is a claim this phase makes in bold and it should be true rather than
- * nearly true.
+ * This list is the difference between a gate and a tautology. The moment is one millisecond before
+ * the earliest stamp the season carries, and while every feed was a record of a completed game that
+ * was exactly right. The instant a PRE-GAME feed lands, it becomes the earliest stamp and the moment
+ * slides to one millisecond before it — so the feed gates itself out, silently, and an ablation of
+ * it measures nothing at all. That is not a hypothetical: the injury report is stamped from the
+ * league's own filing, two days before the opener, and it had made itself invisible to every
+ * preseason board this engine has ever built.
+ *
+ * A source belongs here only if its stamp is provably earlier than the game it concerns. Both of
+ * these are: an injury report carries the filing timestamp the league published it at, and a
+ * week-one depth chart is stamped by `firstGameDayFor` at an instant that precedes the season's
+ * first kickoff by construction. Everything else is a box score and defines the moment.
+ */
+export const PRE_GAME_SOURCES: readonly string[] = [INJURY_SOURCE, DEPTH_SOURCE];
+
+/**
+ * THE PRESEASON MOMENT: the last instant before anything the SEASON ITSELF produced was knowable.
+ *
+ * One millisecond before the earliest GAME-DERIVED stamp the season carries, rather than at it.
+ * Phase 5's replay used the earliest stamp itself, which admits the first game's numbers — a single
+ * game out of two hundred and seventy, so it made no measurable difference there, but "the board may
+ * see nothing dated after the opener" is a claim this phase makes in bold and it should be true
+ * rather than nearly true.
  *
  * Derived from the store rather than from a calendar, following `replay-moments.ts`: the honest
  * moment is a fact about the real world, and a date computed from nowhere would be a guess dressed
  * as a guarantee. A season absent from the store is refused rather than defaulted.
  */
 export async function preseasonMomentFor(db: ReadonlyDb, season: number): Promise<Date> {
+  const earliest = await earliestGameDerivedStamp(db, season);
+  if (earliest === null) {
+    throw new Error(
+      `The store holds no game-derived observations for ${season}, so its preseason moment cannot be derived. Run \`npm run projections:backfill\` first.`,
+    );
+  }
+  return new Date(earliest.getTime() - 1);
+}
+
+async function earliestGameDerivedStamp(db: ReadonlyDb, season: number): Promise<Date | null> {
   const [row] = await db
     .select({ earliest: min(playerWeekObservations.asOf) })
     .from(playerWeekObservations)
-    .where(eq(playerWeekObservations.season, season));
-  const earliest = row?.earliest ?? null;
-  if (earliest === null) {
-    throw new Error(
-      `The store holds no observations for ${season}, so its preseason moment cannot be derived. Run \`npm run projections:backfill\` first.`,
+    .where(
+      and(
+        eq(playerWeekObservations.season, season),
+        notInArray(playerWeekObservations.source, [...PRE_GAME_SOURCES]),
+      ),
     );
-  }
-  return new Date(new Date(earliest).getTime() - 1);
+  const earliest = row?.earliest ?? null;
+  return earliest === null ? null : new Date(earliest);
 }
 
 /**
- * Refuses to build a board that can see the season it is predicting.
+ * Refuses to build a board that can see a RESULT of the season it is predicting.
  *
  * The structural test model v1 relies on is that a week-2 replay is byte-identical before and after
  * later weeks are written into the store. This is the preseason equivalent, and it runs on every
  * board rather than only in a test: a leak here would not fail anything, it would simply make the
  * scoreboard improve, and nothing else in the suite would notice.
+ *
+ * The claim it enforces narrowed when the pre-game feeds arrived, and narrowed honestly. It used to
+ * be "nothing the season carries"; it is now "nothing the season's GAMES produced", because a
+ * league injury filing and a published depth chart are things a person could read before the opener
+ * and an expert consensus board demonstrably did. What the assertion still refuses outright is a
+ * single box-score number, and that is the claim the scoreboard rests on.
  */
 async function assertNothingFromTheSeasonIsVisible(db: ReadonlyDb, season: number, moment: Date): Promise<void> {
-  const [row] = await db
-    .select({ earliest: min(playerWeekObservations.asOf) })
-    .from(playerWeekObservations)
-    .where(and(eq(playerWeekObservations.season, season)));
-  const earliest = row?.earliest ?? null;
-  if (earliest !== null && new Date(earliest) <= moment) {
+  const earliest = await earliestGameDerivedStamp(db, season);
+  if (earliest !== null && earliest <= moment) {
     throw new Error(
-      `A ${season} preseason board taken at ${moment.toISOString()} can see a ${season} observation stamped ${new Date(earliest).toISOString()}. The board would be reading the season it is predicting.`,
+      `A ${season} preseason board taken at ${moment.toISOString()} can see a ${season} game-derived observation stamped ${earliest.toISOString()}. The board would be reading the season it is predicting.`,
     );
   }
 }
@@ -274,7 +366,18 @@ export async function loadPreseason(db: ReadonlyDb, season: number): Promise<Pre
     priorPlayerTeams,
     teamObservations,
     gamesPlayed: await gamesPlayedBySeason(db, priorSeasons, moment),
+    depthChart: await depthChartAsOf(db, season, moment),
   };
+}
+
+/** The published week-one ordering, read through the same gate as everything else. */
+async function depthChartAsOf(db: ReadonlyDb, season: number, asOf: Date): Promise<DepthChart> {
+  const rows = await observationsAsOf(db, { season, week: 1, asOf, source: DEPTH_SOURCE });
+  return new Map(
+    rows
+      .filter((row) => row.metric === DEPTH_METRIC)
+      .map((row) => [row.playerId, depthRankFor(row.value)] as const),
+  );
 }
 
 /** The team each player finished the prior season on, from the last week the store holds for him. */
@@ -467,7 +570,14 @@ export function preseasonCandidates(
   const deltas = features.offseason
     ? offseasonDeltas({ moves, rosters, absorptionRate: priors.model.context.redistribution.absorptionRate })
     : new Map<string, ShareDelta>();
-  const opportunity = applyDeltas(schemed, deltas);
+  const redistributed = applyDeltas(schemed, deltas);
+  // LAST, and after the offseason rather than before it. The chart is a statement about the roster
+  // that exists NOW — it already reflects every arrival and departure the offseason log is
+  // reasoning about — so correcting first and redistributing afterwards would move share away from
+  // a starter the club has just confirmed and toward a man it has just listed third.
+  const opportunity = features.depthChart
+    ? applyDepthChart(redistributed, inputs.depthChart, inputs.positions, priors.depth)
+    : redistributed;
 
   const rates = contextualiseRates(
     predictRates(inputs.history, inputs.usage, { season: inputs.season, week, positions: inputs.positions }, priors.model.efficiency),
@@ -500,6 +610,11 @@ export function preseasonCandidates(
     team: string,
     predicted: PredictedOpportunity,
     reasons: readonly BoardReason[],
+    /**
+     * A rookie's availability baseline, from his draft capital. Null for everybody else, whose
+     * baseline is the position-and-role table and whose own record is the evidence against it.
+     */
+    baselineRate: number | null,
   ): void => {
     const roster = rosterByPlayer.get(playerId);
     if (roster === undefined || roster.status === "off_roster") return;
@@ -513,6 +628,7 @@ export function preseasonCandidates(
             status: roster.status,
             projectedSnapShare: predicted.snapShare,
             history: historyFor(playerId),
+            baselineRate,
           },
           { season: inputs.season, priors: priors.availability },
         )
@@ -548,7 +664,7 @@ export function preseasonCandidates(
           : { code: "offseason_share_lost", targetShare: -delta.targetShare, carryShare: -delta.carryShare },
       );
     }
-    emit(playerId, position, roster.team, predicted, reasons);
+    emit(playerId, position, roster.team, predicted, reasons, null);
   }
 
   if (features.rookies) {
@@ -565,13 +681,24 @@ export function preseasonCandidates(
         overallPick: roster.draftPick,
         incumbentClaim: claims.get(`${roster.team}|${position}`) ?? 0,
       };
-      emit(roster.playerId, position, roster.team, rookieOpportunity(rookieInput, priors.rookies), [
-        {
-          code: "rookie",
-          overallPick: roster.draftPick,
-          landingMultiplier: landingMultiplier(rookieInput, priors.rookies),
-        },
-      ]);
+      const rookieFeatures: RookieFeatures = {
+        landingSpot: features.rookieLanding,
+        pickCurve: features.rookiePickCurve,
+      };
+      emit(
+        roster.playerId,
+        position,
+        roster.team,
+        rookieOpportunity(rookieInput, priors.rookies, rookieFeatures),
+        [
+          {
+            code: "rookie",
+            overallPick: roster.draftPick,
+            landingMultiplier: rookieFeatures.landingSpot ? landingMultiplier(rookieInput, priors.rookies) : 1,
+          },
+        ],
+        capitalGameRate(position, roster.draftPick, priors.rookies, rookieFeatures),
+      );
     }
   }
 
@@ -660,6 +787,7 @@ export async function loadAvailabilityObservations(
         status: row.status,
         projectedSnapShare: opportunity.get(row.playerId)?.snapShare ?? 0,
         history,
+        baselineRate: null,
         gamesPlayed: gamesPlayed.get(season)?.get(row.playerId) ?? 0,
       });
     }
@@ -708,6 +836,10 @@ export async function loadRookieObservations(
         position,
         overallPick: row.draftPick,
         incumbentClaim: claims.get(`${row.team}|${position}`) ?? 0,
+        // Zero for a man who never dressed, which is the observation the game-rate cell exists to
+        // hold. `shares` stays null for him, because he took no share of anything.
+        gamesPlayed: totals?.weeks ?? 0,
+        teamGames: teamGamesIn(season),
         shares:
           totals === undefined || totals.weeks === 0
             ? null
@@ -717,6 +849,51 @@ export async function loadRookieObservations(
                 carryShare: totals.carry / totals.weeks,
                 passAttemptShare: totals.pass / totals.weeks,
               },
+      });
+    }
+  }
+  return observations;
+}
+
+/**
+ * One season of depth-chart labels: where his club listed him, what layer 1 thought, what he played.
+ *
+ * The projected share is taken from the SAME preseason inputs a board would have had, so the
+ * correction is fitted against the number it will later be applied to. The actual share is over the
+ * team's whole season with absences counted as zero, because the claim the chart makes is about how
+ * much of the year a man is on the field and a mean over the games he dressed for would answer a
+ * different question.
+ */
+export async function loadDepthObservations(
+  db: ReadonlyDb,
+  seasons: readonly number[],
+  priors: ModelPriors,
+): Promise<readonly DepthObservation[]> {
+  const observations: DepthObservation[] = [];
+  for (const season of seasons) {
+    const inputs = await loadPreseason(db, season);
+    const projected = predictOpportunity(
+      inputs.usage,
+      { season, week: 1, positions: inputs.positions },
+      priors.opportunity,
+    );
+    const actual = await usageAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FINAL_OUTCOME });
+    const played = new Map<string, number>();
+    for (const row of actual) played.set(row.playerId, (played.get(row.playerId) ?? 0) + (row.snapShare ?? 0));
+
+    const teamGames = teamGamesIn(season);
+    for (const row of inputs.roster) {
+      if (row.status === "off_roster") continue;
+      const position = inputs.positions.get(row.playerId);
+      const predicted = projected.get(row.playerId);
+      if (position === undefined || predicted === undefined) continue;
+      observations.push({
+        season,
+        playerId: row.playerId,
+        position,
+        rank: inputs.depthChart.get(row.playerId) ?? "offChart",
+        projectedSnapShare: predicted.snapShare,
+        actualSnapShare: (played.get(row.playerId) ?? 0) / teamGames,
       });
     }
   }

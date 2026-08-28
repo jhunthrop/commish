@@ -23,9 +23,9 @@ import { RANK_BANDS, scoreCard, type Observation, type RankBandName, type ScoreC
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { overlapTiers, preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
-import { FITTED_AVAILABILITY_PRIORS, FITTED_ROOKIE_PRIORS } from "@/projections/preseason/fitted";
+import { FITTED_AVAILABILITY_PRIORS, FITTED_DEPTH_PRIORS, FITTED_ROOKIE_PRIORS } from "@/projections/preseason/fitted";
 import {
-  ALL_PRESEASON_FEATURES,
+  SHIPPED_PRESEASON_FEATURES,
   loadPreseason,
   offseasonSegmentFor,
   preseasonCandidates,
@@ -34,6 +34,7 @@ import {
   type PreseasonInputs,
   type PreseasonPriors,
 } from "@/projections/preseason/source";
+import { UNDRAFTED_PICK } from "@/projections/preseason/rookies";
 import { preseasonRankingsAsOf } from "@/projections/preseason/store";
 
 const SEASONS = process.argv.slice(2).map(Number);
@@ -60,13 +61,24 @@ const PRIORS: PreseasonPriors = {
   model: FITTED_MODEL,
   availability: FITTED_AVAILABILITY_PRIORS,
   rookies: FITTED_ROOKIE_PRIORS,
+  depth: FITTED_DEPTH_PRIORS,
 };
 
-/** Each ablation: one of Phase 6's groups switched off, and the segment it is judged on. */
+/**
+ * Each ablation: the shipped board with ONE thing changed, and the segment it is judged on.
+ *
+ * `features` is the arm the shipped board is compared AGAINST, so the printed line always reads
+ * "what we would have had -> what we ship". For the two rookie-ordering flags that means the arm is
+ * the setting we rejected, which is the honest way round: the claim being tested is that turning
+ * the landing term off and the pick curve on made the class order better.
+ */
 const ABLATIONS: readonly { readonly name: string; readonly features: PreseasonFeatures; readonly segment: string }[] = [
-  { name: "availability", features: { ...ALL_PRESEASON_FEATURES, availability: false }, segment: "everyone" },
-  { name: "offseason", features: { ...ALL_PRESEASON_FEATURES, offseason: false }, segment: "changed situation" },
-  { name: "rookies", features: { ...ALL_PRESEASON_FEATURES, rookies: false }, segment: "rookies" },
+  { name: "availability", features: { ...SHIPPED_PRESEASON_FEATURES, availability: false }, segment: "everyone" },
+  { name: "offseason", features: { ...SHIPPED_PRESEASON_FEATURES, offseason: false }, segment: "changed situation" },
+  { name: "rookies", features: { ...SHIPPED_PRESEASON_FEATURES, rookies: false }, segment: "rookies" },
+  { name: "rookie landing", features: { ...SHIPPED_PRESEASON_FEATURES, rookieLanding: true }, segment: "rookies" },
+  { name: "rookie pick curve", features: { ...SHIPPED_PRESEASON_FEATURES, rookiePickCurve: false }, segment: "rookies" },
+  { name: "depth chart", features: { ...SHIPPED_PRESEASON_FEATURES, depthChart: false }, segment: "everyone" },
 ];
 
 function requireEnv(name: string): string {
@@ -158,8 +170,10 @@ function draftCapitalOnly(inputs: PreseasonInputs, eligible: ReadonlySet<string>
     inputs.roster
       .filter((row) => eligible.has(row.playerId))
       // An undrafted man sits behind the last pick of the draft, which is what a team saying nothing
-      // about him means. Negated so higher is better, as every other column in this report is.
-      .map((row) => [row.playerId, -(row.draftPick ?? 300)] as const),
+      // about him means. The constant is `rookies.ts`' own, so the counterfactual and the capital
+      // curve it is scored against can never disagree about where undrafted sits. Negated so higher
+      // is better, as every other column in this report is.
+      .map((row) => [row.playerId, -(row.draftPick ?? UNDRAFTED_PICK)] as const),
   );
 }
 
@@ -193,25 +207,25 @@ async function main(): Promise<void> {
     console.log(`${season} PRESEASON BOARD, 12-team PPR, taken at ${inputs.moment.toISOString()}`);
     console.log(`${"=".repeat(96)}\n`);
 
-    const board = build(inputs, ALL_PRESEASON_FEATURES);
+    const board = build(inputs, SHIPPED_PRESEASON_FEATURES);
     console.log(
       `board: ${board.length} players from a ${inputs.roster.length}-man week-one roster, ` +
         `${inputs.usage.length} prior usage rows, ${inputs.teamObservations.length} team facts`,
     );
 
-    console.log("\nTOP 20 BY VALUE OVER REPLACEMENT");
+    console.log("\nTOP 20, the board's own order (projected points), with the draft-value rank beside it");
     for (const entry of board.slice(0, 20)) {
       const scored = actual.get(entry.playerId) ?? 0;
       console.log(
         `  ${String(entry.rank).padStart(3)} ${entry.position} ${entry.team.padEnd(3)} ${(names.get(entry.playerId) ?? entry.playerId).padEnd(22)}` +
-          `proj ${entry.projectedPoints.toFixed(0).padStart(4)}  vor ${entry.valueOverReplacement.toFixed(0).padStart(4)}  ` +
+          `proj ${entry.projectedPoints.toFixed(0).padStart(4)}  vor ${entry.valueOverReplacement.toFixed(0).padStart(4)} (#${String(entry.valueRank).padStart(3)})  ` +
           `games ${entry.expectedGames.toFixed(1).padStart(4)}  tier ${entry.tier}  actual ${scored.toFixed(0).padStart(4)}`,
       );
     }
 
     console.log("\nAGAINST THE OUTCOME, banded by our own rank");
-    printBands("value over replacement", scoreOrdering(boardValues(board), actual, everyone, null));
-    printBands("projected points", scoreOrdering(boardPoints(board), actual, everyone, null));
+    printBands("the board (points)", scoreOrdering(boardPoints(board), actual, everyone, null));
+    printBands("draft-value view (VOR)", scoreOrdering(boardValues(board), actual, everyone, null));
 
     // The two published benchmarks, scored like for like: only players BOTH sources had an opinion
     // about, so neither is credited for breadth. Model v1 established that discipline and the same
@@ -235,8 +249,8 @@ async function main(): Promise<void> {
       const benchmark = new Map([...rankOf].map(([playerId, rank]) => [playerId, -rank] as const));
       console.log(`\nAGAINST ${label.toUpperCase()}, like for like on ${common.size} players, banded by the benchmark's own rank`);
       printBands(label, scoreOrdering(benchmark, actual, common, rankOf));
-      printBands("our board (VOR)", scoreOrdering(boardValues(board), actual, common, rankOf));
-      printBands("our board (points)", scoreOrdering(boardPoints(board), actual, common, rankOf));
+      printBands("our board", scoreOrdering(boardPoints(board), actual, common, rankOf));
+      printBands("our draft-value view", scoreOrdering(boardValues(board), actual, common, rankOf));
     }
 
     console.log("\nABLATIONS, on the segment each group targets");
@@ -256,8 +270,10 @@ async function main(): Promise<void> {
             // thing a board would do instead: rank the class by draft capital alone, with no
             // landing spot, no efficiency and no composition. That is what the task has to beat.
             scoreOrdering(draftCapitalOnly(inputs, eligible), actual, eligible, null)
-          : scoreOrdering(boardValues(without), actual, eligible, null);
-      const after = scoreOrdering(boardValues(board), actual, eligible, null);
+          : scoreOrdering(boardPoints(without), actual, eligible, null);
+      // Ablated on the ORDERING THE BOARD SHIPS, which is points. Measuring an ablation on a view
+      // the board does not lead with would be answering a question nobody asks.
+      const after = scoreOrdering(boardPoints(board), actual, eligible, null);
       console.log(
         `  ${ablation.name.padEnd(14)} on ${ablation.segment.padEnd(18)} ${rho(before.overall)} -> ${rho(after.overall)}  ` +
           `${delta(before.overall, after.overall)}   n=${after.overall.sampleSize} (before n=${before.overall.sampleSize})` +

@@ -78,6 +78,17 @@ export interface TeamGame {
   readonly windSpeed: number | null;
   /** When the game finished and its facts became knowable, on the same basis as `gameDayAsOf`. */
   readonly kickoffAsOf: Date;
+  /**
+   * The real instant the ball was kicked off. The stamp for the CLOSING LINE, which is settled then
+   * — see `kickoffInstant`. The recorded weather keeps `kickoffAsOf`, because a temperature is
+   * recorded over the course of a game rather than at its start.
+   *
+   * OPTIONAL, and the omission is a claim rather than a convenience: a game whose local start time
+   * is not known cannot have its line stamped at kickoff, and `scheduleObservations` falls back to
+   * the publication-lag stamp for it. That is the conservative direction — a line nobody could reach
+   * costs a replay some accuracy, and one reachable before it was settled would be a leak.
+   */
+  readonly kickoffAt?: Date;
 }
 
 const MILLISECONDS_PER_HOUR = 3_600_000;
@@ -105,6 +116,59 @@ export function schedulePublishedAsOf(season: number): Date {
  * Same arithmetic and same reason: a Monday night game finishes after midnight UTC, so stamping
  * from the bare date would claim a fact was knowable before the game producing it had ended.
  */
+/**
+ * THE REAL KICKOFF INSTANT, from the file's own date and local start time.
+ *
+ * `kickoffAsOf` below is the right stamp for a fact a game PRODUCED and the wrong one for a fact
+ * that is settled AT kickoff. A closing line is the market's last word before the ball is thrown; a
+ * stamp of "the end of the game's day plus a publication lag" puts it thirty-six hours after the
+ * moment any replay could act on it, which is why Phase 3 had to record the betting line as
+ * unmeasurable rather than as worthless. This is the honest stamp for that half of the file.
+ *
+ * `gametime` is local Eastern, and the season crosses the daylight-saving boundary in early
+ * November, so the offset is resolved from the zone database rather than assumed. Two passes,
+ * because the offset depends on the instant and the instant depends on the offset: the first pass
+ * is right except within an hour of a transition and the second settles it.
+ */
+export function kickoffInstant(gameday: string, gametime: string): Date {
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(gameday);
+  const time = /^(\d{1,2}):(\d{2})$/.exec(gametime);
+  if (day === null || time === null) {
+    throw new Error(
+      `Schedule row has no readable kickoff (gameday ${JSON.stringify(gameday)}, gametime ${JSON.stringify(gametime)}); a closing line cannot be stamped.`,
+    );
+  }
+  const asIfUtc = Date.UTC(Number(day[1]), Number(day[2]) - 1, Number(day[3]), Number(time[1]), Number(time[2]));
+  let instant = asIfUtc;
+  for (let pass = 0; pass < 2; pass += 1) instant = asIfUtc + easternOffsetMillis(new Date(instant));
+  return new Date(instant);
+}
+
+const EASTERN = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  hour12: false,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+/** How far behind UTC Eastern time is at `instant`, in milliseconds. Positive. */
+function easternOffsetMillis(instant: Date): number {
+  const parts = new Map(EASTERN.formatToParts(instant).map((part) => [part.type, part.value] as const));
+  const local = Date.UTC(
+    Number(parts.get("year")),
+    Number(parts.get("month")) - 1,
+    Number(parts.get("day")),
+    Number(parts.get("hour")) % 24,
+    Number(parts.get("minute")),
+    Number(parts.get("second")),
+  );
+  return instant.getTime() - local;
+}
+
 export function kickoffAsOf(gameday: string, lagHours: number): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(gameday);
   if (match === null) {
@@ -162,7 +226,13 @@ export function mapSchedule(rows: readonly CsvRow[], seasons: readonly number[],
     if (!wanted.has(season)) continue;
 
     const week = integer(row, "week");
-    const stamp = kickoffAsOf(required(row, "gameday"), lagHours);
+    const gameday = required(row, "gameday");
+    const stamp = kickoffAsOf(gameday, lagHours);
+    // A row with no `gametime` COLUMN at all predates the field or is a narrowed fixture, and it
+    // simply has no kickoff instant. A row that carries the column and leaves it BLANK is a schema
+    // problem and `kickoffInstant` throws, because a silently unstamped line is a feature that has
+    // quietly stopped existing.
+    const kickoffAt = row.gametime === undefined ? undefined : kickoffInstant(gameday, row.gametime);
     const homeSpread = optional(row, "spread_line");
     const totalLine = optional(row, "total_line");
     const homeScore = optional(row, "home_score");
@@ -176,6 +246,7 @@ export function mapSchedule(rows: readonly CsvRow[], seasons: readonly number[],
       temperature: optional(row, "temp"),
       windSpeed: optional(row, "wind"),
       kickoffAsOf: stamp,
+      kickoffAt,
     } as const;
     games.push({
       ...shared,
@@ -214,7 +285,11 @@ export function scheduleObservations(games: readonly TeamGame[]): readonly TeamW
   return games.flatMap((game) => {
     const key = { season: game.season, week: game.week, team: game.team } as const;
     const published = { ...key, source: SCHEDULE_SOURCE.schedule, asOf: schedulePublishedAsOf(game.season) };
-    const atKickoff = { ...key, source: SCHEDULE_SOURCE.kickoff, asOf: game.kickoffAsOf };
+    // TWO STAMPS UNDER ONE SOURCE, and the difference is what each fact is. The line is settled at
+    // kickoff and is stamped there; the recorded temperature and wind are observations taken during
+    // the game and keep the publication-lag stamp every other game-derived fact carries.
+    const atKickoff = { ...key, source: SCHEDULE_SOURCE.kickoff, asOf: game.kickoffAt ?? game.kickoffAsOf };
+    const afterTheGame = { ...key, source: SCHEDULE_SOURCE.kickoff, asOf: game.kickoffAsOf };
     const rows: TeamWeekObservation[] = [
       { ...published, metric: SCHEDULE_METRICS.restDays, value: game.restDays },
       { ...published, metric: SCHEDULE_METRICS.homeField, value: game.home ? 1 : 0 },
@@ -233,8 +308,8 @@ export function scheduleObservations(games: readonly TeamGame[]): readonly TeamW
         });
       }
     }
-    if (game.temperature !== null) rows.push({ ...atKickoff, metric: SCHEDULE_METRICS.temperature, value: game.temperature });
-    if (game.windSpeed !== null) rows.push({ ...atKickoff, metric: SCHEDULE_METRICS.windSpeed, value: game.windSpeed });
+    if (game.temperature !== null) rows.push({ ...afterTheGame, metric: SCHEDULE_METRICS.temperature, value: game.temperature });
+    if (game.windSpeed !== null) rows.push({ ...afterTheGame, metric: SCHEDULE_METRICS.windSpeed, value: game.windSpeed });
     return rows;
   });
 }

@@ -1,6 +1,7 @@
 import type { Position } from "@/domain/player";
 import type { RosterStatus } from "../nflverse/rosters";
 import { ROSTER_STATUSES } from "../nflverse/rosters";
+import { DEPTH_RANKS, type DepthPriors, type DepthRank } from "./depth";
 import { DRAFT_BUCKETS, draftBucketFor, type DraftBucket, type RookiePriors, type RookieShares } from "./rookies";
 import {
   AGE_BRACKETS,
@@ -59,6 +60,13 @@ export interface AvailabilityObservation {
   readonly projectedSnapShare: number;
   /** Prior seasons, as `expectedGamesPlayed` will be given them. */
   readonly history: AvailabilityInput["history"];
+  /**
+   * NULL for every observation, including a rookie's, and that is the fit staying honest about
+   * itself. The rookie game-rate table is fitted from the SAME seasons as these cells; feeding it
+   * back in as a baseline here would fit the position-and-role table against a number derived from
+   * the population it is estimated over.
+   */
+  readonly baselineRate: null;
   /** What actually happened: games he appeared in. THE LABEL. */
   readonly gamesPlayed: number;
 }
@@ -314,12 +322,19 @@ export function fitAvailabilityPriors(
  * at all: twenty-four cells, every one of them a mean of real player-seasons, and a reader who
  * disagrees with a cell can go and count the same players.
  *
- * THE SHARES ARE CONDITIONAL ON PLAYING, and the decomposition matters. A sixth-round receiver who
- * never dresses contributes zero games to the availability fit and nothing at all here, so his
- * absence is charged to availability rather than to his bucket's share. Charging it twice would
- * project every late-round rookie at half of half. The cost is that a late bucket's share is
- * measured over the members of it who made the field, which is optimistic about the bucket, and the
- * availability model is what brings it back down.
+ * THE SHARES ARE CONDITIONAL ON PLAYING, AND THE GAME RATE IS NOT. That decomposition is the whole
+ * of how a rookie's season is composed, and the first version of this fit only had half of it. A
+ * sixth-round receiver who never dresses contributes nothing to a bucket's SHARE, which is correct:
+ * the share is what he does in a game he plays, and charging his absence to it as well would
+ * project every late-round rookie at half of half.
+ *
+ * The other half has to be measured somewhere, and it used to be left to the availability model,
+ * which had nothing to read but a snap share this table had already conditioned on playing. It
+ * concluded that a seventh-round quarterback was a featured starter, gave him ten games, and
+ * projected undrafted quarterbacks above the best receiver in the class. So the game rate is fitted
+ * here, over EVERY rookie in the cell including the ones who never dressed, and it is a rookie's
+ * availability baseline. Nothing is charged twice: the share answers "how much per game", the game
+ * rate answers "how many games", and no cell appears in both answers.
  */
 
 /** What one rookie's first season contributes to the fit. */
@@ -332,10 +347,31 @@ export interface RookieObservation {
   readonly incumbentClaim: number;
   /** His own mean shares over the games he played. Null where he played none. */
   readonly shares: RookieShares | null;
+  /** Games he appeared in, over every rookie in the class and not only the ones who dressed. */
+  readonly gamesPlayed: number;
+  /** Games his league played that year, the denominator `gamesPlayed` is a share of. */
+  readonly teamGames: number;
 }
 
-/** How many rookie-seasons of the position's own mean each draft bucket is shrunk toward. */
-const ROOKIE_CELL_PRIOR = 12;
+/**
+ * How many rookie-seasons of the position's own mean each draft bucket is shrunk toward.
+ *
+ * TWO, chosen on the FIT SEASONS and on nothing else, by sweeping it and scoring the rookie segment
+ * against ranking the class by pick number. At twelve the table was all but flat — a round-one back
+ * and a round-three back came out within a hundredth of each other, because a cell holding five
+ * player-seasons was weighed a fifth of its own evidence and four fifths of the position mean, and
+ * `enforceCapitalOrdering` then capped the surviving differences into exact ties. A prior that
+ * erases the only signal the module has is not caution, it is a table that says nothing.
+ *
+ * Light shrinkage is defensible here BECAUSE of that monotonicity cap. The regularisation a thin
+ * cell needs is mostly the constraint that more capital cannot mean less opportunity, and that is
+ * structural rather than statistical; stacking a heavy prior on top of it regularises twice. The
+ * sweep on the fit seasons: 12 gave -0.079 and -0.074 against the pick ordering, 8 gave -0.062 and
+ * -0.060, 4 gave -0.022 and -0.037, 2 gave -0.005 and -0.028, and 0 gave +0.012 and -0.075. Zero is
+ * the best single season and the second worst on the other, which is what an unshrunk five-player
+ * cell looks like; two is the best on both together and the best on the worse of the two.
+ */
+const ROOKIE_CELL_PRIOR = 2;
 
 function meanShares(observations: readonly RookieObservation[]): RookieShares | null {
   const played = observations.filter((observation) => observation.shares !== null);
@@ -371,6 +407,26 @@ function blendShares(prior: RookieShares, cell: RookieShares | null, count: numb
 
 const NO_SHARES: RookieShares = { snapShare: 0, targetShare: 0, carryShare: 0, passAttemptShare: 0 };
 
+/** The share of a season a cell's rookies played, counting the ones who never dressed as zero. */
+function meanGameRate(observations: readonly RookieObservation[]): number | null {
+  return mean(
+    observations
+      .filter((observation) => observation.teamGames > 0)
+      .map((observation) => Math.min(1, Math.max(0, observation.gamesPlayed / observation.teamGames))),
+  );
+}
+
+/** Caps each cell at the one above it, for the reason `enforceCapitalOrdering` gives for shares. */
+function enforceRateOrdering(cells: Record<DraftBucket, number>): Record<DraftBucket, number> {
+  const ordered = {} as Record<DraftBucket, number>;
+  let ceiling = Number.POSITIVE_INFINITY;
+  for (const bucket of DRAFT_BUCKETS) {
+    ordered[bucket] = Math.min(cells[bucket], ceiling);
+    ceiling = ordered[bucket];
+  }
+  return ordered;
+}
+
 export interface RookieFitOptions {
   readonly heldOutSeasons: readonly number[];
   readonly leagueTeamVolume: RookiePriors["leagueTeamVolume"];
@@ -392,16 +448,25 @@ export function fitRookiePriors(
   }
 
   const byBucket = {} as Record<Position, Record<DraftBucket, RookieShares>>;
+  const gameRate = {} as Record<Position, Record<DraftBucket, number>>;
   const typicalIncumbentClaim = {} as Record<Position, number>;
   for (const position of ALL_POSITIONS) {
     const atPosition = observations.filter((observation) => observation.position === position);
     const positionMean = meanShares(atPosition) ?? NO_SHARES;
+    const positionRate = meanGameRate(atPosition) ?? 0;
     const cells = {} as Record<DraftBucket, RookieShares>;
+    const rates = {} as Record<DraftBucket, number>;
     for (const bucket of DRAFT_BUCKETS) {
       const inCell = atPosition.filter((observation) => draftBucketFor(observation.overallPick) === bucket);
       const withGames = inCell.filter((observation) => observation.shares !== null);
       cells[bucket] = blendShares(positionMean, meanShares(inCell), withGames.length);
+      // Shrunk toward the position's own rookie mean on the SAME prior as the shares, and over the
+      // whole cell rather than over its survivors, so a thin cell cannot assert a starter's season.
+      const rate = meanGameRate(inCell);
+      const weight = inCell.length / (ROOKIE_CELL_PRIOR + inCell.length);
+      rates[bucket] = rate === null ? positionRate : positionRate * (1 - weight) + rate * weight;
     }
+    gameRate[position] = enforceRateOrdering(rates);
     // Monotone in draft capital by construction. A thin cell can otherwise say that third-rounders
     // out-target first-rounders, which is noise rather than a finding, and a board that acted on it
     // would rank a fifth-round back above a top-ten pick for no reason a reader could defend.
@@ -410,7 +475,7 @@ export function fitRookiePriors(
     typicalIncumbentClaim[position] = claim === null || claim <= 0 ? 1 : claim;
   }
 
-  return { byBucket, leagueTeamVolume, typicalIncumbentClaim, landingBound };
+  return { byBucket, leagueTeamVolume, typicalIncumbentClaim, gameRate, landingBound };
 }
 
 /**
@@ -440,4 +505,85 @@ function enforceCapitalOrdering(cells: Record<DraftBucket, RookieShares>): Recor
     ceiling = capped;
   }
   return ordered;
+}
+
+/**
+ * FITTING THE DEPTH-CHART CORRECTION — the same discipline again, and one number per cell.
+ *
+ * What the fit measures is how far layer 1's belief about a man's role is from what he went on to
+ * do, GROUPED BY WHERE HIS CLUB LISTED HIM. If the chart carried nothing layer 1 did not already
+ * know, every cell would come out at one; the fit seasons say a club's number-two quarterback plays
+ * about half the snaps the model gives him and its number one about a third more, which is a large
+ * and consistent statement that the model cannot make for itself.
+ *
+ * NORMALISED WITHIN THE POSITION, so the chart reorders and never relevels. See
+ * `DepthPriors.bySnapShare` for why that restriction is the honest one.
+ */
+
+/** What one player-season contributes to the depth-chart fit. */
+export interface DepthObservation {
+  readonly season: number;
+  readonly playerId: string;
+  readonly position: Position;
+  /** Where his club listed him on its published week-one offensive depth chart. */
+  readonly rank: DepthRank;
+  /** Layer 1's predicted snap share at the preseason moment, before any correction. */
+  readonly projectedSnapShare: number;
+  /** What he actually played: his mean snap share over his team's whole season, absences included. */
+  readonly actualSnapShare: number;
+}
+
+export interface DepthFitOptions {
+  readonly heldOutSeasons: readonly number[];
+  /** Chosen, not fitted. See `DepthPriors.bound`. */
+  readonly bound?: number;
+}
+
+/**
+ * How many player-seasons of "the chart says nothing" each cell is shrunk toward.
+ *
+ * Sixteen cells over two fit seasons leaves the thinnest (a third-string quarterback) at under
+ * twenty, and an unshrunk cell of that size would assert a multiplier from a handful of men who
+ * happened to be pressed into service. Shrinking toward one, which is the null hypothesis that the
+ * chart adds nothing, is the conservative direction: a cell has to earn its correction.
+ */
+const DEPTH_CELL_PRIOR = 20;
+
+export function fitDepthPriors(
+  observations: readonly DepthObservation[],
+  { heldOutSeasons, bound = 1 }: DepthFitOptions,
+): DepthPriors {
+  const forbidden = new Set(heldOutSeasons);
+  for (const observation of observations) {
+    if (forbidden.has(observation.season)) {
+      throw new Error(
+        `The depth-chart fit was handed ${observation.season}, which is held out. A parameter fitted on a season it is later scored on is not a measurement.`,
+      );
+    }
+  }
+
+  const bySnapShare = {} as Record<Position, Record<DepthRank, number>>;
+  for (const position of ALL_POSITIONS) {
+    const atPosition = observations.filter((observation) => observation.position === position);
+    const cells = {} as Record<DepthRank, number>;
+    // The position's own overall correction, divided out below so only the RELATIVE claim survives.
+    const positionRatio = ratioOf(atPosition);
+    for (const rank of DEPTH_RANKS) {
+      const inCell = atPosition.filter((observation) => observation.rank === rank);
+      const cellRatio = ratioOf(inCell);
+      const weight = inCell.length / (DEPTH_CELL_PRIOR + inCell.length);
+      const relative = cellRatio === null || positionRatio === null || positionRatio <= 0 ? 1 : cellRatio / positionRatio;
+      cells[rank] = 1 * (1 - weight) + relative * weight;
+    }
+    bySnapShare[position] = cells;
+  }
+  return { bySnapShare, bound };
+}
+
+/** Mean actual over mean projected, or null where the group says nothing. */
+function ratioOf(observations: readonly DepthObservation[]): number | null {
+  if (observations.length === 0) return null;
+  const projected = observations.reduce((sum, observation) => sum + observation.projectedSnapShare, 0);
+  const actual = observations.reduce((sum, observation) => sum + observation.actualSnapShare, 0);
+  return projected <= 0 ? null : actual / projected;
 }

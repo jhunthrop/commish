@@ -1,0 +1,233 @@
+import { and, eq, min } from "drizzle-orm";
+import type { ReadonlyDb } from "@/db/client";
+import { teamWeekObservations } from "@/db/schema";
+import type { Position } from "@/domain/player";
+import type { CsvRow } from "../nflverse/csv";
+import { NFLVERSE_CONFIG } from "../nflverse/config";
+import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
+import type { PredictedOpportunity } from "../model/opportunity";
+import type { PlayerWeekObservation } from "../store";
+
+/**
+ * THE DEPTH CHART — who is behind whom, which is the one thing August knows and this board did not.
+ *
+ * `docs/research/2026-08-27-preseason-board.md` lost the deep band, on both held-out seasons and by
+ * more than any other band, and named the cause in its own weaknesses section: "preseason holdouts,
+ * training-camp injury designations, beat-reporter depth charts and coaching quotes are all real
+ * August information and we ingest none of them." Ranks 151 to 400 are backups, committee members
+ * and third receivers, and the difference between the man who starts and the man behind him is
+ * almost the whole of what separates them.
+ *
+ * WHY LAYER 1 CANNOT KNOW THIS. Opportunity is forecast from the usage a player has already
+ * produced, and across an offseason there is none of this season's. A quarterback who was benched in
+ * March and a quarterback who won the job in August look identical to a model reading last year's
+ * snaps. Measured on the fit seasons, that is exactly where the error is: the model projects a
+ * club's number-two quarterback at nearly twice what he scores and its number one at three quarters
+ * of it, consistently, in both seasons.
+ *
+ * WEAK IN SEASON, STRONG IN AUGUST, and this is the opposite of the weekly case. In week ten a depth
+ * chart is a stale restatement of snaps everybody can already see; the model reads the snaps and the
+ * chart adds nothing. In August the snaps do not exist yet and the chart is the only statement of
+ * intent anybody has published. It is measured on its own terms here for that reason, and on the
+ * band it targets rather than on the pooled number.
+ *
+ * WHAT IT IS ALLOWED TO CLAIM, and this is the delicate part. nflverse's historical depth charts
+ * carry a season and a week and NO DATE — the 2020-to-2024 schema has no timestamp column at all —
+ * so the stamp has to be derived rather than read. It is derived as the LATEST instant that is
+ * provably before the season's first kickoff: one millisecond before that kickoff, which
+ * `firstKickoffFor` recovers from the store's own closing-line stamps. A week-1 depth chart is filed by the league's own process before week 1 is played,
+ * so this stamp is LATER than the real publication, which is the direction that cannot claim
+ * knowledge we did not have. What it cannot rule out is that nflverse scraped the file late in that
+ * window; the file contains orderings rather than outcomes, so the exposure is a club reshuffling
+ * after a Thursday game, and the research document states it as a weakness rather than hiding it.
+ */
+
+/** Where a depth-chart fact came from. Matches the store's `source` column. */
+export const DEPTH_SOURCE = "nflverse_depth_charts";
+
+/** The metric: his place on his club's own list, 1 for the starter. See `DEPTH_RANKS`. */
+export const DEPTH_METRIC = "depth_team";
+
+/**
+ * The ranks the prior is estimated in, plus the one that is an absence rather than a number.
+ *
+ * `offChart` is a real and different fact from being listed third: a club that publishes an
+ * offensive depth chart and does not put a man on it anywhere has said something about him. It is
+ * kept as its own cell rather than folded into third string because it measured differently from
+ * third string on both fit seasons, in the same direction on both.
+ */
+export const DEPTH_RANKS = ["first", "second", "third", "offChart"] as const;
+export type DepthRank = (typeof DEPTH_RANKS)[number];
+
+/** Everything past third string is third string: the published charts only ever run to three. */
+export function depthRankFor(depthTeam: number | null): DepthRank {
+  if (depthTeam === null) return "offChart";
+  if (depthTeam <= 1) return "first";
+  if (depthTeam === 2) return "second";
+  return "third";
+}
+
+export interface DepthPriors {
+  /**
+   * How much the chart moves layer 1's belief about how much a man plays, per position and rank.
+   *
+   * ONE MULTIPLIER, ON SNAP SHARE, and everything else scales with it. The depth chart is a
+   * statement about ROLE and nothing else — it does not say how many targets a slot receiver sees,
+   * it says he is the slot receiver — and snap share is the quantity layer 1 holds that role in.
+   * Applying separate corrections to targets and carries would be reading four claims out of a file
+   * that makes one.
+   *
+   * Normalised so the position's own overall correction is one. The chart is allowed to reorder a
+   * position and never to relevel it against the others: a league-wide multiplier on every
+   * quarterback would move all thirty-two of them together and could not improve a ranking, and if
+   * the model were badly levelled at a position that is layer 1's defect to fix rather than this
+   * file's to paper over.
+   */
+  readonly bySnapShare: Readonly<Record<Position, Readonly<Record<DepthRank, number>>>>;
+  /**
+   * The most the chart may move a projection, either way, as a multiplier.
+   *
+   * Bounded for the reason `rookies.ts` bounds its landing term, and less tightly for a reason: a
+   * depth chart is a much stronger claim in August than a landing spot is, and the correction it
+   * needs at quarterback is genuinely large. What the bound stops is a thin cell asserting that a
+   * third-string tight end is a starter.
+   */
+  readonly bound: number;
+}
+
+/** One club's published ordering, as the board consumes it: rank per player. */
+export type DepthChart = ReadonlyMap<string, DepthRank>;
+
+export interface MapDepthChartResult {
+  readonly observations: readonly PlayerWeekObservation[];
+  /** Rows naming a player the universe does not project. Reported, never silently dropped. */
+  readonly unknownPlayers: readonly string[];
+}
+
+/**
+ * THE INSTANT A PRE-GAME FACT ABOUT `season` MAY CLAIM: the season's first kickoff.
+ *
+ * Recovered from the store rather than from a calendar, following `replay-moments.ts`.
+ * `schedule.ts` stamps every closing line at the game's own start time, so the earliest of them is
+ * the first ball thrown in the season. Anything stamped before it is, by definition, something a
+ * person could have known without watching any football.
+ */
+export async function firstKickoffFor(db: ReadonlyDb, season: number): Promise<Date> {
+  const [row] = await db
+    .select({ earliest: min(teamWeekObservations.asOf) })
+    .from(teamWeekObservations)
+    .where(
+      and(
+        eq(teamWeekObservations.season, season),
+        eq(teamWeekObservations.source, SCHEDULE_SOURCE.kickoff),
+        eq(teamWeekObservations.metric, SCHEDULE_METRICS.pointSpread),
+      ),
+    );
+  const earliest = row?.earliest ?? null;
+  if (earliest === null) {
+    throw new Error(
+      `The store holds no ${season} closing lines, so the season's first kickoff cannot be derived. Run \`npm run projections:context\` first.`,
+    );
+  }
+  return new Date(earliest);
+}
+
+/**
+ * Turns one season's `depth_charts_YYYY.csv` into stamped observations.
+ *
+ * Narrowed to WEEK ONE, to the regular season, to the offence, and to players the engine projects.
+ * The week-one chart is the only one a preseason board could have read, the offensive formation is
+ * the only one carrying a fantasy position, and the universe decides who is projectable exactly as
+ * it does for every other feed here.
+ *
+ * A player listed in several slots keeps his BEST rank. Charts list a man at both `WR` and `KR`, or
+ * at `RB` and `HB`, and the highest place his club gave him anywhere is the claim it is making
+ * about him.
+ */
+export function mapDepthChart(
+  rows: readonly CsvRow[],
+  projected: ReadonlySet<string>,
+  season: number,
+  asOf: Date,
+): MapDepthChartResult {
+  const best = new Map<string, number>();
+  const unknown = new Set<string>();
+  for (const row of rows) {
+    if (required(row, "week", season) !== "1") continue;
+    if (required(row, "game_type", season) !== NFLVERSE_CONFIG.seasonType) continue;
+    if (required(row, "formation", season) !== "Offense") continue;
+    const playerId = (row.gsis_id ?? "").trim();
+    if (playerId === "") continue;
+    const depth = Number(required(row, "depth_team", season));
+    if (!Number.isFinite(depth) || depth < 1) continue;
+    if (!projected.has(playerId)) {
+      unknown.add(playerId);
+      continue;
+    }
+    best.set(playerId, Math.min(best.get(playerId) ?? Number.POSITIVE_INFINITY, depth));
+  }
+
+  return {
+    observations: [...best.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([playerId, depth]) => ({
+        season,
+        week: 1,
+        playerId,
+        source: DEPTH_SOURCE,
+        metric: DEPTH_METRIC,
+        value: depth,
+        asOf,
+      })),
+    unknownPlayers: [...unknown].sort(),
+  };
+}
+
+function required(row: CsvRow, column: string, season: number): string {
+  const value = row[column];
+  if (value === undefined) {
+    throw new Error(`depth_charts_${season}.csv has no ${column} column; the published schema changed.`);
+  }
+  return value.trim();
+}
+
+/**
+ * Layer 1's opportunity, corrected by what the clubs published.
+ *
+ * Applied to the whole predicted line rather than to snap share alone, because everything a player
+ * does scales with how much he is on the field, and applied BEFORE availability reads his snap
+ * share so that a backup's shorter season follows from the same correction rather than from a
+ * second rule about backups.
+ */
+export function applyDepthChart(
+  opportunity: ReadonlyMap<string, PredictedOpportunity>,
+  chart: DepthChart,
+  positions: ReadonlyMap<string, Position>,
+  priors: DepthPriors,
+): ReadonlyMap<string, PredictedOpportunity> {
+  const clamp = (value: number): number => Math.min(1, Math.max(0, value));
+  return new Map(
+    [...opportunity].map(([playerId, player]) => {
+      const position = positions.get(playerId);
+      if (position === undefined) return [playerId, player] as const;
+      const multiplier = depthMultiplier(position, chart.get(playerId) ?? "offChart", priors);
+      return [
+        playerId,
+        {
+          ...player,
+          snapShare: clamp(player.snapShare * multiplier),
+          targetShare: clamp(player.targetShare * multiplier),
+          carryShare: clamp(player.carryShare * multiplier),
+          passAttemptShare: clamp(player.passAttemptShare * multiplier),
+        },
+      ] as const;
+    }),
+  );
+}
+
+/** The bounded correction for one cell. Exported so a test and the fit report read the same number. */
+export function depthMultiplier(position: Position, rank: DepthRank, priors: DepthPriors): number {
+  const raw = priors.bySnapShare[position]?.[rank];
+  if (raw === undefined || !(raw > 0) || !Number.isFinite(raw)) return 1;
+  return Math.min(1 + priors.bound, Math.max(1 / (1 + priors.bound), raw));
+}

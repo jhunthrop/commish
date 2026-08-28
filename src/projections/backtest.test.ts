@@ -4,6 +4,8 @@ import { nflPlayers } from "@/db/schema";
 import { PPR_SCORING } from "@/domain/scoring";
 import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
 import { replay, type ProjectionInput, type ProjectionSource } from "./backtest";
+import { INJURY_METRICS, INJURY_SOURCE, REPORT_STATUS } from "./news/retrieve";
+import { recordPlayerTeams } from "./team-store";
 import { naiveProjection, NAIVE_SOURCE_NAME } from "./benchmarks/naive";
 import type { SeasonStatLine } from "./lines";
 import { statLineObservations } from "./nflverse/stat-lines";
@@ -205,5 +207,73 @@ describe("replay scoring", () => {
     await expect(
       replay(db, { season: 2024, weeks: [9], source: naiveSource, rules: PPR_SCORING, asOfForWeek: () => undefined as never }),
     ).rejects.toThrow(/replay moment/i);
+  });
+});
+
+/**
+ * THE PER-PLAYER MOMENT, and the guarantee that makes it safe.
+ *
+ * `docs/research/2026-08-27-model-v3.md` found that four fifths of the injury wire is unreachable by
+ * any whole-week replay moment, because one instant for the whole week must precede Thursday night
+ * and the league files most of its report on the Friday. Replaying each man at his own game moves
+ * that line, and the only thing standing between "moves the line" and "reads the future" is that a
+ * player may still see nothing stamped after HIS OWN kickoff. That is what these two pin.
+ */
+describe("the per-player replay moment", () => {
+  /** Thursday's club and Sunday's club, in the week being replayed. */
+  const THURSDAY = new Date("2024-09-12T12:00:00.000Z");
+  const SUNDAY = new Date("2024-09-15T12:00:00.000Z");
+  const FRIDAY_FILING = new Date("2024-09-13T18:00:00.000Z");
+
+  const asOfForPlayerGame = (week: number, team: string): Date | null =>
+    week !== 2 ? null : team === "KC" ? THURSDAY : team === "BUF" ? SUNDAY : null;
+
+  beforeEach(async () => {
+    await recordPlayerTeams(db, [
+      { season: 2024, week: 1, playerId: "star", team: "KC", asOf: RESULTS_KNOWN[1]! },
+      { season: 2024, week: 1, playerId: "starter", team: "BUF", asOf: RESULTS_KNOWN[1]! },
+    ]);
+    // One designation about each man, filed on the Friday: after the Thursday game and before the
+    // Sunday one. Exactly the row a whole-week moment can never reach.
+    await recordObservations(
+      db,
+      ["star", "starter"].map((playerId) => ({
+        season: 2024,
+        week: 2,
+        playerId,
+        source: INJURY_SOURCE,
+        metric: INJURY_METRICS.reportStatus,
+        value: REPORT_STATUS.out,
+        asOf: FRIDAY_FILING,
+      })),
+    );
+  });
+
+  it("READS THE FRIDAY FILING for the man who plays on Sunday, which no whole-week moment can", async () => {
+    const { source, seen } = spySource();
+
+    await replay(db, { season: 2024, weeks: [2], source, rules: PPR_SCORING, asOfForWeek, asOfForPlayerGame });
+
+    expect(seen[0]!.news.map((row) => row.playerId)).toEqual(["starter"]);
+  });
+
+  it("REFUSES IT for the man whose own game was already played, which is the whole guarantee", async () => {
+    const { source, seen } = spySource();
+
+    await replay(db, { season: 2024, weeks: [2], source, rules: PPR_SCORING, asOfForWeek, asOfForPlayerGame });
+
+    for (const row of seen[0]!.news) {
+      const kickoff = asOfForPlayerGame(2, row.playerId === "star" ? "KC" : "BUF")!;
+      expect(row.asOf.getTime()).toBeLessThanOrEqual(kickoff.getTime());
+    }
+    expect(seen[0]!.news.some((row) => row.playerId === "star")).toBe(false);
+  });
+
+  it("behaves exactly as before when no per-player moment is given", async () => {
+    const { source, seen } = spySource();
+
+    await replay(db, { season: 2024, weeks: [2], source, rules: PPR_SCORING, asOfForWeek });
+
+    expect(seen[0]!.news).toEqual([]);
   });
 });

@@ -16,11 +16,22 @@ import type { PredictedOpportunity } from "../model/opportunity";
  * statement of intent by the only people who get to hand out the carries, and it is available in
  * April, which is what makes it usable here.
  *
- * LANDING SPOT IS THE SECOND HALF, and without it draft capital alone would rank two identical
- * backs identically when one of them is behind a man who took three hundred carries last year. The
- * competition term is bounded rather than free: it adjusts a capital prior by up to half in either
- * direction and can never overturn it, because a depth chart in August is a weaker claim than a
- * first-round pick.
+ * LANDING SPOT WAS THE SECOND HALF, AND IT MEASURED WORSE THAN DRAFT CAPITAL ALONE. The argument
+ * for it is still the one below: two identical backs are not identical when one of them is behind a
+ * man who took three hundred carries last year. The measurement disagreed, on both held-out seasons
+ * and badly on one — judged on the rookie segment against ranking the class by pick number, the
+ * board with the landing term scored 0.3733 against 0.6374 in 2023 and 0.6459 against 0.6790 in
+ * 2024. It is bounded to half in either direction, which is enough to move a first-round back below
+ * a third-round one, and on that evidence the reordering destroys more information than it adds. It
+ * is now behind `PreseasonFeatures.rookieLanding` and that flag is OFF.
+ *
+ * WHAT REPLACES IT IS THE PICK NUMBER ITSELF. The buckets below are the level the fit can estimate;
+ * they are not the resolution a draft has. Six cells rank the third pick level with the thirty-first
+ * and the fitted table caps ties into place on top of that, so a bucket-only board hands a whole
+ * round a single number and lets availability break it. `capitalShares` interpolates between the
+ * buckets on the pick axis, which keeps every fitted mean where the fit put it and makes the class
+ * order by draft capital in between — the ordering the counterfactual uses and the one this module
+ * had to beat.
  *
  * THE DISTRIBUTION IS WIDER, AND NOT BY A RULE WRITTEN HERE. `availability.ts` narrows its spread
  * with the length of a player's record; a rookie's record is empty, so his distribution comes out
@@ -45,6 +56,32 @@ import type { PredictedOpportunity } from "../model/opportunity";
  */
 export const DRAFT_BUCKETS = ["round1", "round2", "round3", "rounds4to5", "rounds6to7", "undrafted"] as const;
 export type DraftBucket = (typeof DRAFT_BUCKETS)[number];
+
+/**
+ * Where an undrafted man sits on the pick axis: behind the last pick of a seven-round draft.
+ *
+ * One constant, consumed by the capital curve here and by the draft-capital counterfactual the
+ * research script scores against it, so the two can never disagree about what "undrafted" means.
+ */
+export const UNDRAFTED_PICK = 300;
+
+/**
+ * The pick each bucket's fitted mean is anchored at: the middle of the picks that bucket covers.
+ *
+ * A bucket mean is an average over its members, so the pick it describes is the middle of the
+ * bucket rather than its first pick. Anchoring at the midpoint and interpolating between anchors
+ * leaves every fitted mean exactly where the fit put it and invents nothing in between — the value
+ * at pick 48 is the round-2 mean because that is what was measured, and the value at pick 40 is
+ * between the round-1 and round-2 means because a fit over six cells has nothing finer to say.
+ */
+const BUCKET_ANCHOR: Readonly<Record<DraftBucket, number>> = {
+  round1: 16.5,
+  round2: 48.5,
+  round3: 84.5,
+  rounds4to5: 142.5,
+  rounds6to7: 220,
+  undrafted: UNDRAFTED_PICK,
+};
 
 /**
  * Which bucket an overall pick falls in.
@@ -87,6 +124,12 @@ export interface RookiePriors {
    */
   readonly typicalIncumbentClaim: Readonly<Record<Position, number>>;
   /**
+   * The share of his team's games a rookie of each position and each level of capital plays,
+   * measured over EVERY rookie in the cell including the ones who never dressed. See
+   * `capitalGameRate` for why this table exists and what its absence cost.
+   */
+  readonly gameRate: Readonly<Record<Position, Readonly<Record<DraftBucket, number>>>>;
+  /**
    * The most the landing spot may move a capital prior, either way.
    *
    * Bounded on purpose. A depth chart in August is a much weaker claim than a first-round pick — it
@@ -114,6 +157,97 @@ export interface RookieInput {
 }
 
 /**
+ * WHICH RANKING OF A ROOKIE CLASS IS IN USE. Both flags are measured, never assumed.
+ *
+ * `PreseasonFeatures` carries these through from the board so an ablation can flip one at a time.
+ */
+export interface RookieFeatures {
+  /**
+   * The landing-spot competition term. OFF on the shipped board: it measured worse than ranking the
+   * class by draft pick alone on both held-out seasons.
+   */
+  readonly landingSpot: boolean;
+  /**
+   * Interpolate the six fitted bucket means on the pick axis, so a class orders by draft capital
+   * rather than in six flat steps. ON on the shipped board.
+   */
+  readonly pickCurve: boolean;
+}
+
+/**
+ * Where one bucket table lands for one pick, blending the two cells the pick falls between.
+ *
+ * Shared by the share table and the game-rate table so the two can never interpolate differently,
+ * and generic in the cell type because "blend two cells" is the whole of what differs between them.
+ */
+function alongTheCapitalCurve<T>(
+  cells: Readonly<Record<DraftBucket, T>>,
+  overallPick: number | null,
+  pickCurve: boolean,
+  blend: (above: T, below: T, weight: number) => T,
+): T {
+  if (!pickCurve) return cells[draftBucketFor(overallPick)];
+  if (overallPick === null || overallPick <= 0) return cells.undrafted;
+
+  const anchors = DRAFT_BUCKETS.map((bucket) => ({ pick: BUCKET_ANCHOR[bucket], cell: cells[bucket] }));
+  const first = anchors[0]!;
+  const last = anchors[anchors.length - 1]!;
+  // Clamped rather than extrapolated at both ends. Above the first anchor there is no measured cell
+  // to run toward, and inventing a steeper first round would be a curve nobody fitted.
+  if (overallPick <= first.pick) return first.cell;
+  if (overallPick >= last.pick) return last.cell;
+
+  const index = anchors.findIndex((anchor) => overallPick <= anchor.pick);
+  const above = anchors[index - 1]!;
+  const below = anchors[index]!;
+  return blend(above.cell, below.cell, (overallPick - above.pick) / (below.pick - above.pick));
+}
+
+/** The shares draft capital alone implies, interpolated between the fitted bucket means. */
+export function capitalShares(
+  position: Position,
+  overallPick: number | null,
+  priors: RookiePriors,
+  { pickCurve }: RookieFeatures,
+): RookieShares {
+  return alongTheCapitalCurve(priors.byBucket[position], overallPick, pickCurve, (above, below, weight) => {
+    const between = (high: number, low: number): number => high + (low - high) * weight;
+    return {
+      snapShare: between(above.snapShare, below.snapShare),
+      targetShare: between(above.targetShare, below.targetShare),
+      carryShare: between(above.carryShare, below.carryShare),
+      passAttemptShare: between(above.passAttemptShare, below.passAttemptShare),
+    };
+  });
+}
+
+/**
+ * THE SHARE OF HIS TEAM'S GAMES A ROOKIE OF THIS CAPITAL PLAYS, over the whole class and not only
+ * over the ones who made the field.
+ *
+ * This is the other half of the decomposition `fit.ts` describes, and the half the first version of
+ * this board did not have. The share table above is conditional on playing, which is the right
+ * per-game number; without an unconditional companion, the availability model was left to guess how
+ * often a rookie plays from a snap share that already assumed he did. It guessed that every rookie
+ * quarterback in the league was a starter, projected the undrafted ones above the best receiver in
+ * the class, and that single cross-position error was most of what made the rookie ordering worse
+ * than sorting the class by pick number.
+ */
+export function capitalGameRate(
+  position: Position,
+  overallPick: number | null,
+  priors: RookiePriors,
+  { pickCurve }: RookieFeatures,
+): number {
+  return alongTheCapitalCurve(
+    priors.gameRate[position],
+    overallPick,
+    pickCurve,
+    (above, below, weight) => above + (below - above) * weight,
+  );
+}
+
+/**
  * How much the landing spot moves the capital prior.
  *
  * A room where returning players already hold twice the typical share of the work halves the
@@ -138,9 +272,13 @@ export function landingMultiplier(input: RookieInput, priors: RookiePriors): num
  * place for the arithmetic to drift, and it would make "how does the board rank rookies against
  * veterans" a question about two models rather than one.
  */
-export function rookieOpportunity(input: RookieInput, priors: RookiePriors): PredictedOpportunity {
-  const shares = priors.byBucket[input.position][draftBucketFor(input.overallPick)];
-  const multiplier = landingMultiplier(input, priors);
+export function rookieOpportunity(
+  input: RookieInput,
+  priors: RookiePriors,
+  features: RookieFeatures,
+): PredictedOpportunity {
+  const shares = capitalShares(input.position, input.overallPick, priors, features);
+  const multiplier = features.landingSpot ? landingMultiplier(input, priors) : 1;
   const clamp = (value: number): number => Math.min(1, Math.max(0, value));
   return {
     playerId: input.playerId,

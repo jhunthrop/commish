@@ -1,4 +1,5 @@
 import type { AvailabilityPriors } from "./availability";
+import type { DepthPriors } from "./depth";
 import type { RookiePriors } from "./rookies";
 
 /**
@@ -107,153 +108,153 @@ export const FITTED_ROOKIE_PRIORS: RookiePriors = {
   "byBucket": {
     "QB": {
       "round1": {
-        "snapShare": 0.732791142048932,
-        "targetShare": 0.0006224361063070741,
-        "carryShare": 0.11829618297219399,
-        "passAttemptShare": 0.7242013122730864
+        "snapShare": 0.8022774139931153,
+        "targetShare": 0.000597632654084267,
+        "carryShare": 0.14215105376617468,
+        "passAttemptShare": 0.7922001235927232
       },
       "round2": {
         "snapShare": 0.6772021244935853,
-        "targetShare": 0.0006224361063070741,
+        "targetShare": 0.000597632654084267,
         "carryShare": 0.09921228633700943,
         "passAttemptShare": 0.669802263217377
       },
       "round3": {
-        "snapShare": 0.6597372454032902,
-        "targetShare": 0.00048170915106398975,
-        "carryShare": 0.09211204223591468,
-        "passAttemptShare": 0.6550411228042984
+        "snapShare": 0.6306291135861316,
+        "targetShare": 0.00021409295602843994,
+        "carryShare": 0.0802783020674234,
+        "passAttemptShare": 0.6304392221158339
       },
       "rounds4to5": {
-        "snapShare": 0.6597372454032902,
-        "targetShare": 0.00048170915106398975,
-        "carryShare": 0.09211204223591468,
-        "passAttemptShare": 0.6550411228042984
+        "snapShare": 0.6306291135861316,
+        "targetShare": 0.00021409295602843994,
+        "carryShare": 0.0802783020674234,
+        "passAttemptShare": 0.6304392221158339
       },
       "rounds6to7": {
-        "snapShare": 0.6197969834902923,
-        "targetShare": 0.00048170915106398975,
-        "carryShare": 0.09103266120523841,
-        "passAttemptShare": 0.608500638813493
+        "snapShare": 0.504986701483706,
+        "targetShare": 0.00021409295602843994,
+        "carryShare": 0.07467341094169637,
+        "passAttemptShare": 0.48589739000572474
       },
       "undrafted": {
-        "snapShare": 0.6197969834902923,
-        "targetShare": 0.00048170915106398975,
-        "carryShare": 0.08850849032968156,
-        "passAttemptShare": 0.608500638813493
+        "snapShare": 0.504986701483706,
+        "targetShare": 0.00021409295602843994,
+        "carryShare": 0.06174900031136186,
+        "passAttemptShare": 0.48589739000572474
       }
     },
     "RB": {
       "round1": {
-        "snapShare": 0.2486518739026008,
-        "targetShare": 0.04058316671629343,
-        "carryShare": 0.22118562870993275,
+        "snapShare": 0.41230553888403254,
+        "targetShare": 0.06876627845843652,
+        "carryShare": 0.36811093615127183,
         "passAttemptShare": 0
       },
       "round2": {
-        "snapShare": 0.2486518739026008,
-        "targetShare": 0.04058316671629343,
-        "carryShare": 0.22118562870993275,
+        "snapShare": 0.37267366469270474,
+        "targetShare": 0.06813885805342806,
+        "carryShare": 0.33214850894040227,
         "passAttemptShare": 0
       },
       "round3": {
-        "snapShare": 0.22083018352543393,
-        "targetShare": 0.032452310861270324,
-        "carryShare": 0.2065538950528084,
+        "snapShare": 0.25628753205420507,
+        "targetShare": 0.03299244030730337,
+        "carryShare": 0.2556303260116042,
         "passAttemptShare": 0
       },
       "rounds4to5": {
-        "snapShare": 0.21825431634831782,
-        "targetShare": 0.032452310861270324,
-        "carryShare": 0.19249854524251941,
+        "snapShare": 0.22925345866605112,
+        "targetShare": 0.03299244030730337,
+        "carryShare": 0.20155178569251261,
         "passAttemptShare": 0
       },
       "rounds6to7": {
-        "snapShare": 0.17128715746577317,
-        "targetShare": 0.0258692711788407,
-        "carryShare": 0.14338695412645935,
+        "snapShare": 0.155582370275552,
+        "targetShare": 0.022392070059501924,
+        "carryShare": 0.1246530194869751,
         "passAttemptShare": 0
       },
       "undrafted": {
-        "snapShare": 0.13774554087217836,
-        "targetShare": 0.02286681827721692,
-        "carryShare": 0.12547451141226051,
+        "snapShare": 0.10340652224107119,
+        "targetShare": 0.017721587768087153,
+        "carryShare": 0.0967892197093325,
         "passAttemptShare": 0
       }
     },
     "WR": {
       "round1": {
-        "snapShare": 0.4789671002772279,
-        "targetShare": 0.1316210861813114,
-        "carryShare": 0.005106921862507639,
-        "passAttemptShare": 0.0004571762738590372
+        "snapShare": 0.6161016103251818,
+        "targetShare": 0.18004415455923076,
+        "carryShare": 0.005902196903290352,
+        "passAttemptShare": 0.0007228024231552045
       },
       "round2": {
-        "snapShare": 0.39155558844448235,
-        "targetShare": 0.09196814116219312,
-        "carryShare": 0.005106921862507639,
-        "passAttemptShare": 0.00005836292857774943
+        "snapShare": 0.46145047400570893,
+        "targetShare": 0.1098889441407907,
+        "carryShare": 0.005902196903290352,
+        "passAttemptShare": 0.000017209581503695345
       },
       "round3": {
-        "snapShare": 0.30109846065179147,
-        "targetShare": 0.06216824799943991,
-        "carryShare": 0.0047706159872266665,
-        "passAttemptShare": 0.00005836292857774943
+        "snapShare": 0.30146775468534037,
+        "targetShare": 0.0562565668261887,
+        "carryShare": 0.0054047538760780825,
+        "passAttemptShare": 0.000017209581503695345
       },
       "rounds4to5": {
-        "snapShare": 0.28375359466531347,
-        "targetShare": 0.06216824799943991,
-        "carryShare": 0.003679153240837025,
-        "passAttemptShare": 0.00005836292857774943
+        "snapShare": 0.2707238696271794,
+        "targetShare": 0.0562565668261887,
+        "carryShare": 0.0033761447264884976,
+        "passAttemptShare": 0.000017209581503695345
       },
       "rounds6to7": {
-        "snapShare": 0.23565766548828354,
-        "targetShare": 0.04289847576111638,
-        "carryShare": 0.002415092585530196,
-        "passAttemptShare": 0.000049716568788453216
+        "snapShare": 0.19740203506086929,
+        "targetShare": 0.02773811015588116,
+        "carryShare": 0.001439815100847894,
+        "passAttemptShare": 0.000013160268208708208
       },
       "undrafted": {
-        "snapShare": 0.1911466316572947,
-        "targetShare": 0.038630662820276454,
-        "carryShare": 0.0021365711052409994,
-        "passAttemptShare": 0.00003627965830508749
+        "snapShare": 0.15057418515448245,
+        "targetShare": 0.02750457597963208,
+        "carryShare": 0.0014193513999635507,
+        "passAttemptShare": 0.000008286094798075536
       }
     },
     "TE": {
       "round1": {
-        "snapShare": 0.3202135099235147,
-        "targetShare": 0.05495066478024792,
-        "carryShare": 0.0005663586862624874,
+        "snapShare": 0.4356346640294526,
+        "targetShare": 0.09619103576698707,
+        "carryShare": 0.000409036828967352,
         "passAttemptShare": 0
       },
       "round2": {
-        "snapShare": 0.3202135099235147,
-        "targetShare": 0.05062881811229353,
-        "carryShare": 0.0005259044943865954,
+        "snapShare": 0.43253852643830837,
+        "targetShare": 0.07075447968246193,
+        "carryShare": 0.00030677762172551395,
         "passAttemptShare": 0
       },
       "round3": {
-        "snapShare": 0.3095685979986633,
-        "targetShare": 0.04847326769378651,
-        "carryShare": 0.0005259044943865954,
+        "snapShare": 0.3395453908823258,
+        "targetShare": 0.055841660455736936,
+        "carryShare": 0.00030677762172551395,
         "passAttemptShare": 0
       },
       "rounds4to5": {
-        "snapShare": 0.3095685979986633,
-        "targetShare": 0.04847326769378651,
-        "carryShare": 0.0005259044943865954,
+        "snapShare": 0.3395453908823258,
+        "targetShare": 0.055841660455736936,
+        "carryShare": 0.00030677762172551395,
         "passAttemptShare": 0
       },
       "rounds6to7": {
-        "snapShare": 0.2507483465825872,
-        "targetShare": 0.03585940785906394,
-        "carryShare": 0.0005259044943865954,
+        "snapShare": 0.192683651400677,
+        "targetShare": 0.024660831817126905,
+        "carryShare": 0.00030677762172551395,
         "passAttemptShare": 0
       },
       "undrafted": {
-        "snapShare": 0.20938540653856513,
-        "targetShare": 0.024759084758394737,
-        "carryShare": 0.00048684677509930276,
+        "snapShare": 0.16927921856321346,
+        "targetShare": 0.01538041700795714,
+        "carryShare": 0.00030677762172551395,
         "passAttemptShare": 0
       }
     },
@@ -347,5 +348,97 @@ export const FITTED_ROOKIE_PRIORS: RookiePriors = {
     "K": 1,
     "DEF": 1
   },
+  "gameRate": {
+    "QB": {
+      "round1": 0.6558823529411764,
+      "round2": 0.2196078431372549,
+      "round3": 0.2196078431372549,
+      "rounds4to5": 0.20235294117647057,
+      "rounds6to7": 0.20235294117647057,
+      "undrafted": 0.16323529411764703
+    },
+    "RB": {
+      "round1": 0.47689075630252103,
+      "round2": 0.47689075630252103,
+      "round3": 0.47689075630252103,
+      "rounds4to5": 0.47689075630252103,
+      "rounds6to7": 0.47689075630252103,
+      "undrafted": 0.211484593837535
+    },
+    "WR": {
+      "round1": 0.7351086714635412,
+      "round2": 0.6321807411489185,
+      "round3": 0.6321807411489185,
+      "rounds4to5": 0.5019286403085824,
+      "rounds6to7": 0.3954676952748313,
+      "undrafted": 0.12377515786854137
+    },
+    "TE": {
+      "round1": 0.5922643029814666,
+      "round2": 0.5922643029814666,
+      "round3": 0.5922643029814666,
+      "rounds4to5": 0.5922643029814666,
+      "rounds6to7": 0.4719312382487242,
+      "undrafted": 0.16991173659651815
+    },
+    "K": {
+      "round1": 0,
+      "round2": 0,
+      "round3": 0,
+      "rounds4to5": 0,
+      "rounds6to7": 0,
+      "undrafted": 0
+    },
+    "DEF": {
+      "round1": 0,
+      "round2": 0,
+      "round3": 0,
+      "rounds4to5": 0,
+      "rounds6to7": 0,
+      "undrafted": 0
+    }
+  },
   "landingBound": 0.5
+};
+
+export const FITTED_DEPTH_PRIORS: DepthPriors = {
+  "bySnapShare": {
+    "QB": {
+      "first": 1.5084042223082774,
+      "second": 0.6126855371059732,
+      "third": 0.7237934855793506,
+      "offChart": 0.5142060742185813
+    },
+    "RB": {
+      "first": 1.1625325802204838,
+      "second": 1.1873205648294163,
+      "third": 0.8051862084966813,
+      "offChart": 0.48896157155637515
+    },
+    "WR": {
+      "first": 1.2788561716255673,
+      "second": 1.0497162314601667,
+      "third": 0.8197348904236147,
+      "offChart": 0.3876062484286849
+    },
+    "TE": {
+      "first": 1.2058084254141446,
+      "second": 1.0606027983176718,
+      "third": 0.9197637700024627,
+      "offChart": 0.4932476598666712
+    },
+    "K": {
+      "first": 1,
+      "second": 1,
+      "third": 1,
+      "offChart": 1
+    },
+    "DEF": {
+      "first": 1,
+      "second": 1,
+      "third": 1,
+      "offChart": 1
+    }
+  },
+  "bound": 1
 };

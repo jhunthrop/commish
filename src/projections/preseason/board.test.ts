@@ -5,7 +5,7 @@ import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/doma
 import { computeFantasyPoints } from "@/scoring/compute";
 import type { LeagueShape } from "../decide/replacement";
 import type { GamesPlayedOutlook } from "./availability";
-import { overlapTiers, preseasonBoard, scaleStatLine, type BoardCandidate } from "./board";
+import { byValueOverReplacement, overlapTiers, preseasonBoard, scaleStatLine, type BoardCandidate } from "./board";
 
 const SCORED: readonly Position[] = ["QB", "RB", "WR", "TE"];
 const SLOTS: readonly RosterSlotConfig[] = STANDARD_ROSTER_SLOTS.filter(
@@ -102,22 +102,38 @@ describe("preseasonBoard", () => {
     expect(entry.projectedPoints).toBeCloseTo(computeFantasyPoints(perGame, "WR", PPR_SCORING) * 17, 6);
   });
 
-  it("RANKS BY VALUE OVER REPLACEMENT, NOT BY POINTS — the quarterback case, at board level", () => {
-    // The quarterbacks here outscore every back by a distance, and there are forty of them against a
-    // league that starts twelve. A points ranking puts a quarterback first; a board must not.
-    const first = board[0]!;
-    const topScorer = [...board].sort((a, b) => b.projectedPoints - a.projectedPoints)[0]!;
-    expect(topScorer.position).toBe("QB");
-    expect(first.position).not.toBe("QB");
-    expect(first.valueOverReplacement).toBeGreaterThan(topScorer.valueOverReplacement);
-  });
-
-  it("is ordered by value over replacement, descending, with a stable tiebreak", () => {
+  it("IS ORDERED BY POINTS, because that is the ordering that measured better on both held-out seasons", () => {
     for (let index = 1; index < board.length; index += 1) {
-      expect(board[index - 1]!.valueOverReplacement).toBeGreaterThanOrEqual(board[index]!.valueOverReplacement);
+      expect(board[index - 1]!.projectedPoints).toBeGreaterThanOrEqual(board[index]!.projectedPoints);
     }
     expect(board.map((entry) => entry.rank)).toEqual(board.map((_, index) => index + 1));
     expect(preseasonBoard(pool(), OPTIONS)).toEqual(board);
+  });
+
+  it("KEEPS VALUE OVER REPLACEMENT AS A LABELLED VIEW — the quarterback case, at board level", () => {
+    // The quarterbacks here outscore every back by a distance, and there are forty of them against a
+    // league that starts twelve. The points order puts a quarterback first, which is the true answer
+    // to "who scores most"; the draft-value view must not, which is the true answer to "what is this
+    // pick worth".
+    const view = byValueOverReplacement(board);
+    expect(board[0]!.position).toBe("QB");
+    expect(view[0]!.position).not.toBe("QB");
+    expect(view[0]!.valueOverReplacement).toBeGreaterThan(board[0]!.valueOverReplacement);
+    for (let index = 1; index < view.length; index += 1) {
+      expect(view[index - 1]!.valueOverReplacement).toBeGreaterThanOrEqual(view[index]!.valueOverReplacement);
+    }
+    expect(view.map((entry) => entry.valueRank)).toEqual(view.map((_, index) => index + 1));
+  });
+
+  it("gives the same order under both readings WITHIN a position, which bounds the disagreement", () => {
+    // Value over replacement subtracts a constant per position, so it can only change how positions
+    // interleave. Everything computed per position is therefore the same under either default.
+    const view = byValueOverReplacement(board);
+    for (const position of SCORED) {
+      const byPoints = board.filter((entry) => entry.position === position).map((entry) => entry.playerId);
+      const byValue = view.filter((entry) => entry.position === position).map((entry) => entry.playerId);
+      expect(byValue).toEqual(byPoints);
+    }
   });
 
   it("carries a floor and a ceiling that bracket the projection", () => {

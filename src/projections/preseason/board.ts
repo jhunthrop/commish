@@ -19,22 +19,30 @@ import type { GamesPlayedOutlook } from "./availability";
  * itself, and it means a format with a reception bonus at one position gets the bonus on the season
  * total rather than on a per-game number somebody multiplied afterwards.
  *
- * RANKED BY VALUE OVER REPLACEMENT, NEVER BY POINTS, and this is the difference between a board and
- * a list. `decide/replacement.ts` makes the argument in full; the short form is that a quarterback
- * who scores 330 and a back who scores 300 are not a thirty-point gap when the twelfth quarterback
- * scores 290 and the thirty-first back scores 150. Replacement level is CONSUMED from that module
- * and not re-derived, because it is a function of this league's team count and roster shape and
- * nothing here knows better than the league does.
+ * ORDERED BY PROJECTED POINTS, WITH VALUE OVER REPLACEMENT AS A SECOND, LABELLED VIEW. The first
+ * two versions of this board were ordered by value over replacement and both measured worse than
+ * their own points column: 0.6559 against 0.6839 in 2023 and 0.7075 against 0.7385 in 2024, and
+ * points won in almost every band against both published benchmarks
+ * (`docs/research/2026-08-27-preseason-board.md`). Phase 5 named the mechanism before this board
+ * existed: value over replacement subtracts a replacement level estimated from the same noisy
+ * projections and then re-ranks aggressively ACROSS positions, so it AMPLIFIES board error rather
+ * than absorbing it. A better board reduces the error being amplified; it does not stop the
+ * amplification. The measurement decides the default and it says points.
  *
- * WHAT PHASE 5 LEARNED AND THIS BOARD OWES IT. `docs/research/2026-08-27-decision-quality.md` found
- * that drafting by highest value over replacement, with no roster need, is worse than a plain points
- * ranking every single time — a seat that takes the highest number available drafts seven tight
- * ends. That is an argument about a STRATEGY, not about a valuation, and the fix belongs where the
- * decision is made. What this board owes it is two things: the replacement level is computed over
- * the starters this league actually fields (flex slots included, which is what stops a position
- * from looking scarcer than it is), and both orderings are measured. If the value ranking scores
- * worse than the points ranking on held-out seasons, the research document says so and the board
- * ships as an explanation rather than as an instruction.
+ * REPLACEMENT LEVEL IS STILL THE RIGHT IDEA FOR A DRAFT, which is why it is kept rather than
+ * deleted. `decide/replacement.ts` makes the argument in full and it is correct: a quarterback who
+ * scores 330 and a back who scores 300 are not a thirty-point gap when the twelfth quarterback
+ * scores 290 and the thirty-first back scores 150. That argument is about WHAT A PICK IS WORTH TO A
+ * ROSTER, and it is a different question from "who scores more", which is what a rank correlation
+ * against season points measures. So every entry carries both numbers and both ranks: `rank` is the
+ * board's own order and is by points, `valueRank` is the draft-value view and is by value over
+ * replacement. `byValueOverReplacement` returns the second.
+ *
+ * WITHIN A POSITION THE TWO ORDERS ARE IDENTICAL, and that is worth stating because it bounds the
+ * whole disagreement. Value over replacement subtracts a constant per position, so it can only ever
+ * change how positions INTERLEAVE. Everything computed per position — the tiers below, the
+ * position rank, the cliff — is the same under either order, and the choice of default changes
+ * nothing except where the quarterbacks sit relative to the backs.
  */
 
 /**
@@ -77,8 +85,10 @@ export interface PreseasonBoardOptions {
 }
 
 export interface BoardEntry extends ValuedPlayer {
-  /** 1-based overall rank, by value over replacement. */
+  /** 1-based overall rank, by PROJECTED POINTS. The board's own order; see the module docblock. */
   readonly rank: number;
+  /** 1-based overall rank by value over replacement. The draft-value view, never the default. */
+  readonly valueRank: number;
   readonly team: string;
   readonly expectedGames: number;
   /** The season line the points were composed from — the intermediate worth arguing with. */
@@ -192,11 +202,14 @@ export function preseasonBoard(
     projections.push({ playerId: candidate.playerId, position: candidate.position, projectedPoints });
   }
 
+  // `valueBoard` returns its own order, which is by value over replacement. That order is the
+  // DRAFT-VALUE VIEW and it is stamped here as `valueRank` before the board is re-sorted by points.
   const valued = valueBoard(projections, shape);
+  const valueRanks = new Map(valued.map((player, index) => [player.playerId, index + 1] as const));
 
-  // Tiers are per POSITION and computed on value over replacement, because that is what the board is
-  // ordered by and a tier drawn on a different quantity than the ranking would put a cliff in the
-  // middle of a run of adjacent players.
+  // Tiers are per POSITION, and within a position value over replacement and points give the same
+  // order because the subtraction is a constant, so a tier is the same object under either default.
+  // Computed on value over replacement, which is the quantity `dropToNextTier` is reported in.
   //
   // The GAP rule, consumed from `decide/tiers.ts`. `overlapTiers` above implements the rule the spec
   // actually wrote down and returns one tier per position on both held-out seasons; see its docblock
@@ -213,7 +226,11 @@ export function preseasonBoard(
     });
   }
 
-  return valued.map((player, index) => {
+  const ordered = [...valued].sort(
+    (a, b) => b.projectedPoints - a.projectedPoints || a.playerId.localeCompare(b.playerId),
+  );
+
+  return ordered.map((player, index) => {
     const held = byPlayer.get(player.playerId)!;
     const standing = standings.get(player.playerId)!;
     const reasons: BoardReason[] = [
@@ -234,6 +251,7 @@ export function preseasonBoard(
     return {
       ...player,
       rank: index + 1,
+      valueRank: valueRanks.get(player.playerId)!,
       team: held.candidate.team,
       expectedGames: held.candidate.games.expected,
       seasonLine: held.seasonLine,
@@ -247,15 +265,18 @@ export function preseasonBoard(
 }
 
 /**
- * The same projections ordered by POINTS instead, which is what Phase 5 found beat a value ranking.
+ * THE DRAFT-VALUE VIEW: the same board, ordered by value over replacement.
  *
- * Exported so the research document can score both from one board rather than building two, which
- * is the only way the comparison is like for like. Named as a benchmark rather than as a mode: it is
- * the thing the board has to beat, not an alternative the product offers.
+ * A labelled second reading rather than the default, and the label is the point. Ranking a
+ * quarterback below a back because the twelfth quarterback is nearly as good as the first is a real
+ * and useful statement about a DRAFT PICK, and it is the statement `decide/replacement.ts` exists to
+ * make. It is not a statement about who will score more, and when it is scored as one it loses to
+ * the plain points column on both held-out seasons and in almost every band.
+ *
+ * So both are computed from one board rather than two, which is the only way the comparison is like
+ * for like, and the research document publishes both numbers side by side.
  */
-export function byProjectedPoints(board: readonly BoardEntry[]): readonly BoardEntry[] {
-  return [...board].sort(
-    (a, b) => b.projectedPoints - a.projectedPoints || a.playerId.localeCompare(b.playerId),
-  );
+export function byValueOverReplacement(board: readonly BoardEntry[]): readonly BoardEntry[] {
+  return [...board].sort((a, b) => a.valueRank - b.valueRank);
 }
 
