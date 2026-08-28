@@ -1,11 +1,19 @@
 import type { Db } from "@/db/client";
 import { recordObservations } from "../store";
+import { recordPlayerTeams, recordTeamObservations, teamObservationsAsOf, type TeamWeekObservation } from "../team-store";
+import { indexTeamMetrics } from "../team-context";
+import { LAST_POSSIBLE_WEEK } from "../store";
+import { coachObservations, seasonMeans } from "./coaches";
+import { DEFENCE_METRICS, opponentDefenceObservations, type DefenceWeek } from "../features/context";
 import { recordNflPlayers } from "../universe";
-import type { NflverseClient } from "./client";
+import { createNflverseClient, type NflverseClient } from "./client";
 import { NFLVERSE_CONFIG } from "./config";
 import { mapParticipation, participationObservations, weekAsOfFromSnapCounts } from "./map";
+import { PlayByPlayAggregator, playProfileObservations, PBP_COLUMNS } from "./pbp";
 import { buildPlayerUniverse, mapNflPlayers, nflPlayerRows, type PlayerUniverse } from "./players";
+import { kickoffAsOf, mapSchedule, scheduleObservations, SCHEDULE_SOURCE_CONFIG } from "./schedule";
 import { mapStatLines, statLineObservations } from "./stat-lines";
+import { lineContinuityObservations, mapPlayerTeams } from "./team-map";
 
 /**
  * ONE SEASON, FROM RELEASE TO STORE — the sequence every script that touches nflverse runs.
@@ -20,6 +28,16 @@ import { mapStatLines, statLineObservations } from "./stat-lines";
  * release covering every year, and re-parsing it per season would be six downloads to answer the
  * same question.
  */
+
+/**
+ * The moment a derivation reads the store at when it is deriving a fact about the PAST.
+ *
+ * A coach's prior pace is computed from seasons that are over, so the honest read is the final,
+ * corrected one — the same choice `backtest.ts` makes for actuals and `projection-fit.ts` makes for
+ * fitting. The point-in-time gate governs what a MODEL may see when predicting; the resulting fact
+ * carries its own `as_of`, which is what a replay is bounded by.
+ */
+const FAR_FUTURE = new Date("9999-12-31T00:00:00.000Z");
 
 /** Everything one season's ingestion reports about itself, which the operator is expected to read. */
 export interface SeasonIngestReport {
@@ -66,6 +84,12 @@ export async function ingestSeason(
     (await recordObservations(db, participationObservations(participation.participation))) +
     (await recordObservations(db, statLineObservations(statLines.statLines)));
 
+  // Both derived from the snap counts already in hand, so they cost no second download. The
+  // player-to-team edge is what every Phase 3 context feature joins on, and line continuity is the
+  // one part of the offensive line composite that needs no play-by-play at all.
+  await recordPlayerTeams(db, mapPlayerTeams(snapCounts, universe));
+  await recordTeamObservations(db, lineContinuityObservations(snapCounts, season));
+
   const unresolved = new Map<string, { id: string; name: string; occurrences: number }>();
   for (const row of [...participation.unresolved, ...statLines.unresolved]) {
     const already = unresolved.get(row.id);
@@ -85,4 +109,130 @@ export async function ingestSeason(
     unresolved: [...unresolved.values()],
     weekAsOf,
   };
+}
+
+/**
+ * THE CONTEXT INGESTION — play-by-play and the schedule, which `ingestSeason` deliberately does not
+ * touch.
+ *
+ * Separate because the costs are two orders of magnitude apart. `ingestSeason` pulls a few
+ * megabytes and is run by the report script every time somebody wants a scoreboard; a season of
+ * play-by-play is a hundred megabytes, and putting it on that path would make printing a scoreboard
+ * a coffee break. This is run when the seasons change, exactly as the backfill is.
+ *
+ * The schedule covers every season in one small file, so it is fetched once for a list of them
+ * rather than once per season.
+ */
+export interface ContextIngestReport {
+  readonly season: number;
+  readonly playsRead: number;
+  readonly teamWeeks: number;
+  readonly observationsWritten: number;
+}
+
+/** The schedule repository is a different host from the release assets — see `schedule.ts`. */
+function createScheduleClient(): NflverseClient {
+  return createNflverseClient({ baseUrl: SCHEDULE_SOURCE_CONFIG.baseUrl });
+}
+
+/**
+ * Opponent, rest, venue, weather and the closing line, for every named season at once.
+ *
+ * The two `source` stamps the mapper applies are the load-bearing part: half of this file is
+ * knowable in May and half only at kickoff, and the store is where that difference is recorded.
+ */
+export async function ingestSchedule(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
+  const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  return await recordTeamObservations(db, scheduleObservations(mapSchedule(rows, seasons)));
+}
+
+/**
+ * One season of play-by-play, streamed and reduced to team-week facts as it arrives.
+ *
+ * Stamped from the game's own date, on exactly the arithmetic `gameDayAsOf` uses for a box score:
+ * end of the game's UTC calendar day plus the publication lag. A pace number is knowable when the
+ * game that produced it has finished and not before.
+ */
+export async function ingestPlayByPlay(db: Db, client: NflverseClient, season: number): Promise<ContextIngestReport> {
+  const aggregator = new PlayByPlayAggregator();
+  const playsRead = await client.streamCsv("pbp", `play_by_play_${season}.csv`, PBP_COLUMNS, (row) => {
+    aggregator.add(row);
+  });
+  const profiles = aggregator.profiles();
+  const observations = playProfileObservations(profiles, (profile) =>
+    kickoffAsOf(profile.gameDate, NFLVERSE_CONFIG.publicationLagHours),
+  );
+  return {
+    season,
+    playsRead,
+    teamWeeks: profiles.length,
+    observationsWritten: await recordTeamObservations(db, observations),
+  };
+}
+
+/**
+ * The play-caller table: tenure, and an incoming coach's own pace and pass-rate history.
+ *
+ * Run AFTER the play-by-play, and the ordering is not incidental: a coach's prior pace is the mean
+ * of the situation-neutral pace of every offence he ran before this season, so it can only be
+ * computed once those seasons' play-by-play is in the store. Run first, it would write a table of
+ * nulls and nothing downstream would complain — the scheme prior would simply fall back to the
+ * league for every coaching change, which is exactly the case the feature exists to handle.
+ */
+export async function ingestCoaches(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
+  const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  // Every season back to the earliest the store could hold, so a coach hired in 2024 is credited
+  // with the offences he ran in 2016 rather than looking like a first-time head coach.
+  const earliest = Math.min(...seasons);
+  const history = Array.from({ length: Math.max(...seasons) - earliest + 1 }, (_, index) => earliest + index);
+  const games = mapSchedule(rows, history);
+
+  const all: TeamWeekObservation[] = [];
+  for (const season of history) {
+    all.push(
+      ...(await teamObservationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FAR_FUTURE })),
+    );
+  }
+  const metrics = indexTeamMetrics({ playerTeams: [], teamObservations: all });
+  const weeks = Array.from({ length: LAST_POSSIBLE_WEEK }, (_, index) => index + 1);
+  return await recordTeamObservations(db, coachObservations(games, seasonMeans(metrics, weeks), seasons));
+}
+
+/**
+ * The opponent adjustment, derived from what is already in the store.
+ *
+ * Run AFTER the play-by-play, like the coach table and for the same reason: the ratings are built
+ * from what each defence allowed, which the play-by-play ingestion is what writes. Run first, it
+ * would rate every defence exactly league average and the feature would measure as nothing.
+ *
+ * A derivation rather than an ingestion — it reaches no network except for the schedule, which is
+ * two megabytes and covers every season. Re-running it after a change of method costs seconds,
+ * which is the point of keeping the method here rather than inside the play-by-play stream.
+ */
+export async function ingestOpponentDefence(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
+  const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  // The prior season too, so week 1 carries last season's final ratings rather than no adjustment.
+  const earliest = Math.min(...seasons) - 1;
+  const history = Array.from({ length: Math.max(...seasons) - earliest + 1 }, (_, index) => earliest + index);
+  const games = mapSchedule(rows, history);
+
+  const observations: TeamWeekObservation[] = [];
+  for (const season of history) {
+    observations.push(
+      ...(await teamObservationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FAR_FUTURE })),
+    );
+  }
+  const metrics = indexTeamMetrics({ playerTeams: [], teamObservations: observations });
+
+  const defenceWeeks: DefenceWeek[] = games.map((game) => ({
+    season: game.season,
+    week: game.week,
+    defence: game.team,
+    offence: game.opponent,
+    passYardsAllowedPerDropback: metrics(game.team, { season: game.season, week: game.week }, DEFENCE_METRICS.pass),
+    rushYardsAllowedPerCarry: metrics(game.team, { season: game.season, week: game.week }, DEFENCE_METRICS.rush),
+    asOf: game.kickoffAsOf,
+  }));
+
+  return await recordTeamObservations(db, opponentDefenceObservations(games, defenceWeeks, seasons));
 }

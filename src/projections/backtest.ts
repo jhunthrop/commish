@@ -6,6 +6,8 @@ import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { statLinesAsOf, type SeasonStatLine } from "./lines";
 import { predictOpportunity, type OpportunityPriors } from "./model/opportunity";
 import { LAST_POSSIBLE_WEEK } from "./store";
+import { playerTeamsAsOf, teamObservationsAsOf } from "./team-store";
+import type { TeamContext } from "./team-context";
 import { usageAsOf, type PlayerWeekUsage } from "./usage";
 import { rankBandFor, scoreCard, RANK_BANDS, type Observation, type RankBandName, type ScoreCard } from "./metrics";
 
@@ -46,6 +48,12 @@ export interface ProjectionInput {
   readonly usage: readonly PlayerWeekUsage[];
   /** From `nfl_players`, narrowed. A player absent here is one the engine cannot score. */
   readonly positions: ReadonlyMap<string, Position>;
+  /**
+   * Everything KNOWABLE ABOUT THE TEAMS at `asOf` — Phase 3's context layers and nothing else reads
+   * it. Read here, through the same two point-in-time functions, for the same reason `usage` is: a
+   * source that opened its own connection would be a second path from the store into a projection.
+   */
+  readonly teamContext: TeamContext;
 }
 
 export interface ProjectionSource {
@@ -164,6 +172,14 @@ interface WeekOutcome {
   /** Projected points per player, one map per source, in the order the sources were given. */
   readonly projected: readonly ReadonlyMap<string, number>[];
   readonly actual: ReadonlyMap<string, number>;
+  /**
+   * The players this week that a SEGMENT restricts scoring to, or `null` for all of them.
+   *
+   * Computed once per week from the same `ProjectionInput` every source was handed, never per
+   * source: a segment that saw different data from the sources it is dividing would be selecting
+   * on something other than the situation it claims to name.
+   */
+  readonly segment: ReadonlySet<string> | null;
 }
 
 /**
@@ -182,6 +198,7 @@ async function replayWeeks(
   rules: ScoringRules,
   asOfForWeek: (week: number) => Date,
   historySeasons: number,
+  segment?: (input: ProjectionInput) => ReadonlySet<string>,
 ): Promise<readonly WeekOutcome[]> {
   // Ascending, whatever order the caller listed them in: a replay that ran week 3 before week 2
   // would still be leak-free (each week's own as-of gate holds) but the scoreboard would read as
@@ -205,13 +222,25 @@ async function replayWeeks(
     // still admit a pre-kickoff fact about this week, which is not what "history" means.
     const history: SeasonStatLine[] = [];
     const usage: PlayerWeekUsage[] = [];
+    const playerTeams: TeamContext["playerTeams"][number][] = [];
+    const teamObservations: TeamContext["teamObservations"][number][] = [];
     for (let historySeason = earliestSeason; historySeason <= season; historySeason += 1) {
       const upTo = historySeason === season ? week - 1 : LAST_POSSIBLE_WEEK;
-      if (upTo < 1) continue;
-      const span = { season: historySeason, week: { from: 1, to: upTo }, asOf } as const;
-      history.push(...(await statLinesAsOf(db, span)));
-      usage.push(...(await usageAsOf(db, span)));
+      if (upTo >= 1) {
+        const span = { season: historySeason, week: { from: 1, to: upTo }, asOf } as const;
+        history.push(...(await statLinesAsOf(db, span)));
+        usage.push(...(await usageAsOf(db, span)));
+        playerTeams.push(...(await playerTeamsAsOf(db, span)));
+      }
+      // Team facts reach into the week being predicted and are bounded by the as-of gate alone.
+      // The schedule half of them was published in May and is genuinely knowable; the kickoff half
+      // cannot pass the gate. See `TeamContext` for why a week bound here would have hidden both.
+      const contextTo = historySeason === season ? week : LAST_POSSIBLE_WEEK;
+      teamObservations.push(
+        ...(await teamObservationsAsOf(db, { season: historySeason, week: { from: 1, to: contextTo }, asOf })),
+      );
     }
+    const teamContext: TeamContext = { playerTeams, teamObservations };
 
     const pointsOf = (line: StatLine): number | null => {
       const position = positions.get(line.playerId);
@@ -226,12 +255,19 @@ async function replayWeeks(
       return points;
     };
 
+    const input: ProjectionInput = { season, week, asOf, history, usage, positions, teamContext };
     const projected: ReadonlyMap<string, number>[] = [];
     for (const source of sources) {
-      projected.push(asPoints(await source.project({ season, week, asOf, history, usage, positions })));
+      projected.push(asPoints(await source.project(input)));
     }
     const actuals = await statLinesAsOf(db, { season, week, asOf: FINAL_OUTCOME });
-    outcomes.push({ week, asOf, projected, actual: asPoints(actuals.map((row) => row.line)) });
+    outcomes.push({
+      week,
+      asOf,
+      projected,
+      actual: asPoints(actuals.map((row) => row.line)),
+      segment: segment?.(input) ?? null,
+    });
   }
   return outcomes;
 }
@@ -290,6 +326,16 @@ export async function replay(
 export interface HeadToHeadOptions extends Omit<ReplayOptions, "source"> {
   /** Two or more sources, shown identical history and scored by identical code. */
   readonly sources: readonly ProjectionSource[];
+  /**
+   * Narrows scoring to the players a SITUATION applies to — the post-transaction segment, the
+   * rookies, the returning starters.
+   *
+   * The engine spec's learning loop asks "where are we wrong, and what would fix that segment?"
+   * rather than "which feature matters most", and a pooled number cannot answer it. A feature that
+   * fixes exactly the situation it was built for and is neutral everywhere else is a success whose
+   * overall figure barely moves, and without this it would be discarded.
+   */
+  readonly segment?: (input: ProjectionInput) => ReadonlySet<string>;
 }
 
 export interface HeadToHead {
@@ -312,15 +358,20 @@ export interface HeadToHead {
  */
 export async function replayHeadToHead(
   db: ReadonlyDb,
-  { season, weeks, sources, rules, asOfForWeek, historySeasons = DEFAULT_HISTORY_SEASONS }: HeadToHeadOptions,
+  { season, weeks, sources, rules, asOfForWeek, historySeasons = DEFAULT_HISTORY_SEASONS, segment }: HeadToHeadOptions,
 ): Promise<HeadToHead> {
   if (sources.length < 2) {
     throw new Error("A head-to-head needs at least two sources; one source is a replay.");
   }
-  const outcomes = await replayWeeks(db, season, weeks, sources, rules, asOfForWeek, historySeasons);
+  const outcomes = await replayWeeks(db, season, weeks, sources, rules, asOfForWeek, historySeasons, segment);
   const intersection = (outcome: WeekOutcome): ReadonlySet<string> => {
     const [first, ...rest] = outcome.projected;
-    return new Set([...first!.keys()].filter((playerId) => rest.every((other) => other.has(playerId))));
+    return new Set(
+      [...first!.keys()].filter(
+        (playerId) =>
+          rest.every((other) => other.has(playerId)) && (outcome.segment === null || outcome.segment.has(playerId)),
+      ),
+    );
   };
   return {
     full: sources.map((source, index) => scoreSource(source.name, outcomes, index)),

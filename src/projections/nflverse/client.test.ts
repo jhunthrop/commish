@@ -90,3 +90,83 @@ describe("createFixtureFetch", () => {
     await expect(client.getCsv("snap_counts", "snap_counts_1999.csv")).rejects.toThrow(/No nflverse fixture/);
   });
 });
+
+/**
+ * The streaming reader is the path play-by-play arrives on, and the only path in the engine where
+ * the data is too large to eyeball. These pin the three things that would corrupt a season's worth
+ * of derived team metrics without anything else in the suite noticing: a record split across a
+ * chunk boundary, a column that has moved, and a ragged row.
+ */
+describe("createNflverseClient.streamCsv", () => {
+  /** A body delivered in the awkward pieces a real socket delivers, not as one string. */
+  function chunkedResponse(chunks: readonly string[]): Response {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+        controller.close();
+      },
+    });
+    return new Response(stream, { status: 200, headers: { "content-type": "text/csv" } });
+  }
+
+  function streamingClient(chunks: readonly string[]) {
+    return clientWith((async () => chunkedResponse(chunks)) as typeof globalThis.fetch);
+  }
+
+  it("reassembles records split across chunk boundaries", async () => {
+    const client = streamingClient(["week,team,ya", "rds\n1,CLE,", "88\n2,BU", "F,120\n"]);
+    const rows: Record<string, string>[] = [];
+
+    const count = await client.streamCsv("pbp", "play_by_play_2024.csv", ["team", "yards"], (row) => rows.push({ ...row }));
+
+    expect(count).toBe(2);
+    expect(rows).toEqual([
+      { team: "CLE", yards: "88" },
+      { team: "BUF", yards: "120" },
+    ]);
+  });
+
+  it("hands the caller only the columns it named", async () => {
+    const client = streamingClient(["a,b,c\n1,2,3\n"]);
+    const rows: Record<string, string>[] = [];
+    await client.streamCsv("pbp", "play_by_play_2024.csv", ["c"], (row) => rows.push({ ...row }));
+    expect(rows).toEqual([{ c: "3" }]);
+  });
+
+  it("keeps a quoted field containing a comma and a newline intact across chunks", async () => {
+    const client = streamingClient(['a,b\n"one,', 'two\nthree",4\n']);
+    const rows: Record<string, string>[] = [];
+    await client.streamCsv("pbp", "play_by_play_2024.csv", ["a", "b"], (row) => rows.push({ ...row }));
+    expect(rows).toEqual([{ a: "one,two\nthree", b: "4" }]);
+  });
+
+  it("throws when a named column is absent, rather than handing back an undefined a rate would read as zero", async () => {
+    const client = streamingClient(["a,b\n1,2\n"]);
+    await expect(
+      client.streamCsv("pbp", "play_by_play_2024.csv", ["rushing_yards"], () => undefined),
+    ).rejects.toThrow(/no column "rushing_yards"/);
+  });
+
+  it("throws on a ragged row — a truncated download is not a short row", async () => {
+    const client = streamingClient(["a,b\n1,2\n3\n"]);
+    await expect(client.streamCsv("pbp", "play_by_play_2024.csv", ["a"], () => undefined)).rejects.toThrow(/truncated/);
+  });
+
+  it("throws on an empty body rather than reporting a season of no plays", async () => {
+    const client = streamingClient([""]);
+    await expect(client.streamCsv("pbp", "play_by_play_2024.csv", ["a"], () => undefined)).rejects.toThrow(/empty body/);
+  });
+
+  it("decompresses a .gz asset, because nflverse publishes some releases only that way", async () => {
+    const { gzipSync } = await import("node:zlib");
+    const gzipped = gzipSync(Buffer.from("player,avg_time_to_throw\nMahomes,2.81\n"));
+    const client = clientWith((async () =>
+      new Response(new Uint8Array(gzipped), { status: 200 })) as typeof globalThis.fetch);
+    const rows: Record<string, string>[] = [];
+
+    await client.streamCsv("nextgen_stats", "ngs_2024_passing.csv.gz", ["avg_time_to_throw"], (row) => rows.push({ ...row }));
+
+    expect(rows).toEqual([{ avg_time_to_throw: "2.81" }]);
+  });
+});

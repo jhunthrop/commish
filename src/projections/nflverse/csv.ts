@@ -20,63 +20,100 @@
 export type CsvRow = Readonly<Record<string, string>>;
 
 /**
- * Splits one CSV document into rows of raw fields, honouring quoting.
+ * Splits CSV text into rows of raw fields, honouring quoting, ACROSS CHUNK BOUNDARIES.
  *
  * A single character-at-a-time pass rather than a regex or a `split(",")`: quoted fields may
  * legally contain commas, newlines and doubled quotes, and every shortcut that ignores that
  * corrupts real nflverse rows (the weekly stats file carries headshot URLs with commas in them).
+ *
+ * INCREMENTAL because play-by-play is a hundred megabytes a season and cannot be held in memory as
+ * one string, let alone as fifty thousand objects of four hundred columns each. The state that a
+ * whole-document pass keeps in local variables lives on the instance instead, so a caller can feed
+ * network chunks in and take records out. `parseCsv` is then the same code with one chunk, which
+ * matters more than the few lines it saves: two CSV readers in one codebase is two definitions of
+ * what a quoted field means, and the one used for the big file would be the one nobody tested.
  */
-function splitRecords(text: string): readonly (readonly string[])[] {
-  const records: string[][] = [];
-  let fields: string[] = [];
-  let field = "";
-  let quoted = false;
-  let started = false;
+export class CsvSplitter {
+  private fields: string[] = [];
+  private field = "";
+  private quoted = false;
+  private started = false;
+  /** A `"` that ended a chunk may be an escaped quote whose partner is in the next one. */
+  private pendingQuote = false;
 
-  const endField = () => {
-    fields.push(field);
-    field = "";
-    started = true;
-  };
-  const endRecord = () => {
-    endField();
-    records.push(fields);
-    fields = [];
-    started = false;
-  };
-
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i]!;
-    if (quoted) {
-      if (char !== '"') {
-        field += char;
-      } else if (text[i + 1] === '"') {
-        // RFC 4180 escapes a quote by doubling it; consume both and emit one.
-        field += '"';
-        i += 1;
-      } else {
-        quoted = false;
-      }
-      continue;
-    }
-    if (char === '"' && field === "") {
-      quoted = true;
-    } else if (char === ",") {
+  /** Feeds one chunk and returns every record COMPLETED by it. */
+  feed(text: string): readonly (readonly string[])[] {
+    const records: string[][] = [];
+    const endField = (): void => {
+      this.fields.push(this.field);
+      this.field = "";
+      this.started = true;
+    };
+    const endRecord = (): void => {
       endField();
-    } else if (char === "\n") {
-      endRecord();
-    } else if (char !== "\r") {
-      // A lone `\r` is dropped: CRLF is the line ending nflverse's own tooling emits on Windows
-      // runners, and treating the CR as data would append it to the last field of every row.
-      field += char;
-    } else {
-      started = started || field.length > 0;
+      records.push(this.fields);
+      this.fields = [];
+      this.started = false;
+    };
+
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i]!;
+      if (this.pendingQuote) {
+        this.pendingQuote = false;
+        // RFC 4180 escapes a quote by doubling it. A doubled quote emits one; a single one closed
+        // the field, and this character still has to be processed as though unquoted.
+        if (char === '"') {
+          this.field += '"';
+          continue;
+        }
+        this.quoted = false;
+      }
+      if (this.quoted) {
+        if (char !== '"') {
+          this.field += char;
+        } else {
+          this.pendingQuote = true;
+        }
+        continue;
+      }
+      if (char === '"' && this.field === "") {
+        this.quoted = true;
+      } else if (char === ",") {
+        endField();
+      } else if (char === "\n") {
+        endRecord();
+      } else if (char !== "\r") {
+        // A lone `\r` is dropped: CRLF is the line ending nflverse's own tooling emits on Windows
+        // runners, and treating the CR as data would append it to the last field of every row.
+        this.field += char;
+      } else {
+        this.started = this.started || this.field.length > 0;
+      }
     }
+    return records;
   }
-  // A file with no trailing newline still has a final record; one WITH a trailing newline must not
-  // produce a phantom empty row after it.
-  if (field !== "" || fields.length > 0 || started) endRecord();
-  return records;
+
+  /**
+   * The final record, if the document did not end with a newline.
+   *
+   * A file WITH a trailing newline must not produce a phantom empty row after it, which is why this
+   * is a separate call rather than something `feed` guesses at: mid-stream, "no trailing newline
+   * yet" and "end of file" look identical.
+   */
+  end(): readonly (readonly string[])[] {
+    if (this.field === "" && this.fields.length === 0 && !this.started) return [];
+    this.fields.push(this.field);
+    const record = this.fields;
+    this.fields = [];
+    this.field = "";
+    this.started = false;
+    return [record];
+  }
+}
+
+function splitRecords(text: string): readonly (readonly string[])[] {
+  const splitter = new CsvSplitter();
+  return [...splitter.feed(text), ...splitter.end()];
 }
 
 /**

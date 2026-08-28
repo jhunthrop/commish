@@ -19,8 +19,14 @@ import type { Position } from "@/domain/player";
 import { statLinesAsOf, type SeasonStatLine } from "@/projections/lines";
 import { RATES, TOUCHDOWN_RATES, type EfficiencyPriors, type RateName } from "@/projections/model/efficiency";
 import { fitEfficiencyPriors, fitOpportunityPriors } from "@/projections/model/fit";
+import { fitLinePriors, type LinePriors } from "@/projections/model/line-fit";
+import { fitSchemePriors, type SchemePriors } from "@/projections/model/scheme-fit";
+import { fitRedistributionPriors, type RedistributionPriors } from "@/projections/model/redistribution-fit";
+import { fitGameContextPriors, type GameContextPriors } from "@/projections/model/context-fit";
 import { projectedPosition } from "@/projections/nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
+import { playerTeamsAsOf, teamObservationsAsOf } from "@/projections/team-store";
+import type { TeamContext } from "@/projections/team-context";
 import { usageAsOf, type PlayerWeekUsage } from "@/projections/usage";
 
 /**
@@ -79,6 +85,111 @@ async function usageForSeasons(db: Db, seasons: readonly number[]): Promise<read
   return rows;
 }
 
+/**
+ * The team-level context for the fit seasons, read WITHOUT an as-of gate.
+ *
+ * The same choice `historyForSeasons` makes and for the same reason: a parameter should be fitted
+ * against what really happened, not against what was briefly believed on a Sunday night. The
+ * point-in-time gate governs what a model may see when PREDICTING, and that is enforced at replay.
+ * The composite the fit regresses against is still computed from weeks BEFORE the one it explains,
+ * because a composite that included the week being predicted would measure a correlation the model
+ * can never exploit.
+ */
+async function contextForSeasons(db: Db, seasons: readonly number[]): Promise<TeamContext> {
+  const playerTeams = [];
+  const teamObservations = [];
+  for (const season of seasons) {
+    const span = { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FINAL } as const;
+    playerTeams.push(...(await playerTeamsAsOf(db, span)));
+    teamObservations.push(...(await teamObservationsAsOf(db, span)));
+  }
+  return { playerTeams, teamObservations };
+}
+
+function renderLine(line: LinePriors): string {
+  return `/**
+ * PHASE 3, TASK 1 — the offensive line composite's league means and its two measured elasticities.
+ *
+ * The elasticities are regression slopes, not guesses: log team rushing yards per carry against log
+ * run-blocking composite, through the origin, weighted by carries, over the fit seasons' team-weeks
+ * only. An elasticity near zero is the measurement saying the composite does not move the rate, and
+ * the ablation is what decides whether the feature ships.
+ */
+export const FITTED_LINE_PRIORS: LinePriors = {
+  league: {
+    adjustedLineYards: ${line.league.adjustedLineYards.toFixed(6)},
+    stuffedRate: ${line.league.stuffedRate.toFixed(6)},
+    sackRateAllowed: ${line.league.sackRateAllowed.toFixed(6)},
+  },
+  rushingYardsElasticity: ${line.rushingYardsElasticity.toFixed(6)},
+  passingYardsElasticity: ${line.passingYardsElasticity.toFixed(6)},
+  leagueRushingYardsPerCarry: ${line.leagueRushingYardsPerCarry.toFixed(6)},
+  leaguePassingYardsPerAttempt: ${line.leaguePassingYardsPerAttempt.toFixed(6)},
+};
+`;
+}
+
+function renderGameContext(gameContext: GameContextPriors): string {
+  const pair = (name: string, elasticity: { opponent: number; rest: number }) =>
+    `  ${name}: { opponent: ${elasticity.opponent.toFixed(6)}, rest: ${elasticity.rest.toFixed(6)} },`;
+  return `/**
+ * PHASE 3, TASK 4 — the opponent adjusted for the offences it has faced, and rest.
+ *
+ * Fitted directly against the league-relative team rate rather than against a residual, unlike the
+ * scheme: layer 2 has never been shown who anybody played, so there is nothing here to double-count.
+ * The implied total, the spread and the weather are absent on purpose and not by oversight — every
+ * one of them is knowable only at kickoff, and the store's stamps make them unreachable from a
+ * projection made the Tuesday before. See \`features/context.ts\`.
+ */
+export const FITTED_GAME_CONTEXT_PRIORS: GameContextPriors = {
+${pair("passing", gameContext.passing)}
+${pair("rushing", gameContext.rushing)}
+  leaguePassingYardsPerAttempt: ${gameContext.leaguePassingYardsPerAttempt.toFixed(6)},
+  leagueRushingYardsPerCarry: ${gameContext.leagueRushingYardsPerCarry.toFixed(6)},
+};
+`;
+}
+
+function renderRedistribution(redistribution: RedistributionPriors): string {
+  return `/**
+ * PHASE 3, TASK 3 — how much of a departed player's share the remaining roster actually takes on.
+ *
+ * Measured over ${redistribution.events} team-weeks with a detected departure on the fit seasons,
+ * as a ratio of sums: the gap between what the roster really did and what layer 1 predicted, over
+ * the share that vacated. Never 1 — an offence that loses its best receiver throws less, and that
+ * part of the share stops existing rather than moving to anybody.
+ */
+export const FITTED_REDISTRIBUTION_PRIORS: RedistributionPriors = {
+  absorptionRate: ${redistribution.absorptionRate.toFixed(6)},
+  events: ${redistribution.events},
+};
+`;
+}
+
+function renderScheme(scheme: SchemePriors): string {
+  const volume = (name: string, elasticity: { tempo: number; passLean: number }) =>
+    `  ${name}: { tempo: ${elasticity.tempo.toFixed(6)}, passLean: ${elasticity.passLean.toFixed(6)} },`;
+  return `/**
+ * PHASE 3, TASK 2 — situation-neutral pace and pass rate, as elasticities on team volume.
+ *
+ * Fitted against the RESIDUAL of layer 1's own team-volume prediction, never against raw volume:
+ * layer 1 already predicts volume from realised volume, which is mostly a function of pace, and
+ * fitting there would count the same effect twice. Two regressors at once, because tempo and pass
+ * lean are correlated and separate fits would each claim the other's effect.
+ */
+export const FITTED_SCHEME_PRIORS: SchemePriors = {
+  league: {
+    paceSecondsPerPlay: ${scheme.league.paceSecondsPerPlay.toFixed(6)},
+    passRate: ${scheme.league.passRate.toFixed(6)},
+    passRateOverExpected: ${scheme.league.passRateOverExpected.toFixed(6)},
+  },
+${volume("targets", scheme.targets)}
+${volume("carries", scheme.carries)}
+${volume("passAttempts", scheme.passAttempts)}
+};
+`;
+}
+
 function renderEfficiency(efficiency: EfficiencyPriors): string {
   const names = Object.keys(RATES) as RateName[];
   const row = (position: string) =>
@@ -104,6 +215,10 @@ ${names.map((name) => `    ${name}: ${efficiency.regression[name].toFixed(2)},`)
 function render(
   fit: ReturnType<typeof fitOpportunityPriors>,
   efficiency: EfficiencyPriors,
+  line: LinePriors,
+  scheme: SchemePriors,
+  redistribution: RedistributionPriors,
+  gameContext: GameContextPriors,
   generatedFrom: readonly number[],
 ): string {
   const { priors } = fit;
@@ -112,7 +227,11 @@ function render(
     return `    ${position}: { snapShare: ${entry.snapShare.toFixed(6)}, targetsPerSnap: ${entry.targetsPerSnap.toFixed(6)}, carriesPerSnap: ${entry.carriesPerSnap.toFixed(6)}, passAttemptsPerSnap: ${entry.passAttemptsPerSnap.toFixed(6)} },`;
   };
   return `import type { EfficiencyPriors } from "./efficiency";
+import type { LinePriors } from "./line-fit";
 import type { OpportunityPriors } from "./opportunity";
+import type { GameContextPriors } from "./context-fit";
+import type { RedistributionPriors } from "./redistribution-fit";
+import type { SchemePriors } from "./scheme-fit";
 
 /**
  * GENERATED by \`npm run projections:fit\`. Do not edit by hand — regenerate.
@@ -123,7 +242,7 @@ import type { OpportunityPriors } from "./opportunity";
  * makes a published scoreboard reproducible: "what did the engine believe when it said that" has to
  * be answerable from the repository alone.
  *
- * Next-week share error on the fit seasons, pooled over snap, target and carry share
+ * Next-week share error on the fit seasons, pooled over all four shares the model emits
  * (n = ${fit.fitted.sampleSize}). The baseline is last observed share with no shrinkage — layer 1's
  * own floor, the thing the model has to beat before anything above it is worth reviewing.
  *
@@ -143,7 +262,11 @@ ${["QB", "RB", "WR", "TE", "K", "DEF"].map(role).join("\n")}
   leagueTeamVolume: { targets: ${priors.leagueTeamVolume.targets.toFixed(4)}, carries: ${priors.leagueTeamVolume.carries.toFixed(4)}, passAttempts: ${priors.leagueTeamVolume.passAttempts.toFixed(4)} },
 };
 
-${renderEfficiency(efficiency)}`;
+${renderEfficiency(efficiency)}
+${renderLine(line)}
+${renderScheme(scheme)}
+${renderRedistribution(redistribution)}
+${renderGameContext(gameContext)}`;
 }
 
 async function main(): Promise<void> {
@@ -181,7 +304,60 @@ async function main(): Promise<void> {
     );
   }
 
-  writeFileSync(OUTPUT, render(fit, efficiency, FIT_SEASONS));
+  const context = await contextForSeasons(db, [...HISTORY_SEASONS, ...FIT_SEASONS]);
+  const linePriors = fitLinePriors({ usage, history, context, seasons: [...FIT_SEASONS], heldOut: [...HELD_OUT_SEASONS] });
+  console.log(
+    `\noffensive line composite, fitted on ${FIT_SEASONS.join(", ")}:\n` +
+      `  league adjusted line yards ${linePriors.league.adjustedLineYards.toFixed(3)}, stuffed rate ${linePriors.league.stuffedRate.toFixed(3)}, sack rate ${linePriors.league.sackRateAllowed.toFixed(3)}\n` +
+      `  rushing yards elasticity ${linePriors.rushingYardsElasticity.toFixed(4)}, passing yards elasticity ${linePriors.passingYardsElasticity.toFixed(4)}`,
+  );
+
+  const schemePriors = fitSchemePriors({
+    usage,
+    positions,
+    context,
+    opportunity: fit.priors,
+    seasons: [...FIT_SEASONS],
+    heldOut: [...HELD_OUT_SEASONS],
+  });
+  console.log(
+    `\nscheme, fitted on ${FIT_SEASONS.join(", ")} against layer 1's own residual:\n` +
+      `  league pace ${schemePriors.league.paceSecondsPerPlay.toFixed(2)}s/play, neutral pass rate ${(schemePriors.league.passRate * 100).toFixed(1)}%, PROE ${schemePriors.league.passRateOverExpected.toFixed(2)}\n` +
+      `  targets      tempo ${schemePriors.targets.tempo.toFixed(4)}  passLean ${schemePriors.targets.passLean.toFixed(4)}\n` +
+      `  carries      tempo ${schemePriors.carries.tempo.toFixed(4)}  passLean ${schemePriors.carries.passLean.toFixed(4)}\n` +
+      `  passAttempts tempo ${schemePriors.passAttempts.tempo.toFixed(4)}  passLean ${schemePriors.passAttempts.passLean.toFixed(4)}`,
+  );
+
+  const redistributionPriors = fitRedistributionPriors({
+    usage,
+    positions,
+    context,
+    opportunity: fit.priors,
+    seasons: [...FIT_SEASONS],
+    heldOut: [...HELD_OUT_SEASONS],
+  });
+  console.log(
+    `\nredistribution, fitted on ${FIT_SEASONS.join(", ")}:\n` +
+      `  absorption rate ${redistributionPriors.absorptionRate.toFixed(4)} over ${redistributionPriors.events} team-weeks with a detected departure`,
+  );
+
+  const gameContextPriors = fitGameContextPriors({
+    usage,
+    history,
+    context,
+    seasons: [...FIT_SEASONS],
+    heldOut: [...HELD_OUT_SEASONS],
+  });
+  console.log(
+    `\ngame context, fitted on ${FIT_SEASONS.join(", ")}:\n` +
+      `  passing  opponent ${gameContextPriors.passing.opponent.toFixed(4)}  rest ${gameContextPriors.passing.rest.toFixed(4)}\n` +
+      `  rushing  opponent ${gameContextPriors.rushing.opponent.toFixed(4)}  rest ${gameContextPriors.rushing.rest.toFixed(4)}`,
+  );
+
+  writeFileSync(
+    OUTPUT,
+    render(fit, efficiency, linePriors, schemePriors, redistributionPriors, gameContextPriors, FIT_SEASONS),
+  );
   console.log(`\nwrote ${OUTPUT}`);
 
   await db.$client.end();

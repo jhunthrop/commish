@@ -1732,3 +1732,97 @@ export const captureSnapshots = pgTable(
     index("capture_snapshots_source_captured_idx").on(t.source, t.capturedAt),
   ],
 );
+
+/**
+ * WHICH OFFENCE A PLAYER WAS IN, WEEK BY WEEK — the edge `player_week_observations` deliberately
+ * does not carry, and which every context feature needs.
+ *
+ * The observation store is player-keyed with team totals riding on each player's own row, and that
+ * was the right call for layer 1: a player traded in October carries his new offence's volume with
+ * him automatically, where a team-keyed lookup would hand him his old one. But layers 2 and 4 ask
+ * questions that are ABOUT the team — how does this line block, how fast does this offence play,
+ * who is the defence this week — and those cannot be answered without knowing whose offence a man
+ * was in. Deriving it from the volume triple (as `fitLeagueTeamVolume` does to count team-weeks)
+ * identifies a team-week but not a TEAM, so it cannot follow one across a season.
+ *
+ * A separate table rather than a column on the observations, because it is a different KIND of
+ * fact: one row per player-week rather than one per metric, and a text value rather than a number.
+ * Squeezing a team code into a `double precision` column would mean an integer nobody can read in
+ * a query result, which is how a join silently goes wrong.
+ *
+ * `as_of` carries the same meaning and the same discipline as the observation store's: when the
+ * fact became knowable, which for "he took a snap for Cleveland in week 6" is the end of that game.
+ * A trade is therefore only visible to a replay AFTER the player has played a down for his new
+ * team, which is the honest bound — the transaction wire is a Phase 4 concern, and until it exists
+ * the engine may not pretend to have read it.
+ */
+export const playerWeekTeams = pgTable(
+  "player_week_teams",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season: integer("season").notNull(),
+    week: integer("week").notNull(),
+    /** An `nfl_players.id` (a `gsis_id`), matching `player_week_observations`. */
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** The nflverse team abbreviation (`CLE`, `BUF`). Free text, as the store's metric names are. */
+    team: text("team").notNull(),
+    /** THE STAMP, meaning exactly what it means in `player_week_observations`. Never `defaultNow()`. */
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** Identity of the fact, so a re-run of an ingestion is a no-op. A player can legitimately
+     *  appear for two teams in one WEEK only if a feed is wrong, and then the two rows differ by
+     *  `team` and both are kept for the operator to see rather than one silently winning. */
+    uniqueIndex("player_week_teams_fact_idx").on(t.season, t.week, t.playerId, t.team, t.asOf),
+    index("player_week_teams_as_of_idx").on(t.season, t.week, t.asOf),
+  ],
+);
+
+/**
+ * TEAM-LEVEL FACTS, POINT IN TIME — the same store as `player_week_observations`, one level up.
+ *
+ * Everything the context layers read lives here: the offensive line composite's four components,
+ * situation-neutral pace and pass rate over expected, the opponent's adjusted defence, the implied
+ * total and spread, the weather and the rest. Every one is a property of a TEAM in a WEEK and has
+ * no player to hang on, and forcing them onto player rows would repeat one number across fifty
+ * players and invite somebody to average it.
+ *
+ * The shape is copied from the player store on purpose rather than generalised into one table with
+ * a nullable `player_id`: the two have different foreign keys, different natural indexes and
+ * different write paths, and a nullable key is how a query that meant to read team rows quietly
+ * reads a hundred thousand player rows too.
+ *
+ * `as_of` is the load-bearing column here more than anywhere else in the engine, because the
+ * temptation in a context feature is enormous. A betting line for Sunday's game is knowable before
+ * Sunday and a kickoff temperature is not, and the difference between them is invisible in the
+ * value. The stamp is the only place that difference is recorded, so a feature derived from a fact
+ * stamped at kickoff is structurally unable to reach a projection made the Tuesday before — which
+ * is the correct outcome and one the ablation will report as "no effect" rather than hide.
+ */
+export const teamWeekObservations = pgTable(
+  "team_week_observations",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season: integer("season").notNull(),
+    week: integer("week").notNull(),
+    /** The nflverse team abbreviation. Not a foreign key: teams relocate and rename, and a lookup
+     *  table would have to be maintained for no read this engine performs. */
+    team: text("team").notNull(),
+    /** Which derivation said it (`nflverse_pbp`, `nflverse_schedule`, `commish_line`). */
+    source: text("source").notNull(),
+    /** Snake_case quantity (`pace_seconds_per_play`, `line_stuffed_rate`, `implied_team_total`). */
+    metric: text("metric").notNull(),
+    value: doublePrecision("value").notNull(),
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("team_week_observations_fact_idx").on(t.season, t.week, t.team, t.source, t.metric, t.asOf),
+    /** The read every context feature performs: one season, a span of weeks, everything knowable at
+     *  a moment — once per replayed week, for every week of every season the harness can reach. */
+    index("team_week_observations_as_of_idx").on(t.season, t.week, t.asOf),
+  ],
+);
