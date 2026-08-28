@@ -1,183 +1,95 @@
-# Commish — Design System
+# Gameday — Commish Design System v4
 
 **Read this before building any user-visible surface**, alongside `docs/conventions.md`. Everything here is enforced by tests where it can be, and by review where it can't. Every claim below either names the test that enforces it, or says "review-enforced."
 
-## Identity: the Sunday Standard
+**Status:** Gameday replaces Sunday Standard (v3) across the whole product, founder-directed 2026-08-28. The argument is `docs/design/2026-08-28-gameday-spec.md`; the approved compositions are the two applied screens in its rendered artifact. This document is the binding form.
 
-v3 (Phase 3.7) retones the product again, on top of v2's room-not-poster shell: the founder
-rejected v2's mint-on-ink identity outright ("I don't like this at all") and approved the Sunday
-Standard mock in its place (`docs/research/sunday-standard.html`, "this is better," 2026-08-24,
-binding). v3 is **near-monochrome** — paper/graphite and ink, with color spent on exactly two
-things: money (seats filling, a good outcome) and live (a clock, a failure). Six rules govern
-every surface this doc describes; they are the spine the rest of this document hangs off:
+## Identity: Gameday
 
-1. **Color is meaning.** Green is money and seats filling, red is live and clocks, everything
-   else is ink and paper. **Amended 2026-08-27** — it also means magnitude, tier grade and team
-   identity; see "The fun-pass amendments" below, which carries the colourblind gate that ships
-   with magnitude.
-2. **One face, earned weights.** Geist only; hierarchy from size and weight, not from a second
-   typeface.
-3. **No capitals anywhere.** Every `text-transform: uppercase` is gone — league names, eyebrows,
-   section labels, all of it. `src/design/no-uppercase.source.test.ts` is the gate.
-4. **Hairlines, not boxes.** Structure comes from thin rules and space, not card borders.
-   **Amended 2026-08-27** with a stated test for when a thing earns a card anyway: *act on or
-   compare = card; read down a column = row.*
-5. **One ink action per view.** One solid pill (ink fill, ground text) per view; every other
-   action is a quiet outlined pill. **Amended 2026-08-27** with named exceptions for surfaces
-   whose whole purpose is repeated action (the draft room; later waivers and trades). `src/design/accent-budget.source.test.ts` is the gate on the
-   two pill spellings; the *count* per view is a component-test/review law (see "Pill discipline"
-   below).
-6. **Only true things move.** The wire, draft clocks, seat meters and live pulses animate because
-   something real happened; chrome never does. `prefers-reduced-motion` is honored globally and
-   deliberately (see "Motion").
+Sunday Standard was built on restraint, and restraint is a magazine's value system. It produced a calm, well-set document, and the founder's verdict on it was exact: *"It feels like a legal website and not a fantasy site."*
 
-**Both themes are still first-class** (founder ruling, 2026-08-23, unrevisited by v3): dark is
-the approved mocks' identity and light is **designed** to the same nineteen roles and the same
-contrast thresholds, never inverted from dark by formula. `ThemeProvider` (`system | light |
-dark`) is untouched by any of this; only the palette each theme paints with moved.
+An earlier pass tried amending it — three rules bent, five phases, every change individually defensible — and produced *"little changes here and there"* rather than a step change, because **six rules that each forbid a thing cannot be patched into a system that affords one.** So this replaces v3 rather than amending it.
 
-- **The room is still the hero.** v3 keeps v2's four-surface depth model (`surface` →
-  `surfaceElevated` → `surfaceRaised` → `surfaceInset`); a panel earns its place by sitting at a
-  different depth, not by drawing a heavier line around itself — rule 4 is this idea applied to
-  the v3 palette.
-- **One green, two jobs; one red, two jobs.** `accent`/`positive` (money, an outcome) share one
-  hex, deliberately, exactly as v2 ruled; v3 gives `negative` the identical treatment — the live
-  family (clocks, live chips, destructive) is one red, jobs separated by context. See "One
-  pigment, two jobs" below.
-- **A hairline separates; an edge bounds.** `line` is decorative (<3:1, never the boundary of a
-  control) and `edge` is interactive (≥3:1, WCAG 1.4.11) — unchanged from v2.
-- **One type family, two roles.** Geist for both `font-sans` and `font-display`; see "Type"
-  below for v3's ramp.
+**Fantasy is not calm.** Six laws govern every surface this document describes; they are the spine the rest of it hangs off. Each replaces a v3 rule and is exactly as strict — they simply forbid different things.
 
-Default theme is still `system`; both themes are designed and tested.
+1. **Colour is a legend.** Six channels, each with exactly one meaning: **money**, **live**, **magnitude**, **position**, **team**, **tier**. Nothing else carries pigment. A manager should read state without reading words.
+   *Replaces v3 rule 1's "colour is meaning" as scarcity, which left every screen grey and forced you to read everything.*
+2. **The number is the hero.** One typeface, a **7.6x** scale range. A score is 84px; its label is 11px. Digits are tabular everywhere. If the largest thing on a screen is not a number or a name, the screen is wrong.
+   *Replaces v3 rule 2's hierarchy-from-weight capped at 600, which produced a 2x range and nothing for the eye to hold. The cap itself does not move — see "The 600 cap holds" below.*
+3. **A player is an object.** Face, team colour, position, number — every surface showing a player shows all four. Players, matchups and leagues are things you act on, drawn as things.
+   *Replaces v3 rule 4's "hairlines, not boxes", which rendered every object as a line of text.*
+4. **Density is respect.** A manager on Sunday wants more true facts per screen, not fewer. Tight leading, real tables, no decorative whitespace. Space separates kinds of information; it never exists to calm.
+   *New. v3 had no density position, so every surface drifted airy by default.*
+5. **The verb is obvious.** The action a screen exists for is the loudest thing on it, however many times it repeats. A draft board has a Draft on every row.
+   *Replaces v3 rule 5's "one ink action per view", which hid the primary verb on exactly the screens built to repeat it.*
+6. **Motion reports, never performs.** Nothing animates on mount, scroll or hover. Motion is permitted only where a real value changed, a real clock is running, or a real event arrived. Nothing eases longer than 250ms. Reduced-motion removes all of it and loses nothing.
+   *Sharpens v3 rule 6's "only true things move" — which was right, never spent, and silent on the tacky failure modes.*
 
-## The fun-pass amendments (2026-08-27) — three rules move, three hold
+### The razor
 
-Founder, 2026-08-27: *"I like the cleanliness of the UI but it doesn't feel like 'fun' you know?"*
-Then, precisely: **"It feels like a legal website and not a fantasy site."** And on scope, when an
-earlier draft of the spec narrowed to one screen: *"I wanted to reshape the entire site to be fun
-like flock fantasy."* The full argument is `docs/design/2026-08-27-fun-pass-spec.md`; the program
-is `docs/superpowers/plans/2026-08-27-fun-pass.md`. What follows is the binding record of what
-changed in the six rules and what did not.
+**Turn every animation off. If the product feels dead, the aliveness was fake.**
 
-**Rule 1 — colour is meaning — gains three meanings, product-wide.**
+Real aliveness in a sports interface comes from four things and none of them is motion: **numbers that change because the world changed**, **colour that encodes state so you read the screen without reading words**, **density of true facts**, and **the manager's own identity present on every screen**. Motion's only job is to make a change legible. It never announces itself.
 
-- **Magnitude.** A number may be coloured by where it falls in a real comparison set. This is the
-  heat map and it is the largest single change in the pass: four causes were diagnosed for why the
-  product reads as a contract, and "every number is the same colour" was the one the first draft
-  missed. It is permitted **only where the comparison is genuine and stated** — a percentile within
-  a defined population, never a designer's feeling about whether 14.2 is a good number. Tokens:
-  `TOKENS.magnitude`, five steps (`strong · good · neutral · weak · bad`), Tailwind `text-mag-*`.
-  Renderer: `Stat` (`src/components/ui/stat.tsx`), and **only** `Stat` —
-  `src/design/magnitude-budget.source.test.ts` fails any other file in the seven swept directories
-  that names a magnitude colour, in any spelling.
-  - **Magnitude may never appear on a control.** That is what keeps "green fill = action" intact.
-    A `Stat` renders a `<span>`, so magnitude cannot reach a control without first reaching a file
-    the sweep reddens.
-  - **`neutral` IS `textPrimary`**, the same deliberate doubling as `accent`/`positive`. A number
-    with no comparison behind it must be indistinguishable from ordinary text; give the no-verdict
-    step a pigment of its own and every uncompared number starts reading as a judgement.
-  - **The populations in use, and where they are built.** Every sanctioned comparison set on the
-    season surfaces lives in one pure module, `src/league-room/lib/population.ts`, so a new heat
-    column starts by naming its population there rather than inventing one at a call site. There
-    are three, all built from numbers the surface already holds — no heat column has ever cost a
-    query:
-    - *"starting quarterbacks this week"* (and the five sibling positions), on the matchup page's
-      player lines. Started players only, both sides of every matchup in the week; a player with no
-      stat line yet keeps a dash and stays out of the pool, because folding "has not played" in as
-      a zero drags every real score up the ramp on a Sunday morning.
-    - *"teams by points for"*, on the standings.
-    - *"teams by fewest points allowed"*, on the standings. Named in the direction it is judged,
-      because `Stat` speaks the population out loud: ranking it by raw size would paint the best
-      defense in the league as its worst number, under a sentence that agreed.
-  - **A population has a floor.** `LEAGUE_ROOM_CONFIG.heatMinPopulation` (4) is how many real
-    values a set must hold before anything is ranked inside it. Below it the module returns no
-    comparison at all and the number renders as ordinary ink. A percentile across three
-    quarterbacks is arithmetic dressed as a fact, which is the thing this amendment exists to
-    forbid.
-  - **Where magnitude is deliberately NOT spent.** A matchup's score, because it already carries an
-    ink meaning (a decided matchup's loser recedes) and a number cannot say two things with one
-    channel. A standings record, because the table is sorted by it and position already says it.
-    Anything on the storefront, because a shelf has no honest population to rank a league inside —
-    colouring an empty room red would be a judgement about a league rather than a fact about one.
-- **Tier grade.** S/A/B bands as coloured bars, once the projection engine makes tiers real. Parked
-  until then; this amendment already covers it, so no second ruling is needed when it lands.
-- **Team identity.** A team's own colour, behind a player's face only. Never on a surface, never
-  behind text. Tokens: `TOKENS.team`, thirty-two club colours keyed by the abbreviation the stats
-  feed emits, theme-independent (a club's colour is the club's, in daylight and at night alike).
-  Renderer: `PlayerFace` (`src/draft-room/components/player-face.tsx`) — one decorative,
-  `aria-hidden` tile exactly the size of the face, with the `Avatar` on top of it. It is the one
-  palette here that reaches the DOM as an inline `style` rather than a CSS variable, because it is
-  keyed by DATA and a Tailwind class the static scanner cannot see ships no rule at all; that is
-  also why the values live in `tokens.ts`, the one file allowed to hold a colour literal. A team
-  we have no colour for renders the bare face rather than a grey rectangle pretending to be
-  somebody's colours.
+### What survives from v3, unchanged
 
-Green still means money and red still means live. Magnitude reuses those hues deliberately — good
-is green because good is the same feeling as money.
+- **One typeface.** Geist only. Range comes from size, never from a second family.
+- **Sentence case in prose.** Uppercase survives only in mono micro-labels, where every sports interface has always put it. See "The caps charter" below, which is unchanged in strictness and now has exactly one address.
+- **Every accessibility gate.** Contrast in both themes; magnitude never carried by hue alone.
+- **Both themes.** Dark is the flagship; light is **designed** to the same roles and the same thresholds, never inverted from dark by formula. `ThemeProvider` (`system | light | dark`) is untouched; only the palette each theme paints with moved. Default theme is still `system`.
+- **Honesty.** No invented data, no tint without a stated population, no motion without a real event.
+- **A hairline separates; an edge bounds.** `line` is decorative (<3:1, never the boundary of a control) and `edge` is interactive (≥3:1, WCAG 1.4.11).
 
-**The colourblind rule, which is a gate and not a nicety.** Green versus red is the worst available
-pair for deuteranopia, which affects roughly one man in twelve, and this product's audience is
-overwhelmingly men. The reference product's heat map fails this and we do not copy the failure.
-**Magnitude colour is never the only channel.** Every heat-coloured value carries a second
-encoding: its own numeric value read plainly, and — where the value is judged rather than merely
-reported — a caret naming which side of the population it fell on and a weight step naming how far.
-A manager who sees no colour at all must still rank the column correctly. Three enforcements, at
-three levels:
+### The 600 cap holds
 
-1. `stat.test.tsx` asserts the value renders as text in every state, that each verdict step carries
-   its caret and its weight step, and that a neutral carries neither.
-2. `tokens.test.ts` orders the ramp by **contrast against the ground** rather than by hue, so the
-   sequence survives with the hue channel switched off entirely. (Ordering by contrast is also
-   direction-free across themes: louder is brighter at night and darker in daylight.)
-3. `tokens.test.ts` also holds every step to 4.5:1 on **all four** surfaces in both themes, not the
-   two the semantic roles are checked against — a heat-coloured number lands in a table row and an
-   inset well as readily as on the page ground.
+Law 2 asks for range and gets it from **size only**. `weight-cap.source.test.ts` still bans `font-bold`/`font-extrabold`/`font-black` across seven directories with no allowlist, and `font-semibold` (600) is still the ceiling. A bigger number is the answer; a heavier face is not. Law 2's own gate in `tokens.test.ts` pins the two values the law names — display `2xl` at 84 and `xs` at 11 — so the 7.6x claim above cannot quietly stop being true.
 
-A heat map that fails this is worse than no heat map, because it silently misinforms one manager in
-twelve.
+## The rule concordance: v3 numbers to v4 laws
 
-**Rule 4 — hairlines, not boxes — gains a stated test.** **A thing you act on or compare against
-its neighbours may be a card; a thing you read down a column stays a row.** Player pool rows,
-league cards and matchup cards become cards. Standings tables, pick logs and rosters stay
-hairline-separated rows, because scanning a column is what they are for. In code this is `Card`'s
-`interactive` prop, which spends `surfaceRaised` on `hover`/`focus-within` — depth, never a heavier
-line, so rule 4's original claim is untouched. `line` stays decorative and `edge` stays a control
-boundary; a card takes no `role` and no `tabindex`, so the action inside it is still the view's one
-ink action.
+v3's six rules are cited **by number** in eighty-eight source and test files, and the numbering moved. This table is what makes those citations resolve; it is not decoration. A comment saying "rule 4" was written about hairlines-not-boxes and must not be read as law 4, which is density.
 
-**The amendment says MAY, and a founder ruling outranks a permission.** The open-league shelf reads
-as horizontal rows at lg+ because the founder ordered exactly that on 2026-08-24 ("horizontal row
-elements instead of these cards - my eyes don't know where to focus"). The amendment does not
-reopen it. What it buys that shelf is the card response below lg, where the card is the form that
-fits 360px. Read a "may" as a licence to relitigate a ruling and this document stops being a record
-of decisions.
+| v3 rule | v4 law | What changed |
+|---|---|---|
+| 1 — Colour is meaning | **1 — Colour is a legend** | Same channels, opposite posture. v3 spent colour scarcely; Gameday names six channels and requires them. The fun-pass amendments (magnitude, tier, team) are absorbed wholesale, not repealed. |
+| 2 — One face, earned weights | **2 — The number is the hero** | The typeface and the 600 cap survive verbatim. The range widens from 2x to 7.6x, and it comes from size. |
+| 3 — No capitals anywhere | *(not a numbered law)* | Demoted to "What survives", with one carve-out: mono micro-labels. `no-uppercase.source.test.ts` is unchanged in strictness. |
+| 4 — Hairlines, not boxes | **3 — A player is an object** | Reversed. v3's amended test (*act on or compare = card; read down a column = row*) survives as the boundary, but the default flipped: an object is drawn as a thing. |
+| 5 — One ink action per view | **5 — The verb is obvious** | Reversed. v3's "named exceptions" for repeated-action surfaces become the general case. See "Pill discipline" for what replaces the count. |
+| 6 — Only true things move | **6 — Motion reports, never performs** | Sharpened, not replaced. v3 said what may move; law 6 also says what may never move (mount, scroll, hover) and caps the duration. |
+| *(none)* | **4 — Density is respect** | New. |
 
-**Rule 5 — one ink action per view — holds everywhere except surfaces whose entire purpose is
-repeated action:** the draft room, and later waivers and trades. Named exceptions, not a general
-relaxation. `e2e/page-audit.spec.ts` keeps enforcing the rule on every audited route, and those
-routes do not change.
+**Migrating a citation is the route tracks' work, not a licence to ignore it.** Until a file is migrated, read "rule N" in a v3-era comment against the left column.
 
-Spent once so far (Task 8): the player pool's per-row act button took the ink back, reversing D3's
-2026-08-26 ruling that made it `secondary`. The exception is narrower than "the draft room may be
-loud" — the ink belongs to ACTS only, and `snake-room.test.tsx` asserts exactly that by walking
-every ink pill in the rendered room and requiring each one to be a Draft or a Confirm. Every
-filter, toggle and way out in that room stays quiet.
+## The fun-pass amendments (2026-08-27) — absorbed into Gameday
 
-**The three that hold.** One typeface at ≤600 weight; no capitals; only true things move.
+Kept as a section because eighteen source files cite it by name, and because Gameday **absorbs** these amendments rather than repealing them. The founder's complaint that produced them — *"It feels like a legal website and not a fantasy site"* — is the same complaint Gameday answers at larger scale. The full argument is `docs/design/2026-08-27-fun-pass-spec.md`.
 
-- The **weight cap does not move**, and it stopped being a promise: `weight-cap.source.test.ts`
-  bans `font-bold`/`font-extrabold`/`font-black` across the same seven directories, no allowlist.
-  What widened instead is the **size** range — `2xl 82` and `3xl 116` on the display scale, taking
-  a number-over-label pairing from 4.8x to ~10x. Dynamic range comes from scale, never from a
-  heavier face.
-- The **caps charter is untouched**; `no-uppercase.source.test.ts` is unchanged.
-- **Rule 6 is finally spent rather than merely obeyed:** a clock pulses because it is running out,
-  a score moves because it changed, a card lifts because there is something in it to press. A
-  change that makes a screen louder without making a true thing more legible is decoration, and
-  rule 6 rejects it. The complaint was that the product reads as a contract, not that it lacks
-  ornament.
+What the amendments added to v3's rule 1 is now simply what law 1 **is**: three of Gameday's six channels arrived here first.
 
+- **Magnitude.** Where a number falls in a **stated** population. The tint is never permitted without one — a percentile across three quarterbacks is arithmetic dressed as a fact, which is the thing this amendment exists to forbid. `Stat` is the only component allowed to name a magnitude colour (`magnitude-budget.source.test.ts`).
+  - **Where magnitude is deliberately NOT spent.** A standings record, because the table is sorted by it and position already says it. Anything on the storefront, because a shelf has no honest population to rank a league inside — colouring an empty room red would be a judgement about a league rather than a fact about one.
+  - **The exclusion on a matchup's score STANDS, and the approved mock is the thing that gives way.** The mock paints the leading score in the magnitude ramp's `strong` ink, and `Scoreboard` declines to reproduce it. The population a matchup hero has to hand is "the two teams in this matchup", which is not a population but a pair: a percentile inside a set of two is fully determined by who is ahead — the leader is 1.0 and the trailer 0.0, whether the margin is 0.2 points or 60. That would paint a one-point lead in the same ink as a blowout and announce *"Top 1% of the two teams in this matchup"* to a screen reader. The percentile floors were tuned against real distributions of many players; a coin flip dressed in them is a lie with a legend attached, which is worse than a plain number. The lead is carried instead by the channels that are true — the larger figure, a "Leading" micro-label, and `data-winning`. A caller that genuinely holds a wider population ("all twelve teams this week") passes a `comparison` and the tint means something. **Honesty beats matching the mock**, which is the one place in this whole version where that trade came due.
+- **Tier grade.** S/A/B bands as coloured bars, once the projection engine makes tiers real. Parked until then; this amendment already covers it, so no second ruling is needed when it lands.
+  **It has landed.** `players.adp` carries a real average draft position for 476 of the 1,646 players in the pool, and a tier band is a gap between adjacent ADPs — measured, not drawn. `TOKENS.tier` is the palette this amendment already sanctioned, and `TierDivider` renders it. A grade is a fact or it is not drawn.
+- **Team identity.** A team's own colour, behind a player's face only. Never on a surface, never behind text. Tokens: `TOKENS.team`, thirty-two club colours keyed by the abbreviation the stats feed emits, theme-independent (a club's colour is the club's, in daylight and at night alike). Renderer: `PlayerFace` — one decorative, `aria-hidden` tile exactly the size of the face, with the `Avatar` on top of it. It is the ONE palette here that reaches the DOM as an inline `style` rather than a CSS variable, because it is keyed by DATA and a Tailwind class the static scanner cannot see ships no rule at all; that is also why the values live in `tokens.ts`, the one file allowed to hold a colour literal. A team we have no colour for renders the bare face rather than a grey rectangle pretending to be somebody's colours.
+
+Green still means money and red still means live. Magnitude reuses those hues deliberately — good is green because good is the same feeling as money.
+
+**The colourblind rule, which is a gate and not a nicety.** Green versus red is the worst available pair for deuteranopia, which affects roughly one man in twelve, and this product's audience is overwhelmingly men. The reference product's heat map fails this and we do not copy the failure. **Magnitude colour is never the only channel.** Every heat-coloured value carries a second encoding: its own numeric value read plainly, and — where the value is judged rather than merely reported — a caret naming which side of the population it fell on and a weight step naming how far. A manager who sees no colour at all must still rank the column correctly. Three enforcements, at three levels:
+
+1. `stat.test.tsx` asserts the value renders as text in every state, that each verdict step carries its caret and its weight step, and that a neutral carries neither.
+2. `tokens.test.ts` orders the ramp by **contrast against the ground** rather than by hue, so the sequence survives with the hue channel switched off entirely. (Ordering by contrast is also direction-free across themes: louder is brighter at night and darker in daylight.)
+3. `tokens.test.ts` also holds every step to 4.5:1 on **all four** surfaces in both themes, not the two the semantic roles are checked against — a heat-coloured number lands in a table row and an inset well as readily as on the page ground.
+
+A heat map that fails this is worse than no heat map, because it silently misinforms one manager in twelve.
+
+**The tier ladder's colourblind channel is the LETTER, not a caret.** Adjacent rungs are close in hue on purpose (red, amber, gold — a warmth that cools as the grade falls), which is what makes the four read as one ladder rather than four unrelated stickers. So `tokens.test.ts` does not hold tier pairs to the position stickers' pairwise-hue rule: a position sticker is a CATEGORY and must be told apart from every other, while a grade is an ORDER and always prints its own letter on it. What the gate does check is that the ladder's ends are far apart, that every badge is findable against the row it divides, and that every letter is readable on its own badge — in both themes.
+
+**Rule 4's amended test survives law 3.** **A thing you act on or compare against its neighbours may be a card; a thing you read down a column stays a row.** What changed is the default, not the boundary: law 3 says a player, a matchup and a league are objects and are drawn as things, so the card is now where those start. Standings tables, pick logs and rosters stay hairline-separated rows, because scanning a column is what they are for. In code this is `Card`'s `interactive` prop, which spends `surfaceRaised` on `hover`/`focus-within` — depth, never a heavier line. `line` stays decorative and `edge` stays a control boundary; a card takes no `role` and no `tabindex`.
+
+**The amendment says MAY, and a founder ruling outranks a permission.** The open-league shelf reads as horizontal rows at lg+ because the founder ordered exactly that on 2026-08-24 ("horizontal row elements instead of these cards - my eyes don't know where to focus"). Neither the amendment nor law 3 reopens it. Read a "may" as a licence to relitigate a ruling and this document stops being a record of decisions.
+
+**Rule 5's named exceptions became law 5.** v3 held "one ink action per view" everywhere except surfaces whose entire purpose is repeated action — the draft room, and later waivers and trades. Gameday promotes the exception to the rule: the verb is obvious wherever it repeats. What survives from the narrow version is the discipline that made it safe — **the loud action belongs to ACTS only.** `snake-room.test.tsx` walks every ink pill in the rendered room and requires each one to be a Draft or a Confirm; every filter, toggle and way out stays quiet. That test is the shape of law 5's enforcement everywhere, and it is why law 5 is not "the draft room may be loud."
 
 ## Principles
 - **Delightful, not merely functional.** The product thesis (strategy doc §4) is that this category feels flat and we won't. Optimistic UI, celebration moments, motion with intent (rule 6).
@@ -196,60 +108,113 @@ This two-layer scheme (generated `--commish-*` source vars → `@theme inline` T
 
 The rule has been enforced by review since Phase 1; `src/design/no-raw-color.source.test.ts` (Phase 3.6, Task 1) is what enforces it by test — a directory-derived sweep of every `.tsx` under `src/components`, `src/league-room`, `src/draft-room`, `src/chat-room`, `src/account-room`, `src/admin-room` and `src/app`, failing on a hex literal, an `rgb(`/`rgba(` literal, or a Tailwind arbitrary-value bracket that contains one (the last is caught for free, since the first two patterns match inside a bracket exactly as they do anywhere else).
 
-### The v3 palette: money and live, in daylight and at night
+### The Gameday palette: six channels, in daylight and at night
 
-The mock names six colors, two grounds. Values live in exactly one place, `src/design/tokens.ts`
-(`light`/`dark`) — this doc names the vocabulary, not a copy of the hexes, so a palette tune
-never leaves it stale. As shipped (Task 1, plus fix round 1's WCAG corrections):
+Values live in exactly one place, `src/design/tokens.ts` (`light`/`dark`) — this doc names the
+vocabulary, not a copy of the hexes, so a palette tune never leaves it stale. The dark ramp is the
+approved artifact's own; light is designed to the same roles and thresholds.
 
-| the mock's word | role(s) | dark (night) | light (daylight) |
+| Gameday's word | role(s) | dark (flagship) | light (daylight) |
 |---|---|---|---|
-| slate / paper | `surface` | `#1A1A21` | `#FBFBFA` |
-| card | `surfaceElevated` | `#26262F` | `#FFFFFF` |
-| — (derived) | `surfaceRaised` | `#2F2F39` | `#F8F8F6` |
-| tickbg / — | `surfaceInset` | `#1F1F27` | `#F3F3F1` |
-| hairline | `line` | `#3B3B47` | `#E8E8EA` |
-| — (derived, no mock value) | `edge` | `#7A7A80` | `#8B8B91` |
-| ink | `textPrimary` | `#EAEAF0` | `#1A1A1E` |
-| quiet | `textMuted` | `#9EA0AD` | `#68686D` |
-| faint (retuned, see below) | `textFaint` | `#9898A0` | `#6D6D76` |
+| page | `surface` | `#1A1A21` | `#FBFBFA` |
+| surface | `surfaceElevated` | `#23252E` | `#FFFFFF` |
+| raised | `surfaceRaised` | `#2C2F3A` | `#F8F8F6` |
+| well | `surfaceInset` | `#1F1F27` | `#F3F3F1` |
+| line | `line` | `#383C4A` | `#E8E8EA` |
+| edge (re-solved, see below) | `edge` | `#70788E` | `#8B8B91` |
+| ink | `textPrimary` | `#EDEEF2` | `#1A1A1E` |
+| muted | `textMuted` | `#A0A5B4` | `#68686D` |
+| faint (re-solved, see below) | `textFaint` | `#9196A3` | `#6D6D76` |
 | money | `accent` / `positive` | `#3ECF8E` | `#0B6B43` |
-| live | `negative` | `#FF6B5E` | `#C23228` (retuned, see below) |
-| — (retuned, demoted usage) | `warning` | `#BA9335` | `#846315` (retuned) |
-| — (retuned, unnamed by the mock) | `info` | `#5F99F2` | `#4C69CD` |
+| live | `negative` | `#FF6B5E` | `#C23228` |
+| — (demoted usage) | `warning` | `#BA9335` | `#846315` |
+| — (unnamed by the mock) | `info` | `#5F99F2` | `#4C69CD` |
 
-Two corrections during Task 1's fix round, the same class of gap v2's own contrast corrections
-were: `light.textMuted` and `light.negative`/`warning` measured a hair under 4.5:1 once composited
-under the draft room's translucent `bg-negative/10` "hot" rail tint — a case the plain-surface
-pair matrix never exercised. `tokens.test.ts`'s `"TOKENS.color bands"` describe block is the gate
-added to catch this class of failure going forward: every text role is now also checked against
-its own translucent band composited over each surface, in both themes.
+**Four grounds, not the artifact's nominal five.** The mock declares a fifth step above `raised`
+(`--overlay: #363A47`) and never paints it — neither approved screen contains a modal. Shipping it
+costs a text role: at that luminance `textFaint` must brighten to `#9FA4AF` to clear 4.5:1, which
+is **1.02:1** from `textMuted` — the two quiet inks become literally the same colour, product-wide,
+to gain a ground nothing draws on. The magnitude ramp fails harder still (`bad` measures 4.11:1
+there and cannot be fixed without collapsing the heat map upward into `weak`). So the fourth step
+is spent on the **well**, which is the step both approved screens actually use — the matchup's
+points-share track, the draft room's meters. A modal keeps `surfaceElevated`: a scrim already
+separates it from the page, so it needs no brighter ground of its own.
 
-**Money is a fill only when it is money or an action; live is text/glow/chip, never a solid
-block outside its own destructive button.** The doubling rules from v2 carry forward exactly:
-`accent`/`positive` share a hex because a live game and a live action are the same energy;
-`negative` is now the whole "live" family (a draft clock tightening, a live chip's dot, a
-destructive button) for the identical reason — one hue, jobs separated by context, never two
-solid fills of the same color in one view meaning two different things.
+**Two values from the mock could not ship as drawn**, and both failures are the same kind — a
+static page has no controls to bound and no quiet captions to place, so nothing in it exercised
+the gate. Each is re-solved along its own hue, moving only as far as the gate requires:
 
-**`warning`/`info` survive, retuned and demoted (self-ruling S1).** The nineteen-role set is
-frozen — v3 does not remove a role, it retones values and, for `warning`, demotes *usage*: E5
-moved the browse card's `when_full` reassurance sentence from `text-warning` to `text-text-muted`,
-so amber is reserved for a clock that is actually tightening rather than every neutral scheduling
-fact on the shelf.
+- `edge` — the mock's `#5A6072` measures **2.13:1** on a raised row, missing WCAG 1.4.11's 3:1
+  floor for the boundary of a control a user has to find. Brightened to `#70788E` (3.03:1 on the
+  binding ground).
+- `textFaint` — the mock's `#767C8C` measures **3.20:1** on a raised row, below the 4.5:1 text
+  floor on every ground in the ramp. Brightened to `#9196A3` (4.51:1 on the binding ground).
 
-**Type ramp:** `TOKENS.font.display.xl` moved 64 → 58 (the mock's display size); display tracking
-moved −0.02em → −0.028em on display sizes only (self-ruling S3, `globals.css`'s `.font-display`
-rule); body sizes are untouched. See "Type" below for the full ramp.
+**The position channel reverses v3's desaturation.** v3 took these six to 60% of their semantic
+parent's saturation on a 2026-08-24 ruling that a full-saturation sticker "reads as a spreadsheet".
+Law 1 reverses it in one line: **a badge you have to read is not a badge.** A manager reads QB off
+the colour before his eye reaches the letters, and a pigment quiet enough to be polite is a pigment
+you have to read.
 
-**Motion:** `TOKENS.motion.duration` gained `wire` (38 000ms, the ticker loop) and `pulse`
-(1 600ms, the live chip's breath) — both consumed by name in `globals.css`, never a literal
-duration at a call site.
+| position | dark sticker | light sticker |
+|---|---|---|
+| QB | `#F2685E` | `#E32012` |
+| RB | `#35C98A` | `#23835A` |
+| WR | `#4E9BF0` | `#1372DC` |
+| TE | `#E0A340` | `#9C6A19` |
+| K | `#B98BF5` | `#924BEF` |
+| DEF (re-solved) | `#616D83` | `#535963` |
+
+Five ship the artifact's values verbatim on its near-black ink. **DEF is re-solved because the
+mock's `#6C7A93` clears no label at all** — it is a mid steel, measuring 4.20:1 under dark ink and
+4.34:1 under white, so both miss the 4.5:1 floor. It darkens to `#616D83`, the first value at which
+the product's own ink clears it, which also restores what DEF is for: its meaning is "no colour of
+its own", and a mid steel sitting between WR's blue and nothing in particular was never that. Its
+fill is too dark to double as text on a surface, so it keeps a separately brightened `text` variant.
+
+In daylight all six walk down their own hue until white ink clears them and the pigment itself
+clears 4.5:1 as text on paper. Hues land within 2° of the mock's in every case, so switching themes
+shows the same six colours rather than a second palette. `def` carries one extra constraint in
+daylight that it does not need at night: WR and DEF sit 6° apart in hue (both blues), so their
+pairwise gate is carried by **contrast**, and `def` darkens until it is 1.5:1 from `wr`.
+
+**The tier ladder** (`TOKENS.tier`, four grades best-first) is also keyed by data rather than by
+role, but unlike `TOKENS.team` it is emitted as per-theme CSS variables and consumed as Tailwind
+classes. The difference is not the one it looks like: a team code arrives at RUNTIME off the stats
+feed and is unbounded, so a class for it is one the static scanner cannot see and therefore ships
+no rule at all; a grade is one of four literals, so a component writes all four class names out and
+Tailwind sees every one. That is a requirement, not a convenience — an inline style would have to
+choose between the two designed palettes in React, and nothing rendering a band can read the
+resolved theme, so it would have shipped dark's bright pigments onto the light theme's near-white
+ground. Dark carries the mock's values verbatim (`S #FF7A6E`, `A #F5A248`,
+`B #E8CF5A`, `C #6FA8DC`) on near-black ink; light re-derives the same four hues dark enough to be
+findable, with white ink. A grade badge has two jobs and the gate checks both: the letter is
+readable ON the badge (4.5:1) and the badge is findable AGAINST the row it divides (3:1).
+
+**Money is a fill only when it is money or an action; live is text/glow/chip, never a solid block
+outside its own destructive button.** The doubling rules carry forward exactly: `accent`/`positive`
+share a hex because a live game and a live action are the same energy; `negative` is the whole
+"live" family (a draft clock tightening, a live chip's dot, a destructive button) for the identical
+reason — one hue, jobs separated by context, never two solid fills of the same colour in one view
+meaning two different things.
+
+Law 1 adds the one clause that makes the `verb` button legal: **money is also the fill of the verb,
+because pressing it is how money moves.** That is a widening of "an action", not a new channel.
+
+**`warning`/`info` survive, retuned and demoted (self-ruling S1).** The role set does not shrink —
+Gameday retones values and, for `warning`, demotes *usage*: amber is reserved for a clock that is
+actually tightening rather than every neutral scheduling fact on a shelf.
+
+**Composite bands.** A role can clear 4.5:1 against a plain surface and still miss it once a
+translucent 10% wash of a semantic hue is mixed into that same ground. `tokens.test.ts`'s
+`"TOKENS.color bands"` block checks every text role against its own translucent band composited
+over each surface, in both themes — the gate that caught `light.textMuted`, `light.negative` and
+`light.warning` under the draft room's "hot" rail tint.
 
 ### One pigment, two (or three) jobs
 
-The palette is **six pigments**. Values live in exactly one place, `src/design/tokens.ts`
-(`lightPigments`/`darkPigments`) — this doc names the roles, not the hexes, so a palette tune
+The position palette is **six pigments**. Values live in exactly one place, `src/design/tokens.ts`
+(`lightPositions`/`darkPositions`) — this doc names the roles, not the hexes, so a palette tune
 never leaves it stale.
 
 `accent` and `positive` remain a true doubling: the exact same hex, deliberately (see above) —
@@ -257,82 +222,100 @@ the product's identity is that a live game and a live action are the same energy
 doubling logic to `negative` (see above): one red, two jobs, separated by context rather than by
 hue.
 
-**RETONED (LED-2, founder-delegated design ruling, 2026-08-24) then RE-DERIVED for v3's grounds,
-same date:** the position pigments (`whistle`/`leaf`/`marker`/`clay`/`grape`/`slate`) used to be a
-straight doubling of a semantic role's own hex — `whistle` (QB) was literally `negative`, `leaf`
-(RB) was `positive`, `marker` (WR) was `info`, `clay` (TE) was `warning`. The gauntlet named that
-as the product's last old-software signal: a full-cell sticker fill at semantic-role saturation
-reads as a spreadsheet, not a board. Position color stays as scanning information — the veteran
-reads the position off the color before the letters — so the ruling did not remove the hue
-relationship, only the saturation:
+**GAMEDAY REVERSES v3's DESATURATION, and the reversal is law 1.** From 2026-08-24 until now the
+six position pigments carried an indirection — a `Pigments` record (`whistle`/`leaf`/`marker`/
+`clay`/`grape`/`slate`) holding each hue at 60% of the saturation of a semantic role it used to
+double, on a ruling that a full-saturation sticker "reads as a spreadsheet, not a board".
 
-| pigment | position | derived from | relationship |
-|---|---|---|---|
-| whistle | QB | `negative` | same hue/lightness, 60% saturation |
-| leaf | RB | `positive` (== `accent`) | same hue/lightness, 60% saturation |
-| marker | WR | `info` | same hue/lightness (lightness retuned to clear 4.5:1 against v3's grounds) |
-| clay | TE | `warning` | same hue/lightness (lightness retuned in dark to clear 4.5:1) |
-| grape | K | — | its own pigment, unchanged by the v3 re-derivation |
-| slate | DEF | — | unchanged — already the quiet one, no hue of its own |
+Law 1 answers that in one line: **a badge you have to read is not a badge.** The whole point of a
+position sticker is that a manager reads QB off the colour before his eye reaches the letters, and
+a pigment quiet enough to be polite is a pigment you have to read. The stickers are now the
+approved artifact's own saturated values, listed in "The Gameday palette" above.
 
-Each of the four now has its **own hex**, no longer pinned to the semantic role's own value — a
-position sticker and its one-time semantic twin move independently. `negative`/`positive`/`info`/
-`warning` keep full saturation everywhere else in the product (an error state should not read as
-quiet); the draft board's own fills read calmer. `tokens.test.ts`'s pairwise sticker matrix
-(`"TOKENS.position"` describe block) is the gate this retone is proven against, in both themes:
-every pair still clears 1.5:1 contrast or 30° of hue separation, and `marker`/`clay` — the two
-that missed the floor once plugged into v3's near-monochrome grounds — had their lightness
-retuned (never their hue or their saturation family) until they cleared.
+The `Pigments` indirection is **gone**, not merely retuned. It existed to express "60% of the
+saturation of `negative`", and with the derivation retired the layer was a name for a relationship
+that no longer holds — `darkPositions`/`lightPositions` now hold their own values directly. Any
+comment in the repo still naming `whistle`, `leaf`, `marker`, `clay`, `grape` or `slate` is
+describing a structure that no longer exists.
 
-The kinship is still deliberate: a real draft kit has one pack of markers dialed to a house tone,
-and that shared hue family is what still makes the board and the chrome read as one object even
-though the fills no longer match pixel-for-pixel. It stays safe for the same reason the doubling
-always was — **a position color and a semantic color never share a context** — a position color
-appears exclusively inside a `PositionBadge` or a draft-board sticker, and a semantic color never
-appears inside either.
+**What survives from the old ruling is the safety argument, and it survives intact:** a position
+colour and a semantic colour never share a context. A position colour appears exclusively inside a
+`PositionBadge`, a `Sticker` or a draft-board cell; a semantic colour never appears inside any of
+them. That is why QB may be a red neighbouring `negative`, and RB a green neighbouring `accent`,
+without either being mistakable for the other — the same contextual separation that has always
+made `accent`/`positive` safe as one hex.
+
+`tokens.test.ts`'s pairwise sticker matrix (`"TOKENS.position"`) is the gate the saturated set is
+proven against, in both themes: every one of the fifteen pairs clears 1.5:1 contrast or 30° of hue
+separation, every sticker's own label clears 4.5:1 on it, and every pigment clears 4.5:1 used as
+text on a surface.
 
 ### Color roles
 
 Values live in `src/design/tokens.ts` (`light`/`dark` palettes) — read them there, not here;
-this table is the meaning of each role in v3, which is the part a doc can keep true across a
-palette tune. The nineteen-role set (`COLOR_ROLES`) is frozen; v3 retones every value and changes
-what two of the roles are *used for*.
+this table is the meaning of each role, which is the part a doc can keep true across a palette
+tune. The role set (`COLOR_ROLES`) is frozen; Gameday retones every value and adds no role.
 
-| role | used for |
-|---|---|
-| `surface` | the page — the ground |
-| `surfaceElevated` | a panel |
-| `surfaceRaised` | a row hover, a field, a nested tile |
-| `surfaceInset` | a track, a slot well, an unfilled meter, the wire's own band |
-| `line` | the decorative hairline between two surfaces (<3:1 vs `surface` — NOT a control boundary) |
-| `edge` | the boundary of a control a user must find (≥3:1 vs every surface) |
-| `textPrimary` | primary text — also the ink pill's own fill (`bg-text-primary`, see "Pill discipline") |
-| `textMuted` | secondary text |
-| `textFaint` | tertiary text — card meta, step captions, table subs |
-| `accent` | **money**: interactive links, focus rings, seat-meter fill. **Same hex as `positive`** |
-| `accentText` | the label ON a money fill |
-| `accentGlow` | a translucent money tint — the front door's floodlight, a highlighted row |
-| `positive` | good outcome, as text/glow/meter fill only — **never a solid button fill** (see "One pigment, two jobs") |
-| `negative` | **live**: a draft clock tightening, a live chip's dot, destructive actions — one red family, jobs separated by context |
-| `negativeText` | the label ON a live/destructive fill |
-| `warning` | caution, demoted usage in v3 (E5) — reserved for a clock genuinely tightening, never a neutral scheduling sentence |
-| `warningGlow` | a translucent warning tint |
-| `info` | informational — neutral notices, the WR sticker's semantic pairing |
-| `scrim` | modal backdrop (used at `bg-scrim/50`) |
+**The role NAMES predate Gameday and its ramp words map onto them.** Gameday says page / surface /
+raised; the tokens say `surface` / `surfaceElevated` / `surfaceRaised`. The names were not renamed
+because `bg-surface-elevated` alone appears in forty-three route files owned by other tracks, and a
+rename would deliver forty-three conflicting diffs and zero visual change. Read the first column as
+the ramp:
+
+| role | Gameday's word | used for |
+|---|---|---|
+| `surface` | page | the page — the ground |
+| `surfaceElevated` | surface | a card, a row, a panel |
+| `surfaceRaised` | raised | a row hover, a field, a nested tile, a meter track |
+| `surfaceInset` | well | a track, a slot well, an unfilled meter, the wire's own band |
+| `line` | line | the decorative hairline between two surfaces (<3:1 vs `surface` — NOT a control boundary) |
+| `edge` | edge | the boundary of a control a user must find (≥3:1 vs every surface) |
+| `textPrimary` | ink | primary text — also the ink pill's own fill (`bg-text-primary`, see "Pill discipline") |
+| `textMuted` | muted | secondary text |
+| `textFaint` | faint | tertiary text — card meta, step captions, table subs |
+| `accent` | money | **money**: interactive links, focus rings, seat-meter fill. **Same hex as `positive`** |
+| `accentText` | money | the label ON a money fill |
+| `accentGlow` | money | a translucent money tint — the front door's floodlight, a highlighted row |
+| `positive` | money | good outcome, as text/glow/meter fill only — **never a solid button fill** (see "One pigment, two jobs") |
+| `negative` | live | **live**: a draft clock tightening, a live chip's dot, destructive actions — one red family, jobs separated by context |
+| `negativeText` | live | the label ON a live/destructive fill |
+| `warning` | — | caution, demoted usage in v3 (E5) — reserved for a clock genuinely tightening, never a neutral scheduling sentence |
+| `warningGlow` | — | a translucent warning tint |
+| `info` | — | informational — neutral notices, the WR sticker's semantic pairing |
+| `scrim` | — | modal backdrop (used at `bg-scrim/50`) |
 
 Tailwind aliases: `bg-surface`, `bg-surface-elevated`, `bg-surface-raised`, `bg-surface-inset`, `border-line`, `border-edge`, `text-text-primary`, `text-text-muted`, `text-text-faint`, `bg-accent text-accent-text`, `text-accent`, `bg-accent-glow`, `text-positive` / `text-negative` / `text-warning` / `text-info`, `bg-warning-glow`, `bg-scrim`.
 
 **Semantic-on-fill:** when a semantic color is used as a fill (`bg-negative`), pair it with its `-text` role (`text-negative-text`) for the label — never a raw white or black.
 
-### The caps charter: no capitals anywhere (rule 3)
+### The caps charter: no capitals in prose (v3 rule 3, kept)
 
 **Every `text-transform: uppercase` is gone from the product.** League names, section headers,
 eyebrows, wordmarks, chip labels, TV-board labels, the draft board's "You" marker — the 2026-08-24
 UX remediation audit inventoried 43 sites (plus 7 `.toUpperCase()` data transforms, a separate
 category, below); v3 removed every styled one.
 
-**The allowlist is exactly two files, and it is data, not prose:** `position-badge.tsx` (a "QB"
-sticker label) and `crest.tsx` (a two-letter crest tile like "BB"). These are semantically
+**GAMEDAY'S ONE CARVE-OUT.** "What survives from v3" reads: *"Sentence case in prose. Uppercase
+survives only in mono micro-labels, where every sports interface has always put it."* That is the
+approved mock's `.lbl` — 11px Geist Mono, 0.11em tracking, faint ink — on the things a scoreboard
+has always shouted quietly: a column header, a slot name, `248 LEFT`, `Q3`, the eyebrow over a
+stat block.
+
+**The sweep does not relax; the carve-out has exactly one address.** No `.tsx` may spell the class,
+as before. The sanctioned register is `MICRO_LABEL` in `src/components/ui/config.ts` — a `.ts`
+module the sweep does not walk because it renders nothing. A component that wants shouted capitals
+imports the constant; a component that hand-rolls the class still fails. The charter's real target
+was forty-three treatments drifting apart from one another, and routing every one of them through
+a single constant is the opposite of that rather than a hole in it. `no-uppercase.source.test.ts`
+pins `MICRO_LABEL`'s existence and its spelling, so the carve-out cannot rot into "uppercase is
+fine again" by the constant being deleted or quietly de-capitalised.
+
+`MICRO_LABEL` is distinct from `EYEBROW` on purpose: an eyebrow is a **sentence-case label above a
+block**, a micro-label is a **shouted key beside data**. Both are mono and small; only one is
+capitals, and collapsing them would put capitals back on the prose labels the charter cleared.
+
+**The data allowlist is still exactly two files, and it is data, not prose:** `position-badge.tsx`
+(a "QB" sticker label) and `crest.tsx` (a two-letter crest tile like "BB"). These are semantically
 capitals — acronym and initials *data* — not styled shouting, which is why the charter treats
 them differently from `.toUpperCase()` elsewhere (initials fallbacks, crest-letter derivations):
 a data transform that happens to produce capital letters is not the same claim as a CSS rule that
@@ -353,7 +336,7 @@ spelling that used to diverge (the admin queue, held-trade detail, resolution-fo
 fact labels, the step numerals) now routes through this one class constant; a caller supplies
 its own color.
 
-### Pill discipline and one ink action per view (rule 5)
+### Pill discipline and the obvious verb (law 5)
 
 **Two pill shapes, one primitive family, no third spelling.** `Button`
 (`src/components/ui/button.tsx`) and its anchor form `ButtonLink`
@@ -368,8 +351,27 @@ never drift.
   (Task 4 review finding, controller-ruled fix).
 - **`secondary` is the quiet pill:** `rounded-pill border border-edge bg-transparent
   text-text-primary` — `edge`, not `line`, because a control boundary must clear 3:1.
+- **`verb` is the repeated action (Gameday, law 5):** `rounded-md bg-accent text-accent-text
+  hover:opacity-90`. Money-filled, because law 1 says money is *"also the fill of the verb, because
+  pressing it is how money moves"*; `rounded-md` rather than a pill, because shape is what keeps it
+  from reading as a second `primary`. **`primary` is ceremonial — one per view, the thing a page
+  exists to do once** (create the league, confirm the trade). **`verb` is the thing a board does
+  forty times** (Draft, Claim, Accept). A board of forty rows cannot spend its one ink pill on row
+  one and leave thirty-nine quiet outlines behind it, which is precisely how v3's rule 5 hid the
+  primary verb on the screens built to repeat it.
+  `button.tsx` is on `accent-budget.source.test.ts`'s fill allowlist for exactly this variant: green
+  fills one control primitive, and a call site that hand-rolls the class still fails the sweep —
+  which was always the real failure mode (E8 was eleven copies of one CTA class string drifting
+  apart, not one primitive owning it).
 - **`destructive`** keeps `bg-negative text-negative-text` and joins the pill radius family.
 - **`ghost`** is unchanged, `rounded-md`.
+
+**What replaces the count.** v3 enforced "at most one ink action per view" on every audited route
+(`e2e/page-audit.spec.ts`). Law 5 removes the count and keeps the discipline that made it safe:
+**the loud action belongs to ACTS only.** A filter, a toggle, a sort control and a way out are
+quiet on every surface, however loud the verb beside them is. `snake-room.test.tsx` is the shape of
+that enforcement — it walks every loud action in the rendered room and requires each one to be a
+Draft or a Confirm.
 
 **The one-ink-per-view law:** every view gets exactly one solid (ink) action; every other action
 in that view is a quiet pill. This is a per-view *count*, which a source sweep structurally
@@ -541,14 +543,21 @@ once, in the generated stylesheet. Both scales carry the same keys; a key presen
 missing from the other is a size that silently stops responding, and `generate-css.test.ts`
 asserts they match.
 
-Body scale (`--text-*`): `xs 12 · sm 13.5 · md 15 · lg 17 · xl 20 · 2xl 26 · 3xl 34`, densifying
-at `UI_CONFIG.shell.denseFromPx` to `xs 11 · sm 12.5 · md 13.5 · lg 15 · xl 17 · 2xl 22 · 3xl 30`.
-**`xs` is for letter-spaced eyebrows only, never a sentence** — the mono, sentence-case `EYEBROW`
-register above, not the uppercase treatment `xs` carried before the caps charter.
+Body scale (`--text-*`): `xs 11 · sm 13 · md 15 · lg 17 · xl 20 · 2xl 26 · 3xl 34`, densifying at
+`UI_CONFIG.shell.denseFromPx` to `xs 11 · sm 12 · md 13.5 · lg 15 · xl 17 · 2xl 22 · 3xl 30`.
+**`xs` is for micro-labels and eyebrows only, never a sentence.** Gameday moved `xs` from 12 to
+**11** because 11 is the denominator of law 2's stated range and the size the approved mock sets
+every micro-label at.
 
-Display scale (`--text-display-*`): `sm 20 · md 28 · lg 44 · xl 58 · 2xl 82 · 3xl 116` (v3 moved
-`xl` 64 → 58, the mock's own display size — self-ruling S3; the fun pass added `2xl`/`3xl`), with
-`leading-display` (1.06). A display size is never a substitute for a body size at the same px.
+Display scale (`--text-display-*`): `sm 20 · md 28 · lg 44 · xl 58 · 2xl 84 · 3xl 116`, with
+`leading-display`. Gameday moved `2xl` 82 → **84**: that is the scoreboard step, and law 2 names it
+by value. A display size is never a substitute for a body size at the same px.
+
+**Law 2's ratio is pinned, not described.** *"A score is 84px; its label is 11px"* — 7.6x.
+`tokens.test.ts` asserts `display["2xl"] === 84`, `size.xs === 11` and the ratio between them, so
+the sentence above cannot drift out from under the scale. That is a separate gate from the ≥9x
+dynamic-range check below, which measures the TV board's 116px top step and would still pass if the
+scoreboard step vanished.
 
 **The scale carries ~10x of dynamic range, and that is a gate.** The fun pass's third named cause
 of "it feels like a legal website" is uniform hierarchy: *"sports interfaces live on roughly 10x
@@ -640,11 +649,27 @@ form, not a new page or a new information architecture:
 
 ## Signed-in surfaces and the draft room: retone only
 
-The signed-in shell, the draft room and the TV board were already structurally disciplined before
-v3 (the audit's own diagnosis: "the signed-in board, draft room, and profile already mostly hold
-the bar"). v3's Cluster C sweep (Tasks 9–10) applied the palette, caps and pill rules above to
-every remaining surface without restructuring bands, regions or animations — `Countdown`'s
-`tone: "hot"` now reads live-red by token change alone, with no component-level edit.
+**Historical, and superseded by Gameday's execution doctrine.** Kept because several research
+documents cite this section by name.
+
+Under v3 this section recorded a deliberate limit: the signed-in shell, the draft room and the TV
+board were already structurally disciplined (the audit's own diagnosis: "the signed-in board,
+draft room, and profile already mostly hold the bar"), so v3's Cluster C sweep applied the palette,
+caps and pill rules to every remaining surface **without restructuring** bands, regions or
+animations — `Countdown`'s `tone: "hot"` read live-red by token change alone, with no
+component-level edit.
+
+**Gameday reverses that limit**, and the reversal is the point of the whole version. Laws 1 and 3
+require the position, team and tier channels on every surface that draws a player, which is most of
+them; law 2 changes a type scale the whole product reads from; law 4 tightens every table. The
+spec's own words: *"It is a system replacement, not a repaint, and it should be built as one piece
+with the screens as the acceptance criterion rather than as phased amendments."* A retone-only pass
+is exactly the mistake that produced "little changes here and there".
+
+**The acceptance criterion is a screenshot, not a rule check.** Every screen track ends by
+rendering the real page, putting it beside the approved composition, naming the differences and
+closing them. The previous pass verified tests, contrast ratios and rule compliance, and shipped
+surfaces nobody had ever looked at.
 
 ## Guided help
 
@@ -765,7 +790,7 @@ No z-index scale yet — three sanctioned layers exist by convention: a sticky b
 `<ThemeProvider>` (in `layout.tsx`) manages `system | light | dark`, persisted, stamping `data-theme` on `<html>`. Default is system.
 
 ## Primitives (`src/components/ui`)
-`Button` (variants primary/secondary/destructive/ghost — v3, Task 4: `primary` is the ink pill, `secondary` the quiet pill, see "Pill discipline" above; `loading` = aria-busy + disabled + spinner, label stays), **`ButtonLink`** (v3, Task 4 — the anchor form of `Button`, same `buttonClassName` source of truth; no `loading`/`disabled`, since an anchor has neither), `Input` (label required; error → `aria-invalid` + `aria-describedby`), `Textarea` (the multi-line sibling of `Input`, same `FieldShell` label/hint/error contract; an optional `maxLength` renders a live, `aria-live="polite"` remaining-character count wired into `aria-describedby` — `ReviewComposer` is the one caller today, backed by the same `validateReviewDraft` rule the server enforces, so the number on screen and the number the API accepts can never drift), `Select` (label required; native `<select>`; same error/hint contract as `Input`), **`Card`** (border + `shadow-card`; `interactive` is **rule 4's amended test in code** — *a thing you act on or compare against its neighbours may be a card; a thing you read down a column stays a row* — and it spends `surfaceRaised` on `hover`/`focus-within`, the depth role the palette had always named "a row hover" and no surface had ever used. Depth, never a heavier line: `line` stays decorative, `edge` stays a control boundary, and a card is not a control — it takes no `role` and no `tabindex`, so the action inside it is still the view's one ink action. A card that lifts with nothing inside to press is decoration and rule 6 rejects it), `Badge` (semantic tones; `glow` adds a tinted `ring-2` for a live/urgent tone, built on `accentGlow`/`warningGlow`; only `accent` and `warning` carry a glow token today), **`PositionBadge`** (`position` + `size: sm|md` — the sticker chip; the ONLY renderer of a position; one of the caps charter's two allowlisted files), **`SlotChip`** (`slot` — the bordered chip for a roster-slot letter that isn't itself a position, e.g. `FLEX`/`BENCH`), **`PageTitle`** (`size: md|xl` — the one `<h1>` treatment for a PAGE; `font-semibold`, not `font-bold`, as of Task 9; a room supplies its own `<h1>` instead, see "Layout" above), `Table` (semantic `<table>`; `caption` required — visually hidden unless `captionVisible`; `empty` node required; optional `rowAttributes` spreads plain attributes onto the `<tr>` itself, never a second wrapper element; scrolls horizontally inside its own wrapper at 360px; `density: comfortable|dense`, defaulting to `dense`, see `docs/decisions/design-v2.md` §4 for the full decision record), `Celebration` (`role="status"`; `emphasis: "self" | "peer"` picks the animation class and the accent treatment; renders with no animation class at all under reduced motion — the one primitive both `PickCelebration` and `MatchupCelebration` are built on), `Avatar` (`name` for the deterministic initials fallback, plus an `avatar` prop that is NOT a URL — it is the raw stored `AvatarRef` string (`users.avatar_url`), which `parseAvatarRef` (`@/identity/avatars.ts`) resolves into one of three renders: a preset tile — an `Icon` on one of `AvatarTone`'s five fills — for a `preset:<key>` value, an `<img>` for an `https://` URL, or the same initials fallback for anything else, including `null`, an unrecognized preset key, or a rejected scheme like `javascript:`/`data:`/`http:`; decorative unless given a `label`), `Modal` (renders nothing when closed; `role="dialog"` + `aria-modal`; focus moves in on open, cycles on Tab, returns to the opener on close; Esc closes), `ToastProvider`/`useToast` (one polite live region; `tone: "error"` toasts are also `role="alert"`; auto-dismiss after `UI_CONFIG.toast.dismissMs`, or `reducedMotionDismissMs` when the user prefers reduced motion; optional action button), `Skeleton` (aria-busy, announces "Loading…"), `EmptyState` / `ErrorState` (action required), `Icon` (curated `IconName` union; feature code never imports lucide directly), `InfoTip` (`term: TermKey`; click-to-reveal — never hover, per WCAG 2.2 1.4.13 — a real `<button>` with `aria-expanded`; the revealed `role="note"` sits in normal document flow, never a floating overlay, so it can never obscure the trigger; `helpLevel="guided"` additionally prints the glossary entry's short line inline, unhidden — the ONE way a `@/help/glossary` definition reaches the page, except inside a `LeagueRow`, which never passes `helpLevel` at all — see "The row shelf" above; `Escape` closes it while it holds focus), **`Countdown`** (`remainingMs`, `size: md|lg|xl`, `tone: default|hot` — the ticking-digits primitive, `aria-hidden`, paired with a plain-language `aria-live="polite"` sibling stating the same time coarsely via `formatCoarseRemaining`, e.g. "About 8 hours left"; display only — a countdown never decides anything, the server ticker owns clock expiry; `tone: "hot"` reads live-red by v3's token retone alone, no component change).
+`Button` (variants primary/verb/secondary/destructive/ghost — `primary` is the ceremonial ink pill, `verb` is Gameday's money-filled repeated action (law 5), `secondary` the quiet pill, see "Pill discipline and the obvious verb" above; `loading` = aria-busy + disabled + spinner, label stays), **`ButtonLink`** (v3, Task 4 — the anchor form of `Button`, same `buttonClassName` source of truth; no `loading`/`disabled`, since an anchor has neither), `Input` (label required; error → `aria-invalid` + `aria-describedby`), `Textarea` (the multi-line sibling of `Input`, same `FieldShell` label/hint/error contract; an optional `maxLength` renders a live, `aria-live="polite"` remaining-character count wired into `aria-describedby` — `ReviewComposer` is the one caller today, backed by the same `validateReviewDraft` rule the server enforces, so the number on screen and the number the API accepts can never drift), `Select` (label required; native `<select>`; same error/hint contract as `Input`), **`Card`** (border + `shadow-card`; `interactive` is **rule 4's amended test in code** — *a thing you act on or compare against its neighbours may be a card; a thing you read down a column stays a row* — and it spends `surfaceRaised` on `hover`/`focus-within`, the depth role the palette had always named "a row hover" and no surface had ever used. Depth, never a heavier line: `line` stays decorative, `edge` stays a control boundary, and a card is not a control — it takes no `role` and no `tabindex`, so the action inside it is still the view's one ink action. A card that lifts with nothing inside to press is decoration and rule 6 rejects it), `Badge` (semantic tones; `glow` adds a tinted `ring-2` for a live/urgent tone, built on `accentGlow`/`warningGlow`; only `accent` and `warning` carry a glow token today), **`PositionBadge`** (`position` + `size: sm|md` — the sticker chip; the ONLY renderer of a position; one of the caps charter's two allowlisted files), **`SlotChip`** (`slot` — the bordered chip for a roster-slot letter that isn't itself a position, e.g. `FLEX`/`BENCH`), **`PageTitle`** (`size: md|xl` — the one `<h1>` treatment for a PAGE; `font-semibold`, not `font-bold`, as of Task 9; a room supplies its own `<h1>` instead, see "Layout" above), `Table` (semantic `<table>`; `caption` required — visually hidden unless `captionVisible`; `empty` node required; optional `rowAttributes` spreads plain attributes onto the `<tr>` itself, never a second wrapper element; scrolls horizontally inside its own wrapper at 360px; `density: comfortable|dense`, defaulting to `dense`, see `docs/decisions/design-v2.md` §4 for the full decision record), `Celebration` (`role="status"`; `emphasis: "self" | "peer"` picks the animation class and the accent treatment; renders with no animation class at all under reduced motion — the one primitive both `PickCelebration` and `MatchupCelebration` are built on), `Avatar` (`name` for the deterministic initials fallback, plus an `avatar` prop that is NOT a URL — it is the raw stored `AvatarRef` string (`users.avatar_url`), which `parseAvatarRef` (`@/identity/avatars.ts`) resolves into one of three renders: a preset tile — an `Icon` on one of `AvatarTone`'s five fills — for a `preset:<key>` value, an `<img>` for an `https://` URL, or the same initials fallback for anything else, including `null`, an unrecognized preset key, or a rejected scheme like `javascript:`/`data:`/`http:`; decorative unless given a `label`), `Modal` (renders nothing when closed; `role="dialog"` + `aria-modal`; focus moves in on open, cycles on Tab, returns to the opener on close; Esc closes), `ToastProvider`/`useToast` (one polite live region; `tone: "error"` toasts are also `role="alert"`; auto-dismiss after `UI_CONFIG.toast.dismissMs`, or `reducedMotionDismissMs` when the user prefers reduced motion; optional action button), `Skeleton` (aria-busy, announces "Loading…"), `EmptyState` / `ErrorState` (action required), `Icon` (curated `IconName` union; feature code never imports lucide directly), `InfoTip` (`term: TermKey`; click-to-reveal — never hover, per WCAG 2.2 1.4.13 — a real `<button>` with `aria-expanded`; the revealed `role="note"` sits in normal document flow, never a floating overlay, so it can never obscure the trigger; `helpLevel="guided"` additionally prints the glossary entry's short line inline, unhidden — the ONE way a `@/help/glossary` definition reaches the page, except inside a `LeagueRow`, which never passes `helpLevel` at all — see "The row shelf" above; `Escape` closes it while it holds focus), **`Countdown`** (`remainingMs`, `size: md|lg|xl`, `tone: default|hot` — the ticking-digits primitive, `aria-hidden`, paired with a plain-language `aria-live="polite"` sibling stating the same time coarsely via `formatCoarseRemaining`, e.g. "About 8 hours left"; display only — a countdown never decides anything, the server ticker owns clock expiry; `tone: "hot"` reads live-red by v3's token retone alone, no component change).
 
 **Five v2 primitives (Task 3, Phase 3.6), each extracted at its own second caller rather than invented ahead of need**, joining `Badge`, `Table` and `Countdown` above as the three *existing* primitives v2 extended instead of forking:
 - **`Panel`** (`title`, optional `meta`, `headingLevel: 2|3`) — the "eyebrow label, hairline, content" block, built on `Card` plus the shared `EYEBROW` class (now sentence-case mono, see "The caps charter" above). Two callers today (`seat-hold-panel.tsx`, `invite-panel.tsx`).
@@ -780,33 +805,106 @@ No z-index scale yet — three sanctioned layers exist by convention: a sticky b
 
 Two free-standing exports beside `Countdown` itself: `useCountdown(deadlineAt)` (the ticking hook — `UI_CONFIG.countdown.tickMs`, slowed to `reducedMotionTickMs` under reduced motion) and `formatCoarseDuration`/`formatCoarseRemaining` (the "5 minutes" / "About 2 hours left" building blocks a caller with its own sentence to build — `WaitingRoom`'s "Starts in …" and the wire's own item sentences both reuse this directly rather than writing a second minute/hour formatter).
 
+**The Gameday primitives (v4)** — built directly from the two approved compositions, which is the only reason each one exists. `docs/research/2026-08-28-gameday-foundation.png` is the side-by-side that proves the set is sufficient.
+
+- **`PlayerFace`** (`player`, `size: sm|md|lg`) — law 3's atom: the club-colour tile with the `Avatar` on it. `md` (44px) is the approved composition's own face size and the one measurement law 4 does not get to tighten — the face IS the object. An unknown team code renders the bare face, never a grey rectangle pretending to be somebody's colours. Promoted out of `src/draft-room/components/` so every surface that draws a player can reach it.
+- **`PlayerRow`** (`player`, `meta?`, `verdict?`, `action?`, `highlight?`) — laws 3 and 5 in one atom: face, name over meta, verdict, verb, in that order, so the verb sits in the same horizontal position on all sixty rows. `verdict` and `action` are SLOTS, not props: a magnitude colour may only be named by `Stat`, and a row that hard-coded its verb would have to learn every room's rules about when a manager may act. `highlight` paints the `accent-wash` utility rather than a hand-rolled tint, because the accent budget bans `bg-accent/10` outside its allowlist and the fix that budget actually wants is one address for the tint.
+- **`TierDivider`** (`grade: TierGrade`, `label`) — the band, drawn from real ADP gaps. The grade LETTER is the colourblind channel and always renders as text; a square badge, not a pill, so it can never be mistaken for the position sticker a few pixels below it.
+- **`Scoreboard`** (`home`/`away: SideProps`, `middle`) — the matchup hero. The score is `text-display-2xl` (84px) over an 11px micro-label, which is law 2's 7.6x pairing spent rather than admired. It stacks to one column below `sm` because two 84px scores are wider than 360px and law 2 says the layout moves, not the type. `SideProps.comparison` is the honest-comparison seam — see "The fun-pass amendments" for why it is empty by default.
+- **`PointsShareBar`** (`mineLabel`, `theirsLabel`, `mine`, `theirs`) — real arithmetic, `mine / (mine + theirs)`, and its docblock says out loud that it is NOT a win probability. A win probability needs a per-game distribution the engine does not emit, and a probability we cannot compute is exactly the kind of number a sports app fakes. It carries its own percentages beside the bar, the same contract `Meter` keeps.
+- **`GameStateChip`** (`state: GameState`) — `Q3 · 8:42` live, `Final` faint, `4:25 ET` muted. Ships with **`NOT_STARTED_DASH`** and **`pointsForGameState(state, points)`**, which is the rule rather than a suggestion: a scheduled player's points are an em-dash whatever number the caller holds. *"Folding 'has not played' into 'scored nothing' is the most common lie a fantasy scoreboard tells."*
+- **`EventFeedRow`** (`time`, `children`, `delta`, `mine`, `comparison?`) — the heartbeat. **`signedPoints(points)`** always attaches the sign, because the sign is the colourblind channel and cannot be left to a caller's `toFixed`; it also refuses to render a negative zero.
+- **`Pill`** (`tone: neutral|hot`) — the figure-carrying chip ("3 yet to play", "18.4 on your bench"). Composes `Badge` so there is still exactly one pill geometry in the product, and adds the one thing `Badge` is wrong about for this job: mono, because a `Pill` states a NUMBER inside a sentence.
+
+**`useValueChangeHighlight(value)`** (`src/design/use-value-change-highlight.ts`) — law 6's only new motion, and the only sanctioned way to spell a value-change wash. False on mount (nothing changed on mount), true for `TOKENS.motion.duration.slow` after a real change, false again after. Under reduced motion it returns `false` unconditionally and **arms no timer at all** — its test asserts `vi.getTimerCount() === 0`, so the branch is proven absent rather than merely suppressed, which is the bar law 6 sets.
+
 Tunables for primitives live in `src/components/ui/config.ts` (`UI_CONFIG`, `EYEBROW`) — never inline in a component. v3 additions: `UI_CONFIG.frontDoor.shelfCap` (6 — how many member leagues the front door shows before handing off to `/browse`), `UI_CONFIG.openLeagueCard.clockWithinMs` (6h — the window inside which the Drafts value ticks), `UI_CONFIG.wire.minItems` (3), and `MATCHMAKING_CONFIG.wire.windowMs`/`maxItems` alongside the pre-existing `MATCHMAKING_CONFIG`. (`MATCHMAKING_CONFIG.proof.nextDraftWithinMs`, the 24h window for a scheduled-kickoff proof chip, is gone — storefront review R1 retired the scheduled-kickoff fact it gated once the whole shelf went sit-and-go; see `docs/decisions/formats-and-lobby.md`, "The whole shelf is sit-and-go".)
 
-## Motion (rule 6: only true things move)
+## Motion (law 6: motion reports, never performs)
 
-`TOKENS.motion` — fast 120ms / base 200ms / slow 320ms / **pulse 1 600ms / wire 38 000ms** (v3
-additions), easings `standard` and `emphasized`. Use motion for state changes and moments that
-matter (a pick landing, a win, a real event on the wire). Never decorative loops — every animation
-below is driven by something that is actually true.
+**The razor first, because it is the whole section:** *turn every animation off — if the product
+feels dead, the aliveness was fake.* Aliveness is a property of the information, not the
+animation. Count the moving parts on the approved Sunday screen and there are two: a breathing live
+dot, and a one-off highlight on the row that just scored. Everything else is still, and it still
+reads as a sports app.
 
-Ten sanctioned animations, all declared in `globals.css` against token variables — never a
-literal duration:
+`TOKENS.motion` — fast 120ms / base 200ms / **slow 250ms** / pulse 1 600ms / wire 38 000ms, easings
+`standard` and `emphasized`.
+
+**`slow` moved 320ms → 250ms**, because law 6's *"nothing eases longer than 250ms"* is not a real
+rule while the variable every celebration reads says 320. `tokens.test.ts` holds every eased
+duration at or under the ceiling. `pulse` and `wire` are deliberately exempt and named in that
+test's docblock so the exemption is a decision rather than an oversight: neither is an *ease* —
+`pulse` is the live dot's cycle length and `wire` is a ticker's loop, both continuous states
+reporting something still true. Law 6 caps transitions; it does not cap a clock.
+
+Deliberately **no second `highlight` token**: the longest permitted ease and the duration of the
+value-change wash are one fact, and two names for one fact is how they drift apart.
+
+### What may move, and nothing else
+
+Five permissions, each requiring something real to have happened:
+
+1. **A value that just changed** — a one-off highlight on the row carrying it. `useValueChangeHighlight` (`src/design/use-value-change-highlight.ts`) is the only way to spell this.
+2. **A running clock's digits** — the number itself, not an effect around it.
+3. **A meter reflecting real progress** — the bar moves because the quantity did.
+4. **An element appearing because a real event created it** — a feed row, a landed pick, a toast.
+5. **A control responding to being pressed.**
+
+### What may never move
+
+**Nothing animates on mount, on scroll, or on hover.** No slide-ins, no bounce, no spring, no
+shimmer, no parallax, no skeleton pulse dressed up as personality. This is the clause v3 lacked:
+"only true things move" said what *may* move and was silent on the tacky failure modes, so nothing
+in it forbade a page that eased itself into view every time you visited it.
+
+A change that makes a screen louder without making a true thing more legible is decoration, and
+law 6 rejects it. The complaint that produced Gameday was that the product reads as a contract, not
+that it lacks ornament.
+
+### The sanctioned animations
+
+All declared in `globals.css` against token variables — never a literal duration:
 
 | class | what it does | where |
 |---|---|---|
-| `animate-celebrate-peer` | 8px rise + fade, `base` | `Celebration`'s panel when the moment is someone else's (`emphasis="peer"`) — a pick that isn't yours, a league-mate's matchup |
-| `animate-celebrate-self` | scale 0.96 → 1.03 → 1 settle, `slow`/`emphasized` | `Celebration`'s panel when the moment is yours (`emphasis="self"`) — your own drafted pick, your matchup win, a clinched playoff spot |
+| `animate-celebrate-peer` | 8px rise + fade, `base` | `Celebration`'s panel when the moment is someone else's — a pick that isn't yours |
+| `animate-celebrate-self` | scale 0.96 → 1.03 → 1 settle, `slow`/`emphasized` | `Celebration`'s panel when the moment is yours |
 | `animate-sticker-slap` | scale 1.15 → 1 with a small rotate settle, `slow`/`emphasized` | the board cell for the pick that just landed |
 | `animate-spotlight` | a slow opacity breath on the accent ring | the board cell that is on the clock |
-| `animate-wire` | translateX marquee, `wire` (38s), linear, infinite | the front-door/`/browse` activity ticker (`Wire`) — real events only, see "The wire's honesty contract" above |
-| `animate-pulse-live` | opacity 1 → .35 → 1 breath, `pulse` (1.6s) | the live chip's dot (`LiveChip`, `open-league-shared.tsx`) — rendered only while something on that league is genuinely live |
-| `animate-rise` | opacity + 14px rise, `base`; `rise-1..4` stagger by 1–4× `fast` | the front-door hero's entrance (`.floodlight`/`.yard-lines` wrapper, Task 7) |
+| `animate-wire` | translateX marquee, `wire` (38s), linear, infinite | the activity ticker — real events only, see "The wire's honesty contract" above |
+| `animate-pulse-live` | opacity 1 → .35 → 1 breath, `pulse` (1.6s) | the live chip's dot — rendered only while something is genuinely live |
+| `animate-rise` | opacity + 14px rise, `base`; `rise-1..4` stagger by 1–4× `fast` | the front-door hero's entrance |
 
-**One `Celebration` primitive, two callers.** `PickCelebration` (the draft room) and `MatchupCelebration` (the league room) are the same moment — "something worth announcing just happened" — said with different words. Both are built on `Celebration` + `useTransientVisibility` (`src/design/use-transient-visibility.ts`, keyed so a redelivered event never re-animates) rather than each rolling its own timer and markup. The board's sticker slap is a separate animation on the grid cell, independent of the panel's own self/peer treatment.
+Each of these predates Gameday and each still needs an event behind it. `animate-rise` is the one
+closest to the line law 6 draws — it is an entrance — and it survives only because it fires on a
+signed-out marketing hero rather than on a surface a manager returns to. It is not a licence for
+entrance animations on signed-in screens.
 
-Reduced motion is honored twice over:
-1. **Globally**, in `globals.css`: a `prefers-reduced-motion: reduce` block collapses every animation and transition to 0.01ms. This is the safety net — it applies to code that has never heard of the preference. It is what turns the wire's infinite marquee into a static, non-scrolling list for free.
-2. **Deliberately**, via `usePrefersReducedMotion()` (`src/design/use-reduced-motion.ts`) whenever "less motion" should mean *different behavior*, not merely a faster animation: the landing sticker simply appears (no slap), the on-the-clock cell keeps a **static** accent ring instead of breathing, `Celebration`'s panel renders with no animation class at all (but still appears, and is still announced via `role="status"`), toasts dwell twice as long, the live chip's dot stops pulsing but the chip itself still shows, and the wire renders its first `minItems` items as a static row rather than a frozen mid-scroll marquee. Any component whose reduced-motion behavior is a real branch must have a test that asserts both branches.
+**One `Celebration` primitive, two callers.** `PickCelebration` (the draft room) and
+`MatchupCelebration` (the league room) are the same moment — "something worth announcing just
+happened" — said with different words. Both are built on `Celebration` + `useTransientVisibility`
+(keyed so a redelivered event never re-animates) rather than each rolling its own timer and markup.
+
+### Reduced motion, honored twice over
+
+1. **Globally**, in `globals.css`: a `prefers-reduced-motion: reduce` block collapses every
+   animation and transition to 0.01ms. This is the safety net — it applies to code that has never
+   heard of the preference, and it is what turns the wire's infinite marquee into a static list for
+   free.
+2. **Deliberately**, via `usePrefersReducedMotion()` whenever "less motion" should mean *different
+   behavior* rather than a faster animation: the landing sticker simply appears (no slap), the
+   on-the-clock cell keeps a **static** accent ring instead of breathing, `Celebration`'s panel
+   renders with no animation class at all (but still appears, and is still announced via
+   `role="status"`), toasts dwell twice as long, the live chip's dot stops pulsing but the chip
+   still shows, the countdown ticks every 30s instead of every second, and
+   `useValueChangeHighlight` returns `false` unconditionally so the wash is never rendered at all.
+
+**The reduced-motion branch must be a real branch, and it must be tested as one.** Any component
+whose reduced-motion behavior differs from a faster animation carries a test asserting *both*
+branches. The bar law 6 sets is that **reduced-motion removes all of it and the product loses
+nothing** — if a screen becomes less informative with motion off, the information was living in the
+motion, which is the failure the razor exists to catch.
 
 ## Copy
 

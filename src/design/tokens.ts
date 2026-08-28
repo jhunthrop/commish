@@ -335,7 +335,7 @@ const lightMagnitude: MagnitudePalette = {
  *
  * - **Not a semantic role.** These thirty-two values mean "the Chiefs" and nothing else. They
  *   never become a surface, a fill behind text, a control, or a magnitude. The consumer
- *   (`src/draft-room/components/player-face.tsx`) paints one decorative, `aria-hidden` tile and
+ *   (`src/components/ui/player-face.tsx`) paints one decorative, `aria-hidden` tile and
  *   the face sits on top of it, so no contrast threshold applies and none is claimed.
  * - **Not theme-varying.** A club's colour is the club's, in daylight and at night alike.
  *   Inverting it per theme would be inventing a Chiefs red that the Chiefs do not have.
@@ -423,10 +423,15 @@ export type TierGrade = (typeof TIER_GRADES)[number];
  *   find is not a divider, it is decoration. So this is TWO designed palettes over one ladder, the
  *   same shape `TOKENS.position` keeps: dark carries the approved mock's values verbatim, light
  *   carries the same four hues re-derived dark enough to be findable, with white ink on them.
- * - **Not a CSS variable.** Keyed by DATA (the grade riding a pool row), the same reason
- *   `teamColors` reaches the DOM as an inline `style` — a Tailwind class the static scanner cannot
- *   see ships no rule at all, and this file is the only one allowed to hold a colour literal
- *   (`no-raw-color.source.test.ts`).
+ * - **Not an inline style, unlike `teamColors` — and the difference is not the one it looks like.**
+ *   Both palettes are keyed by data, but a team code ARRIVES AT RUNTIME off the stats feed and is
+ *   unbounded, so a Tailwind class for it is one the static scanner cannot see and therefore ships
+ *   no rule at all. A grade is one of four literals (`TIER_GRADES`), so a component can write all
+ *   four class names out and Tailwind sees every one. That is what lets this palette be emitted as
+ *   per-theme custom properties (`--commish-tier-*`, `src/design/generate-css.ts`) and consumed as
+ *   classes — which is not a convenience but the requirement below: an inline style would have to
+ *   choose between the two designed palettes in React, and nothing rendering here can read the
+ *   resolved theme. Renderer: `TierDivider` (`src/components/ui/tier-divider.tsx`).
  *
  * **The colourblind channel is the LETTER, not a caret.** Adjacent rungs of this ramp are close in
  * hue on purpose (red, amber, gold — a warmth that cools as the grade falls), which is what makes

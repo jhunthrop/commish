@@ -1,4 +1,4 @@
-import { TOKENS, MAGNITUDE_STEPS, type ColorRole, type PositionColorRole, type ThemeName } from "./tokens";
+import { TOKENS, MAGNITUDE_STEPS, TIER_GRADES, type ColorRole, type PositionColorRole, type ThemeName } from "./tokens";
 import { UI_CONFIG } from "@/components/ui/config";
 
 /** Namespace for every generated CSS custom property, so `@theme inline` aliases in
@@ -38,9 +38,38 @@ function magnitudeVars(theme: ThemeName, indent: string): string {
   return MAGNITUDE_STEPS.map((step) => `${indent}${tokenVar(`mag-${step}`)}: ${TOKENS.magnitude[theme][step]};`).join("\n");
 }
 
+/**
+ * The tier ladder's four grades, two variables each (the badge fill and the letter printed on
+ * it), emitted per theme beside the colors — the same shape a position sticker takes, for the
+ * same reason: a grade badge is a FILL carrying its own on-fill label, so the pair travels
+ * together or the label ends up chosen at a call site.
+ *
+ * WHY THIS PALETTE IS A CSS VARIABLE WHEN `TOKENS.team` IS NOT. `tokens.ts` groups the two under
+ * one heading ("not a CSS variable, keyed by data") and they are not actually alike. A team colour
+ * is keyed by a value that ARRIVES AT RUNTIME — a `teamAbv` off the stats feed, unbounded from the
+ * static scanner's point of view — so it can only ever reach the DOM as an inline style. A tier
+ * grade is keyed by a CLOSED union of four literals (`TIER_GRADES`), so a component can write the
+ * four class names out and Tailwind can see all four. That difference is the whole argument: with
+ * variables the badge is theme-REACTIVE, repainting itself when the theme switches under it, where
+ * an inline style would have to read the theme in React — which no component here can do — and
+ * would therefore have shipped dark's bright pigments onto the light theme's near-white ground,
+ * the exact 3:1 failure `TOKENS.tier`'s own docblock says two designed palettes exist to prevent.
+ *
+ * Grades are lower-cased in the variable name (`--commish-tier-s-fill`) because a CSS custom
+ * property is case-sensitive and every other generated name here is kebab-lower; the component's
+ * class map keys stay the union's own capitals.
+ */
+function tierVars(theme: ThemeName, indent: string): string {
+  const palette = TOKENS.tier[theme];
+  return TIER_GRADES.flatMap((grade) => [
+    `${indent}${tokenVar(`tier-${grade.toLowerCase()}-fill`)}: ${palette[grade].fill};`,
+    `${indent}${tokenVar(`tier-${grade.toLowerCase()}-label`)}: ${palette[grade].label};`,
+  ]).join("\n");
+}
+
 /** Everything that changes with the theme, in the order every theme block emits it. */
 function themeVars(theme: ThemeName, indent: string): string {
-  return [colorVars(theme, indent), magnitudeVars(theme, indent), positionVars(theme, indent)].join("\n");
+  return [colorVars(theme, indent), magnitudeVars(theme, indent), positionVars(theme, indent), tierVars(theme, indent)].join("\n");
 }
 
 function scaleVars(prefix: string, obj: Readonly<Record<string, number | string>>, unit: string, indent: string): string {

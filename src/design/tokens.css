@@ -42,6 +42,14 @@
   --commish-pos-def-sticker: #535963;
   --commish-pos-def-sticker-text: #FFFFFF;
   --commish-pos-def-text: #535963;
+  --commish-tier-s-fill: #BE3A2C;
+  --commish-tier-s-label: #FFFFFF;
+  --commish-tier-a-fill: #A85B10;
+  --commish-tier-a-label: #FFFFFF;
+  --commish-tier-b-fill: #7A6512;
+  --commish-tier-b-label: #FFFFFF;
+  --commish-tier-c-fill: #2F5EA8;
+  --commish-tier-c-label: #FFFFFF;
   --commish-radius-sm: 4px;
   --commish-radius-md: 8px;
   --commish-radius-lg: 12px;
@@ -116,6 +124,14 @@
   --commish-pos-def-sticker: #616D83;
   --commish-pos-def-sticker-text: #EDEEF2;
   --commish-pos-def-text: #818CA1;
+  --commish-tier-s-fill: #FF7A6E;
+  --commish-tier-s-label: #14140F;
+  --commish-tier-a-fill: #F5A248;
+  --commish-tier-a-label: #14140F;
+  --commish-tier-b-fill: #E8CF5A;
+  --commish-tier-b-label: #14140F;
+  --commish-tier-c-fill: #6FA8DC;
+  --commish-tier-c-label: #14140F;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -162,6 +178,14 @@
     --commish-pos-def-sticker: #616D83;
     --commish-pos-def-sticker-text: #EDEEF2;
     --commish-pos-def-text: #818CA1;
+    --commish-tier-s-fill: #FF7A6E;
+    --commish-tier-s-label: #14140F;
+    --commish-tier-a-fill: #F5A248;
+    --commish-tier-a-label: #14140F;
+    --commish-tier-b-fill: #E8CF5A;
+    --commish-tier-b-label: #14140F;
+    --commish-tier-c-fill: #6FA8DC;
+    --commish-tier-c-label: #14140F;
   }
 }
 
