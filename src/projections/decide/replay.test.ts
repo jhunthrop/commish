@@ -8,6 +8,7 @@ import { valueBoard } from "./replacement";
 import {
   byProjectedPoints,
   byRecommendation,
+  byStartersFirstPoints,
   byValueOverReplacement,
   lineupRegret,
   pairedDraftReplay,
@@ -62,14 +63,30 @@ describe("replayDraft", () => {
     expect(picks[23]!.seat).toBe(0);
   });
 
-  it("gives every seat a full, legal roster and nobody two of the same man", () => {
+  it("gives every seat a legal roster and nobody two of the same man", () => {
     const seats = Array.from({ length: 12 }, () => byRecommendation);
     const { picks, rostersBySeat } = replayDraft({ board: BOARD, shape: SHAPE, seats });
     expect(new Set(picks.map((pick) => pick.playerId)).size).toBe(picks.length);
     for (const roster of rostersBySeat) {
-      expect(roster.length).toBe(15);
+      // Fifteen slots, and a seat may end one short: a pass is a legal outcome when the roster's
+      // last open slot is at a position the board has run out of. See `SeatStrategy`.
+      expect(roster.length).toBeGreaterThanOrEqual(14);
+      expect(roster.length).toBeLessThanOrEqual(15);
       // The engine's own slot rules are what limit this; nothing here re-states them.
       expect(roster.filter((player) => player.position === "QB").length).toBeLessThanOrEqual(7);
+    }
+  });
+
+  it("the realistic opponent fills its starting slots before stacking a bench", () => {
+    const seats = Array.from({ length: 12 }, () => byStartersFirstPoints);
+    const { rostersBySeat } = replayDraft({ board: BOARD, shape: SHAPE, seats });
+    for (const roster of rostersBySeat) {
+      // Nine starting slots in the standard shape, and every one of them filled before any
+      // position was stacked. A plain points ranking spends four to six picks on quarterbacks.
+      expect(roster.filter((player) => player.position === "QB").length).toBeLessThanOrEqual(2);
+      for (const position of ["RB", "WR", "TE"] as const) {
+        expect(roster.some((player) => player.position === position)).toBe(true);
+      }
     }
   });
 

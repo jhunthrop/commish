@@ -85,11 +85,12 @@ describe("recommendPick", () => {
   it("A TIER CLIFF AT AN UNFILLED POSITION: crosses it before it breaks", () => {
     // Two starting receivers and two backs already in. The flex is the only spot a third
     // receiver can take, and tight end is empty.
+    // Values carried, because what a candidate is worth is what he adds ON TOP of these men.
     const roster: readonly RosteredPlayer[] = [
-      { playerId: "own-wr-1", position: "WR" },
-      { playerId: "own-wr-2", position: "WR" },
-      { playerId: "own-rb-1", position: "RB" },
-      { playerId: "own-rb-2", position: "RB" },
+      { playerId: "own-wr-1", position: "WR", valueOverReplacement: 120 },
+      { playerId: "own-wr-2", position: "WR", valueOverReplacement: 110 },
+      { playerId: "own-rb-1", position: "RB", valueOverReplacement: 130 },
+      { playerId: "own-rb-2", position: "RB", valueOverReplacement: 100 },
     ];
     const lastGoodTightEnd = candidate("lastGoodTightEnd", "TE", 70, 40);
     const anotherReceiver = candidate("anotherReceiver", "WR", 70, 90);
@@ -117,9 +118,11 @@ describe("recommendPick", () => {
   });
 
   it("ROSTER SATURATION: a fifth back ranks below a first tight end at the same value", () => {
+    // Four backs already better than the fifth: every slot a back can start in is held.
     const roster: readonly RosteredPlayer[] = Array.from({ length: 4 }, (_, index) => ({
       playerId: `own-rb-${index}`,
       position: "RB" as Position,
+      valueOverReplacement: 140 - index * 10,
     }));
     const fifthBack = candidate("fifthBack", "RB", 60, 50);
     const firstTightEnd = candidate("firstTightEnd", "TE", 60, 50);
@@ -138,8 +141,10 @@ describe("recommendPick", () => {
     expect(rankOf("fifthBack")).toBeGreaterThan(-1);
 
     expect(rankOf("firstTightEnd")).toBeLessThan(rankOf("fifthBack"));
-    expect(ranked.find((r) => r.playerId === "firstTightEnd")!.rosterAdjustedValue).toBe(60);
-    expect(ranked.find((r) => r.playerId === "fifthBack")!.rosterAdjustedValue).toBeLessThan(60);
+    // The tight end fills an empty slot, so all sixty points of him count. The fifth back adds
+    // nothing to any lineup this roster can field, and only his insurance value survives.
+    expect(ranked.find((r) => r.playerId === "firstTightEnd")!.rosterAdjustedValue).toBeGreaterThan(60);
+    expect(ranked.find((r) => r.playerId === "fifthBack")!.rosterAdjustedValue).toBeLessThan(10);
     expect(codesOf(ranked.find((r) => r.playerId === "fifthBack")!.reasons)).toContain("roster_saturated");
     expect(codesOf(ranked.find((r) => r.playerId === "firstTightEnd")!.reasons)).toContain(
       "fills_starting_slot",
@@ -179,6 +184,7 @@ describe("recommendPick", () => {
     const roster: readonly RosteredPlayer[] = Array.from({ length: 7 }, (_, index) => ({
       playerId: `own-qb-${index}`,
       position: "QB" as Position,
+      valueOverReplacement: 50,
     }));
     const board = [candidate("eighthQuarterback", "QB", 300, 1), ...filler("WR", 20, 2, 10)];
     const ranked = recommendPick({ board, roster, shape: SHAPE, pickNumber: 37, nextPickNumber: 60 });

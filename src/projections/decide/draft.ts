@@ -1,6 +1,7 @@
 import type { Position } from "@/domain/player";
 import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig, type RosterSlotType } from "@/domain/roster";
 import { assignSlot } from "@/draft-engine";
+import { bestStartingTotal } from "./slots";
 import type { LeagueShape, ValuedPlayer } from "./replacement";
 import { survivalProbabilities, type RoomTendency } from "./survival";
 import { tierStanding } from "./tiers";
@@ -18,7 +19,9 @@ import { tierStanding } from "./tiers";
  *
  * So the score is an expected value over a two-turn horizon: take him now, and then take the best
  * man who survives to your next pick. Written out, `EV(c) = value(c) + E[best survivor after c is
- * gone]`, where `value` is already discounted by what the roster needs. The expectation is exact
+ * gone]`, where `value` is MARGINAL - what he adds to the starting lineup this roster can field,
+ * not what he is worth in the abstract. `fitFor` argues that distinction in full, and the draft
+ * replay is what forced it. The expectation is exact
  * rather than sampled - sort the remaining board by value, and the best survivor is the first man
  * who lasts - which is O(n) and, more importantly, is an argument a manager can follow. A Monte
  * Carlo that produced a slightly better answer nobody could check would be the wrong trade: an
@@ -43,10 +46,22 @@ export interface DraftCandidate extends ValuedPlayer {
   readonly averageDraftPosition: number;
 }
 
-/** A player already on your roster. Position, because a roster slot alone cannot tell you. */
+/**
+ * A player already on your roster.
+ *
+ * `valueOverReplacement` is REQUIRED, and it is not decoration. A candidate's marginal value is
+ * the improvement he makes to your starting lineup, which cannot be computed without knowing who
+ * he would be improving on. This field was optional for exactly one afternoon, defaulting to
+ * replacement level, and the draft replay drafted EIGHT TIGHT ENDS a seat: every man already
+ * rostered scored zero, so every candidate looked like a starting upgrade and the marginal rule
+ * silently collapsed back into the standalone-value rule it was written to replace. An optional
+ * field with a plausible default is how a decision layer gets a confidently wrong answer, so this
+ * one fails to compile instead.
+ */
 export interface RosteredPlayer {
   readonly playerId: string;
   readonly position: Position;
+  readonly valueOverReplacement: number;
 }
 
 export interface RecommendationQuery {
@@ -77,7 +92,7 @@ export interface Recommendation {
   /** The score the shortlist is ordered by: value now plus the best man expected to survive. */
   readonly expectedValueAdded: number;
   readonly valueOverReplacement: number;
-  /** Value over replacement after the roster's own needs are priced in. */
+  /** What he adds to the starting lineup this roster can field, plus a little insurance. */
   readonly rosterAdjustedValue: number;
   /** Zero at your last pick: nothing survives to a turn you do not have. */
   readonly survivalProbability: number;
@@ -88,13 +103,13 @@ export interface Recommendation {
 export const DEFAULT_SHORTLIST = 5;
 
 /**
- * What a bench player is worth against a starter of identical value: he plays on a bye, on an
- * injury, and not otherwise. Each further body at the same position is worth less again.
+ * What a man is worth sitting behind somebody: a bye week, an injury, and not much else. Each
+ * further body already stacked at that position is worth less again.
  *
- * Chosen rather than fitted, and the draft replay in `scripts/decision-report.ts` is what says
- * whether the choice pays. Anything finer would be false precision.
+ * Chosen rather than fitted, and `scripts/decision-report.ts` is what says whether the choice
+ * pays. Anything finer would be false precision.
  */
-export const BENCH_VALUE_SHARE = 0.4;
+export const BENCH_INSURANCE_SHARE = 0.08;
 export const BENCH_DEPTH_DECAY = 0.7;
 
 /** Below this he is going, above it he will keep. Thresholds for the reason, never for the score. */
@@ -142,58 +157,108 @@ function filledSlots(placements: readonly Placement[]): readonly RosterSlot[] {
 }
 
 /**
- * Whether this roster can legally take another player at that position, asked of the engine's own
- * oracle. Exported because the draft replay needs the identical answer: a replay that let a seat
- * roster nine quarterbacks would be scoring a draft the room would have refused.
+ * Where a player at this position would land on this roster, or `null` if the roster cannot take
+ * him at all. Asked of the engine's own oracle (`assignSlot`), never a second rule written here.
+ *
+ * Exported because the draft replay needs the identical answer twice over: a replay that let a
+ * seat roster nine quarterbacks would be scoring a draft the room would have refused, and its
+ * realistic opponent needs to know whether a man would START or merely sit.
  */
+export function landingSlot(
+  roster: readonly RosteredPlayer[],
+  position: Position,
+  slotConfig: readonly RosterSlotConfig[],
+): RosterSlotType | null {
+  const assignment = assignSlot({
+    position,
+    roster: filledSlots(placeRoster(roster, slotConfig)),
+    slotConfig,
+  });
+  return assignment.ok ? assignment.slot : null;
+}
+
 export function canRoster(
   roster: readonly RosteredPlayer[],
   position: Position,
   slotConfig: readonly RosterSlotConfig[],
 ): boolean {
-  return assignSlot({ position, roster: filledSlots(placeRoster(roster, slotConfig)), slotConfig }).ok;
+  return landingSlot(roster, position, slotConfig) !== null;
 }
 
-interface NeedVerdict {
-  readonly weight: number;
+interface RosterFit {
+  /** What he adds to the best starting lineup this roster can field, in value over replacement. */
+  readonly marginalStartingValue: number;
+  /** What he is worth sitting behind somebody: a bye, an injury, and not much else. */
+  readonly insurance: number;
+  readonly value: number;
+  /** Where he would land, or `null` when the roster cannot legally take him at all. */
   readonly slot: RosterSlotType | null;
   readonly alreadyRostered: number;
   readonly alreadyBenched: number;
 }
 
-/**
- * How much of a player's value this particular roster can actually use.
- *
- * A man who fills an empty starting slot is worth all of it. A man who can only sit is worth a
- * share of it, falling again for every body already stacked behind that position. A man the
- * roster cannot legally take is worth nothing and never reaches the shortlist.
- *
- * NEGATIVE VALUE IS NEVER DISCOUNTED. Multiplying a below-replacement player's value by a
- * fraction would make him LESS negative and float him up the board, which is the opposite of
- * what saturation means.
- */
-function needFor(
-  position: Position,
-  placements: readonly Placement[],
+/** Below-replacement men contribute nothing to a lineup; they do not contribute NEGATIVELY to it. */
+function surplus(player: RosteredPlayer): number {
+  return Math.max(0, player.valueOverReplacement);
+}
+
+function startingValue(
+  players: readonly RosteredPlayer[],
   slotConfig: readonly RosterSlotConfig[],
-): NeedVerdict {
-  const alreadyRostered = placements.filter((p) => p.position === position).length;
-  const alreadyBenched = placements.filter((p) => p.position === position && p.slot === BENCH_SLOT).length;
-  const assignment = assignSlot({ position, roster: filledSlots(placements), slotConfig });
-  if (!assignment.ok) return { weight: 0, slot: null, alreadyRostered, alreadyBenched };
-  if (assignment.slot !== BENCH_SLOT) {
-    return { weight: 1, slot: assignment.slot, alreadyRostered, alreadyBenched };
+): number {
+  return bestStartingTotal(players, slotConfig, surplus);
+}
+
+/**
+ * HOW MUCH OF A PLAYER'S VALUE THIS PARTICULAR ROSTER CAN ACTUALLY USE.
+ *
+ * The first version of this scored a candidate at his own value over replacement, discounted by a
+ * fraction when he could only sit. THE DRAFT REPLAY DESTROYED IT: every seat following the
+ * recommendation drafted EIGHT TIGHT ENDS. Tight end has the lowest replacement level of any
+ * position, so tight ends carry high value over replacement all the way down the board, and a
+ * fixed bench discount was never going to be large enough to stop a strategy that kept finding the
+ * best remaining number at one position. The roster it produced was worse than a plain points
+ * ranking by about eighty points a season, and no unit test in this directory would ever have
+ * caught it: each individual comparison the old rule made was defensible.
+ *
+ * The honest quantity is MARGINAL. A player is worth what he adds to the starting lineup you can
+ * field, which is zero for a fourth tight end however good he is, because the tight end slot and
+ * the flex are already held by better tight ends. That single change is what makes a recommendation
+ * a roster-building decision rather than a very careful way of reading one column.
+ *
+ * A bench body is not worthless, so a small insurance share of his surplus remains, decaying with
+ * every man already stacked behind that position: the fourth backup at one position cannot start
+ * even if the man ahead of him goes down.
+ */
+function fitFor(
+  candidate: RosteredPlayer,
+  roster: readonly RosteredPlayer[],
+  slotConfig: readonly RosterSlotConfig[],
+): RosterFit {
+  const alreadyRostered = roster.filter((player) => player.position === candidate.position).length;
+  const placements = placeRoster(roster, slotConfig);
+  const alreadyBenched = placements.filter(
+    (placement) => placement.position === candidate.position && placement.slot === BENCH_SLOT,
+  ).length;
+  const assignment = assignSlot({
+    position: candidate.position,
+    roster: filledSlots(placements),
+    slotConfig,
+  });
+  if (!assignment.ok) {
+    return { marginalStartingValue: 0, insurance: 0, value: 0, slot: null, alreadyRostered, alreadyBenched };
   }
+  const marginalStartingValue =
+    startingValue([...roster, candidate], slotConfig) - startingValue(roster, slotConfig);
+  const insurance = BENCH_INSURANCE_SHARE * surplus(candidate) * BENCH_DEPTH_DECAY ** alreadyBenched;
   return {
-    weight: BENCH_VALUE_SHARE * BENCH_DEPTH_DECAY ** alreadyBenched,
-    slot: BENCH_SLOT,
+    marginalStartingValue,
+    insurance,
+    value: marginalStartingValue + insurance,
+    slot: assignment.slot,
     alreadyRostered,
     alreadyBenched,
   };
-}
-
-function adjust(valueOverReplacement: number, weight: number): number {
-  return valueOverReplacement >= 0 ? valueOverReplacement * weight : valueOverReplacement;
 }
 
 /**
@@ -244,7 +309,7 @@ function positionPool(board: readonly DraftCandidate[], position: Position): rea
 
 function reasonsFor(
   candidate: DraftCandidate,
-  need: NeedVerdict,
+  fit: RosterFit,
   survival: number,
   query: RecommendationQuery,
   board: readonly DraftCandidate[],
@@ -266,14 +331,16 @@ function reasonsFor(
     reasons.push({ code: "safe_to_wait", survivalProbability: survival, nextPick: query.nextPickNumber });
   }
 
-  if (need.slot !== null && need.slot !== BENCH_SLOT) {
-    reasons.push({ code: "fills_starting_slot", slot: need.slot });
-  } else if (need.slot === BENCH_SLOT) {
+  if (fit.marginalStartingValue > 0 && fit.slot !== null) {
+    reasons.push({ code: "fills_starting_slot", slot: fit.slot });
+  } else if (fit.slot !== null) {
+    // He can be rostered and adds nothing to the lineup: everything he could start in is already
+    // held by somebody better. That is saturation, whatever slot he technically lands in.
     reasons.push({
       code: "roster_saturated",
       position: candidate.position,
-      alreadyRostered: need.alreadyRostered,
-      alreadyBenched: need.alreadyBenched,
+      alreadyRostered: fit.alreadyRostered,
+      alreadyBenched: fit.alreadyBenched,
     });
   }
 
@@ -307,7 +374,6 @@ export function recommendPick(query: RecommendationQuery): readonly Recommendati
     throw new Error(`A recommendation is made at a whole pick number; got ${pickNumber}.`);
   }
   const slotConfig = shape.rosterSlots;
-  const placements = placeRoster(roster, slotConfig);
 
   const survival =
     nextPickNumber === null
@@ -315,23 +381,27 @@ export function recommendPick(query: RecommendationQuery): readonly Recommendati
       : survivalProbabilities({ board, fromPick: pickNumber, toPick: nextPickNumber, room });
 
   const rankable = board
-    .map((candidate) => ({ candidate, need: needFor(candidate.position, placements, slotConfig) }))
-    .filter((entry) => entry.need.weight > 0)
-    .map((entry) => ({ ...entry, value: adjust(entry.candidate.valueOverReplacement, entry.need.weight) }))
-    .sort((a, b) => b.value - a.value || a.candidate.playerId.localeCompare(b.candidate.playerId));
+    .map((candidate) => ({ candidate, fit: fitFor(candidate, roster, slotConfig) }))
+    .filter((entry) => entry.fit.slot !== null)
+    .sort(
+      (a, b) =>
+        b.fit.value - a.fit.value ||
+        b.candidate.valueOverReplacement - a.candidate.valueOverReplacement ||
+        a.candidate.playerId.localeCompare(b.candidate.playerId),
+    );
 
   // Only the top of the board can win, and each one costs a full re-valuation of what is left.
   const considered = rankable.slice(0, Math.max(shortlistSize * 3, DEFAULT_SHORTLIST * 3));
 
-  const scored = considered.map(({ candidate, need, value }) => {
+  const scored = considered.map(({ candidate, fit }) => {
     const survives = survival.get(candidate.playerId) ?? 0;
-    let expectedValueAdded = value;
+    let expectedValueAdded = fit.value;
     if (nextPickNumber !== null) {
-      const after = [...placements, { slot: need.slot ?? BENCH_SLOT, position: candidate.position }];
+      const after = [...roster, candidate];
       const survivors = board
         .filter((entry) => entry.playerId !== candidate.playerId)
         .map((entry) => ({
-          value: adjust(entry.valueOverReplacement, needFor(entry.position, after, slotConfig).weight),
+          value: fitFor(entry, after, slotConfig).value,
           survival: survival.get(entry.playerId) ?? 0,
         }));
       expectedValueAdded += expectedBestSurvivor(survivors);
@@ -341,9 +411,9 @@ export function recommendPick(query: RecommendationQuery): readonly Recommendati
       position: candidate.position,
       expectedValueAdded,
       valueOverReplacement: candidate.valueOverReplacement,
-      rosterAdjustedValue: value,
+      rosterAdjustedValue: fit.value,
       survivalProbability: survives,
-      reasons: reasonsFor(candidate, need, survives, query, board),
+      reasons: reasonsFor(candidate, fit, survives, query, board),
     } satisfies Recommendation;
   });
 

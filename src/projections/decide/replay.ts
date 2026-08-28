@@ -1,9 +1,10 @@
 import { snakeTeamForPick, totalRosterSlots } from "@/draft-engine";
-import { canRoster, recommendPick, type DraftCandidate, type RosteredPlayer } from "./draft";
+import { BENCH_SLOT } from "@/domain/roster";
+import { canRoster, landingSlot, recommendPick, type DraftCandidate, type RosteredPlayer } from "./draft";
 import { startSit, type LineupCandidate, type MatchupContext } from "./lineup";
 import type { LeagueShape } from "./replacement";
 import { MIN_RANK_GAP, type MarketPrice, type Sleeper } from "./sleepers";
-import { assignStarters, bestStartingTotal, startingSpots } from "./slots";
+import { assignStarters, bestStartingTotal, startingSpots, type Slottable } from "./slots";
 
 /**
  * SCORING THE DECISIONS, NOT THE PREDICTIONS.
@@ -63,6 +64,45 @@ function firstLegal(view: SeatView, order: (a: DraftCandidate, b: DraftCandidate
  */
 export const byProjectedPoints: SeatStrategy = (view) =>
   firstLegal(view, (a, b) => b.projectedPoints - a.projectedPoints || a.playerId.localeCompare(b.playerId));
+
+/**
+ * THE OPPONENT A REAL ROOM ACTUALLY HAS: fill your starting slots first, best available by
+ * projected points, and only then take bench bodies.
+ *
+ * `byProjectedPoints` is the honest strawman but it is a strawman: because quarterbacks score the
+ * most points, it spends four to six of every roster on them, which no human room does. That is
+ * not merely a weak opponent, it INVALIDATES THE PREMISE VALUE OVER REPLACEMENT RESTS ON. A
+ * replacement level says "the twelfth quarterback is free", and he is only free in a room that
+ * rosters starters rationally. Measuring our advice against a room that hoards one position is
+ * measuring it against a world where its central assumption is false.
+ */
+export const byStartersFirstPoints: SeatStrategy = (view) => {
+  const { roster, shape } = view;
+  const slotConfig = shape.rosterSlots;
+
+  /**
+   * One backup per startable slot and no more. The one positional rule every real manager keeps
+   * without being told: nobody rosters a third quarterback in a league that starts one, however
+   * many points he projects for.
+   */
+  const cap = (position: DraftCandidate["position"]): number =>
+    slotConfig
+      .filter((slot) => slot.slot !== BENCH_SLOT && slot.eligiblePositions.includes(position))
+      .reduce((count, slot) => count + slot.count, 0) + 1;
+
+  const byPoints = [...view.board]
+    .sort((a, b) => b.projectedPoints - a.projectedPoints || a.playerId.localeCompare(b.playerId))
+    .filter(
+      (entry) =>
+        canRoster(roster, entry.position, slotConfig) &&
+        roster.filter((player) => player.position === entry.position).length < cap(entry.position),
+    );
+
+  const starter = byPoints.find(
+    (entry) => landingSlot(roster, entry.position, slotConfig) !== BENCH_SLOT,
+  );
+  return (starter ?? byPoints[0])?.playerId ?? null;
+};
 
 /** Task 1 alone, with no survival and no roster need. Isolates what replacement level is worth. */
 export const byValueOverReplacement: SeatStrategy = (view) =>
@@ -135,7 +175,14 @@ export function replayDraft({ board, shape, seats }: DraftReplayInput): DraftRep
       throw new Error(`A seat took ${playerId} at pick ${pickNumber}, who is not on the board.`);
     }
     taken.add(playerId);
-    rosters[seat]!.push({ playerId, position: chosen.position });
+    // The VALUE travels with the pick. Without it every rostered man reads as replacement level,
+    // the marginal-value rule in `fitFor` degenerates into the standalone-value rule, and the
+    // replay quietly measures a strategy nobody wrote. See `RosteredPlayer`.
+    rosters[seat]!.push({
+      playerId,
+      position: chosen.position,
+      valueOverReplacement: chosen.valueOverReplacement,
+    });
     picks.push({ pickNumber, seat, playerId });
   }
   return { picks, rostersBySeat: rosters };
@@ -174,7 +221,9 @@ export interface PairedDraftInput {
  * injuries, so it is if anything generous to the baseline.
  */
 export function rosterValue(
-  roster: readonly RosteredPlayer[],
+  // `Slottable` rather than `RosteredPlayer`: scoring a roster needs a position and an id, and
+  // asking for a value over replacement it never reads would invite a caller to invent one.
+  roster: readonly Slottable[],
   actualPoints: ReadonlyMap<string, number>,
   shape: LeagueShape,
 ): number {
