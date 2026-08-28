@@ -373,8 +373,21 @@ export const TOKENS = {
      * scale's own docblock neighbor. `xl` is 58 (was 64 in v2) — the Sunday Standard mock's
      * display size (self-ruling S3); the display tracking rule that pairs with it lives in
      * globals.css, not here.
+     *
+     * `2xl` and `3xl` are the fun pass's own addition (Task 3, 2026-08-27). The spec's third
+     * named cause of "it feels like a legal website" is that this product has almost no
+     * typographic dynamic range: "sports interfaces live on roughly 10x scale contrast — a huge
+     * number, a tiny label. We are at about 2x." The scale topped out at 58 against a 12px
+     * eyebrow, which is 4.8x, and no amount of care at a call site invents range a scale does not
+     * carry. 116 over the eyebrow is 9.7x on a phone and 10.5x at desktop density.
+     *
+     * The range comes from SIZE and only from size. Rule 2's ≤600 weight cap does not move, and
+     * `weight-cap.source.test.ts` is what stops the next author reaching for a heavier face
+     * instead of a bigger one. These two steps are not densified: a display size is a call site's
+     * own responsive decision (`text-display-lg sm:text-display-3xl`, the idiom E6 established
+     * for the hero), because 116px is a TV board and a matchup hero, never a 360px phone.
      */
-    display: { sm: 20, md: 28, lg: 44, xl: 58 },
+    display: { sm: 20, md: 28, lg: 44, xl: 58, "2xl": 82, "3xl": 116 },
     lineHeight: { display: 1.06, tight: 1.2, base: 1.5 },
   },
   /**

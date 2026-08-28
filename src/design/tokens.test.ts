@@ -309,6 +309,24 @@ describe("TOKENS scales", () => {
     for (let i = 1; i < vals.length; i++) expect(vals[i]).toBeGreaterThan(vals[i - 1]!);
     expect(vals[0]).toBeGreaterThan(TOKENS.font.size.md);
   });
+  it("carries roughly ten times the range between the biggest number on a screen and its label", () => {
+    // THE DYNAMIC-RANGE GATE (docs/design/2026-08-27-fun-pass-spec.md, cause 3): "Sports
+    // interfaces live on roughly 10x scale contrast — a huge number, a tiny label. We are at
+    // about 2x. Uniform hierarchy is a document convention, and it is why the eye has nothing to
+    // grab on any page."
+    //
+    // The two ends are real, not notional: the top of the display scale is what a `Stat` renders
+    // its value at, and `xs` is the `EYEBROW` register every label in the product is set in. The
+    // ratio is checked against BOTH emissions, because the dense scale shrinks the label without
+    // shrinking the number and a gate that only saw the phone would be measuring the easy case.
+    //
+    // Range comes from SIZE and only from size — the ≤600 weight cap is rule 2 and does not move
+    // (`weight-cap.source.test.ts` is what keeps it from being reached for instead).
+    const MIN_DISPLAY_RANGE = 9;
+    const largest = Math.max(...Object.values(TOKENS.font.display));
+    expect(largest / TOKENS.font.size.xs).toBeGreaterThanOrEqual(MIN_DISPLAY_RANGE);
+    expect(largest / TOKENS.font.sizeDense.xs).toBeGreaterThanOrEqual(MIN_DISPLAY_RANGE);
+  });
   it("display line height is tighter than the tight body line height", () => {
     expect(TOKENS.font.lineHeight.display).toBeLessThan(TOKENS.font.lineHeight.tight);
   });

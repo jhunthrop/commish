@@ -75,6 +75,10 @@
   --text-display-md: var(--commish-display-size-md);
   --text-display-lg: var(--commish-display-size-lg);
   --text-display-xl: var(--commish-display-size-xl);
+  /* The fun pass's dynamic range (Task 3): 116px over a 12px eyebrow is the ~10x a sports
+     interface lives on. A call site steps down responsively; these are never a phone default. */
+  --text-display-2xl: var(--commish-display-size-2xl);
+  --text-display-3xl: var(--commish-display-size-3xl);
   --leading-display: var(--commish-line-height-display);
   --shadow-card: var(--commish-shadow-card);
   --shadow-sticker: var(--commish-shadow-sticker);
@@ -107,7 +111,9 @@ body {
 .font-display.text-display-sm,
 .font-display.text-display-md,
 .font-display.text-display-lg,
-.font-display.text-display-xl {
+.font-display.text-display-xl,
+.font-display.text-display-2xl,
+.font-display.text-display-3xl {
   letter-spacing: -0.028em;
 }
 

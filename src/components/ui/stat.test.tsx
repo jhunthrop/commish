@@ -131,9 +131,19 @@ describe("Stat", () => {
   it("takes its dynamic range from size, never from a heavier face than the display cap", async () => {
     // Rule 2 holds: the weight cap is 600 (`font-semibold`), and the number gets big by being
     // big. `font-bold` must never appear here, at any size or any magnitude.
-    await renderSurface(<Stat label="Score" value="118.4" size="xl" comparison={RB_WEEK} />, ({ container }) => {
-      expect(container.innerHTML).toContain("text-display-xl");
+    await renderSurface(<Stat label="Score" value="118.4" size="3xl" comparison={RB_WEEK} />, ({ container }) => {
+      expect(container.innerHTML).toContain("text-display-3xl");
       expect(container.innerHTML).not.toContain("font-bold");
+    });
+  });
+
+  it("pairs the top of the display scale with the eyebrow register, which is where the ~10x lives", async () => {
+    // The scale carries the range (`tokens.test.ts`); this is the component that spends it. A
+    // 116px number over a 12px mono label is the shape a sports interface has and a contract
+    // does not.
+    await renderSurface(<Stat label="Score" value="118.4" size="3xl" comparison={RB_WEEK} />, ({ getByText }) => {
+      expect(getByText("Score").className).toContain("text-xs");
+      expect(getByText("118.4").parentElement!.className).toContain("text-display-3xl");
     });
   });
 

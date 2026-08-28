@@ -413,9 +413,25 @@ at `UI_CONFIG.shell.denseFromPx` to `xs 11 · sm 12.5 · md 13.5 · lg 15 · xl 
 **`xs` is for letter-spaced eyebrows only, never a sentence** — the mono, sentence-case `EYEBROW`
 register above, not the uppercase treatment `xs` carried before the caps charter.
 
-Display scale (`--text-display-*`): `sm 20 · md 28 · lg 44 · xl 58` (v3 moved `xl` 64 → 58, the
-mock's own display size — self-ruling S3), with `leading-display` (1.06). A display size is
-never a substitute for a body size at the same px. The v3 hero adopts the responsive step E6
+Display scale (`--text-display-*`): `sm 20 · md 28 · lg 44 · xl 58 · 2xl 82 · 3xl 116` (v3 moved
+`xl` 64 → 58, the mock's own display size — self-ruling S3; the fun pass added `2xl`/`3xl`), with
+`leading-display` (1.06). A display size is never a substitute for a body size at the same px.
+
+**The scale carries ~10x of dynamic range, and that is a gate.** The fun pass's third named cause
+of "it feels like a legal website" is uniform hierarchy: *"sports interfaces live on roughly 10x
+scale contrast — a huge number, a tiny label. We are at about 2x."* The scale topped out at 58
+against a 12px `EYEBROW`, which is 4.8x, and no amount of care at a call site invents range the
+scale does not carry. `tokens.test.ts` now asserts the top of the display scale is at least 9x
+`size.xs` in **both** emissions (116 over 12 is 9.7x on a phone, over 11 is 10.5x at desktop
+density). **The range comes from size and only from size** — rule 2's ≤600 weight cap did not
+move, and `src/design/weight-cap.source.test.ts` is what stops the next author reaching for a
+heavier face instead of a bigger one: `font-bold`/`font-extrabold`/`font-black` are banned across
+the same seven directories the caps and accent sweeps walk, with no allowlist, because no surface
+in this product has earned 700. (That claim used to be a repo-wide grep recorded in this doc; a
+grep at a moment in time is not a gate.) `2xl`/`3xl` are deliberately **not** densified: 116px is
+a TV board or a matchup hero, so a call site steps down responsively (`text-display-lg
+sm:text-display-3xl`, the idiom E6 established for the hero) rather than shipping it at 360px.
+`Stat` (see Primitives) is the primitive that spends this range. The v3 hero adopts the responsive step E6
 demanded: `text-display-md sm:text-display-xl`, so a ten-word headline no longer wraps to ten
 lines at 360px.
 

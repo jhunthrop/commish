@@ -13,8 +13,14 @@ export interface StatComparison {
   readonly population: string;
 }
 
-/** The display steps a `Stat` may take. Range comes from size; the weight cap never moves. */
-export type StatSize = "sm" | "md" | "lg" | "xl";
+/**
+ * The display steps a `Stat` may take — the whole display scale, because this primitive IS the
+ * pairing the scale exists for: a huge number over a tiny label. Range comes from size and only
+ * from size; the ≤600 weight cap never moves. `3xl` is a TV board or a matchup hero, so a caller
+ * steps down responsively for a phone (`text-display-lg sm:text-display-3xl` is the idiom) rather
+ * than shipping 116px at 360px.
+ */
+export type StatSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 
 export interface StatProps {
   /** What the number is. Always announced, always on screen. */
@@ -106,6 +112,8 @@ const SIZE_CLASS: Readonly<Record<StatSize, string>> = {
   md: "text-display-md",
   lg: "text-display-lg",
   xl: "text-display-xl",
+  "2xl": "text-display-2xl",
+  "3xl": "text-display-3xl",
 };
 
 /**
