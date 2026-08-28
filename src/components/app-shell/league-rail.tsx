@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { Icon } from "@/components/ui/icon";
 import { Crest } from "@/components/ui/crest";
 import { UI_CONFIG } from "@/components/ui/config";
@@ -21,11 +22,24 @@ const STATE_LABEL: Readonly<Partial<Record<RailLeagueState, string>>> = {
   live: NEXT_ACTION_COPY["watch-scores"],
 };
 
-/** The dot's own color — `aria-hidden` always, per Step 3: a colored dot with no sentence
- *  behind it is never rendered, and the sentence lives in the link's accessible name instead. */
+/**
+ * The dot's own color — `aria-hidden` always, per Step 3: a colored dot with no sentence behind it
+ * is never rendered, and the sentence lives in the link's accessible name instead.
+ *
+ * LAW 1, COLOUR IS A LEGEND (Gameday, 2026-08-28). Both values were wrong, and wrong in a way that
+ * made the product's most persistent navigation teach the WRONG legend on every signed-in page:
+ *
+ * - `live` was `positive` — money-green. Green means money in this product and red is the whole
+ *   live family (a clock tightening, a live chip's dot, `WeekStatusBadge`'s own in_progress tone,
+ *   `GameStateChip`'s live state). A live game wearing the money pigment is the one colour rule
+ *   this product cannot afford to break, because it is the pair a manager reads fastest.
+ * - `needs-you` was `warning` — amber, whose usage law 1 demotes to "a clock genuinely tightening"
+ *   and nothing else. A league waiting on your lineup is not a caution, it is an ACT, and money is
+ *   the pigment of an action here (the same clause that makes `Button`'s `verb` variant legal).
+ */
 const DOT_CLASS: Readonly<Partial<Record<RailLeagueState, string>>> = {
-  "needs-you": "bg-warning",
-  live: "bg-positive",
+  "needs-you": "bg-accent",
+  live: "bg-negative",
 };
 
 /** `"needs-you"`'s own accessible-name fragment: `league.needsYouKind` names WHICH of the two
@@ -64,6 +78,7 @@ export interface LeagueRailProps {
  */
 export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
   const pathname = usePathname();
+  const reducedMotion = usePrefersReducedMotion();
   const crestSize = UI_CONFIG.shell.crestSizePx;
   const tileStyle = { width: crestSize, height: crestSize };
 
@@ -99,7 +114,17 @@ export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
           >
             <Crest id={league.id} name={league.name} size={crestSize} />
             {league.state === "quiet" ? null : (
-              <span aria-hidden="true" className={`absolute -right-0.5 -top-0.5 size-2.5 rounded-pill border border-surface ${DOT_CLASS[league.state]}`} />
+              // LAW 6, MOTION REPORTS: the live dot breathes because a game is genuinely running
+              // right now, which is the live chip's own sanctioned use of `animate-pulse-live`.
+              // A needs-you dot does not move — nothing about it is changing, it is a standing
+              // fact waiting on the manager. Reduced motion is a real branch, not a faster
+              // animation: the dot still renders, in the same pigment, and simply stops breathing.
+              <span
+                aria-hidden="true"
+                className={`absolute -right-0.5 -top-0.5 size-2.5 rounded-pill border border-surface ${DOT_CLASS[league.state]} ${
+                  league.state === "live" && !reducedMotion ? "animate-pulse-live" : ""
+                }`}
+              />
             )}
           </Link>
         );
