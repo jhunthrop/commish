@@ -27,6 +27,13 @@ export const NFLVERSE_CONFIG = {
      * because retired players are genuinely absent from a roster. See `players.ts`.
      */
     players: "players",
+    /**
+     * WEEK-ONE ROSTERS — the only source in this adapter whose facts predate the season they
+     * describe. Cutdown to fifty-three is a league-wide deadline in late August, so a week-1 roster
+     * is knowable before the opener, and it is the only way a preseason board can know that a
+     * receiver changed teams in March. See `rosters.ts` for what is deliberately discarded.
+     */
+    weeklyRosters: "weekly_rosters",
   },
   /** Asset names. Only the universe's is fixed; the other two carry a season. */
   files: {

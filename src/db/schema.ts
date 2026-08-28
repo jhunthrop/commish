@@ -1826,3 +1826,113 @@ export const teamWeekObservations = pgTable(
     index("team_week_observations_as_of_idx").on(t.season, t.week, t.asOf),
   ],
 );
+
+/**
+ * THE WEEK-ONE ROSTER, AS IT STOOD BEFORE ANYBODY PLAYED — the one thing a preseason board cannot
+ * do without and the one thing the rest of the store structurally cannot supply.
+ *
+ * Every other player fact in this engine becomes knowable when a game produces it. `player_week_teams`
+ * says so in its own docblock: a man's team is only visible once he has taken a snap for it, which
+ * for a preseason board is one whole season too late. A board built in August that did not know a
+ * receiver had changed teams in March would be worse than useless, and deriving his new team from a
+ * week-1 box score would read the future.
+ *
+ * nflverse's `weekly_rosters` release carries the real answer: every club's roster in week 1, with
+ * the status the league assigned each man, plus the biography that never changes (birth date, draft
+ * year, overall draft pick, drafting club). The NFL's final cutdown to 53 is a league-wide deadline
+ * in the last days of August, so this snapshot describes a world that existed BEFORE the opener, and
+ * `as_of` records that rather than the game day the file happens to be keyed to.
+ *
+ * ONE ROW PER PLAYER PER SEASON, not per week. A weekly roster table would be a second, parallel
+ * `player_week_teams` with worse provenance for every week after the first; the week-1 snapshot is
+ * the only one whose knowable-before-kickoff claim is true, so it is the only one stored.
+ *
+ * THE BIOGRAPHY LIVES HERE RATHER THAN ON `nfl_players` on purpose. `nfl_players` is a CURRENT
+ * snapshot, upserted on every backfill — a 2023 board reading a draft class off it would be reading
+ * a 2026 file. Carried per season, the same fact is stamped with the season it was true in, and a
+ * backtest cannot reach a later restatement of it.
+ */
+export const preseasonRosters = pgTable(
+  "preseason_rosters",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season: integer("season").notNull(),
+    /** The nflverse team abbreviation, matching `player_week_teams.team`. */
+    team: text("team").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** nflverse's own spelling, unnarrowed, exactly as `nfl_players.position` is. */
+    position: text("position").notNull(),
+    /**
+     * Coarsened league status: `active`, `reserve`, `practice_squad` or `off_roster`.
+     *
+     * DELIBERATELY COARSER THAN THE FILE. nflverse distinguishes ACT from INA, and INA is decided
+     * ninety minutes before kickoff — reading it here would smuggle a game-day fact into a stamp
+     * that claims late August. The four values kept are all settled at the cutdown deadline, which
+     * is what this row's `as_of` asserts. See `rosterStatusOf`.
+     */
+    status: text("status").notNull(),
+    /** ISO `yyyy-mm-dd`, as text: a date column would be read back through the driver's timezone
+     *  and an age computed from it would move by a day depending on where the process runs. */
+    birthDate: text("birth_date"),
+    /** The season he entered the league. Fixed at his draft and never restated. */
+    draftYear: integer("draft_year"),
+    /** OVERALL pick number (1 to ~262), not the round. A round is a coarsening of this, and the
+     *  gap between pick 33 and pick 63 is most of a round's worth of intent. Null for the undrafted,
+     *  which is a real and common status rather than a missing value. */
+    draftPick: integer("draft_pick"),
+    draftClub: text("draft_club"),
+    /** THE STAMP. Cutdown day, never the game day the source file is keyed to, and never
+     *  `defaultNow()`. See `week1RosterAsOf`. */
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("preseason_rosters_fact_idx").on(t.season, t.playerId, t.asOf),
+    index("preseason_rosters_as_of_idx").on(t.season, t.asOf),
+  ],
+);
+
+/**
+ * THE MARKET AND THE CONSENSUS, AS THEY STOOD BEFORE A SEASON — the two benchmarks the engine spec
+ * names and the two the repository did not have.
+ *
+ * `docs/research/2026-08-27-decision-quality.md` records the gap as its second-highest priority:
+ * "There is no real average draft position anywhere in this repository. `players.adp` is a
+ * current-value column with no history and no join to the historical player universe." Without a
+ * dated market price, a board can only be scored against outcomes, and "we beat last season's points
+ * per game" is a much weaker claim than "we beat what the room was actually paying".
+ *
+ * A DEDICATED TABLE RATHER THAN WEEK ZERO IN `player_week_observations`, and the reason is not
+ * taste. `replayMomentsFor` derives week 1's replay moment as the maximum `as_of` of week 0 — which
+ * today is the end of the prior season, exactly as intended. A preseason ranking written at week 0
+ * would silently become that moment, moving every week-1 replay in the engine eight months forward
+ * and admitting data none of the published measurements were taken under. The leak would look like
+ * an improvement.
+ *
+ * `rank` is `double precision` because an average draft position is a fraction (1.4, 26.7) while an
+ * expert consensus rank is an integer, and both belong in the column a scorer reads.
+ */
+export const preseasonRankings = pgTable(
+  "preseason_rankings",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season: integer("season").notNull(),
+    /** Which market or panel said it (`ffc_adp_ppr_12`, `fantasypros_ecr_ppr`). */
+    source: text("source").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** Lower is better, in whatever unit the source publishes. */
+    rank: doublePrecision("rank").notNull(),
+    /** THE STAMP: the day the source published this ranking, which for both benchmarks is inside
+     *  the last week of the preseason. Never `defaultNow()`. */
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("preseason_rankings_fact_idx").on(t.season, t.source, t.playerId, t.asOf),
+    index("preseason_rankings_as_of_idx").on(t.season, t.source, t.asOf),
+  ],
+);
