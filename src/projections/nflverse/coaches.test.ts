@@ -87,7 +87,7 @@ describe("coachObservations", () => {
 
 describe("seasonMeans", () => {
   it("averages only the weeks the store actually holds", () => {
-    const read = (_team: string, at: WeekRef, _metric: string): number | null => (at.week <= 2 ? at.week * 10 : null);
+    const read = (_team: string, at: WeekRef): number | null => (at.week <= 2 ? at.week * 10 : null);
     expect(seasonMeans(read, [1, 2, 3, 4])("SEA", 2024, PBP_METRICS.paceSecondsPerPlay)).toBe(15);
   });
 

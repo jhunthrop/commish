@@ -21,6 +21,9 @@ import { scoreShares } from "@/projections/model/fit";
 import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
 import { lastObservedPriors } from "@/projections/model/opportunity";
 import { modelSource } from "@/projections/model/source";
+import { detectTransactions } from "@/projections/model/transactions";
+import { predictOpportunity } from "@/projections/model/opportunity";
+import type { ProjectionInput } from "@/projections/backtest";
 import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
 import { replayMomentsFor } from "@/projections/replay-moments";
 
@@ -45,6 +48,39 @@ const VARIANTS: Readonly<Record<string, { readonly before: FeatureFlags; readonl
   context: { before: NO_FEATURES, after: { ...NO_FEATURES, gameContext: true }, label: "game context" },
   all: { before: NO_FEATURES, after: ALL_FEATURES, label: "every feature group at once (headline, not an ablation)" },
 };
+
+/**
+ * THE POST-TRANSACTION SEGMENT — the player-weeks the redistribution feature can possibly affect.
+ *
+ * The founder's instruction for Task 3 was to measure this rather than the average, and the reason
+ * is arithmetic: a feature that fires on two per cent of player-weeks cannot move a pooled figure
+ * over four thousand of them however right it is, and judging it on the average would discard it
+ * for a rounding error. A feature that fixes exactly what it was built for and is neutral elsewhere
+ * is a success.
+ *
+ * The set is computed from the SAME `ProjectionInput` both arms were handed, through the same
+ * detector the feature itself uses. Selecting on anything else — on the actual outcome, on a
+ * hand-listed set of trades — would be selecting on something other than the situation it names.
+ */
+function postTransactionSegment(input: ProjectionInput): ReadonlySet<string> {
+  const opportunity = predictOpportunity(
+    input.usage,
+    { season: input.season, week: input.week, positions: input.positions },
+    FITTED_OPPORTUNITY_PRIORS,
+  );
+  const transactions = detectTransactions({
+    usage: input.usage,
+    playerTeams: input.teamContext.playerTeams,
+    positions: input.positions,
+    snapShares: new Map([...opportunity].map(([playerId, player]) => [playerId, player.snapShare] as const)),
+  });
+  const affected = new Set<string>();
+  for (const transaction of transactions) {
+    if (transaction.departures.length === 0 && transaction.arrivals.length === 0) continue;
+    for (const player of transaction.roster) affected.add(player.playerId);
+  }
+  return affected;
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -124,6 +160,9 @@ async function main(): Promise<void> {
   }
   const seasons = process.argv.slice(3).map(Number);
   const targets = seasons.length > 0 ? seasons : [2024, 2023];
+  // Only the redistribution feature has a situation narrow enough to need one, and it is the one
+  // the founder named. Everything else is measured over everybody.
+  const segment = feature === "redistribution" ? postTransactionSegment : undefined;
   if (targets.some((season) => !Number.isInteger(season))) {
     throw new Error(`Seasons must be whole numbers; got ${process.argv.slice(3).join(", ")}.`);
   }
@@ -132,7 +171,8 @@ async function main(): Promise<void> {
   const weeks = Array.from({ length: LAST_REGULAR_WEEK }, (_, index) => index + 1);
 
   console.log(`ABLATION: ${variant.label}`);
-  console.log("  measured on seasons no fit has ever seen, like for like against the naive floor\n");
+  console.log("  measured on seasons no fit has ever seen, like for like against the naive floor");
+  console.log(segment === undefined ? "" : "  RESTRICTED TO THE POST-TRANSACTION SEGMENT\n");
 
   for (const season of targets) {
     const asOfForWeek = await replayMomentsFor(db, season);
@@ -148,6 +188,7 @@ async function main(): Promise<void> {
       sources: [naive, before, after],
       rules: PPR_SCORING,
       asOfForWeek,
+      segment,
     });
     const [floorScore, beforeScore, afterScore] = headToHead.common;
 

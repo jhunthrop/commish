@@ -1,6 +1,7 @@
 import type { EfficiencyPriors } from "./efficiency";
 import type { LinePriors } from "./line-fit";
 import type { OpportunityPriors } from "./opportunity";
+import type { RedistributionPriors } from "./redistribution-fit";
 import type { SchemePriors } from "./scheme-fit";
 
 /**
@@ -161,4 +162,17 @@ export const FITTED_SCHEME_PRIORS: SchemePriors = {
   targets: { tempo: 0.106880, passLean: 0.204816 },
   carries: { tempo: 0.100079, passLean: -0.125394 },
   passAttempts: { tempo: 0.028265, passLean: 0.227550 },
+};
+
+/**
+ * PHASE 3, TASK 3 — how much of a departed player's share the remaining roster actually takes on.
+ *
+ * Measured over 796 team-weeks with a detected departure on the fit seasons,
+ * as a ratio of sums: the gap between what the roster really did and what layer 1 predicted, over
+ * the share that vacated. Never 1 — an offence that loses its best receiver throws less, and that
+ * part of the share stops existing rather than moving to anybody.
+ */
+export const FITTED_REDISTRIBUTION_PRIORS: RedistributionPriors = {
+  absorptionRate: 0.064821,
+  events: 796,
 };

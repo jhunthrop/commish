@@ -1,4 +1,5 @@
 import { lineComposite, lineWindow } from "../features/line";
+import { redistributeShares, type ShareDelta } from "../features/redistribution";
 import { schemeEstimate, schemeRatios } from "../features/scheme";
 import { indexTeamMetrics, latestTeams } from "../team-context";
 import { LAST_POSSIBLE_WEEK } from "../store";
@@ -7,7 +8,9 @@ import type { PlayerRates } from "./efficiency";
 import type { FeatureFlags } from "./features";
 import type { LinePriors } from "./line-fit";
 import type { PredictedOpportunity } from "./opportunity";
+import type { RedistributionPriors } from "./redistribution-fit";
 import type { SchemePriors, SchemeVolumeElasticity } from "./scheme-fit";
+import { detectTransactions } from "./transactions";
 
 /**
  * WHERE PHASE 3'S CONTEXT MEETS PHASE 2'S MODEL — one file, so the whole of "what the context is
@@ -28,6 +31,7 @@ import type { SchemePriors, SchemeVolumeElasticity } from "./scheme-fit";
 export interface ContextPriors {
   readonly line: LinePriors;
   readonly scheme: SchemePriors;
+  readonly redistribution: RedistributionPriors;
 }
 
 /**
@@ -169,4 +173,64 @@ export function contextualiseOpportunity(
 /** Two ratios raised to their fitted powers, bounded. `exp(a·log x + b·log y)`, written plainly. */
 function applyElasticity(tempo: number, passLean: number, elasticity: SchemeVolumeElasticity): number {
   return bounded(tempo ** elasticity.tempo * passLean ** elasticity.passLean);
+}
+
+/**
+ * Redistributes shares when somebody leaves or arrives — the one context group that moves a player
+ * relative to his own TEAMMATES rather than moving a whole offence together.
+ *
+ * Applied to shares AFTER the scheme has sized the pie, and the order matters: the scheme decides
+ * how many targets an offence throws, this decides who catches them, and doing it the other way
+ * round would apply a redistribution to a volume it was never measured against.
+ *
+ * Layer 1's clamp is reapplied here because a delta can in principle push a share outside `[0, 1]`,
+ * and nothing downstream is prepared for a share that is not one.
+ */
+export function redistributeOpportunity(
+  opportunity: ReadonlyMap<string, PredictedOpportunity>,
+  input: ProjectionInput,
+  features: FeatureFlags,
+  priors: ContextPriors,
+): ReadonlyMap<string, PredictedOpportunity> {
+  if (!features.redistribution) return opportunity;
+
+  const transactions = detectTransactions({
+    usage: input.usage,
+    playerTeams: input.teamContext.playerTeams,
+    positions: input.positions,
+    snapShares: new Map([...opportunity].map(([playerId, player]) => [playerId, player.snapShare] as const)),
+  });
+  if (transactions.length === 0) return opportunity;
+
+  const deltas = new Map<string, ShareDelta>();
+  for (const transaction of transactions) {
+    for (const [playerId, delta] of redistributeShares({
+      roster: transaction.roster,
+      departures: transaction.departures,
+      arrivals: transaction.arrivals,
+      absorptionRate: priors.redistribution.absorptionRate,
+    })) {
+      deltas.set(playerId, delta);
+    }
+  }
+
+  const adjusted = new Map<string, PredictedOpportunity>();
+  for (const [playerId, player] of opportunity) {
+    const delta = deltas.get(playerId);
+    if (delta === undefined) {
+      adjusted.set(playerId, player);
+      continue;
+    }
+    adjusted.set(playerId, {
+      ...player,
+      targetShare: clampShare(player.targetShare + delta.targetShare),
+      carryShare: clampShare(player.carryShare + delta.carryShare),
+    });
+  }
+  return adjusted;
+}
+
+/** A share is a fraction; nothing downstream is prepared for one that is not. Mirrors layer 1's own. */
+function clampShare(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }

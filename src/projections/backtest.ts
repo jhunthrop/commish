@@ -172,6 +172,14 @@ interface WeekOutcome {
   /** Projected points per player, one map per source, in the order the sources were given. */
   readonly projected: readonly ReadonlyMap<string, number>[];
   readonly actual: ReadonlyMap<string, number>;
+  /**
+   * The players this week that a SEGMENT restricts scoring to, or `null` for all of them.
+   *
+   * Computed once per week from the same `ProjectionInput` every source was handed, never per
+   * source: a segment that saw different data from the sources it is dividing would be selecting
+   * on something other than the situation it claims to name.
+   */
+  readonly segment: ReadonlySet<string> | null;
 }
 
 /**
@@ -190,6 +198,7 @@ async function replayWeeks(
   rules: ScoringRules,
   asOfForWeek: (week: number) => Date,
   historySeasons: number,
+  segment?: (input: ProjectionInput) => ReadonlySet<string>,
 ): Promise<readonly WeekOutcome[]> {
   // Ascending, whatever order the caller listed them in: a replay that ran week 3 before week 2
   // would still be leak-free (each week's own as-of gate holds) but the scoreboard would read as
@@ -246,12 +255,19 @@ async function replayWeeks(
       return points;
     };
 
+    const input: ProjectionInput = { season, week, asOf, history, usage, positions, teamContext };
     const projected: ReadonlyMap<string, number>[] = [];
     for (const source of sources) {
-      projected.push(asPoints(await source.project({ season, week, asOf, history, usage, positions, teamContext })));
+      projected.push(asPoints(await source.project(input)));
     }
     const actuals = await statLinesAsOf(db, { season, week, asOf: FINAL_OUTCOME });
-    outcomes.push({ week, asOf, projected, actual: asPoints(actuals.map((row) => row.line)) });
+    outcomes.push({
+      week,
+      asOf,
+      projected,
+      actual: asPoints(actuals.map((row) => row.line)),
+      segment: segment?.(input) ?? null,
+    });
   }
   return outcomes;
 }
@@ -310,6 +326,16 @@ export async function replay(
 export interface HeadToHeadOptions extends Omit<ReplayOptions, "source"> {
   /** Two or more sources, shown identical history and scored by identical code. */
   readonly sources: readonly ProjectionSource[];
+  /**
+   * Narrows scoring to the players a SITUATION applies to — the post-transaction segment, the
+   * rookies, the returning starters.
+   *
+   * The engine spec's learning loop asks "where are we wrong, and what would fix that segment?"
+   * rather than "which feature matters most", and a pooled number cannot answer it. A feature that
+   * fixes exactly the situation it was built for and is neutral everywhere else is a success whose
+   * overall figure barely moves, and without this it would be discarded.
+   */
+  readonly segment?: (input: ProjectionInput) => ReadonlySet<string>;
 }
 
 export interface HeadToHead {
@@ -332,15 +358,20 @@ export interface HeadToHead {
  */
 export async function replayHeadToHead(
   db: ReadonlyDb,
-  { season, weeks, sources, rules, asOfForWeek, historySeasons = DEFAULT_HISTORY_SEASONS }: HeadToHeadOptions,
+  { season, weeks, sources, rules, asOfForWeek, historySeasons = DEFAULT_HISTORY_SEASONS, segment }: HeadToHeadOptions,
 ): Promise<HeadToHead> {
   if (sources.length < 2) {
     throw new Error("A head-to-head needs at least two sources; one source is a replay.");
   }
-  const outcomes = await replayWeeks(db, season, weeks, sources, rules, asOfForWeek, historySeasons);
+  const outcomes = await replayWeeks(db, season, weeks, sources, rules, asOfForWeek, historySeasons, segment);
   const intersection = (outcome: WeekOutcome): ReadonlySet<string> => {
     const [first, ...rest] = outcome.projected;
-    return new Set([...first!.keys()].filter((playerId) => rest.every((other) => other.has(playerId))));
+    return new Set(
+      [...first!.keys()].filter(
+        (playerId) =>
+          rest.every((other) => other.has(playerId)) && (outcome.segment === null || outcome.segment.has(playerId)),
+      ),
+    );
   };
   return {
     full: sources.map((source, index) => scoreSource(source.name, outcomes, index)),

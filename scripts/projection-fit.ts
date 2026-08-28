@@ -21,6 +21,7 @@ import { RATES, TOUCHDOWN_RATES, type EfficiencyPriors, type RateName } from "@/
 import { fitEfficiencyPriors, fitOpportunityPriors } from "@/projections/model/fit";
 import { fitLinePriors, type LinePriors } from "@/projections/model/line-fit";
 import { fitSchemePriors, type SchemePriors } from "@/projections/model/scheme-fit";
+import { fitRedistributionPriors, type RedistributionPriors } from "@/projections/model/redistribution-fit";
 import { projectedPosition } from "@/projections/nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "@/projections/team-store";
@@ -127,6 +128,22 @@ export const FITTED_LINE_PRIORS: LinePriors = {
 `;
 }
 
+function renderRedistribution(redistribution: RedistributionPriors): string {
+  return `/**
+ * PHASE 3, TASK 3 — how much of a departed player's share the remaining roster actually takes on.
+ *
+ * Measured over ${redistribution.events} team-weeks with a detected departure on the fit seasons,
+ * as a ratio of sums: the gap between what the roster really did and what layer 1 predicted, over
+ * the share that vacated. Never 1 — an offence that loses its best receiver throws less, and that
+ * part of the share stops existing rather than moving to anybody.
+ */
+export const FITTED_REDISTRIBUTION_PRIORS: RedistributionPriors = {
+  absorptionRate: ${redistribution.absorptionRate.toFixed(6)},
+  events: ${redistribution.events},
+};
+`;
+}
+
 function renderScheme(scheme: SchemePriors): string {
   const volume = (name: string, elasticity: { tempo: number; passLean: number }) =>
     `  ${name}: { tempo: ${elasticity.tempo.toFixed(6)}, passLean: ${elasticity.passLean.toFixed(6)} },`;
@@ -178,6 +195,7 @@ function render(
   efficiency: EfficiencyPriors,
   line: LinePriors,
   scheme: SchemePriors,
+  redistribution: RedistributionPriors,
   generatedFrom: readonly number[],
 ): string {
   const { priors } = fit;
@@ -188,6 +206,7 @@ function render(
   return `import type { EfficiencyPriors } from "./efficiency";
 import type { LinePriors } from "./line-fit";
 import type { OpportunityPriors } from "./opportunity";
+import type { RedistributionPriors } from "./redistribution-fit";
 import type { SchemePriors } from "./scheme-fit";
 
 /**
@@ -221,7 +240,8 @@ ${["QB", "RB", "WR", "TE", "K", "DEF"].map(role).join("\n")}
 
 ${renderEfficiency(efficiency)}
 ${renderLine(line)}
-${renderScheme(scheme)}`;
+${renderScheme(scheme)}
+${renderRedistribution(redistribution)}`;
 }
 
 async function main(): Promise<void> {
@@ -283,7 +303,20 @@ async function main(): Promise<void> {
       `  passAttempts tempo ${schemePriors.passAttempts.tempo.toFixed(4)}  passLean ${schemePriors.passAttempts.passLean.toFixed(4)}`,
   );
 
-  writeFileSync(OUTPUT, render(fit, efficiency, linePriors, schemePriors, FIT_SEASONS));
+  const redistributionPriors = fitRedistributionPriors({
+    usage,
+    positions,
+    context,
+    opportunity: fit.priors,
+    seasons: [...FIT_SEASONS],
+    heldOut: [...HELD_OUT_SEASONS],
+  });
+  console.log(
+    `\nredistribution, fitted on ${FIT_SEASONS.join(", ")}:\n` +
+      `  absorption rate ${redistributionPriors.absorptionRate.toFixed(4)} over ${redistributionPriors.events} team-weeks with a detected departure`,
+  );
+
+  writeFileSync(OUTPUT, render(fit, efficiency, linePriors, schemePriors, redistributionPriors, FIT_SEASONS));
   console.log(`\nwrote ${OUTPUT}`);
 
   await db.$client.end();
