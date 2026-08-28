@@ -157,7 +157,7 @@ export function TradeComposer({ context, onAssess, onPropose, onDone, onCancel }
           <p className="text-lg font-medium text-text-primary">Trade proposed.</p>
           {/* Fix round 1, F2 (HIGH, member panel): a first-timer who just sent their first offer
               could not answer "what happens next" from anything this screen showed before. */}
-          <p className="text-sm text-text-muted">{`${formatExpiry(PROPOSAL_TTL_DAYS)} If nobody answers by then, it expires on its own and neither roster changes.`}</p>
+          <p className="text-sm text-text-muted">{`${formatExpiry(PROPOSAL_TTL_DAYS)} If nobody answers, it expires and neither roster changes.`}</p>
           <TradeVerdict assessment={sent} />
           <div>
             <Button onClick={onDone}>Done</Button>

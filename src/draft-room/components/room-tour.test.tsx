@@ -36,6 +36,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * FUN PASS, TASK 4 (the voice), 2026-08-27. These stop bodies used to narrate a button and a
+ * countdown the manager is looking at while they read them. The founder's "it feels like a legal
+ * website and not a fantasy site" is largely this failure: a tour that EXPLAINS the room instead
+ * of naming it. Every stop now asserts and stops talking.
+ *
+ * C3's sanctioned safety-net phrase still appears verbatim wherever the tour reassures about a
+ * missed pick. The practice stop no longer does, deliberately: its subject is practice, and
+ * leading with absolution ("Even if you miss your pick...") sold the wrong thing.
+ */
 describe("RoomTour", () => {
   it("is shown once and never again", async () => {
     const onDismiss = vi.fn();
@@ -74,7 +84,7 @@ describe("RoomTour", () => {
     expect(screen.getByText("The queue")).toBeInTheDocument();
     expect(screen.getByText("Taking your turn")).toBeInTheDocument();
     expect(
-      screen.getByText("When it is your turn, click Draft next to the player you want. Do it before the clock runs out, or the room picks for you from your queue."),
+      screen.getByText("Draft the player you want before the clock runs out. Miss it and the room picks for you from your queue."),
     ).toBeInTheDocument();
   });
 
@@ -83,7 +93,7 @@ describe("RoomTour", () => {
     // renders is "Nominate" in an auction room, never "Draft", so the copy has to say so too.
     render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Nominate" />);
     expect(
-      screen.getByText("When it is your turn, click Nominate next to the player you want. Do it before the clock runs out, or the room picks for you from your queue."),
+      screen.getByText("Nominate the player you want before the clock runs out. Miss it and the room picks for you from your queue."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/click Draft/)).not.toBeInTheDocument();
   });
@@ -93,7 +103,7 @@ describe("RoomTour", () => {
     render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Draft" />);
     expect(screen.getByText("Practice anytime")).toBeInTheDocument();
     expect(
-      screen.getByText("Even if you miss your pick, the room picks for you from your queue. Start a mock draft anytime to practice first."),
+      screen.getByText("Run a mock draft first. Same room, practice opponents, nothing counts."),
     ).toBeInTheDocument();
   });
 
@@ -142,7 +152,7 @@ describe("RoomTour — anchored mode (Task 4, R3)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(
-      screen.getByText("When it is your turn, click Nominate next to the player you want. Do it before the clock runs out, or the room picks for you from your queue."),
+      screen.getByText("Nominate the player you want before the clock runs out. Miss it and the room picks for you from your queue."),
     ).toBeInTheDocument();
   });
 

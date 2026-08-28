@@ -55,7 +55,7 @@ describe("MatchupPanel", () => {
   it("says which state the week is in, and never shows a score with no state", async () => {
     const { deps } = fixtureLeagueDeps();
     renderInLeague(<MatchupPanel matchup={inProgressMatchup} myTeamId="t1" weekStatus="in_progress" />, deps);
-    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.queryByText("Final")).not.toBeInTheDocument();
   });
 

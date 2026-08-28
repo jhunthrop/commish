@@ -12,14 +12,19 @@ things: money (seats filling, a good outcome) and live (a clock, a failure). Six
 every surface this doc describes; they are the spine the rest of this document hangs off:
 
 1. **Color is meaning.** Green is money and seats filling, red is live and clocks, everything
-   else is ink and paper.
+   else is ink and paper. **Amended 2026-08-27** — it also means magnitude, tier grade and team
+   identity; see "The fun-pass amendments" below, which carries the colourblind gate that ships
+   with magnitude.
 2. **One face, earned weights.** Geist only; hierarchy from size and weight, not from a second
    typeface.
 3. **No capitals anywhere.** Every `text-transform: uppercase` is gone — league names, eyebrows,
    section labels, all of it. `src/design/no-uppercase.source.test.ts` is the gate.
 4. **Hairlines, not boxes.** Structure comes from thin rules and space, not card borders.
+   **Amended 2026-08-27** with a stated test for when a thing earns a card anyway: *act on or
+   compare = card; read down a column = row.*
 5. **One ink action per view.** One solid pill (ink fill, ground text) per view; every other
-   action is a quiet outlined pill. `src/design/accent-budget.source.test.ts` is the gate on the
+   action is a quiet outlined pill. **Amended 2026-08-27** with named exceptions for surfaces
+   whose whole purpose is repeated action (the draft room; later waivers and trades). `src/design/accent-budget.source.test.ts` is the gate on the
    two pill spellings; the *count* per view is a component-test/review law (see "Pill discipline"
    below).
 6. **Only true things move.** The wire, draft clocks, seat meters and live pulses animate because
@@ -45,6 +50,90 @@ dark`) is untouched by any of this; only the palette each theme paints with move
   below for v3's ramp.
 
 Default theme is still `system`; both themes are designed and tested.
+
+## The fun-pass amendments (2026-08-27) — three rules move, three hold
+
+Founder, 2026-08-27: *"I like the cleanliness of the UI but it doesn't feel like 'fun' you know?"*
+Then, precisely: **"It feels like a legal website and not a fantasy site."** And on scope, when an
+earlier draft of the spec narrowed to one screen: *"I wanted to reshape the entire site to be fun
+like flock fantasy."* The full argument is `docs/design/2026-08-27-fun-pass-spec.md`; the program
+is `docs/superpowers/plans/2026-08-27-fun-pass.md`. What follows is the binding record of what
+changed in the six rules and what did not.
+
+**Rule 1 — colour is meaning — gains three meanings, product-wide.**
+
+- **Magnitude.** A number may be coloured by where it falls in a real comparison set. This is the
+  heat map and it is the largest single change in the pass: four causes were diagnosed for why the
+  product reads as a contract, and "every number is the same colour" was the one the first draft
+  missed. It is permitted **only where the comparison is genuine and stated** — a percentile within
+  a defined population, never a designer's feeling about whether 14.2 is a good number. Tokens:
+  `TOKENS.magnitude`, five steps (`strong · good · neutral · weak · bad`), Tailwind `text-mag-*`.
+  Renderer: `Stat` (`src/components/ui/stat.tsx`), and **only** `Stat` —
+  `src/design/magnitude-budget.source.test.ts` fails any other file in the seven swept directories
+  that names a magnitude colour, in any spelling.
+  - **Magnitude may never appear on a control.** That is what keeps "green fill = action" intact.
+    A `Stat` renders a `<span>`, so magnitude cannot reach a control without first reaching a file
+    the sweep reddens.
+  - **`neutral` IS `textPrimary`**, the same deliberate doubling as `accent`/`positive`. A number
+    with no comparison behind it must be indistinguishable from ordinary text; give the no-verdict
+    step a pigment of its own and every uncompared number starts reading as a judgement.
+- **Tier grade.** S/A/B bands as coloured bars, once the projection engine makes tiers real. Parked
+  until then; this amendment already covers it, so no second ruling is needed when it lands.
+- **Team identity.** A team's own colour, behind a player's face only. Never on a surface, never
+  behind text.
+
+Green still means money and red still means live. Magnitude reuses those hues deliberately — good
+is green because good is the same feeling as money.
+
+**The colourblind rule, which is a gate and not a nicety.** Green versus red is the worst available
+pair for deuteranopia, which affects roughly one man in twelve, and this product's audience is
+overwhelmingly men. The reference product's heat map fails this and we do not copy the failure.
+**Magnitude colour is never the only channel.** Every heat-coloured value carries a second
+encoding: its own numeric value read plainly, and — where the value is judged rather than merely
+reported — a caret naming which side of the population it fell on and a weight step naming how far.
+A manager who sees no colour at all must still rank the column correctly. Three enforcements, at
+three levels:
+
+1. `stat.test.tsx` asserts the value renders as text in every state, that each verdict step carries
+   its caret and its weight step, and that a neutral carries neither.
+2. `tokens.test.ts` orders the ramp by **contrast against the ground** rather than by hue, so the
+   sequence survives with the hue channel switched off entirely. (Ordering by contrast is also
+   direction-free across themes: louder is brighter at night and darker in daylight.)
+3. `tokens.test.ts` also holds every step to 4.5:1 on **all four** surfaces in both themes, not the
+   two the semantic roles are checked against — a heat-coloured number lands in a table row and an
+   inset well as readily as on the page ground.
+
+A heat map that fails this is worse than no heat map, because it silently misinforms one manager in
+twelve.
+
+**Rule 4 — hairlines, not boxes — gains a stated test.** **A thing you act on or compare against
+its neighbours may be a card; a thing you read down a column stays a row.** Player pool rows,
+league cards and matchup cards become cards. Standings tables, pick logs and rosters stay
+hairline-separated rows, because scanning a column is what they are for. In code this is `Card`'s
+`interactive` prop, which spends `surfaceRaised` on `hover`/`focus-within` — depth, never a heavier
+line, so rule 4's original claim is untouched. `line` stays decorative and `edge` stays a control
+boundary; a card takes no `role` and no `tabindex`, so the action inside it is still the view's one
+ink action.
+
+**Rule 5 — one ink action per view — holds everywhere except surfaces whose entire purpose is
+repeated action:** the draft room, and later waivers and trades. Named exceptions, not a general
+relaxation. `e2e/page-audit.spec.ts` keeps enforcing the rule on every audited route, and those
+routes do not change.
+
+**The three that hold.** One typeface at ≤600 weight; no capitals; only true things move.
+
+- The **weight cap does not move**, and it stopped being a promise: `weight-cap.source.test.ts`
+  bans `font-bold`/`font-extrabold`/`font-black` across the same seven directories, no allowlist.
+  What widened instead is the **size** range — `2xl 82` and `3xl 116` on the display scale, taking
+  a number-over-label pairing from 4.8x to ~10x. Dynamic range comes from scale, never from a
+  heavier face.
+- The **caps charter is untouched**; `no-uppercase.source.test.ts` is unchanged.
+- **Rule 6 is finally spent rather than merely obeyed:** a clock pulses because it is running out,
+  a score moves because it changed, a card lifts because there is something in it to press. A
+  change that makes a screen louder without making a true thing more legible is decoration, and
+  rule 6 rejects it. The complaint was that the product reads as a contract, not that it lacks
+  ornament.
+
 
 ## Principles
 - **Delightful, not merely functional.** The product thesis (strategy doc §4) is that this category feels flat and we won't. Optimistic UI, celebration moments, motion with intent (rule 6).
@@ -413,9 +502,25 @@ at `UI_CONFIG.shell.denseFromPx` to `xs 11 · sm 12.5 · md 13.5 · lg 15 · xl 
 **`xs` is for letter-spaced eyebrows only, never a sentence** — the mono, sentence-case `EYEBROW`
 register above, not the uppercase treatment `xs` carried before the caps charter.
 
-Display scale (`--text-display-*`): `sm 20 · md 28 · lg 44 · xl 58` (v3 moved `xl` 64 → 58, the
-mock's own display size — self-ruling S3), with `leading-display` (1.06). A display size is
-never a substitute for a body size at the same px. The v3 hero adopts the responsive step E6
+Display scale (`--text-display-*`): `sm 20 · md 28 · lg 44 · xl 58 · 2xl 82 · 3xl 116` (v3 moved
+`xl` 64 → 58, the mock's own display size — self-ruling S3; the fun pass added `2xl`/`3xl`), with
+`leading-display` (1.06). A display size is never a substitute for a body size at the same px.
+
+**The scale carries ~10x of dynamic range, and that is a gate.** The fun pass's third named cause
+of "it feels like a legal website" is uniform hierarchy: *"sports interfaces live on roughly 10x
+scale contrast — a huge number, a tiny label. We are at about 2x."* The scale topped out at 58
+against a 12px `EYEBROW`, which is 4.8x, and no amount of care at a call site invents range the
+scale does not carry. `tokens.test.ts` now asserts the top of the display scale is at least 9x
+`size.xs` in **both** emissions (116 over 12 is 9.7x on a phone, over 11 is 10.5x at desktop
+density). **The range comes from size and only from size** — rule 2's ≤600 weight cap did not
+move, and `src/design/weight-cap.source.test.ts` is what stops the next author reaching for a
+heavier face instead of a bigger one: `font-bold`/`font-extrabold`/`font-black` are banned across
+the same seven directories the caps and accent sweeps walk, with no allowlist, because no surface
+in this product has earned 700. (That claim used to be a repo-wide grep recorded in this doc; a
+grep at a moment in time is not a gate.) `2xl`/`3xl` are deliberately **not** densified: 116px is
+a TV board or a matchup hero, so a call site steps down responsively (`text-display-lg
+sm:text-display-3xl`, the idiom E6 established for the hero) rather than shipping it at 360px.
+`Stat` (see Primitives) is the primitive that spends this range. The v3 hero adopts the responsive step E6
 demanded: `text-display-md sm:text-display-xl`, so a ten-word headline no longer wraps to ten
 lines at 360px.
 
@@ -616,7 +721,7 @@ No z-index scale yet — three sanctioned layers exist by convention: a sticky b
 `<ThemeProvider>` (in `layout.tsx`) manages `system | light | dark`, persisted, stamping `data-theme` on `<html>`. Default is system.
 
 ## Primitives (`src/components/ui`)
-`Button` (variants primary/secondary/destructive/ghost — v3, Task 4: `primary` is the ink pill, `secondary` the quiet pill, see "Pill discipline" above; `loading` = aria-busy + disabled + spinner, label stays), **`ButtonLink`** (v3, Task 4 — the anchor form of `Button`, same `buttonClassName` source of truth; no `loading`/`disabled`, since an anchor has neither), `Input` (label required; error → `aria-invalid` + `aria-describedby`), `Textarea` (the multi-line sibling of `Input`, same `FieldShell` label/hint/error contract; an optional `maxLength` renders a live, `aria-live="polite"` remaining-character count wired into `aria-describedby` — `ReviewComposer` is the one caller today, backed by the same `validateReviewDraft` rule the server enforces, so the number on screen and the number the API accepts can never drift), `Select` (label required; native `<select>`; same error/hint contract as `Input`), `Card` (border + `shadow-card`), `Badge` (semantic tones; `glow` adds a tinted `ring-2` for a live/urgent tone, built on `accentGlow`/`warningGlow`; only `accent` and `warning` carry a glow token today), **`PositionBadge`** (`position` + `size: sm|md` — the sticker chip; the ONLY renderer of a position; one of the caps charter's two allowlisted files), **`SlotChip`** (`slot` — the bordered chip for a roster-slot letter that isn't itself a position, e.g. `FLEX`/`BENCH`), **`PageTitle`** (`size: md|xl` — the one `<h1>` treatment for a PAGE; `font-semibold`, not `font-bold`, as of Task 9; a room supplies its own `<h1>` instead, see "Layout" above), `Table` (semantic `<table>`; `caption` required — visually hidden unless `captionVisible`; `empty` node required; optional `rowAttributes` spreads plain attributes onto the `<tr>` itself, never a second wrapper element; scrolls horizontally inside its own wrapper at 360px; `density: comfortable|dense`, defaulting to `dense`, see `docs/decisions/design-v2.md` §4 for the full decision record), `Celebration` (`role="status"`; `emphasis: "self" | "peer"` picks the animation class and the accent treatment; renders with no animation class at all under reduced motion — the one primitive both `PickCelebration` and `MatchupCelebration` are built on), `Avatar` (`name` for the deterministic initials fallback, plus an `avatar` prop that is NOT a URL — it is the raw stored `AvatarRef` string (`users.avatar_url`), which `parseAvatarRef` (`@/identity/avatars.ts`) resolves into one of three renders: a preset tile — an `Icon` on one of `AvatarTone`'s five fills — for a `preset:<key>` value, an `<img>` for an `https://` URL, or the same initials fallback for anything else, including `null`, an unrecognized preset key, or a rejected scheme like `javascript:`/`data:`/`http:`; decorative unless given a `label`), `Modal` (renders nothing when closed; `role="dialog"` + `aria-modal`; focus moves in on open, cycles on Tab, returns to the opener on close; Esc closes), `ToastProvider`/`useToast` (one polite live region; `tone: "error"` toasts are also `role="alert"`; auto-dismiss after `UI_CONFIG.toast.dismissMs`, or `reducedMotionDismissMs` when the user prefers reduced motion; optional action button), `Skeleton` (aria-busy, announces "Loading…"), `EmptyState` / `ErrorState` (action required), `Icon` (curated `IconName` union; feature code never imports lucide directly), `InfoTip` (`term: TermKey`; click-to-reveal — never hover, per WCAG 2.2 1.4.13 — a real `<button>` with `aria-expanded`; the revealed `role="note"` sits in normal document flow, never a floating overlay, so it can never obscure the trigger; `helpLevel="guided"` additionally prints the glossary entry's short line inline, unhidden — the ONE way a `@/help/glossary` definition reaches the page, except inside a `LeagueRow`, which never passes `helpLevel` at all — see "The row shelf" above; `Escape` closes it while it holds focus), **`Countdown`** (`remainingMs`, `size: md|lg|xl`, `tone: default|hot` — the ticking-digits primitive, `aria-hidden`, paired with a plain-language `aria-live="polite"` sibling stating the same time coarsely via `formatCoarseRemaining`, e.g. "About 8 hours left"; display only — a countdown never decides anything, the server ticker owns clock expiry; `tone: "hot"` reads live-red by v3's token retone alone, no component change).
+`Button` (variants primary/secondary/destructive/ghost — v3, Task 4: `primary` is the ink pill, `secondary` the quiet pill, see "Pill discipline" above; `loading` = aria-busy + disabled + spinner, label stays), **`ButtonLink`** (v3, Task 4 — the anchor form of `Button`, same `buttonClassName` source of truth; no `loading`/`disabled`, since an anchor has neither), `Input` (label required; error → `aria-invalid` + `aria-describedby`), `Textarea` (the multi-line sibling of `Input`, same `FieldShell` label/hint/error contract; an optional `maxLength` renders a live, `aria-live="polite"` remaining-character count wired into `aria-describedby` — `ReviewComposer` is the one caller today, backed by the same `validateReviewDraft` rule the server enforces, so the number on screen and the number the API accepts can never drift), `Select` (label required; native `<select>`; same error/hint contract as `Input`), **`Card`** (border + `shadow-card`; `interactive` is **rule 4's amended test in code** — *a thing you act on or compare against its neighbours may be a card; a thing you read down a column stays a row* — and it spends `surfaceRaised` on `hover`/`focus-within`, the depth role the palette had always named "a row hover" and no surface had ever used. Depth, never a heavier line: `line` stays decorative, `edge` stays a control boundary, and a card is not a control — it takes no `role` and no `tabindex`, so the action inside it is still the view's one ink action. A card that lifts with nothing inside to press is decoration and rule 6 rejects it), `Badge` (semantic tones; `glow` adds a tinted `ring-2` for a live/urgent tone, built on `accentGlow`/`warningGlow`; only `accent` and `warning` carry a glow token today), **`PositionBadge`** (`position` + `size: sm|md` — the sticker chip; the ONLY renderer of a position; one of the caps charter's two allowlisted files), **`SlotChip`** (`slot` — the bordered chip for a roster-slot letter that isn't itself a position, e.g. `FLEX`/`BENCH`), **`PageTitle`** (`size: md|xl` — the one `<h1>` treatment for a PAGE; `font-semibold`, not `font-bold`, as of Task 9; a room supplies its own `<h1>` instead, see "Layout" above), `Table` (semantic `<table>`; `caption` required — visually hidden unless `captionVisible`; `empty` node required; optional `rowAttributes` spreads plain attributes onto the `<tr>` itself, never a second wrapper element; scrolls horizontally inside its own wrapper at 360px; `density: comfortable|dense`, defaulting to `dense`, see `docs/decisions/design-v2.md` §4 for the full decision record), `Celebration` (`role="status"`; `emphasis: "self" | "peer"` picks the animation class and the accent treatment; renders with no animation class at all under reduced motion — the one primitive both `PickCelebration` and `MatchupCelebration` are built on), `Avatar` (`name` for the deterministic initials fallback, plus an `avatar` prop that is NOT a URL — it is the raw stored `AvatarRef` string (`users.avatar_url`), which `parseAvatarRef` (`@/identity/avatars.ts`) resolves into one of three renders: a preset tile — an `Icon` on one of `AvatarTone`'s five fills — for a `preset:<key>` value, an `<img>` for an `https://` URL, or the same initials fallback for anything else, including `null`, an unrecognized preset key, or a rejected scheme like `javascript:`/`data:`/`http:`; decorative unless given a `label`), `Modal` (renders nothing when closed; `role="dialog"` + `aria-modal`; focus moves in on open, cycles on Tab, returns to the opener on close; Esc closes), `ToastProvider`/`useToast` (one polite live region; `tone: "error"` toasts are also `role="alert"`; auto-dismiss after `UI_CONFIG.toast.dismissMs`, or `reducedMotionDismissMs` when the user prefers reduced motion; optional action button), `Skeleton` (aria-busy, announces "Loading…"), `EmptyState` / `ErrorState` (action required), `Icon` (curated `IconName` union; feature code never imports lucide directly), `InfoTip` (`term: TermKey`; click-to-reveal — never hover, per WCAG 2.2 1.4.13 — a real `<button>` with `aria-expanded`; the revealed `role="note"` sits in normal document flow, never a floating overlay, so it can never obscure the trigger; `helpLevel="guided"` additionally prints the glossary entry's short line inline, unhidden — the ONE way a `@/help/glossary` definition reaches the page, except inside a `LeagueRow`, which never passes `helpLevel` at all — see "The row shelf" above; `Escape` closes it while it holds focus), **`Countdown`** (`remainingMs`, `size: md|lg|xl`, `tone: default|hot` — the ticking-digits primitive, `aria-hidden`, paired with a plain-language `aria-live="polite"` sibling stating the same time coarsely via `formatCoarseRemaining`, e.g. "About 8 hours left"; display only — a countdown never decides anything, the server ticker owns clock expiry; `tone: "hot"` reads live-red by v3's token retone alone, no component change).
 
 **Five v2 primitives (Task 3, Phase 3.6), each extracted at its own second caller rather than invented ahead of need**, joining `Badge`, `Table` and `Countdown` above as the three *existing* primitives v2 extended instead of forking:
 - **`Panel`** (`title`, optional `meta`, `headingLevel: 2|3`) — the "eyebrow label, hairline, content" block, built on `Card` plus the shared `EYEBROW` class (now sentence-case mono, see "The caps charter" above). Two callers today (`seat-hold-panel.tsx`, `invite-panel.tsx`).
@@ -661,7 +766,41 @@ Plain language, active voice, specific. Errors say what happened and what to do 
 exception/DB text ever reaches a user. Five surfaces phrasing one promise five ways is a
 design-system failure, not a writing one — the rules below exist so nobody has to re-derive a
 sentence this product already decided on. **Unchanged by v3** — the caps and pill rules govern
-typography and layout, never the words themselves.
+typography and layout, never the words themselves. **Amended by the fun pass (Task 4), which is
+the one place the words themselves moved.**
+
+### Assert, do not explain (the fun pass, 2026-08-27)
+
+The founder's *"it feels like a legal website and not a fantasy site"* is a copy complaint at
+least as much as a visual one, and it is the cheapest half of the fix. The spec's second named
+cause: *"The copy is written like terms. 'This team must make its pick before time runs out.' is a
+compliance sentence. A fantasy product says 'You're on the clock' and stops talking."*
+
+**Name the moment, then stop.** Four tells, each of which had shipped on more than one surface
+before Task 4 swept them:
+
+1. **Explaining a mechanic the screen is already showing.** A tour stop that narrates a countdown
+   the reader is watching, a board empty state that explains that boards fill up.
+2. **The lawyerly softener** — a second sentence whose only job is to reassure, absolve or grant
+   permission. *"and that is fine"*, *"Clear it whenever you like"*, *"Make it whenever you are
+   ready"*, *"There is nothing to run by hand"*. All gone. The first sentence was already kind.
+3. **The stacked restatement** — a rule, then a worked example of the same rule, above a control
+   that teaches it faster than either. The slot panel's example was deleted outright; the
+   `InfoTip` beside the heading is the long version for whoever presses it.
+4. **The administrative noun where a sports word exists.** The clearest instance: a week that is
+   happening now reads **"Live"**, not "In progress".
+
+**What this rule does NOT license.** Money, seats, refunds, fairness and moderation sentences are
+load-bearing and stay long if long is what makes them true — `seatCountsAsOfSentence`'s second
+sentence is the thing that makes its first one honest. Screen-reader sentences are never trimmed:
+the visible digits of a clock are `aria-hidden` and the `sr-only` sentence beside them is the only
+spoken form there is. And C3's sanctioned safety-net phrase, **"the room picks for you from your
+queue"**, is still quoted verbatim by every surface that reassures a member about missing a draft.
+Cutting a sentence is only an improvement when nothing true leaves with it.
+
+Everything above this line still binds: expanded register (no contractions, C1), no em-dashes or
+en-dashes, no accusatory terms, no passive constructions, no forbidden vocabulary — all five
+mechanically enforced by `copyViolations` (`src/integrity/copy-rules.ts`) through four sweeps.
 
 **The register is expanded: no contractions** (C1, ruled). "You do not have to wait here," never
 "You don't." This product tells people things about money, seats and fairness, and the expanded
@@ -699,6 +838,6 @@ ticker on an anonymous surface names a league, a count, or a duration, never a p
 on a board, never a color, a badge or an animation.
 
 ## Checklist for every UI step (from `docs/conventions.md`)
-Design review against this doc · light + dark verified · loading/empty/error/success states exist · `axe` clean + keyboard walkthrough · copy review · works at 360px · no `uppercase` outside the two allowlisted files · at most one ink pill per view.
+Design review against this doc · light + dark verified · loading/empty/error/success states exist · `axe` clean + keyboard walkthrough · copy review (**assert, do not explain** — see "Copy") · works at 360px · no `uppercase` outside the two allowlisted files · nothing heavier than `font-semibold` · at most one ink pill per view · **any heat-coloured number also reads plainly as its own number, and a judged one carries its caret and weight step**.
 
 Component tests run in happy-dom without a stylesheet, so the "both themes + axe" checks in `*.test.tsx` verify structural a11y (roles, labels, ARIA attributes) in each theme, not actual rendered color; real color contrast is verified numerically by `src/design/tokens.test.ts` — which covers the semantic roles, the translucent-band composites, and all fifteen sticker pairs in both themes — and browser-based visual contrast checks land with the e2e plan (Task 12's contrast spot-verification).

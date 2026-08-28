@@ -78,6 +78,20 @@ export const UI_CONFIG = {
      */
     clockWithinMs: 21_600_000,
   },
+  stat: {
+    /**
+     * Where each magnitude step begins, as a percentile floor inside the comparison set the
+     * caller stated (1 = best in the population). A value at or above `strong` is strong, at or
+     * above `good` is good, and anything below `weak` is bad. The middle band — `neutral`'s floor
+     * up to `good`'s — is deliberately the widest: most numbers on any screen are ordinary, and a
+     * heat map that tints two thirds of a column has told the reader nothing.
+     *
+     * A tunable, never a literal in a component: these four numbers are the difference between
+     * "a steal" and "a fine pick", and that judgement belongs somewhere a persona review can find
+     * it in one file rather than inside whichever surface rendered it first.
+     */
+    percentileFloors: { strong: 0.85, good: 0.65, neutral: 0.35, weak: 0.15 },
+  },
   seatMeter: {
     /**
      * Below this many remaining seats (and above zero), `SeatMeter` appends its own "{n} seat(s)

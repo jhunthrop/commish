@@ -100,7 +100,9 @@ describe("DraftSchedulePanel", () => {
       <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={SCHEDULED} />,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.getByText(/pause automatically between 2:00 AM and 5:00 AM Eastern/)).toBeInTheDocument();
+    // Fun pass, Task 4: the sentence kept both facts (the window, and which clocks it
+    // applies to) and dropped the terms-of-service framing around them.
+    expect(screen.getByText(/Picks pause 2:00 AM to 5:00 AM Eastern/)).toBeInTheDocument();
   });
 
   it("drops the overnight-freeze notice once kickoff is within the hour — that draft never reaches a slow enough tier", () => {
@@ -142,7 +144,7 @@ describe("DraftSchedulePanel", () => {
     );
     expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
     expect(screen.queryByText(/we will start it/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Nothing starts this automatically/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Press Start the draft/)).not.toBeInTheDocument();
   });
 
   // Persona review, Step 4: a private league's commissioner asks the same "what happens if I do
@@ -153,7 +155,9 @@ describe("DraftSchedulePanel", () => {
       <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: false }} />,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.getByText("Nothing starts this automatically. Press Start the draft when everyone is ready.")).toBeInTheDocument();
+    // Fun pass, Task 4: the negative fact went. Telling a commissioner what does NOT happen
+    // before telling them what to press is the register of a disclaimer, not a room.
+    expect(screen.getByText("Press Start the draft when everyone is ready.")).toBeInTheDocument();
   });
 
   it("shows a link into the room while the draft is live, in both themes, axe-clean", async () => {

@@ -99,7 +99,8 @@ describe("TradeCard", () => {
     render(<TradeCard trade={BASE} meTeamId="them" playersById={PLAYERS} onWithdraw={() => {}} />);
     expect(screen.getByRole("button", { name: "Withdraw" })).toBeInTheDocument();
     expect(screen.queryByText("Proposed. Waiting for a reply.")).not.toBeInTheDocument();
-    expect(screen.getByText("Nobody answered before this ran out. Clear it whenever you like.")).toBeInTheDocument();
+    // Fun pass, Task 4: the permission clause went. Nothing was stopping anyone clearing it.
+    expect(screen.getByText("Nobody answered before this ran out.")).toBeInTheDocument();
   });
 
   it("keeps the answer controls right up to the moment the offer runs out", () => {
@@ -247,7 +248,9 @@ describe("TradeCard states", () => {
   it("renders a superseded offer with what happened, not with a blank status", () => {
     const trade: TradeProposalView = { ...BASE, status: "superseded", settledAt: "2026-08-19T00:00:00.000Z" };
     render(<TradeCard trade={trade} meTeamId="me" playersById={PLAYERS} />);
-    expect(screen.getByText(/moved to another team/i)).toBeInTheDocument();
+    // Fun pass, Task 4: "This offer can't be answered anymore" restated the status chip
+    // above it, in the register of a refusal. The card names the reason and stops.
+    expect(screen.getByText(/moved in another trade/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
   });
 

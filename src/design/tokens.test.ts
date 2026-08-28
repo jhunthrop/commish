@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TOKENS, COLOR_ROLES, type ColorRole, type PositionColorRole, type ThemeName } from "./tokens";
+import { TOKENS, COLOR_ROLES, MAGNITUDE_STEPS, type ColorRole, type MagnitudeStep, type PositionColorRole, type ThemeName } from "./tokens";
 import { contrastRatio, hueDegrees, hueDistance, blendOver } from "./test-support";
 
 const THEMES: readonly ThemeName[] = ["light", "dark"];
@@ -158,6 +158,92 @@ describe("TOKENS.color bands", () => {
   }
 });
 
+// THE MAGNITUDE RAMP — the heat map (docs/design/2026-08-27-fun-pass-spec.md, rule 1's largest
+// amendment). Five steps: four verdicts and the absence of one. Four gates, and the third and
+// fourth are what make this ramp different from the reference product's:
+//
+// 1. Every step clears AA text contrast on ALL FOUR surfaces, not the two `TEXT_ON_SURFACE`
+//    checks the semantic roles against. A heat-coloured number lands in a table row, an inset
+//    well and a raised tile exactly as readily as on the page ground, and unlike `warning` it has
+//    no "demoted usage" story to fall back on — it is the number itself.
+// 2. `neutral` IS `textPrimary`, deliberately, the same way `accent` IS `positive`. A number with
+//    no stated comparison set has to be indistinguishable from ordinary text; give the "no
+//    verdict" step a pigment of its own and every uncompared number in the product starts reading
+//    as a judgement, which is the exact failure the spec forbids ("we do not colour a number
+//    because it looks big").
+// 3. The ramp is strictly ordered by CONTRAST AGAINST THE GROUND, never by hue. Green-versus-red
+//    is the worst available pair for deuteranopia, which affects roughly one man in twelve, and
+//    this product's audience is overwhelmingly men — so hue, the channel `DISTINGUISHABLE_PAIRS`
+//    above is happy to accept, is precisely the channel this ramp may not lean on. Ordering by
+//    contrast-against-`surface` also spares the gate a per-theme direction: "louder" is brighter
+//    at night and darker in daylight, and one assertion covers both.
+// 4. No verdict step may be visually interchangeable with `neutral`. A heat-coloured number and a
+//    plain one have to differ in something a monochrome eye can see, or the tint is doing all the
+//    work.
+//
+// None of this is the whole colourblind gate. Colour is never magnitude's only channel — the
+// value reads plainly as its own number and a judged value carries a caret and a weight step —
+// and THAT gate lives with the component that renders it, `src/components/ui/stat.test.tsx`.
+// This block only proves the pigments are legible and correctly ordered.
+const MAGNITUDE_SURFACES: readonly ColorRole[] = ["surface", "surfaceElevated", "surfaceRaised", "surfaceInset"];
+/** The judged steps, best first. `neutral` sits between `good` and `weak` and is not on the ramp. */
+const MAGNITUDE_RAMP: readonly MagnitudeStep[] = ["strong", "good", "weak", "bad"];
+const MIN_ADJACENT_STEP_CONTRAST = 1.15;
+const MIN_RAMP_END_CONTRAST = 1.5;
+const MIN_VERDICT_VS_NEUTRAL_CONTRAST = 1.25;
+
+describe("TOKENS.magnitude", () => {
+  it("carries the same five steps in both palettes", () => {
+    for (const theme of THEMES) {
+      expect(Object.keys(TOKENS.magnitude[theme]).sort()).toEqual([...MAGNITUDE_STEPS].sort());
+    }
+  });
+
+  for (const theme of THEMES) {
+    describe(theme, () => {
+      const c = TOKENS.color[theme];
+      const m = TOKENS.magnitude[theme];
+
+      for (const step of MAGNITUDE_STEPS) {
+        for (const surface of MAGNITUDE_SURFACES) {
+          it(`${step} on ${surface} ≥ ${AA_TEXT}:1`, () => {
+            expect(contrastRatio(m[step], c[surface])).toBeGreaterThanOrEqual(AA_TEXT);
+          });
+        }
+      }
+
+      it("makes the no-verdict step the ordinary ink, deliberately — an uncompared number is not a judgement", () => {
+        expect(m.neutral).toBe(c.textPrimary);
+      });
+
+      it("orders the ramp by contrast against the ground, so it reads as a ramp with no hue at all", () => {
+        const ladder = MAGNITUDE_RAMP.map((step) => contrastRatio(m[step], c.surface));
+        for (let i = 1; i < ladder.length; i++) {
+          expect(ladder[i]).toBeLessThan(ladder[i - 1]!);
+        }
+      });
+
+      for (let i = 1; i < MAGNITUDE_RAMP.length; i++) {
+        const previous = MAGNITUDE_RAMP[i - 1]!;
+        const step = MAGNITUDE_RAMP[i]!;
+        it(`${previous} and ${step} are separated by luminance, not hue (≥ ${MIN_ADJACENT_STEP_CONTRAST}:1)`, () => {
+          expect(contrastRatio(m[previous], m[step])).toBeGreaterThanOrEqual(MIN_ADJACENT_STEP_CONTRAST);
+        });
+      }
+
+      it(`puts the ends of the ramp ≥ ${MIN_RAMP_END_CONTRAST}:1 apart, because green and red are the pair that vanishes`, () => {
+        expect(contrastRatio(m.strong, m.bad)).toBeGreaterThanOrEqual(MIN_RAMP_END_CONTRAST);
+      });
+
+      for (const step of MAGNITUDE_RAMP) {
+        it(`${step} is not interchangeable with an uncoloured number (≥ ${MIN_VERDICT_VS_NEUTRAL_CONTRAST}:1 vs neutral)`, () => {
+          expect(contrastRatio(m[step], m.neutral)).toBeGreaterThanOrEqual(MIN_VERDICT_VS_NEUTRAL_CONTRAST);
+        });
+      }
+    });
+  }
+});
+
 // The six position stickers. `def` is the quiet one by design (no hue of its own to speak
 // of), which is exactly why it has to be checked against the five that do have one.
 const POSITION_ROLES: readonly PositionColorRole[] = ["qb", "rb", "wr", "te", "k", "def"];
@@ -222,6 +308,24 @@ describe("TOKENS scales", () => {
     const vals = Object.values(TOKENS.font.display);
     for (let i = 1; i < vals.length; i++) expect(vals[i]).toBeGreaterThan(vals[i - 1]!);
     expect(vals[0]).toBeGreaterThan(TOKENS.font.size.md);
+  });
+  it("carries roughly ten times the range between the biggest number on a screen and its label", () => {
+    // THE DYNAMIC-RANGE GATE (docs/design/2026-08-27-fun-pass-spec.md, cause 3): "Sports
+    // interfaces live on roughly 10x scale contrast — a huge number, a tiny label. We are at
+    // about 2x. Uniform hierarchy is a document convention, and it is why the eye has nothing to
+    // grab on any page."
+    //
+    // The two ends are real, not notional: the top of the display scale is what a `Stat` renders
+    // its value at, and `xs` is the `EYEBROW` register every label in the product is set in. The
+    // ratio is checked against BOTH emissions, because the dense scale shrinks the label without
+    // shrinking the number and a gate that only saw the phone would be measuring the easy case.
+    //
+    // Range comes from SIZE and only from size — the ≤600 weight cap is rule 2 and does not move
+    // (`weight-cap.source.test.ts` is what keeps it from being reached for instead).
+    const MIN_DISPLAY_RANGE = 9;
+    const largest = Math.max(...Object.values(TOKENS.font.display));
+    expect(largest / TOKENS.font.size.xs).toBeGreaterThanOrEqual(MIN_DISPLAY_RANGE);
+    expect(largest / TOKENS.font.sizeDense.xs).toBeGreaterThanOrEqual(MIN_DISPLAY_RANGE);
   });
   it("display line height is tighter than the tight body line height", () => {
     expect(TOKENS.font.lineHeight.display).toBeLessThan(TOKENS.font.lineHeight.tight);

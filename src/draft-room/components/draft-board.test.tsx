@@ -190,7 +190,9 @@ describe("DraftBoard", () => {
   it("says so plainly in the narrow list when nothing has been drafted yet", () => {
     stubMatchMedia(false);
     render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, phase: "scheduled", onClockTeamId: null }} />);
-    expect(within(screen.getByTestId("draft-board-list")).getByText(/Nothing has been drafted yet/)).toBeInTheDocument();
+    // Fun pass, Task 4: "The board fills in as picks land" explained that a draft board
+    // fills up, to someone looking at a draft board. The empty state says the one true thing.
+    expect(within(screen.getByTestId("draft-board-list")).getByText("Nothing drafted yet.")).toBeInTheDocument();
   });
 
   it("still draws a column per team before the draft order exists", () => {

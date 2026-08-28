@@ -194,7 +194,9 @@ describe("RoomDock", () => {
 
   it("invites you to build a queue when you have none", () => {
     render(<RoomDock {...props} queue={[]} />);
-    expect(screen.getByText(/Star players in the pool to build your queue/)).toBeInTheDocument();
+    // Fun pass, Task 4: "to build your queue" narrated the list the sentence sits under.
+    // The instruction and C3's sanctioned safety-net phrase survive; the narration does not.
+    expect(screen.getByText(/Star players in the pool\./)).toBeInTheDocument();
   });
 
   it("counts my roster fill per slot, and only mine", () => {
@@ -220,7 +222,9 @@ describe("RoomDock", () => {
   it("tells the owing manager their pick passed and they can still make it, even on somebody else's turn", () => {
     const view: DraftStateView = { ...SNAKE_VIEW, ...waiting, owedPicks: { t1: [1] } };
     render(<RoomDock {...props} view={view} canAct={false} />);
-    expect(screen.getByTestId("dock-owed-pick")).toHaveTextContent("Your pick passed while you were away. Make it whenever you are ready.");
+    expect(screen.getByTestId("dock-owed-pick")).// Fun pass, Task 4: "Make it whenever you are ready" was a softener on a sentence that
+    // already carried no blame. The dock says what happened and what to do.
+    toHaveTextContent("Your pick passed. Take it now.");
     // No accusation, no blame voice — the integrity notices discipline applies to this copy too.
     expect(screen.queryByText(/missed|failed/i)).toBeNull();
   });

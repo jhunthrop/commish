@@ -383,8 +383,9 @@ src/
                           Skeleton, EmptyState, ErrorState, Icon, Countdown — the ticking-clock
                           primitive, extracted at its third caller, Phase 3.5 Task 8, …, and v2's
                           five (Phase 3.6 Task 3, each extracted at its own second caller) — Panel,
-                          Crest, SeatMeter, Meter, StatPill) — see
-                          design-system.md.
+                          Crest, SeatMeter, Meter, StatPill, and the fun pass's Stat — the heat
+                          map's ONE renderer, the only file allowed to name a magnitude colour)
+                          — see design-system.md.
 drizzle/                  generated SQL migrations (committed)
 docs/                     conventions.md (this), design-system.md, draft-engine.md, draft-room.md,
                           draft-moderator.md, league.md, mock-drafts.md — Phase 4.5's practice

@@ -24,6 +24,14 @@
   --color-warning-glow: var(--commish-color-warning-glow);
   --color-info: var(--commish-color-info);
   --color-scrim: var(--commish-color-scrim);
+  /* The heat map (rule 1's magnitude amendment, 2026-08-27). Only `Stat` may name one of these,
+     and only as text — `magnitude-budget.source.test.ts` is the gate. Magnitude on a control
+     would spend the one signal green still has, which is "press this". */
+  --color-mag-strong: var(--commish-mag-strong);
+  --color-mag-good: var(--commish-mag-good);
+  --color-mag-neutral: var(--commish-mag-neutral);
+  --color-mag-weak: var(--commish-mag-weak);
+  --color-mag-bad: var(--commish-mag-bad);
   /* Position stickers. Three per position: `pos-<role>` is the sticker fill (bg-pos-qb),
      `pos-<role>-on` is the label printed ON that fill (text-pos-qb-on), and
      `pos-<role>-text` is the same hue used as text on a surface (text-pos-qb-text).
@@ -67,6 +75,10 @@
   --text-display-md: var(--commish-display-size-md);
   --text-display-lg: var(--commish-display-size-lg);
   --text-display-xl: var(--commish-display-size-xl);
+  /* The fun pass's dynamic range (Task 3): 116px over a 12px eyebrow is the ~10x a sports
+     interface lives on. A call site steps down responsively; these are never a phone default. */
+  --text-display-2xl: var(--commish-display-size-2xl);
+  --text-display-3xl: var(--commish-display-size-3xl);
   --leading-display: var(--commish-line-height-display);
   --shadow-card: var(--commish-shadow-card);
   --shadow-sticker: var(--commish-shadow-sticker);
@@ -99,7 +111,9 @@ body {
 .font-display.text-display-sm,
 .font-display.text-display-md,
 .font-display.text-display-lg,
-.font-display.text-display-xl {
+.font-display.text-display-xl,
+.font-display.text-display-2xl,
+.font-display.text-display-3xl {
   letter-spacing: -0.028em;
 }
 

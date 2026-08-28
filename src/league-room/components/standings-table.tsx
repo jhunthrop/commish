@@ -144,7 +144,7 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false, 
         empty={
           <EmptyState
             title="No results yet"
-            description="Standings appear once the first week has been scored."
+            description="Nothing scored yet."
             icon="trophy"
             action={<Button disabled>Waiting for the first week to be scored</Button>}
           />

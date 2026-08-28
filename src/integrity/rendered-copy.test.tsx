@@ -1711,10 +1711,16 @@ describe("PracticeBanner says nothing that breaks the house copy rules", () => {
  * what it always has, not that it matches a config value that no longer exists.
  */
 describe("RoomTour says nothing that breaks the house copy rules, and never drifts from MOCK_CONFIG's own words", () => {
-  it("is clean, and its closing stop still states the practice phrase", () => {
-    const { container, getByText } = render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Draft" />);
+  // Fun pass, Task 4: the closing stop used to sell practice by leading with absolution
+  // ("Even if you miss your pick..."), which put the safety net in a stop whose subject is not
+  // the safety net. It now says what a mock draft IS. C3's sanctioned phrase is unaffected — the
+  // clock, queue and turn stops still quote it verbatim, and the assertion below is what proves
+  // this rewrite did not quietly take it out of the tour along with the sentence it moved.
+  it("is clean, still sells the mock draft, and still quotes the one safety-net phrase", () => {
+    const { container, getByText, getAllByText } = render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Draft" />);
     expectClean(container);
-    expect(getByText(/Start a mock draft anytime to practice first\./)).toBeInTheDocument();
+    expect(getByText(/Run a mock draft first\./)).toBeInTheDocument();
+    expect(getAllByText(/the room picks for you from your queue/).length).toBeGreaterThan(0);
   });
 });
 

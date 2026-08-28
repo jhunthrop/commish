@@ -7,7 +7,7 @@ const COPY: Readonly<Record<WeekStatus, { readonly label: string; readonly tone:
   // Competition review D1 (2026-08-27): rule 1 gives clocks and LIVE to the red family — a week
   // in progress is the live thing this product owns, and it was painted in the money pigment
   // (with Final the same hex one key over). Live is negative; a settled week is a plain fact.
-  in_progress: { label: "In progress", tone: "negative" },
+  in_progress: { label: "Live", tone: "negative" },
   final: { label: "Final", tone: "neutral" },
 };
 

@@ -128,7 +128,7 @@ describe("LeagueBoard", () => {
   // margin, a supplementary detail, drops below `sm`.
   it("keeps the state badge visible at 360px, and only hides the supplementary margin column", async () => {
     await renderSurface(<LeagueBoard leagues={[ORDINARY]} />, ({ getByText }) => {
-      expect(getByText("In progress").closest("td")?.className).not.toMatch(/hidden/);
+      expect(getByText("Live").closest("td")?.className).not.toMatch(/hidden/);
       expect(getByText("State").className).not.toMatch(/hidden/);
       expect(getByText("Margin").className).toMatch(/hidden/);
     });
@@ -153,7 +153,7 @@ describe("LeagueBoard", () => {
   it("never lets the State badge or the Margin figure wrap, in either theme (LED-11)", async () => {
     await renderSurface(<LeagueBoard leagues={[ORDINARY]} />, ({ getByText }) => {
       expect(getByText("Watch the scores")).toBeInTheDocument();
-      expect(getByText("In progress").className).toMatch(/whitespace-nowrap/);
+      expect(getByText("Live").className).toMatch(/whitespace-nowrap/);
     });
     const wideMargin: readonly HomeLeagueCard[] = [
       {

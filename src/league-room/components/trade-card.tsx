@@ -100,7 +100,7 @@ function settledCopy(trade: TradeProposalView, meTeamId: string): string | null 
   }
   if (trade.status === "expired") return "This offer expired without an answer.";
   // superseded
-  return "This offer can't be answered anymore. One of these players moved to another team in a different trade.";
+  return "One of these players moved in another trade.";
 }
 
 function myAndTheirSides(trade: TradeProposalView, meTeamId: string): { readonly mine: TradeSideView; readonly theirs: TradeSideView } | null {
@@ -253,7 +253,7 @@ export function TradeCard({
                 proposed." too, so this card and that screen agree on the word. Final review,
                 HIGH 3: an offer that ran out is not still waiting for a reply, and saying so was
                 the second half of the same lie the expiry line told. */}
-            <p className="text-sm text-text-muted">{expired ? "Nobody answered before this ran out. Clear it whenever you like." : "Proposed. Waiting for a reply."}</p>
+            <p className="text-sm text-text-muted">{expired ? "Nobody answered before this ran out." : "Proposed. Waiting for a reply."}</p>
             <div>
               <Button variant="secondary" onClick={() => onWithdraw?.(trade.id)} disabled={busy}>
                 Withdraw
