@@ -45,7 +45,9 @@
     "projections:preseason:ingest": "dotenv -e .env.local -- tsx scripts/preseason-ingest.ts",
     "projections:preseason:fit": "dotenv -e .env.local -- tsx scripts/preseason-fit.ts",
     "projections:preseason": "dotenv -e .env.local -- tsx scripts/preseason-report.ts",
-    "projections:preseason:diagnose": "dotenv -e .env.local -- tsx scripts/preseason-diagnose.ts"
+    "projections:preseason:diagnose": "dotenv -e .env.local -- tsx scripts/preseason-diagnose.ts",
+    "projections:crosswalk": "dotenv -e .env.local -- tsx scripts/build-crosswalk.ts",
+    "projections:preseason:persist": "dotenv -e .env.local -- tsx scripts/preseason-persist.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

@@ -28,6 +28,12 @@ export interface NflPlayer {
   readonly id: string;
   /** Pro Football Reference's id — the ONLY way into the snap-counts file. Null when unlisted. */
   readonly pfrId: string | null;
+  /**
+   * ESPN's own player id — the ONLY way to the roster this product drafts from, whose stats
+   * provider numbers players in ESPN's space. Null for roughly a third of the universe, mostly
+   * people who never appeared in a game. See `nfl_players.espn_id` and `crosswalk.ts`.
+   */
+  readonly espnId: string | null;
   readonly name: string;
   /** nflverse's own spelling, not narrowed — see `projectedPosition` for why. */
   readonly position: string;
@@ -74,6 +80,7 @@ export function mapNflPlayers(rows: readonly CsvRow[]): readonly NflPlayer[] {
     return {
       id,
       pfrId: text(row, "pfr_id"),
+      espnId: text(row, "espn_id"),
       name,
       position,
       latestTeam: text(row, "latest_team"),
@@ -200,6 +207,7 @@ export function buildPlayerUniverse(universe: readonly NflPlayer[]): PlayerUnive
 export interface NflPlayerRow {
   readonly id: string;
   readonly pfrId: string | null;
+  readonly espnId: string | null;
   readonly name: string;
   readonly position: string;
   readonly latestTeam: string | null;

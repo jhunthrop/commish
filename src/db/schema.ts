@@ -1592,6 +1592,22 @@ export const nflPlayers = pgTable(
      * `gsis_id` at all — so this column is what joins participation to outcomes.
      */
     pfrId: text("pfr_id"),
+    /**
+     * ESPN's own player id (`4362628`), migration 0051. NULLABLE, and null for a third of the
+     * universe: the release carries one for 16,769 of its 25,066 people, essentially everyone ESPN
+     * has ever built a page for and nobody else.
+     *
+     * THIS IS THE BRIDGE TO THE PRODUCT. `players.id` is the stats provider's own player id, and
+     * the provider numbers players in ESPN's space — the same man is `4362628` in both. That makes
+     * the crosswalk between the research corpus and the roster a league drafts from an ID JOIN,
+     * which is the only kind this codebase accepts for identity (`players.ts` is scathing about
+     * name joins and is right). `player_crosswalk` is the table it fills.
+     *
+     * The column was in the source file from the first backfill and was discarded by the mapper,
+     * along with five other id spaces. It is read now because a phase finally needs it, which is
+     * the same rule `nfl_players`' own docblock applies to the link it refused to guess at.
+     */
+    espnId: text("espn_id"),
     name: text("name").notNull(),
     /**
      * nflverse's own spelling (`QB`, `RB`, `WR`, `TE`, `FB`, `C`, …), NOT narrowed to this
@@ -1612,6 +1628,11 @@ export const nflPlayers = pgTable(
      *  written onto another, silently and forever — the failure the Phase 1 crosswalk's coherence
      *  check was built to catch. Enforcing it here makes it a database error instead. */
     uniqueIndex("nfl_players_pfr_id_idx").on(t.pfrId),
+    /** The same ruling as `pfr_id`'s, for the same reason and with more at stake: two people
+     *  sharing an ESPN id would mean one man's expert consensus and one man's projection rendered
+     *  on another man's screen. Measured on the live release before the index was written — 16,769
+     *  ids, zero collisions — so this asserts a property the data already has. */
+    uniqueIndex("nfl_players_espn_id_idx").on(t.espnId),
   ],
 );
 
@@ -1934,5 +1955,166 @@ export const preseasonRankings = pgTable(
   (t) => [
     uniqueIndex("preseason_rankings_fact_idx").on(t.season, t.source, t.playerId, t.asOf),
     index("preseason_rankings_as_of_idx").on(t.season, t.source, t.asOf),
+  ],
+);
+
+/**
+ * THE ONE EDGE BETWEEN THE TWO ID SPACES THIS PRODUCT HOLDS (migration 0051).
+ *
+ * `nfl_players`' own docblock refused to guess at this link and said who should draw it: "mapping
+ * those to the roster the product drafts from is a separate concern with its own failure modes,
+ * and it belongs to whichever phase first renders a projection." This is that phase. Everything
+ * the engine knows is keyed to a gsis id and everything the product shows is keyed to the stats
+ * provider's id, and until this table existed there was no join between them anywhere — which is
+ * why a player's screen printed a dash where expert consensus and our own number belong.
+ *
+ * IT IS AN ID JOIN, NOT A NAME JOIN. The provider numbers players in ESPN's space and nflverse
+ * publishes an `espn_id` for most of its universe, so the same man carries the same integer on
+ * both sides and nothing has to guess. Measured on the live data the day it was built: 1,223 of
+ * 1,647 league players, 74.3%. Set aside the 52 team defences and the 230 fabricated seed rows the
+ * demo dataset carries and it is 1,223 of 1,365 real NFL players, 89.6% — and every one of the 444
+ * players the market ranks resolved, which is the population any product surface actually draws.
+ * The 11 pairs whose NAMES disagree across a matched id are the argument for the mechanism rather
+ * than against it: every one is a nickname for the same person (`Hollywood Brown` against
+ * `Marquise Brown`, `Joshua Palmer` against `Josh Palmer`), so a name join would have lost all
+ * eleven while still having to guess at the 124 name-and-position collisions the universe holds.
+ *
+ * EVERY LEAGUE PLAYER GETS A ROW, matched or not. One row per `players.id`, always, so the table
+ * is a census rather than a success list and the match rate is a query over it rather than a
+ * number somebody remembered from a script run. An unmatched man is recorded with the reason he
+ * could not be placed; he is never dropped, and he is never attached to somebody who happens to
+ * share his name.
+ *
+ * NO `as_of`, DELIBERATELY, and this is the one table in the engine's neighbourhood where that is
+ * correct. `universe.ts` states the rule: identity is not a fact that gets restated by a
+ * Sunday-night correction. A stamp here would invite a reader to filter on it and silently drop
+ * every player resolved after the moment it was asking about — a leakage defence turned into a
+ * data-loss bug. The point-in-time discipline lives on the RANKING and the PROJECTION this table
+ * leads to, both of which carry their own stamp.
+ */
+export const playerCrosswalk = pgTable(
+  "player_crosswalk",
+  {
+    /** A `players.id` — the stats provider's id (`4362628`). One row per league player, always. */
+    playerId: text("player_id")
+      .primaryKey()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** The `nfl_players.id` (a gsis id) he is the same person as, or NULL when he could not be
+     *  placed. `restrict` rather than `cascade`: a universe row vanishing under a live crosswalk
+     *  is a bug upstream, and it should stop the delete rather than quietly unlink a player. */
+    nflPlayerId: text("nfl_player_id").references(() => nflPlayers.id, { onDelete: "restrict" }),
+    /** How he was placed (`espn_id`). NULL exactly when unmatched. Free text so a second mechanism
+     *  can be added without a migration, and so a row always says which one placed it. */
+    method: text("method"),
+    /**
+     * Why he could not be placed. NULL exactly when matched. One of `not_an_nfl_player` (a team
+     * defence, which has no person and never will), `no_espn_id` (nobody in the universe carries
+     * this id — a fringe or undrafted man the release has not listed, or a fabricated seed row) or
+     * `ambiguous_espn_id` (two universe rows claim it, which the unique index upstream makes
+     * impossible today and which is recorded rather than resolved if it ever happens).
+     */
+    unmatchedReason: text("unmatched_reason"),
+    /** When the resolver last ran for this row. Operational only, never a filter — see the
+     *  docblock on why this table has no `as_of`. */
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    /** A matched row states a method and no reason; an unmatched row states a reason and no
+     *  method. Enforced here rather than in the writer because a half-filled row is the shape a
+     *  silent drop takes, and the database is the only place every writer passes through. */
+    check(
+      "player_crosswalk_matched_ck",
+      sql`(${t.nflPlayerId} IS NOT NULL AND ${t.method} IS NOT NULL AND ${t.unmatchedReason} IS NULL)
+          OR (${t.nflPlayerId} IS NULL AND ${t.method} IS NULL AND ${t.unmatchedReason} IS NOT NULL)`,
+    ),
+    /** TWO LEAGUE PLAYERS MAY NOT BE THE SAME NFL PLAYER. The failure this whole table exists to
+     *  prevent is one man's numbers rendered on another's screen, and collapsing two provider rows
+     *  onto one gsis id is exactly how that happens. Postgres treats NULLs as distinct, so the
+     *  unmatched are unaffected. */
+    uniqueIndex("player_crosswalk_nfl_player_idx").on(t.nflPlayerId),
+  ],
+);
+
+/**
+ * WHERE THE BOARD LANDS (migration 0051) — the first table in this repository that holds a number
+ * the model produced rather than a number somebody else published.
+ *
+ * `preseasonBoard` has been a pure function whose only callers print to a research document. That
+ * was right while the question was "is it any good"; it is wrong now that the answer is yes
+ * (`docs/research/2026-08-28-starter-band.md`). A rank correlation over a held-out season is a
+ * fact about the BOARD; a manager looking at one receiver needs a fact about that receiver, and
+ * nothing could give him one because the board did not survive the process that computed it.
+ *
+ * THE SHAPE IS `preseason_rankings`, deliberately and almost column for column. Our own board and
+ * the two published benchmarks are the same KIND of object — one source's ordering of one season's
+ * players, published at a moment — and the source strip on a player's screen sets all three beside
+ * each other. Storing ours in a differently-shaped table would have made that comparison a
+ * translation. `source` carries the same style of value the benchmarks use (`ffc_adp_ppr_12`,
+ * `fantasypros_ecr_ppr`), naming both the model version and the format it was composed under,
+ * because a projected point total is meaningless without the scoring rules that produced it.
+ *
+ * WIDE, WHERE `player_week_observations` IS NARROW AND TALL, and the difference is not taste. That
+ * store is tall because its metrics arrive from different feeds at different times and no writer
+ * ever knows every column at once. A board is the opposite: one process computes every column of
+ * every row in one pass from one set of inputs, and splitting it into fourteen rows per player
+ * would let a reader reassemble a projection whose points came from one run and whose rank came
+ * from another.
+ *
+ * `as_of` IS THE PRESEASON MOMENT THE BOARD WAS TAKEN AT — `loadPreseason`'s own `moment`, which
+ * is one millisecond before the earliest thing the season would reveal, and which that function
+ * asserts the store against before it returns. It is not the time of the run. A projection is a
+ * claim about the future made from a stated position in time, and a stamp of `now()` would erase
+ * the only thing that makes the claim checkable. Two leakage defects have already been found in
+ * this engine, both silent, both caught by audit rather than by a failure; a projection that could
+ * not say what it was allowed to see would make a third one unfindable.
+ */
+export const preseasonProjections = pgTable(
+  "preseason_projections",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season: integer("season").notNull(),
+    /** Which board said it — model version and league format together, as the benchmark sources
+     *  name market and format together. `commish_board_v1_ppr_12`. */
+    source: text("source").notNull(),
+    /** An `nfl_players.id` (a gsis id), the space the whole engine keys on. The product reaches it
+     *  through `player_crosswalk`, never by name. */
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** 1-based overall rank BY PROJECTED POINTS — the board's own order. Comparable to a published
+     *  consensus rank, which is what the source strip sets it beside. */
+    rank: integer("rank").notNull(),
+    /** 1-based rank within his position, from the same order. */
+    positionRank: integer("position_rank").notNull(),
+    /** Season points under this row's stated scoring rules. */
+    projectedPoints: doublePrecision("projected_points").notNull(),
+    /** The draft-value view: points above this position's replacement level. Carried with its own
+     *  rank because the board measured worse when ordered by it and better when it is offered as a
+     *  labelled second reading — see `board.ts`. */
+    valueOverReplacement: doublePrecision("value_over_replacement").notNull(),
+    valueRank: integer("value_rank").notNull(),
+    expectedGames: doublePrecision("expected_games").notNull(),
+    /** Season points at the tenth, fiftieth and ninetieth percentiles of his games distribution.
+     *  Honest about what it covers — availability — and silent about what it does not. */
+    floorPoints: doublePrecision("floor_points").notNull(),
+    medianPoints: doublePrecision("median_points").notNull(),
+    ceilingPoints: doublePrecision("ceiling_points").notNull(),
+    /** 0-based tier within his position, from `decide/tiers.ts`' gap rule. */
+    tier: integer("tier").notNull(),
+    /** THE STAMP: the preseason moment the board was taken at. Never `defaultNow()`, for the
+     *  reason every other stamp in this engine is not. */
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    /** When the fit ran. Operational only — the gap between this and `as_of` is how stale a board
+     *  on a screen is, and it is never a filter. */
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** Identity of the fact, matching `preseason_rankings_fact_idx`: this board's opinion of this
+     *  player, as taken at this moment. Re-running the writer is a no-op rather than a duplicate,
+     *  and a refit is a NEW row under a new `source` or a new stamp rather than an overwrite of a
+     *  number somebody has already been shown. */
+    uniqueIndex("preseason_projections_fact_idx").on(t.season, t.source, t.playerId, t.asOf),
+    /** The read the product performs: one season, one board, everything knowable at a moment. */
+    index("preseason_projections_as_of_idx").on(t.season, t.source, t.asOf),
   ],
 );
