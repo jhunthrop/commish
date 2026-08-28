@@ -1,4 +1,5 @@
 import type { EfficiencyPriors } from "./efficiency";
+import type { LinePriors } from "./line-fit";
 import type { OpportunityPriors } from "./opportunity";
 
 /**
@@ -120,4 +121,20 @@ export const FITTED_EFFICIENCY_PRIORS: EfficiencyPriors = {
     interceptionsPerAttempt: 1103.93,
     fumblesLostPerPlay: 10000.00,
   },
+};
+
+/**
+ * PHASE 3, TASK 1 — the offensive line composite's league means and its two measured elasticities.
+ *
+ * The elasticities are regression slopes, not guesses: log team rushing yards per carry against log
+ * run-blocking composite, through the origin, weighted by carries, over the fit seasons' team-weeks
+ * only. An elasticity near zero is the measurement saying the composite does not move the rate, and
+ * the ablation is what decides whether the feature ships.
+ */
+export const FITTED_LINE_PRIORS: LinePriors = {
+  league: { adjustedLineYards: 0, stuffedRate: 0, sackRateAllowed: 0 },
+  rushingYardsElasticity: 0,
+  passingYardsElasticity: 0,
+  leagueRushingYardsPerCarry: 0,
+  leaguePassingYardsPerAttempt: 0,
 };

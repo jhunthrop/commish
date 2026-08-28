@@ -1,11 +1,15 @@
 import type { Db } from "@/db/client";
 import { recordObservations } from "../store";
+import { recordPlayerTeams, recordTeamObservations } from "../team-store";
 import { recordNflPlayers } from "../universe";
-import type { NflverseClient } from "./client";
+import { createNflverseClient, type NflverseClient } from "./client";
 import { NFLVERSE_CONFIG } from "./config";
 import { mapParticipation, participationObservations, weekAsOfFromSnapCounts } from "./map";
+import { PlayByPlayAggregator, playProfileObservations, PBP_COLUMNS } from "./pbp";
 import { buildPlayerUniverse, mapNflPlayers, nflPlayerRows, type PlayerUniverse } from "./players";
+import { kickoffAsOf, mapSchedule, scheduleObservations, SCHEDULE_SOURCE_CONFIG } from "./schedule";
 import { mapStatLines, statLineObservations } from "./stat-lines";
+import { lineContinuityObservations, mapPlayerTeams } from "./team-map";
 
 /**
  * ONE SEASON, FROM RELEASE TO STORE — the sequence every script that touches nflverse runs.
@@ -66,6 +70,12 @@ export async function ingestSeason(
     (await recordObservations(db, participationObservations(participation.participation))) +
     (await recordObservations(db, statLineObservations(statLines.statLines)));
 
+  // Both derived from the snap counts already in hand, so they cost no second download. The
+  // player-to-team edge is what every Phase 3 context feature joins on, and line continuity is the
+  // one part of the offensive line composite that needs no play-by-play at all.
+  await recordPlayerTeams(db, mapPlayerTeams(snapCounts, universe));
+  await recordTeamObservations(db, lineContinuityObservations(snapCounts, season));
+
   const unresolved = new Map<string, { id: string; name: string; occurrences: number }>();
   for (const row of [...participation.unresolved, ...statLines.unresolved]) {
     const already = unresolved.get(row.id);
@@ -84,5 +94,64 @@ export async function ingestSeason(
     statLineResolution: statLines.resolutionRate,
     unresolved: [...unresolved.values()],
     weekAsOf,
+  };
+}
+
+/**
+ * THE CONTEXT INGESTION — play-by-play and the schedule, which `ingestSeason` deliberately does not
+ * touch.
+ *
+ * Separate because the costs are two orders of magnitude apart. `ingestSeason` pulls a few
+ * megabytes and is run by the report script every time somebody wants a scoreboard; a season of
+ * play-by-play is a hundred megabytes, and putting it on that path would make printing a scoreboard
+ * a coffee break. This is run when the seasons change, exactly as the backfill is.
+ *
+ * The schedule covers every season in one small file, so it is fetched once for a list of them
+ * rather than once per season.
+ */
+export interface ContextIngestReport {
+  readonly season: number;
+  readonly playsRead: number;
+  readonly teamWeeks: number;
+  readonly observationsWritten: number;
+}
+
+/** The schedule repository is a different host from the release assets — see `schedule.ts`. */
+function createScheduleClient(): NflverseClient {
+  return createNflverseClient({ baseUrl: SCHEDULE_SOURCE_CONFIG.baseUrl });
+}
+
+/**
+ * Opponent, rest, venue, weather and the closing line, for every named season at once.
+ *
+ * The two `source` stamps the mapper applies are the load-bearing part: half of this file is
+ * knowable in May and half only at kickoff, and the store is where that difference is recorded.
+ */
+export async function ingestSchedule(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
+  const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  return await recordTeamObservations(db, scheduleObservations(mapSchedule(rows, seasons)));
+}
+
+/**
+ * One season of play-by-play, streamed and reduced to team-week facts as it arrives.
+ *
+ * Stamped from the game's own date, on exactly the arithmetic `gameDayAsOf` uses for a box score:
+ * end of the game's UTC calendar day plus the publication lag. A pace number is knowable when the
+ * game that produced it has finished and not before.
+ */
+export async function ingestPlayByPlay(db: Db, client: NflverseClient, season: number): Promise<ContextIngestReport> {
+  const aggregator = new PlayByPlayAggregator();
+  const playsRead = await client.streamCsv("pbp", `play_by_play_${season}.csv`, PBP_COLUMNS, (row) => {
+    aggregator.add(row);
+  });
+  const profiles = aggregator.profiles();
+  const observations = playProfileObservations(profiles, (profile) =>
+    kickoffAsOf(profile.gameDate, NFLVERSE_CONFIG.publicationLagHours),
+  );
+  return {
+    season,
+    playsRead,
+    teamWeeks: profiles.length,
+    observationsWritten: await recordTeamObservations(db, observations),
   };
 }

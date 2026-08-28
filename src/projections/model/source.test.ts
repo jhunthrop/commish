@@ -8,6 +8,7 @@ import type { SeasonStatLine } from "../lines";
 import { participationObservations, type PlayerWeekParticipation } from "../nflverse/map";
 import { statLineObservations } from "../nflverse/stat-lines";
 import { recordObservations } from "../store";
+import { emptyTeamContext } from "../team-context";
 import { modelSource, MODEL_SOURCE_NAME } from "./source";
 
 const db = createTestDb();
@@ -120,6 +121,7 @@ describe("the model as a projection source", () => {
       history: [],
       usage: [],
       positions: new Map(ROSTER),
+      teamContext: emptyTeamContext,
     });
     // With no history at all every player falls back to his role prior, so this must still return
     // nothing rather than a confident league-average opinion about everybody.

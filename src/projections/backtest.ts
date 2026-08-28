@@ -6,6 +6,8 @@ import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { statLinesAsOf, type SeasonStatLine } from "./lines";
 import { predictOpportunity, type OpportunityPriors } from "./model/opportunity";
 import { LAST_POSSIBLE_WEEK } from "./store";
+import { playerTeamsAsOf, teamObservationsAsOf } from "./team-store";
+import type { TeamContext } from "./team-context";
 import { usageAsOf, type PlayerWeekUsage } from "./usage";
 import { rankBandFor, scoreCard, RANK_BANDS, type Observation, type RankBandName, type ScoreCard } from "./metrics";
 
@@ -46,6 +48,12 @@ export interface ProjectionInput {
   readonly usage: readonly PlayerWeekUsage[];
   /** From `nfl_players`, narrowed. A player absent here is one the engine cannot score. */
   readonly positions: ReadonlyMap<string, Position>;
+  /**
+   * Everything KNOWABLE ABOUT THE TEAMS at `asOf` — Phase 3's context layers and nothing else reads
+   * it. Read here, through the same two point-in-time functions, for the same reason `usage` is: a
+   * source that opened its own connection would be a second path from the store into a projection.
+   */
+  readonly teamContext: TeamContext;
 }
 
 export interface ProjectionSource {
@@ -205,13 +213,25 @@ async function replayWeeks(
     // still admit a pre-kickoff fact about this week, which is not what "history" means.
     const history: SeasonStatLine[] = [];
     const usage: PlayerWeekUsage[] = [];
+    const playerTeams: TeamContext["playerTeams"][number][] = [];
+    const teamObservations: TeamContext["teamObservations"][number][] = [];
     for (let historySeason = earliestSeason; historySeason <= season; historySeason += 1) {
       const upTo = historySeason === season ? week - 1 : LAST_POSSIBLE_WEEK;
-      if (upTo < 1) continue;
-      const span = { season: historySeason, week: { from: 1, to: upTo }, asOf } as const;
-      history.push(...(await statLinesAsOf(db, span)));
-      usage.push(...(await usageAsOf(db, span)));
+      if (upTo >= 1) {
+        const span = { season: historySeason, week: { from: 1, to: upTo }, asOf } as const;
+        history.push(...(await statLinesAsOf(db, span)));
+        usage.push(...(await usageAsOf(db, span)));
+        playerTeams.push(...(await playerTeamsAsOf(db, span)));
+      }
+      // Team facts reach into the week being predicted and are bounded by the as-of gate alone.
+      // The schedule half of them was published in May and is genuinely knowable; the kickoff half
+      // cannot pass the gate. See `TeamContext` for why a week bound here would have hidden both.
+      const contextTo = historySeason === season ? week : LAST_POSSIBLE_WEEK;
+      teamObservations.push(
+        ...(await teamObservationsAsOf(db, { season: historySeason, week: { from: 1, to: contextTo }, asOf })),
+      );
     }
+    const teamContext: TeamContext = { playerTeams, teamObservations };
 
     const pointsOf = (line: StatLine): number | null => {
       const position = positions.get(line.playerId);
@@ -228,7 +248,7 @@ async function replayWeeks(
 
     const projected: ReadonlyMap<string, number>[] = [];
     for (const source of sources) {
-      projected.push(asPoints(await source.project({ season, week, asOf, history, usage, positions })));
+      projected.push(asPoints(await source.project({ season, week, asOf, history, usage, positions, teamContext })));
     }
     const actuals = await statLinesAsOf(db, { season, week, asOf: FINAL_OUTCOME });
     outcomes.push({ week, asOf, projected, actual: asPoints(actuals.map((row) => row.line)) });
