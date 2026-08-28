@@ -116,6 +116,9 @@ describe("resolveRankings", () => {
 
 describe("parseExpertConsensus", () => {
   const page = (body: string): string => `<html><script>var ecrData = ${body};\n</script></html>`;
+  /** Long after any season this suite names, so the convention stamp wins and these tests are
+   *  about the parser rather than about the clock. */
+  const READ_AT = new Date("2030-01-01T00:00:00.000Z");
 
   it("reads the board out of the page's embedded JSON", () => {
     const board = parseExpertConsensus(
@@ -127,6 +130,7 @@ describe("parseExpertConsensus", () => {
         }),
       ),
       2024,
+      READ_AT,
     );
     expect(board.candidates).toEqual([{ name: "CeeDee Lamb", position: "WR", team: "DAL", rank: 1 }]);
     expect(board.publisherStamp).toBe("9/06");
@@ -141,22 +145,46 @@ describe("parseExpertConsensus", () => {
         }),
       ),
       2024,
+      READ_AT,
     );
     expect(board.candidates[0]!.team).toBeNull();
   });
 
   it("THROWS when the page shape changes, because a scrape's failure mode is a silent empty board", () => {
-    expect(() => parseExpertConsensus("<html>nothing here</html>", 2024)).toThrow(/no ecrData block/);
+    expect(() => parseExpertConsensus("<html>nothing here</html>", 2024, READ_AT)).toThrow(/no ecrData block/);
   });
 
   it("throws rather than scoring one season's consensus against another's outcomes", () => {
-    expect(() => parseExpertConsensus(page(JSON.stringify({ year: "2023", players: [] })), 2024)).toThrow(
+    expect(() => parseExpertConsensus(page(JSON.stringify({ year: "2023", players: [] })), 2024, READ_AT)).toThrow(
       /board for 2023 when asked for 2024/,
     );
   });
 
+  /**
+   * THE STAMP CANNOT CLAIM THE FUTURE. Asked for a season that has not started, the September
+   * convention would date a board we are holding today to eleven days from now, and a present-tense
+   * reader gating on `as_of <= now` would print a dash beside a number we already have.
+   */
+  it("stamps a board we read before its convention date with the moment we read it", () => {
+    const board = parseExpertConsensus(
+      page(JSON.stringify({ year: "2026", players: [{ player_name: "Ja'Marr Chase", player_position_id: "WR", rank_ecr: 1 }] })),
+      2026,
+      new Date("2026-08-28T12:00:00.000Z"),
+    );
+    expect(board.publishedAt).toEqual(new Date("2026-08-28T12:00:00.000Z"));
+  });
+
+  it("leaves an archived board on the published convention, so no measurement moves", () => {
+    const board = parseExpertConsensus(
+      page(JSON.stringify({ year: "2024", players: [{ player_name: "CeeDee Lamb", player_position_id: "WR", rank_ecr: 1 }] })),
+      2024,
+      READ_AT,
+    );
+    expect(board.publishedAt).toEqual(new Date(Date.UTC(2024, 8, 8)));
+  });
+
   it("throws on a board with no ranked players at all", () => {
-    expect(() => parseExpertConsensus(page(JSON.stringify({ year: "2024", players: [] })), 2024)).toThrow(
+    expect(() => parseExpertConsensus(page(JSON.stringify({ year: "2024", players: [] })), 2024, READ_AT)).toThrow(
       /no ranked players/,
     );
   });

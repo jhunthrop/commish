@@ -95,7 +95,7 @@ interface FantasyProsBoard {
 }
 
 /**
- * FantasyPros' archived expert consensus draft board for a past season.
+ * FantasyPros' expert consensus draft board for a season, archived or live.
  *
  * THE STAMP ON THIS ONE IS NOT TRUSTWORTHY AND IS NOT PRETENDED TO BE. The archive embeds a bare
  * `M/D` with no year, and the values it carries across seasons are not consistent with a single
@@ -109,6 +109,19 @@ interface FantasyProsBoard {
  * here credits the benchmark with more information than it may have had, which is the direction
  * that cannot flatter us. See `docs/research/2026-08-27-preseason-board.md`, which states this in
  * the same paragraph as the number it affects.
+ *
+ * AND IT IS BOUNDED BY THE MOMENT WE FETCHED IT, which matters the first time this is pointed at a
+ * season that has not started. The convention above is a date in September; asked for the CURRENT
+ * season in August it would stamp a fact eleven days into the future, and a present-tense reader
+ * gating on `as_of <= now` would then find nothing and print a dash next to a number we were
+ * holding. That is the mirror of the leak this engine has twice caught — the same hard-coded date
+ * in place of the moment something was actually knowable — and it fails quietly in the same way.
+ *
+ * The rule is one line and needs no branch on which season is being asked for: a board became
+ * knowable no later than the moment we read it. For an archive, publication really was earlier and
+ * the convention wins, so every measurement taken under it is untouched. For a live board, we knew
+ * it when we saw it. `capture_snapshots.captured_at` makes the same argument in its own docblock:
+ * we can only honestly claim to have known something at the moment we saw it.
  */
 export async function fetchExpertConsensus(
   season: number,
@@ -119,19 +132,30 @@ export async function fetchExpertConsensus(
   if (!response.ok) {
     throw new Error(`FantasyPros returned HTTP ${response.status} for ${season}.`);
   }
-  const board = parseExpertConsensus(await response.text(), season);
-  return board;
+  const html = await response.text();
+  // Read AFTER the body, never before the request: the claim is "we had this", and a clock read
+  // before a slow fetch would date the claim to before the bytes existed.
+  return parseExpertConsensus(html, season, new Date());
 }
 
 /**
  * Pulls the consensus board out of the page's embedded JSON.
+ *
+ * `fetchedAt` is passed in rather than read here so the parser stays pure and a test can state the
+ * moment rather than race a clock.
  *
  * Separated from the fetch so the parser is testable without a network call, and because a scrape's
  * failure mode is a silent shape change: the page still returns 200 and the board is simply absent.
  * Throwing by name here is what turns that into an operator's problem rather than a benchmark that
  * quietly has no rows.
  */
-export function parseExpertConsensus(html: string, season: number): PublishedBoard {
+/** The earlier of two moments. Named rather than inlined because `Math.min` over `getTime` reads
+ *  as arithmetic, and this is a claim about knowledge. */
+function earlierOf(left: Date, right: Date): Date {
+  return left.getTime() <= right.getTime() ? left : right;
+}
+
+export function parseExpertConsensus(html: string, season: number, fetchedAt: Date): PublishedBoard {
   const match = /ecrData\s*=\s*(\{[\s\S]*?\});\s*\n/.exec(html);
   if (match === null) {
     throw new Error(`FantasyPros' ${season} page carries no ecrData block; the page shape has changed.`);
@@ -156,7 +180,7 @@ export function parseExpertConsensus(html: string, season: number): PublishedBoa
       team: player.player_team_id === undefined || player.player_team_id === "FA" ? null : player.player_team_id,
       rank: player.rank_ecr,
     })),
-    publishedAt: new Date(Date.UTC(season, 8, 8)),
+    publishedAt: earlierOf(new Date(Date.UTC(season, 8, 8)), fetchedAt),
     publisherStamp: board.last_updated ?? "none",
   };
 }

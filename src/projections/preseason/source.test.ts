@@ -91,8 +91,8 @@ function playerWeek(season: number, week: number, playerId: string, asOf: Date, 
 
 async function seedPriorSeason(): Promise<void> {
   await recordNflPlayers(db, [
-    { id: VETERAN, pfrId: "Vete01", name: "Vera Veteran", position: "WR", latestTeam: "BUF", rookieSeason: 2020, lastSeason: 2024 },
-    { id: ROOKIE, pfrId: "Rook01", name: "Rory Rookie", position: "WR", latestTeam: "BUF", rookieSeason: 2024, lastSeason: 2024 },
+    { id: VETERAN, espnId: null, pfrId: "Vete01", name: "Vera Veteran", position: "WR", latestTeam: "BUF", rookieSeason: 2020, lastSeason: 2024 },
+    { id: ROOKIE, espnId: null, pfrId: "Rook01", name: "Rory Rookie", position: "WR", latestTeam: "BUF", rookieSeason: 2024, lastSeason: 2024 },
   ]);
   const rows: PlayerWeekObservation[] = [];
   for (let week = 1; week <= 17; week += 1) rows.push(...playerWeek(2023, week, VETERAN, PRIOR_SEASON_LANDED, 1));

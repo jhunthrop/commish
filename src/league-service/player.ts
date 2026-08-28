@@ -3,8 +3,18 @@ import type { Db } from "@/db/client";
 import { matchups, players, playerStatLines, scoringSettings, statWeeks } from "@/db/schema";
 import type { Player, Position } from "@/domain/player";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
+import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG, seasonProgress } from "@/league";
+import { nflPlayerIdFor } from "@/projections/crosswalk";
+import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
+import { BOARD_SOURCE, preseasonProjectionsFor } from "@/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { preseasonRankingsFor } from "@/projections/preseason/store";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
+
+/** The outermost edge is the only place a wall clock is allowed, exactly as every other service
+ *  in this directory has it. */
+const systemClock: Clock = { now: () => new Date().toISOString() };
 
 /**
  * One week of a player's season, as the detail screen draws it.
@@ -28,29 +38,24 @@ export interface PlayerWeekView {
  * Everything the player screen draws, and NOTHING WE CANNOT REACH.
  *
  * The screen's source strip compares three independent readings of one quantity — where the
- * market has him, where the experts have him, where OUR MODEL has him — and only the first of
- * those three exists at this layer today. The other two are absent from this body rather than
- * approximated in it, and the strip prints a dash for each. What blocks them, precisely:
+ * market has him, where the experts have him, where OUR MODEL has him. All three are now computed
+ * here, and each is `null` for a player it genuinely cannot be computed for. What each one costs:
  *
- * - **Expert consensus (FantasyPros ECR).** It IS in the database — `preseason_rankings`, source
- *   `fantasypros_ecr_ppr` — and it is unreachable from here for two independent reasons, either
- *   one fatal on its own. It is keyed to `nfl_players.id`, the GSIS id space the nflverse research
- *   corpus uses ("00-0033280"), while every league player is keyed to the stats provider's own id
- *   ("4362628"); there is no crosswalk between the two id spaces anywhere in the schema, and the
- *   research pipeline joins them by NAME at ingest time against its own roster (`resolveRankings`,
- *   `@/projections/preseason/benchmarks`), never against `players`. And the only seasons ingested
- *   are 2021 through 2024, the held-out seasons the model is scored on, not the season a league is
- *   currently playing.
- * - **Our own board.** `preseasonBoard` (`@/projections/preseason/board`) is a pure function whose
- *   only two callers are `scripts/preseason-report.ts` and `scripts/preseason-diagnose.ts`. Its
- *   output is printed to a research report and never persisted: there is no projections table in
- *   the schema, and no module under `src/app` or `src/league-service` imports it. The engine's
- *   published results are aggregate rank correlations over held-out seasons
- *   (`docs/research/2026-08-28-starter-band.md`), which is a fact about the BOARD and not a number
- *   about any one player.
+ * - **The market** is `players.adp`, already on the row.
+ * - **Expert consensus** is `preseason_rankings`, source `fantasypros_ecr_ppr`, read through
+ *   `player_crosswalk` — the id join that did not exist when this docblock was first written and
+ *   was the reason the cell printed a dash. It resolves for a player the crosswalk placed AND the
+ *   publisher ranked, which for the current season is 441 of the 518 names on the board.
+ * - **Our own board** is `preseason_projections`, source `commish_board_v1_ppr_12`, read through
+ *   the same crosswalk. It is EMPTY FOR THE CURRENT SEASON and stated as such rather than
+ *   backfilled from a season that has finished: the board needs three prior seasons of ingested
+ *   usage and a replay moment derived from games already played, and the store holds 2021 to 2024.
+ *   Showing 2024's number beside this year's consensus would be the most plausible-looking lie
+ *   this product could tell. `docs/research/2026-08-28-live-season.md` scopes what closes it.
  *
- * Both are a wiring job with a real shape — a crosswalk, and a table the fit writes into — and
- * neither is a thing a display layer may paper over in the meantime.
+ * BOTH ARE READ AT `now`, through the same `as_of <=` gate the backtest uses. A product surface
+ * lives in the present, so "everything knowable now" is both the honest read and exactly the
+ * predicate a replay would use standing here — which is what lets the same store serve both.
  */
 export interface PlayerSeasonBody {
   readonly player: Player;
@@ -60,6 +65,15 @@ export interface PlayerSeasonBody {
   /** Where his draft position sits among every ranked player, 0..1, best is 1. `null` when he is
    *  unranked, or when the feed ranks nobody else to compare him against. */
   readonly adpPercentile: number | null;
+  /**
+   * Expert consensus rank for this season, or `null` where the crosswalk could not place him or
+   * the publisher does not rank him. Never approximated from a neighbouring season: a consensus is
+   * a claim about one August and it stops being one the moment it is borrowed.
+   */
+  readonly expertRank: number | null;
+  /** Our own board's overall rank for this season, or `null` where there is no board for him.
+   *  Empty for every player while the current season has no board — see the type's docblock. */
+  readonly modelRank: number | null;
   /** Points per game over the weeks he actually played, under THIS league's scoring rules. */
   readonly pointsPerGame: number | null;
   readonly pointsPerGamePercentile: number | null;
@@ -119,6 +133,32 @@ function peerPointsPerGame(lines: readonly Line[], position: Position, rules: Sc
 }
 
 /**
+ * The two preseason readings for one man: where the experts had him, where our board had him.
+ *
+ * ONE CROSSWALK LOOKUP GATES BOTH. A league player the crosswalk could not place has no gsis id,
+ * and both stores are keyed on one, so there is nothing to look up and the honest answer to both
+ * questions is `null`. There is no fallback by name here and there must never be one: the only
+ * thing worse than a dash on a player's screen is another man's number on it.
+ *
+ * `asOf` is the caller's `now` and it is passed to both reads. That is the same `as_of <=` gate a
+ * backtest uses, standing in the present rather than in 2023, which is what lets one store serve
+ * the harness and the product without either of them holding a special case for the other.
+ */
+async function preseasonReadings(
+  db: Db,
+  playerId: string,
+  asOf: Date,
+): Promise<{ readonly expertRank: number | null; readonly modelRank: number | null }> {
+  const nflPlayerId = await nflPlayerIdFor(db, playerId);
+  if (nflPlayerId === null) return { expertRank: null, modelRank: null };
+
+  const season = PRODUCT_SEASON;
+  const [consensus] = await preseasonRankingsFor(db, { season, source: BENCHMARK_SOURCES.ecr, asOf }, [nflPlayerId]);
+  const [ours] = await preseasonProjectionsFor(db, { season, source: BOARD_SOURCE, asOf }, [nflPlayerId]);
+  return { expertRank: consensus?.rank ?? null, modelRank: ours?.rank ?? null };
+}
+
+/**
  * A player's whole season on one screen, read under one league's scoring rules.
  *
  * WHY THE LEAGUE IS A PARAMETER AND NOT A CONVENIENCE. A fantasy point is not a property of a
@@ -138,8 +178,18 @@ function peerPointsPerGame(lines: readonly Line[], position: Position, rules: Sc
  * fetched by an id list at his position (four hundred receivers, never sixteen hundred players)
  * crossed with the played weeks, and BOTH populations — every week at his position, and every
  * peer's points per game — are folded out of that single result rather than queried twice.
+ *
+ * The three preseason reads are bounded to ONE MAN by construction: the crosswalk is a primary-key
+ * lookup and both board reads take his single gsis id, so nothing here loads a five-hundred-name
+ * board to find one row on it. Skipped entirely for a player the crosswalk could not place, which
+ * is the cheap case as well as the correct one.
  */
-export async function playerSeason(db: Db, leagueId: string, playerId: string): Promise<PlayerSeasonBody | null> {
+export async function playerSeason(
+  db: Db,
+  leagueId: string,
+  playerId: string,
+  clock: Clock = systemClock,
+): Promise<PlayerSeasonBody | null> {
   const [row] = await db.select().from(players).where(eq(players.id, playerId));
   if (row === undefined) return null;
   const player: Player = {
@@ -175,10 +225,14 @@ export async function playerSeason(db: Db, leagueId: string, playerId: string): 
   const mine = weeks.flatMap((week) => (week.points === null ? [] : [week.points]));
   const pointsPerGame = mine.length === 0 ? null : roundPoints(mine.reduce((sum, points) => sum + points, 0) / mine.length);
 
+  const preseason = await preseasonReadings(db, playerId, new Date(clock.now()));
+
   return {
     player,
     positionRank: adp === null ? null : 1 + peers.filter((peer) => peer.adp !== null && peer.adp < adp).length,
     adpPercentile: adp === null ? null : percentileOf(adp, rankedAll, "lower"),
+    expertRank: preseason.expertRank,
+    modelRank: preseason.modelRank,
     pointsPerGame,
     pointsPerGamePercentile: pointsPerGame === null ? null : percentileOf(pointsPerGame, peerPointsPerGame(lines, player.position, rules), "higher"),
     weeks,

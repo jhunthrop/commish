@@ -52,8 +52,8 @@ function ranking(overrides: Partial<PreseasonRankingRow> = {}): PreseasonRanking
 beforeEach(async () => {
   await truncateAll(db);
   await recordNflPlayers(db, [
-    { id: "00-0034857", pfrId: "AlleJo02", name: "Josh Allen", position: "QB", latestTeam: "BUF", rookieSeason: 2018, lastSeason: 2024 },
-    { id: "00-0036358", pfrId: "LambCe00", name: "CeeDee Lamb", position: "WR", latestTeam: "DAL", rookieSeason: 2020, lastSeason: 2024 },
+    { id: "00-0034857", espnId: null, pfrId: "AlleJo02", name: "Josh Allen", position: "QB", latestTeam: "BUF", rookieSeason: 2018, lastSeason: 2024 },
+    { id: "00-0036358", espnId: null, pfrId: "LambCe00", name: "CeeDee Lamb", position: "WR", latestTeam: "DAL", rookieSeason: 2020, lastSeason: 2024 },
   ]);
 });
 

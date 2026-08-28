@@ -18,8 +18,8 @@ import type { NflPlayerRow } from "./nflverse/players";
 export async function recordNflPlayers(db: Db, rows: readonly NflPlayerRow[]): Promise<number> {
   if (rows.length === 0) return 0;
   /**
-   * Postgres caps a statement at 65,535 bound parameters. Seven columns per row puts the hard
-   * ceiling at 9,362, and the universe is roughly 25,000 people, so this is not a tuning knob —
+   * Postgres caps a statement at 65,535 bound parameters. Eight columns per row puts the hard
+   * ceiling at 8,191, and the universe is roughly 25,000 people, so this is not a tuning knob —
    * without it the write fails outright. Rounded well down for headroom, matching
    * `recordObservations`' own chunk size.
    */
@@ -37,6 +37,7 @@ export async function recordNflPlayers(db: Db, rows: readonly NflPlayerRow[]): P
         // like an update and is a no-op.
         set: {
           pfrId: sql`excluded.pfr_id`,
+          espnId: sql`excluded.espn_id`,
           name: sql`excluded.name`,
           position: sql`excluded.position`,
           latestTeam: sql`excluded.latest_team`,
