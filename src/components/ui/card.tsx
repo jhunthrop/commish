@@ -31,12 +31,14 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
  */
 const INTERACTIVE = "transition-colors hover:bg-surface-raised focus-within:bg-surface-raised";
 
+const BASE = "rounded-lg border border-line bg-surface-elevated p-4 shadow-card";
+
 export function Card({ as: Tag = "div", interactive = false, className = "", children, ...rest }: CardProps) {
+  // Joined from the non-empty fragments rather than interpolated: a `${cond ? x : ""}` slot
+  // leaves a double space in the rendered `class` attribute on every quiet card in the product.
+  const classes = [BASE, interactive ? INTERACTIVE : "", className].filter((part) => part !== "").join(" ");
   return (
-    <Tag
-      className={`rounded-lg border border-line bg-surface-elevated p-4 shadow-card ${interactive ? INTERACTIVE : ""} ${className}`}
-      {...rest}
-    >
+    <Tag className={classes} {...rest}>
       {children}
     </Tag>
   );
