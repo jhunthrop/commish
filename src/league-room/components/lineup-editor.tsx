@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { DraftStatus } from "@/domain/draft";
 import type { ApiEnvelope } from "@/lib/api/respond";
@@ -9,7 +10,6 @@ import type { HelpLevel } from "@/identity/preferences";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeek } from "../lib/format";
 import { playerOf } from "../lib/player";
-import { term } from "@/help/glossary";
 
 const slotKey = (slot: LineupSlotView): string => `${slot.slot}:${slot.slotIndex}`;
 
@@ -19,13 +19,21 @@ const slotKey = (slot: LineupSlotView): string => `${slot.slot}:${slot.slotIndex
  * to draw, and a placeholder tile pretending to be somebody is the failure `PlayerFace` already
  * refuses for an unknown club.
  */
-function SlotPlayer({ slot }: { readonly slot: LineupSlotView }) {
+function SlotPlayer({ slot, leagueId }: { readonly slot: LineupSlotView; readonly leagueId: string }) {
   const player = playerOf(slot);
   if (player === null) return <span className="text-sm text-text-faint">Empty</span>;
   return (
     <span className="flex min-w-0 items-center gap-2">
       <PlayerFace player={player} size="sm" />
-      <span className="truncate text-sm text-text-primary">{player.name}</span>
+      {/* THE NAME IS THE DOOR TO HIS OWN SCREEN. "Should he be starting?" is the question this
+          panel exists to answer and the panel cannot answer it — a season's shape and where the
+          market has him live one route away, and the name is the thing a manager reaches for.
+          The LINK is the control, never the row around it: the same rule `PlayerRow` keeps, so a
+          list of six bench players has six focus stops with six real names and not one wrapper
+          swallowing them. */}
+      <Link className="truncate text-sm text-accent underline" href={`/app/leagues/${leagueId}/players/${player.id}`}>
+        {player.name}
+      </Link>
       <PositionBadge position={player.position} size="sm" />
       {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
     </span>
@@ -75,15 +83,6 @@ export function LineupEditor({
    *  CURRENT selection rather than the one the page loaded with. Built from the same list the
    *  dropdown options come from, so a face can never appear for a player the select cannot pick. */
   const byId = useMemo(() => new Map(everyone.map((slot) => [slot.playerId!, slot])), [everyone]);
-  // A per-league override could drop FLEX from the roster entirely — the caption only prints
-  // when the slot it explains is actually on the page, same reasoning as GLOSSARY omitting
-  // `waiver` for a feature the product doesn't have.
-  const hasFlexSlot = lineup.starters.some((slot) => slot.slot === "FLEX");
-  // SUPERFLEX (Task 1): only a superflex league's lineup ever has this slot, so the caption is
-  // just as conditional as FLEX's own — and carries an InfoTip, since "a flex spot that also
-  // takes a quarterback" is a newer word than FLEX and worth the click-to-learn-more.
-  const hasSuperflexSlot = lineup.starters.some((slot) => slot.slot === "SUPERFLEX");
-
   // League-life review D2 (2026-08-27): a league whose draft has not run has NOTHING on any
   // roster — and the locked branch below told that first-timer "Week 1 has started, so its
   // lineup cannot change" over nine Empty rows. Week 1 had not started; the slots were empty
@@ -124,20 +123,10 @@ export function LineupEditor({
           {lineup.starters.map((slot) => (
             <li key={slotKey(slot)} className="flex items-center gap-2">
               <SlotChip slot={slot.slot} />
-              <SlotPlayer slot={slot} />
+              <SlotPlayer slot={slot} leagueId={leagueId} />
             </li>
           ))}
         </ul>
-        {hasFlexSlot ? <p className="text-xs text-text-muted">{term("flex").short}</p> : null}
-        {hasSuperflexSlot ? (
-          <p className="flex items-center gap-1 text-xs text-text-muted">
-            {term("superflex").short}
-            {/* No `helpLevel` here: the short line is already unconditionally on the page (the
-                caption above), so a guided reader gains nothing InfoTip's own inline branch
-                would add — the trigger stays click-only, opening the longer `detail`. */}
-            <InfoTip term="superflex" />
-          </p>
-        ) : null}
       </section>
     );
   }
@@ -221,17 +210,13 @@ export function LineupEditor({
           );
         })}
       </div>
-      {/* Persona review (FIX 4): a caption near the slot list, not a tip on every FLEX chip —
-          there is only ever one FLEX slot, so one sentence explains it once. */}
-      {hasFlexSlot ? <p className="text-xs text-text-muted">{term("flex").short}</p> : null}
-      {hasSuperflexSlot ? (
-        <p className="flex items-center gap-1 text-xs text-text-muted">
-          {term("superflex").short}
-          {/* No `helpLevel`: the short line above is already unconditional, so guided readers
-              gain nothing InfoTip's own inline branch would add. Click still opens `detail`. */}
-          <InfoTip term="superflex" />
-        </p>
-      ) : null}
+      {/* THE FLEX AND SUPERFLEX CAPTIONS ARE GONE (2026-08-28), and they are the clearest case
+          of the "assert, do not explain" charter's third tell in the product: *"a rule, then a
+          worked example of the same rule, above a control that teaches it faster than either."*
+          The control here is a `Select` that offers exactly the players the slot accepts, under a
+          `SlotChip` that names it. Nothing true left with them: `/league-rules` carries both
+          definitions in full, with a `TermLink`, and the glossary entries themselves are
+          untouched. Two sentences and a tip trigger off the screen a manager uses every week. */}
       <h3 className="flex items-center gap-1 text-sm font-medium text-text-muted">
         Bench
         <InfoTip term="bench" helpLevel={helpLevel} />
@@ -246,7 +231,7 @@ export function LineupEditor({
         <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
           {lineup.bench.map((slot) => (
             <li key={slotKey(slot)} className="flex items-center gap-2">
-              <SlotPlayer slot={slot} />
+              <SlotPlayer slot={slot} leagueId={leagueId} />
             </li>
           ))}
         </ul>

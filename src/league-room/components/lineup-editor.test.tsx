@@ -95,50 +95,42 @@ describe("LineupEditor", () => {
     expect(screen.getByText(GLOSSARY["lineup-lock"].short)).toBeInTheDocument();
   });
 
-  // Persona review (FIX 4): a caption near the slot list, not a tip on every FLEX chip — one
-  // sentence, since there is only ever one FLEX slot to explain.
-  it("captions FLEX near the slot list when the roster has one, and says nothing when it doesn't", () => {
-    const { rerender } = renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" />, fixtureLeagueDeps().deps);
+  /**
+   * THE SLOT CAPTIONS ARE GONE (2026-08-28), and this is the test that used to demand them, kept
+   * and INVERTED rather than deleted, so the sentences cannot drift back in unnoticed.
+   *
+   * Why they went: the "assert, do not explain" charter's third tell (`docs/design-system.md`) is
+   * *"a rule, then a worked example of the same rule, above a control that teaches it faster than
+   * either"*, and this was the clearest instance of it in the product — two captions explaining
+   * what a slot accepts, directly above a `Select` that only offers players that slot accepts,
+   * under a `SlotChip` that names it. Nothing true left the product with them: `/league-rules`
+   * carries both definitions in full with a `TermLink`, and both glossary entries are untouched.
+   *
+   * Both branches are checked, because both used to print them.
+   */
+  it("explains neither FLEX nor SUPERFLEX in prose, in either branch", () => {
+    const { rerender } = renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP_WITH_FLEX} totalWeeks={14} draftStatus="complete" />, fixtureLeagueDeps().deps);
     expect(screen.queryByText(term("flex").short)).not.toBeInTheDocument();
     rerender(
       <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
-        <LineupEditor leagueId="l1" lineup={LINEUP_WITH_FLEX} totalWeeks={14} draftStatus="complete" />
+        <LineupEditor leagueId="l1" lineup={LINEUP_WITH_SUPERFLEX} totalWeeks={14} draftStatus="complete" helpLevel="guided" />
       </LeagueRoomDepsProvider>,
     );
-    expect(screen.getByText(term("flex").short)).toBeInTheDocument();
-  });
-
-  it("also captions FLEX on the locked, read-only slot list", () => {
-    renderInLeague(<LineupEditor leagueId="l1" lineup={{ ...LINEUP_WITH_FLEX, locked: true }} totalWeeks={14} draftStatus="complete" />, fixtureLeagueDeps().deps);
-    expect(screen.getByText(term("flex").short)).toBeInTheDocument();
-  });
-
-  // Task 1 (superflex): the same shared-caption treatment FLEX gets, plus an InfoTip — a newer
-  // word than FLEX and worth the click-to-learn-more.
-  it("captions SUPERFLEX near the slot list when the roster has one, with an InfoTip, and says nothing when it doesn't", () => {
-    const { rerender } = renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} draftStatus="complete" />, fixtureLeagueDeps().deps);
-    expect(screen.queryByText(term("superflex").short)).not.toBeInTheDocument();
+    expect(screen.queryByText(GLOSSARY.superflex.short)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "What is a superflex spot?" })).not.toBeInTheDocument();
     rerender(
       <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
-        <LineupEditor leagueId="l1" lineup={LINEUP_WITH_SUPERFLEX} totalWeeks={14} draftStatus="complete" />
+        <LineupEditor leagueId="l1" lineup={{ ...LINEUP_WITH_SUPERFLEX, locked: true }} totalWeeks={14} draftStatus="complete" />
       </LeagueRoomDepsProvider>,
     );
-    expect(screen.getByText(term("superflex").short)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is a superflex spot?" })).toBeInTheDocument();
+    expect(screen.queryByText(GLOSSARY.superflex.short)).not.toBeInTheDocument();
   });
 
-  it("also captions SUPERFLEX on the locked, read-only slot list", () => {
-    renderInLeague(<LineupEditor leagueId="l1" lineup={{ ...LINEUP_WITH_SUPERFLEX, locked: true }} totalWeeks={14} draftStatus="complete" />, fixtureLeagueDeps().deps);
-    expect(screen.getByText(term("superflex").short)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is a superflex spot?" })).toBeInTheDocument();
-  });
-
-  // The SUPERFLEX caption's short line is already unconditional, unlike bench/lineup-lock's
-  // InfoTip-only short line — so `helpLevel="guided"` must not print it a second time.
-  it("does not duplicate the SUPERFLEX short line when helpLevel is guided", () => {
-    const fixture = fixtureLeagueDeps();
-    renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP_WITH_SUPERFLEX} totalWeeks={14} draftStatus="complete" helpLevel="guided" />, fixture.deps);
-    expect(screen.getAllByText(GLOSSARY.superflex.short)).toHaveLength(1);
+  /** The bench name is the door to a player's own screen — the one thing this panel cannot
+   *  answer ("should he be starting?") lives one route away. */
+  it("links every named player to his own screen inside this league", () => {
+    renderInLeague(<LineupEditor leagueId="l1" lineup={{ ...LINEUP_WITH_FLEX, locked: true }} totalWeeks={14} draftStatus="complete" />, fixtureLeagueDeps().deps);
+    expect(screen.getByRole("link", { name: "Ja'Marr Chase" })).toHaveAttribute("href", "/app/leagues/l1/players/wr1");
   });
 
   // Persona review (veteran, FIX 5): the whole-week lock is coarse and nothing said so before
