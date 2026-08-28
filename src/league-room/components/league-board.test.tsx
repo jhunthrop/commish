@@ -185,4 +185,52 @@ describe("LeagueBoard", () => {
       expect(await axe(container)).toHaveNoViolations();
     });
   });
+  /**
+   * THE FUN PASS REACHES THE FIRST SCREEN (2026-08-28). This page was excluded from every phase
+   * of the pass — Task 11 covered a single league's home, not the leagues INDEX — so the screen a
+   * signed-in manager actually lands on kept its margin at label size in muted ink, saying
+   * nothing about whether it was a good Sunday. That absence was most of "I don't see any
+   * changes".
+   *
+   * The population is this board's own margins: the only pool the page holds, and the one a
+   * manager compares in their head anyway. It REFUSES below `heatMinPopulation` rather than
+   * ranking a number against two others, and that refusal is the half worth pinning — a tint that
+   * cannot be true does not appear.
+   */
+  it("colours the margin against the board's own leagues, and refuses when the pool is too small", async () => {
+    const scored = (id: string, mine: number, theirs: number): HomeLeagueCard => ({
+      ...BASE,
+      id,
+      name: `League ${id}`,
+      myTeamId: "home_team",
+      matchup: {
+        weekNumber: 4,
+        homeTeamId: "home_team",
+        awayTeamId: "away_team",
+        homeTeamName: "Mine",
+        awayTeamName: "Theirs",
+        homeScore: mine,
+        awayScore: theirs,
+        final: false,
+        weekStatus: "in_progress",
+      },
+      nextAction: { kind: "watch-scores", label: "Watch the scores" },
+    });
+
+    // Two scored leagues sits below the floor: plain ink, no percentile invented from a pair.
+    await renderSurface(<LeagueBoard leagues={[scored("a", 120, 100), scored("b", 90, 110)]} />, ({ container }) => {
+      for (const node of container.querySelectorAll("[data-magnitude]")) {
+        expect(node.getAttribute("data-magnitude")).toBe("neutral");
+      }
+    });
+
+    // Four clears it, and the best margin on the board must not read the same as the worst.
+    await renderSurface(
+      <LeagueBoard leagues={[scored("a", 140, 90), scored("b", 120, 100), scored("c", 100, 110), scored("d", 80, 130)]} />,
+      ({ container }) => {
+        const steps = [...container.querySelectorAll("[data-magnitude]")].map((n) => n.getAttribute("data-magnitude"));
+        expect(new Set(steps).size).toBeGreaterThan(1);
+      },
+    );
+  });
 });

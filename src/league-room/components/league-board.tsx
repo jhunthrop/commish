@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { HomeLeagueCard } from "../contract";
-import { ButtonLink, Crest, EYEBROW, Meter, Table, type TableColumn } from "@/components/ui";
+import { ButtonLink, Crest, EYEBROW, Meter, Stat, Table, type TableColumn } from "@/components/ui";
+import { comparisonWithin } from "../lib/population";
 import { actionHref } from "../lib/action-href";
 import { formatPoints, formatRecord, formatWeek } from "../lib/format";
 import { WeekStatusBadge } from "./week-status-badge";
@@ -84,13 +85,36 @@ function MatchupCell({ league }: { readonly league: HomeLeagueCard }) {
  *  probability, and its value/max is this manager's own share of the combined score — the bar
  *  is the glance, the label is the decision (`Meter`'s own contract). `null` when there is no
  *  live score to measure a margin from at all (a bye, or a week that has not started). */
-function MarginCell({ league }: { readonly league: HomeLeagueCard }) {
+function MarginCell({ league, margins }: { readonly league: HomeLeagueCard; readonly margins: readonly number[] }) {
   const margin = myMargin(league);
   if (margin === null) return <span className="text-sm text-text-muted">No score yet</span>;
   const matchup = league.matchup!;
   const mine = matchup.homeTeamId === league.myTeamId ? matchup.homeScore! : matchup.awayScore!;
   const combined = matchup.homeScore! + matchup.awayScore!;
-  return <Meter label={formatMargin(margin)} value={mine} max={combined <= 0 ? 1 : combined} className="min-w-[8rem]" />;
+  return (
+    <div className="flex min-w-[8rem] flex-col gap-1">
+      {/* THE ONE NUMBER THIS ROW IS ABOUT (the fun pass, 2026-08-28). This page is the first
+          screen a signed-in manager sees and it was excluded from every phase of the pass — the
+          margin sat at label size, in muted ink, saying nothing about whether it was a good
+          Sunday. It is a `Stat` now, which buys the size AND the meaning in one move.
+
+          The population is THIS BOARD'S own margins: the leagues you are playing this week, which
+          is the only pool the page actually holds and the one a manager compares in their head
+          anyway ("I am getting beaten worse here than there"). It refuses below
+          `heatMinPopulation`, so a manager in two leagues gets plain ink rather than a percentile
+          across two numbers, which would be arithmetic dressed as a fact. */}
+      <Stat
+        label="Margin"
+        srOnlyLabel
+        value={formatMargin(margin)}
+        comparison={comparisonWithin(margins, margin, "your leagues this week")}
+      />
+      {/* The bar keeps its own separate job — share of the combined score, which is "how close",
+          a different question from "how far ahead". Its label names that job now rather than
+          restating the number directly above it. */}
+      <Meter label="Share of points" value={mine} max={combined <= 0 ? 1 : combined} />
+    </div>
+  );
 }
 
 function LeagueCell({ league }: { readonly league: HomeLeagueCard }) {
@@ -125,13 +149,15 @@ function ActionCell({ league }: { readonly league: HomeLeagueCard }) {
 // Persona panel, Step 5 (the phone user): the score and the state badge stay INTACT at 360px —
 // only `margin` (supplementary detail, already restated by the matchup cell's own leader mark)
 // drops below `sm`. `WeekStatusBadge` never hides.
-const COLUMNS: readonly TableColumn<HomeLeagueCard>[] = [
+function columnsFor(margins: readonly number[]): readonly TableColumn<HomeLeagueCard>[] {
+  return [
   { key: "league", header: "League", cell: (league) => <LeagueCell league={league} /> },
   { key: "matchup", header: "Matchup", cell: (league) => <MatchupCell league={league} /> },
-  { key: "margin", header: "Margin", cell: (league) => <MarginCell league={league} />, hideOnNarrow: true },
+  { key: "margin", header: "Margin", cell: (league) => <MarginCell league={league} margins={margins} />, hideOnNarrow: true },
   { key: "action", header: "Action", cell: (league) => <ActionCell league={league} /> },
   { key: "state", header: "State", cell: (league) => <WeekStatusBadge status={league.weekStatus} /> },
-];
+  ];
+}
 
 export interface LeagueBoardProps {
   readonly leagues: readonly HomeLeagueCard[];
@@ -151,10 +177,13 @@ export interface LeagueBoardProps {
  */
 export function LeagueBoard({ leagues }: LeagueBoardProps) {
   const sorted = sortLeagues(leagues);
+  // Built from every league that HAS a live margin — a league on a bye contributes no number, and
+  // padding the pool with a zero would tell a manager they are mid-table when they are not playing.
+  const margins = sorted.map(myMargin).filter((margin): margin is number => margin !== null);
   return (
     <Table
       caption="Your leagues"
-      columns={COLUMNS}
+      columns={columnsFor(margins)}
       rows={sorted}
       rowKey={(league) => league.id}
       empty={<p className={`${EYEBROW} text-text-muted`}>No leagues yet.</p>}
