@@ -4,6 +4,7 @@ import type { OpportunityPriors } from "./opportunity";
 import type { GameContextPriors } from "./context-fit";
 import type { RedistributionPriors } from "./redistribution-fit";
 import type { RedZonePriors } from "../features/red-zone";
+import type { TargetDepthPriors } from "../features/target-depth";
 import type { SchemePriors } from "./scheme-fit";
 
 /**
@@ -220,8 +221,36 @@ export const FITTED_RED_ZONE_PRIORS: RedZonePriors = {
     DEF: { insideTenCarriesPerCarry: 0.000000, redZoneTargetsPerTarget: 0.000000 },
   },
   recencyDecay: 0.95,
-  carryShrinkage: 320,
-  targetShrinkage: 5,
-  rushingElasticity: 1.208067,
-  receivingElasticity: 0.177008,
+  carryShrinkage: 200,
+  targetShrinkage: 120,
+  rushingElasticity: 0.873018,
+  receivingElasticity: 0.649996,
+};
+
+/**
+ * PHASE 5 — DEPTH OF TARGET, the second teammate-separating group.
+ *
+ * Fitted against the RESIDUAL of layer 2's own prediction over 8397 player-weeks
+ * carrying 34635 targets, on the fit seasons only. Regressing yards per target on depth
+ * of target would find a very strong relationship and measure almost nothing new, because layer 2
+ * already predicts a receiver's yards per target from his own past yards per target — which is
+ * itself mostly a consequence of how deep he is thrown to. The exposure handed to the estimator is
+ * therefore what the model already thinks, and the elasticity is what depth adds to it.
+ *
+ * The two elasticities point in opposite directions or the feature is not describing football: a
+ * deeper target is worth more yards and is caught less often.
+ */
+export const FITTED_TARGET_DEPTH_PRIORS: TargetDepthPriors = {
+  league: {
+    QB: -0.733333,
+    RB: 0.474510,
+    WR: 10.514505,
+    TE: 6.962685,
+    K: 0.000000,
+    DEF: 0.000000,
+  },
+  recencyDecay: 0.7,
+  shrinkage: 120,
+  yardsElasticity: 0.165250,
+  receptionsElasticity: -0.070576,
 };

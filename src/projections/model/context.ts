@@ -1,6 +1,7 @@
 import { gameContextFor } from "../features/context";
 import { lineComposite, lineWindow } from "../features/line";
 import { redZoneLeverage, redZoneMultiplier, redZoneTotals, NO_LEVERAGE } from "../features/red-zone";
+import { targetDepthMultiplier, targetDepthRatio, targetDepthTotals } from "../features/target-depth";
 import { redistributeShares, type ShareDelta } from "../features/redistribution";
 import { schemeEstimate, schemeRatios } from "../features/scheme";
 import { indexTeamMetrics, latestTeams } from "../team-context";
@@ -12,6 +13,7 @@ import type { GameContextPriors } from "./context-fit";
 import type { LinePriors } from "./line-fit";
 import type { PredictedOpportunity } from "./opportunity";
 import type { RedZonePriors } from "../features/red-zone";
+import type { TargetDepthPriors } from "../features/target-depth";
 import type { RedistributionPriors } from "./redistribution-fit";
 import type { SchemePriors, SchemeVolumeElasticity } from "./scheme-fit";
 import { detectTransactions } from "./transactions";
@@ -38,6 +40,7 @@ export interface ContextPriors {
   readonly redistribution: RedistributionPriors;
   readonly gameContext: GameContextPriors;
   readonly redZone: RedZonePriors;
+  readonly targetDepth: TargetDepthPriors;
 }
 
 /**
@@ -70,7 +73,7 @@ export function contextualiseRates(
   features: FeatureFlags,
   priors: ContextPriors,
 ): ReadonlyMap<string, PlayerRates> {
-  if (!features.line && !features.gameContext && !features.redZone) return rates;
+  if (!features.line && !features.gameContext && !features.redZone && !features.targetDepth) return rates;
 
   const metrics = indexTeamMetrics(input.teamContext);
   const teams = latestTeams(input.teamContext);
@@ -111,22 +114,37 @@ export function contextualiseRates(
    * point-in-time answer with no further filtering. Grouped in one pass rather than filtered per
    * player: the usage array is tens of thousands of rows and there are hundreds of players a week.
    */
-  const touchesByPlayer = new Map<string, ReturnType<typeof redZoneTotals>>();
-  if (features.redZone) {
-    const rows = new Map<string, (typeof input.usage)[number][]>();
+  const rowsByPlayer = new Map<string, (typeof input.usage)[number][]>();
+  if (features.redZone || features.targetDepth) {
     for (const row of input.usage) {
-      (rows.get(row.playerId) ?? rows.set(row.playerId, []).get(row.playerId)!).push(row);
+      (rowsByPlayer.get(row.playerId) ?? rowsByPlayer.set(row.playerId, []).get(row.playerId)!).push(row);
     }
+  }
+
+  const redZoneByPlayer = new Map<string, ReturnType<typeof redZoneTotals>>();
+  if (features.redZone) {
     const window = { season: input.season, week: input.week, decay: priors.redZone.recencyDecay };
-    for (const [playerId, playerRows] of rows) touchesByPlayer.set(playerId, redZoneTotals(playerRows, window));
+    for (const [playerId, playerRows] of rowsByPlayer) redZoneByPlayer.set(playerId, redZoneTotals(playerRows, window));
   }
   const leverageFor = (playerId: string): ReturnType<typeof redZoneLeverage> => {
     if (!features.redZone) return NO_LEVERAGE;
     const position = input.positions.get(playerId);
-    const totals = touchesByPlayer.get(playerId);
+    const totals = redZoneByPlayer.get(playerId);
     if (position === undefined || totals === undefined) return NO_LEVERAGE;
     return redZoneLeverage(totals, position, priors.redZone);
   };
+
+  const depthByPlayer = new Map<string, number | null>();
+  if (features.targetDepth) {
+    const window = { season: input.season, week: input.week, decay: priors.targetDepth.recencyDecay };
+    for (const [playerId, playerRows] of rowsByPlayer) {
+      const position = input.positions.get(playerId);
+      depthByPlayer.set(
+        playerId,
+        position === undefined ? null : targetDepthRatio(targetDepthTotals(playerRows, window), position, priors.targetDepth),
+      );
+    }
+  }
 
   const adjusted = new Map<string, PlayerRates>();
   for (const [playerId, playerRates] of rates) {
@@ -140,11 +158,25 @@ export function contextualiseRates(
       receivingTouchdownsPerTarget:
         playerRates.receivingTouchdownsPerTarget * redZoneMultiplier(leverage.receiving, priors.redZone.receivingElasticity),
     };
+    // Depth of target moves the two receiving rates in OPPOSITE directions, which is the whole claim:
+    // a deeper throw is worth more yards and is caught less often. Applied beside the touchdown
+    // multipliers rather than through them, so the two groups stay independently ablatable.
+    const depth = features.targetDepth ? (depthByPlayer.get(playerId) ?? null) : null;
+    const receiving = {
+      receivingYardsPerTarget:
+        playerRates.receivingYardsPerTarget * targetDepthMultiplier(depth, priors.targetDepth.yardsElasticity),
+      // A catch rate is a probability, and nothing downstream is prepared for one above 1: layer 3
+      // would emit more receptions than targets, and a PPR league would pay for them.
+      receptionsPerTarget: Math.min(
+        1,
+        playerRates.receptionsPerTarget * targetDepthMultiplier(depth, priors.targetDepth.receptionsElasticity),
+      ),
+    };
     const team = teams.get(playerId);
     if (team === undefined) {
       // No known offence means no composite. The model without the feature is the right answer,
       // never a league-average one — an unknown team is not an average team, it is an unknown.
-      adjusted.set(playerId, { ...playerRates, ...touchdowns });
+      adjusted.set(playerId, { ...playerRates, ...touchdowns, ...receiving });
       continue;
     }
     const composite = features.line ? compositeFor(team) : null;
@@ -160,11 +192,12 @@ export function contextualiseRates(
     adjusted.set(playerId, {
       ...playerRates,
       ...touchdowns,
+      ...receiving,
       rushingYardsPerCarry: playerRates.rushingYardsPerCarry * rushing * matchup.rushing,
       // Receiving yards move with the passing matchup too: they are the same throws seen from the
       // other end, and adjusting one without the other would say a defence can be soft against a
       // quarterback and neutral against everyone he throws to.
-      receivingYardsPerTarget: playerRates.receivingYardsPerTarget * matchup.passing,
+      receivingYardsPerTarget: receiving.receivingYardsPerTarget * matchup.passing,
       passingYardsPerAttempt: playerRates.passingYardsPerAttempt * passing * matchup.passing,
     });
   }

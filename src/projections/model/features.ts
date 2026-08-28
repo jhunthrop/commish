@@ -30,6 +30,11 @@ export interface FeatureFlags {
    * lesson said would be needed to move a ranking.
    */
   readonly redZone: boolean;
+  /**
+   * Phase 5 — depth of target on the receiving rates. The second teammate-separating group: a
+   * checkdown back and a field-stretcher can take the same target share of the same offence.
+   */
+  readonly targetDepth: boolean;
 }
 
 /** Model v1 exactly: three layers, no context. The `before` arm of every ablation. */
@@ -39,6 +44,7 @@ export const NO_FEATURES: FeatureFlags = {
   redistribution: false,
   gameContext: false,
   redZone: false,
+  targetDepth: false,
 };
 
 /** Every group at once. The headline number, and explicitly NOT an ablation of anything. */
@@ -48,6 +54,7 @@ export const ALL_FEATURES: FeatureFlags = {
   redistribution: true,
   gameContext: true,
   redZone: true,
+  targetDepth: true,
 };
 
 /**

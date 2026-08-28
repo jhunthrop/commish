@@ -24,6 +24,7 @@ import { fitSchemePriors, type SchemePriors } from "@/projections/model/scheme-f
 import { fitRedistributionPriors, type RedistributionPriors } from "@/projections/model/redistribution-fit";
 import { fitGameContextPriors, type GameContextPriors } from "@/projections/model/context-fit";
 import { fitRedZonePriors, type RedZoneFitReport } from "@/projections/model/red-zone-fit";
+import { fitTargetDepthPriors, type TargetDepthFitReport } from "@/projections/model/target-depth-fit";
 import { projectedPosition } from "@/projections/nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "@/projections/team-store";
@@ -248,6 +249,34 @@ ${["QB", "RB", "WR", "TE", "K", "DEF"].map(rates).join("\n")}
 `;
 }
 
+function renderTargetDepth(report: TargetDepthFitReport): string {
+  const priors = report.priors;
+  const depth = (position: string) => `    ${position}: ${priors.league[position as Position].toFixed(6)},`;
+  return `/**
+ * PHASE 5 — DEPTH OF TARGET, the second teammate-separating group.
+ *
+ * Fitted against the RESIDUAL of layer 2's own prediction over ${report.playerWeeks} player-weeks
+ * carrying ${report.targets} targets, on the fit seasons only. Regressing yards per target on depth
+ * of target would find a very strong relationship and measure almost nothing new, because layer 2
+ * already predicts a receiver's yards per target from his own past yards per target — which is
+ * itself mostly a consequence of how deep he is thrown to. The exposure handed to the estimator is
+ * therefore what the model already thinks, and the elasticity is what depth adds to it.
+ *
+ * The two elasticities point in opposite directions or the feature is not describing football: a
+ * deeper target is worth more yards and is caught less often.
+ */
+export const FITTED_TARGET_DEPTH_PRIORS: TargetDepthPriors = {
+  league: {
+${["QB", "RB", "WR", "TE", "K", "DEF"].map(depth).join("\n")}
+  },
+  recencyDecay: ${priors.recencyDecay},
+  shrinkage: ${priors.shrinkage},
+  yardsElasticity: ${priors.yardsElasticity.toFixed(6)},
+  receptionsElasticity: ${priors.receptionsElasticity.toFixed(6)},
+};
+`;
+}
+
 function render(
   fit: ReturnType<typeof fitOpportunityPriors>,
   efficiency: EfficiencyPriors,
@@ -256,6 +285,7 @@ function render(
   redistribution: RedistributionPriors,
   gameContext: GameContextPriors,
   redZone: RedZoneFitReport,
+  targetDepth: TargetDepthFitReport,
   generatedFrom: readonly number[],
 ): string {
   const { priors } = fit;
@@ -269,6 +299,7 @@ import type { OpportunityPriors } from "./opportunity";
 import type { GameContextPriors } from "./context-fit";
 import type { RedistributionPriors } from "./redistribution-fit";
 import type { RedZonePriors } from "../features/red-zone";
+import type { TargetDepthPriors } from "../features/target-depth";
 import type { SchemePriors } from "./scheme-fit";
 
 /**
@@ -305,7 +336,8 @@ ${renderLine(line)}
 ${renderScheme(scheme)}
 ${renderRedistribution(redistribution)}
 ${renderGameContext(gameContext)}
-${renderRedZone(redZone)}`;
+${renderRedZone(redZone)}
+${renderTargetDepth(targetDepth)}`;
 }
 
 async function main(): Promise<void> {
@@ -408,9 +440,24 @@ async function main(): Promise<void> {
       `  receiving  elasticity ${redZone.priors.receivingElasticity.toFixed(4)}  over ${redZone.receivingPlayerWeeks} player-weeks and ${redZone.receivingTouchdowns} touchdowns, ${redZone.priors.targetShrinkage} targets of prior`,
   );
 
+  const targetDepth = fitTargetDepthPriors({
+    usage,
+    history,
+    positions,
+    efficiency,
+    seasons: [...FIT_SEASONS],
+    heldOut: [...HELD_OUT_SEASONS],
+  });
+  console.log(
+    `\ntarget depth, fitted on ${FIT_SEASONS.join(", ")} against layer 2's own residual:\n` +
+      `  decay ${targetDepth.priors.recencyDecay} per week, ${targetDepth.priors.shrinkage} targets of prior, over ${targetDepth.playerWeeks} player-weeks and ${targetDepth.targets} targets\n` +
+      `  yards      elasticity ${targetDepth.priors.yardsElasticity.toFixed(4)}\n` +
+      `  receptions elasticity ${targetDepth.priors.receptionsElasticity.toFixed(4)}`,
+  );
+
   writeFileSync(
     OUTPUT,
-    render(fit, efficiency, linePriors, schemePriors, redistributionPriors, gameContextPriors, redZone, FIT_SEASONS),
+    render(fit, efficiency, linePriors, schemePriors, redistributionPriors, gameContextPriors, redZone, targetDepth, FIT_SEASONS),
   );
   console.log(`\nwrote ${OUTPUT}`);
 

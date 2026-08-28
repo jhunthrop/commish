@@ -9,28 +9,18 @@ import {
 import type { SeasonStatLine } from "../lines";
 import type { PlayerWeekUsage } from "../usage";
 import type { EfficiencyPriors } from "./efficiency";
+import { fitLogLinkElasticity, logLinkLikelihood, type LogLinkPoint } from "./log-link";
 
 /**
- * FITTING RED-ZONE LEVERAGE AS A POISSON RATE, because touchdowns are counts and mostly zeros.
+ * FITTING RED-ZONE LEVERAGE, through the shared log-link estimator in `log-link.ts`.
  *
- * Every other elasticity in this engine is a weighted least-squares slope in log space, and that
- * technique cannot be used here: the left-hand side is a player's touchdowns in a week, which is
- * zero for the large majority of player-weeks, and `log 0` is not a number. The usual dodges — add a
- * half, drop the zeros, aggregate to a season — each destroy the thing being measured. Dropping the
- * zeros in particular would fit the elasticity on the subset of weeks somebody scored in, which is
- * the subset selected BY the outcome.
+ * The exposure is the player's opportunities times his POSITION's touchdown rate rather than his
+ * own, and that is not a shortcut: layer 2's fit regresses rushing and passing touchdown rate
+ * entirely to the position mean (10,000 opportunities of prior), so the position rate IS what the
+ * model already predicts. The exposure is therefore the model's own prediction, and the elasticity
+ * is a fit against its residual.
  *
- * A Poisson likelihood is the honest instrument for the question and it handles a zero natively. The
- * model is that a player's expected touchdowns in a week are his opportunities times his position's
- * touchdown rate times his leverage raised to the elasticity:
- *
- *   mu = carries x positionRate x leverage^e
- *
- * The log-likelihood in `e` is strictly concave, so its derivative crosses zero exactly once and a
- * bisection finds it without a library, an initial guess or a convergence criterion anyone has to
- * trust. Sixty iterations of bisection on a bracket of ten is a precision of 1e-17.
- *
- * THE SHRINKAGE IS FITTED TOO, on the same likelihood. "How many carries of league prior is a
+ * THE SHRINKAGE AND THE DECAY ARE FITTED TOO, on the same likelihood. "How many carries of league prior is a
  * player's own red-zone rate worth" has a right answer in the data and no right answer in anybody's
  * intuition, and leaving it as a hand-chosen constant would put the one number that decides how
  * aggressive this feature is outside the measurement. Chosen by likelihood on the FIT seasons and on
@@ -71,13 +61,16 @@ export interface RedZoneFitReport {
 }
 
 /**
- * The candidate priors the likelihood is compared over, in opportunities.
+ * The priors the leverages are shrunk by, in opportunities, FIXED rather than fitted.
  *
- * A geometric ladder rather than a fine grid: the likelihood in `k` is flat enough that a difference
- * between 40 and 45 carries of prior is noise, and a fine grid would invite reading meaning into
- * which of them won.
+ * See `log-link.ts`: the prior and the elasticity are a ridge, so only their ratio is identified and
+ * the prior is a choice of units. These are a full season of a lead back's carries and of a number
+ * one receiver's targets, which is the scale at which "this is his role" stops being "this is what
+ * happened to him" — and the elasticity is fitted against them, so a different choice would produce
+ * a different elasticity and the same model.
  */
-const SHRINKAGE_CANDIDATES: readonly number[] = [5, 10, 20, 40, 80, 160, 320];
+const CARRY_SHRINKAGE = 200;
+const TARGET_SHRINKAGE = 120;
 
 /**
  * The candidate recency decays, as a weight multiplier per week into the past.
@@ -88,12 +81,6 @@ const SHRINKAGE_CANDIDATES: readonly number[] = [5, 10, 20, 40, 80, 160, 320];
  * the ladder brackets it on both sides.
  */
 const DECAY_CANDIDATES: readonly number[] = [1, 0.95, 0.9, 0.8, 0.7, 0.6];
-
-/** The elasticity is bracketed rather than searched from a guess. Nothing real sits outside this. */
-const ELASTICITY_BRACKET = { min: -5, max: 5 } as const;
-
-/** 1e-17 of precision on a bracket of ten, which is past the point where the data means anything. */
-const BISECTION_STEPS = 60;
 
 const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
@@ -150,50 +137,8 @@ function rowsByPlayer(usage: readonly PlayerWeekUsage[]): ReadonlyMap<string, re
   return grouped;
 }
 
-/**
- * The elasticity that maximises the Poisson likelihood, by bisecting its derivative.
- *
- * The derivative is `sum(count x logLeverage) - sum(exposure x leverage^e x logLeverage)`, strictly
- * decreasing in `e` because the second derivative is a sum of negative terms. So the sign at the
- * bracket's ends is all the information a bisection needs, and a bracket whose ends share a sign
- * means the optimum is outside anything meaningful — reported as zero, which says "no effect the
- * data supports" rather than pinning the answer to an arbitrary edge.
- */
-function fitElasticity(points: readonly { count: number; exposure: number; logLeverage: number }[]): number {
-  const derivative = (e: number): number => {
-    let value = 0;
-    for (const point of points) {
-      value += point.logLeverage * (point.count - point.exposure * Math.exp(e * point.logLeverage));
-    }
-    return value;
-  };
-  let low: number = ELASTICITY_BRACKET.min;
-  let high: number = ELASTICITY_BRACKET.max;
-  const atLow = derivative(low);
-  const atHigh = derivative(high);
-  if (!Number.isFinite(atLow) || !Number.isFinite(atHigh) || atLow <= 0 || atHigh >= 0) return 0;
-  for (let step = 0; step < BISECTION_STEPS; step += 1) {
-    const middle = (low + high) / 2;
-    if (derivative(middle) > 0) low = middle;
-    else high = middle;
-  }
-  return (low + high) / 2;
-}
-
-/** The Poisson log-likelihood at an elasticity, without the constant term that `k` cannot move. */
-function logLikelihood(points: readonly { count: number; exposure: number; logLeverage: number }[], e: number): number {
-  let total = 0;
-  for (const point of points) {
-    const mu = point.exposure * Math.exp(e * point.logLeverage);
-    if (!(mu > 0)) continue;
-    total += point.count * Math.log(mu) - mu;
-  }
-  return total;
-}
-
-/** What one side's sweep found at one decay: the best prior, its elasticity, and how well it fit. */
+/** What one side found at one decay: its elasticity and how well the pair fit. */
 interface SideFit {
-  readonly shrinkage: number;
   readonly elasticity: number;
   readonly likelihood: number;
 }
@@ -201,32 +146,24 @@ interface SideFit {
 /**
  * One side at one decay — carries into rushing touchdowns, or targets into receiving touchdowns.
  *
- * The shrinkage is swept and the elasticity solved inside it rather than the two being searched
- * together, because for a FIXED prior the likelihood in the elasticity is concave and has an exact
- * answer. Only the prior needs a sweep.
+ * One exact solve rather than a sweep: for a fixed prior the likelihood in the elasticity is
+ * concave and its maximum is found by bisecting the score, so there is nothing here to search over.
  */
 function fitSideAtDecay(
   observations: readonly PoissonPoint[],
   decay: number,
-  leverageOf: (totals: RedZoneTotals, position: Position, k: number) => number | null,
+  leverageOf: (totals: RedZoneTotals, position: Position) => number | null,
 ): SideFit | null {
-  const totals = observations.map((observation) =>
-    redZoneTotals(observation.rows, { season: observation.season, week: observation.week, decay }),
-  );
-  let best: SideFit | null = null;
-  for (const shrinkage of SHRINKAGE_CANDIDATES) {
-    const points: { count: number; exposure: number; logLeverage: number }[] = [];
-    for (const [index, observation] of observations.entries()) {
-      const leverage = leverageOf(totals[index]!, observation.position, shrinkage);
-      if (leverage === null || !(leverage > 0) || !(observation.exposure > 0)) continue;
-      points.push({ count: observation.count, exposure: observation.exposure, logLeverage: Math.log(leverage) });
-    }
-    if (points.length === 0) continue;
-    const elasticity = fitElasticity(points);
-    const likelihood = logLikelihood(points, elasticity);
-    if (best === null || likelihood > best.likelihood) best = { shrinkage, elasticity, likelihood };
+  const points: LogLinkPoint[] = [];
+  for (const observation of observations) {
+    const totals = redZoneTotals(observation.rows, { season: observation.season, week: observation.week, decay });
+    const leverage = leverageOf(totals, observation.position);
+    if (leverage === null || !(leverage > 0) || !(observation.exposure > 0)) continue;
+    points.push({ outcome: observation.count, exposure: observation.exposure, logRatio: Math.log(leverage) });
   }
-  return best;
+  if (points.length === 0) return null;
+  const elasticity = fitLogLinkElasticity(points);
+  return { elasticity, likelihood: logLinkLikelihood(points, elasticity) };
 }
 
 /**
@@ -272,14 +209,14 @@ export function fitRedZonePriors(input: RedZoneFitInput): RedZoneFitReport {
     }
   }
 
-  const withShrinkage = (k: number): RedZonePriors => ({
+  const shape: RedZonePriors = {
     league,
     recencyDecay: 1,
-    carryShrinkage: k,
-    targetShrinkage: k,
+    carryShrinkage: CARRY_SHRINKAGE,
+    targetShrinkage: TARGET_SHRINKAGE,
     rushingElasticity: 0,
     receivingElasticity: 0,
-  });
+  };
 
   /**
    * ONE DECAY FOR BOTH SIDES, chosen on the two sides' likelihoods ADDED TOGETHER.
@@ -292,12 +229,8 @@ export function fitRedZonePriors(input: RedZoneFitInput): RedZoneFitReport {
    */
   let best: { decay: number; rushing: SideFit; receiving: SideFit } | null = null;
   for (const decay of DECAY_CANDIDATES) {
-    const rushingFit = fitSideAtDecay(rushing, decay, (totals, position, k) =>
-      redZoneLeverage(totals, position, withShrinkage(k)).rushing,
-    );
-    const receivingFit = fitSideAtDecay(receiving, decay, (totals, position, k) =>
-      redZoneLeverage(totals, position, withShrinkage(k)).receiving,
-    );
+    const rushingFit = fitSideAtDecay(rushing, decay, (totals, position) => redZoneLeverage(totals, position, shape).rushing);
+    const receivingFit = fitSideAtDecay(receiving, decay, (totals, position) => redZoneLeverage(totals, position, shape).receiving);
     if (rushingFit === null || receivingFit === null) continue;
     const total = rushingFit.likelihood + receivingFit.likelihood;
     if (best === null || total > best.rushing.likelihood + best.receiving.likelihood) {
@@ -312,8 +245,8 @@ export function fitRedZonePriors(input: RedZoneFitInput): RedZoneFitReport {
     priors: {
       league,
       recencyDecay: best?.decay ?? 1,
-      carryShrinkage: best?.rushing.shrinkage ?? SHRINKAGE_CANDIDATES[0]!,
-      targetShrinkage: best?.receiving.shrinkage ?? SHRINKAGE_CANDIDATES[0]!,
+      carryShrinkage: CARRY_SHRINKAGE,
+      targetShrinkage: TARGET_SHRINKAGE,
       rushingElasticity: best?.rushing.elasticity ?? 0,
       receivingElasticity: best?.receiving.elasticity ?? 0,
     },
