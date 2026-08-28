@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { nflPlayers } from "@/db/schema";
 import { PPR_SCORING } from "@/domain/scoring";
 import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
 import { replay, type ProjectionInput, type ProjectionSource } from "./backtest";
@@ -54,8 +54,10 @@ const PRIOR_SEASON_STAMP = new Date("2024-01-15T00:00:00.000Z");
 
 beforeEach(async () => {
   await truncateAll(db);
-  await db.insert(players).values(
-    ROSTER.map(([id, position]) => ({ id, name: id, position, nflTeam: "KC", headshotUrl: null })),
+  // Positions come from the HISTORICAL universe, so that a replay of a season whose players have
+  // since retired scores them rather than silently dropping them.
+  await db.insert(nflPlayers).values(
+    ROSTER.map(([id, position]) => ({ id, pfrId: id, name: id, position, latestTeam: "KC", rookieSeason: 2020, lastSeason: 2024 })),
   );
   // 2023: what the naive benchmark projects from. The ordering it will predict is
   // star > starter > deep, and `rookie` has no prior season at all.

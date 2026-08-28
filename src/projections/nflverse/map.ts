@@ -1,7 +1,7 @@
 import type { PlayerWeekObservation } from "../store";
 import { NFLVERSE_CONFIG } from "./config";
-import { crosswalkKey, type Crosswalk, type UnresolvedPlayer } from "./crosswalk";
 import type { CsvRow } from "./csv";
+import { projectedPosition, type PlayerRef, type PlayerUniverse, type UnresolvedRef } from "./players";
 
 /**
  * SNAP COUNTS AND TARGETS — the participation layer, and the reason this whole module exists.
@@ -11,9 +11,9 @@ import type { CsvRow } from "./csv";
  * OPPORTUNITY, and opportunity is a share — so it needs the denominator, and the denominator is
  * the one thing our paid stats feed cannot supply.
  *
- * Everything here is pure over already-fetched rows. The client does the I/O, the crosswalk does
- * identity, and this file does exactly one job: turn two nflverse files into facts with an
- * honest `as_of` on each.
+ * Everything here is pure over already-fetched rows. The client does the I/O, the player universe
+ * (`players.ts`) does identity, and this file does exactly one job: turn two nflverse files into
+ * facts with an honest `as_of` on each.
  */
 
 /** The `source` stamp each file's observations carry — the axis an ablation holds a feed out on. */
@@ -22,12 +22,27 @@ export const NFLVERSE_SOURCE = {
   playerWeek: "nflverse_player_week",
 } as const;
 
-/** Metric names, spelled once. A typo here and a feature silently reads nothing. */
+/**
+ * Metric names, spelled once. A typo here and a feature silently reads nothing.
+ *
+ * Every share the opportunity model predicts appears here as a NUMERATOR and a DENOMINATOR pair,
+ * because a share computed against the wrong denominator is not merely inaccurate — it is a
+ * plausible-looking number that survives review. The team totals ride on each player's own row
+ * rather than in a table of their own: the store has no team column, and a player traded midseason
+ * therefore carries his new team's volume with him automatically, which is exactly the segment a
+ * team-keyed table would get wrong.
+ */
 export const PARTICIPATION_METRICS = {
   offensiveSnaps: "offensive_snaps",
   teamOffensiveSnaps: "team_offensive_snaps",
   routesRun: "routes_run",
   targets: "targets",
+  teamTargets: "team_targets",
+  carries: "carries",
+  teamCarries: "team_carries",
+  /** A quarterback's own throws. The denominator for every passing rate the composer applies. */
+  passAttempts: "pass_attempts",
+  teamPassAttempts: "team_pass_attempts",
 } as const;
 
 /** One player's opportunity in one week, joined across the two files that describe it. */
@@ -46,21 +61,28 @@ export interface PlayerWeekParticipation {
    */
   readonly routesRun: number | null;
   readonly targets: number;
+  readonly carries: number;
+  readonly passAttempts: number;
+  /** His team's totals for the same week — the denominators the shares are taken against. */
+  readonly teamTargets: number;
+  readonly teamCarries: number;
+  readonly teamPassAttempts: number;
   readonly asOf: Date;
 }
 
 export interface MapParticipationInput {
   readonly snapCounts: readonly CsvRow[];
   readonly playerWeek: readonly CsvRow[];
-  readonly crosswalk: Crosswalk;
+  /** The historical player universe — `players.ts`. Identity is an id join, never a name join. */
+  readonly universe: PlayerUniverse;
   /** Defaults to `NFLVERSE_CONFIG.publicationLagHours`. */
   readonly publicationLagHours?: number;
 }
 
 export interface MapParticipationResult {
   readonly participation: readonly PlayerWeekParticipation[];
-  /** Never empty when someone failed to join — see `crosswalk.ts` for why a silent drop is fatal. */
-  readonly unresolved: readonly UnresolvedPlayer[];
+  /** Never empty when someone failed to join — see `players.ts` for why a silent drop is fatal. */
+  readonly unresolved: readonly UnresolvedRef[];
   readonly resolutionRate: number | null;
 }
 
@@ -148,15 +170,54 @@ function teamSnapsByGame(rows: readonly CsvRow[]): ReadonlyMap<string, number> {
   return totals;
 }
 
-/** Targets, keyed by the identity the crosswalk uses, so the two files join on a person. */
-function targetsByPlayerWeek(rows: readonly CsvRow[]): ReadonlyMap<string, number> {
-  const targets = new Map<string, number>();
+/** One player's, or one team's, opportunity numerators for a week. */
+interface Usage {
+  readonly targets: number;
+  readonly carries: number;
+  readonly passAttempts: number;
+}
+
+const NO_USAGE: Usage = { targets: 0, carries: 0, passAttempts: 0 };
+
+function usageOf(row: CsvRow): Usage {
+  return {
+    targets: optionalNumeric(row, "targets"),
+    carries: optionalNumeric(row, "carries"),
+    passAttempts: optionalNumeric(row, "attempts"),
+  };
+}
+
+/**
+ * Opportunity numerators keyed by `<gsis id>|<week>`, and the same totals keyed by `<team>|<week>`.
+ *
+ * The join between the two files used to be a name join through the crosswalk. It is now the id
+ * both files already carry, which is why this reads a column instead of building a key.
+ *
+ * Team totals are summed over EVERY player the weekly file carries for that team, at every
+ * position, not over the four the engine projects. Every target belongs to somebody, so the sum is
+ * the team's real volume; a total built from skill players alone would be short by the trick plays
+ * and the linemen who caught something, and every share taken against it would be inflated in the
+ * same direction — a wrong number that looks right, which is the only kind that survives review.
+ */
+function usageByPlayerAndTeam(rows: readonly CsvRow[]): {
+  readonly byPlayer: ReadonlyMap<string, Usage>;
+  readonly byTeam: ReadonlyMap<string, Usage>;
+} {
+  const byPlayer = new Map<string, Usage>();
+  const byTeam = new Map<string, Usage>();
   for (const row of rows) {
     if (row.season_type !== NFLVERSE_CONFIG.seasonType) continue;
-    const key = `${crosswalkKey({ name: row.player_display_name ?? "", position: row.position ?? "", team: row.team ?? "" })}|${row.week}`;
-    targets.set(key, optionalNumeric(row, "targets"));
+    const usage = usageOf(row);
+    byPlayer.set(`${row.player_id ?? ""}|${row.week ?? ""}`, usage);
+    const teamKey = `${row.team ?? ""}|${row.week ?? ""}`;
+    const running = byTeam.get(teamKey) ?? NO_USAGE;
+    byTeam.set(teamKey, {
+      targets: running.targets + usage.targets,
+      carries: running.carries + usage.carries,
+      passAttempts: running.passAttempts + usage.passAttempts,
+    });
   }
-  return targets;
+  return { byPlayer, byTeam };
 }
 
 /**
@@ -167,35 +228,46 @@ function targetsByPlayerWeek(rows: readonly CsvRow[]): ReadonlyMap<string, numbe
  * built from skill players alone is short by the whole offensive line, and every share computed
  * against it is inflated by roughly a third — a number that looks plausible, which is why it would
  * survive review.
+ *
+ * Two narrowings, and they are not the same one. The file's own position decides who is a
+ * CANDIDATE, because that is all that is knowable before resolving; the UNIVERSE's position decides
+ * who is projected, because `nfl_players.position` is what the backtest scores through and the two
+ * must agree or a player would be ingested and then silently dropped at scoring time.
  */
 export function mapParticipation({
   snapCounts,
   playerWeek,
-  crosswalk,
+  universe,
   publicationLagHours = NFLVERSE_CONFIG.publicationLagHours,
 }: MapParticipationInput): MapParticipationResult {
   const teamSnaps = teamSnapsByGame(snapCounts);
-  const targets = targetsByPlayerWeek(playerWeek);
+  const { byPlayer: playerUsage, byTeam: teamUsage } = usageByPlayerAndTeam(playerWeek);
 
   const scored = snapCounts.filter(
     (row) =>
       row.game_type === NFLVERSE_CONFIG.seasonType &&
       (NFLVERSE_CONFIG.scoredPositions as readonly string[]).includes(row.position ?? ""),
   );
-  const candidates = scored.map((row) => ({
+  const refs: readonly PlayerRef[] = scored.map((row) => ({
+    kind: "pfr" as const,
+    id: row.pfr_player_id ?? "",
     name: row.player ?? "",
-    position: row.position ?? "",
-    team: row.team ?? "",
   }));
-  const { resolved, unresolved, resolutionRate } = crosswalk.resolveAll(candidates);
+  const { resolved, unresolved, resolutionRate } = universe.resolveAll(refs);
 
   const participation: PlayerWeekParticipation[] = [];
   for (const [index, row] of scored.entries()) {
-    const playerId = resolved.get(crosswalkKey(candidates[index]!));
+    const playerId = resolved.get(refs[index]!.id);
     // Unresolved players are NOT silently skipped — they are on `unresolved`, named and counted.
     // They are merely not stored, because there is no id to store them against.
     if (playerId === undefined) continue;
+    if (projectedPosition(universe.byGsisId(playerId)!.position) === null) continue;
     const week = numeric(row, "week");
+    // The player's own team for THIS week comes from the snap row he appears on, not from any
+    // roster: a player traded in October has two teams in one season, and his shares belong to
+    // whichever offence he was actually in that Sunday.
+    const own = playerUsage.get(`${playerId}|${week}`) ?? NO_USAGE;
+    const team = teamUsage.get(`${row.team}|${week}`) ?? NO_USAGE;
     participation.push({
       playerId,
       season: numeric(row, "season"),
@@ -203,7 +275,12 @@ export function mapParticipation({
       offensiveSnaps: numeric(row, "offense_snaps"),
       teamOffensiveSnaps: teamSnaps.get(`${row.game_id}|${row.team}`) ?? 0,
       routesRun: null,
-      targets: targets.get(`${crosswalkKey(candidates[index]!)}|${week}`) ?? 0,
+      targets: own.targets,
+      carries: own.carries,
+      passAttempts: own.passAttempts,
+      teamTargets: team.targets,
+      teamCarries: team.carries,
+      teamPassAttempts: team.passAttempts,
       asOf: gameDayAsOf(row.pfr_game_id ?? "", publicationLagHours),
     });
   }
@@ -225,6 +302,11 @@ export function participationObservations(
       { ...stamp, source: NFLVERSE_SOURCE.snapCounts, metric: PARTICIPATION_METRICS.offensiveSnaps, value: row.offensiveSnaps },
       { ...stamp, source: NFLVERSE_SOURCE.snapCounts, metric: PARTICIPATION_METRICS.teamOffensiveSnaps, value: row.teamOffensiveSnaps },
       { ...stamp, source: NFLVERSE_SOURCE.playerWeek, metric: PARTICIPATION_METRICS.targets, value: row.targets },
+      { ...stamp, source: NFLVERSE_SOURCE.playerWeek, metric: PARTICIPATION_METRICS.teamTargets, value: row.teamTargets },
+      { ...stamp, source: NFLVERSE_SOURCE.playerWeek, metric: PARTICIPATION_METRICS.carries, value: row.carries },
+      { ...stamp, source: NFLVERSE_SOURCE.playerWeek, metric: PARTICIPATION_METRICS.teamCarries, value: row.teamCarries },
+      { ...stamp, source: NFLVERSE_SOURCE.playerWeek, metric: PARTICIPATION_METRICS.passAttempts, value: row.passAttempts },
+      { ...stamp, source: NFLVERSE_SOURCE.playerWeek, metric: PARTICIPATION_METRICS.teamPassAttempts, value: row.teamPassAttempts },
     ];
     if (row.routesRun !== null) {
       observations.push({ ...stamp, source: NFLVERSE_SOURCE.playerWeek, metric: PARTICIPATION_METRICS.routesRun, value: row.routesRun });

@@ -25,6 +25,8 @@
     "stats:headshots": "dotenv -e .env.local -- tsx scripts/backfill-headshots.ts",
     "stats:correct": "dotenv -e .env.local -- tsx scripts/correct-stat-week.ts",
     "projections:report": "dotenv -e .env.local -- tsx scripts/projection-report.ts",
+    "projections:backfill": "dotenv -e .env.local -- tsx scripts/projection-backfill.ts",
+    "projections:fit": "dotenv -e .env.local -- tsx scripts/projection-fit.ts",
     "audit:verify": "dotenv -e .env.local -- tsx scripts/verify-audit-chain.ts",
     "reviews:remove": "dotenv -e .env.local -- tsx scripts/remove-review.ts",
     "admin:grant": "dotenv -e .env.local -- tsx scripts/grant-admin.ts",

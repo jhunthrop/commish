@@ -1558,6 +1558,64 @@ export const paymentTransferIntents = pgTable(
 );
 
 /**
+ * THE HISTORICAL PLAYER UNIVERSE — every man who has ever taken an NFL snap, not the men on a
+ * roster today (Phase 2, Task 1).
+ *
+ * Phase 1 keyed the projection store to `players`, which is a CURRENT roster snapshot fetched from
+ * the stats provider, and measured what that costs: the nflverse crosswalk resolved 98.1% of the
+ * 2024 season and 87.1% of 2023, degrading monotonically the further back a backfill reached,
+ * because anyone who has since retired simply is not in a roster snapshot. Latavius Murray played
+ * 2023; he is not on a 2026 roster; his season was therefore invisible. A model needs several
+ * seasons, so a roster snapshot is the wrong spine for one.
+ *
+ * `id` is nflverse's `gsis_id` — the NFL's own player id, which every historical feed carries and
+ * which never changes. That turns the whole identity problem from a NAME JOIN into an ID JOIN:
+ * `stats_player_week` carries `gsis_id` directly, `snap_counts` carries `pfr_id` which this table
+ * cross-references, and neither has to guess whether `Josh Palmer` and `Joshua Palmer` are one man.
+ * The universe file itself carries TWO Josh Allens — a quarterback and a retired centre — which is
+ * precisely the case a name join cannot settle and an id join never has to.
+ *
+ * Deliberately NOT linked to `players`. The projection engine models NFL players; mapping those to
+ * the roster the product drafts from is a separate concern with its own failure modes, and it
+ * belongs to whichever phase first renders a projection. An unused foreign key here would be a
+ * guess at that mapping's shape, made years early.
+ */
+export const nflPlayers = pgTable(
+  "nfl_players",
+  {
+    /** nflverse `gsis_id` (`00-0034857`) — the NFL's own id, stable for a career. */
+    id: text("id").primaryKey(),
+    /**
+     * Pro Football Reference's id (`AlleJo02`). NULLABLE because the universe carries players PFR
+     * never listed, and the unique index tolerates that: Postgres treats NULLs as distinct. It is
+     * the ONLY way into the snap-counts file, which keys by `pfr_player_id` and carries no
+     * `gsis_id` at all — so this column is what joins participation to outcomes.
+     */
+    pfrId: text("pfr_id"),
+    name: text("name").notNull(),
+    /**
+     * nflverse's own spelling (`QB`, `RB`, `WR`, `TE`, `FB`, `C`, …), NOT narrowed to this
+     * product's `Position`. The universe holds linemen and fullbacks we never project, and storing
+     * a narrowed enum would mean either dropping them (losing the snap denominator) or inventing a
+     * position for a centre. `projectedPosition` (`src/projections/nflverse/players.ts`) does the
+     * narrowing at the one place that needs it.
+     */
+    position: text("position").notNull(),
+    /** Last team the release lists him on. Descriptive only — a player's team in a given WEEK comes
+     *  from that week's own rows, never from here. */
+    latestTeam: text("latest_team"),
+    rookieSeason: integer("rookie_season"),
+    lastSeason: integer("last_season"),
+  },
+  (t) => [
+    /** The snap-counts join. Unique because two people sharing a PFR id would mean one man's snaps
+     *  written onto another, silently and forever — the failure the Phase 1 crosswalk's coherence
+     *  check was built to catch. Enforcing it here makes it a database error instead. */
+    uniqueIndex("nfl_players_pfr_id_idx").on(t.pfrId),
+  ],
+);
+
+/**
  * THE POINT-IN-TIME STORE the projection engine rests on (Phase 1, Task 1 —
  * `docs/design/2026-08-27-projection-engine-spec.md`). Every fact the engine will ever learn from
  * lands here first, and `as_of` is why: it is the moment that fact became KNOWABLE, not the moment
@@ -1587,9 +1645,14 @@ export const playerWeekObservations = pgTable(
     id: bigserial("id", { mode: "number" }).primaryKey(),
     season: integer("season").notNull(),
     week: integer("week").notNull(),
+    /**
+     * An `nfl_players.id` (a `gsis_id`), NOT a `players.id`. Repointed in Phase 2, Task 1: keyed to
+     * the current roster this table could only ever hold the seasons whose players are still
+     * playing, which is not enough seasons to fit a model on. See `nflPlayers`' own docblock.
+     */
     playerId: text("player_id")
       .notNull()
-      .references(() => players.id, { onDelete: "cascade" }),
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
     /** Which feed said it (`nflverse_snap_counts`, `nflverse_player_week`, `tank01`) — provenance,
      *  and the axis an ablation holds a whole source out on. */
     source: text("source").notNull(),
