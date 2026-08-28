@@ -16,6 +16,7 @@ import { ModerationSummary } from "./moderation-summary";
 import { StandingsTable } from "./standings-table";
 import { TradeInboxLink } from "./trade-inbox-link";
 import { WaitingRoom } from "./waiting-room";
+import { WeekStatusBadge } from "./week-status-badge";
 
 /**
  * The league's home screen. Deliberately NOT a client component: it composes, it does not
@@ -100,7 +101,11 @@ function DraftCompleteArrival({
 }) {
   const roster = [...lineup.starters, ...lineup.bench].filter((slot) => slot.playerId !== null);
   return (
-    <Card as="section" data-testid="draft-complete-arrival" aria-label="Your draft is in the books" className="flex flex-col gap-3">
+    // `interactive` (rule 4's amendment, the fun pass): this card holds the two links a manager
+    // presses in the moment their draft ends, which is the "a thing you act on may be a card"
+    // half of the test. The depth response is the card's, never a second click target: the links
+    // inside it are still the only things you can press.
+    <Card as="section" interactive data-testid="draft-complete-arrival" aria-label="Your draft is in the books" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
         <h2 className={EYEBROW}>Your draft is in the books</h2>
         <span className="text-sm text-text-muted">{matchupHeadline(matchup)}</span>
@@ -174,13 +179,17 @@ export function LeagueHome({
 
   return (
     <>
-      <header className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-elevated p-3 shadow-card">
+      {/* The `Card` primitive, not a hand-rolled copy of it: this header spelled
+          `rounded-lg border border-line bg-surface-elevated shadow-card` inline, which is
+          `Card`'s own base string with a different padding step. One surface vocabulary, spelled
+          in one file (the fun pass, Task 11). */}
+      <Card as="header" className="flex flex-wrap items-center gap-3">
         <Crest id={home.leagueId} name={home.name} size={40} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <PageTitle>{home.name}</PageTitle>
           <p className="text-sm text-text-muted">{headerFacts(home)}</p>
         </div>
-      </header>
+      </Card>
 
       {draftJustCompleted ? (
         <DraftCompleteArrival leagueId={home.leagueId} draftId={home.draftId} lineup={lineup!} matchup={home.myMatchup!} />
@@ -231,7 +240,19 @@ export function LeagueHome({
 
       <section className="flex flex-col gap-2" aria-label={`${formatWeek(home.currentWeek)} matchup`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-medium text-text-primary">{formatWeek(home.currentWeek)}</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* THE WEEK, ON THE DISPLAY SCALE (the fun pass, Task 11). The two things a manager
+                opens this page for are which week it is and what happened in it, and the week
+                rendered at 18px — the same size as the "All matchups" link beside it. Range from
+                size, never from weight: rule 2's ≤600 cap did not move. */}
+            <h2 className="font-display text-display-sm font-semibold leading-display text-text-primary">{formatWeek(home.currentWeek)}</h2>
+            {/* Only on a bye. The scoreboard below carries this same badge for every manager who
+                HAS a matchup, and a week that said "Live" twice on one band would be the
+                template-shaped repetition the fun pass is undoing. A manager with no matchup used
+                to be told nothing at all about the week's state, because the one place that fact
+                lived was inside a scoreboard they never saw. */}
+            {home.myMatchup === null ? <WeekStatusBadge status={home.weekStatus} /> : null}
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link className="text-sm text-accent underline" href={`/app/leagues/${home.leagueId}/matchups/${home.currentWeek}`}>
               All matchups
@@ -250,7 +271,10 @@ export function LeagueHome({
         {home.myMatchup === null ? (
           <p className="text-text-muted">You have no matchup this week.</p>
         ) : (
-          <MatchupScoreboard matchup={home.myMatchup} myTeamId={home.myTeamId} />
+          // `size="hero"`: this is the manager's OWN matchup on the page whose subject it is, so
+          // it takes the register the matchup page uses rather than the tile register `/app`'s
+          // grid of league cards needs.
+          <MatchupScoreboard matchup={home.myMatchup} myTeamId={home.myTeamId} size="hero" />
         )}
         {/* Same visibility the retired "Score Week" button had: the commissioner's control is
             gone, and this is what replaced it — an explanation of why, not a silent absence. */}

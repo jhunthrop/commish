@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import type { TeamStandingsRow } from "../contract";
-import { Avatar, Badge, Button, EmptyState, InfoTip, Table, type TableColumn } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, InfoTip, Stat, Table, type TableColumn } from "@/components/ui";
 import type { HelpLevel } from "@/identity/preferences";
 import { formatPoints, formatRecord } from "../lib/format";
+import { comparisonWithin } from "../lib/population";
 
 type SortKey = "rank" | "pointsFor" | "pointsAgainst";
 
@@ -20,6 +21,15 @@ const ORDER_BY: Readonly<Record<SortKey, (row: TeamStandingsRow) => number>> = {
   pointsFor: (row) => row.pointsFor,
   pointsAgainst: (row) => row.pointsAgainst,
 };
+
+/**
+ * The two populations this table can honestly name, in the words a manager would use — `Stat`
+ * builds a sentence around them verbatim ("Top 8% of teams by points for."), so they are noun
+ * phrases and the second one carries its own direction. A league is the whole population here:
+ * unlike the matchup page, there is nothing wider to compare a team's season against.
+ */
+const POINTS_FOR_POPULATION = "teams by points for";
+const POINTS_AGAINST_POPULATION = "teams by fewest points allowed";
 
 export interface StandingsTableProps {
   readonly rows: readonly TeamStandingsRow[];
@@ -70,6 +80,13 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false, 
   const showClinchBadges = rows.length > 0 && rows.some((row) => !row.clinched);
   const firstOutId = firstTeamOutId(rows, playoffTeams);
 
+  // The heat map's two populations (the fun pass, Task 10). Read off `rows` — the whole league,
+  // in the server's own ranking — never off `ordered`: a re-sort reshuffles what the reader sees
+  // and changes nothing about where a number stands among its peers, and a percentile that moved
+  // when you pressed "Sort by points against" would be telling you about the sort, not the season.
+  const pointsFor = useMemo(() => rows.map((row) => row.pointsFor), [rows]);
+  const pointsAgainst = useMemo(() => rows.map((row) => row.pointsAgainst), [rows]);
+
   const sortable = (key: SortKey, label: string) => (
     <button type="button" className="underline" onClick={() => setSort(key)}>
       {`Sort by ${label}`}
@@ -103,14 +120,49 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false, 
       ),
       cell: (row) => <span className="font-mono">{formatRecord(row)}</span>,
     },
-    // Step 2: the mocks' own dense numerals — `font-mono` (tabular by construction, see
-    // `docs/design-system.md`'s "Type" section) on every number this table renders, standings'
-    // own record included, so a re-sort never shifts a column's digits sideways.
-    { key: "pointsFor", header: "Points for", cell: (row) => <span className="font-mono">{formatPoints(row.pointsFor)}</span>, numeric: true },
+    // THE HEAT MAP (the fun pass, Task 10). The two columns a reader cannot get from the row
+    // order — the record above is what the table is sorted BY, so tinting it would spend the heat
+    // on a fact position already tells, which is the "louder without making a true thing more
+    // legible" failure rule 6 rejects.
+    //
+    // `srOnlyLabel`: the `<th>` is the column's label, on screen and announced, and a caption
+    // under each of twelve numbers would be the document grammar this pass exists to undo.
+    // `items-end` aligns the `Stat`'s flex column inside a `numeric` (right-aligned) cell.
+    // Tabular alignment survives the change — `Stat` carries `tabular-nums` on the display face
+    // where these cells used to carry `font-mono` (which is tabular by construction, see
+    // `docs/design-system.md`'s "Type" section), so a re-sort still never shifts digits sideways.
+    {
+      key: "pointsFor",
+      header: "Points for",
+      cell: (row) => (
+        <Stat
+          label="Points for"
+          srOnlyLabel
+          size="sm"
+          value={formatPoints(row.pointsFor)}
+          comparison={comparisonWithin(pointsFor, row.pointsFor, POINTS_FOR_POPULATION)}
+          className="items-end"
+        />
+      ),
+      numeric: true,
+    },
     {
       key: "pointsAgainst",
       header: "Points against",
-      cell: (row) => <span className="font-mono">{formatPoints(row.pointsAgainst)}</span>,
+      // The one column in this product where the biggest number is the worst one. The population
+      // is NAMED in the direction the ramp reads ("teams by fewest points allowed") because
+      // `Stat` speaks it out loud — "Top 8% of teams by points against" would be a true tint
+      // under a false sentence.
+      cell: (row) => (
+        <Stat
+          label="Points against"
+          srOnlyLabel
+          size="sm"
+          value={formatPoints(row.pointsAgainst)}
+          comparison={comparisonWithin(pointsAgainst, row.pointsAgainst, POINTS_AGAINST_POPULATION, "lower-is-better")}
+          className="items-end"
+        />
+      ),
       numeric: true,
       hideOnNarrow: true,
     },

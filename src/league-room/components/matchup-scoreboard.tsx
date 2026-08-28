@@ -11,7 +11,27 @@ export interface MatchupScoreboardProps {
    *  other two callers, are unaffected; the matchup page (`MatchupPanel`) always supplies both. */
   readonly gamesFinal?: number;
   readonly gamesTotal?: number;
+  /**
+   * Which register the two scores render at (the fun pass, Task 9).
+   *
+   * `"card"` (the default) is 44px — this component is also a tile inside a grid of league cards
+   * on `/app` (`HomeLeagueCard`), where the hero size would be a shout rather than a hierarchy,
+   * and that caller must stay byte-identical. `"hero"` is for the two surfaces whose whole
+   * subject IS this matchup: the weekly matchup page and the league home's own week band.
+   */
+  readonly size?: "card" | "hero";
 }
+
+/**
+ * The two registers, and the reason the hero one is responsive: 82px is a desktop matchup hero,
+ * never a 360px phone (the same `text-display-* sm:text-display-*` idiom the front door's own
+ * headline already uses). Rule 2 is untouched — the range is entirely in `text-display-*`, and
+ * `font-semibold` (600) is the cap in both.
+ */
+const SCORE_SIZE: Readonly<Record<"card" | "hero", string>> = {
+  card: "text-display-lg",
+  hero: "text-display-xl sm:text-display-2xl",
+};
 
 /** E1(a)+(c): "You are up 7.40. 6 of 13 games final." — the two facts the review named
  *  (`docs/research/2026-08-27-competition-review.md`, D2/E3) composed into one sentence, from
@@ -53,7 +73,7 @@ function honestLine(matchup: MatchupSummary, myTeamId: string | null, gamesFinal
  * (Task 9: the caps charter treats DOM text as data, not CSS, so this was the one literal
  * left shouting after Task 3's class-level sweep — respelled sentence-case here to match).
  */
-export function MatchupScoreboard({ matchup, myTeamId, gamesFinal, gamesTotal }: MatchupScoreboardProps) {
+export function MatchupScoreboard({ matchup, myTeamId, gamesFinal, gamesTotal, size = "card" }: MatchupScoreboardProps) {
   const decided = matchup.final && matchup.homeScore !== null && matchup.awayScore !== null;
   const homeWon = decided && matchup.homeScore! > matchup.awayScore!;
   const awayWon = decided && matchup.awayScore! > matchup.homeScore!;
@@ -70,7 +90,13 @@ export function MatchupScoreboard({ matchup, myTeamId, gamesFinal, gamesTotal }:
         {name}
         {teamId === myTeamId ? <span className="ml-1.5 align-middle text-xs font-semibold text-accent">You</span> : null}
       </p>
-      <p className={`font-display text-display-lg font-semibold tabular-nums leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
+      {/* NOT a `Stat`, deliberately (the fun pass, Task 9): this number already carries an ink
+          meaning — a decided matchup's loser recedes and its winner keeps full ink — and
+          magnitude is the ONE thing a `Stat`'s ink says. A score that was both "you lost" and
+          "top 10% of the league this week" would have to spend one channel on two facts, and the
+          reader could not tell which one the colour meant. The heat goes where it has a
+          population and no competing meaning: the player lines below (`MatchupPanel`). */}
+      <p className={`font-display ${SCORE_SIZE[size]} font-semibold tabular-nums leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
         {score === null ? "—" : formatPoints(score)}
       </p>
     </div>

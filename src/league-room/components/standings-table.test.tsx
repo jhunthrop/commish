@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
 import { renderSurface } from "@/components/ui/test-utils";
+import type { TeamStandingsRow } from "../contract";
 import { ALL_CLINCHED_STANDINGS, STANDINGS } from "../test-fixtures";
 import { StandingsTable } from "./standings-table";
 
@@ -29,12 +30,23 @@ describe("StandingsTable", () => {
     expect(screen.getByRole("button", { name: "What is a record?" })).toBeInTheDocument();
   });
 
-  // Step 2: dense numerals — `font-mono` on every number this table renders, the record cell
-  // included, so a re-sort never shifts a column's digits sideways.
-  it("renders its numbers in font-mono, record included", () => {
+  /**
+   * Step 2's invariant was "dense numerals — `font-mono` on every number this table renders, the
+   * record cell included, so a re-sort never shifts a column's digits sideways." The INVARIANT is
+   * unchanged and still asserted; the spelling of it moved for the points columns only.
+   *
+   * The fun pass (Task 10) made both points columns `Stat`s, which is the product's one renderer
+   * of magnitude colour — and `Stat` reaches tabular alignment through `tabular-nums` on the
+   * display face rather than through `font-mono`. Pinning `font-mono` there would have banned the
+   * heat map from the table it pays off most in, to defend a property the replacement also has.
+   * The record cell keeps `font-mono` exactly as before: it is not a `Stat` and never became one.
+   */
+  it("keeps every number tabular so a re-sort never shifts a column's digits sideways", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
     expect(screen.getByText("9-4").className).toContain("font-mono");
-    expect(screen.getByText("1412.50").className).toContain("font-mono");
+    // `Stat` wraps its value in a bare span inside the run that carries the numeric styling, so
+    // the classes live one level up — the same reach `stat.test.tsx` makes.
+    expect(screen.getByText("1412.50").parentElement!.className).toContain("tabular-nums");
   });
 
   it("renders dense, the mocks' own 11px vertical cell padding", () => {
@@ -163,5 +175,79 @@ describe("StandingsTable", () => {
     expect(
       screen.getByText("Ties in the standings break on points for. Clinched means a guaranteed playoff spot. Records include each week's median game."),
     ).toBeInTheDocument();
+  });
+
+  /**
+   * THE HEAT MAP ON THE STANDINGS (the fun pass, Task 10 — `docs/design/2026-08-27-fun-pass-
+   * spec.md`). The table stays a table: rule 4's amended test is "a thing you act on or compare
+   * against its neighbours may be a card; a thing you read down a column stays a row", and the
+   * standings is the canonical column you read down. What changes is that its two points columns
+   * stop being the same colour as every other number in the product.
+   *
+   * The population is this league's own teams, which is the only genuine one a standings table
+   * has — and it is why a three-row fixture (every other test above) still renders plain ink.
+   */
+  describe("magnitude on the points columns", () => {
+    const SIX: readonly TeamStandingsRow[] = [1400, 1300, 1200, 1100, 1000, 900].map((pointsFor, index) => ({
+      teamId: `x${index}`,
+      teamName: `Team ${index}`,
+      wins: 10 - index,
+      losses: index,
+      ties: 0,
+      pointsFor,
+      // Deliberately the REVERSE order: the team scoring most also allows most, so a test that
+      // passed by reading the wrong column would be caught.
+      pointsAgainst: 900 + index * 100,
+      clinched: false,
+      ownerDisplayName: `Owner ${index}`,
+      ownerAvatar: null,
+    }));
+
+    it("ranks points for against the league, and says which population it used", () => {
+      render(<StandingsTable rows={SIX} myTeamId="x0" />);
+      expect(screen.getByText("Top 8% of teams by points for.")).toBeInTheDocument();
+      expect(screen.getByText("Bottom 8% of teams by points for.")).toBeInTheDocument();
+    });
+
+    it("reads points against in the direction it is actually judged, where the biggest number is the worst", () => {
+      render(<StandingsTable rows={SIX} myTeamId="x0" />);
+      // `x0` allows the FEWEST (900) and therefore sits at the top of a population named for that
+      // direction. A ramp that ranked it by raw size would paint the best defense in the league
+      // as its worst number.
+      expect(screen.getByText("Top 8% of teams by fewest points allowed.")).toBeInTheDocument();
+      expect(screen.getByText("Bottom 8% of teams by fewest points allowed.")).toBeInTheDocument();
+    });
+
+    it("leaves the record alone, because the row order already ranks it", () => {
+      const { container } = render(<StandingsTable rows={SIX} myTeamId="x0" />);
+      // Two heat-coloured cells per row and no more. A record is what the table is SORTED by —
+      // tinting it would spend the heat map on a fact the reader gets from position, which is the
+      // "louder without making a true thing more legible" failure rule 6 rejects.
+      expect(screen.getByText("10-0").className).toContain("font-mono");
+      expect(container.querySelectorAll("[data-magnitude]")).toHaveLength(SIX.length * 2);
+    });
+
+    it("keeps the ranking readable with the hue switched off", () => {
+      const { container } = render(<StandingsTable rows={SIX} myTeamId="x0" />);
+      expect(container.textContent).toContain("▲");
+      expect(container.textContent).toContain("▼");
+      // The first channel, and the least negotiable: whatever the tint is doing, the number is on
+      // screen as its own number. (Twice here — 1400 is both the top scorer's points for and the
+      // worst defense's points against.)
+      expect(screen.getAllByText("1400.00")).toHaveLength(2);
+    });
+
+    it("stays plain ink for a league too small to rank inside", () => {
+      const { container } = render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
+      const steps = Array.from(container.querySelectorAll("[data-magnitude]")).map((el) => el.getAttribute("data-magnitude"));
+      expect(steps.length).toBeGreaterThan(0);
+      expect(steps.every((step) => step === "neutral")).toBe(true);
+    });
+
+    it("is axe-clean with the heat on, in both themes", async () => {
+      await renderSurface(<StandingsTable rows={SIX} myTeamId="x0" />, async ({ container }) => {
+        expect(await axe(container)).toHaveNoViolations();
+      });
+    });
   });
 });

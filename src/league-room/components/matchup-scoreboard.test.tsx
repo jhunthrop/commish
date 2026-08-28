@@ -96,4 +96,39 @@ describe("MatchupScoreboard", () => {
     expect(nameEl.className).toContain("truncate");
     expect(nameEl.className).toContain("w-full");
   });
+
+  /**
+   * THE SCORE BECOMES A REAL DISPLAY NUMBER (the fun pass, Task 9). The spec's third named cause
+   * of "it feels like a legal website" is that this product has almost no typographic dynamic
+   * range: "sports interfaces live on roughly 10x scale contrast — a huge number, a tiny label."
+   * A matchup's score is the single biggest number a manager looks at all week, and it rendered
+   * at the same 44px a card title uses.
+   *
+   * `size` exists because the same component is ALSO a tile in a grid of league cards on `/app`
+   * (`HomeLeagueCard`), where 82px would be a shout rather than a hierarchy. The default keeps
+   * that caller byte-identical; only the two surfaces whose whole subject is this one matchup ask
+   * for the hero.
+   */
+  describe("the score's own register", () => {
+    it("stays at card scale by default, so a shelf of league cards is unchanged", () => {
+      render(<MatchupScoreboard matchup={FINAL} myTeamId="t1" />);
+      expect(screen.getByText("121.40").className).toContain("text-display-lg");
+      expect(screen.getByText("121.40").className).not.toContain("text-display-2xl");
+    });
+
+    it("takes the top of the display scale when the whole page is about this one matchup", () => {
+      render(<MatchupScoreboard matchup={FINAL} myTeamId="t1" size="hero" />);
+      const score = screen.getByText("121.40").className;
+      // Responsive by construction: 82px is a desktop matchup hero, never a 360px phone — the
+      // same `text-display-* sm:text-display-*` idiom the front door's own headline uses.
+      expect(score).toContain("text-display-xl");
+      expect(score).toContain("sm:text-display-2xl");
+    });
+
+    it("gets its range from size and never from a heavier face, at either register", () => {
+      // Rule 2 did not move with the fun pass: the weight cap is 600.
+      const { container } = render(<MatchupScoreboard matchup={FINAL} myTeamId="t1" size="hero" />);
+      expect(container.innerHTML).not.toContain("font-bold");
+    });
+  });
 });

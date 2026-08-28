@@ -1,7 +1,11 @@
 import type { HTMLAttributes } from "react";
 
 export interface CardProps extends HTMLAttributes<HTMLElement> {
-  readonly as?: "div" | "section" | "article";
+  /** `header` joined the union with the fun pass (Task 11): a page's own title block is a card
+   *  in every visual respect and a `<header>` in every semantic one, and spelling `Card`'s base
+   *  classes inline to keep the element was how the league home ended up with a second copy of
+   *  the surface vocabulary. */
+  readonly as?: "div" | "section" | "article" | "header";
   /**
    * RULE 4'S AMENDED TEST, in code (`docs/design/2026-08-27-fun-pass-spec.md`, founder-approved
    * 2026-08-27): **a thing you act on or compare against its neighbours may be a card; a thing

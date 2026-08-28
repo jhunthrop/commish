@@ -37,16 +37,34 @@ describe("ProofStrip (repointed by storefront review R1)", () => {
     expect(queryByText(/member rating/)).not.toBeInTheDocument();
   });
 
-  // Task 7 (Spec): the strip re-renders as the mock's score chips — hairline-bordered
-  // rounded-lg, mono tabular numbers, quiet labels.
-  it("renders each stat as a hairline-bordered score chip with a mono tabular number", () => {
+  /**
+   * Task 7 (Spec) made the strip the mock's hairline-bordered score chips. The hairline and the
+   * tabular numerals are unchanged and still asserted here; what moved is the FACE and the SIZE.
+   *
+   * The fun pass (Task 12): the front door's own numbers are the storefront's proof, and they
+   * rendered at 22px beside a 14px label — 1.6x, where the spec's third named cause of "it feels
+   * like a legal website" is "sports interfaces live on roughly 10x scale contrast". They are on
+   * the display scale now, over their labels rather than beside them, which is the shape a
+   * scoreboard has. `font-mono` gives way to the display face carrying `tabular-nums`, the same
+   * pairing `Stat` uses everywhere else in this pass — one product, one way of setting a number.
+   */
+  it("renders each stat as a hairline-bordered score chip, its number on the display scale and tabular", () => {
     const { getByText } = render(<ProofStrip stats={FULL_STATS} />);
     const number = getByText("247");
-    expect(number.className).toContain("font-mono");
+    expect(number.className).toContain("font-display");
     expect(number.className).toContain("tabular-nums");
+    // Responsive: 44px is a desktop scoreboard, never a 360px phone.
+    expect(number.className).toContain("text-display-md");
+    expect(number.className).toContain("sm:text-display-lg");
     const chip = number.closest("p");
     expect(chip?.className).toContain("rounded-lg");
     expect(chip?.className).toContain("border-line");
+  });
+
+  it("takes its range from size and never from a heavier face", () => {
+    // Rule 2 did not move with the fun pass: the cap is 600.
+    const { container } = render(<ProofStrip stats={FULL_STATS} />);
+    expect(container.innerHTML).not.toContain("font-bold");
   });
 
   it("prints leaguesFilled in ink and the live roomsFillingNow count in text-negative", () => {
