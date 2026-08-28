@@ -81,7 +81,13 @@ export function ChatComposer({ sending, onSend, gifSearchEnabled, onSearchGifs }
             Add a GIF
           </Button>
         ) : null}
-        <Button type="submit" loading={sending} disabled={sending}>
+        {/* SECONDARY, not the default ink. The composer renders inside the league home, whose one
+            ink action is the week's act (set your lineup, watch the scores). A chat sidebar's Send
+            competing with that is law 5's exact failure: two loud verbs, and the manager has to
+            decide which of them the page wanted. Chat is a thing you can do here, not the thing
+            you came for. Not `verb` either: that fill is the money channel, and sending a message
+            moves no money. */}
+        <Button type="submit" variant="secondary" loading={sending} disabled={sending}>
           Send
         </Button>
       </div>
