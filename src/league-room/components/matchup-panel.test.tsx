@@ -120,10 +120,14 @@ describe("MatchupPanel", () => {
 
   // Step 3c: the last two `Table` consumers to converge dense (the other is `budget-table.tsx`,
   // Task 12) — see `table.tsx`'s own docblock for the density-default decision this leaves.
-  it("renders its starters table dense, the mocks' own 11px vertical cell padding", () => {
+  it("renders its starters table dense, at Gameday's own 7px vertical cell padding", () => {
     render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
     const headerCell = screen.getAllByRole("columnheader", { name: "Player" })[0]!;
-    expect(headerCell).toHaveStyle({ paddingTop: "11px", paddingBottom: "11px" });
+    // Gameday law 4, density is respect (2026-08-28): v3 set this at 11px, which was the
+    // Sunday Standard mock's own figure and airier than a fantasy table wants. A manager on a
+    // Sunday reads more rows, not calmer ones. Read from `UI_CONFIG.table` rather than pinned as a
+    // literal twice over.
+    expect(headerCell).toHaveStyle({ paddingTop: "7px", paddingBottom: "7px" });
   });
 
   // Gauntlet fix wave, NEW-10: `Pos` (a `PositionBadge` sticker) used to be its own column here,
