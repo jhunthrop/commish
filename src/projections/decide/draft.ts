@@ -141,6 +141,19 @@ function filledSlots(placements: readonly Placement[]): readonly RosterSlot[] {
   });
 }
 
+/**
+ * Whether this roster can legally take another player at that position, asked of the engine's own
+ * oracle. Exported because the draft replay needs the identical answer: a replay that let a seat
+ * roster nine quarterbacks would be scoring a draft the room would have refused.
+ */
+export function canRoster(
+  roster: readonly RosteredPlayer[],
+  position: Position,
+  slotConfig: readonly RosterSlotConfig[],
+): boolean {
+  return assignSlot({ position, roster: filledSlots(placeRoster(roster, slotConfig)), slotConfig }).ok;
+}
+
 interface NeedVerdict {
   readonly weight: number;
   readonly slot: RosterSlotType | null;

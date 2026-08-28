@@ -1,7 +1,8 @@
 import type { Position } from "@/domain/player";
-import { BENCH_SLOT, type RosterSlotConfig, type RosterSlotType } from "@/domain/roster";
+import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import { chanceOfClearing } from "./normal";
 import { standardDeviationOf, type ProjectionDistribution } from "./outlook";
+import { assignStarters, eligibleFor, spotKey, startingSpots, type StartingSpot } from "./slots";
 
 /**
  * START AND SIT: FLOOR WHEN YOU ARE AHEAD, CEILING WHEN YOU ARE BEHIND.
@@ -80,57 +81,8 @@ export interface LineupDecision {
   readonly winProbability: number;
 }
 
-interface Spot {
-  readonly slot: RosterSlotType;
-  readonly slotIndex: number;
-  readonly eligiblePositions: readonly Position[];
-}
-
-/**
- * Starting spots, one per configured place, NARROWEST ELIGIBILITY FIRST.
- *
- * That order is not a heuristic here, it is what makes the assignment optimal. This product's
- * eligibility sets are laminar - QB sits inside SUPERFLEX, and RB/WR/TE each sit inside FLEX
- * which sits inside SUPERFLEX - and for a laminar family, filling the most restrictive place
- * first with the best man it can take is provably the best whole lineup. Widest first is not: it
- * puts your best back in the flex and leaves your worst in the back slot.
- */
-function startingSpots(rosterSlots: readonly RosterSlotConfig[]): readonly Spot[] {
-  return rosterSlots
-    .filter((config) => config.slot !== BENCH_SLOT)
-    .flatMap((config) =>
-      Array.from({ length: config.count }, (_, slotIndex) => ({
-        slot: config.slot,
-        slotIndex,
-        eligiblePositions: config.eligiblePositions,
-      })),
-    )
-    .sort((a, b) => a.eligiblePositions.length - b.eligiblePositions.length);
-}
-
-function eligibleFor(spot: Spot, candidates: readonly LineupCandidate[], taken: ReadonlySet<string>): readonly LineupCandidate[] {
-  return candidates.filter(
-    (candidate) => !taken.has(candidate.playerId) && spot.eligiblePositions.includes(candidate.position),
-  );
-}
-
 function byExpectedPoints(a: LineupCandidate, b: LineupCandidate): number {
   return b.outlook.median - a.outlook.median || a.playerId.localeCompare(b.playerId);
-}
-
-/** The baseline: the lineup a manager gets by starting his best expected scorers. */
-function fillByExpectedPoints(
-  spots: readonly Spot[],
-  candidates: readonly LineupCandidate[],
-): ReadonlyMap<string, LineupCandidate | null> {
-  const taken = new Set<string>();
-  const filled = new Map<string, LineupCandidate | null>();
-  for (const spot of spots) {
-    const best = [...eligibleFor(spot, candidates, taken)].sort(byExpectedPoints)[0] ?? null;
-    if (best !== null) taken.add(best.playerId);
-    filled.set(`${spot.slot}:${spot.slotIndex}`, best);
-  }
-  return filled;
 }
 
 export function startSit({ candidates, rosterSlots, matchup }: StartSitQuery): LineupDecision {
@@ -140,7 +92,8 @@ export function startSit({ candidates, rosterSlots, matchup }: StartSitQuery): L
     );
   }
   const spots = startingSpots(rosterSlots);
-  const baseline = fillByExpectedPoints(spots, candidates);
+  // The baseline: the lineup a manager gets by starting his best expected scorers.
+  const baseline = assignStarters(spots, candidates, (candidate) => candidate.outlook.median);
   const spreadOf = (candidate: LineupCandidate): number => standardDeviationOf(candidate.outlook);
 
   const baselineVariance =
@@ -152,8 +105,8 @@ export function startSit({ candidates, rosterSlots, matchup }: StartSitQuery): L
    * there. Everything not under consideration is held at its baseline value, which is what makes
    * the comparison between two candidates for one spot a fair one.
    */
-  const winIfStarted = (spot: Spot, candidate: LineupCandidate): number => {
-    const incumbent = baseline.get(`${spot.slot}:${spot.slotIndex}`) ?? null;
+  const winIfStarted = (spot: StartingSpot, candidate: LineupCandidate): number => {
+    const incumbent = baseline.get(spotKey(spot)) ?? null;
     const incumbentPoints = incumbent?.outlook.median ?? 0;
     const incumbentVariance = incumbent === null ? 0 : spreadOf(incumbent) ** 2;
     const variance = baselineVariance - incumbentVariance + spreadOf(candidate) ** 2;
