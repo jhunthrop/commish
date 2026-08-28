@@ -2,16 +2,31 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { sourceFilesIn } from "./test-support";
+import { MICRO_LABEL } from "@/components/ui/config";
 
 /**
- * THE CAPS CHARTER, APPLIED TO SOURCE: no capitals anywhere, enforced forever.
+ * THE CAPS CHARTER, APPLIED TO SOURCE: no `.tsx` file spells the word Tailwind uses to shout.
  *
- * v3 "Sunday Standard" rule 3 removes every `text-transform: uppercase` from the product —
+ * v3 "Sunday Standard" rule 3 removed every `text-transform: uppercase` from the product —
  * league names, eyebrows, section labels, wordmarks, chips, all of it (the 2026-08-24 UX
- * remediation audit inventoried 43 sites; the founder-approved mock has zero). Like the hex
- * ban next door (`no-raw-color.source.test.ts`), the rule only survives contact with the next
- * hundred class strings if a test enforces it, so this sweep walks the same directories and
- * fails any `.tsx` file that spells the one word Tailwind uses to shout: `uppercase`.
+ * remediation audit inventoried 43 sites). Like the hex ban next door
+ * (`no-raw-color.source.test.ts`), the rule only survives contact with the next hundred class
+ * strings if a test enforces it, so this sweep walks the same directories and fails any `.tsx`
+ * file that spells `uppercase`.
+ *
+ * GAMEDAY (v4) CARVES OUT ONE ADDRESS, NOT ONE EXCEPTION PER CALL SITE. The design system's
+ * "What stays" clause reads: *"Sentence case in prose. Uppercase survives only in mono
+ * micro-labels, where every sports interface has always put it."* The sweep below is therefore
+ * UNCHANGED in strictness — no `.tsx` may spell the class — and the one sanctioned all-caps
+ * register lives in `src/components/ui/config.ts` as `MICRO_LABEL`, a `.ts` file this sweep does
+ * not walk because it renders nothing.
+ *
+ * That placement is the whole enforcement: a component that wants shouted capitals imports the
+ * constant, and a component that hand-rolls the class still fails here. The charter's real
+ * target was forty-three treatments drifting apart from one another, and routing every one of
+ * them through a single constant is the opposite of that rather than a hole in it. The guard
+ * test below pins `MICRO_LABEL`'s existence and spelling, so the carve-out cannot silently
+ * become "uppercase is fine again" by the constant being deleted or renamed.
  *
  * MATCHING IS DELIBERATELY BLUNT — the raw, case-sensitive string, comments included:
  *
@@ -78,5 +93,22 @@ describe("nothing outside the acronym allowlist forces text to uppercase", () =>
   it("catches the class string and exempts the data transform", () => {
     expect('className="uppercase tracking-wide"'.includes(BANNED)).toBe(true);
     expect("name.slice(0, 2).toUpperCase()".includes(BANNED)).toBe(false);
+  });
+
+  /**
+   * GAMEDAY'S ONE ADDRESS FOR CAPITALS, pinned. `MICRO_LABEL` is the only sanctioned all-caps
+   * register in the product (see this file's docblock), and it earns that by living in a `.ts`
+   * module the sweep above does not walk. Two ways that could rot silently, both closed here:
+   * the constant is deleted or renamed (and every micro-label goes back to being hand-rolled),
+   * or it quietly stops being all-caps (and the carve-out is dead armor protecting nothing).
+   */
+  it("keeps the one sanctioned all-caps register alive, and actually capitalised", () => {
+    const config = readFileSync(join(REPO_ROOT, "src/components/ui/config.ts"), "utf8");
+    expect(config).toContain("export const MICRO_LABEL");
+    expect(config).toContain(BANNED);
+    // Mono is half the carve-out's justification — capitals are legible at 11px in a mono face
+    // and muddy in the display face, which is why the exception is narrow to micro-labels.
+    expect(MICRO_LABEL).toContain("font-mono");
+    expect(MICRO_LABEL).toContain(BANNED);
   });
 });

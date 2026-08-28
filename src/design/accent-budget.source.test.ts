@@ -32,15 +32,24 @@ import { sourceFilesIn, stripCommentsPreservingLines, bannedLines } from "./test
 const SWEPT_DIRS = ["src/components", "src/league-room", "src/draft-room", "src/chat-room", "src/account-room", "src/admin-room", "src/app"];
 
 /**
- * The data primitives where an accent fill IS the meaning (seats filling, money, you).
- * `button.tsx` is deliberately NOT here: its legacy `bg-accent` primary is exactly what this
- * sweep exists to retire — the ink pill (`bg-text-primary`, allowlisted below) replaces it.
+ * The primitives where an accent fill IS the meaning (seats filling, money, you) — and, since
+ * Gameday, the one control primitive allowed to fill with it.
+ *
+ * `button.tsx` WAS deliberately excluded here: under v3's rule 5 its legacy `bg-accent` primary
+ * was the exact thing this sweep existed to retire, and the ink pill replaced it. Gameday law 5
+ * ("the verb is obvious") replaces that rule and brings the fill back on purpose, narrowly: the
+ * `verb` variant, `rounded-md`, money-filled, allowed to repeat down a board — see `button.tsx`'s
+ * `VARIANT` docblock for why money is the correct pigment for an action rather than a free
+ * choice. The budget is unchanged in kind: green may fill exactly one control primitive, and a
+ * call site that hand-rolls the class still fails, which was always the failure mode (E8 was
+ * eleven copies of one CTA class string drifting apart, not one primitive owning it).
  */
 const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   "src/components/ui/meter.tsx",
   "src/components/ui/seat-meter.tsx",
   "src/components/ui/celebration.tsx",
   "src/components/ui/avatar.tsx",
+  "src/components/ui/button.tsx",
   "src/draft-room/components/budget-table.tsx",
 ];
 

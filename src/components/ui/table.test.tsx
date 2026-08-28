@@ -5,6 +5,7 @@ import { Table, type TableColumn } from "./table";
 import { Button } from "./button";
 import { EmptyState } from "./empty-state";
 import { renderSurface } from "./test-utils";
+import { UI_CONFIG } from "./config";
 
 interface Pick {
   readonly id: string;
@@ -82,16 +83,22 @@ describe("Table", () => {
     expect(screen.getByRole("columnheader", { name: "Team" }).className).toMatch(/hidden/);
   });
 
-  // Task 12 Step 3c (the closeout): every real consumer now wants the mocks' 11px padding, so
-  // that is what a caller gets by saying nothing at all — the same "no consumer left opted out"
-  // reasoning `table.tsx`'s own DENSITY-DEFAULT DECISION docblock records.
+  // Task 12 Step 3c (the closeout): every real consumer wants the dense padding, so that is what
+  // a caller gets by saying nothing at all — the same "no consumer left opted out" reasoning
+  // `table.tsx`'s own DENSITY-DEFAULT DECISION docblock records.
+  //
+  // Reads the figure from `UI_CONFIG` rather than restating it. Gameday law 4 moved it from 11px
+  // to 7px and this assertion was the only thing in the repo that disagreed — a test that pins a
+  // spacing VALUE is testing the token, while what earns its keep here is that the default
+  // reaches the DOM as an inline style at all (a templated `py-[Npx]` class ships no rule).
   it("defaults to dense padding now that every Table consumer in the product wants it", () => {
+    const dense = `${UI_CONFIG.table.denseRowPaddingPx}px`;
     render(<Table caption="Auction results" columns={columns} rows={rows} rowKey={(r) => r.id} empty={<p>None.</p>} />);
     const header = screen.getByRole("columnheader", { name: "Player" });
     expect(header.className).not.toMatch(/py-2/);
-    expect(header).toHaveStyle({ paddingTop: "11px", paddingBottom: "11px" });
+    expect(header).toHaveStyle({ paddingTop: dense, paddingBottom: dense });
     const cell = screen.getByText("Jalen Croft").closest("td")!;
-    expect(cell).toHaveStyle({ paddingTop: "11px", paddingBottom: "11px" });
+    expect(cell).toHaveStyle({ paddingTop: dense, paddingBottom: dense });
   });
 
   it("keeps the original, roomier padding available as an explicit opt-out", () => {

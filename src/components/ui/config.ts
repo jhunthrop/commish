@@ -102,10 +102,17 @@ export const UI_CONFIG = {
     lowSeatsThreshold: 3,
   },
   table: {
-    /** `Table`'s `density="dense"` vertical cell padding, px — the mocks' own spec. `comfortable`
-     *  keeps the table's original, more generous padding for a context that has not adopted the
-     *  shell's density. */
-    denseRowPaddingPx: 11,
+    /**
+     * `Table`'s `density="dense"` vertical cell padding, px. `comfortable` keeps the table's
+     * original, more generous padding for a context that has not adopted the shell's density.
+     *
+     * LAW 4, DENSITY IS RESPECT: 7px, down from v3's 11. The Gameday mock's Sunday table sets
+     * `padding: 0.45rem 0.6rem` — 7.2px vertical — and that table is the screen the law was
+     * written about: a manager staring at his starters for six hours wants the seventh row on
+     * screen, not air around the sixth. Four pixels a row is roughly one more starter visible
+     * without scrolling on a phone, which is the whole argument.
+     */
+    denseRowPaddingPx: 7,
   },
   waitingRoom: {
     /**
@@ -172,10 +179,32 @@ export const UI_CONFIG = {
 
 /**
  * The section-label treatment: a board header, a roster/queue heading, a sticky column header.
- * v3 "Sunday Standard" register — sentence case, mono, quiet (the caps charter removed the
- * old all-caps display treatment; `no-uppercase.source.test.ts` keeps it removed). A class
- * CONSTANT, not a component — the element varies (`span`/`h2`/`th`) and the color is often
- * conditional, so a caller composes this with its own color utility rather than a component
- * absorbing a `className` prop for the one thing it varies by.
+ * Sentence case, mono, quiet. A class CONSTANT, not a component — the element varies
+ * (`span`/`h2`/`th`) and the color is often conditional, so a caller composes this with its own
+ * color utility rather than a component absorbing a `className` prop for the one thing it
+ * varies by.
  */
 export const EYEBROW = "font-mono text-xs tracking-wide";
+
+/**
+ * THE MICRO-LABEL — the product's one sanctioned all-caps register, and the ONLY place law 2's
+ * "sentence case in prose" gives way.
+ *
+ * Gameday keeps v3's caps charter almost intact and carves out exactly one exception, stated in
+ * "What stays": *"Sentence case in prose. Uppercase survives only in mono micro-labels, where
+ * every sports interface has always put it."* That is the mock's `.lbl` — 11px Geist Mono, 0.11em
+ * tracking, the faint ink — and it appears on the things a scoreboard has always shouted quietly:
+ * a column header, a slot name, `248 LEFT`, `Q3`, the eyebrow over a stat block.
+ *
+ * WHY IT LIVES HERE AND NOWHERE ELSE. `no-uppercase.source.test.ts` bans the literal word
+ * `uppercase` from every `.tsx` in the product, and that ban does not relax — it now has exactly
+ * one address instead of none. A component that wants the register imports this constant; a
+ * component that spells the class itself still fails the sweep. The charter's real target was
+ * forty-three hand-rolled all-caps treatments drifting apart from each other, and one shared
+ * constant is the opposite of that, not a hole in it.
+ *
+ * Distinct from `EYEBROW` on purpose: an eyebrow is a sentence-case label above a block, a
+ * micro-label is a shouted key beside data. Both are mono and small; only one is capitals, and
+ * collapsing them would put capitals back on the prose labels the charter cleared.
+ */
+export const MICRO_LABEL = "font-mono text-xs uppercase tracking-[0.11em]";

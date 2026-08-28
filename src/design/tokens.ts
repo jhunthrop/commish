@@ -57,66 +57,58 @@ type MagnitudePalette = Readonly<Record<MagnitudeStep, string>>;
  * bounds a control a user must find (see `tokens.test.ts`'s "gives an interactive boundary its
  * own role"). One `ColorRole` union, one role set, two designed palettes.
  */
-interface Pigments {
-  readonly whistle: string;
-  readonly leaf: string;
-  readonly marker: string;
-  readonly clay: string;
-  readonly grape: string;
-  readonly slate: string;
-}
 
 /**
- * Dark — the room at night, and the v3 identity: the founder-approved Sunday Standard mock
- * (docs mock `sunday-standard.html`, approved 2026-08-24) is dark-first, and this is what it
- * specifies verbatim for the six roles it names directly (`surface`, `surfaceElevated`,
- * `surfaceInset`, `line`, `accent`, `negative`). v2's mint-on-ink identity is retired — the
- * founder rejected that direction outright; v3 is near-monochrome, with color reserved for
- * money (`accent`/`positive`) and live/failure (`negative`) rather than spread across the
- * surface. Every role NOT named by the mock (`surfaceRaised`, `edge`, `textFaint`, `warning`,
- * `info`, and both `*Text`/`*Glow` pairs) is derived here and proven against `tokens.test.ts` —
- * the gates that never moved.
+ * Dark — the flagship, and Gameday's own room (`docs/design/2026-08-28-gameday-spec.md`, the
+ * rendered artifact). The approved mock is a single dark page by construction, so for the
+ * ELEVATION RAMP it is the authority and this palette carries its ladder: page #1A1A21,
+ * surface #23252E, raised #2C2F3A, line #383C4A. Every value the mock names AND that survives a
+ * gate is here verbatim; the three that do not survive (`edge`, `textFaint`, and the position
+ * `def` sticker) are re-solved along their own hue and say so at their field.
+ *
+ * WHY THE RAMP IS FOUR GROUNDS AND NOT GAMEDAY'S NOMINAL FIVE. The mock declares a fifth step,
+ * `--overlay: #363A47`, brighter than `raised`, and never paints it — neither approved screen
+ * contains a modal. Shipping it costs a text role: at that luminance `textFaint` has to be
+ * brightened to #9FA4AF to clear 4.5:1, which is 1.02:1 from `textMuted` — the two quiet inks
+ * become literally the same colour, and the product loses the distinction between "secondary"
+ * and "tertiary" everywhere, to gain a ground nothing draws on. The magnitude ramp fails harder
+ * still: `bad` measures 4.11:1 there and cannot be fixed without collapsing the whole heat map
+ * upward into `weak`.
+ *
+ * So the fourth step is spent on the WELL (`surfaceInset`) rather than on an overlay, which is
+ * the step both approved screens actually use — the matchup's points-share track and the draft
+ * room's meters. Four grounds either way; Gameday puts its fourth above the card and we put ours
+ * below it, because that is the one the screens paint. A modal keeps `surfaceElevated`: a scrim
+ * already separates it from the page, so it needs no brighter ground of its own.
  */
 const dark: Palette = {
+  surface: "#1A1A21", // PAGE — the ground. The one value v3 and Gameday agree on verbatim.
+  surfaceElevated: "#23252E", // SURFACE — a card, a row, a panel. Gameday's `--surface`.
+  surfaceRaised: "#2C2F3A", // RAISED — a row lifted off its card, a meter track. Gameday's `--raised`.
+  surfaceInset: "#1F1F27", // the well: an unfilled meter, the wire's band. Below the ground, not above it.
+  line: "#383C4A", // the decorative hairline between two surfaces (Gameday's `--line`, verbatim)
   /**
-   * THE GROUND, LIFTED — founder ruling 2026-08-27, from the four-candidate study
-   * (`docs/design/2026-08-27-dark-ground-study.md`): "the dark mode is too dark", candidate C.
+   * The interactive boundary. Gameday's mock proposes #5A6072 and it CANNOT SHIP: measured
+   * against this ramp it is 2.76:1 on the page and 2.13:1 on a raised row, missing WCAG
+   * 1.4.11's 3:1 floor for the edge of a control a user has to find. The mock is a static
+   * page with no controls to bound, so nothing in it ever exercised the gate.
    *
-   * The v3 mock specified #0D0D0F, and shipping it taught us what the mock could not: at that
-   * floor the four-step depth model spans fifteen points of luminance, which nobody sees. Paired
-   * with rule 4 (hairlines, not boxes) every surface collapsed onto one plane and the room read
-   * as an absence rather than a designed ground — the founder's word for it was a void, looking
-   * at a finished mock draft.
-   *
-   * The fix is the RAMP more than the floor: this lifts the ground thirteen points but doubles
-   * the ground-to-raised span to thirty, so a panel reads as a panel without becoming a box. The
-   * near-monochrome identity is untouched — colour still means money (`accent`) and live
-   * (`negative`), and nothing here spreads pigment across the surface.
-   *
-   * Text softens with it (`textPrimary` #F4F4F6 → #EAEAF0): #F4F4F6 on this ground is 15.7:1,
-   * roughly twice what AAA asks, and that surplus reads as harsh rather than crisp — it halates
-   * on OLED. Every role below still clears its own gate in `tokens.test.ts`, which is the
-   * authority on that claim, not this comment.
+   * Solved the way every other pigment here is solved: keep the mock's hue and saturation
+   * (218°, the cool steel it chose), walk lightness up until the DIMMEST margin clears, and
+   * stop at the first value that does. Binding ground is `surfaceRaised`, at 3.03:1.
    */
-  surface: "#1A1A21", // slate — the ground
-  surfaceElevated: "#26262F", // card — a panel
-  // Derived: one step brighter than surfaceElevated, keeping the four-step depth model
-  // (ground darkest, then the inset well, then the panel, then a raised row/tile closest to the
-  // viewer) legible — and now actually visible, which was the whole point of the ruling.
-  surfaceRaised: "#2F2F39",
-  surfaceInset: "#1F1F27", // track, well, unfilled meter, the wire's band
-  line: "#3B3B47", // the decorative hairline between two surfaces
-  // Derived: a quiet, near-neutral gray (same cool family as textMuted) tuned so it clears
-  // WCAG 1.4.11's 3:1 against all three surfaces a control can sit on — the mock has no
-  // control-boundary value of its own.
-  edge: "#7A7A80", // lifted with the ground (2026-08-27 slate ruling); minimal hue-preserving bump to clear its gate
-  textPrimary: "#EAEAF0",
-  textMuted: "#9EA0AD",
-  // Derived: the mock's --faint (#5D5D66) is a night-appropriate gray but too dark to clear
-  // 4.5:1 against surfaceRaised (the brightest of the four surfaces textFaint is used on) —
-  // brightened, same hue family, until it clears the floor on all four. The token moves, the
-  // threshold does not.
-  textFaint: "#9898A0", // lifted with the ground (2026-08-27 slate ruling); minimal hue-preserving bump to clear its gate
+  edge: "#70788E",
+  textPrimary: "#EDEEF2", // Gameday's `--ink`
+  textMuted: "#A0A5B4", // Gameday's `--muted`
+  /**
+   * Gameday's `--faint` is #767C8C, which measures 4.15:1 on the page and 3.20:1 on a raised
+   * row — below the 4.5:1 floor on every surface in the ramp, the same way v3's mock value was.
+   * Brightened along its own hue until it clears the binding ground (`surfaceRaised`, 4.51:1).
+   *
+   * This role is the reason Gameday's fifth ground could not ship — see `TOKENS.color`'s
+   * elevation docblock below.
+   */
+  textFaint: "#9196A3",
   accent: "#3ECF8E", // money — links, focus rings, seat segments
   // Derived: a label ≥4.5:1 on the money fill. Money is never a button fill in v3, but the role
   // keeps a valid pair.
@@ -208,93 +200,72 @@ const light: Palette = {
 };
 
 /**
- * The Poster Board's marker set, one pack per theme, each re-derived against its own ground
- * (`dark.surface` #1A1A21, `light.surface` #FBFBFA).
+ * THE POSITION CHANNEL — law 1's third meaning, and the one value v3 got backwards.
  *
- * RETONED (LED-2, founder-delegated design ruling, 2026-08-24, persona-adjudicated) then
- * RE-DERIVED for v3's Sunday Standard grounds, same date: these six used to be a straight
- * doubling of a semantic role's own hex — `whistle` (QB) was literally `dark.negative`, `leaf`
- * (RB) was `dark.positive`, `marker` (WR) was `dark.info`, `clay` (TE) was `dark.warning`. The
- * gauntlet named that doubling as the product's last old-software signal: a full-cell sticker
- * fill at semantic-role saturation reads as a spreadsheet, not a board. The ruling is narrow —
- * position color STAYS as scanning information (the veteran reads the position off the color
- * before the letters), and the six hues stay distinct — only the SATURATION was the complaint.
- * Each pigment below is its own value, one HSL desaturation pass off the semantic hue it used
- * to share (60% of the semantic role's saturation, same hue, same lightness as a starting
- * point) — no longer pinned to the semantic role's own hex, so a position sticker and its
- * one-time semantic twin can move independently. `negative`, `positive`, `info` and `warning`
- * still carry full saturation everywhere else in the product (an error state should not read as
- * quiet), while the board's own fills read calmer.
+ * v3 desaturated these six to 60% of their semantic parent's saturation, on a 2026-08-24 ruling
+ * that a full-saturation sticker "reads as a spreadsheet, not a board". Gameday reverses it in
+ * one line: **a badge you have to read is not a badge.** The point of a position sticker is that
+ * a manager reads QB off the colour before his eye reaches the letters, and a pigment quiet
+ * enough to be polite is a pigment you have to read. These are the mock's own values.
  *
- * `marker` (WR, both themes' straight 60%-saturation point) and `clay` (TE, dark theme's) missed
- * the 4.5:1 text-on-surface floor once plugged into v3's near-monochrome grounds — those two
- * keep the same hue and a comparably reduced saturation but had their LIGHTNESS retuned (darker
- * for `marker` in daylight, brighter for `clay` at night) until they cleared. Every other
- * pigment's straight 60%-saturation/same-lightness value already cleared with margin, so it was
- * left alone — values move only as far as the gate requires.
+ * Five of the six ship verbatim from the approved mock, each with its near-black label:
+ * QB #F2685E, RB #35C98A, WR #4E9BF0, TE #E0A340, K #B98BF5.
  *
- * `grape` (K) and `slate` (DEF) never doubled a semantic role; `grape` gets the same
- * desaturation-pass hue family for consistency, `slate` is untouched — it was already the quiet
- * one by design (its meaning is "no color of its own"). Both cleared v3's grounds without
- * retuning, so neither value moved. `tokens.test.ts`'s sticker matrix is the gate this pass is
- * proven against, in both themes: every pairwise sticker still clears 1.5:1 contrast or 30° of
- * hue separation, and `marker`/`slate` (the one pair that was ALREADY hue-adjacent, ~0-9° apart,
- * riding on contrast alone) still clear it with margin to spare.
+ * **DEF is re-solved, because the mock's #6C7A93 clears no label at all.** It is a mid steel:
+ * near-black ink on it measures 4.20:1 and white measures 4.34:1, so BOTH miss the 4.5:1 floor —
+ * the classic mid-tone trap, where a fill is too dark for dark ink and too light for light. The
+ * fix keeps its hue (219°) and darkens it to #616D83, the first value at which the product's own
+ * `textPrimary` clears 4.5:1 on it. That also restores what DEF is FOR: its meaning is "no colour
+ * of its own", so it is supposed to be the quiet one, and a mid steel sitting between WR's blue
+ * and nothing in particular was never that.
  *
- * Task 1 fix round 1 retuned `light.negative` and `light.warning` further (a translucent-band
- * gap the sticker matrix can't see — see those two fields' own docblocks and `TOKENS.color
- * bands` in `tokens.test.ts`). The pigments below are UNCHANGED: a sticker fill is always
- * painted opaque, never composited into a translucent band, so the sticker matrix that already
- * proved these values stands. `whistle`/`clay`'s "was #…" comments below name the ANCHOR hex at
- * the time each pigment was derived, not `negative`/`warning`'s current value — the two roles
- * moved out from under an already-proven pigment, which is exactly what "no longer pinned to the
- * semantic role's own hex" (above) means in practice.
+ * DEF's fill is too dark to double as text on the room's surfaces, so it keeps the separate,
+ * brightened `text` variant v3 established for exactly this reason (#818CA1).
+ *
+ * LIGHT IS DESIGNED, NOT INVERTED (founder ruling 2026-08-23). Daylight takes the same six hues
+ * and walks each DOWN in lightness until white ink clears 4.5:1 on it and the pigment itself
+ * clears 4.5:1 as text on paper — one move that satisfies both, since the binding constraint is
+ * the same direction. Hues land within 2° of the mock's in every case, so a manager who switches
+ * themes sees the same six colours, not a second palette.
+ *
+ * `def` needs one extra constraint in daylight that it does not need at night: WR and DEF are
+ * 6° apart in hue (both blues), so the pairwise gate has to be carried by CONTRAST rather than
+ * hue, and `def` is darkened until it is 1.5:1 from `wr` — the same threshold that keeps the
+ * semantic roles apart. At night the two are separated by the same channel for the same reason.
+ *
+ * Every claim above is a number `tokens.test.ts` re-derives; none of it is asserted here.
+ *
  */
-const darkPigments: Pigments = {
-  whistle: "#DF867E", // v3 dark.negative #FF6B5E, 60% saturation, same hue/lightness
-  leaf: "#5BB28B", // v3 dark.accent/positive #3ECF8E, 60% saturation, same hue/lightness
-  marker: "#6790CE", // v3 dark.info #5F99F2, 60%-family saturation, lightness retuned for the slate ground
-  clay: "#A78C4A", // v3 dark.warning #BA9335, 60%-family saturation, lightness retuned to clear 4.5:1
-  grape: "#C2A2E8", // independent purple, unchanged — already clears v3's grounds
-  slate: "#3E4A5C", // unchanged — already the quiet one, already clears v3's grounds
-};
-
-const lightPigments: Pigments = {
-  whistle: "#B35750", // light.negative's Task 1 anchor #D43A2F (since retuned to #C23228), 60% saturation, same hue/lightness
-  leaf: "#1E5840", // v3 light.accent/positive #0B6B43, 60% saturation, same hue/lightness
-  marker: "#5D70AF", // v3 light.info #4C69CD, 60%-family saturation, lightness retuned to clear 4.5:1
-  clay: "#76612F", // light.warning's Task 1 anchor #8E6A17 (since retuned to #846315), 60% saturation, same hue/lightness
-  grape: "#6D528D", // independent purple, unchanged — already clears v3's grounds
-  slate: "#B9C0CB", // unchanged — already the quiet one, already clears v3's grounds
-};
 
 /** One sticker: the fill, the label printed on it, and the hue's text-on-surface variant. */
 function stickerOf(fill: string, label: string, text: string = fill): PositionColor {
   return { sticker: fill, stickerText: label, text };
 }
 
+/** The near-black the mock prints on every saturated sticker (`.pos { color: #14151A }`). */
+const STICKER_INK = "#14151A";
+
 const darkPositions: PositionPalette = {
-  qb: stickerOf(darkPigments.whistle, dark.negativeText),
-  rb: stickerOf(darkPigments.leaf, dark.accentText),
-  wr: stickerOf(darkPigments.marker, dark.negativeText),
-  te: stickerOf(darkPigments.clay, dark.negativeText),
-  k: stickerOf(darkPigments.grape, "#1A0B33"),
-  // DEF is the one sticker that stays dark: its meaning is "no color of its own", and a bright
-  // slate would be indistinguishable from the WR blue beside it. Its fill is too dark to read
-  // as text on the room's surfaces, so its `text` variant is a separate, brightened steel.
-  def: stickerOf(darkPigments.slate, dark.textPrimary, "#A9B4C4"),
+  qb: stickerOf("#F2685E", STICKER_INK),
+  rb: stickerOf("#35C98A", STICKER_INK),
+  wr: stickerOf("#4E9BF0", STICKER_INK),
+  te: stickerOf("#E0A340", STICKER_INK),
+  k: stickerOf("#B98BF5", STICKER_INK),
+  // DEF, re-solved from the mock's #6C7A93 — see this block's docblock. Darkened until the
+  // product's own ink clears it, which is also what makes it the quiet one again; its `text`
+  // variant is brightened separately because the fill itself is too dark to read on a surface.
+  def: stickerOf("#616D83", dark.textPrimary, "#818CA1"),
 };
 
 const lightPositions: PositionPalette = {
-  qb: stickerOf(lightPigments.whistle, "#FFFFFF"),
-  rb: stickerOf(lightPigments.leaf, "#FFFFFF"),
-  wr: stickerOf(lightPigments.marker, "#FFFFFF"),
-  te: stickerOf(lightPigments.clay, "#FFFFFF"),
-  k: stickerOf(lightPigments.grape, "#FFFFFF"),
-  // DEF is the quiet one in light too, inverted: its fill is a pale, muted steel — too LIGHT to
-  // read as its own label or as text on the room's surfaces, so it takes a dark label and a
-  // separate, darkened `text` variant, the mirror image of dark's brightened one.
-  def: stickerOf(lightPigments.slate, light.textPrimary, "#4B5563"),
+  qb: stickerOf("#E32012", "#FFFFFF"),
+  rb: stickerOf("#23835A", "#FFFFFF"),
+  wr: stickerOf("#1372DC", "#FFFFFF"),
+  te: stickerOf("#9C6A19", "#FFFFFF"),
+  k: stickerOf("#924BEF", "#FFFFFF"),
+  // Daylight DEF is dark enough to be its own text variant, so it takes no second value — the
+  // one place the light palette is simpler than the dark one rather than its mirror.
+  def: stickerOf("#535963", "#FFFFFF"),
 };
 
 /**
@@ -417,19 +388,103 @@ const teamColors: Readonly<Record<string, string>> = {
   WAS: "#5A1414",
 };
 
+/**
+ * The four grades a draft board's tier ladder carries, best first. `S` is the top break, then
+ * `A`, `B`, `C`; below the fourth break the pool draws no grade at all (see
+ * `src/draft-room/lib/tiers.ts`).
+ *
+ * Ordered, and the array order IS the ladder — the same contract `MAGNITUDE_STEPS` keeps, so
+ * `tokens.test.ts` can assert the ramp without restating the sequence.
+ */
+export const TIER_GRADES = ["S", "A", "B", "C"] as const;
+
+export type TierGrade = (typeof TIER_GRADES)[number];
+
+/**
+ * TIER GRADE — rule 1's second amended meaning, founder-approved 2026-08-27 and parked until the
+ * ranking could make tiers real (`docs/design-system.md`: *"S/A/B bands as coloured bars, once the
+ * projection engine makes tiers real. Parked until then; this amendment already covers it, so no
+ * second ruling is needed when it lands."*). It has landed: the pool tiers on ADP gaps, so the
+ * bands are measured rather than drawn, and this is the palette the amendment already sanctioned.
+ *
+ * The four values are the founder-approved mock's own (`Draft Room, Broadcast Cut`, 2026-08-27) —
+ * a warm-to-cool ramp read as a grade, not as a semantic role.
+ *
+ * Three things this is NOT, each one a rule somebody could reasonably think it breaks:
+ *
+ * - **Not the live family, even though `S` is a red.** `negative` is #FF6B5E and `S` is #FF7A6E,
+ *   which are neighbours on purpose: the mock puts the hottest grade at the hot end of the ramp.
+ *   What keeps them apart is that a grade is only ever an opaque BADGE FILL carrying its own dark
+ *   label, and `negative` is only ever ink, a hairline, or a 10% tint. The two never appear in the
+ *   same role, so neither can be mistaken for the other.
+ * - **Not theme-independent, though the mock's own values are.** The mock is a single dark room by
+ *   construction, and its four fills are bright pigments chosen against #1A1A21. Dropped onto the
+ *   light theme's near-white ground every one of them fails WCAG 1.4.11's 3:1 — a badge you cannot
+ *   find is not a divider, it is decoration. So this is TWO designed palettes over one ladder, the
+ *   same shape `TOKENS.position` keeps: dark carries the approved mock's values verbatim, light
+ *   carries the same four hues re-derived dark enough to be findable, with white ink on them.
+ * - **Not a CSS variable.** Keyed by DATA (the grade riding a pool row), the same reason
+ *   `teamColors` reaches the DOM as an inline `style` — a Tailwind class the static scanner cannot
+ *   see ships no rule at all, and this file is the only one allowed to hold a colour literal
+ *   (`no-raw-color.source.test.ts`).
+ *
+ * **The colourblind channel is the LETTER, not a caret.** Adjacent rungs of this ramp are close in
+ * hue on purpose (red, amber, gold — a warmth that cools as the grade falls), which is what makes
+ * it read as one ladder rather than four unrelated stickers. That is why `tokens.test.ts` does NOT
+ * hold tier pairs to the position stickers' pairwise-hue rule: a position sticker is a CATEGORY and
+ * must be told apart from every other, while a grade is an ORDER and is always printed with its own
+ * letter on it. What the gate does check is that the ladder's ends are genuinely far apart, so the
+ * ramp has real range, and that every badge is findable and every letter readable, in both themes.
+ */
+interface TierColor {
+  /** The badge's fill. ≥3:1 against `surface` and `surfaceElevated` in its own theme. */
+  readonly fill: string;
+  /** The grade letter printed ON the fill. ≥4.5:1 against it. */
+  readonly label: string;
+}
+
+type TierPalette = Readonly<Record<TierGrade, TierColor>>;
+
+/** The founder-approved mock's values verbatim, on the near-black ink it prints them with. */
+const darkTiers: TierPalette = {
+  S: { fill: "#FF7A6E", label: "#14140F" },
+  A: { fill: "#F5A248", label: "#14140F" },
+  B: { fill: "#E8CF5A", label: "#14140F" },
+  C: { fill: "#6FA8DC", label: "#14140F" },
+};
+
+/** The same four hues (6°, 30°, 48°, 217° against dark's 5°, 31°, 49°, 209°) taken down in
+ *  lightness until each clears 4.5:1 against white — which is what puts white ink on them and,
+ *  in one step, satisfies the 3:1 findability floor on every light surface with margin. */
+const lightTiers: TierPalette = {
+  S: { fill: "#BE3A2C", label: "#FFFFFF" },
+  A: { fill: "#A85B10", label: "#FFFFFF" },
+  B: { fill: "#7A6512", label: "#FFFFFF" },
+  C: { fill: "#2F5EA8", label: "#FFFFFF" },
+};
+
 export const TOKENS = {
   color: { light, dark },
   team: teamColors,
+  tier: { light: lightTiers, dark: darkTiers },
   magnitude: { light: lightMagnitude, dark: darkMagnitude },
   position: { light: lightPositions, dark: darkPositions },
   radius: { sm: 4, md: 8, lg: 12, pill: 999 },
   font: {
-    /** Base scale, px — what a phone gets. */
-    size: { xs: 12, sm: 13.5, md: 15, lg: 17, xl: 20, "2xl": 26, "3xl": 34 },
+    /**
+     * Base scale, px — what a phone gets.
+     *
+     * `xs` is 11, not 12 (law 2): 11px is the mock's micro-label everywhere it appears
+     * (`.lbl`, `.sb-rec`, table headers, the feed's timestamps) and it is the DENOMINATOR of the
+     * law's stated range. A score is 84 and its label is 11, which is 7.6x — the number law 2
+     * names. Move this and the range claim in `docs/design-system.md` stops being true, which is
+     * why `tokens.test.ts` asserts the ratio rather than the two values.
+     */
+    size: { xs: 11, sm: 13, md: 15, lg: 17, xl: 20, "2xl": 26, "3xl": 34 },
     /** The dense scale, px — emitted inside a min-width media query at
      *  `UI_CONFIG.shell.denseFromPx`. Same keys as `size`; a component never writes
      *  `text-sm lg:text-xs` because density is a property of the viewport, expressed once. */
-    sizeDense: { xs: 11, sm: 12.5, md: 13.5, lg: 15, xl: 17, "2xl": 22, "3xl": 30 },
+    sizeDense: { xs: 11, sm: 12, md: 13.5, lg: 15, xl: 17, "2xl": 22, "3xl": 30 },
     /**
      * Display scale, px — the display face only. Deliberately a SEPARATE scale from `size`:
      * these sizes interleave with the body scale numerically, and a display size is never a
@@ -453,8 +508,17 @@ export const TOKENS = {
      * own responsive decision (`text-display-lg sm:text-display-3xl`, the idiom E6 established
      * for the hero), because 116px is a TV board and a matchup hero, never a 360px phone.
      */
-    display: { sm: 20, md: 28, lg: 44, xl: 58, "2xl": 82, "3xl": 116 },
-    lineHeight: { display: 1.06, tight: 1.2, base: 1.5 },
+    display: { sm: 20, md: 28, lg: 44, xl: 58, "2xl": 84, "3xl": 116 },
+    /**
+     * LAW 4, DENSITY IS RESPECT — every step tighter than v3's (1.06 / 1.2 / 1.5).
+     *
+     * `display` drops below 1 because at 84px the line box is the number's own bounding box and
+     * anything looser puts air inside a scoreboard; the mock sets 0.92 on its largest step and
+     * 1.0 on the next. `base` is the one that moves the whole product: 1.45 rather than 1.5 is
+     * roughly one extra table row per screen at Sunday's densities, which is the entire content
+     * of the law. Space separates kinds of information here; it never exists to calm.
+     */
+    lineHeight: { display: 0.95, tight: 1.15, base: 1.45 },
   },
   /**
    * Paper depth. Theme-independent on purpose: a shadow is cast light, and on the dark surface
@@ -464,12 +528,29 @@ export const TOKENS = {
     card: "0 1px 2px rgb(22 24 29 / 0.06), 0 1px 3px rgb(22 24 29 / 0.05)",
     sticker: "0 2px 0 rgb(22 24 29 / 0.14)",
   },
+  /**
+   * LAW 6, MOTION REPORTS AND NEVER PERFORMS. Nothing here animates a mount, a scroll or a
+   * hover; every duration below belongs to something that actually happened.
+   *
+   * `highlight` is law 6's own ceiling, stated as a number: *"nothing eases longer than 250ms."*
+   * It is the one-off wash on a row whose value just changed — the only motion on the Sunday
+   * screen besides the live dot and the running clock. It is deliberately the LONGEST
+   * event-driven duration in this object and the law's cap is deliberately the same figure, so
+   * `tokens.test.ts` can assert the cap against the token rather than against a comment.
+   */
   motion: {
     /** ms */
     duration: {
       fast: 120,
       base: 200,
-      slow: 320,
+      /**
+       * LAW 6'S CEILING, and the value-change wash's own duration. Was 320ms in v3, which the
+       * law retires in one clause: *"nothing eases longer than 250ms."* Deliberately NOT a
+       * second `highlight` token beside it — the longest ease the product may run and the
+       * duration of the only motion a changed number is allowed to make are the same fact, and
+       * two names for one fact is how they drift apart.
+       */
+      slow: 250,
       /** The live chip's pulse cycle. */
       pulse: 1_600,
       /** The mock's ticker loop. */

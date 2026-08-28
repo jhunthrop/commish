@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
 
-export type ButtonVariant = "primary" | "secondary" | "destructive" | "ghost";
+export type ButtonVariant = "primary" | "verb" | "secondary" | "destructive" | "ghost";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -44,9 +44,28 @@ const BASE =
 // - `ghost` is unchanged — the radius moved from `BASE` into each variant so ghost could keep
 //   its `rounded-md` while the real actions became pills.
 //
-// Accent survives here only as the focus ring, which was never a fill.
+// GAMEDAY ADDS `verb` (law 5, "the verb is obvious"). v3's rule 5 — one ink action per view —
+// is the rule Gameday replaces outright, because it hid the primary action on exactly the
+// screens built to repeat it: *"A draft board has a Draft on every row."* A board of forty rows
+// cannot spend its one ink pill on row one and leave thirty-nine quiet outlines behind it.
+//
+// The fill is MONEY, and that is law 1 rather than a free choice: *"Money — entry, prizes,
+// wallet. Also the fill of the verb, because pressing it is how money moves."* Green already
+// meant "seats filling, value accruing"; the verb is the moment a manager causes that.
+//
+// Shape separates it from `primary` so the two never read as the same weight of act:
+// - `primary` is the CEREMONIAL pill — one per view, the thing a page exists to do once
+//   (create the league, confirm the trade). Ink on ground, `rounded-pill`.
+// - `verb` is the REPEATED action — `rounded-md`, compact, the mock's own `0.4rem` radius. It is
+//   allowed forty times on a screen, and looks like a control you press rather than a
+//   destination you arrive at.
+//
+// This is why `button.tsx` is on `accent-budget.source.test.ts`'s fill allowlist: green as a
+// control fill is now sanctioned in exactly one primitive, and still banned everywhere a call
+// site might hand-roll it.
 const VARIANT: Readonly<Record<ButtonVariant, string>> = {
   primary: "rounded-pill bg-text-primary text-surface hover:opacity-90",
+  verb: "rounded-md bg-accent text-accent-text hover:opacity-90",
   secondary: "rounded-pill border border-edge bg-transparent text-text-primary hover:bg-surface-elevated",
   destructive: "rounded-pill bg-negative text-negative-text hover:brightness-110",
   ghost: "rounded-md text-text-primary hover:bg-surface-elevated",
