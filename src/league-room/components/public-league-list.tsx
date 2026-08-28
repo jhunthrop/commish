@@ -170,6 +170,17 @@ export interface OpenLeagueShelfProps {
  * The title register is the mock's 22/650: `text-2xl` is 22px on the dense (desktop) scale, and
  * `font-semibold` is the repo's weight stop for the mock's 600-650 band — the same mapping the
  * ledger card's 16.5/600 → `text-lg font-semibold` already made (Task 5). Sentence case (rule 3).
+ *
+ * RULE 4'S AMENDED TEST, AND WHY THE lg+ ROWS STAY ROWS (the fun pass, Task 12). The amendment
+ * (`docs/design/2026-08-27-fun-pass-spec.md`) reads "a thing you act on or compare against its
+ * neighbours MAY be a card" — a permission, not an instruction, and the founder already spent it
+ * the other way on this exact surface: "horizontal row elements instead of these cards - my eyes
+ * don't know where to focus" (2026-08-24, live-page feedback, the ruling that created
+ * `LeagueRow`). Turning these back into cards would relitigate a founder ruling on the strength
+ * of a permission, and it would re-break the thing that ruling fixed. What the amendment DOES
+ * buy this shelf is the card response below lg, where the card is the form that fits 360px:
+ * `OpenLeagueCard` takes `interactive` now, which is the depth step `Card` has carried since
+ * Task 2 and had never been spent on anything.
  */
 export function OpenLeagueShelf({
   house,

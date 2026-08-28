@@ -290,4 +290,28 @@ describe("OpenLeagueCard", () => {
       expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
     });
   });
+
+  /**
+   * RULE 4'S AMENDED TEST, applied to the surface it was written for (the fun pass, Task 12 —
+   * `docs/design/2026-08-27-fun-pass-spec.md`): "a thing you act on or compare against its
+   * neighbours may be a card". A shelf of open leagues is both, and it sat as still as a page of
+   * terms — `Card`'s `interactive` variant existed from Task 2 and was used on nothing at all.
+   */
+  describe("the shelf's card response", () => {
+    it("answers a pointer and a keyboard landing with depth, on every card and not only the featured one", () => {
+      const { container } = render(card(BASE));
+      const surface = container.querySelector(".shadow-card")!;
+      expect(surface.className).toContain("hover:bg-surface-raised");
+      expect(surface.className).toContain("focus-within:bg-surface-raised");
+    });
+
+    it("stays a surface and never becomes a second click target", () => {
+      // Rule 5's accounting depends on this: a card that took a `role` or a `tabindex` would be
+      // an action the page-level audit never counted, on the one route where that audit runs.
+      const { container } = render(card(BASE));
+      const surface = container.querySelector(".shadow-card")!;
+      expect(surface.getAttribute("role")).toBeNull();
+      expect(surface.getAttribute("tabindex")).toBeNull();
+    });
+  });
 });
