@@ -24,6 +24,7 @@ describe("mapNflPlayers", () => {
     expect(murray[0]).toMatchObject({
       id: "00-0030513",
       pfrId: "MurrLa00",
+      espnId: "15920",
       position: "RB",
       rookieSeason: 2013,
       lastSeason: 2023,
@@ -106,6 +107,7 @@ describe("nflPlayerRows", () => {
     expect(row).toEqual({
       id: "00-0030513",
       pfrId: "MurrLa00",
+      espnId: "15920",
       name: "Latavius Murray",
       position: "RB",
       latestTeam: "BUF",
