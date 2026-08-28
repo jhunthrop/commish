@@ -23,8 +23,20 @@ export interface StatComparison {
 export type StatSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 
 export interface StatProps {
-  /** What the number is. Always announced, always on screen. */
+  /** What the number is. Always announced; on screen unless `srOnlyLabel` says a column already
+   *  prints it. */
   readonly label: string;
+  /**
+   * Drop the visible label, keeping it for assistive tech. For ONE situation: a table cell, where
+   * the column's own `<th>` is already the label on screen and in the accessibility tree for
+   * every number beneath it. Printing "Points" again under each of eighteen rows is the document
+   * grammar the fun pass exists to undo, and dropping the label entirely would leave a screen
+   * reader a bare number with no name.
+   *
+   * Never a general "quieter Stat" switch: outside a labelled column, a number with no visible
+   * name is the thing this primitive was built to stop shipping.
+   */
+  readonly srOnlyLabel?: boolean;
   /**
    * The number, already formatted. This primitive never decides how many decimals a score has:
    * a projection, a margin and a verdict round differently and the surface that owns the fact
@@ -140,12 +152,12 @@ const SIZE_CLASS: Readonly<Record<StatSize, string>> = {
  * The population is stated to assistive tech in one sentence; a surface with room states it
  * visibly in its own column header, which is where a sports table has always put it.
  */
-export function Stat({ label, value, comparison, size = "md", className = "" }: StatProps) {
+export function Stat({ label, value, comparison, size = "md", srOnlyLabel = false, className = "" }: StatProps) {
   const step = magnitudeStep(comparison);
   const caret = MAGNITUDE_CARET[step];
   return (
     <div data-magnitude={step} className={`flex flex-col gap-1 ${className}`}>
-      <span className={`${EYEBROW} text-text-faint`}>{label}</span>
+      <span className={srOnlyLabel ? "sr-only" : `${EYEBROW} text-text-faint`}>{label}</span>
       {/* `items-baseline`: the caret sits on the number's own baseline at eyebrow size, so it
           annotates the value without competing with it at `display-xl`. */}
       <span className={`flex items-baseline gap-1 font-display leading-display tabular-nums ${SIZE_CLASS[size]} ${MAGNITUDE_INK[step]} ${MAGNITUDE_WEIGHT[step]}`}>

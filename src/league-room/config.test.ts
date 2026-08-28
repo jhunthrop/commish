@@ -10,6 +10,9 @@ describe("LEAGUE_ROOM_CONFIG", () => {
       "attentionQueueCap",
       "mockLobbyPollIntervalMs",
       "mockHistoryVisibleCount",
+      // The fun pass, Tasks 9 and 10: the heat map's own floor. Flat rather than nested under a
+      // `heat` object precisely so this sweep keeps covering it.
+      "heatMinPopulation",
     ];
     expect(Object.keys(LEAGUE_ROOM_CONFIG).sort()).toEqual([...keys].sort());
     for (const key of keys) {

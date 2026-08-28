@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import type { TeamScore } from "@/stats-pipeline/contract";
 import type { MatchupDetail, MatchupWeekBody } from "../contract";
 import { useLiveScores } from "../hooks/use-live-scores";
+import { startedPointsByPosition } from "../lib/population";
 import { MatchupPanel } from "./matchup-panel";
 
 /** The teams that already have a real score, home and away, across every matchup in the week.
@@ -61,6 +63,20 @@ export function LiveMatchupWeek({ leagueId, body }: { readonly leagueId: string;
   });
   const notice = statsNotFinalNotice(live.status);
 
+  /**
+   * THE HEAT MAP'S POPULATION (the fun pass, Task 9). This component is the only thing on the
+   * route that can see every matchup at once, which is exactly what makes "starting quarterbacks
+   * this week" a real population rather than a phrase — so the pool is built here, once, and
+   * threaded down rather than recomputed inside each of six panels.
+   *
+   * Read off `body`, NOT off the live-folded matchups: `score.update` carries team totals only,
+   * never a per-player breakdown (`foldLiveScore`'s own docblock), so the per-player numbers are
+   * the request-time ones and the population they are ranked inside must be too. Ranking today's
+   * server-rendered player line against a pool that moved under it would produce a percentile
+   * belonging to neither snapshot.
+   */
+  const positionPoints = useMemo(() => startedPointsByPosition(body.matchups), [body.matchups]);
+
   return (
     <>
       {notice === null ? null : <p className="text-sm text-text-muted">{notice}</p>}
@@ -72,6 +88,7 @@ export function LiveMatchupWeek({ leagueId, body }: { readonly leagueId: string;
           weekStatus={live.status}
           gamesFinal={live.gamesFinal}
           gamesTotal={live.gamesTotal}
+          positionPoints={positionPoints}
         />
       ))}
     </>

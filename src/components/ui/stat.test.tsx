@@ -147,6 +147,21 @@ describe("Stat", () => {
     });
   });
 
+  it("hides the label from eyes but never from a screen reader, for the one place a column already says it", async () => {
+    // A table's own `<th>` is the label, on screen and announced, for every cell beneath it —
+    // printing "Points" a second time under each of eighteen numbers would be the document
+    // grammar the fun pass exists to undo. The label still ships to assistive tech, because a
+    // number read on its own with no name is worse than a redundant one.
+    await renderSurface(<Stat label="Points" srOnlyLabel value="14.2" comparison={RB_WEEK} />, ({ getByText, container }) => {
+      expect(getByText("Points").className).toContain("sr-only");
+      expect(getByText("Points").className).not.toContain("text-xs");
+      // The number is untouched: hiding the label is a layout decision and never a licence to
+      // drop one of the three colourblind channels.
+      expect(container.querySelector("[data-magnitude]")!.textContent).toContain("▲");
+      expect(getByText("14.2")).toBeInTheDocument();
+    });
+  });
+
   it("is axe-clean in both themes, coloured and uncoloured", async () => {
     await renderSurface(<Stat label="Projection" value="14.2" comparison={RB_WEEK} />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();

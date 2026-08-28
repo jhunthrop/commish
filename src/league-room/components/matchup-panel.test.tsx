@@ -136,4 +136,82 @@ describe("MatchupPanel", () => {
     const slot = MATCHUP.home.starters[0]!.slot;
     expect(screen.getAllByText(slot).length).toBeGreaterThan(0);
   });
+
+  /**
+   * THE HEAT MAP, on the surface it pays off most (the fun pass, Task 9 — `docs/design/
+   * 2026-08-27-fun-pass-spec.md`). Every one of these asserts the same bargain from a different
+   * side: a points cell is tinted ONLY against a population the page can actually name, and the
+   * tint is never the channel a manager depends on.
+   */
+  describe("magnitude on the player lines", () => {
+    /** A week wide enough to rank inside: five started quarterbacks, this matchup's own two
+     *  among them. `LiveMatchupWeek` builds this from every matchup in the week; the panel takes
+     *  it as a prop because one matchup can never see the league. */
+    const QB_WEEK = new Map([["QB" as const, [4, 8, 12, 19.25, 24.5]]]);
+
+    it("compares a starter against the players who share their job, and says so out loud", () => {
+      render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />);
+      // 24.5 is the best of the five, which is 0.9 on a tie-split percentile rank — "Top 10%",
+      // never "Top 0%" and never a claim of perfection. 19.25 sits fourth of five, at 0.7.
+      expect(screen.getByText("Top 10% of starting quarterbacks this week.")).toBeInTheDocument();
+      expect(screen.getByText("Top 30% of starting quarterbacks this week.")).toBeInTheDocument();
+    });
+
+    it("leaves a position the week has no population for as plain ink, beside a tinted one", () => {
+      // The running back has no pool here at all: a fixture week with one started RB is not
+      // "running backs this week". A heat map that filled that gap with a guess would be the
+      // decoration rule 6 rejects, so the cell simply stays a number.
+      const { container } = render(
+        <MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />,
+      );
+      const steps = Array.from(container.querySelectorAll("[data-magnitude]")).map((el) => el.getAttribute("data-magnitude"));
+      expect(steps).toContain("strong");
+      expect(steps).toContain("good");
+      expect(steps).toContain("neutral");
+    });
+
+    it("keeps the number readable as a number, and keeps the caret that survives with no colour", () => {
+      const { container } = render(
+        <MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />,
+      );
+      expect(screen.getByText("24.50")).toBeInTheDocument();
+      expect(screen.getByText("19.25")).toBeInTheDocument();
+      // The caret is the channel that survives with the hue switched off. Without it this whole
+      // feature misinforms one man in twelve rather than merely underserving him.
+      expect(container.textContent).toContain("▲");
+    });
+
+    it("tints nothing at all when the page named no population, which is every other caller", () => {
+      const { container } = render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+      const steps = Array.from(container.querySelectorAll("[data-magnitude]")).map((el) => el.getAttribute("data-magnitude"));
+      expect(steps.length).toBeGreaterThan(0);
+      expect(steps.every((step) => step === "neutral")).toBe(true);
+    });
+
+    it("leaves a player who has not played as a dash, never a heat-coloured zero", () => {
+      const notPlayed = {
+        ...MATCHUP,
+        home: { ...MATCHUP.home, starters: [{ ...MATCHUP.home.starters[0]!, points: null }] },
+      };
+      const { container } = render(
+        <MatchupPanel matchup={notPlayed} myTeamId="t1" weekStatus="in_progress" positionPoints={QB_WEEK} />,
+      );
+      expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+      expect(container.textContent).not.toContain("0.00");
+    });
+
+    it("prints the column name once per table on screen, never visibly under every number", () => {
+      render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />);
+      // The `<th>` is the label a reader sees, for both side tables. Every other "Points" in the
+      // document belongs to a cell's `Stat` and is `sr-only` — the number still has a name in the
+      // accessibility tree, and the page still reads as a table rather than eighteen captioned
+      // tiles (the document grammar the fun pass exists to undo).
+      const spelled = screen.getAllByText("Points");
+      const headers = screen.getAllByRole("columnheader", { name: "Points" });
+      expect(headers).toHaveLength(2);
+      const inCells = spelled.filter((el) => el.closest("th") === null);
+      expect(inCells.length).toBeGreaterThan(0);
+      expect(inCells.every((el) => el.className.includes("sr-only"))).toBe(true);
+    });
+  });
 });
