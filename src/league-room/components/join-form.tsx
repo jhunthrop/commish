@@ -148,7 +148,10 @@ export function JoinForm({
           onStateOfEntryChange={setStateOfEntry}
         />
       ) : null}
-      <Button onClick={() => void join()} loading={submitting} disabled={submitting || (paid && stateOfEntry === null)}>
+      {/* `self-start`: this stays the invite's one ceremonial ink pill (law 5), but a pill
+          stretched to the whole measure of the page is a button that has stopped looking like a
+          button — it reads as a banner and the eye stops registering it as pressable. */}
+      <Button className="self-start" onClick={() => void join()} loading={submitting} disabled={submitting || (paid && stateOfEntry === null)}>
         {`Join ${terms.name}`}
       </Button>
       {error === null ? null : (
