@@ -40,7 +40,7 @@ import { TradeComposer } from "@/league-room/components/trade-composer";
 import type { HomeLeagueCard, ModerationSummaryView, TradeRoomContext } from "@/league-room/contract";
 import { ReviewFeed } from "@/account-room/components/review-feed";
 import { InviteLanding, type InviteLandingState } from "@/league-room/components/invite-landing";
-import { StandingPanel } from "@/account-room/components/standing-panel";
+import { ManagerHeader } from "@/account-room/components/manager-header";
 import { ThemeSwitcher } from "@/account-room/components/theme-switcher";
 import { ThemeProvider } from "@/design/theme-provider";
 import type { ReviewsPage, ReviewView } from "@/reviews/contract";
@@ -1246,13 +1246,15 @@ describe("ReviewFeed says nothing that breaks the house copy rules, verified bad
 });
 
 /**
- * Task 18. `StandingPanel`'s two sentences (the seasons caption, the tier sentence) are both
- * composed from props at runtime — `room-copy.source.test.ts`'s own blind spot, restated in its
- * docblock: "a string has to be both composed at runtime AND unreachable at first paint to
- * escape." This sweep drives every branch that changes either one: newcomer and veteran, verified
- * and not, and 0/1/2 seasons for the seasons caption's own pluralization.
+ * Task 18, retargeted onto `ManagerHeader` when Gameday replaced `StandingPanel` with it (the
+ * same three facts, promoted from a 13px caption at the bottom of the account room to the page's
+ * own object). The tier sentence is still composed from props at runtime —
+ * `room-copy.source.test.ts`'s own blind spot, restated in its docblock: "a string has to be both
+ * composed at runtime AND unreachable at first paint to escape." This sweep drives every branch
+ * that changes it: newcomer and veteran, verified and not, and 0/1/2/3 seasons, since the seasons
+ * count reaches the DOM as a rendered number rather than a literal a source sweep could read.
  */
-describe("StandingPanel says nothing that breaks the house copy rules, in every branch", () => {
+describe("ManagerHeader says nothing that breaks the house copy rules, in every branch", () => {
   it("is clean across tier, verified and every seasons count", () => {
     for (const props of [
       { seasons: 0, tier: "newcomer" as const, verified: false },
@@ -1260,7 +1262,7 @@ describe("StandingPanel says nothing that breaks the house copy rules, in every 
       { seasons: 2, tier: "veteran" as const, verified: true },
       { seasons: 3, tier: "veteran" as const, verified: false },
     ]) {
-      const { container, unmount } = render(<StandingPanel {...props} />);
+      const { container, unmount } = render(<ManagerHeader displayName="Dana Reyes" avatar={null} email="dana@example.test" {...props} />);
       expectClean(container);
       unmount();
     }
@@ -1299,7 +1301,7 @@ describe("ThemeSwitcher says nothing that breaks the house copy rules, system, l
  * Worth the setup: the account facts paragraph (Step 3) is exactly the kind of carefully worded,
  * once-composed string this file exists to catch, and it is assembled from `CurrentUser.email`
  * at runtime, invisible to `room-copy.source.test.ts`. Two passes — a newcomer with no review on
- * file, a verified veteran with one — cover both `StandingPanel` branches and both `ReviewComposer`
+ * file, a verified veteran with one — cover both `ManagerHeader` branches and both `ReviewComposer`
  * states in the one page they actually share a screen with.
  */
 describe("the profile page says nothing that breaks the house copy rules", () => {
@@ -1331,7 +1333,9 @@ describe("the profile page says nothing that breaks the house copy rules", () =>
           <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>
         </ThemeProvider>,
       );
-      await screen.findByText("Your profile");
+      // The page's own <h1> is the MANAGER (Gameday law 2, `ManagerHeader`); "Your profile" is
+      // now only the browser tab. Wait on the heading the page actually renders.
+      await screen.findByText(PROFILE.displayName);
       expectClean(container, PROFILE.displayName, "ada@test.local", review.state === "live" ? VERIFIED_REVIEW.body : "", review.state === "live" ? VERIFIED_REVIEW.authorName : "");
       unmount();
     }
