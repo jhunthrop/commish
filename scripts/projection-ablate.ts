@@ -57,6 +57,17 @@ const VARIANTS: Readonly<Record<string, { readonly before: FeatureFlags; readonl
     label: "depth of target on the receiving rates",
   },
   news: { before: NO_FEATURES, after: { ...NO_FEATURES, news: true }, label: "the news pass — bounded, cited, expiring" },
+  /**
+   * The news pass ON TOP OF what already ships, which is a different question from what it adds to
+   * model v1 and the only one that answers "is the starter-band defect closed". Every other entry
+   * here is measured against the bare model on purpose; this one is measured against the engine as
+   * it actually stands, because a defect is a property of the shipped thing.
+   */
+  "news-on-shipped": {
+    before: SHIPPED_FEATURES,
+    after: { ...SHIPPED_FEATURES, news: true },
+    label: "the news pass added to everything that already ships",
+  },
   all: { before: NO_FEATURES, after: ALL_FEATURES, label: "every feature group at once (headline, not an ablation)" },
   /** What the engine actually ships against model v1. The headline for the research document. */
   shipped: { before: NO_FEATURES, after: SHIPPED_FEATURES, label: "model v1 against everything that earned its place" },

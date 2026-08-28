@@ -83,7 +83,8 @@ npm run projections:report  # replay a season and print the scoreboard: layer 1'
                           # npm run projections:report 2023. See docs/research/2026-08-27-model-v1.md.
 npm run projections:ablate  # measure ONE feature group on the held-out seasons and print
                           # `rho before -> rho after`, overall, by rank band and week by week:
-                          # line|scheme|redistribution|context|red-zone|target-depth|news|shipped.
+                          # line|scheme|redistribution|context|red-zone|target-depth|news|
+                          # news-on-shipped|shipped.
                           # `shares` prints layer 1 on its own terms instead. Add --at=game-week to
                           # replay from the morning of the week's first game rather than from the
                           # Tuesday; the news pass is the one feature whose value depends on which
