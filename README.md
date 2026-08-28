@@ -85,6 +85,21 @@ npm run projections:ablate  # measure ONE feature group on the held-out seasons 
                           # `shares` prints layer 1 on its own terms instead. Reads the store and
                           # never the network, so an ablation is fifteen seconds rather than a
                           # download. See docs/research/2026-08-27-model-v2.md.
+npm run projections:preseason:ingest  # ingest what a PRESEASON board needs and a game never
+                          # produces: nflverse week-one rosters (stamped at the league's cutdown,
+                          # so they are knowable before the opener) plus the two published
+                          # benchmarks, average draft position and expert consensus. Hits the
+                          # network. npm run projections:preseason:ingest 2021 2024. Exits non-zero
+                          # if a benchmark resolves below 70% of its published board.
+npm run projections:preseason:fit  # refit the availability and rookie priors on the FIT seasons and
+                          # regenerate src/projections/preseason/fitted.ts. Prints every cell before
+                          # writing it, including the sanity check that a full-time starter projects
+                          # like a starter.
+npm run projections:preseason  # build a preseason board for each held-out season and score it
+                          # against the outcome, against the market and against expert consensus,
+                          # overall and by rank band, plus the three ablations. Reads the store and
+                          # never the network. npm run projections:preseason 2024.
+                          # See docs/research/2026-08-27-preseason-board.md.
 npm run e2e:install       # one-time: download the Playwright browser
 npm run e2e               # browser end-to-end suite (needs a build + a WorkOS test key)
 npm run e2e:ui            # same suite, in Playwright's interactive UI mode
