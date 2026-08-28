@@ -25,6 +25,15 @@ export const COLOR_ROLES = [
 
 export type ColorRole = (typeof COLOR_ROLES)[number];
 
+/**
+ * The magnitude ramp, best first: where a number falls in a stated comparison set. Five steps,
+ * four of them a verdict and `neutral` the absence of one. Ordered — the array order IS the
+ * ramp, which is what lets `tokens.test.ts` assert monotonicity without restating the sequence.
+ */
+export const MAGNITUDE_STEPS = ["strong", "good", "neutral", "weak", "bad"] as const;
+
+export type MagnitudeStep = (typeof MAGNITUDE_STEPS)[number];
+
 /** The six positions a player can occupy — the sticker colors of the draft board. */
 export type PositionColorRole = "qb" | "rb" | "wr" | "te" | "k" | "def";
 
@@ -39,6 +48,7 @@ export interface PositionColor {
 
 type Palette = Readonly<Record<ColorRole, string>>;
 type PositionPalette = Readonly<Record<PositionColorRole, PositionColor>>;
+type MagnitudePalette = Readonly<Record<MagnitudeStep, string>>;
 
 /**
  * Both themes are first-class (founder ruling, 2026-08-23 — revised ruling 1). `surface`
@@ -287,8 +297,64 @@ const lightPositions: PositionPalette = {
   def: stickerOf(lightPigments.slate, light.textPrimary, "#4B5563"),
 };
 
+/**
+ * THE HEAT MAP — rule 1's magnitude amendment, founder-approved 2026-08-27
+ * (`docs/design/2026-08-27-fun-pass-spec.md`). "It feels like a legal website and not a fantasy
+ * site," and the largest single cause was that every number in the product was the same colour.
+ * These eight pigments are what a number is allowed to be tinted when it falls somewhere real in
+ * a stated comparison set. They are NOT a semantic role: `Stat` is the only component permitted
+ * to name one (`magnitude-budget.source.test.ts`), because magnitude on a control would spend the
+ * one signal green still has, which is "press this."
+ *
+ * Solved numerically against the gates, the same method the slate ruling above used — pick the
+ * hue family, then walk lightness until every surface clears. Two constraints bind, one per
+ * theme, and neither is the surface you would guess:
+ *
+ * - **Dark's binding ground is `surfaceRaised`** (#2F2F39, the BRIGHTEST of the four), so every
+ *   dark step needs relative luminance ≥ 0.307 to clear 4.5:1.
+ * - **Light's binding ground is `surfaceInset`** (#F3F3F1, the DIMMEST of the four — a well
+ *   recedes in daylight), so every light step needs luminance ≤ 0.160. Solving against white
+ *   instead would have allowed 0.183 and shipped a `bad` red that failed in every table's own
+ *   track. The 2026-08-27 solve caught that on the first pass; it is written down here so the
+ *   next person tuning this ramp does not rediscover it in an axe report.
+ *
+ * **The ramp is ordered by luminance, not by hue, and that ordering is the point.** Green versus
+ * red is the worst available pair for deuteranopia (roughly one man in twelve) and this
+ * product's audience is overwhelmingly men. So `strong` → `good` → `weak` → `bad` is strictly
+ * decreasing in contrast against the ground in BOTH themes: louder is brighter at night and
+ * darker in daylight, and the sequence survives with the hue channel switched off entirely.
+ * Hue families still carry the meaning for everyone else — green because good is the same feeling
+ * as money, amber for middling, red for bad — they are simply not carrying it alone.
+ *
+ * `neutral` is `textPrimary` verbatim, the same deliberate doubling as `accent`/`positive`: a
+ * number with no comparison set behind it must be indistinguishable from ordinary text. Give the
+ * no-verdict step a pigment of its own and every uncompared number in the product starts reading
+ * as a judgement — which is the exact thing the spec forbids ("we do not colour a number because
+ * it looks big"). `tokens.test.ts` pins the equality so a palette tune cannot quietly break it.
+ *
+ * Colour is never magnitude's only channel. The value reads plainly as its own number and a
+ * judged value carries a caret and a weight step — that gate lives with `Stat`
+ * (`src/components/ui/stat.tsx`), because only the component can keep it.
+ */
+const darkMagnitude: MagnitudePalette = {
+  strong: "#85E0BA", // hue 155, the money-green family, lifted well clear of `accent` itself
+  good: "#81CCA6", // hue 150, quieter green — one luminance step down, same family
+  neutral: dark.textPrimary, // NOT a pigment: an uncompared number is ordinary ink
+  weak: "#CEA547", // hue 42, the amber family — middling, the reference product's own word
+  bad: "#EE7A68", // hue 8, the live-red family, still 4.80:1 on the brightest dark ground
+};
+
+const lightMagnitude: MagnitudePalette = {
+  strong: "#064129", // hue 156 — daylight inverts the ramp's direction, never its order
+  good: "#1C583A", // hue 150
+  neutral: light.textPrimary,
+  weak: "#795A12", // hue 42
+  bad: "#C73923", // hue 8, 4.68:1 on `surfaceInset`, the binding ground in daylight
+};
+
 export const TOKENS = {
   color: { light, dark },
+  magnitude: { light: lightMagnitude, dark: darkMagnitude },
   position: { light: lightPositions, dark: darkPositions },
   radius: { sm: 4, md: 8, lg: 12, pill: 999 },
   font: {

@@ -1,4 +1,4 @@
-import { TOKENS, type ColorRole, type PositionColorRole, type ThemeName } from "./tokens";
+import { TOKENS, MAGNITUDE_STEPS, type ColorRole, type PositionColorRole, type ThemeName } from "./tokens";
 import { UI_CONFIG } from "@/components/ui/config";
 
 /** Namespace for every generated CSS custom property, so `@theme inline` aliases in
@@ -31,9 +31,16 @@ function positionVars(theme: ThemeName, indent: string): string {
     .join("\n");
 }
 
+/** The heat map's five steps, emitted per theme beside the colors. One variable per step: a
+ *  magnitude value is only ever a number's own ink, never a fill or a boundary, so unlike a
+ *  position sticker it needs no on-fill or on-surface companion. */
+function magnitudeVars(theme: ThemeName, indent: string): string {
+  return MAGNITUDE_STEPS.map((step) => `${indent}${tokenVar(`mag-${step}`)}: ${TOKENS.magnitude[theme][step]};`).join("\n");
+}
+
 /** Everything that changes with the theme, in the order every theme block emits it. */
 function themeVars(theme: ThemeName, indent: string): string {
-  return [colorVars(theme, indent), positionVars(theme, indent)].join("\n");
+  return [colorVars(theme, indent), magnitudeVars(theme, indent), positionVars(theme, indent)].join("\n");
 }
 
 function scaleVars(prefix: string, obj: Readonly<Record<string, number | string>>, unit: string, indent: string): string {

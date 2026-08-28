@@ -19,6 +19,11 @@
   --commish-color-warning-glow: rgba(132, 99, 21, 0.12);
   --commish-color-info: #4C69CD;
   --commish-color-scrim: #000000;
+  --commish-mag-strong: #064129;
+  --commish-mag-good: #1C583A;
+  --commish-mag-neutral: #1A1A1E;
+  --commish-mag-weak: #795A12;
+  --commish-mag-bad: #C73923;
   --commish-pos-qb-sticker: #B35750;
   --commish-pos-qb-sticker-text: #FFFFFF;
   --commish-pos-qb-text: #B35750;
@@ -86,6 +91,11 @@
   --commish-color-warning-glow: rgba(173, 126, 14, 0.12);
   --commish-color-info: #5F99F2;
   --commish-color-scrim: #000000;
+  --commish-mag-strong: #85E0BA;
+  --commish-mag-good: #81CCA6;
+  --commish-mag-neutral: #EAEAF0;
+  --commish-mag-weak: #CEA547;
+  --commish-mag-bad: #EE7A68;
   --commish-pos-qb-sticker: #DF867E;
   --commish-pos-qb-sticker-text: #04120A;
   --commish-pos-qb-text: #DF867E;
@@ -127,6 +137,11 @@
     --commish-color-warning-glow: rgba(173, 126, 14, 0.12);
     --commish-color-info: #5F99F2;
     --commish-color-scrim: #000000;
+    --commish-mag-strong: #85E0BA;
+    --commish-mag-good: #81CCA6;
+    --commish-mag-neutral: #EAEAF0;
+    --commish-mag-weak: #CEA547;
+    --commish-mag-bad: #EE7A68;
     --commish-pos-qb-sticker: #DF867E;
     --commish-pos-qb-sticker-text: #04120A;
     --commish-pos-qb-text: #DF867E;

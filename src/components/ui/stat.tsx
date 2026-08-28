@@ -1,0 +1,154 @@
+import { EYEBROW, UI_CONFIG } from "./config";
+import { type MagnitudeStep } from "@/design/tokens";
+
+/**
+ * The comparison set a number is judged against. Both fields are required and neither has a
+ * default, which is the whole design: a `Stat` cannot be tinted without a caller naming a real
+ * population and a real position inside it.
+ */
+export interface StatComparison {
+  /** Where the value falls in `population`, 0..1, where 1 is the best in the set. */
+  readonly percentile: number;
+  /** The population, in the words a manager would use: "running backs this week". */
+  readonly population: string;
+}
+
+/** The display steps a `Stat` may take. Range comes from size; the weight cap never moves. */
+export type StatSize = "sm" | "md" | "lg" | "xl";
+
+export interface StatProps {
+  /** What the number is. Always announced, always on screen. */
+  readonly label: string;
+  /**
+   * The number, already formatted. This primitive never decides how many decimals a score has:
+   * a projection, a margin and a verdict round differently and the surface that owns the fact
+   * owns its precision.
+   */
+  readonly value: string;
+  /** Omit and the number renders as ordinary ink. There is no other way to get a neutral. */
+  readonly comparison?: StatComparison;
+  readonly size?: StatSize;
+  readonly className?: string;
+}
+
+/** A comparison is usable only if it is genuine: a named population and a percentile on the
+ *  scale. Anything else is a caller bug, and tinting on a caller bug is the precise failure
+ *  the magnitude amendment exists to avoid. */
+function isStated(comparison: StatComparison | undefined): comparison is StatComparison {
+  if (comparison === undefined) return false;
+  const { percentile, population } = comparison;
+  return Number.isFinite(percentile) && percentile >= 0 && percentile <= 1 && population.trim() !== "";
+}
+
+/**
+ * Where a value lands on the ramp — the one place a percentile becomes a colour. Pure and
+ * exported so a surface can ask the question without rendering (the draft room's verdict chip
+ * will), and so the "no comparison, no colour" rule has a single home.
+ */
+export function magnitudeStep(comparison: StatComparison | undefined): MagnitudeStep {
+  if (!isStated(comparison)) return "neutral";
+  const floors = UI_CONFIG.stat.percentileFloors;
+  const { percentile } = comparison;
+  if (percentile >= floors.strong) return "strong";
+  if (percentile >= floors.good) return "good";
+  if (percentile >= floors.neutral) return "neutral";
+  if (percentile >= floors.weak) return "weak";
+  return "bad";
+}
+
+/** "Top 8% of running backs this week." — the population, stated, in the register the product
+ *  already speaks (expanded, sentence case, no em-dashes). A percentile of exactly 0 or 1 floors
+ *  at one percent rather than claiming a nonsense "Top 0%". */
+function comparisonSentence({ percentile, population }: StatComparison): string {
+  const side = percentile >= 0.5 ? "Top" : "Bottom";
+  const share = Math.max(1, Math.round((percentile >= 0.5 ? 1 - percentile : percentile) * 100));
+  return `${side} ${share}% of ${population}.`;
+}
+
+/** The ink. Named only here — `magnitude-budget.source.test.ts` fails any other file that does. */
+const MAGNITUDE_INK: Readonly<Record<MagnitudeStep, string>> = {
+  strong: "text-mag-strong",
+  good: "text-mag-good",
+  neutral: "text-mag-neutral",
+  weak: "text-mag-weak",
+  bad: "text-mag-bad",
+};
+
+/**
+ * The second channel: which side of the population the value fell on. A text caret rather than
+ * an `Icon`, deliberately — a `Stat` renders between 20px and the top of the display scale, and a
+ * glyph that is part of the text run scales with the number it annotates, where an SVG at a fixed
+ * `size` would drift from tiny to lost. It is `aria-hidden`: the sentence below says the same
+ * thing in words, and a screen reader should hear the words.
+ */
+const MAGNITUDE_CARET: Readonly<Record<MagnitudeStep, string | null>> = {
+  strong: "▲",
+  good: "▲",
+  neutral: null,
+  weak: "▼",
+  bad: "▼",
+};
+
+/**
+ * The third channel: how far from the middle. Capped at 600 — rule 2 does not move, and dynamic
+ * range comes from `SIZE_CLASS` below, never from a heavier face.
+ */
+const MAGNITUDE_WEIGHT: Readonly<Record<MagnitudeStep, string>> = {
+  strong: "font-semibold",
+  good: "font-medium",
+  neutral: "",
+  weak: "font-medium",
+  bad: "font-semibold",
+};
+
+const SIZE_CLASS: Readonly<Record<StatSize, string>> = {
+  sm: "text-display-sm",
+  md: "text-display-md",
+  lg: "text-display-lg",
+  xl: "text-display-xl",
+};
+
+/**
+ * A number that knows where it stands — the heat map's one renderer, and the vocabulary the rest
+ * of the fun pass is built out of (`docs/design/2026-08-27-fun-pass-spec.md`).
+ *
+ * The founder's complaint was that the product reads as a contract, and the largest single cause
+ * was that every number in it was the same colour. This is the fix, with the two guardrails that
+ * make a heat map honest rather than merely lively:
+ *
+ * **A number is never coloured for looking big.** `comparison` is the only route to a tint, it
+ * carries a named population and a percentile, and a comparison that is missing, unnamed or off
+ * the scale renders `neutral` — which IS `textPrimary`, so an uncompared number is visually a
+ * plain number and nothing else.
+ *
+ * **Colour is never the only channel.** Green versus red is the worst pair for deuteranopia and
+ * this audience is overwhelmingly men, so a heat map that leans on hue silently misinforms one
+ * manager in twelve, which is worse than no heat map at all. Three channels ship together here:
+ * the value reads plainly as its own number in every state, a caret says which side of the
+ * population it fell on, and a weight step says how far. Strip the colour entirely and the
+ * column still ranks correctly. `stat.test.tsx` is the gate, and `tokens.test.ts` adds a fourth
+ * for good measure by ordering the ramp's own pigments by luminance rather than hue.
+ *
+ * The population is stated to assistive tech in one sentence; a surface with room states it
+ * visibly in its own column header, which is where a sports table has always put it.
+ */
+export function Stat({ label, value, comparison, size = "md", className = "" }: StatProps) {
+  const step = magnitudeStep(comparison);
+  const caret = MAGNITUDE_CARET[step];
+  return (
+    <div data-magnitude={step} className={`flex flex-col gap-1 ${className}`}>
+      <span className={`${EYEBROW} text-text-faint`}>{label}</span>
+      {/* `items-baseline`: the caret sits on the number's own baseline at eyebrow size, so it
+          annotates the value without competing with it at `display-xl`. */}
+      <span className={`flex items-baseline gap-1 font-display leading-display tabular-nums ${SIZE_CLASS[size]} ${MAGNITUDE_INK[step]} ${MAGNITUDE_WEIGHT[step]}`}>
+        {caret === null ? null : (
+          <span aria-hidden="true" className="text-xs">
+            {caret}
+          </span>
+        )}
+        <span>{value}</span>
+      </span>
+      {isStated(comparison) ? <span className="sr-only">{comparisonSentence(comparison)}</span> : null}
+    </div>
+  );
+}

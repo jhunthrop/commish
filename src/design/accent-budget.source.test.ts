@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { sourceFilesIn } from "./test-support";
+import { sourceFilesIn, stripCommentsPreservingLines, bannedLines } from "./test-support";
 
 /**
  * THE ACCENT BUDGET, APPLIED TO SOURCE: green is money and seats filling, never a button.
@@ -57,20 +57,9 @@ const REPO_ROOT = process.cwd();
 const ACCENT_FILL = "bg-accent";
 const INK_FILL = "bg-text-primary";
 
-/** `source` with every comment blanked but every newline kept, so offenders keep their line
- *  numbers — the one refinement over `no-raw-color.source.test.ts`'s stripper, which reports
- *  matches rather than lines. */
-function stripCommentsPreservingLines(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " ")).replace(/^(\s*)\/\/.*$/gm, "$1");
-}
-
-/** Every line of `source` (comments already exempt) still spelling `banned`, as `file:line`. */
-function bannedLines(file: string, source: string, banned: string): readonly string[] {
-  return stripCommentsPreservingLines(source)
-    .split("\n")
-    .map((line, index) => (line.includes(banned) ? `${file}:${index + 1}: ${line.trim()}` : null))
-    .filter((line): line is string => line !== null);
-}
+// `stripCommentsPreservingLines`/`bannedLines` moved to `test-support.ts` when the magnitude
+// budget became this sweep's sibling (`magnitude-budget.source.test.ts`) — one stripper, two
+// budgets, rather than a second copy that could quietly disagree about what a comment is.
 
 const files = sourceFilesIn(SWEPT_DIRS, ".tsx");
 const accentSweptFiles = files.filter((file) => !ACCENT_FILL_ALLOWLIST.includes(file));
