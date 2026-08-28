@@ -21,7 +21,19 @@ function rosterOf(entries: readonly MatchupLineupEntry[]): TradeRosterPlayer[] {
   const players: TradeRosterPlayer[] = [];
   for (const entry of entries) {
     if (entry.playerId === null || entry.playerName === null || entry.position === null) continue;
-    players.push({ playerId: entry.playerId, name: entry.playerName, position: entry.position });
+    // Law 3's three fields ride the SAME entry this loop already reads — see
+    // `TradeRosterPlayer`'s own docblock for why they live here rather than on `ValuedPlayer`.
+    // `nflTeam` falls back to the empty string, which is `PlayerFace`'s own "no club colour I
+    // know" input: it renders the bare face rather than a grey rectangle pretending to be
+    // somebody's colours.
+    players.push({
+      playerId: entry.playerId,
+      name: entry.playerName,
+      position: entry.position,
+      nflTeam: entry.nflTeam ?? "",
+      headshotUrl: entry.headshotUrl,
+      adp: entry.adp,
+    });
   }
   return players;
 }

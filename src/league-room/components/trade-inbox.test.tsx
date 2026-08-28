@@ -13,8 +13,8 @@ const CONTEXT: TradeRoomContext = {
   myTeamId: "me",
   counterparties: [{ teamId: "them", teamName: "Iron Owls" }],
   rostersByTeamId: {
-    me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" }],
-    them: [{ playerId: "p2", name: "Puka Nacua", position: "WR" }],
+    me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB", nflTeam: "ATL", headshotUrl: null, adp: null }],
+    them: [{ playerId: "p2", name: "Puka Nacua", position: "WR", nflTeam: "ATL", headshotUrl: null, adp: null }],
   },
   leagueName: "Sunday Money",
 };

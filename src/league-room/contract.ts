@@ -368,6 +368,25 @@ export interface MatchupLineupEntry {
   readonly playerName: string | null;
   readonly position: Position | null;
   /**
+   * GAMEDAY, LAW 3 — *"a player is an object: face, team colour, position, number."* These three
+   * fields are what let a season surface draw one. Every value here was ALREADY in hand: the
+   * `matchupWeek` read (`@/league-service/read.ts`) loads the whole `players` table into
+   * `playerById` to resolve names and positions, so a club code and a headshot cost this wire
+   * three columns and zero queries.
+   *
+   * They are REQUIRED, not optional, for the reason `Player.headshotUrl` states on the domain
+   * type: a caller must never have to guess whether an absent field means "this player has none"
+   * or "whoever built this entry forgot". `null` on all three is the one spelling of an EMPTY
+   * SLOT — no player, so no club, no face and no draft position.
+   *
+   * The fourth of law 3's attributes, the jersey number, is not here because it is nowhere in the
+   * feed this product maps (`PlayerFace`'s own docblock carries the full argument). An invented
+   * number is worse than an absent one.
+   */
+  readonly nflTeam: string | null;
+  readonly headshotUrl: string | null;
+  readonly adp: number | null;
+  /**
    * `null` when this player has no stat line for the week yet — "has not played" and "played
    * and scored nothing" are different facts (`MatchupSide.score`'s own team-level rule, and
    * `initialScores`' docblock, `live-matchup-week.tsx`), and coalescing the first into the
@@ -441,6 +460,16 @@ export interface LineupSlotView {
   readonly playerId: string | null;
   readonly playerName: string | null;
   readonly position: Position | null;
+  /**
+   * GAMEDAY, LAW 3, the same three fields `MatchupLineupEntry` carries and for the same reason:
+   * a lineup editor that draws nine dropdowns full of strings is drawing no players at all.
+   * `lineupView` (`@/league-service/lineups.ts`) already loads the whole `players` table to
+   * resolve `playerName`/`position`, so these cost three columns off a map lookup that had
+   * already happened. `null` on all three is the one spelling of an EMPTY SLOT.
+   */
+  readonly nflTeam: string | null;
+  readonly headshotUrl: string | null;
+  readonly adp: number | null;
 }
 
 export interface LineupBody {
@@ -491,6 +520,20 @@ export interface TradeRosterPlayer {
   readonly playerId: string;
   readonly name: string;
   readonly position: Position;
+  /**
+   * GAMEDAY, LAW 3, the same three fields the matchup and lineup wires carry. A trade is the one
+   * place in this product where a manager is comparing PEOPLE, and the card drew a position chip
+   * beside a string. These arrive from the SAME `matchupWeek` read this context is already built
+   * from (`rosterOf`, the trades page), so they cost nothing beyond three fields on a shape that
+   * was already crossing the boundary.
+   *
+   * NOT folded into `ValuedPlayer` (`@/trades/fairness`), which is the fairness engine's own
+   * currency type: a headshot is not a valuation input, and widening a domain type so a card can
+   * draw a face is how a display concern ends up inside a collusion sweep.
+   */
+  readonly nflTeam: string;
+  readonly headshotUrl: string | null;
+  readonly adp: number | null;
 }
 
 /** One team a manager could open a trade with: enough to fill the composer's counterparty `Select`. */

@@ -2,10 +2,13 @@
 
 import { useMemo } from "react";
 import type { TeamScore } from "@/stats-pipeline/contract";
+import { EYEBROW, Pill } from "@/components/ui";
 import type { MatchupDetail, MatchupWeekBody } from "../contract";
 import { useLiveScores } from "../hooks/use-live-scores";
 import { startedPointsByPosition } from "../lib/population";
-import { MatchupPanel } from "./matchup-panel";
+import type { RecordsByTeamId } from "./matchup-hero";
+import { MatchupLineups, MatchupPanel } from "./matchup-panel";
+import { MatchupStrip } from "./matchup-strip";
 
 /** The teams that already have a real score, home and away, across every matchup in the week.
  *  A side with no score yet (`null` — hasn't started) is left out, the same rule
@@ -43,17 +46,41 @@ function foldLiveScore(matchup: MatchupDetail, scores: ReadonlyMap<string, numbe
   };
 }
 
+/** Whether this manager is playing in this matchup. `false` for every matchup when the viewer has
+ *  no team here (a commissioner reading somebody else's league), which is why the page below falls
+ *  back to leading with the first fixture rather than rendering no hero at all. */
+function isMine(matchup: MatchupDetail, myTeamId: string | null): boolean {
+  return myTeamId !== null && (matchup.home.teamId === myTeamId || matchup.away.teamId === myTeamId);
+}
+
 /**
- * The live matchup surface itself: mounts `useLiveScores` ONCE for the whole week (one league
- * stream, one status, one score map — `score.update` is a per-league frame, not per-matchup) and
- * folds it over the server-rendered `body` before handing each matchup to `MatchupPanel`.
+ * THE WEEK, WITH THE MANAGER'S OWN GAME AT THE TOP OF IT.
  *
- * A thin client boundary around an otherwise server-rendered page, the same shape
- * `MatchupWeekPage` (`src/app/app/leagues/[leagueId]/matchups/[week]/page.tsx`) already uses for
- * `MatchupPanel` itself: the page stays a Server Component (title, nav, the provider-driven
- * footer sentence), and only the part that actually moves is client-side.
+ * Before Gameday this page rendered six identical panels in fixture order, so a manager's own
+ * matchup was — measured on the real seeded league — the fifth thing on a four-thousand-pixel
+ * scroll, drawn at exactly the same weight as five games they have no stake in. That is a listing,
+ * not a Sunday screen, and it is what the founder's *"I want it to feel like a sports app"* was
+ * about.
+ *
+ * The order is a fact, not a preference: `myTeamId` is on the wire, so the page knows which
+ * fixture is the reader's and leads with it at full weight (`MatchupPanel`, hero plus both
+ * lineups). Everything else becomes one row each in `MatchupStrip`, with the lineups behind a
+ * native disclosure so nothing that used to be on this page has left it. A viewer with no team in
+ * this league has no "own" game to lead with, so the first fixture takes the hero and the label
+ * stays "Matchup" — there is no second person to speak to and the page does not pretend there is.
+ *
+ * `gamesFinal`/`gamesTotal` are a WEEK-WIDE fact and are stated once, here, in the week's own
+ * band. They used to be appended to a sentence inside every scoreboard, which printed "0 of 15
+ * games final" six times on one screen for one fact.
  */
-export function LiveMatchupWeek({ leagueId, body }: { readonly leagueId: string; readonly body: MatchupWeekBody }) {
+export function LiveMatchupWeek({ leagueId, body, records }: {
+  readonly leagueId: string;
+  readonly body: MatchupWeekBody;
+  /** Every team's win-loss-tie line, joined by the page from the standings read it already makes.
+   *  Optional so a test that does not care renders exactly as before — the hero prints no record
+   *  rather than a fabricated one. */
+  readonly records?: RecordsByTeamId;
+}) {
   const live = useLiveScores(leagueId, {
     week: body.weekNumber,
     status: body.weekStatus,
@@ -71,26 +98,47 @@ export function LiveMatchupWeek({ leagueId, body }: { readonly leagueId: string;
    *
    * Read off `body`, NOT off the live-folded matchups: `score.update` carries team totals only,
    * never a per-player breakdown (`foldLiveScore`'s own docblock), so the per-player numbers are
-   * the request-time ones and the population they are ranked inside must be too. Ranking today's
-   * server-rendered player line against a pool that moved under it would produce a percentile
-   * belonging to neither snapshot.
+   * the request-time ones and the population they are ranked inside must be too.
    */
   const positionPoints = useMemo(() => startedPointsByPosition(body.matchups), [body.matchups]);
 
+  const folded = body.matchups.map((matchup) => foldLiveScore(matchup, live.scores, live.status));
+  const mineIndex = folded.findIndex((matchup) => isMine(matchup, body.myTeamId));
+  const leadIndex = mineIndex === -1 ? 0 : mineIndex;
+  const lead = folded[leadIndex];
+  const rest = folded.filter((_, index) => index !== leadIndex);
+
+  if (lead === undefined) return null;
+
   return (
     <>
-      {notice === null ? null : <p className="text-sm text-text-muted">{notice}</p>}
-      {body.matchups.map((matchup) => (
-        <MatchupPanel
-          key={`${matchup.home.teamId}:${matchup.away.teamId}`}
-          matchup={foldLiveScore(matchup, live.scores, live.status)}
-          myTeamId={body.myTeamId}
-          weekStatus={live.status}
-          gamesFinal={live.gamesFinal}
-          gamesTotal={live.gamesTotal}
-          positionPoints={positionPoints}
-        />
-      ))}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* The week's own progress, said once. A `Pill` because it is a figure inside a sentence,
+            and `neutral` because a games-final count is a fact about the afternoon rather than
+            something urgent — the live family is spent on the chips that mean "points can still
+            arrive". `gamesTotal === 0` is a week with no `stat_weeks` row yet, which has nothing
+            honest to say about how many of zero games are done. */}
+        {live.gamesTotal === 0 ? null : <Pill>{`${live.gamesFinal} of ${live.gamesTotal} games final`}</Pill>}
+        {notice === null ? null : <p className="text-sm text-text-muted">{notice}</p>}
+      </div>
+
+      <MatchupPanel
+        matchup={lead}
+        myTeamId={body.myTeamId}
+        weekStatus={live.status}
+        positionPoints={positionPoints}
+        records={records}
+        eyebrow={mineIndex === -1 ? "Matchup" : "Your matchup"}
+      />
+
+      {rest.length === 0 ? null : (
+        <section aria-label="Around the league" className="flex flex-col gap-2">
+          <h2 className={`${EYEBROW} text-text-muted`}>Around the league</h2>
+          <MatchupStrip matchups={rest}>
+            {(matchup) => <MatchupLineups matchup={matchup} myTeamId={body.myTeamId} positionPoints={positionPoints} />}
+          </MatchupStrip>
+        </section>
+      )}
     </>
   );
 }

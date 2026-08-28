@@ -12,13 +12,13 @@ import { LeagueRoomDepsProvider } from "../hooks/deps";
 /** FIX 4: `LINEUP` carries no FLEX starter, so the caption's own branch needs a fixture that has one. */
 const LINEUP_WITH_FLEX: LineupBody = {
   ...LINEUP,
-  starters: [...LINEUP.starters, { slot: "FLEX", slotIndex: 0, playerId: "wr1", playerName: "Ja'Marr Chase", position: "WR" }],
+  starters: [...LINEUP.starters, { slot: "FLEX", slotIndex: 0, playerId: "wr1", playerName: "Ja'Marr Chase", position: "WR", nflTeam: "BUF", headshotUrl: null, adp: null }],
 };
 
 /** Task 1 (superflex): the same "no branch without a fixture" reasoning as `LINEUP_WITH_FLEX`. */
 const LINEUP_WITH_SUPERFLEX: LineupBody = {
   ...LINEUP,
-  starters: [...LINEUP.starters, { slot: "SUPERFLEX", slotIndex: 0, playerId: "qb2", playerName: "Backup Quarterback", position: "QB" }],
+  starters: [...LINEUP.starters, { slot: "SUPERFLEX", slotIndex: 0, playerId: "qb2", playerName: "Backup Quarterback", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null }],
 };
 
 /** Every roster slot empty, the shape `lineupView` returns before a draft has run — a team

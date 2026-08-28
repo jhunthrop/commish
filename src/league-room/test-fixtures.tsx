@@ -21,11 +21,11 @@ export const LINEUP: LineupBody = {
   weekNumber: 5,
   locked: false,
   starters: [
-    { slot: "QB", slotIndex: 0, playerId: "qb1", playerName: "Josh Allen", position: "QB" },
-    { slot: "RB", slotIndex: 0, playerId: "rb1", playerName: "Derrick Henry", position: "RB" },
+    { slot: "QB", slotIndex: 0, playerId: "qb1", playerName: "Josh Allen", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "RB", slotIndex: 0, playerId: "rb1", playerName: "Derrick Henry", position: "RB", nflTeam: "BUF", headshotUrl: null, adp: null },
   ],
   bench: [
-    { slot: "BENCH", slotIndex: 0, playerId: "qb2", playerName: "Backup Quarterback", position: "QB" },
+    { slot: "BENCH", slotIndex: 0, playerId: "qb2", playerName: "Backup Quarterback", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null },
   ],
 };
 
@@ -39,16 +39,16 @@ export const MATCHUP: MatchupDetail = {
     teamName: "Bay Bandits",
     score: 112.5,
     starters: [
-      { slot: "QB", slotIndex: 0, playerId: "qb1", playerName: "Josh Allen", position: "QB", points: 24.5 },
-      { slot: "RB", slotIndex: 0, playerId: "rb1", playerName: "Derrick Henry", position: "RB", points: 18 },
+      { slot: "QB", slotIndex: 0, playerId: "qb1", playerName: "Josh Allen", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null, points: 24.5 },
+      { slot: "RB", slotIndex: 0, playerId: "rb1", playerName: "Derrick Henry", position: "RB", nflTeam: "BUF", headshotUrl: null, adp: null, points: 18 },
     ],
-    bench: [{ slot: "BENCH", slotIndex: 0, playerId: "qb2", playerName: "Backup Quarterback", position: "QB", points: 0 }],
+    bench: [{ slot: "BENCH", slotIndex: 0, playerId: "qb2", playerName: "Backup Quarterback", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null, points: 0 }],
   },
   away: {
     teamId: "t2",
     teamName: "Iron Owls",
     score: 98.25,
-    starters: [{ slot: "QB", slotIndex: 0, playerId: "qb3", playerName: "Marcus Reed", position: "QB", points: 19.25 }],
+    starters: [{ slot: "QB", slotIndex: 0, playerId: "qb3", playerName: "Marcus Reed", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null, points: 19.25 }],
     bench: [],
   },
 };

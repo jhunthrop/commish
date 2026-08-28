@@ -273,6 +273,13 @@ export async function lineupView(
       playerId: slot.playerId,
       playerName: player?.name ?? null,
       position: player?.position ?? null,
+      // Gameday law 3: the club code and the headshot a lineup editor draws a player WITH. Free —
+      // `playerById` above already holds the whole row. `adp` rides along because `Player`
+      // (`@/domain/player`) requires it, and a surface handing this slot to `PlayerFace` needs a
+      // whole `Player`.
+      nflTeam: player?.nflTeam ?? null,
+      headshotUrl: player?.headshotUrl ?? null,
+      adp: player?.adp ?? null,
     };
   };
 

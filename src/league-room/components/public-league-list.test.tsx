@@ -266,12 +266,54 @@ describe("OpenLeagueShelf", () => {
     expect(screen.queryByText(GLOSSARY["house-league"].short)).not.toBeInTheDocument();
   });
 
+  // Gameday: the house promise and the legend are ONE muted line now, not two stacked
+  // paragraphs — the founder cut this head to one line on 2026-08-24 and it had drifted back to
+  // three. Both sentences are still on the page, still exactly once, still above both renderings;
+  // what changed is that they share a paragraph, so the assertion reads the paragraph rather than
+  // an exact-text node match.
   it("prints the legend line once, above both renderings, whenever there are leagues to read (D1)", () => {
-    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />);
-    const legend = screen.getByText(OPEN_LEAGUE_LEGEND);
+    const { container } = render(
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />,
+    );
+    expect(occurrences(container, OPEN_LEAGUE_LEGEND)).toBe(1);
+    const legend = [...container.querySelectorAll("p")].find((node) => (node.textContent ?? "").includes(OPEN_LEAGUE_LEGEND));
+    expect(legend).toBeDefined();
     for (const rendering of [rows(), cards()]) {
-      expect(legend.compareDocumentPosition(rendering) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(legend!.compareDocumentPosition(rendering) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
+  });
+
+  // The head is ONE muted guidance line, never a stack. This is the founder's 2026-08-24 ruling
+  // held by a test rather than by memory, since it had already drifted back once.
+  it("says the house promise and the legend on one line, never as two stacked paragraphs", () => {
+    const { container } = render(
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />,
+    );
+    const guidance = [...container.querySelectorAll("p")].filter((node) => {
+      const text = node.textContent ?? "";
+      return text.includes(OPEN_LEAGUE_LEGEND) || text.includes(HOUSE_SHELF_SENTENCE);
+    });
+    expect(guidance).toHaveLength(1);
+  });
+
+  // The heading-order fix the storefront track handed over: an `aside` renders INSIDE the head,
+  // after the heading, so a caller can no longer put an interactive control ahead of the page's
+  // only `<h1>` however it composes the page around this component.
+  it("renders its aside after the heading, never before it", () => {
+    render(
+      <OpenLeagueShelf
+        house={[HOUSE_LEAGUE]}
+        leagues={PUBLIC_LEAGUES}
+        signedIn
+        helpLevel="standard"
+        asOfTime={AS_OF}
+        headingLevel={1}
+        aside={<button type="button">Try a mock draft</button>}
+      />,
+    );
+    const heading = screen.getByRole("heading", { level: 1, name: "Open leagues" });
+    const aside = screen.getByRole("button", { name: "Try a mock draft" });
+    expect(heading.compareDocumentPosition(aside) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("passes emphasis='ink' to exactly one league PER RENDERING — never more, whatever the shelf holds (D2, extended to rows)", () => {

@@ -12,8 +12,8 @@ const CONTEXT: TradeRoomContext = {
   myTeamId: "me",
   counterparties: [{ teamId: "them", teamName: "Iron Owls" }],
   rostersByTeamId: {
-    me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" }],
-    them: [{ playerId: "p2", name: "Puka Nacua", position: "WR" }],
+    me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB", nflTeam: "ATL", headshotUrl: null, adp: null }],
+    them: [{ playerId: "p2", name: "Puka Nacua", position: "WR", nflTeam: "ATL", headshotUrl: null, adp: null }],
   },
   leagueName: "Sunday Money",
 };
@@ -74,6 +74,9 @@ describe("TradeComposer", () => {
       playerId: `p${index}`,
       name: `Player ${index}`,
       position: "WR" as const,
+      nflTeam: "ATL",
+      headshotUrl: null,
+      adp: null,
     }));
     const context: TradeRoomContext = { ...CONTEXT, rostersByTeamId: { ...CONTEXT.rostersByTeamId, me: roster } };
     render(<TradeComposer context={context} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);

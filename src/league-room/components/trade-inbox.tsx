@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Button, EmptyState, ErrorState, Skeleton } from "@/components/ui";
+import { Button, EmptyState, ErrorState, EYEBROW, Skeleton } from "@/components/ui";
 import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
-import type { TradeRoomContext } from "../contract";
+import type { TradeRosterPlayer, TradeRoomContext } from "../contract";
 import { useTrades, type TradeDecision } from "../hooks/use-trades";
 import { TradeCard, type TradeCardProps } from "./trade-card";
 import { TradeComposer } from "./trade-composer";
@@ -31,11 +31,30 @@ function flattenPlayers(rostersByTeamId: TradeRoomContext["rostersByTeamId"]): R
   return byId;
 }
 
+/**
+ * THE SAME ROSTERS, KEYED BY PLAYER ID, KEEPING THE FIELDS `ValuedPlayer` DELIBERATELY DROPS.
+ *
+ * `flattenPlayers` above narrows every roster player down to the fairness engine's currency
+ * (`ValuedPlayer` — id, name, position, an average), which is correct for valuation and useless
+ * for drawing one. Law 3 needs a club and a face, and those belong nowhere near a collusion
+ * sweep's input type, so the card takes two lookups over the same list rather than one widened
+ * one: `describeAsset` still owns the LABEL (it is the only function permitted to switch on
+ * `TradeAssetKind` at all) and this owns the OBJECT.
+ */
+function flattenRoster(rostersByTeamId: TradeRoomContext["rostersByTeamId"]): Readonly<Record<string, TradeRosterPlayer>> {
+  const byId: Record<string, TradeRosterPlayer> = {};
+  for (const roster of Object.values(rostersByTeamId)) {
+    for (const player of roster) byId[player.playerId] = player;
+  }
+  return byId;
+}
+
 function Band({
   title,
   trades,
   meTeamId,
   playersById,
+  rosterById,
   leagueName,
   assessmentStatusById,
   assessments,
@@ -49,6 +68,7 @@ function Band({
   readonly trades: readonly TradeProposalView[];
   readonly meTeamId: string;
   readonly playersById: Readonly<Record<string, ValuedPlayer>>;
+  readonly rosterById: Readonly<Record<string, TradeRosterPlayer>>;
   readonly leagueName: string;
   readonly assessmentStatusById: Readonly<Record<string, AssessmentStatus>>;
   readonly assessments: Readonly<Record<string, TradeAssessmentSummary>>;
@@ -61,7 +81,7 @@ function Band({
   if (trades.length === 0) return null;
   return (
     <section className="flex flex-col gap-3" aria-label={title}>
-      <h2 className="text-lg font-medium text-text-primary">{title}</h2>
+      <h2 className={`${EYEBROW} text-text-muted`}>{title}</h2>
       <div className="flex flex-col gap-3">
         {trades.map((trade) => (
           <TradeCard
@@ -69,6 +89,7 @@ function Band({
             trade={trade}
             meTeamId={meTeamId}
             playersById={playersById}
+            rosterById={rosterById}
             leagueName={leagueName}
             assessmentStatus={assessmentStatusById[trade.id] ?? "idle"}
             assessment={assessments[trade.id]}
@@ -110,6 +131,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
   const [assessmentStatusById, setAssessmentStatusById] = useState<Readonly<Record<string, AssessmentStatus>>>({});
 
   const playersById = flattenPlayers(context.rostersByTeamId);
+  const rosterById = flattenRoster(context.rostersByTeamId);
 
   const requestAssessment = (tradeId: string): void => {
     // A second click while a request is already in flight (or once it's already answered) is a
@@ -179,6 +201,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
   const bandProps = {
     meTeamId: meTeamId ?? "",
     playersById,
+    rosterById,
     leagueName: context.leagueName,
     assessmentStatusById,
     assessments,
@@ -198,7 +221,12 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
           nothing left to show, so there is always exactly one way to start an offer, named the
           same way everywhere it appears. */}
       {nothingHere ? null : (
-        <div className="flex justify-end">
+        // Sits on the page's own top line rather than in a `justify-end` strip of its own, which
+        // spent 60px of vertical on one button and left it floating over nothing (law 4: space
+        // separates kinds of information, it never exists to calm). It is this page's ONE
+        // ceremonial ink pill; every Accept below it is a `verb` — see `TradeCard`.
+        <div className="flex items-center justify-between gap-3">
+          <h2 className={`${EYEBROW} text-text-muted`}>Your trades</h2>
           <Button onClick={() => setComposing(true)}>Put an offer together</Button>
         </div>
       )}

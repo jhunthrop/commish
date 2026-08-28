@@ -42,11 +42,13 @@ describe("MatchupPanel", () => {
     expect(screen.queryByText("0.00")).not.toBeInTheDocument();
   });
 
-  // E1(a)+(c) (D2/E3, competition review): the margin and the week's own games-final count,
-  // both already on the wire and neither printed before this.
-  it("prints the margin and the games-final count when both are supplied", () => {
-    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" gamesFinal={13} gamesTotal={13} />);
-    expect(screen.getByText("You are up 14.25. 13 of 13 games final.")).toBeInTheDocument();
+  // E1(a) (D2/E3, competition review), as Gameday re-sites it: the margin is the hero's own
+  // middle-column line. The games-final clause it used to carry moved up to the week band
+  // (`LiveMatchupWeek`), which states it ONCE — it is a week-wide fact, and six panels printing
+  // "13 of 13 games final" on one screen was six copies of one truth.
+  it("prints the margin from the reader's own seat", () => {
+    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    expect(screen.getByText("You are up 14.25.")).toBeInTheDocument();
   });
 
   // Phase 2 Plan B: live scoring EXISTS. This case used to assert the opposite, and it was
@@ -203,7 +205,11 @@ describe("MatchupPanel", () => {
         <MatchupPanel matchup={notPlayed} myTeamId="t1" weekStatus="in_progress" positionPoints={QB_WEEK} />,
       );
       expect(screen.getAllByText("—").length).toBeGreaterThan(0);
-      expect(container.textContent).not.toContain("0.00");
+      // Scoped to the tables. The hero's own bench chip may legitimately print "0.00 on your
+      // bench" for a bench that PLAYED and produced nothing, which is a different fact from a
+      // starter who has not kicked off and the one this assertion is about.
+      const tables = Array.from(container.querySelectorAll("table")).map((table) => table.textContent).join("");
+      expect(tables).not.toContain("0.00");
     });
 
     it("prints the column name once per table on screen, never visibly under every number", () => {

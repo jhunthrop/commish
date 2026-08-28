@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, Card, Modal, PositionBadge } from "@/components/ui";
+import { Badge, Button, Card, EYEBROW, Modal, PlayerFace, PositionBadge } from "@/components/ui";
 import { describeAsset, type TradeAsset } from "@/trades/assets";
 import type { TradeProposalView, TradeSideView } from "@/trades/contract";
+import type { TradeRosterPlayer } from "../contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { isExpired } from "@/trades/lifecycle";
 import { LEAGUE_ROOM_CONFIG } from "../config";
@@ -22,6 +23,19 @@ export interface TradeCardProps {
    *  function this codebase permits to switch on `TradeAssetKind` at all. Built once, upstream,
    *  from the same read `TradeComposer`'s pickers use (`TradeRoomContext.rostersByTeamId`). */
   readonly playersById: Readonly<Record<string, ValuedPlayer>>;
+  /**
+   * The same rosters, keyed the same way, keeping the fields `ValuedPlayer` deliberately drops —
+   * see `flattenRoster` (`./trade-inbox.tsx`) for why the card takes two lookups over one list
+   * rather than one widened valuation type.
+   *
+   * Optional, defaulting to empty, on the same contract every other optional prop on this card
+   * holds: omit it and the asset rows render exactly as they did before law 3 reached this
+   * surface — a position chip beside a name, no face. The one production caller (`TradeInbox`)
+   * always supplies it. An empty lookup is also the honest render for an asset naming a player no
+   * longer on anybody's roster, which is a real state this card already words, so the missing
+   * case and the omitted case degrade identically rather than one of them drawing a placeholder.
+   */
+  readonly rosterById?: Readonly<Record<string, TradeRosterPlayer>>;
   /** The league's own name — Plan D's `held-trade-banner.tsx` needs it, and only it: every other
    *  status renders with no league name at all. Optional so every OTHER existing caller of this
    *  card is unaffected; `TradeInbox` (the one production caller) always supplies it via
@@ -55,17 +69,29 @@ export interface TradeCardProps {
  * table already use for "this player, and their position" — the sticker fill stays exactly
  * where LED-2 ruled it belongs, on a board cell, never a list row.
  */
-function AssetList({ heading, assets, playersById }: { readonly heading: string; readonly assets: readonly TradeAsset[]; readonly playersById: Readonly<Record<string, ValuedPlayer>> }) {
+function AssetList({ heading, assets, playersById, rosterById }: { readonly heading: string; readonly assets: readonly TradeAsset[]; readonly playersById: Readonly<Record<string, ValuedPlayer>>; readonly rosterById: Readonly<Record<string, TradeRosterPlayer>> }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-2">
-      <h3 className="text-sm font-medium text-text-muted">{heading}</h3>
-      <ul className="flex flex-col gap-2">
+      <h3 className={`${EYEBROW} text-text-muted`}>{heading}</h3>
+      <ul className="flex flex-col gap-1.5">
         {assets.map((asset, index) => {
           const described = describeAsset(asset, playersById);
+          // LAW 3, ON THE ONE SCREEN WHERE A MANAGER IS COMPARING PEOPLE. `describeAsset` still
+          // owns the LABEL — it is the only function in this codebase permitted to switch on
+          // `TradeAssetKind`, and an asset that is no longer on a roster says so in its own
+          // words. What this adds is the OBJECT: the face on its club colour, for the assets that
+          // resolve to a player still on somebody's roster. An asset that resolves to nobody
+          // renders no face, which is the same "we do not know" branch `PlayerFace` already takes
+          // for an unknown club rather than a placeholder standing in for a person.
+          const roster = asset.kind === "player" ? rosterById[asset.playerId] : undefined;
           return (
             <li key={`${asset.kind}:${asset.kind === "player" ? asset.playerId : index}`} className="flex min-w-0 items-center gap-2">
-              {described.position === null ? null : <PositionBadge position={described.position} size="sm" />}
+              {roster === undefined ? null : (
+                <PlayerFace player={{ id: roster.playerId, name: roster.name, position: roster.position, nflTeam: roster.nflTeam, headshotUrl: roster.headshotUrl, adp: roster.adp }} size="sm" />
+              )}
               <span className="min-w-0 break-words text-sm font-medium text-text-primary">{described.label}</span>
+              {described.position === null ? null : <PositionBadge position={described.position} size="sm" />}
+              {roster === undefined || roster.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{roster.nflTeam}</span>}
             </li>
           );
         })}
@@ -120,6 +146,7 @@ export function TradeCard({
   trade,
   meTeamId,
   playersById,
+  rosterById = {},
   leagueName,
   assessmentStatus = "idle",
   assessment,
@@ -196,8 +223,8 @@ export function TradeCard({
         ) : null}
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <AssetList heading={givingHeading} assets={givingSide.assets} playersById={playersById} />
-          <AssetList heading={gettingHeading} assets={gettingSide.assets} playersById={playersById} />
+          <AssetList heading={givingHeading} assets={givingSide.assets} playersById={playersById} rosterById={rosterById} />
+          <AssetList heading={gettingHeading} assets={gettingSide.assets} playersById={playersById} rosterById={rosterById} />
         </div>
 
         {trade.note === null ? null : <p className="break-words text-sm italic text-text-muted">{`"${trade.note}"`}</p>}
@@ -236,7 +263,19 @@ export function TradeCard({
                 sits side by side, so the gap between them is a deliberate choice rather than
                 whatever a flex row defaults to. */}
             <div className="flex flex-wrap gap-4">
-              <Button onClick={() => setConfirmingAccept(true)} disabled={busy}>
+              {/* LAW 5, AND THE DISTINCTION `Button`'s own docblock draws: *"`primary` is
+                  ceremonial, one per view, the thing a page exists to do ONCE; `verb` is the thing
+                  a board does forty times."* Answering an offer is the second kind — an inbox with
+                  six open trades has six of these — while "Put an offer together" is the one
+                  ceremonial act at the top of the page. Both were ink pills, which is two
+                  competing verbs in ink on one screen, and that is the defect law 5 names rather
+                  than the repetition it permits. `verb` is money-filled and `rounded-md`, so it is
+                  unmistakably the act without being a second `primary`.
+
+                  It stays paired with a `Modal` confirm: this is the one irreversible control pair
+                  in the product, and making the verb obvious is not the same as making it easy to
+                  press by accident. */}
+              <Button variant="verb" onClick={() => setConfirmingAccept(true)} disabled={busy}>
                 Accept
               </Button>
               <Button variant="secondary" onClick={() => onDecline?.(trade.id)} disabled={busy}>

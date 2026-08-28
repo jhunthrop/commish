@@ -213,7 +213,13 @@ export function InvitePanel({ leagueId, leagueName = "" }: { readonly leagueId: 
       {loading ? (
         <Skeleton lines={2} />
       ) : invites.length === 0 ? (
-        <Button onClick={() => void create()} loading={creating} disabled={creating}>
+        // LAW 5, "the verb is obvious", and the discipline that keeps it safe: the loud action
+        // belongs to the act a screen EXISTS for. On the league home that act is setting a
+        // lineup, and this panel used to answer with a second, equally loud, full-width ink pill
+        // four hundred pixels below it — two competing verbs in ink on one screen, which is the
+        // defect law 5 names. Minting an invite is a commissioner's utility, not the league
+        // home's reason for being, so it takes the quiet pill and stops shouting over the week.
+        <Button variant="secondary" className="w-fit" onClick={() => void create()} loading={creating} disabled={creating}>
           Create invite link
         </Button>
       ) : (

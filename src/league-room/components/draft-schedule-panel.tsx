@@ -100,18 +100,22 @@ export function draftTerminalStatePanel(
 ): ReactNode | null {
   if (schedule.status === "complete") {
     if (currentWeek > totalWeeks) return null;
+    // GAMEDAY, LAW 4: *"space separates kinds of information; it never exists to calm."* This was
+    // a centred `StatePanel` — an icon, a heading and a caption inside 32px of padding — sitting
+    // above the week band for the WHOLE regular season to report a fact that stopped changing in
+    // August. A settled fact earns a line, not a hero. The `in_progress` state below keeps its
+    // panel, because a draft happening RIGHT NOW is the loudest thing that can be true about a
+    // league and the two states are not the same kind of news.
+    //
+    // Nothing is lost: the sentence and the link are the same words in the same order, and the
+    // link is still the ordinary, load-bearing way to reach the board all season.
     return (
-      <StatePanel
-        tone="neutral"
-        icon="check"
-        title="Draft complete"
-        description="Every roster is set."
-        action={
-          <Link className="text-sm font-medium text-accent underline" href={`/app/drafts/${schedule.draftId}`}>
-            View the draft board
-          </Link>
-        }
-      />
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted">
+        <span>Draft complete. Every roster is set.</span>
+        <Link className="font-medium text-accent underline" href={`/app/drafts/${schedule.draftId}`}>
+          View the draft board
+        </Link>
+      </p>
     );
   }
   if (schedule.status === "in_progress") {

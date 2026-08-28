@@ -16,23 +16,23 @@ const JUST_DRAFTED_LINEUP: LineupBody = {
   weekNumber: 1,
   locked: false,
   starters: [
-    { slot: "QB", slotIndex: 0, playerId: "p1", playerName: "Josh Allen", position: "QB" },
-    { slot: "RB", slotIndex: 0, playerId: "p2", playerName: "Derrick Henry", position: "RB" },
-    { slot: "RB", slotIndex: 1, playerId: "p3", playerName: "Bijan Robinson", position: "RB" },
-    { slot: "WR", slotIndex: 0, playerId: "p4", playerName: "Justin Jefferson", position: "WR" },
-    { slot: "WR", slotIndex: 1, playerId: "p5", playerName: "CeeDee Lamb", position: "WR" },
-    { slot: "TE", slotIndex: 0, playerId: "p6", playerName: "Travis Kelce", position: "TE" },
-    { slot: "FLEX", slotIndex: 0, playerId: "p7", playerName: "Amon-Ra St. Brown", position: "WR" },
-    { slot: "K", slotIndex: 0, playerId: "p8", playerName: "Justin Tucker", position: "K" },
-    { slot: "DEF", slotIndex: 0, playerId: "p9", playerName: "Steelers D/ST", position: "DEF" },
+    { slot: "QB", slotIndex: 0, playerId: "p1", playerName: "Josh Allen", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "RB", slotIndex: 0, playerId: "p2", playerName: "Derrick Henry", position: "RB", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "RB", slotIndex: 1, playerId: "p3", playerName: "Bijan Robinson", position: "RB", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "WR", slotIndex: 0, playerId: "p4", playerName: "Justin Jefferson", position: "WR", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "WR", slotIndex: 1, playerId: "p5", playerName: "CeeDee Lamb", position: "WR", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "TE", slotIndex: 0, playerId: "p6", playerName: "Travis Kelce", position: "TE", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "FLEX", slotIndex: 0, playerId: "p7", playerName: "Amon-Ra St. Brown", position: "WR", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "K", slotIndex: 0, playerId: "p8", playerName: "Justin Tucker", position: "K", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "DEF", slotIndex: 0, playerId: "p9", playerName: "Steelers D/ST", position: "DEF", nflTeam: "BUF", headshotUrl: null, adp: null },
   ],
   bench: [
-    { slot: "BENCH", slotIndex: 0, playerId: "p10", playerName: "Backup One", position: "RB" },
-    { slot: "BENCH", slotIndex: 1, playerId: "p11", playerName: "Backup Two", position: "WR" },
-    { slot: "BENCH", slotIndex: 2, playerId: "p12", playerName: "Backup Three", position: "QB" },
-    { slot: "BENCH", slotIndex: 3, playerId: "p13", playerName: "Backup Four", position: "TE" },
-    { slot: "BENCH", slotIndex: 4, playerId: "p14", playerName: "Backup Five", position: "WR" },
-    { slot: "BENCH", slotIndex: 5, playerId: "p15", playerName: "Backup Six", position: "RB" },
+    { slot: "BENCH", slotIndex: 0, playerId: "p10", playerName: "Backup One", position: "RB", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "BENCH", slotIndex: 1, playerId: "p11", playerName: "Backup Two", position: "WR", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "BENCH", slotIndex: 2, playerId: "p12", playerName: "Backup Three", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "BENCH", slotIndex: 3, playerId: "p13", playerName: "Backup Four", position: "TE", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "BENCH", slotIndex: 4, playerId: "p14", playerName: "Backup Five", position: "WR", nflTeam: "BUF", headshotUrl: null, adp: null },
+    { slot: "BENCH", slotIndex: 5, playerId: "p15", playerName: "Backup Six", position: "RB", nflTeam: "BUF", headshotUrl: null, adp: null },
   ],
 };
 
@@ -560,8 +560,8 @@ describe("LeagueHome", () => {
           `/app/drafts/${JUST_DRAFTED_HOME.draftId}`,
         );
         // `WaitingRoom`'s own terminal panel never renders alongside the arrival — its heading
-        // ("Draft complete", an `h2` per `StatePanel`) appears nowhere on the page.
-        expect(screen.queryByRole("heading", { name: "Draft complete" })).not.toBeInTheDocument();
+        // ("Draft complete. Every roster is set.", one line since Gameday) appears nowhere on the page.
+        expect(screen.queryByText(/Draft complete/)).not.toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       });
     });
@@ -577,7 +577,7 @@ describe("LeagueHome", () => {
       expect(screen.queryByTestId("draft-complete-arrival")).toBeNull();
       // The permanent panel returns on its own, with its own "View the draft board" link — no
       // arrival card left to have folded it into.
-      expect(screen.getByRole("heading", { name: "Draft complete" })).toBeInTheDocument();
+      expect(screen.getByText("Draft complete. Every roster is set.")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "View the draft board" })).toHaveAttribute(
         "href",
         `/app/drafts/${afterWeekOne.draftId}`,
@@ -625,7 +625,13 @@ describe("LeagueHome", () => {
       expect(screen.getByRole("heading", { level: 2, name: "Week 3" }).className).toContain("font-display");
       // The manager's own matchup is this page's subject, so it takes the hero register the
       // matchup page uses, not the tile register a shelf of league cards uses.
-      expect(screen.getByText("112.50").className).toContain("sm:text-display-2xl");
+      // `Scoreboard`'s own 84px step (`Stat size="2xl"`), law 2's stated hero register. It is
+      // not responsive at the class level any more — the primitive moves the LAYOUT on a phone
+      // (one column instead of three) rather than shrinking the figure, which is law 2's own
+      // answer to a 360px viewport.
+      // `.closest`: `Stat` puts the display size on the figure's own wrapper and the digits in a
+      // bare inner span, so the class lives one level up from the text node.
+      expect(screen.getByText("112.50").closest("[class*='text-display']")?.className).toContain("text-display-2xl");
     });
 
     it("takes its range from size, never from a heavier face", () => {

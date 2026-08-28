@@ -86,10 +86,6 @@ export default async function BrowsePage({ searchParams }: PageProps) {
 
   const content = (
     <>
-      {/* Task 9: the same quiet practice invitation the front door carries, above the shelf so
-          it never fights the shelf's own filters or cards for attention — one line, one link,
-          never the view's ink action. */}
-      <PracticeEntryLink signedIn={user !== null} />
       <OpenLeagueShelf
         house={house}
         leagues={leagues}
@@ -97,6 +93,12 @@ export default async function BrowsePage({ searchParams }: PageProps) {
         helpLevel={helpLevel}
         asOfTime={formatAbsoluteTime(nowIso)}
         headingLevel={1}
+        // Task 9's quiet practice invitation, moved INSIDE the shelf head (Gameday). It used to
+        // render as a sibling above the shelf, which put an interactive element ahead of this
+        // page's only <h1> — the heading-order defect the page audit gates on. As the head's own
+        // `aside` it sits beside the heading rather than before it, and it is still the quiet
+        // outlined pill it has always been, never this view's ink action.
+        aside={<PracticeEntryLink signedIn={user !== null} />}
         intro={
           <p className="max-w-prose text-text-muted">
             Leagues looking for managers, with a draft still to come. Pick one that matches how
