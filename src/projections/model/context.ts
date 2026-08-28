@@ -1,10 +1,13 @@
 import { lineComposite, lineWindow } from "../features/line";
+import { schemeEstimate, schemeRatios } from "../features/scheme";
 import { indexTeamMetrics, latestTeams } from "../team-context";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import type { ProjectionInput } from "../backtest";
 import type { PlayerRates } from "./efficiency";
 import type { FeatureFlags } from "./features";
 import type { LinePriors } from "./line-fit";
+import type { PredictedOpportunity } from "./opportunity";
+import type { SchemePriors, SchemeVolumeElasticity } from "./scheme-fit";
 
 /**
  * WHERE PHASE 3'S CONTEXT MEETS PHASE 2'S MODEL — one file, so the whole of "what the context is
@@ -24,6 +27,7 @@ import type { LinePriors } from "./line-fit";
 /** Every fitted parameter the context layers consume. Fitted on the fit seasons, never on 2023/24. */
 export interface ContextPriors {
   readonly line: LinePriors;
+  readonly scheme: SchemePriors;
 }
 
 /**
@@ -97,4 +101,72 @@ export function contextualiseRates(
     });
   }
   return adjusted;
+}
+
+/**
+ * Applies every switched-on context group to layer 1's TEAM VOLUME.
+ *
+ * Volume rather than share, and that distinction is the whole of where this feature belongs. A fast
+ * offence does not give any one receiver a larger fraction of its targets; it runs more plays, so
+ * the same fraction is worth more targets. Putting the scheme on the share would have moved players
+ * relative to their own teammates, which is not what pace does and would have been wrong in a way
+ * a points scoreboard could not distinguish from being right.
+ */
+export function contextualiseOpportunity(
+  opportunity: ReadonlyMap<string, PredictedOpportunity>,
+  input: ProjectionInput,
+  features: FeatureFlags,
+  priors: ContextPriors,
+): ReadonlyMap<string, PredictedOpportunity> {
+  if (!features.scheme) return opportunity;
+
+  const metrics = indexTeamMetrics(input.teamContext);
+  const teams = latestTeams(input.teamContext);
+  const league = priors.scheme.league;
+  const factors = new Map<string, { targets: number; carries: number; passAttempts: number } | null>();
+
+  const factorsFor = (team: string): { targets: number; carries: number; passAttempts: number } | null => {
+    if (factors.has(team)) return factors.get(team)!;
+    const estimate = schemeEstimate({
+      team,
+      season: input.season,
+      week: input.week,
+      metrics,
+      league,
+      lastPossibleWeek: LAST_POSSIBLE_WEEK,
+    });
+    const ratios = schemeRatios(estimate, league);
+    const resolved =
+      ratios.tempo === null || ratios.passLean === null || ratios.tempo <= 0 || ratios.passLean <= 0
+        ? null
+        : {
+            targets: applyElasticity(ratios.tempo, ratios.passLean, priors.scheme.targets),
+            carries: applyElasticity(ratios.tempo, ratios.passLean, priors.scheme.carries),
+            passAttempts: applyElasticity(ratios.tempo, ratios.passLean, priors.scheme.passAttempts),
+          };
+    factors.set(team, resolved);
+    return resolved;
+  };
+
+  const adjusted = new Map<string, PredictedOpportunity>();
+  for (const [playerId, player] of opportunity) {
+    const team = teams.get(playerId);
+    const factor = team === undefined ? null : factorsFor(team);
+    if (factor === null) {
+      adjusted.set(playerId, player);
+      continue;
+    }
+    adjusted.set(playerId, {
+      ...player,
+      teamTargets: player.teamTargets * factor.targets,
+      teamCarries: player.teamCarries * factor.carries,
+      teamPassAttempts: player.teamPassAttempts * factor.passAttempts,
+    });
+  }
+  return adjusted;
+}
+
+/** Two ratios raised to their fitted powers, bounded. `exp(a·log x + b·log y)`, written plainly. */
+function applyElasticity(tempo: number, passLean: number, elasticity: SchemeVolumeElasticity): number {
+  return bounded(tempo ** elasticity.tempo * passLean ** elasticity.passLean);
 }

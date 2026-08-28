@@ -51,4 +51,13 @@ export const ALL_FEATURES: FeatureFlags = {
  * neutral or negative belongs in the research document and not in this constant, however good the
  * story for it was.
  */
-export const SHIPPED_FEATURES: FeatureFlags = NO_FEATURES;
+export const SHIPPED_FEATURES: FeatureFlags = {
+  ...NO_FEATURES,
+  /**
+   * ON. Every rank band improved on both held-out seasons — eight of eight — while the overall
+   * number stayed flat (0.6770 -> 0.6767 in 2024, 0.6780 -> 0.6781 in 2023). The overall figure is
+   * dominated by ordering ACROSS bands, which everybody gets right; the bands are where a manager's
+   * start-and-sit decision actually lives. See `docs/research/2026-08-27-model-v2.md`.
+   */
+  scheme: true,
+};

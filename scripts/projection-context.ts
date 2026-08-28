@@ -13,7 +13,7 @@
 // nflverse is free, so this spends no upstream request budget.
 import { createDb } from "@/db/client";
 import { createNflverseClient } from "@/projections/nflverse/client";
-import { ingestPlayByPlay, ingestSchedule } from "@/projections/nflverse/ingest";
+import { ingestCoaches, ingestPlayByPlay, ingestSchedule } from "@/projections/nflverse/ingest";
 
 const FIRST_SEASON = Number(process.argv[2] ?? 2020);
 const LAST_SEASON = Number(process.argv[3] ?? 2024);
@@ -46,6 +46,11 @@ async function main(): Promise<void> {
         `${report.observationsWritten} new observations in ${((Date.now() - started) / 1000).toFixed(0)}s`,
     );
   }
+
+  // Last, because a coach's prior pace can only be computed once the seasons he coached are in the
+  // store. Running it before the play-by-play would silently produce a table of nulls.
+  const coachRows = await ingestCoaches(db, seasons);
+  console.log(`coaches: ${coachRows} new team-week observations`);
 
   await db.$client.end();
 }

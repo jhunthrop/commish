@@ -1,6 +1,9 @@
 import type { Db } from "@/db/client";
 import { recordObservations } from "../store";
-import { recordPlayerTeams, recordTeamObservations } from "../team-store";
+import { recordPlayerTeams, recordTeamObservations, teamObservationsAsOf, type TeamWeekObservation } from "../team-store";
+import { indexTeamMetrics } from "../team-context";
+import { LAST_POSSIBLE_WEEK } from "../store";
+import { coachObservations, seasonMeans } from "./coaches";
 import { recordNflPlayers } from "../universe";
 import { createNflverseClient, type NflverseClient } from "./client";
 import { NFLVERSE_CONFIG } from "./config";
@@ -24,6 +27,16 @@ import { lineContinuityObservations, mapPlayerTeams } from "./team-map";
  * release covering every year, and re-parsing it per season would be six downloads to answer the
  * same question.
  */
+
+/**
+ * The moment a derivation reads the store at when it is deriving a fact about the PAST.
+ *
+ * A coach's prior pace is computed from seasons that are over, so the honest read is the final,
+ * corrected one — the same choice `backtest.ts` makes for actuals and `projection-fit.ts` makes for
+ * fitting. The point-in-time gate governs what a MODEL may see when predicting; the resulting fact
+ * carries its own `as_of`, which is what a replay is bounded by.
+ */
+const FAR_FUTURE = new Date("9999-12-31T00:00:00.000Z");
 
 /** Everything one season's ingestion reports about itself, which the operator is expected to read. */
 export interface SeasonIngestReport {
@@ -154,4 +167,32 @@ export async function ingestPlayByPlay(db: Db, client: NflverseClient, season: n
     teamWeeks: profiles.length,
     observationsWritten: await recordTeamObservations(db, observations),
   };
+}
+
+/**
+ * The play-caller table: tenure, and an incoming coach's own pace and pass-rate history.
+ *
+ * Run AFTER the play-by-play, and the ordering is not incidental: a coach's prior pace is the mean
+ * of the situation-neutral pace of every offence he ran before this season, so it can only be
+ * computed once those seasons' play-by-play is in the store. Run first, it would write a table of
+ * nulls and nothing downstream would complain — the scheme prior would simply fall back to the
+ * league for every coaching change, which is exactly the case the feature exists to handle.
+ */
+export async function ingestCoaches(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
+  const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  // Every season back to the earliest the store could hold, so a coach hired in 2024 is credited
+  // with the offences he ran in 2016 rather than looking like a first-time head coach.
+  const earliest = Math.min(...seasons);
+  const history = Array.from({ length: Math.max(...seasons) - earliest + 1 }, (_, index) => earliest + index);
+  const games = mapSchedule(rows, history);
+
+  const all: TeamWeekObservation[] = [];
+  for (const season of history) {
+    all.push(
+      ...(await teamObservationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FAR_FUTURE })),
+    );
+  }
+  const metrics = indexTeamMetrics({ playerTeams: [], teamObservations: all });
+  const weeks = Array.from({ length: LAST_POSSIBLE_WEEK }, (_, index) => index + 1);
+  return await recordTeamObservations(db, coachObservations(games, seasonMeans(metrics, weeks), seasons));
 }

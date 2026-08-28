@@ -1,10 +1,10 @@
 import type { StatLine } from "@/domain/player";
 import type { ProjectionInput, ProjectionSource } from "../backtest";
 import { composeStatLine } from "./compose";
-import { contextualiseRates, type ContextPriors } from "./context";
+import { contextualiseOpportunity, contextualiseRates, type ContextPriors } from "./context";
 import { predictRates, type EfficiencyPriors } from "./efficiency";
 import { SHIPPED_FEATURES, type FeatureFlags } from "./features";
-import { FITTED_EFFICIENCY_PRIORS, FITTED_LINE_PRIORS, FITTED_OPPORTUNITY_PRIORS } from "./fitted";
+import { FITTED_EFFICIENCY_PRIORS, FITTED_LINE_PRIORS, FITTED_OPPORTUNITY_PRIORS, FITTED_SCHEME_PRIORS } from "./fitted";
 import { predictOpportunity, type OpportunityPriors } from "./opportunity";
 
 /**
@@ -40,7 +40,7 @@ export interface ModelPriors {
 export const FITTED_MODEL: ModelPriors = {
   opportunity: FITTED_OPPORTUNITY_PRIORS,
   efficiency: FITTED_EFFICIENCY_PRIORS,
-  context: { line: FITTED_LINE_PRIORS },
+  context: { line: FITTED_LINE_PRIORS, scheme: FITTED_SCHEME_PRIORS },
 };
 
 export function modelProjection(
@@ -49,7 +49,12 @@ export function modelProjection(
   features: FeatureFlags = SHIPPED_FEATURES,
 ): readonly StatLine[] {
   const { season, week, history, usage, positions } = input;
-  const opportunity = predictOpportunity(usage, { season, week, positions }, priors.opportunity);
+  const opportunity = contextualiseOpportunity(
+    predictOpportunity(usage, { season, week, positions }, priors.opportunity),
+    input,
+    features,
+    priors.context,
+  );
   const rates = contextualiseRates(
     predictRates(history, usage, { season, week, positions }, priors.efficiency),
     input,
