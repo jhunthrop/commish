@@ -100,20 +100,29 @@ export function MockShareLanding({ code, summary }: MockShareLandingProps) {
             the spec measured and rejected. `SeatMeter` keeps the spoken sentence
             (`srOnlySentence`) so the product's one seat statement still reaches assistive tech
             while the screen shows the figure. */}
-        <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
-          <div className="flex shrink-0 items-baseline gap-2">
-            <span data-testid="share-seats-open" className="font-mono text-display-lg font-semibold tabular-nums leading-display text-text-primary">
-              {summary.seatsOpen}
-            </span>
-            <span className={`${MICRO_LABEL} text-text-faint`}>{summary.seatsOpen === 1 ? "seat open" : "seats open"}</span>
-          </div>
-          {summary.started || remainingMs === null ? null : (
-            <div className="flex shrink-0 flex-col">
-              <Countdown remainingMs={remainingMs} size="md" />
-              <span className={`${MICRO_LABEL} text-text-faint`}>until kickoff</span>
+        {summary.started ? null : (
+          // Both figures answer "should I take this seat", and neither is that question any more
+          // once the room is drafting: the seats left are stale the instant the board opens, and
+          // a countdown to a kickoff that already happened is not a fact. A started room says its
+          // one true thing through the action below instead.
+          <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
+            <div className="flex shrink-0 items-baseline gap-2">
+              <span data-testid="share-seats-open" className="font-mono text-display-lg font-semibold tabular-nums leading-display text-text-primary">
+                {summary.seatsOpen}
+              </span>
+              <span className={`${MICRO_LABEL} text-text-faint`}>{summary.seatsOpen === 1 ? "seat open" : "seats open"}</span>
             </div>
-          )}
-        </div>
+            {remainingMs === null ? null : (
+              <div className="flex shrink-0 flex-col">
+                {/* The same step as the seat figure beside it: the two facts a stranger weighs
+                    against each other are weighed at the same size, or the layout has made the
+                    choice for them. */}
+                <Countdown remainingMs={remainingMs} size="lg" />
+                <span className={`${MICRO_LABEL} text-text-faint`}>until kickoff</span>
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <SeatMeter filled={summary.teamCount - summary.seatsOpen} total={summary.teamCount} srOnlySentence />
           <span className="font-mono text-xs tabular-nums text-text-muted">
