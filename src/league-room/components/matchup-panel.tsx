@@ -62,7 +62,16 @@ function pointsStat(row: MatchupLineupEntry, points: number, positionPoints: Pos
  */
 function PlayerCell({ row }: { readonly row: MatchupLineupEntry }) {
   const player = playerOf(row);
-  if (player === null) return <span className="text-text-faint">Empty</span>;
+  if (player === null) {
+    // An empty slot has no player to name, so the slot itself is the whole cell — the one row
+    // where the chip is still the only thing that could be there.
+    return (
+      <span className="flex items-center gap-2">
+        <SlotChip slot={row.slot} />
+        <span className="text-text-faint">Empty</span>
+      </span>
+    );
+  }
   return (
     <span className="flex min-w-0 items-center gap-2">
       <PlayerFace player={player} size="sm" />
@@ -70,6 +79,10 @@ function PlayerCell({ row }: { readonly row: MatchupLineupEntry }) {
         <span className="truncate text-text-primary">{player.name}</span>
         <span className="flex items-center gap-1.5">
           <PositionBadge position={player.position} size="sm" />
+          {/* THE SLOT ONLY WHEN IT IS NOT THE POSITION (2026-08-28) — see `columnsFor`. On eight
+              of nine starter rows "RB" in the slot chip and "RB" on the sticker are one fact
+              printed twice, side by side, and the ninth is the only one anybody reads. */}
+          {row.slot === player.position ? null : <SlotChip slot={row.slot} />}
           {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
         </span>
       </span>
@@ -78,24 +91,47 @@ function PlayerCell({ row }: { readonly row: MatchupLineupEntry }) {
 }
 
 /**
- * NEW-10 (gauntlet fix wave): `Slot` and `Pos` used to be two columns for one fact — identical
- * for every row but FLEX, at ~15% of the table's width each. `Slot` is the one that survives:
- * `LineupEditor`'s own roster table (`lineup-editor.tsx`) already shows only the slot, the same
- * precedent this table now matches, and `SlotChip` alone still tells FLEX and BENCH apart from a
- * starting position. Gameday puts the position sticker back — but inside the Player cell, on the
- * object, where law 3 says it belongs, rather than as a second column repeating the first.
+ * TWO COLUMNS: who, and what he scored.
  *
- * THE HEAT MAP lives in the Points column (the fun pass, Task 9). Built per render rather than
- * hoisted to a module constant because the cell needs the week's population, which is a prop —
- * and a population is the ONLY thing that can tint a number here.
+ * THE SLOT COLUMN IS CUT (2026-08-28), which closes a duplication this table has been carrying
+ * from both directions. NEW-10 deleted `Pos` because `Slot` and `Pos` were two columns for one
+ * fact, identical on every row but FLEX. Gameday then put the position sticker back inside the
+ * Player cell, where law 3 says it belongs — and quietly recreated the same duplication from the
+ * other side: a nine-row lineup printed "RB" in a chip and "RB" on a sticker, an inch apart,
+ * eight times. A column is worth its width when a manager acts on it, and nobody has ever read a
+ * lineup's QB row to learn that the quarterback is playing quarterback.
+ *
+ * FLEX SURVIVES, which is the only thing that column was ever really saying. The chip renders
+ * inside the Player cell exactly when the slot and the position disagree, so the one row a
+ * manager actually looks for is the one row that carries a chip — the fact is now louder for
+ * being rarer. An empty slot keeps its chip too: with no player to name, the slot IS the row.
+ *
+ * Nothing moves left into the reclaimed width. The table simply ends sooner.
+ *
+ * THE HEAT MAP lives in the Points column (the fun pass, Task 9), and it stays a hand-built
+ * `Stat` rather than becoming `Table`'s declarative `judged` column. That is deliberate: a judged
+ * column ranks its numbers against THE OTHER NUMBERS IN THAT COLUMN, and this column's nine
+ * starters are nine different jobs. The real population is every starter at the same position
+ * across every game in the week — a set this table cannot see, handed down as a prop. Declaring
+ * it judged would rank a kicker against a quarterback for sharing a column. The head states the
+ * set instead, in the same two registers a judged head uses, so a reader gets the same claim.
  */
 function columnsFor(positionPoints: PositionPoints | undefined): readonly TableColumn<MatchupLineupEntry>[] {
   return [
-    { key: "slot", header: "Slot", cell: (row) => <SlotChip slot={row.slot} /> },
     { key: "player", header: "Player", cell: (row) => <PlayerCell row={row} /> },
     {
       key: "points",
-      header: "Points",
+      header: (
+        <span className="flex flex-col items-end gap-0.5">
+          <span>Points</span>
+          {/* Stated only when there IS a population — an omitted `positionPoints` renders every
+              cell as ordinary ink, and a head claiming a comparison the column did not make would
+              be the exact dishonesty the tint is bound by. */}
+          {positionPoints === undefined ? null : (
+            <span className="normal-case tracking-normal text-text-faint">vs the week, by position</span>
+          )}
+        </span>
+      ),
       // D4: `null` means this player has no stat line for the week yet — not-yet-played, never a
       // silent zero. The same dash the team-level score already renders for the identical fact,
       // and the one case that renders no `Stat` at all: a dash is not a number, and a number that

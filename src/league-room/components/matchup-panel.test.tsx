@@ -219,8 +219,12 @@ describe("MatchupPanel", () => {
       // accessibility tree, and the page still reads as a table rather than eighteen captioned
       // tiles (the document grammar the fun pass exists to undo).
       const spelled = screen.getAllByText("Points");
-      const headers = screen.getAllByRole("columnheader", { name: "Points" });
+      // A regex, not an exact name: the head states its comparison set beneath the label now, the
+      // same claim `Stat` speaks per cell, so its accessible name is "Points vs the week, by
+      // position". A population it was not given states nothing — see `columnsFor`.
+      const headers = screen.getAllByRole("columnheader", { name: /^Points/ });
       expect(headers).toHaveLength(2);
+      expect(headers[0]).toHaveTextContent("vs the week, by position");
       const inCells = spelled.filter((el) => el.closest("th") === null);
       expect(inCells.length).toBeGreaterThan(0);
       expect(inCells.every((el) => el.className.includes("sr-only"))).toBe(true);
