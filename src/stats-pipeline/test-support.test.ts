@@ -24,8 +24,8 @@ const LINE: StatLine = {
 
 describe("fakeStatsProvider", () => {
   it("listPlayers answers the scripted roster, or an empty list when none was scripted", async () => {
-    const scripted = fakeStatsProvider({ players: [{ id: "p1", name: "A Player", position: "WR", nflTeam: "SF", headshotUrl: null }], games: {} });
-    await expect(scripted.listPlayers()).resolves.toEqual([{ id: "p1", name: "A Player", position: "WR", nflTeam: "SF", headshotUrl: null }]);
+    const scripted = fakeStatsProvider({ players: [{ id: "p1", name: "A Player", position: "WR", nflTeam: "SF", headshotUrl: null, adp: null }], games: {} });
+    await expect(scripted.listPlayers()).resolves.toEqual([{ id: "p1", name: "A Player", position: "WR", nflTeam: "SF", headshotUrl: null, adp: null }]);
 
     const unscripted = fakeStatsProvider({ games: {} });
     await expect(unscripted.listPlayers()).resolves.toEqual([]);
@@ -69,12 +69,12 @@ describe("fakeStatsProvider", () => {
  * game's lines drawn only from that game's own two teams.
  */
 const CONTRACT_PLAYERS: readonly Player[] = [
-  { id: "qb_sf", name: "A Quarterback", position: "QB", nflTeam: "SF", headshotUrl: null },
-  { id: "rb_sf", name: "A Running Back", position: "RB", nflTeam: "SF", headshotUrl: null },
-  { id: "wr_sea", name: "A Receiver", position: "WR", nflTeam: "SEA", headshotUrl: null },
-  { id: "te_sea", name: "A Tight End", position: "TE", nflTeam: "SEA", headshotUrl: null },
-  { id: "k_kc", name: "A Kicker", position: "K", nflTeam: "KC", headshotUrl: null },
-  { id: "def_den", name: "DEN Defense", position: "DEF", nflTeam: "DEN", headshotUrl: null },
+  { id: "qb_sf", name: "A Quarterback", position: "QB", nflTeam: "SF", headshotUrl: null, adp: null },
+  { id: "rb_sf", name: "A Running Back", position: "RB", nflTeam: "SF", headshotUrl: null, adp: null },
+  { id: "wr_sea", name: "A Receiver", position: "WR", nflTeam: "SEA", headshotUrl: null, adp: null },
+  { id: "te_sea", name: "A Tight End", position: "TE", nflTeam: "SEA", headshotUrl: null, adp: null },
+  { id: "k_kc", name: "A Kicker", position: "K", nflTeam: "KC", headshotUrl: null, adp: null },
+  { id: "def_den", name: "DEN Defense", position: "DEF", nflTeam: "DEN", headshotUrl: null, adp: null },
 ];
 
 const CONTRACT_SCRIPT: FakeStatsProviderScript = {

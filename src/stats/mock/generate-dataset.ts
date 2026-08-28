@@ -72,7 +72,12 @@ export function generateDataset(seed: number): Dataset {
       // The mock dataset ships no photos at all (founder directive 2026-08-26): every mock player
       // exercises the SAME `Avatar` initials fallback a real player with no ESPN photo gets,
       // rather than a fabricated data URI nothing in production ever produces.
-      players.push({ id, name, position, nflTeam, headshotUrl: null });
+      // `adp: null` is the only honest value the GENERATOR can write: the mock's ADP is derived
+      // from the dataset's own season totals at read time (`createMockStatsProvider`'s
+      // `listAdpEntries`), never stored beside it, so storing a number here would be a second
+      // copy of that fact free to disagree with the first. Written rather than omitted so the
+      // committed `dataset.json` parses straight back to a `Dataset` with no widening.
+      players.push({ id, name, position, nflTeam, headshotUrl: null, adp: null });
     }
   }
   const statLines: StatLine[] = [];

@@ -8,8 +8,8 @@ import { sourceFilesIn, bannedLines } from "./test-support";
  *
  * v3 converged every display call site from `font-bold` (700) to `font-semibold` (600) —
  * self-ruling S4, the mock's own ramp asks for 650 and 600 is the nearest loaded Geist weight —
- * and `docs/design-system.md` recorded the result as "zero occurrences across the swept
- * directories, proven by grep repo-wide rather than claimed." Grep at a moment in time is not a
+ * and `docs/design-system.md` recorded the result as zero occurrences across the swept
+ * directories, "proven by grep repo-wide rather than claimed." Grep at a moment in time is not a
  * gate, and the fun pass is exactly the pressure that would break this one: the whole point of
  * Task 3's widened display scale is that a number gets loud by getting BIG, and the cheap
  * alternative an author reaches for under deadline is a heavier face.

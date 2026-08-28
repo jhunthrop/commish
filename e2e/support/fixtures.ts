@@ -26,7 +26,7 @@ import { MANAGER_A_EMAIL, MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_D_STATE, MAN
  */
 export const test = base.extend<{ managerA: Page; managerB: Page; managerZero: Page; managerSignOut: Page; managerD: Page }>({
   managerA: async ({ browser }, use) => {
-    const context = await browser.newContext({ storageState: MANAGER_A_STATE });
+    const context = await browser.newContext({ storageState: MANAGER_A_STATE, ...(process.env.E2E_COLOR_SCHEME === undefined ? {} : { colorScheme: process.env.E2E_COLOR_SCHEME as "dark" | "light" }) });
     const page = await context.newPage();
     await use(page);
     await context.close();

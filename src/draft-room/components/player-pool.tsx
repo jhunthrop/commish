@@ -7,7 +7,7 @@ import { Badge, Button, Card, EmptyState, Input, PositionBadge } from "@/compone
 import { queueButtonLabel } from "../lib/lookups";
 import { verdictFor, verdictPopulation } from "../lib/verdict";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
-import { PlayerFace } from "./player-face";
+import { PlayerFace } from "@/components/ui/player-face";
 import { VerdictChip } from "./verdict-chip";
 
 const ALL = "ALL";
@@ -201,7 +201,10 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                   {/* Founder directive 2026-08-26 ("why aren't we showing the players picture?"),
                       now on the club's own colour (rule 1's team-identity amendment, Task 8).
                       Decorative — the name right beside it already says who this is. */}
-                  <PlayerFace player={row.player} />
+                  {/* `sm` explicitly: the pool is sixty rows in a 320px rail, the density this
+                      face was originally built at, and the primitive's default is now the
+                      card-and-roster step rather than this one. */}
+                  <PlayerFace player={row.player} size="sm" />
                   <span data-testid="pool-player-name" className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
                   <VerdictChip verdict={steal} />
                 </div>

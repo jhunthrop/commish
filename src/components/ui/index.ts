@@ -33,3 +33,15 @@ export { StatPill } from "./stat-pill";
 /** The heat map's one renderer (the fun pass, Task 1). `StatComparison` rides the barrel with it
  *  because a caller that cannot name a population cannot use the component at all. */
 export { Stat, magnitudeStep, type StatComparison, type StatSize } from "./stat";
+
+/** GAMEDAY (v4) — the primitives the two approved compositions are built from. Each rides the
+ *  barrel with the type a caller cannot use it without: `GameState` because the chip is a closed
+ *  union, `TierGrade`'s home is `@/design/tokens` so it is NOT re-exported here. */
+export { PlayerFace } from "./player-face";
+export { PlayerRow } from "./player-row";
+export { TierDivider } from "./tier-divider";
+export { Scoreboard } from "./scoreboard";
+export { PointsShareBar } from "./points-share-bar";
+export { GameStateChip, pointsForGameState, NOT_STARTED_DASH, type GameState } from "./game-state-chip";
+export { EventFeedRow, signedPoints } from "./event-feed-row";
+export { Pill } from "./pill";

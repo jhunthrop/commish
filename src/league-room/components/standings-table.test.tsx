@@ -49,10 +49,14 @@ describe("StandingsTable", () => {
     expect(screen.getByText("1412.50").parentElement!.className).toContain("tabular-nums");
   });
 
-  it("renders dense, the mocks' own 11px vertical cell padding", () => {
+  it("renders dense, at Gameday's own 7px vertical cell padding", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
     const headerCell = screen.getByRole("columnheader", { name: "Team" });
-    expect(headerCell).toHaveStyle({ paddingTop: "11px", paddingBottom: "11px" });
+    // Gameday law 4, density is respect (2026-08-28): v3 set this at 11px, which was the
+    // Sunday Standard mock's own figure and airier than a fantasy table wants. A manager on a
+    // Sunday reads more rows, not calmer ones. Read from `UI_CONFIG.table` rather than pinned as a
+    // literal twice over.
+    expect(headerCell).toHaveStyle({ paddingTop: "7px", paddingBottom: "7px" });
   });
 
   // FIX 1 (HIGH): helpLevel must actually reach a wired InfoTip, not just be accepted and

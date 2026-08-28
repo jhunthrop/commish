@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderTokensCss } from "./generate-css";
-import { TOKENS } from "./tokens";
+import { TOKENS, TIER_GRADES } from "./tokens";
 import { UI_CONFIG } from "@/components/ui/config";
 
 describe("renderTokensCss", () => {
@@ -40,6 +40,21 @@ describe("renderTokensCss", () => {
     expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-pos-qb-sticker-text:\s*${light.stickerText}`, "i"));
     expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-pos-def-text:\s*${TOKENS.position.light.def.text}`, "i"));
     expect(css).toMatch(new RegExp(String.raw`:root\[data-theme="dark"\]\s*\{[^}]*--commish-pos-def-text:\s*${darkDef.text}`, "i"));
+  });
+
+  it("emits both tier variables per grade, in both themes — the palette is theme-reactive or it is not findable", () => {
+    // The whole reason the tier ladder became a variable rather than an inline style: dark's
+    // bright mock pigments fail WCAG 1.4.11's 3:1 on the light theme's near-white ground, so a
+    // badge that cannot repaint itself when the theme changes is a badge nobody can see in one of
+    // the two themes. Emission shape only — `tokens.test.ts` owns the contrast gates.
+    for (const grade of TIER_GRADES) {
+      const key = grade.toLowerCase();
+      expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-tier-${key}-fill:\s*${TOKENS.tier.light[grade].fill}`, "i"));
+      expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-tier-${key}-label:\s*${TOKENS.tier.light[grade].label}`, "i"));
+      expect(css).toMatch(
+        new RegExp(String.raw`:root\[data-theme="dark"\]\s*\{[^}]*--commish-tier-${key}-fill:\s*${TOKENS.tier.dark[grade].fill}`, "i"),
+      );
+    }
   });
 
   it("emits radius, font-size, display-size, shadow and motion vars, namespaced with the token var prefix", () => {

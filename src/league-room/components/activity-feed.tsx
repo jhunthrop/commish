@@ -47,8 +47,8 @@ function ActivityRowItem({ row }: { readonly row: ActivityRow }) {
  * `activityRowFor` (Task 9's allowlist) — this component prints them, it never re-derives
  * visibility or re-sorts. Deliberately NOT `"use client"`: `Show older` is a plain `<Link>`
  * carrying a `before` cursor in the query string, so the history reads with no JavaScript at
- * all, and the page it lives on is a document, not a room (`docs/design-system.md`, "Layout:
- * pages vs. rooms") — this plan's own closing note says the feed is a history, not a second
+ * all, and the page it lives on is a document, not a room (`docs/design-system.md`, "Layout: shell
+ * pages, rooms, public pages, and prose") — this plan's own closing note says the feed is a history, not a second
  * realtime surface.
  *
  * `rows.length === 0` renders the "nothing has happened" empty state ONLY when `nextBefore` is

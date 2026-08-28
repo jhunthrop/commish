@@ -3,7 +3,7 @@ import type { Player, StatLine } from "@/domain/player";
 import { deriveMockGames } from "./games";
 
 function player(id: string, nflTeam: string): Player {
-  return { id, name: id, position: "WR", nflTeam, headshotUrl: null };
+  return { id, name: id, position: "WR", nflTeam, headshotUrl: null, adp: null };
 }
 
 function line(playerId: string, week: number): StatLine {

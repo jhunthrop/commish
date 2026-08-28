@@ -172,7 +172,7 @@ describe("MockResults", () => {
       // case gets a deeper pool: `deep11` sits at rank 12 and goes first overall.
       const deepPool = [
         ...PLAYERS,
-        ...Array.from({ length: 8 }, (_, index) => ({ id: `deep${index + 4}`, name: `Deep Player ${index + 4}`, position: "WR" as const, nflTeam: "DAL", headshotUrl: null })),
+        ...Array.from({ length: 8 }, (_, index) => ({ id: `deep${index + 4}`, name: `Deep Player ${index + 4}`, position: "WR" as const, nflTeam: "DAL", headshotUrl: null, adp: index + 12 })),
       ];
       const oneEach: DraftStateView = {
         ...COMPLETE_VIEW,

@@ -7,7 +7,7 @@ export type BadgeTone = "neutral" | "accent" | "positive" | "negative" | "warnin
  * solid green fill, pixel-identical to `Button`'s primary variant. Every caller of this tone is a
  * LABEL (a house rung, a role, a live state, a count), never a control, and `positive`'s own row
  * below already proves the house rule for a Badge: "good outcome, as text/glow/meter fill only —
- * never a solid fill" (`docs/design-system.md`). Green as a solid block is reserved for the one
+ * never a solid button fill" (`docs/design-system.md`). Green as a solid block is reserved for the one
  * thing on this product that is actually clickable; a badge that copies it reads as a second,
  * unclickable "Take a seat" button sitting right next to the real one. `glow` (below) still gives
  * a genuinely live/urgent badge its own tinted ring — the outcome-is-a-glow escape hatch stays.
@@ -20,8 +20,9 @@ const TONE: Readonly<Record<BadgeTone, string>> = {
   warning: "text-warning border border-warning",
 };
 
-/** A tinted ring for a live/urgent state, built on `accentGlow`/`warningGlow` — the "an outcome
- *  is a glow, never a solid block" rule (`docs/design-system.md`) applied to a chip. Only
+/** A tinted ring for a live/urgent state, built on `accentGlow`/`warningGlow` — an outcome is a
+ *  glow rather than a solid block, which is the palette rule "money is a fill only when it is
+ *  money or an action" (`docs/design-system.md`) applied to a chip. Only
  *  `accent` and `warning` carry a glow token; any other tone ignores the prop. */
 const GLOW: Readonly<Partial<Record<BadgeTone, string>>> = {
   accent: "ring-2 ring-accent-glow",

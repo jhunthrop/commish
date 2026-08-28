@@ -43,7 +43,11 @@ export function mapPlayerList(body: unknown): readonly Player[] {
     // `headshotUrl: null` already means everywhere else — never an empty-string URL an `<img
     // src>` would fail to load (founder directive 2026-08-26).
     const headshotUrl = str(record.espnHeadshot) || null;
-    return [{ id, name, position, nflTeam, headshotUrl }];
+    // Always null here, never a guess: the player-list feed carries no ADP at all — it arrives on
+    // a separate feed (`listAdp` → `mapAdpList`) and is written only by `ingestAdp`. This null
+    // cannot clobber a real value, because `seed-players.ts` excludes `adp` from its upsert set,
+    // so a reseed leaves whatever the ADP ingestion last wrote standing.
+    return [{ id, name, position, nflTeam, headshotUrl, adp: null }];
   });
 }
 
@@ -74,6 +78,8 @@ export function mapTeamsToDefensePlayers(body: unknown): readonly Player[] {
         // A team defense is not a person Tank01 photographs — always null, never derived from
         // any per-team logo/asset (founder directive 2026-08-26).
         headshotUrl: null,
+        // See `mapPlayerList`: ADP arrives on its own feed, never on this one.
+        adp: null,
       },
     ];
   });

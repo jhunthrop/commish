@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TOKENS, COLOR_ROLES, MAGNITUDE_STEPS, type ColorRole, type MagnitudeStep, type PositionColorRole, type ThemeName } from "./tokens";
+import { TOKENS, COLOR_ROLES, MAGNITUDE_STEPS, TIER_GRADES, type ColorRole, type MagnitudeStep, type PositionColorRole, type ThemeName } from "./tokens";
 import { contrastRatio, hueDegrees, hueDistance, blendOver } from "./test-support";
 
 const THEMES: readonly ThemeName[] = ["light", "dark"];
@@ -289,6 +289,56 @@ describe("TOKENS.position", () => {
   }
 });
 
+/**
+ * The tier ladder's own gate. A grade badge is an opaque fill carrying its own dark label, so it
+ * has two jobs and this block checks both: the letter has to be readable ON the badge, and the
+ * badge has to be findable AGAINST the row it divides — in both themes, because the palette is
+ * theme-independent and only one of the two grounds was ever looked at while it was chosen.
+ *
+ * WHAT BREAKS WITHOUT IT: a band nobody can see is not a divider, it is decoration, and a grade
+ * letter that washes into its own fill is a colour-only signal — the exact failure the
+ * colourblind rule exists to forbid.
+ */
+describe("TOKENS.tier", () => {
+  it("defines the same grades in both themes, so no band can exist in a theme nobody designed", () => {
+    expect(Object.keys(TOKENS.tier.light).sort()).toEqual([...TIER_GRADES].sort());
+    expect(Object.keys(TOKENS.tier.dark).sort()).toEqual([...TIER_GRADES].sort());
+  });
+
+  for (const theme of THEMES) {
+    describe(theme, () => {
+      const c = TOKENS.color[theme];
+      const t = TOKENS.tier[theme];
+
+      for (const grade of TIER_GRADES) {
+        it(`${grade}'s letter on its own badge ≥ ${AA_TEXT}:1`, () => {
+          expect(contrastRatio(t[grade].label, t[grade].fill)).toBeGreaterThanOrEqual(AA_TEXT);
+        });
+        // The UI threshold, not the text one: the badge is a shape you have to FIND against the
+        // ground, which is exactly what WCAG 1.4.11 sizes 3:1 for. The letter inside it carries
+        // the text threshold, above. `surfaceElevated` is checked because a band sits between two
+        // pool CARDS, not only on the page ground.
+        for (const surface of ["surface", "surfaceElevated"] as const) {
+          it(`${grade}'s badge is findable on ${surface} ≥ ${AA_LARGE_AND_UI}:1`, () => {
+            expect(contrastRatio(t[grade].fill, c[surface])).toBeGreaterThanOrEqual(AA_LARGE_AND_UI);
+          });
+        }
+      }
+
+      // THE RANGE OF THE LADDER, not the separation of its rungs. Adjacent grades are close in hue
+      // on purpose (see `TOKENS.tier`'s docblock) and every badge prints its own letter, so a
+      // pairwise-hue rule would be the position stickers' gate applied to something that is an
+      // ORDER rather than a set of categories. What has to be true is that top and bottom do not
+      // look like the same grade — a ramp with no range is one colour spent four times.
+      it(`puts the ends of the ladder ≥ ${MIN_DISTINGUISHABLE_HUE_DEG}° apart in hue, so S never reads as C`, () => {
+        const first = t[TIER_GRADES[0]!].fill;
+        const last = t[TIER_GRADES[TIER_GRADES.length - 1]!].fill;
+        expect(hueDistance(hueDegrees(first), hueDegrees(last))).toBeGreaterThanOrEqual(MIN_DISTINGUISHABLE_HUE_DEG);
+      });
+    });
+  }
+});
+
 describe("TOKENS scales", () => {
   it("body scale is strictly increasing", () => {
     const vals = Object.values(TOKENS.font.size);
@@ -330,9 +380,54 @@ describe("TOKENS scales", () => {
   it("display line height is tighter than the tight body line height", () => {
     expect(TOKENS.font.lineHeight.display).toBeLessThan(TOKENS.font.lineHeight.tight);
   });
+
+  /**
+   * LAW 2's OWN NUMBER. The law is not "make it big", it is a stated ratio: *"A score is 84px;
+   * its label is 11px"* — 7.6x. The dynamic-range gate above only asks for ≥9x against the top
+   * of the display scale, which is the TV board's 116px; it would still pass if the scoreboard
+   * step vanished. This pins the two values the law actually names, so the scale cannot drift
+   * out from under the sentence in `docs/design-system.md` that quotes them.
+   */
+  it("puts a score at 84 and its label at 11 — law 2's stated 7.6x, not a nearby ratio", () => {
+    expect(TOKENS.font.display["2xl"]).toBe(84);
+    expect(TOKENS.font.size.xs).toBe(11);
+    expect(TOKENS.font.display["2xl"] / TOKENS.font.size.xs).toBeCloseTo(7.64, 1);
+  });
+
+  /**
+   * LAW 4, MEASURED. "Tight leading, real tables, no decorative whitespace." v3 shipped
+   * 1.06/1.2/1.5 and every surface drifted airy underneath it. The absolute ceilings below are
+   * what "tighter than v3" means in numbers, so the claim survives the next person who nudges a
+   * value for one screen's benefit.
+   */
+  it("sets leading tighter than v3 at every step, because density is the law not a preference", () => {
+    const { display, tight, base } = TOKENS.font.lineHeight;
+    expect(display).toBeLessThan(1.0);
+    expect(tight).toBeLessThanOrEqual(1.15);
+    expect(base).toBeLessThanOrEqual(1.45);
+  });
+
   it("motion durations are strictly increasing", () => {
     const { fast, base, slow } = TOKENS.motion.duration;
     expect(fast).toBeLessThan(base);
     expect(base).toBeLessThan(slow);
+  });
+
+  /**
+   * LAW 6's CAP, ENFORCED ON THE TOKEN RATHER THAN ON REVIEW. *"Nothing eases longer than
+   * 250ms."* v3's `slow` was 320ms and every celebration in the product read from it, so the law
+   * is only real if the token moves — a rule that lives in prose while the variable says 320 is
+   * a rule the next author overrides by accident.
+   *
+   * `pulse` and `wire` are deliberately exempt, named here so the exemption is a decision rather
+   * than an oversight: neither is an EASE. `pulse` is the live dot's cycle length and `wire` is a
+   * ticker's loop — both are continuous states reporting something still true, not a transition
+   * playing out. Law 6 caps transitions; it does not cap a clock.
+   */
+  it("keeps every eased duration inside law 6's 250ms ceiling", () => {
+    const LAW_6_CEILING_MS = 250;
+    const { fast, base, slow } = TOKENS.motion.duration;
+    for (const eased of [fast, base, slow]) expect(eased).toBeLessThanOrEqual(LAW_6_CEILING_MS);
+    expect(slow).toBe(LAW_6_CEILING_MS);
   });
 });

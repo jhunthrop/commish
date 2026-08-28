@@ -13,8 +13,7 @@ import { computeFantasyPoints } from "@/scoring";
  * `rankedPlayers` is expensive — every player × every week of stat lines, run through the
  * scoring engine — and this phase calls it repeatedly for the SAME league: once per
  * `GET /api/drafts/[draftId]/players`, once from `startDraft`, and up to 14 times from the
- * season seed. The player/stat-line universe is fixed for this phase (no live feed, see
- * docs/design-system.md), and a league's `scoring_settings` row currently has no update path
+ * season seed. The player/stat-line universe is fixed for this phase (no live feed), and a league's `scoring_settings` row currently has no update path
  * — it is written once at league creation (`src/league-service/creation.ts`) and never
  * touched again — so a cache keyed on leagueId alone cannot go stale under real usage today.
  *
