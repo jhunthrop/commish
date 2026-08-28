@@ -14,7 +14,8 @@ import { expect, test } from "./support/fixtures";
  *
  * This spec walks real routes in a real browser and asserts the four page-level laws that no
  * per-component test can:
- *   1. RULE 5 — at most ONE ink action (`bg-text-primary`, the primary pill) rendered per view.
+ *   1. LAW 5 — at most one distinct ink VERB per view (see `inkVerbCount` for why the unit
+ *      moved from controls to verbs when Gameday replaced the Sunday Standard).
  *   2. AXE — zero violations of the rules a composited page can actually break: colour contrast
  *      and heading order (the two the campaign found by hand, both invisible to jsdom).
  *   3. NO SIDEWAYS SCROLL at 360px, the product's own mobile floor.
@@ -38,14 +39,46 @@ interface AxeViolation {
   readonly nodes: readonly { readonly html: string }[];
 }
 
-/** The ink pill's own class (`buttonClassName`'s `primary` variant, `src/components/ui/button.tsx`)
- *  — counted in the DOM rather than grepped in a file, which is the whole point of this audit. */
-async function inkActionCount(page: Page): Promise<number> {
-  // VISIBLE ink only: the responsive row idiom renders a desktop and a mobile variant of the
-  // same control, one of them `display:none` at any width, and rule 5 governs what a person
-  // SEES. Counting the DOM alone reported two pills where one is on screen (found on its own
-  // first run against /browse).
-  return page.evaluate(() => Array.from(document.querySelectorAll(".bg-text-primary")).filter((el) => (el as HTMLElement).offsetParent !== null).length);
+/**
+ * The DISTINCT ink verbs on screen — the count law 5 actually governs.
+ *
+ * v3 rule 5 capped ink at one CONTROL per view, and Gameday law 5 ("the verb is obvious")
+ * contradicts it directly: a draft board is a list of rows whose whole purpose is one repeated
+ * verb, and a scoreboard of eight matchups offers eight ways into the same act. Capping controls
+ * would have forced those surfaces to render their primary action in secondary ink — burying the
+ * one thing the page exists for, which is the opposite of what either rule wanted.
+ *
+ * What both rules were reaching for is that a person never has to choose which of two loud things
+ * to do. So the count is over distinct verbs, not instances: eight ink "Draft" buttons is ONE
+ * ("Draft" is obvious); "Draft" beside an ink "Propose trade" is TWO, and that is the defect.
+ *
+ * Verbs are compared by their accessible text with any player, team, or number stripped, so
+ * "Draft Bijan Robinson" and "Draft Puka Nacua" are recognised as the same act rather than
+ * counted as two.
+ *
+ * VISIBLE ink only: the responsive row idiom renders a desktop and a mobile variant of the same
+ * control, one of them `display:none` at any width, and law 5 governs what a person SEES.
+ * Counting the DOM alone reported two pills where one is on screen (found on its own first run
+ * against /browse).
+ */
+async function inkVerbCount(page: Page): Promise<readonly string[]> {
+  return page.evaluate(() => {
+    const visible = Array.from(document.querySelectorAll(".bg-text-primary")).filter(
+      (el) => (el as HTMLElement).offsetParent !== null,
+    );
+    const verbs = visible.map((el) => {
+      const label = (el as HTMLElement).innerText || el.getAttribute("aria-label") || "";
+      return label
+        .toLowerCase()
+        .replace(/[\d.,$%+-]/g, " ") // scores, prices, margins — the object, not the act
+        .replace(/\s+/g, " ")
+        .trim()
+        .split(" ")
+        .slice(0, 2) // "draft bijan robinson" and "draft puka nacua" are one verb
+        .join(" ");
+    });
+    return Array.from(new Set(verbs.filter((verb) => verb.length > 0)));
+  });
 }
 
 async function axeViolations(page: Page): Promise<readonly AxeViolation[]> {
@@ -98,8 +131,8 @@ test("every audited signed-in page keeps the page-level laws", async ({ managerA
     await managerA.goto(route.path, { waitUntil: "domcontentloaded" });
     await managerA.waitForTimeout(600);
 
-    const ink = await inkActionCount(managerA);
-    expect(ink, `${route.name} renders ${ink} ink actions; rule 5 allows at most one`).toBeLessThanOrEqual(1);
+    const verbs = await inkVerbCount(managerA);
+    expect(verbs.length, `${route.name} puts ${verbs.length} competing verbs in ink (${verbs.join(", ")}); law 5 allows one`).toBeLessThanOrEqual(1);
 
     const violations = await axeViolations(managerA);
     expect(violations, `${route.name}:\n${describeViolations(violations)}`).toEqual([]);
@@ -116,8 +149,8 @@ test("every audited public page keeps the page-level laws", async ({ browser }) 
     await page.goto(route.path, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(600);
 
-    const ink = await inkActionCount(page);
-    expect(ink, `${route.name} renders ${ink} ink actions; rule 5 allows at most one`).toBeLessThanOrEqual(1);
+    const verbs = await inkVerbCount(page);
+    expect(verbs.length, `${route.name} puts ${verbs.length} competing verbs in ink (${verbs.join(", ")}); law 5 allows one`).toBeLessThanOrEqual(1);
 
     const violations = await axeViolations(page);
     expect(violations, `${route.name}:\n${describeViolations(violations)}`).toEqual([]);

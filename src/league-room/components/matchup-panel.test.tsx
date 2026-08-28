@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import { UI_CONFIG } from "@/components/ui/config";
 import { renderSurface } from "@/components/ui/test-utils";
 import { fixtureLeagueDeps, MATCHUP, MATCHUP_WITH_MEDIAN, renderInLeague } from "../test-fixtures";
 import { MatchupPanel } from "./matchup-panel";
@@ -120,14 +121,15 @@ describe("MatchupPanel", () => {
 
   // Step 3c: the last two `Table` consumers to converge dense (the other is `budget-table.tsx`,
   // Task 12) — see `table.tsx`'s own docblock for the density-default decision this leaves.
-  it("renders its starters table dense, at Gameday's own 7px vertical cell padding", () => {
+  it("renders its starters table dense, at whatever vertical cell padding the density token carries", () => {
     render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
     const headerCell = screen.getAllByRole("columnheader", { name: "Player" })[0]!;
     // Gameday law 4, density is respect (2026-08-28): v3 set this at 11px, which was the
     // Sunday Standard mock's own figure and airier than a fantasy table wants. A manager on a
     // Sunday reads more rows, not calmer ones. Read from `UI_CONFIG.table` rather than pinned as a
     // literal twice over.
-    expect(headerCell).toHaveStyle({ paddingTop: "7px", paddingBottom: "7px" });
+    const dense = `${UI_CONFIG.table.denseRowPaddingPx}px`;
+    expect(headerCell).toHaveStyle({ paddingTop: dense, paddingBottom: dense });
   });
 
   // Gauntlet fix wave, NEW-10: `Pos` (a `PositionBadge` sticker) used to be its own column here,
