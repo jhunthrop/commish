@@ -273,6 +273,22 @@ describe("PlayerPool", () => {
       expect(screen.queryByText("steal")).toBeNull();
     });
 
+    /**
+     * THE REGRESSION THIS EXISTS FOR. The first cut passed the raw verdict to the chip, so every
+     * row ranked more than the even band below the current slot rendered a red "reach" — in a
+     * real room at pick 12 that was fifty-four red chips down a sixty-row rail, saying nothing
+     * fifty-four times. A pool row is a PROSPECT, and "ranked below this slot" is true of almost
+     * everybody; only a player who has LASTED past his own rank is news here.
+     */
+    it("never paints a reach down the rail, however far below the slot a prospect is ranked", () => {
+      // Deep enough that every visible row is more than the even band below pick 1.
+      const deep = Array.from({ length: 30 }, (_, index) => ({ id: `d${index}`, name: `Deep ${index}`, position: "WR" as const, nflTeam: "DAL", headshotUrl: null }));
+      const view = { ...SNAKE_VIEW, pickNumber: 1, availablePlayerIds: deep.map((player) => player.id), picks: [] };
+      const { container } = render(<PlayerPool {...props} players={deep} view={view} />);
+      expect(screen.queryByText("reach")).toBeNull();
+      expect(container.querySelectorAll("[data-magnitude]")).toHaveLength(0);
+    });
+
     it("judges nothing at all before the draft has started", () => {
       const scheduled = { ...SNAKE_VIEW, phase: "scheduled" as const, availablePlayerIds: [], onClockTeamId: null, pickNumber: 0 };
       render(<PlayerPool {...props} view={scheduled} canAct={false} />);

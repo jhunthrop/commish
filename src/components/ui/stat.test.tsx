@@ -179,6 +179,26 @@ describe("Stat", () => {
     });
   });
 
+  /**
+   * THE `sr-only` ESCAPE, pinned. The population sentence is `sr-only`, which is
+   * `position: absolute`. An absolutely positioned box whose ancestors are all `position: static`
+   * takes the INITIAL containing block, so every `overflow: hidden` between it and the page clips
+   * it for paint but NOT for the document's scrollable area.
+   *
+   * Sixty verdict chips in the draft room's scrolling player pool therefore stretched the ROOT
+   * scroll area to the pool's full 5,363px content height, breaking that room's own law that the
+   * page never scrolls at desktop. It cost a full e2e cycle to find, and one positioned ancestor
+   * fixes it: the sentence belongs to its own `Stat` again, so the clip that was always meant to
+   * apply does.
+   */
+  it("contains its own screen-reader sentence, so a scrolling list cannot stretch the page", async () => {
+    await renderSurface(<Stat label="Projection" value="14.2" comparison={RB_WEEK} />, ({ container }) => {
+      const root = container.querySelector("[data-magnitude]")!;
+      expect(root.className).toMatch(/(^|\s)relative(\s|$)/);
+      expect(root.querySelector(".sr-only")).not.toBeNull();
+    });
+  });
+
   it("stays a stacked div by default, so no existing caller changes shape", async () => {
     await renderSurface(<Stat label="Projection" value="14.2" />, ({ container }) => {
       const root = container.querySelector("[data-magnitude]")!;

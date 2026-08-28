@@ -163,12 +163,16 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
         <ol aria-label="Available players, best first" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           {rows.map((row) => {
             const queued = queuedPlayerIds.has(row.player.id);
-            // Steals only, and only while the draft is actually running. A pool row is a
+            // STEALS ONLY, and only while the draft is actually running. A pool row is a
             // PROSPECT, not a pick: at any slot, everybody ranked below that slot is trivially a
-            // "reach", so painting sixty red chips would say nothing sixty times. A player still
-            // sitting there LATER than his own rank is the one thing worth calling out, and it is
-            // the fact a manager scanning the pool is actually hunting for.
+            // "reach", so the un-filtered verdict painted fifty-four red chips down a sixty-row
+            // rail — saying nothing, fifty-four times, which is precisely the decoration rule 6
+            // rejects. A player still sitting there LATER than his own rank is the one thing
+            // worth calling out here, and it is the fact a manager scanning the pool is hunting
+            // for. The pick wire and the results log show both verdicts, because those judge
+            // picks that actually happened.
             const verdict = row.drafted || !live ? null : verdictFor(verdicts, row.rank, view.pickNumber);
+            const steal = verdict !== null && verdict.kind === "steal" ? verdict : null;
             return (
               // RULE 4'S AMENDED TEST (`docs/design-system.md`): a thing you act on or compare
               // against its neighbours may be a card. A pool row is both — you read three of them
@@ -199,7 +203,7 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                       Decorative — the name right beside it already says who this is. */}
                   <PlayerFace player={row.player} />
                   <span data-testid="pool-player-name" className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
-                  <VerdictChip verdict={verdict} />
+                  <VerdictChip verdict={steal} />
                 </div>
                 {/* The meta row: the team code (no longer fighting the name for width, so it no
                     longer needs the laptop-fit `xl:` gate — it fits on its own line at the

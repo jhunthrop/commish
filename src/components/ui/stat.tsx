@@ -175,9 +175,19 @@ export function Stat({ label, value, comparison, size = "md", orientation = "sta
   );
   const eyebrow = <span className={`${EYEBROW} text-text-faint`}>{label}</span>;
   return (
+    // `relative` is LOAD-BEARING and cost a full e2e cycle to find. The population sentence
+    // below is `sr-only`, which is `position: absolute` — and an absolutely positioned box whose
+    // ancestors are all `position: static` takes the INITIAL containing block, which means every
+    // `overflow: hidden` between it and the page clips it for PAINT but not for the document's
+    // scrollable area. Sixty verdict chips in the draft room's scrolling player pool therefore
+    // extended the root scroll area to the pool's full 5,363px content height, breaking that
+    // room's own law that the page never scrolls at desktop (`e2e/mock-draft.spec.ts`). One
+    // positioned ancestor makes the sentence belong to its own `Stat` again, and the clip that
+    // was always meant to apply does.
+    //
     // Inline reads value-then-label ("+11 steal"), which is the order the phrase is spoken in;
     // stacked reads label-then-value, because a column header sits above its column.
-    <Root data-magnitude={step} className={`${inline ? "inline-flex items-baseline gap-1.5" : "flex flex-col gap-1"} ${className}`}>
+    <Root data-magnitude={step} className={`relative ${inline ? "inline-flex items-baseline gap-1.5" : "flex flex-col gap-1"} ${className}`}>
       {inline ? number : eyebrow}
       {inline ? eyebrow : number}
       {isStated(comparison) ? <span className="sr-only">{comparisonSentence(comparison)}</span> : null}
