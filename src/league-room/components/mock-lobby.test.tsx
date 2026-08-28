@@ -101,6 +101,34 @@ describe("MockLobby", () => {
     expect(screen.getByTestId("quick-start-primary")).toHaveTextContent("Start a solo mock now, 12 teams, 60s clock");
   });
 
+  /**
+   * TASK 13'S LOBBY HALF (the fun pass). The room list was hairline-separated rows, which is the
+   * shape for a column you READ down. A lobby is the other thing: a manager compares three rooms'
+   * sizes, clocks and countdowns against each other and then joins one — exactly what rule 4's
+   * amended test permits a card for (*act on or compare = card; read down a column = row*).
+   *
+   * `interactive` is the half that answers the founder's complaint rather than the rule. A shelf
+   * you are meant to compare and then act on, which never acknowledges the pointer, is part of
+   * why the product read as a page of terms.
+   */
+  it("draws an open room as a card that answers the pointer, not a row you read down", () => {
+    const fixture = fixtureLeagueDeps();
+    const { container } = renderInLeague(<MockLobby {...baseProps()} initialOpen={[OPEN_ROOM]} />, fixture.deps);
+
+    const row = container.querySelector("li");
+    expect(row).not.toBeNull();
+    // A card, not a hairline row: the old idiom's top border is gone and a real surface is under it.
+    expect(row!.className).not.toContain("border-t");
+    expect(row!.className).toContain("bg-surface-elevated");
+    // The depth response rule 4's amendment actually buys.
+    expect(row!.className).toMatch(/hover:/);
+    // The card never becomes the control — Join is still its own button (rule 5 holds here; the
+    // lobby is audited by e2e/page-audit.spec.ts and is not the draft room's named exception).
+    expect(row!.getAttribute("role")).toBeNull();
+    expect(row!.getAttribute("tabindex")).toBeNull();
+    expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
+  });
+
   it("renders nothing for the practice wire when initialWireItems is empty (R3, real-or-nothing)", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);

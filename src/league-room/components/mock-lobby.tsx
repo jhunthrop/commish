@@ -15,7 +15,7 @@ import type {
 } from "@/mock-draft-service/lobby";
 import type { MockWireItem } from "@/mock-draft-service/wire";
 import type { MockMode } from "@/mock-draft/config";
-import { Button, EYEBROW, Panel, SeatMeter } from "@/components/ui";
+import { Button, Card, EYEBROW, Panel, SeatMeter } from "@/components/ui";
 import {
   Countdown,
   formatCoarseDuration,
@@ -161,8 +161,16 @@ function OpenRoomRow({ room, joiningCode, onJoin }: OpenRoomRowProps) {
   );
   const { remainingMs } = useCountdown(startsAt);
   return (
-    <li className="border-t border-line">
-      <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+    // RULE 4'S AMENDED TEST (the fun pass, Task 13): *a thing you act on or compare against its
+    // neighbours may be a card.* An open practice room is both — a manager reads three rooms'
+    // sizes, clocks and countdowns against each other and then joins one. It was a hairline row,
+    // which is the shape for a column you READ down, and the lobby is not that.
+    //
+    // `interactive` is the half that answers the founder's actual complaint: the shelf you are
+    // meant to compare and then act on never acknowledged the pointer at all, which is a large
+    // part of why the product read as a page of terms rather than somewhere you do something.
+    <Card as="li" padding="compact" interactive>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2">
           <span className="min-w-0 text-sm font-medium text-text-primary">
             {room.teamCount} teams · {room.pickSeconds}s clock
@@ -185,7 +193,7 @@ function OpenRoomRow({ room, joiningCode, onJoin }: OpenRoomRowProps) {
           Join
         </Button>
       </div>
-    </li>
+    </Card>
   );
 }
 
@@ -411,7 +419,7 @@ export function MockLobby({
               ) : (
                 <div>
                   <ShelfColumnHeader />
-                  <ul className="flex flex-col">
+                  <ul className="flex flex-col gap-2">
                     {open.map((room) => (
                       <OpenRoomRow
                         key={room.shareCode}
