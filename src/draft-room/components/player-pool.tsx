@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Badge, Button, Card, EmptyState, Input, PositionBadge } from "@/components/ui";
+import { Badge, Button, EmptyState, Input, PlayerRow, PositionBadge, TierDivider } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { queueButtonLabel } from "../lib/lookups";
+import { formatAdp, poolTiers } from "../lib/tiers";
 import { verdictFor, verdictPopulation } from "../lib/verdict";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
-import { PlayerFace } from "@/components/ui/player-face";
 import { VerdictChip } from "./verdict-chip";
 
 const ALL = "ALL";
@@ -32,6 +33,14 @@ export interface PlayerPoolProps {
   readonly onAct: (playerId: string) => void;
   readonly queuedPlayerIds: ReadonlySet<string>;
   readonly onQueue: (playerId: string) => void;
+  /**
+   * The league's own seat count, for the tier ladder's grades (a consensus ROUND is a fact about
+   * a room of a given size — see `../lib/tiers`). Passed rather than read off
+   * `view.draftOrder.length` alone because the draft order does not exist until the draft starts,
+   * and the pre-kickoff room is exactly when a manager is studying the board. The view's order
+   * still wins once it exists: it is the seating this draft actually drew.
+   */
+  readonly teamCount: number;
 }
 
 interface PoolRow {
@@ -49,8 +58,9 @@ interface PoolRow {
 function PositionFilters({ value, onChange }: { readonly value: string; readonly onChange: (next: string) => void }) {
   return (
     <div role="group" aria-label="Filter by position" className="flex flex-wrap items-center gap-1">
-      {/* Secondary when selected, ghost when not — never primary: a filter is not the room's
-          one ink action (D3, rule 5). The outline alone says "this is the active toggle". */}
+      {/* Secondary when selected, ghost when not — never `verb` and never `primary`: a filter is
+          not an ACT, and law 5's whole discipline is that the loud action belongs to acts only.
+          The outline alone says "this is the active toggle". */}
       <Button
         size="sm"
         variant={value === ALL ? "secondary" : "ghost"}
@@ -86,14 +96,38 @@ function PositionFilters({ value, onChange }: { readonly value: string; readonly
 }
 
 /**
- * The pool, as the room's left-hand rail: search, position stickers, and one compact row per
- * player. A list rather than a `Table` — at rail width there are no columns worth aligning,
- * and the row's meaning is "this player, and the two things I can do with him".
+ * THE POOL, as a tiered board of player objects — laws 1, 3, 4 and 5 in one column, and the
+ * surface this room's Gameday pass moved furthest.
  *
- * The star is the queue toggle; the button beside it is the act. Both are real, named
- * controls, so the whole pool is walkable from the keyboard.
+ * WHAT IT WAS. Sixty two-line bordered cards, each ~90px tall, each carrying a rank, a sticker, a
+ * face, a name, a team code and an INK pill. Eight players fitted on a 1000px screen, the tallest
+ * thing in the column was a card border, and the only number anywhere was a 12px ordinal. On a
+ * sixty-second clock that is a seven-screen scroll through a list with no landmarks in it.
+ *
+ * WHAT IT IS. `PlayerRow` (the law-3 atom) at one row per player, a `TierDivider` wherever the
+ * consensus board genuinely steps down, each player's own ADP printed beside his team code, and
+ * the act on every row as `verb` — money-filled, `rounded-md`, repeated as many times as the
+ * screen repeats the act, which is exactly what law 5 replaced "one ink action per view" to
+ * permit. Four changes, one argument: **a draft board is a ladder you climb, and the old pool was
+ * a list you read.**
+ *
+ * WHY THE VERB IS NOT THE INK PILL ANY MORE. It was `primary` from the fun pass onward, which was
+ * right against v3's rule 5 and is wrong against Gameday's law 5: *"`primary` is ceremonial — one
+ * per view, the thing a page exists to do once… `verb` is the thing a board does forty times."*
+ * Sixty white ink pills down a rail read as sixty ceremonies; sixty money pills read as one board
+ * you can act on anywhere. `Button`'s own variant carries the whole change — nothing here spells
+ * a fill.
+ *
+ * THE TIERS SURVIVE FILTERING BECAUSE THEY ARE NOT COMPUTED FROM THE FILTER. `poolTiers` runs
+ * once over the whole ranked pool (`../lib/tiers`), and this list draws a divider wherever two
+ * adjacent VISIBLE rows carry different band ids. Filter to running backs and the ladder still
+ * says which tier each survivor came out of — including the case that matters most, a band with
+ * one man left in it.
+ *
+ * The star is the queue toggle; the button beside it is the act. Both are real, named controls,
+ * so the whole pool is walkable from the keyboard.
  */
-export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, actionLabel, submitting, onAct, queuedPlayerIds, onQueue }: PlayerPoolProps) {
+export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, actionLabel, submitting, onAct, queuedPlayerIds, onQueue, teamCount }: PlayerPoolProps) {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(ALL);
   // Task 5: a team that owes a pick may make it any time, so the row-level Draft button below
@@ -125,6 +159,16 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
   // picks this room has already made?" Built once per render pass, never per row — sixty rows
   // each rebuilding it would be sixty scans of the same pick log.
   const verdicts = useMemo(() => verdictPopulation(players, view.picks), [players, view.picks]);
+  // The ladder, over the WHOLE board rather than the filtered view — see the docblock. Keyed on
+  // the room's own seat count, because a consensus round is a fact about a room of that size.
+  const seats = view.draftOrder.length > 0 ? view.draftOrder.length : teamCount;
+  const tiers = useMemo(() => poolTiers(players, seats), [players, seats]);
+
+  // Law 2, in the one place the pool has an honest number for it: how many players the filter
+  // currently leaves standing. `filtered.length`, not the pool size — the figure answers the
+  // question a manager is actually asking while he narrows ("how thin is this position getting"),
+  // and it moves as the room drafts.
+  const standing = filtered.length;
 
   return (
     // `id="player-pool"` (review E3): the dock's below-`lg` "Jump to the pool" affordance
@@ -133,13 +177,36 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
     <section id="player-pool" aria-label="Player pool" className="flex h-full min-h-0 flex-col gap-2 p-3">
       <div className="flex shrink-0 flex-col gap-2">
         <Input label="Search players" value={query} placeholder="Name" onChange={(event) => setQuery(event.target.value)} />
+        {/* The seven stickers own their own line: at a 320px rail they are already one row
+            exactly, and anything sharing it pushed two of them onto a second line. */}
         <PositionFilters value={position} onChange={setPosition} />
-        {preStart ? null : (
-          <label className="flex items-center gap-2 text-xs text-text-muted">
-            <input type="checkbox" checked={showDrafted} onChange={(event) => setShowDrafted(event.target.checked)} />
-            Show drafted players
-          </label>
-        )}
+        <div className="flex items-center justify-between gap-2">
+          {preStart ? (
+            <span />
+          ) : (
+            // A real toggle with a real boundary, not a bare `<input type="checkbox">`: it is the
+            // same `aria-pressed` vocabulary as the position stickers above it, so the pool's
+            // filter controls speak one grammar rather than two.
+            <Button
+              size="sm"
+              variant={showDrafted ? "secondary" : "ghost"}
+              aria-pressed={showDrafted}
+              onClick={() => setShowDrafted((shown) => !shown)}
+            >
+              Show drafted players
+            </Button>
+          )}
+          {/* The mock's own `248 LEFT` — a mono figure and a shouted micro-label, the one
+              register the caps charter still permits capitals in. No `Stat`: there is no
+              population a remaining-player count falls inside, and a number is never coloured
+              for looking big. */}
+          <span className="flex shrink-0 items-baseline gap-1">
+            <span data-testid="pool-standing-count" className="font-mono text-md font-semibold tabular-nums text-text-primary">
+              {standing}
+            </span>
+            <span className={`${MICRO_LABEL} text-text-faint`}>left</span>
+          </span>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -161,108 +228,88 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
         />
       ) : (
         <ol aria-label="Available players, best first" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-          {rows.map((row) => {
+          {rows.map((row, index) => {
             const queued = queuedPlayerIds.has(row.player.id);
             // STEALS ONLY, and only while the draft is actually running. A pool row is a
             // PROSPECT, not a pick: at any slot, everybody ranked below that slot is trivially a
             // "reach", so the un-filtered verdict painted fifty-four red chips down a sixty-row
-            // rail — saying nothing, fifty-four times, which is precisely the decoration rule 6
+            // rail — saying nothing, fifty-four times, which is precisely the decoration law 6
             // rejects. A player still sitting there LATER than his own rank is the one thing
             // worth calling out here, and it is the fact a manager scanning the pool is hunting
             // for. The pick wire and the results log show both verdicts, because those judge
             // picks that actually happened.
             const verdict = row.drafted || !live ? null : verdictFor(verdicts, row.rank, view.pickNumber);
             const steal = verdict !== null && verdict.kind === "steal" ? verdict : null;
+            const tier = tiers.get(row.player.id) ?? null;
+            const previousTier = index === 0 ? null : (tiers.get(rows[index - 1]!.player.id) ?? null);
+            // A divider opens a band, so it draws on the FIRST visible row of one — including
+            // the very first row in the list, which is what makes the top of the board carry its
+            // own grade instead of inheriting it silently from a row nobody can see. A player the
+            // feed does not rank ends the ladder rather than opening an unlabelled band.
+            const opensBand = tier !== null && (previousTier === null || previousTier.id !== tier.id);
+            const adp = formatAdp(row.player.adp);
             return (
-              // RULE 4'S AMENDED TEST (`docs/design-system.md`): a thing you act on or compare
-              // against its neighbours may be a card. A pool row is both — you read three of them
-              // against each other and then draft one — which is exactly the case the amendment
-              // names. `interactive` only while there is something to act on: a drafted row lifts
-              // for nobody.
-              <Card
-                as="li"
-                padding="compact"
-                interactive={!row.drafted}
-                key={row.player.id}
-                className={`flex shrink-0 flex-col justify-center gap-1 ${row.drafted ? "opacity-60" : ""}`}
-              >
-                {/* V-04 (veteran journey, BLOCKER): the name used to share ONE row with the
-                    rank, sticker, avatar, team code, queue star and act button — every one of
-                    those has a natural, non-shrinking minimum width, so the only element that
-                    could ever give up space (`min-w-0 flex-1 truncate`) absorbed the ENTIRE
-                    deficit and collapsed to 3-4 characters the instant a "Draft"/"Nominate"
-                    button appeared beside it, on a 60-second clock, where you cannot pick a
-                    player you cannot read. The name now owns its own line at the row's full
-                    width — nothing else competes with it for space, so it truncates only a
-                    genuinely long name, never first and never most. */}
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="w-5 shrink-0 text-right font-mono text-xs tabular-nums text-text-muted">{row.rank}</span>
-                  <PositionBadge position={row.player.position} size="sm" />
-                  {/* Founder directive 2026-08-26 ("why aren't we showing the players picture?"),
-                      now on the club's own colour (rule 1's team-identity amendment, Task 8).
-                      Decorative — the name right beside it already says who this is. */}
-                  {/* `sm` explicitly: the pool is sixty rows in a 320px rail, the density this
-                      face was originally built at, and the primitive's default is now the
-                      card-and-roster step rather than this one. */}
-                  <PlayerFace player={row.player} size="sm" />
-                  <span data-testid="pool-player-name" className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
-                  <VerdictChip verdict={steal} />
-                </div>
-                {/* The meta row: the team code (no longer fighting the name for width, so it no
-                    longer needs the laptop-fit `xl:` gate — it fits on its own line at the
-                    320px rail floor) on the left, and the fixed action column on the right —
-                    the star and the act control never move, whichever state they're in. */}
-                <div className="flex items-center justify-between gap-2 pl-7">
-                  <span data-testid="pool-player-team" className="min-w-0 truncate text-xs text-text-muted">{row.player.nflTeam}</span>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {row.drafted ? null : (
-                      <Button size="sm" variant="ghost" disabled={submitting} aria-label={queueButtonLabel(row.player.name, queued)} onClick={() => onQueue(row.player.id)}>
-                        <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>
-                          {queued ? "★" : "☆"}
-                        </span>
-                      </Button>
-                    )}
-                    {preStart ? (
-                      // Nothing at all — E11 (2026-08-26 design review): a per-row "—" printed a
-                      // 60-row column of dashes before kickoff. There is nothing to do here yet,
-                      // the rail says why, and the star beside this slot is still the whole story.
-                      null
-                    ) : row.drafted ? (
-                      <Badge tone="neutral">Drafted</Badge>
-                    ) : canDraft ? (
-                      // Picking mode: the act button exists while it is genuinely your turn, OR
-                      // (Task 5) while you owe a pick from an earlier skip — live on your turn
-                      // and off it. While neither is true, the star is the action — a disabled
-                      // "Draft" would be a lie-in-waiting.
-                      //
-                      // INK, as of the fun pass (Task 8). This was `secondary` under D3
-                      // (2026-08-26), which read rule 5 as binding here: sixty ink pills against
-                      // a one-ink-action law. Rule 5 has since been amended
-                      // (`docs/design-system.md`, "The fun-pass amendments") to hold everywhere
-                      // EXCEPT surfaces whose entire purpose is repeated action, and it names the
-                      // draft room first. The row is where a manager drafts, so the row is where
-                      // the ink belongs; a quiet pill beside a loud dock taught people to hunt
-                      // for the dock instead of pressing the thing they were already looking at.
-                      // `e2e/page-audit.spec.ts` still enforces one ink action on every route it
-                      // audits, and the draft room is deliberately not one of them.
-                      <Button
-                        size="sm"
-                        loading={submitting && pendingPlayerId === row.player.id}
-                        onClick={() => onAct(row.player.id)}
-                      >
-                        {actionLabel}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </Card>
+              // A fragment, never a wrapper element: an `<ol>` may hold only list items, and a
+              // band divider is a sibling `<li>` of the rows it opens rather than a `<div>`
+              // smuggled between them.
+              <Fragment key={row.player.id}>
+                {opensBand ? (
+                  <li className="mt-1 shrink-0 first:mt-0">
+                    <TierDivider grade={tier.grade} label={tier.label} />
+                  </li>
+                ) : null}
+                <li data-pool-row="true" className={`shrink-0 ${row.drafted ? "opacity-60" : ""}`}>
+                  <PlayerRow
+                    player={row.player}
+                    highlight={queued && !row.drafted}
+                    meta={
+                      <>
+                        <span data-testid="pool-player-team">{row.player.nflTeam}</span>
+                        {adp === null ? null : <span data-testid="pool-player-adp">{` · ${adp}`}</span>}
+                      </>
+                    }
+                    verdict={<VerdictChip verdict={steal} />}
+                    action={
+                      <div className="flex items-center gap-1">
+                        {row.drafted ? null : (
+                          <Button size="sm" variant="ghost" disabled={submitting} aria-label={queueButtonLabel(row.player.name, queued)} onClick={() => onQueue(row.player.id)}>
+                            <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>
+                              {queued ? "★" : "☆"}
+                            </span>
+                          </Button>
+                        )}
+                        {preStart ? (
+                          // Nothing at all — E11 (2026-08-26 design review): a per-row "—" printed a
+                          // 60-row column of dashes before kickoff. There is nothing to do here yet,
+                          // the rail says why, and the star beside this slot is still the whole story.
+                          null
+                        ) : row.drafted ? (
+                          <Badge tone="neutral">Drafted</Badge>
+                        ) : canDraft ? (
+                          // Law 5's own variant. Live while it is genuinely your turn, OR (Task 5)
+                          // while you owe a pick from an earlier skip. While neither is true the
+                          // star is the action — a disabled "Draft" would be a lie-in-waiting.
+                          <Button
+                            size="sm"
+                            variant="verb"
+                            loading={submitting && pendingPlayerId === row.player.id}
+                            onClick={() => onAct(row.player.id)}
+                          >
+                            {actionLabel}
+                          </Button>
+                        ) : null}
+                      </div>
+                    }
+                  />
+                </li>
+              </Fragment>
             );
           })}
         </ol>
       )}
 
       {truncated ? (
-        <p className="shrink-0 text-sm text-text-muted">
+        <p className="shrink-0 font-mono text-xs tabular-nums text-text-muted">
           Showing the top {rows.length} of {filtered.length}. Narrow your search to see more.
         </p>
       ) : null}

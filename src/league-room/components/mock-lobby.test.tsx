@@ -167,7 +167,10 @@ describe("MockLobby", () => {
   it("renders one of the caller's own rooms with its identity line and status-appropriate link label", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} initialMine={[MINE_ROOM]} />, fixture.deps);
-    expect(screen.getByText("Mock Squad · Solo · 8 teams · 30s · under a minute ago")).toBeInTheDocument();
+    // Gameday split the row's one sentence in two: the team NAME on its own baseline, and the
+    // data clauses under it in mono, where a history's columns line up as the eye runs down.
+    expect(screen.getByText("Mock Squad")).toBeInTheDocument();
+    expect(screen.getByText("Solo · 8 teams · 30s · under a minute ago")).toBeInTheDocument();
     expect(screen.getByText("Drafting now")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Continue" })).toHaveAttribute("href", "/app/drafts/d2");
     expect(screen.getByText("1 mock draft")).toBeInTheDocument();

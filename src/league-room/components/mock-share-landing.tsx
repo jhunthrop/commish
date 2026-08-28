@@ -8,6 +8,7 @@ import type { ClaimMockSeatBody } from "@/app/api/mock-drafts/[code]/route";
 import type { MockRoomSummary } from "@/mock-draft-service/lobby";
 import type { MockMode } from "@/mock-draft/config";
 import { Button, Panel, SeatMeter } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
@@ -93,12 +94,40 @@ export function MockShareLanding({ code, summary }: MockShareLandingProps) {
         {/* E10: the title now carries the invitation; this states the promise a forwarded
             stranger has no other way to learn before they act. */}
         <p className="text-sm text-text-muted">{MOCK_SHARE_LANDING_PRACTICE_SENTENCE}</p>
-        <p className="text-sm text-text-muted">
-          {MODE_LABEL[summary.mode]} · {summary.teamCount} teams · {summary.pickSeconds}s clock
-        </p>
+        {/* GAMEDAY, LAW 2: the two facts a forwarded stranger actually decides on — how many
+            seats are still going, and how long is left — are the page's largest things now. They
+            were a 13px clause and a 13px clock inside a 400px column, which is the flat hierarchy
+            the spec measured and rejected. `SeatMeter` keeps the spoken sentence
+            (`srOnlySentence`) so the product's one seat statement still reaches assistive tech
+            while the screen shows the figure. */}
+        {summary.started ? null : (
+          // Both figures answer "should I take this seat", and neither is that question any more
+          // once the room is drafting: the seats left are stale the instant the board opens, and
+          // a countdown to a kickoff that already happened is not a fact. A started room says its
+          // one true thing through the action below instead.
+          <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
+            <div className="flex shrink-0 items-baseline gap-2">
+              <span data-testid="share-seats-open" className="font-mono text-display-lg font-semibold tabular-nums leading-display text-text-primary">
+                {summary.seatsOpen}
+              </span>
+              <span className={`${MICRO_LABEL} text-text-faint`}>{summary.seatsOpen === 1 ? "seat open" : "seats open"}</span>
+            </div>
+            {remainingMs === null ? null : (
+              <div className="flex shrink-0 flex-col">
+                {/* The same step as the seat figure beside it: the two facts a stranger weighs
+                    against each other are weighed at the same size, or the layout has made the
+                    choice for them. */}
+                <Countdown remainingMs={remainingMs} size="lg" />
+                <span className={`${MICRO_LABEL} text-text-faint`}>until kickoff</span>
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-3">
-          <SeatMeter filled={summary.teamCount - summary.seatsOpen} total={summary.teamCount} />
-          {summary.started || remainingMs === null ? null : <Countdown remainingMs={remainingMs} size="sm" />}
+          <SeatMeter filled={summary.teamCount - summary.seatsOpen} total={summary.teamCount} srOnlySentence />
+          <span className="font-mono text-xs tabular-nums text-text-muted">
+            {MODE_LABEL[summary.mode]} · {summary.teamCount} teams · {summary.pickSeconds}s clock
+          </span>
         </div>
         {error === null ? null : (
           <p role="alert" className="text-sm text-negative">
@@ -115,7 +144,10 @@ export function MockShareLanding({ code, summary }: MockShareLandingProps) {
           </p>
         ) : (
           // The button STAYS the act — the invitation now lives in the Panel's own title.
-          <Button onClick={() => void join()} loading={claiming} disabled={claiming}>
+          // `primary` and full width nowhere: this IS the one ceremonial act the page exists to
+          // perform (law 5's own definition), but a 1500px-wide ink pill is a button that has
+          // stopped looking like a button. `self-start` gives it its own measure.
+          <Button className="self-start" onClick={() => void join()} loading={claiming} disabled={claiming}>
             {summary.alreadySeated ? "Enter this mock draft" : "Join this mock draft"}
           </Button>
         )}

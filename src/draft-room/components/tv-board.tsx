@@ -4,7 +4,9 @@ import { useMemo } from "react";
 import type { CountdownTone } from "@/components/ui/countdown";
 import { Avatar, Badge, Button, ErrorState, PositionBadge, Skeleton } from "@/components/ui";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
+import { rosterSpots } from "../state/format";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { playersById as buildPlayersById, teamsById } from "../lib/lookups";
 import { DraftBoard } from "./draft-board";
@@ -68,6 +70,8 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
   // here is time, not identity.
   const spotlightHot = spotlightClockTone(remainingMs) === "hot";
   const lastPick = room.lastPick;
+  // The room's whole shape, from the payload: one pick per roster spot per seat.
+  const totalPicks = view.draftOrder.length * rosterSpots(view.slotConfig);
   const lastPickPlayer = lastPick === null ? null : (playersById.get(lastPick.pick.playerId) ?? null);
 
   return (
@@ -94,16 +98,31 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
             TV — the countdown (E5, moved out of the rail entirely, see `RoomRail`) and the last
             pick landed, restated quietly at glance scale. This is the TV's one dense fact-band
             now, not a mostly-empty restatement of the rail. */}
-        <section data-testid="spotlight" className="flex shrink-0 items-center gap-4 rounded-lg border border-line bg-surface-elevated p-6 shadow-card">
+        <section data-testid="spotlight" className="flex shrink-0 items-center gap-4 rounded-lg border border-line bg-surface-elevated px-6 py-4 shadow-card">
           {onClock === null ? null : <Avatar name={onClock.ownerDisplayName} avatar={onClock.ownerAvatarUrl} size="lg" />}
           <div className="min-w-0 flex-1">
             <p className="font-display text-sm tracking-wide text-text-muted">Now picking</p>
             <p className="font-display text-display-lg font-semibold leading-display text-text-primary">{onClock?.name ?? "Nobody"}</p>
             {onClock === null ? null : <Badge tone="neutral">{onClock.ownerDisplayName}</Badge>}
           </div>
+          {/* THE DRAFT'S OWN PROGRESS, AS A NUMBER (Gameday, law 2). A television is read from
+              across a room and the one question a spectator has that the board itself cannot
+              answer at a glance is "how far in are we". `picks × seats` is arithmetic on the
+              payload, never a projection; zero seats (an undrawn order) prints the count alone
+              rather than a divide-by-nothing. */}
+          <div className="mr-6 hidden shrink-0 flex-col items-end lg:flex">
+            <span data-testid="tv-progress" className="font-mono text-display-sm font-semibold tabular-nums leading-display text-text-primary">
+              {totalPicks === 0 ? view.picks.length : `${view.picks.length} of ${totalPicks}`}
+            </span>
+            <span className={`${MICRO_LABEL} text-text-faint`}>picks in</span>
+          </div>
           <div className="ml-auto flex flex-col items-end gap-1">
             {remainingMs === null ? null : (
-              <Countdown remainingMs={remainingMs} size="lg" tone={spotlightHot ? "hot" : "default"} data-testid="spotlight-countdown" />
+              // THE PARTY'S ONE CLOCK, AT THE PARTY'S OWN SCALE (law 2). It rendered at `lg`
+              // (44px) — the size the ROOM's rail uses, on a surface designed to be read from a
+              // sofa — while the display scale carries 84 and 116 above it. `xl` is the step the
+              // TV earns without the digits outgrowing the band the spotlight holds them in.
+              <Countdown remainingMs={remainingMs} size="xl" tone={spotlightHot ? "hot" : "default"} data-testid="spotlight-countdown" />
             )}
             {/* The wire underneath already carries the newest pick's ink (`PickWire`'s own
                 docblock); this is a restatement at glance scale, so the player name stays

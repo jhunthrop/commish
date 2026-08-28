@@ -109,24 +109,29 @@ describe("SnakeRoom", () => {
   });
 
   /**
-   * RULE 5'S NAMED EXCEPTION (the fun pass, 2026-08-27 — `docs/design-system.md`, "The fun-pass
-   * amendments"). This test used to assert at most ONE ink pill in the whole room, on D3's
-   * 2026-08-26 reading that the one-ink law bound here. It does not any more: rule 5 now holds
-   * everywhere *except surfaces whose entire purpose is repeated action*, and the draft room is
-   * the first surface the amendment names. A room where the act lives on the row you are already
-   * looking at, rather than in a dock you have to find, is the point of the exception.
+   * LAW 5, AND THIS TEST IS THE SHAPE OF ITS ENFORCEMENT EVERYWHERE (`docs/design-system.md`,
+   * "Pill discipline and the obvious verb"). Its history is the whole argument in three steps:
+   * D3 (2026-08-26) read v3's one-ink law as binding here and asserted at most ONE loud pill in
+   * the room; the fun pass (2026-08-27) made the draft room rule 5's named exception and flipped
+   * that to "many, and every one an act"; Gameday promotes the exception to the law and moves the
+   * repeated act off the CEREMONIAL ink pill onto `verb`.
    *
-   * What is still checked, and is what actually keeps the exception from becoming a general
-   * relaxation: the ink belongs to ACTS ONLY. Every filter, every toggle, every way out stays
-   * quiet, and `e2e/page-audit.spec.ts` keeps enforcing the unamended rule on every route it
-   * audits — the draft room is deliberately not one of them, and that list does not change.
+   * So the room now carries **no `primary` at all** — `primary` is *"the thing a page exists to do
+   * once"* and a draft is sixteen picks — and every loud control it does carry is money-filled.
+   * What has never changed, through all three versions, is the discipline that makes any of it
+   * safe: **the loud action belongs to ACTS only.** Every filter, every toggle, every way out
+   * stays quiet, whatever the verb beside it is doing.
    */
-  it("gives ink to the acts and to nothing else, on your turn (rule 5's named exception)", () => {
+  it("spends its loud fills on acts and on nothing else, on your turn (law 5)", () => {
     const { container } = renderRoom();
     expect(screen.getByRole("button", { name: "Draft Marcus Reed" })).toBeInTheDocument();
-    const ink = [...container.querySelectorAll(".bg-text-primary")];
-    expect(ink.length).toBeGreaterThan(1);
-    for (const pill of ink) {
+    // The ceremonial pill has no business in a room built to repeat one act.
+    expect(container.querySelector(".bg-text-primary")).toBeNull();
+    // Every money fill in the rendered room, walked. `bg-accent` is `verb`'s own fill; the
+    // translucent `accent-wash` a starred row carries is a tint, not a fill, and is not this.
+    const loud = [...container.querySelectorAll("button.bg-accent")];
+    expect(loud.length).toBeGreaterThan(1);
+    for (const pill of loud) {
       expect(pill.textContent ?? "").toMatch(/Draft|Confirm/);
     }
   });

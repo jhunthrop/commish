@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { LeagueTerms } from "@/league";
 import type { HelpLevel } from "@/identity/preferences";
 import { ButtonLink, Panel, Crest, buttonClassName } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { StatePanel } from "@/components/ui/state-panel";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { LeagueTermsPanel } from "./league-terms-panel";
@@ -166,8 +167,27 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
   }
 
   // `state.kind === "open"` — the only branch left.
+  const seatsOpen = Math.max(0, state.terms.teamCount - state.terms.filledTeams);
   return (
     <div className="flex flex-col gap-3">
+      {/* GAMEDAY, LAW 2: THE ONE NUMBER A STRANGER DECIDES ON, AT SIZE. Every fact on this page
+          rendered at 13px, including whether the league had any room left — *"if the largest
+          thing on a screen is not a number or a name, the screen is wrong"*, and the largest
+          thing here was the words "Join a league", which is a category rather than a league.
+
+          The FIGURE only, deliberately: `LeagueTermsPanel` below already carries the league's own
+          name as its heading, and this codebase's own standing complaint about itself is the same
+          fact stated twice, differently. That panel also renders inside the league itself, so its
+          ledger is not this surface's to restructure — this is additive, and the terms stay the
+          authority for everything but the headline count.
+
+          No tint and no `Stat`: a count of open seats sits inside no stated population. */}
+      <div className="flex items-baseline gap-2 border-b border-line pb-3">
+        <span data-testid="invite-seats-open" className="font-mono text-display-md font-semibold tabular-nums leading-display text-text-primary">
+          {seatsOpen}
+        </span>
+        <span className={`${MICRO_LABEL} text-text-faint`}>{seatsOpen === 1 ? "seat open" : "seats open"}</span>
+      </div>
       {/* First-timer persona review (Phase 3.5, Task 8 fix round 1): nothing anywhere in the
           invite flow said what JOINING MEANS. Lives here, not in `LeagueTermsPanel` — that
           component also renders post-join inside the league itself (Task 8), where this sentence

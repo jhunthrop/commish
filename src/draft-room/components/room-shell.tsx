@@ -9,7 +9,7 @@ import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { DraftBoard } from "./draft-board";
 import { NudgeBanner } from "./nudge-banner";
 import { PickCelebration } from "./pick-celebration";
-import { PickWire } from "./pick-wire";
+import { PickLog } from "./pick-log";
 import { PlayerPool } from "./player-pool";
 import { RoomDock } from "./room-dock";
 import { RoomLayout } from "./room-layout";
@@ -69,6 +69,7 @@ export function RoomShell({
       onAct={onAct}
       queuedPlayerIds={queuedPlayerIds}
       onQueue={onQueueToggle}
+      teamCount={room.teams.length}
     />
   );
 
@@ -118,10 +119,6 @@ export function RoomShell({
               <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
             </div>
           </div>
-          {/* R1 (2026-08-26 design review): the room's own history, one quiet mono line above
-              the board it never moves — same fixed-height reasoning as the notices slot above,
-              just reserved unconditionally rather than only while something is speaking. */}
-          <PickWire view={view} teams={room.teams} playersById={playersById} players={room.players} />
           <DraftBoard
             view={view}
             teams={room.teams}
@@ -130,6 +127,19 @@ export function RoomShell({
             landedPickNumber={room.lastPick?.pick.pickNumber ?? null}
             mock={room.mock ? { botMarkerLabel: room.mock.botMarkerLabel, botBadge: room.mock.botBadge } : null}
           />
+          {/* GAMEDAY, LAW 4: the room's history, at density. This band replaced `PickWire` here
+              — R1's one truncated mono line, which showed six picks and hid every one before
+              them. Collapsing the board's unreached rounds handed the stage back several hundred
+              pixels and the honest thing to spend them on is more true facts, not a taller grid
+              of dashes. `PickWire` itself is untouched and still serves the TV, where a party
+              across a room wants a glanceable ticker rather than a scrolling table.
+
+              A FIXED BAND, like every other band in this frame: `lg:h-56` and it scrolls inside
+              itself, so a landing pick never moves the board above it — the room's own
+              nothing-reflows law (D2), applied to the region that gains a row most often. */}
+          <div className="shrink-0 border-t border-line pt-2 lg:h-56 lg:min-h-0 lg:overflow-hidden">
+            <PickLog view={view} teams={room.teams} playersById={playersById} players={room.players} myTeamId={room.myTeamId} />
+          </div>
         </div>
       }
       dock={

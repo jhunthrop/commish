@@ -15,7 +15,7 @@ import { DRAFT_ROOM_CONFIG } from "./config";
 describe("DRAFT_ROOM_CONFIG", () => {
   it("defines every numeric tunable as a positive number", () => {
     const numericKeys: readonly (keyof typeof DRAFT_ROOM_CONFIG)[] = ["poolPageSize", "celebrationMs"];
-    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire", "tv", "verdict"] as const;
+    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire", "tv", "verdict", "tiers", "boardFutureRoundsShown", "dock"] as const;
     expect(Object.keys(DRAFT_ROOM_CONFIG).sort()).toEqual([...allKeys].sort());
     for (const key of numericKeys) {
       expect(Number.isFinite(DRAFT_ROOM_CONFIG[key])).toBe(true);
@@ -30,16 +30,37 @@ describe("DRAFT_ROOM_CONFIG", () => {
     expect(DRAFT_ROOM_CONFIG.wire.maxItems).toBeGreaterThan(0);
   });
 
-  // Task 2 (review E5/E7): the TV's own tunables — the ms threshold the spotlight clock goes
-  // hot at, and how many rounds past the active one the board still draws before collapsing
-  // the rest into one summary line. Both positive, or the rule they gate never fires (a
-  // zero/negative threshold never goes hot; a zero/negative round count collapses everything,
-  // including the active round).
-  it("defines the TV's own hot-threshold and future-rounds-shown as positive numbers", () => {
+  // Task 2 (review E5): the TV's own hot threshold. Positive, or the rule it gates never fires.
+  it("defines the TV's own hot-threshold as a positive number", () => {
     expect(Number.isFinite(DRAFT_ROOM_CONFIG.tv.hotThresholdMs)).toBe(true);
     expect(DRAFT_ROOM_CONFIG.tv.hotThresholdMs).toBeGreaterThan(0);
-    expect(Number.isFinite(DRAFT_ROOM_CONFIG.tv.futureRoundsShown)).toBe(true);
-    expect(DRAFT_ROOM_CONFIG.tv.futureRoundsShown).toBeGreaterThan(0);
+  });
+
+  // Gameday, law 4: the board's round horizon, now on BOTH variants. Every value positive, or
+  // the rule collapses everything including the active round; and the room's horizon stays at
+  // least the TV's, because a manager plans against the next few rounds and a party does not.
+  it("gives every board variant a positive round horizon, the room's no shorter than the TV's", () => {
+    for (const [variant, rounds] of Object.entries(DRAFT_ROOM_CONFIG.boardFutureRoundsShown)) {
+      expect(Number.isFinite(rounds), variant).toBe(true);
+      expect(rounds, variant).toBeGreaterThan(0);
+    }
+    expect(DRAFT_ROOM_CONFIG.boardFutureRoundsShown.room).toBeGreaterThanOrEqual(DRAFT_ROOM_CONFIG.boardFutureRoundsShown.tv);
+  });
+
+  // Gameday, law 1's grade channel: the pool's tier ladder. A cliff of zero would open a band
+  // between every adjacent pair; a band size under two would let the sparse tail of the ADP feed
+  // draw a rung per player. The ladder itself must end unbounded, or a deep-enough ADP falls off
+  // the end and gets no grade at all.
+  it("keeps the tier ladder measurable and unbounded at its foot", () => {
+    expect(DRAFT_ROOM_CONFIG.tiers.cliffAdp).toBeGreaterThan(0);
+    expect(DRAFT_ROOM_CONFIG.tiers.minBandSize).toBeGreaterThanOrEqual(2);
+    expect(DRAFT_ROOM_CONFIG.tiers.ladder.length).toBeGreaterThan(0);
+    const rungs = DRAFT_ROOM_CONFIG.tiers.ladder;
+    expect(rungs[rungs.length - 1]!.throughRound).toBe(Number.POSITIVE_INFINITY);
+    // Ascending, so `find` returns the FIRST rung a round still fits inside.
+    for (let index = 1; index < rungs.length; index++) {
+      expect(rungs[index]!.throughRound).toBeGreaterThan(rungs[index - 1]!.throughRound);
+    }
   });
 
   // Task 7 (the fun pass): the even band has to be a positive count of picks, or every pick in

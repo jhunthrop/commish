@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Avatar, EYEBROW, PositionBadge, Stat } from "@/components/ui";
+import { EYEBROW, PlayerFace, PositionBadge, Stat } from "@/components/ui";
 import { BENCH_SLOT } from "@/domain/roster";
 import { playersById as buildPlayersById } from "../lib/lookups";
 import { verdictFor, verdictPopulation, type Verdict } from "../lib/verdict";
@@ -192,7 +192,10 @@ function PickList({
             return (
               <li key={review.pickNumber} className="flex items-center gap-3 border-t border-line py-2 first:border-t-0">
                 <span className="w-8 shrink-0 font-mono text-xs tabular-nums text-text-muted">{review.pickNumber}</span>
-                <Avatar name={player.name} avatar={player.headshotUrl} size="sm" className="shrink-0" />
+                {/* Law 3: the club colour behind the face, on every surface that draws a
+                    player. This log was the one place in the room still drawing a bare
+                    `Avatar` — the same drift `RosterRow` was extracted to prevent. */}
+                <PlayerFace player={player} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">{player.name}</span>
                 <PositionBadge position={player.position} size="sm" />
                 <VerdictChip verdict={verdict} />

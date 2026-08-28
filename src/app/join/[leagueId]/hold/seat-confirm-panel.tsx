@@ -117,16 +117,28 @@ export function SeatConfirmPanel({ leagueId, leagueName, houseRung }: SeatConfir
   }
 
   return (
-    <Panel title={leagueName} meta="Ready to join">
-      <p className="text-sm text-text-muted">{`Confirm your seat in ${leagueName}.`}</p>
+    // GAMEDAY: THE LEAGUE'S NAME, ONCE. The page above this panel now carries a masthead with the
+    // league's name at display size and its open-seat count beside it (`page.tsx`'s
+    // `SeatMasthead`), and this panel used to say the same name three more times — as its own
+    // title, inside a sentence, and again inside the button label. Four statements of one fact on
+    // a screen with one decision on it is the "same fact stated twice, differently" pattern this
+    // codebase's own flow analysis keeps finding, and it reads as a form rather than a door.
+    //
+    // The title becomes the ACT ("Confirm your seat"), the sentence says what pressing it does
+    // (and says only what is true here: this branch places no hold of its own, so it never
+    // promises one), and the button becomes the verb. The ACCESSIBLE NAME still carries the
+    // league — a screen-reader user tabbing to a lone "Take your seat" has no other way to know
+    // which one — so nothing was lost, only stopped being repeated on screen.
+    <Panel title="Confirm your seat" meta="Ready to join">
+      <p className="text-sm text-text-muted">Confirming puts you in this league. You are in the draft, then the season.</p>
       <button
         type="button"
         onClick={() => void confirm()}
         disabled={state.status === "confirming"}
         aria-label={`Take your seat in ${leagueName}`}
-        className={buttonClassName("primary", "md", "w-full")}
+        className={buttonClassName("primary", "md", "w-fit")}
       >
-        {state.status === "confirming" ? "Taking your seat…" : `Take your seat in ${leagueName}`}
+        {state.status === "confirming" ? "Taking your seat…" : "Take your seat"}
       </button>
     </Panel>
   );

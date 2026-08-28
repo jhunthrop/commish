@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { SeatMeter } from "@/components/ui/seat-meter";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
@@ -26,6 +27,48 @@ interface PageProps {
  *  both return here (Task 16, F6), and it is the `returnTo` WorkOS seals into the callback's state. */
 function pageIntent(leagueId: string): string {
   return `/join/${leagueId}/hold`;
+}
+
+/**
+ * THE SEAT MASTHEAD (Gameday, laws 2 and 4) — the same block for both branches of this page,
+ * written once because a signed-out visitor and a signed-in member are looking at the identical
+ * league and must never be shown two drawings of it.
+ *
+ * WHAT IT REPLACED. A 400px column in the middle of a 1600px screen: the league name, then
+ * "11 of 12 seated. 1 seat left." at 13px muted, then the timing sentence at 13px muted, then the
+ * panel. The most consequential fact on the page — that one seat is left — was the smallest thing
+ * on it, which is precisely the uniform hierarchy law 2 exists to end. *"If the largest thing on
+ * a screen is not a number or a name, the screen is wrong."*
+ *
+ * The figure is `teamCount − filled − held`: a held seat is somebody else's, so counting it as
+ * open would be the page's one number telling its one lie. `SeatMeter` keeps the spoken sentence
+ * (`srOnlySentence`) so assistive tech hears the product's single seat statement while the screen
+ * shows the figure — the same split `LeagueRow` and the mock lobby's own shelf already keep.
+ *
+ * No tint on the figure and no `Stat`: a count of open seats sits inside no stated population,
+ * and rule 1 permits a magnitude colour only where the comparison is genuine.
+ */
+function SeatMasthead({ preview }: { readonly preview: NonNullable<Awaited<ReturnType<typeof publicLeaguePreview>>> }) {
+  const open = Math.max(0, preview.teamCount - preview.filledTeams - preview.heldSeats);
+  return (
+    <div className="flex flex-col gap-4 border-b border-line pb-6">
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <PageTitle>{preview.name}</PageTitle>
+          <p className="font-mono text-xs tabular-nums text-text-muted">
+            {preview.startTrigger === "when_full" ? "Starts as soon as it fills" : `Drafts ${preview.draftAt}`}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-baseline gap-2">
+          <span data-testid="hold-seats-open" className="font-mono text-display-xl font-semibold tabular-nums leading-display text-text-primary">
+            {open}
+          </span>
+          <span className={`${MICRO_LABEL} text-text-faint`}>{open === 1 ? "seat open" : "seats open"}</span>
+        </div>
+      </div>
+      <SeatMeter filled={preview.filledTeams} total={preview.teamCount} heldSeats={preview.heldSeats} srOnlySentence />
+    </div>
+  );
 }
 
 /**
@@ -56,13 +99,15 @@ export default async function SeatHoldPage({ params }: PageProps) {
     return (
       <>
         <PublicBar intent={pageIntent(leagueId)} signedIn={user !== null} />
-        <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
-          <PageTitle>{preview.name}</PageTitle>
-          <SeatMeter filled={preview.filledTeams} total={preview.teamCount} heldSeats={preview.heldSeats} />
-          <p className="text-sm text-text-muted">
-            {preview.startTrigger === "when_full" ? "Starts as soon as it fills" : `Drafts ${preview.draftAt}`}
-          </p>
-          <SeatHoldPanel leagueId={leagueId} leagueName={preview.name} />
+        {/* FULL-BLEED FRAME, MEASURED CONTENT (`docs/design-system.md`, "Layout"): the masthead
+            spans the page so the seat count sits at the far edge where a manager's eye lands,
+            and only the decision card takes a measure. It was a 400px column centred in a
+            1600px screen — 75% of the page carrying nothing at all. */}
+        <main className="flex w-full flex-col gap-6 p-4">
+          <SeatMasthead preview={preview} />
+          <div className="max-w-xl">
+            <SeatHoldPanel leagueId={leagueId} leagueName={preview.name} />
+          </div>
         </main>
         <PublicFooter />
       </>
@@ -83,13 +128,11 @@ export default async function SeatHoldPage({ params }: PageProps) {
 
   return (
     <AppShell user={shellUser} rail={rail} liveState={liveState}>
-      <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
-        <PageTitle>{preview.name}</PageTitle>
-        <SeatMeter filled={preview.filledTeams} total={preview.teamCount} heldSeats={preview.heldSeats} />
-        <p className="text-sm text-text-muted">
-          {preview.startTrigger === "when_full" ? "Starts as soon as it fills" : `Drafts ${preview.draftAt}`}
-        </p>
-        <SeatConfirmPanel leagueId={leagueId} leagueName={preview.name} houseRung={preview.houseRung} />
+      <main className="flex w-full flex-col gap-6 p-4">
+        <SeatMasthead preview={preview} />
+        <div className="max-w-xl">
+          <SeatConfirmPanel leagueId={leagueId} leagueName={preview.name} houseRung={preview.houseRung} />
+        </div>
       </main>
     </AppShell>
   );

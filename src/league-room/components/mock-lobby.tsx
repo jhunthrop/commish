@@ -15,7 +15,8 @@ import type {
 } from "@/mock-draft-service/lobby";
 import type { MockWireItem } from "@/mock-draft-service/wire";
 import type { MockMode } from "@/mock-draft/config";
-import { Button, Card, EYEBROW, Panel, SeatMeter } from "@/components/ui";
+import { Button, ButtonLink, Card, EYEBROW, Panel, SeatMeter, StatPill } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import {
   Countdown,
   formatCoarseDuration,
@@ -170,21 +171,41 @@ function OpenRoomRow({ room, joiningCode, onJoin }: OpenRoomRowProps) {
     // meant to compare and then act on never acknowledged the pointer at all, which is a large
     // part of why the product read as a page of terms rather than somewhere you do something.
     <Card as="li" padding="compact" interactive>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2">
-          <span className="min-w-0 text-sm font-medium text-text-primary">
-            {room.teamCount} teams · {room.pickSeconds}s clock
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        {/* GAMEDAY, LAW 2: the row's hero is the fact that decides whether you join — how many
+            seats are still going. It read as a 13px clause inside a sentence, which is the
+            uniform hierarchy the spec measured and rejected. `SeatMeter` still owns the SPOKEN
+            sentence ("9 of 12 seated") via `srOnlySentence`, so the figure beside the bar is one
+            product seat statement rendered twice, never two that can disagree — the identical
+            split `LeagueRow` already keeps. */}
+        <div className="flex shrink-0 items-baseline gap-2">
+          <span
+            data-testid="lobby-seats-open"
+            className="font-mono text-display-sm font-semibold tabular-nums leading-display text-text-primary"
+          >
+            {room.seatsOpen}
           </span>
+          <span className={`${MICRO_LABEL} text-text-faint`}>
+            {room.seatsOpen === 1 ? "seat open" : "seats open"}
+          </span>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2">
           <SeatMeter
             filled={room.teamCount - room.seatsOpen}
             total={room.teamCount}
+            srOnlySentence
           />
-          {remainingMs === null ? null : (
-            <Countdown remainingMs={remainingMs} size="sm" />
-          )}
+          <span className="min-w-0 font-mono text-xs tabular-nums text-text-muted">
+            {room.teamCount} teams · {room.pickSeconds}s clock
+          </span>
         </div>
+        {remainingMs === null ? null : (
+          <Countdown remainingMs={remainingMs} size="md" />
+        )}
+        {/* LAW 5: `verb`, because a lobby is a shelf you act on once per row. `primary` belongs
+            to the form's own submit — the one ceremonial act this page exists to perform. */}
         <Button
-          variant="secondary"
+          variant="verb"
           size="sm"
           onClick={() => onJoin(room.shareCode)}
           disabled={joiningCode !== null}
@@ -205,23 +226,35 @@ function OpenRoomRow({ room, joiningCode, onJoin }: OpenRoomRowProps) {
 function MineRoomRow({ room }: { readonly room: MyMockRoomSummary }) {
   return (
     <li className="border-t border-line">
-      <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="min-w-0 break-words text-sm font-medium text-text-primary">
-            {room.teamName} · {MODE_ROW_LABEL[room.mode]} · {room.teamCount}{" "}
-            teams · {room.pickSeconds}s ·{" "}
-            {historyWhenSentence(room.status, room.startsInMs)}
+      <div className="flex flex-wrap items-center justify-between gap-3 py-2">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="min-w-0 break-words text-sm font-semibold text-text-primary">
+            {room.teamName}
           </span>
-          <span className="text-sm text-text-muted">
-            {STATUS_LABEL[room.status]}
+          {/* Mono, because every clause after the name is DATA — a mode, a size, a clock, a
+              coarse duration — and mono keeps those columns aligned as the eye runs down a
+              history. Law 4: the same facts, one line tighter. */}
+          <span className="min-w-0 break-words font-mono text-xs tabular-nums text-text-muted">
+            {MODE_ROW_LABEL[room.mode]} · {room.teamCount} teams ·{" "}
+            {room.pickSeconds}s · {historyWhenSentence(room.status, room.startsInMs)}
           </span>
         </div>
-        <Link
-          href={`/app/drafts/${room.draftId}`}
-          className="text-sm font-medium text-accent underline"
-        >
-          {STATUS_LINK_LABEL[room.status]}
-        </Link>
+        <div className="flex shrink-0 items-center gap-3">
+          {/* The status as a chip rather than a second sentence: a state you read off a colour
+              and a shape is law 1's whole point, and `StatPill` is the product's one
+              state-chip vocabulary. `in_progress` is the only one that is live. */}
+          <StatPill label={STATUS_LABEL[room.status]} tone={room.status === "in_progress" ? "negative" : "neutral"} />
+          {/* LAW 5: a room still drafting is an ACT you return to, and it wears the verb; a
+              finished or waiting room is a thing you look at, and its way in stays quiet. A bare
+              underlined green link was neither — it spent the money channel on navigation. */}
+          <ButtonLink
+            href={`/app/drafts/${room.draftId}`}
+            size="sm"
+            variant={room.status === "in_progress" ? "verb" : "secondary"}
+          >
+            {STATUS_LINK_LABEL[room.status]}
+          </ButtonLink>
+        </div>
       </div>
     </li>
   );

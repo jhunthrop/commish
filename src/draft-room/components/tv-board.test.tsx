@@ -164,6 +164,34 @@ describe("TvBoard", () => {
       await waitFor(() => expect(screen.getByTestId("spotlight-countdown")).toBeInTheDocument());
       expect(screen.getByTestId("spotlight-countdown").className).toContain("text-negative");
     });
+
+    /**
+     * LAW 2, ON THE ONE SURFACE BUILT FOR READING DISTANCE. The party clock shipped at `lg`
+     * (44px) — the size the ROOM's own rail uses, on a screen designed to be read from a sofa —
+     * while the display scale carries 84 and 116 above it. Pinned by the SIZE CLASS rather than
+     * a pixel, so a scale retune moves it and a call-site regression does not.
+     */
+    it("gives the party clock the TV's own step, never the room rail's", async () => {
+      stubMatchMedia();
+      const fixture = fixtureDeps({ ...SNAKE_VIEW, deadlineAt: new Date(Date.now() + 45_000).toISOString() });
+      renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
+      await waitFor(() => expect(screen.getByTestId("spotlight-countdown")).toBeInTheDocument());
+      expect(screen.getByTestId("spotlight-countdown").className).toContain("text-display-xl");
+    });
+  });
+
+  /**
+   * GAMEDAY, LAW 2: the draft's own progress, as a number, on the one surface whose viewer cannot
+   * scroll or click to find it out. Arithmetic on the payload — picks made, over seats times
+   * roster spots — never a projection.
+   */
+  it("states how far into the draft the room is, as a figure", async () => {
+    stubMatchMedia();
+    const fixture = fixtureDeps();
+    renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
+    await waitFor(() => expect(screen.getByTestId("tv-progress")).toBeInTheDocument());
+    const total = SNAKE_VIEW.draftOrder.length * SNAKE_VIEW.slotConfig.reduce((sum, slot) => sum + slot.count, 0);
+    expect(screen.getByTestId("tv-progress")).toHaveTextContent(`${SNAKE_VIEW.picks.length} of ${total}`);
   });
 
   // Task 2 (review E6): the last pick landed, restated quietly at glance scale beside the
