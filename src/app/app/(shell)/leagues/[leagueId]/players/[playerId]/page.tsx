@@ -46,28 +46,34 @@ const POSITION_PLURAL: Readonly<Record<Position, string>> = {
  * aggregations of the same crowd, and we compare the market against expert consensus against our
  * own model, which is a disagreement somebody can be right or wrong about.
  *
- * TODAY EXACTLY ONE OF THE THREE REACHES THIS PAGE, and the other two print a dash and say
- * nothing. `PlayerSeasonBody`'s docblock carries the full account of what blocks each one; the
- * short version is that expert consensus lives in a different id space with no crosswalk and only
- * for seasons the model is scored on, and our own board has no persisted per-player output at all.
- * They are named and dashed rather than omitted, because a strip that silently drops the sources
- * it cannot reach is a strip that stops being a comparison — the dash is the honest report that
- * this product holds an opinion it cannot yet show you.
+ * TWO OF THE THREE REACH THIS PAGE, and the third prints a dash and says nothing.
+ * `PlayerSeasonBody`'s docblock carries the full account; the short version is that expert
+ * consensus now arrives through the crosswalk for this season, and our own board holds four
+ * finished seasons and none of this one, because it needs games that have not been played yet.
+ *
+ * A DASH IS NEVER FILLED FROM A NEIGHBOURING SEASON, and the temptation to do it is the reason
+ * this paragraph exists. The board has a number for this man in 2024 and it would render
+ * beautifully. It would also be a claim about a season that has ended, printed in the same row and
+ * the same ink as a consensus published this week, with nothing on the screen to tell them apart.
+ * The dash is the honest report that this product holds an opinion it cannot yet show you.
  *
  * ONLY ONE CELL IS TINTED. Points per game is a verdict about the player and has a population
  * behind it. The three draft-position cells are one quantity read by different sources: colouring
  * them would be colouring a SOURCE rather than a player, which is a claim none of them makes.
  */
 function sourcesFor(body: PlayerSeasonBody): readonly SourceValue[] {
-  const { player, positionRank, pointsPerGame, pointsPerGamePercentile } = body;
+  const { player, positionRank, expertRank, modelRank, pointsPerGame, pointsPerGamePercentile } = body;
   return [
     { label: player.position, value: positionRank === null ? null : String(positionRank) },
     // One decimal, the precision `formatAdp` (`@/draft-room/lib/tiers`) already rules on: a
     // consensus of real drafts genuinely carries it, and rounding to a whole number makes two
     // different players look identical.
     { label: "Market", value: player.adp === null ? null : player.adp.toFixed(1) },
-    { label: "Experts", value: null },
-    { label: "Model", value: null },
+    // Whole numbers, both: a consensus rank and a board rank are ordinals and a decimal place on
+    // one would claim a precision neither publishes. `Market` keeps its decimal because an average
+    // draft position genuinely carries one.
+    { label: "Experts", value: expertRank === null ? null : String(expertRank) },
+    { label: "Model", value: modelRank === null ? null : String(modelRank) },
     {
       label: "PPG",
       value: pointsPerGame === null ? null : pointsPerGame.toFixed(1),

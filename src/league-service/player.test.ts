@@ -2,6 +2,12 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { matchups, players, playerStatLines, statWeeks, teams, users } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
+import { crosswalkRows, recordCrosswalk, resolveCrosswalk } from "@/projections/crosswalk";
+import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
+import { BOARD_SOURCE, recordPreseasonProjections } from "@/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { recordPreseasonRankings } from "@/projections/preseason/store";
+import { recordNflPlayers } from "@/projections/universe";
 import { createLeague } from "./creation";
 import { playerSeason } from "./player";
 
@@ -137,5 +143,93 @@ describe("playerSeason", () => {
   it("answers null for a player the feed does not carry at all", async () => {
     const leagueId = await league();
     expect(await playerSeason(db, leagueId, "nobody")).toBeNull();
+  });
+});
+
+/**
+ * THE TWO CELLS THE SOURCE STRIP PRINTED A DASH IN FOR AS LONG AS IT EXISTED.
+ *
+ * Both readings sit behind the same crosswalk, so the cases worth pinning are the ones where the
+ * join or the store legitimately has nothing: an unplaced player, a placed player nobody ranked, a
+ * player whose only number belongs to a season that has finished. Every one of those must be a
+ * dash, and none of them may be filled from the nearest available number.
+ */
+describe("playerSeason's preseason readings", () => {
+  const CHASE = "00-0036900";
+  const NOW = new Date(clock.now());
+  const LAST_WEEK = new Date(Date.parse(clock.now()) - 7 * 86_400_000);
+
+  async function crossOver(leagueId: string): Promise<string> {
+    await recordNflPlayers(db, [
+      { id: CHASE, pfrId: "LongRa00", espnId: "rb1", name: "Rashad Long", position: "RB", latestTeam: "SF", rookieSeason: 2021, lastSeason: 2026 },
+    ]);
+    await recordCrosswalk(db, crosswalkRows(resolveCrosswalk(
+      [{ id: "rb1", name: "Rashad Long", position: "RB" }],
+      [{ id: CHASE, espnId: "rb1", name: "Rashad Long" }],
+    ), NOW));
+    return leagueId;
+  }
+
+  it("carries both numbers for a player the crosswalk placed and both stores rank", async () => {
+    const leagueId = await crossOver(await league());
+    await recordPreseasonRankings(db, [
+      { season: PRODUCT_SEASON, source: BENCHMARK_SOURCES.ecr, playerId: CHASE, rank: 14, asOf: LAST_WEEK },
+    ]);
+    await recordPreseasonProjections(db, [
+      { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: CHASE, rank: 9, positionRank: 4, projectedPoints: 288.1,
+        valueOverReplacement: 96.4, valueRank: 12, expectedGames: 16.1, floorPoints: 230.5, medianPoints: 288.1,
+        ceilingPoints: 316.9, tier: 1, asOf: LAST_WEEK },
+    ]);
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.expertRank).toBe(14);
+    expect(body.modelRank).toBe(9);
+  });
+
+  /** The failure mode this whole track exists to remove, and the one it must not replace with a
+   *  guess: a player nobody placed gets a dash, never the number of somebody with his name. */
+  it("gives a player the crosswalk could not place two dashes", async () => {
+    const leagueId = await league();
+    await recordNflPlayers(db, [
+      { id: CHASE, pfrId: "LongRa00", espnId: "someone-else", name: "Rashad Long", position: "RB", latestTeam: "SF", rookieSeason: 2021, lastSeason: 2026 },
+    ]);
+    await recordPreseasonRankings(db, [
+      { season: PRODUCT_SEASON, source: BENCHMARK_SOURCES.ecr, playerId: CHASE, rank: 14, asOf: LAST_WEEK },
+    ]);
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.expertRank).toBeNull();
+    expect(body.modelRank).toBeNull();
+  });
+
+  it("gives a placed player nobody has ranked two dashes rather than a last place", async () => {
+    const leagueId = await crossOver(await league());
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.expertRank).toBeNull();
+    expect(body.modelRank).toBeNull();
+  });
+
+  /**
+   * THE MOST PLAUSIBLE-LOOKING LIE AVAILABLE, refused. A board for a finished season would render
+   * as a number and read as this year's opinion, with nothing in a bare row of figures to say
+   * otherwise.
+   */
+  it("refuses to fill this season's cell from a season that has ended", async () => {
+    const leagueId = await crossOver(await league());
+    await recordPreseasonProjections(db, [
+      { season: PRODUCT_SEASON - 2, source: BOARD_SOURCE, playerId: CHASE, rank: 9, positionRank: 4, projectedPoints: 288.1,
+        valueOverReplacement: 96.4, valueRank: 12, expectedGames: 16.1, floorPoints: 230.5, medianPoints: 288.1,
+        ceilingPoints: 316.9, tier: 1, asOf: LAST_WEEK },
+    ]);
+    expect((await playerSeason(db, leagueId, "rb1", clock))!.modelRank).toBeNull();
+  });
+
+  /** The gate, in the product rather than in a backtest: a consensus stamped tomorrow is not one
+   *  we hold today, whatever the row says. */
+  it("does not show a ranking stamped after the moment it is being read at", async () => {
+    const leagueId = await crossOver(await league());
+    await recordPreseasonRankings(db, [
+      { season: PRODUCT_SEASON, source: BENCHMARK_SOURCES.ecr, playerId: CHASE, rank: 14,
+        asOf: new Date(Date.parse(clock.now()) + 86_400_000) },
+    ]);
+    expect((await playerSeason(db, leagueId, "rb1", clock))!.expertRank).toBeNull();
   });
 });

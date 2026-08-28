@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { preseasonRankings, preseasonRosters } from "@/db/schema";
 import type { PreseasonRosterEntry, RosterStatus } from "../nflverse/rosters";
@@ -108,6 +108,39 @@ export async function preseasonRostersAsOf(
     .where(and(eq(preseasonRosters.season, season), lte(preseasonRosters.asOf, asOf)))
     .orderBy(asc(preseasonRosters.playerId), desc(preseasonRosters.asOf));
   return rows.map((row) => ({ ...row, status: row.status as RosterStatus }));
+}
+
+/**
+ * One source's opinion of a named handful of players, for a surface that draws one man.
+ *
+ * The same gate and the same `DISTINCT ON` as the whole-board read; only the `IN` list differs. A
+ * player the source never ranked is ABSENT FROM THE RESULT rather than present with a zero, so the
+ * caller has one thing to check and one thing to print for it.
+ */
+export async function preseasonRankingsFor(
+  db: ReadonlyDb,
+  { season, source, asOf }: { readonly season: number; readonly source: string; readonly asOf: Date },
+  playerIds: readonly string[],
+): Promise<readonly PreseasonRankingRow[]> {
+  if (playerIds.length === 0) return [];
+  return db
+    .selectDistinctOn([preseasonRankings.playerId], {
+      season: preseasonRankings.season,
+      source: preseasonRankings.source,
+      playerId: preseasonRankings.playerId,
+      rank: preseasonRankings.rank,
+      asOf: preseasonRankings.asOf,
+    })
+    .from(preseasonRankings)
+    .where(
+      and(
+        eq(preseasonRankings.season, season),
+        eq(preseasonRankings.source, source),
+        lte(preseasonRankings.asOf, asOf),
+        inArray(preseasonRankings.playerId, [...playerIds]),
+      ),
+    )
+    .orderBy(asc(preseasonRankings.playerId), desc(preseasonRankings.asOf));
 }
 
 /** One source's whole published board for a season, as it was knowable at `asOf`. */
