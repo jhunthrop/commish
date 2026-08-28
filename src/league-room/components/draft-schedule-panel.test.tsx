@@ -181,7 +181,7 @@ describe("DraftSchedulePanel", () => {
         <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={{ ...SCHEDULED, status: "complete" }} currentWeek={1} />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
-        expect(screen.getByText("Draft complete")).toBeInTheDocument();
+        expect(screen.getByText("Draft complete. Every roster is set.")).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "View the draft board" })).toHaveAttribute("href", "/app/drafts/draft_1");
         expect(await axe(container)).toHaveNoViolations();
       },
@@ -205,7 +205,7 @@ describe("DraftSchedulePanel", () => {
       />,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.queryByText("Draft complete")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Draft complete/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "View the draft board" })).not.toBeInTheDocument();
   });
 

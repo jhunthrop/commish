@@ -4,6 +4,7 @@ import type { MatchupDetail, MatchupLineupEntry, MatchupSide } from "../contract
 import { Card, EYEBROW, InfoTip, PlayerFace, PositionBadge, SlotChip, Stat, Table, type TableColumn } from "@/components/ui";
 import { formatPoints } from "../lib/format";
 import { playerOf } from "../lib/player";
+import { summaryOf } from "../lib/matchup-facts";
 import { starterComparison } from "../lib/population";
 import { MatchupHero, SideChips, type RecordsByTeamId } from "./matchup-hero";
 import { MedianResultLine } from "./median-result";
@@ -261,7 +262,7 @@ export function MatchupPanel({
             `final` flips, and `final` alone cannot tell that apart from `scheduled`. */}
         <WeekStatusBadge status={weekStatus} />
       </div>
-      <MatchupHero matchup={matchup} myTeamId={myTeamId} records={records} />
+      <MatchupHero matchup={summaryOf(matchup)} myTeamId={myTeamId} records={records} />
       <div className="border-t border-line pt-3">
         <MatchupLineups matchup={matchup} myTeamId={myTeamId} positionPoints={positionPoints} />
       </div>

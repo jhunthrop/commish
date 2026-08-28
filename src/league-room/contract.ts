@@ -460,6 +460,16 @@ export interface LineupSlotView {
   readonly playerId: string | null;
   readonly playerName: string | null;
   readonly position: Position | null;
+  /**
+   * GAMEDAY, LAW 3, the same three fields `MatchupLineupEntry` carries and for the same reason:
+   * a lineup editor that draws nine dropdowns full of strings is drawing no players at all.
+   * `lineupView` (`@/league-service/lineups.ts`) already loads the whole `players` table to
+   * resolve `playerName`/`position`, so these cost three columns off a map lookup that had
+   * already happened. `null` on all three is the one spelling of an EMPTY SLOT.
+   */
+  readonly nflTeam: string | null;
+  readonly headshotUrl: string | null;
+  readonly adp: number | null;
 }
 
 export interface LineupBody {

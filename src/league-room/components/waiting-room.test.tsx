@@ -172,7 +172,7 @@ describe("WaitingRoom", () => {
   it("shows a designed complete state with a link into the finished board when the caller did not miss it", async () => {
     const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete", missedDraft: false, currentWeek: 1 };
     await renderSurface(<WaitingRoom league={complete} />, async ({ container }) => {
-      expect(screen.getByText("Draft complete")).toBeInTheDocument();
+      expect(screen.getByText("Draft complete. Every roster is set.")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "View the draft board" })).toHaveAttribute("href", "/app/drafts/draft_1");
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -184,7 +184,7 @@ describe("WaitingRoom", () => {
   it("yields its own terminal panel once the season is past its regular-season window", () => {
     const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete", missedDraft: false, currentWeek: 15, totalWeeks: 14 };
     render(<WaitingRoom league={complete} />);
-    expect(screen.queryByText("Draft complete")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Draft complete/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "View the draft board" })).not.toBeInTheDocument();
   });
 
@@ -195,7 +195,7 @@ describe("WaitingRoom", () => {
   it("suppresses its own terminal panel while draftJustCompleted is true, in both themes, axe-clean", async () => {
     const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete", missedDraft: false };
     await renderSurface(<WaitingRoom league={complete} draftJustCompleted />, async ({ container }) => {
-      expect(screen.queryByText("Draft complete")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Draft complete/)).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "View the draft board" })).not.toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -204,7 +204,7 @@ describe("WaitingRoom", () => {
   it("brings its own terminal panel back once draftJustCompleted goes false again — the arrival's window closing, not a code change", () => {
     const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete", missedDraft: false };
     render(<WaitingRoom league={complete} draftJustCompleted={false} />);
-    expect(screen.getByText("Draft complete")).toBeInTheDocument();
+    expect(screen.getByText("Draft complete. Every roster is set.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View the draft board" })).toBeInTheDocument();
   });
 

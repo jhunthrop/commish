@@ -1,17 +1,18 @@
 import Link from "next/link";
 import type { LeagueHomeBody, LineupBody, MatchupSummary } from "../contract";
-import { Card, Crest, EYEBROW, PageTitle, SlotChip } from "@/components/ui";
+import { Card, Crest, EYEBROW, PageTitle, PlayerFace, PositionBadge } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import type { HelpLevel } from "@/identity/preferences";
 import type { NextActionKind } from "@/league";
 import { formatRecord, formatWeek } from "../lib/format";
+import { playerOf } from "../lib/player";
 import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
 import { LeagueMembersPanel } from "./league-members-panel";
 import { LeagueTermsPanel } from "./league-terms-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
-import { MatchupScoreboard } from "./matchup-scoreboard";
+import { MatchupHero, type RecordsByTeamId } from "./matchup-hero";
 import { ModerationSummary } from "./moderation-summary";
 import { StandingsTable } from "./standings-table";
 import { TradeInboxLink } from "./trade-inbox-link";
@@ -56,6 +57,20 @@ function headerFacts(home: LeagueHomeBody): string {
   if (home.draftStatus === "complete") parts.push(formatWeek(home.currentWeek));
   parts.push(`${home.format === "auction" ? "Auction" : "Snake"} draft`);
   return parts.join(" · ");
+}
+
+/**
+ * Every team's win-loss-tie line, keyed by team id, for the week band's hero — the same join
+ * `MatchupWeekPage` makes for the same reason. The standings are already on this page; a
+ * scoreboard that prints a team name with no record beside it is the one thing every real sports
+ * interface does that this band did not.
+ */
+function recordsFrom(standings: LeagueHomeBody["standings"]): RecordsByTeamId {
+  const records: Record<string, { wins: number; losses: number; ties: number }> = {};
+  for (const row of standings) {
+    records[row.teamId] = { wins: row.wins, losses: row.losses, ties: row.ties };
+  }
+  return records;
 }
 
 /** "Week 1 · Bay Bandits vs Volt Kings" — the one sentence `DraftCompleteArrival` (Step 3b)
@@ -110,13 +125,20 @@ function DraftCompleteArrival({
         <h2 className={EYEBROW}>Your draft is in the books</h2>
         <span className="text-sm text-text-muted">{matchupHeadline(matchup)}</span>
       </div>
-      <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-        {roster.map((slot) => (
-          <li key={`${slot.slot}:${slot.slotIndex}`} className="flex items-center gap-2 text-sm text-text-primary">
-            <SlotChip slot={slot.slot} />
-            <span className="truncate">{slot.playerName}</span>
-          </li>
-        ))}
+      {/* Law 3: fifteen players a manager just drafted, drawn as players. This was fifteen slot
+          chips beside fifteen strings — the first screen after a draft room that spent an hour
+          drawing every one of these men as an object. */}
+      <ul className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+        {roster.map((slot) => {
+          const player = playerOf(slot);
+          return (
+            <li key={`${slot.slot}:${slot.slotIndex}`} className="flex min-w-0 items-center gap-2 text-sm text-text-primary">
+              {player === null ? null : <PlayerFace player={player} size="sm" />}
+              <span className="truncate">{slot.playerName}</span>
+              {player === null ? null : <PositionBadge position={player.position} size="sm" />}
+            </li>
+          );
+        })}
       </ul>
       <div className="flex flex-wrap items-center gap-4">
         <Link href={`/app/leagues/${leagueId}/matchups/${matchup.weekNumber}`} className="text-sm font-medium text-accent underline">
@@ -246,12 +268,14 @@ export function LeagueHome({
                 rendered at 18px — the same size as the "All matchups" link beside it. Range from
                 size, never from weight: rule 2's ≤600 cap did not move. */}
             <h2 className="font-display text-display-sm font-semibold leading-display text-text-primary">{formatWeek(home.currentWeek)}</h2>
-            {/* Only on a bye. The scoreboard below carries this same badge for every manager who
-                HAS a matchup, and a week that said "Live" twice on one band would be the
-                template-shaped repetition the fun pass is undoing. A manager with no matchup used
-                to be told nothing at all about the week's state, because the one place that fact
-                lived was inside a scoreboard they never saw. */}
-            {home.myMatchup === null ? <WeekStatusBadge status={home.weekStatus} /> : null}
+            {/* ALWAYS, now — the badge moved out of the scoreboard when the band adopted the
+                shared hero (Gameday). `Scoreboard` is a primitive shared with the matchup page,
+                which carries the week's state on its own panel head; putting a week status inside
+                it would have made every caller inherit a fact only some of them own. So the band
+                states it once, here, beside its own week heading, for a manager with a matchup and
+                a manager on a bye alike. It is still said exactly once: the hero below has no
+                badge of its own. */}
+            <WeekStatusBadge status={home.weekStatus} />
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link className="text-sm text-accent underline" href={`/app/leagues/${home.leagueId}/matchups/${home.currentWeek}`}>
@@ -271,10 +295,16 @@ export function LeagueHome({
         {home.myMatchup === null ? (
           <p className="text-text-muted">You have no matchup this week.</p>
         ) : (
-          // `size="hero"`: this is the manager's OWN matchup on the page whose subject it is, so
-          // it takes the register the matchup page uses rather than the tile register `/app`'s
-          // grid of league cards needs.
-          <MatchupScoreboard matchup={home.myMatchup} myTeamId={home.myTeamId} size="hero" />
+          // THE SAME HERO THE MATCHUP PAGE LEADS WITH (Gameday, law 2), not a quieter cousin of
+          // it. This band used to render `MatchupScoreboard` at its `hero` size — 58px, no
+          // crests, no records, the two names centred over the two numbers — while the page one
+          // click away drew the identical fixture at 84px with both teams' records under their
+          // crests. One matchup, two treatments, is exactly the "little changes here and there"
+          // incoherence Gameday replaced. `records` is joined here from `home.standings`, which
+          // this page already holds.
+          <Card className="flex flex-col gap-3">
+            <MatchupHero matchup={home.myMatchup} myTeamId={home.myTeamId} records={recordsFrom(home.standings)} />
+          </Card>
         )}
         {/* Same visibility the retired "Score Week" button had: the commissioner's control is
             gone, and this is what replaced it — an explanation of why, not a silent absence. */}

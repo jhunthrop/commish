@@ -4,13 +4,33 @@ import { useMemo, useState } from "react";
 import type { DraftStatus } from "@/domain/draft";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
-import { Button, InfoTip, Select, SlotChip } from "@/components/ui";
+import { Button, InfoTip, PlayerFace, PositionBadge, Select, SlotChip } from "@/components/ui";
 import type { HelpLevel } from "@/identity/preferences";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeek } from "../lib/format";
+import { playerOf } from "../lib/player";
 import { term } from "@/help/glossary";
 
 const slotKey = (slot: LineupSlotView): string => `${slot.slot}:${slot.slotIndex}`;
+
+/**
+ * One roster slot's occupant, drawn as an object — face on the club colour, name, position
+ * sticker, club code (law 3). An empty slot reads as the word and nothing else: there is no face
+ * to draw, and a placeholder tile pretending to be somebody is the failure `PlayerFace` already
+ * refuses for an unknown club.
+ */
+function SlotPlayer({ slot }: { readonly slot: LineupSlotView }) {
+  const player = playerOf(slot);
+  if (player === null) return <span className="text-sm text-text-faint">Empty</span>;
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <PlayerFace player={player} size="sm" />
+      <span className="truncate text-sm text-text-primary">{player.name}</span>
+      <PositionBadge position={player.position} size="sm" />
+      {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
+    </span>
+  );
+}
 
 /**
  * Starters and bench for one week.
@@ -51,6 +71,10 @@ export function LineupEditor({
   const [submitting, setSubmitting] = useState(false);
 
   const everyone = useMemo(() => [...lineup.starters, ...lineup.bench].filter((slot) => slot.playerId !== null), [lineup]);
+  /** Every rosterable player on this team, keyed by id, so the face beside a slot follows the
+   *  CURRENT selection rather than the one the page loaded with. Built from the same list the
+   *  dropdown options come from, so a face can never appear for a player the select cannot pick. */
+  const byId = useMemo(() => new Map(everyone.map((slot) => [slot.playerId!, slot])), [everyone]);
   // A per-league override could drop FLEX from the roster entirely — the caption only prints
   // when the slot it explains is actually on the page, same reasoning as GLOSSARY omitting
   // `waiver` for a feature the product doesn't have.
@@ -98,9 +122,9 @@ export function LineupEditor({
         </p>
         <ul className="flex flex-col gap-1">
           {lineup.starters.map((slot) => (
-            <li key={slotKey(slot)} className="flex items-center gap-2 text-text-primary">
+            <li key={slotKey(slot)} className="flex items-center gap-2">
               <SlotChip slot={slot.slot} />
-              <span>{slot.playerName ?? "Empty"}</span>
+              <SlotPlayer slot={slot} />
             </li>
           ))}
         </ul>
@@ -157,21 +181,45 @@ export function LineupEditor({
         Lineups lock for the whole week when its first game kicks off.
         <InfoTip term="lineup-lock" helpLevel={helpLevel} />
       </p>
+      {/* LAW 3, ON THE SCREEN WHERE IT MATTERS MOST. This grid was nine bare `<select>`s: the
+          one place in the product where a manager decides which PLAYERS play, drawn with no
+          player in it at all. The face is not decoration — a manager recognises a roster by
+          faces and club colours long before they finish reading nine names, which is the
+          whole claim law 3 makes. It is derived from the CURRENT selection, so it changes with
+          the dropdown rather than reporting what was there on load. An empty slot shows an
+          empty tile, never a grey rectangle pretending to be somebody. */}
       <div className="grid gap-2 sm:grid-cols-2">
-        {lineup.starters.map((slot) => (
-          <Select
-            key={slotKey(slot)}
-            label={slot.slot}
-            value={assignments[slotKey(slot)] ?? ""}
-            options={[
-              { value: "", label: "Empty" },
-              ...everyone.map((option) => ({ value: option.playerId!, label: `${option.playerName} (${option.position})` })),
-            ]}
-            onChange={(event) =>
-              setAssignments((prev) => ({ ...prev, [slotKey(slot)]: event.target.value === "" ? null : event.target.value }))
-            }
-          />
-        ))}
+        {lineup.starters.map((slot) => {
+          const chosen = byId.get(assignments[slotKey(slot)] ?? "");
+          const face = chosen === undefined ? null : playerOf(chosen);
+          return (
+            <div key={slotKey(slot)} className="flex items-end gap-2">
+              {/* `aria-hidden` on the wrapper, not on `PlayerFace` (which hides its own tile
+                  already): the select beside it announces the same player by name, and a face
+                  announced a second time is a duplicate, not a fact. `h-10` matches the select's
+                  own height so the two sit on one baseline. */}
+              <span aria-hidden="true" className="flex h-10 shrink-0 items-center">
+                {face === null ? (
+                  <span className="size-8 rounded-sm border border-line" />
+                ) : (
+                  <PlayerFace player={face} size="sm" />
+                )}
+              </span>
+              <Select
+                className="w-full"
+                label={slot.slot}
+                value={assignments[slotKey(slot)] ?? ""}
+                options={[
+                  { value: "", label: "Empty" },
+                  ...everyone.map((option) => ({ value: option.playerId!, label: `${option.playerName} (${option.position})` })),
+                ]}
+                onChange={(event) =>
+                  setAssignments((prev) => ({ ...prev, [slotKey(slot)]: event.target.value === "" ? null : event.target.value }))
+                }
+              />
+            </div>
+          );
+        })}
       </div>
       {/* Persona review (FIX 4): a caption near the slot list, not a tip on every FLEX chip —
           there is only ever one FLEX slot, so one sentence explains it once. */}
@@ -188,9 +236,21 @@ export function LineupEditor({
         Bench
         <InfoTip term="bench" helpLevel={helpLevel} />
       </h3>
-      <p className="text-sm text-text-muted">
-        {lineup.bench.map((slot) => slot.playerName).filter((name) => name !== null).join(", ") || "Nobody on the bench."}
-      </p>
+      {/* The bench used to be a comma-joined sentence — six names run together, which is a list
+          pretending to be prose and unreadable at a glance on the exact screen where a manager is
+          deciding whether one of them should be starting. Law 3 again: they are players, so they
+          are drawn as players. */}
+      {lineup.bench.length === 0 ? (
+        <p className="text-sm text-text-muted">Nobody on the bench.</p>
+      ) : (
+        <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {lineup.bench.map((slot) => (
+            <li key={slotKey(slot)} className="flex items-center gap-2">
+              <SlotPlayer slot={slot} />
+            </li>
+          ))}
+        </ul>
+      )}
       <Button onClick={() => void save()} loading={submitting} disabled={submitting}>
         Save lineup
       </Button>

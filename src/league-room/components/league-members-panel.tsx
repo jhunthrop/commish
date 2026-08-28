@@ -60,15 +60,23 @@ export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, comp
           action={<Button disabled>Waiting for managers to join</Button>}
         />
       ) : (
-        <ul aria-label="Managers" className="flex flex-col gap-2">
+        // LAW 4, DENSITY IS RESPECT, AND RULE 4's AMENDED TEST DECIDES THE FORM. Twelve managers
+        // are a thing you READ DOWN A COLUMN — you are scanning for one name, or counting who is
+        // missing — not twelve things you act on, so they are rows under hairlines rather than
+        // twelve separate bordered, gapped cards. That is the amendment applied as written ("a
+        // thing you read down a column stays a row"), and it takes this block from twelve boxes
+        // to one, at roughly two thirds of the height, with the same twelve facts on it. The
+        // two-column split (owner over team name) collapses to one line at `sm` and up for the
+        // same reason: they are two short facts about one person, not a stacked pairing.
+        <ul aria-label="Managers" className="flex flex-col rounded-lg border border-line bg-surface-elevated">
           {teams.map((team) => (
             <li
               key={team.id}
-              className="flex items-center gap-3 rounded-md border border-line bg-surface-elevated p-2"
+              className="flex items-center gap-3 border-b border-line px-3 py-1.5 last:border-b-0"
             >
-              <Avatar name={team.ownerDisplayName} avatar={team.ownerAvatarUrl} />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium text-text-primary">{team.ownerDisplayName}</span>
+              <Avatar name={team.ownerDisplayName} avatar={team.ownerAvatarUrl} size="sm" />
+              <div className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-baseline sm:gap-2">
+                <span className="truncate text-sm font-medium text-text-primary">{team.ownerDisplayName}</span>
                 <span className="truncate text-sm text-text-muted">{team.name}</span>
               </div>
               <div className="flex shrink-0 items-center gap-2">

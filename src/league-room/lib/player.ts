@@ -1,5 +1,12 @@
 import type { Player } from "@/domain/player";
-import type { MatchupLineupEntry } from "../contract";
+import type { MatchupLineupEntry, LineupSlotView } from "../contract";
+
+/**
+ * The fields a roster slot has to carry before a player can be drawn from it — the intersection
+ * of `MatchupLineupEntry` and `LineupSlotView`, named structurally rather than as a union of the
+ * two so a third slot shape (a trade asset, a waiver claim) fits without editing this file.
+ */
+export type PlayerSlot = Pick<MatchupLineupEntry & LineupSlotView, "playerId" | "playerName" | "position" | "nflTeam" | "headshotUrl" | "adp">;
 
 /**
  * One roster slot's occupant as a domain `Player`, or `null` for an empty slot.
@@ -24,7 +31,7 @@ import type { MatchupLineupEntry } from "../contract";
  * cannot arise from `matchupWeek`, which reads both fields off the same row; the guard exists so
  * the type is honest rather than asserted past.
  */
-export function playerOf(entry: MatchupLineupEntry): Player | null {
+export function playerOf(entry: PlayerSlot): Player | null {
   if (entry.playerId === null || entry.position === null) return null;
   return {
     id: entry.playerId,

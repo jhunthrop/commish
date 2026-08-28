@@ -1,15 +1,15 @@
-import type { MatchupDetail, MatchupSide } from "../contract";
+import type { MatchupSide, MatchupSummary } from "../contract";
 import { Crest, NOT_STARTED_DASH, Pill, PointsShareBar, Scoreboard } from "@/components/ui";
 import { formatPoints, formatRecord } from "../lib/format";
-import { benchPoints, marginSentence, summaryOf, yetToPlayCount } from "../lib/matchup-facts";
+import { benchPoints, marginSentence, yetToPlayCount } from "../lib/matchup-facts";
 
 /** A team's win-loss-tie line, keyed by team id — `LeagueHomeBody.standings` reshaped by the
  *  page, which already reads it. The matchup wire has never carried a record and does not learn
- *  to here: the page holds both reads, so it is the one place that can join them. */
+ *  to here: the pages hold both reads, so they are the one place that can join them. */
 export type RecordsByTeamId = Readonly<Record<string, { readonly wins: number; readonly losses: number; readonly ties: number }>>;
 
 /**
- * The record as the hero prints it, or an empty string when the page could not name one.
+ * The record as the hero prints it, or an empty string when the caller could not name one.
  *
  * `Scoreboard` requires the string, and an empty one renders an empty micro-label rather than a
  * fabricated "0-0" — a team the standings do not carry a row for has no record, and inventing the
@@ -59,7 +59,14 @@ export function SideChips({ side, mine }: { readonly side: MatchupSide; readonly
 }
 
 export interface MatchupHeroProps {
-  readonly matchup: MatchupDetail;
+  /**
+   * The flattened matchup. A `MatchupSummary` rather than a `MatchupDetail` on purpose: the two
+   * surfaces that render this hero hold different things. The matchup page has whole lineups; the
+   * league home has only the week's fixture. Everything the hero itself draws — two names, two
+   * ids, two scores, the margin — lives on the summary, so taking the smaller shape is what lets
+   * one hero serve both instead of the league home keeping a second, quieter scoreboard of its own.
+   */
+  readonly matchup: MatchupSummary;
   readonly myTeamId: string | null;
   readonly records?: RecordsByTeamId;
 }
@@ -73,8 +80,8 @@ export interface MatchupHeroProps {
  *
  * WHAT THE MIDDLE CARRIES, AND WHY IT IS THE WHOLE ARGUMENT. `Scoreboard`'s middle is a slot
  * because *"the middle is where a matchup's own story goes and every week's is different"*. The
- * story this product can tell honestly is the points share — real arithmetic over points already
- * on the board — and the two chips beside it. Nothing here is modelled: `PointsShareBar`'s own
+ * story this product can tell honestly is the margin said out loud and the points share — real
+ * arithmetic over points already on the board. Nothing here is modelled: `PointsShareBar`'s own
  * docblock says out loud that it is not a win probability, and this file adds no forecast of its
  * own.
  *
@@ -92,31 +99,34 @@ export interface MatchupHeroProps {
  * in the day the engine emits one.
  */
 export function MatchupHero({ matchup, myTeamId, records }: MatchupHeroProps) {
-  const { home, away } = matchup;
-  const decided = home.score !== null && away.score !== null;
-  const iAmAway = away.teamId === myTeamId;
+  const { homeScore, awayScore, homeTeamId, awayTeamId, homeTeamName, awayTeamName } = matchup;
+  const decided = homeScore !== null && awayScore !== null;
+  const iAmAway = awayTeamId === myTeamId;
+  const watching = myTeamId === homeTeamId || iAmAway;
+  const margin = marginSentence(matchup, myTeamId);
+
   // `mine`/`theirs` for the share bar, from the viewer's own seat. A viewer with no team in this
   // matchup (a commissioner reading somebody else's game) gets the home side as "mine" and both
   // labels are team names, so the bar still divides the right two numbers under the right two
   // words — it just has no second person to speak to.
-  const mineSide = iAmAway ? away : home;
-  const theirsSide = iAmAway ? home : away;
-  const watching = myTeamId === home.teamId || iAmAway;
-  const margin = marginSentence(summaryOf(matchup), myTeamId);
+  const mineScore = iAmAway ? awayScore : homeScore;
+  const theirsScore = iAmAway ? homeScore : awayScore;
+  const theirsName = iAmAway ? homeTeamName : awayTeamName;
+  const mineName = iAmAway ? awayTeamName : homeTeamName;
 
-  const sideFor = (side: MatchupSide, opponent: MatchupSide) => ({
-    name: side.teamName,
-    record: recordFor(records, side.teamId),
-    score: scoreText(side.score),
+  const sideFor = (name: string, teamId: string, score: number | null, otherScore: number | null) => ({
+    name,
+    record: recordFor(records, teamId),
+    score: scoreText(score),
     projected: NOT_STARTED_DASH,
-    crest: <Crest id={side.teamId} name={side.teamName} size={32} />,
-    winning: decided && (side.score ?? 0) > (opponent.score ?? 0),
+    crest: <Crest id={teamId} name={name} size={32} />,
+    winning: decided && (score ?? 0) > (otherScore ?? 0),
   });
 
   return (
     <Scoreboard
-      home={sideFor(home, away)}
-      away={sideFor(away, home)}
+      home={sideFor(homeTeamName, homeTeamId, homeScore, awayScore)}
+      away={sideFor(awayTeamName, awayTeamId, awayScore, homeScore)}
       middle={
         <div className="flex flex-col items-center gap-3 sm:w-52">
           {/* The margin, said out loud. Mono and tabular, no colour: a lead is a record, and law 1
@@ -126,10 +136,10 @@ export function MatchupHero({ matchup, myTeamId, records }: MatchupHeroProps) {
           {margin === null ? null : <p className="text-center font-mono text-sm tabular-nums text-text-muted">{margin}</p>}
           <PointsShareBar
             className="w-full"
-            mineLabel={watching ? "You" : mineSide.teamName}
-            theirsLabel={theirsSide.teamName}
-            mine={mineSide.score ?? 0}
-            theirs={theirsSide.score ?? 0}
+            mineLabel={watching ? "You" : mineName}
+            theirsLabel={theirsName}
+            mine={mineScore ?? 0}
+            theirs={theirsScore ?? 0}
           />
         </div>
       }
