@@ -136,7 +136,7 @@ async function main(): Promise<void> {
     console.log(`${result.source}`);
     console.log("  BY WEEK");
     for (const week of result.weeks) console.log(`    ${card(`week ${week.week}`, week.overall)}`);
-    console.log("  BY RANK BAND (banded by each source's OWN projected rank — see the caveat in the research doc)");
+    console.log("  BY RANK BAND (banded by each source's OWN projected rank; see the caveat in the research doc)");
     for (const band of RANK_BANDS) console.log(`    ${card(band.name, result.byRankBand[band.name])}`);
     console.log(`    ${card("OVERALL", result.overall)}\n`);
   }

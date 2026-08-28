@@ -177,7 +177,7 @@ async function main(): Promise<void> {
     // real result behind a large number.
     const ceiling = efficiency.regression[name] >= MAX_REGRESSION_REPORTED;
     console.log(
-      `  ${name.padEnd(30)} ${efficiency.regression[name].toFixed(1).padStart(9)}${touchdown ? "   <- touchdown rate" : ""}${ceiling ? "   (no measurable spread between players — regressed entirely to role)" : ""}`,
+      `  ${name.padEnd(30)} ${efficiency.regression[name].toFixed(1).padStart(9)}${touchdown ? "   <- touchdown rate" : ""}${ceiling ? "   (no measurable spread between players, regressed entirely to role)" : ""}`,
     );
   }
 
