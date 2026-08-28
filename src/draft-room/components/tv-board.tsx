@@ -130,7 +130,7 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
         {/* R1 (2026-08-26 design review): the same band the room runs, at the TV's own scale —
             the crowd across the room gets the draft's recent history without a second glance
             at a laptop. */}
-        <PickWire view={view} teams={room.teams} playersById={playersById} variant="tv" />
+        <PickWire view={view} teams={room.teams} playersById={playersById} players={room.players} variant="tv" />
 
         <DraftBoard
           view={view}

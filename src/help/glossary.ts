@@ -125,7 +125,14 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
   "on-the-clock": {
     key: "on-the-clock",
     term: "on the clock",
-    short: "This team must make its pick before time runs out.",
+    // THE SENTENCE THE SPEC NAMES. `docs/design/2026-08-27-fun-pass-spec.md` quotes this exact
+    // line as its example of the second cause of "it feels like a legal website": *"'This team
+    // must make its pick before time runs out.' is a compliance sentence. A fantasy product says
+    // 'You're on the clock' and stops talking."* Task 4's voice pass swept `src/draft-room/**`
+    // and this string survived it, because it lives in the glossary and only reaches the room
+    // through a guided `InfoTip` — where it prints inline, under the very label it contradicts.
+    // Same fact, said the way the product says it.
+    short: "It is their turn, and the clock is running.",
     detail:
       "Being on the clock means it is that team's turn to draft, and a countdown is running. If the clock runs out before they pick, the room moves on for them so the draft never stalls on one team.",
   },

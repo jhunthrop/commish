@@ -162,6 +162,66 @@ describe("Stat", () => {
     });
   });
 
+  /**
+   * THE INLINE ORIENTATION (the fun pass, Task 7). The verdict chip — "+11 steal" on a pick —
+   * is a magnitude-coloured number and therefore has to be a `Stat`: `Stat` is the only file in
+   * the product allowed to name a magnitude colour (`magnitude-budget.source.test.ts`), and that
+   * budget is what keeps green meaning "press this" everywhere else. But the surfaces it renders
+   * on are a dense pool row, a one-line pick wire and a tabular pick log, none of which have room
+   * for a stacked label above a number.
+   *
+   * So the pairing turns on its side rather than a second renderer appearing beside this one. It
+   * is a `<span>` in that orientation, deliberately: the pick wire is a single truncating line of
+   * inline items, and a block-level chip inside it would break the line box outright.
+   */
+  it("turns the label beside the number, as a span, for a chip in a row", async () => {
+    await renderSurface(<Stat label="steal" value="+11" size="sm" orientation="inline" comparison={RB_WEEK} />, ({ container, getByText }) => {
+      const root = container.querySelector("[data-magnitude]")!;
+      expect(root.tagName).toBe("SPAN");
+      expect(root.className).toContain("inline-flex");
+      expect(getByText("+11")).toBeInTheDocument();
+      expect(getByText("steal")).toBeInTheDocument();
+    });
+  });
+
+  it("keeps every channel in the inline orientation — the colourblind gate does not bend for a chip", async () => {
+    await renderSurface(<Stat label="steal" value="+11" size="sm" orientation="inline" comparison={{ ...RB_WEEK, percentile: 0.97 }} />, ({ container }) => {
+      const root = container.querySelector("[data-magnitude]")!;
+      expect(root.getAttribute("data-magnitude")).toBe("strong");
+      expect(root.textContent).toContain("▲");
+      expect(container.querySelector(".font-semibold")).not.toBeNull();
+      expect(container.innerHTML).toContain("text-mag-strong");
+    });
+  });
+
+  /**
+   * THE `sr-only` ESCAPE, pinned. The population sentence is `sr-only`, which is
+   * `position: absolute`. An absolutely positioned box whose ancestors are all `position: static`
+   * takes the INITIAL containing block, so every `overflow: hidden` between it and the page clips
+   * it for paint but NOT for the document's scrollable area.
+   *
+   * Sixty verdict chips in the draft room's scrolling player pool therefore stretched the ROOT
+   * scroll area to the pool's full 5,363px content height, breaking that room's own law that the
+   * page never scrolls at desktop. It cost a full e2e cycle to find, and one positioned ancestor
+   * fixes it: the sentence belongs to its own `Stat` again, so the clip that was always meant to
+   * apply does.
+   */
+  it("contains its own screen-reader sentence, so a scrolling list cannot stretch the page", async () => {
+    await renderSurface(<Stat label="Projection" value="14.2" comparison={RB_WEEK} />, ({ container }) => {
+      const root = container.querySelector("[data-magnitude]")!;
+      expect(root.className).toMatch(/(^|\s)relative(\s|$)/);
+      expect(root.querySelector(".sr-only")).not.toBeNull();
+    });
+  });
+
+  it("stays a stacked div by default, so no existing caller changes shape", async () => {
+    await renderSurface(<Stat label="Projection" value="14.2" />, ({ container }) => {
+      const root = container.querySelector("[data-magnitude]")!;
+      expect(root.tagName).toBe("DIV");
+      expect(root.className).toContain("flex-col");
+    });
+  });
+
   it("is axe-clean in both themes, coloured and uncoloured", async () => {
     await renderSurface(<Stat label="Projection" value="14.2" comparison={RB_WEEK} />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();

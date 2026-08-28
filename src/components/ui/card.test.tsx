@@ -88,6 +88,38 @@ describe("Card", () => {
     );
   });
 
+  /**
+   * ONE PADDING DECLARATION, CHOSEN BY NAME. `compact` exists for a card that is also a ROW in a
+   * dense list (Task 8's player pool: sixty of them in a 320px rail). The first cut left `p-4` in
+   * the base class and layered `px-2 py-1.5` on top, which only resolves correctly if Tailwind
+   * reliably emits every shorthand ahead of its longhands — a bet on stylesheet ORDER, settled by
+   * the framework's sort rather than by anything the component says. This asserts the two options
+   * never both reach the element, so no future sort can decide a card's padding for us.
+   */
+  it("gives a compact card exactly one padding, and never the comfortable one underneath it", async () => {
+    await renderSurface(
+      <Card padding="compact" aria-label="Pool row">
+        <p>Row</p>
+      </Card>,
+      ({ container }) => {
+        const card = container.querySelector("[aria-label='Pool row']")!;
+        expect(card.className).toMatch(/(^|\s)px-2(\s|$)/);
+        expect(card.className).not.toMatch(/(^|\s)p-4(\s|$)/);
+      },
+    );
+  });
+
+  it("keeps the panel padding for every caller that does not ask for anything else", async () => {
+    await renderSurface(
+      <Card aria-label="Standings">
+        <p>Row</p>
+      </Card>,
+      ({ container }) => {
+        expect(container.querySelector("[aria-label='Standings']")!.className).toMatch(/(^|\s)p-4(\s|$)/);
+      },
+    );
+  });
+
   it("stays perfectly still when nothing inside is yours to act on", async () => {
     // A panel you read is the default. A card that lifts under the pointer with nothing to press
     // is decoration, and rule 6 rejects it.

@@ -352,8 +352,74 @@ const lightMagnitude: MagnitudePalette = {
   bad: "#C73923", // hue 8, 4.68:1 on `surfaceInset`, the binding ground in daylight
 };
 
+/**
+ * TEAM IDENTITY — rule 1's third amended meaning, founder-approved 2026-08-27
+ * (`docs/design/2026-08-27-fun-pass-spec.md`): *"A team's own colour, behind a player's face
+ * only. Never on a surface, never behind text."* The reference product the founder named puts a
+ * team-coloured block behind every face in the pool, and it is most of why a list of names reads
+ * as football rather than as a directory.
+ *
+ * Three things this is NOT, stated because each one is a rule somebody could reasonably think
+ * this breaks:
+ *
+ * - **Not a semantic role.** These thirty-two values mean "the Chiefs" and nothing else. They
+ *   never become a surface, a fill behind text, a control, or a magnitude. The consumer
+ *   (`src/draft-room/components/player-face.tsx`) paints one decorative, `aria-hidden` tile and
+ *   the face sits on top of it, so no contrast threshold applies and none is claimed.
+ * - **Not theme-varying.** A club's colour is the club's, in daylight and at night alike.
+ *   Inverting it per theme would be inventing a Chiefs red that the Chiefs do not have.
+ * - **Not a CSS variable.** Unlike every other palette here, this one is keyed by DATA — the
+ *   team code riding a `Player` — so it can never reach the DOM as a Tailwind class (a class the
+ *   static scanner cannot see ships no rule at all). It reaches the DOM as an inline `style`,
+ *   the same idiom `UI_CONFIG.infoTip.minTargetPx` already documents, which is precisely why the
+ *   values have to live HERE: `tokens.ts` is the one file in the repo allowed to contain a colour
+ *   literal, and `no-raw-color.source.test.ts` is what keeps that true.
+ *
+ * Keys are the abbreviations the stats feed emits (`teamAbv`, `src/stats/tank01/map.ts`). `WAS`
+ * rides beside `WSH` because that one genuinely varies between feeds. An unrecognized code —
+ * a free agent, a retired club code, a feed that changes its mind — resolves to nothing and the
+ * face renders with no tile at all, which is the honest answer rather than a grey rectangle
+ * pretending to be somebody's colours.
+ */
+const teamColors: Readonly<Record<string, string>> = {
+  ARI: "#97233F",
+  ATL: "#A71930",
+  BAL: "#241773",
+  BUF: "#00338D",
+  CAR: "#0085CA",
+  CHI: "#0B162A",
+  CIN: "#FB4F14",
+  CLE: "#311D00",
+  DAL: "#003594",
+  DEN: "#FB4F14",
+  DET: "#0076B6",
+  GB: "#203731",
+  HOU: "#03202F",
+  IND: "#002C5F",
+  JAX: "#006778",
+  KC: "#E31837",
+  LAC: "#0080C6",
+  LAR: "#003594",
+  LV: "#000000",
+  MIA: "#008E97",
+  MIN: "#4F2683",
+  NE: "#002244",
+  NO: "#D3BC8D",
+  NYG: "#0B2265",
+  NYJ: "#125740",
+  PHI: "#004C54",
+  PIT: "#FFB612",
+  SEA: "#002244",
+  SF: "#AA0000",
+  TB: "#D50A0A",
+  TEN: "#4B92DB",
+  WSH: "#5A1414",
+  WAS: "#5A1414",
+};
+
 export const TOKENS = {
   color: { light, dark },
+  team: teamColors,
   magnitude: { light: lightMagnitude, dark: darkMagnitude },
   position: { light: lightPositions, dark: darkPositions },
   radius: { sm: 4, md: 8, lg: 12, pill: 999 },

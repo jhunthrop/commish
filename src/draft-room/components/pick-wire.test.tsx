@@ -15,7 +15,7 @@ function pick(overrides: Partial<CompletedPick> & Pick<CompletedPick, "pickNumbe
 
 describe("PickWire", () => {
   it("reserves the band even with zero picks — the fixed-height slot, not the list, is what's always there", () => {
-    render(<PickWire view={SNAKE_VIEW} teams={TEAMS} playersById={playersById(PLAYERS)} />);
+    render(<PickWire view={SNAKE_VIEW} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
     const band = screen.getByTestId("pick-wire");
     expect(band).toBeInTheDocument();
     expect(band).toHaveTextContent("");
@@ -33,7 +33,7 @@ describe("PickWire", () => {
       pick({ pickNumber: 1, teamId: "t1", playerId: "qb1" }),
       pick({ pickNumber: 2, teamId: "t2", playerId: "rb1" }),
     ];
-    render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} />);
+    render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
     const band = screen.getByTestId("pick-wire");
     const text = band.textContent ?? "";
     expect(text.indexOf("Marcus Reed")).toBeLessThan(text.indexOf("Jalen Croft"));
@@ -52,7 +52,7 @@ describe("PickWire", () => {
       pick({ pickNumber: 1, teamId: "t1", playerId: "qb1" }),
       pick({ pickNumber: 2, teamId: "t2", playerId: "rb1" }),
     ];
-    render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} />);
+    render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
     const newest = screen.getByText("Marcus Reed");
     const oldest = screen.getByText("Jalen Croft");
     expect(newest.className).toMatch(/text-text-primary/);
@@ -73,7 +73,7 @@ describe("PickWire", () => {
     const picks: CompletedPick[] = Array.from({ length: 20 }, (_, index) =>
       pick({ pickNumber: index + 1, teamId: index % 2 === 0 ? "t1" : "t2", playerId: roster[index % roster.length]! }),
     );
-    render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} />);
+    render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
     const band = screen.getByTestId("pick-wire");
     const items = band.querySelectorAll("li");
     expect(items.length).toBe(DRAFT_ROOM_CONFIG.wire.maxItems);
@@ -84,7 +84,7 @@ describe("PickWire", () => {
 
   it("renders identically for an auction pick — a completed pick is a completed pick", () => {
     const auctionPick = pick({ pickNumber: 1, teamId: "t1", playerId: "qb1", price: 42 });
-    render(<PickWire view={{ ...SNAKE_VIEW, format: "auction", picks: [auctionPick] }} teams={TEAMS} playersById={playersById(PLAYERS)} />);
+    render(<PickWire view={{ ...SNAKE_VIEW, format: "auction", picks: [auctionPick] }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
     const band = screen.getByTestId("pick-wire");
     expect(band).toHaveTextContent("#1 Bay Bandits");
     expect(band).toHaveTextContent("Jalen Croft");
@@ -93,13 +93,70 @@ describe("PickWire", () => {
 
   it("skips an item whose player id can't be resolved instead of crashing", () => {
     const picks = [pick({ pickNumber: 1, teamId: "t1", playerId: "ghost-player" })];
-    expect(() => render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} />)).not.toThrow();
+    expect(() => render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />)).not.toThrow();
     expect(screen.getByTestId("pick-wire")).toHaveTextContent("");
+  });
+
+  /**
+   * TASK 7, THE VERDICT (the fun pass). The band records what happened; the chip on its newest
+   * item says whether it was any good. Only the newest, and only when there is a verdict to
+   * give: six chips on a one-line band would be a scoreboard the band has no width for, and an
+   * "even" pick has no verdict at all.
+   */
+  describe("the newest pick's verdict (Task 7)", () => {
+    // wr1 is the board's 4th player. Taken at pick 12 he lasted eight picks past his rank; the
+    // three earlier picks went straight down the board, so the room has a population to rank
+    // that against.
+    const straightPicks = [
+      pick({ pickNumber: 1, teamId: "t1", playerId: "qb1" }),
+      pick({ pickNumber: 2, teamId: "t2", playerId: "rb1" }),
+      pick({ pickNumber: 3, teamId: "t1", playerId: "rb2" }),
+    ];
+
+    it("calls out a steal on the pick that just landed", () => {
+      const picks = [...straightPicks, pick({ pickNumber: 12, teamId: "t2", playerId: "wr1" })];
+      render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
+      const band = screen.getByTestId("pick-wire");
+      expect(band).toHaveTextContent("+8");
+      expect(band).toHaveTextContent("steal");
+    });
+
+    it("judges only the newest item, never the five behind it", () => {
+      const picks = [...straightPicks, pick({ pickNumber: 12, teamId: "t2", playerId: "wr1" }), pick({ pickNumber: 13, teamId: "t1", playerId: "qb1" })];
+      render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
+      const band = screen.getByTestId("pick-wire");
+      // #13 (qb1, board rank 1, taken twelve picks late) leads and carries the chip; wr1's own
+      // "+8" from the item behind it is gone.
+      expect(band).toHaveTextContent("+12");
+      expect(band).not.toHaveTextContent("+8");
+    });
+
+    it("says nothing at all when the newest pick matched the board", () => {
+      render(<PickWire view={{ ...SNAKE_VIEW, picks: straightPicks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
+      const band = screen.getByTestId("pick-wire");
+      expect(band).not.toHaveTextContent("steal");
+      expect(band).not.toHaveTextContent("reach");
+    });
+
+    it("stays one line: the chip is inline, never a block that would break the band", () => {
+      const picks = [...straightPicks, pick({ pickNumber: 12, teamId: "t2", playerId: "wr1" })];
+      render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
+      const chip = screen.getByTestId("pick-wire").querySelector("[data-magnitude]")!;
+      expect(chip.tagName).toBe("SPAN");
+    });
+  });
+
+  // The house copy rule bans both dash characters (`@/integrity/copy-rules`); this band used to
+  // carry an em dash between the team and the player.
+  it("writes no em or en dash", () => {
+    const picks = [pick({ pickNumber: 1, teamId: "t1", playerId: "qb1" })];
+    render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />);
+    expect(screen.getByTestId("pick-wire").textContent ?? "").not.toMatch(/[—–]/);
   });
 
   it("renders at TV scale when asked", () => {
     const picks = [pick({ pickNumber: 1, teamId: "t1", playerId: "qb1" })];
-    render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} variant="tv" />);
+    render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} variant="tv" />);
     expect(screen.getByTestId("pick-wire").className).toMatch(/text-base/);
   });
 });

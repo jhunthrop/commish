@@ -1,11 +1,32 @@
 import type { HTMLAttributes } from "react";
 
+/**
+ * How much room a card gives its contents. `comfortable` is the default panel-sized card;
+ * `compact` is a card that is also a ROW in a dense list — the draft room's player pool, sixty of
+ * them in a 320px rail, where the panel's own padding fits eight.
+ *
+ * The padding lives HERE and not in `BASE`, and that is a correctness choice rather than
+ * tidiness. `BASE` carried `p-4` and the first cut of this prop layered `px-2 py-1.5` on top of
+ * it, which only works if Tailwind reliably emits every shorthand ahead of its longhands — a bet
+ * on stylesheet ORDER, decided by the framework's sort rather than by anything stated here. One
+ * padding declaration per card, chosen by name, races nothing and needs no bet.
+ */
+export type CardPadding = "comfortable" | "compact";
+
 export interface CardProps extends HTMLAttributes<HTMLElement> {
-  /** `header` joined the union with the fun pass (Task 11): a page's own title block is a card
-   *  in every visual respect and a `<header>` in every semantic one, and spelling `Card`'s base
-   *  classes inline to keep the element was how the league home ended up with a second copy of
-   *  the surface vocabulary. */
-  readonly as?: "div" | "section" | "article" | "header";
+  /**
+   * Both `header` and `li` joined the union during the fun pass, from opposite ends of the
+   * product, and both for the same reason: the element a card needs to BE is a semantic fact
+   * about its surroundings, and a card that cannot be that element gets reimplemented inline.
+   *
+   * `header` (Task 11) — a page's own title block is a card in every visual respect and a
+   * `<header>` in every semantic one. Spelling `Card`'s base classes inline to keep the element
+   * was exactly how the league home ended up carrying a second copy of the surface vocabulary.
+   *
+   * `li` (Task 8) — a `<ul>`/`<ol>` may only contain `<li>` children, so a card that IS a list
+   * row has to be able to be one rather than sit inside a second wrapper element.
+   */
+  readonly as?: "div" | "section" | "article" | "header" | "li";
   /**
    * RULE 4'S AMENDED TEST, in code (`docs/design/2026-08-27-fun-pass-spec.md`, founder-approved
    * 2026-08-27): **a thing you act on or compare against its neighbours may be a card; a thing
@@ -18,6 +39,8 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
    * click target the view's one-ink-action law (rule 5) never counted.
    */
   readonly interactive?: boolean;
+  /** @default "comfortable" */
+  readonly padding?: CardPadding;
 }
 
 /**
@@ -35,12 +58,17 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
  */
 const INTERACTIVE = "transition-colors hover:bg-surface-raised focus-within:bg-surface-raised";
 
-const BASE = "rounded-lg border border-line bg-surface-elevated p-4 shadow-card";
+const BASE = "rounded-lg border border-line bg-surface-elevated shadow-card";
 
-export function Card({ as: Tag = "div", interactive = false, className = "", children, ...rest }: CardProps) {
+const PADDING: Readonly<Record<CardPadding, string>> = {
+  comfortable: "p-4",
+  compact: "px-2 py-1.5",
+};
+
+export function Card({ as: Tag = "div", interactive = false, padding = "comfortable", className = "", children, ...rest }: CardProps) {
   // Joined from the non-empty fragments rather than interpolated: a `${cond ? x : ""}` slot
   // leaves a double space in the rendered `class` attribute on every quiet card in the product.
-  const classes = [BASE, interactive ? INTERACTIVE : "", className].filter((part) => part !== "").join(" ");
+  const classes = [BASE, PADDING[padding], interactive ? INTERACTIVE : "", className].filter((part) => part !== "").join(" ");
   return (
     <Tag className={classes} {...rest}>
       {children}

@@ -103,7 +103,15 @@ changed in the six rules and what did not.
 - **Tier grade.** S/A/B bands as coloured bars, once the projection engine makes tiers real. Parked
   until then; this amendment already covers it, so no second ruling is needed when it lands.
 - **Team identity.** A team's own colour, behind a player's face only. Never on a surface, never
-  behind text.
+  behind text. Tokens: `TOKENS.team`, thirty-two club colours keyed by the abbreviation the stats
+  feed emits, theme-independent (a club's colour is the club's, in daylight and at night alike).
+  Renderer: `PlayerFace` (`src/draft-room/components/player-face.tsx`) — one decorative,
+  `aria-hidden` tile exactly the size of the face, with the `Avatar` on top of it. It is the one
+  palette here that reaches the DOM as an inline `style` rather than a CSS variable, because it is
+  keyed by DATA and a Tailwind class the static scanner cannot see ships no rule at all; that is
+  also why the values live in `tokens.ts`, the one file allowed to hold a colour literal. A team
+  we have no colour for renders the bare face rather than a grey rectangle pretending to be
+  somebody's colours.
 
 Green still means money and red still means live. Magnitude reuses those hues deliberately — good
 is green because good is the same feeling as money.
@@ -149,6 +157,12 @@ of decisions.
 repeated action:** the draft room, and later waivers and trades. Named exceptions, not a general
 relaxation. `e2e/page-audit.spec.ts` keeps enforcing the rule on every audited route, and those
 routes do not change.
+
+Spent once so far (Task 8): the player pool's per-row act button took the ink back, reversing D3's
+2026-08-26 ruling that made it `secondary`. The exception is narrower than "the draft room may be
+loud" — the ink belongs to ACTS only, and `snake-room.test.tsx` asserts exactly that by walking
+every ink pill in the rendered room and requiring each one to be a Draft or a Confirm. Every
+filter, toggle and way out in that room stays quiet.
 
 **The three that hold.** One typeface at ≤600 weight; no capitals; only true things move.
 
@@ -759,6 +773,10 @@ No z-index scale yet — three sanctioned layers exist by convention: a sticky b
 - **`SeatMeter`** (`filled`, `total`, `heldSeats?`, `srOnlySentence?`) — THE seat sentence for the whole product (F17): "9 of 12 seated", gaining a low-seats clause and a held-seats clause as each becomes true, composed rather than concatenated so a screen reader takes one pause, not several — **unchanged by v3, verbatim**. What changed is the visual bar beside it: v3 (Task 5) redesigned it from dots to the mock's segment bar — `total` equal flex segments, `filled` of them `bg-accent` (money = seats filling, rule 1), the rest `bg-surface-inset`, still `aria-hidden` beside the same sentence. `srOnlySentence` (Task 13) lets `LeagueRow` print its own visible tabular "{n} of {t} open" value while the one product seat sentence still speaks to assistive tech underneath it. Nine-plus callers, including `OpenLeagueCard`, `LeagueRow` and `WaitingRoom`.
 - **`Meter`** (`label`, `value`, `max`) — a labeled fill bar that cannot be constructed without its own number beside it. Two callers today (`home-board.tsx`, `league-board.tsx`, both a matchup margin).
 - **`StatPill`** (`label`, `tone?`, `glow?`) — a `Badge`, for the state-chip vocabulary (Live / Final / Fix lineup). v3 (Task 3) dropped its forced `uppercase` — the chips now read sentence case, the caps charter applied to a primitive that used to force the transform itself.
+
+**`Stat`** (`label`, `value`, `comparison?`, `size?`, `orientation?`) — the fun pass's own primitive (Task 1) and the **only** renderer of magnitude colour in the product. `comparison` is a `{ percentile, population }` pair and the sole route to a tint; omit it, or state it badly (an unnamed population, a percentile off the scale), and the number renders as ordinary ink. Three channels ship together so the ramp survives with hue switched off: the value as text, a caret naming which side of the population it fell on, and a weight step naming how far. `size` walks the display scale (`sm`…`3xl`); `orientation` is `stacked` (default, a `<div>`: the number-over-label pairing the ~10x range exists for) or `inline` (a `<span>`, value then label — added by Task 7 for the verdict chip, which renders in a dense pool row, a one-line pick wire and a tabular pick log, none of which have room for a stacked pairing). Free-standing `magnitudeStep(comparison)` answers the same question without rendering.
+
+`Card` also takes `padding` (`comfortable` default, `compact` — a card that is also a ROW in a dense list, added by Task 8 for the draft room's player pool) and accepts `as="li"`, since an `<ol>` may only hold list items and a card that IS a list row must be able to be one rather than sit inside a second wrapper.
 
 Two free-standing exports beside `Countdown` itself: `useCountdown(deadlineAt)` (the ticking hook — `UI_CONFIG.countdown.tickMs`, slowed to `reducedMotionTickMs` under reduced motion) and `formatCoarseDuration`/`formatCoarseRemaining` (the "5 minutes" / "About 2 hours left" building blocks a caller with its own sentence to build — `WaitingRoom`'s "Starts in …" and the wire's own item sentences both reuse this directly rather than writing a second minute/hour formatter).
 

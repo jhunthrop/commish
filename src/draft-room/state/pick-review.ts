@@ -42,6 +42,22 @@ export interface PickReview {
  * fine at the sizes this product ever runs (at most a few hundred players, at most a few
  * hundred picks): no draft here is large enough for that to matter.
  */
+/**
+ * playerId → 1-based rank in the pool order the draft snapshotted, best first.
+ *
+ * THE BOARD-RANK COMPUTATION, named. It was already here, inline inside `reviewPicks` below, and
+ * it is what every "on the board" fact this room states is derived from. The fun pass's verdict
+ * chip (`../lib/verdict`) needs the same number and must not recompute it: two rankings of one
+ * board is exactly how a room ends up telling a manager two different things about one pick.
+ *
+ * `players` must be the pool's own ranked snapshot order — `GET /api/drafts/[draftId]/players`'s
+ * own docblock, "the same ranked order `START_DRAFT` snapshots" — so a rank is a fact of the
+ * board this draft actually started from, never of a live ranking that has moved since.
+ */
+export function boardRanks(players: readonly Player[]): ReadonlyMap<string, number> {
+  return new Map(players.map((player, index) => [player.id, index + 1]));
+}
+
 export function reviewPicks(players: readonly Player[], picks: readonly CompletedPick[], myTeamId: string): readonly PickReview[] {
   const positionRankById = new Map<string, number>();
   const positionRunningCount = new Map<Position, number>();
@@ -51,7 +67,7 @@ export function reviewPicks(players: readonly Player[], picks: readonly Complete
     positionRankById.set(player.id, nextRank);
   }
 
-  const rankIndexById = new Map(players.map((player, index) => [player.id, index]));
+  const rankById = boardRanks(players);
   const playersById = new Map(players.map((player) => [player.id, player]));
   const available = new Set(players.map((player) => player.id));
 
@@ -64,10 +80,12 @@ export function reviewPicks(players: readonly Player[], picks: readonly Complete
     // a fabricated one — the same "degrade to nothing rather than a lie" posture the surface
     // this replaces (`formatBoardDelta`) used to take for a missing rank.
     if (pick.teamId === myTeamId && taken !== undefined) {
-      const rank = rankIndexById.get(pick.playerId)!;
+      // `boardRanks` is 1-based, so the exclusive bound over the players ranked ABOVE this one is
+      // `rank - 1` — the same scan, one subtraction, no second ranking of the same board.
+      const rank = rankById.get(pick.playerId)!;
       let bestAvailableDelta = 0;
       let positionBestDelta = 0;
-      for (let index = 0; index < rank; index++) {
+      for (let index = 0; index < rank - 1; index++) {
         const higher = players[index]!;
         if (!available.has(higher.id)) continue;
         bestAvailableDelta += 1;

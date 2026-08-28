@@ -164,6 +164,24 @@ export interface BotSeatPricing {
   readonly pickSeconds: number;
 }
 
+/**
+ * How many turns stand between now and yours: `0` while the clock is already yours, and null
+ * when there is nothing to count — a spectator with no seat, or a seat the engine's own
+ * lookahead (`DraftClockView.upcoming`) does not reach.
+ *
+ * The same index lookup `formatYourTurn` below states in a sentence, exported as a NUMBER for
+ * the on-clock band (Task 6, the fun pass): the rail renders it at display scale, because "when
+ * am I up?" is the one question a manager asks all draft long and a digit answers it at a glance
+ * where a sentence has to be read. One derivation, two renderings — a component that counted
+ * this for itself would be a second turn-order rule living in React, which is exactly what
+ * `upcoming` rides the payload to prevent.
+ */
+export function picksUntilYours(upcoming: readonly string[], myTeamId: string | null): number | null {
+  if (myTeamId === null) return null;
+  const picksAway = upcoming.indexOf(myTeamId);
+  return picksAway < 0 ? null : picksAway;
+}
+
 export function formatYourTurn(
   upcoming: readonly string[],
   myTeamId: string | null,
@@ -171,9 +189,8 @@ export function formatYourTurn(
   pausedUntil: string | null = null,
   botSeats: BotSeatPricing | null = null,
 ): string | null {
-  if (myTeamId === null) return null;
-  const picksAway = upcoming.indexOf(myTeamId);
-  if (picksAway < 0) return null;
+  const picksAway = picksUntilYours(upcoming, myTeamId);
+  if (picksAway === null) return null;
   if (picksAway === 0) return "You're on the clock.";
   const picks = plural(picksAway, "pick");
   if (clockSeconds === null) return `You're up in ${picks}.`;

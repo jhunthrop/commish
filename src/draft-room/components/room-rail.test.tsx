@@ -377,9 +377,74 @@ describe("RoomRail", () => {
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "watching");
   });
 
-  it("keeps its lg countdown in the room", () => {
-    render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
-    expect(screen.getByTestId("countdown").className).toContain("text-3xl");
+  /**
+   * TASK 6, THE ON-CLOCK BAND (the fun pass, 2026-08-27). This test used to assert `text-3xl`
+   * unconditionally — "keeps its lg countdown in the room". That assertion is gone because the
+   * behaviour it pinned is the behaviour the fun pass changes: a room where your own sixty
+   * seconds render at exactly the size somebody else's do is the "almost no typographic dynamic
+   * range" the spec names as its third cause of "it feels like a legal website". Watching still
+   * gets `lg`; the turn that is yours gets a full display size.
+   */
+  describe("the on-clock band (Task 6)", () => {
+    it("keeps the calm clock at lg and steps yours up to the display scale", () => {
+      const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+      expect(screen.getByTestId("countdown").className).toContain("text-3xl");
+
+      rerender(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
+      expect(screen.getByTestId("countdown").className).toContain("text-display-xl");
+    });
+
+    it("grows the manager's name with the moment, and shrinks it back when the turn moves on", () => {
+      // Bay Bandits (t1) holds the clock in the fixture; only the caller's own seat changes.
+      const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
+      expect(screen.getByText("Bay Bandits").className).toContain("text-display-md");
+
+      rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+      expect(screen.getByText("Bay Bandits").className).toContain("text-display-sm");
+    });
+
+    /** Rule 6, spent rather than merely obeyed: the clock genuinely is running out, and the dot
+     *  is the product's existing "live" vocabulary (`animate-pulse-live`). It is decorative and
+     *  `aria-hidden` — the label beside it already says the same thing in words. */
+    it("pulses a live dot only while the clock is yours", () => {
+      const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
+      const dot = screen.getByTestId("on-clock-pulse");
+      expect(dot.className).toContain("animate-pulse-live");
+      expect(dot).toHaveAttribute("aria-hidden", "true");
+
+      rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+      expect(screen.queryByTestId("on-clock-pulse")).toBeNull();
+    });
+
+    /** The anxiety-killer as a NUMBER (`picksUntilYours`), not a sentence: the dock still says it
+     *  in words, the band says it at a glance. Absent the moment the turn is yours, because zero
+     *  picks until yours is not a fact anybody needs while the clock is already ticking. */
+    it("counts the picks until yours while somebody else is on the clock", async () => {
+      const view = liveView({ onClockTeamId: "t2", upcoming: ["t2", "t3", "t1"] });
+      await renderSurface(<RoomRail {...props} view={view} myTeamId="t1" />, async ({ container }) => {
+        const until = screen.getByTestId("picks-until-yours");
+        expect(until).toHaveTextContent("2");
+        expect(until).toHaveTextContent("Picks until yours");
+        expect(await axe(container)).toHaveNoViolations();
+      });
+    });
+
+    it("says one pick in the singular, and nothing at all once the turn is yours", () => {
+      const { rerender } = render(<RoomRail {...props} view={liveView({ onClockTeamId: "t2", upcoming: ["t2", "t1"] })} myTeamId="t1" />);
+      expect(screen.getByTestId("picks-until-yours")).toHaveTextContent("Pick until yours");
+
+      rerender(<RoomRail {...props} view={liveView({ onClockTeamId: "t1", upcoming: ["t1", "t2"] })} myTeamId="t1" />);
+      expect(screen.queryByTestId("picks-until-yours")).toBeNull();
+    });
+
+    it("counts nothing for a spectator, and nothing on the TV — neither of them is anybody's turn", () => {
+      const { rerender } = render(<RoomRail {...props} view={liveView({ onClockTeamId: "t2", upcoming: ["t2", "t1"] })} myTeamId={null} />);
+      expect(screen.queryByTestId("picks-until-yours")).toBeNull();
+
+      rerender(<RoomRail {...props} view={liveView({ onClockTeamId: "t2", upcoming: ["t2", "t1"] })} myTeamId="t1" variant="tv" />);
+      expect(screen.queryByTestId("picks-until-yours")).toBeNull();
+      expect(screen.queryByTestId("on-clock-pulse")).toBeNull();
+    });
   });
 
   // Task 2 (review E5/E6): the TV spotlight band now owns the party's one clock — folding in
