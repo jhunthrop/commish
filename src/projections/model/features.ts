@@ -60,4 +60,11 @@ export const SHIPPED_FEATURES: FeatureFlags = {
    * start-and-sit decision actually lives. See `docs/research/2026-08-27-model-v2.md`.
    */
   scheme: true,
+  /**
+   * ON. The elite and starter bands improve by nearly identical amounts on both held-out seasons
+   * (+0.0102 / +0.0102 and +0.0073 / +0.0058) and mean absolute error falls on both. Only the
+   * opponent adjustment and rest are in it: the implied total, the spread and the weather are
+   * knowable only at kickoff and cannot reach a projection made the Tuesday before.
+   */
+  gameContext: true,
 };

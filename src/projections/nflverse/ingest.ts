@@ -4,6 +4,7 @@ import { recordPlayerTeams, recordTeamObservations, teamObservationsAsOf, type T
 import { indexTeamMetrics } from "../team-context";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import { coachObservations, seasonMeans } from "./coaches";
+import { DEFENCE_METRICS, opponentDefenceObservations, type DefenceWeek } from "../features/context";
 import { recordNflPlayers } from "../universe";
 import { createNflverseClient, type NflverseClient } from "./client";
 import { NFLVERSE_CONFIG } from "./config";
@@ -195,4 +196,43 @@ export async function ingestCoaches(db: Db, seasons: readonly number[], client =
   const metrics = indexTeamMetrics({ playerTeams: [], teamObservations: all });
   const weeks = Array.from({ length: LAST_POSSIBLE_WEEK }, (_, index) => index + 1);
   return await recordTeamObservations(db, coachObservations(games, seasonMeans(metrics, weeks), seasons));
+}
+
+/**
+ * The opponent adjustment, derived from what is already in the store.
+ *
+ * Run AFTER the play-by-play, like the coach table and for the same reason: the ratings are built
+ * from what each defence allowed, which the play-by-play ingestion is what writes. Run first, it
+ * would rate every defence exactly league average and the feature would measure as nothing.
+ *
+ * A derivation rather than an ingestion — it reaches no network except for the schedule, which is
+ * two megabytes and covers every season. Re-running it after a change of method costs seconds,
+ * which is the point of keeping the method here rather than inside the play-by-play stream.
+ */
+export async function ingestOpponentDefence(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
+  const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  // The prior season too, so week 1 carries last season's final ratings rather than no adjustment.
+  const earliest = Math.min(...seasons) - 1;
+  const history = Array.from({ length: Math.max(...seasons) - earliest + 1 }, (_, index) => earliest + index);
+  const games = mapSchedule(rows, history);
+
+  const observations: TeamWeekObservation[] = [];
+  for (const season of history) {
+    observations.push(
+      ...(await teamObservationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FAR_FUTURE })),
+    );
+  }
+  const metrics = indexTeamMetrics({ playerTeams: [], teamObservations: observations });
+
+  const defenceWeeks: DefenceWeek[] = games.map((game) => ({
+    season: game.season,
+    week: game.week,
+    defence: game.team,
+    offence: game.opponent,
+    passYardsAllowedPerDropback: metrics(game.team, { season: game.season, week: game.week }, DEFENCE_METRICS.pass),
+    rushYardsAllowedPerCarry: metrics(game.team, { season: game.season, week: game.week }, DEFENCE_METRICS.rush),
+    asOf: game.kickoffAsOf,
+  }));
+
+  return await recordTeamObservations(db, opponentDefenceObservations(games, defenceWeeks, seasons));
 }

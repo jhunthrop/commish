@@ -16,7 +16,7 @@ import { createDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
 import { replayHeadToHead, replayOpportunity, SHARE_FIELDS, type ProjectionSource } from "@/projections/backtest";
 import { naiveProjection, NAIVE_SOURCE_NAME } from "@/projections/benchmarks/naive";
-import { ALL_FEATURES, NO_FEATURES, type FeatureFlags } from "@/projections/model/features";
+import { ALL_FEATURES, NO_FEATURES, SHIPPED_FEATURES, type FeatureFlags } from "@/projections/model/features";
 import { scoreShares } from "@/projections/model/fit";
 import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
 import { lastObservedPriors } from "@/projections/model/opportunity";
@@ -47,6 +47,8 @@ const VARIANTS: Readonly<Record<string, { readonly before: FeatureFlags; readonl
   },
   context: { before: NO_FEATURES, after: { ...NO_FEATURES, gameContext: true }, label: "game context" },
   all: { before: NO_FEATURES, after: ALL_FEATURES, label: "every feature group at once (headline, not an ablation)" },
+  /** What the engine actually ships against model v1. The headline for the research document. */
+  shipped: { before: NO_FEATURES, after: SHIPPED_FEATURES, label: "model v1 against everything that earned its place" },
 };
 
 /**
@@ -197,12 +199,17 @@ async function main(): Promise<void> {
     console.log(`  before       rho ${rho(beforeScore!.overall)}   ${errors(beforeScore!.overall)}`);
     console.log(`  after        rho ${rho(afterScore!.overall)}   ${errors(afterScore!.overall)}`);
     console.log(`  OVERALL      ${rho(beforeScore!.overall)} -> ${rho(afterScore!.overall)}   ${delta(beforeScore!.overall, afterScore!.overall)}`);
-    console.log("  by rank band");
+    // The floor's own bands are printed beside the model's because the starter band is the one
+    // model v1 lost to the floor in, and "did we fix it" is a question about the floor rather than
+    // about the previous model. Bands are by each source's OWN projected rank, so the comparison is
+    // indicative rather than exact — see `bandByProjectedRank`.
+    console.log("  by rank band (floor | before -> after)");
     for (const band of RANK_BANDS) {
+      const bandFloor = floorScore!.byRankBand[band.name];
       const bandBefore = beforeScore!.byRankBand[band.name];
       const bandAfter = afterScore!.byRankBand[band.name];
       console.log(
-        `    ${band.name.padEnd(8)} ${rho(bandBefore)} -> ${rho(bandAfter)}   ${delta(bandBefore, bandAfter)}   n=${bandAfter.sampleSize}`,
+        `    ${band.name.padEnd(8)} ${rho(bandFloor)} | ${rho(bandBefore)} -> ${rho(bandAfter)}   ${delta(bandBefore, bandAfter)}   n=${bandAfter.sampleSize}`,
       );
     }
     const half = (result: (typeof headToHead.common)[number], from: number, to: number): number => {

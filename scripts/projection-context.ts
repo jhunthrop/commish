@@ -13,7 +13,7 @@
 // nflverse is free, so this spends no upstream request budget.
 import { createDb } from "@/db/client";
 import { createNflverseClient } from "@/projections/nflverse/client";
-import { ingestCoaches, ingestPlayByPlay, ingestSchedule } from "@/projections/nflverse/ingest";
+import { ingestCoaches, ingestOpponentDefence, ingestPlayByPlay, ingestSchedule } from "@/projections/nflverse/ingest";
 
 const FIRST_SEASON = Number(process.argv[2] ?? 2020);
 const LAST_SEASON = Number(process.argv[3] ?? 2024);
@@ -51,6 +51,10 @@ async function main(): Promise<void> {
   // store. Running it before the play-by-play would silently produce a table of nulls.
   const coachRows = await ingestCoaches(db, seasons);
   console.log(`coaches: ${coachRows} new team-week observations`);
+
+  // Also last, and for the same reason: a defence can only be rated once what it allowed is stored.
+  const opponentRows = await ingestOpponentDefence(db, seasons);
+  console.log(`opponent adjustment: ${opponentRows} new team-week observations`);
 
   await db.$client.end();
 }

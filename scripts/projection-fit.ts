@@ -22,6 +22,7 @@ import { fitEfficiencyPriors, fitOpportunityPriors } from "@/projections/model/f
 import { fitLinePriors, type LinePriors } from "@/projections/model/line-fit";
 import { fitSchemePriors, type SchemePriors } from "@/projections/model/scheme-fit";
 import { fitRedistributionPriors, type RedistributionPriors } from "@/projections/model/redistribution-fit";
+import { fitGameContextPriors, type GameContextPriors } from "@/projections/model/context-fit";
 import { projectedPosition } from "@/projections/nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "@/projections/team-store";
@@ -128,6 +129,27 @@ export const FITTED_LINE_PRIORS: LinePriors = {
 `;
 }
 
+function renderGameContext(gameContext: GameContextPriors): string {
+  const pair = (name: string, elasticity: { opponent: number; rest: number }) =>
+    `  ${name}: { opponent: ${elasticity.opponent.toFixed(6)}, rest: ${elasticity.rest.toFixed(6)} },`;
+  return `/**
+ * PHASE 3, TASK 4 — the opponent adjusted for the offences it has faced, and rest.
+ *
+ * Fitted directly against the league-relative team rate rather than against a residual, unlike the
+ * scheme: layer 2 has never been shown who anybody played, so there is nothing here to double-count.
+ * The implied total, the spread and the weather are absent on purpose and not by oversight — every
+ * one of them is knowable only at kickoff, and the store's stamps make them unreachable from a
+ * projection made the Tuesday before. See \`features/context.ts\`.
+ */
+export const FITTED_GAME_CONTEXT_PRIORS: GameContextPriors = {
+${pair("passing", gameContext.passing)}
+${pair("rushing", gameContext.rushing)}
+  leaguePassingYardsPerAttempt: ${gameContext.leaguePassingYardsPerAttempt.toFixed(6)},
+  leagueRushingYardsPerCarry: ${gameContext.leagueRushingYardsPerCarry.toFixed(6)},
+};
+`;
+}
+
 function renderRedistribution(redistribution: RedistributionPriors): string {
   return `/**
  * PHASE 3, TASK 3 — how much of a departed player's share the remaining roster actually takes on.
@@ -196,6 +218,7 @@ function render(
   line: LinePriors,
   scheme: SchemePriors,
   redistribution: RedistributionPriors,
+  gameContext: GameContextPriors,
   generatedFrom: readonly number[],
 ): string {
   const { priors } = fit;
@@ -206,6 +229,7 @@ function render(
   return `import type { EfficiencyPriors } from "./efficiency";
 import type { LinePriors } from "./line-fit";
 import type { OpportunityPriors } from "./opportunity";
+import type { GameContextPriors } from "./context-fit";
 import type { RedistributionPriors } from "./redistribution-fit";
 import type { SchemePriors } from "./scheme-fit";
 
@@ -241,7 +265,8 @@ ${["QB", "RB", "WR", "TE", "K", "DEF"].map(role).join("\n")}
 ${renderEfficiency(efficiency)}
 ${renderLine(line)}
 ${renderScheme(scheme)}
-${renderRedistribution(redistribution)}`;
+${renderRedistribution(redistribution)}
+${renderGameContext(gameContext)}`;
 }
 
 async function main(): Promise<void> {
@@ -316,7 +341,23 @@ async function main(): Promise<void> {
       `  absorption rate ${redistributionPriors.absorptionRate.toFixed(4)} over ${redistributionPriors.events} team-weeks with a detected departure`,
   );
 
-  writeFileSync(OUTPUT, render(fit, efficiency, linePriors, schemePriors, redistributionPriors, FIT_SEASONS));
+  const gameContextPriors = fitGameContextPriors({
+    usage,
+    history,
+    context,
+    seasons: [...FIT_SEASONS],
+    heldOut: [...HELD_OUT_SEASONS],
+  });
+  console.log(
+    `\ngame context, fitted on ${FIT_SEASONS.join(", ")}:\n` +
+      `  passing  opponent ${gameContextPriors.passing.opponent.toFixed(4)}  rest ${gameContextPriors.passing.rest.toFixed(4)}\n` +
+      `  rushing  opponent ${gameContextPriors.rushing.opponent.toFixed(4)}  rest ${gameContextPriors.rushing.rest.toFixed(4)}`,
+  );
+
+  writeFileSync(
+    OUTPUT,
+    render(fit, efficiency, linePriors, schemePriors, redistributionPriors, gameContextPriors, FIT_SEASONS),
+  );
   console.log(`\nwrote ${OUTPUT}`);
 
   await db.$client.end();

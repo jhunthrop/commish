@@ -1,6 +1,7 @@
 import type { EfficiencyPriors } from "./efficiency";
 import type { LinePriors } from "./line-fit";
 import type { OpportunityPriors } from "./opportunity";
+import type { GameContextPriors } from "./context-fit";
 import type { RedistributionPriors } from "./redistribution-fit";
 import type { SchemePriors } from "./scheme-fit";
 
@@ -175,4 +176,20 @@ export const FITTED_SCHEME_PRIORS: SchemePriors = {
 export const FITTED_REDISTRIBUTION_PRIORS: RedistributionPriors = {
   absorptionRate: 0.064821,
   events: 796,
+};
+
+/**
+ * PHASE 3, TASK 4 — the opponent adjusted for the offences it has faced, and rest.
+ *
+ * Fitted directly against the league-relative team rate rather than against a residual, unlike the
+ * scheme: layer 2 has never been shown who anybody played, so there is nothing here to double-count.
+ * The implied total, the spread and the weather are absent on purpose and not by oversight — every
+ * one of them is knowable only at kickoff, and the store's stamps make them unreachable from a
+ * projection made the Tuesday before. See `features/context.ts`.
+ */
+export const FITTED_GAME_CONTEXT_PRIORS: GameContextPriors = {
+  passing: { opponent: 0.423623, rest: -0.075854 },
+  rushing: { opponent: 0.589490, rest: -0.018239 },
+  leaguePassingYardsPerAttempt: 7.064554,
+  leagueRushingYardsPerCarry: 4.400851,
 };

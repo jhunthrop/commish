@@ -1,3 +1,4 @@
+import { gameContextFor } from "../features/context";
 import { lineComposite, lineWindow } from "../features/line";
 import { redistributeShares, type ShareDelta } from "../features/redistribution";
 import { schemeEstimate, schemeRatios } from "../features/scheme";
@@ -6,6 +7,7 @@ import { LAST_POSSIBLE_WEEK } from "../store";
 import type { ProjectionInput } from "../backtest";
 import type { PlayerRates } from "./efficiency";
 import type { FeatureFlags } from "./features";
+import type { GameContextPriors } from "./context-fit";
 import type { LinePriors } from "./line-fit";
 import type { PredictedOpportunity } from "./opportunity";
 import type { RedistributionPriors } from "./redistribution-fit";
@@ -32,6 +34,7 @@ export interface ContextPriors {
   readonly line: LinePriors;
   readonly scheme: SchemePriors;
   readonly redistribution: RedistributionPriors;
+  readonly gameContext: GameContextPriors;
 }
 
 /**
@@ -64,7 +67,7 @@ export function contextualiseRates(
   features: FeatureFlags,
   priors: ContextPriors,
 ): ReadonlyMap<string, PlayerRates> {
-  if (!features.line) return rates;
+  if (!features.line && !features.gameContext) return rates;
 
   const metrics = indexTeamMetrics(input.teamContext);
   const teams = latestTeams(input.teamContext);
@@ -80,6 +83,23 @@ export function contextualiseRates(
     return fresh;
   };
 
+  /** One matchup multiplier pair per team, computed once — it is a property of the game. */
+  const matchups = new Map<string, { rushing: number; passing: number }>();
+  const matchupFor = (team: string): { rushing: number; passing: number } => {
+    const known = matchups.get(team);
+    if (known !== undefined) return known;
+    const context = gameContextFor(team, { season: input.season, week: input.week }, metrics);
+    const rest = context.restRatio === null || context.restRatio <= 0 ? 1 : context.restRatio;
+    const factor = (opponent: number | null, elasticity: { opponent: number; rest: number }): number =>
+      opponent === null || opponent <= 0 ? 1 : bounded(opponent ** elasticity.opponent * rest ** elasticity.rest);
+    const fresh = {
+      rushing: factor(context.opponentRushDefence, priors.gameContext.rushing),
+      passing: factor(context.opponentPassDefence, priors.gameContext.passing),
+    };
+    matchups.set(team, fresh);
+    return fresh;
+  };
+
   const adjusted = new Map<string, PlayerRates>();
   for (const [playerId, playerRates] of rates) {
     const team = teams.get(playerId);
@@ -89,19 +109,24 @@ export function contextualiseRates(
       adjusted.set(playerId, playerRates);
       continue;
     }
-    const composite = compositeFor(team);
+    const composite = features.line ? compositeFor(team) : null;
     const rushing =
-      composite.runBlocking === null || composite.runBlocking <= 0
+      composite === null || composite.runBlocking === null || composite.runBlocking <= 0
         ? 1
         : bounded(composite.runBlocking ** priors.line.rushingYardsElasticity);
     const passing =
-      composite.passProtection === null || composite.passProtection <= 0
+      composite === null || composite.passProtection === null || composite.passProtection <= 0
         ? 1
         : bounded(composite.passProtection ** priors.line.passingYardsElasticity);
+    const matchup = features.gameContext ? matchupFor(team) : { rushing: 1, passing: 1 };
     adjusted.set(playerId, {
       ...playerRates,
-      rushingYardsPerCarry: playerRates.rushingYardsPerCarry * rushing,
-      passingYardsPerAttempt: playerRates.passingYardsPerAttempt * passing,
+      rushingYardsPerCarry: playerRates.rushingYardsPerCarry * rushing * matchup.rushing,
+      // Receiving yards move with the passing matchup too: they are the same throws seen from the
+      // other end, and adjusting one without the other would say a defence can be soft against a
+      // quarterback and neutral against everyone he throws to.
+      receivingYardsPerTarget: playerRates.receivingYardsPerTarget * matchup.passing,
+      passingYardsPerAttempt: playerRates.passingYardsPerAttempt * passing * matchup.passing,
     });
   }
   return adjusted;
