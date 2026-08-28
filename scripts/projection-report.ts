@@ -12,17 +12,12 @@
 // budget and prints no budget line. It does reach the network, which is why it is a script an
 // operator runs and never anything the product calls.
 import { createDb } from "@/db/client";
-import { players } from "@/db/schema";
 import { PPR_SCORING } from "@/domain/scoring";
 import { replay, type ProjectionSource } from "@/projections/backtest";
 import { naiveProjection, NAIVE_SOURCE_NAME } from "@/projections/benchmarks/naive";
 import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
 import { createNflverseClient } from "@/projections/nflverse/client";
-import { NFLVERSE_CONFIG } from "@/projections/nflverse/config";
-import { buildCrosswalk } from "@/projections/nflverse/crosswalk";
-import { mapParticipation, participationObservations, weekAsOfFromSnapCounts } from "@/projections/nflverse/map";
-import { mapStatLines, statLineObservations } from "@/projections/nflverse/stat-lines";
-import { recordObservations } from "@/projections/store";
+import { ingestPlayerUniverse, ingestSeason } from "@/projections/nflverse/ingest";
 
 /** The season to replay. Its prior season is ingested too, because that is what naive projects from. */
 const TARGET_SEASON = Number(process.argv[2] ?? 2024);
@@ -50,36 +45,29 @@ function card(name: string, score: ScoreCard): string {
 async function main(): Promise<void> {
   const db = createDb(requireEnv("DATABASE_URL"));
   const client = createNflverseClient();
-  const roster = await db.select().from(players);
-  const crosswalk = buildCrosswalk(roster);
-  console.log(`crosswalking against ${roster.length} players in the store`);
+
+  // Identity is an id join against the HISTORICAL universe (Phase 2, Task 1), not a name join
+  // against today's roster. The rate below is therefore a measurement of nflverse's own id
+  // coverage rather than of our matching, and it no longer decays going backwards.
+  const universe = await ingestPlayerUniverse(db, client);
 
   /** The last week of each ingested season, so week 1 of the target can be dated from the one before. */
   const weekAsOfBySeason = new Map<number, ReadonlyMap<number, Date>>();
 
   for (const season of [TARGET_SEASON - 1, TARGET_SEASON]) {
-    const snapCounts = await client.getCsv(NFLVERSE_CONFIG.releases.snapCounts, `snap_counts_${season}.csv`);
-    const playerWeek = await client.getCsv(NFLVERSE_CONFIG.releases.playerWeek, `stats_player_week_${season}.csv`);
-    const weekAsOf = weekAsOfFromSnapCounts(snapCounts, NFLVERSE_CONFIG.publicationLagHours);
-    weekAsOfBySeason.set(season, weekAsOf);
+    const report = await ingestSeason(db, client, universe, season);
+    weekAsOfBySeason.set(season, report.weekAsOf);
 
-    const participation = mapParticipation({ snapCounts, playerWeek, crosswalk });
-    const statLines = mapStatLines({ playerWeek, weekAsOf, crosswalk });
-
-    const written =
-      (await recordObservations(db, participationObservations(participation.participation))) +
-      (await recordObservations(db, statLineObservations(statLines.statLines)));
-
-    // The crosswalk rate is printed every run, not only when it looks wrong. A bad join is silent
+    // The resolution rate is printed every run, not only when it looks wrong. A bad join is silent
     // by nature — an unmatched player is indistinguishable from one who did not play — so the
     // number that would reveal it has to be in front of whoever ran the report.
     console.log(
-      `${season}: ${participation.participation.length} participation rows, ${statLines.statLines.length} stat lines, ` +
-        `${written} new observations | crosswalk ${percent(participation.resolutionRate)} participation, ` +
-        `${percent(statLines.resolutionRate)} weekly stats (${statLines.unresolved.length} unresolved)`,
+      `${season}: ${report.participationRows} participation rows, ${report.statLines} stat lines, ` +
+        `${report.observationsWritten} new observations | universe ${percent(report.participationResolution)} participation, ` +
+        `${percent(report.statLineResolution)} weekly stats (${report.unresolved.length} unresolved)`,
     );
-    for (const unresolved of [...statLines.unresolved].sort((a, b) => b.occurrences - a.occurrences).slice(0, 10)) {
-      console.log(`    unresolved: ${unresolved.name} (${unresolved.position}, ${unresolved.team}) x${unresolved.occurrences} — ${unresolved.reason}`);
+    for (const unresolved of [...report.unresolved].sort((a, b) => b.occurrences - a.occurrences).slice(0, 10)) {
+      console.log(`    unresolved: ${unresolved.name} (${unresolved.id}) x${unresolved.occurrences}`);
     }
   }
 

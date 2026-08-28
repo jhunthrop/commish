@@ -1,7 +1,8 @@
 import { eq, inArray } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
-import { players } from "@/db/schema";
+import { nflPlayers } from "@/db/schema";
 import type { Position, StatLine } from "@/domain/player";
+import { projectedPosition } from "./nflverse/players";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { statLinesAsOf, type SeasonStatLine } from "./lines";
 import { LAST_POSSIBLE_WEEK } from "./store";
@@ -124,13 +125,27 @@ function bandByProjectedRank(projections: readonly { playerId: string; points: n
   );
 }
 
+/**
+ * Position comes from the HISTORICAL universe (`nfl_players`), not from `players`.
+ *
+ * `players` is a current roster snapshot, so scoring a 2021 replay through it would silently drop
+ * every player who has since retired — the same defect that made a Phase 1 backfill lose ten points
+ * of coverage per season going backwards (Phase 2, Task 1). A player whose universe position does
+ * not narrow to one this product scores (a centre, a linebacker) is omitted rather than guessed at,
+ * and omission here means excluded from BOTH the projections and the actuals, so the comparison
+ * stays over the same set of people.
+ */
 async function positionsOf(db: ReadonlyDb, playerIds: readonly string[]): Promise<ReadonlyMap<string, Position>> {
   if (playerIds.length === 0) return new Map();
   const rows = await db
-    .select({ id: players.id, position: players.position })
-    .from(players)
-    .where(playerIds.length === 1 ? eq(players.id, playerIds[0]!) : inArray(players.id, playerIds));
-  return new Map(rows.map((row) => [row.id, row.position]));
+    .select({ id: nflPlayers.id, position: nflPlayers.position })
+    .from(nflPlayers)
+    .where(playerIds.length === 1 ? eq(nflPlayers.id, playerIds[0]!) : inArray(nflPlayers.id, playerIds));
+  return new Map(
+    rows
+      .map((row) => [row.id, projectedPosition(row.position)] as const)
+      .filter((entry): entry is readonly [string, Position] => entry[1] !== null),
+  );
 }
 
 export async function replay(

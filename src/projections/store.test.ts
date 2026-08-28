@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { nflPlayers } from "@/db/schema";
 import { observationsAsOf, recordObservations, type PlayerWeekObservation } from "./store";
 
 const db = createTestDb();
@@ -11,9 +11,11 @@ const SUNDAY = new Date("2024-09-15T20:00:00.000Z");
 
 beforeEach(async () => {
   await truncateAll(db);
-  await db.insert(players).values([
-    { id: "p1", name: "One", position: "WR" as const, nflTeam: "KC", headshotUrl: null },
-    { id: "p2", name: "Two", position: "RB" as const, nflTeam: "BUF", headshotUrl: null },
+  // The store's foreign key points at the HISTORICAL universe, not at today's roster — see
+  // `nflPlayers` in the schema for why a roster snapshot cannot hold enough seasons to fit on.
+  await db.insert(nflPlayers).values([
+    { id: "p1", pfrId: "OneOn00", name: "One", position: "WR", latestTeam: "KC", rookieSeason: 2020, lastSeason: 2024 },
+    { id: "p2", pfrId: "TwoTw00", name: "Two", position: "RB", latestTeam: "BUF", rookieSeason: 2019, lastSeason: 2024 },
   ]);
 });
 

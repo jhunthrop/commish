@@ -337,6 +337,13 @@
       "when": 1787884032586,
       "tag": "0047_capture_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1787888859828,
+      "tag": "0048_tough_fallen_one",
+      "breakpoints": true
     }
   ]
 }

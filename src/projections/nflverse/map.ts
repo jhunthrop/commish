@@ -1,7 +1,7 @@
 import type { PlayerWeekObservation } from "../store";
 import { NFLVERSE_CONFIG } from "./config";
-import { crosswalkKey, type Crosswalk, type UnresolvedPlayer } from "./crosswalk";
 import type { CsvRow } from "./csv";
+import { projectedPosition, type PlayerRef, type PlayerUniverse, type UnresolvedRef } from "./players";
 
 /**
  * SNAP COUNTS AND TARGETS — the participation layer, and the reason this whole module exists.
@@ -11,9 +11,9 @@ import type { CsvRow } from "./csv";
  * OPPORTUNITY, and opportunity is a share — so it needs the denominator, and the denominator is
  * the one thing our paid stats feed cannot supply.
  *
- * Everything here is pure over already-fetched rows. The client does the I/O, the crosswalk does
- * identity, and this file does exactly one job: turn two nflverse files into facts with an
- * honest `as_of` on each.
+ * Everything here is pure over already-fetched rows. The client does the I/O, the player universe
+ * (`players.ts`) does identity, and this file does exactly one job: turn two nflverse files into
+ * facts with an honest `as_of` on each.
  */
 
 /** The `source` stamp each file's observations carry — the axis an ablation holds a feed out on. */
@@ -52,15 +52,16 @@ export interface PlayerWeekParticipation {
 export interface MapParticipationInput {
   readonly snapCounts: readonly CsvRow[];
   readonly playerWeek: readonly CsvRow[];
-  readonly crosswalk: Crosswalk;
+  /** The historical player universe — `players.ts`. Identity is an id join, never a name join. */
+  readonly universe: PlayerUniverse;
   /** Defaults to `NFLVERSE_CONFIG.publicationLagHours`. */
   readonly publicationLagHours?: number;
 }
 
 export interface MapParticipationResult {
   readonly participation: readonly PlayerWeekParticipation[];
-  /** Never empty when someone failed to join — see `crosswalk.ts` for why a silent drop is fatal. */
-  readonly unresolved: readonly UnresolvedPlayer[];
+  /** Never empty when someone failed to join — see `players.ts` for why a silent drop is fatal. */
+  readonly unresolved: readonly UnresolvedRef[];
   readonly resolutionRate: number | null;
 }
 
@@ -148,13 +149,17 @@ function teamSnapsByGame(rows: readonly CsvRow[]): ReadonlyMap<string, number> {
   return totals;
 }
 
-/** Targets, keyed by the identity the crosswalk uses, so the two files join on a person. */
+/**
+ * Targets, keyed by `<gsis id>|<week>` — the weekly file's own `player_id` column, unmodified.
+ *
+ * The join between the two files used to be a name join through the crosswalk. It is now the id
+ * both files already carry, which is why this function reads a column instead of building a key.
+ */
 function targetsByPlayerWeek(rows: readonly CsvRow[]): ReadonlyMap<string, number> {
   const targets = new Map<string, number>();
   for (const row of rows) {
     if (row.season_type !== NFLVERSE_CONFIG.seasonType) continue;
-    const key = `${crosswalkKey({ name: row.player_display_name ?? "", position: row.position ?? "", team: row.team ?? "" })}|${row.week}`;
-    targets.set(key, optionalNumeric(row, "targets"));
+    targets.set(`${row.player_id ?? ""}|${row.week ?? ""}`, optionalNumeric(row, "targets"));
   }
   return targets;
 }
@@ -167,11 +172,16 @@ function targetsByPlayerWeek(rows: readonly CsvRow[]): ReadonlyMap<string, numbe
  * built from skill players alone is short by the whole offensive line, and every share computed
  * against it is inflated by roughly a third — a number that looks plausible, which is why it would
  * survive review.
+ *
+ * Two narrowings, and they are not the same one. The file's own position decides who is a
+ * CANDIDATE, because that is all that is knowable before resolving; the UNIVERSE's position decides
+ * who is projected, because `nfl_players.position` is what the backtest scores through and the two
+ * must agree or a player would be ingested and then silently dropped at scoring time.
  */
 export function mapParticipation({
   snapCounts,
   playerWeek,
-  crosswalk,
+  universe,
   publicationLagHours = NFLVERSE_CONFIG.publicationLagHours,
 }: MapParticipationInput): MapParticipationResult {
   const teamSnaps = teamSnapsByGame(snapCounts);
@@ -182,19 +192,20 @@ export function mapParticipation({
       row.game_type === NFLVERSE_CONFIG.seasonType &&
       (NFLVERSE_CONFIG.scoredPositions as readonly string[]).includes(row.position ?? ""),
   );
-  const candidates = scored.map((row) => ({
+  const refs: readonly PlayerRef[] = scored.map((row) => ({
+    kind: "pfr" as const,
+    id: row.pfr_player_id ?? "",
     name: row.player ?? "",
-    position: row.position ?? "",
-    team: row.team ?? "",
   }));
-  const { resolved, unresolved, resolutionRate } = crosswalk.resolveAll(candidates);
+  const { resolved, unresolved, resolutionRate } = universe.resolveAll(refs);
 
   const participation: PlayerWeekParticipation[] = [];
   for (const [index, row] of scored.entries()) {
-    const playerId = resolved.get(crosswalkKey(candidates[index]!));
+    const playerId = resolved.get(refs[index]!.id);
     // Unresolved players are NOT silently skipped — they are on `unresolved`, named and counted.
     // They are merely not stored, because there is no id to store them against.
     if (playerId === undefined) continue;
+    if (projectedPosition(universe.byGsisId(playerId)!.position) === null) continue;
     const week = numeric(row, "week");
     participation.push({
       playerId,
@@ -203,7 +214,7 @@ export function mapParticipation({
       offensiveSnaps: numeric(row, "offense_snaps"),
       teamOffensiveSnaps: teamSnaps.get(`${row.game_id}|${row.team}`) ?? 0,
       routesRun: null,
-      targets: targets.get(`${crosswalkKey(candidates[index]!)}|${week}`) ?? 0,
+      targets: targets.get(`${playerId}|${week}`) ?? 0,
       asOf: gameDayAsOf(row.pfr_game_id ?? "", publicationLagHours),
     });
   }

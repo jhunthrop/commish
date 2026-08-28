@@ -2,9 +2,9 @@ import { STAT_FIELDS, type StatLine } from "@/domain/player";
 import { statMetricName, type SeasonStatLine } from "../lines";
 import type { PlayerWeekObservation } from "../store";
 import { NFLVERSE_CONFIG } from "./config";
-import { crosswalkKey, type Crosswalk, type UnresolvedPlayer } from "./crosswalk";
 import type { CsvRow } from "./csv";
 import { NFLVERSE_SOURCE } from "./map";
+import { projectedPosition, type PlayerRef, type PlayerUniverse, type UnresolvedRef } from "./players";
 
 /**
  * THE ACTUALS — what a player really did, which is the other half of every measurement the harness
@@ -30,12 +30,13 @@ export interface MapStatLinesInput {
   readonly playerWeek: readonly CsvRow[];
   /** From `weekAsOfFromSnapCounts` — the weekly stats file carries no date of its own. */
   readonly weekAsOf: ReadonlyMap<number, Date>;
-  readonly crosswalk: Crosswalk;
+  /** The historical player universe — `players.ts`. The weekly file carries `player_id` (gsis). */
+  readonly universe: PlayerUniverse;
 }
 
 export interface MapStatLinesResult {
   readonly statLines: readonly SeasonStatLine[];
-  readonly unresolved: readonly UnresolvedPlayer[];
+  readonly unresolved: readonly UnresolvedRef[];
   readonly resolutionRate: number | null;
 }
 
@@ -87,23 +88,26 @@ function statValue(row: CsvRow, columns: readonly string[]): number {
   return total;
 }
 
-export function mapStatLines({ playerWeek, weekAsOf, crosswalk }: MapStatLinesInput): MapStatLinesResult {
+export function mapStatLines({ playerWeek, weekAsOf, universe }: MapStatLinesInput): MapStatLinesResult {
   const scored = playerWeek.filter(
     (row) =>
       row.season_type === NFLVERSE_CONFIG.seasonType &&
       (NFLVERSE_CONFIG.scoredPositions as readonly string[]).includes(row.position ?? ""),
   );
-  const candidates = scored.map((row) => ({
+  const refs: readonly PlayerRef[] = scored.map((row) => ({
+    kind: "gsis" as const,
+    id: row.player_id ?? "",
     name: row.player_display_name ?? "",
-    position: row.position ?? "",
-    team: row.team ?? "",
   }));
-  const { resolved, unresolved, resolutionRate } = crosswalk.resolveAll(candidates);
+  const { resolved, unresolved, resolutionRate } = universe.resolveAll(refs);
 
   const statLines: SeasonStatLine[] = [];
   for (const [index, row] of scored.entries()) {
-    const playerId = resolved.get(crosswalkKey(candidates[index]!));
+    const playerId = resolved.get(refs[index]!.id);
     if (playerId === undefined) continue;
+    // The universe's position governs, exactly as in `mapParticipation`: an outcome stored for a
+    // player the backtest cannot score is a row nothing will ever read.
+    if (projectedPosition(universe.byGsisId(playerId)!.position) === null) continue;
     const week = Number(row.week);
     const asOf = weekAsOf.get(week);
     // Throws rather than defaulting to a stamp of its own: a fact whose as-of we had to invent is

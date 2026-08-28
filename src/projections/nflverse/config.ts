@@ -20,6 +20,17 @@ export const NFLVERSE_CONFIG = {
     /** Per-player, per-week counting stats. The targets numerator, and the ACTUALS the backtest
      *  scores every projection against. */
     playerWeek: "player_stats",
+    /**
+     * THE HISTORICAL PLAYER UNIVERSE — every player back to 1999, with the gsis and pfr ids the
+     * other two files key on. Phase 2, Task 1: without it, identity is a name join against a
+     * current roster snapshot, which loses ten points of resolution per season going backwards
+     * because retired players are genuinely absent from a roster. See `players.ts`.
+     */
+    players: "players",
+  },
+  /** Asset names. Only the universe's is fixed; the other two carry a season. */
+  files: {
+    players: "players.csv",
   },
   /**
    * How long after a game its numbers become knowable, for the `as_of` stamp.

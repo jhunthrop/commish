@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { nflPlayers } from "@/db/schema";
 import { NFLVERSE_SOURCE } from "./nflverse/map";
 import { statLinesAsOf, statMetricName, STAT_LINE_SOURCE } from "./lines";
 import { recordObservations, type PlayerWeekObservation } from "./store";
@@ -12,9 +12,9 @@ const LATER = new Date("2024-09-20T00:00:00.000Z");
 
 beforeEach(async () => {
   await truncateAll(db);
-  await db.insert(players).values([
-    { id: "p1", name: "One", position: "WR" as const, nflTeam: "KC", headshotUrl: null },
-    { id: "p2", name: "Two", position: "QB" as const, nflTeam: "BUF", headshotUrl: null },
+  await db.insert(nflPlayers).values([
+    { id: "p1", pfrId: "OneOn00", name: "One", position: "WR", latestTeam: "KC", rookieSeason: 2020, lastSeason: 2024 },
+    { id: "p2", pfrId: "TwoTw00", name: "Two", position: "QB", latestTeam: "BUF", rookieSeason: 2019, lastSeason: 2024 },
   ]);
 });
 
