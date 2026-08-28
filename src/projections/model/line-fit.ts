@@ -1,7 +1,7 @@
 import type { SeasonStatLine } from "../lines";
-import { lineComposite, type LineLeagueMeans } from "../features/line";
+import { lineComposite, lineWindow, type LineLeagueMeans } from "../features/line";
 import { PBP_METRICS } from "../nflverse/pbp";
-import { contextWindow, indexTeamMetrics, type TeamContext } from "../team-context";
+import { indexTeamMetrics, type TeamContext } from "../team-context";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import type { PlayerWeekUsage } from "../usage";
 
@@ -151,7 +151,7 @@ export function fitLinePriors(input: LineFitInput): LinePriors {
   const rushing: { x: number; y: number; weight: number }[] = [];
   const passing: { x: number; y: number; weight: number }[] = [];
   for (const row of production) {
-    const weeks = contextWindow(row.season, row.week, LAST_POSSIBLE_WEEK);
+    const weeks = lineWindow(row.season, row.week, LAST_POSSIBLE_WEEK);
     const composite = lineComposite({ team: row.team, weeks, metrics, league });
     if (composite.runBlocking !== null && composite.runBlocking > 0 && row.carries > 0 && row.rushingYards > 0) {
       rushing.push({

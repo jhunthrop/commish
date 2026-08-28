@@ -1,5 +1,5 @@
-import { lineComposite } from "../features/line";
-import { contextWindow, indexTeamMetrics, latestTeams } from "../team-context";
+import { lineComposite, lineWindow } from "../features/line";
+import { indexTeamMetrics, latestTeams } from "../team-context";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import type { ProjectionInput } from "../backtest";
 import type { PlayerRates } from "./efficiency";
@@ -60,7 +60,7 @@ export function contextualiseRates(
 
   const metrics = indexTeamMetrics(input.teamContext);
   const teams = latestTeams(input.teamContext);
-  const weeks = contextWindow(input.season, input.week, LAST_POSSIBLE_WEEK);
+  const weeks = lineWindow(input.season, input.week, LAST_POSSIBLE_WEEK);
   // One composite per TEAM, not per player: it is a property of the offence, and computing it
   // inside the player loop would repeat the same arithmetic fifty times a week per team.
   const composites = new Map<string, ReturnType<typeof lineComposite>>();

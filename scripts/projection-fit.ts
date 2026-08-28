@@ -19,8 +19,11 @@ import type { Position } from "@/domain/player";
 import { statLinesAsOf, type SeasonStatLine } from "@/projections/lines";
 import { RATES, TOUCHDOWN_RATES, type EfficiencyPriors, type RateName } from "@/projections/model/efficiency";
 import { fitEfficiencyPriors, fitOpportunityPriors } from "@/projections/model/fit";
+import { fitLinePriors, type LinePriors } from "@/projections/model/line-fit";
 import { projectedPosition } from "@/projections/nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
+import { playerTeamsAsOf, teamObservationsAsOf } from "@/projections/team-store";
+import type { TeamContext } from "@/projections/team-context";
 import { usageAsOf, type PlayerWeekUsage } from "@/projections/usage";
 
 /**
@@ -79,6 +82,50 @@ async function usageForSeasons(db: Db, seasons: readonly number[]): Promise<read
   return rows;
 }
 
+/**
+ * The team-level context for the fit seasons, read WITHOUT an as-of gate.
+ *
+ * The same choice `historyForSeasons` makes and for the same reason: a parameter should be fitted
+ * against what really happened, not against what was briefly believed on a Sunday night. The
+ * point-in-time gate governs what a model may see when PREDICTING, and that is enforced at replay.
+ * The composite the fit regresses against is still computed from weeks BEFORE the one it explains,
+ * because a composite that included the week being predicted would measure a correlation the model
+ * can never exploit.
+ */
+async function contextForSeasons(db: Db, seasons: readonly number[]): Promise<TeamContext> {
+  const playerTeams = [];
+  const teamObservations = [];
+  for (const season of seasons) {
+    const span = { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FINAL } as const;
+    playerTeams.push(...(await playerTeamsAsOf(db, span)));
+    teamObservations.push(...(await teamObservationsAsOf(db, span)));
+  }
+  return { playerTeams, teamObservations };
+}
+
+function renderLine(line: LinePriors): string {
+  return `/**
+ * PHASE 3, TASK 1 — the offensive line composite's league means and its two measured elasticities.
+ *
+ * The elasticities are regression slopes, not guesses: log team rushing yards per carry against log
+ * run-blocking composite, through the origin, weighted by carries, over the fit seasons' team-weeks
+ * only. An elasticity near zero is the measurement saying the composite does not move the rate, and
+ * the ablation is what decides whether the feature ships.
+ */
+export const FITTED_LINE_PRIORS: LinePriors = {
+  league: {
+    adjustedLineYards: ${line.league.adjustedLineYards.toFixed(6)},
+    stuffedRate: ${line.league.stuffedRate.toFixed(6)},
+    sackRateAllowed: ${line.league.sackRateAllowed.toFixed(6)},
+  },
+  rushingYardsElasticity: ${line.rushingYardsElasticity.toFixed(6)},
+  passingYardsElasticity: ${line.passingYardsElasticity.toFixed(6)},
+  leagueRushingYardsPerCarry: ${line.leagueRushingYardsPerCarry.toFixed(6)},
+  leaguePassingYardsPerAttempt: ${line.leaguePassingYardsPerAttempt.toFixed(6)},
+};
+`;
+}
+
 function renderEfficiency(efficiency: EfficiencyPriors): string {
   const names = Object.keys(RATES) as RateName[];
   const row = (position: string) =>
@@ -104,6 +151,7 @@ ${names.map((name) => `    ${name}: ${efficiency.regression[name].toFixed(2)},`)
 function render(
   fit: ReturnType<typeof fitOpportunityPriors>,
   efficiency: EfficiencyPriors,
+  line: LinePriors,
   generatedFrom: readonly number[],
 ): string {
   const { priors } = fit;
@@ -112,6 +160,7 @@ function render(
     return `    ${position}: { snapShare: ${entry.snapShare.toFixed(6)}, targetsPerSnap: ${entry.targetsPerSnap.toFixed(6)}, carriesPerSnap: ${entry.carriesPerSnap.toFixed(6)}, passAttemptsPerSnap: ${entry.passAttemptsPerSnap.toFixed(6)} },`;
   };
   return `import type { EfficiencyPriors } from "./efficiency";
+import type { LinePriors } from "./line-fit";
 import type { OpportunityPriors } from "./opportunity";
 
 /**
@@ -123,7 +172,7 @@ import type { OpportunityPriors } from "./opportunity";
  * makes a published scoreboard reproducible: "what did the engine believe when it said that" has to
  * be answerable from the repository alone.
  *
- * Next-week share error on the fit seasons, pooled over snap, target and carry share
+ * Next-week share error on the fit seasons, pooled over all four shares the model emits
  * (n = ${fit.fitted.sampleSize}). The baseline is last observed share with no shrinkage — layer 1's
  * own floor, the thing the model has to beat before anything above it is worth reviewing.
  *
@@ -143,7 +192,8 @@ ${["QB", "RB", "WR", "TE", "K", "DEF"].map(role).join("\n")}
   leagueTeamVolume: { targets: ${priors.leagueTeamVolume.targets.toFixed(4)}, carries: ${priors.leagueTeamVolume.carries.toFixed(4)}, passAttempts: ${priors.leagueTeamVolume.passAttempts.toFixed(4)} },
 };
 
-${renderEfficiency(efficiency)}`;
+${renderEfficiency(efficiency)}
+${renderLine(line)}`;
 }
 
 async function main(): Promise<void> {
@@ -181,7 +231,15 @@ async function main(): Promise<void> {
     );
   }
 
-  writeFileSync(OUTPUT, render(fit, efficiency, FIT_SEASONS));
+  const context = await contextForSeasons(db, [...HISTORY_SEASONS, ...FIT_SEASONS]);
+  const linePriors = fitLinePriors({ usage, history, context, seasons: [...FIT_SEASONS], heldOut: [...HELD_OUT_SEASONS] });
+  console.log(
+    `\noffensive line composite, fitted on ${FIT_SEASONS.join(", ")}:\n` +
+      `  league adjusted line yards ${linePriors.league.adjustedLineYards.toFixed(3)}, stuffed rate ${linePriors.league.stuffedRate.toFixed(3)}, sack rate ${linePriors.league.sackRateAllowed.toFixed(3)}\n` +
+      `  rushing yards elasticity ${linePriors.rushingYardsElasticity.toFixed(4)}, passing yards elasticity ${linePriors.passingYardsElasticity.toFixed(4)}`,
+  );
+
+  writeFileSync(OUTPUT, render(fit, efficiency, linePriors, FIT_SEASONS));
   console.log(`\nwrote ${OUTPUT}`);
 
   await db.$client.end();

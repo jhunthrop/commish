@@ -65,8 +65,20 @@ function assertHeldOut({ seasons, heldOut = [] }: FitInput): void {
   }
 }
 
-/** The shares the fit's objective is measured over — the three that drive fantasy points. */
-const SCORED_SHARES = ["snapShare", "targetShare", "carryShare"] as const;
+/**
+ * THE SHARES THE FIT'S OBJECTIVE IS MEASURED OVER: all four the model emits.
+ *
+ * It was three until Phase 3. Pass-attempt share was left out, and it was the one share whose
+ * held-out rank correlation came in below the floor — 0.496 against 0.858 — which is not a
+ * coincidence. A search cannot improve what it is never scored on, and a model that emits four
+ * numbers while being fitted on three is being told that one of its outputs does not matter.
+ *
+ * The defect was found by reading the held-out numbers, and fixing it there and then would have
+ * been tuning against the test set. It is corrected here instead, in a phase of its own, on the fit
+ * seasons, and then measured — which is the whole reason model v1 named it and deliberately left
+ * it alone.
+ */
+const SCORED_SHARES = ["snapShare", "targetShare", "carryShare", "passAttemptShare"] as const;
 
 const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 

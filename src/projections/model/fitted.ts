@@ -11,13 +11,13 @@ import type { OpportunityPriors } from "./opportunity";
  * makes a published scoreboard reproducible: "what did the engine believe when it said that" has to
  * be answerable from the repository alone.
  *
- * Next-week share error on the fit seasons, pooled over snap, target and carry share
- * (n = 40179). The baseline is last observed share with no shrinkage — layer 1's
+ * Next-week share error on the fit seasons, pooled over all four shares the model emits
+ * (n = 53572). The baseline is last observed share with no shrinkage — layer 1's
  * own floor, the thing the model has to beat before anything above it is worth reviewing.
  *
  *            rho      MAE      RMSE
- *   fitted   0.8870   0.06839  0.11922
- *   baseline 0.8668   0.07387  0.13441
+ *   fitted   0.8808   0.05481  0.11071
+ *   baseline 0.8862   0.05875  0.12474
  */
 export const FIT_SEASONS: readonly number[] = [2021, 2022];
 export const HELD_OUT_SEASONS: readonly number[] = [2023, 2024];
@@ -132,9 +132,13 @@ export const FITTED_EFFICIENCY_PRIORS: EfficiencyPriors = {
  * the ablation is what decides whether the feature ships.
  */
 export const FITTED_LINE_PRIORS: LinePriors = {
-  league: { adjustedLineYards: 0, stuffedRate: 0, sackRateAllowed: 0 },
-  rushingYardsElasticity: 0,
-  passingYardsElasticity: 0,
-  leagueRushingYardsPerCarry: 0,
-  leaguePassingYardsPerAttempt: 0,
+  league: {
+    adjustedLineYards: 2.545908,
+    stuffedRate: 0.184807,
+    sackRateAllowed: 0.062849,
+  },
+  rushingYardsElasticity: 0.184959,
+  passingYardsElasticity: 0.024803,
+  leagueRushingYardsPerCarry: 4.400851,
+  leaguePassingYardsPerAttempt: 7.064554,
 };

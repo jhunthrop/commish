@@ -14,9 +14,12 @@
 // comparable by construction.
 import { createDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
-import { replayHeadToHead, type ProjectionSource } from "@/projections/backtest";
+import { replayHeadToHead, replayOpportunity, SHARE_FIELDS, type ProjectionSource } from "@/projections/backtest";
 import { naiveProjection, NAIVE_SOURCE_NAME } from "@/projections/benchmarks/naive";
 import { ALL_FEATURES, NO_FEATURES, type FeatureFlags } from "@/projections/model/features";
+import { scoreShares } from "@/projections/model/fit";
+import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
+import { lastObservedPriors } from "@/projections/model/opportunity";
 import { modelSource } from "@/projections/model/source";
 import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
 import { replayMomentsFor } from "@/projections/replay-moments";
@@ -67,8 +70,54 @@ function errors(score: ScoreCard): string {
   return `MAE ${mae.padStart(6)}  RMSE ${rmse.padStart(6)}  n=${score.sampleSize}`;
 }
 
+/**
+ * LAYER 1 ON ITS OWN TERMS, without the network the report script needs.
+ *
+ * Printed as its own variant because the shares are what a change to the FIT is measured on, and a
+ * points scoreboard cannot see the difference: an efficiency error and an opportunity error look
+ * identical there. Model v1 left pass-attempt share out of the fit's objective and it was the one
+ * share that regressed, which is a defect only this table shows.
+ */
+async function reportShares(db: ReturnType<typeof createDb>, seasons: readonly number[], weeks: readonly number[]): Promise<void> {
+  console.log("LAYER 1, predicted share against observed share, on held-out seasons");
+  console.log(`  parameters fitted on ${FIT_SEASONS.join(", ")}; held out: ${HELD_OUT_SEASONS.join(", ")}\n`);
+  for (const season of seasons) {
+    if ((FIT_SEASONS as readonly number[]).includes(season)) {
+      console.log(`${season} is a FIT season; its share numbers would be a description, not a measurement. Skipped.\n`);
+      continue;
+    }
+    const asOfForWeek = await replayMomentsFor(db, season);
+    const model = await replayOpportunity(db, { season, weeks, asOfForWeek, priors: FITTED_OPPORTUNITY_PRIORS });
+    const floorPriors = lastObservedPriors(FITTED_OPPORTUNITY_PRIORS);
+    const floor = await replayOpportunity(db, { season, weeks, asOfForWeek, priors: floorPriors });
+    console.log(`${season}`);
+    const line = (name: string, observations: Parameters<typeof scoreShares>[0]): string => {
+      const score = scoreShares(observations);
+      return `  ${name.padEnd(22)} rho ${(score.rankCorrelation ?? 0).toFixed(4)}   MAE ${(score.meanAbsoluteError ?? 0).toFixed(5)}   RMSE ${(score.rootMeanSquaredError ?? 0).toFixed(5)}   n=${score.sampleSize}`;
+    };
+    for (const field of SHARE_FIELDS) {
+      console.log(line(`${field} model`, model.byShare[field]));
+      console.log(line(`${field} last-week`, floor.byShare[field]));
+    }
+    console.log(line("POOLED model", model.pooled));
+    console.log(line("POOLED last-week", floor.pooled));
+    console.log("");
+  }
+}
+
 async function main(): Promise<void> {
   const feature = process.argv[2] ?? "all";
+  if (feature === "shares") {
+    const db = createDb(requireEnv("DATABASE_URL"));
+    const seasons = process.argv.slice(3).map(Number);
+    await reportShares(
+      db,
+      seasons.length > 0 ? seasons : [...HELD_OUT_SEASONS],
+      Array.from({ length: LAST_REGULAR_WEEK }, (_, index) => index + 1),
+    );
+    await db.$client.end();
+    return;
+  }
   const variant = VARIANTS[feature];
   if (variant === undefined) {
     throw new Error(`Unknown feature group "${feature}". Known groups: ${Object.keys(VARIANTS).join(", ")}.`);
