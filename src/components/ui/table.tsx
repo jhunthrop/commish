@@ -77,6 +77,24 @@ function columnClass<T>(column: TableColumn<T>): string {
  * screen-reader user navigate a draft board cell by cell; a grid of divs does not. Scrolls
  * horizontally inside its own wrapper so the page body never scrolls sideways at the 360px
  * baseline.
+ *
+ * THE TABLE SIZES TO ITS CONTENT AND THEN STOPS (2026-08-28). This used to be `w-full`, which is
+ * the default nobody chooses on purpose and which cost this product more legibility than any
+ * single colour decision. A `w-full` table does not show more; it shows the same facts further
+ * apart. On the league page at 1440px it put a team name at x=100 and that team's points at
+ * x=1370 — twelve rows of a 1,270px eye journey between the two facts a standings row is about,
+ * with nothing in the gap. Six columns spread over a desktop window read as a spreadsheet;
+ * the same six hugging their own content read as a scoreboard.
+ *
+ * So the width is content-driven and the leftover window is left EMPTY. That is the deliberate
+ * half of it: reclaimed horizontal space is not a slot waiting for a column, and a table that
+ * ends at 60% of the window with nothing to its right is the shape the founder pointed at.
+ *
+ * NOT A PROP. There is no `width="fill"` escape hatch, for the reason this file's own
+ * DENSITY-DEFAULT decision gives one paragraph down: an option no consumer chooses is dead
+ * configuration, and every table in the product wants this. `max-w-full` keeps a table whose
+ * content genuinely exceeds the window inside its own scrolling wrapper, so the 360px baseline
+ * is unchanged.
  */
 export function Table<T>({
   caption,
@@ -96,7 +114,7 @@ export function Table<T>({
 
   return (
     <div className="w-full overflow-x-auto">
-      <table className="w-full border-collapse text-sm text-text-primary">
+      <table className="w-auto max-w-full border-collapse text-sm text-text-primary">
         <caption className={captionVisible ? "mb-2 text-left text-sm font-medium text-text-muted" : "sr-only"}>{caption}</caption>
         <thead>
           <tr className="border-b border-line">
