@@ -42,6 +42,23 @@ import { STAT_FIELDS } from "@/domain/player";
  * ageing at all: a large part of the veteran cell is survivorship in the OTHER direction, in that a
  * man with seven seasons of usage history has a long record precisely because he was good, and the
  * shrinkage trusts that record at the moment it stops being true.
+ *
+ * WHAT IT MEASURED, on the two held-out seasons, fitted on 2021-22 only. Three of four measures are
+ * positive on both, and the fourth is a no-op on one of them:
+ *
+ *   |                        | 2023            | 2024            |
+ *   |---|---|---|
+ *   | starter band           | 0.2339 → 0.2485 | 0.2290 → 0.2685 |
+ *   | market (ADP) pop.      | 0.4697 → 0.4759 | 0.3992 → 0.4186 |
+ *   | consensus (ECR) pop.   | 0.6489 → 0.6659 | 0.7594 → 0.7598 |
+ *   | whole board, pooled    | 0.7146 → 0.7263 | 0.7724 → 0.7723 |
+ *
+ * THE POOLED 2024 FIGURE IS −0.0001, and it belongs in this docblock rather than only in the write-
+ * up, because this is what an engineer reads before trusting the multiplier. It ships on the gate
+ * model v3 set for the news pass — which shipped OFF for costing the pooled figure on both seasons
+ * — since this is a band-level gain on the players a manager actually drafts that costs the pooled
+ * figure nothing. A later change that moves the pooled number down is not free to cite this one as
+ * precedent: the argument here is "no cost", not "an acceptable cost".
  */
 
 /**
