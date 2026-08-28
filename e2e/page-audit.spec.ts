@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import type { Page } from "@playwright/test";
-import { expect, test } from "./support/fixtures";
+import { expect, test, SEEDED_SEASON_LEAGUE_ID } from "./support/fixtures";
+import { SEEDED_SEASON_CURRENT_WEEK } from "./global-setup";
 
 /**
  * THE PAGE-LEVEL AUDIT (the Ive campaign's systemic finding S1, 2026-08-27).
@@ -116,6 +117,15 @@ const SIGNED_IN_ROUTES: readonly AuditedRoute[] = [
   { path: "/app/mock-drafts", name: "the mock draft lobby" },
   { path: "/app/profile", name: "the account room" },
   { path: "/app/wallet", name: "the wallet" },
+  // The season surfaces, added when the Gameday conversion landed (2026-08-28). The matchup is
+  // the one that most needed a page-level gate: it is the product's emotional centre, it carries
+  // the largest number on any screen, and every defect the conversion found there (a hero at the
+  // weight of five games nobody had a stake in, a name squeezed to zero characters at 380px) was
+  // invisible to its own component tests.
+  { path: `/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`, name: "the league home" },
+  { path: `/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/matchups/${SEEDED_SEASON_CURRENT_WEEK}`, name: "the matchup" },
+  { path: `/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/trades`, name: "the trade room" },
+  { path: `/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/activity`, name: "the activity log" },
 ];
 
 /** The storefront a stranger meets. */
@@ -124,6 +134,13 @@ const PUBLIC_ROUTES: readonly AuditedRoute[] = [
   { path: "/browse", name: "the shelf" },
   { path: "/league-rules", name: "how it works" },
   { path: "/support", name: "support" },
+  // The reading pages, added with the Gameday conversion. Before it they were four hand-rolled
+  // copies of one layout rendering the public bar with no navigation at all, which is the
+  // dead-end class this audit's fourth law exists to catch.
+  { path: "/reviews", name: "the reviews page" },
+  { path: "/legal/terms", name: "the terms" },
+  { path: "/legal/privacy", name: "the privacy notice" },
+  { path: "/sign-in/problem", name: "the sign-in problem page" },
 ];
 
 test("every audited signed-in page keeps the page-level laws", async ({ managerA }) => {
