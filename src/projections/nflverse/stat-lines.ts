@@ -1,4 +1,5 @@
 import { STAT_FIELDS, type StatLine } from "@/domain/player";
+import { statMetricName, type SeasonStatLine } from "../lines";
 import type { PlayerWeekObservation } from "../store";
 import { NFLVERSE_CONFIG } from "./config";
 import { crosswalkKey, type Crosswalk, type UnresolvedPlayer } from "./crosswalk";
@@ -21,13 +22,9 @@ import { NFLVERSE_SOURCE } from "./map";
  * purest form.
  */
 
-/** A `StatLine` plus the season it belongs to and the moment it became knowable. */
-export interface SeasonStatLine {
-  readonly season: number;
-  /** `line.week` carries the week; `line.playerId` carries OUR id, already crosswalked. */
-  readonly line: StatLine;
-  readonly asOf: Date;
-}
+/** `SeasonStatLine` (`../lines`) is the shape both the writer here and the store's reader use —
+ *  one definition, so a mapper and a backtest can never disagree about what an outcome looks like. */
+export type { SeasonStatLine };
 
 export interface MapStatLinesInput {
   readonly playerWeek: readonly CsvRow[];
@@ -130,11 +127,6 @@ export function mapStatLines({ playerWeek, weekAsOf, crosswalk }: MapStatLinesIn
   return { statLines, unresolved, resolutionRate };
 }
 
-/** `passingYards` → `passing_yards`. The store's metric names are snake_case throughout. */
-function metricName(field: string): string {
-  return field.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
-}
-
 /**
  * Flattens actuals into store rows — every stat field, including the zeros.
  *
@@ -150,7 +142,7 @@ export function statLineObservations(rows: readonly SeasonStatLine[]): readonly 
       week: line.week,
       playerId: line.playerId,
       source: NFLVERSE_SOURCE.playerWeek,
-      metric: metricName(field),
+      metric: statMetricName(field),
       value: line[field],
       asOf,
     })),
