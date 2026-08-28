@@ -68,7 +68,13 @@ export function AdvisorPanel({ leagueId, weekNumber }: { readonly leagueId: stri
           onChange={(event) => setQuestion(event.target.value)}
         />
         <div className="flex justify-end">
-          <Button type="submit" loading={thinking} disabled={thinking}>
+          {/* LAW 5, AND WHAT THE PAGE AUDIT ACTUALLY COUNTS: distinct ink VERBS on one screen.
+              The league home exists for setting a lineup, and "Save lineup" is that act's ink
+              pill. This panel's own words are "Advice only. You make the move." — an aside that
+              decides nothing, shouting at the same volume as the decision it sits under. It is
+              the quiet pill now, which is the same demotion the invite panel took on this page
+              for the same reason. */}
+          <Button variant="secondary" type="submit" loading={thinking} disabled={thinking}>
             Get advice
           </Button>
         </div>
