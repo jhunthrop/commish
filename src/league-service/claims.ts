@@ -1,5 +1,5 @@
 import { and, asc, eq, ilike, notInArray, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { excludedSetFor } from "@/db/upsert";
 import { drafts, leagues, lineupSlots, players, rosterSlots, statWeeks, teams } from "@/db/schema";
 import type { Position } from "@/domain/player";
@@ -216,10 +216,134 @@ export async function claimPlayer(db: Db, input: ClaimInput, deps: ClaimDeps): P
       actorId: input.userId,
       actorType: "user",
       leagueId: input.leagueId,
-      payload: { outcome: "claim", teamId: mine.id, added: addPlayer.id, dropped: drop, materializedLineupRows: materialized },
+      // `reason`, not `outcome`: the key every `roster_move` renderer switches on
+      // (`renderRosterMove`, `@/integrity/activity-view`) — a payload spelled differently is
+      // silently invisible in the feed, by that module's own deny-by-default.
+      payload: { reason: "claim", teamId: mine.id, addedPlayerId: addPlayer.id, droppedPlayerId: drop, materializedLineupRows: materialized },
       occurredAt: deps.clock.now(),
     });
 
     return { ok: true, added: addPlayer.id, dropped: drop };
   });
+}
+
+/** Why a reversal declines, in the operator's own console. */
+export const CLAIM_REVERSAL_REFUSALS = {
+  notOnRoster:
+    "The added player is not on that roster any more. He was dropped or traded since, so undoing this claim needs a different decision.",
+  dropTaken:
+    "The dropped player has been claimed by another team since. Restoring him would take him off their roster, so this needs a different decision.",
+  noRoomBack: "There is no legal slot to restore the dropped player into.",
+} as const;
+
+export interface ReverseClaimInput {
+  readonly leagueId: string;
+  readonly teamId: string;
+  readonly addedPlayerId: string;
+  readonly droppedPlayerId: string | null;
+  /** The claim's own audit event, carried as provenance on the compensating event. */
+  readonly reversesEventId: string;
+  readonly operatorUserId: string;
+  readonly clock: Clock;
+  readonly audit?: AuditLogger;
+}
+
+export type ReverseClaimResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * THE COMPENSATING CLAIM — `reverseTradeInTx`'s sibling, closing the one gap claims had against
+ * the standard trade set: an operator can now undo one, audited, instead of doing it by hand.
+ *
+ * SELF-GUARDING WITHOUT A CLAIMS TABLE. A trade has a row to stamp `reversed_at` on; a claim
+ * exists only as its audit event, and the guard is derived from state instead: the added player
+ * must still be on that team (a second reversal, or a claim whose player was since dropped or
+ * traded, refuses here — the PLAYER_MOVED_AGAIN discipline), and the dropped player must still
+ * be free in the league. Both are the honest questions, and both answers change the moment the
+ * reversal runs, which is what makes running it twice impossible rather than merely forbidden.
+ *
+ * Same transaction order as the claim itself, for the same reasons: advisory lock on the player
+ * pair, materialize locked lineups first, place through `assignSlot`, one upsert, null the
+ * removed player out of unlocked saved lineups, audit LAST (lock-order ruling 3).
+ */
+export async function reverseClaimInTx(tx: DbTx, input: ReverseClaimInput): Promise<ReverseClaimResult> {
+  const audit = input.audit ?? getAuditLogger();
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`claim:${input.leagueId}:${input.addedPlayerId}`}))`);
+
+  const [league] = await tx.select({ id: leagues.id, slotConfig: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
+  if (league === undefined) return { ok: false, reason: CLAIM_REFUSALS.leagueMissing };
+  const slotConfig: readonly RosterSlotConfig[] = league.slotConfig;
+
+  const currentRows = await tx
+    .select({ teamId: rosterSlots.teamId, slot: rosterSlots.slot, slotIndex: rosterSlots.slotIndex, playerId: rosterSlots.playerId })
+    .from(rosterSlots)
+    .where(eq(rosterSlots.teamId, input.teamId));
+  const current = toFilledRosterSlots(currentRows);
+  if (!current.some((slot) => slot.playerId === input.addedPlayerId)) return { ok: false, reason: CLAIM_REVERSAL_REFUSALS.notOnRoster };
+
+  let restored: { readonly slot: string; readonly slotIndex: number } | null = null;
+  const cleared = current.filter((slot) => slot.playerId !== input.addedPlayerId);
+  let nextRoster = cleared;
+  if (input.droppedPlayerId !== null) {
+    const [holder] = await tx
+      .select({ teamId: rosterSlots.teamId })
+      .from(rosterSlots)
+      .innerJoin(teams, eq(rosterSlots.teamId, teams.id))
+      .where(and(eq(teams.leagueId, input.leagueId), eq(rosterSlots.playerId, input.droppedPlayerId)));
+    if (holder !== undefined) return { ok: false, reason: CLAIM_REVERSAL_REFUSALS.dropTaken };
+    const [dropped] = await tx.select({ id: players.id, position: players.position }).from(players).where(eq(players.id, input.droppedPlayerId));
+    if (dropped === undefined) return { ok: false, reason: CLAIM_REFUSALS.playerMissing };
+    const assignment = assignSlot({ position: dropped.position, roster: cleared, slotConfig });
+    if (!assignment.ok) return { ok: false, reason: CLAIM_REVERSAL_REFUSALS.noRoomBack };
+    restored = { slot: assignment.slot, slotIndex: assignment.slotIndex };
+    nextRoster = [...cleared, { slot: assignment.slot, slotIndex: assignment.slotIndex, playerId: dropped.id }];
+  }
+
+  await materializeLockedLineupsInTx(tx, { leagueId: input.leagueId, teamIds: [input.teamId, input.teamId], slotConfig });
+
+  const writeRows = defaultLineup(slotConfig, nextRoster).map((slot) => ({
+    teamId: input.teamId,
+    slot: slot.slot,
+    slotIndex: slot.slotIndex,
+    playerId: slot.playerId,
+  }));
+  await tx
+    .insert(rosterSlots)
+    .values(writeRows)
+    .onConflictDoUpdate({ target: [rosterSlots.teamId, rosterSlots.slot, rosterSlots.slotIndex], set: excludedSetFor(rosterSlots, ["teamId", "slot", "slotIndex"]) });
+
+  // The removed player must not stay fielded in any UNLOCKED saved lineup.
+  const weekRows = await tx.select({ week: statWeeks.week, status: statWeeks.status }).from(statWeeks);
+  const lockedWeeks = weekRows.filter((row) => isLineupLocked(row.status)).map((row) => row.week);
+  await tx
+    .update(lineupSlots)
+    .set({ playerId: null })
+    .where(
+      and(
+        eq(lineupSlots.teamId, input.teamId),
+        eq(lineupSlots.playerId, input.addedPlayerId),
+        lockedWeeks.length === 0 ? sql`true` : notInArray(lineupSlots.weekNumber, lockedWeeks),
+      ),
+    );
+
+  await audit.record(tx, {
+    eventType: "roster_move",
+    actorId: input.operatorUserId,
+    // "user": the audit domain knows people and the system, and an operator is a person whose
+    // authority the payload's own reason carries — the same shape reverseTradeInTx writes.
+    actorType: "user",
+    leagueId: input.leagueId,
+    payload: {
+      reason: "claim_reversed",
+      teamId: input.teamId,
+      removedPlayerId: input.addedPlayerId,
+      restoredPlayerId: input.droppedPlayerId,
+      restoredTo: restored,
+      reversesEventId: input.reversesEventId,
+    },
+    occurredAt: input.clock.now(),
+  });
+
+  return { ok: true };
 }

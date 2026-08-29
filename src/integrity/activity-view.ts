@@ -34,7 +34,8 @@ export const ACTIVITY_VISIBILITY: Readonly<Record<AuditEventType, ActivityVisibi
   /**
    * Task 5 (ruling 12): a roster change caused by a trade is exactly the kind of thing a league
    * feed exists for, unlike the negotiation that led to it. `renderRosterMove` only ever renders
-   * for the two reasons this plan writes (`"trade"`, `"trade_reversed"`) — a `roster_move` this
+   * for the four reasons the product writes (`"trade"`, `"trade_reversed"`, `"claim"`,
+   * `"claim_reversed"`) — a `roster_move` this
    * process doesn't recognize the reason for renders nothing, the same deny-by-default the rest
    * of this module holds every payload to.
    */
@@ -345,6 +346,32 @@ function renderTradeAccepted(event: AuditEvent, names: ActivityNames): Rendered 
  */
 function renderRosterMove(event: AuditEvent, names: ActivityNames): Rendered | null {
   const reason = str(event.payload, "reason");
+
+  // The claim pair (2026-08-28, free agency). Same deny-by-default: a payload missing its ids
+  // renders nothing rather than a half-sentence.
+  if (reason === "claim") {
+    const teamId = str(event.payload, "teamId");
+    const addedPlayerId = str(event.payload, "addedPlayerId");
+    if (teamId === undefined || addedPlayerId === undefined) return null;
+    const droppedPlayerId = str(event.payload, "droppedPlayerId");
+    return {
+      icon: "refresh-cw",
+      headline: `${names.team(teamId)} added ${names.player(addedPlayerId)} from free agency.`,
+      detail: droppedPlayerId === undefined ? null : `${names.player(droppedPlayerId)} was dropped to make room.`,
+    };
+  }
+  if (reason === "claim_reversed") {
+    const teamId = str(event.payload, "teamId");
+    const removedPlayerId = str(event.payload, "removedPlayerId");
+    if (teamId === undefined || removedPlayerId === undefined) return null;
+    const restoredPlayerId = str(event.payload, "restoredPlayerId");
+    return {
+      icon: "refresh-cw",
+      headline: `An operator reversed ${names.team(teamId)}'s claim of ${names.player(removedPlayerId)}.`,
+      detail: restoredPlayerId === undefined ? null : `${names.player(restoredPlayerId)} went back to their roster.`,
+    };
+  }
+
   if (reason !== "trade" && reason !== "trade_reversed") return null;
   const proposerTeamId = str(event.payload, "proposerTeamId");
   const counterpartyTeamId = str(event.payload, "counterpartyTeamId");
