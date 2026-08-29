@@ -62,9 +62,16 @@ interface OpenBand {
  * because the next player sat a measured cliff away — never for the ladder's last band, which has
  * nothing after it to describe.
  */
+/**
+ * REWRITTEN 2026-08-28: the founder read "C ROUNDS 13 TO 14, THEN A REAL DROP" and asked what it
+ * was telling them — which is law 5's own failure condition, since the consequence must explain
+ * itself in plain words. Two fixes: the round range now says what it IS ("usually drafted in"),
+ * and the cliff names what a reader should DO with it (the next tier is a step down, so this
+ * band is the window). "Then" was the ambiguity — a temporal word narrating an ADP fact.
+ */
 function bandLabel(firstRound: number, lastRound: number, cliffFollows: boolean): string {
-  const rounds = firstRound === lastRound ? `Round ${firstRound}` : `Rounds ${firstRound} to ${lastRound}`;
-  return cliffFollows ? `${rounds}, then a real drop` : `${rounds} and later`;
+  const rounds = firstRound === lastRound ? `usually drafted in round ${firstRound}` : `usually drafted in rounds ${firstRound} to ${lastRound}`;
+  return cliffFollows ? `${rounds} · next tier is a big step down` : rounds;
 }
 
 function seal(band: OpenBand, id: number, teamCount: number, cliffFollows: boolean): readonly (readonly [string, PoolTier])[] {
