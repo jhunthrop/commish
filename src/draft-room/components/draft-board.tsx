@@ -465,7 +465,11 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
                 .map((cell) => (
                   <li key={cell.teamId} className="flex items-center gap-2">
                     <span className="w-24 shrink-0 truncate font-display font-semibold text-text-muted">{teamName(byId, cell.teamId)}</span>
-                    <span className="grow">{cellFor(cell)}</span>
+                    {/* `min-w-0` beside `grow`: a flex item's automatic minimum size is its
+                        content, so a sticker's own face plus a long name stretched this list past
+                        a 360px viewport and scrolled the whole PAGE sideways. The sticker's own
+                        inner column already truncates; this is what lets it. */}
+                    <span className="min-w-0 grow">{cellFor(cell)}</span>
                   </li>
                 ))}
             </ul>

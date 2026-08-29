@@ -89,7 +89,13 @@ export function PickWire({ view, teams, playersById, players, variant = "room" }
   return (
     <div
       data-testid="pick-wire"
-      className={`h-8 shrink-0 truncate border-t border-line font-mono leading-8 text-text-muted ${TEXT_SIZE[variant]}`}
+      // `min-w-0` beside `truncate`: `truncate` clips what overflows, but this band is a flex
+      // ITEM in the room's and the TV's column and a flex item's automatic minimum size is its
+      // CONTENT, so six un-wrapping mono pick items could stretch the column itself. Belt and
+      // braces on the one band whose content length is unbounded — the 360px sweep this pass ran
+      // found the real page-level leaks elsewhere (`mock-results.tsx`'s grid items and
+      // `draft-board.tsx`'s narrow list), but this is the same class of bug one paste away.
+      className={`h-8 min-w-0 shrink-0 truncate border-t border-line font-mono leading-8 text-text-muted ${TEXT_SIZE[variant]}`}
     >
       {entries.length === 0 ? null : (
         <ul aria-label="Recent picks" className="inline">

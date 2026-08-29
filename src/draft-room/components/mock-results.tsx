@@ -212,7 +212,7 @@ function PickList({
                     what made a column of near-identical phrases read as the loudest thing in the
                     log. The width it gives back goes to the NAME, which is the thing being
                     scanned. */}
-                <span className={`w-40 shrink-0 truncate text-right font-mono text-xs tabular-nums ${best ? "font-semibold text-text-primary" : "text-text-muted"}`}>
+                <span className={`hidden w-40 shrink-0 truncate text-right font-mono text-xs tabular-nums sm:block ${best ? "font-semibold text-text-primary" : "text-text-muted"}`}>
                   {formatPickFactClause(copy.pickFact, review, player.position)}
                 </span>
               </li>
@@ -288,17 +288,21 @@ export function MockResults({ view, teams, board, players, myTeamId, copy, actio
       <div className="grid gap-8 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
         {myTeamId === null ? null : (
           <>
-            <div className="order-1">
+            {/* `min-w-0` on both grid items, and it is load-bearing at 360px
+                (`TOKENS.minViewport`): a grid item's default `min-width: auto` is its CONTENT, so
+                a roster row's own face plus sticker stretched this column past the viewport and
+                the whole PAGE scrolled sideways. Not the column: the page. */}
+            <div className="order-1 min-w-0">
               <RosterSection view={view} playersById={playersById} myTeamId={myTeamId} copy={copy} />
             </div>
-            <div className="order-2">
+            <div className="order-2 min-w-0">
               <PickList judged={judged} copy={copy} />
             </div>
           </>
         )}
         {/* The finished board (review R3/E7) — for EVERY caller, including the commissioner
             with no team, for whom the room's own completed picture is the whole point. */}
-        <div className="order-3 min-h-0 lg:col-span-2">{board}</div>
+        <div className="order-3 min-h-0 min-w-0 lg:col-span-2">{board}</div>
       </div>
       {/* LAW 6: the screen ends in a lower third. The story this draft told (steals, reaches,
           the single best pick) and then the one act it is waiting on. A commissioner who watched
