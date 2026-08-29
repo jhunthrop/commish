@@ -54,12 +54,15 @@ export const metadata: Metadata = pageTitle("Your profile");
  *
  * - **Who you are** — `ProfileForm` (which renders `AvatarPicker` internally) and the account
  *   facts WorkOS owns.
- * - **How the product treats you** — `HelpLevelForm`, `ThemeSwitcher`, and the wallet's door.
- * - **What reaches you, and what you told the world** — `NotificationSummary` and
- *   `ReviewComposer`.
+ * - **How the product treats you** — `HelpLevelForm`, the wallet's door, and
+ *   `NotificationSummary`. (`ThemeSwitcher` left this column under Sunday v5 and became the
+ *   page's foot band; see below.)
+ * - **What you told the world** — `ReviewComposer`.
  *
  * Every column is a flow of `Panel`s at the same width, so no column can run out of content and
- * leave a gutter. The review section keeps `max-w-prose` INSIDE its own panel — it is the one
+ * leave a gutter. Sunday v5 moved `NotificationSummary` one column left for exactly that reason:
+ * with the theme band pulled out to the foot, the middle column ended 800px above its neighbours,
+ * which is the same "space that exists to calm" the old two-column shape was rebuilt to close. The review section keeps `max-w-prose` INSIDE its own panel — it is the one
  * block that holds prose someone writes, and a measured paragraph inside a full-bleed frame is
  * the idiom `AppShell`'s own docblock states.
  *
@@ -112,16 +115,17 @@ export default async function ProfilePage() {
         </section>
 
         <section className="flex flex-col gap-4" aria-label="How the product treats you">
+          {/* The caption over this control is gone (v5 subtraction): "Your experience above sets
+              this for you. Change it here any time, and changing your experience sets it again."
+              restated the control's own hint back at the reader in a circle, and the `Select`
+              below already says what each setting does in the words that matter. */}
           <Panel title="Preferences">
-            <p className="text-sm text-text-muted">
-              Your experience above sets this for you. Change it here any time, and changing your experience sets it again.
-            </p>
             <HelpLevelForm helpLevel={preferences.helpLevel} />
           </Panel>
-          <ThemeSwitcher />
           {/* The wallet's DOOR (self review D1, 2026-08-27): a repo-wide sweep found zero links
               to /app/wallet — the product's biggest trust surface was unreachable by
-              construction. The member's own place is where their money door belongs. */}
+              construction. The member's own place is where their money door belongs. The free
+              season sentence stays: money copy is load-bearing and never trimmed for register. */}
           <Panel title="Wallet">
             <div className="flex flex-col items-start gap-2">
               <p className="text-sm text-text-muted">Every league is free this season, so there is nothing to deposit yet.</p>
@@ -130,10 +134,10 @@ export default async function ProfilePage() {
               </ButtonLink>
             </div>
           </Panel>
+          <NotificationSummary />
         </section>
 
-        <section className="flex flex-col gap-4" aria-label="What reaches you">
-          <NotificationSummary />
+        <section className="flex flex-col gap-4" aria-label="What you told the world">
           <Panel title="Leave a review">
             <p className="max-w-prose text-sm text-text-muted">
               What you say here appears on the public review feed, unfiltered by rating.{" "}
@@ -148,6 +152,14 @@ export default async function ProfilePage() {
           </Panel>
         </section>
       </div>
+
+      {/* SUNDAY v5, LAW 6 — the account room's foot. The theme band moved out of the middle
+          column and across the whole page: it is the one decision on this route that governs
+          every OTHER screen, which is what earns a lower third on a surface that is otherwise
+          three columns of settings that save themselves. `ThemeSwitcher`'s own docblock carries
+          the full argument, including why it is the band's geometry rather than the `LowerThird`
+          primitive (a three-way preference is a control, never a verb). */}
+      <ThemeSwitcher />
     </>
   );
 }
