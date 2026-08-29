@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { EmptyState } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { moneyIsLive } from "@/money/states";
@@ -201,6 +202,12 @@ export function OpenLeagueShelf({
   );
   const featuredId = featuredInHero ? null : featuredLeagueId(merged);
   const Heading = headingLevel === 1 ? "h1" : "h2";
+  // The tower's one axis: seats remaining, ascending. Rooms with claims rank above untouched
+  // rooms whatever their size, because a claim is the fact that starts a room's clock.
+  const seatsRemaining = (league: PublicLeagueSummary): number => league.teamCount - league.filledTeams;
+  const filling = merged.filter((league) => league.filledTeams > 0).sort((a, b) => seatsRemaining(a) - seatsRemaining(b));
+  const fresh = merged.filter((league) => league.filledTeams === 0);
+  const houseIds = new Set(house.map((league) => league.id));
 
   return (
     <div className="flex flex-col gap-4">
@@ -224,32 +231,47 @@ export function OpenLeagueShelf({
 
       {merged.length > 0 ? (
         <>
-          {/* Task 13 (FOUNDER-ORDERED): on lg+ the shelf is a hairline-separated ROW stack —
-              horizontal rows, one league each, under one eyebrow column header — because a grid
-              of cards gave the eye nowhere to land. The `data-testid="member-league"` scoping
-              (`season.spec.ts`'s "click the first Join button") rides on BOTH renderings' member
-              `<li>`s: house leagues share each list, render the identical "Join {name}"
-              accessible-name shape, and a house league's tier can refuse the very manager the
-              spec is driving. This block renders FIRST so a `.first()` text read at a desktop
-              viewport lands on the visible form. */}
+          {/* THE RANKED BOARD (Sunday v5; founder: "boring and stagnant... make it feel alive
+              like the tower"). One list, ranked by the one number that varies — seats remaining
+              — so P1 is the room that fires next, with the leader wearing the amber rail. Two
+              chapter bands (law 5), each carrying its consequence in words: rooms with claims
+              are FILLING, untouched rooms wait below. House-first ordering died with the
+              ranking; a leaderboard has one axis. */}
           <div data-testid="league-rows" className="hidden lg:block">
             <LeagueRowsHeader />
+            {filling.length > 0 ? (
+              <div className="flex items-center gap-2.5 border-t border-line bg-gradient-to-r from-surface-raised to-transparent px-2 py-1.5">
+                <span className={`${MICRO_LABEL} rounded-sm bg-live px-2 py-0.5 font-semibold text-live-text`}>Filling</span>
+                <span className={`${MICRO_LABEL} text-text-muted`}>Claimed seats · first to fill is first to draft</span>
+              </div>
+            ) : null}
             <ul className="flex flex-col">
-              {house.map((league) => (
-                <li key={league.id} className="border-t border-line">
+              {filling.map((league, index) => (
+                <li key={league.id} className="border-t border-hair border-t-line" data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
                   <LeagueRow
                     league={league}
                     signedIn={signedIn}
+                    position={index + 1}
+                    leader={index === 0}
                     emphasis={league.id === featuredId ? "ink" : "quiet"}
                     headingLevel={headingLevel === 1 ? 2 : 3}
                   />
                 </li>
               ))}
-              {leagues.map((league) => (
-                <li key={league.id} className="border-t border-line" data-testid="member-league">
+            </ul>
+            {fresh.length > 0 ? (
+              <div className="flex items-center gap-2.5 border-t border-line bg-gradient-to-r from-surface-raised to-transparent px-2 py-1.5">
+                <span className={`${MICRO_LABEL} rounded-sm bg-surface-raised px-2 py-0.5 font-semibold text-text-muted`}>Fresh</span>
+                <span className={`${MICRO_LABEL} text-text-muted`}>No claims yet · yours would be the first seat</span>
+              </div>
+            ) : null}
+            <ul className="flex flex-col">
+              {fresh.map((league, index) => (
+                <li key={league.id} className="border-t border-line" data-testid={houseIds.has(league.id) ? undefined : "member-league"}>
                   <LeagueRow
                     league={league}
                     signedIn={signedIn}
+                    position={filling.length + index + 1}
                     emphasis={league.id === featuredId ? "ink" : "quiet"}
                     headingLevel={headingLevel === 1 ? 2 : 3}
                   />

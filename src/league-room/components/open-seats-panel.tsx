@@ -49,9 +49,11 @@ export function OpenSeatsPanel({ leagues, quiet = false }: OpenSeatsPanelProps) 
       <div data-testid="league-rows" className="hidden lg:block">
         <LeagueRowsHeader />
         <ul className="flex flex-col">
-          {leagues.map((league) => (
+          {leagues.map((league, index) => (
             <li key={league.id} className="border-t border-line">
-              <LeagueRow league={league} signedIn emphasis="quiet" />
+              {/* Ranked the same way the storefront board is: this panel's caller already sorts
+                  by seats remaining, so the index IS the rank. */}
+              <LeagueRow league={league} signedIn emphasis="quiet" position={index + 1} leader={index === 0 && league.filledTeams > 0} />
             </li>
           ))}
         </ul>

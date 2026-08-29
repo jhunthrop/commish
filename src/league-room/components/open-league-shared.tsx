@@ -76,8 +76,8 @@ function Dot() {
 export function LiveChip({ label }: { readonly label: string }) {
   const reducedMotion = usePrefersReducedMotion();
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-negative">
-      <span aria-hidden="true" className={`size-1.5 rounded-pill bg-negative${reducedMotion ? "" : " animate-pulse-live"}`} />
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-live">
+      <span aria-hidden="true" className={`size-1.5 rounded-pill bg-live${reducedMotion ? "" : " animate-pulse-live"}`} />
       {label}
     </span>
   );
@@ -211,6 +211,7 @@ export function FormatLine({ league }: { readonly league: PublicLeagueSummary })
  * rather than forking a second ticking clock with its own onDeck gate.
  */
 export function ScheduledDraftValue({
+  relativeFirst = false,
   league,
   onDeck,
   remainingMs,
@@ -222,6 +223,8 @@ export function ScheduledDraftValue({
   readonly remainingMs: number | null;
   readonly className?: string;
   readonly size?: CountdownSize;
+  /** Lead with the relative fact and drop the date to the faint line — the tower rows' mode. */
+  readonly relativeFirst?: boolean;
 }) {
   if (league.startTrigger === "when_full") {
     return (
@@ -230,11 +233,28 @@ export function ScheduledDraftValue({
       <span className={`min-w-0 font-medium text-text-primary ${className}`}>Drafts when full</span>
     );
   }
-  return onDeck && remainingMs !== null ? (
-    <Countdown remainingMs={remainingMs} size={size} tone="hot" data-testid="draft-clock" />
-  ) : (
-    <span className={`min-w-0 font-medium tabular-nums text-text-primary ${className}`}>{league.draftAt}</span>
-  );
+  if (onDeck && remainingMs !== null) {
+    return <Countdown remainingMs={remainingMs} size={size} tone="hot" data-testid="draft-clock" />;
+  }
+  if (relativeFirst) {
+    // The tower's reading order (Sunday v5, law 1): the RELATIVE fact leads, because "in 2
+    // days" is the delta a visitor decides on, and the absolute date is the record. `draftAt`
+    // arrives preformatted ("Sunday 30 August, 8:52 PM UTC (in 2 days)"); the split is on the
+    // parenthetical the formatter itself appends, and a string without one renders whole
+    // rather than being reformatted here — law 7, never restate a fact this component does
+    // not own.
+    const match = /^(.*?)\s*\((in [^)]+)\)$/.exec(league.draftAt);
+    if (match !== null) {
+      const [, absolute, relative] = match;
+      return (
+        <span className={`flex min-w-0 flex-col ${className}`}>
+          <span className="font-medium text-text-primary first-letter:uppercase">{relative}</span>
+          <span className="text-xs text-text-faint">{absolute}</span>
+        </span>
+      );
+    }
+  }
+  return <span className={`min-w-0 font-medium tabular-nums text-text-primary ${className}`}>{league.draftAt}</span>;
 }
 
 /**

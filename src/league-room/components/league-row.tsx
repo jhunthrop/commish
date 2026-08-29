@@ -1,7 +1,8 @@
 "use client";
 
 import { SeatMeter } from "@/components/ui";
-import { MICRO_LABEL } from "@/components/ui/config";
+import { MICRO_LABEL, UI_CONFIG } from "@/components/ui/config";
+import { useValueChangeHighlight } from "@/design/use-value-change-highlight";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import {
   DraftTimingNotes,
@@ -9,49 +10,42 @@ import {
   LiveChip,
   OpenLeagueCta,
   ScheduledDraftValue,
-  entryFeeLabel,
   stakeBadge,
   useOpenLeagueLive,
 } from "./open-league-shared";
 
 /**
  * The one grid template the column-header row and every league row share — six columns:
- * name+chip · format line · Drafts · Entry · Seats · action. `minmax(0, …)` on every fr column
+ * position · name+chip · format · drafts · seats · verb. `minmax(0, …)` on every fr column
  * for the same reason the card grid's items carry `min-w-0`: a grid track's default
  * `min-width: auto` otherwise lets a long league name widen its column past its share.
  *
- * Entry and action are FIXED pixel tracks, never `max-content` (storefront review D2, fixed
- * rather than left as the finding's second option): `LeagueRowsHeader` and `LeagueRow` are TWO
- * SEPARATE grid containers sharing this one class string, and `max-content` resolves PER
- * CONTAINER — the header's own Entry cell ("Entry", ~34px) and a data row's own Entry cell
- * ("Free" or a real fee, ~27–70px) sized to two different widths, which pushed every column to
- * its right out of alignment by exactly that difference (measured: up to 80px at Entry/Seats).
- * A fixed track resolves to the identical width in both containers regardless of either one's
- * content, which is what makes the header sit over its columns rather than merely near them. 96px
- * clears every entry-fee string this product renders today (`entryFeeLabel`, up to `$9,999.00`);
- * 176px clears the row's longest CTA text, "Take the last seat" (`ctaVisibleText`), at the
- * button's own `md` padding.
+ * SUNDAY v5 (founder, 2026-08-28: "this table is boring and feels stagnant"): the ENTRY column
+ * is deleted — every league is free this season, and a column with zero variance carries no
+ * information, which is the tower's own test for a column's existence. The stake disclosure
+ * line under the board still says the money fact once. POSITION arrived in its place: the board
+ * is ranked by seats remaining, so the room that fires next reads as P1, which is what makes a
+ * list a leaderboard.
+ *
+ * The verb track stays 176px: it clears "Take the last seat" (`ctaVisibleText`) at the button's
+ * own `md` padding, and a fixed track is what keeps the header aligned over two separate grid
+ * containers (storefront review D2 — `max-content` resolves per container).
  */
 export const LEAGUE_ROW_GRID =
-  "grid grid-cols-[minmax(0,2.1fr)_minmax(0,2fr)_minmax(0,1.7fr)_96px_minmax(0,1.9fr)_176px] items-center gap-x-4";
+  "grid grid-cols-[44px_minmax(0,2.2fr)_minmax(0,1.7fr)_minmax(0,1.7fr)_minmax(0,2fr)_176px] items-center gap-x-4";
 
 /**
- * The five column names, once, above the stack — EYEBROW register (sentence case, mono, quiet;
- * the caps charter applies to headers too). `aria-hidden`: a bare run of five nouns read in
- * sequence tells a screen reader nothing a row does not already say better — every cell that
- * needs a spoken key carries its own (`sr-only` "Entry", the full seat sentence, the CTA's
- * accessible name), so this line is layout for eyes, like the seat segments beside their
- * sentence. The sixth (action) column deliberately has no name: a pill names itself.
+ * The column names, once, above the stack — the shouted micro-label register (the one register
+ * a scoreboard has always shouted quietly). `aria-hidden`: every cell that needs a spoken key
+ * carries its own, so this line is layout for eyes. The verb column names itself.
  */
 export function LeagueRowsHeader() {
   return (
-    // Sunday v5: column heads take the shouted micro-label register — the one register a
-    // scoreboard has always shouted quietly, and the timing-tower render's own head row.
-    <div aria-hidden="true" className={`${LEAGUE_ROW_GRID} pb-2 ${MICRO_LABEL} text-text-faint`}>
+    <div aria-hidden="true" className={`${LEAGUE_ROW_GRID} pb-2 pl-2 ${MICRO_LABEL} text-text-faint`}>
+      <span>#</span>
       <span>League</span>
       <span>Format</span>
       <span>Drafts</span>
-      <span>Entry</span>
       <span>Seats</span>
       <span />
     </div>
@@ -61,44 +55,58 @@ export function LeagueRowsHeader() {
 export interface LeagueRowProps {
   readonly league: PublicLeagueSummary;
   readonly signedIn: boolean;
-  /** Rule 5, one ink action per view — which row, if any, earns it is the PARENT's call
-   *  (`featuredLeagueId`), exactly as on the card. Quiet by default. */
+  /** The board's rank for this room — 1 is the room that fires next. The PARENT computes it
+   *  over the whole ranked list, so a filtered rendering never renumbers. */
+  readonly position: number;
+  /** True on the board's leader — the row that wears the amber rail, the tower's own "your
+   *  row" treatment spent on the room closest to firing. */
+  readonly leader?: boolean;
   readonly emphasis?: "ink" | "quiet";
-  /**
-   * The heading level this row's league name renders at — the PARENT's call, because only the
-   * shelf knows what heading sits above it (page-audit harness, 2026-08-27: `/browse` renders
-   * the shelf under an `<h1>` and every row's hardcoded `<h3>` skipped a level, eleven axe
-   * `heading-order` violations on one page; the front door's shelf sits under an `<h2>`, where
-   * `h3` was right all along). Defaults to the front door's shape.
-   */
+  /** The heading level this row's league name renders at — the PARENT's call (page-audit
+   *  harness, 2026-08-27). Defaults to the front door's shape. */
   readonly headingLevel?: 2 | 3;
 }
 
 /**
- * THE open-league row (Phase 3.7, Task 13 — FOUNDER-ORDERED, 2026-08-24 live-page feedback:
- * "horizontal row elements instead of these cards - my eyes don't know where to focus"): one
- * league per horizontal row on lg+ viewports, in a hairline-separated stack (rule 4 — the
- * hairline lives on the parent's `<li>`, no boxes), the six columns above. Below lg the shelf
- * renders `OpenLeagueCard` instead — a six-column row cannot fit 360px; the card IS the mobile
- * form. Every derived fact comes from `open-league-shared.tsx`, the ONE source both forms
- * consume, so a row and a card can never disagree about the same league.
+ * THE open-league row as a timing-tower line (Sunday v5; founder, 2026-08-28: "make it feel
+ * alive like the tower"). What changed from the ledger row it replaces, law by law:
  *
- * Deliberately NOT here, per the founder's six columns: the card's Roster and Playoffs ledger
- * rows and the beginner escape-hatch paragraph — the format line's "newer players only" still
- * says who a beginner row is for, and the CTA's accessible name still says it to a screen
- * reader, verbatim. There is no `helpLevel` prop at all: guided captions never print inline in
- * a row, regardless of the member's stored preference — the InfoTips stay click-only.
+ * - LAW 1/2 — a POSITION numeral leads the row, and the board is ranked by the one number that
+ *   varies: seats remaining. P1 is the room that fires next.
+ * - LAW 3 — seats-left is the row's HERO number, display face at 2xl, not a micro caption. The
+ *   pips read under it as the shape; the number is the fact.
+ * - THE LIVE CHANNEL — a room inside `lowSeatsThreshold` of firing paints its numeral live-red.
+ *   That is the real threshold every seat sentence already keys on, not a vibe.
+ * - MOTION REPORTS — `useValueChangeHighlight` flashes the numeral amber for a beat when the
+ *   live count actually changes (a claim landed while you were looking). Nothing animates on
+ *   mount; a row is only ever seen moving because the world moved.
+ * - The DRAFTS column leads with the relative fact ("In 2 days" / "When full" / the ticking
+ *   countdown) and drops the absolute date to the faint line — the delta is the story, the
+ *   date is the record.
  */
-export function LeagueRow({ league, signedIn, emphasis = "quiet", headingLevel = 3 }: LeagueRowProps) {
+export function LeagueRow({ league, signedIn, position, leader = false, emphasis = "quiet", headingLevel = 3 }: LeagueRowProps) {
   const { remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
+  const claimFlash = useValueChangeHighlight(remainingSeats);
   const NameHeading = headingLevel === 2 ? "h2" : "h3";
 
+  const urgent = league.filledTeams > 0 && remainingSeats > 0 && remainingSeats < UI_CONFIG.seatMeter.lowSeatsThreshold;
+
   return (
-    <div className={`${LEAGUE_ROW_GRID} py-3`}>
+    <div
+      className={`${LEAGUE_ROW_GRID} border-l-[3px] py-3 pl-2 transition-colors hover:bg-surface-elevated ${
+        leader ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent" : "border-l-transparent"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`font-display text-2xl font-extrabold tabular-nums ${
+          leader ? "text-accent" : urgent ? "text-live" : "text-text-faint"
+        }`}
+      >
+        {position}
+      </span>
+
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        {/* The ledger-card register (16.5/600, sentence case) — the same heading element the
-            card renders, so every heading-role read of the shelf survives the form change. */}
-        {/* The tower's name register: the display face at its earned 700 (law 3). */}
         <NameHeading className="min-w-0 break-words font-display text-lg font-bold leading-display text-text-primary">
           {league.name}
         </NameHeading>
@@ -109,25 +117,21 @@ export function LeagueRow({ league, signedIn, emphasis = "quiet", headingLevel =
       <FormatLine league={league} />
 
       <div className="min-w-0 text-sm">
-        <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} />
+        <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} relativeFirst />
         <DraftTimingNotes league={league} />
       </div>
 
-      <div className="text-sm">
-        {/* The row's only spoken key: "Free" alone, mid-row, would answer a question a screen
-            reader was never asked. Money green is what green means (rule 1). */}
-        <span className="sr-only">Entry</span>{" "}
-        {/* A price is a FACT (law 1), so it wears ink. v3 painted it money-green; v5's green is
-            gone and cyan is the verdict channel, which a price has no claim on. */}
-        <span className="font-display font-semibold text-text-primary">{entryFeeLabel(league)}</span>
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-1 text-sm">
-        <span className={`${MICRO_LABEL} tabular-nums text-text-faint`}>
-          {remainingSeats} of {league.teamCount} open
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <span
+          className={`font-display text-2xl font-bold leading-none tabular-nums transition-colors duration-500 ${
+            claimFlash ? "text-accent" : urgent ? "text-live" : "text-text-primary"
+          }`}
+        >
+          {remainingSeats}
+          <span className={`${MICRO_LABEL} ml-1.5 align-middle font-sans text-text-faint`}>
+            {remainingSeats === 1 ? "seat left" : "left"} of {league.teamCount}
+          </span>
         </span>
-        {/* F17 kept: the one product seat sentence still speaks (held seats included) — sr-only,
-            because the tabular count above is this column's visible value. */}
         <SeatMeter filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} srOnlySentence />
       </div>
 
