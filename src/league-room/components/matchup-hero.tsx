@@ -219,6 +219,10 @@ function Seed({ line, align }: { readonly line: RecordsByTeamId[string] | undefi
   if (line === undefined) return <span />;
   return (
     <span className={`flex items-baseline gap-2 ${SEED_ALIGN[align]}`}>
+      {/* The centre column's "Seed" label is a `sm`-and-up treatment (the row is a three-column
+          grid there). Stacked on a phone the two seeds would be two bare numerals with nothing
+          naming them, so each carries its own key at that width instead. */}
+      <span aria-hidden="true" className={`${MICRO_LABEL} text-text-faint sm:hidden`}>Seed</span>
       <span className="font-display text-base font-bold tabular-nums text-text-muted">
         <span aria-hidden="true">{`#${line.rank}`}</span>
         <span className="sr-only">{`Seed ${line.rank}`}</span>
