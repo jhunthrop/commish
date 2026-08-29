@@ -2,9 +2,12 @@
 
 import { useMemo } from "react";
 import type { TeamScore } from "@/stats-pipeline/contract";
-import { EYEBROW, Pill } from "@/components/ui";
+import { ButtonLink, EYEBROW, LowerThird, NOT_STARTED_DASH, signedPoints } from "@/components/ui";
+import { useValueChangeHighlight } from "@/design/use-value-change-highlight";
+import type { LeagueAct } from "@/lib/leagues/next-act";
 import type { MatchupDetail, MatchupWeekBody } from "../contract";
 import { useLiveScores } from "../hooks/use-live-scores";
+import { remainingToPlay, signedMargin, summaryOf } from "../lib/matchup-facts";
 import { startedPointsByPosition } from "../lib/population";
 import type { RecordsByTeamId } from "./matchup-hero";
 import { MatchupLineups, MatchupPanel } from "./matchup-panel";
@@ -73,13 +76,17 @@ function isMine(matchup: MatchupDetail, myTeamId: string | null): boolean {
  * band. They used to be appended to a sentence inside every scoreboard, which printed "0 of 15
  * games final" six times on one screen for one fact.
  */
-export function LiveMatchupWeek({ leagueId, body, records }: {
+export function LiveMatchupWeek({ leagueId, body, records, act = null }: {
   readonly leagueId: string;
   readonly body: MatchupWeekBody;
   /** Every team's win-loss-tie line, joined by the page from the standings read it already makes.
    *  Optional so a test that does not care renders exactly as before — the hero prints no record
    *  rather than a fabricated one. */
   readonly records?: RecordsByTeamId;
+  /** The one act this league is waiting on, computed by the page (`leagueAct`, `@/lib/leagues/
+   *  next-act`) because `nextAction` is a value import this room may not make. `null` is a real
+   *  answer and renders no verb: law 6 gives the verb a place, not an obligation. */
+  readonly act?: LeagueAct | null;
 }) {
   const live = useLiveScores(leagueId, {
     week: body.weekNumber,
@@ -108,19 +115,27 @@ export function LiveMatchupWeek({ leagueId, body, records }: {
   const lead = folded[leadIndex];
   const rest = folded.filter((_, index) => index !== leadIndex);
 
+  // THE TWO VALUES SSE ACTUALLY MOVES ON THIS PAGE, and the only two that flash. `score.update`
+  // carries team totals and the week's own games-final count, so the margin below is derived from
+  // a number that genuinely changes under the reader and the games count changes directly. Every
+  // per-player figure on this page is request-time (`foldLiveScore`'s own docblock), so the
+  // yet-to-play counts are deliberately NOT wired to a highlight: arming a wash on a value that
+  // cannot change is a promise of motion the data never keeps.
+  const margin = lead === undefined ? null : signedMargin(summaryOf(lead), body.myTeamId);
+  // `String`, not the number itself: the hook keys on a scalar and `null` is a real state here
+  // (no score yet). Coercing it to a zero would flash the cell the instant the first score landed,
+  // reporting a change from a number that never existed.
+  const marginFlash = useValueChangeHighlight(String(margin));
+  const gamesFlash = useValueChangeHighlight(live.gamesFinal);
+
   if (lead === undefined) return null;
+
+  const myLeadSide = body.myTeamId === null ? null : lead.home.teamId === body.myTeamId ? lead.home : lead.away.teamId === body.myTeamId ? lead.away : null;
+  const leftToPlay = myLeadSide === null ? null : remainingToPlay(myLeadSide, live.status);
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        {/* The week's own progress, said once. A `Pill` because it is a figure inside a sentence,
-            and `neutral` because a games-final count is a fact about the afternoon rather than
-            something urgent — the live family is spent on the chips that mean "points can still
-            arrive". `gamesTotal === 0` is a week with no `stat_weeks` row yet, which has nothing
-            honest to say about how many of zero games are done. */}
-        {live.gamesTotal === 0 ? null : <Pill>{`${live.gamesFinal} of ${live.gamesTotal} games final`}</Pill>}
-        {notice === null ? null : <p className="text-sm text-text-muted">{notice}</p>}
-      </div>
+      {notice === null ? null : <p className="text-sm text-text-muted">{notice}</p>}
 
       <MatchupPanel
         matchup={lead}
@@ -139,6 +154,64 @@ export function LiveMatchupWeek({ leagueId, body, records }: {
           </MatchupStrip>
         </section>
       )}
+
+      {/*
+        LAW 6 — THE MATCHUP'S LOWER THIRD. *"On a matchup it is the game state and the act the week
+        is waiting on."* Four cells and one verb, left to right in the order a broadcast reads them:
+        where the afternoon is, what state the week is in, the margin AS A DELTA, and how much of
+        this manager's own lineup has yet to take the field.
+
+        THE GAMES COUNT MOVED HERE from a `Pill` at the top of the page, which is a subtraction and
+        not an addition: it was a lone chip floating above the hero, saying a week-wide fact in a
+        place nothing else on the page belonged to. A strip across the foot is where a clock has
+        always gone, and `clock` draws it at the hero size in the live ink for exactly the window
+        it is still ticking.
+
+        THE MARGIN IS UNTINTED, and that is the same refusal `Scoreboard` makes about the winning
+        score, applied to the figure derived from it. A pair is not a population: a percentile
+        inside a set of two is fully determined by who is ahead, so a one-point lead would wear a
+        blowout's ink. The sign is printed, which is the channel that survives a monochrome screen.
+      */}
+      <LowerThird
+        live={live.status === "in_progress"}
+        cells={[
+          ...(live.gamesTotal === 0
+            ? []
+            : [
+                {
+                  label: "Games final",
+                  clock: live.status === "in_progress",
+                  value: (
+                    <span className={`transition-colors duration-500 ${gamesFlash ? "text-accent" : ""}`}>
+                      {`${live.gamesFinal}/${live.gamesTotal}`}
+                    </span>
+                  ),
+                },
+              ]),
+          { label: "Week", value: WEEK_STATE_WORD[live.status] },
+          {
+            label: mineIndex === -1 ? "Margin" : "Your margin",
+            value: (
+              <span className={`transition-colors duration-500 ${marginFlash ? "text-accent" : ""}`}>
+                {margin === null ? NOT_STARTED_DASH : signedPoints(margin, 2)}
+              </span>
+            ),
+          },
+          ...(leftToPlay === null || leftToPlay === 0
+            ? []
+            : [{ label: "Still to play", value: <span className="text-live">{leftToPlay}</span> }]),
+        ]}
+        action={act === null ? undefined : <ButtonLink href={act.href} variant="verb" size="sm">{act.label}</ButtonLink>}
+      />
     </>
   );
 }
+
+/** The week's state in the words a scoreboard uses, not the enum's own. "In progress" is an
+ *  administrative noun; a week that is happening now reads "Live" (the copy charter's own
+ *  example). */
+const WEEK_STATE_WORD: Readonly<Record<MatchupWeekBody["weekStatus"], string>> = {
+  scheduled: "Not started",
+  in_progress: "Live",
+  final: "Final",
+};

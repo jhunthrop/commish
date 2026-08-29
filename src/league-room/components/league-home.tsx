@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { LeagueHomeBody, LineupBody, MatchupSummary } from "../contract";
-import { Card, Crest, EYEBROW, PageTitle, PlayerFace, PositionBadge } from "@/components/ui";
+import { ButtonLink, Card, Crest, EYEBROW, LowerThird, Movement, PageTitle, PlayerFace, PositionBadge } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import type { HelpLevel } from "@/identity/preferences";
 import type { NextActionKind } from "@/league";
+import type { LeagueAct } from "@/lib/leagues/next-act";
 import { formatRecord, formatWeek } from "../lib/format";
 import { playerOf } from "../lib/player";
 import { AdvisorPanel } from "./advisor-panel";
@@ -41,13 +42,10 @@ import { WeekStatusBadge } from "./week-status-badge";
  *  seed only means something once at least one result has separated the field. */
 function headerFacts(home: LeagueHomeBody): string {
   const parts: string[] = [];
-  const myRank = home.standings.findIndex((row) => row.teamId === home.myTeamId);
-  const myRow = myRank === -1 ? null : home.standings[myRank]!;
-  const hasPlayedWeek = myRow !== null && myRow.wins + myRow.losses + myRow.ties > 0;
-  if (myRow !== null && hasPlayedWeek) {
-    parts.push(formatRecord(myRow));
-    parts.push(`#${myRank + 1} seed`);
-  }
+  // THE RECORD AND THE SEED LEFT THIS LINE (Sunday v5). They are the manager's own standing, and
+  // law 6 gives that to the lower third at the foot of the page, where the seed can carry its
+  // movement beside it. Printing both in the header AND in the strip is one fact twice on one
+  // screen, which is the duplication this pass is spending most of its subtractions on.
   // The next thing on the calendar: the current week once there's a season to point at
   // (`formatWeek`, never a new fact). Before the draft is complete, `WaitingRoom` (below,
   // whenever `home.draftSchedule` is non-null) already owns naming this same instant, in the
@@ -66,9 +64,9 @@ function headerFacts(home: LeagueHomeBody): string {
  * interface does that this band did not.
  */
 function recordsFrom(standings: LeagueHomeBody["standings"]): RecordsByTeamId {
-  const records: Record<string, { wins: number; losses: number; ties: number }> = {};
+  const records: Record<string, RecordsByTeamId[string]> = {};
   for (const row of standings) {
-    records[row.teamId] = { wins: row.wins, losses: row.losses, ties: row.ties };
+    records[row.teamId] = { wins: row.wins, losses: row.losses, ties: row.ties, rank: row.rank, previousRank: row.previousRank };
   }
   return records;
 }
@@ -168,6 +166,7 @@ export function LeagueHome({
    * optional prop on this component already holds.
    */
   nextActionKind = null,
+  act = null,
   playoffTeams = null,
 }: {
   readonly home: LeagueHomeBody;
@@ -180,6 +179,10 @@ export function LeagueHome({
    *  reaches; every other panel on this page ignores it entirely. */
   readonly holdExpired?: boolean;
   readonly nextActionKind?: NextActionKind | null;
+  /** The same act, with the words and the destination — `leagueAct` (`@/lib/leagues/next-act`),
+   *  computed by `LeaguePage` because `nextAction` is a value import this room may not make. It is
+   *  the verb in this page's lower third; `null` renders the strip with no verb at all. */
+  readonly act?: LeagueAct | null;
   /** `LEAGUE_CONFIG.playoffTeams` (Step 3c) — see `StandingsTable`'s own docblock for why this
    *  arrives as a plain prop rather than a value-import. `null` (the default) draws no cut line. */
   readonly playoffTeams?: number | null;
@@ -218,7 +221,7 @@ export function LeagueHome({
       ) : null}
 
       {promoteLineupEditor ? (
-        <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} helpLevel={helpLevel} draftStatus={home.draftStatus} />
+        <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} draftStatus={home.draftStatus} />
       ) : null}
 
       <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
@@ -315,29 +318,43 @@ export function LeagueHome({
         ) : null}
       </section>
 
-      <StandingsTable
-        rows={home.standings}
-        myTeamId={home.myTeamId}
-        helpLevel={helpLevel}
-        medianGame={home.medianGame}
-        playoffTeams={playoffTeams ?? undefined}
-      />
-
       {/*
-        Unlike the draft room's `aside` band, this section sits in ordinary document flow, so
-        `LeagueChat`'s own `h-full min-h-0` chain has nothing bounded to fill and would grow to
-        fit every held message. A fixed height from the spacing scale is all the inner
-        `min-h-0`/`flex-1` chain needs to scroll inside itself instead (L2, final review).
+        THE BOARD AND THE ROOM, SIDE BY SIDE FROM `xl` (Sunday v5). `Table` sizes itself to its
+        content (`w-auto max-w-full`, its own decision), so a twelve-row standings tower occupies
+        roughly 600px and left half a full-bleed shell page empty beneath a hero that spans all of
+        it. Law 3's answer to spare width is never to stretch a table — it is to put another true
+        thing beside it, and the league's own chat is the thing every manager on this page is
+        already scrolling down to find.
+
+        Below `xl` they stack in the order they always did, board first.
+
+        `items-start`: the chat's fixed height (see below) must not be dragged to the tower's, and
+        the tower must not stretch to the chat's.
       */}
-      <div className="h-96">
-        <LeagueChat leagueId={home.leagueId} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] xl:items-start">
+        <StandingsTable
+          rows={home.standings}
+          myTeamId={home.myTeamId}
+          medianGame={home.medianGame}
+          playoffTeams={playoffTeams ?? undefined}
+        />
+
+        {/*
+          Unlike the draft room's `aside` band, this section sits in ordinary document flow, so
+          `LeagueChat`'s own `h-full min-h-0` chain has nothing bounded to fill and would grow to
+          fit every held message. A fixed height from the spacing scale is all the inner
+          `min-h-0`/`flex-1` chain needs to scroll inside itself instead (L2, final review).
+        */}
+        <div className="h-96">
+          <LeagueChat leagueId={home.leagueId} />
+        </div>
       </div>
 
       {/* The default position (Step 4) — rendered here UNLESS `promoteLineupEditor` already put
           it first, right below the header. One rule, read once, at the top of this component;
           there is no second, per-page copy of it down here. */}
       {lineup === null || promoteLineupEditor ? null : (
-        <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} helpLevel={helpLevel} draftStatus={home.draftStatus} />
+        <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} draftStatus={home.draftStatus} />
       )}
 
       {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
@@ -359,7 +376,7 @@ export function LeagueHome({
         not just a cosmetic one: a screen reader's headings list would carry the league's name
         twice for one fact. See `LeagueTermsPanel`'s own docblock.
       */}
-      <LeagueTermsPanel terms={home.terms} helpLevel={helpLevel} titleAs="p" />
+      <LeagueTermsPanel terms={home.terms} titleAs="p" />
 
       <LeagueMembersPanel
         teams={home.teams}
@@ -367,7 +384,6 @@ export function LeagueHome({
         authority={home.authority}
         myTeamId={home.myTeamId}
         compositionCategory={home.compositionCategory}
-        helpLevel={helpLevel}
       />
 
       {/* `id="invite-managers"`: `WaitingRoom`'s own "Invite someone" link (Task 8, a `when_full`
@@ -382,6 +398,60 @@ export function LeagueHome({
           member with extra buttons, not an operator, so this sits behind the identical
           `isCommissioner` gate `InvitePanel` already does, right beside it. */}
       {home.isCommissioner ? <ModerationSummary leagueId={home.leagueId} /> : null}
+
+      {/*
+        LAW 6 — the league home's lower third. Everything above it is a room: a scoreboard, a
+        table, a chat, three panels of terms. The strip is the one place that answers "so what am I
+        supposed to do", which is the question a manager opens this page with and the reason law 6
+        exists at all.
+
+        The cells are this manager's own line in the league — the week, their record, their seed
+        and what it did last week — because the strip speaks to the reader, not about the league in
+        general. A viewer with no team here (a commissioner without one) gets the week and nothing
+        personal, which is the same discipline `headerFacts` above already keeps.
+      */}
+      <LowerThird live={home.weekStatus === "in_progress"} cells={homeCells(home)} action={act === null ? undefined : (
+        <ButtonLink href={act.href} variant="verb" size="sm">{act.label}</ButtonLink>
+      )} />
     </>
   );
+}
+
+/** The week's state in the words a scoreboard uses. "In progress" is an administrative noun; a
+ *  week that is happening now reads "Live" (the copy charter's own worked example). */
+const WEEK_STATE_WORD: Readonly<Record<LeagueHomeBody["weekStatus"], string>> = {
+  scheduled: "Not started",
+  in_progress: "Live",
+  final: "Final",
+};
+
+/**
+ * The lower third's facts, in the order a broadcast reads them: where the season is, then where
+ * this manager is in it.
+ *
+ * The seed carries its movement (law 2) from the SAME standings rows the table below already
+ * renders — `previousRank` is real arithmetic over held-out weeks, never a stored snapshot, so a
+ * league with no week behind it shows the seed alone and no arrow rather than a fabricated zero.
+ */
+function homeCells(home: LeagueHomeBody) {
+  const myRow = home.standings.find((row) => row.teamId === home.myTeamId) ?? null;
+  const played = myRow !== null && myRow.wins + myRow.losses + myRow.ties > 0;
+  return [
+    { label: "Week", value: String(home.currentWeek) },
+    { label: "Week state", value: WEEK_STATE_WORD[home.weekStatus] },
+    ...(myRow === null || !played
+      ? []
+      : [
+          { label: "Your record", value: formatRecord(myRow) },
+          {
+            label: "Seed",
+            value: (
+              <span className="flex items-baseline gap-2">
+                {`#${myRow.rank}`}
+                {myRow.previousRank === null ? null : <Movement places={myRow.previousRank - myRow.rank} against="last week" />}
+              </span>
+            ),
+          },
+        ]),
+  ];
 }

@@ -14,6 +14,47 @@ async function medianByWeekFor(db: Db, leagueId: string): Promise<ReadonlyMap<nu
 }
 
 /**
+ * The last week this league has a settled result in, or `null` before it has any — the boundary
+ * "last week's ranking" is measured against.
+ *
+ * A matchup counts once BOTH scores are present, which is the identical test `computeStandings`
+ * itself applies. A half-scored week is not a result, so it is not a week the standings moved in.
+ */
+function lastSettledWeek(rows: readonly { readonly weekNumber: number; readonly homeScore: number | null; readonly awayScore: number | null }[]): number | null {
+  let latest: number | null = null;
+  for (const row of rows) {
+    if (row.homeScore === null || row.awayScore === null) continue;
+    if (latest === null || row.weekNumber > latest) latest = row.weekNumber;
+  }
+  return latest;
+}
+
+/**
+ * Where every team stood BEFORE the most recent settled week — law 2's previous value, and the
+ * whole reason the standings can show `▲2` instead of only `3`.
+ *
+ * IT IS ARITHMETIC, NOT A SECOND SOURCE, which is what makes it legal under law 7. The same
+ * `computeStandings` runs a second time over the same matchup rows already in hand, with the most
+ * recent settled week held out — no new query, no stored history table, no snapshot anybody has to
+ * trust. A league whose only settled week IS the most recent one has nothing to hold out, so the
+ * map comes back empty and every row reports a dash rather than a fabricated "unchanged".
+ */
+function previousRankByTeamId(input: {
+  readonly teamIds: readonly string[];
+  readonly matchups: readonly Parameters<typeof computeStandings>[0]["matchups"][number][];
+  readonly medianByWeek: ReadonlyMap<number, number>;
+}): ReadonlyMap<string, number> {
+  const boundary = lastSettledWeek(input.matchups);
+  // `null` is a league with no results at all; `1` is a league whose first week is its only one.
+  // Neither has a previous ranking, and inventing one would rank twelve teams by nothing.
+  if (boundary === null || boundary <= 1) return new Map();
+  const before = input.matchups.filter((row) => row.weekNumber < boundary);
+  const medianBefore = new Map([...input.medianByWeek].filter(([week]) => week < boundary));
+  const priorStandings = computeStandings({ teamIds: input.teamIds, matchups: before, medianByWeek: medianBefore });
+  return new Map(priorStandings.map((row, index) => [row.teamId, index + 1]));
+}
+
+/**
  * The standings table, with the display names, the owner's face, and the clinch flag the page
  * renders. `teamCards` is the SAME "team + owner's public profile" row set `leagueHome`
  * (`@/league-service/read.ts`) already reads via `listTeamCards` — passed in rather than
@@ -43,8 +84,9 @@ export async function leagueStandings(
   const gamesRemaining = weeksRemaining * (medianGame ? 2 : 1);
   const clinched = new Set(clinchedTeamIds({ standings, gamesRemaining, playoffTeams: LEAGUE_CONFIG.playoffTeams }));
   const cardById = new Map(teamCards.map((card) => [card.id, card]));
+  const previousRank = previousRankByTeamId({ teamIds: teamCards.map((card) => card.id), matchups: matchupRows, medianByWeek });
 
-  return standings.map((row) => {
+  return standings.map((row, index) => {
     // `computeStandings` only ever produces a row for a teamId drawn from `teamCards.map(id)`
     // (`tallies`'s keys, above) — the exact same source `cardById`'s keys come from — so a
     // standings row's card is always found. No `?? ` fallback: one would read as a real
@@ -57,6 +99,8 @@ export async function leagueStandings(
       ownerDisplayName: card.ownerDisplayName,
       ownerAvatar: card.ownerAvatarUrl,
       clinched: clinched.has(row.teamId),
+      rank: index + 1,
+      previousRank: previousRank.get(row.teamId) ?? null,
     };
   });
 }

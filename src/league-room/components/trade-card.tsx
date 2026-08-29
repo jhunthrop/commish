@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, Card, EYEBROW, Modal, PlayerFace, PositionBadge } from "@/components/ui";
+import { Button, Card, EYEBROW, Modal, PlayerFace, PositionBadge } from "@/components/ui";
 import { describeAsset, type TradeAsset } from "@/trades/assets";
 import type { TradeProposalView, TradeSideView } from "@/trades/contract";
 import type { TradeRosterPlayer } from "../contract";
@@ -205,8 +205,11 @@ export function TradeCard({
     <Card as="article" aria-label={cardLabel}>
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* SUBTRACTION (Sunday v5): the "Needs your answer" badge is gone. Every answerable
+              card sits under a chapter band saying exactly that, in the same amber, one row above
+              — the control the band opens teaches it, and a badge repeating its own section
+              heading on every card is the prose law 5's bands exist to replace. */}
           <p className="text-sm text-text-muted">{`${formatWeek(trade.weekNumber)} · ${counterpartyLabel} · ${dateLabel}`}</p>
-          {isAnswerable ? <Badge tone="accent">Needs your answer</Badge> : null}
         </div>
 
         {/* Fix round 1, F2 (HIGH, member panel): neither side of an open offer was ever told

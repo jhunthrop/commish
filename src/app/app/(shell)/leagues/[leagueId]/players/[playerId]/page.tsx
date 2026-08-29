@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { resolveLeagueMembership } from "@/lib/leagues/membership";
-import { Card, PlayerObject, SeasonBars, SourceStrip, type SeasonWeek, type SourceValue } from "@/components/ui";
+import Link from "next/link";
+import { Card, EdgeCell, PlayerObject, SeasonBars, SourceStrip, type SeasonWeek, type SourceValue } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import type { Position } from "@/domain/player";
 import { playerSeason, type PlayerSeasonBody } from "@/league-service/player";
 import { pageTitle } from "@/components/app-shell/page-metadata";
@@ -123,11 +125,62 @@ export default async function PlayerPage({ params }: PageProps) {
   const body = await playerSeason(getDb(), leagueId, playerId);
   if (body === null) notFound();
 
+  const played = body.weeks.some((week) => week.points !== null);
+
   return (
-    <Card as="section" className="flex flex-col gap-6">
-      <PlayerObject player={body.player} />
-      <SourceStrip label={`Where ${body.player.name} is ranked, by source`} sources={sourcesFor(body)} />
-      <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
-    </Card>
+    <div className="flex flex-col gap-4">
+      {/* The way back. A player screen is reached from a lineup, a roster or a trade, and until
+          now the only route off it was the rail. Quiet, because a way out is never the loud
+          action however loud the verb beside it (law 5's surviving discipline). */}
+      <Link href={`/app/leagues/${leagueId}`} className="text-sm text-accent underline">
+        Back to the league
+      </Link>
+
+      <Card as="section" className="flex flex-col gap-6">
+        <PlayerObject player={body.player} />
+        <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
+          <SourceStrip label={`Where ${body.player.name} is ranked, by source`} sources={sourcesFor(body)} />
+          <Edge body={body} />
+        </div>
+        {played ? (
+          <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
+        ) : (
+          // LAW 7. `SeasonBars` draws nothing at all for a season with no points in it, which is
+          // right — thirteen empty columns under thirteen week numbers read as a rendering fault
+          // rather than as an absence — but a card that then just ends leaves the reader to guess
+          // whether the chart failed. One line, stating the absence, and no chart.
+          <p className="text-sm text-text-muted">No scored week for him this season.</p>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * LAW 1, AND THE ONE FIGURE ON THIS PAGE THAT EARNS CHROMA — *"every number is a delta, not a
+ * fact"*. Market rank, expert rank and our own rank all sit quiet and grey in the strip beside
+ * this; the disagreement BETWEEN two of them is the only comparison on the screen, so it is the
+ * only thing with colour on it.
+ *
+ * WHICH TWO, AND WHY IT IS NOT OURS. The delta this product exists to sell is our board against
+ * the room, and our board holds no rank for the season in progress (`PlayerSeasonBody` carries the
+ * full account). Law 7 forbids drawing that one, so the honest delta available today is the one
+ * between the two sources that ARE here: what the drafting public did, and what the experts said.
+ * `EdgeCell` renders a `null` gap as an untinted dash, so a player either side is missing simply
+ * shows the absence — which is the same seam our own rank lands in the day the engine emits one.
+ *
+ * THE SIGN IS FROM THE EXPERTS' SEAT, and it has to be stated because ranks invert: a LOWER number
+ * is a better player. `market - experts` is positive when the market lets him fall past where the
+ * experts have him, which is the experts rating him HIGHER — exactly what `EdgeCell`'s positive
+ * direction means, with the counterparty named in words rather than implied by the sign.
+ */
+function Edge({ body }: { readonly body: PlayerSeasonBody }) {
+  const { adp } = body.player;
+  const gap = adp === null || body.expertRank === null ? null : adp - body.expertRank;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className={`${MICRO_LABEL} text-text-faint`}>Experts vs market</span>
+      <EdgeCell gap={gap} against="the draft market" />
+    </div>
   );
 }

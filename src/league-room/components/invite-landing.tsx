@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { LeagueTerms } from "@/league";
-import type { HelpLevel } from "@/identity/preferences";
 import { ButtonLink, Panel, Crest, buttonClassName } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { StatePanel } from "@/components/ui/state-panel";
@@ -51,7 +50,6 @@ export interface InviteLandingProps {
   /** The invite code — needed only by the "open" state, for `SignInLink`'s intent and
    *  `JoinForm`'s accept call. */
   readonly code?: string;
-  readonly helpLevel?: HelpLevel;
   /** `JoinForm`'s own `balanceAfterUsd` — see that prop's docblock. Threaded straight through;
    *  this component reads it for nothing of its own. */
   readonly balanceAfterUsd?: string;
@@ -94,7 +92,7 @@ function shelfActions() {
  * meant. This landing says what is true right now (open, or not) and never promises a hold this
  * product deliberately does not place here.
  */
-export function InviteLanding({ state: initialState, signedIn = true, code, helpLevel, balanceAfterUsd }: InviteLandingProps) {
+export function InviteLanding({ state: initialState, signedIn = true, code, balanceAfterUsd }: InviteLandingProps) {
   const [state, setState] = useState<InviteLandingState>(initialState);
 
   if (state.kind === "invalid" || state.kind === "expired" || state.kind === "exhausted") {
@@ -197,7 +195,7 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
       <p className="text-sm text-text-muted">
         {"You are in the draft, then the season. Set a lineup every week."}
       </p>
-      <LeagueTermsPanel terms={state.terms} helpLevel={helpLevel} />
+      <LeagueTermsPanel terms={state.terms} />
       {signedIn ? (
         <JoinForm
           code={code ?? ""}

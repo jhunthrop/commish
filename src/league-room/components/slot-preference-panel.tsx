@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { HelpLevel } from "@/identity/preferences";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { SlotPreferenceView } from "../contract";
-import { Button, EYEBROW, InfoTip } from "@/components/ui";
+import { Button, EYEBROW } from "@/components/ui";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 /**
@@ -64,7 +63,6 @@ export interface SlotPreferencePanelProps {
   /** The caller's OWN preference. Never anybody else's — a ranking is a preference a person
    *  expressed privately (Plan A's notice-privacy reasoning applies to it whole). */
   readonly initialPreference: SlotPreferenceView;
-  readonly helpLevel?: HelpLevel;
 }
 
 /**
@@ -80,7 +78,7 @@ export interface SlotPreferencePanelProps {
  * idiom `DraftSchedulePanel` already uses — and updated directly from the PUT's own response,
  * never re-fetched.
  */
-export function SlotPreferencePanel({ leagueId, initialPreference, helpLevel }: SlotPreferencePanelProps) {
+export function SlotPreferencePanel({ leagueId, initialPreference }: SlotPreferencePanelProps) {
   const { fetchJson } = useLeagueRoomDeps();
   const [preference, setPreference] = useState<SlotPreferenceView>(initialPreference);
   const [ranking, setRanking] = useState<readonly number[]>(initialPreference.ranking);
@@ -131,10 +129,7 @@ export function SlotPreferencePanel({ leagueId, initialPreference, helpLevel }: 
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-elevated p-4">
-      <div className="flex flex-wrap items-center gap-1">
-        <h2 className={`${EYEBROW} text-text-muted`}>Draft slot</h2>
-        <InfoTip term="draft-slot" helpLevel={helpLevel} />
-      </div>
+      <h2 className={`${EYEBROW} text-text-muted`}>Draft slot</h2>
       <p className="text-sm text-text-muted">{SLOT_PREFERENCE_EXPLAINER}</p>
 
       {ranking.length === 0 ? (

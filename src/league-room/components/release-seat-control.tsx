@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, InfoTip, Modal } from "@/components/ui";
+import { Button, Modal } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
@@ -81,7 +81,6 @@ export function ReleaseSeatControl({ leagueId, leagueName, kickoffRolls, onRelea
             Release your seat
           </Button>
         )}
-        <InfoTip term="release-seat" />
       </div>
       {error === null ? null : (
         <p role="alert" className="text-sm text-negative">

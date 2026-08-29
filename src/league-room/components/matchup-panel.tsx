@@ -1,7 +1,7 @@
 import type { Position } from "@/domain/player";
 import type { MedianResult, WeekStatus } from "@/league";
 import type { MatchupDetail, MatchupLineupEntry, MatchupSide } from "../contract";
-import { Card, EYEBROW, InfoTip, PlayerFace, PositionBadge, SlotChip, Stat, Table, type TableColumn } from "@/components/ui";
+import { Card, EYEBROW, PlayerFace, PositionBadge, SlotChip, Stat, Table, type TableColumn } from "@/components/ui";
 import { formatPoints } from "../lib/format";
 import { playerOf } from "../lib/player";
 import { summaryOf } from "../lib/matchup-facts";
@@ -169,9 +169,11 @@ function Side({
   isMine,
   median,
   positionPoints,
+  weekStatus,
 }: {
   readonly side: MatchupSide;
   readonly isMine: boolean;
+  readonly weekStatus: WeekStatus;
   readonly median: { readonly score: number; readonly medianScore: number; readonly result: MedianResult } | null;
   readonly positionPoints: PositionPoints | undefined;
 }) {
@@ -181,7 +183,7 @@ function Side({
         <h3 className={`${EYEBROW} text-text-muted`}>{side.teamName}</h3>
         {/* "Can I still win?", attached to the team it is about — see `SideChips`' own docblock
             for why these do not sit between the two scores. */}
-        <SideChips side={side} mine={isMine} />
+        <SideChips side={side} mine={isMine} weekStatus={weekStatus} />
       </div>
       <Table
         caption={`${side.teamName} starters`}
@@ -225,12 +227,14 @@ export function MatchupLineups({
         isMine={matchup.home.teamId === myTeamId}
         median={medianLineFor(matchup, "home")}
         positionPoints={positionPoints}
+        weekStatus={matchup.weekStatus}
       />
       <Side
         side={matchup.away}
         isMine={matchup.away.teamId === myTeamId}
         median={medianLineFor(matchup, "away")}
         positionPoints={positionPoints}
+        weekStatus={matchup.weekStatus}
       />
     </div>
   );
@@ -249,10 +253,10 @@ export function MatchupLineups({
  * lets a caller fold a live `score.update` frame (`useLiveScores`) over it without having to
  * reconstruct the whole `MatchupDetail`.
  *
- * A15: the "matchup" glossary term's own `InfoTip` caller. Placed on this panel's own eyebrow
- * rather than on the hero itself: the hero's `Scoreboard` is a shared primitive with callers
- * (a league card, a week band) whose tests pin "no button at all", and an unconditional InfoTip
- * trigger inside it would be a real regression on a component this file does not own.
+ * NO TIPS (founder ruling, 2026-08-28: *"the UX should explain itself, we shouldn't need tips"*).
+ * The eyebrow carried the "matchup" glossary trigger. A screen showing two crests, two records and
+ * two 84px scores under the word "Matchup" has already defined the term better than a paragraph
+ * behind a button could, which is the whole substance of the ruling.
  */
 export function MatchupPanel({
   matchup,
@@ -290,10 +294,7 @@ export function MatchupPanel({
     <Card as="section" aria-labelledby={headingId} className="flex flex-col gap-4">
       <h2 id={headingId} className="sr-only">{`${matchup.home.teamName} against ${matchup.away.teamName}`}</h2>
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1">
-          <span className={`${EYEBROW} text-text-muted`}>{eyebrow}</span>
-          <InfoTip term="matchup" />
-        </span>
+        <span className={`${EYEBROW} text-text-muted`}>{eyebrow}</span>
         {/* `weekStatus`, never `matchup.final`: a week can be `in_progress` for hours before
             `final` flips, and `final` alone cannot tell that apart from `scheduled`. */}
         <WeekStatusBadge status={weekStatus} />

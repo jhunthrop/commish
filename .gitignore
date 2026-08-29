@@ -48,6 +48,11 @@ next-env.d.ts
 # cookies, never commit
 .lab-session*.json
 lab-session*.json
+# Anything a lab run writes. The two patterns above only cover the DEFAULT filename at the repo
+# root, and a run that pointed `LAB_SESSION_FILE` at a directory of its own put a live sealed
+# session cookie into three commits on 2026-08-28. Ignore the whole working directory,
+# screenshots included: none of it is source.
+.lab/
 e2e/.auth/
 playwright-report/
 test-results/

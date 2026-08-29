@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ActivityRow } from "@/integrity/activity-view";
-import { EmptyState, InfoTip } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
+import { ChapterBand } from "@/components/ui/chapter-band";
 import { Icon } from "@/components/ui/icon";
 
 export interface ActivityFeedProps {
@@ -12,42 +13,65 @@ export interface ActivityFeedProps {
   readonly nextBefore: number | null;
 }
 
-function formatOccurredAt(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+/** The clock only. The DAY is the band above the row now (law 5), so repeating the date on every
+ *  line is the same fact printed forty times down one column. */
+function formatTimeOfDay(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { timeStyle: "short" });
+}
+
+/** A stable key for the calendar day an event landed on, in the same clock every timestamp on
+ *  this page is already rendered against. */
+function dayKey(iso: string): string {
+  return new Date(iso).toDateString();
+}
+
+/**
+ * The day, in the words somebody would say out loud. "Today" and "Yesterday" are the two a reader
+ * checks for; everything older gets its real name, because "3 days ago" stops being useful the
+ * moment a history is more than a week long.
+ */
+function dayMarker(iso: string, now: Date): string {
+  const day = new Date(iso);
+  const midnight = (date: Date): number => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const daysBack = Math.round((midnight(now) - midnight(day)) / 86_400_000);
+  if (daysBack === 0) return "Today";
+  if (daysBack === 1) return "Yesterday";
+  return day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+}
+
+/** The rows, split into one chapter per calendar day, newest first — the order they arrive in. */
+function byDay(rows: readonly ActivityRow[]): readonly { readonly key: string; readonly rows: readonly ActivityRow[] }[] {
+  const chapters: { key: string; rows: ActivityRow[] }[] = [];
+  for (const row of rows) {
+    const key = dayKey(row.occurredAt);
+    const last = chapters[chapters.length - 1];
+    if (last !== undefined && last.key === key) last.rows.push(row);
+    else chapters.push({ key, rows: [row] });
+  }
+  return chapters;
 }
 
 function ActivityRowItem({ row }: { readonly row: ActivityRow }) {
-  // `"clock"` is the icon ONLY `renderDraftPick`'s clock-ran-out branch uses
-  // (`src/integrity/activity-view.ts`) — the one headline that says "from their queue" to a
-  // reader who may never have seen an autopick before.
-  const isQueueAutopick = row.icon === "clock";
   return (
-    // GAMEDAY, LAW 4. This row was `py-4` around a three-line stack — icon, headline, detail, and
-    // the timestamp last, at the bottom of a block whose height depended on how long the sentence
-    // was. Three lines and 64px to say "You set your week 14 lineup", forty of them down a page,
-    // is a history you scroll rather than one you read. The stamp leads its own fixed column at
-    // `sm` and up, so the times line up and the sentences start together; below `sm` it drops
-    // back under the sentence, because a 40-character timestamp column on a 360px phone would
-    // leave the sentence nothing to live in.
+    // The stamp gets its own fixed column at `sm` and up, so every time in the feed starts at the
+    // same x and a reader runs their eye down ONE column instead of hunting for each at the end of
+    // a different-length sentence. Literal classes, never a template: Tailwind's scanner reads
+    // source text, and a width built from a variable ships no rule at all. The column narrowed
+    // from `w-40` to `w-16` when the date moved into the band above it.
     <li className="flex flex-col gap-0.5 border-b border-line py-2 last:border-b-0 sm:flex-row sm:items-baseline sm:gap-3">
-      {/* The stamp gets its own fixed column at `sm` and up, so every timestamp in the feed
-          starts at the same x and a reader runs their eye down ONE column of times instead of
-          hunting for each at the end of a different-length sentence. Literal classes, never a
-          template: Tailwind's scanner reads source text, and a width built from a variable ships
-          no rule at all. */}
-      <time dateTime={row.occurredAt} className="order-last font-mono text-xs text-text-faint sm:order-first sm:w-40 sm:shrink-0">
-        {formatOccurredAt(row.occurredAt)}
+      <time dateTime={row.occurredAt} className="order-last font-mono text-xs text-text-faint sm:order-first sm:w-16 sm:shrink-0">
+        {formatTimeOfDay(row.occurredAt)}
       </time>
       <Icon name={row.icon} size={14} className="hidden shrink-0 self-center text-text-faint sm:block" />
       {/* `min-w-0` on the flex item plus `break-words` on the text: a headline carries user
-          content (a league name, a manager's name, a team name) that can be one long unbroken
-          run with nowhere to wrap, and a flex item will not shrink below its min-content width
-          without this. Same pair, same reason, as `HomeLeagueCard`'s heading. */}
+          content (a league name, a manager's name, a team name) that can be one long unbroken run
+          with nowhere to wrap, and a flex item will not shrink below its min-content width
+          without this. */}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <p className="break-words text-sm text-text-primary">
-          {row.headline}
-          {isQueueAutopick ? <InfoTip term="queue" className="ml-1" /> : null}
-        </p>
+        {/* NO TIPS (founder ruling, 2026-08-28): the clock-icon row carried a `queue` glossary
+            trigger. `renderDraftPick`'s own headline for that branch already says "from their
+            queue" in the sentence, which is the definition the tip was one press away from. */}
+        <p className="break-words text-sm text-text-primary">{row.headline}</p>
         {row.detail === null ? null : <p className="break-words text-sm text-text-muted">{row.detail}</p>}
       </div>
     </li>
@@ -55,18 +79,21 @@ function ActivityRowItem({ row }: { readonly row: ActivityRow }) {
 }
 
 /**
- * The chronological, member-visible half of Task 10: `rows` arrive already rendered by
- * `activityRowFor` (Task 9's allowlist) — this component prints them, it never re-derives
- * visibility or re-sorts. Deliberately NOT `"use client"`: `Show older` is a plain `<Link>`
- * carrying a `before` cursor in the query string, so the history reads with no JavaScript at
- * all, and the page it lives on is a document, not a room (`docs/design-system.md`, "Layout: shell
- * pages, rooms, public pages, and prose") — this plan's own closing note says the feed is a history, not a second
- * realtime surface.
+ * THE LEAGUE'S HISTORY, BANDED BY DAY (Sunday v5, law 5).
+ *
+ * *"A hairline divider at sixty rows becomes the loudest thing on the screen while saying the
+ * least."* This ledger was forty identical hairline rows each carrying its own full date and time,
+ * which is that failure in reverse: no divisions at all, and the one fact that WOULD divide them
+ * printed on every line. The day is now a chapter marker carrying its own count, and the row keeps
+ * only the clock.
+ *
+ * Grouping is a fold over rows that ARRIVE in order, never a sort: `activityRowFor`'s allowlist
+ * decided what is visible and `listLeagueActivity` decided the order, and this component prints
+ * them. A day boundary is simply where two adjacent rows stop agreeing about the date.
  *
  * `rows.length === 0` renders the "nothing has happened" empty state ONLY when `nextBefore` is
  * also `null` — a page that came back with zero visible rows but a real cursor still offers
- * `Show older`, never the dead-end empty state, so a member reading an early, mostly-hidden
- * page of their league's history can still page forward to where the visible rows start.
+ * `Show older`, never the dead-end empty state.
  */
 export function ActivityFeed({ rows, leagueId, nextBefore }: ActivityFeedProps) {
   if (rows.length === 0 && nextBefore === null) {
@@ -82,14 +109,29 @@ export function ActivityFeed({ rows, leagueId, nextBefore }: ActivityFeedProps) 
     );
   }
 
+  // ONE clock for the whole render. Reading `new Date()` inside the loop would let a page that
+  // straddles midnight label two rows of the same day differently.
+  const now = new Date();
+
   return (
     <div className="flex flex-col gap-4">
       {rows.length === 0 ? <p className="text-sm text-text-muted">Nothing visible to you on this page.</p> : null}
-      <ul className="flex flex-col" aria-label="League activity">
-        {rows.map((row) => (
-          <ActivityRowItem key={row.eventId} row={row} />
-        ))}
-      </ul>
+      {byDay(rows).map((chapter) => (
+        <section key={chapter.key} aria-label={dayMarker(chapter.rows[0]!.occurredAt, now)} className="flex flex-col">
+          <ChapterBand
+            name={dayMarker(chapter.rows[0]!.occurredAt, now)}
+            consequence={`${chapter.rows.length} ${chapter.rows.length === 1 ? "entry" : "entries"}`}
+          />
+          <ul className="flex flex-col">
+            {chapter.rows.map((row) => (
+              <ActivityRowItem key={row.eventId} row={row} />
+            ))}
+          </ul>
+        </section>
+      ))}
+      {/* QUIET, deliberately. Law 5's surviving discipline is that the loud action belongs to ACTS
+          only — a filter, a toggle and a way to read further stay quiet however loud the verb
+          beside them is — and paging back through a history is not an act. */}
       {nextBefore === null ? null : (
         <Link className="text-accent underline" href={`/app/leagues/${leagueId}/activity?before=${nextBefore}`}>
           Show older

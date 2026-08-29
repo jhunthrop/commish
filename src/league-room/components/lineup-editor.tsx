@@ -5,8 +5,7 @@ import { useMemo, useState } from "react";
 import type { DraftStatus } from "@/domain/draft";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
-import { Button, InfoTip, PlayerFace, PositionBadge, Select, SlotChip } from "@/components/ui";
-import type { HelpLevel } from "@/identity/preferences";
+import { Button, PlayerFace, PositionBadge, Select, SlotChip } from "@/components/ui";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeek } from "../lib/format";
 import { playerOf } from "../lib/player";
@@ -52,7 +51,6 @@ export function LineupEditor({
   leagueId,
   lineup,
   totalWeeks,
-  helpLevel,
   draftStatus,
 }: {
   readonly leagueId: string;
@@ -60,9 +58,6 @@ export function LineupEditor({
   /** The season's last week number. Names the reopening condition in the locked message —
    *  "next week" only means something if there is one. */
   readonly totalWeeks: number;
-  /** Forwarded from `LeagueHome`. Omitted only by tests that don't care about this branch —
-   *  `InfoTip` itself defaults to the click-only, non-inline behavior when it's absent. */
-  readonly helpLevel?: HelpLevel;
   /** Wave-1 review Q10, SETTLED: `home.draftStatus`, threaded from both `LeagueHome` call sites
    *  — the fact itself, not an inference over the lineup's own empty slots. Optional only for a
    *  caller that genuinely does not know it yet (never true at either real call site); `null` and
@@ -166,10 +161,10 @@ export function LineupEditor({
           first kickoff, not each player at their own — and nothing said so before this. A
           manager who plans to swap a Monday-night player after watching Sunday's early games
           needs to know that plan won't work before they're locked out of trying it. */}
-      <p className="flex items-center gap-1 text-sm text-text-muted">
-        Lineups lock for the whole week when its first game kicks off.
-        <InfoTip term="lineup-lock" helpLevel={helpLevel} />
-      </p>
+      {/* NO TIPS (founder ruling, 2026-08-28). This sentence WAS the tip's definition, printed
+          in full, with the trigger beside it repeating it behind a click. The sentence stays; the
+          button goes. */}
+      <p className="text-sm text-text-muted">Lineups lock for the whole week when its first game kicks off.</p>
       {/* LAW 3, ON THE SCREEN WHERE IT MATTERS MOST. This grid was nine bare `<select>`s: the
           one place in the product where a manager decides which PLAYERS play, drawn with no
           player in it at all. The face is not decoration — a manager recognises a roster by
@@ -217,10 +212,7 @@ export function LineupEditor({
           `SlotChip` that names it. Nothing true left with them: `/league-rules` carries both
           definitions in full, with a `TermLink`, and the glossary entries themselves are
           untouched. Two sentences and a tip trigger off the screen a manager uses every week. */}
-      <h3 className="flex items-center gap-1 text-sm font-medium text-text-muted">
-        Bench
-        <InfoTip term="bench" helpLevel={helpLevel} />
-      </h3>
+      <h3 className="text-sm font-medium text-text-muted">Bench</h3>
       {/* The bench used to be a comma-joined sentence — six names run together, which is a list
           pretending to be prose and unreadable at a glance on the exact screen where a manager is
           deciding whether one of them should be starting. Law 3 again: they are players, so they
@@ -236,9 +228,15 @@ export function LineupEditor({
           ))}
         </ul>
       )}
-      <Button onClick={() => void save()} loading={submitting} disabled={submitting}>
-        Save lineup
-      </Button>
+      {/* Wrapped, so the pill sizes to its own words. In a `flex flex-col` section a bare
+          `Button` stretches the full width of a full-bleed shell page, which made the loudest
+          thing on the league home a 1300px white bar — law 5 asks for an obvious verb, not a
+          billboard, and the lower third at the foot is where the page's one act lives now. */}
+      <div>
+        <Button onClick={() => void save()} loading={submitting} disabled={submitting}>
+          Save lineup
+        </Button>
+      </div>
       {saved ? (
         <p role="status" className="text-sm text-positive">
           Lineup saved.

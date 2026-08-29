@@ -174,6 +174,21 @@ export type InvitePreviewBody = LeagueTerms;
 /** One row of the standings table, ready to render: the pure math plus what the page shows. */
 export interface TeamStandingsRow extends StandingsRow {
   readonly teamName: string;
+  /**
+   * This team's place in the league right now, 1-based — the server's own ranking, never
+   * re-derived in React. The table renders it as the row's position numeral, and it stays fixed
+   * when a reader re-sorts the table by points: a seed is a fact about the season, not about
+   * whichever column is currently driving the visible order.
+   */
+  readonly rank: number;
+  /**
+   * Where this team stood BEFORE the most recent settled week, or `null` when the league has no
+   * previous ranking to compare against — its first settled week, or none at all. Law 2 wants the
+   * movement and law 7 forbids inventing it, so a league with nothing behind it prints a dash.
+   * Computed by `leagueStandings` (`@/league-service/results.ts`) as a second pass of the same
+   * `computeStandings` over the same rows with the latest week held out.
+   */
+  readonly previousRank: number | null;
   /** Can no longer be caught for a playoff spot. Computed server-side, never in React. */
   readonly clinched: boolean;
   readonly ownerDisplayName: string;
