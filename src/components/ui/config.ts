@@ -234,3 +234,15 @@ export const EYEBROW = "font-mono text-xs tracking-wide";
  * collapsing them would put capitals back on the prose labels the charter cleared.
  */
 export const MICRO_LABEL = "font-mono text-xs uppercase tracking-[0.11em]";
+
+/**
+ * THE RAIL REGISTER — the caps charter's second sanctioned address (Sunday v5, 2026-08-28).
+ *
+ * The broadcast rail's navigation speaks in the condensed face, small caps, tracked: the way
+ * every sports network sets its own chrome, and the register the approved timing-tower render
+ * uses for BOARD / ROOMS / LEAGUES. Distinct from `MICRO_LABEL` on purpose: a micro-label is a
+ * mono key shouted beside data; a rail label is a display-face destination a person presses.
+ * Same enforcement mechanism as `MICRO_LABEL` — a component imports this constant, and one that
+ * hand-rolls the class still fails `no-uppercase.source.test.ts`.
+ */
+export const RAIL_LABEL = "font-display text-sm font-semibold uppercase tracking-[0.08em]";

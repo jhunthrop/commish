@@ -118,6 +118,11 @@ function WireList({
             key={index}
             className={`mx-6 inline whitespace-nowrap ${TONE_CLASS[tone]}`}
           >
+            {/* The broadcast tick: a breathing dot on the genuinely urgent item only — the same
+                pulse the live chip carries, because they are reporting the same fact. */}
+            {tone === "live" ? (
+              <span aria-hidden="true" className="mr-1.5 inline-block size-1.5 rounded-pill bg-live align-middle motion-safe:animate-pulse-live" />
+            ) : null}
             {sentenceOf(item, tone)}
           </li>
         );
@@ -157,7 +162,7 @@ export function Wire({ items }: WireProps) {
   if (items.length < UI_CONFIG.wire.minItems) return null;
 
   return (
-    <div className={WIRE_BAND_CLASSNAME}>
+    <div className={`relative ${WIRE_BAND_CLASSNAME}`}>
       {reducedMotion ? (
         <WireList items={items.slice(0, UI_CONFIG.wire.minItems)} />
       ) : (
@@ -166,6 +171,11 @@ export function Wire({ items }: WireProps) {
           <WireList items={items} hidden />
         </div>
       )}
+      {/* Broadcast edge fades: the marquee's entry and exit dissolve into the band instead of
+          hard-clipping mid-word at the viewport edge, which read as a rendering fault. Painted
+          from the band's own ground so both themes hold; aria-hidden, pure chrome. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-surface-inset to-transparent" />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-surface-inset to-transparent" />
     </div>
   );
 }

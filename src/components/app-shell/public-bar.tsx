@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { RAIL_LABEL } from "@/components/ui/config";
 import { SignInLink } from "./sign-in-link";
 
 export interface NavLink {
@@ -62,44 +63,53 @@ export interface PublicBarProps {
 export function PublicBar({ intent, signedIn, nav = [], action = null }: PublicBarProps) {
   return (
     <header className="border-b border-line bg-surface">
-      <div className="flex w-full items-center justify-between gap-4 px-4 py-3">
+      <div className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        {/* The mark: the condensed face at its earned weight, with the amber full stop every
+            v5 mock signs off with — the one place the furniture colour appears in the rail's
+            left half. */}
         <Link
           href="/"
-          className="font-display text-xl font-semibold tracking-wide text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="font-display text-xl font-extrabold tracking-[-0.01em] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          Commish
+          Commish<span className="text-accent">.</span>
         </Link>
         {nav.length === 0 ? null : (
-          <nav aria-label="Commish" className="hidden items-center gap-4 text-sm font-medium text-text-primary sm:flex">
-            {nav.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                {link.label}
-              </Link>
-            ))}
+          <nav aria-label="Commish" className={`hidden items-center gap-6 ${RAIL_LABEL} text-text-muted sm:flex`}>
+            {nav.map((link) => {
+              // `intent` is every caller's own path (it is where sign-in returns), so it also
+              // answers which rail label is the page under the reader's feet — that one carries
+              // the amber underline, the broadcast rail's here-marker.
+              const active = link.href === intent;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`pb-0.5 transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    active ? "text-text-primary shadow-[inset_0_-2px_0_0_var(--commish-color-accent)]" : ""
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {action}
-          {/* Quiet on purpose (E11): with the front door's ink "Take a seat" in `action`, a
-              second loud CTA beside it read as two competing doors. Either link here is the
-              returning member's, not the stranger's pitch — muted ink, visible on hover.
-              Signed in, the door says where it goes: "Your leagues" is the exact heading of the
-              page it opens (`/app`), never a second vocabulary for the same place. */}
+          {/* The returning member's door, in the rail register but quiet — the verb beside it is
+              the stranger's pitch, and two loud doors read as competing (E11, unchanged). */}
           {signedIn ? (
             <Link
               href="/app"
-              className="text-sm font-medium text-text-muted underline transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className={`${RAIL_LABEL} text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
             >
               Your leagues
             </Link>
           ) : (
             <SignInLink
               intent={intent}
-              className="text-sm font-medium text-text-muted underline transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className={`${RAIL_LABEL} text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
             />
           )}
         </div>

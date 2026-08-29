@@ -114,7 +114,9 @@ export default async function Home() {
         signedIn={user !== null}
         nav={nav}
         action={
-          <ButtonLink href="/browse" variant={featuredLeague === null ? "primary" : "secondary"}>
+          // The rail's persistent verb, in the amber the verb owns — law 6 lets one act repeat,
+          // and this is the same act the hero and the lower third carry.
+          <ButtonLink href="/browse" variant="verb">
             Take a seat
           </ButtonLink>
         }
