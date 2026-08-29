@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, PlayerFace, PositionBadge } from "@/components/ui";
-import { MICRO_LABEL, RAIL_LABEL } from "@/components/ui/config";
+import { Button, Input, PlayerFace, PositionBadge, SegmentGroup } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { Position } from "@/domain/player";
@@ -130,22 +130,14 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        {/* The amber segmented rail, the same furniture /browse's filters wear. */}
-        <div className={`flex overflow-hidden rounded-md border border-line ${RAIL_LABEL}`} role="group" aria-label="Position">
-          {POSITIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={position === option}
-              onClick={() => setPosition(option)}
-              className={`px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                position === option ? "bg-accent text-accent-text" : "text-text-muted hover:text-text-primary"
-              }`}
-            >
-              {option === "ALL" ? "All" : option}
-            </button>
-          ))}
-        </div>
+        {/* The segmented rail, now the shared primitive it was the second hand-rolled copy of. */}
+        <SegmentGroup
+          label="Position"
+          labelled={false}
+          options={POSITIONS.map((option) => ({ value: option, label: option === "ALL" ? "All" : option }))}
+          value={position}
+          onChange={(value) => setPosition(value as (typeof POSITIONS)[number])}
+        />
         <Input
           className="w-64"
           label="Search"

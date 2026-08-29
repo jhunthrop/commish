@@ -57,6 +57,8 @@ export type { MovementProps } from "./movement";
 export { EdgeCell } from "./edge-cell";
 export type { EdgeCellProps } from "./edge-cell";
 export { LowerThird } from "./lower-third";
+export { SegmentGroup } from "./segment-group";
+export type { SegmentGroupProps, SegmentOption } from "./segment-group";
 export type { LowerThirdProps, LowerThirdCell } from "./lower-third";
 export { Scoreboard } from "./scoreboard";
 export { PointsShareBar } from "./points-share-bar";

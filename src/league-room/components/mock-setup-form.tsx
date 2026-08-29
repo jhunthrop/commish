@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { CreateMockRoomBody } from "@/app/api/mock-drafts/route";
 import type { MockMode } from "@/mock-draft/config";
-import { Button, EYEBROW, Input, Select } from "@/components/ui";
+import { Button, EYEBROW, Input, SegmentGroup } from "@/components/ui";
 import { formatOrdinal } from "@/draft-room/state/format";
 import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { useLeagueRoomDeps } from "../hooks/deps";
@@ -163,67 +163,74 @@ export function MockSetupForm({
         void submit();
       }}
     >
+      {/* SEGMENTS, NOT SELECTS (founder, 2026-08-28: the stadium overhaul reaches the config).
+          Every option visible at once, the active one filled amber — the same rail /browse's
+          filters and the free-agents board wear, now one shared primitive. The draft position is
+          the boundary case: up to twelve values earns PILLS in a wrap, not a strip, and Random
+          stays the first of them. */}
       <div className="flex flex-col gap-3">
         <h3 className={`${EYEBROW} text-text-muted`}>Room</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Select
+        <div className="flex flex-wrap gap-x-6 gap-y-3">
+          <SegmentGroup
             label="Mode"
             options={modes.map((value) => ({ value, label: MODE_LABEL[value] }))}
             value={mode}
-            onChange={(event) => setMode(event.target.value as MockMode)}
+            onChange={(value) => setMode(value as MockMode)}
           />
-          <Select
+          <SegmentGroup
             label="Teams"
-            options={teamCountOptions.map((n) => ({ value: String(n), label: `${n} teams` }))}
+            options={teamCountOptions.map((n) => ({ value: String(n), label: String(n) }))}
             value={teamCount}
-            onChange={(event) => changeTeamCount(event.target.value)}
+            onChange={changeTeamCount}
           />
         </div>
       </div>
 
       <div className="flex flex-col gap-3">
         <h3 className={`${EYEBROW} text-text-muted`}>Rules</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Select
+        <div className="flex flex-wrap gap-x-6 gap-y-3">
+          <SegmentGroup
             label="Pick clock"
-            options={pickSecondsOptions.map((n) => ({ value: String(n), label: `${n} seconds` }))}
+            options={pickSecondsOptions.map((n) => ({ value: String(n), label: `${n}s` }))}
             value={pickSeconds}
-            onChange={(event) => setPickSeconds(event.target.value)}
+            onChange={setPickSeconds}
           />
-          <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => setScoringPreset(event.target.value)} />
-          <Select
-            label="Roster shape"
-            options={ROSTER_SHAPE_OPTIONS}
-            value={rosterShape}
-            onChange={(event) => setRosterShape(event.target.value)}
-          />
+          <SegmentGroup label="Scoring" options={PRESETS} value={scoringPreset} onChange={setScoringPreset} />
+          <SegmentGroup label="Roster shape" options={ROSTER_SHAPE_OPTIONS} value={rosterShape} onChange={setRosterShape} />
         </div>
       </div>
 
       <div className="flex flex-col gap-3">
         <h3 className={`${EYEBROW} text-text-muted`}>You</h3>
-        {/* E3: Draft position and Randomize as one size-matched row — `size="md"` on the
-            button matches `Select`'s own `h-10`, closing the 8px baseline mismatch the review
-            measured against the old `size="sm"` (32px vs 40px). */}
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Select
-              label="Draft position"
-              options={draftSlotOptions(Number(teamCount))}
-              value={draftSlot}
-              onChange={(event) => setDraftSlot(event.target.value)}
-            />
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-text-primary">Draft position</span>
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Draft position">
+            {draftSlotOptions(Number(teamCount)).map((option) => (
+              <button
+                key={option.value === "" ? "random" : option.value}
+                type="button"
+                aria-pressed={draftSlot === option.value}
+                onClick={() => setDraftSlot(option.value)}
+                className={`min-w-9 rounded-md border px-2 py-1.5 font-display text-sm font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  draftSlot === option.value
+                    ? "border-accent bg-accent text-accent-text"
+                    : "border-line text-text-muted hover:text-text-primary"
+                }`}
+              >
+                {option.value === "" ? "Random" : option.value}
+              </button>
+            ))}
+            <Button type="button" variant="ghost" size="sm" onClick={randomize}>
+              Roll it
+            </Button>
           </div>
-          <Button type="button" variant="ghost" size="md" onClick={randomize}>
-            Randomize
-          </Button>
         </div>
         {/* Present from first render, announced politely — the same "the region exists before
             it has anything to say" shape `Countdown`'s own sr-only sibling uses. */}
         <span className="sr-only" aria-live="polite">
           {rolledAnnouncement}
         </span>
-        <Input label="Team name (optional)" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
+        <Input className="max-w-sm" label="Team name (optional)" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
       </div>
 
       {error === null ? null : (
@@ -233,7 +240,7 @@ export function MockSetupForm({
       )}
       {/* E1: `self-start`, not the flex column's default stretch — a submit button at the
           form's own measure is still a PILL, never a bar the width of whatever column holds it. */}
-      <Button type="submit" className="self-start" loading={submitting} disabled={submitting}>
+      <Button type="submit" variant="verb" className="self-start" loading={submitting} disabled={submitting}>
         Start mock draft
       </Button>
     </form>

@@ -503,8 +503,16 @@ export function MockLobby({
           </Panel>
         </div>
 
-        {/* R1: the live lobby and the caller's own history. */}
-        <div className="flex flex-col gap-8">
+        {/* R1: the live lobby and the caller's own history — RENDERED ONLY WHEN REAL (founder,
+            2026-08-28, the stadium pass): two bordered panels each announcing an absence were
+            most of this page on a quiet Tuesday. When neither has a row, one faint line says the
+            one true thing and the strip at the foot still carries the act. */}
+        {open.length === 0 && mine.length === 0 ? (
+          <p className="text-sm text-text-faint lg:pt-8">
+            Nothing is drafting right now. Start one and a room opens in seconds.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-8">
           <Panel title="Open mock drafts">
             <div className="flex flex-col gap-3">
               {joinError === null ? null : (
@@ -570,7 +578,8 @@ export function MockLobby({
               </div>
             )}
           </Panel>
-        </div>
+          </div>
+        )}
       </div>
       {/* LAW 6: the page ends in a lower third. Full-bleed against the shell's own gutter, the
           way a strip across the foot is meant to read. */}
