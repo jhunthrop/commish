@@ -1,64 +1,55 @@
-# Gameday — Commish Design System v4
+# Sunday — Commish Design System v5
 
 **Read this before building any user-visible surface**, alongside `docs/conventions.md`. Everything here is enforced by tests where it can be, and by review where it can't. Every claim below either names the test that enforces it, or says "review-enforced."
 
-**Status:** Gameday replaces Sunday Standard (v3) across the whole product, founder-directed 2026-08-28. The argument is `docs/design/2026-08-28-gameday-spec.md`; the approved compositions are the two applied screens in its rendered artifact. This document is the binding form.
+**Status:** Sunday v5 replaces Gameday (v4) across the whole product, founder-approved 2026-08-28 from the timing-tower mockup. The argument and the solved palette are `docs/design/2026-08-28-sunday-spec.md`. This document is the binding form.
 
-## Identity: Gameday
+## Identity: the timing tower
 
-Sunday Standard was built on restraint, and restraint is a magazine's value system. It produced a calm, well-set document, and the founder's verdict on it was exact: *"It feels like a legal website and not a fantasy site."*
+Every product in this category picks one thing to be. ESPN and Yahoo chose the database. Sleeper chose the group chat. Underdog chose the slot machine. Flock chose the tool shed. **We are the house** — the operator who runs the league, seats you in it, and has a better board than the consensus — and the house has two registers: the **broadcast** for the hours that carry emotion, and the **tower** for every screen where a decision has money on it. One language, two densities.
 
-An earlier pass tried amending it — three rules bent, five phases, every change individually defensible — and produced *"little changes here and there"* rather than a step change, because **six rules that each forbid a thing cannot be patched into a system that affords one.** So this replaces v3 rather than amending it.
+**The razor: a timing tower, not a spreadsheet.** A trading terminal is dense because density is cheap when nobody has to feel anything. An F1 timing tower carries more numbers per square inch than most trading screens and nobody has ever mistaken one for a spreadsheet — because every number is a delta against a rival, the type is heavy enough to read at speed, and colour is spent only on what changed.
 
-**Fantasy is not calm.** Six laws govern every surface this document describes; they are the spine the rest of it hangs off. Each replaces a v3 rule and is exactly as strict — they simply forbid different things.
+## The seven laws
 
-1. **Colour is a legend.** Six channels, each with exactly one meaning: **money**, **live**, **magnitude**, **position**, **team**, **tier**. Nothing else carries pigment. A manager should read state without reading words.
-   *Replaces v3 rule 1's "colour is meaning" as scarcity, which left every screen grey and forced you to read everything.*
-2. **The number is the hero.** One typeface, a **7.6x** scale range. A score is 84px; its label is 11px. Digits are tabular everywhere. If the largest thing on a screen is not a number or a name, the screen is wrong.
-   *Replaces v3 rule 2's hierarchy-from-weight capped at 600, which produced a 2x range and nothing for the eye to hold. The cap itself does not move — see "The 600 cap holds" below.*
-3. **A player is an object.** Face, team colour, position, number — every surface showing a player shows all four. Players, matchups and leagues are things you act on, drawn as things.
-   *Replaces v3 rule 4's "hairlines, not boxes", which rendered every object as a line of text.*
-4. **Density is respect.** A manager on Sunday wants more true facts per screen, not fewer. Tight leading, real tables, no decorative whitespace. Space separates kinds of information; it never exists to calm.
-   *New. v3 had no density position, so every surface drifted airy by default.*
-5. **The verb is obvious.** The action a screen exists for is the loudest thing on it, however many times it repeats. A draft board has a Draft on every row.
-   *Replaces v3 rule 5's "one ink action per view", which hid the primary verb on exactly the screens built to repeat it.*
-6. **Motion reports, never performs.** Nothing animates on mount, scroll or hover. Motion is permitted only where a real value changed, a real clock is running, or a real event arrived. Nothing eases longer than 250ms. Reduced-motion removes all of it and loses nothing.
-   *Sharpens v3 rule 6's "only true things move" — which was right, never spent, and silent on the tacky failure modes.*
+1. **Every number is a delta, not a fact.** Raw values sit quiet in muted ink; the comparison is the figure with chroma on it. A number with no comparison set behind it is a fact, and facts are grey. *Primitive: `EdgeCell`. Descends from v4's refusal to tint without a stated population, unchanged.*
+2. **Movement is a story; position is only a state.** `3` is where he sits; `▲ 9` is what happened. Wherever the product knows a previous value, it shows the change. *Primitive: `Movement`.*
+3. **Readable from the sofa.** A terminal shrinks type to fit another column; a broadcast keeps type readable and **drops the column instead**. Rows ~44px, names 18px — the condensed face buys the columns back, which is why it is load-bearing and not decorative.
+4. **Colour is spent exactly three times.** Amber is **furniture and you and the verb**. Cyan/warm-red is **the verdict pair** (we rate him higher / lower — never green-vs-red; luminance-ordered so it survives with hue off). Red is **live and nothing else**. Position and tier hues are a legend the way a map key is: they name a category and never render a judgement.
+5. **Bands are chapter markers, not hairlines.** A tier is a filled plate carrying its letter and its consequence in plain words ("a real drop after this"). *Primitive: `TierDivider`.*
+6. **Every screen ends in a lower third.** A strip across the foot carrying the clock, the subject, and one verb. The lower third is *where* the verb lives, which frees the rest of the screen to repeat that verb down a column without competing. If a screen has no lower third, either it needs no decision or the decision is hidden. *Primitive: `LowerThird`. This settles the one-ink-action lineage for good; the page audit counts distinct verbs.*
+7. **We never draw a number we cannot stand behind.** A dash is not a zero; an absent number never picks up a tint; a held-out measurement is never printed beside a current one as the same kind of claim. *Carried from v4 verbatim. Non-negotiable.*
 
-### The razor
+### What survives from v4, unchanged
 
-**Turn every animation off. If the product feels dead, the aliveness was fake.**
+- **The refusals**, which were the best part of it: no invented data, no tint without a stated population, no team colour behind text, no magnitude on a control, colour never carrying a meaning alone.
+- **Every accessibility gate.** Contrast in both themes against the *binding* grounds — dark's is `surfaceRaised` (its brightest), light's is `surfaceInset` (its dimmest). Getting that backwards is the most repeated mistake in this system's history.
+- **Both themes.** Dark is the flagship (a stadium at night); light is the **day game** (a printed sports section) — designed, never inverted. `ThemeProvider` untouched; default is still `system`.
+- **The caps charter.** Sentence case in prose; the shouted register exists only as `MICRO_LABEL`, imported never hand-rolled. `no-uppercase.source.test.ts` unchanged in strictness.
+- **The execution doctrine.** The acceptance criterion is a screenshot, not a rule check.
 
-Real aliveness in a sports interface comes from four things and none of them is motion: **numbers that change because the world changed**, **colour that encodes state so you read the screen without reading words**, **density of true facts**, and **the manager's own identity present on every screen**. Motion's only job is to make a change legible. It never announces itself.
+### What v5 repeals, deliberately
 
-### What survives from v3, unchanged
+- **The one-typeface rule.** Saira Condensed (500–800) carries every name, number and label; Saira (400–600) carries sentences. Law 3 makes condensed load-bearing.
+- **The 600 weight cap, above the body face.** Weight above 600 now belongs to the display face alone — `weight-cap.source.test.ts` is re-chartered, not deleted: a bold *body* line still fails (Saira loads nothing above 600 and would faux-bold), and 900 is banned everywhere.
+- **The accent/positive doubling.** Through v4 the act and a positive outcome were the same green on purpose. v5 splits them: the act is amber, the verdict is cyan — a tower has to say "we rate him higher" without it reading as "press this". `tokens.test.ts` now asserts the two are *different*.
+- **Near-monochrome.** Chroma is still rationed (three channels), but it is present on every board, not reserved for live events.
 
-- **One typeface.** Geist only. Range comes from size, never from a second family.
-- **Sentence case in prose.** Uppercase survives only in mono micro-labels, where every sports interface has always put it. See "The caps charter" below, which is unchanged in strictness and now has exactly one address.
-- **Every accessibility gate.** Contrast in both themes; magnitude never carried by hue alone.
-- **Both themes.** Dark is the flagship; light is **designed** to the same roles and the same thresholds, never inverted from dark by formula. `ThemeProvider` (`system | light | dark`) is untouched; only the palette each theme paints with moved. Default theme is still `system`.
-- **Honesty.** No invented data, no tint without a stated population, no motion without a real event.
-- **A hairline separates; an edge bounds.** `line` is decorative (<3:1, never the boundary of a control) and `edge` is interactive (≥3:1, WCAG 1.4.11).
+## The rule concordance: v3 and v4 numbers to v5 laws
 
-### The 600 cap holds
+Rules are cited **by number** in dozens of source and test files across two generations of numbering. This table is what makes those citations resolve. A comment naming "rule 4" (v3) meant hairlines-not-boxes; "law 4" (v4) meant density; neither is v5's law 4.
 
-Law 2 asks for range and gets it from **size only**. `weight-cap.source.test.ts` still bans `font-bold`/`font-extrabold`/`font-black` across seven directories with no allowlist, and `font-semibold` (600) is still the ceiling. A bigger number is the answer; a heavier face is not. Law 2's own gate in `tokens.test.ts` pins the two values the law names — display `2xl` at 84 and `xs` at 11 — so the 7.6x claim above cannot quietly stop being true.
+| v3 rule | v4 law | v5 law | Where it went |
+|---|---|---|---|
+| 1 — Colour is meaning | 1 — Colour is a legend | **4 — Spent exactly three times** | Channels consolidated: money-green becomes amber (furniture/you/verb); magnitude re-hued to the verdict pair; live splits from negative. Position/tier stay a legend. |
+| 2 — One face, earned weights | 2 — The number is the hero | **3 — Readable from the sofa** | The hero-scale idea survives in the display scale; the one-face rule and the blanket 600 cap are repealed (see above). |
+| 4 — Hairlines, not boxes | 3 — A player is an object | *(kept as-is)* | Law 3's player-object work (PlayerFace, PlayerRow, PlayerObject) is untouched by v5 and still binding. |
+| — | 4 — Density is respect | **3 — Readable from the sofa** | Reversed in mechanism: v4 tightened padding (7px); v5 restores 11px rows and drops columns instead. The diagnosis (spreadsheet feel) was right; the cause was full-width tables, fixed separately. |
+| 5 — One ink action | 5 — The verb is obvious | **6 — The lower third** | The verb gets a *place* instead of a count. The page audit counts distinct verbs, unchanged. |
+| 6 — Only true things move | 6 — Motion reports, never performs | *(kept as-is)* | v5 adds no motion law; v4's stands: nothing on mount/scroll/hover, ≤250ms, reduced-motion loses nothing. |
+| — | — | **1 — Delta, not fact** / **2 — Movement** / **5 — Chapter markers** / **7 — Never invent** | New as numbered laws; 7 existed in v4 as an unnumbered refusal. |
 
-## The rule concordance: v3 numbers to v4 laws
-
-v3's six rules are cited **by number** in eighty-eight source and test files, and the numbering moved. This table is what makes those citations resolve; it is not decoration. A comment saying "rule 4" was written about hairlines-not-boxes and must not be read as law 4, which is density.
-
-| v3 rule | v4 law | What changed |
-|---|---|---|
-| 1 — Colour is meaning | **1 — Colour is a legend** | Same channels, opposite posture. v3 spent colour scarcely; Gameday names six channels and requires them. The fun-pass amendments (magnitude, tier, team) are absorbed wholesale, not repealed. |
-| 2 — One face, earned weights | **2 — The number is the hero** | The typeface and the 600 cap survive verbatim. The range widens from 2x to 7.6x, and it comes from size. |
-| 3 — No capitals anywhere | *(not a numbered law)* | Demoted to "What survives", with one carve-out: mono micro-labels. `no-uppercase.source.test.ts` is unchanged in strictness. |
-| 4 — Hairlines, not boxes | **3 — A player is an object** | Reversed. v3's amended test (*act on or compare = card; read down a column = row*) survives as the boundary, but the default flipped: an object is drawn as a thing. |
-| 5 — One ink action per view | **5 — The verb is obvious** | Reversed. v3's "named exceptions" for repeated-action surfaces become the general case. See "Pill discipline" for what replaces the count. |
-| 6 — Only true things move | **6 — Motion reports, never performs** | Sharpened, not replaced. v3 said what may move; law 6 also says what may never move (mount, scroll, hover) and caps the duration. |
-| *(none)* | **4 — Density is respect** | New. |
-
-**Migrating a citation is the route tracks' work, not a licence to ignore it.** Until a file is migrated, read "rule N" in a v3-era comment against the left column.
+**Migrating a citation is a route track's work, not a licence to ignore it.** Until a file is migrated, read its rule number against the generation that wrote it.
 
 ## The fun-pass amendments (2026-08-27) — absorbed into Gameday
 
@@ -297,7 +288,7 @@ category, below); v3 removed every styled one.
 
 **GAMEDAY'S ONE CARVE-OUT.** "What survives from v3" reads: *"Sentence case in prose. Uppercase
 survives only in mono micro-labels, where every sports interface has always put it."* That is the
-approved mock's `.lbl` — 11px Geist Mono, 0.11em tracking, faint ink — on the things a scoreboard
+approved mock's `.lbl` — the 11px mono micro-label, 0.11em tracking, faint ink — on the things a scoreboard
 has always shouted quietly: a column header, a slot name, `248 LEFT`, `Q3`, the eyebrow over a
 stat block.
 
@@ -506,33 +497,32 @@ re-litigate it:
 
 ### Type
 
-Two faces, one family (v2, Task 1: `Barlow_Condensed` removed).
+Two families, three faces (Sunday v5 — the condensed face returned, and this time it is
+load-bearing under law 3 rather than decorative: it is what buys ten columns at 18px).
 
 | face | variable | Tailwind | for |
 |---|---|---|---|
-| body | `--font-geist-sans` | `font-sans` (default) | everything you read in sentences |
-| display | `--font-geist-sans` | `font-display` | board headers, sticker names, the clock, page titles, team names |
-| mono | `--font-geist-mono` | `font-mono` | clock digits, tabular numbers, the wire, EYEBROW labels |
+| body | `--font-body` (Saira) | `font-sans` (default) | everything you read in sentences |
+| display | `--font-display` (Saira Condensed) | `font-display` | every name, number and label: board headers, stickers, clocks, scores, page titles |
+| mono | `--font-body` (Saira, tabular) | `font-mono` | micro-labels and columns of digits — Saira ships true tabular figures, so no third family is loaded for digits alone |
 
-`font-display` resolves to the same Geist family as `font-sans`, distinguished by
-`letter-spacing`. v3 moved that tracking from −0.02em to **−0.028em, on display sizes only**
-(self-ruling S3, a plain CSS rule on `.font-display` in `globals.css`) — body tracking is
-untouched. **Never set the display face on a paragraph.** It is a lettering face, not a reading
-face.
+The display tracking rule survives from v3 (−0.028em at display sizes, on `.font-display` in
+`globals.css`); body tracking untouched. **Never set the display face on a paragraph.** It is a
+lettering face, not a reading face.
+
+**Weight:** the display face has earned 700/800 (law 3); the body face still caps at 600, and
+`weight-cap.source.test.ts` enforces the split per line — a bold body line fails because Saira
+loads nothing above 600 and would silently faux-bold.
 
 `font-mono` carries `font-variant-numeric: tabular-nums` on `.font-mono` itself, so a score or a
 countdown digit never shifts the column beside it.
 
-**Display weight converged from `font-bold` (700) to `font-semibold` (600) at every display call
-site (self-ruling S4)** — the mock's display ramp asks for 650, and 600 is the closest loaded
-Geist weight without an arbitrary value. This was not a one-task edit: Task 3 moved the caps-sweep
-call sites, and Task 9 closed the last five residual `font-bold` sites the audit's own inventory
-missed (`room-rail.tsx` ×2, `tv-board.tsx`, `room-dock.tsx`, `matchup-scoreboard.tsx`) as part of
-resolving a review MEDIUM — **`font-bold` is now zero occurrences across
-`src/components`, `src/league-room`, `src/draft-room`, `src/chat-room`, `src/account-room`,
-`src/admin-room` and `src/app`**, proven by grep repo-wide rather than claimed. (`page-title.tsx`
-still contains the string `font-bold`, but only inside a comment recording this history — its
-rendered class is `font-semibold`.)
+**Display weight history, in one paragraph so the reversal cannot read as drift.** v3 converged
+every display call site to 600 (self-ruling S4) and the sweep proved zero occurrences of
+`font-bold` across seven directories. Sunday v5 reverses this for the display face only: the
+condensed face at 700/800 is law 3's mechanism, and `weight-cap.source.test.ts` is re-chartered
+to enforce the new line — weight above 600 must sit on a line that also declares `font-display`,
+the body face still caps at 600, and `font-black` (900) is banned everywhere.
 
 **The type scale has two emissions from one source of truth**, `TOKENS.font.size` /
 `TOKENS.font.sizeDense` — the mocks are 13–14px dense on desktop, and that density is deliberate,
@@ -649,27 +639,10 @@ form, not a new page or a new information architecture:
 
 ## Signed-in surfaces and the draft room: retone only
 
-**Historical, and superseded by Gameday's execution doctrine.** Kept because several research
-documents cite this section by name.
-
-Under v3 this section recorded a deliberate limit: the signed-in shell, the draft room and the TV
-board were already structurally disciplined (the audit's own diagnosis: "the signed-in board,
-draft room, and profile already mostly hold the bar"), so v3's Cluster C sweep applied the palette,
-caps and pill rules to every remaining surface **without restructuring** bands, regions or
-animations — `Countdown`'s `tone: "hot"` read live-red by token change alone, with no
-component-level edit.
-
-**Gameday reverses that limit**, and the reversal is the point of the whole version. Laws 1 and 3
-require the position, team and tier channels on every surface that draws a player, which is most of
-them; law 2 changes a type scale the whole product reads from; law 4 tightens every table. The
-spec's own words: *"It is a system replacement, not a repaint, and it should be built as one piece
-with the screens as the acceptance criterion rather than as phased amendments."* A retone-only pass
-is exactly the mistake that produced "little changes here and there".
-
-**The acceptance criterion is a screenshot, not a rule check.** Every screen track ends by
-rendering the real page, putting it beside the approved composition, naming the differences and
-closing them. The previous pass verified tests, contrast ratios and rule compliance, and shipped
-surfaces nobody had ever looked at.
+**Historical twice over — superseded by Gameday's execution doctrine, and again by Sunday v5.**
+Kept because several research documents cite this section by name. The v3 "retone only" limit and
+the v4 conversion it describes are both closed campaigns; v5's route work follows the spec's own
+doctrine (the acceptance criterion is a screenshot) and the concordance table above.
 
 ## Guided help
 
