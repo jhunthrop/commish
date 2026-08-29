@@ -179,6 +179,11 @@ export function LineupEditor({
   };
 
   const startingIds = new Set(Object.values(assignments).filter((id): id is string => id !== null));
+  /** The selected STARTER slot's type and occupant position, for the both-directions test. */
+  const selectedSlotType = (): string | null => {
+    if (selected === null || selected.startsWith("bench:")) return null;
+    return lineup.starters.find((slot) => slotKey(slot) === selected)?.slot ?? null;
+  };
   const benchNow = everyone.filter((slot) => !startingIds.has(slot.playerId!));
   const selectedSlot = selected === null ? null : lineup.starters.find((slot) => slotKey(slot) === selected) ?? null;
   const selectedPlayerId = selected === null ? null : selected.startsWith("bench:") ? selected.slice(6) : (assignments[selected] ?? null);
@@ -236,7 +241,18 @@ export function LineupEditor({
             const occupant = occupantId === null ? undefined : byId.get(occupantId);
             const face = occupant === undefined ? null : playerOf(occupant);
             const isSelected = selected === key;
-            const canReceive = moving && !isSelected && eligible(slot.slot, selectedPosition);
+            const occupantPosition = occupant?.position ?? null;
+            const fromSlotType = selectedSlotType();
+            // BOTH ENDS MUST FIT (founder, 2026-08-28: "if you select a QB it should only
+            // highlight the QBs on your bench... visually show what you can do"). The selected
+            // player must fit THIS slot, and — on a starter-to-starter swap — the displaced
+            // occupant must fit the slot he falls back into. A move that lights is a move that
+            // saves; nothing lights that the server would bounce.
+            const canReceive =
+              moving &&
+              !isSelected &&
+              eligible(slot.slot, selectedPosition) &&
+              (fromSlotType === null || occupantId === null || eligible(fromSlotType, occupantPosition));
             const dimmed = moving && !isSelected && !canReceive;
             return (
               <li
@@ -306,7 +322,11 @@ export function LineupEditor({
                 const key = `bench:${slot.playerId!}`;
                 const player = playerOf(slot)!;
                 const isSelected = selected === key;
-                const canReceive = moving && selectedSlot !== null && !isSelected;
+                const fromSlotType = selectedSlotType();
+                // Selecting the QB lights only the bench's QBs; selecting the FLEX lights only
+                // RB/WR/TE. The dimmed rows are the chart, taught by looking.
+                const canReceive = moving && fromSlotType !== null && !isSelected && eligible(fromSlotType, player.position);
+                const dimmed = moving && !isSelected && !canReceive;
                 return (
                   <li
                     key={key}
@@ -314,7 +334,7 @@ export function LineupEditor({
                       isSelected
                         ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent"
                         : "border-l-transparent"
-                    }`}
+                    } ${dimmed ? "opacity-40" : ""}`}
                   >
                     <PlayerFace player={player} size="sm" />
                     <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
