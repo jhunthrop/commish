@@ -1,5 +1,5 @@
-import { PlayerFace, SlotChip } from "@/components/ui";
-import { MICRO_LABEL } from "@/components/ui/config";
+import { PlayerFace, SlotChip, Stat } from "@/components/ui";
+import { MICRO_LABEL, UI_CONFIG } from "@/components/ui/config";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import type { MatchupDetail, MatchupLineupEntry } from "../contract";
 import { formatPoints } from "../lib/format";
@@ -20,8 +20,32 @@ function pairStarters(mine: readonly MatchupLineupEntry[], theirs: readonly Matc
   return keys.map((key) => ({ key, mine: mineByKey.get(key), theirs: theirsByKey.get(key) }));
 }
 
-/** One side of one row: the player as an object, points at the slate's spine. */
-function SlateSide({ entry, align }: { readonly entry: MatchupLineupEntry | undefined; readonly align: "left" | "right" }) {
+/**
+ * One side of one row: the player as an object, the points JUDGED at the slate's spine.
+ *
+ * TWO VERDICTS PER ROW (founder, 2026-08-29: "it still looks boring and plain - make it feel
+ * alive"). Plainness was every figure rendering as a fact — same ink, same weight, no verdict
+ * anywhere on a card that holds two honest ones:
+ *
+ * - THE HEAT: each figure is tinted against the matchup's own starters — a real, stated
+ *   population of ~18, above the floor — through `Stat`, the one component allowed to name a
+ *   magnitude pigment. Your 23.80 burns strong, the 1.00 kicker reads bad, and the caret and
+ *   weight step ride along so colour is never the only channel.
+ * - THE SLOT WINNER: the higher figure in a settled pairing takes the display face's 800 and
+ *   `data-slot-winner`; the loser stays at 700. A head-to-head is a pair, so it earns WEIGHT,
+ *   never a tint of its own — the pair-is-not-a-population rule, held for the third time.
+ */
+function SlateSide({
+  entry,
+  align,
+  wonSlot,
+  comparison,
+}: {
+  readonly entry: MatchupLineupEntry | undefined;
+  readonly align: "left" | "right";
+  readonly wonSlot: boolean;
+  readonly comparison: { readonly percentile: number; readonly population: string } | undefined;
+}) {
   const player = entry === undefined ? null : playerOf(entry);
   const points = entry?.points ?? null;
   const identity =
@@ -31,7 +55,9 @@ function SlateSide({ entry, align }: { readonly entry: MatchupLineupEntry | unde
       <span className={`flex min-w-0 items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
         <PlayerFace player={player} size="sm" />
         <span className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-semibold leading-tight text-text-primary">{player.name}</span>
+          <span className={`truncate text-sm leading-tight text-text-primary ${wonSlot ? "font-display font-bold" : "font-semibold"}`}>
+            {player.name}
+          </span>
           <span className="truncate font-mono text-xs text-text-faint">
             {player.position}
             {player.nflTeam === "" ? "" : ` · ${player.nflTeam}`}
@@ -39,15 +65,16 @@ function SlateSide({ entry, align }: { readonly entry: MatchupLineupEntry | unde
         </span>
       </span>
     );
-  const figure = (
-    <span
-      className={`shrink-0 font-display text-lg font-bold tabular-nums ${points === null ? "text-text-faint" : "text-text-primary"}`}
-    >
-      {points === null ? NOT_STARTED_DASH : formatPoints(points)}
-    </span>
-  );
+  const figure =
+    points === null ? (
+      <span className="shrink-0 font-display text-lg font-bold tabular-nums text-text-faint">{NOT_STARTED_DASH}</span>
+    ) : (
+      <span className="shrink-0" data-slot-winner={wonSlot ? "true" : undefined}>
+        <Stat label="Points" srOnlyLabel value={formatPoints(points)} size="md" comparison={comparison} />
+      </span>
+    );
   return (
-    <div className={`flex min-w-0 items-center gap-3 ${align === "right" ? "flex-row-reverse" : ""} ${align === "left" ? "justify-between" : "justify-between"}`}>
+    <div className={`flex min-w-0 items-center justify-between gap-3 ${align === "right" ? "flex-row-reverse" : ""}`}>
       {identity}
       {figure}
     </div>
@@ -88,8 +115,25 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
   const homeIsMine = detail.home.teamId === myTeamId;
   const awayIsMine = detail.away.teamId === myTeamId;
 
+  // THE POPULATION: every starter in this matchup with a real stat line — one stated set, both
+  // columns judged against it. Below the floor (a week barely begun) nothing tints, which is the
+  // refusal that keeps the heat honest.
+  const allPoints = [...mine.starters, ...theirs.starters]
+    .map((entry) => entry.points)
+    .filter((points): points is number => points !== null)
+    .sort((a, b) => a - b);
+  const comparisonFor = (points: number | null) => {
+    if (points === null || allPoints.length < UI_CONFIG.stat.minPopulation) return undefined;
+    const below = allPoints.filter((value) => value < points).length;
+    return { percentile: below / Math.max(1, allPoints.length - 1), population: "the starters in this matchup" };
+  };
+
   return (
-    <div className="flex flex-col">
+    <div
+      className={`flex flex-col border-l-[3px] border-r-[3px] pl-2 pr-2 ${
+        homeIsMine ? "border-l-accent border-r-transparent" : awayIsMine ? "border-l-transparent border-r-accent" : "border-l-transparent border-r-transparent"
+      }`}
+    >
       <div aria-hidden="true" className={`grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] items-center gap-x-3 pb-1.5 ${MICRO_LABEL} text-text-faint`}>
         <span className="truncate">{homeIsMine ? `${mine.teamName} · you` : mine.teamName}</span>
         <span className="text-center">Slot</span>
@@ -98,9 +142,19 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
       <ul className="flex flex-col">
         {pairs.map((pair) => (
           <li key={pair.key} className="grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] items-center gap-x-3 border-t border-line py-2">
-            <SlateSide entry={pair.mine} align="left" />
+            <SlateSide
+              entry={pair.mine}
+              align="left"
+              wonSlot={pair.mine?.points !== null && pair.mine !== undefined && (pair.theirs?.points === null || pair.theirs === undefined || pair.mine.points! > (pair.theirs.points ?? -Infinity))}
+              comparison={comparisonFor(pair.mine?.points ?? null)}
+            />
             <SlotChip slot={(pair.mine ?? pair.theirs)!.slot} className="justify-self-center" />
-            <SlateSide entry={pair.theirs} align="right" />
+            <SlateSide
+              entry={pair.theirs}
+              align="right"
+              wonSlot={pair.theirs?.points !== null && pair.theirs !== undefined && (pair.mine?.points === null || pair.mine === undefined || pair.theirs.points! > (pair.mine.points ?? -Infinity))}
+              comparison={comparisonFor(pair.theirs?.points ?? null)}
+            />
           </li>
         ))}
       </ul>
