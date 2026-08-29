@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { EmptyState } from "@/components/ui";
-import { MICRO_LABEL } from "@/components/ui/config";
+import { ChapterBand } from "@/components/ui/chapter-band";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { moneyIsLive } from "@/money/states";
@@ -240,10 +240,7 @@ export function OpenLeagueShelf({
           <div data-testid="league-rows" className="hidden lg:block">
             <LeagueRowsHeader />
             {filling.length > 0 ? (
-              <div className="flex items-center gap-2.5 border-t border-line bg-gradient-to-r from-surface-raised to-transparent px-2 py-1.5">
-                <span className={`${MICRO_LABEL} rounded-sm bg-live px-2 py-0.5 font-semibold text-live-text`}>Filling</span>
-                <span className={`${MICRO_LABEL} text-text-muted`}>Claimed seats · first to fill is first to draft</span>
-              </div>
+              <ChapterBand name="Filling" consequence="Claimed seats · first to fill is first to draft" tone="live" />
             ) : null}
             <ul className="flex flex-col">
               {filling.map((league, index) => (
@@ -260,10 +257,7 @@ export function OpenLeagueShelf({
               ))}
             </ul>
             {fresh.length > 0 ? (
-              <div className="flex items-center gap-2.5 border-t border-line bg-gradient-to-r from-surface-raised to-transparent px-2 py-1.5">
-                <span className={`${MICRO_LABEL} rounded-sm bg-surface-raised px-2 py-0.5 font-semibold text-text-muted`}>Fresh</span>
-                <span className={`${MICRO_LABEL} text-text-muted`}>No claims yet · yours would be the first seat</span>
-              </div>
+              <ChapterBand name="Fresh" consequence="No claims yet · yours would be the first seat" />
             ) : null}
             <ul className="flex flex-col">
               {fresh.map((league, index) => (

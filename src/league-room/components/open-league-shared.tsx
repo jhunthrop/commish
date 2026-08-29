@@ -2,13 +2,12 @@
 
 import type { ReactElement } from "react";
 import { Badge, buttonClassName } from "@/components/ui";
+import { LiveMarker } from "@/components/ui/live-marker";
 import { UI_CONFIG } from "@/components/ui/config";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
-import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import type { DraftFormat } from "@/domain/league";
 import type { TermKey } from "@/help/glossary";
-import type { HelpLevel } from "@/identity/preferences";
 import { rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
@@ -24,16 +23,6 @@ import { JoinPublicLeagueButton } from "./join-public-league-button";
  */
 
 const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
-const FORMAT_TERM: Readonly<Record<DraftFormat, TermKey>> = { snake: "snake-draft", auction: "auction-draft" };
-
-/** `scoringLabel` is a derived string (`describeScoring`), not a `TermKey` — every label but
- *  "Standard" is left plain. */
-const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
-  PPR: "ppr",
-  "Half PPR": "half-ppr",
-  "PPR, TE premium": "te-premium",
-  Custom: "custom-scoring",
-};
 
 /**
  * Whether `league` names the LAST open seat — the exact remaining count, never accounting for a
@@ -68,19 +57,12 @@ function Dot() {
 }
 
 /**
- * The mock's live chip (rule 6): a pulsing dot beside one word, in the live family, rendered
- * only while something on this league is genuinely live — the label is DERIVED on every render
- * from facts already on the wire, never a stored flag. Static under reduced motion: the state
- * still shows, only the pulse stops.
+ * The storefront's live marker — now the ONE `LiveMarker` primitive, which the season track
+ * built after finding this exact shape hand-rolled here (its own docblock names this file). The
+ * label is still DERIVED on every render from facts already on the wire, never a stored flag.
  */
 export function LiveChip({ label }: { readonly label: string }) {
-  const reducedMotion = usePrefersReducedMotion();
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-live">
-      <span aria-hidden="true" className={`size-1.5 rounded-pill bg-live${reducedMotion ? "" : " animate-pulse-live"}`} />
-      {label}
-    </span>
-  );
+  return <LiveMarker className="shrink-0">{label}</LiveMarker>;
 }
 
 export interface OpenLeagueLive {
