@@ -1,5 +1,6 @@
-import { EYEBROW, Panel, Stat } from "@/components/ui";
+import { Panel } from "@/components/ui";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
+import { TowerFigure } from "@/components/ui/tower-figure";
 import type { WalletSummary } from "@/money-service/read";
 import { formatUsd } from "@/money/config";
 
@@ -57,12 +58,19 @@ function figureText(summary: WalletSummary | null, key: keyof WalletSummary): st
  * The wallet's own four figures (Task 12), each a straight read of `WalletSummary` — the ONE
  * data source (`@/money-service/read`'s own docblock: "no surface invents its own sums").
  *
- * GAMEDAY, LAW 2 ON A MONEY SURFACE. The available balance is the number this page exists to
- * answer, and it used to render as 15px mono in `Panel`'s own `meta` slot, the same size as the
- * three figures explaining why the rest of the money is not available. It is now a `Stat` at
- * `display-lg` over an 11px label, which is the pairing law 2's scale exists for — `lg` and not
- * the top of the scale, because `display-2xl` and `3xl` are a TV board and a matchup hero, and a
- * balance is read carefully rather than shouted. Four times its label is range enough here.
+ * LAW 3 ON A MONEY SURFACE. The available balance is the number this page exists to answer, and
+ * it used to render as 15px mono in `Panel`'s own `meta` slot, the same size as the three figures
+ * explaining why the rest of the money is not available. It is a `TowerFigure` at `display-lg`
+ * over an 11px micro-label — `lg` and not the top of the scale, because `display-2xl` and `3xl`
+ * are a TV board and a matchup hero, and a balance is read anxiously rather than shouted. Four
+ * times its label is range enough here.
+ *
+ * SUNDAY v5 COLLAPSED THE TWO BRANCHES INTO ONE. The dormant hero used to be a hand-rolled
+ * eyebrow-over-dash, written out longhand precisely because `Stat` could not draw an absence in
+ * faint ink; `TowerFigure`'s `absent` prop is that same argument made into a primitive, so the
+ * dormant and live states are now literally one line of markup with one prop different. That was
+ * the whole point of rendering this panel on the dark page at all: the shape a manager will read
+ * when money goes live is the shape they are learning now.
  *
  * The three reasons the rest of the money is not available stay dense hairline rows beneath it,
  * because they are read down a column (law 3's amended test: *a thing you act on or compare
@@ -85,26 +93,16 @@ function figureText(summary: WalletSummary | null, key: keyof WalletSummary): st
 export function WalletPanel({ summary }: WalletPanelProps) {
   return (
     <Panel title="Balance">
-      {summary === null ? (
-        // THE DORMANT HERO IS NOT A `Stat`, AND THAT IS THE POINT. `Stat` is the primitive for a
-        // NUMBER, and its `neutral` step is `textPrimary` by deliberate design — an uncompared
-        // number must be indistinguishable from ordinary ink. Rendered, a dash in that ink at
-        // 44px is not a dash: it is a solid bar the width of an em, and on the light theme it
-        // reads as a redaction over the reader's own balance, which is the opposite of what it
-        // says. The same eyebrow, the same display size, faint ink — an absence drawn as an
-        // absence. Both branches keep `Stat`'s own label-over-number order so the two states are
-        // the same block at the same place, which is the whole reason the dormant page renders
-        // this panel at all.
-        <div className="flex flex-col gap-1">
-          <span className={`${EYEBROW} text-text-faint`}>Available</span>
-          <span aria-hidden="true" className="font-display text-display-lg leading-display text-text-faint">
-            {NOT_STARTED_DASH}
-          </span>
-          <span className="sr-only">No balance yet.</span>
-        </div>
-      ) : (
-        <Stat label="Available" value={formatUsd(summary.availableCents)} size="lg" className="font-mono" />
-      )}
+      {/* `absent` is the whole free-season contract in one prop: a dash drawn in ordinary ink at
+          44px is not a dash, it is a solid bar the width of an em, and on the light theme it
+          reads as a redaction over the reader's own balance. Faint ink, `aria-hidden`, and a
+          spoken sentence beside it — an absence drawn as an absence. */}
+      <TowerFigure
+        label="Available"
+        value={figureText(summary, "availableCents")}
+        size="lg"
+        absent={summary === null ? "No balance yet." : undefined}
+      />
       <p className="text-sm text-text-muted">{AVAILABLE_EXPLANATION}</p>
       <dl className="flex flex-col">
         {SECONDARY_FIGURES.map((figure) => (
