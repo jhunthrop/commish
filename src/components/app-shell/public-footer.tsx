@@ -16,7 +16,7 @@ export const PUBLIC_FOOTER_LINKS: readonly FooterLink[] = [
   { href: "/legal/terms", label: "Terms" },
   { href: "/legal/privacy", label: "Privacy" },
   { href: "/support", label: "Support" },
-  { href: "/league-rules", label: "League rules" },
+  { href: "/league-rules", label: "How it works" },
 ];
 
 /**

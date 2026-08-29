@@ -63,7 +63,7 @@ export interface PublicBarProps {
 export function PublicBar({ intent, signedIn, nav = [], action = null }: PublicBarProps) {
   return (
     <header className="border-b border-line bg-surface">
-      <div className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6">
+      <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
         {/* The mark: the condensed face at its earned weight, with the amber full stop every
             v5 mock signs off with — the one place the furniture colour appears in the rail's
             left half. */}
@@ -74,7 +74,9 @@ export function PublicBar({ intent, signedIn, nav = [], action = null }: PublicB
           Commish<span className="text-accent">.</span>
         </Link>
         {nav.length === 0 ? null : (
-          <nav aria-label="Commish" className={`hidden items-center gap-6 ${RAIL_LABEL} text-text-muted sm:flex`}>
+          {/* Order-last + full width below sm: the rail wraps to its own row on a phone instead
+              of vanishing — the store track found the no-way-back defect reopened at 390. */}
+          <nav aria-label="Commish" className={`order-last flex w-full items-center gap-6 ${RAIL_LABEL} text-text-muted sm:order-none sm:w-auto`}>
             {nav.map((link) => {
               // `intent` is every caller's own path (it is where sign-in returns), so it also
               // answers which rail label is the page under the reader's feet — that one carries
