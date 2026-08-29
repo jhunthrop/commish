@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LeagueTerms } from "@/league";
-import { Button } from "@/components/ui";
+import { Button, LowerThird, type LowerThirdCell } from "@/components/ui";
 import type { StateCode } from "@/money/states";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import type { JoinBody } from "../contract";
@@ -37,6 +37,9 @@ const TIER_REFUSED =
 
 export interface JoinFormProps {
   readonly code: string;
+  /** The strip's own facts, built ONCE by `InviteLanding` so the signed-in and signed-out
+   *  renderings of this decision can never disagree about how many seats are left. */
+  readonly cells: readonly LowerThirdCell[];
   /** Already known — `InviteLanding` fetched it once, server-side, before this ever mounts. This
    *  form reads only `terms.name` for its own button label; the rest of the terms are
    *  `LeagueTermsPanel`'s job, rendered once by `InviteLanding` regardless of session. */
@@ -70,6 +73,7 @@ export interface JoinFormProps {
  */
 export function JoinForm({
   code,
+  cells,
   terms,
   balanceAfterUsd,
   onAlreadyMember,
@@ -148,17 +152,31 @@ export function JoinForm({
           onStateOfEntryChange={setStateOfEntry}
         />
       ) : null}
-      {/* `self-start`: this stays the invite's one ceremonial ink pill (law 5), but a pill
-          stretched to the whole measure of the page is a button that has stopped looking like a
-          button — it reads as a banner and the eye stops registering it as pressable. */}
-      <Button className="self-start" onClick={() => void join()} loading={submitting} disabled={submitting || (paid && stateOfEntry === null)}>
-        {`Join ${terms.name}`}
-      </Button>
       {error === null ? null : (
         <p role="alert" className="text-sm text-negative">
           {error}
         </p>
       )}
+      {/* LAW 6: the page ends in a lower third, and the verb lives in it. It was a ceremonial ink
+          pill floating under a terms panel, which made the decision the quietest thing on a page
+          that exists to make it. `verb`, not `primary`, because the strip's own place at the foot
+          is what makes it findable — a fill does not have to fight for that as well. */}
+      <div className="-mx-4">
+        <LowerThird
+          cells={cells}
+          action={
+            <Button
+              variant="verb"
+              size="lg"
+              onClick={() => void join()}
+              loading={submitting}
+              disabled={submitting || (paid && stateOfEntry === null)}
+            >
+              {`Join ${terms.name}`}
+            </Button>
+          }
+        />
+      </div>
     </div>
   );
 }

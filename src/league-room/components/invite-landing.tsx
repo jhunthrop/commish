@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { LeagueTerms } from "@/league";
 import type { HelpLevel } from "@/identity/preferences";
-import { ButtonLink, Panel, Crest, buttonClassName } from "@/components/ui";
+import { ButtonLink, LowerThird, Panel, Crest, buttonClassName, type LowerThirdCell } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { StatePanel } from "@/components/ui/state-panel";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
@@ -168,26 +168,34 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
 
   // `state.kind === "open"` — the only branch left.
   const seatsOpen = Math.max(0, state.terms.teamCount - state.terms.filledTeams);
+  /**
+   * THE FACTS THE DECISION RESTS ON (Sunday v5, law 6), built once here so the signed-in strip
+   * and the signed-out one can never disagree about them.
+   *
+   * The seat figure used to sit at the top of this page in its own bordered row — law 2's "the
+   * one number a stranger decides on, at size" — and the strip is simply where that number
+   * belongs now: beside the act it decides. The FIGURE only, deliberately: `LeagueTermsPanel`
+   * below already carries the league's own name as its heading.
+   *
+   * No tint and no `Stat`: a count of open seats sits inside no stated population.
+   */
+  const cells: readonly LowerThirdCell[] = [
+    {
+      label: "Seats",
+      value: (
+        <>
+          <span data-testid="invite-seats-open">{seatsOpen}</span>
+          <span className={`${MICRO_LABEL} ml-1.5 align-middle font-sans text-text-faint`}>
+            {seatsOpen === 1 ? "seat open" : "open"} of {state.terms.teamCount}
+          </span>
+        </>
+      ),
+    },
+    { label: "Drafts", value: state.terms.draftAt },
+  ];
   return (
     <div className="flex flex-col gap-3">
-      {/* GAMEDAY, LAW 2: THE ONE NUMBER A STRANGER DECIDES ON, AT SIZE. Every fact on this page
-          rendered at 13px, including whether the league had any room left — *"if the largest
-          thing on a screen is not a number or a name, the screen is wrong"*, and the largest
-          thing here was the words "Join a league", which is a category rather than a league.
-
-          The FIGURE only, deliberately: `LeagueTermsPanel` below already carries the league's own
-          name as its heading, and this codebase's own standing complaint about itself is the same
-          fact stated twice, differently. That panel also renders inside the league itself, so its
-          ledger is not this surface's to restructure — this is additive, and the terms stay the
-          authority for everything but the headline count.
-
-          No tint and no `Stat`: a count of open seats sits inside no stated population. */}
-      <div className="flex items-baseline gap-2 border-b border-line pb-3">
-        <span data-testid="invite-seats-open" className="font-mono text-display-md font-semibold tabular-nums leading-display text-text-primary">
-          {seatsOpen}
-        </span>
-        <span className={`${MICRO_LABEL} text-text-faint`}>{seatsOpen === 1 ? "seat open" : "seats open"}</span>
-      </div>
+      <div className="flex max-w-2xl flex-col gap-3">
       {/* First-timer persona review (Phase 3.5, Task 8 fix round 1): nothing anywhere in the
           invite flow said what JOINING MEANS. Lives here, not in `LeagueTermsPanel` — that
           component also renders post-join inside the league itself (Task 8), where this sentence
@@ -198,9 +206,11 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
         {"You are in the draft, then the season. Set a lineup every week."}
       </p>
       <LeagueTermsPanel terms={state.terms} helpLevel={helpLevel} />
+      </div>
       {signedIn ? (
         <JoinForm
           code={code ?? ""}
+          cells={cells}
           terms={state.terms}
           balanceAfterUsd={balanceAfterUsd}
           onAlreadyMember={(leagueId) => setState({ kind: "already-member", leagueId, name: state.terms.name })}
@@ -209,9 +219,16 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
           onTierRefused={() => setState({ kind: "tier-refused" })}
         />
       ) : (
-        // This page's own path (Task 16, F6) — signing in returns here, to the same invite,
-        // rather than dropping the visitor at a generic `/app`.
-        <SignInLink intent={`/app/join/${code ?? ""}`} className={buttonClassName("primary", "md", "w-fit")} />
+        // The same strip, signed out, with the same facts — the only thing that changes is which
+        // act it is waiting on. This page's own path (Task 16, F6) rides the intent, so signing
+        // in returns here, to the same invite, rather than dropping the visitor at a generic
+        // `/app`.
+        <div className="-mx-4">
+          <LowerThird
+            cells={cells}
+            action={<SignInLink intent={`/app/join/${code ?? ""}`} className={buttonClassName("verb", "lg")} />}
+          />
+        </div>
       )}
     </div>
   );
