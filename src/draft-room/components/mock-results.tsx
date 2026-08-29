@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { EYEBROW, PlayerFace, PositionBadge, Stat } from "@/components/ui";
+import { EYEBROW, LowerThird, PlayerFace, PositionBadge, type LowerThirdCell } from "@/components/ui";
 import { BENCH_SLOT } from "@/domain/roster";
 import { playersById as buildPlayersById } from "../lib/lookups";
 import { verdictFor, verdictPopulation, type Verdict } from "../lib/verdict";
@@ -126,13 +126,17 @@ function judgedPicks(view: DraftStateView, players: readonly Player[], playersBy
 }
 
 /**
- * THE DEBRIEF (Task 13). The plan's own words: *"the results debrief is where the verdict chips
- * accumulate into a story about how you drafted."* Three facts, at display scale, above the log
- * they are counted from: how many picks beat the board, how many did not, and the single best
- * one.
+ * THE DEBRIEF, AS THE SCREEN'S LOWER THIRD (Task 13, re-formed by Sunday v5's law 6). The plan's
+ * own words: *"the results debrief is where the verdict chips accumulate into a story about how
+ * you drafted."* Three facts — how many picks beat the board, how many did not, and the single
+ * best one — and then the one verb the screen is actually waiting on.
  *
- * The two counts carry NO comparison, on purpose — there is no stated population a count of
- * steals falls inside, and rule 1 permits a tint only where the comparison is genuine. They are
+ * It used to sit at the TOP, beside a row of three equally-weighted buttons where a manager had
+ * to choose which of them was the point. Law 6 gives the verb a place: "Run another mock draft"
+ * is the act, it goes last in the strip, and the two ways out stay quiet up in the headline row.
+ *
+ * The two counts carry no comparison, on purpose — there is no stated population a count of
+ * steals falls inside, and law 1 permits a tint only where the comparison is genuine. They are
  * big because they matter, not coloured because they are good. The best pick's own chip IS
  * coloured, because that number has a real population behind it (the picks this room made).
  *
@@ -142,27 +146,28 @@ function judgedPicks(view: DraftStateView, players: readonly Player[], playersBy
  * rules still bind — `rendered-copy.test.tsx` mounts this component and sweeps every string it
  * paints.
  */
-function Debrief({ judged }: { readonly judged: readonly JudgedPick[] }) {
+function debriefCells(judged: readonly JudgedPick[]): readonly LowerThirdCell[] {
   const steals = judged.filter((entry) => entry.verdict.kind === "steal");
   const reaches = judged.filter((entry) => entry.verdict.kind === "reach");
   // The single pick that beat the board by most. Absent for a manager who never beat it, which
   // is an honest silence rather than a "best" that was merely least bad.
   const best = steals.reduce<JudgedPick | null>((leader, entry) => (leader === null || entry.verdict.slip > leader.verdict.slip ? entry : leader), null);
-  return (
-    <div data-testid="mock-debrief" className="flex flex-wrap items-end gap-x-10 gap-y-4">
-      <Stat label={steals.length === 1 ? "Steal" : "Steals"} value={String(steals.length)} size="lg" />
-      <Stat label={reaches.length === 1 ? "Reach" : "Reaches"} value={String(reaches.length)} size="lg" />
-      {best === null ? null : (
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className={`${EYEBROW} text-text-faint`}>Best pick</span>
-          <span className="flex min-w-0 items-baseline gap-2">
-            <span className="min-w-0 truncate font-display text-display-sm font-semibold leading-display text-text-primary">{best.player.name}</span>
-            <VerdictChip verdict={best.verdict} />
-          </span>
-        </div>
-      )}
-    </div>
-  );
+  const cells: LowerThirdCell[] = [
+    { label: steals.length === 1 ? "Steal" : "Steals", value: steals.length },
+    { label: reaches.length === 1 ? "Reach" : "Reaches", value: reaches.length },
+  ];
+  if (best !== null) {
+    cells.push({
+      label: "Best pick",
+      value: (
+        <span className="inline-flex items-baseline gap-2">
+          <span className="truncate">{best.player.name}</span>
+          <VerdictChip verdict={best.verdict} />
+        </span>
+      ),
+    });
+  }
+  return cells;
 }
 
 function PickList({
@@ -197,9 +202,17 @@ function PickList({
                     `Avatar` — the same drift `RosterRow` was extracted to prevent. */}
                 <PlayerFace player={player} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">{player.name}</span>
-                <PositionBadge position={player.position} size="sm" />
+                {/* The position rank rides the sticker (`WR6`), the way the pool has always
+                    drawn it — it used to be printed as prose at the end of every row's fact
+                    clause, which spent a column restating what a five-character badge says. */}
+                <PositionBadge position={player.position} rank={review.positionRank} size="sm" />
                 <VerdictChip verdict={verdict} />
-                <span className={`min-w-0 flex-1 truncate text-right font-mono text-xs tabular-nums ${best ? "font-semibold text-text-primary" : "text-text-muted"}`}>
+                {/* A fixed track, not a second `flex-1`: the clause is three or four words now
+                    ("Best available", "2 ranked higher"), and letting it claim half the row was
+                    what made a column of near-identical phrases read as the loudest thing in the
+                    log. The width it gives back goes to the NAME, which is the thing being
+                    scanned. */}
+                <span className={`w-40 shrink-0 truncate text-right font-mono text-xs tabular-nums ${best ? "font-semibold text-text-primary" : "text-text-muted"}`}>
                   {formatPickFactClause(copy.pickFact, review, player.position)}
                 </span>
               </li>
@@ -262,12 +275,12 @@ export function MockResults({ view, teams, board, players, myTeamId, copy, actio
           {/* ONE retention fact per view (review E3): the practice banner above this panel
               already says the room clears itself — `copy.retentionSentence` stays on the wire
               for any chrome-less consumer but is deliberately not restated here. */}
-          {/* TASK 13: the story, above the record. Only for a caller who actually drafted — a
-              commissioner watching a mock with no seat has no picks to have a story about. */}
-          {judged.length === 0 ? null : <Debrief judged={judged} />}
         </div>
+        {/* The two ways OUT stay here, quiet. The one ACT ("Run another mock draft") moved to
+            the strip at the foot, because law 6 says that is where a verb lives — and because
+            three equally weighted buttons in a row made a manager choose which of them was the
+            point of the screen. */}
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          {actions.runAgain}
           {actions.openLobby}
           {actions.browseLeagues}
         </div>
@@ -286,6 +299,13 @@ export function MockResults({ view, teams, board, players, myTeamId, copy, actio
         {/* The finished board (review R3/E7) — for EVERY caller, including the commissioner
             with no team, for whom the room's own completed picture is the whole point. */}
         <div className="order-3 min-h-0 lg:col-span-2">{board}</div>
+      </div>
+      {/* LAW 6: the screen ends in a lower third. The story this draft told (steals, reaches,
+          the single best pick) and then the one act it is waiting on. A commissioner who watched
+          without a seat has no story to tell, so the strip carries the verb alone rather than
+          three cells of zeroes. */}
+      <div data-testid="mock-debrief" className="-mx-6 -mb-6 mt-2">
+        <LowerThird cells={debriefCells(judged)} action={actions.runAgain} />
       </div>
     </section>
   );

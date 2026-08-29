@@ -194,7 +194,14 @@ export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
               />
             }
             actions={{
-              runAgain: <ButtonLink href={`${MOCK_LOBBY_PATH}?create=solo`}>{room.mock.results.runAgainLabel}</ButtonLink>,
+              // `verb` (law 6): this is the act the results strip is waiting on, and the strip is
+              // where the verb lives. It was the ceremonial ink pill while it sat in a row of
+              // three buttons at the top of the page, which is exactly the shape law 6 replaced.
+              runAgain: (
+                <ButtonLink href={`${MOCK_LOBBY_PATH}?create=solo`} variant="verb" size="lg">
+                  {room.mock.results.runAgainLabel}
+                </ButtonLink>
+              ),
               openLobby: (
                 <ButtonLink href={MOCK_LOBBY_PATH} variant="secondary">
                   {room.mock.results.openLobbyLabel}
