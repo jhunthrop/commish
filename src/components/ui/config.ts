@@ -131,7 +131,14 @@ export const UI_CONFIG = {
      * screen, not air around the sixth. Four pixels a row is roughly one more starter visible
      * without scrolling on a phone, which is the whole argument.
      */
-    denseRowPaddingPx: 7,
+    /**
+     * SUNDAY v5, law 3: a row is ~44px and a name is 18px, because a broadcast graphic stays
+     * readable from the sofa and DROPS A COLUMN rather than shrinking type. This reverses the
+     * v4 pass that took it 11px -> 7px chasing density; that pass was right that our tables read
+     * as spreadsheets and wrong about why. The cause was full-width tables spreading two related
+     * facts 1270px apart, not row height, and that has since been fixed separately.
+     */
+    denseRowPaddingPx: 11,
   },
   waitingRoom: {
     /**

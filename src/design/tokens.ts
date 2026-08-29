@@ -237,9 +237,6 @@ function stickerOf(fill: string, label: string, text: string = fill): PositionCo
   return { sticker: fill, stickerText: label, text };
 }
 
-/** The near-black the mock prints on every saturated sticker (`.pos { color: #14151A }`). */
-const STICKER_INK = "#14151A";
-
 const darkPositions: PositionPalette = {
   qb: stickerOf("#2A1D3B", "#B08BF0", "#B08BF0"),
   rb: stickerOf("#0E3B32", "#4FE0C0", "#4FE0C0"),
@@ -481,11 +478,11 @@ export const TOKENS = {
      * names. Move this and the range claim in `docs/design-system.md` stops being true, which is
      * why `tokens.test.ts` asserts the ratio rather than the two values.
      */
-    size: { xs: 11, sm: 13, md: 15, lg: 17, xl: 20, "2xl": 26, "3xl": 34 },
+    size: { xs: 11, sm: 13, md: 15, lg: 18, xl: 22, "2xl": 28, "3xl": 38 },
     /** The dense scale, px — emitted inside a min-width media query at
      *  `UI_CONFIG.shell.denseFromPx`. Same keys as `size`; a component never writes
      *  `text-sm lg:text-xs` because density is a property of the viewport, expressed once. */
-    sizeDense: { xs: 11, sm: 12, md: 13.5, lg: 15, xl: 17, "2xl": 22, "3xl": 30 },
+    sizeDense: { xs: 11, sm: 12.5, md: 14, lg: 17, xl: 20, "2xl": 25, "3xl": 34 },
     /**
      * Display scale, px — the display face only. Deliberately a SEPARATE scale from `size`:
      * these sizes interleave with the body scale numerically, and a display size is never a

@@ -67,12 +67,14 @@
   --color-tier-b-on: var(--commish-tier-b-label);
   --color-tier-c: var(--commish-tier-c-fill);
   --color-tier-c-on: var(--commish-tier-c-label);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  /* v2 (ruling 6): the condensed poster face is gone. `font-display` keeps its name and every
-     call site — it now resolves to the same Geist family as `font-sans`, distinguished only by
-     the `letter-spacing` rule below, added at every display size. */
-  --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  /* SUNDAY v5, law 3. The condensed poster face is BACK, and this time it is load-bearing
+     rather than decorative: condensed is what buys ten columns at 18px on a board. v2's ruling 6
+     removed it because nothing was using it; v5 uses it for every name, number and label. */
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), "Saira Condensed", ui-sans-serif, system-ui, sans-serif;
+  /* Saira ships true tabular figures, so the numeric face is the body face with the feature on
+     rather than a third family loaded for digits alone. */
+  --font-mono: var(--font-body), ui-monospace, monospace;
   --radius-sm: var(--commish-radius-sm);
   --radius-md: var(--commish-radius-md);
   --radius-lg: var(--commish-radius-lg);

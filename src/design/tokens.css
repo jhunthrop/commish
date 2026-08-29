@@ -59,10 +59,10 @@
   --commish-font-size-xs: 11px;
   --commish-font-size-sm: 13px;
   --commish-font-size-md: 15px;
-  --commish-font-size-lg: 17px;
-  --commish-font-size-xl: 20px;
-  --commish-font-size-2xl: 26px;
-  --commish-font-size-3xl: 34px;
+  --commish-font-size-lg: 18px;
+  --commish-font-size-xl: 22px;
+  --commish-font-size-2xl: 28px;
+  --commish-font-size-3xl: 38px;
   --commish-display-size-sm: 20px;
   --commish-display-size-md: 28px;
   --commish-display-size-lg: 44px;
@@ -198,11 +198,11 @@
 @media (min-width: 1024px) {
   :root {
     --commish-font-size-xs: 11px;
-    --commish-font-size-sm: 12px;
-    --commish-font-size-md: 13.5px;
-    --commish-font-size-lg: 15px;
-    --commish-font-size-xl: 17px;
-    --commish-font-size-2xl: 22px;
-    --commish-font-size-3xl: 30px;
+    --commish-font-size-sm: 12.5px;
+    --commish-font-size-md: 14px;
+    --commish-font-size-lg: 17px;
+    --commish-font-size-xl: 20px;
+    --commish-font-size-2xl: 25px;
+    --commish-font-size-3xl: 34px;
   }
 }

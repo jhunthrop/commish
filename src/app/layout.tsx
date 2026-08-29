@@ -1,18 +1,28 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Saira, Saira_Condensed } from "next/font/google";
 import { ThemeProvider } from "@/design/theme-provider";
 import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import { TITLE_TEMPLATE } from "@/components/app-shell/page-metadata";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+/**
+ * SUNDAY v5, law 3. Condensed is load-bearing, not decorative: it is what buys ten columns at
+ * 18px on a board, which is the whole reason a timing tower reads as sport and a spreadsheet
+ * does not. Replacing this with a normal-width face silently breaks the law.
+ *
+ * `Saira_Condensed` carries every name, number and label. `Saira` carries the few sentences the
+ * product still has, and doubles as the numeric face because it ships true tabular figures.
+ */
+const sairaCondensed = Saira_Condensed({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const saira = Saira({
+  variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -32,7 +42,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${sairaCondensed.variable} ${saira.variable} antialiased`}>
         <ThemeProvider>
           {/* Plan D Task 9: the notices hook's state moved here so it outlives every
               client-side navigation instead of remounting per page (ruling 19). Renders no UI
