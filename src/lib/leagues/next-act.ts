@@ -1,4 +1,4 @@
-import { nextAction } from "@/league";
+import { nextAction, type NextActionKind } from "@/league";
 import type { LeagueHomeBody, LineupBody } from "@/league-room/contract";
 import { actionHref } from "@/league-room/lib/action-href";
 
@@ -11,6 +11,9 @@ import { actionHref } from "@/league-room/lib/action-href";
  * no decision, or the decision is hidden"* — spent on the verb rather than on the whole strip.
  */
 export interface LeagueAct {
+  /** Which act it is, for a caller that needs to branch on the act itself rather than render it —
+   *  the league home promotes its lineup editor on `fix-lineup` and nothing else. */
+  readonly kind: Exclude<NextActionKind, "none">;
   readonly label: string;
   readonly href: string;
 }
@@ -47,5 +50,5 @@ export function leagueAct(home: LeagueHomeBody, lineup: LineupBody | null): Leag
   if (action === null) return null;
   // `actionHref` is the one place a next-action's destination is decided, shared with the leagues
   // board so the two can never send a manager to different pages for the same act.
-  return { label: action.label, href: actionHref({ id: home.leagueId, draftId: home.draftId, nextAction: action }) };
+  return { kind: action.kind, label: action.label, href: actionHref({ id: home.leagueId, draftId: home.draftId, nextAction: action }) };
 }

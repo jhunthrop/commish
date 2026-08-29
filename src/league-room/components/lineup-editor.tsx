@@ -228,9 +228,15 @@ export function LineupEditor({
           ))}
         </ul>
       )}
-      <Button onClick={() => void save()} loading={submitting} disabled={submitting}>
-        Save lineup
-      </Button>
+      {/* Wrapped, so the pill sizes to its own words. In a `flex flex-col` section a bare
+          `Button` stretches the full width of a full-bleed shell page, which made the loudest
+          thing on the league home a 1300px white bar — law 5 asks for an obvious verb, not a
+          billboard, and the lower third at the foot is where the page's one act lives now. */}
+      <div>
+        <Button onClick={() => void save()} loading={submitting} disabled={submitting}>
+          Save lineup
+        </Button>
+      </div>
       {saved ? (
         <p role="status" className="text-sm text-positive">
           Lineup saved.

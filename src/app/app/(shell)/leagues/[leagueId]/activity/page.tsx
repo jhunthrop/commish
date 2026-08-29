@@ -6,7 +6,7 @@ import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import { leagueNameFor } from "@/draft-service/teams";
 import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices, quoteFor } from "@/integrity-service/notify";
-import { PageTitle } from "@/components/ui";
+import { LowerThird, PageTitle } from "@/components/ui";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
@@ -108,6 +108,27 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
       <p className="text-sm text-text-muted">Lineup changes appear only in your own history. Nobody else in this league can see them.</p>
 
       <ActivityFeed rows={activity.rows} leagueId={leagueId} nextBefore={activity.nextBefore} />
+
+      {/*
+        LAW 6, AND ITS "NOTHING PENDING" CASE. A history is the one surface in the league that is
+        not waiting on anybody: everything here already happened, and the only control is a quiet
+        way to read further back. So the strip carries what the page is showing and NO verb at
+        all, which is law 6's own diagnostic satisfied rather than skipped — a screen with no
+        lower-third verb either needs no decision or is hiding one, and this is the first case.
+
+        A league where genuinely nothing has happened gets no strip either. Three zeros under an
+        empty state is a foot for a page with no body, and "nothing pending renders nothing" is
+        the same ruling one level up.
+      */}
+      {activity.rows.length === 0 && leagueNotices.length === 0 && activity.nextBefore === null ? null : (
+        <LowerThird
+          cells={[
+            { label: "On this page", value: activity.rows.length },
+            { label: "Notices for you", value: leagueNotices.length },
+            { label: "Older entries", value: activity.nextBefore === null ? "None left" : "Yes" },
+          ]}
+        />
+      )}
     </>
   );
 }
