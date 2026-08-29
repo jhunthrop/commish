@@ -157,7 +157,7 @@ export function LineupEditor({
 
   /**
    * ESPN'S TWO-TAP MODEL (founder, 2026-08-28: "the lineup manager should function just like
-   * ESPN's... best in breed"). Tap MOVE on any player, starter or bench: he becomes the
+   * ESPN's... best in breed"). Tap SWAP on any player, starter or bench: he becomes the
    * selection, every slot he can legally fill lights up with HERE, everything else dims. Tap a
    * destination: the two swap and the selection clears. The bench is DERIVED — whoever is not in
    * a starting slot is on it, live — so a displaced starter falls to the bench by arithmetic
@@ -300,8 +300,8 @@ export function LineupEditor({
                     </Button>
                   </span>
                 ) : moving ? null : occupantId === null ? null : (
-                  <Button variant="secondary" size="sm" onClick={() => setSelected(key)} aria-label={`Move ${occupant?.playerName ?? ""}`}>
-                    Move
+                  <Button variant="secondary" size="sm" onClick={() => setSelected(key)} aria-label={`Swap ${occupant?.playerName ?? ""}`}>
+                    Swap
                   </Button>
                 )}
               </li>
@@ -356,8 +356,8 @@ export function LineupEditor({
                         Cancel
                       </Button>
                     ) : moving ? null : (
-                      <Button variant="secondary" size="sm" onClick={() => setSelected(key)} aria-label={`Move ${player.name}`}>
-                        Move
+                      <Button variant="secondary" size="sm" onClick={() => setSelected(key)} aria-label={`Swap ${player.name}`}>
+                        Swap
                       </Button>
                     )}
                   </li>
