@@ -35,12 +35,11 @@ import { GLOSSARY, type TermKey } from "./glossary";
  * enforces (an unwired term is a decision someone made on purpose, not a silent gap) outlives
  * any one term's own unsurfaced window.
  */
-const UNSURFACED: Readonly<Partial<Record<TermKey, string>>> = {
-  playoffs:
-    "The card's ⓘ was its one caller, retired by the no-tips ruling (founder, 2026-08-28: the " +
-    "UX should explain itself). The definition stays here for /league-rules to surface when that " +
-    "page grows its bracket section; 'Playoffs' beside 'Weeks 15 to 17' self-explains on the card.",
-};
+// EMPTY, and it should stay that way. `playoffs` sat here from the no-tips ruling until
+// `/league-rules` grew the bracket section that entry was waiting on (Sunday v5, 2026-08-28) —
+// the entry is deleted in the same commit that wired it, which is the discipline the reverse
+// assertion below exists to enforce.
+const UNSURFACED: Readonly<Partial<Record<TermKey, string>>> = {};
 
 /** Every surface a manager can actually be looking at when they might want a term explained.
  *  Directory-derived, the same discipline `room-copy.source.test.ts` already established for the

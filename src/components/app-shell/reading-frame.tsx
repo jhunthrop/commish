@@ -48,6 +48,40 @@ export function ReadingMasthead({ title, lede, kicker, action }: ReadingMasthead
   );
 }
 
+export interface ReadingSectionProps {
+  /** The anchor a `TermLink`, a nav entry or an external link can point at. */
+  readonly id: string;
+  readonly title: string;
+  readonly children: ReactNode;
+}
+
+/**
+ * A CHAPTER inside the measured column (Sunday v5, 2026-08-28).
+ *
+ * `/league-rules` became load-bearing the day the founder retired every tip in the product
+ * ("the UX should explain itself"): it is now the one place a curious manager is sent, and a
+ * reference nobody can navigate is a reference in name only. Eight unlabelled paragraphs in a
+ * row is a wall; a named chapter with an anchor on it is a place.
+ *
+ * The heading takes the display face at the body scale's `xl` — one step of hierarchy, which is
+ * all a page of sentences honestly has. Law 3's register without law 3's volume: this is a
+ * reading page, and 44px chapter headings on prose would be the drama the frame exists to avoid.
+ * The hairline above is a chapter rule, not a band — nothing here is a row in a column of sixty.
+ *
+ * Lives here rather than beside `/league-rules` because it is the reading page's own register
+ * and the next reference page must not hand-roll a second spelling of it.
+ */
+export function ReadingSection({ id, title, children }: ReadingSectionProps) {
+  return (
+    // `first:border-t-0` because the masthead already ends in a hairline: two rules an inch apart
+    // read as a rendering accident, the same finding the front door's closing band recorded.
+    <section id={id} className="flex scroll-mt-6 flex-col gap-3 border-t border-line pt-6 first:border-t-0 first:pt-0">
+      <h2 className="font-display text-xl font-semibold leading-display text-text-primary">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
 export interface ReadingFrameProps {
   /** The page's own `<h1>`, and the same string its `metadata` title uses (A5). */
   readonly title: string;
