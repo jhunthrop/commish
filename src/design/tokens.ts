@@ -17,6 +17,10 @@ export const COLOR_ROLES = [
   "positive",
   "negative",
   "negativeText",
+  // v5 law 4 channel three. Split from `negative`, which through v4 carried BOTH "happening now"
+  // and "this is bad" — a conflation a broadcast never makes.
+  "live",
+  "liveText",
   "warning",
   "warningGlow",
   "info",
@@ -59,77 +63,78 @@ type MagnitudePalette = Readonly<Record<MagnitudeStep, string>>;
  */
 
 /**
- * Dark — the flagship, and Gameday's own room (`docs/design/2026-08-28-gameday-spec.md`, the
- * rendered artifact). The approved mock is a single dark page by construction, so for the
- * ELEVATION RAMP it is the authority and this palette carries its ladder: page #1A1A21,
- * surface #23252E, raised #2C2F3A, line #383C4A. Every value the mock names AND that survives a
- * gate is here verbatim; the three that do not survive (`edge`, `textFaint`, and the position
- * `def` sticker) are re-solved along their own hue and say so at their field.
+ * DARK — a stadium at night (Sunday v5, `docs/design/2026-08-28-sunday-spec.md`).
  *
- * WHY THE RAMP IS FOUR GROUNDS AND NOT GAMEDAY'S NOMINAL FIVE. The mock declares a fifth step,
- * `--overlay: #363A47`, brighter than `raised`, and never paints it — neither approved screen
- * contains a modal. Shipping it costs a text role: at that luminance `textFaint` has to be
- * brightened to #9FA4AF to clear 4.5:1, which is 1.02:1 from `textMuted` — the two quiet inks
- * become literally the same colour, and the product loses the distinction between "secondary"
- * and "tertiary" everywhere, to gain a ground nothing draws on. The magnitude ramp fails harder
- * still: `bad` measures 4.11:1 there and cannot be fixed without collapsing the whole heat map
- * upward into `weak`.
+ * Every value here was solved numerically against the binding ground and is recorded with its
+ * measured ratio in that spec's appendix. Nothing in this object was picked by eye, and the
+ * ratios in the comments are the measured minimum across all four surfaces — not estimates.
  *
- * So the fourth step is spent on the WELL (`surfaceInset`) rather than on an overlay, which is
- * the step both approved screens actually use — the matchup's points-share track and the draft
- * room's meters. Four grounds either way; Gameday puts its fourth above the card and we put ours
- * below it, because that is the one the screens paint. A modal keeps `surfaceElevated`: a scrim
- * already separates it from the page, so it needs no brighter ground of its own.
+ * THE BINDING GROUND IS `surfaceRaised`, the BRIGHTEST of the four. This has caught a value
+ * three times across two design systems now, so it is stated here as well as in the spec:
+ * change a surface and every chroma value against it is unverified until re-measured.
  */
 const dark: Palette = {
-  surface: "#1A1A21", // PAGE — the ground. The one value v3 and Gameday agree on verbatim.
-  surfaceElevated: "#23252E", // SURFACE — a card, a row, a panel. Gameday's `--surface`.
-  surfaceRaised: "#2C2F3A", // RAISED — a row lifted off its card, a meter track. Gameday's `--raised`.
-  surfaceInset: "#1F1F27", // the well: an unfilled meter, the wire's band. Below the ground, not above it.
-  line: "#383C4A", // the decorative hairline between two surfaces (Gameday's `--line`, verbatim)
+  surface: "#05070C", // the ground, blue-biased black. A stadium is never neutral grey.
+  surfaceElevated: "#0B1019", // a card, a panel, a row's container
+  surfaceRaised: "#101724", // a row lifted off its card. THE BINDING GROUND for every value below.
+  surfaceInset: "#0A0F17", // the well: an unfilled meter, a track. Below the ground, not above it.
+  line: "#1B2331", // the decorative hairline between two surfaces
   /**
-   * The interactive boundary. Gameday's mock proposes #5A6072 and it CANNOT SHIP: measured
-   * against this ramp it is 2.76:1 on the page and 2.13:1 on a raised row, missing WCAG
-   * 1.4.11's 3:1 floor for the edge of a control a user has to find. The mock is a static
-   * page with no controls to bound, so nothing in it ever exercised the gate.
+   * The interactive boundary, held to WCAG 1.4.11's 3:1 rather than the decorative bar, because
+   * the edge of a control a person has to FIND is not decoration.
    *
-   * Solved the way every other pigment here is solved: keep the mock's hue and saturation
-   * (218°, the cool steel it chose), walk lightness up until the DIMMEST margin clears, and
-   * stop at the first value that does. Binding ground is `surfaceRaised`, at 3.03:1.
+   * The v5 mockup's #4A5872 measured 2.50:1 on the binding ground and could not ship — the same
+   * class of failure v4's mock had at 2.13:1, found the same way. Re-solved along its own hue
+   * until the dimmest margin cleared: 3.36:1.
    */
-  edge: "#70788E",
-  textPrimary: "#EDEEF2", // Gameday's `--ink`
-  textMuted: "#A0A5B4", // Gameday's `--muted`
+  edge: "#5A6C87",
+  textPrimary: "#FFFFFF", // floodlit. 17.95:1
+  textMuted: "#8794A8", // 5.84:1
+  textFaint: "#738195", // 4.53:1 — held to the full text bar, not 3:1
   /**
-   * Gameday's `--faint` is #767C8C, which measures 4.15:1 on the page and 3.20:1 on a raised
-   * row — below the 4.5:1 floor on every surface in the ramp, the same way v3's mock value was.
-   * Brightened along its own hue until it clears the binding ground (`surfaceRaised`, 4.51:1).
+   * LAW 4, channel one: furniture, you, and the verb. Amber is the network's own graphics — the
+   * segmented rail, a tier plate, your own row's marker — and it is the single verb in a lower
+   * third. It is deliberately NOT a verdict: amber never says a number is good.
    *
-   * This role is the reason Gameday's fifth ground could not ship — see `TOKENS.color`'s
-   * elevation docblock below.
+   * This is the v5 change with the widest blast radius. Through v2, v3 and v4 `accent` was money
+   * green and `accent`/`positive` were the same pigment on purpose. v5 breaks that doubling:
+   * the act and the verdict are now different channels, because a timing tower has to say "we
+   * rate him higher" without that reading as "press this".
    */
-  textFaint: "#9196A3",
-  accent: "#3ECF8E", // money — links, focus rings, seat segments
-  // Derived: a label ≥4.5:1 on the money fill. Money is never a button fill in v3, but the role
-  // keeps a valid pair.
-  accentText: "#04120A",
-  accentGlow: "rgba(62, 207, 142, 0.14)", // the floodlight's radial tint (Task 7)
-  // `accent` and `positive` are the SAME green, deliberately — v2's identity is that a live
-  // game and a live action are the same energy, and v3 keeps the doubling verbatim (only the
-  // hex moved). See docs/design-system.md, "One pigment, two jobs": green is a fill only when
-  // it is an action; a positive outcome is green as text, a glow or a meter fill, never as a
-  // solid button-shaped block.
-  positive: "#3ECF8E",
-  negative: "#FF6B5E", // live — the mock's failure family: clocks, live chips, destructive
-  // Derived: a label ≥4.5:1 on the live fill.
-  negativeText: "#04120A",
-  // Derived: a quiet amber, same hue family as v2's, resaturated down and retuned to clear
-  // 4.5:1 as text on the new (darker) grounds. v3 demotes warning's USAGE (E5) so the clock
-  // tightening keeps a voice without the shelf glowing — the role survives, quieter.
-  warning: "#BA9335", // lifted with the ground (2026-08-27 slate ruling); minimal hue-preserving bump to clear its gate
-  warningGlow: "rgba(173, 126, 14, 0.12)",
-  // Derived: a quiet blue, same hue family as v2's, retuned for notices and the WR pigment.
-  info: "#5F99F2", // lifted with the ground (2026-08-27 slate ruling); minimal hue-preserving bump to clear its gate
+  accent: "#FFB627", // 10.23:1
+  accentText: "#1A1200", // 10.59:1 on the amber fill
+  accentGlow: "rgba(255, 182, 39, 0.14)",
+  /**
+   * LAW 4, channel two: the verdict pair. `positive` means we rate him HIGHER than the room
+   * does; `negative` means lower. Cyan against warm red, never green against red — that pair is
+   * the worst available for deuteranopia (~1 man in 12) and this audience is overwhelmingly men.
+   *
+   * The pair is also ordered by LUMINANCE, so it survives with the hue channel switched off
+   * entirely: 11.67 against 6.42, a gap of 5.25.
+   */
+  positive: "#00E5FF", // 11.67:1
+  negative: "#FF998A", // 8.70:1
+  negativeText: "#1A0303", // 9.62:1 on the warm-red fill
+  /**
+   * LAW 4, channel three: LIVE, and nothing else ever. Split from `negative` in v5 — through v4
+   * one red carried both "happening now" and "this is bad", which a broadcast never conflates.
+   *
+   * Its label is near-black, not white: white measures 3.71:1 here and fails. Live red is a
+   * mid-luminance colour in BOTH themes, which is exactly why it reads as urgent, and the cost
+   * of that is that white cannot sit on it.
+   */
+  live: "#FF3D3D", // 5.12:1
+  liveText: "#1A0303", // 5.66:1 on the live fill
+  /**
+   * A tightening clock. A separate hue from `accent`, not a shade of it: amber is the network's
+   * furniture and must never be mistaken for a verdict about time.
+   */
+  // Law 4 says colour is spent exactly THREE times, so `warning` is not a fourth hue: a
+  // tightening clock IS the live channel, and this role points at the same value. Keeping a
+  // separate amber-orange here put it 19 degrees from `accent` and failed the confusability gate.
+  warning: "#FF3D3D",
+  warningGlow: "rgba(255, 61, 61, 0.12)",
+  info: "#4CACF0", // 7.24:1
   scrim: "#000000",
 };
 
@@ -144,58 +149,48 @@ const dark: Palette = {
  * `surface` — a naive inversion (dark's bright mint literally on white) fails that badly.
  */
 const light: Palette = {
-  surface: "#FBFBFA", // paper — the ground, the mock's --bg
-  surfaceElevated: "#FFFFFF", // card — the brightest surface, not a step further from it
-  // Derived: one hairline step darker than surfaceElevated, a shade toward gray — keeps the
-  // four-step depth model (elevated peak, then the page, then a raised row/tile, then the
-  // inset well recedes furthest) without the mock naming this step directly.
-  surfaceRaised: "#F8F8F6",
-  surfaceInset: "#F3F3F1", // track, well, unfilled meter — the mock's --tickbg
-  line: "#E8E8EA", // the decorative hairline between two surfaces
-  // Derived: a quiet, near-neutral gray (same cool family as textMuted) tuned so it clears
-  // WCAG 1.4.11's 3:1 against all three surfaces a control can sit on.
-  edge: "#8B8B91",
-  textPrimary: "#1A1A1E", // ink — also the ink pill's fill (see Button, Task 4)
-  // Derived, retuned (Task 1 fix round 1): darkened one further notch past the mock's raw
-  // "quiet" gray. `tokens.test.ts`'s original pair matrix only checked this role against the
-  // four PLAIN surfaces (`surface`/`surfaceElevated`/`surfaceRaised`/`surfaceInset`), which it
-  // clears comfortably at either value — but the draft room's "hot" rail paints a translucent
-  // `bg-negative/10` tint UNDER this text (`room-rail.tsx`'s `MODE_SKIN.hot`), and axe's
-  // real-browser color-contrast scan (`e2e/design-v2.spec.ts`) caught that the untinted value
-  // measured only 4.45:1 against that composited ground in daylight — a hair under the 4.5:1
-  // floor the plain-surface checks never exercised. See `TOKENS.color bands` below.
-  textMuted: "#68686D",
-  // Derived: the mock's --faint (#AEAEB4) is a daylight-appropriate gray but too light to clear
-  // 4.5:1 against surfaceInset (the dimmest of the four surfaces textFaint is used on) —
-  // darkened, same hue family, until it clears the floor on all four. The token moves, the
-  // threshold does not.
-  textFaint: "#6D6D76",
-  accent: "#0B6B43", // money — links, focus rings, seat segments
-  // Derived: a label ≥4.5:1 on the money fill.
-  accentText: "#FFFFFF",
-  accentGlow: "rgba(11, 107, 67, 0.12)", // the floodlight's radial tint (Task 7)
-  // Same doubling as dark, same reason — see `dark.positive`'s docblock.
-  positive: "#0B6B43",
-  // Derived, retuned (Task 1 fix round 1): live — darkened further than the fraction the mock's
-  // raw #D6453A was already missing by. `negative` is both the "hot" rail's text-on-its-own-tint
-  // color (the on-the-clock label, `text-negative` in `room-rail.tsx`) AND the source color OF
-  // that tint (`bg-negative/10`), so this is a fixed point: the value darkens until it clears
-  // 4.5:1 against the very 10%-of-itself-over-`surface` composite it paints. See
-  // `TOKENS.color bands` below — the plain-surface checks alone (still ≥5.3:1 here) never would
-  // have caught this.
-  negative: "#C23228",
-  negativeText: "#FFFFFF", // label ≥4.5:1 on the live fill
-  // Derived, retuned (Task 1 fix round 1): a quiet amber, same hue family as v2's, resaturated
-  // down. Darkened one further notch past the original retune: the "Connecting…" chip
-  // (`ConnectionBanner`, `Badge tone="warning"`) has no fill of its own, so it sits directly on
-  // whatever is behind it — inside the draft room's "hot" rail, that is the same `bg-negative/10`
-  // composite `textMuted`'s comment above describes, and axe caught the same class of gap here.
-  // See `dark.warning`'s docblock for the usage-demotion context (E5), and
-  // `TOKENS.color bands` below for the composite-ground gate.
-  warning: "#846315",
-  warningGlow: "rgba(132, 99, 21, 0.12)",
-  // Derived: a quiet blue, same hue family as v2's, retuned for notices and the WR pigment.
-  info: "#4C69CD",
+  surface: "#F4F5F7", // newsprint — the ground
+  surfaceElevated: "#FAFBFC", // a card lifted off the paper
+  surfaceRaised: "#FFFFFF", // a row lifted off its card — the brightest surface in daylight
+  /**
+   * The well, and THE BINDING GROUND for every light value below: the dimmest of the four,
+   * because a well recedes in daylight while a raised row climbs. This is the mirror of dark,
+   * where the binding ground is the brightest surface, and getting it backwards is the single
+   * most repeated mistake in this file's history.
+   */
+  surfaceInset: "#E8EBEF",
+  line: "#DDE1E8", // the decorative hairline between two surfaces
+  edge: "#767F8E", // WCAG 1.4.11's 3:1 for a control boundary. 3.38:1
+  textPrimary: "#0A0D12", // ink. 16.27:1
+  /**
+   * Re-solved twice. The plain-surface check passes at a lighter value, but this role also sits
+   * on the 10%-of-negative and 10%-of-live tint composites the product paints, and against those
+   * a plain-surface-only solve measured 4.27:1 and 4.22:1. Solved against all six grounds.
+   */
+  textMuted: "#596576", // 4.56:1 across four surfaces AND both tint composites
+  textFaint: "#5C6470", // 4.60:1 — held to the full text bar, and to both tint composites
+  accent: "#9D5707", // law 4 channel one: furniture, you, the verb. 4.62:1
+  accentText: "#FFFFFF", // 5.53:1 on the amber fill
+  accentGlow: "rgba(157, 87, 7, 0.12)",
+  positive: "#003447", // law 4 channel two, the loud end of the verdict pair. 11.10:1
+  /**
+   * The quiet end of the verdict pair, and a FIXED POINT: this value is both the text colour and
+   * the source of the 10%-of-itself tint it then sits on, so it must clear 4.5:1 against a
+   * composite made from itself. v4 documented this trap and v5 walked into it anyway — the
+   * plain-surface solve gave #BF3122, which measured 4.50:1 against its own tint.
+   *
+   * Light needed a second pass for a separate reason too, recorded in the spec: on a BRIGHT
+   * ground the loud end of the verdict pair has to go DARKER, not brighter, or `positive` and
+   * `negative` cannot both clear the floor and stay 1.5 apart in luminance.
+   */
+  negative: "#7F2315", // 8.15:1 plain, and clears its own 10% tint
+  negativeText: "#FFFFFF", // 5.71:1 on the warm-red fill
+  live: "#C81616", // law 4 channel three: live and nothing else. 4.90:1
+  liveText: "#FFFFFF", // 5.77:1 on the live fill
+  // A tightening clock. A separate hue from `accent`, never a shade of it — see dark's docblock.
+  warning: "#C81616", // the live channel; see dark's docblock
+  warningGlow: "rgba(200, 22, 22, 0.12)",
+  info: "#105C93", // 5.90:1
   scrim: "#000000",
 };
 
@@ -246,26 +241,27 @@ function stickerOf(fill: string, label: string, text: string = fill): PositionCo
 const STICKER_INK = "#14151A";
 
 const darkPositions: PositionPalette = {
-  qb: stickerOf("#F2685E", STICKER_INK),
-  rb: stickerOf("#35C98A", STICKER_INK),
-  wr: stickerOf("#4E9BF0", STICKER_INK),
-  te: stickerOf("#E0A340", STICKER_INK),
-  k: stickerOf("#B98BF5", STICKER_INK),
-  // DEF, re-solved from the mock's #6C7A93 — see this block's docblock. Darkened until the
-  // product's own ink clears it, which is also what makes it the quiet one again; its `text`
-  // variant is brightened separately because the fill itself is too dark to read on a surface.
-  def: stickerOf("#616D83", dark.textPrimary, "#818CA1"),
+  qb: stickerOf("#2A1D3B", "#B08BF0", "#B08BF0"),
+  rb: stickerOf("#0E3B32", "#4FE0C0", "#4FE0C0"),
+  wr: stickerOf("#3B0E28", "#FF6FA5", "#FF6FA5"),
+  te: stickerOf("#184362", "#5BB8EF", "#5BB8EF"),
+  k: stickerOf("#60656C", "#E4E8EE", "#9AA5B5"),
+  def: stickerOf("#14161A", "#8E9BAD", "#8E9BAD"),
 };
 
 const lightPositions: PositionPalette = {
-  qb: stickerOf("#E32012", "#FFFFFF"),
-  rb: stickerOf("#23835A", "#FFFFFF"),
-  wr: stickerOf("#1372DC", "#FFFFFF"),
-  te: stickerOf("#9C6A19", "#FFFFFF"),
-  k: stickerOf("#924BEF", "#FFFFFF"),
-  // Daylight DEF is dark enough to be its own text variant, so it takes no second value — the
-  // one place the light palette is simpler than the dark one rather than its mirror.
-  def: stickerOf("#535963", "#FFFFFF"),
+  // Saturated fills, not pale tints. Six pale plates cannot be pairwise separable: keeping them
+  // all in the light band needs a 1.5x luminance step five times over, which is a 7.6x range the
+  // band does not have. Dark can use dark plates with bright labels for the same reason inverted.
+  qb: stickerOf("#A78BE0", "#14181F", "#672EB8"),
+  rb: stickerOf("#3FB79A", "#14181F", "#157764"),
+  wr: stickerOf("#E36AA0", "#14181F", "#C32265"),
+  te: stickerOf("#6FB4E0", "#14181F", "#1E6FA9"),
+  // The two neutrals share a hue, so they are separated by lightness instead: 2.15:1 apart.
+  k: stickerOf("#7A828F", "#14181F", "#626B77"),
+  def: stickerOf("#3E4756", "#FFFFFF", "#5C6B7F"),
+  // The third argument is the hue used AS TEXT on a surface, which cannot be the fill: a
+  // saturated plate colour is legible against dark ink, not against paper.
 };
 
 /**
@@ -308,19 +304,19 @@ const lightPositions: PositionPalette = {
  * (`src/components/ui/stat.tsx`), because only the component can keep it.
  */
 const darkMagnitude: MagnitudePalette = {
-  strong: "#85E0BA", // hue 155, the money-green family, lifted well clear of `accent` itself
-  good: "#81CCA6", // hue 150, quieter green — one luminance step down, same family
-  neutral: dark.textPrimary, // NOT a pigment: an uncompared number is ordinary ink
-  weak: "#CEA547", // hue 42, the amber family — middling, the reference product's own word
-  bad: "#EE7A68", // hue 8, the live-red family, still 4.80:1 on the brightest dark ground
+  strong: "#34E4FF", // 11.70:1
+  good: "#69C5D3", // 9.00:1
+  neutral: dark.textPrimary, // no comparison set behind it: indistinguishable from ordinary text
+  weak: "#FF7A59", // 6.99:1
+  bad: "#F05543", // 5.20:1
 };
 
 const lightMagnitude: MagnitudePalette = {
-  strong: "#064129", // hue 156 — daylight inverts the ramp's direction, never its order
-  good: "#1C583A", // hue 150
+  strong: "#004B66", // 7.99:1
+  good: "#205A6F", // 6.38:1
   neutral: light.textPrimary,
-  weak: "#795A12", // hue 42
-  bad: "#C73923", // hue 8, 4.68:1 on `surfaceInset`, the binding ground in daylight
+  weak: "#A04028", // 5.39:1
+  bad: "#C63120", // 4.55:1
 };
 
 /**
@@ -452,20 +448,20 @@ type TierPalette = Readonly<Record<TierGrade, TierColor>>;
 
 /** The founder-approved mock's values verbatim, on the near-black ink it prints them with. */
 const darkTiers: TierPalette = {
-  S: { fill: "#FF7A6E", label: "#14140F" },
-  A: { fill: "#F5A248", label: "#14140F" },
-  B: { fill: "#E8CF5A", label: "#14140F" },
-  C: { fill: "#6FA8DC", label: "#14140F" },
+  S: { fill: "#FFB627", label: "#1A1200" }, // 10.59:1
+  A: { fill: "#B9C2D0", label: "#14181F" }, // 9.91:1
+  B: { fill: "#7F8C9F", label: "#0A0D12" }, // 5.58:1 on ground, 5.70:1 label
+  C: { fill: "#5E6773", label: "#FFFFFF" }, // 3.32:1 on ground, 5.73:1 label
 };
 
 /** The same four hues (6°, 30°, 48°, 217° against dark's 5°, 31°, 49°, 209°) taken down in
  *  lightness until each clears 4.5:1 against white — which is what puts white ink on them and,
  *  in one step, satisfies the 3:1 findability floor on every light surface with margin. */
 const lightTiers: TierPalette = {
-  S: { fill: "#BE3A2C", label: "#FFFFFF" },
-  A: { fill: "#A85B10", label: "#FFFFFF" },
-  B: { fill: "#7A6512", label: "#FFFFFF" },
-  C: { fill: "#2F5EA8", label: "#FFFFFF" },
+  S: { fill: "#9D5707", label: "#FFFFFF" }, // 5.07:1 on ground, 5.53:1 label
+  A: { fill: "#495465", label: "#FFFFFF" }, // 7.03:1 on ground, 7.67:1 label
+  B: { fill: "#6E7D91", label: "#0A0D12" }, // 3.85:1 on ground, 4.64:1 label
+  C: { fill: "#7F8C9F", label: "#0A0D12" }, // 3.13:1 on ground, 5.70:1 label
 };
 
 export const TOKENS = {

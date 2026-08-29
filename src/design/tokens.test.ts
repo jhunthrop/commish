@@ -97,8 +97,19 @@ describe("TOKENS.color", () => {
         });
       }
 
-      it("accent and positive are the same green, deliberately — not a drift bug", () => {
-        expect(c.accent).toBe(c.positive);
+      /**
+       * INVERTED FOR SUNDAY v5 (2026-08-28). Through v2, v3 and v4 this asserted that `accent`
+       * and `positive` were the SAME green, on the argument that a live game and a live action
+       * are one energy. v5 repeals that: law 4 gives the act its own channel (amber, which is
+       * also the furniture and you) and the verdict its own pair (cyan against warm red).
+       *
+       * A timing tower has to be able to say "we rate him higher than the room does" without
+       * that reading as "press this", and one pigment cannot carry both. Kept as an assertion
+       * rather than deleted, because the doubling is the thing a careless palette edit would
+       * silently restore.
+       */
+      it("keeps the act and the verdict on different channels — v5 repealed the doubling", () => {
+        expect(c.accent).not.toBe(c.positive);
       });
     });
   }
