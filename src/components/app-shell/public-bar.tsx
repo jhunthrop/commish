@@ -74,8 +74,8 @@ export function PublicBar({ intent, signedIn, nav = [], action = null }: PublicB
           Commish<span className="text-accent">.</span>
         </Link>
         {nav.length === 0 ? null : (
-          {/* Order-last + full width below sm: the rail wraps to its own row on a phone instead
-              of vanishing — the store track found the no-way-back defect reopened at 390. */}
+          // Order-last + full width below sm: the rail wraps to its own row on a phone instead
+          // of vanishing — the store track found the no-way-back defect reopened at 390.
           <nav aria-label="Commish" className={`order-last flex w-full items-center gap-6 ${RAIL_LABEL} text-text-muted sm:order-none sm:w-auto`}>
             {nav.map((link) => {
               // `intent` is every caller's own path (it is where sign-in returns), so it also
