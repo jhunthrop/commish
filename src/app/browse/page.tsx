@@ -12,9 +12,10 @@ import { listPublicLeagues } from "@/league-service/browse";
 import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { BrowseFilters, type BrowseFilterOption } from "@/league-room/components/browse-filters";
-import { HOUSE_SHELF_SENTENCE, OpenLeagueShelf } from "@/league-room/components/public-league-list";
+import { HOUSE_SHELF_SENTENCE, OpenLeagueShelf, featuredFillingLeague } from "@/league-room/components/public-league-list";
 import { PracticeEntryLink } from "@/league-room/components/practice-entry-link";
 import { Wire } from "@/league-room/components/wire";
+import { BrowseLowerThird } from "./lower-third";
 
 export const dynamic = "force-dynamic";
 // A5: matches this page's own <h1> (`OpenLeagueShelf`'s `headingLevel={1}` band, "Open leagues").
@@ -78,6 +79,12 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   ]);
 
 
+  // Law 6's subject, derived from the SAME ranking the shelf uses (deduped exactly as
+  // `OpenLeagueShelf` dedupes it, so a league open on both reads is not counted twice) — the
+  // board's P1 row and the strip at the foot can never name two different rooms.
+  const merged = [...house, ...leagues].filter((league, index, all) => all.findIndex((other) => other.id === league.id) === index);
+  const leader = featuredFillingLeague(merged);
+
   const content = (
     <>
       <OpenLeagueShelf
@@ -93,16 +100,18 @@ export default async function BrowsePage({ searchParams }: PageProps) {
         // outlined pill it has always been, never this view's ink action.
         aside={<PracticeEntryLink signedIn={user !== null} />}
         intro={
+          // SUNDAY v5: the operator-transparency sentence and ONE way out, and nothing else.
+          // "Pick a league that matches how you like to play" was the filter rail's own label
+          // restated as prose, above the rail; "Recruiting your own group instead?" was a second
+          // sentence whose only job was to introduce the link under it. Both are the tells the
+          // copy rules name (a control restated, a lawyerly lead-in), and the sentence that
+          // survives is the one a real-money product owes a stranger: which rooms the house runs.
           <p className="max-w-prose text-text-muted">
-            {/* The operator-transparency half of the retired shelf explainer survives HERE, on
-                the full lobby where scrutiny belongs — a real-money product says which rooms the
-                house runs. The front door's hero says the always-a-seat half by itself. */}
-            {HOUSE_SHELF_SENTENCE} Pick a league that matches how you like to play. Recruiting
-            your own group instead?{" "}
+            {HOUSE_SHELF_SENTENCE} Or{" "}
             {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
                 first rather than an error, exactly like the empty state's identical link. */}
             <Link href="/app#create-league" className="font-medium text-accent underline">
-              Start your own league
+              start your own league
             </Link>
             .
           </p>
@@ -129,7 +138,12 @@ export default async function BrowsePage({ searchParams }: PageProps) {
             open-league shelf is the busiest page in the product and is not under `/app`, so it
             never inherited the shell's full-width fix. A long-form reading surface keeps its own
             `max-w-prose` on its paragraph column instead, same as the shell's own carve-out. */}
-        <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">{content}</main>
+        <main className="flex w-full min-w-0 flex-col">
+          <div className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">{content}</div>
+          {/* Law 6: the board ends in a strip. Full-bleed, outside the gutter, the way a lower
+              third sits on the front door. */}
+          <BrowseLowerThird leader={leader} roomCount={merged.length} signedIn={user !== null} />
+        </main>
         <PublicFooter />
       </>
     );
@@ -139,6 +153,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   return (
     <AppShell user={{ displayName: user.displayName, avatar: user.avatarUrl, isAdmin: user.isAdmin }} rail={rail} liveState={liveState}>
       {content}
+      <BrowseLowerThird leader={leader} roomCount={merged.length} signedIn={user !== null} />
     </AppShell>
   );
 }

@@ -53,12 +53,16 @@ export default async function SupportPage() {
           The draft room, the league schedule, and scoring run automatically once a league is
           set up, so most leagues never need an operator to step in.
         </p>
+        {/* N15's one-name rule: this link used to read "league rules", which is the ROUTE's name
+            and not the page's — a stranger following it landed on a page headed "How it works"
+            and a signed-in manager reached the same page by a third name. It also undersold what
+            is there now: the no-tips ruling made that page the product's whole reference, not a
+            format glossary. */}
         <p>
-          Curious how a specific rule works before you join a league? The{" "}
           <Link href="/league-rules" className="font-medium text-accent underline">
-            league rules
+            How it works
           </Link>{" "}
-          page covers the format vocabulary this product uses.
+          defines every format, scoring and season term this product uses.
         </p>
     </ReadingFrame>
   );

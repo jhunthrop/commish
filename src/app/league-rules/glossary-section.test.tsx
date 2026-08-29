@@ -2,14 +2,23 @@ import { describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
-import { GLOSSARY } from "@/help/glossary";
+import { GLOSSARY, type TermKey } from "@/help/glossary";
 import { copyViolations } from "@/integrity/copy-rules";
 import { GlossarySection, LEAGUE_RULES_GLOSSARY_TERMS } from "./glossary-section";
 
 describe("GlossarySection", () => {
-  it("renders every one of this page's seven terms with an anchor a TermLink can land on", async () => {
+  // THE COMPLETENESS GATE (Sunday v5, 2026-08-28). With `InfoTip` retired by the no-tips ruling,
+  // this section is the only place in the product a `GLOSSARY` definition reaches a reader — so a
+  // term added to the registry and forgotten here is a word the product shows a manager and
+  // explains nowhere. Set equality in both directions, rather than a count: a count passes the
+  // moment somebody swaps one term for another.
+  it("carries every term the registry defines, and invents none", () => {
+    expect([...LEAGUE_RULES_GLOSSARY_TERMS].sort()).toEqual((Object.keys(GLOSSARY) as TermKey[]).sort());
+    expect(new Set(LEAGUE_RULES_GLOSSARY_TERMS).size).toBe(LEAGUE_RULES_GLOSSARY_TERMS.length);
+  });
+
+  it("renders every term with an anchor a TermLink can land on", async () => {
     await renderSurface(<GlossarySection />, ({ container }) => {
-      expect(LEAGUE_RULES_GLOSSARY_TERMS).toHaveLength(7);
       for (const key of LEAGUE_RULES_GLOSSARY_TERMS) {
         const target = container.querySelector(`#term-${key}`);
         expect(target, `no anchor target for "${key}"`).not.toBeNull();
