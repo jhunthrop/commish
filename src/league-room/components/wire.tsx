@@ -174,8 +174,8 @@ export function Wire({ items }: WireProps) {
       {/* Broadcast edge fades: the marquee's entry and exit dissolve into the band instead of
           hard-clipping mid-word at the viewport edge, which read as a rendering fault. Painted
           from the band's own ground so both themes hold; aria-hidden, pure chrome. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-surface-inset to-transparent" />
-      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-surface-inset to-transparent" />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-surface-inset via-surface-inset/70 to-transparent" />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-surface-inset via-surface-inset/70 to-transparent" />
     </div>
   );
 }
