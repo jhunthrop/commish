@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import type { DraftStatus } from "@/domain/draft";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
-import { Button, PlayerFace, PositionBadge, Select, SlotChip } from "@/components/ui";
+import { Button, PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeek } from "../lib/format";
 import { playerOf } from "../lib/player";
@@ -69,6 +70,7 @@ export function LineupEditor({
   const [assignments, setAssignments] = useState<Readonly<Record<string, string | null>>>(
     () => Object.fromEntries(lineup.starters.map((slot) => [slotKey(slot), slot.playerId])),
   );
+  const [openSlot, setOpenSlot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -152,88 +154,156 @@ export function LineupEditor({
     }
   };
 
+  const swap = (targetKey: string, playerId: string | null): void => {
+    setAssignments((prev) => {
+      const next: Record<string, string | null> = { ...prev };
+      if (playerId !== null) {
+        // THE SWAP, not the error: picking a player who already starts in another slot moves the
+        // displaced starter into the slot the picked player leaves, instead of building a
+        // duplicate lineup the server would bounce at save. Pure client state; the server's
+        // validateLineup stays the only legality authority.
+        const occupied = Object.entries(prev).find(([key, id]) => id === playerId && key !== targetKey);
+        if (occupied !== undefined) next[occupied[0]] = prev[targetKey] ?? null;
+      }
+      next[targetKey] = playerId;
+      return next;
+    });
+    setOpenSlot(null);
+    setSaved(false);
+  };
+
   return (
     // `id="lineup"` (F16): the fragment `actionHref` builds (`/app/leagues/${id}#lineup`) is a
     // real anchor on a real panel, not a scroll script — Step 1.
     <section id="lineup" className="flex flex-col gap-3">
-      <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
-      {/* Persona review (veteran, FIX 5): the lock is coarse — the WHOLE week locks at the
-          first kickoff, not each player at their own — and nothing said so before this. A
-          manager who plans to swap a Monday-night player after watching Sunday's early games
-          needs to know that plan won't work before they're locked out of trying it. */}
-      {/* NO TIPS (founder ruling, 2026-08-28). This sentence WAS the tip's definition, printed
-          in full, with the trigger beside it repeating it behind a click. The sentence stays; the
-          button goes. */}
+      <h2 className="font-display text-xl font-bold text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
+      {/* Persona review (veteran, FIX 5): the lock is coarse and nothing said so. NO TIPS
+          (founder ruling): the sentence stays, the trigger died with the system. */}
       <p className="text-sm text-text-muted">Lineups lock for the whole week when its first game kicks off.</p>
-      {/* LAW 3, ON THE SCREEN WHERE IT MATTERS MOST. This grid was nine bare `<select>`s: the
-          one place in the product where a manager decides which PLAYERS play, drawn with no
-          player in it at all. The face is not decoration — a manager recognises a roster by
-          faces and club colours long before they finish reading nine names, which is the
-          whole claim law 3 makes. It is derived from the CURRENT selection, so it changes with
-          the dropdown rather than reporting what was there on load. An empty slot shows an
-          empty tile, never a grey rectangle pretending to be somebody. */}
-      <div className="grid gap-2 sm:grid-cols-2">
+
+      {/* THE WEEKLY RITUAL AS A TOWER, NOT A FORM (founder, 2026-08-28: "set your lineup doesn't
+          look or feel premium at all"). Nine native selects were the one place a manager decides
+          who PLAYS, drawn as browser chrome: 40px faces beside dropdown arrows, two ragged
+          columns, a bench of underlined links. Now each starter is a full row — slot plate, the
+          face at md, the name in the display face — and the control is a Swap that opens the
+          roster INSIDE the row, every candidate drawn as a player with one amber verb. The
+          contract carries no projections, so the row carries no numbers: law 7 outranks decor,
+          and the name is still the door to the screen that has them. */}
+      <ul className="flex flex-col">
         {lineup.starters.map((slot) => {
-          const chosen = byId.get(assignments[slotKey(slot)] ?? "");
+          const key = slotKey(slot);
+          const chosenId = assignments[key] ?? null;
+          const chosen = chosenId === null ? undefined : byId.get(chosenId);
           const face = chosen === undefined ? null : playerOf(chosen);
+          const open = openSlot === key;
           return (
-            <div key={slotKey(slot)} className="flex items-end gap-2">
-              {/* `aria-hidden` on the wrapper, not on `PlayerFace` (which hides its own tile
-                  already): the select beside it announces the same player by name, and a face
-                  announced a second time is a duplicate, not a fact. `h-10` matches the select's
-                  own height so the two sit on one baseline. */}
-              <span aria-hidden="true" className="flex h-10 shrink-0 items-center">
+            <li key={key} className="border-t border-line">
+              <div className="flex items-center gap-3 py-2">
+                <SlotChip slot={slot.slot} className="w-16 shrink-0 justify-center" />
                 {face === null ? (
-                  <span className="size-8 rounded-sm border border-line" />
+                  <span className="flex min-w-0 flex-1 items-center gap-2.5 text-sm text-text-faint">
+                    <span aria-hidden="true" className="size-9 rounded-sm border border-dashed border-line" />
+                    Empty
+                  </span>
                 ) : (
-                  <PlayerFace player={face} size="sm" />
+                  <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <PlayerFace player={face} size="md" />
+                    <span className="flex min-w-0 flex-col">
+                      <Link
+                        className="truncate font-display text-lg font-bold leading-display text-text-primary hover:underline"
+                        href={`/app/leagues/${leagueId}/players/${face.id}`}
+                      >
+                        {face.name}
+                      </Link>
+                      <span className="flex items-center gap-1.5">
+                        <PositionBadge position={face.position} size="sm" />
+                        {face.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{face.nflTeam}</span>}
+                      </span>
+                    </span>
+                  </span>
                 )}
-              </span>
-              <Select
-                className="w-full"
-                label={slot.slot}
-                value={assignments[slotKey(slot)] ?? ""}
-                options={[
-                  { value: "", label: "Empty" },
-                  ...everyone.map((option) => ({ value: option.playerId!, label: `${option.playerName} (${option.position})` })),
-                ]}
-                onChange={(event) =>
-                  setAssignments((prev) => ({ ...prev, [slotKey(slot)]: event.target.value === "" ? null : event.target.value }))
-                }
-              />
-            </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  aria-expanded={open}
+                  onClick={() => {
+                    setOpenSlot(open ? null : key);
+                  }}
+                >
+                  {open ? "Close" : "Swap"}
+                </Button>
+              </div>
+              {open ? (
+                <ul className="mb-2 flex flex-col gap-1 border-l-[3px] border-l-accent bg-surface-elevated py-1.5 pl-3 pr-2">
+                  {everyone
+                    .filter((option) => option.playerId !== chosenId)
+                    .map((option) => {
+                      const candidate = playerOf(option)!;
+                      const startingAt = Object.entries(assignments).find(([, id]) => id === option.playerId)?.[0] ?? null;
+                      return (
+                        <li key={option.playerId} className="flex items-center gap-2.5 py-1">
+                          <PlayerFace player={candidate} size="sm" />
+                          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="truncate text-sm font-medium text-text-primary">{candidate.name}</span>
+                            <PositionBadge position={candidate.position} size="sm" />
+                            {candidate.nflTeam === "" ? null : (
+                              <span className="font-mono text-xs text-text-faint">{candidate.nflTeam}</span>
+                            )}
+                            {startingAt === null ? null : (
+                              <span className="font-mono text-xs text-text-faint">starting {startingAt.split(":")[0]}</span>
+                            )}
+                          </span>
+                          <Button variant="verb" size="sm" onClick={() => swap(key, option.playerId)}>
+                            Start
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  {chosenId === null ? null : (
+                    <li className="py-1">
+                      <Button variant="secondary" size="sm" onClick={() => swap(key, null)}>
+                        Leave the slot empty
+                      </Button>
+                    </li>
+                  )}
+                </ul>
+              ) : null}
+            </li>
           );
         })}
-      </div>
-      {/* THE FLEX AND SUPERFLEX CAPTIONS ARE GONE (2026-08-28), and they are the clearest case
-          of the "assert, do not explain" charter's third tell in the product: *"a rule, then a
-          worked example of the same rule, above a control that teaches it faster than either."*
-          The control here is a `Select` that offers exactly the players the slot accepts, under a
-          `SlotChip` that names it. Nothing true left with them: `/league-rules` carries both
-          definitions in full, with a `TermLink`, and the glossary entries themselves are
-          untouched. Two sentences and a tip trigger off the screen a manager uses every week. */}
-      <h3 className="text-sm font-medium text-text-muted">Bench</h3>
-      {/* The bench used to be a comma-joined sentence — six names run together, which is a list
-          pretending to be prose and unreadable at a glance on the exact screen where a manager is
-          deciding whether one of them should be starting. Law 3 again: they are players, so they
-          are drawn as players. */}
+      </ul>
+
+      <h3 className={`${MICRO_LABEL} text-text-faint`}>Bench</h3>
       {lineup.bench.length === 0 ? (
         <p className="text-sm text-text-muted">Nobody on the bench.</p>
       ) : (
-        <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
-          {lineup.bench.map((slot) => (
-            <li key={slotKey(slot)} className="flex items-center gap-2">
-              <SlotPlayer slot={slot} leagueId={leagueId} />
-            </li>
-          ))}
+        <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
+          {lineup.bench.map((slot) => {
+            const player = playerOf(slot);
+            if (player === null) return null;
+            const starting = Object.values(assignments).includes(slot.playerId);
+            return (
+              <li key={slotKey(slot)} className="flex min-w-0 items-center gap-2.5 py-0.5">
+                <PlayerFace player={player} size="sm" />
+                <Link
+                  className="truncate text-sm font-medium text-text-primary hover:underline"
+                  href={`/app/leagues/${leagueId}/players/${player.id}`}
+                >
+                  {player.name}
+                </Link>
+                <PositionBadge position={player.position} size="sm" />
+                {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
+                {starting ? <span className="font-mono text-xs text-text-faint">starting</span> : null}
+              </li>
+            );
+          })}
         </ul>
       )}
-      {/* Wrapped, so the pill sizes to its own words. In a `flex flex-col` section a bare
-          `Button` stretches the full width of a full-bleed shell page, which made the loudest
-          thing on the league home a 1300px white bar — law 5 asks for an obvious verb, not a
-          billboard, and the lower third at the foot is where the page's one act lives now. */}
+
       <div>
-        <Button onClick={() => void save()} loading={submitting} disabled={submitting}>
+        {/* The panel's own act, in the verb's amber — the lower third at the page foot anchors
+            here, and the act it names should look like the act it is. */}
+        <Button variant="verb" onClick={() => void save()} loading={submitting} disabled={submitting}>
           Save lineup
         </Button>
       </div>
