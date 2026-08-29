@@ -840,9 +840,9 @@ describe("OpenLeagueShelf says nothing that breaks the house copy rules, includi
   const HOUSE = { ...PUBLIC_LEAGUES[0]!, id: "house_sweep", name: "The Longshot League", houseRung: "open_12" as const };
   it("is clean signed in, signed out, house-shelved, and empty", () => {
     for (const element of [
-      <OpenLeagueShelf key="signed-in" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={true} helpLevel="guided" asOfTime={AS_OF} />,
-      <OpenLeagueShelf key="signed-out" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={false} helpLevel="standard" asOfTime={AS_OF} />,
-      <OpenLeagueShelf key="empty" house={[]} leagues={[]} signedIn={true} helpLevel="standard" asOfTime={AS_OF} />,
+      <OpenLeagueShelf key="signed-in" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={true} asOfTime={AS_OF} />,
+      <OpenLeagueShelf key="signed-out" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={false} asOfTime={AS_OF} />,
+      <OpenLeagueShelf key="empty" house={[]} leagues={[]} signedIn={true} asOfTime={AS_OF} />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name), HOUSE.name);
@@ -857,7 +857,7 @@ describe("OpenLeagueShelf says nothing that breaks the house copy rules, includi
   it("is clean live, with a real entry fee on one listed league", () => {
     const PAID: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "live_paid_sweep", name: "Real Stakes Sweep League", entryFeeCents: 5000 };
     const { container } = render(
-      <OpenLeagueShelf house={[HOUSE]} leagues={[PAID, ...PUBLIC_LEAGUES]} signedIn={false} helpLevel="standard" asOfTime={AS_OF} live />,
+      <OpenLeagueShelf house={[HOUSE]} leagues={[PAID, ...PUBLIC_LEAGUES]} signedIn={false} asOfTime={AS_OF} live />,
     );
     expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name), HOUSE.name, PAID.name);
   });
@@ -878,19 +878,19 @@ describe("OpenLeagueCard says nothing that breaks the house copy rules, in every
     // rendered copy is swept here, not trusted.
     const soonIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     for (const element of [
-      <OpenLeagueCard key="scheduled" league={base} signedIn={false} helpLevel="standard" />,
-      <OpenLeagueCard key="signed-in" league={base} signedIn={true} helpLevel="standard" />,
-      <OpenLeagueCard key="guided" league={base} signedIn={false} helpLevel="guided" />,
-      <OpenLeagueCard key="when-full" league={{ ...base, id: "wf", startTrigger: "when_full" }} signedIn={false} helpLevel="standard" />,
-      <OpenLeagueCard key="house" league={{ ...base, id: "house1", houseRung: "open_12" }} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard key="scheduled" league={base} signedIn={false} />,
+      <OpenLeagueCard key="signed-in" league={base} signedIn={true} />,
+      <OpenLeagueCard key="guided" league={base} signedIn={false} />,
+      <OpenLeagueCard key="when-full" league={{ ...base, id: "wf", startTrigger: "when_full" }} signedIn={false} />,
+      <OpenLeagueCard key="house" league={{ ...base, id: "house1", houseRung: "open_12" }} signedIn={false} />,
       <OpenLeagueCard
         key="last-seat"
         league={{ ...base, id: "last", filledTeams: base.teamCount - 1 }}
         signedIn={false}
-        helpLevel="standard"
+       
       />,
-      <OpenLeagueCard key="on-deck" league={{ ...base, id: "deck", draftAtIso: soonIso }} signedIn={false} helpLevel="standard" />,
-      <OpenLeagueCard key="beginner" league={{ ...base, id: "beg", experienceTier: "beginner" }} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard key="on-deck" league={{ ...base, id: "deck", draftAtIso: soonIso }} signedIn={false} />,
+      <OpenLeagueCard key="beginner" league={{ ...base, id: "beg", experienceTier: "beginner" }} signedIn={false} />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, base.name);
@@ -1518,9 +1518,9 @@ describe("AttentionQueue says nothing that breaks the house copy rules", () => {
 describe("OpenSeatsPanel says nothing that breaks the house copy rules", () => {
   it("is clean populated, empty, and quiet", () => {
     for (const element of [
-      <OpenSeatsPanel key="populated" leagues={PUBLIC_LEAGUES} helpLevel="standard" />,
-      <OpenSeatsPanel key="quiet" leagues={PUBLIC_LEAGUES} quiet helpLevel="guided" />,
-      <OpenSeatsPanel key="empty" leagues={[]} helpLevel="standard" />,
+      <OpenSeatsPanel key="populated" leagues={PUBLIC_LEAGUES} />,
+      <OpenSeatsPanel key="quiet" leagues={PUBLIC_LEAGUES} quiet />,
+      <OpenSeatsPanel key="empty" leagues={[]} />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));

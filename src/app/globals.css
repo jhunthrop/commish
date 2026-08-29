@@ -20,6 +20,11 @@
   --color-positive: var(--commish-color-positive);
   --color-negative: var(--commish-color-negative);
   --color-negative-text: var(--commish-color-negative-text);
+  /* Sunday v5's third channel: live, and nothing else ever. Mapped here the day the role was
+     added — an unmapped role means `text-live` silently generates no CSS at all, the same
+     literal-class trap the tier map's docblock records. */
+  --color-live: var(--commish-color-live);
+  --color-live-text: var(--commish-color-live-text);
   --color-warning: var(--commish-color-warning);
   --color-warning-glow: var(--commish-color-warning-glow);
   --color-info: var(--commish-color-info);

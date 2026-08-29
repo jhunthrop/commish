@@ -61,11 +61,13 @@ describe("Wire", () => {
     const rows = within(container).getAllByRole("listitem");
 
     const byText = (text: string) => rows.find((row) => row.textContent?.includes(text));
-    expect(byText("Iron Bowl filled")?.className).toContain("text-accent");
-    expect(byText("Almost Full")?.className).toContain("text-negative");
+    // v5: a filled room is a FACT (ink, semibold) — amber is furniture and the ticker IS
+    // furniture; live-red survives for the genuinely urgent claim, in the role v5 split out.
+    expect(byText("Iron Bowl filled")?.className).toContain("text-text-primary");
+    expect(byText("Almost Full")?.className).toContain("text-live");
     // A quiet claim is muted ink, never the live family — and a claim that FILLED the league is
     // not urgent either (the league_filled item carries that fact, in money).
-    expect(byText("Sunday Money")?.className).toContain("text-text-muted");
+    expect(byText("Sunday Money")?.className).toContain("text-text-faint");
     expect(byText("Sunday Money")?.className).not.toContain("text-negative");
     expect(byText("Now Full")?.className).not.toContain("text-negative");
   });

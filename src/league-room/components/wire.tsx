@@ -39,10 +39,16 @@ function toneOf(item: WireItem): "quiet" | "money" | "live" {
 /** Exported for `MockWire` (./mock-wire): its own `toneOf` only ever answers `"quiet"` or
  *  `"live"` (a mock room carries no money moment, R3's ruling), both drawn from this SAME map
  *  rather than a second copy of the two colors. */
+/**
+ * SUNDAY v5: the ticker is furniture, so it does not wear the furniture colour — amber on every
+ * second item was the loudest thing on the storefront. A filled room is a FACT now (money green
+ * is gone and a fact wears ink, law 1); the live channel survives for the one thing that is
+ * genuinely urgent, in the `live` role v5 split from `negative`.
+ */
 export const TONE_CLASS: Readonly<Record<ReturnType<typeof toneOf>, string>> = {
-  quiet: "text-text-muted",
-  money: "font-semibold text-accent",
-  live: "font-semibold text-negative",
+  quiet: "text-text-faint",
+  money: "font-semibold text-text-primary",
+  live: "font-semibold text-live",
 };
 
 /**

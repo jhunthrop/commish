@@ -1,7 +1,7 @@
 "use client";
 
 import { SeatMeter } from "@/components/ui";
-import { EYEBROW } from "@/components/ui/config";
+import { MICRO_LABEL } from "@/components/ui/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import {
   DraftTimingNotes,
@@ -45,7 +45,9 @@ export const LEAGUE_ROW_GRID =
  */
 export function LeagueRowsHeader() {
   return (
-    <div aria-hidden="true" className={`${LEAGUE_ROW_GRID} pb-2 ${EYEBROW} text-text-muted`}>
+    // Sunday v5: column heads take the shouted micro-label register — the one register a
+    // scoreboard has always shouted quietly, and the timing-tower render's own head row.
+    <div aria-hidden="true" className={`${LEAGUE_ROW_GRID} pb-2 ${MICRO_LABEL} text-text-faint`}>
       <span>League</span>
       <span>Format</span>
       <span>Drafts</span>
@@ -96,14 +98,15 @@ export function LeagueRow({ league, signedIn, emphasis = "quiet", headingLevel =
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         {/* The ledger-card register (16.5/600, sentence case) — the same heading element the
             card renders, so every heading-role read of the shelf survives the form change. */}
-        <NameHeading className="min-w-0 break-words font-display text-lg font-semibold leading-display text-text-primary">
+        {/* The tower's name register: the display face at its earned 700 (law 3). */}
+        <NameHeading className="min-w-0 break-words font-display text-lg font-bold leading-display text-text-primary">
           {league.name}
         </NameHeading>
         {liveChipLabel === null ? null : <LiveChip label={liveChipLabel} />}
         {stakeBadge(league)}
       </div>
 
-      <FormatLine league={league} helpLevel="standard" />
+      <FormatLine league={league} />
 
       <div className="min-w-0 text-sm">
         <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} />
@@ -114,11 +117,13 @@ export function LeagueRow({ league, signedIn, emphasis = "quiet", headingLevel =
         {/* The row's only spoken key: "Free" alone, mid-row, would answer a question a screen
             reader was never asked. Money green is what green means (rule 1). */}
         <span className="sr-only">Entry</span>{" "}
-        <span className="font-semibold text-positive">{entryFeeLabel(league)}</span>
+        {/* A price is a FACT (law 1), so it wears ink. v3 painted it money-green; v5's green is
+            gone and cyan is the verdict channel, which a price has no claim on. */}
+        <span className="font-display font-semibold text-text-primary">{entryFeeLabel(league)}</span>
       </div>
 
       <div className="flex min-w-0 flex-col gap-1 text-sm">
-        <span className="font-medium tabular-nums text-text-primary">
+        <span className={`${MICRO_LABEL} tabular-nums text-text-faint`}>
           {remainingSeats} of {league.teamCount} open
         </span>
         {/* F17 kept: the one product seat sentence still speaks (held seats included) — sr-only,

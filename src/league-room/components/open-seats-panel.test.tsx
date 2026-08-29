@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: 
 
 describe("OpenSeatsPanel", () => {
   it("renders the house's own promise and every league's seat count through SeatMeter, in both themes", async () => {
-    await renderSurface(<OpenSeatsPanel leagues={PUBLIC_LEAGUES} helpLevel="standard" />, async ({ container, getByText }) => {
+    await renderSurface(<OpenSeatsPanel leagues={PUBLIC_LEAGUES} />, async ({ container, getByText }) => {
       expect(getByText("The house always has a game.")).toBeInTheDocument();
       expect(getByText("Open leagues")).toBeInTheDocument();
       // F17: seat counts come through `SeatMeter` (`LeagueRow`'s and `OpenLeagueCard`'s own
@@ -24,7 +24,7 @@ describe("OpenSeatsPanel", () => {
   });
 
   it("renders the list twice — rows on lg+, cards below — with every action quiet (Task 12 adjudication)", () => {
-    const { container } = render(<OpenSeatsPanel leagues={PUBLIC_LEAGUES} helpLevel="standard" />);
+    const { container } = render(<OpenSeatsPanel leagues={PUBLIC_LEAGUES} />);
     // The founder's rows order ("horizontal row elements instead of these cards", 2026-08-24)
     // followed on the signed-in surface too — the same dual-render shape as `OpenLeagueShelf`
     // (Task 13), CSS deciding which form is visible at the lg boundary.
@@ -40,18 +40,18 @@ describe("OpenSeatsPanel", () => {
   });
 
   it("renders nothing at all when there are no open leagues", () => {
-    const { container } = render(<OpenSeatsPanel leagues={[]} helpLevel="standard" />);
+    const { container } = render(<OpenSeatsPanel leagues={[]} />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("renders a quieter, smaller heading when quiet (Step 4's below-the-fold case)", () => {
-    render(<OpenSeatsPanel leagues={PUBLIC_LEAGUES} quiet helpLevel="standard" />);
+    render(<OpenSeatsPanel leagues={PUBLIC_LEAGUES} quiet />);
     const heading = screen.getByRole("heading", { name: "Open leagues" });
     expect(heading.tagName).toBe("H3");
   });
 
   it("uses a full h2 by default", () => {
-    render(<OpenSeatsPanel leagues={PUBLIC_LEAGUES} helpLevel="standard" />);
+    render(<OpenSeatsPanel leagues={PUBLIC_LEAGUES} />);
     const heading = screen.getByRole("heading", { name: "Open leagues" });
     expect(heading.tagName).toBe("H2");
   });

@@ -68,11 +68,12 @@ describe("LeagueRow", () => {
     expect((container.firstElementChild as HTMLElement).className).toContain(LEAGUE_ROW_GRID);
   });
 
-  it("keeps the league name a heading, in the ledger-card register (16.5/600, sentence case)", () => {
+  it("keeps the league name a heading, in the tower's register — display face at its earned 700", () => {
     render(row(BASE));
     const heading = screen.getByRole("heading", { name: BASE.name });
     expect(heading.className).toContain("text-lg");
-    expect(heading.className).toContain("font-semibold");
+    expect(heading.className).toContain("font-display");
+    expect(heading.className).toContain("font-bold");
   });
 
   it("folds team count, format, scoring and the beginner tier into the one shared format line", () => {
@@ -83,19 +84,20 @@ describe("LeagueRow", () => {
     expect(screen.getByText("newer players only")).toBeInTheDocument();
   });
 
-  it("keeps InfoTips click-only in a row — guided captions never print inline, there is no helpLevel to ask", () => {
+  it("carries no tips and no captions — the words explain themselves (founder ruling, 2026-08-28)", () => {
     render(row(BASE));
-    expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is Half PPR?" })).toBeInTheDocument();
+    expect(screen.queryAllByRole("button", { name: /What is/ })).toHaveLength(0);
     expect(screen.queryByText(GLOSSARY["snake-draft"].short)).not.toBeInTheDocument();
-    expect(screen.queryByText(GLOSSARY["half-ppr"].short)).not.toBeInTheDocument();
   });
 
-  it("prices the Entry column in money green, semibold, with an sr-only key for screen readers", () => {
+  it("prices the Entry column in ink, semibold, with an sr-only key for screen readers", () => {
+    // v5 law 1: a price is a FACT and wears ink. Money green is gone, and cyan is the verdict
+    // channel a price has no claim on.
     render(row(BASE));
-    const entry = screen.getAllByText("Free").find((element) => element.className.includes("text-positive"));
+    const entry = screen.getAllByText("Free").find((element) => element.className.includes("text-text-primary"));
     expect(entry).toBeDefined();
     expect(entry!.className).toContain("font-semibold");
+    expect(entry!.className).not.toContain("text-positive");
     expect(screen.getByText("Entry")).toHaveClass("sr-only");
   });
 
@@ -105,7 +107,7 @@ describe("LeagueRow", () => {
   it("prices the Entry column from the real entry fee, once a league carries one", () => {
     render(row({ ...BASE, entryFeeCents: 5000 }));
     const entry = screen.getByText("$50.00");
-    expect(entry.className).toContain("text-positive");
+    expect(entry.className).toContain("text-text-primary");
     expect(entry.className).toContain("font-semibold");
   });
 
@@ -140,7 +142,8 @@ describe("LeagueRow", () => {
     it("prints a compact 'Drafts when full' value with the full commitment one press away, never a placeholder date (storefront review E1)", () => {
       render(row({ ...BASE, startTrigger: "when_full" }));
       expect(screen.getByText("Drafts when full")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "What is a sit-and-go league?" })).toBeInTheDocument();
+      // No tip: "Drafts when full" is the self-explaining register the no-tips ruling asks for.
+      expect(screen.queryByRole("button", { name: "What is a sit-and-go league?" })).not.toBeInTheDocument();
       expect(screen.queryByText(/This one drafts the moment the last seat is taken/)).not.toBeInTheDocument();
       expect(screen.queryByText(BASE.draftAt)).not.toBeInTheDocument();
     });

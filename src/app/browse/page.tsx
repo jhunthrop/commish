@@ -7,14 +7,12 @@ import { shellData } from "@/components/app-shell/shell-data";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
-import type { HelpLevel } from "@/identity/preferences";
-import { readPreferences } from "@/identity-service/preferences";
 import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { BrowseFilters, type BrowseFilterOption } from "@/league-room/components/browse-filters";
-import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
+import { HOUSE_SHELF_SENTENCE, OpenLeagueShelf } from "@/league-room/components/public-league-list";
 import { PracticeEntryLink } from "@/league-room/components/practice-entry-link";
 import { Wire } from "@/league-room/components/wire";
 
@@ -79,10 +77,6 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     listPublicLeagues(getDb(), filter, clock, { sort, whenFullOnly }),
   ]);
 
-  // D1/E7 (Phase 3.7, Task 5): guided is a signed-in PREFERENCE behavior, never a surface
-  // default — a stranger gets `standard` (every definition one click away), a member gets
-  // their own stored choice, so a guided-preference member keeps inline captions here.
-  const helpLevel: HelpLevel = user === null ? "standard" : (await readPreferences(getDb(), user)).helpLevel;
 
   const content = (
     <>
@@ -90,7 +84,6 @@ export default async function BrowsePage({ searchParams }: PageProps) {
         house={house}
         leagues={leagues}
         signedIn={user !== null}
-        helpLevel={helpLevel}
         asOfTime={formatAbsoluteTime(nowIso)}
         headingLevel={1}
         // Task 9's quiet practice invitation, moved INSIDE the shelf head (Gameday). It used to
@@ -101,8 +94,11 @@ export default async function BrowsePage({ searchParams }: PageProps) {
         aside={<PracticeEntryLink signedIn={user !== null} />}
         intro={
           <p className="max-w-prose text-text-muted">
-            Leagues looking for managers, with a draft still to come. Pick one that matches how
-            you like to play. Recruiting your own group instead?{" "}
+            {/* The operator-transparency half of the retired shelf explainer survives HERE, on
+                the full lobby where scrutiny belongs — a real-money product says which rooms the
+                house runs. The front door's hero says the always-a-seat half by itself. */}
+            {HOUSE_SHELF_SENTENCE} Pick a league that matches how you like to play. Recruiting
+            your own group instead?{" "}
             {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
                 first rather than an error, exactly like the empty state's identical link. */}
             <Link href="/app#create-league" className="font-medium text-accent underline">

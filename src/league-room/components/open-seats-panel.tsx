@@ -1,4 +1,3 @@
-import type { HelpLevel } from "@/identity/preferences";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { LeagueRow, LeagueRowsHeader } from "./league-row";
 import { OpenLeagueCard } from "./open-league-card";
@@ -12,7 +11,6 @@ export interface OpenSeatsPanelProps {
   /** D1/E7: the signed-in member's own stored preference, threaded from the home page's
    *  `readPreferences` read — a guided-preference member keeps inline captions on the CARD
    *  form; the row form never prints a caption inline (Task 13's rule, unchanged here). */
-  readonly helpLevel: HelpLevel;
 }
 
 /**
@@ -34,7 +32,7 @@ export interface OpenSeatsPanelProps {
  * league — rule 5 gives this view's one ink action to the attention queue's top item (S10), so
  * every CTA here is the quiet pill in both renderings.
  */
-export function OpenSeatsPanel({ leagues, quiet = false, helpLevel }: OpenSeatsPanelProps) {
+export function OpenSeatsPanel({ leagues, quiet = false }: OpenSeatsPanelProps) {
   if (leagues.length === 0) return null;
   const Heading = quiet ? "h3" : "h2";
   return (
@@ -63,7 +61,7 @@ export function OpenSeatsPanel({ leagues, quiet = false, helpLevel }: OpenSeatsP
       <ul data-testid="league-cards" className="grid gap-3 sm:grid-cols-2 lg:hidden">
         {leagues.map((league) => (
           <li key={league.id} className="min-w-0">
-            <OpenLeagueCard league={league} signedIn helpLevel={helpLevel} />
+            <OpenLeagueCard league={league} signedIn />
           </li>
         ))}
       </ul>

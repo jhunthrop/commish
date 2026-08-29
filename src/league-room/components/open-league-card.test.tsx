@@ -73,14 +73,14 @@ const soonIso = () => new Date(Date.now() + UI_CONFIG.openLeagueCard.clockWithin
 const farIso = () => new Date(Date.now() + UI_CONFIG.openLeagueCard.clockWithinMs * 4).toISOString();
 
 const card = (league: PublicLeagueSummary, extra: Partial<Parameters<typeof OpenLeagueCard>[0]> = {}) => (
-  <OpenLeagueCard league={league} signedIn={false} helpLevel="standard" {...extra} />
+  <OpenLeagueCard league={league} signedIn={false} {...extra} />
 );
 
 describe("OpenLeagueCard", () => {
   it("prints a compact 'Drafts when full' value with the full commitment one press away (storefront review E1)", () => {
     render(card(WHEN_FULL));
     expect(screen.getByText("Drafts when full")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is a sit-and-go league?" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "What is a sit-and-go league?" })).not.toBeInTheDocument();
     // The old 30-word paragraph is retired from the column — the fact is one press away instead.
     expect(screen.queryByText(/This one drafts the moment the last seat is taken/)).not.toBeInTheDocument();
     // Never both a date and the value — the placeholder kickoff is never rendered as if somebody
@@ -126,13 +126,14 @@ describe("OpenLeagueCard", () => {
     });
   });
 
-  it("prices the Entry row in money green — every league is free this season, and the label says so", () => {
-    // "Free" also appears as the member card's stake badge — the Entry row's value is the one
-    // in the money-green register.
+  it("prices the Entry row in ink — a price is a fact, and v5 gave facts no colour", () => {
+    // "Free" also appears as the member card's stake badge — the Entry row's value is the
+    // semibold-ink one.
     render(card(BASE));
-    const entry = screen.getAllByText("Free").find((element) => element.className.includes("text-positive"));
+    const entry = screen.getAllByText("Free").find((element) => element.className.includes("text-text-primary"));
     expect(entry).toBeDefined();
     expect(entry!.className).toContain("font-semibold");
+    expect(entry!.className).not.toContain("text-positive");
   });
 
   // Phase 4, Task 13: the live branch, proven through injection — no league that exists today
@@ -143,7 +144,7 @@ describe("OpenLeagueCard", () => {
     // Entry ROW switches from the tier label to the real fee.
     render(card({ ...BASE, entryFeeCents: 5000 }));
     const entry = screen.getByText("$50.00");
-    expect(entry.className).toContain("text-positive");
+    expect(entry.className).toContain("text-text-primary");
     expect(entry.className).toContain("font-semibold");
   });
 
@@ -271,24 +272,15 @@ describe("OpenLeagueCard", () => {
     expect(screen.getByText(/1 seat is being claimed right now/)).toBeInTheDocument();
   });
 
-  it("carries an InfoTip on the format, the scoring label and the playoffs", () => {
+  /**
+   * FOUNDER RULING (2026-08-28): "the UX should explain itself - we shouldn't need tips." The
+   * card's three ⓘ triggers and the guided-caption machinery are retired; the words themselves
+   * carry the meaning and /league-rules carries the definitions.
+   */
+  it("carries no tips and no captions, whoever is looking", () => {
     render(card(BASE));
-    expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is Half PPR?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is the playoff bracket?" })).toBeInTheDocument();
-  });
-
-  describe("helpLevel is the caller's decision, never a constant (D1, E7)", () => {
-    it("keeps inline captions for a guided caller", () => {
-      render(card(BASE, { helpLevel: "guided" }));
-      expect(screen.getByText(GLOSSARY["snake-draft"].short)).toBeInTheDocument();
-    });
-
-    it("keeps definitions one click away, not inline, for a standard caller", () => {
-      render(card(BASE));
-      expect(screen.queryByText(GLOSSARY["snake-draft"].short)).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
-    });
+    expect(screen.queryAllByRole("button", { name: /What is/ })).toHaveLength(0);
+    expect(screen.queryByText(GLOSSARY["snake-draft"].short)).not.toBeInTheDocument();
   });
 
   /**

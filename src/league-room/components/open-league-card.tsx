@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Card, InfoTip, LedgerRow, SeatMeter } from "@/components/ui";
-import type { HelpLevel } from "@/identity/preferences";
+import { Card, LedgerRow, SeatMeter } from "@/components/ui";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import {
   DraftTimingNotes,
@@ -31,13 +30,6 @@ export interface OpenLeagueCardProps {
   readonly league: PublicLeagueSummary;
   readonly signedIn: boolean;
   /**
-   * D1/E7: how much inline explanation this card's `InfoTip`s volunteer is the CALLER's call,
-   * never a constant — public pages pass `"standard"` (the definition stays one click away,
-   * beneath Task 6's one legend line), and a signed-in surface passes the member's own stored
-   * preference (`readPreferences`) so guided remains a preference behavior, not a surface one.
-   */
-  readonly helpLevel: HelpLevel;
-  /**
    * Rule 5, one ink action per view — and which card, if any, earns it is the PARENT's call
    * (Task 6 computes the shelf's single featured card). Quiet by default: a card in a shelf of
    * twenty is never the view's one ink action on its own authority.
@@ -61,7 +53,7 @@ export interface OpenLeagueCardProps {
  * retired the 30-word paragraph this row used to print inline, in place of the Drafts value,
  * on every `when_full` card).
  */
-export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet" }: OpenLeagueCardProps) {
+export function OpenLeagueCard({ league, signedIn, emphasis = "quiet" }: OpenLeagueCardProps) {
   const { remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
   const isBeginnerOnly = league.experienceTier === "beginner";
   const badge = stakeBadge(league);
@@ -91,7 +83,7 @@ export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet"
         )}
       </div>
 
-      <FormatLine league={league} helpLevel={helpLevel} />
+      <FormatLine league={league} />
 
       {/* The five ledger rows (S7): dense, comparable, hairline-topped. */}
       <div className="flex flex-col">
@@ -103,10 +95,10 @@ export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet"
           <DraftTimingNotes league={league} />
         </div>
         <LedgerRow label="Entry">
-          {/* Real, not promotional: `entryFeeLabel` reads the league's REAL entry fee — "Free"
-              for every league today, because every league is free this season — and money
-              green is what green means (rule 1). */}
-          <span className="font-semibold text-positive">{entryFeeLabel(league)}</span>
+          {/* Real, not promotional: `entryFeeLabel` reads the league's REAL entry fee. A price
+              is a fact and wears ink (v5 law 1) — money green is gone, and cyan is the verdict
+              channel a price has no claim on. */}
+          <span className="font-semibold text-text-primary">{entryFeeLabel(league)}</span>
         </LedgerRow>
         <LedgerRow label="Seats">
           <span className="font-medium tabular-nums text-text-primary">
@@ -116,18 +108,9 @@ export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet"
         <LedgerRow label="Roster">
           <span className="font-medium text-text-primary">{league.rosterSummary}</span>
         </LedgerRow>
-        <LedgerRow
-          label={
-            <>
-              Playoffs
-              {/* `standard`, not this card's `helpLevel`, only here: a guided caption stacking
-                  between a ledger key and its value would break the one row out of line with its
-                  four siblings — the definition stays one click away, same as everywhere
-                  `InfoTip` is not the always-visible kind. */}
-              <InfoTip term="playoffs" helpLevel="standard" />
-            </>
-          }
-        >
+        {/* No tip (founder ruling, 2026-08-28): "Playoffs" beside "Weeks 15 to 17" explains
+            itself; the bracket rules live at /league-rules. */}
+        <LedgerRow label="Playoffs">
           <span className="font-medium text-text-primary">{formatPlayoffWeeks(league.playoffWeeks)}</span>
         </LedgerRow>
       </div>

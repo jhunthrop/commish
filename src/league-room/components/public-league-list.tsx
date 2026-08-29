@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { EmptyState, InfoTip } from "@/components/ui";
-import type { HelpLevel } from "@/identity/preferences";
+import { EmptyState } from "@/components/ui";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { moneyIsLive } from "@/money/states";
@@ -28,14 +27,6 @@ import { OpenLeagueCard } from "./open-league-card";
  */
 export const HOUSE_SHELF_SENTENCE =
   "Commish runs some of these leagues itself, and a new league opens as soon as one fills, so there is always a seat.";
-
-/**
- * D1's other half (Phase 3.7, Task 6): the one legend line above the grid, spelled with the real
- * `InfoTip` affordance language — the trigger IS a pressable ⓘ (`info-tip.tsx`'s `Icon
- * name="info"` button), and "press" is the verb that is true on every input this product
- * supports (360px touch included), where "hover" would not be.
- */
-export const OPEN_LEAGUE_LEGEND = "New to these terms? Press any ⓘ for a plain answer.";
 
 /**
  * The shelf header's own freshness disclosure (Phase 3.6, Task 5, F20 and the honest half of
@@ -112,10 +103,6 @@ export interface OpenLeagueShelfProps {
    *  (`UI_CONFIG.frontDoor.shelfCap` on the front door; `/browse` passes it whole). */
   readonly leagues: readonly PublicLeagueSummary[];
   readonly signedIn: boolean;
-  /** D1/E7: the caller's decision, never a constant here — public pages pass `"standard"` (the
-   *  definitions stay one click away, beneath the legend line) and a signed-in page passes the
-   *  member's own stored preference (`readPreferences`). */
-  readonly helpLevel: HelpLevel;
   /** The already-formatted render instant (`formatAbsoluteTime(nowIso)`), interpolated into
    *  `seatCountsAsOfSentence` — see that function's docblock for why the time arrives formatted. */
   readonly asOfTime: string;
@@ -197,7 +184,6 @@ export function OpenLeagueShelf({
   house,
   leagues,
   signedIn,
-  helpLevel,
   asOfTime,
   headingLevel = 2,
   intro,
@@ -228,31 +214,11 @@ export function OpenLeagueShelf({
         </div>
       </div>
 
-      {/* F2 kept, collapsed (Task 13) and collapsed AGAIN (Gameday): ONE full-row muted sentence,
-          never a stack. The founder cut the shelf head from three stacked explainer sentences to
-          one on 2026-08-24, and it had drifted back to three — the house promise, the page's own
-          lede, and the legend line, in three separate paragraphs above the first league. The house
-          promise and the legend are the same KIND of thing (quiet guidance about how to read the
-          shelf), so they are one line with one separator; the page's `intro` stays its own
-          paragraph because it carries a real link a visitor acts on, which is a different kind.
-
-          Rendered only while the factory actually has leagues on the shelf — an unreconciled
-          database never prints a promise about leagues that are not there. The `InfoTip` keeps the
-          glossary definition one press away exactly as the legend advertises, and deliberately
-          does NOT take this surface's `helpLevel`: its guided caption was the stacked duplicate
-          the founder cut, so here the trigger stays click-only for everyone. */}
-      {house.length > 0 || merged.length > 0 ? (
-        <p className="max-w-prose text-sm text-text-muted">
-          {house.length > 0 ? (
-            <>
-              {HOUSE_SHELF_SENTENCE} <InfoTip term="house-league" />
-              {merged.length > 0 ? " · " : null}
-            </>
-          ) : null}
-          {merged.length > 0 ? OPEN_LEAGUE_LEGEND : null}
-        </p>
-      ) : null}
-
+      {/* The explainer row is gone (founder ruling, 2026-08-28: "the UX should explain itself -
+          we shouldn't need tips"). The legend line advertised the ⓘ affordance, which no longer
+          exists on these rows; the house-factory sentence said what the hero's own headline and
+          the board itself now demonstrate. `/browse` still carries the operator-transparency
+          sentence through its `intro` slot, where scrutiny of the full lobby belongs. */}
       {intro}
       {filters}
 
@@ -298,12 +264,12 @@ export function OpenLeagueShelf({
           <ul data-testid="league-cards" className="grid gap-3 sm:grid-cols-2 lg:hidden">
             {house.map((league) => (
               <li key={league.id} className="min-w-0">
-                <OpenLeagueCard league={league} signedIn={signedIn} helpLevel={helpLevel} emphasis={league.id === featuredId ? "ink" : "quiet"} />
+                <OpenLeagueCard league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} />
               </li>
             ))}
             {leagues.map((league) => (
               <li key={league.id} className="min-w-0" data-testid="member-league">
-                <OpenLeagueCard league={league} signedIn={signedIn} helpLevel={helpLevel} emphasis={league.id === featuredId ? "ink" : "quiet"} />
+                <OpenLeagueCard league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} />
               </li>
             ))}
           </ul>

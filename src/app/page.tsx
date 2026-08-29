@@ -4,8 +4,6 @@ import { ButtonLink } from "@/components/ui";
 import { MICRO_LABEL, UI_CONFIG } from "@/components/ui/config";
 import { PublicBar, STOREFRONT_NAV, type NavLink } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
-import type { HelpLevel } from "@/identity/preferences";
-import { readPreferences } from "@/identity-service/preferences";
 import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { proofStats } from "@/league-service/proof";
@@ -94,9 +92,6 @@ export default async function Home() {
     listReviews(getDb(), {}),
   ]);
 
-  // D1/E7 (Phase 3.7, Task 5): guided is a signed-in PREFERENCE behavior, never a surface
-  // default — see `/browse`'s identical read.
-  const helpLevel: HelpLevel = user === null ? "standard" : (await readPreferences(getDb(), user)).helpLevel;
 
   // 2026-08-25 founder finding, controller-ruled (Q5, wave-1 review: name and comment repointed
   // to what the sit-and-go shelf actually produces — storefront review R1 retired the
@@ -155,7 +150,6 @@ export default async function Home() {
             house={house}
             leagues={cappedLeagues}
             signedIn={user !== null}
-            helpLevel={helpLevel}
             asOfTime={formatAbsoluteTime(nowIso)}
             featuredInHero={featuredLeague !== null}
           />

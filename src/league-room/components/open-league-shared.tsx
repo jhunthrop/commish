@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { Badge, InfoTip, buttonClassName } from "@/components/ui";
+import { Badge, buttonClassName } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
@@ -27,7 +27,7 @@ const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction
 const FORMAT_TERM: Readonly<Record<DraftFormat, TermKey>> = { snake: "snake-draft", auction: "auction-draft" };
 
 /** `scoringLabel` is a derived string (`describeScoring`), not a `TermKey` — every label but
- *  "Standard" gets an `InfoTip`. */
+ *  "Standard" is left plain. */
 const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
   PPR: "ppr",
   "Half PPR": "half-ppr",
@@ -150,35 +150,28 @@ export function entryFeeLabel(league: PublicLeagueSummary): string {
 /**
  * F1: ONE muted format line, dot-separated — a separator between items on one line separates
  * something again. Who folds in here (S7): the beginner tier is a fact about the league's
- * format, said once, quietly. `helpLevel` stays the CALLER's call (D1/E7) — the card threads
- * the surface's preference through, and `LeagueRow` pins `"standard"` because guided captions
- * never print inline in a row (founder-ordered, Task 13).
+ * format, said once, quietly.
+ *
+ * NO TIPS (founder ruling, 2026-08-28): "the UX should explain itself - we shouldn't need
+ * tips." Every ⓘ this line used to carry was a confession that a label failed. Where a term
+ * needed a plainer word it got one ("Median" reads "Median game" now); the full definitions
+ * survive at `/league-rules`, one press away behind the nav's How it works, which is where a
+ * curious reader goes and an uncurious one never has to.
  */
-export function FormatLine({ league, helpLevel }: { readonly league: PublicLeagueSummary; readonly helpLevel: HelpLevel }) {
+export function FormatLine({ league }: { readonly league: PublicLeagueSummary }) {
   return (
     <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-text-muted">
       <span>{league.teamCount} teams</span>
       <Dot />
-      <span className="inline-flex items-center gap-1">
-        {FORMAT_LABEL[league.format] ?? league.format}
-        <InfoTip term={FORMAT_TERM[league.format]} helpLevel={helpLevel} />
-      </span>
+      <span>{FORMAT_LABEL[league.format] ?? league.format}</span>
       <Dot />
-      <span className="inline-flex items-center gap-1">
-        {league.scoringLabel}
-        {SCORING_LABEL_TERM[league.scoringLabel] === undefined ? null : (
-          <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} helpLevel={helpLevel} />
-        )}
-      </span>
+      <span>{league.scoringLabel}</span>
       {/* Deciding a week is a fact about the league, not about anyone in it — the same
           reasoning `PublicLeagueSummary.medianGame`'s own docblock carries. */}
       {league.medianGame ? (
         <>
           <Dot />
-          <span className="inline-flex items-center gap-1">
-            Median
-            <InfoTip term="median-game" helpLevel={helpLevel} />
-          </span>
+          <span>Median game</span>
         </>
       ) : null}
       {league.experienceTier === "beginner" ? (
@@ -230,10 +223,9 @@ export function ScheduledDraftValue({
 }) {
   if (league.startTrigger === "when_full") {
     return (
-      <span className={`inline-flex min-w-0 items-center gap-1 font-medium text-text-primary ${className}`}>
-        Drafts when full
-        <InfoTip term="sit-and-go" />
-      </span>
+      // "Drafts when full" is the self-explaining register the no-tips ruling asks for: the
+      // sentence IS the commitment, and the fuller version lives at /league-rules.
+      <span className={`min-w-0 font-medium text-text-primary ${className}`}>Drafts when full</span>
     );
   }
   return onDeck && remainingMs !== null ? (
