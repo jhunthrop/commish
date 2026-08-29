@@ -214,6 +214,13 @@ export function LeagueHome({
           <PageTitle>{home.name}</PageTitle>
           <p className="text-sm text-text-muted">{headerFacts(home)}</p>
         </div>
+        {/* The draft's one remnant once it is history — quiet, in the masthead, instead of a
+            floating sentence row of its own between the masthead and the week. */}
+        {home.draftStatus === "complete" ? (
+          <Link className="text-sm font-medium text-text-muted underline hover:text-text-primary" href={`/app/drafts/${home.draftId}`}>
+            View the draft board
+          </Link>
+        ) : null}
       </Card>
 
       {draftJustCompleted ? (
@@ -241,7 +248,14 @@ export function LeagueHome({
           is where the two are told apart now, not this page, and it is also where the ranking
           panel (Task 6, NFFC's Kentucky Derby System) lives, inlined into the checklist's own
           third item rather than a fourth sibling panel here. */}
-      {home.draftSchedule === null ? null : (
+      {/* THE PHASE GATE (founder, 2026-08-28: "it's already drafted but it shows that we have
+          position 6"). WaitingRoom is the PRE-draft surface — the fill meter, the slot ranking,
+          the checklist. It used to render for every draft state including `complete`, which kept
+          a season-long league narrating its own pre-draft ("You did not rank a slot, so we gave
+          you slot 6") months after the draft. Once the draft is history it renders only inside
+          the just-completed arrival window; afterwards the masthead's own "View the draft board"
+          link is the one true remnant of the draft on this page. */}
+      {home.draftSchedule === null || (home.draftStatus === "complete" && !draftJustCompleted) ? null : (
         <WaitingRoom
           league={{
             ...home.draftSchedule,
@@ -263,6 +277,14 @@ export function LeagueHome({
         />
       )}
 
+      {/* ONE GRID, TWO REGIONS (founder, 2026-08-28: "it feels like it's all over the place").
+          The page was ten siblings in a flat stack, every band negotiating its own width. Now
+          the MAIN column carries the week: the bug, the tower, the lineup, the advisor — one
+          left edge, one rhythm. The RAIL carries the room's ambient life: chat, the terms, the
+          members. Below xl they stack in reading order, main first. The lower third stays
+          full-bleed at the foot, outside both. */}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-6">
       <section className="flex flex-col gap-2" aria-label={`${formatWeek(home.currentWeek)} matchup`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-3">
@@ -318,73 +340,39 @@ export function LeagueHome({
         ) : null}
       </section>
 
-      {/*
-        THE BOARD AND THE ROOM, SIDE BY SIDE FROM `xl` (Sunday v5). `Table` sizes itself to its
-        content (`w-auto max-w-full`, its own decision), so a twelve-row standings tower occupies
-        roughly 600px and left half a full-bleed shell page empty beneath a hero that spans all of
-        it. Law 3's answer to spare width is never to stretch a table — it is to put another true
-        thing beside it, and the league's own chat is the thing every manager on this page is
-        already scrolling down to find.
 
-        Below `xl` they stack in the order they always did, board first.
+          <StandingsTable
+            rows={home.standings}
+            myTeamId={home.myTeamId}
+            medianGame={home.medianGame}
+            playoffTeams={playoffTeams ?? undefined}
+          />
 
-        `items-start`: the chat's fixed height (see below) must not be dragged to the tower's, and
-        the tower must not stretch to the chat's.
-      */}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] xl:items-start">
-        <StandingsTable
-          rows={home.standings}
-          myTeamId={home.myTeamId}
-          medianGame={home.medianGame}
-          playoffTeams={playoffTeams ?? undefined}
-        />
+          {lineup === null || promoteLineupEditor ? null : (
+            <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} draftStatus={home.draftStatus} />
+          )}
 
-        {/*
-          Unlike the draft room's `aside` band, this section sits in ordinary document flow, so
-          `LeagueChat`'s own `h-full min-h-0` chain has nothing bounded to fill and would grow to
-          fit every held message. A fixed height from the spacing scale is all the inner
-          `min-h-0`/`flex-1` chain needs to scroll inside itself instead (L2, final review).
-        */}
-        <div className="h-96">
-          <LeagueChat leagueId={home.leagueId} />
+          {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-6">
+          {/* The chat's fixed height: in ordinary flow its `h-full min-h-0` chain has nothing
+              bounded to fill and would grow to every held message (L2, final review). */}
+          <div className="h-96">
+            <LeagueChat leagueId={home.leagueId} />
+          </div>
+
+          <LeagueTermsPanel terms={home.terms} titleAs="p" />
+
+          <LeagueMembersPanel
+            teams={home.teams}
+            teamCount={home.teamCount}
+            authority={home.authority}
+            myTeamId={home.myTeamId}
+            compositionCategory={home.compositionCategory}
+          />
         </div>
       </div>
-
-      {/* The default position (Step 4) — rendered here UNLESS `promoteLineupEditor` already put
-          it first, right below the header. One rule, read once, at the top of this component;
-          there is no second, per-page copy of it down here. */}
-      {lineup === null || promoteLineupEditor ? null : (
-        <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} draftStatus={home.draftStatus} />
-      )}
-
-      {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
-
-      {/*
-        The terms panel, the members panel and the invite panel sit here, in that order, as
-        siblings in ordinary document flow rather than inside a layout that claims the space
-        between them: "how this league works" (Task 8, the SAME `LeagueTermsPanel` the invite
-        preview renders, fed by `home.terms` rather than a second fetch), the commissioner's
-        "who is missing" question (the members panel), and their "invite someone" answer (the
-        panel below) read together without any one of them owning the section. Every member sees
-        the terms panel — it is not gated on `isCommissioner` — because the terms are what
-        everybody in the league is playing under, not a commissioner-only fact.
-
-        `titleAs="p"`: this page's own `PageTitle` above already renders `home.name` (the same
-        string as `home.terms.name`) as its `h1`. Left at the panel's default `h2`, that is a
-        second heading with the identical accessible name — a real e2e regression Task 9 caught
-        (`league-lifecycle.spec.ts`, strict-mode ambiguity on `getByRole("heading", { name })`),
-        not just a cosmetic one: a screen reader's headings list would carry the league's name
-        twice for one fact. See `LeagueTermsPanel`'s own docblock.
-      */}
-      <LeagueTermsPanel terms={home.terms} titleAs="p" />
-
-      <LeagueMembersPanel
-        teams={home.teams}
-        teamCount={home.teamCount}
-        authority={home.authority}
-        myTeamId={home.myTeamId}
-        compositionCategory={home.compositionCategory}
-      />
 
       {/* `id="invite-managers"`: `WaitingRoom`'s own "Invite someone" link (Task 8, a `when_full`
           league's filling state) points here — the one real invite surface a commissioner has. */}

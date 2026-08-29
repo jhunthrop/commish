@@ -10,8 +10,11 @@ export interface SideProps {
   /** The live score, already formatted. Precision belongs to the surface that owns the fact:
    *  a half-PPR league's 118.4 and a standard league's 118 are both correct here. */
   readonly score: string;
-  /** The projected final for this side, already formatted. */
-  readonly projected: string;
+  /** The projected final for this side, already formatted. OPTIONAL (founder, 2026-08-28): a
+   *  projection that exists nowhere in the product renders no row at all — "PROJ —" printed
+   *  twice on every hero was law 7's dash rule applied to a label that should not have been
+   *  there. The row returns the day a caller genuinely holds a number. */
+  readonly projected?: string;
   /** The team's crest — a slot, so `Crest`, an `Avatar` or a league's own mark all fit without
    *  this component learning what a crest is. */
   readonly crest: ReactNode;
@@ -43,6 +46,9 @@ export interface SideProps {
    * from.
    */
   readonly comparison?: StatComparison;
+  /** One line under the identity — the seed and its movement, on the hero itself rather than in
+   *  a spread-out row of its own beneath it. */
+  readonly sub?: ReactNode;
 }
 
 export interface ScoreboardProps {
@@ -61,8 +67,8 @@ export interface ScoreboardProps {
  * diverge at `sm` and up, because the layout below stacks on a phone (see the root's docblock).
  */
 const SIDE_ALIGN = {
-  home: "sm:items-start sm:text-left",
-  away: "sm:items-end sm:text-right",
+  home: "sm:flex-row sm:text-right",
+  away: "sm:flex-row-reverse sm:text-left",
 } as const;
 
 type SideName = keyof typeof SIDE_ALIGN;
@@ -90,7 +96,7 @@ type SideName = keyof typeof SIDE_ALIGN;
  */
 export function Scoreboard({ home, away, middle, className = "" }: ScoreboardProps) {
   return (
-    <div className={`grid items-center gap-5 sm:grid-cols-[1fr_auto_1fr] ${className}`}>
+    <div className={`grid items-center gap-x-8 gap-y-5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] ${className}`}>
       <Side side="home" {...home} />
       <div className="min-w-0">{middle}</div>
       <Side side="away" {...away} />
@@ -98,32 +104,46 @@ export function Scoreboard({ home, away, middle, className = "" }: ScoreboardPro
   );
 }
 
-/** One team's half of the hero: identity above, the score, the projected final below. */
-function Side({ side, name, record, score, projected, crest, winning, comparison }: SideProps & { readonly side: SideName }) {
+/**
+ * One team's half of the hero, laid out as a BROADCAST BUG (founder, 2026-08-28: "move the
+ * scores closer together... center aligned where they are close to each other"). The old layout
+ * stacked identity over score at each edge of the grid, which put the two figures ~1,400px apart
+ * on a wide screen with a share bar floating in the void between them. A score bug has always
+ * solved this: identity OUTSIDE, score INSIDE, so the two numbers flank the middle and read as
+ * one fixture. `flex-row-reverse` on the away side is what mirrors it without a second markup
+ * branch.
+ */
+function Side({ side, name, record, score, projected, crest, winning, comparison, sub }: SideProps & { readonly side: SideName }) {
   return (
-    <div data-winning={winning} className={`flex min-w-0 flex-col items-start gap-2 ${SIDE_ALIGN[side]}`}>
-      <div className="flex min-w-0 items-center gap-2">
+    <div
+      data-winning={winning}
+      className={`flex min-w-0 flex-col items-start gap-2 sm:items-center sm:justify-end sm:gap-5 ${SIDE_ALIGN[side]}`}
+    >
+      <div className="flex min-w-0 items-center gap-2.5">
         {crest}
         <div className="flex min-w-0 flex-col">
-          <span className="truncate text-lg leading-tight">{name}</span>
-          <span className="flex items-baseline gap-2">
+          <span className="truncate font-display text-lg font-bold leading-tight">{name}</span>
+          <span className={`flex items-baseline gap-2 ${side === "home" ? "sm:justify-end" : ""}`}>
             <span className={`${MICRO_LABEL} text-text-faint`}>{record}</span>
             {/* The lead, stated in words. Law 1 spends no pigment on it (see
                 `SideProps.comparison`), so this micro-label IS the channel rather than a
                 decoration beside a coloured number. */}
             {winning ? <span className={`${MICRO_LABEL} text-text-primary`}>Leading</span> : null}
           </span>
+          {sub === undefined ? null : <span className={`flex items-baseline gap-1.5 ${side === "home" ? "sm:justify-end" : ""}`}>{sub}</span>}
         </div>
       </div>
-      {/* The label stays visible. `Stat`'s `srOnlyLabel` exists for one situation — a cell under
-          a table's own `<th>` — and this is not one: an 84px figure with no name on screen is
-          precisely what that primitive was built to stop shipping, and "Score" at 11px over 84px
-          is the pairing law 2 describes in so many words. */}
-      <Stat label="Score" value={score} size="2xl" comparison={comparison} />
-      <span className="flex items-baseline gap-1.5">
-        <span className={`${MICRO_LABEL} text-text-faint`}>Proj</span>
-        <span className="font-mono text-sm tabular-nums text-text-muted">{projected}</span>
-      </span>
+      <div className="flex shrink-0 flex-col items-start sm:items-center">
+        {/* The label stays visible: "Score" at 11px over 84px is law 2's pairing in so many
+            words, and an 84px figure with no name on screen is what `Stat` exists to stop. */}
+        <Stat label="Score" value={score} size="2xl" comparison={comparison} />
+        {projected === undefined ? null : (
+          <span className="flex items-baseline gap-1.5">
+            <span className={`${MICRO_LABEL} text-text-faint`}>Proj</span>
+            <span className="font-mono text-sm tabular-nums text-text-muted">{projected}</span>
+          </span>
+        )}
+      </div>
     </div>
   );
 }

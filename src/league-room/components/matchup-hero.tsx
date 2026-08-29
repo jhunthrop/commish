@@ -146,13 +146,34 @@ export function MatchupHero({ matchup, myTeamId, records }: MatchupHeroProps) {
   const theirsName = iAmAway ? homeTeamName : awayTeamName;
   const mineName = iAmAway ? awayTeamName : homeTeamName;
 
+  // The seed and its movement, IN the bug's identity block rather than a spread-out row of its
+  // own — the founder's centering note killed the old `SeedLine`, whose two halves sat 1,400px
+  // apart under two scores that already were. Same data, same honesty gates: no records row, no
+  // seed; no settled prior week, no arrow.
+  const seedFor = (teamId: string) => {
+    const row = records?.[teamId];
+    if (row === undefined || row.rank === undefined) return undefined;
+    return (
+      <>
+        <span className="font-display text-base font-bold tabular-nums text-text-muted">
+          <span aria-hidden="true">{`#${row.rank}`}</span>
+          <span className="sr-only">{`Seed ${row.rank}`}</span>
+        </span>
+        {row.previousRank === null ? null : <Movement places={row.previousRank - row.rank} against="last week" />}
+      </>
+    );
+  };
+
   const sideFor = (name: string, teamId: string, score: number | null, otherScore: number | null) => ({
     name,
     record: recordFor(records, teamId),
     score: scoreText(score),
-    projected: NOT_STARTED_DASH,
+    // NO projected prop (founder, 2026-08-28): a projection exists nowhere in the product, and
+    // "Proj —" printed on every hero was a label without a fact. The Scoreboard row returns the
+    // day the engine publishes a weekly number this layer can read.
     crest: <Crest id={teamId} name={name} size={32} />,
     winning: decided && (score ?? 0) > (otherScore ?? 0),
+    sub: seedFor(teamId),
   });
 
   return (
@@ -172,62 +193,6 @@ export function MatchupHero({ matchup, myTeamId, records }: MatchupHeroProps) {
           </div>
         }
       />
-      <SeedLine records={records} homeTeamId={homeTeamId} awayTeamId={awayTeamId} />
     </div>
-  );
-}
-
-/**
- * LAW 2, ON THE HERO — where each side stands in the league, and what happened to them last week.
- *
- * A scoreboard prints two numbers and a record. What it never prints, and what a manager asks
- * within two seconds of reading it, is "so where does that leave us". The seed answers it; the
- * movement beside it is the story the seed alone cannot tell — `▲2` says a team is climbing, and
- * one narrow arrow is the whole difference between a table and a narrative.
- *
- * NOTHING HERE IS INVENTED. Both figures come off the same standings rows the record does. A
- * caller that passes no records renders nothing at all, and a league with no settled week behind
- * it has `previousRank === null` and gets the seed with no arrow — never a zero, which would claim
- * a team held its place through a week that has not been played.
- */
-function SeedLine({
-  records,
-  homeTeamId,
-  awayTeamId,
-}: {
-  readonly records: RecordsByTeamId | undefined;
-  readonly homeTeamId: string;
-  readonly awayTeamId: string;
-}) {
-  const home = records?.[homeTeamId];
-  const away = records?.[awayTeamId];
-  if (home === undefined && away === undefined) return null;
-  return (
-    <div className="grid items-center gap-2 border-t border-line pt-2 sm:grid-cols-[1fr_auto_1fr]">
-      <Seed line={home} align="left" />
-      <span aria-hidden="true" className={`${MICRO_LABEL} hidden text-text-faint sm:block`}>Seed</span>
-      <Seed line={away} align="right" />
-    </div>
-  );
-}
-
-/** Literal class strings, never built from the align variable: Tailwind's scanner reads source
- *  text, so a template-built `sm:justify-${x}` ships no rule at all. */
-const SEED_ALIGN = { left: "sm:justify-start", right: "sm:justify-end" } as const;
-
-function Seed({ line, align }: { readonly line: RecordsByTeamId[string] | undefined; readonly align: "left" | "right" }) {
-  if (line === undefined) return <span />;
-  return (
-    <span className={`flex items-baseline gap-2 ${SEED_ALIGN[align]}`}>
-      {/* The centre column's "Seed" label is a `sm`-and-up treatment (the row is a three-column
-          grid there). Stacked on a phone the two seeds would be two bare numerals with nothing
-          naming them, so each carries its own key at that width instead. */}
-      <span aria-hidden="true" className={`${MICRO_LABEL} text-text-faint sm:hidden`}>Seed</span>
-      <span className="font-display text-base font-bold tabular-nums text-text-muted">
-        <span aria-hidden="true">{`#${line.rank}`}</span>
-        <span className="sr-only">{`Seed ${line.rank}`}</span>
-      </span>
-      {line.previousRank === null ? null : <Movement places={line.previousRank - line.rank} against="last week" />}
-    </span>
   );
 }
