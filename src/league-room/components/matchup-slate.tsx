@@ -5,6 +5,41 @@ import type { MatchupDetail, MatchupLineupEntry } from "../contract";
 import { formatPoints } from "../lib/format";
 import { playerOf } from "../lib/player";
 
+/**
+ * THE SPINE CELL — the slot plate over a per-slot share bar and its margin (founder, 2026-08-29:
+ * "it should show how each player is doing relative to each other"). The bar is PROPORTION, not
+ * verdict: the left fill is the left player's share of the pair's points, drawn in plain ink on
+ * the inset track, so a 19-to-14 slot reads as a lean and a 23-to-9 slot reads as a rout before
+ * any number is read. The margin beneath it is the pair's delta, mono and muted — a fact about
+ * a pair, which is why neither takes a magnitude tint (the pair-is-not-a-population rule; the
+ * heat on the figures either side already carries the against-the-field verdict).
+ *
+ * Both render only when BOTH sides have played: a share of one number is not a comparison, and
+ * a margin against a dash is an invented lead.
+ */
+function SpineCell({ slot, mine, theirs }: { readonly slot: MatchupLineupEntry["slot"]; readonly mine: number | null; readonly theirs: number | null }) {
+  const both = mine !== null && theirs !== null;
+  const total = both ? mine + theirs : 0;
+  const share = both && total > 0 ? mine / total : 0.5;
+  const margin = both ? Math.abs(mine - theirs) : null;
+  return (
+    <div className="flex w-full flex-col items-center gap-1 justify-self-center">
+      <SlotChip slot={slot} />
+      {both ? (
+        <>
+          <span aria-hidden="true" className="block h-[3px] w-full overflow-hidden rounded-pill bg-surface-inset">
+            <span className="block h-full rounded-pill bg-text-muted" style={{ width: `${Math.round(share * 100)}%` }} />
+          </span>
+          <span className="font-mono text-[10px] tabular-nums leading-none text-text-faint">
+            <span aria-hidden="true">{margin !== null && margin > 0 ? `+${formatPoints(margin)}` : "even"}</span>
+            <span className="sr-only">{margin === null ? "" : margin === 0 ? "This slot is even." : `${mine! > theirs! ? "Left" : "Right"} side leads this slot by ${formatPoints(margin)}.`}</span>
+          </span>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 /** One slot's pairing across the two lineups, keyed the way both sides' configs align. */
 interface SlotPair {
   readonly key: string;
@@ -148,7 +183,7 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
               wonSlot={pair.mine?.points !== null && pair.mine !== undefined && (pair.theirs?.points === null || pair.theirs === undefined || pair.mine.points! > (pair.theirs.points ?? -Infinity))}
               comparison={comparisonFor(pair.mine?.points ?? null)}
             />
-            <SlotChip slot={(pair.mine ?? pair.theirs)!.slot} className="justify-self-center" />
+            <SpineCell slot={(pair.mine ?? pair.theirs)!.slot} mine={pair.mine?.points ?? null} theirs={pair.theirs?.points ?? null} />
             <SlateSide
               entry={pair.theirs}
               align="right"
