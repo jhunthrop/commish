@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { DraftStatus } from "@/domain/draft";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
@@ -73,8 +73,10 @@ export function LineupEditor({
   /** ESPN's selection: a starter slot's key, or `bench:<playerId>`. One at a time, ever. */
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  /** Monotonic save counter: a slow response from an older save never overwrites the story a
+   *  newer one is telling. Last write wins, on the wire and on the screen. */
+  const saveSeq = useRef(0);
 
   const everyone = useMemo(() => [...lineup.starters, ...lineup.bench].filter((slot) => slot.playerId !== null), [lineup]);
   /** Every rosterable player on this team, keyed by id, so the face beside a slot follows the
@@ -129,29 +131,40 @@ export function LineupEditor({
     );
   }
 
-  const save = async (): Promise<void> => {
-    setSubmitting(true);
+  /**
+   * AUTO-SAVE (founder, 2026-08-28: "it should auto save the lineup we shouldn't have a save
+   * lineup button"). Every completed swap persists itself: optimistic on screen, reverted to
+   * `previous` in the one case the server refuses, with the refusal shown in the server's own
+   * words. A second swap during a save simply starts a newer save; the sequence counter keeps a
+   * stale response from overwriting a fresher one.
+   */
+  const autoSave = async (next: Readonly<Record<string, string | null>>, previous: Readonly<Record<string, string | null>>): Promise<void> => {
+    const seq = ++saveSeq.current;
+    setSaveState("saving");
     setError(null);
-    setSaved(false);
     try {
       const response = await fetchJson(`/api/leagues/${leagueId}/teams/me/lineup`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           weekNumber: lineup.weekNumber,
-          slots: lineup.starters.map((slot) => ({ slot: slot.slot, slotIndex: slot.slotIndex, playerId: assignments[slotKey(slot)] ?? null })),
+          slots: lineup.starters.map((slot) => ({ slot: slot.slot, slotIndex: slot.slotIndex, playerId: next[slotKey(slot)] ?? null })),
         }),
       });
       const body = (await response.json()) as ApiEnvelope<LineupBody>;
+      if (seq !== saveSeq.current) return;
       if (!body.ok) {
+        setAssignments(previous);
         setError(body.error);
+        setSaveState("idle");
         return;
       }
-      setSaved(true);
+      setSaveState("saved");
     } catch {
+      if (seq !== saveSeq.current) return;
+      setAssignments(previous);
       setError("We could not reach the server. Check your connection and try again.");
-    } finally {
-      setSubmitting(false);
+      setSaveState("idle");
     }
   };
 
@@ -191,33 +204,36 @@ export function LineupEditor({
 
   const placeHere = (targetKey: string): void => {
     if (selectedPlayerId === null && selectedSlot === null) return;
-    setAssignments((prev) => {
-      const next: Record<string, string | null> = { ...prev };
-      const displaced = prev[targetKey] ?? null;
-      next[targetKey] = selectedPlayerId;
-      // A starter-to-starter move is a true SWAP: the displaced man takes the vacated slot. A
-      // bench selection leaves no slot behind, so the displaced man simply falls to the bench.
-      if (selected !== null && !selected.startsWith("bench:")) next[selected] = displaced;
-      return next;
-    });
+    const previous = assignments;
+    const next: Record<string, string | null> = { ...previous };
+    const displaced = previous[targetKey] ?? null;
+    next[targetKey] = selectedPlayerId;
+    // A starter-to-starter move is a true SWAP: the displaced man takes the vacated slot. A
+    // bench selection leaves no slot behind, so the displaced man simply falls to the bench.
+    if (selected !== null && !selected.startsWith("bench:")) next[selected] = displaced;
+    setAssignments(next);
     setSelected(null);
-    setSaved(false);
+    void autoSave(next, previous);
   };
 
   /** A starter is selected and a bench row was tapped: the bench man takes the slot, the
    *  displaced starter falls to the derived bench. */
   const swapWithBench = (benchPlayerId: string): void => {
     if (selected === null || selected.startsWith("bench:")) return;
-    setAssignments((prev) => ({ ...prev, [selected]: benchPlayerId }));
+    const previous = assignments;
+    const next = { ...previous, [selected]: benchPlayerId };
+    setAssignments(next);
     setSelected(null);
-    setSaved(false);
+    void autoSave(next, previous);
   };
 
   const sendToBench = (): void => {
     if (selected === null || selected.startsWith("bench:")) return;
-    setAssignments((prev) => ({ ...prev, [selected]: null }));
+    const previous = assignments;
+    const next = { ...previous, [selected]: null };
+    setAssignments(next);
     setSelected(null);
-    setSaved(false);
+    void autoSave(next, previous);
   };
 
   const moving = selected !== null;
@@ -368,16 +384,12 @@ export function LineupEditor({
         </div>
       </div>
 
-      <div>
-        <Button variant="verb" onClick={() => void save()} loading={submitting} disabled={submitting}>
-          Save lineup
-        </Button>
-      </div>
-      {saved ? (
-        <p role="status" className="text-sm text-positive">
-          Lineup saved.
-        </p>
-      ) : null}
+      {/* NO SAVE BUTTON (founder ruling): the swap IS the save. The line below is the only
+          evidence, and it stays quiet — "Saving" while the wire is out, "saved" once it lands,
+          the server's own words if it refuses (with the board already reverted). */}
+      <p role="status" aria-live="polite" className="text-sm text-text-faint">
+        {saveState === "saving" ? "Saving…" : saveState === "saved" ? "All changes saved." : "\u00A0"}
+      </p>
       {error === null ? null : (
         <p role="alert" className="text-sm text-negative">
           {error}
