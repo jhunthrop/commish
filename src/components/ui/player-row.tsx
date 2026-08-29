@@ -110,9 +110,15 @@ export function PlayerRow({ player, positionRank, meta, verdict, action, highlig
         <span className="flex min-w-0 items-center gap-1.5 font-mono text-xs text-text-muted">
           <PositionBadge position={player.position} rank={positionRank} size="sm" />
           {meta === undefined ? null : <span className="truncate">{meta}</span>}
+          {/* THE VERDICT RIDES THE DATA LINE (founder, 2026-08-28: "you cant see the players
+              name on the pick list"). As a third sibling on the primary axis it was a fixed-width
+              tenant beside the star and the verb, and the name — the thing law 2 says a board is
+              FOR — truncated at six characters in a 540px rail. A verdict is a fact about the
+              player, so it sits with the facts, pushed to the line's right edge where the eye
+              expects a figure. The name now loses width only to the face and the act. */}
+          {verdict === undefined || verdict === null ? null : <span className="ml-auto shrink-0 pl-2">{verdict}</span>}
         </span>
       </div>
-      {verdict === undefined ? null : <div className="shrink-0">{verdict}</div>}
       {action === undefined ? null : <div className="shrink-0">{action}</div>}
     </div>
   );
