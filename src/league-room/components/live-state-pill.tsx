@@ -40,16 +40,13 @@ export interface LiveStatePillProps {
  * of every cycle. The icon is decorative (`aria-hidden` by default, no `label`), so it dipping is
  * free; the count stays at a constant, always-compliant opacity.
  *
- * GAMEDAY, LAW 1: IT IS `negative`, THE LIVE FAMILY, AND IT USED TO BE `accent`. Colour is a
- * legend and each of the six channels has exactly one meaning: green means MONEY (an entry fee, a
- * seat filling, the fill of a verb) and red is the whole LIVE family — a draft clock tightening,
- * a live chip's dot, a game happening right now. A flame in the money pigment says "there is money
- * here" to anyone reading the legend rather than the words, which is precisely what law 1 exists
- * to make possible. This is the same correction the app chrome took in two other places, and it is
- * the most-seen instance of the mistake in the product: this pill renders in `TopBar`, on every
- * signed-in page. `GameStateChip`'s live state and `Countdown`'s `hot` tone already spend
- * `negative` for the identical fact, so this is a third surface joining one channel, not a fourth
- * opinion about what live looks like.
+ * SUNDAY v5, LAW 4: IT IS `live`, AND IT HAS NOW BEEN TWO OTHER THINGS. It was `accent` (money)
+ * until v4 corrected it to `negative` on the reasoning that one red family carried the whole live
+ * lineage. v5 splits that family in two — `live` means happening right now and nothing else ever,
+ * `negative` is left to the verdict and the failure — so a flame that means "seven games are on"
+ * can no longer be read as "seven things went wrong". Colour is spent exactly three times and this
+ * is channel three, on the most-seen instance of it in the product: this pill renders in `TopBar`,
+ * on every signed-in page.
  */
 export function LiveStatePill({ liveState }: LiveStatePillProps) {
   const reducedMotion = usePrefersReducedMotion();
@@ -60,7 +57,7 @@ export function LiveStatePill({ liveState }: LiveStatePillProps) {
 
   return (
     <>
-      <span className="flex items-center gap-0.5 text-negative">
+      <span className="flex items-center gap-0.5 text-live">
         <Icon name="flame" size={16} className={reducedMotion ? "" : "animate-pulse"} />
         <span aria-hidden="true" className="font-mono text-xs font-semibold tabular-nums">
           {liveState.gamesLive}

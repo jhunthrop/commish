@@ -1,5 +1,6 @@
 import type { MatchupSide, MatchupSummary } from "../contract";
 import { Crest, NOT_STARTED_DASH, Pill, PointsShareBar, Scoreboard } from "@/components/ui";
+import { LiveMarker } from "@/components/ui/live-marker";
 import { formatPoints, formatRecord } from "../lib/format";
 import { benchPoints, marginSentence, yetToPlayCount } from "../lib/matchup-facts";
 
@@ -36,23 +37,25 @@ function scoreText(score: number | null): string {
  * itself. Sitting on its own team's lineup heading, the same chip needs no label at all: the team
  * name is already the thing it is attached to.
  *
- * `hot` on the yet-to-play chip is the live family, spent exactly where `Pill`'s own docblock
- * reserves it: points that can still arrive. A side with nobody left to play gets no chip at all
- * rather than "0 to play" — the absence IS the fact, and a chip stating zero is noise on the one
- * screen this product cannot afford noise on.
+ * SUNDAY v5, THE LIVE CHANNEL. Yet-to-play is the definition of channel three: points that can
+ * still arrive are the only thing on a settled-looking screen that is still moving. It used to be
+ * `Pill tone="hot"`, which resolved to the `negative` family — the same ink as a failed write —
+ * and it is now `LiveMarker`, which is `live` and means nothing else ever. A side with nobody left
+ * to play gets no marker at all rather than "0 to play": the absence IS the fact, and a chip
+ * stating zero is noise on the one screen this product cannot afford noise on.
  *
- * The bench figure is `neutral`, not `hot`. It is regret, and regret is settled: those points
- * cannot arrive any more, so painting them in the live pigment would say the opposite of what
- * they mean. It renders only for the viewer's own side, because another manager's bench is not
- * this manager's regret and printing it for both sides turns a confession into a scoreboard stat.
+ * The bench figure stays a plain `Pill`. It is regret, and regret is settled: those points cannot
+ * arrive any more, so painting them in the live pigment would say the opposite of what they mean.
+ * It renders only for the viewer's own side, because another manager's bench is not this manager's
+ * regret and printing it for both sides turns a confession into a scoreboard stat.
  */
 export function SideChips({ side, mine }: { readonly side: MatchupSide; readonly mine: boolean }) {
   const left = yetToPlayCount(side);
   const bench = mine ? benchPoints(side) : null;
   if (left === 0 && bench === null) return null;
   return (
-    <span className="flex flex-wrap items-center gap-1.5">
-      {left === 0 ? null : <Pill tone="hot">{`${left} to play`}</Pill>}
+    <span className="flex flex-wrap items-center gap-2">
+      {left === 0 ? null : <LiveMarker mono>{`${left} to play`}</LiveMarker>}
       {bench === null ? null : <Pill>{`${formatPoints(bench)} on your bench`}</Pill>}
     </span>
   );
