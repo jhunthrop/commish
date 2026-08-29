@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ButtonLink, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
-import type { HelpLevel } from "@/identity/preferences";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { useDraftRoomDeps } from "../hooks/deps";
 import { actionLabelFor, playersById as buildPlayersById } from "../lib/lookups";
@@ -35,15 +34,13 @@ export interface DraftRoomProps {
    * room's critical path just to decide whether to show `RoomTour`.
    */
   readonly dismissedAt: string | null;
-  /** Same read, forwarded to `RoomRail`'s `InfoTip`s via `SnakeRoom`/`AuctionRoom`/`RoomShell`. */
-  readonly helpLevel?: HelpLevel;
 }
 
 /**
  * The client entry point. Owns the three page-level states (loading / error / ready) and the
  * one place a rejected action becomes a toast — components below never talk to the server.
  */
-export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
+export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
   const room = useDraftRoom(draftId);
   const deps = useDraftRoomDeps();
   const { show } = useToast();
@@ -220,9 +217,9 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
           {mockChrome}
           <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} actionLabel={actionLabelFor(room.view.format)} />
           {room.view.format === "auction" ? (
-            <AuctionRoom room={room} playersById={playersById} onAct={act} aside={aside} helpLevel={helpLevel} />
+            <AuctionRoom room={room} playersById={playersById} onAct={act} aside={aside} />
           ) : (
-            <SnakeRoom room={room} playersById={playersById} onAct={act} aside={aside} helpLevel={helpLevel} />
+            <SnakeRoom room={room} playersById={playersById} onAct={act} aside={aside} />
           )}
         </div>
       )}

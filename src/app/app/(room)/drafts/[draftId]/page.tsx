@@ -33,8 +33,6 @@ interface PageProps {
  * Reads preferences server-side (`readPreferences`, which seeds the row on a caller's first
  * read anywhere in the product) so `DraftRoom` knows on its very first render whether to show
  * `RoomTour` — no client-side fetch sits on the room's critical path just to answer that. The
- * same read's `helpLevel` is forwarded too, so `RoomRail`'s `InfoTip`s open guided for a
- * `guided` caller from the room's very first render, not just `RoomTour`.
  */
 export default async function DraftRoomPage({ params }: PageProps) {
   const user = await requireCurrentUser();
@@ -43,7 +41,7 @@ export default async function DraftRoomPage({ params }: PageProps) {
   return (
     <ToastProvider>
       <main className="w-full">
-        <DraftRoom draftId={draftId} dismissedAt={preferences.draftTourDismissedAt} helpLevel={preferences.helpLevel} />
+        <DraftRoom draftId={draftId} dismissedAt={preferences.draftTourDismissedAt} />
       </main>
     </ToastProvider>
   );

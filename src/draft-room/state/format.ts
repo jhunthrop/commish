@@ -182,6 +182,31 @@ export function picksUntilYours(upcoming: readonly string[], myTeamId: string | 
   return picksAway < 0 ? null : picksAway;
 }
 
+/**
+ * How long the wait to your own turn is likely to be — "any moment", "~5m" — or null when there
+ * is nothing honest to say: no seat, your own turn already, no clock length on the payload, or a
+ * paused room (a freeze makes every estimate a guess about when a human comes back).
+ *
+ * Extracted out of `formatYourTurn` (Sunday v5, law 6) rather than copied: the room's lower third
+ * prints the count and the estimate as a FIGURE and its micro-label, where the sentence below
+ * prints them as prose, and two derivations of one wait is exactly how the two would come to
+ * disagree in a practice room, where bot seats are priced differently from human ones.
+ */
+export function formatWaitEstimate(
+  upcoming: readonly string[],
+  myTeamId: string | null,
+  clockSeconds: number | null,
+  pausedUntil: string | null = null,
+  botSeats: BotSeatPricing | null = null,
+): string | null {
+  const picksAway = picksUntilYours(upcoming, myTeamId);
+  if (picksAway === null || picksAway === 0 || clockSeconds === null || pausedUntil !== null) return null;
+  const waitMs = upcoming
+    .slice(0, picksAway)
+    .reduce((total, teamId) => total + (botSeats !== null && botSeats.ids.has(teamId) ? botSeats.pickSeconds : clockSeconds) * MS_PER_SECOND, 0);
+  return waitMs < UI_CONFIG.countdown.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
+}
+
 export function formatYourTurn(
   upcoming: readonly string[],
   myTeamId: string | null,
@@ -195,9 +220,6 @@ export function formatYourTurn(
   const picks = plural(picksAway, "pick");
   if (clockSeconds === null) return `You're up in ${picks}.`;
   if (pausedUntil !== null) return `You're up in ${picks}, once picks resume.`;
-  const waitMs = upcoming
-    .slice(0, picksAway)
-    .reduce((total, teamId) => total + (botSeats !== null && botSeats.ids.has(teamId) ? botSeats.pickSeconds : clockSeconds) * MS_PER_SECOND, 0);
-  const wait = waitMs < UI_CONFIG.countdown.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
+  const wait = formatWaitEstimate(upcoming, myTeamId, clockSeconds, pausedUntil, botSeats);
   return `You're up in ${picks} (${wait}).`;
 }

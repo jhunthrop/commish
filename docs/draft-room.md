@@ -177,8 +177,11 @@ Everything else waits the one round trip it takes for the truth to arrive.
 purely so countdowns tick. A countdown never decides anything: clock expiry is the server
 ticker's job, and `TIMER_EXPIRE` has no HTTP path a client could use. `Countdown`/`useCountdown`
 (`components/countdown.tsx`) is the one shared implementation of "milliseconds until
-`deadlineAt`, clamped to zero, ticking on `DRAFT_ROOM_CONFIG.countdownTickMs`". `RoomRail`
-is now its only caller: there is one clock in the room, on one surface.
+`deadlineAt`, clamped to zero, ticking on `DRAFT_ROOM_CONFIG.countdownTickMs`". There is one
+clock in the room, on one surface: `RoomDock`'s lower third owns the PICK clock (`useCountdown`
+plus `formatCountdown`, drawn at display scale in the live channel by the `LowerThird`
+primitive's own clock cell), and `RoomRail` keeps only the scheduled room's KICKOFF countdown,
+which never coexists with it.
 
 ## The commissioner's clock, and the platform's (Phase 3 Plan D)
 
@@ -216,13 +219,15 @@ A draft has two emotional modes, and the room morphs between them rather than ma
 hunt for a control.
 
 - **WATCHING** (roughly 95% of a draft) — the board is the stage. The two live anxieties are
-  answered on screen at all times, without being asked for: *"when am I up?"* is the dock's
-  standing `formatYourTurn` line, and *"will my guy last?"* is the queue chips beside it, with
-  anybody already taken struck through.
-- **PICKING** (about sixty seconds) — the room leans in. The rail goes hot (the negative
-  family, the clock in the same red), and the dock's left edge becomes ONE primary button:
-  *Draft &lt;top of your queue&gt;*. One click if you planned; two if you pivot, because the
-  pool is already under your left hand.
+  answered on screen at all times, without being asked for: *"when am I up?"* is the lower
+  third's own `Picks until yours` cell (the figure, with `formatWaitEstimate`'s coarse wait as
+  its caption), and *"will my guy last?"* is the queue rail above it, with anybody already taken
+  struck through.
+- **PICKING** (about sixty seconds) — the room leans in. The rail goes hot (the LIVE family,
+  Sunday v5's third channel, split from `negative` so a running clock is never the same pigment
+  as a bad outcome), and the lower third's right edge carries the one amber verb: *Draft &lt;top
+  of your queue&gt;*, or *Pick from the pool* when the queue cannot supply one. One click if you
+  planned; two if you pivot, because the pool is already under your left hand.
 
 ### Layout contract (`RoomLayout`)
 
@@ -230,17 +235,17 @@ At `lg` and up the room is a `100dvh`, `overflow-hidden` frame with four regions
 
 | Region | Component | Size | Scroll |
 |---|---|---|---|
-| RAIL | `RoomRail` | fixed band (`lg:h-20`), full width | none |
+| RAIL | `RoomRail` | fixed band (`lg:min-h-20`), full width | none |
 | POOL | `PlayerPool` | fixed `lg:w-88` (352px) column, left | its own list scrolls |
 | STAGE | `DraftBoard` | every remaining pixel | its own, and only when the board hits the sticker minimum |
-| DOCK | `RoomDock` | fixed band (`lg:h-24`), **full width** | queue chips scroll sideways |
+| DOCK | `RoomDock` | fixed band (`lg:h-32`), **full width** — a reserved `lg:h-10` queue rail over the lower third | queue chips scroll sideways |
 
 **The page itself never scrolls.** Every region that can outgrow its band scrolls inside
 itself, and the two bands are fixed height, so a turn changing never moves the board a pixel.
 
 Both fixed bands were re-measured against the dense type scale (Phase 3.6, Task 12 Step 2):
 `TOKENS.font.sizeDense` only ever shrinks a size relative to the base scale it replaces at
-`UI_CONFIG.shell.denseFromPx`, never grows one, so `lg:h-20`/`lg:h-24` stay generous rather than
+`UI_CONFIG.shell.denseFromPx`, never grows one, so `lg:min-h-20`/`lg:h-32` stay generous rather than
 tight — the SessionNotice room variant (Step 1b) trades a bordered strip for an inline pill,
 which is narrower, not taller, so it fits the rail's existing row without widening the band.
 
@@ -319,11 +324,11 @@ the exact derivation and why it stops rendering itself once the season has a res
 | `RoomShell` | `RoomLayout` wired up with `RoomRail`, `PlayerPool`, the stage (`NudgeBanner`, pick-celebration, `DraftBoard`) and `RoomDock` — the one frame `SnakeRoom` and `AuctionRoom` both render. Everything format-specific is a prop: `actionLabel`, `onAct`, an optional `poolFooter` under the pool, an optional `bidConsole` for the dock. |
 | `SnakeRoom` | `RoomShell` with `actionLabel="Draft"`, no `poolFooter`, no `bidConsole`. Reads `room.queue`/`room.nudge` and calls `room.setQueue` directly via `useQueueHandlers` — no queue props threaded from `DraftRoom`. |
 | `AuctionRoom` | `RoomShell` with `actionLabel="Nominate"`, `BudgetTable` as its `poolFooter` (money sits under the players you would spend it on), `BidControls` as its `bidConsole` while a lot is live, plus `NominateModal` rendered alongside the shell. Same `useQueueHandlers` wiring as `SnakeRoom`. |
-| `RoomDock` | The personal band: the manager's own queue as reorderable chips (`<ol>`, because position IS the meaning; named move/remove buttons, never drag-only; a player somebody has since taken is struck through, not dropped), their own roster fill per slot type, and `formatYourTurn`'s standing "You're up in N picks" line. On your turn its left edge becomes the single primary action — *Draft/Nominate &lt;top of your queue&gt;*, or a pointer at the pool when nothing queued is still available. It renders whatever `bidConsole` it is handed instead, which is how the auction's live lot turns the dock into a bid console without the dock knowing what an auction is. |
+| `RoomDock` | **The room's lower third** (Sunday v5, law 6): a reserved queue rail over a `LowerThird` strip. The rail is the manager's own queue as reorderable chips (`<ol>`, because position IS the meaning; named move/remove buttons, never drag-only; a player somebody has since taken is struck through, not dropped) and, when it is empty, the one sentence that says what happens if the clock beats you. The strip is the moment: who is on the clock, how many picks until yours, who drafts next off your queue, **the room's one pick clock** at display scale in the live channel, and one amber verb last — *Draft/Nominate &lt;top of your queue&gt;*, or *Pick from the pool* when the queue cannot supply one. Off your turn it carries no verb at all, which is law 6's own diagnostic rather than an omission. It renders whatever `bidConsole` it is handed in the verb slot, which is how the auction's live lot turns the dock into a bid console without the dock knowing what an auction is. Below `lg` it also keeps the compact per-slot roster fill. |
 | `NudgeBanner` | The moderator's prompt, verbatim, `role="status"`/`aria-live="polite"`. Renders only while `nudge.sequence === view.sequence`, so it clears itself the instant the turn moves on — no timer, nothing to leak. One surface, not two: a banner, never a toast as well. |
 | `TvBoard` | The read-only `/draft/[draftId]/board` shell, and the room's **stage alone**: `RoomRail` (`variant="tv"` — no team chip, no my-turn heat, because nobody across a room is "you"), pick-celebration, a "Now picking" portrait spotlight, and `DraftBoard` (`variant="tv"`). No pool and no dock: nobody acts from the other side of a living room. Shares `useDraftRoom` with the real room — no second data path. Renders no control except the error state's retry. Read from across a room (Phase 3.6, Task 12 Step 3): both `RoomRail` and `DraftBoard` take the `xl` display scale on this variant, the countdown steps up to its largest size, and `xs` never appears anywhere on either component's own authored labels — only the shared `Badge`/`Avatar` chrome beside them keeps its ordinary fixed size (see `room-rail.tsx`'s `RAIL_EYEBROW` docblock for the stated carve-out). |
 | `DraftBoard` | **The hero.** Teams across, rounds down, one position-colored sticker per pick, from `view.picks`/`view.slotConfig`/`view.draftOrder` alone. A semantic `<table>` scrolling sideways in its own container above `sm`; below it, the same board as a per-round list, newest round first. The on-the-clock cell gets an accent ring (breathing, or static under reduced motion); the pick that just landed gets `animate-sticker-slap`. `variant="tv"` is the same board at party scale — see `TvBoard`'s own row for the Task 12 Step 3 "no `xs`" rule this variant also holds to. |
-| `RoomRail` | The masthead, and the ONLY clock in the room: league name (the page's `<h1>`), format chip, `ROUND X · PICK Y` (or `LOT N`), whose turn it is, the countdown digits, the tightening line, your team chip, a quiet `ConnectionBanner`, and `SessionNotice` (`variant="room"`, Task 12 Step 1b — a compact, borderless pill that reads as `ConnectionBanner`'s sibling instead of `TopBar`'s bordered strip, same copy and escalation). It publishes its morph as `data-mode` — `scheduled` / `watching` / `hot` / `complete` — and `hot` recolors the band and the digits into the negative family. It replaced `RoomHeader`, having already absorbed `ClockBanner` and now `AuctionLotPanel`: the standing bid and its holder are a fact about *the turn*, and the turn has exactly one home. |
+| `RoomRail` | The masthead: league name (the page's `<h1>`), format chip, `Round X · Pick Y` (or `Lot N`) with the live pulse beside it while the turn is yours, the pending-picks count, the schedule's own two clock facts (a freeze, and when the pick clock next tightens), your team chip, a quiet `ConnectionBanner`, and `SessionNotice` (`variant="room"`, Task 12 Step 1b — a compact, borderless pill that reads as `ConnectionBanner`'s sibling instead of `TopBar`'s bordered strip, same copy and escalation). **It is no longer the room's clock**: Sunday v5's law 6 moved the pick clock, the turn subject and the picks-until-yours figure down into `RoomDock`'s lower third, and the `lg:hidden` clock echo the dock used to carry went with them. It still publishes its morph as `data-mode` — `scheduled` / `watching` / `hot` / `complete` — and `hot` tints the whole band in the live family. The one clock it keeps is the scheduled room's KICKOFF countdown, which is a masthead fact about when the room opens and never coexists with a pick clock. |
 | `Countdown` / `useCountdown` | The one shared countdown implementation (see "Wall clock" above). Its ticking digits are `aria-hidden`, paired with an `sr-only`/`aria-live="polite"` SIBLING span that states the same time coarsely — the live region must sit outside the `aria-hidden` span, not inside it, or an `aria-hidden` ancestor hides it from assistive tech regardless of `sr-only`. |
 | `PlayerPool` | The left rail: name search, the six positions as `PositionBadge` toggles (`aria-pressed`, one tap to narrow, one to clear), and one compact 44px row per player — rank, sticker, name, NFL team, a ☆ queue toggle and the act button. A list rather than a `Table`: at rail width there are no columns worth aligning. Caps rendered rows at `DRAFT_ROOM_CONFIG.poolPageSize` and never re-ranks. **Before the draft starts (`view.phase === "scheduled"`) no row is marked "Drafted"** — the engine has no pool yet, so `availablePlayerIds` is empty, and reading that as "everyone is gone" was the room's most confusing bug. Pre-start rows are browsable and queueable, with a quiet "—" where the action button goes. |
 | `BidControls` | The bid form, and the dock's primary slot while a lot is live. `view.minBid` is the floor and `view.maxBids[myTeamId]` is the ceiling — both server-computed, never re-derived. A row rather than a stack, so it fits the dock's fixed band. |
