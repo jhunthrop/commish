@@ -242,7 +242,7 @@ describe("OpenLeagueCard", () => {
     quiet.unmount();
 
     render(card(BASE, { emphasis: "ink" }));
-    expect(screen.getByRole("link", { name: "Take a seat in Half-PPR #241." }).className).toBe(buttonClassName("primary", "md"));
+    expect(screen.getByRole("link", { name: "Take a seat in Half-PPR #241." }).className).toBe(buttonClassName("verb", "md"));
   });
 
   it("sends a signed-out visitor into the hold interstitial for THIS league", () => {

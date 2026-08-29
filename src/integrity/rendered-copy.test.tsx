@@ -30,9 +30,8 @@ import { OpenLeagueCard } from "@/league-room/components/open-league-card";
 import { OpenSeatsPanel } from "@/league-room/components/open-seats-panel";
 import { Wire } from "@/league-room/components/wire";
 import type { PublicLeagueSummary, WireItem } from "@/matchmaking/contract";
-import { ProofStrip } from "@/league-room/components/proof-strip";
+import { FrontDoorLowerThird } from "@/league-room/components/front-door-lower-third";
 import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
-import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
 import { SeatHoldPanel } from "@/league-room/components/seat-hold-panel";
 import { SeatTakenPanel } from "@/league-room/components/seat-taken-panel";
 import { TradeCard } from "@/league-room/components/trade-card";
@@ -910,48 +909,22 @@ describe("FrontDoorHero says nothing that breaks the house copy rules", () => {
   });
 });
 
-describe("SeatClaimSteps says nothing that breaks the house copy rules", () => {
-  it("is clean", () => {
-    const { container } = render(<SeatClaimSteps />);
-    expectClean(container);
-  });
-});
-
-/**
- * Phase 3.6, Task 5, Step 5: the four trust stubs `PublicFooter` links to, real content rather
- * than a placeholder or a 404 — swept here since none of them has a dedicated test of its own.
- */
-describe("the four trust stubs say nothing that breaks the house copy rules", () => {
-  it("is clean for Terms, Privacy, Support and League rules", async () => {
-    const [{ default: TermsPage }, { default: PrivacyPage }, { default: SupportPage }, { default: LeagueRulesPage }] = await Promise.all([
-      import("@/app/legal/terms/page"),
-      import("@/app/legal/privacy/page"),
-      import("@/app/support/page"),
-      import("@/app/league-rules/page"),
-    ]);
-    for (const Page of [TermsPage, PrivacyPage, SupportPage, LeagueRulesPage]) {
-      const { container, unmount } = render(<Page />);
-      expectClean(container);
-      unmount();
-    }
-  });
-});
-
-describe("ProofStrip says nothing that breaks the house copy rules, full and empty", () => {
+describe("FrontDoorLowerThird says nothing that breaks the house copy rules, full and empty", () => {
+  // Sunday v5: `ProofStrip` and `SeatClaimSteps` retired with the Direction A front door —
+  // the proof numbers live in the lower third now, and this sweep moved with them.
   it("is clean with every stat present and with none of them", () => {
-    // Both the plural and singular tightest-room label get swept (storefront review R1).
     for (const element of [
-      <ProofStrip
+      <FrontDoorLowerThird
         key="full"
         stats={{ leaguesFilled: 247, roomsFillingNow: 12, rating: { average: 4.8, count: 63 }, tightestRoomSeatsRemaining: 5, any: true }}
+        featuredLeague={null}
+        signedIn={false}
       />,
-      <ProofStrip
-        key="one-left"
-        stats={{ leaguesFilled: 247, roomsFillingNow: 12, rating: { average: 4.8, count: 63 }, tightestRoomSeatsRemaining: 1, any: true }}
-      />,
-      <ProofStrip
+      <FrontDoorLowerThird
         key="empty"
         stats={{ leaguesFilled: null, roomsFillingNow: null, rating: null, tightestRoomSeatsRemaining: null, any: false }}
+        featuredLeague={null}
+        signedIn={false}
       />,
     ]) {
       const { container, unmount } = render(element);

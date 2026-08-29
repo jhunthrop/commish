@@ -113,11 +113,13 @@ describe("the front door (Task 5)", () => {
     expect(screen.queryByText(/member rating/)).not.toBeInTheDocument();
   });
 
-  it("renders the earned proof numbers once proofStats clears every floor", async () => {
+  it("renders the earned proof numbers in the lower third once proofStats clears every floor", async () => {
     vi.mocked(getProofCache).mockReturnValue({ stats: vi.fn(async () => FULL_STATS) } as never);
     await renderHome();
     expect(screen.getByText("247")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Read all 63 member reviews" })).toHaveAttribute("href", "/reviews");
+    expect(screen.getByText("Leagues filled this season")).toBeInTheDocument();
+    // v5: the rating cell is retired — the nav's own Reviews entry is the room's one honest door.
+    expect(screen.queryByRole("link", { name: /member reviews/ })).not.toBeInTheDocument();
   });
 
   it("names the shelf header's freshness sentence verbatim, never the mock's refused 'live' phrasing (F20)", async () => {
@@ -191,9 +193,10 @@ describe("the front door (Task 5)", () => {
     expect(band?.className).toContain("overflow-hidden");
     expect(band?.querySelector(".yard-lines")).not.toBeNull();
     expect(band?.querySelector(".yard-lines")).toHaveAttribute("aria-hidden", "true");
-    // The band holds the hero, the steps and (when earned) the proof chips.
+    // v5: the band holds the hero alone — the steps strip is retired (the board's own Join
+    // column is the instruction), and the proof numbers moved to the lower third.
     expect(within(band as HTMLElement).getByRole("heading", { level: 1 })).toBeInTheDocument();
-    expect(within(band as HTMLElement).getByText("Pick a seat")).toBeInTheDocument();
+    expect(screen.queryByText("Pick a seat")).not.toBeInTheDocument();
   });
 
   // Task 8: the wire mounts under the nav — real events or nothing at all.
@@ -237,61 +240,40 @@ describe("the front door (Task 5)", () => {
   });
 });
 
-describe("the front door's Next Draft module — page-level wiring (2026-08-25 hero finding; repointed by storefront review R1; E2)", () => {
-  it("mounts the module naming the shelf's own featured (fullest filling) league, leaves the shelf all-quiet, and gives the HERO the page's one ink action (rule 5, E2)", async () => {
+describe("the front door's lower third — page-level wiring (Sunday v5, law 6)", () => {
+  it("names the shelf's own featured (fullest filling) league in the strip, repeats its verb, and quiets the nav pill", async () => {
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [FULLEST_FILLING, PUBLIC_LEAGUES[1]!], house: [] });
     const { container } = await renderHome();
 
-    // (1) the module renders and names the featured league.
-    const nextDraftModule = screen.getByTestId("next-draft-module");
-    expect(within(nextDraftModule).getByText(FULLEST_FILLING.name)).toBeInTheDocument();
+    // (1) the strip names the subject with its own seat count.
+    expect(screen.getByText("Filling now")).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`${FULLEST_FILLING.name} · 1 seat left`))).toBeInTheDocument();
 
-    // (2) E2: the nav's own "Take a seat" pill steps back to quiet — the hero band's own ink
-    // seat action (below) carries the page's one ink action instead.
+    // (2) the nav's own "Take a seat" pill steps back to quiet — the hero's verb carries the act.
     const header = screen.getByRole("banner");
-    const navCta = within(header).getByRole("link", { name: "Take a seat" });
-    expect(navCta.className).not.toContain("bg-text-primary");
+    expect(within(header).getByRole("link", { name: "Take a seat" }).className).not.toContain("bg-text-primary");
 
-    // (3) E2: the hero band itself carries an ink seat control for the SAME featured league,
-    // named — this, not the nav, is now the page's one ink action. `FULLEST_FILLING` sits at its
-    // own last seat (11 of 12) on a beginner-tier league, so the CTA's accessible name is the
-    // same "last seat / newer players only" sentence `ctaAccessibleName` builds everywhere else —
-    // the SAME name the module's own quiet CTA and the (now all-quiet) shelf rows/cards carry
-    // too, so this asserts on the one INK instance among them rather than a name unique to it.
+    // (3) law 6: the verb REPEATS — hero and lower third both render the featured room's seat in
+    // the amber verb, and repetition of one act is correct where two different loud acts are not.
     const sameNameCtas = screen.getAllByRole("link", { name: `Take the last seat in ${FULLEST_FILLING.name}. Newer players only.` });
-    const inkCtas = sameNameCtas.filter((el) => el.className.includes("bg-text-primary"));
-    expect(inkCtas).toHaveLength(1);
+    expect(sameNameCtas.filter((el) => el.className.includes("bg-accent")).length).toBeGreaterThanOrEqual(2);
 
-    // (4) the page's total ink stays at exactly one — the shelf goes all-quiet (`featuredInHero`)
-    // because the module IS this league's featured rendering (rule 5): two inked renderings of
-    // the same league would double the one-ink-per-view budget, and the nav's own pill (2) no
-    // longer counts toward it either.
-    expect(inkPillCount(container)).toBe(1);
+    // (4) the v3 ink pill is extinct on this page: the verb wears amber, never bg-text-primary.
+    expect(inkPillCount(container)).toBe(0);
 
-    // (5) the module names the SAME league id the shelf's own featured-selection logic
-    // (`featuredLeagueId`) would independently pick for this identical merged list — proving
-    // `page.tsx` derives ONE feature and threads it to both children, rather than the module and
-    // the shelf each computing (and risking disagreeing on) their own.
+    // (5) the strip names the SAME league the shelf's own featured-selection logic would pick,
+    // proving page.tsx derives ONE feature and threads it, rather than two children computing two.
     const merged = [FULLEST_FILLING, PUBLIC_LEAGUES[1]!];
     expect(featuredFillingLeague(merged)?.id).toBe(FULLEST_FILLING.id);
     expect(featuredLeagueId(merged)).toBe(FULLEST_FILLING.id);
-    expect(within(nextDraftModule).getByText(FULLEST_FILLING.name).textContent).toBe(featuredFillingLeague(merged)!.name);
   });
 
-  // (6) the paired case: nothing filling means no module at all and no hero seat action, so the
-  // nav's own pill stays the page's one ink action, and the shelf's OWN featured pick keeps rule
-  // 5's one ink action — just owned by the shelf instead of the hero.
-  it("stays absent, keeps the nav's own pill inked, and lets the shelf carry its own featured ink, when nothing on the shelf is filling", async () => {
+  it("renders no subject cell and keeps the nav pill loud when nothing on the shelf is filling", async () => {
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [...NOTHING_FILLING], house: [] });
-    const { container } = await renderHome();
-    expect(screen.queryByTestId("next-draft-module")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Filling now/)).not.toBeInTheDocument();
+    await renderHome();
+    expect(screen.queryByText("Filling now")).not.toBeInTheDocument();
     const header = screen.getByRole("banner");
     expect(within(header).getByRole("link", { name: "Take a seat" }).className).toContain("bg-text-primary");
-    // 1 nav CTA + 1 ink row + 1 ink card — both responsive shelf renderings coexist in jsdom
-    // (Task 13's own pair, no stylesheet to hide either), each carrying the shelf's own single
-    // featured ink since `featuredInHero` is never passed `true` in this branch.
-    expect(inkPillCount(container)).toBe(3);
   });
 });
 

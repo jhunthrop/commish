@@ -214,7 +214,8 @@ describe("LeagueRow", () => {
       quiet.unmount();
 
       render(row(BASE, { emphasis: "ink" }));
-      expect(screen.getByRole("link", { name: "Take a seat in Half-PPR #241." }).className).toBe(buttonClassName("primary", "md"));
+      // Sunday v5: a granted row wears the amber VERB, not the v3 ink pill.
+      expect(screen.getByRole("link", { name: "Take a seat in Half-PPR #241." }).className).toBe(buttonClassName("verb", "md"));
     });
 
     it("gives a signed-in visitor the real join button", () => {

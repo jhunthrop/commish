@@ -47,9 +47,9 @@ const HOUSE_LEAGUE: PublicLeagueSummary = {
   kickoffRolls: 0,
 };
 
-/** How many ink pills (rule 5's `bg-text-primary` fill) a rendered container holds. */
+/** How many granted verbs (Sunday v5's `bg-accent` fill) a rendered container holds. */
 function inkPillCount(container: HTMLElement): number {
-  return container.querySelectorAll('[class*="bg-text-primary"]').length;
+  return container.querySelectorAll('a[class*="bg-accent"], button[class*="bg-accent"]').length;
 }
 
 function occurrences(container: HTMLElement, sentence: string): number {
@@ -345,7 +345,7 @@ describe("OpenLeagueShelf", () => {
       <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={[soon, PUBLIC_LEAGUES[1]!]} signedIn={false} helpLevel="standard" asOfTime={AS_OF} />,
     );
     for (const rendering of [rows(), cards()]) {
-      const ink = rendering.querySelector('[class*="bg-text-primary"]');
+      const ink = rendering.querySelector('a[class*="bg-accent"], button[class*="bg-accent"]');
       expect(ink?.getAttribute("aria-label")).toContain("Fullest Draft Room");
     }
   });

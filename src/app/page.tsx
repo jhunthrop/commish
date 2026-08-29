@@ -15,10 +15,8 @@ import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { listReviews } from "@/review-service/reviews";
 import { excludeFixtureReviews } from "./reviews/fixture-filter";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
-import { NextDraftModule } from "@/league-room/components/next-draft-module";
+import { FrontDoorLowerThird } from "@/league-room/components/front-door-lower-third";
 import { OpenLeagueShelf, featuredFillingLeague } from "@/league-room/components/public-league-list";
-import { ProofStrip } from "@/league-room/components/proof-strip";
-import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
 import { Wire } from "@/league-room/components/wire";
 
 export const dynamic = "force-dynamic";
@@ -45,11 +43,11 @@ const REVIEWS_NAV_LINK: NavLink = { href: "/reviews", label: "Reviews" };
 /**
  * The signed-out landing page (Phase 3.6, Task 5; reshaped by Phase 3.7, Task 6) — the first
  * surface a stranger sees, and the one the founder's "best app I've ever seen" bar is judged on
- * hardest. Everything on it is either a query or a sentence this product can keep: the hero and
- * three-step strip are static copy this task can defend word for word, `ProofStrip` renders only
- * numbers `proofStats` actually earned (Task 4), and the shelf below it is the SAME
- * `listPublicLeagues` read and the SAME `OpenLeagueShelf` `/browse` renders — the front door
- * does not invent a second, decorative shelf, it shows the real one.
+ * hardest. SUNDAY v5 (Direction A): the BOARD is the hero — a two-line broadcast headline, then
+ * the real shelf. Everything on it is either a query or a sentence this product can keep: the
+ * proof numbers render only what `proofStats` actually earned, now inside the lower third, and
+ * the shelf is the SAME `listPublicLeagues` read and the SAME `OpenLeagueShelf` `/browse`
+ * renders — the front door does not invent a second, decorative shelf, it shows the real one.
  *
  * D3 (Task 6): the front door is the CAPPED teaser — the house shelf plus the first
  * `UI_CONFIG.frontDoor.shelfCap` member leagues, one quiet "See every open league" pill to
@@ -58,11 +56,10 @@ const REVIEWS_NAV_LINK: NavLink = { href: "/reviews", label: "Reviews" };
  * dies here. Reading no params also means this page is one fixed document: two visitors always
  * see the same front door.
  *
- * `PublicBar`'s `action` (the ink-pill "Take a seat" CTA) points at `/browse` when nothing on the
- * shelf is genuinely filling; once `featuredLeague` names a room, the hero band itself earns the
- * page's one ink action (E2, `FrontDoorHero`'s own docblock) and this pill steps back to quiet —
- * rule 5's one-ink-per-view budget applied to the WHOLE page, nav corner included, not merely the
- * content below it.
+ * `PublicBar`'s `action` points at `/browse` when nothing on the shelf is genuinely filling;
+ * once `featuredLeague` names a room, the hero's verb IS that room's seat and this pill steps
+ * back to quiet. (v5's law 6 retired the one-ink-per-view arithmetic — the verb has a place
+ * instead of a count — but two loud "Take a seat"s an inch apart is still one too many.)
  *
  * `proofStats` is read through `getProofCache()` (`@/league-service/proof-cache-instance`) —
  * this is the highest-traffic unauthenticated page in the product, and the three-query read
@@ -77,11 +74,9 @@ const REVIEWS_NAV_LINK: NavLink = { href: "/reviews", label: "Reviews" };
  * gutter from the spacing scale (`sm:px-10`; `px-4` keeps the product's usual minimum-viewport
  * gutter below that).
  *
- * 2026-08-25 founder finding, controller-ruled: at xl+, when a league qualifies
- * (`featuredFillingLeague`), the hero band's headline pairs with `NextDraftModule` in a
- * two-column grid — the SAME merged, capped list the shelf renders, so the module and the
- * shelf's one inked row/card can never disagree about which league is featured
- * (`featuredInHero` tells the shelf to go all-quiet while the module carries that ink instead).
+ * The 2026-08-25 hero-module ruling is superseded by v5's law 6: the featured room's second
+ * rendering lives in the lower third now, and `featuredInHero` still tells the shelf to go
+ * all-quiet so the two renderings cannot disagree about which league leads.
  */
 export default async function Home() {
   const nowIso = new Date().toISOString();
@@ -139,27 +134,19 @@ export default async function Home() {
             that clips both at the band's own edge (Task 2's carry). The inner div is `relative`
             so the content paints above the positioned overlays; each child carries its own
             `Rise` stagger slot (headline 1, sub 2, steps 3, scoreboard 4 — the mock's d1..d4). */}
+        {/* SUNDAY v5 (Direction A, founder-approved from the mockups): the hero shrinks to the
+            broadcast register — one line, one sub, the money fact, the verb — because the promise
+            it used to assert in six text blocks is ON SCREEN one band below: real rooms with live
+            seat meters. `SeatClaimSteps` (the three-step strip) is retired with it: "Pick a seat"
+            above a board of Join verbs was the control's own label restated as prose, and the one
+            fact it carried a visitor cannot see elsewhere ("your seat holds for 10 minutes") is
+            said at the moment it is true, on the hold page. `NextDraftModule` is retired because
+            the lower third is law 6's place for the featured room, and two renderings of the same
+            subject on one screen is the disagreement the module existed to prevent. */}
         <section className="floodlight w-full overflow-hidden">
           <div aria-hidden="true" className="yard-lines" />
-          <div className="relative flex flex-col gap-6 px-4 py-10 sm:px-10 sm:py-14">
-            {/* 2026-08-25 founder finding, controller-ruled: at xl+ the headline block pairs
-                with "THE NEXT DRAFT" module in a two-column grid, vertically centered against
-                each other — the right half of the hero band used to be a dead dark field once
-                the headline went left-aligned. Below xl (and whenever nothing qualifies —
-                `featuredLeague` null) the hero keeps its current single-column shape: real or
-                absent, never dressed up (rule 6). Either way `FrontDoorHero` gets the SAME
-                `featuredLeague`, so its own in-band ink seat action (E2) and this module (when
-                it renders) can never point at two different leagues. */}
-            {featuredLeague === null ? (
-              <FrontDoorHero signedIn={user !== null} featuredLeague={null} />
-            ) : (
-              <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_360px] xl:items-center xl:gap-10">
-                <FrontDoorHero signedIn={user !== null} featuredLeague={featuredLeague} />
-                <NextDraftModule league={featuredLeague} signedIn={user !== null} />
-              </div>
-            )}
-            <SeatClaimSteps />
-            <ProofStrip stats={stats} />
+          <div className="relative px-4 py-10 sm:px-10 sm:py-14">
+            <FrontDoorHero signedIn={user !== null} featuredLeague={featuredLeague} />
           </div>
         </section>
 
@@ -213,6 +200,11 @@ export default async function Home() {
             </ButtonLink>
           </div>
         </section>
+
+        {/* Law 6: the screen ends in a lower third — the subject (the room closest to firing),
+            the proof the operator can measure, and the one verb. `ProofStrip`'s three numbers
+            moved here; the strip itself is retired. */}
+        <FrontDoorLowerThird stats={stats} featuredLeague={featuredLeague} signedIn={user !== null} />
       </main>
       <PublicFooter />
     </>

@@ -262,8 +262,13 @@ export function DraftTimingNotes({ league }: { readonly league: PublicLeagueSumm
 /**
  * The one action, both forms, both auth states. Signed in: the real join button. Signed out:
  * the HOLD interstitial for THIS league (Task 6, F6), never a generic `/app` — the parent seats
- * a visitor who comes back still holding a live token. Quiet pill unless the PARENT grants this
- * league the view's one ink action (rule 5 — `featuredLeagueId` decides, per rendering).
+ * a visitor who comes back still holding a live token.
+ *
+ * SUNDAY v5: "ink" now renders the VERB variant — the amber fill law 4 gives the act — rather
+ * than the v3 ink pill. The emphasis prop and the parent's featured-league decision survive
+ * unchanged; what a granted row LOOKS like moved with the system. Under law 6 a board is free to
+ * repeat its verb down every row, so `featuredLeagueId`'s one-per-view arithmetic is no longer a
+ * cap the audit enforces — it is the shelf's own choice about which room leads.
  */
 export function OpenLeagueCta({
   league,
@@ -274,7 +279,7 @@ export function OpenLeagueCta({
   readonly signedIn: boolean;
   readonly emphasis: "ink" | "quiet";
 }) {
-  const variant = emphasis === "ink" ? ("primary" as const) : ("secondary" as const);
+  const variant = emphasis === "ink" ? ("verb" as const) : ("secondary" as const);
   return signedIn ? (
     <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} variant={variant} />
   ) : (

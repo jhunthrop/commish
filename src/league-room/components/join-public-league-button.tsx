@@ -24,7 +24,7 @@ export function JoinPublicLeagueButton({
   readonly leagueName: string;
   /** Rule 5: quiet pill unless the PARENT grants this card the view's one ink action —
    *  `OpenLeagueCard` maps its own `emphasis` prop here, and Task 6 decides which card gets it. */
-  readonly variant?: "primary" | "secondary";
+  readonly variant?: "primary" | "secondary" | "verb";
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const router = useRouter();
