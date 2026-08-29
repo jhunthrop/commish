@@ -5,13 +5,11 @@ import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { WaitingInfo } from "../contract";
-import { Avatar, Badge, EYEBROW, InfoTip, Stat } from "@/components/ui";
+import { Badge, EYEBROW } from "@/components/ui";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SessionNotice } from "@/components/app-shell/session-notice";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
-import type { TermKey } from "@/help/glossary";
-import type { HelpLevel } from "@/identity/preferences";
-import { formatClockLength, formatPausedUntil, formatTightening, picksUntilYours } from "../state/format";
+import { formatClockLength, formatPausedUntil, formatTightening } from "../state/format";
 import { playerName, teamName, teamsById } from "../lib/lookups";
 import type { ConnectionStatus } from "../hooks/use-draft-room";
 import { ConnectionBanner } from "./connection-banner";
@@ -29,10 +27,6 @@ export interface RoomRailProps {
   readonly connection: ConnectionStatus;
   /** `tv` drops the personal chrome — no team chip, no my-turn heat. */
   readonly variant?: RoomRailVariant;
-  /** The signed-in caller's preference, forwarded from `DraftRoomPage`. Omitted only by tests
-   *  that don't care about this branch — `InfoTip` itself defaults to the click-only, non-inline
-   *  behavior when it's absent. */
-  readonly helpLevel?: HelpLevel;
   /**
    * R2: the scheduled room's waiting story, straight off the snapshot
    * (`DraftSnapshotBody.waiting`) — the kickoff instant this rail counts down to and the
@@ -46,11 +40,6 @@ export interface RoomRailProps {
 const FORMAT_LABEL: Readonly<Record<DraftStateView["format"], string>> = {
   snake: "Snake draft",
   auction: "Auction draft",
-};
-
-const FORMAT_TERM: Readonly<Record<DraftStateView["format"], TermKey>> = {
-  snake: "snake-draft",
-  auction: "auction-draft",
 };
 
 const LEAGUE_TEXT: Readonly<Record<RoomRailVariant, string>> = {
@@ -84,48 +73,29 @@ const TIGHTENING_TEXT: Readonly<Record<RoomRailVariant, string>> = {
   tv: "text-sm",
 };
 
-/** Task 12 Step 3: the TV variant takes the largest KICKOFF countdown — the room's own headline
- *  size everywhere else in the product stays `lg`. The live pick clock reads
- *  `LIVE_COUNTDOWN_SIZE` below instead, which is keyed on whose turn it is rather than on the
- *  variant, because the TV never renders a pick clock in the rail at all (E5's one-clock rule:
- *  `TvBoard`'s spotlight band owns the party's clock). */
+/** The KICKOFF countdown's size — the only clock this rail still renders. A room's PICK clock
+ *  moved to the lower third (`RoomDock`, Sunday v5 law 6) and the TV's to its spotlight band,
+ *  which is what keeps one clock per screen honest; a kickoff instant is a masthead fact about
+ *  when the room opens, and it never coexists with a pick clock. The TV takes the larger step
+ *  for its own reading distance. */
 const RAIL_COUNTDOWN_SIZE: Readonly<Record<RoomRailVariant, CountdownSize>> = {
   room: "lg",
   tv: "xl",
 };
 
 /**
- * TASK 6, THE ON-CLOCK BAND (the fun pass, `docs/design/2026-08-27-fun-pass-spec.md`): the pick
- * clock steps up a full display size the moment the turn is yours.
+ * The rail's whole visual morph, in one map. `hot` is the LIVE family (Sunday v5's third
+ * channel), because the one moment the room should stop being calm is the sixty seconds that
+ * belong to you — and "happening right now" is exactly what that channel was split off to mean.
  *
- * The spec's third named cause of "it feels like a legal website and not a fantasy site" is that
- * this product has almost no typographic dynamic range, and this rail was a clean example of it:
- * your own sixty seconds rendered at exactly the size somebody else's did. Now the moment owns
- * the top of the room. Range comes from SIZE and only from size — rule 2's ≤600 weight cap does
- * not move, and `weight-cap.source.test.ts` is what keeps the next author from reaching for a
- * heavier face instead of a bigger one.
- */
-const LIVE_COUNTDOWN_SIZE: Readonly<Record<"mine" | "theirs", CountdownSize>> = {
-  mine: "xl",
-  theirs: "lg",
-};
-
-/** The same step applied to the subject beside the clock — the manager whose turn it is. A name
- *  at 28px over a 12px eyebrow is the number-over-label pairing the display scale exists for;
- *  20px over 12px was the ~2x uniformity the spec measured and rejected. */
-const TURN_SUBJECT_TEXT: Readonly<Record<"mine" | "theirs", string>> = {
-  mine: "text-display-md",
-  theirs: "text-display-sm",
-};
-
-/**
- * The rail's whole visual morph, in one map. `hot` is the negative family, because the one
- * moment the room should stop being calm is the sixty seconds that belong to you.
+ * Through v4 one red carried both "happening now" and "this is bad", so a running clock and a
+ * failed write wore the same pigment. v5 separates them: `live` is the clock, the on-the-clock
+ * cell and the hot rail; `negative` stays with the verdict pair and with genuine failure.
  */
 const MODE_SKIN: Readonly<Record<RoomMode, string>> = {
   scheduled: "border-line bg-surface-elevated",
   watching: "border-line bg-surface-elevated",
-  hot: "border-negative bg-negative/10",
+  hot: "border-live bg-live/10",
   complete: "border-line bg-surface-elevated",
 };
 
@@ -236,45 +206,39 @@ function modeOf(view: DraftStateView, turn: TurnSummary): RoomMode {
   return turn.mine ? "hot" : "watching";
 }
 
-/** The waiting and finished states: no pick clock, one plain sentence, nothing to hunt for.
- *  `eyebrowClass` is `RAIL_EYEBROW[variant]` — the TV variant's own "no `xs` anywhere" rule
- *  (Step 3) applied to this headline the same way it applies to the turn label below. `detail`
- *  is nullable for R2's degraded case (a scheduled room whose snapshot carried no waiting
- *  story): the headline stands alone rather than the rail inventing a sentence. `max-w-md`
- *  caps the one long detail (`describeStartTiming`'s when-full commitment, three sentences)
- *  so it wraps as a paragraph instead of stretching the masthead. */
-function StaticState({ headline, detail, eyebrowClass }: { readonly headline: string; readonly detail: string | null; readonly eyebrowClass: string }) {
-  return (
-    <div className="flex flex-col">
-      <span className={`${eyebrowClass} text-text-muted`}>{headline}</span>
-      {detail === null ? null : <span className="max-w-md text-sm text-text-muted">{detail}</span>}
-    </div>
-  );
+/** The waiting and finished states: one plain sentence, nothing to hunt for. The HEADLINE that
+ *  used to sit above it is gone (Sunday v5) — the lower third's own phase cell already names
+ *  "Not started" and "Complete" in the shouted register, and this rail restating the same two
+ *  words in an eyebrow was the "same fact stated twice, differently" pattern the room keeps
+ *  finding in itself. `detail` is nullable for R2's degraded case (a scheduled room whose
+ *  snapshot carried no waiting story): the block simply renders nothing rather than the rail
+ *  inventing a sentence. `max-w-md` caps the one long detail (`describeStartTiming`'s when-full
+ *  commitment, three sentences) so it wraps as a paragraph instead of stretching the masthead. */
+function StaticState({ detail }: { readonly detail: string | null }) {
+  if (detail === null) return null;
+  return <span className="max-w-md text-sm text-text-muted">{detail}</span>;
 }
 
 /**
- * The room's masthead and its ONLY clock: league, format, where the board is, whose turn it
- * is, the countdown, and when the clock next tightens. It replaced `RoomHeader` outright and
- * absorbed `ClockBanner` before it and `AuctionLotPanel` alongside it — three surfaces
- * claiming one fact is what made the old room feel like a hunt.
+ * THE ROOM'S MASTHEAD (Sunday v5, law 6): league, format, where the board is, what the room is
+ * waiting on, and the way out. It is no longer the room's clock.
  *
- * It is a fixed-HEIGHT-FLOOR band by construction (`lg:min-h-20`): the stage below it gets
- * every remaining pixel, and nothing in the room reflows when the turn changes — for the
- * overwhelming common case, where every child renders at its ordinary single-line height, a
- * `min-height` floor holds the band at exactly 80px indistinguishably from a hard `height`.
+ * WHAT LEFT, AND WHY. Through v4 this rail carried the moment as well as the masthead — the turn
+ * subject at display scale, the pick clock, the picks-until-yours figure — and the dock carried a
+ * second, `lg:hidden` copy of that clock because the rail scrolled away on a phone. Law 6 gives
+ * the moment a place of its own: *"On the draft board that is the pick clock, who is queued, and
+ * Draft."* All three moved down to `RoomDock`'s lower third, the phone echo went with them, and
+ * what stays here is the standing description of the room rather than the state of this turn.
  *
- * NEW-3 (gauntlet fix wave, "reported, not fixed"): it was `lg:h-20`, a hard cap, until this fix
- * — the same guided-`InfoTip` layout break `open-league-card.tsx`'s eyebrow row had. A guided
- * caller's format-name and on-the-clock `InfoTip`s (below) print their glossary caption inline,
- * growing their own row past a single line; a HARD `h-20` does not grow to fit that, so the
- * caption either overflowed the band's own box (no `overflow-hidden` here — nothing does; see
- * `info-tip.tsx`'s own "never a `position: absolute` overlay" rule) or, had one been added,
- * would have been silently clipped — losing the very definition guided mode exists to show
- * without a click. `min-h-20` keeps the band at exactly 80px whenever nothing demands more, and
- * lets it grow the rare time a guided caption does, rather than fighting content that has every
- * right to be there.
+ * The rail still MORPHS with the turn (`MODE_SKIN`'s live tint, and the pulse beside the round
+ * label): the whole frame going live is the broadcast move, and the strip at the foot is where
+ * the words for it live.
+ *
+ * It is a fixed-HEIGHT-FLOOR band (`lg:min-h-20`): the stage below gets every remaining pixel,
+ * and nothing reflows when the turn changes. `min-h` rather than a hard `h` so a long waiting
+ * detail wraps instead of being clipped.
  */
-export function RoomRail({ leagueName, view, teams, myTeamId, playersById, connection, variant = "room", helpLevel, waiting }: RoomRailProps) {
+export function RoomRail({ leagueName, view, teams, myTeamId, playersById, connection, variant = "room", waiting }: RoomRailProps) {
   // The TV board is nobody's team: `personalId` is what every personal affordance reads, so
   // dropping the chrome for that variant is one assignment rather than a flag per element.
   const personalId = variant === "room" ? myTeamId : null;
@@ -303,14 +267,6 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
   const myTeamName = personalId === null ? null : teamName(teamsById(teams), personalId, "Your team");
   const turnWhere = turnLabel(view);
   const pending = pendingPickCount(view);
-  // Task 6: the on-clock band's two new facts. `turnKey` is the one branch every size in the
-  // band reads, so the clock, the name and the pulse can never disagree about whose moment this
-  // is. `untilYours` is the engine's own lookahead as a number (`picksUntilYours`) — null for a
-  // spectator, for the TV (no `personalId`, so nobody is "you"), and for a seat the lookahead
-  // does not reach; zero while the turn is already yours, which the band says with the clock
-  // rather than with a count.
-  const turnKey = turn.mine ? "mine" : "theirs";
-  const untilYours = picksUntilYours(view.upcoming, personalId);
   // A real BRANCH, not a cosmetic one — the same idiom `useCountdown`'s tick rate already uses.
   // `globals.css`'s reduced-motion block would flatten the animation anyway; not emitting the
   // class at all is what makes the intent legible in the markup rather than only in a stylesheet.
@@ -352,19 +308,21 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
           )}
         </h1>
       </div>
-      {/* NEW-3: `basis-full` so that below `lg:` (where the header is still `flex-wrap`, not yet
-          `flex-nowrap`), a guided caption growing this span past one line claims a whole wrapped
-          line of its own rather than squeezing onto a shared one beside the league name — the
-          same "give the growing term its own line" containment `open-league-card.tsx`'s eyebrow
-          fix applied to a `flex flex-col` of terms, adapted here to one term inside a row of
-          otherwise-unrelated masthead chrome. */}
-      <span className="inline-flex basis-full items-center gap-1 lg:basis-auto">
-        <Badge tone="neutral">{FORMAT_LABEL[view.format]}</Badge>
-        {/* The TV variant is a shared, unattended display — no control on it is ever clickable. */}
-        {variant === "room" ? <InfoTip term={FORMAT_TERM[view.format]} helpLevel={helpLevel} /> : null}
-      </span>
+      {/* The format's own `InfoTip` is gone (founder ruling, 2026-08-28: "the UX should explain
+          itself - we shouldn't need tips"). "Snake draft" is the board's own name for the shape a
+          manager is looking at, the board draws the serpentine direction on every round's row
+          with an arrow, and the full definition lives at `/league-rules` for whoever wants it. */}
+      <Badge tone="neutral">{FORMAT_LABEL[view.format]}</Badge>
       {turnWhere === null ? null : (
-        <span data-testid="turn-label" className="font-display text-sm font-semibold tracking-wide text-text-muted">
+        <span data-testid="turn-label" className="inline-flex items-center gap-1.5 font-display text-sm font-semibold tracking-wide text-text-muted">
+          {/* Law 6's motion, spent rather than merely obeyed: the clock genuinely is running out,
+              and it is running out on YOU. The dot is the product's existing live vocabulary
+              (`animate-pulse-live`, built for the live chip) rather than a new animation, and it
+              is decorative and `aria-hidden` because the lower third right below says the same
+              thing in words. It never pulses a number a manager is reading. */}
+          {turn.mine && !reducedMotion ? (
+            <span data-testid="on-clock-pulse" aria-hidden="true" className="size-1.5 shrink-0 rounded-pill bg-live animate-pulse-live" />
+          ) : null}
           {turnWhere}
         </span>
       )}
@@ -385,7 +343,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
           // hydrating frame, and `Countdown`'s own placeholder holds the line box rather than
           // the whole block popping in a frame late.
           <>
-            <StaticState headline="Not started" detail={waitingInfo?.detail ?? null} eyebrowClass={RAIL_EYEBROW[variant]} />
+            <StaticState detail={waitingInfo?.detail ?? null} />
             {waitingInfo?.kickoffAt == null ? null : (
               <div className="flex flex-col items-end">
                 <span className={`${RAIL_EYEBROW[variant]} text-text-muted`}>Starts in</span>
@@ -394,76 +352,25 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
             )}
           </>
         ) : mode === "complete" ? (
-          <StaticState headline="Draft complete" detail="Every roster is final." eyebrowClass={RAIL_EYEBROW[variant]} />
+          <StaticState detail="Every roster is final." />
         ) : (
-          <>
-            <div className="flex min-w-0 items-center gap-2">
-              {turn.team === null ? null : (
-                <Avatar name={turn.team.ownerDisplayName} avatar={turn.team.ownerAvatarUrl} size="sm" />
-              )}
-              <div className="flex min-w-0 flex-col">
-                <span className={`inline-flex items-center gap-1 ${RAIL_EYEBROW[variant]} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
-                  {/* Rule 6, finally spent rather than merely obeyed (the spec's own words): the
-                      clock genuinely is running out, and it is running out on YOU. The dot is
-                      the product's existing live vocabulary (`animate-pulse-live`, built for the
-                      live chip) rather than a new animation, it is decorative and `aria-hidden`
-                      because the label right beside it already says the same thing in words, and
-                      it never pulses the digits themselves — a breathing opacity on the number a
-                      manager is reading would trade legibility for energy, which is the exact
-                      swap the spec's own test rejects. */}
-                  {turn.mine && !reducedMotion ? (
-                    <span data-testid="on-clock-pulse" aria-hidden="true" className="size-1.5 shrink-0 rounded-pill bg-negative animate-pulse-live" />
-                  ) : null}
-                  {turn.label}
-                  {/* An auction's "Live bid"/"Nominating" states aren't the on-the-clock rule
-                      this term defines, so the tip only joins the snake-format turn label. The
-                      TV variant drops it too — a shared, unattended display has no clickable
-                      controls at all. */}
-                  {view.format === "auction" || variant !== "room" ? null : <InfoTip term="on-the-clock" helpLevel={helpLevel} />}
-                </span>
-                <span className={`truncate font-display font-semibold leading-display text-text-primary ${TURN_SUBJECT_TEXT[turnKey]}`}>{turn.subject}</span>
-              </div>
-            </div>
-            {/* Task 6: "when am I up?", answered by a digit. The dock still says it in a full
-                sentence (`formatYourTurn`, the anxiety-killer) — this is the same lookup at a
-                glance, in the band a manager is already watching. Absent the moment the turn is
-                yours: zero picks until yours is not a fact anybody needs while their own clock is
-                ticking, and the clock beside it is already the loudest thing on the screen. No
-                `comparison`, so `Stat` renders it as ordinary ink — there is no population a
-                pick count falls inside, and a number is never coloured for looking big. */}
-            {untilYours === null || untilYours === 0 ? null : (
-              <div data-testid="picks-until-yours" className="shrink-0">
-                <Stat label={untilYours === 1 ? "Pick until yours" : "Picks until yours"} value={String(untilYours)} size="sm" />
-              </div>
-            )}
-            {/* `id="room-clock"` (Task 4, R3): the anchored `RoomTour`'s "The clock" stop points
-                here — the one wrapper that's always present for every in-progress/hot state
-                regardless of which of paused/counting/tightening is showing inside it. Absent
-                during `scheduled`/`complete` (a different branch of this same ternary renders
-                then), which is exactly the "not rendered on this surface" signal `RoomTour`
-                reads to fall back to its modal instead of anchoring to nothing. */}
-            <div id="room-clock" className="flex flex-col items-end">
-              {paused ? (
-                <span data-testid="paused-message" className="text-sm font-medium text-warning">
-                  {formatPausedUntil(pausedUntil!)}
-                </span>
-              ) : remainingMs === null || variant === "tv" ? null : (
-                // Task 2 (review E5/E6): the TV variant renders NO countdown of its own here —
-                // the TV board's spotlight band now owns the party's one clock (`TvBoard`, its
-                // own `hotThresholdMs` rule), and a second ticking clock beside it would be the
-                // exact "one clock per screen" violation E5/E6 called out.
-                <Countdown remainingMs={remainingMs} size={LIVE_COUNTDOWN_SIZE[turnKey]} tone={turn.mine ? "hot" : "default"} data-testid="countdown" />
-              )}
-              {tightening === null ? null : <span className={`${TIGHTENING_TEXT[variant]} text-warning`}>{tightening}</span>}
-            </div>
-            {/* The digits above are `aria-hidden`; this is the same turn stated once, in words. */}
-            <p className="sr-only">{turn.sentence}</p>
-          </>
+          // WHAT THE MASTHEAD STILL SAYS ABOUT THE CLOCK, once the clock itself moved to the
+          // lower third: the two facts that are about the SCHEDULE rather than about this turn.
+          // A freeze and a tightening are both statements about how the room's rules change over
+          // the next hours, which is masthead work; the sixty seconds in front of you are not.
+          <div className="flex flex-col items-end">
+            {paused ? (
+              <span data-testid="paused-message" className="text-sm font-medium text-warning">
+                {formatPausedUntil(pausedUntil!)}
+              </span>
+            ) : null}
+            {tightening === null ? null : <span className={`${TIGHTENING_TEXT[variant]} text-warning`}>{tightening}</span>}
+          </div>
         )}
         {/* Suppressed while `hot` — E9 (2026-08-26 design review): "Your team: Turf Burners"
-            beside "You're on the clock · Turf Burners" said the same name twice at the exact
-            moment the rail should say one thing. The turn line owns the fact while the turn
-            is mine; the chip returns the moment it isn't. */}
+            beside a rail already tinted live said the same thing twice at the exact moment the
+            rail should say one thing. The lower third owns the fact while the turn is mine; the
+            chip returns the moment it is not. */}
         {myTeamName === null || mode === "hot" ? null : (
           <span className="whitespace-nowrap text-sm text-text-muted">
             Your team: <span className="font-display font-semibold text-text-primary">{myTeamName}</span>

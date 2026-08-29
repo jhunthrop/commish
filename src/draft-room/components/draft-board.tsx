@@ -247,15 +247,16 @@ function StickerCell({
   }
 
   if (cell.onClock) {
-    // The negative family, not accent — E1 (2026-08-26 design review): the rail speaks this
-    // same fact ("You're on the clock", the hot countdown) in live-red, and rule 1 assigns
-    // clocks and live to red. A green answer to a red question split one fact across two
-    // color families at the room's emotional peak. The one decision, made once: the "You"
-    // COLUMN marker in the header stays money — it names identity, never the clock.
+    // THE LIVE CHANNEL (Sunday v5, law 4), not accent and no longer `negative` — E1
+    // (2026-08-26) put this cell in the same red as the rail's hot clock, which was right about
+    // the pairing and wrong about the family: through v4 one red meant both "happening now" and
+    // "this went badly". v5 splits them, and a cell that is on the clock is the purest "right
+    // now" this product draws. The one decision, made once: the "You" COLUMN marker in the
+    // header stays amber — it names identity, never the clock.
     return (
       <div data-onclock-cell="true" className="relative flex h-full items-center justify-center rounded-sm border border-dashed border-line px-2 py-2">
-        <span aria-hidden="true" className={`pointer-events-none absolute inset-0 rounded-sm ring-2 ring-negative ${spotlight ? "animate-spotlight" : ""}`} />
-        <span className={`${HEADER_EYEBROW[variant]} text-negative`}>On the clock</span>
+        <span aria-hidden="true" className={`pointer-events-none absolute inset-0 rounded-sm ring-2 ring-live ${spotlight ? "animate-spotlight" : ""}`} />
+        <span className={`${HEADER_EYEBROW[variant]} text-live`}>On the clock</span>
       </div>
     );
   }
@@ -464,7 +465,11 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
                 .map((cell) => (
                   <li key={cell.teamId} className="flex items-center gap-2">
                     <span className="w-24 shrink-0 truncate font-display font-semibold text-text-muted">{teamName(byId, cell.teamId)}</span>
-                    <span className="grow">{cellFor(cell)}</span>
+                    {/* `min-w-0` beside `grow`: a flex item's automatic minimum size is its
+                        content, so a sticker's own face plus a long name stretched this list past
+                        a 360px viewport and scrolled the whole PAGE sideways. The sticker's own
+                        inner column already truncates; this is what lets it. */}
+                    <span className="min-w-0 grow">{cellFor(cell)}</span>
                   </li>
                 ))}
             </ul>

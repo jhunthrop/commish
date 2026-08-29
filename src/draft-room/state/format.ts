@@ -72,15 +72,18 @@ function fillTemplate(template: string, values: Readonly<Record<string, string>>
 }
 
 /**
- * `MockResults`' own pick-fact sentence, in four parts a caller assembles with
- * `formatPickFact` below. Every template is `@/mock-draft`'s own `MOCK_COPY` text, threaded to
- * this client module as data (never a value import — the client boundary,
- * `eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`) the same way every other mock-room sentence
- * reaches it (`MockRoomInfo`'s own docblock, `../contract`).
+ * `MockResults`' own pick-fact clause, in three parts a caller picks between. Every template is
+ * `@/mock-draft`'s own `MOCK_COPY` text, threaded to this client module as data (never a value
+ * import — the client boundary, `eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`) the same way
+ * every other mock-room sentence reaches it (`MockRoomInfo`'s own docblock, `../contract`).
+ *
+ * TWO TEMPLATES LEFT (Sunday v5). `took` ("You took {name} at pick {pickNumber}.") had no
+ * production caller at all — the results row states the pick number and the name in their own
+ * columns — and `positionRank` ("{position}{rank} on the board.") was printed as prose on every
+ * row of a fifteen-row log while `PositionBadge` has carried a `rank` prop the pool already
+ * spends. A fact the sticker draws is not a fact a sentence should repeat.
  */
 export interface PickFactCopy {
-  /** `"You took {name} at pick {pickNumber}."` */
-  readonly took: string;
   /** `bestAvailableDelta === 0`: the board's own top player, taken at the turn. No placeholder. */
   readonly bestAvailable: string;
   /** `bestAvailableDelta > 0` but `positionBestDelta === 0`: the board's own top player AT THIS
@@ -89,9 +92,6 @@ export interface PickFactCopy {
   readonly positionBestAvailable: string;
   /** Otherwise: a genuine reach, at this player's own position too. Takes `{count}`. */
   readonly rankedHigherAvailable: string;
-  /** Always appended: the player's own position rank on the whole board. Takes `{position}` and
-   *  `{rank}`. */
-  readonly positionRank: string;
 }
 
 /**
@@ -99,26 +99,17 @@ export interface PickFactCopy {
  * D3/R2, 2026-08-26: state the pick against the board's own best available AT THAT PICK, and
  * within position, rather than a raw un-normalized rank that implies a verdict it never earned).
  * `review` is a pure fact of this draft's own log (`reviewPicks`, `./pick-review`) — this
- * function only chooses which of the three honest sentences fits it and fills the templates,
- * never judges the pick itself.
- */
-export function formatPickFact(copy: PickFactCopy, review: PickReview, playerName: string, position: Position): string {
-  const took = fillTemplate(copy.took, { name: playerName, pickNumber: String(review.pickNumber) });
-  return `${took} ${formatPickFactClause(copy, review, position)}`;
-}
-
-/** The fact WITHOUT the lead-in — the tabular results row (review E1) already states the pick
- *  number and the name in their own columns, so repeating them in prose would name every
- *  player twice, the exact defect the sentence form had. */
+ * function only chooses which of the three honest sentences fits it, never judges the pick.
+ *
+ * The pick against the board's own best available at that pick, and nothing else. The tabular
+ *  results row already states the pick number, the name and (on the sticker) the position rank in
+ *  their own columns, so none of the three is repeated in prose here. */
 export function formatPickFactClause(copy: PickFactCopy, review: PickReview, position: Position): string {
-  const delta =
-    review.bestAvailableDelta === 0
-      ? copy.bestAvailable
-      : review.positionBestDelta === 0
-        ? fillTemplate(copy.positionBestAvailable, { position })
-        : fillTemplate(copy.rankedHigherAvailable, { count: String(review.bestAvailableDelta) });
-  const positionRank = fillTemplate(copy.positionRank, { position, rank: String(review.positionRank) });
-  return `${delta} ${positionRank}`;
+  return review.bestAvailableDelta === 0
+    ? copy.bestAvailable
+    : review.positionBestDelta === 0
+      ? fillTemplate(copy.positionBestAvailable, { position })
+      : fillTemplate(copy.rankedHigherAvailable, { count: String(review.bestAvailableDelta) });
 }
 
 /**
@@ -182,6 +173,31 @@ export function picksUntilYours(upcoming: readonly string[], myTeamId: string | 
   return picksAway < 0 ? null : picksAway;
 }
 
+/**
+ * How long the wait to your own turn is likely to be — "any moment", "~5m" — or null when there
+ * is nothing honest to say: no seat, your own turn already, no clock length on the payload, or a
+ * paused room (a freeze makes every estimate a guess about when a human comes back).
+ *
+ * Extracted out of `formatYourTurn` (Sunday v5, law 6) rather than copied: the room's lower third
+ * prints the count and the estimate as a FIGURE and its micro-label, where the sentence below
+ * prints them as prose, and two derivations of one wait is exactly how the two would come to
+ * disagree in a practice room, where bot seats are priced differently from human ones.
+ */
+export function formatWaitEstimate(
+  upcoming: readonly string[],
+  myTeamId: string | null,
+  clockSeconds: number | null,
+  pausedUntil: string | null = null,
+  botSeats: BotSeatPricing | null = null,
+): string | null {
+  const picksAway = picksUntilYours(upcoming, myTeamId);
+  if (picksAway === null || picksAway === 0 || clockSeconds === null || pausedUntil !== null) return null;
+  const waitMs = upcoming
+    .slice(0, picksAway)
+    .reduce((total, teamId) => total + (botSeats !== null && botSeats.ids.has(teamId) ? botSeats.pickSeconds : clockSeconds) * MS_PER_SECOND, 0);
+  return waitMs < UI_CONFIG.countdown.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
+}
+
 export function formatYourTurn(
   upcoming: readonly string[],
   myTeamId: string | null,
@@ -195,9 +211,6 @@ export function formatYourTurn(
   const picks = plural(picksAway, "pick");
   if (clockSeconds === null) return `You're up in ${picks}.`;
   if (pausedUntil !== null) return `You're up in ${picks}, once picks resume.`;
-  const waitMs = upcoming
-    .slice(0, picksAway)
-    .reduce((total, teamId) => total + (botSeats !== null && botSeats.ids.has(teamId) ? botSeats.pickSeconds : clockSeconds) * MS_PER_SECOND, 0);
-  const wait = waitMs < UI_CONFIG.countdown.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
+  const wait = formatWaitEstimate(upcoming, myTeamId, clockSeconds, pausedUntil, botSeats);
   return `You're up in ${picks} (${wait}).`;
 }

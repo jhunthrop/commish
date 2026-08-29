@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type {
   MockLobbyBody,
@@ -15,11 +14,12 @@ import type {
 } from "@/mock-draft-service/lobby";
 import type { MockWireItem } from "@/mock-draft-service/wire";
 import type { MockMode } from "@/mock-draft/config";
-import { Button, ButtonLink, Card, EYEBROW, Panel, SeatMeter, StatPill } from "@/components/ui";
-import { MICRO_LABEL } from "@/components/ui/config";
+import { Button, ButtonLink, EYEBROW, LowerThird, Panel, SeatMeter, StatPill, type LowerThirdCell } from "@/components/ui";
+import { MICRO_LABEL, UI_CONFIG } from "@/components/ui/config";
 import {
   Countdown,
   formatCoarseDuration,
+  formatCountdown,
   useCountdown,
 } from "@/components/ui/countdown";
 import type { DraftStatus } from "@/domain/draft";
@@ -95,65 +95,41 @@ export function soloQuickStartLabel(
   return `Start a solo mock now, ${teamCount} teams, ${pickSeconds}s clock`;
 }
 
-interface SoloQuickStartProps {
-  readonly teamCount: number;
-  readonly pickSeconds: number;
-  readonly "data-testid"?: string;
-}
-
-/**
- * ONE component, rendered at up to three call sites (the left column's own quick start beside
- * the form, the open-lobby empty state, and the history empty state) — never a second invented
- * shortcut duplicating its logic. `?create=solo` is `DraftRoom`'s own contract with this page;
- * this is the one place that link ever gets a label.
- */
-function SoloQuickStart({
-  teamCount,
-  pickSeconds,
-  "data-testid": testId,
-}: SoloQuickStartProps) {
-  return (
-    <Link
-      href={SOLO_LOBBY_PATH}
-      data-testid={testId}
-      className="text-sm font-medium text-accent underline"
-    >
-      {soloQuickStartLabel(teamCount, pickSeconds)}
-    </Link>
-  );
-}
-
-/** D2's shelf idiom (`LeagueRowsHeader`, `@/league-room/components/league-row.tsx`), scaled down
- *  to this surface's own two-block rows: one quiet eyebrow label over the row's own content, a
- *  second (often blank) one over its action — the sixth League-row column's own "a pill names
- *  itself" reasoning applies here too. `aria-hidden`: every cell that needs a spoken key already
- *  carries its own (the seat sentence, the status text, the action's accessible name). */
-function ShelfColumnHeader({ trailing = "" }: { readonly trailing?: string }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={`flex items-center justify-between gap-3 pb-2 ${EYEBROW} text-text-muted`}
-    >
-      <span>Room</span>
-      <span>{trailing}</span>
-    </div>
-  );
+/** The open lobby's own axis: seats remaining, ascending. The room closest to firing is P1 — the
+ *  same one number the storefront's tower ranks by, for the same reason: it is the only fact that
+ *  varies between two practice rooms and the only one that decides which to join. */
+function bySeatsRemaining(a: MockLobbyRoomSummary, b: MockLobbyRoomSummary): number {
+  return a.seatsOpen - b.seatsOpen;
 }
 
 interface OpenRoomRowProps {
   readonly room: MockLobbyRoomSummary;
+  readonly position: number;
+  readonly leader: boolean;
   readonly joiningCode: string | null;
   readonly onJoin: (shareCode: string) => void;
 }
 
 /**
- * E4/E5: the one live fact this whole page owns, finally rendered live — the same `SeatMeter` +
- * ticking `Countdown` pairing `MockShareLanding` already keeps for the identical room, off the
- * identical wire fact (`startsInMs`). A dedicated row component (rather than inlining the hook
- * in a `.map`) so each room's own countdown ticks independently, the same reason
- * `MockShareLanding` itself is a whole component rather than a fragment.
+ * AN OPEN PRACTICE ROOM AS A TIMING-TOWER LINE (Sunday v5), pattern-matched to `LeagueRow` rather
+ * than re-derived: a position numeral, the seats left as the row's HERO number, the room's shape
+ * in mono, its countdown, and the verb last in the same horizontal place on every row.
+ *
+ * IT WAS A CARD, and rule 4's amended test permitted that. The founder's own storefront ruling
+ * settles which side of the "may" this list falls on — a ranked list of near-identical rooms is
+ * something you read DOWN, and eight bordered cards is exactly the "my eyes do not know where to
+ * focus" complaint at a smaller scale.
+ *
+ * THE LIVE CHANNEL, on the real threshold every seat sentence in the product already keys on
+ * (`UI_CONFIG.seatMeter.lowSeatsThreshold`): a room this close to firing paints its numeral and
+ * its hero figure live-red, and the leader wears the amber rail. `SeatMeter` still owns the SPOKEN
+ * sentence via `srOnlySentence`, so the figure beside the bar is one product seat statement
+ * rendered twice, never two that can disagree.
+ *
+ * A dedicated row component (rather than inlining the hook in a `.map`) so each room's own
+ * countdown ticks independently, the same reason `MockShareLanding` is a whole component.
  */
-function OpenRoomRow({ room, joiningCode, onJoin }: OpenRoomRowProps) {
+function OpenRoomRow({ room, position, leader, joiningCode, onJoin }: OpenRoomRowProps) {
   // Computed once, from the request-time `startsInMs` the server read (ruling 10) — the same
   // "a relative duration becomes an absolute deadline the moment the client has it" shape
   // `MockShareLanding` keeps for this identical fact.
@@ -161,44 +137,41 @@ function OpenRoomRow({ room, joiningCode, onJoin }: OpenRoomRowProps) {
     new Date(Date.now() + room.startsInMs).toISOString(),
   );
   const { remainingMs } = useCountdown(startsAt);
+  const urgent = room.seatsOpen > 0 && room.seatsOpen < UI_CONFIG.seatMeter.lowSeatsThreshold;
   return (
-    // RULE 4'S AMENDED TEST (the fun pass, Task 13): *a thing you act on or compare against its
-    // neighbours may be a card.* An open practice room is both — a manager reads three rooms'
-    // sizes, clocks and countdowns against each other and then joins one. It was a hairline row,
-    // which is the shape for a column you READ down, and the lobby is not that.
-    //
-    // `interactive` is the half that answers the founder's actual complaint: the shelf you are
-    // meant to compare and then act on never acknowledged the pointer at all, which is a large
-    // part of why the product read as a page of terms rather than somewhere you do something.
-    <Card as="li" padding="compact" interactive>
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        {/* GAMEDAY, LAW 2: the row's hero is the fact that decides whether you join — how many
-            seats are still going. It read as a 13px clause inside a sentence, which is the
-            uniform hierarchy the spec measured and rejected. `SeatMeter` still owns the SPOKEN
-            sentence ("9 of 12 seated") via `srOnlySentence`, so the figure beside the bar is one
-            product seat statement rendered twice, never two that can disagree — the identical
-            split `LeagueRow` already keeps. */}
-        <div className="flex shrink-0 items-baseline gap-2">
+    <li className="border-t border-line">
+      <div
+        className={`flex items-center gap-4 border-l-[3px] py-3 pl-2 transition-colors hover:bg-surface-elevated ${
+          leader ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent" : "border-l-transparent"
+        }`}
+      >
+        <span
+          aria-hidden="true"
+          className={`font-display text-2xl font-extrabold tabular-nums ${
+            leader ? "text-accent" : urgent ? "text-live" : "text-text-faint"
+          }`}
+        >
+          {position}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span
             data-testid="lobby-seats-open"
-            className="font-mono text-display-sm font-semibold tabular-nums leading-display text-text-primary"
+            className={`font-display text-2xl font-bold leading-none tabular-nums ${urgent ? "text-live" : "text-text-primary"}`}
           >
             {room.seatsOpen}
+            <span className={`${MICRO_LABEL} ml-1.5 align-middle font-sans text-text-faint`}>
+              {room.seatsOpen === 1 ? "seat open" : "open"} of {room.teamCount}
+            </span>
           </span>
-          <span className={`${MICRO_LABEL} text-text-faint`}>
-            {room.seatsOpen === 1 ? "seat open" : "seats open"}
-          </span>
-        </div>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2">
           <SeatMeter
             filled={room.teamCount - room.seatsOpen}
             total={room.teamCount}
             srOnlySentence
           />
-          <span className="min-w-0 font-mono text-xs tabular-nums text-text-muted">
-            {room.teamCount} teams · {room.pickSeconds}s clock
-          </span>
         </div>
+        <span className="hidden shrink-0 font-mono text-xs tabular-nums text-text-muted sm:inline">
+          {room.teamCount} teams · {room.pickSeconds}s clock
+        </span>
         {remainingMs === null ? null : (
           <Countdown remainingMs={remainingMs} size="md" />
         )}
@@ -214,7 +187,7 @@ function OpenRoomRow({ room, joiningCode, onJoin }: OpenRoomRowProps) {
           Join
         </Button>
       </div>
-    </Card>
+    </li>
   );
 }
 
@@ -240,10 +213,16 @@ function MineRoomRow({ room }: { readonly room: MyMockRoomSummary }) {
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          {/* The status as a chip rather than a second sentence: a state you read off a colour
-              and a shape is law 1's whole point, and `StatPill` is the product's one
-              state-chip vocabulary. `in_progress` is the only one that is live. */}
-          <StatPill label={STATUS_LABEL[room.status]} tone={room.status === "in_progress" ? "negative" : "neutral"} />
+          {/* The status as a chip rather than a second sentence. `in_progress` is the only one
+              that is genuinely happening now, so it is the only one that takes the LIVE channel
+              (Sunday v5, law 4) — a filled plate in live red, the same shape the storefront's own
+              chapter bands wear. Everything else is a quiet neutral chip: a finished mock draft
+              is a record, and a record is grey. */}
+          {room.status === "in_progress" ? (
+            <span className={`${MICRO_LABEL} rounded-sm bg-live px-2 py-0.5 font-semibold text-live-text`}>{STATUS_LABEL.in_progress}</span>
+          ) : (
+            <StatPill label={STATUS_LABEL[room.status]} tone="neutral" />
+          )}
           {/* LAW 5: a room still drafting is an ACT you return to, and it wears the verb; a
               finished or waiting room is a thing you look at, and its way in stays quiet. A bare
               underlined green link was neither — it spent the money channel on navigation. */}
@@ -286,6 +265,104 @@ export function historyGroupFor(
   if (day === dayKey(nowMs)) return "Today";
   if (day === dayKey(nowMs - MS_PER_DAY)) return "Yesterday";
   return "Earlier";
+}
+
+/**
+ * THE LOBBY'S LOWER THIRD (Sunday v5, law 6): the subject, the fact the decision rests on, and
+ * one verb. It replaces the three identical "Start a solo mock now" links this page used to
+ * scatter through its two empty states and its left column — each placement individually
+ * defensible, never reconciled, and all three saying the same sentence to the same eye.
+ *
+ * THE VERB IS WHICHEVER ACT IS ACTUALLY WAITING, in this order: a room of your own that is
+ * drafting right now outranks everything (you are late to it), then the open room closest to
+ * firing, then the standing offer to start a solo room. Only one of the three ever renders, so
+ * this page has exactly one loud action however many rooms are on it.
+ *
+ * `live` follows the same rule the front door's own strip does: the strip goes red when there is
+ * something genuinely happening, and stays amber when the only thing on offer is a standing one.
+ */
+function LobbyLowerThird({
+  open,
+  mine,
+  defaultTeamCount,
+  defaultPickSeconds,
+  joiningCode,
+  onJoin,
+}: {
+  readonly open: readonly MockLobbyRoomSummary[];
+  readonly mine: readonly MyMockRoomSummary[];
+  readonly defaultTeamCount: number;
+  readonly defaultPickSeconds: number;
+  readonly joiningCode: string | null;
+  readonly onJoin: (shareCode: string) => void;
+}) {
+  const drafting = mine.find((room) => room.status === "in_progress") ?? null;
+  const nearest = [...open].sort(bySeatsRemaining)[0] ?? null;
+  const [startsAt] = useState(() => new Date(Date.now() + (nearest?.startsInMs ?? 0)).toISOString());
+  const { remainingMs } = useCountdown(nearest === null ? null : startsAt);
+
+  if (drafting !== null) {
+    return (
+      <LowerThird
+        live
+        cells={[
+          { label: "Drafting now", value: drafting.teamName },
+          { label: "Room", value: `${drafting.teamCount} teams · ${drafting.pickSeconds}s` },
+        ]}
+        action={
+          <ButtonLink href={`/app/drafts/${drafting.draftId}`} variant="verb" size="lg">
+            Back to your draft
+          </ButtonLink>
+        }
+      />
+    );
+  }
+
+  if (nearest !== null) {
+    const cells: LowerThirdCell[] = [
+      { label: "Rooms open", value: open.length },
+      {
+        label: "Closest to filling",
+        value: (
+          <>
+            {nearest.seatsOpen}
+            <span className={`${MICRO_LABEL} ml-1.5 align-middle font-sans text-text-faint`}>
+              {nearest.seatsOpen === 1 ? "seat open" : "open"} of {nearest.teamCount}
+            </span>
+          </>
+        ),
+      },
+    ];
+    if (remainingMs !== null) cells.push({ label: "Starts in", value: formatCountdown(remainingMs), clock: true });
+    return (
+      <LowerThird
+        live
+        cells={cells}
+        action={
+          <Button
+            variant="verb"
+            size="lg"
+            onClick={() => onJoin(nearest.shareCode)}
+            disabled={joiningCode !== null}
+            loading={joiningCode === nearest.shareCode}
+          >
+            Take a seat
+          </Button>
+        }
+      />
+    );
+  }
+
+  return (
+    <LowerThird
+      cells={[{ label: "Open rooms", value: "None right now" }]}
+      action={
+        <ButtonLink href={SOLO_LOBBY_PATH} variant="verb" size="lg" data-testid="quick-start-primary">
+          {soloQuickStartLabel(defaultTeamCount, defaultPickSeconds)}
+        </ButtonLink>
+      }
+    />
+  );
 }
 
 export interface MockLobbyProps {
@@ -424,11 +501,6 @@ export function MockLobby({
               }}
             />
           </Panel>
-          <SoloQuickStart
-            teamCount={defaultTeamCount}
-            pickSeconds={defaultPickSeconds}
-            data-testid="quick-start-primary"
-          />
         </div>
 
         {/* R1: the live lobby and the caller's own history. */}
@@ -441,28 +513,23 @@ export function MockLobby({
                 </p>
               )}
               {open.length === 0 ? (
-                <div className="flex flex-col items-start gap-2">
-                  <p className="text-sm text-text-muted">{emptyMessage}</p>
-                  <SoloQuickStart
-                    teamCount={defaultTeamCount}
-                    pickSeconds={defaultPickSeconds}
-                    data-testid="quick-start-open-empty"
-                  />
-                </div>
+                // The empty state says the one true thing and stops: the strip at the foot of
+                // this page already carries the action, in every state, so an empty list no
+                // longer grows its own CTA beside two others.
+                <p className="text-sm text-text-muted">{emptyMessage}</p>
               ) : (
-                <div>
-                  <ShelfColumnHeader />
-                  <ul className="flex flex-col gap-2">
-                    {open.map((room) => (
-                      <OpenRoomRow
-                        key={room.shareCode}
-                        room={room}
-                        joiningCode={joiningCode}
-                        onJoin={(code) => void join(code)}
-                      />
-                    ))}
-                  </ul>
-                </div>
+                <ul className="flex flex-col">
+                  {[...open].sort(bySeatsRemaining).map((room, index) => (
+                    <OpenRoomRow
+                      key={room.shareCode}
+                      room={room}
+                      position={index + 1}
+                      leader={index === 0}
+                      joiningCode={joiningCode}
+                      onJoin={(code) => void join(code)}
+                    />
+                  ))}
+                </ul>
               )}
             </div>
           </Panel>
@@ -476,24 +543,9 @@ export function MockLobby({
             }
           >
             {mine.length === 0 ? (
-              <div className="flex flex-col items-start gap-2">
-                <p className="text-sm text-text-muted">{historyEmptyMessage}</p>
-                {/* At most TWO one-taps on screen (fix-pass review MEDIUM): a brand-new account
-                  has both lists empty, and three byte-identical CTAs raced for the same eyeball
-                  — each placement individually right (D3, R1, E12), never reconciled. The open
-                  list's empty state already carries the action in exactly that state, so this
-                  one yields to it and renders only when the open shelf has real rooms. */}
-                {open.length === 0 ? null : (
-                  <SoloQuickStart
-                    teamCount={defaultTeamCount}
-                    pickSeconds={defaultPickSeconds}
-                    data-testid="quick-start-history-empty"
-                  />
-                )}
-              </div>
+              <p className="text-sm text-text-muted">{historyEmptyMessage}</p>
             ) : (
               <div className="flex flex-col gap-4">
-                <ShelfColumnHeader />
                 {historyGroups.map(({ group, rooms }) => (
                   <div key={group} className="flex flex-col gap-1">
                     <h3 className={`${EYEBROW} text-text-muted`}>{group}</h3>
@@ -519,6 +571,18 @@ export function MockLobby({
             )}
           </Panel>
         </div>
+      </div>
+      {/* LAW 6: the page ends in a lower third. Full-bleed against the shell's own gutter, the
+          way a strip across the foot is meant to read. */}
+      <div className="-mx-4 mt-2">
+        <LobbyLowerThird
+          open={open}
+          mine={mine}
+          defaultTeamCount={defaultTeamCount}
+          defaultPickSeconds={defaultPickSeconds}
+          joiningCode={joiningCode}
+          onJoin={(code) => void join(code)}
+        />
       </div>
     </div>
   );

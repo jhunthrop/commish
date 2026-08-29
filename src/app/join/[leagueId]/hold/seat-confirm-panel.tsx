@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import { ErrorState, Panel, buttonClassName } from "@/components/ui";
+import { ErrorState, LowerThird, buttonClassName } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
 import { SeatTakenPanel } from "@/league-room/components/seat-taken-panel";
 import { HOUSE_RUNG_LABEL, type HouseRungName } from "@/matchmaking/house-catalog";
@@ -14,6 +14,9 @@ import type { SeatConfirmBody } from "./contract";
 export interface SeatConfirmPanelProps {
   readonly leagueId: string;
   readonly leagueName: string;
+  /** When this league drafts, in `publicLeaguePreview`'s own words — the one fact this strip
+   *  carries that the masthead above it does not. */
+  readonly draftLine: string;
   /** The race loser's own next destination (Task 6 Step 4, F15) — read once, server-side, off
    *  the SAME `publicLeaguePreview` row the page's own read-only render already fetched. */
   readonly houseRung: HouseRungName | null;
@@ -37,7 +40,7 @@ type ConfirmState =
  * dependency-injected `useLeagueRoomDeps` every league-room write goes through) rather than
  * inventing a second write pattern for the one screen either side of sign-in shares.
  */
-export function SeatConfirmPanel({ leagueId, leagueName, houseRung }: SeatConfirmPanelProps) {
+export function SeatConfirmPanel({ leagueId, leagueName, draftLine, houseRung }: SeatConfirmPanelProps) {
   const { fetchJson } = useLeagueRoomDeps();
   const router = useRouter();
   const [state, setState] = useState<ConfirmState>({ status: "idle" });
@@ -70,6 +73,7 @@ export function SeatConfirmPanel({ leagueId, leagueName, houseRung }: SeatConfir
 
   if (state.status === "tier-blocked") {
     return (
+      <div className="max-w-xl">
       <StatePanel
         tone="neutral"
         icon="shield"
@@ -81,11 +85,13 @@ export function SeatConfirmPanel({ leagueId, leagueName, houseRung }: SeatConfir
           </Link>
         }
       />
+      </div>
     );
   }
 
   if (state.status === "seat-taken") {
     return (
+      <div className="max-w-xl">
       <SeatTakenPanel
         leagueName={leagueName}
         primaryAction={
@@ -99,11 +105,13 @@ export function SeatConfirmPanel({ leagueId, leagueName, houseRung }: SeatConfir
           </Link>
         }
       />
+      </div>
     );
   }
 
   if (state.status === "network-error") {
     return (
+      <div className="max-w-xl">
       <ErrorState
         title="We could not confirm your seat"
         description={state.reason}
@@ -113,33 +121,36 @@ export function SeatConfirmPanel({ leagueId, leagueName, houseRung }: SeatConfir
           </button>
         }
       />
+      </div>
     );
   }
 
   return (
-    // GAMEDAY: THE LEAGUE'S NAME, ONCE. The page above this panel now carries a masthead with the
-    // league's name at display size and its open-seat count beside it (`page.tsx`'s
-    // `SeatMasthead`), and this panel used to say the same name three more times — as its own
-    // title, inside a sentence, and again inside the button label. Four statements of one fact on
-    // a screen with one decision on it is the "same fact stated twice, differently" pattern this
-    // codebase's own flow analysis keeps finding, and it reads as a form rather than a door.
+    // LAW 6: the page ends in a lower third, and this is the decision it ends on. It was a
+    // bordered panel with a title, an explanatory sentence and an ink pill — four statements of
+    // one league's name on a screen with one decision on it, which is the "same fact stated
+    // twice, differently" pattern this codebase's own flow analysis keeps finding. The masthead
+    // above says which league and how many seats; this strip says when it drafts and offers the
+    // one act.
     //
-    // The title becomes the ACT ("Confirm your seat"), the sentence says what pressing it does
-    // (and says only what is true here: this branch places no hold of its own, so it never
-    // promises one), and the button becomes the verb. The ACCESSIBLE NAME still carries the
-    // league — a screen-reader user tabbing to a lone "Take your seat" has no other way to know
-    // which one — so nothing was lost, only stopped being repeated on screen.
-    <Panel title="Confirm your seat" meta="Ready to join">
-      <p className="text-sm text-text-muted">Confirming puts you in this league. You are in the draft, then the season.</p>
-      <button
-        type="button"
-        onClick={() => void confirm()}
-        disabled={state.status === "confirming"}
-        aria-label={`Take your seat in ${leagueName}`}
-        className={buttonClassName("primary", "md", "w-fit")}
-      >
-        {state.status === "confirming" ? "Taking your seat…" : "Take your seat"}
-      </button>
-    </Panel>
+    // The ACCESSIBLE NAME still carries the league — a screen-reader user tabbing to a lone
+    // "Take your seat" has no other way to know which one — so nothing was lost, only stopped
+    // being repeated on screen.
+    <div className="-mx-4">
+      <LowerThird
+        cells={[{ label: "Drafts", value: draftLine }]}
+        action={
+          <button
+            type="button"
+            onClick={() => void confirm()}
+            disabled={state.status === "confirming"}
+            aria-label={`Take your seat in ${leagueName}`}
+            className={buttonClassName("verb", "lg")}
+          >
+            {state.status === "confirming" ? "Taking your seat…" : "Take your seat"}
+          </button>
+        }
+      />
+    </div>
   );
 }

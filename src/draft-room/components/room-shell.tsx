@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import type { HelpLevel } from "@/identity/preferences";
 import type { QueueHandlers } from "../hooks/use-queue-handlers";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { DraftBoard } from "./draft-board";
@@ -33,8 +32,6 @@ export interface RoomShellProps extends QueueHandlers {
   readonly bidConsole?: ReactNode;
   /** The social band down the right edge (league chat), or nothing. Built by `DraftRoom`. */
   readonly aside?: ReactNode;
-  /** Forwarded to `RoomRail`'s `InfoTip`s. See `RoomRailProps.helpLevel`. */
-  readonly helpLevel?: HelpLevel;
 }
 
 /**
@@ -55,7 +52,6 @@ export function RoomShell({
   poolFooter,
   bidConsole,
   aside,
-  helpLevel,
 }: RoomShellProps) {
   const pool = (
     <PlayerPool
@@ -84,7 +80,7 @@ export function RoomShell({
           myTeamId={room.myTeamId}
           playersById={playersById}
           connection={room.connection}
-          helpLevel={helpLevel}
+
           waiting={room.waiting}
         />
       }

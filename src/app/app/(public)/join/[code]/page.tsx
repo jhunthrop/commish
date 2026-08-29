@@ -89,8 +89,14 @@ export default async function JoinPage({ params }: PageProps) {
   return (
     <>
       {user === null ? <PublicBar intent={pageIntent} signedIn={false} /> : null}
-      <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
-        <PageTitle>Join a league</PageTitle>
+      {/* FULL-BLEED FRAME, MEASURED CONTENT (`docs/design-system.md`, "Layout"): the terms
+          ledger keeps its own measure inside `InviteLanding`, and the strip at the foot runs
+          edge to edge, the way a lower third is meant to. It was a 672px column centred in a
+          1440px screen, which put the one decision on the page in the middle of nothing. */}
+      <main className="flex w-full flex-col gap-4 p-4">
+        <div className="max-w-2xl">
+          <PageTitle>Join a league</PageTitle>
+        </div>
         <InviteLanding
           state={stateFor(preview)}
           signedIn={user !== null}

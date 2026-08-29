@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { ClaimMockSeatBody } from "@/app/api/mock-drafts/[code]/route";
 import type { MockRoomSummary } from "@/mock-draft-service/lobby";
 import type { MockMode } from "@/mock-draft/config";
-import { Button, Panel, SeatMeter } from "@/components/ui";
+import { Button, ButtonLink, LowerThird, Panel, SeatMeter, type LowerThirdCell } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { Countdown, useCountdown } from "@/components/ui/countdown";
+import { formatCoarseRemaining, formatCountdown, useCountdown } from "@/components/ui/countdown";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 export interface MockShareLandingProps {
@@ -85,73 +84,82 @@ export function MockShareLanding({ code, summary }: MockShareLandingProps) {
 
   const strangerAfterStart = summary.started && !summary.alreadySeated;
 
+  // LAW 6: the two facts a forwarded stranger decides on, then the one verb. Both figures are
+  // gone the instant the room is drafting — the seats left are stale the moment the board opens
+  // and a countdown to a kickoff that already happened is not a fact — so a started room's strip
+  // carries the state and the way out instead.
+  const cells: LowerThirdCell[] = summary.started
+    ? [{ label: "Room", value: "Drafting now" }]
+    : [
+        {
+          label: "Seats",
+          value: (
+            <>
+              {summary.seatsOpen}
+              <span className={`${MICRO_LABEL} ml-1.5 align-middle font-sans text-text-faint`}>
+                {summary.seatsOpen === 1 ? "seat open" : "open"} of {summary.teamCount}
+              </span>
+            </>
+          ),
+        },
+      ];
+  if (!summary.started && remainingMs !== null) {
+    cells.push({ label: "Starts in", value: formatCountdown(remainingMs), clock: true });
+  }
+
   return (
     // E9: no wrapper margins here — the shell's own `<main>` already pads 16px on every side
     // (`app-shell.tsx`), so `mx-4 mt-3` on top of that was a compounding, visible 16px
     // misalignment against the `PageTitle` above. The shell owns the gutter.
-    <Panel title="You are invited to a mock draft">
-      <div className="flex flex-col gap-3">
-        {/* E10: the title now carries the invitation; this states the promise a forwarded
-            stranger has no other way to learn before they act. */}
-        <p className="text-sm text-text-muted">{MOCK_SHARE_LANDING_PRACTICE_SENTENCE}</p>
-        {/* GAMEDAY, LAW 2: the two facts a forwarded stranger actually decides on — how many
-            seats are still going, and how long is left — are the page's largest things now. They
-            were a 13px clause and a 13px clock inside a 400px column, which is the flat hierarchy
-            the spec measured and rejected. `SeatMeter` keeps the spoken sentence
-            (`srOnlySentence`) so the product's one seat statement still reaches assistive tech
-            while the screen shows the figure. */}
-        {summary.started ? null : (
-          // Both figures answer "should I take this seat", and neither is that question any more
-          // once the room is drafting: the seats left are stale the instant the board opens, and
-          // a countdown to a kickoff that already happened is not a fact. A started room says its
-          // one true thing through the action below instead.
-          <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
-            <div className="flex shrink-0 items-baseline gap-2">
-              <span data-testid="share-seats-open" className="font-mono text-display-lg font-semibold tabular-nums leading-display text-text-primary">
-                {summary.seatsOpen}
-              </span>
-              <span className={`${MICRO_LABEL} text-text-faint`}>{summary.seatsOpen === 1 ? "seat open" : "seats open"}</span>
-            </div>
-            {remainingMs === null ? null : (
-              <div className="flex shrink-0 flex-col">
-                {/* The same step as the seat figure beside it: the two facts a stranger weighs
-                    against each other are weighed at the same size, or the layout has made the
-                    choice for them. */}
-                <Countdown remainingMs={remainingMs} size="lg" />
-                <span className={`${MICRO_LABEL} text-text-faint`}>until kickoff</span>
-              </div>
-            )}
+    <div className="flex flex-col gap-4">
+      <Panel title="You are invited to a mock draft">
+        <div className="flex flex-col gap-3">
+          {/* E10: the title carries the invitation; this states the promise a forwarded stranger
+              has no other way to learn before they act. */}
+          <p className="text-sm text-text-muted">{MOCK_SHARE_LANDING_PRACTICE_SENTENCE}</p>
+          {/* The two hero figures moved to the strip at the foot (law 6) — they are what the
+              decision rests on, and that is where the decision lives now. What stays here is the
+              room's shape and the ONE spoken seat sentence (`srOnlySentence`), so the product's
+              single seat statement still reaches assistive tech. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <SeatMeter filled={summary.teamCount - summary.seatsOpen} total={summary.teamCount} srOnlySentence />
+            <span className="font-mono text-xs tabular-nums text-text-muted">
+              {MODE_LABEL[summary.mode]} · {summary.teamCount} teams · {summary.pickSeconds}s clock
+            </span>
           </div>
-        )}
-        <div className="flex flex-wrap items-center gap-3">
-          <SeatMeter filled={summary.teamCount - summary.seatsOpen} total={summary.teamCount} srOnlySentence />
-          <span className="font-mono text-xs tabular-nums text-text-muted">
-            {MODE_LABEL[summary.mode]} · {summary.teamCount} teams · {summary.pickSeconds}s clock
-          </span>
+          {error === null ? null : (
+            <p role="alert" className="text-sm text-negative">
+              {error}
+            </p>
+          )}
         </div>
-        {error === null ? null : (
-          <p role="alert" className="text-sm text-negative">
-            {error}
-          </p>
-        )}
-        {strangerAfterStart ? (
-          <p className="text-sm text-text-muted">
-            This mock draft has already started.{" "}
-            <Link href="/app/mock-drafts" className="font-medium text-accent underline">
-              Start a new one
-            </Link>
-            .
-          </p>
-        ) : (
-          // The button STAYS the act — the invitation now lives in the Panel's own title.
-          // `primary` and full width nowhere: this IS the one ceremonial act the page exists to
-          // perform (law 5's own definition), but a 1500px-wide ink pill is a button that has
-          // stopped looking like a button. `self-start` gives it its own measure.
-          <Button className="self-start" onClick={() => void join()} loading={claiming} disabled={claiming}>
-            {summary.alreadySeated ? "Enter this mock draft" : "Join this mock draft"}
-          </Button>
-        )}
+      </Panel>
+      <div className="-mx-4">
+        <LowerThird
+          cells={cells}
+          live={!summary.started}
+          action={
+            strangerAfterStart ? (
+              // A room that started without you has one honest act left, and it is not this one.
+              <ButtonLink href="/app/mock-drafts" variant="secondary" size="lg">
+                Start a new one
+              </ButtonLink>
+            ) : (
+              // `verb`, not the ceremonial ink pill: the strip is where the verb lives, and its
+              // own place at the end of the strip is what makes it findable without a fill that
+              // competes with the page's own primary.
+              <Button variant="verb" size="lg" onClick={() => void join()} loading={claiming} disabled={claiming}>
+                {summary.alreadySeated ? "Enter this mock draft" : "Join this mock draft"}
+              </Button>
+            )
+          }
+        />
+        {/* The strip's digits are `aria-hidden` inside the primitive; this is the same time in
+            words, coarsely, so it announces on a boundary rather than every tick. */}
+        <p className="sr-only" aria-live="polite">
+          {summary.started || remainingMs === null ? null : formatCoarseRemaining(remainingMs)}
+        </p>
       </div>
-    </Panel>
+    </div>
   );
 }

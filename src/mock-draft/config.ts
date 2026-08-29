@@ -312,16 +312,18 @@ export const MOCK_COPY = {
    * The pick-fact sentence (finding D3 + ruling R2): the honest replacement for the old,
    * un-normalized "The board ranked X Nth" line, which implied a verdict a raw rank never
    * earned (a round-15 kicker with a huge raw rank can still be the board's own best kicker
-   * still available). `state/format.ts`'s `formatPickFact` fills these four templates from
-   * `reviewPicks`' own facts (`state/pick-review.ts`) — a pure derivation of the draft's own
-   * log, never a judgment. `{name}`/`{pickNumber}`/`{position}`/`{count}`/`{rank}` are the only
-   * tokens any of these four ever carry.
+   * still available). `state/format.ts`'s `formatPickFactClause` picks whichever of these three
+   * fits `reviewPicks`' own facts (`state/pick-review.ts`) — a pure derivation of the draft's own
+   * log, never a judgment. `{position}`/`{count}` are the only tokens any of the three carries.
+   *
+   * The lead-in ("You took X at pick N.") and the position-rank clause ("WR6 on the board.") were
+   * both retired in Sunday v5: the results row prints the pick number and the name in their own
+   * columns, and the position rank now rides `PositionBadge`'s own `rank` prop, the way the pool
+   * has always drawn it.
    */
-  resultsPickTook: "You took {name} at pick {pickNumber}.",
-  resultsPickBestAvailable: "The board's best player available.",
-  resultsPickPositionBestAvailable: "The board's best {position} available.",
-  resultsPickRankedHigherAvailable: "{count} ranked higher were available.",
-  resultsPickPositionRank: "{position}{rank} on the board.",
+  resultsPickBestAvailable: "Best available",
+  resultsPickPositionBestAvailable: "Best {position} available",
+  resultsPickRankedHigherAvailable: "{count} ranked higher",
   /** The results page's three next actions (Task 8, Step 2 — "never a dead end"): a quick
    *  rematch, the lobby, and the real thing. `MockResults` (`@/draft-room/components/
    *  mock-results`) renders all three, every time — a finished mock draft never leaves a

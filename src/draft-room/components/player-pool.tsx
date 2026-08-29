@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Badge, Button, EmptyState, Input, PlayerRow, PositionBadge, TierDivider } from "@/components/ui";
+import { Badge, Button, EmptyState, Input, Movement, PlayerRow, PositionBadge, TierDivider } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { queueButtonLabel } from "../lib/lookups";
 import { formatAdp, poolTiers, positionRanks } from "../lib/tiers";
@@ -244,6 +244,23 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
             // picks that actually happened.
             const verdict = row.drafted || !live ? null : verdictFor(verdicts, row.rank, view.pickNumber);
             const steal = verdict !== null && verdict.kind === "steal" ? verdict : null;
+            // LAW 1, IN THE ONE COLUMN THAT WAS EMPTY (Sunday v5): where our board disagrees with
+            // the market, and by how many places. `players` arrives server-ranked best-first, so
+            // `row.rank` IS our rank; `adp` is the room's consensus. The gap between two REAL
+            // rankings is the only figure on this row that carries chroma — the ADP itself stays
+            // grey in the meta line, because a value with no comparison behind it is a fact.
+            //
+            // Rounded to whole places, because the claim is "nine spots higher than the room has
+            // him", not a decimal. A player the feed does not rank has no comparison at all and
+            // gets nothing (law 7).
+            //
+            // A ZERO GAP RENDERS NOTHING, for the same reason `VerdictChip` declines to print
+            // "0 even": agreeing with the market is the absence of a verdict, and the pool has
+            // already learned once (E11) what a sixty-row column of em-dashes costs. `Movement`
+            // itself draws the dash where a caller genuinely wants "unchanged" on screen; this
+            // caller does not.
+            const rawGap = row.player.adp === null ? null : Math.round(row.player.adp) - row.rank;
+            const marketGap = rawGap === 0 ? null : rawGap;
             const tier = tiers.get(row.player.id) ?? null;
             const previousTier = index === 0 ? null : (tiers.get(rows[index - 1]!.player.id) ?? null);
             // A divider opens a band, so it draws on the FIRST visible row of one — including
@@ -273,7 +290,11 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                         {adp === null ? null : <span data-testid="pool-player-adp">{` · ${adp}`}</span>}
                       </>
                     }
-                    verdict={<VerdictChip verdict={steal} />}
+                    // A steal is a judgement about THIS MOMENT and outranks the standing market
+                    // gap: once the board has run past a man's own rank, "still here at pick 44"
+                    // is the fact worth the column. Everywhere else the column carries the gap,
+                    // which is the product's whole thesis stated sixty times without a word.
+                    verdict={steal !== null ? <VerdictChip verdict={steal} /> : marketGap === null ? null : <Movement places={marketGap} against="the market" />}
                     action={
                       <div className="flex items-center gap-1">
                         {row.drafted ? null : (

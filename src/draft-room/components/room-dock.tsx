@@ -5,12 +5,11 @@ import type { TeamCard } from "@/domain/league";
 import type { Player, Position } from "@/domain/player";
 import type { RosterSlotType } from "@/domain/roster";
 import type { DraftStateView } from "@/draft-engine";
-import { Button, EYEBROW, PositionBadge, SlotChip } from "@/components/ui";
+import { Avatar, Button, EYEBROW, LowerThird, PositionBadge, SlotChip, type LowerThirdCell } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { Countdown, useCountdown } from "@/components/ui/countdown";
+import { formatCoarseRemaining, formatCountdown, useCountdown } from "@/components/ui/countdown";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
-import { DRAFT_ROOM_CONFIG } from "../state/config";
-import { formatYourTurn } from "../state/format";
+import { formatWaitEstimate, picksUntilYours } from "../state/format";
 import { playerName, queueButtonLabel } from "../lib/lookups";
 import { moveInQueue, removeFromQueue } from "../state/queue";
 import { turnSummary } from "./room-rail";
@@ -22,7 +21,7 @@ export interface RoomDockProps {
   /** The caller's OWN ranked autopick queue. Never anybody else's. */
   readonly queue: readonly string[];
   readonly playersById: ReadonlyMap<string, Player>;
-  /** The league's teams, for the compact clock's turn label (E2) — same list the rail reads. */
+  /** The league's teams, for the strip's turn subject — the same list the rail reads. */
   readonly teams: readonly TeamCard[];
   readonly myTeamId: string | null;
   readonly submitting: boolean;
@@ -39,7 +38,7 @@ export interface RoomDockProps {
   /**
    * The auction's live-lot console (`BidControls`), or null. Passing it in rather than
    * building it here is what keeps the dock format-agnostic: it renders whatever occupies its
-   * primary slot, and the auction room is the only thing that knows a lot is open.
+   * verb slot, and the auction room is the only thing that knows a lot is open.
    */
   readonly bidConsole?: ReactNode;
 }
@@ -84,10 +83,7 @@ function RosterFill({ view, myTeamId }: { readonly view: DraftStateView; readonl
     // phone's own answer to "what positions have I filled", which the old gating never showed
     // anywhere the rail wasn't. display:none keeps the hidden copy out of the a11y tree, so
     // exactly one roster landmark is exposed at every width.
-    // `min-w-0 basis-full`, never `shrink-0`: this block is phone-only now, and inside the
-    // dock's wrapping flex row a shrink-refusing child is exactly the D1 overflow class — the
-    // meters take their own full-width line and the chip list wraps within it.
-    <div className="flex min-w-0 basis-full flex-col gap-1 lg:hidden">
+    <div className="flex min-w-0 flex-col gap-1 border-t border-line px-4 py-2 lg:hidden">
       <h2 className={`${EYEBROW} text-text-muted`}>Your roster</h2>
       <ul aria-label="Your roster" className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {view.slotConfig.map((config) => (
@@ -103,7 +99,7 @@ function RosterFill({ view, myTeamId }: { readonly view: DraftStateView; readonl
  *  quiet-until-wanted, touch stays always-on, focus always reveals. */
 const CHIP_REVEAL = "[@media(hover:hover)]:opacity-0 group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 focus-visible:opacity-100 transition-opacity motion-reduce:transition-none";
 
-interface QueueChipsProps {
+interface QueueRailProps {
   readonly queue: readonly string[];
   readonly playersById: ReadonlyMap<string, Player>;
   readonly draftedIds: ReadonlySet<string>;
@@ -112,159 +108,76 @@ interface QueueChipsProps {
 }
 
 /**
- * The queue as chips. An `<ol>` because position IS the meaning, and named move/remove
- * buttons because drag reordering is not keyboard-operable. A queued player somebody has
- * since taken is struck through rather than removed — the engine skips them on autopick
- * anyway, and silently vanishing rows is how a plan stops feeling like yours.
- */
-function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChipsProps) {
-  if (queue.length === 0) {
-    return (
-      // `basis-full lg:basis-auto`: the same "give the growing term its own line" containment
-      // `room-rail.tsx`'s own masthead already applies (NEW-3) — below `lg:` (where the dock is
-      // still `flex-wrap`, not yet `flex-nowrap`), `flex-1`'s own `min-w-0` lets this sentence
-      // shrink to whatever sliver is left beside `PrimarySlot` on the SAME wrapped line instead
-      // of wrapping to its own, which at a phone width squeezed it into a column a few characters
-      // wide (a real 360px defect this task's own e2e sweep of the room's mock dressing was the
-      // first to reach: the two-team fixture every earlier draft-room spec used never left a
-      // human this far from their own turn with an empty queue).
-      //
-      // `id="dock-queue"` (Task 4, R3): the anchored `RoomTour`'s "The queue" stop points here.
-      // Carried on BOTH this empty-state sentence and the populated wrapper below, on purpose —
-      // the target must exist whether or not a manager has queued anyone yet, so opening the
-      // tour with an empty queue still anchors instead of falling back to the modal.
-      <p id="dock-queue" className="min-w-0 basis-full flex-1 self-center text-sm text-text-muted lg:basis-auto">
-        Star players in the pool. The room picks for you from your queue if your clock runs out.
-      </p>
-    );
-  }
-
-  return (
-    <div id="dock-queue" className="flex min-w-0 basis-full flex-1 flex-col gap-1 lg:basis-auto">
-      <h2 className={`${EYEBROW} text-text-muted`}>Your queue</h2>
-      {/* `[contain:layout]` — D1 (2026-08-26 design review): at 360px the first chip's box
-          leaked past this list's `overflow-x-auto` clip into the PAGE's scrollable overflow,
-          panning the whole room sideways into a 186px void. Layout containment makes this
-          list its own formatting root, so nothing it lays out can ever contribute to an
-          ancestor's scrollable overflow — verified in-browser against the real compiled CSS
-          (`overflow-hidden` on the parent did NOT close it). The 360px e2e walk asserts the
-          page-level effect with a queued chip present. */}
-      <ol aria-label="Your queue" className="flex items-center gap-2 overflow-x-auto pb-1 [contain:layout]">
-        {queue.map((playerId, index) => {
-          const name = playerName(playersById, playerId);
-          const player = playersById.get(playerId);
-          const drafted = draftedIds.has(playerId);
-          return (
-            // `group/chip` is the reveal surface for this chip's own controls (review E8):
-            // opacity-only, gated on @media(hover:hover), so touch keeps every control visible
-            // and the chip's width never changes — the D1 containment above stays honest.
-            <li
-              key={playerId}
-              className="group/chip flex shrink-0 items-center gap-1 rounded-pill border border-line bg-surface-elevated py-1 pl-2 pr-1"
-            >
-              <span className="font-mono text-xs tabular-nums text-text-muted">{index + 1}</span>
-              {player === undefined ? null : <PositionBadge position={player.position} size="sm" />}
-              <span className={`max-w-32 truncate font-display font-semibold ${drafted ? "text-text-muted line-through" : "text-text-primary"}`}>
-                {name}
-              </span>
-              {drafted ? <span className="sr-only">Already drafted</span> : null}
-              <Button size="sm" variant="ghost" className={CHIP_REVEAL} disabled={busy} aria-label={`Move ${name} up`} onClick={() => onChange(moveInQueue(queue, playerId, -1))}>
-                <span aria-hidden="true">←</span>
-              </Button>
-              <Button size="sm" variant="ghost" className={CHIP_REVEAL} disabled={busy} aria-label={`Move ${name} down`} onClick={() => onChange(moveInQueue(queue, playerId, 1))}>
-                <span aria-hidden="true">→</span>
-              </Button>
-              <Button size="sm" variant="ghost" className={CHIP_REVEAL} disabled={busy} aria-label={queueButtonLabel(name, true)} onClick={() => onChange(removeFromQueue(queue, playerId))}>
-                <span aria-hidden="true">×</span>
-              </Button>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}
-
-/**
- * E2 (2026-08-26 design review): below `lg` only the dock sticks — the rail, the room's ONLY
- * clock, scrolled away, so a phone user deep in the pool acted against an invisible clock and
- * the essential loop (see clock, see pool, pick) did not hold at 360px. This is the same clock
- * riding the sticky dock: `lg:hidden`, so the fact is never spoken twice at desktop widths,
- * and its grammar is the rail's own `turnSummary` — one authority, two renderings.
+ * THE PLAN, ON ONE RESERVED LINE ABOVE THE STRIP (Sunday v5, law 6).
  *
- * `aria-hidden` on purpose: the rail's coarse live region and turn sentence stay in the
- * accessibility tree wherever the page has scrolled, so this echo is visual-only — a second
- * live region would double every clock announcement. Hydration discipline holds: `useCountdown`
- * is null until the client clock snaps and `Countdown` renders its placeholder, never a false
- * "0:00". A paused room renders nothing rather than a frozen, false clock — the dock's own
- * standing sentence already says "once picks resume".
- */
-function DockClock({
-  view,
-  teams,
-  playersById,
-  myTeamId,
-}: {
-  readonly view: DraftStateView;
-  readonly teams: readonly TeamCard[];
-  readonly playersById: ReadonlyMap<string, Player>;
-  readonly myTeamId: string | null;
-}) {
-  // Called unconditionally, before any early return — React's Rules of Hooks.
-  const { remainingMs, now } = useCountdown(view.deadlineAt);
-  const pausedUntil = view.pausedUntil ?? null;
-  const paused = pausedUntil !== null && now !== null && now < Date.parse(pausedUntil);
-  if (view.phase !== "in_progress" || view.deadlineAt === null || paused) return null;
-  const turn = turnSummary(view, teams, playersById, myTeamId);
-  return (
-    <div aria-hidden="true" data-testid="dock-clock" className="ml-auto flex shrink-0 flex-col items-end lg:hidden">
-      <Countdown remainingMs={remainingMs} size="md" tone={turn.mine ? "hot" : "default"} />
-      <span className={`${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>{turn.label}</span>
-    </div>
-  );
-}
-
-/**
- * WHO IS BETWEEN YOU AND YOUR PICK (Gameday, law 4). `view.upcoming` is the engine's own
- * lookahead — the same list `picksUntilYours` and `formatYourTurn` already read — and until now
- * the room spent it entirely on one sentence ("You're up in 6 picks"). The order itself is the
- * fact a veteran is actually watching: it is how you know whether the two managers ahead of you
- * are the ones who take running backs.
+ * The queue is what the lower third's "Queued" cell names, and this is the rail where it can be
+ * re-ordered — an `<ol>` because position IS the meaning, and named move/remove buttons because
+ * drag reordering is not keyboard-operable. A queued player somebody has since taken is struck
+ * through rather than removed: the engine skips them on autopick anyway, and silently vanishing
+ * rows is how a plan stops feeling like yours.
  *
- * `upcoming[0]` is the seat currently ON the clock (`picksUntilYours` returns 0 for it), so the
- * strip starts at index 1 and numbers each seat from `view.pickNumber`. Your own seat carries ink
- * against everyone else's muted; nothing here is coloured, because a turn order is a sequence and
- * not a magnitude.
+ * THE BAND IS ALWAYS RESERVED (`h-10`), empty or not. Inside the room frame the nothing-reflows
+ * law beats the nothing-to-say law — the D2 precedent `PickWire`'s own band already set — so
+ * starring your first player never shoves the board up ten pixels.
  *
- * Desktop only. Below `lg` the dock is already carrying the clock echo, the primary slot and the
- * queue in a wrapping row, and a seventh band there would be the D1 overflow class all over again.
+ * The empty state is the one sentence this rail owes a manager, and it quotes C3's sanctioned
+ * safety-net phrase verbatim: nothing else in the room says what happens if the clock beats you.
  */
-function OnDeck({
-  view,
-  teams,
-  myTeamId,
-}: {
-  readonly view: DraftStateView;
-  readonly teams: readonly TeamCard[];
-  readonly myTeamId: string | null;
-}) {
-  if (view.phase !== "in_progress") return null;
-  const byId = new Map(teams.map((team) => [team.id, team] as const));
-  const next = view.upcoming.slice(1, 1 + DRAFT_ROOM_CONFIG.dock.onDeckSeats);
-  if (next.length === 0) return null;
+function QueueRail({ queue, playersById, draftedIds, busy, onChange }: QueueRailProps) {
   return (
-    <div data-testid="on-deck" className="hidden min-w-0 flex-col gap-0.5 lg:flex">
-      <span className={`${MICRO_LABEL} text-text-faint`}>On deck</span>
-      <ol className="flex min-w-0 items-center gap-3">
-        {next.map((teamId, index) => (
-          <li key={`${teamId}:${index}`} className="flex min-w-0 items-baseline gap-1.5">
-            <span className="shrink-0 font-mono text-xs tabular-nums text-text-faint">{`#${view.pickNumber + index + 1}`}</span>
-            <span className={`min-w-0 max-w-32 truncate text-sm ${teamId === myTeamId ? "font-semibold text-text-primary" : "text-text-muted"}`}>
-              {byId.get(teamId)?.name ?? "Someone"}
-            </span>
-          </li>
-        ))}
-      </ol>
+    <div className="flex min-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-line px-4 lg:h-10">
+      {queue.length === 0 ? (
+        // `id="dock-queue"` (Task 4, R3): the anchored `RoomTour`'s "The queue" stop points here.
+        // Carried on BOTH this empty-state sentence and the populated rail below, on purpose —
+        // the target must exist whether or not a manager has queued anyone yet, so opening the
+        // tour with an empty queue still anchors instead of falling back to the modal.
+        <p id="dock-queue" className="min-w-0 py-1.5 text-xs text-text-muted lg:truncate lg:py-0">
+          Star players in the pool. The room picks for you from your queue if your clock runs out.
+        </p>
+      ) : (
+        <div id="dock-queue" className="flex min-w-0 items-center gap-2">
+          <span aria-hidden="true" className={`${MICRO_LABEL} shrink-0 text-text-faint`}>
+            Queue
+          </span>
+          {/* `[contain:layout]` — D1 (2026-08-26 design review): at 360px the first chip's box
+              leaked past this list's `overflow-x-auto` clip into the PAGE's scrollable overflow,
+              panning the whole room sideways into a 186px void. Layout containment makes this
+              list its own formatting root, so nothing it lays out can ever contribute to an
+              ancestor's scrollable overflow. */}
+          <ol aria-label="Your queue" className="flex min-w-0 items-center gap-2 overflow-x-auto [contain:layout]">
+            {queue.map((playerId, index) => {
+              const name = playerName(playersById, playerId);
+              const player = playersById.get(playerId);
+              const drafted = draftedIds.has(playerId);
+              return (
+                // `group/chip` is the reveal surface for this chip's own controls (review E8):
+                // opacity-only, gated on @media(hover:hover), so touch keeps every control visible
+                // and the chip's width never changes — the D1 containment above stays honest.
+                <li
+                  key={playerId}
+                  className="group/chip flex shrink-0 items-center gap-1 rounded-pill border border-line bg-surface-raised py-0.5 pl-2 pr-1"
+                >
+                  <span className="font-mono text-xs tabular-nums text-text-faint">{index + 1}</span>
+                  {player === undefined ? null : <PositionBadge position={player.position} size="sm" />}
+                  <span className={`max-w-32 truncate font-display text-sm font-semibold ${drafted ? "text-text-muted line-through" : "text-text-primary"}`}>
+                    {name}
+                  </span>
+                  {drafted ? <span className="sr-only">Already drafted</span> : null}
+                  <Button size="sm" variant="ghost" className={CHIP_REVEAL} disabled={busy} aria-label={`Move ${name} up`} onClick={() => onChange(moveInQueue(queue, playerId, -1))}>
+                    <span aria-hidden="true">←</span>
+                  </Button>
+                  <Button size="sm" variant="ghost" className={CHIP_REVEAL} disabled={busy} aria-label={`Move ${name} down`} onClick={() => onChange(moveInQueue(queue, playerId, 1))}>
+                    <span aria-hidden="true">→</span>
+                  </Button>
+                  <Button size="sm" variant="ghost" className={CHIP_REVEAL} disabled={busy} aria-label={queueButtonLabel(name, true)} onClick={() => onChange(removeFromQueue(queue, playerId))}>
+                    <span aria-hidden="true">×</span>
+                  </Button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
     </div>
   );
 }
@@ -274,109 +187,54 @@ function OnDeck({
 const POOL_TARGET_ID = "player-pool";
 
 /**
- * E3 (2026-08-26 design review): below `lg` the pool linearizes after the WHOLE board — a
- * 6,100-10,300px scroll from the sticky dock — so "Your pick. Take somebody from the pool."
- * pointed at content nowhere near the screen. This button closes that gap without adding a
- * second nav: `lg:hidden` because at `lg+` the pool is its own always-visible rail
- * (`RoomLayout`), where the affordance would point at something already in view. Gated on
- * `canAct` (below) — this is an on-turn shortcut, not a standing nav item, so it never
- * competes with the dock's other bands the rest of the time.
+ * THE VERB WHEN YOUR QUEUE CANNOT SUPPLY ONE. On your turn with nothing draftable queued there
+ * is still exactly one act available, and it is choosing: this scrolls the pool into view and
+ * puts the cursor in its search box, at every width. Below `lg` that is a long journey (the pool
+ * linearizes after the whole board); at `lg`+ the pool is already beside you and this is simply
+ * the fastest way into it.
+ *
+ * It wears the amber verb because it IS the act the strip is waiting on, and law 6 says the
+ * lower third is where the verb lives. It is never rendered off your turn.
  */
-function JumpToPoolButton() {
+function PickFromPoolButton() {
   const reducedMotion = usePrefersReducedMotion();
   return (
     <Button
-      variant="ghost"
-      size="sm"
-      className="lg:hidden"
+      size="lg"
+      variant="verb"
+      data-testid="dock-verb"
       onClick={() => {
-        document.getElementById(POOL_TARGET_ID)?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+        const pool = document.getElementById(POOL_TARGET_ID);
+        pool?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+        pool?.querySelector("input")?.focus();
       }}
     >
-      Jump to the pool
+      Pick from the pool
     </Button>
   );
 }
 
 /**
- * The dock's left edge: the one thing to do right now. On your turn it is a single button
- * that drafts the top of your queue — one click if you planned. With nothing draftable queued
- * it points at the pool instead of pretending there is a button; the pool is already under
- * your left hand. Off your turn it is the standing answer to "when am I up?".
- */
-function PrimarySlot({
-  canAct,
-  owesPick,
-  actionLabel,
-  targetId,
-  targetName,
-  submitting,
-  onAct,
-  yourTurn,
-}: {
-  readonly canAct: boolean;
-  /** True when this team owes a pick from an earlier skip (Task 5) — checked only once
-   *  `canAct` (this team's REAL current turn) has already had its say below. */
-  readonly owesPick: boolean;
-  readonly actionLabel: string;
-  readonly targetId: string | null;
-  readonly targetName: string;
-  readonly submitting: boolean;
-  readonly onAct: (playerId: string) => void;
-  /** The standing line off your turn — the wait estimate, or the phase's own quiet fallback. */
-  readonly yourTurn: string | null;
-}) {
-  if (canAct && targetId !== null) {
-    return (
-      // `verb`, not the ceremonial ink pill (Gameday, law 5): this is the same act the pool
-      // repeats on every row, spelled once more at the size the moment deserves. `primary` is
-      // *"the thing a page exists to do once"*, and a draft is sixteen of these.
-      <Button size="lg" variant="verb" loading={submitting} className="max-w-80 shrink-0 truncate" onClick={() => onAct(targetId)}>
-        {actionLabel} {targetName}
-      </Button>
-    );
-  }
-  // `basis-full lg:basis-auto` (the same "give the growing term its own line" containment
-  // `room-rail.tsx`'s own masthead already applies, NEW-3, and `QueueChips` above now shares):
-  // below `lg:` the dock is still `flex-wrap`, and an unqualified `shrink-0` on a display-size
-  // sentence held it to a SINGLE line beside `PrimarySlot`'s other siblings regardless of how
-  // little room was left, squeezing "Your pick. Take somebody from the pool." (and its two
-  // siblings below) into a sliver a few characters wide at a phone width — a real 360px defect
-  // this task's own e2e sweep of the room's mock dressing was the first to reach (every earlier
-  // draft-room spec's two-team fixture always put a real manager on the clock immediately, never
-  // several picks away with an empty queue, and never showed this exact turn-state banner at
-  // 360px either). `lg:shrink-0` keeps the desktop layout — a fixed-height dock row, nothing
-  // reflowing when the turn changes — untouched.
-  if (canAct) {
-    return (
-      <p data-testid="dock-primary-empty" className="basis-full self-center font-display text-display-sm font-semibold leading-display text-negative lg:basis-auto lg:shrink-0">
-        Your pick. Take somebody from the pool.
-      </p>
-    );
-  }
-  if (owesPick) {
-    // The skip's own courtesy (Task 5): no blame, no banner — the same primary slot every
-    // other turn state uses, saying the one thing this manager can do. The pool's own Draft
-    // buttons are what actually makes the pick; this is the standing answer to "what now?".
-    return (
-      <p data-testid="dock-owed-pick" className="basis-full self-center font-display text-display-sm font-semibold leading-display text-warning lg:basis-auto lg:shrink-0">
-        Your pick passed. Take it now.
-      </p>
-    );
-  }
-  return (
-    <p data-testid="dock-your-turn" className="basis-full self-center font-display text-display-sm font-semibold leading-display text-text-primary lg:basis-auto lg:shrink-0">
-      {yourTurn}
-    </p>
-  );
-}
-
-/**
- * The personal band along the bottom of the room: what I have planned, what I have filled,
- * when I am up, and — the instant it is my turn — the single button that acts on all of it.
- * Everything here is about ONE team: mine. The board above is about everybody's.
+ * THE ROOM'S LOWER THIRD (Sunday v5, law 6) — *"On the draft board that is the pick clock, who
+ * is queued, and Draft."* The dock had been a proto lower third since Gameday: a strip across
+ * the foot carrying the turn, the plan and the act. This converges it on the primitive's own
+ * anatomy — micro-label cells with hairline separators, the clock at display scale in the live
+ * channel, one amber verb last.
  *
- * Fixed height by construction (`lg:h-24`), so the morph between watching, acting and bidding
+ * WHAT MOVED HERE, AND WHY THAT IS A SUBTRACTION. The pick clock, the turn subject and the
+ * picks-until-yours figure all used to live in the RAIL, and the dock carried a second,
+ * phone-only echo of the clock because the rail scrolled away at 360px. One clock, one subject,
+ * one place — the echo, its `lg:hidden` gating and the `aria-hidden` duplication it needed are
+ * all gone, and the fact is now in the band a manager's hands are already resting on at every
+ * width. The five-seat "On deck" strip went with them: "Picks until yours" answers the question
+ * that strip was asked, in one figure instead of five truncated names.
+ *
+ * THE VERB IS ALWAYS PRESENT ON YOUR TURN and never present off it. With a live queue it drafts
+ * the top of it in one press; with nothing queued it takes you to the pool. Off your turn the
+ * strip carries no action at all, which is law 6's own diagnostic working as intended: there is
+ * genuinely no decision to make yet.
+ *
+ * Fixed height by construction (`lg:h-32`), so the morph between watching, acting and bidding
  * never moves the board a pixel.
  */
 export function RoomDock({
@@ -393,6 +251,10 @@ export function RoomDock({
   expectedBotPickSeconds = null,
   bidConsole = null,
 }: RoomDockProps) {
+  // Called unconditionally, before any branch — React's Rules of Hooks. This is the room's ONE
+  // clock now: the rail renders no countdown of its own.
+  const { remainingMs, now } = useCountdown(view.deadlineAt);
+
   const available = new Set(view.availablePlayerIds);
   // Before START_DRAFT the engine has no pool yet, so `availablePlayerIds` is empty — that is
   // "we don't know yet", not "everybody is gone". Same rule the pool follows.
@@ -400,45 +262,95 @@ export function RoomDock({
   const draftedIds = new Set(preStart ? [] : queue.filter((playerId) => !available.has(playerId)));
   const targetId = queue.find((playerId) => !draftedIds.has(playerId)) ?? null;
   // Task 5: does MY team owe a pick from an earlier skip? Checked off `view.owedPicks` (rides
-  // every payload — `DraftClockView`'s own docblock), never a second fetch. Quiet on purpose —
-  // a courtesy is not a hot turn, so it never flips `mode` the way `canAct` does below.
+  // every payload — `DraftClockView`'s own docblock), never a second fetch. A team that owes a
+  // pick may make it on any turn, so the verb is live for them off their own turn too.
   const owesPick = myTeamId !== null && (view.owedPicks?.[myTeamId]?.length ?? 0) > 0;
+  const canDraft = canAct || owesPick;
   const mode: DockMode = bidConsole !== null ? "bidding" : canAct ? "acting" : "watching";
+  const pausedUntil = view.pausedUntil ?? null;
+  const paused = pausedUntil !== null && now !== null && now < Date.parse(pausedUntil);
+  const live = view.phase === "in_progress" && !paused;
+  const turn = turnSummary(view, teams, playersById, myTeamId);
+  const untilYours = picksUntilYours(view.upcoming, myTeamId);
   // Task 10, finding 1: price practice opponents' turns at the seeded delay's expected value.
   const botSeats =
     expectedBotPickSeconds === null
       ? null
       : { ids: new Set(teams.filter((team) => team.isBot === true).map((team) => team.id)), pickSeconds: expectedBotPickSeconds };
-  // E11 (fixed at Task 10's persona checkpoint): before kickoff there is no board to watch —
-  // the standing line says what the room is actually doing, and the rail above says when.
-  // MERGE of both lanes' E11 fixes: the mock lane threads `botSeats` so a practice room's ETA
-  // uses the bots' real think-delay midpoint (Task 10 fix 1), and the design lane's fix pass
-  // ruled the live-board fallback is NOTHING rather than "Watching the board." (E11 — a sentence
-  // over a board with nothing to say is noise). Pre-start keeps its honest kickoff line.
-  const standingLine = formatYourTurn(view.upcoming, myTeamId, view.clockSeconds, view.pausedUntil ?? null, botSeats) ?? (preStart ? "Waiting for kickoff." : null);
+  const wait = formatWaitEstimate(view.upcoming, myTeamId, view.clockSeconds, pausedUntil, botSeats);
+
+  const cells: LowerThirdCell[] = [];
+  if (view.phase === "scheduled") {
+    cells.push({ label: "Draft", value: "Not started" });
+  } else if (view.phase === "complete") {
+    cells.push({ label: "Draft", value: "Every roster is final" });
+  } else {
+    cells.push({
+      label: turn.mine ? "Your pick" : turn.label,
+      // Law 3: a manager is an object, and the face travels with the name onto every surface
+      // that draws him. `Avatar` renders a `<span>`, so it nests legally inside the cell's own
+      // value span; it is decorative, because the name is right beside it.
+      value: (
+        <span className="inline-flex items-center gap-2">
+          {turn.team === null ? null : <Avatar name={turn.team.ownerDisplayName} avatar={turn.team.ownerAvatarUrl} size="sm" />}
+          <span className="truncate">{turn.mine ? "You" : turn.subject}</span>
+        </span>
+      ),
+    });
+    if (untilYours !== null && untilYours > 0) {
+      cells.push({
+        label: untilYours === 1 ? "Pick until yours" : "Picks until yours",
+        // The figure is the fact; the estimate is its caption. `formatWaitEstimate` is the same
+        // derivation the room's own "You're up in 6 picks (~5m)" sentence uses, so a practice
+        // room's bot-priced wait can never disagree with itself between two renderings.
+        value: (
+          <>
+            {untilYours}
+            {wait === null ? null : <span className={`${MICRO_LABEL} ml-1.5 align-middle font-sans text-text-faint`}>{wait}</span>}
+          </>
+        ),
+      });
+    }
+    cells.push({
+      label: targetId === null ? "Queued" : "Drafts next",
+      value: targetId === null ? "Nobody" : playerName(playersById, targetId),
+    });
+    if (!paused && remainingMs !== null) {
+      cells.push({ label: "Pick clock", value: formatCountdown(remainingMs), clock: true });
+    }
+  }
+
+  const verb =
+    bidConsole ??
+    (!canDraft ? null : targetId !== null ? (
+      // `verb`, not the ceremonial ink pill (law 5): this is the same act the pool repeats on
+      // every row, spelled once more at the size the moment deserves. `primary` is *"the thing a
+      // page exists to do once"*, and a draft is sixteen of these.
+      <Button size="lg" variant="verb" data-testid="dock-verb" loading={submitting} className="max-w-80 shrink-0 truncate" onClick={() => onAct(targetId)}>
+        {actionLabel} {playerName(playersById, targetId)}
+      </Button>
+    ) : (
+      <PickFromPoolButton />
+    ));
 
   return (
-    <footer
-      data-testid="room-dock"
-      data-mode={mode}
-      className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t border-line bg-surface-elevated px-4 py-2 lg:h-24 lg:flex-nowrap"
-    >
-      {bidConsole ?? (
-        <PrimarySlot
-          canAct={canAct}
-          owesPick={owesPick}
-          actionLabel={actionLabel}
-          targetId={targetId}
-          targetName={targetId === null ? "" : playerName(playersById, targetId)}
-          submitting={submitting}
-          onAct={onAct}
-          yourTurn={standingLine}
-        />
-      )}
-      <OnDeck view={view} teams={teams} myTeamId={myTeamId} />
-      <DockClock view={view} teams={teams} playersById={playersById} myTeamId={myTeamId} />
-      {canAct ? <JumpToPoolButton /> : null}
-      <QueueChips queue={queue} playersById={playersById} draftedIds={draftedIds} busy={submitting} onChange={onQueueChange} />
+    <footer data-testid="room-dock" data-mode={mode} className="flex shrink-0 flex-col border-t border-line bg-surface-elevated lg:h-32">
+      <QueueRail queue={queue} playersById={playersById} draftedIds={draftedIds} busy={submitting} onChange={onQueueChange} />
+      {/* `id="room-clock"` (Task 4, R3): the anchored `RoomTour`'s "The clock" stop points here.
+          It moved off the rail with the clock itself, and it is a better anchor than the one it
+          replaces — the strip renders in every phase, where the rail's old clock wrapper existed
+          only while a draft was actually running, so the tour now anchors in a scheduled room
+          instead of silently falling back to its modal. */}
+      <div id="room-clock" className="flex min-h-0 flex-1 flex-col justify-center">
+        <LowerThird cells={cells} action={verb} live={live} />
+      </div>
+      {/* The clock's digits are `aria-hidden` inside the strip, so the turn and the time left are
+          both spoken here instead — one polite region for the coarse remaining time, one static
+          sentence for whose turn it is. */}
+      <p className="sr-only" aria-live="polite">
+        {remainingMs === null || paused ? null : formatCoarseRemaining(remainingMs)}
+      </p>
+      <p className="sr-only">{turn.sentence}</p>
       <RosterFill view={view} myTeamId={myTeamId} />
     </footer>
   );

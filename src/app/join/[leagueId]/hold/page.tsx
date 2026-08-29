@@ -29,6 +29,12 @@ function pageIntent(leagueId: string): string {
   return `/join/${leagueId}/hold`;
 }
 
+/** When this league drafts, in one line — read once, spent by the masthead's own signed-out
+ *  branch and by the signed-in strip's "Drafts" cell, never written twice. */
+function draftLine(preview: NonNullable<Awaited<ReturnType<typeof publicLeaguePreview>>>): string {
+  return preview.startTrigger === "when_full" ? "As soon as it fills" : preview.draftAt;
+}
+
 /**
  * THE SEAT MASTHEAD (Gameday, laws 2 and 4) — the same block for both branches of this page,
  * written once because a signed-out visitor and a signed-in member are looking at the identical
@@ -48,16 +54,27 @@ function pageIntent(leagueId: string): string {
  * No tint on the figure and no `Stat`: a count of open seats sits inside no stated population,
  * and rule 1 permits a magnitude colour only where the comparison is genuine.
  */
-function SeatMasthead({ preview }: { readonly preview: NonNullable<Awaited<ReturnType<typeof publicLeaguePreview>>> }) {
+function SeatMasthead({
+  preview,
+  timing,
+}: {
+  readonly preview: NonNullable<Awaited<ReturnType<typeof publicLeaguePreview>>>;
+  /** The draft-timing line, or null when the page's own lower third is carrying it instead
+   *  (the signed-in branch). The signed-out interstitial has no strip of its own — its action
+   *  is `SeatHoldPanel`'s hold-and-sign-in flow — so it keeps the line here. */
+  readonly timing: string | null;
+}) {
   const open = Math.max(0, preview.teamCount - preview.filledTeams - preview.heldSeats);
   return (
     <div className="flex flex-col gap-4 border-b border-line pb-6">
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+        {/* The draft-timing line moves to the lower third at the foot wherever there IS one
+            (Sunday v5, law 6): it is a fact the decision rests on, and the strip is where those
+            sit. Stating it in both places would be the same fact twice on a screen with one
+            decision on it. */}
         <div className="flex min-w-0 flex-col gap-1">
           <PageTitle>{preview.name}</PageTitle>
-          <p className="font-mono text-xs tabular-nums text-text-muted">
-            {preview.startTrigger === "when_full" ? "Starts as soon as it fills" : `Drafts ${preview.draftAt}`}
-          </p>
+          {timing === null ? null : <p className="font-mono text-xs tabular-nums text-text-muted">{`Drafts ${timing}`}</p>}
         </div>
         <div className="flex shrink-0 items-baseline gap-2">
           <span data-testid="hold-seats-open" className="font-mono text-display-xl font-semibold tabular-nums leading-display text-text-primary">
@@ -104,7 +121,7 @@ export default async function SeatHoldPage({ params }: PageProps) {
             and only the decision card takes a measure. It was a 400px column centred in a
             1600px screen — 75% of the page carrying nothing at all. */}
         <main className="flex w-full flex-col gap-6 p-4">
-          <SeatMasthead preview={preview} />
+          <SeatMasthead preview={preview} timing={draftLine(preview)} />
           <div className="max-w-xl">
             <SeatHoldPanel leagueId={leagueId} leagueName={preview.name} />
           </div>
@@ -129,10 +146,13 @@ export default async function SeatHoldPage({ params }: PageProps) {
   return (
     <AppShell user={shellUser} rail={rail} liveState={liveState}>
       <main className="flex w-full flex-col gap-6 p-4">
-        <SeatMasthead preview={preview} />
-        <div className="max-w-xl">
-          <SeatConfirmPanel leagueId={leagueId} leagueName={preview.name} houseRung={preview.houseRung} />
-        </div>
+        <SeatMasthead preview={preview} timing={null} />
+        <SeatConfirmPanel
+          leagueId={leagueId}
+          leagueName={preview.name}
+          draftLine={draftLine(preview)}
+          houseRung={preview.houseRung}
+        />
       </main>
     </AppShell>
   );

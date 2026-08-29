@@ -2,9 +2,8 @@
 
 import { useMemo } from "react";
 import type { CountdownTone } from "@/components/ui/countdown";
-import { Avatar, Badge, Button, ErrorState, PositionBadge, Skeleton } from "@/components/ui";
-import { Countdown, useCountdown } from "@/components/ui/countdown";
-import { MICRO_LABEL } from "@/components/ui/config";
+import { Avatar, Button, ErrorState, LowerThird, Skeleton, type LowerThirdCell } from "@/components/ui";
+import { formatCoarseRemaining, formatCountdown, useCountdown } from "@/components/ui/countdown";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { rosterSpots } from "../state/format";
 import { useDraftRoom } from "../hooks/use-draft-room";
@@ -26,12 +25,29 @@ import { RoomRail } from "./room-rail";
 /**
  * The party clock's tone rule (review E5), as arithmetic a test can pin at the exact boundary:
  * hot at `hotThresholdMs` remaining ON THE NOSE (`<=`, so 30,000ms is hot and 30,001 is calm),
- * calm with no clock at all. Time-based, never mine-based — a TV has no "me", and rule 1 says
- * a clock in its final seconds is red for everyone in the room.
+ * calm with no clock at all. Time-based, never mine-based — a TV has no "me", and a clock in its
+ * final seconds is urgent for everyone in the room.
+ *
+ * SUNDAY v5 CHANGED WHAT IT SPENDS, not when it fires. The party clock is now ALWAYS drawn in the
+ * live channel (a running draft clock is the purest "happening right now" this product has), so
+ * "hot" can no longer be a colour step — there is nowhere redder for it to go. It spends the
+ * micro-label instead: the strip's clock cell renames itself "Final seconds", which reads across a
+ * room at a glance and survives a viewer who cannot tell the two reds apart anyway.
  */
 export function spotlightClockTone(remainingMs: number | null): CountdownTone {
   return remainingMs !== null && remainingMs <= DRAFT_ROOM_CONFIG.tv.hotThresholdMs ? "hot" : "default";
 }
+
+/**
+ * The TV's own sizes inside the shared `LowerThird` anatomy. The primitive draws a cell value at
+ * `text-xl` and its clock at `text-display-lg`, which is right for a laptop and small for a wall:
+ * law 3 is "readable from the sofa", and this surface is the one where the sofa is literal. The
+ * value slot is a `ReactNode` precisely so a caller can spend its own scale inside it — the same
+ * carve-out `RoomRail`'s `RAIL_EYEBROW`/`LEAGUE_TEXT` maps already make for this variant, and it
+ * reaches no shared primitive's internals to do it.
+ */
+const TV_VALUE = "font-display text-display-lg font-extrabold leading-display";
+const TV_CLOCK = "font-display text-display-2xl font-extrabold leading-none tabular-nums";
 
 export function TvBoard({ draftId }: { readonly draftId: string }) {
   const room = useDraftRoom(draftId);
@@ -64,15 +80,42 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
   const view = room.view;
   const teamsMap = teamsById(room.teams);
   const onClock = view.onClockTeamId === null ? null : (teamsMap.get(view.onClockTeamId) ?? null);
-  // Rule 1: clocks and live are the negative family — the band's clock goes hot for everyone in
-  // the final `DRAFT_ROOM_CONFIG.tv.hotThresholdMs`, the same way the room rail's own countdown
-  // goes hot for whoever's turn it is (`turnSummary`'s `mine`). A TV has no "me", so the trigger
-  // here is time, not identity.
+  // The final `DRAFT_ROOM_CONFIG.tv.hotThresholdMs` renames the clock's own micro-label rather
+  // than recolouring digits that are already in the live channel — see `spotlightClockTone`.
   const spotlightHot = spotlightClockTone(remainingMs) === "hot";
-  const lastPick = room.lastPick;
   // The room's whole shape, from the payload: one pick per roster spot per seat.
   const totalPicks = view.draftOrder.length * rosterSpots(view.slotConfig);
-  const lastPickPlayer = lastPick === null ? null : (playersById.get(lastPick.pick.playerId) ?? null);
+
+  // THE PARTY'S LOWER THIRD (Sunday v5, law 6). It carries the three things a room full of people
+  // is actually watching — who is picking, how far in the draft is, and how long is left — and no
+  // verb at all, which is law 6's diagnostic answering honestly: nobody acts from across a living
+  // room, and this screen's own invariant is that no control on it is ever clickable.
+  const cells: LowerThirdCell[] = [];
+  if (onClock !== null) {
+    cells.push({
+      label: "Now picking",
+      value: (
+        <span className="inline-flex items-center gap-3">
+          <Avatar name={onClock.ownerDisplayName} avatar={onClock.ownerAvatarUrl} size="lg" />
+          <span className={TV_VALUE}>{onClock.name}</span>
+        </span>
+      ),
+    });
+  }
+  cells.push({
+    // Law 1's own pairing: the count means something because the total sits beside it.
+    // `picks × seats` is arithmetic on the payload, never a projection; zero seats (an undrawn
+    // order) prints the count alone rather than a divide-by-nothing.
+    label: "Picks in",
+    value: <span className={TV_VALUE}>{totalPicks === 0 ? view.picks.length : `${view.picks.length} of ${totalPicks}`}</span>,
+  });
+  if (remainingMs !== null) {
+    cells.push({
+      label: spotlightHot ? "Final seconds" : "Pick clock",
+      value: <span className={TV_CLOCK}>{formatCountdown(remainingMs)}</span>,
+      clock: true,
+    });
+  }
 
   return (
     <div className="flex min-h-dvh flex-col text-lg lg:h-dvh lg:min-h-0 lg:overflow-hidden">
@@ -89,66 +132,10 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-6 lg:overflow-hidden">
         <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
 
-        {/* A plain <section>, not <Card>: `data-*` attributes are not part of `CardProps`, and
-            the spotlight needs a stable test hook. Its label is "Now picking", not "On the
-            clock": the rail above already carries that phrase, and saying the same thing twice
-            on one screen is what made the old room feel confusing. What this panel adds is the
-            FACE — the owner's portrait, readable across a room.
-            Task 2 (review E6): the band folds in the two facts that used to sit elsewhere on the
-            TV — the countdown (E5, moved out of the rail entirely, see `RoomRail`) and the last
-            pick landed, restated quietly at glance scale. This is the TV's one dense fact-band
-            now, not a mostly-empty restatement of the rail. */}
-        <section data-testid="spotlight" className="flex shrink-0 items-center gap-4 rounded-lg border border-line bg-surface-elevated px-6 py-4 shadow-card">
-          {onClock === null ? null : <Avatar name={onClock.ownerDisplayName} avatar={onClock.ownerAvatarUrl} size="lg" />}
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-sm tracking-wide text-text-muted">Now picking</p>
-            <p className="font-display text-display-lg font-semibold leading-display text-text-primary">{onClock?.name ?? "Nobody"}</p>
-            {onClock === null ? null : <Badge tone="neutral">{onClock.ownerDisplayName}</Badge>}
-          </div>
-          {/* THE DRAFT'S OWN PROGRESS, AS A NUMBER (Gameday, law 2). A television is read from
-              across a room and the one question a spectator has that the board itself cannot
-              answer at a glance is "how far in are we". `picks × seats` is arithmetic on the
-              payload, never a projection; zero seats (an undrawn order) prints the count alone
-              rather than a divide-by-nothing. */}
-          <div className="mr-6 hidden shrink-0 flex-col items-end lg:flex">
-            <span data-testid="tv-progress" className="font-mono text-display-sm font-semibold tabular-nums leading-display text-text-primary">
-              {totalPicks === 0 ? view.picks.length : `${view.picks.length} of ${totalPicks}`}
-            </span>
-            <span className={`${MICRO_LABEL} text-text-faint`}>picks in</span>
-          </div>
-          <div className="ml-auto flex flex-col items-end gap-1">
-            {remainingMs === null ? null : (
-              // THE PARTY'S ONE CLOCK, AT THE PARTY'S OWN SCALE (law 2). It rendered at `lg`
-              // (44px) — the size the ROOM's rail uses, on a surface designed to be read from a
-              // sofa — while the display scale carries 84 and 116 above it. `xl` is the step the
-              // TV earns without the digits outgrowing the band the spotlight holds them in.
-              <Countdown remainingMs={remainingMs} size="xl" tone={spotlightHot ? "hot" : "default"} data-testid="spotlight-countdown" />
-            )}
-            {/* The wire underneath already carries the newest pick's ink (`PickWire`'s own
-                docblock); this is a restatement at glance scale, so the player name stays
-                muted rather than repeating that emphasis — one fact earns ink per view.
-                Skipped, same as `PickWire`'s own `wireEntries`, when the player id hasn't
-                resolved yet (a resync gap) — never a guessed name or a `RosterSlotType` value
-                (which includes FLEX/BENCH) masquerading as a `PositionBadge`'s `Position`. */}
-            {lastPick === null || lastPickPlayer === null ? null : (
-              <div className="flex items-center gap-2">
-                {/* Founder directive 2026-08-26 ("why aren't we showing the players picture?"):
-                    the same face-beside-name pattern the onClock owner already gets above, at
-                    the spotlight's own `lg` size — decorative, the name text beside it already
-                    says who this is. */}
-                <Avatar name={lastPickPlayer.name} avatar={lastPickPlayer.headshotUrl} size="lg" />
-                <p data-testid="spotlight-last-pick" className="flex items-center gap-1 whitespace-nowrap text-sm text-text-muted">
-                  {`#${lastPick.pick.pickNumber} ${lastPickPlayer.name}`}
-                  <PositionBadge position={lastPickPlayer.position} size="sm" />
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-
         {/* R1 (2026-08-26 design review): the same band the room runs, at the TV's own scale —
             the crowd across the room gets the draft's recent history without a second glance
-            at a laptop. */}
+            at a laptop. It is also why the strip below carries no "last pick" cell any more:
+            this line already names the newest pick, in ink, one row up. */}
         <PickWire view={view} teams={room.teams} playersById={playersById} players={room.players} variant="tv" />
 
         <DraftBoard
@@ -159,6 +146,19 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
           landedPickNumber={room.lastPick?.pick.pickNumber ?? null}
           variant="tv"
         />
+      </div>
+      {/* THE SPOTLIGHT MOVED TO THE FOOT AND BECAME THE LOWER THIRD (Sunday v5, law 6). It was a
+          bordered card between the rail and the board — a second masthead under the first, and
+          the widest thing on the screen that was not the board. As a strip across the foot it
+          costs the board nothing above it, and it is where a broadcast has always put the clock,
+          the subject and the state of play. */}
+      <div data-testid="spotlight" className="shrink-0">
+        <LowerThird cells={cells} live={view.phase === "in_progress"} />
+        {/* The strip's digits are `aria-hidden` inside the primitive, so the time left is spoken
+            here — coarsely, on a boundary crossing rather than every tick. */}
+        <p className="sr-only" aria-live="polite">
+          {remainingMs === null ? null : formatCoarseRemaining(remainingMs)}
+        </p>
       </div>
     </div>
   );
