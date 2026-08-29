@@ -329,8 +329,8 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
          * Nothing here changes what is rendered, only where — every card, every prop, every
          * decision this page offers is exactly what it was.
          */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
-          <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
+          <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
             <SubjectCard subject={subject} />
 
             <Card>

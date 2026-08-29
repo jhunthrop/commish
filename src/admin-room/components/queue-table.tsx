@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { EmptyState, Table, type TableColumn } from "@/components/ui";
+import { ButtonLink, EmptyState, LowerThird, Table, type TableColumn } from "@/components/ui";
+import { ChapterBand } from "@/components/ui/chapter-band";
 import { UI_CONFIG } from "@/components/ui/config";
 import { Icon } from "@/components/ui/icon";
 import type { QueueRow } from "@/integrity/queue-view";
@@ -63,6 +64,26 @@ function formatWaited(iso: string, now: number): string {
  *  here for the same reason it is private there. */
 function plural(count: number, unit: string): string {
   return `${count} ${unit}${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * The queue's two chapters, split on the boundary the age column already rounds to: a day.
+ *
+ * A FILTER, NEVER A SORT (ruling 30). `rows` arrives ordered `raised_at ASC` and every row over a
+ * day old necessarily precedes every row under it, so partitioning preserves the caller's order
+ * exactly — `Array.prototype.filter` twice, and no comparator anywhere in this file. That is the
+ * whole reason the split is legal on a surface whose defining discipline is "oldest first, with
+ * nothing ranked by how serious it looks": this re-ranks nothing, it only NAMES a boundary the
+ * order had already put the rows on either side of.
+ *
+ * The boundary is `UI_CONFIG.countdown.coarseRemainingDayMs`, the same constant `formatWaited`
+ * rounds against, so the band and the cell beneath it can never disagree about what "1 day"
+ * means.
+ */
+function splitByAge(rows: readonly QueueRow[], now: number): { readonly overdue: readonly QueueRow[]; readonly fresh: readonly QueueRow[] } {
+  const dayMs = UI_CONFIG.countdown.coarseRemainingDayMs;
+  const isOverdue = (row: QueueRow): boolean => now - new Date(row.raisedAt).getTime() >= dayMs;
+  return { overdue: rows.filter(isOverdue), fresh: rows.filter((row) => !isOverdue(row)) };
 }
 
 /** Built per render rather than declared once, because the age column is relative to NOW and a
@@ -140,7 +161,12 @@ export function QueueTable({ rows, nextHref = null }: QueueTableProps) {
   // ONE instant for the whole table (see `columnsAsOf`). A Server Component render on a
   // `force-dynamic` page, so this is server time — never a client clock that could disagree with
   // the ordering the query established.
-  const columns = columnsAsOf(Date.now());
+  const now = Date.now();
+  const columns = columnsAsOf(now);
+  const { overdue, fresh } = splitByAge(rows, now);
+  // The next item to act on, which is the oldest one, because that is the only order this queue
+  // has. `rows` is already `raised_at ASC`, so it is simply the head.
+  const oldest = rows[0];
 
   return (
     <div className="flex flex-col gap-3">
@@ -155,7 +181,35 @@ export function QueueTable({ rows, nextHref = null }: QueueTableProps) {
           }
         />
       ) : (
-        <Table caption="Open flags" columns={columns} rows={rows} rowKey={(row) => row.flagId} empty={null} />
+        <div className="flex flex-col">
+          {/* SUNDAY v5, LAW 5 — chapter markers, not hairlines. The split is the ONE fact this
+              queue already holds and never said out loud: how long a question has been waiting.
+              Oldest-first ordering makes the partition free (`splitByAge` filters, it never
+              sorts), so ruling 30's discipline is untouched — nothing is re-ranked, nothing is
+              graded by how serious it looks, and a band is only ever drawn over rows that exist.
+              The bands say the CONSEQUENCE in plain words, which is the half of law 5 that does
+              the work: an operator arriving mid-column learns what the rows beneath share.
+
+              THE OVERDUE PLATE IS `warn`, NOT `live`, AND THE DISTINCTION IS LAW 4's. Red means
+              "happening right now, and nothing else ever" — a flag raised yesterday is not an
+              event in the present tense, it is a clock that has run long, and amber-orange is
+              exactly the channel v5 reserves for that ("a tightening clock", deliberately a
+              separate hue from the furniture amber). Nothing on an operator surface is live, and
+              spending the live channel here is how it stops meaning anything on the surfaces
+              where something genuinely is. */}
+          {overdue.length === 0 ? null : (
+            <>
+              <ChapterBand name="Waited over a day" consequence="Somebody has been waiting since yesterday" tone="warn" />
+              <Table caption="Flags waiting over a day" columns={columns} rows={overdue} rowKey={(row) => row.flagId} empty={null} />
+            </>
+          )}
+          {fresh.length === 0 ? null : (
+            <>
+              <ChapterBand name="Fresh" consequence="Raised today" />
+              <Table caption="Flags raised today" columns={columns} rows={fresh} rowKey={(row) => row.flagId} empty={null} />
+            </>
+          )}
+        </div>
       )}
       {/* A real navigation carrying `?before=` (reads with no JavaScript at all, the same
           discipline `ActivityFeed`'s own `Show older` link holds to) — never client-side
@@ -165,6 +219,30 @@ export function QueueTable({ rows, nextHref = null }: QueueTableProps) {
         <Link className="text-accent underline" href={nextHref}>
           Load more
         </Link>
+      )}
+
+      {/* SUNDAY v5, LAW 6 — a queue with a next item to act on ends in a lower third; a clear
+          queue does not. That conditional IS the law's own diagnostic applied honestly rather
+          than a strip drawn for symmetry: when there is nothing waiting there is no decision, so
+          the page ends on its empty state and stops talking.
+
+          The verb is "Open the oldest" because oldest-first is this queue's whole discipline
+          (ruling 30) and the strip is where a discipline becomes an act. The count carries a "+"
+          the moment a cursor says there are more flags than this page holds — law 7: a page's own
+          row count is not the queue's depth, and printing it as though it were would be a number
+          we cannot stand behind. */}
+      {oldest === undefined ? null : (
+        <LowerThird
+          cells={[
+            { label: "Open flags", value: nextHref === null ? String(rows.length) : `${rows.length}+` },
+            { label: "Waiting longest", value: formatWaited(oldest.raisedAt, now) },
+          ]}
+          action={
+            <ButtonLink href={`/app/admin/queue/${oldest.flagId}`} variant="verb">
+              Open the oldest
+            </ButtonLink>
+          }
+        />
       )}
     </div>
   );

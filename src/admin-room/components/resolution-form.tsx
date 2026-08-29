@@ -249,8 +249,23 @@ export function ResolutionForm({ flagId, decisions, noteMaxLength, previews, isC
         </p>
       )}
 
+      {/* SUNDAY v5 — THE BUTTON REPORTS WHAT THE CHOSEN DECISION DOES.
+          It was `destructive` unconditionally: blood red on an operator's routine act, including
+          "No action", which is the default selection and takes nothing away from anybody. A
+          control that is red whatever you picked is not a warning, it is wallpaper, and the one
+          time red should have meant something an operator had already stopped seeing it.
+
+          `verb` (the amber act) when the decision removes nothing, `destructive` when it warns a
+          member, removes their words or puts a trade back. Colour is never the only channel here
+          and never was: the sentence directly above states "This cannot be taken back" in every
+          state, and the preview beside it prints the exact notice the member receives. */}
       <div>
-        <Button type="submit" variant="destructive" loading={submitting} disabled={submitting || decision === null}>
+        <Button
+          type="submit"
+          variant={decision === null || decision === "no_action" ? "verb" : "destructive"}
+          loading={submitting}
+          disabled={submitting || decision === null}
+        >
           Submit decision
         </Button>
       </div>
