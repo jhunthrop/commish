@@ -42,6 +42,24 @@ export function yetToPlayCount(side: MatchupSide): number {
 }
 
 /**
+ * The same count, with the one gate that makes it true on a week that has ended: ONCE THE WEEK IS
+ * FINAL, NOBODY HAS ANYTHING LEFT TO PLAY.
+ *
+ * Found by looking at the rendered page rather than by reading the code (Sunday v5). A starter
+ * with no stat line is "yet to play" while the afternoon is still running, and after the week
+ * settles the identical row means something entirely different — he was inactive, he was on a bye,
+ * the feed never carried him. Printing "8 to play" in the LIVE ink under a `Final` badge is the
+ * same class of lie `NOT_STARTED_DASH` exists to stop, told in the other direction: it promises
+ * points that can no longer arrive.
+ *
+ * The gate lives here rather than at three call sites because all three ask the identical
+ * question, and the one that forgot would be the one on the screen a manager reads on Sunday.
+ */
+export function remainingToPlay(side: MatchupSide, weekStatus: MatchupSummary["weekStatus"]): number {
+  return weekStatus === "final" ? 0 : yetToPlayCount(side);
+}
+
+/**
  * What this side left on its bench — the sum of every bench player who actually scored, or `null`
  * when nobody on the bench has played yet.
  *
@@ -108,6 +126,28 @@ export function marginSentence(matchup: MatchupSummary, myTeamId: string | null)
     return winning ? `You are up ${margin}.` : `You are down ${margin}.`;
   }
   return `${homeLeads ? homeTeamName : awayTeamName} leads by ${margin}.`;
+}
+
+/**
+ * The margin as the DELTA IT IS, from the viewer's own seat: positive while they lead, negative
+ * while they trail. `null` when either score is missing — a margin needs two real numbers, never a
+ * guess against a dash.
+ *
+ * LAW 1, AND WHY THIS EXISTS BESIDE `marginSentence` RATHER THAN REPLACING IT. *"Every number is a
+ * delta, not a fact"*: a lower third's job is to carry the comparison, and `+3.00` is the
+ * comparison stated as a figure a reader can scan a column of. `marginSentence` is the same
+ * arithmetic written as a sentence, which is the right form inside a card's own prose line and the
+ * wrong one in a strip of tabular cells — the two callers want different registers of one fact,
+ * which is exactly the case for two functions over one subtraction rather than one function and a
+ * formatting flag.
+ *
+ * A viewer with no team in this matchup gets the HOME side's delta, the same seat every other
+ * mine/theirs derivation on this surface gives them.
+ */
+export function signedMargin(matchup: MatchupSummary, myTeamId: string | null): number | null {
+  const { homeScore, awayScore, awayTeamId } = matchup;
+  if (homeScore === null || awayScore === null) return null;
+  return awayTeamId === myTeamId ? awayScore - homeScore : homeScore - awayScore;
 }
 
 /** A `MatchupDetail`'s own `MatchupSummary` shape, so `marginSentence` can be handed either. The

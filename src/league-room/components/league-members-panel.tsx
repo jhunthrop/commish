@@ -1,7 +1,6 @@
 import type { LeagueMemberCard } from "../contract";
-import { Avatar, Badge, Button, EmptyState, InfoTip, SeatMeter } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, SeatMeter } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
-import type { HelpLevel } from "@/identity/preferences";
 import type { LeagueAuthority } from "@/league-service/authority";
 import { TIER_COMPOSITION_LABEL, type CompositionCategory } from "@/participation/composition";
 
@@ -21,7 +20,6 @@ export interface LeagueMembersPanelProps {
    * "count omits" reasoning `teamCount` already follows.
    */
   readonly compositionCategory?: CompositionCategory;
-  readonly helpLevel?: HelpLevel;
 }
 
 /**
@@ -41,15 +39,16 @@ export interface LeagueMembersPanelProps {
  * silent. The line above the roster states the fact instead of leaving it to be inferred from
  * an absence.
  */
-export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, compositionCategory, helpLevel }: LeagueMembersPanelProps) {
+export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, compositionCategory }: LeagueMembersPanelProps) {
   return (
     <section className="flex flex-col gap-2" aria-label="League members">
       <h2 className="text-sm font-medium text-text-muted">Managers</h2>
       {authority.kind === "house" ? (
         <p className="flex items-center gap-2 text-sm text-text-muted">
           <Icon name="shield" size={16} />
-          Run by Commish
-          <InfoTip term="house-league" helpLevel={helpLevel} />
+          {/* NO TIPS (founder ruling, 2026-08-28): the "house league" definition was a click
+              away behind a trigger. What it said is what these six words now say. */}
+          Run by Commish, not by a manager playing in it
         </p>
       ) : null}
       {teams.length === 0 ? (

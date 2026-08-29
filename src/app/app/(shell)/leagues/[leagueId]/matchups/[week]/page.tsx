@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
-import { leagueHome, matchupWeek } from "@/league-service";
+import { leagueHome, lineupView, matchupWeek } from "@/league-service";
+import { leagueAct } from "@/lib/leagues/next-act";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { TeamStandingsRow } from "@/league-room/contract";
 import type { RecordsByTeamId } from "@/league-room/components/matchup-hero";
@@ -52,16 +53,28 @@ export default async function MatchupWeekPage({ params }: PageProps) {
   const body = await matchupWeek(getDb(), leagueId, weekNumber, user.id, getReferenceCache());
   if (body === null) notFound();
 
+  // LAW 6's verb, for the lower third at the foot of this page. The lineup read is the same one
+  // `LeaguePage` makes, for the same reason: `leagueAct` distinguishes "set your lineup" from "fix
+  // your lineup" on whether every starter slot is filled, and a lower third that guessed between
+  // the two would put the wrong words on the one control the week is waiting on. It is the
+  // league's CURRENT week either way — a manager reading week 3 in December is still owed the act
+  // that is actually pending, not a verb about a week that has already settled.
+  const lineup = home.myTeamId === null ? null : await lineupView(getDb(), { leagueId, teamId: home.myTeamId, weekNumber: home.currentWeek });
+
   return (
     <>
       <PageTitle>{`${home.name} · Week ${weekNumber}`}</PageTitle>
       <WeekNav leagueId={leagueId} weekNumber={weekNumber} totalWeeks={body.totalWeeks} />
+      {/* WHERE THE NUMBERS COME FROM, said once, at the top. It used to be the last line on the
+          page; law 6 gives the FOOT of a screen to the lower third, and a provenance sentence
+          under a strip carrying the verb reads as an afterthought to the decision rather than a
+          caveat on the scores it is actually about. */}
+      <p className="text-sm text-text-muted">{liveScoringCopy()}</p>
       {body.matchups.length === 0 ? (
         <p className="text-text-muted">There are no matchups in this week yet.</p>
       ) : (
-        <LiveMatchupWeek leagueId={leagueId} body={body} records={recordsFrom(home.standings)} />
+        <LiveMatchupWeek leagueId={leagueId} body={body} records={recordsFrom(home.standings)} act={leagueAct(home, lineup)} />
       )}
-      <p className="text-sm text-text-muted">{liveScoringCopy()}</p>
     </>
   );
 }
@@ -77,9 +90,9 @@ export default async function MatchupWeekPage({ params }: PageProps) {
  * mean a second query for something already in hand.
  */
 function recordsFrom(standings: readonly TeamStandingsRow[]): RecordsByTeamId {
-  const records: Record<string, { wins: number; losses: number; ties: number }> = {};
+  const records: Record<string, RecordsByTeamId[string]> = {};
   for (const row of standings) {
-    records[row.teamId] = { wins: row.wins, losses: row.losses, ties: row.ties };
+    records[row.teamId] = { wins: row.wins, losses: row.losses, ties: row.ties, rank: row.rank, previousRank: row.previousRank };
   }
   return records;
 }

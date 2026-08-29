@@ -3,10 +3,9 @@
 import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { CreateLeagueBody } from "../contract";
-import { Button, InfoTip, Input, Select } from "@/components/ui";
+import { Button, Input, Select } from "@/components/ui";
 import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
-import type { HelpLevel } from "@/identity/preferences";
 import { MATCHMAKING_CONFIG, SIT_AND_GO_GRACE_MINUTES } from "@/matchmaking/config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
@@ -163,7 +162,6 @@ function AdvancedSettingsDrawer({
   onStartTriggerChange,
   stakeTier,
   onStakeTierChange,
-  helpLevel,
 }: {
   readonly format: string;
   readonly onFormatChange: (value: string) => void;
@@ -180,7 +178,6 @@ function AdvancedSettingsDrawer({
   readonly onStartTriggerChange: (value: string) => void;
   readonly stakeTier: string;
   readonly onStakeTierChange: (value: string) => void;
-  readonly helpLevel?: HelpLevel;
 }) {
   return (
     // `border-edge`, never `border-line`: a disclosure is a control a user must find, not a
@@ -191,12 +188,17 @@ function AdvancedSettingsDrawer({
         <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => onFormatChange(event.target.value)} />
         <Select label="Teams" options={TEAM_COUNTS} value={teamCount} onChange={(event) => onTeamCountChange(event.target.value)} />
         <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => onScoringPresetChange(event.target.value)} />
-        <div className="flex flex-col gap-1">
-          <Select label="Roster shape" options={ROSTER_SHAPE_OPTIONS} value={rosterShape} onChange={(event) => onRosterShapeChange(event.target.value)} />
-          <span className="flex items-center gap-1">
-            <InfoTip term="superflex" helpLevel={helpLevel} />
-          </span>
-        </div>
+        {/* NO TIPS (founder ruling, 2026-08-28): the superflex definition sat under this field
+            as a lone trigger with no words beside it, which is the worst form of the pattern — a
+            button a reader has to press to find out what it is even about. It is a `hint` now, so
+            the field says what it does at the moment somebody is choosing. */}
+        <Select
+          label="Roster shape"
+          options={ROSTER_SHAPE_OPTIONS}
+          value={rosterShape}
+          hint="Superflex lets a second quarterback start in the flex, which makes quarterbacks worth far more."
+          onChange={(event) => onRosterShapeChange(event.target.value)}
+        />
         {format === "auction" ? (
           <Input
             label="Auction budget"
@@ -207,18 +209,13 @@ function AdvancedSettingsDrawer({
           />
         ) : null}
         {visibility === "public" ? (
-          <div className="flex flex-col gap-1">
-            <Select
-              label="Draft start"
-              options={START_TRIGGERS}
-              value={startTrigger}
-              hint={START_TRIGGER_HINT}
-              onChange={(event) => onStartTriggerChange(event.target.value)}
-            />
-            <span className="flex items-center gap-1">
-              <InfoTip term="sit-and-go" helpLevel={helpLevel} />
-            </span>
-          </div>
+          <Select
+            label="Draft start"
+            options={START_TRIGGERS}
+            value={startTrigger}
+            hint={START_TRIGGER_HINT}
+            onChange={(event) => onStartTriggerChange(event.target.value)}
+          />
         ) : null}
         <Select label="Stake tier" options={STAKE_TIERS} value={stakeTier} onChange={(event) => onStakeTierChange(event.target.value)} />
         <p className="text-sm text-text-muted sm:col-span-2">{MATCHMAKING_CONFIG.stakeDisclosure}</p>
@@ -268,11 +265,8 @@ function AdvancedSettingsDrawer({
  */
 export function CreateLeagueForm({
   onCreated,
-  helpLevel,
 }: {
   readonly onCreated: (created: CreateLeagueBody) => void;
-  /** Forwarded the same way `LineupEditor` takes it — `InfoTip` defaults to click-only when omitted. */
-  readonly helpLevel?: HelpLevel;
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const [name, setName] = useState("");
@@ -373,7 +367,6 @@ export function CreateLeagueForm({
         onStartTriggerChange={setStartTrigger}
         stakeTier={stakeTier}
         onStakeTierChange={setStakeTier}
-        helpLevel={helpLevel}
       />
 
       {/* SECONDARY, deliberately (page-audit harness, 2026-08-27): this form lives inside the

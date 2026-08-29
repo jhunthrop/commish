@@ -66,9 +66,9 @@ function headerFacts(home: LeagueHomeBody): string {
  * interface does that this band did not.
  */
 function recordsFrom(standings: LeagueHomeBody["standings"]): RecordsByTeamId {
-  const records: Record<string, { wins: number; losses: number; ties: number }> = {};
+  const records: Record<string, RecordsByTeamId[string]> = {};
   for (const row of standings) {
-    records[row.teamId] = { wins: row.wins, losses: row.losses, ties: row.ties };
+    records[row.teamId] = { wins: row.wins, losses: row.losses, ties: row.ties, rank: row.rank, previousRank: row.previousRank };
   }
   return records;
 }
@@ -218,7 +218,7 @@ export function LeagueHome({
       ) : null}
 
       {promoteLineupEditor ? (
-        <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} helpLevel={helpLevel} draftStatus={home.draftStatus} />
+        <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} draftStatus={home.draftStatus} />
       ) : null}
 
       <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
@@ -318,7 +318,6 @@ export function LeagueHome({
       <StandingsTable
         rows={home.standings}
         myTeamId={home.myTeamId}
-        helpLevel={helpLevel}
         medianGame={home.medianGame}
         playoffTeams={playoffTeams ?? undefined}
       />
@@ -337,7 +336,7 @@ export function LeagueHome({
           it first, right below the header. One rule, read once, at the top of this component;
           there is no second, per-page copy of it down here. */}
       {lineup === null || promoteLineupEditor ? null : (
-        <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} helpLevel={helpLevel} draftStatus={home.draftStatus} />
+        <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} draftStatus={home.draftStatus} />
       )}
 
       {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
@@ -359,7 +358,7 @@ export function LeagueHome({
         not just a cosmetic one: a screen reader's headings list would carry the league's name
         twice for one fact. See `LeagueTermsPanel`'s own docblock.
       */}
-      <LeagueTermsPanel terms={home.terms} helpLevel={helpLevel} titleAs="p" />
+      <LeagueTermsPanel terms={home.terms} titleAs="p" />
 
       <LeagueMembersPanel
         teams={home.teams}
@@ -367,7 +366,6 @@ export function LeagueHome({
         authority={home.authority}
         myTeamId={home.myTeamId}
         compositionCategory={home.compositionCategory}
-        helpLevel={helpLevel}
       />
 
       {/* `id="invite-managers"`: `WaitingRoom`'s own "Invite someone" link (Task 8, a `when_full`

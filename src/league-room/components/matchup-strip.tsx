@@ -4,7 +4,7 @@ import { Crest, NOT_STARTED_DASH } from "@/components/ui";
 import { LiveMarker } from "@/components/ui/live-marker";
 import { Icon } from "@/components/ui/icon";
 import { formatPoints } from "../lib/format";
-import { yetToPlayCount } from "../lib/matchup-facts";
+import { remainingToPlay } from "../lib/matchup-facts";
 
 /** The score, or the product's one glyph for "there is no number yet". */
 function scoreText(score: number | null): string {
@@ -70,7 +70,7 @@ export function MatchupStrip({ matchups, children }: {
       {matchups.map((matchup) => {
         const { home, away } = matchup;
         const decided = home.score !== null && away.score !== null;
-        const left = yetToPlayCount(home) + yetToPlayCount(away);
+        const left = remainingToPlay(home, matchup.weekStatus) + remainingToPlay(away, matchup.weekStatus);
         return (
           <li key={`${home.teamId}:${away.teamId}`} className="border-b border-line last:border-b-0">
             <details className="group">

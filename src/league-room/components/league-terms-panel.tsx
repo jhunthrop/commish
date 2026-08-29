@@ -1,26 +1,27 @@
-import { Avatar, Card, EYEBROW, InfoTip, SeatMeter } from "@/components/ui";
+import { Avatar, Card, EYEBROW, SeatMeter } from "@/components/ui";
 import type { DraftFormat } from "@/domain/league";
-import type { TermKey } from "@/help/glossary";
-import type { HelpLevel } from "@/identity/preferences";
 import type { LeagueTerms } from "@/league";
 
-const FORMAT_LABEL: Readonly<Record<DraftFormat, string>> = { snake: "Snake", auction: "Auction" };
-const FORMAT_TERM: Readonly<Record<DraftFormat, TermKey>> = { snake: "snake-draft", auction: "auction-draft" };
+/** NO TIPS (founder ruling, 2026-08-28): the format used to read "Snake" beside a trigger that
+ *  defined "snake draft". The noun is now the whole word, which is what the trigger was for. */
+const FORMAT_LABEL: Readonly<Record<DraftFormat, string>> = { snake: "Snake draft", auction: "Auction draft" };
 
 /**
- * `scoringLabel` is a derived string (`describeScoring`, `@/scoring`), not a `TermKey`. Every
- * label it can produce gets an `InfoTip` except "Standard" — that one is already plain English —
- * mirroring `open-league-shared.tsx`'s own `SCORING_LABEL_TERM`
- * (`@/league-room/components/open-league-shared`), which this deliberately duplicates rather
- * than shares: the two modules render two different contracts (`PublicLeagueSummary` and
- * `LeagueTerms`) that happen to carry the same string values, and a shared map would couple them
- * for no reason beyond four lines.
+ * `scoringLabel` is a derived string (`describeScoring`, `@/scoring`), not a term key. Every label
+ * it can produce used to carry an `InfoTip` except "Standard"; the founder ruling retired the
+ * triggers, so THE RULE ITSELF IS PRINTED instead — one clause, beside the label, in the words a
+ * manager would use. That is the ruling's own instruction ("change the word") rather than a
+ * deletion: a scoring name is the one term on this panel a reader genuinely cannot infer, and
+ * dropping the definition without replacing it would have made the panel less true, not quieter.
+ *
+ * A label with nothing to add ("Standard", or a name this map has never seen) renders alone.
  */
-const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
-  PPR: "ppr",
-  "Half PPR": "half-ppr",
-  "PPR, TE premium": "te-premium",
-  Custom: "custom-scoring",
+const SCORING_RULE: Readonly<Record<string, string>> = {
+  PPR: "a point for every catch",
+  "Half PPR": "half a point for every catch",
+  "PPR, TE premium": "a point for every catch, and more for a tight end's",
+  Standard: "no points for catches",
+  Custom: "this league wrote its own",
 };
 
 /**
@@ -33,11 +34,9 @@ const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
  */
 export function LeagueTermsPanel({
   terms,
-  helpLevel,
   titleAs: Title = "h2",
 }: {
   readonly terms: LeagueTerms;
-  readonly helpLevel?: HelpLevel;
   /**
    * `Card`'s own `as` idiom, one remove out. `"h2"` (the default, used unchanged on `JoinForm`)
    * is the real, primary heading for that page's content — the invite page's own `PageTitle`
@@ -66,10 +65,7 @@ export function LeagueTermsPanel({
       <dl className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Format</dt>
-          <dd className="inline-flex items-center gap-1 text-text-primary">
-            {FORMAT_LABEL[terms.format]}
-            <InfoTip term={FORMAT_TERM[terms.format]} helpLevel={helpLevel} />
-          </dd>
+          <dd className="text-text-primary">{FORMAT_LABEL[terms.format]}</dd>
         </div>
         {/* Veteran persona review, fix round 1: the money fact is what a real-money decision
             reads first — Stake moves to position 2, right after Format, label and disclosure
@@ -77,10 +73,7 @@ export function LeagueTermsPanel({
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Stake</dt>
           <dd className="flex flex-col gap-1 text-text-primary">
-            <span className="inline-flex items-center gap-1">
-              {terms.stakeLabel}
-              <InfoTip term="stake-tier" helpLevel={helpLevel} />
-            </span>
+            <span>{terms.stakeLabel}</span>
             <span className="text-sm text-text-muted">{terms.stakeDisclosure}</span>
           </dd>
         </div>
@@ -94,10 +87,10 @@ export function LeagueTermsPanel({
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Scoring</dt>
-          <dd className="inline-flex items-center gap-1 text-text-primary">
-            {terms.scoringLabel}
-            {SCORING_LABEL_TERM[terms.scoringLabel] === undefined ? null : (
-              <InfoTip term={SCORING_LABEL_TERM[terms.scoringLabel]!} helpLevel={helpLevel} />
+          <dd className="flex flex-col gap-1 text-text-primary">
+            <span>{terms.scoringLabel}</span>
+            {SCORING_RULE[terms.scoringLabel] === undefined ? null : (
+              <span className="text-sm text-text-muted">{SCORING_RULE[terms.scoringLabel]}</span>
             )}
           </dd>
         </div>

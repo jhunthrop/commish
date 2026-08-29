@@ -141,7 +141,7 @@ export function checklistItems(params: {
     body: "A higher choice wins more often than luck alone.",
     content:
       params.slotPreference !== null ? (
-        <SlotPreferencePanel leagueId={params.leagueId} initialPreference={params.slotPreference} helpLevel={params.helpLevel} />
+        <SlotPreferencePanel leagueId={params.leagueId} initialPreference={params.slotPreference} />
       ) : params.rankHref !== undefined ? (
         <Link href={params.rankHref} className="text-sm font-medium text-accent underline">
           Rank your slots in the league room

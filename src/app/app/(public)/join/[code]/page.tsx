@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { readPreferences } from "@/identity-service/preferences";
 import { PageTitle } from "@/components/ui";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
@@ -63,17 +62,15 @@ function stateFor(preview: Awaited<ReturnType<typeof invitePreview>>): InviteLan
  * regardless of session, because this route never gets `AppShell`'s own chrome either way and a
  * footer's trust links cost a signed-in visitor nothing.
  *
- * `readPreferences` (the same seed-on-first-read call the league home page makes) only runs when
- * there IS a caller: a signed-out visitor has no preferences row and must not seed one. Their
- * `InfoTip`s open `guided` unconditionally, exactly as `/browse`'s do and for the same reason —
- * a stranger deciding whether to join benefits most from more explanation, not less.
+ * THE `readPreferences` READ IS GONE (Sunday v5, the no-tips ruling). Its one consumer was the
+ * `helpLevel` this page handed `InviteLanding` so a guided reader's `InfoTip`s opened inline, and
+ * the founder retired the tips ("the UX should explain itself, we shouldn't need tips"). A read
+ * whose only output nothing renders is a query, a seeded row for a first-time visitor, and a
+ * promise in a `Promise.all` for nothing.
  */
 export default async function JoinPage({ params }: PageProps) {
   const [user, { code }] = await Promise.all([getCurrentUser(), params]);
-  const [preferences, preview] = await Promise.all([
-    user === null ? Promise.resolve(null) : readPreferences(getDb(), user),
-    invitePreview(getDb(), code),
-  ]);
+  const preview = await invitePreview(getDb(), code);
   // This page's own current path — its `PublicBar`'s sign-in link and `InviteLanding`'s own
   // `SignInLink` both return here (Task 16, F6).
   const pageIntent = `/app/join/${code}`;
@@ -98,7 +95,6 @@ export default async function JoinPage({ params }: PageProps) {
           state={stateFor(preview)}
           signedIn={user !== null}
           code={code}
-          helpLevel={preferences?.helpLevel ?? "guided"}
           balanceAfterUsd={balanceAfterUsd}
         />
       </main>

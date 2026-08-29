@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ActivityRow } from "@/integrity/activity-view";
-import { EmptyState, InfoTip } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 
 export interface ActivityFeedProps {
@@ -17,10 +17,6 @@ function formatOccurredAt(iso: string): string {
 }
 
 function ActivityRowItem({ row }: { readonly row: ActivityRow }) {
-  // `"clock"` is the icon ONLY `renderDraftPick`'s clock-ran-out branch uses
-  // (`src/integrity/activity-view.ts`) — the one headline that says "from their queue" to a
-  // reader who may never have seen an autopick before.
-  const isQueueAutopick = row.icon === "clock";
   return (
     // GAMEDAY, LAW 4. This row was `py-4` around a three-line stack — icon, headline, detail, and
     // the timestamp last, at the bottom of a block whose height depended on how long the sentence
@@ -46,7 +42,6 @@ function ActivityRowItem({ row }: { readonly row: ActivityRow }) {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <p className="break-words text-sm text-text-primary">
           {row.headline}
-          {isQueueAutopick ? <InfoTip term="queue" className="ml-1" /> : null}
         </p>
         {row.detail === null ? null : <p className="break-words text-sm text-text-muted">{row.detail}</p>}
       </div>

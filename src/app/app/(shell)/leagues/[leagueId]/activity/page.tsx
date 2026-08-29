@@ -6,7 +6,7 @@ import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import { leagueNameFor } from "@/draft-service/teams";
 import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices, quoteFor } from "@/integrity-service/notify";
-import { InfoTip, PageTitle } from "@/components/ui";
+import { PageTitle } from "@/components/ui";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
@@ -88,7 +88,6 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
                   <p className="break-words font-medium text-text-primary">{notice.title}</p>
                   <p className="break-words text-sm text-text-muted">
                     {notice.body}
-                    {notice.noticeType === "draft_auto_picked" ? <InfoTip term="queue" className="ml-1" /> : null}
                   </p>
                   {/* Fix round 1, FIX 7, as corrected: the author-facing PHRASE the stored
                       reason maps to (`quoteFor`), laid out as a real quotation rather than
