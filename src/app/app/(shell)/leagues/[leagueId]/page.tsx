@@ -4,7 +4,7 @@ import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { LEAGUE_CONFIG } from "@/league";
-import { leagueHome, lineupView } from "@/league-service";
+import { leagueHome, lineupView, matchupWeek } from "@/league-service";
 import { LeagueHome } from "@/league-room/components/league-home";
 import { leagueAct } from "@/lib/leagues/next-act";
 import { pageTitle } from "@/components/app-shell/page-metadata";
@@ -75,8 +75,17 @@ export default async function LeaguePage({ params, searchParams }: PageProps) {
   // is the reason this page no longer carries its own copy of the `nextAction` assembly.
   const act = leagueAct(home, lineup);
 
+  // The slate's read (founder, 2026-08-29): both lineups with per-player points, from the same
+  // matchupWeek the matchups page uses, narrowed to the viewer's own game. Only this tab pays it.
+  const week = home.myMatchup === null ? null : await matchupWeek(getDb(), leagueId, home.currentWeek, user.id);
+  const myMatchupDetail =
+    week === null || home.myTeamId === null
+      ? null
+      : week.matchups.find((m) => m.home.teamId === home.myTeamId || m.away.teamId === home.myTeamId) ?? null;
+
   return (
     <LeagueHome
+      myMatchupDetail={myMatchupDetail}
       home={home}
       lineup={lineup}
       helpLevel={preferences.helpLevel}

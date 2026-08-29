@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { LeagueHomeBody, LineupBody, MatchupSummary } from "../contract";
+import type { LeagueHomeBody, LineupBody, MatchupDetail, MatchupSummary } from "../contract";
 import { ButtonLink, Card, Crest, EYEBROW, LowerThird, Movement, PageTitle, PlayerFace, PositionBadge } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import { LeagueTabs, type LeagueTab } from "./league-tabs";
@@ -16,6 +16,7 @@ import { FreeAgentsBoard, type RosterPlayerRow } from "./free-agents-board";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupHero, type RecordsByTeamId } from "./matchup-hero";
+import { MatchupSlate } from "./matchup-slate";
 import { ModerationSummary } from "./moderation-summary";
 import { StandingsTable } from "./standings-table";
 import { WaitingRoom } from "./waiting-room";
@@ -159,6 +160,7 @@ export function LeagueHome({
   helpLevel,
   holdExpired = false,
   tab = "matchup",
+  myMatchupDetail = null,
   /**
    * The league's own `nextAction.kind` (F16), computed by `LeaguePage` (`src/app/app/(shell)/
    * leagues/[leagueId]/page.tsx`, exempt from the client boundary and the one place this room may
@@ -175,6 +177,10 @@ export function LeagueHome({
    *  tab; only the main column changes. Routes, not client state: /standings and /team pass
    *  their own value, the index passes nothing and gets the matchup. */
   readonly tab?: LeagueTab;
+  /** The viewer's own matchup with BOTH LINEUPS (founder, 2026-08-29: score by player, the ESPN
+   *  slate). Fetched by the matchup tab's page only — every other tab passes nothing and pays
+   *  nothing. */
+  readonly myMatchupDetail?: MatchupDetail | null;
   readonly home: LeagueHomeBody;
   readonly lineup: LineupBody | null;
   /** Forwarded from `LeaguePage`. Omitted only by tests that don't care about this branch —
@@ -334,8 +340,12 @@ export function LeagueHome({
           // crests. One matchup, two treatments, is exactly the "little changes here and there"
           // incoherence Gameday replaced. `records` is joined here from `home.standings`, which
           // this page already holds.
-          <Card className="flex flex-col gap-3">
+          <Card className="flex flex-col gap-4">
             <MatchupHero matchup={home.myMatchup} myTeamId={home.myTeamId} records={recordsFrom(home.standings)} />
+            {/* THE SLATE: the game, player by player, ESPN's mirror — the hero says the totals
+                and the slate says where they came from. Renders only when the page fetched the
+                detail, which is the matchup tab's own read. */}
+            {myMatchupDetail === null ? null : <MatchupSlate detail={myMatchupDetail} myTeamId={home.myTeamId} />}
           </Card>
         )}
         {/* Same visibility the retired "Score Week" button had: the commissioner's control is
