@@ -1,3 +1,4 @@
+import { LeagueTabs } from "@/league-room/components/league-tabs";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
@@ -73,6 +74,7 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
   return (
     <>
       <header className="flex flex-col gap-1">
+        <LeagueTabs leagueId={leagueId} active="activity" />
         <PageTitle>League activity</PageTitle>
         <p className="text-sm text-text-muted">{leagueName}</p>
       </header>

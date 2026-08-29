@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { LeagueHomeBody, LineupBody, MatchupSummary } from "../contract";
 import { ButtonLink, Card, Crest, EYEBROW, LowerThird, Movement, PageTitle, PlayerFace, PositionBadge } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
+import { LeagueTabs, type LeagueTab } from "./league-tabs";
 import type { HelpLevel } from "@/identity/preferences";
 import type { NextActionKind } from "@/league";
 import type { LeagueAct } from "@/lib/leagues/next-act";
@@ -16,7 +17,6 @@ import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupHero, type RecordsByTeamId } from "./matchup-hero";
 import { ModerationSummary } from "./moderation-summary";
 import { StandingsTable } from "./standings-table";
-import { TradeInboxLink } from "./trade-inbox-link";
 import { WaitingRoom } from "./waiting-room";
 import { WeekStatusBadge } from "./week-status-badge";
 
@@ -157,6 +157,7 @@ export function LeagueHome({
   lineup,
   helpLevel,
   holdExpired = false,
+  tab = "matchup",
   /**
    * The league's own `nextAction.kind` (F16), computed by `LeaguePage` (`src/app/app/(shell)/
    * leagues/[leagueId]/page.tsx`, exempt from the client boundary and the one place this room may
@@ -165,10 +166,14 @@ export function LeagueHome({
    * or a test that doesn't care) — the same "omit it, get the old behavior" contract every other
    * optional prop on this component already holds.
    */
-  nextActionKind = null,
   act = null,
   playoffTeams = null,
 }: {
+  /** Which room of the league this render is (founder, 2026-08-28: the tab-based center
+   *  viewport). The shell — masthead, tab rail, right rail, lower third — is identical on every
+   *  tab; only the main column changes. Routes, not client state: /standings and /team pass
+   *  their own value, the index passes nothing and gets the matchup. */
+  readonly tab?: LeagueTab;
   readonly home: LeagueHomeBody;
   readonly lineup: LineupBody | null;
   /** Forwarded from `LeaguePage`. Omitted only by tests that don't care about this branch —
@@ -193,7 +198,6 @@ export function LeagueHome({
   // condition is the SAME fact `nextAction`'s own `fix-lineup` branch reads (`myTeamId !== null`
   // is implied by `lineup !== null`, since `LeaguePage` only fetches a lineup for a caller with a
   // team); this page has nothing else to add.
-  const promoteLineupEditor = nextActionKind === "fix-lineup" && lineup !== null;
   // Step 3b (D4): see `DraftCompleteArrival`'s own docblock for why `home.currentWeek === 1` is
   // the derived "the season has no settled result yet" signal, and why `lineup`/`myMatchup` both
   // being present is the same "nothing to show a team-less commissioner" guard `promoteLineup
@@ -223,12 +227,10 @@ export function LeagueHome({
         ) : null}
       </Card>
 
+      <LeagueTabs leagueId={home.leagueId} active={tab} />
+
       {draftJustCompleted ? (
         <DraftCompleteArrival leagueId={home.leagueId} draftId={home.draftId} lineup={lineup!} matchup={home.myMatchup!} />
-      ) : null}
-
-      {promoteLineupEditor ? (
-        <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} draftStatus={home.draftStatus} />
       ) : null}
 
       <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
@@ -285,6 +287,12 @@ export function LeagueHome({
           full-bleed at the foot, outside both. */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] xl:items-start">
         <div className="flex min-w-0 flex-col gap-6">
+          {/* THE ROOMS OF THE LEAGUE (founder, 2026-08-28). Matchup is the game; Standings is
+              the table; My team is the decision surface (the lineup editor and its advisor,
+              which left the matchup tab because setting a lineup is not watching a game).
+              Trades and Activity keep their own routes and appear in the rail above. */}
+          {tab === "matchup" ? (
+            <>
       <section className="flex flex-col gap-2" aria-label={`${formatWeek(home.currentWeek)} matchup`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-3">
@@ -306,15 +314,6 @@ export function LeagueHome({
             <Link className="text-sm text-accent underline" href={`/app/leagues/${home.leagueId}/matchups/${home.currentWeek}`}>
               All matchups
             </Link>
-            {/* Task 10: the member-visible history this league's own home page had no way to
-                reach before — reachable from where a member already is, not by typing a url. */}
-            <Link className="text-sm text-accent underline" href={`/app/leagues/${home.leagueId}/activity`}>
-              League activity
-            </Link>
-            {/* Task 8: trading requires a team of the caller's own, same as `/trades` itself
-                (`TradesPage`'s own `myTeamId === null` 404) — a viewer with no team here would
-                open a link the page immediately refuses. */}
-            {home.myTeamId === null ? null : <TradeInboxLink leagueId={home.leagueId} />}
           </div>
         </div>
         {home.myMatchup === null ? (
@@ -341,6 +340,10 @@ export function LeagueHome({
       </section>
 
 
+            </>
+          ) : null}
+          {tab === "standings" ? (
+            <>
           <StandingsTable
             rows={home.standings}
             myTeamId={home.myTeamId}
@@ -348,11 +351,17 @@ export function LeagueHome({
             playoffTeams={playoffTeams ?? undefined}
           />
 
-          {lineup === null || promoteLineupEditor ? null : (
+            </>
+          ) : null}
+          {tab === "team" ? (
+            <>
+          {lineup === null ? null : (
             <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} draftStatus={home.draftStatus} />
           )}
 
           {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
+            </>
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">

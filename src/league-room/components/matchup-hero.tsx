@@ -1,6 +1,5 @@
 import type { MatchupSide, MatchupSummary } from "../contract";
 import { Crest, Movement, NOT_STARTED_DASH, Pill, PointsShareBar, Scoreboard } from "@/components/ui";
-import { MICRO_LABEL } from "@/components/ui/config";
 import { LiveMarker } from "@/components/ui/live-marker";
 import { formatPoints, formatRecord } from "../lib/format";
 import { benchPoints, remainingToPlay } from "../lib/matchup-facts";

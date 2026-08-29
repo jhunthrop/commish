@@ -6,8 +6,6 @@ import { LiveMarker } from "@/components/ui/live-marker";
 import { UI_CONFIG } from "@/components/ui/config";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
-import type { DraftFormat } from "@/domain/league";
-import type { TermKey } from "@/help/glossary";
 import { rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";

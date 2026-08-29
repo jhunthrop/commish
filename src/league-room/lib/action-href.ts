@@ -15,7 +15,9 @@ export function actionHref(league: Pick<HomeLeagueCard, "id" | "draftId" | "next
     return `/app/drafts/${league.draftId}`;
   }
   if (kind === "fix-lineup" || kind === "set-lineup") {
-    return `/app/leagues/${league.id}#lineup`;
+    // The tab split (founder, 2026-08-28): the lineup editor lives on the My team tab now, so the
+    // verb lands there — the #lineup anchor survives on the editor itself.
+    return `/app/leagues/${league.id}/team#lineup`;
   }
   return `/app/leagues/${league.id}`;
 }

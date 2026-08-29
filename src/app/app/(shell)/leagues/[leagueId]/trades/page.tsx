@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
+import { LeagueTabs } from "@/league-room/components/league-tabs";
 import { PageTitle } from "@/components/ui";
 import { leagueHome, matchupWeek } from "@/league-service";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
@@ -90,6 +91,7 @@ export default async function TradesPage({ params }: PageProps) {
   return (
     <>
       <header className="flex flex-col gap-1">
+        <LeagueTabs leagueId={leagueId} active="trades" />
         <PageTitle>Trades</PageTitle>
         <p className="text-sm text-text-muted">{home.name}</p>
         {/* Persona panel (commissioner, step 4): founder decision #6 ships immediate execution
