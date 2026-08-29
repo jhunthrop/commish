@@ -219,7 +219,7 @@ function DockClock({
   return (
     <div aria-hidden="true" data-testid="dock-clock" className="ml-auto flex shrink-0 flex-col items-end lg:hidden">
       <Countdown remainingMs={remainingMs} size="md" tone={turn.mine ? "hot" : "default"} />
-      <span className={`${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>{turn.label}</span>
+      <span className={`${EYEBROW} ${turn.mine ? "text-live" : "text-text-muted"}`}>{turn.label}</span>
     </div>
   );
 }
@@ -349,7 +349,7 @@ function PrimarySlot({
   // reflowing when the turn changes — untouched.
   if (canAct) {
     return (
-      <p data-testid="dock-primary-empty" className="basis-full self-center font-display text-display-sm font-semibold leading-display text-negative lg:basis-auto lg:shrink-0">
+      <p data-testid="dock-primary-empty" className="basis-full self-center font-display text-display-sm font-semibold leading-display text-live lg:basis-auto lg:shrink-0">
         Your pick. Take somebody from the pool.
       </p>
     );

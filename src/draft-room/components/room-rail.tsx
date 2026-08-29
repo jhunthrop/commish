@@ -119,13 +119,18 @@ const TURN_SUBJECT_TEXT: Readonly<Record<"mine" | "theirs", string>> = {
 };
 
 /**
- * The rail's whole visual morph, in one map. `hot` is the negative family, because the one
- * moment the room should stop being calm is the sixty seconds that belong to you.
+ * The rail's whole visual morph, in one map. `hot` is the LIVE family (Sunday v5's third
+ * channel), because the one moment the room should stop being calm is the sixty seconds that
+ * belong to you — and "happening right now" is exactly what that channel was split off to mean.
+ *
+ * Through v4 one red carried both "happening now" and "this is bad", so a running clock and a
+ * failed write wore the same pigment. v5 separates them: `live` is the clock, the on-the-clock
+ * cell and the hot rail; `negative` stays with the verdict pair and with genuine failure.
  */
 const MODE_SKIN: Readonly<Record<RoomMode, string>> = {
   scheduled: "border-line bg-surface-elevated",
   watching: "border-line bg-surface-elevated",
-  hot: "border-negative bg-negative/10",
+  hot: "border-live bg-live/10",
   complete: "border-line bg-surface-elevated",
 };
 
@@ -402,7 +407,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                 <Avatar name={turn.team.ownerDisplayName} avatar={turn.team.ownerAvatarUrl} size="sm" />
               )}
               <div className="flex min-w-0 flex-col">
-                <span className={`inline-flex items-center gap-1 ${RAIL_EYEBROW[variant]} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
+                <span className={`inline-flex items-center gap-1 ${RAIL_EYEBROW[variant]} ${turn.mine ? "text-live" : "text-text-muted"}`}>
                   {/* Rule 6, finally spent rather than merely obeyed (the spec's own words): the
                       clock genuinely is running out, and it is running out on YOU. The dot is
                       the product's existing live vocabulary (`animate-pulse-live`, built for the
@@ -412,7 +417,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                       manager is reading would trade legibility for energy, which is the exact
                       swap the spec's own test rejects. */}
                   {turn.mine && !reducedMotion ? (
-                    <span data-testid="on-clock-pulse" aria-hidden="true" className="size-1.5 shrink-0 rounded-pill bg-negative animate-pulse-live" />
+                    <span data-testid="on-clock-pulse" aria-hidden="true" className="size-1.5 shrink-0 rounded-pill bg-live animate-pulse-live" />
                   ) : null}
                   {turn.label}
                   {/* An auction's "Live bid"/"Nominating" states aren't the on-the-clock rule

@@ -240,10 +240,16 @@ function MineRoomRow({ room }: { readonly room: MyMockRoomSummary }) {
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          {/* The status as a chip rather than a second sentence: a state you read off a colour
-              and a shape is law 1's whole point, and `StatPill` is the product's one
-              state-chip vocabulary. `in_progress` is the only one that is live. */}
-          <StatPill label={STATUS_LABEL[room.status]} tone={room.status === "in_progress" ? "negative" : "neutral"} />
+          {/* The status as a chip rather than a second sentence. `in_progress` is the only one
+              that is genuinely happening now, so it is the only one that takes the LIVE channel
+              (Sunday v5, law 4) — a filled plate in live red, the same shape the storefront's own
+              chapter bands wear. Everything else is a quiet neutral chip: a finished mock draft
+              is a record, and a record is grey. */}
+          {room.status === "in_progress" ? (
+            <span className={`${MICRO_LABEL} rounded-sm bg-live px-2 py-0.5 font-semibold text-live-text`}>{STATUS_LABEL.in_progress}</span>
+          ) : (
+            <StatPill label={STATUS_LABEL[room.status]} tone="neutral" />
+          )}
           {/* LAW 5: a room still drafting is an ACT you return to, and it wears the verb; a
               finished or waiting room is a thing you look at, and its way in stays quiet. A bare
               underlined green link was neither — it spent the money channel on navigation. */}
