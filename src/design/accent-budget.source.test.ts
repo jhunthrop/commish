@@ -59,6 +59,14 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   // already names as a place where green MEANS something, in the one file that draws it. The
   // dot's live sibling is `bg-negative` and needs no exemption.
   "src/components/app-shell/league-rail.tsx",
+  // SUNDAY v5 (2026-08-28), law 4. The lobby's segmented filter rail, earning its entry the way
+  // this docblock asks — in review, with a reason. Law 4 spends amber on "furniture and you and
+  // the verb", and a filter strip is furniture: the network's own graphics over the board, not a
+  // verdict and not an act. The ban's real target is a hand-rolled CTA (E8's eleven copies of one
+  // class string); this fill carries no act at all — every segment is a `<Link>` that reorders or
+  // narrows the same list. One file draws it, and a call site that hand-rolls the class still
+  // fails, which is the property the budget actually protects.
+  "src/league-room/components/browse-filters.tsx",
 ];
 
 /**

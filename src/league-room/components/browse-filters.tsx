@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RAIL_LABEL } from "@/components/ui/config";
 
 /**
  * Phase 3.6, Task 5, Step 4: the shelf's filter row, replacing the four-`Select` form this
@@ -41,9 +42,37 @@ export interface BrowseFiltersProps {
   readonly active: BrowseFilterOption;
 }
 
+/**
+ * SUNDAY v5 (2026-08-28): the row is a SEGMENTED RAIL, not four floating pills.
+ *
+ * The approved timing-tower render draws a lens as one joined strip of flat segments with the
+ * selected one filled — the shape a broadcast graphic has always used for "which view of the
+ * same board am I looking at". Four separate rounded pills say four independent toggles; these
+ * are mutually exclusive by construction (`ACTIVE_OPTION`), and the strip is what says so
+ * without a sentence.
+ *
+ * AMBER IS CORRECT HERE, and it is law 4 rather than an exception to it: the amber channel is
+ * *"furniture and you and the verb"*, and a filter row is furniture — the network's own graphics,
+ * not a verdict about a league and not an act. The `bg-accent` fill therefore earns its
+ * `accent-budget.source.test.ts` allowlist entry the way that file asks, in review with a reason.
+ * v3's ruling that a lens is "ink-bordered, never filled" was written under the rule where amber
+ * (then green) doubled as the one ink action; v5 split those (`accent` for furniture and the
+ * verb, the ink pill for the ceremonial act), so a filled segment can no longer be mistaken for
+ * this view's primary button.
+ *
+ * `RAIL_LABEL` is the caps charter's second sanctioned address — the condensed, tracked small
+ * caps the rail above this row already speaks in, imported never hand-rolled.
+ *
+ * Still plain `<Link>`s, still no client component: the URL remains the whole filter state.
+ */
+const SEGMENT = "px-3 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent";
+
 export function BrowseFilters({ active }: BrowseFiltersProps) {
   return (
-    <nav aria-label="Filter open leagues" className="flex flex-wrap gap-2">
+    <nav
+      aria-label="Filter open leagues"
+      className="flex w-fit max-w-full flex-wrap items-stretch overflow-hidden rounded-sm border border-edge bg-surface-elevated"
+    >
       {OPTIONS.map((option) => {
         const isActive = option.key === active;
         return (
@@ -51,15 +80,9 @@ export function BrowseFilters({ active }: BrowseFiltersProps) {
             key={option.key}
             href={option.href}
             aria-current={isActive ? "true" : undefined}
-            // Task 6 restyle (rules 4 and 5): quiet pills, structure from the hairline alone.
-            // Active is INK-BORDERED, never filled — a filter is a lens, not the view's one ink
-            // action — and the quiet pills answer hover with the same border darkening, no fill.
-            className={
-              "rounded-pill border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
-              (isActive
-                ? "border-text-primary text-text-primary"
-                : "border-line text-text-muted hover:border-text-muted hover:text-text-primary")
-            }
+            className={`${SEGMENT} ${RAIL_LABEL} border-l border-line first:border-l-0 ${
+              isActive ? "bg-accent text-accent-text" : "text-text-muted hover:bg-surface-raised hover:text-text-primary"
+            }`}
           >
             {option.label}
           </Link>
