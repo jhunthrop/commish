@@ -104,9 +104,13 @@ export function HoldsControl() {
         void beginConfirm("release");
       }}
     >
+      {/* SUBTRACTION (Sunday v5). The hint's second sentence was `OperatorTool`'s own `intent`
+          line restated eight inches lower, word for word — release pays the wallet, confiscate
+          forfeits to the platform. What survives is the one fact the intent does NOT carry: this
+          acts on the whole held balance, not on one payout. */}
       <Input
         label="Member id"
-        hint="Applies to the member's whole held balance. Release pays it to their wallet; confiscate forfeits it to the platform."
+        hint="Applies to the member's whole held balance."
         value={userId}
         onChange={(event) => {
           setUserId(event.target.value);

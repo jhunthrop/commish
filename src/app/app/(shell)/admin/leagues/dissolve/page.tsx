@@ -21,7 +21,7 @@ export default async function AdminDissolveLeaguePage() {
     return (
       <OperatorTool
         title="Dissolve league"
-        intent={"Close a league that did not fill before its draft. Every seated member is refunded their entry fee and told why."}
+        intent={"Close a league that did not fill before its draft. This cannot be undone. Every seated member is refunded their entry fee and told why."}
       >
         <DissolveLeagueControl />
       </OperatorTool>

@@ -175,9 +175,12 @@ export function SettleLeagueControl() {
         void beginConfirm();
       }}
     >
+      {/* SUBTRACTION (Sunday v5): this hint was `OperatorTool`'s own `intent` line restated on
+          the field below it, and a league id field needs no explanation of what settlement does.
+          The standings field keeps its hint, which teaches a real input format nothing else on
+          the page states. */}
       <Input
         label="League id"
-        hint="Pays the league's published prize table and closes its escrow."
         value={leagueId}
         onChange={(event) => {
           setLeagueId(event.target.value);

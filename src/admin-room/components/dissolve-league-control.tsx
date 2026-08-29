@@ -92,9 +92,12 @@ export function DissolveLeagueControl() {
         void beginConfirm();
       }}
     >
+      {/* SUBTRACTION (Sunday v5): the hint restated `OperatorTool`'s own `intent` line — closed
+          before its draft, every seated member refunded — and carried exactly one fact the
+          intent did not, that it cannot be undone. That fact moved up into the intent, where
+          the reader meets it before the field rather than beneath it. */}
       <Input
         label="League id"
-        hint="Closes the league for good, before its draft, and refunds every seated member."
         value={leagueId}
         onChange={(event) => {
           setLeagueId(event.target.value);
