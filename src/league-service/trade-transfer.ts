@@ -265,7 +265,7 @@ export interface TransferResult {
   readonly materializedLineupRows: number;
 }
 
-function toFilledRosterSlots(rows: readonly { readonly slot: string; readonly slotIndex: number; readonly playerId: string | null }[]): readonly FilledRosterSlot[] {
+export function toFilledRosterSlots(rows: readonly { readonly slot: string; readonly slotIndex: number; readonly playerId: string | null }[]): readonly FilledRosterSlot[] {
   return rows.flatMap((row) => (row.playerId === null ? [] : [{ slot: row.slot as RosterSlotType, slotIndex: row.slotIndex, playerId: row.playerId }]));
 }
 

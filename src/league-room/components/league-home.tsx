@@ -12,6 +12,7 @@ import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
 import { LeagueMembersPanel } from "./league-members-panel";
 import { LeagueTermsPanel } from "./league-terms-panel";
+import { FreeAgentsBoard, type RosterPlayerRow } from "./free-agents-board";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupHero, type RecordsByTeamId } from "./matchup-hero";
@@ -205,6 +206,13 @@ export function LeagueHome({
   // (fix round 1, F1) so its own terminal "Draft complete" panel suppresses itself for this same
   // window rather than stacking a second "draft complete" message under the arrival.
   const draftJustCompleted = home.draftStatus === "complete" && home.currentWeek === 1 && lineup !== null && home.myMatchup !== null;
+  /** Everyone this manager owns, as player objects — the Free agents board's drop list. */
+  const rosterPlayers: readonly RosterPlayerRow[] | null =
+    lineup === null
+      ? null
+      : [...lineup.starters, ...lineup.bench]
+          .map((slot) => playerOf(slot))
+          .filter((player): player is NonNullable<typeof player> => player !== null);
 
   return (
     <>
@@ -341,6 +349,14 @@ export function LeagueHome({
 
 
             </>
+          ) : null}
+          {tab === "players" ? (
+            <FreeAgentsBoard
+              leagueId={home.leagueId}
+              canClaim={home.myTeamId !== null && lineup !== null}
+              rosterFull={rosterPlayers !== null && lineup !== null && rosterPlayers.length >= lineup.starters.length + lineup.bench.length}
+              myRoster={rosterPlayers ?? []}
+            />
           ) : null}
           {tab === "standings" ? (
             <>

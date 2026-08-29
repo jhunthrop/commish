@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RAIL_LABEL } from "@/components/ui/config";
 
-export type LeagueTab = "matchup" | "standings" | "team" | "trades" | "activity";
+export type LeagueTab = "matchup" | "standings" | "team" | "players" | "trades" | "activity";
 
 /**
  * THE LEAGUE'S OWN RAIL (founder, 2026-08-28: "the center viewport should be a tab based
@@ -16,11 +16,10 @@ export type LeagueTab = "matchup" | "standings" | "team" | "trades" | "activity"
  * (`RAIL_LABEL`, amber here-marker), one level down, so the two rails read as one chrome system
  * at two scopes.
  *
- * TWO ABSENCES ARE DECISIONS. Chat is not a tab — it is ambient life and lives in the persistent
- * right rail on every tab. FREE AGENTS is not here because free agency does not exist yet: the
- * player pool is real, waiver claims are not, and the nav never advertises an empty room (the D3
- * rule Reviews and The Board already follow). It takes its place in this list the day the claim
- * flow ships.
+ * ONE ABSENCE IS A DECISION. Chat is not a tab — it is ambient life and lives in the persistent
+ * right rail on every tab. Free agents joined the day the claim flow shipped (2026-08-28, the
+ * same day it was declared absent — the founder built the room), keeping the no-empty-rooms rule
+ * honest in both directions. A player-detail route under /players keeps this tab's here-marker.
  *
  * "My team" and not "Roster": the manager's word for the thing, and the page carries the lineup
  * editor — which is a decision surface, not a list.
@@ -29,6 +28,7 @@ const TABS: readonly { readonly tab: LeagueTab; readonly label: string; readonly
   { tab: "matchup", label: "Matchup", segment: "" },
   { tab: "standings", label: "Standings", segment: "/standings" },
   { tab: "team", label: "My team", segment: "/team" },
+  { tab: "players", label: "Free agents", segment: "/players" },
   { tab: "trades", label: "Trades", segment: "/trades" },
   { tab: "activity", label: "Activity", segment: "/activity" },
 ];

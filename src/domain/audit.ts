@@ -21,10 +21,11 @@ export const AUDIT_EVENT_TYPES = [
   /** Published by Plan A, from `setLineup` — the product's only member-facing roster write. */
   "lineup_change",
   /**
-   * A roster change that is NEITHER a draft pick NOR a lineup change. Today that means exactly
-   * one thing: the player transfer a trade performs. There is no free agency in this product,
-   * no waivers and no add/drop, so nothing else can produce one. PUBLISHED by Plan C, from
-   * `acceptTrade`'s own transfer and from `reverseTradeInTx`'s compensating one.
+   * A roster change that is NEITHER a draft pick NOR a lineup change: the player transfer a
+   * trade performs, and — since the Free agents tab (2026-08-28) — the add/drop a claim
+   * performs (`claimPlayer`, `@/league-service/claims`; `payload.outcome: "claim"` with `added`/
+   * `dropped` ids). PUBLISHED by Plan C from `acceptTrade` and `reverseTradeInTx`, and by the
+   * claim transaction.
    */
   "roster_move",
   /** PUBLISHED by Plan C, from the trade lifecycle it built. `trade_rejected` carries a
