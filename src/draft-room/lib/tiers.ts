@@ -18,7 +18,19 @@ import { DRAFT_ROOM_CONFIG } from "../state/config";
 export interface PoolTier {
   readonly id: number;
   readonly grade: TierGrade;
-  /** The band's own consensus span, in the manager's vocabulary: "ADP 13 to 19". */
+  /**
+   * THE BAND'S CONSEQUENCE, IN PLAIN WORDS (Sunday v5, law 5): "Round 1, then a real drop".
+   *
+   * It used to be the band's raw ADP span ("ADP 13 to 19"), which is the band's DEFINITION rather
+   * than its meaning — and the definition was already on screen, printed on every row in the band
+   * as that player's own ADP. A chapter marker earns its width by saying what the chapter is for:
+   * the round these men go in, and whether the board steps down after them.
+   *
+   * Both halves are measured. The round is `consensusRound` over the band's own ADP edges for this
+   * room's seat count; the drop clause is printed only on a band that was SEALED BY A CLIFF, which
+   * is the one case where a real gap in the consensus board follows. The last band of the ladder
+   * never claims a drop, because nothing was measured after it (law 7).
+   */
   readonly label: string;
 }
 
@@ -45,17 +57,21 @@ interface OpenBand {
   readonly members: string[];
 }
 
-function seal(band: OpenBand, id: number, teamCount: number): readonly (readonly [string, PoolTier])[] {
+/**
+ * The band's own words (law 5). `cliffFollows` is true only for a band the walk below SEALED
+ * because the next player sat a measured cliff away — never for the ladder's last band, which has
+ * nothing after it to describe.
+ */
+function bandLabel(firstRound: number, lastRound: number, cliffFollows: boolean): string {
+  const rounds = firstRound === lastRound ? `Round ${firstRound}` : `Rounds ${firstRound} to ${lastRound}`;
+  return cliffFollows ? `${rounds}, then a real drop` : `${rounds} and later`;
+}
+
+function seal(band: OpenBand, id: number, teamCount: number, cliffFollows: boolean): readonly (readonly [string, PoolTier])[] {
   const tier: PoolTier = {
     id,
     grade: gradeForRound(consensusRound(band.firstAdp, teamCount)),
-    // Rounded, because a band's edges are a range a manager reads at a glance, not a measurement
-    // he does arithmetic on — and "ADP 12.8 to 19.1" is two false digits of precision about where
-    // a cliff is. The underlying values are untouched; only the label rounds.
-    label:
-      Math.round(band.firstAdp) === Math.round(band.lastAdp)
-        ? `ADP ${Math.round(band.firstAdp)}`
-        : `ADP ${Math.round(band.firstAdp)} to ${Math.round(band.lastAdp)}`,
+    label: bandLabel(consensusRound(band.firstAdp, teamCount), consensusRound(band.lastAdp, teamCount), cliffFollows),
   };
   return band.members.map((playerId) => [playerId, tier] as const);
 }
@@ -100,7 +116,8 @@ export function poolTiers(players: readonly Player[], teamCount: number): Readon
     }
     const cliff = adp - band.lastAdp >= DRAFT_ROOM_CONFIG.tiers.cliffAdp;
     if (cliff && band.members.length >= DRAFT_ROOM_CONFIG.tiers.minBandSize) {
-      entries.push(...seal(band, id, teamCount));
+      // Sealed BY a cliff, which is the whole licence the band's "then a real drop" clause has.
+      entries.push(...seal(band, id, teamCount, true));
       id += 1;
       band = { firstAdp: adp, lastAdp: adp, members: [player.id] };
       continue;
@@ -109,7 +126,9 @@ export function poolTiers(players: readonly Player[], teamCount: number): Readon
     band.lastAdp = Math.max(band.lastAdp, adp);
   }
 
-  if (band !== null) entries.push(...seal(band, id, teamCount));
+  // The last band ran out of players rather than hitting a cliff: nothing was measured after it,
+  // so it claims nothing about what follows.
+  if (band !== null) entries.push(...seal(band, id, teamCount, false));
   return new Map(entries);
 }
 
