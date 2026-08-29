@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
+import { RailNav } from "./rail-nav";
 import { Icon } from "@/components/ui/icon";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
 import { LiveStatePill } from "@/league-room/components/live-state-pill";
@@ -76,12 +77,18 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
           can render its OWN band, under this row, still inside the one grid item `AppShell`
           spans across row 1 — "above the content column", never a second header. */}
       <div className="flex w-full items-center justify-between gap-2 border-b border-line px-2 py-3">
-        <Link
-          href="/app"
-          className="font-display text-xl font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          Commish
-        </Link>
+        <div className="flex items-center gap-8">
+          {/* The mark signs off with the amber full stop, matching the storefront rail. */}
+          <Link
+            href="/app"
+            className="font-display text-xl font-extrabold tracking-[-0.01em] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Commish<span className="text-accent">.</span>
+          </Link>
+          {/* Hidden below sm, the PublicBar precedent — the 360px row already runs at capacity
+              (this file's own fix-round history), and a mobile nav is the shell work's problem. */}
+          <RailNav className="hidden sm:flex" />
+        </div>
         {/* Task 13, Step 1c: `gap-1`, not `gap-2` — the row's own fix-round-1 history already
             tightened this once for a font change; a SIXTH real control (the live pill, now
             genuinely present at every width instead of hidden below `sm`) is the second squeeze,
