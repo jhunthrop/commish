@@ -70,7 +70,8 @@ export function LineupEditor({
   const [assignments, setAssignments] = useState<Readonly<Record<string, string | null>>>(
     () => Object.fromEntries(lineup.starters.map((slot) => [slotKey(slot), slot.playerId])),
   );
-  const [openSlot, setOpenSlot] = useState<string | null>(null);
+  /** ESPN's selection: a starter slot's key, or `bench:<playerId>`. One at a time, ever. */
+  const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -154,51 +155,98 @@ export function LineupEditor({
     }
   };
 
-  const swap = (targetKey: string, playerId: string | null): void => {
+  /**
+   * ESPN'S TWO-TAP MODEL (founder, 2026-08-28: "the lineup manager should function just like
+   * ESPN's... best in breed"). Tap MOVE on any player, starter or bench: he becomes the
+   * selection, every slot he can legally fill lights up with HERE, everything else dims. Tap a
+   * destination: the two swap and the selection clears. The bench is DERIVED — whoever is not in
+   * a starting slot is on it, live — so a displaced starter falls to the bench by arithmetic
+   * rather than by a second write.
+   *
+   * ELIGIBILITY IS A HINT, NEVER THE AUTHORITY. The map below is the standard slot chart, spent
+   * on which HERE buttons light; the server's validateLineup still rules on the save, so a
+   * mismatch between this map and a league's real rules costs a lit button, not a corrupt
+   * lineup. An unknown slot type lights for everyone for the same reason.
+   */
+  const eligible = (slotType: string, position: string | null): boolean => {
+    if (position === null) return false;
+    const chart: Record<string, readonly string[]> = {
+      QB: ["QB"], RB: ["RB"], WR: ["WR"], TE: ["TE"], K: ["K"], DEF: ["DEF"],
+      FLEX: ["RB", "WR", "TE"], SUPERFLEX: ["QB", "RB", "WR", "TE"],
+    };
+    const allowed = chart[slotType];
+    return allowed === undefined ? true : allowed.includes(position);
+  };
+
+  const startingIds = new Set(Object.values(assignments).filter((id): id is string => id !== null));
+  const benchNow = everyone.filter((slot) => !startingIds.has(slot.playerId!));
+  const selectedSlot = selected === null ? null : lineup.starters.find((slot) => slotKey(slot) === selected) ?? null;
+  const selectedPlayerId = selected === null ? null : selected.startsWith("bench:") ? selected.slice(6) : (assignments[selected] ?? null);
+  const selectedPosition = selectedPlayerId === null ? null : (byId.get(selectedPlayerId)?.position ?? null);
+
+  const placeHere = (targetKey: string): void => {
+    if (selectedPlayerId === null && selectedSlot === null) return;
     setAssignments((prev) => {
       const next: Record<string, string | null> = { ...prev };
-      if (playerId !== null) {
-        // THE SWAP, not the error: picking a player who already starts in another slot moves the
-        // displaced starter into the slot the picked player leaves, instead of building a
-        // duplicate lineup the server would bounce at save. Pure client state; the server's
-        // validateLineup stays the only legality authority.
-        const occupied = Object.entries(prev).find(([key, id]) => id === playerId && key !== targetKey);
-        if (occupied !== undefined) next[occupied[0]] = prev[targetKey] ?? null;
-      }
-      next[targetKey] = playerId;
+      const displaced = prev[targetKey] ?? null;
+      next[targetKey] = selectedPlayerId;
+      // A starter-to-starter move is a true SWAP: the displaced man takes the vacated slot. A
+      // bench selection leaves no slot behind, so the displaced man simply falls to the bench.
+      if (selected !== null && !selected.startsWith("bench:")) next[selected] = displaced;
       return next;
     });
-    setOpenSlot(null);
+    setSelected(null);
     setSaved(false);
   };
 
-  return (
-    // `id="lineup"` (F16): the fragment `actionHref` builds (`/app/leagues/${id}#lineup`) is a
-    // real anchor on a real panel, not a scroll script — Step 1.
-    <section id="lineup" className="flex flex-col gap-3">
-      <h2 className="font-display text-xl font-bold text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
-      {/* Persona review (veteran, FIX 5): the lock is coarse and nothing said so. NO TIPS
-          (founder ruling): the sentence stays, the trigger died with the system. */}
-      <p className="text-sm text-text-muted">Lineups lock for the whole week when its first game kicks off.</p>
+  /** A starter is selected and a bench row was tapped: the bench man takes the slot, the
+   *  displaced starter falls to the derived bench. */
+  const swapWithBench = (benchPlayerId: string): void => {
+    if (selected === null || selected.startsWith("bench:")) return;
+    setAssignments((prev) => ({ ...prev, [selected]: benchPlayerId }));
+    setSelected(null);
+    setSaved(false);
+  };
 
-      {/* THE WEEKLY RITUAL AS A TOWER, NOT A FORM (founder, 2026-08-28: "set your lineup doesn't
-          look or feel premium at all"). Nine native selects were the one place a manager decides
-          who PLAYS, drawn as browser chrome: 40px faces beside dropdown arrows, two ragged
-          columns, a bench of underlined links. Now each starter is a full row — slot plate, the
-          face at md, the name in the display face — and the control is a Swap that opens the
-          roster INSIDE the row, every candidate drawn as a player with one amber verb. The
-          contract carries no projections, so the row carries no numbers: law 7 outranks decor,
-          and the name is still the door to the screen that has them. */}
-      <ul className="flex flex-col">
-        {lineup.starters.map((slot) => {
-          const key = slotKey(slot);
-          const chosenId = assignments[key] ?? null;
-          const chosen = chosenId === null ? undefined : byId.get(chosenId);
-          const face = chosen === undefined ? null : playerOf(chosen);
-          const open = openSlot === key;
-          return (
-            <li key={key} className="border-t border-line">
-              <div className="flex items-center gap-3 py-2">
+  const sendToBench = (): void => {
+    if (selected === null || selected.startsWith("bench:")) return;
+    setAssignments((prev) => ({ ...prev, [selected]: null }));
+    setSelected(null);
+    setSaved(false);
+  };
+
+  const moving = selected !== null;
+
+  return (
+    // `id="lineup"` (F16): the fragment `actionHref` builds is a real anchor on a real panel.
+    <section id="lineup" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-xl font-bold text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
+        <p className="text-sm text-text-muted">Lineups lock for the whole week when its first game kicks off.</p>
+      </div>
+
+      <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
+        {/* STARTERS. Each row is a destination while a move is live: eligible slots carry the
+            amber HERE, ineligible ones dim — which is the whole chart taught by looking, with no
+            tip anywhere (the no-tips ruling's own test case). */}
+        <ul className="flex flex-col">
+          {lineup.starters.map((slot) => {
+            const key = slotKey(slot);
+            const occupantId = assignments[key] ?? null;
+            const occupant = occupantId === null ? undefined : byId.get(occupantId);
+            const face = occupant === undefined ? null : playerOf(occupant);
+            const isSelected = selected === key;
+            const canReceive = moving && !isSelected && eligible(slot.slot, selectedPosition);
+            const dimmed = moving && !isSelected && !canReceive;
+            return (
+              <li
+                key={key}
+                className={`flex items-center gap-3 border-t border-line border-l-[3px] py-2 pl-2 transition-all ${
+                  isSelected
+                    ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent"
+                    : "border-l-transparent"
+                } ${dimmed ? "opacity-40" : ""}`}
+              >
                 <SlotChip slot={slot.slot} className="w-16 shrink-0 justify-center" />
                 {face === null ? (
                   <span className="flex min-w-0 flex-1 items-center gap-2.5 text-sm text-text-faint">
@@ -222,87 +270,85 @@ export function LineupEditor({
                     </span>
                   </span>
                 )}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  aria-expanded={open}
-                  onClick={() => {
-                    setOpenSlot(open ? null : key);
-                  }}
-                >
-                  {open ? "Close" : "Swap"}
-                </Button>
-              </div>
-              {open ? (
-                <ul className="mb-2 flex flex-col gap-1 border-l-[3px] border-l-accent bg-surface-elevated py-1.5 pl-3 pr-2">
-                  {everyone
-                    .filter((option) => option.playerId !== chosenId)
-                    .map((option) => {
-                      const candidate = playerOf(option)!;
-                      const startingAt = Object.entries(assignments).find(([, id]) => id === option.playerId)?.[0] ?? null;
-                      return (
-                        <li key={option.playerId} className="flex items-center gap-2.5 py-1">
-                          <PlayerFace player={candidate} size="sm" />
-                          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
-                            <span className="truncate text-sm font-medium text-text-primary">{candidate.name}</span>
-                            <PositionBadge position={candidate.position} size="sm" />
-                            {candidate.nflTeam === "" ? null : (
-                              <span className="font-mono text-xs text-text-faint">{candidate.nflTeam}</span>
-                            )}
-                            {startingAt === null ? null : (
-                              <span className="font-mono text-xs text-text-faint">starting {startingAt.split(":")[0]}</span>
-                            )}
-                          </span>
-                          <Button variant="verb" size="sm" onClick={() => swap(key, option.playerId)}>
-                            Start
-                          </Button>
-                        </li>
-                      );
-                    })}
-                  {chosenId === null ? null : (
-                    <li className="py-1">
-                      <Button variant="secondary" size="sm" onClick={() => swap(key, null)}>
-                        Leave the slot empty
-                      </Button>
-                    </li>
-                  )}
-                </ul>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-
-      <h3 className={`${MICRO_LABEL} text-text-faint`}>Bench</h3>
-      {lineup.bench.length === 0 ? (
-        <p className="text-sm text-text-muted">Nobody on the bench.</p>
-      ) : (
-        <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
-          {lineup.bench.map((slot) => {
-            const player = playerOf(slot);
-            if (player === null) return null;
-            const starting = Object.values(assignments).includes(slot.playerId);
-            return (
-              <li key={slotKey(slot)} className="flex min-w-0 items-center gap-2.5 py-0.5">
-                <PlayerFace player={player} size="sm" />
-                <Link
-                  className="truncate text-sm font-medium text-text-primary hover:underline"
-                  href={`/app/leagues/${leagueId}/players/${player.id}`}
-                >
-                  {player.name}
-                </Link>
-                <PositionBadge position={player.position} size="sm" />
-                {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
-                {starting ? <span className="font-mono text-xs text-text-faint">starting</span> : null}
+                {canReceive ? (
+                  <Button variant="verb" size="sm" onClick={() => placeHere(key)} aria-label={`Put ${byId.get(selectedPlayerId!)?.playerName ?? "the selected player"} at ${slot.slot}`}>
+                    Here
+                  </Button>
+                ) : isSelected ? (
+                  <span className="flex items-center gap-2">
+                    <Button variant="secondary" size="sm" onClick={sendToBench}>
+                      To bench
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setSelected(null)}>
+                      Cancel
+                    </Button>
+                  </span>
+                ) : moving ? null : occupantId === null ? null : (
+                  <Button variant="secondary" size="sm" onClick={() => setSelected(key)} aria-label={`Move ${occupant?.playerName ?? ""}`}>
+                    Move
+                  </Button>
+                )}
               </li>
             );
           })}
         </ul>
-      )}
+
+        {/* THE BENCH, derived live. While a bench man is selected the starter slots light; while
+            a starter is selected every bench row is a legal landing (a bench holds anyone), so
+            each carries HERE. */}
+        <div className="flex flex-col">
+          <h3 className={`${MICRO_LABEL} pb-2 text-text-faint`}>Bench</h3>
+          {benchNow.length === 0 ? (
+            <p className="text-sm text-text-muted">Nobody on the bench.</p>
+          ) : (
+            <ul className="flex flex-col">
+              {benchNow.map((slot) => {
+                const key = `bench:${slot.playerId!}`;
+                const player = playerOf(slot)!;
+                const isSelected = selected === key;
+                const canReceive = moving && selectedSlot !== null && !isSelected;
+                return (
+                  <li
+                    key={key}
+                    className={`flex items-center gap-2.5 border-t border-line border-l-[3px] py-1.5 pl-2 transition-all ${
+                      isSelected
+                        ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent"
+                        : "border-l-transparent"
+                    }`}
+                  >
+                    <PlayerFace player={player} size="sm" />
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <Link
+                        className="truncate text-sm font-medium text-text-primary hover:underline"
+                        href={`/app/leagues/${leagueId}/players/${player.id}`}
+                      >
+                        {player.name}
+                      </Link>
+                      <PositionBadge position={player.position} size="sm" />
+                      {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
+                    </span>
+                    {canReceive ? (
+                      <Button variant="verb" size="sm" onClick={() => swapWithBench(slot.playerId!)} aria-label={`Swap ${player.name} into the lineup`}>
+                        Here
+                      </Button>
+                    ) : isSelected ? (
+                      <Button variant="secondary" size="sm" onClick={() => setSelected(null)}>
+                        Cancel
+                      </Button>
+                    ) : moving ? null : (
+                      <Button variant="secondary" size="sm" onClick={() => setSelected(key)} aria-label={`Move ${player.name}`}>
+                        Move
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
 
       <div>
-        {/* The panel's own act, in the verb's amber — the lower third at the page foot anchors
-            here, and the act it names should look like the act it is. */}
         <Button variant="verb" onClick={() => void save()} loading={submitting} disabled={submitting}>
           Save lineup
         </Button>
