@@ -159,26 +159,28 @@ export function entryFeeLabel(league: PublicLeagueSummary): string {
  * curious reader goes and an uncurious one never has to.
  */
 export function FormatLine({ league }: { readonly league: PublicLeagueSummary }) {
+  // Each separator lives INSIDE the span of the word it introduces, so a wrap can never leave a
+  // dot dangling at the end of a line (visible on every beginner row at 1440 before this).
   return (
     <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-text-muted">
-      <span>{league.teamCount} teams</span>
-      <Dot />
-      <span>{FORMAT_LABEL[league.format] ?? league.format}</span>
-      <Dot />
-      <span>{league.scoringLabel}</span>
+      <span className="whitespace-nowrap">{league.teamCount} teams</span>
+      <span className="whitespace-nowrap">
+        <Dot /> {FORMAT_LABEL[league.format] ?? league.format}
+      </span>
+      <span className="whitespace-nowrap">
+        <Dot /> {league.scoringLabel}
+      </span>
       {/* Deciding a week is a fact about the league, not about anyone in it — the same
           reasoning `PublicLeagueSummary.medianGame`'s own docblock carries. */}
       {league.medianGame ? (
-        <>
-          <Dot />
-          <span>Median game</span>
-        </>
+        <span className="whitespace-nowrap">
+          <Dot /> Median game
+        </span>
       ) : null}
       {league.experienceTier === "beginner" ? (
-        <>
-          <Dot />
-          <span>newer players only</span>
-        </>
+        <span className="whitespace-nowrap">
+          <Dot /> newer players only
+        </span>
       ) : null}
     </p>
   );
