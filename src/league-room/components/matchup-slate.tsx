@@ -77,17 +77,23 @@ export interface MatchupSlateProps {
  * own chips carry the bench arithmetic for the one manager it belongs to.
  */
 export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
-  const iAmAway = detail.away.teamId === myTeamId;
-  const mine = iAmAway ? detail.away : detail.home;
-  const theirs = iAmAway ? detail.home : detail.away;
+  // HOME LEFT, AWAY RIGHT — the hero's own order, kept even when the viewer is the away side.
+  // The first render put "mine" left and the two components disagreed about which side Bay
+  // Bandits was on within one card; a page that swaps a team's side between its scoreboard and
+  // its slate is lying about geometry. `myTeamId` still matters below: your side's column head
+  // says so.
+  const mine = detail.home;
+  const theirs = detail.away;
   const pairs = pairStarters(mine.starters, theirs.starters);
+  const homeIsMine = detail.home.teamId === myTeamId;
+  const awayIsMine = detail.away.teamId === myTeamId;
 
   return (
     <div className="flex flex-col">
       <div aria-hidden="true" className={`grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] items-center gap-x-3 pb-1.5 ${MICRO_LABEL} text-text-faint`}>
-        <span className="truncate">{mine.teamName}</span>
+        <span className="truncate">{homeIsMine ? `${mine.teamName} · you` : mine.teamName}</span>
         <span className="text-center">Slot</span>
-        <span className="truncate text-right">{theirs.teamName}</span>
+        <span className="truncate text-right">{awayIsMine ? `${theirs.teamName} · you` : theirs.teamName}</span>
       </div>
       <ul className="flex flex-col">
         {pairs.map((pair) => (
