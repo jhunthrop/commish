@@ -1,4 +1,5 @@
-import { Avatar, Badge, Card, InfoTip, PageTitle, Stat } from "@/components/ui";
+import { Avatar, Badge, Card, PageTitle } from "@/components/ui";
+import { TowerFigure } from "@/components/ui/tower-figure";
 import type { ParticipationTier } from "@/participation/tier";
 import { VERIFIED_BADGE_LABEL } from "@/participation/verified";
 
@@ -47,10 +48,20 @@ function standingSentence(tier: ParticipationTier): string {
  * drawn as a form with a small circle above it. Face, name and record now arrive together, as
  * one thing, the way every other object in the product does.
  *
- * NO COMPARISON, EVER (ruling 30, carried over from `StandingPanel` unchanged). The seasons
- * count takes no `comparison`, so it renders as ordinary ink rather than a magnitude tint: the
- * population "every manager on Commish" is one this page does not hold and would be inventing.
- * Nothing here names another manager, a league, or a rank.
+ * NO COMPARISON, EVER (ruling 30, carried over from `StandingPanel` unchanged). The seasons count
+ * is a `TowerFigure` and not a `Stat`, which is v5 making that refusal structural rather than a
+ * habit: `TowerFigure` has no `comparison` seam to leave empty. The population "every manager on
+ * Commish" is one this page does not hold and would be inventing. Nothing here names another
+ * manager, a league, or a rank.
+ *
+ * SUNDAY v5 — THE REGISTER MOVED, THE SCALE DID NOT. The figure keeps its `display-xl` hero size
+ * (law 3) and its label moves from the sentence-case eyebrow to `MICRO_LABEL`, the shouted key a
+ * scoreboard puts beside data. The email under the name and the tier's own standing sentence
+ * carry the same move: an identifier is a shouted key, a sentence is a sentence.
+ *
+ * NO TIPS (founder, 2026-08-28: "the UX should explain itself, we shouldn't need tips"). The
+ * `InfoTip` beside the verified badge is gone; the badge's own disclosure line — "Shown beside
+ * your reviews." — is the fact a reader of this page actually needs, and it was already here.
  *
  * THE PAGE'S `<h1>` IS THE PERSON, AND THE BROWSER TAB IS STILL THE ROUTE. `ProfilePage`'s
  * `metadata` stays "Your profile" (A5's " · Commish" template) deliberately: a tab has to be
@@ -66,27 +77,30 @@ export function ManagerHeader({ displayName, avatar, email, seasons, tier, verif
         <Avatar name={displayName} avatar={avatar} size="lg" />
         <div className="flex min-w-0 flex-col">
           <PageTitle>{displayName}</PageTitle>
-          {/* The email is an identifier, not prose: mono, faint, and never a field. This product
-              cannot change it here (WorkOS owns sign-in), and a disabled input is a control that
-              lies about being one. */}
+          {/* The email is an identifier, not prose: mono, faint, and never a field. It stays OUT
+              of the micro-label register on purpose — an address is data whose own case is part
+              of what it says, and the one shouted register in this product is for keys, never for
+              values. This product cannot change it here (WorkOS owns sign-in), and a disabled
+              input is a control that lies about being one. */}
           <p className="truncate font-mono text-xs text-text-faint">{email}</p>
         </div>
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-4 lg:gap-6">
-        <Stat label="Seasons finished" value={String(seasons)} size="xl" />
+        <TowerFigure label="Seasons finished" value={String(seasons)} size="xl" />
         <div className="flex flex-col gap-1 border-l border-line pl-4 lg:pl-6">
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge tone={tier === "veteran" ? "positive" : "neutral"}>{tier === "veteran" ? "Veteran" : "Newcomer"}</Badge>
+            {/* NEUTRAL, not `positive` (v5, law 4). Cyan is the VERDICT channel — "we rate him
+                higher than the room does" — and a participation tier is a category, not a
+                judgement: it names which doors are open, which the sentence below says in words.
+                A fact with no comparison set behind it is grey. */}
+            <Badge>{tier === "veteran" ? "Veteran" : "Newcomer"}</Badge>
             {/* Founder decision #8's badge, about the reader this time rather than another
                 reviewer (`ReviewFeed`'s own use of the same pair) — the unverified case renders
-                nothing, matching that precedent exactly. */}
-            {verified ? (
-              <span className="inline-flex items-center gap-0.5">
-                <Badge tone="positive">{VERIFIED_BADGE_LABEL}</Badge>
-                <InfoTip term="verified-reviewer" />
-              </span>
-            ) : null}
+                nothing, matching that precedent exactly. Amber, because law 4 spends amber on
+                "the network's own furniture, and YOU": this is the one claim on this page that
+                the product makes about its reader in public. */}
+            {verified ? <Badge tone="accent">{VERIFIED_BADGE_LABEL}</Badge> : null}
           </div>
           <p className="text-sm text-text-muted">{standingSentence(tier)}</p>
           {/* Fix round 1, F2 (the privacy skeptic's disclosure standard), kept verbatim from

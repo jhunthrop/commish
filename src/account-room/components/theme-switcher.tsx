@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { Panel } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { useTheme, type ThemePreference } from "@/design/theme-provider";
 
 const THEME_OPTIONS: readonly { readonly value: ThemePreference; readonly label: string }[] = [
@@ -42,12 +42,19 @@ function useSystemPrefersDark(): boolean {
   return prefersDark;
 }
 
-/** States the RESOLUTION in words, never just the choice — the addendum's own example
- *  ("Matching your device, which is dark right now") is exactly this: "system" is a fact about
- *  the screen it renders on, not a mystery third option next to two real ones. */
-function resolutionSentence(theme: ThemePreference, systemPrefersDark: boolean): string {
-  if (theme === "system") return `Matching your device, which is ${systemPrefersDark ? "dark" : "light"} right now.`;
-  return theme === "dark" ? "Always dark, regardless of your device." : "Always light, regardless of your device.";
+/**
+ * States the RESOLUTION, never just the choice — "system" is a fact about the screen it renders
+ * on, not a mystery third option next to two real ones.
+ *
+ * SUNDAY v5 turned this from a sentence into a VALUE. It sits in a lower third's fact cell now,
+ * beside the control that sets it, and a lower third cell carries a reading rather than a
+ * paragraph: the display face is a lettering face and this product never sets it on prose. The
+ * two facts a reader wants are the same two either way — what you chose, and what that resolves
+ * to on this screen right now.
+ */
+function resolutionValue(theme: ThemePreference, systemPrefersDark: boolean): string {
+  if (theme === "system") return `System · ${systemPrefersDark ? "dark" : "light"} right now`;
+  return theme === "dark" ? "Always dark" : "Always light";
 }
 
 /**
@@ -56,6 +63,22 @@ function resolutionSentence(theme: ThemePreference, systemPrefersDark: boolean):
  * the choice (`localStorage`, key `commish.theme`) and stamps `data-theme` on `<html>`; this
  * control only ever calls `setTheme`, the exact seam `ThemeProvider`'s own test drives through
  * `useTheme` directly — no new persistence, no new source of truth.
+ *
+ * SUNDAY v5, LAW 6 — THIS IS THE ACCOUNT ROOM'S LOWER THIRD, and choosing it was the live
+ * question on this route. Law 6 says every screen ends in a strip carrying the subject and one
+ * verb, and if it has none, either it needs no decision or the decision is hidden. The self room
+ * has no clock and no single act it is waiting on: every control on it is a setting that saves
+ * itself where it sits, so the honest reading is the first branch. What it DOES have is one
+ * decision that governs the whole product rather than this page — which theme this account reads
+ * every screen in, the founder's both-themes ruling of 2026-08-23 made operable — and that is
+ * what earns the foot.
+ *
+ * It is NOT the `LowerThird` primitive, deliberately. That component's `action` slot is "the
+ * single act this screen is waiting on, rendered in the amber verb", and a three-way preference
+ * is a control, not a verb; dropping a radio group into the verb slot would be the same category
+ * error as putting a magnitude tint on a button. What this band borrows is the GEOMETRY — the
+ * 3px amber rule across the foot, the micro-label over its reading — which is the part that makes
+ * a screen look finished.
  *
  * A radio group, exactly like `AvatarPicker`'s tone tiles (fix round 1, F1): three mutually
  * exclusive choices, one of which is always selected, so a screen reader announces "System, 1 of
@@ -106,8 +129,12 @@ export function ThemeSwitcher() {
   };
 
   return (
-    <Panel title="Theme">
-      <div className="flex flex-col gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t-[3px] border-accent bg-surface-elevated px-5 py-3">
+      <div className="flex min-w-0 flex-col justify-center">
+        <span className={`${MICRO_LABEL} text-text-faint`}>Theme</span>
+        <span className="font-display text-xl font-bold text-text-primary">{resolutionValue(theme, systemPrefersDark)}</span>
+      </div>
+      <div className="ml-auto flex items-center">
         <div role="radiogroup" aria-labelledby={labelId} className="inline-flex w-fit rounded-md border border-line p-0.5">
           <span id={labelId} className="sr-only">
             Theme
@@ -141,8 +168,7 @@ export function ThemeSwitcher() {
             );
           })}
         </div>
-        <p className="text-sm text-text-muted">{resolutionSentence(theme, systemPrefersDark)}</p>
       </div>
-    </Panel>
+    </div>
   );
 }

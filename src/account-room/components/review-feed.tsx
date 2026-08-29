@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Avatar, Badge, Button, EmptyState, InfoTip } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState } from "@/components/ui";
 import { VERIFIED_BADGE_LABEL } from "@/participation/verified";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { REVIEW_CONFIG, type ReportReasonValue } from "@/reviews/config";
@@ -117,15 +117,15 @@ function ReviewRow({ review }: { readonly review: ReviewView }) {
             <span className="font-medium text-text-primary">{review.authorName}</span>
             {/* Founder decision #8: the inverted case renders NOTHING, not a negative badge —
                 an unverified reviewer looks exactly like this product looked before this badge
-                existed. `InfoTip`, not a `title` attribute, so the claim is click-activated and
-                actually readable (`VERIFIED_BADGE_TOOLTIP`, `@/participation/verified`), never a
-                hover-only tooltip nobody on a touch device ever sees. */}
-            {review.verified ? (
-              <span className="inline-flex items-center gap-0.5">
-                <Badge tone="positive">{VERIFIED_BADGE_LABEL}</Badge>
-                <InfoTip term="verified-reviewer" />
-              </span>
-            ) : null}
+                existed.
+
+                NO TIPS (founder, 2026-08-28) and LAW 4 (Sunday v5), in one change. The ⓘ that
+                defined the badge is gone: the badge already reads in plain English and the feed's
+                own head is where a claim about the feed belongs. The tone moves from `positive`
+                to `accent` because cyan is v5's VERDICT channel — "we rate him higher than the
+                room does" — and a verified reviewer is not a verdict about a review; amber is the
+                network's own furniture, which is exactly what this badge is. */}
+            {review.verified ? <Badge tone="accent">{VERIFIED_BADGE_LABEL}</Badge> : null}
           </span>
           {/* Task 20 Step 2: the rating and the date are the one dense, scannable fact on an
               otherwise prose row — `font-mono tabular-nums`, the same idiom `LiveStatePill` and

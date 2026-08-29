@@ -32,18 +32,20 @@ describe("OperatorTool", () => {
     );
   });
 
-  it("spends no drama on an operator surface: no accent fill, no hero number, no motion", async () => {
-    // The spec's own ruling on this route group, as a test: "Gameday's tokens and primitives
-    // apply; its drama does not." The three spellings below are the three ways drama has actually
-    // arrived on a surface in this product — a money-filled verb, a display-scale figure, and a
-    // transition. A page that needs one of them is not this component's caller.
+  it("spends no drama on an operator surface: no accent fill, no hero number, no motion, nothing live", async () => {
+    // The restraint ruling on this route group, as a test: "Sunday's tokens, faces and registers
+    // apply; its drama does not." The spellings below are the ways drama has actually arrived on
+    // a surface in this product — a money-filled verb, a display-scale figure, and a transition —
+    // plus the one Sunday v5 adds: the LIVE channel, which means happening right now and nothing
+    // else ever, and nothing on an operator surface ever is. A page that needs one of them is not
+    // this component's caller.
     await renderSurface(
       <OperatorTool title="Money reconciliation" intent="One line.">
         <p>control</p>
       </OperatorTool>,
       ({ container }) => {
         const frame = container.querySelector("section")?.className ?? "";
-        expect(frame).not.toMatch(/bg-accent|text-display-(xl|2xl|3xl)|transition/);
+        expect(frame).not.toMatch(/bg-accent|text-display-(xl|2xl|3xl)|transition|-live/);
       },
     );
   });

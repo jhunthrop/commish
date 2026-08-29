@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { getDb } from "@/db/client";
-import { ButtonLink, Panel } from "@/components/ui";
+import { ButtonLink, LowerThird, Panel } from "@/components/ui";
+import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
+import { formatUsd } from "@/money/config";
 import { walletAccountFlags, walletSummary } from "@/money-service/read";
 import { moneyIsLive } from "@/money/states";
 import { getSharedPaymentsProvider } from "@/payments-provider/registry";
@@ -18,6 +20,11 @@ import { ExclusionPanel } from "@/account-room/components/exclusion-panel";
  *  couple two independent call sites the moment either needed to say it slightly differently. */
 const DARK_WALLET_SENTENCE = "Real-money play is not available yet. Every league is free this season.";
 
+/** The two anchors the live lower third's verb points at. Named here rather than spelled twice
+ *  at the `id` and at the `href`, which is exactly how an anchor quietly stops resolving. */
+const WALLET_DEPOSIT_ANCHOR = "wallet-deposit";
+const WALLET_IDENTITY_ANCHOR = "wallet-identity";
+
 /**
  * The wallet's live content: four figures, both money-in/money-out forms, and the two
  * account-standing panels. `bankMethod` is asserted present rather than optional-chained away,
@@ -32,26 +39,57 @@ async function liveWalletContent(userId: string): Promise<ReactNode> {
   const bankMethod = methods.find((descriptor) => descriptor.method === "bank");
   if (bankMethod === undefined) throw new Error('liveWalletContent: the payments provider named no "bank" method descriptor.');
 
-  // LAW 4 ON THE MONEY SURFACE: the balance is the column a reader keeps coming back to, so it
-  // stays put on the left while the four things you DO with money sit beside it, two per row.
-  // The old shape stacked five full-width rows, which put the balance off screen the moment a
-  // reader scrolled to the form that spends it.
+  // DENSITY ON THE MONEY SURFACE (law 3): the balance is the column a reader keeps coming back
+  // to, so it stays put on the left while the four things you DO with money sit beside it, two
+  // per row. The old shape stacked five full-width rows, which put the balance off screen the
+  // moment a reader scrolled to the form that spends it.
+  //
+  // SUNDAY v5, LAW 6 — the verb has a PLACE. Identity is the gate on everything else here: a
+  // member who has not cleared it cannot deposit, cannot withdraw and cannot hold a balance, so
+  // until they have, the one act this page is waiting on is that one and the deposit form is not
+  // it. Once they are verified, the verb is the act money surfaces exist for. Both are anchors
+  // into a panel already on this page rather than a second control — the lower third names which
+  // of the four panels is the reader's next move, which is the thing a wall of forms cannot say.
+  const identityCleared = flags.kycStatus === "verified";
   return (
-    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-      <div className="lg:sticky lg:top-4">
-        <WalletPanel summary={summary} />
-      </div>
-      <div className="flex flex-col gap-4 lg:col-span-2">
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-          <DepositForm methods={methods} />
-          <WithdrawalForm bankMethod={bankMethod} />
+    <>
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+        <div className="lg:sticky lg:top-4">
+          <WalletPanel summary={summary} />
         </div>
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-          <KycPanel status={flags.kycStatus} />
-          <ExclusionPanel selfExcludedAt={flags.selfExcludedAt} />
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+            <div id={WALLET_DEPOSIT_ANCHOR}>
+              <DepositForm methods={methods} />
+            </div>
+            <WithdrawalForm bankMethod={bankMethod} />
+          </div>
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+            <div id={WALLET_IDENTITY_ANCHOR}>
+              <KycPanel status={flags.kycStatus} />
+            </div>
+            <ExclusionPanel selfExcludedAt={flags.selfExcludedAt} />
+          </div>
         </div>
       </div>
-    </div>
+      <LowerThird
+        cells={[
+          { label: "Available", value: formatUsd(summary.availableCents) },
+          { label: "In escrow", value: formatUsd(summary.escrowCents) },
+        ]}
+        action={
+          identityCleared ? (
+            <ButtonLink href={`#${WALLET_DEPOSIT_ANCHOR}`} variant="verb">
+              Add money
+            </ButtonLink>
+          ) : (
+            <ButtonLink href={`#${WALLET_IDENTITY_ANCHOR}`} variant="verb">
+              Verify identity
+            </ButtonLink>
+          )
+        }
+      />
+    </>
   );
 }
 
@@ -88,23 +126,40 @@ export async function renderWalletContent(userId: string, live: boolean = moneyI
     // spec's own rule for a fact that has not happened yet. Still no form, no broken control, no
     // invented number — dark still means dark. What a reader now learns is the SHAPE of the page
     // they will read later, which is the honest thing a dormant money surface can teach.
+    //
+    // SUNDAY v5, LAW 6 — the dormant wallet ends in a lower third too, and it is the honest one.
+    // The strip carries the balance (a dash, because a dash is not a zero), the one pending fact
+    // that explains the dash, and the single verb — which on this page today is the way OUT, not
+    // a control this season cannot honour. The verb moved into the strip and out of the panel
+    // above it: law 6's whole trade is that the verb gets a PLACE, which is what frees the rest
+    // of the screen from having to shout.
     return (
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        <WalletPanel summary={null} />
-        <Panel title="Real-money play">
-          <div className="flex max-w-prose flex-col items-start gap-3">
-            <p className="text-sm text-text-primary">{DARK_WALLET_SENTENCE}</p>
-            <p className="text-sm text-text-muted">
-              When real-money leagues open, this page is where your balance lives: deposits, entry fees, winnings and
-              withdrawals, each shown to the cent. Until then there is nothing to hold here, and no number on this page
-              will ever be an invented one.
-            </p>
-            <ButtonLink href="/browse" variant="secondary">
+      <>
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+          <WalletPanel summary={null} />
+          <Panel title="Real-money play">
+            <div className="flex max-w-prose flex-col items-start gap-3">
+              <p className="text-sm text-text-primary">{DARK_WALLET_SENTENCE}</p>
+              <p className="text-sm text-text-muted">
+                When real-money leagues open, this page is where your balance lives: deposits, entry fees, winnings and
+                withdrawals, each shown to the cent. Until then there is nothing to hold here, and no number on this page
+                will ever be an invented one.
+              </p>
+            </div>
+          </Panel>
+        </div>
+        <LowerThird
+          cells={[
+            { label: "Available", value: NOT_STARTED_DASH },
+            { label: "Real-money play", value: "Not open" },
+          ]}
+          action={
+            <ButtonLink href="/browse" variant="verb">
               Browse free leagues
             </ButtonLink>
-          </div>
-        </Panel>
-      </div>
+          }
+        />
+      </>
     );
   }
   return liveWalletContent(userId);

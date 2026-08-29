@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Badge, ErrorState, InfoTip } from "@/components/ui";
+import { Badge, ErrorState } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import type { NoticeView } from "../contract";
 import { useNotices } from "../hooks/use-notices";
@@ -25,10 +25,12 @@ function NoticeRow({ notice }: { readonly notice: NoticeView }) {
   return (
     <li className="flex flex-col gap-1 border-b border-line py-3 last:border-b-0">
       <p className="break-words font-medium text-text-primary">{notice.title}</p>
-      <p className="break-words text-sm text-text-muted">
-        {notice.body}
-        {notice.noticeType === "draft_auto_picked" ? <InfoTip term="queue" className="ml-1" /> : null}
-      </p>
+      {/* NO TIPS (founder, 2026-08-28: "the UX should explain itself, we shouldn't need tips").
+          A `draft_auto_picked` notice used to carry an ⓘ defining "queue" beside its body; the
+          stored notice already says "the room picks for you from your queue" (C3's sanctioned
+          safety-net phrase) in the sentence itself, so the tip was fantasy vocabulary restated
+          next to the sentence that had just used it correctly. */}
+      <p className="break-words text-sm text-text-muted">{notice.body}</p>
       {/* `quote` is the ONE wire field split out of a notice's stored `context`: the
           AUTHOR-FACING PHRASE the stored reason maps to (`quoteFor` -> `removalPhraseFor`),
           never the stored token itself, laid out as a real quotation rather than folded into
