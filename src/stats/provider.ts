@@ -20,6 +20,11 @@ export interface GameSummary {
   /** NFL team abbreviations, matching `Player.nflTeam`. */
   readonly homeNflTeam: string;
   readonly awayNflTeam: string;
+  /** YYYYMMDD as the source publishes it, or "" when it does not say. Raw on purpose: kickoffs
+   *  are published in Eastern time and a raw pair cannot carry a timezone-conversion bug. */
+  readonly gameDate: string;
+  /** Kickoff in Eastern as published (e.g. "4:05p"), or "" when the source does not say. */
+  readonly kickoffEt: string;
 }
 
 /**

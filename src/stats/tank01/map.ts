@@ -136,7 +136,19 @@ export function mapGames(body: unknown, week: number): readonly GameSummary[] {
     const home = str(record.home);
     const away = str(record.away);
     if (gameId === "" || home === "" || away === "") return [];
-    return [{ gameId, week, status: mapGameStatus(record.gameStatus), homeNflTeam: home, awayNflTeam: away }];
+    return [
+      {
+        gameId,
+        week,
+        status: mapGameStatus(record.gameStatus),
+        homeNflTeam: home,
+        awayNflTeam: away,
+        // The schedule half of the response (founder, 2026-08-30): kept in the source's own
+        // spelling — `nfl_games` stores it raw, the display layer formats it.
+        gameDate: str(record.gameDate),
+        kickoffEt: str(record.gameTime),
+      },
+    ];
   });
 }
 

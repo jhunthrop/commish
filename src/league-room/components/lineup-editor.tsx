@@ -15,6 +15,32 @@ import { playerOf } from "../lib/player";
 const slotKey = (slot: LineupSlotView): string => `${slot.slot}:${slot.slotIndex}`;
 
 /**
+ * THE SCHEDULE CELL (founder, 2026-08-30: the ESPN row — opponent and kickoff beside every
+ * player). "vs MIN" over "Sun 1:00p", from the real Tank01 schedule; "Live" wears the live
+ * channel while the game is on. A team with no fixture this week prints BYE in the verdict
+ * red — starting a bye-week player is the mistake this whole column exists to prevent.
+ */
+function FixtureCell({
+  fixtures,
+  nflTeam,
+}: {
+  readonly fixtures: ReadonlyMap<string, { readonly opp: string; readonly when: string; readonly status: "scheduled" | "in_progress" | "final" }> | undefined;
+  readonly nflTeam: string;
+}) {
+  if (fixtures === undefined || nflTeam === "") return null;
+  const fixture = fixtures.get(nflTeam);
+  if (fixture === undefined) {
+    return <span className="w-20 shrink-0 text-right font-mono text-xs font-semibold text-negative">Bye</span>;
+  }
+  return (
+    <span className="flex w-20 shrink-0 flex-col items-end leading-tight">
+      <span className="font-mono text-xs text-text-muted">{fixture.opp}</span>
+      <span className={`font-mono text-xs ${fixture.status === "in_progress" ? "text-live" : "text-text-faint"}`}>{fixture.when}</span>
+    </span>
+  );
+}
+
+/**
  * One roster slot's occupant, drawn as an object — face on the club colour, name, position
  * sticker, club code (law 3). An empty slot reads as the word and nothing else: there is no face
  * to draw, and a placeholder tile pretending to be somebody is the failure `PlayerFace` already
@@ -55,6 +81,7 @@ export function LineupEditor({
   totalWeeks,
   draftStatus,
   pointsByPlayerId,
+  fixturesByNflTeam,
 }: {
   readonly leagueId: string;
   readonly lineup: LineupBody;
@@ -64,6 +91,10 @@ export function LineupEditor({
   /** This week's points per playerId, when the page holds the matchup detail — the veteran
    *  persona's missing number ("I set lineups with numbers"). `undefined` player → dash. */
   readonly pointsByPlayerId?: ReadonlyMap<string, number | null>;
+  /** The week's real NFL schedule keyed by team (Tank01 via `nfl_games`), already worded:
+   *  "@ KC" + "Sun 4:05p" / "Live" / "Final". A team with no entry is on BYE, and the row says
+   *  so — the one schedule fact a lineup manager most needs shouted. */
+  readonly fixturesByNflTeam?: ReadonlyMap<string, { readonly opp: string; readonly when: string; readonly status: "scheduled" | "in_progress" | "final" }>;
   /** Wave-1 review Q10, SETTLED: `home.draftStatus`, threaded from both `LeagueHome` call sites
    *  — the fact itself, not an inference over the lineup's own empty slots. Optional only for a
    *  caller that genuinely does not know it yet (never true at either real call site); `null` and
@@ -310,6 +341,7 @@ export function LineupEditor({
                     </span>
                   </span>
                 )}
+                {face === null ? null : <FixtureCell fixtures={fixturesByNflTeam} nflTeam={face.nflTeam} />}
                 {/* THE FIGURE (the veteran persona, 2026-08-30: "not a single number on the
                     entire screen — I set lineups with numbers"). This week's points, straight
                     from the matchup detail the page already holds; the dash keeps the contract's
@@ -387,6 +419,7 @@ export function LineupEditor({
                       <PositionBadge position={player.position} size="sm" />
                       {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
                     </span>
+                    <FixtureCell fixtures={fixturesByNflTeam} nflTeam={player.nflTeam} />
                     {pointsByPlayerId === undefined ? null : (
                       <span
                         className={`shrink-0 font-display tabular-nums ${

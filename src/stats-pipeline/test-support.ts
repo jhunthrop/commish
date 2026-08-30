@@ -57,6 +57,7 @@ export function fakeStatsProvider(script: FakeStatsProviderScript): StatsProvide
       return gamesFor(week).map((game) => ({
         gameId: game.gameId, week: game.week, status: game.status,
         homeNflTeam: game.homeNflTeam, awayNflTeam: game.awayNflTeam,
+        gameDate: "", kickoffEt: "",
       }));
     },
 

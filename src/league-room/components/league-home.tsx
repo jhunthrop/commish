@@ -13,6 +13,7 @@ import { InvitePanel } from "./invite-panel";
 import { LeagueMembersPanel } from "./league-members-panel";
 import { LeagueTermsPanel } from "./league-terms-panel";
 import { FreeAgentsBoard, type RosterPlayerRow } from "./free-agents-board";
+import type { FixtureLabel } from "@/league-service/nfl-schedule";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupHero, type RecordsByTeamId } from "./matchup-hero";
@@ -161,6 +162,7 @@ export function LeagueHome({
   holdExpired = false,
   tab = "matchup",
   myMatchupDetail = null,
+  fixturesByNflTeam,
   /**
    * The league's own `nextAction.kind` (F16), computed by `LeaguePage` (`src/app/app/(shell)/
    * leagues/[leagueId]/page.tsx`, exempt from the client boundary and the one place this room may
@@ -182,6 +184,9 @@ export function LeagueHome({
    *  tab's (persona pass, 2026-08-30); every other tab passes nothing and pays
    *  nothing. */
   readonly myMatchupDetail?: MatchupDetail | null;
+  /** The week's real NFL schedule keyed by team (Tank01 via `nfl_games`), worded for the row —
+   *  the team tab passes it so the editor can say "@ KC · Sun 4:05p" and BYE. */
+  readonly fixturesByNflTeam?: ReadonlyMap<string, FixtureLabel>;
   readonly home: LeagueHomeBody;
   readonly lineup: LineupBody | null;
   /** Forwarded from `LeaguePage`. Omitted only by tests that don't care about this branch —
@@ -407,6 +412,7 @@ export function LeagueHome({
               lineup={lineup}
               totalWeeks={home.totalWeeks}
               draftStatus={home.draftStatus}
+              fixturesByNflTeam={fixturesByNflTeam}
               // This week's points beside every man (the veteran persona's missing number),
               // from the same matchup detail the slate reads — my side's entries only, since
               // only my players can appear in my editor.

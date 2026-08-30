@@ -7,6 +7,7 @@
 export { createLeague } from "./creation";
 export { createInvite, acceptInvite, invitePreview, listInvites, revokeInvite } from "./invites";
 export { listLeaguesForUser, leagueHome, matchupWeek } from "./read";
+export { fixtureLabelsByTeam, type FixtureLabel } from "./nfl-schedule";
 export { crossLeagueHome } from "./home";
 export { setLineup, lineupView } from "./lineups";
 export { draftScheduleView, setDraftKickoff, KICKOFF_REFUSALS } from "./draft-schedule";

@@ -855,6 +855,36 @@ export const playerStatLines = pgTable(
 );
 
 /**
+ * The NFL schedule, one row per fixture (founder, 2026-08-30: "why don't we have the schedule?
+ * that's a core component"). `/getNFLGamesForWeek` was always fetched — the stats pipeline used
+ * it to enumerate box scores, then threw the fixtures away. This table is where they now land,
+ * so the product can say "@ KC · Sun 4:05 PM" beside a player instead of nothing.
+ *
+ * `gameDate` (YYYYMMDD) and `kickoffEt` ("4:05p") are kept in the source's own spelling rather
+ * than a computed timestamp: NFL kickoffs are published in Eastern time, and a raw pair cannot
+ * carry a timezone-conversion bug. Formatting is the display layer's job. Either may be empty
+ * when the source omits it (the mock provider's derived fixtures, an unannounced flex game).
+ */
+export const nflGames = pgTable(
+  "nfl_games",
+  {
+    /** Tank01's composite `YYYYMMDD_AWAY@HOME`, or the mock provider's deterministic id. */
+    gameId: text("game_id").primaryKey(),
+    week: integer("week").notNull(),
+    /** NFL team abbreviations, matching `players.nfl_team`. */
+    homeNflTeam: text("home_nfl_team").notNull(),
+    awayNflTeam: text("away_nfl_team").notNull(),
+    /** YYYYMMDD, as published; empty when the source did not say. */
+    gameDate: text("game_date").notNull().default(""),
+    /** Kickoff in Eastern, as published (e.g. "4:05p"); empty when the source did not say. */
+    kickoffEt: text("kickoff_et").notNull().default(""),
+    status: text("status", { enum: ["scheduled", "in_progress", "final"] }).notNull(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("nfl_games_week_idx").on(t.week)],
+);
+
+/**
  * The ingestion state of record for one NFL week. One row per week, not per league: a week is
  * final when the NFL's games are over, which is a fact about the world rather than about any
  * league. Phase 1 already conflates league week number with NFL week number (`weeks.week_number`

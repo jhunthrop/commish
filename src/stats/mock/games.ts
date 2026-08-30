@@ -29,6 +29,10 @@ export function deriveMockGames(week: number, players: readonly Player[], lines:
       status,
       homeNflTeam: playing[i]!,
       awayNflTeam: playing[i + 1]!,
+      // A derived fixture has no published kickoff, and this dataset does not invent one
+      // (founder, 2026-08-30: "don't mock ANYTHING"). The real schedule comes from Tank01.
+      gameDate: "",
+      kickoffEt: "",
     });
   }
   return games;
