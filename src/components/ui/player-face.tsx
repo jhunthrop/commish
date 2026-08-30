@@ -78,7 +78,11 @@ export function PlayerFace({ player, size = "md" }: PlayerFaceProps) {
       aria-hidden="true"
       data-testid="player-face-team"
       data-team={player.nflTeam}
-      className={`flex shrink-0 items-center justify-center rounded-sm ${step.tile}`}
+      // A CIRCLE, not a square (founder, 2026-08-30: "maybe it's the squares behind the
+      // players?" — the hard-cornered tile read as a chip, not a person). The club colour is
+      // now a RING around the circular face, the construction every incumbent's avatar uses;
+      // the colour's meaning and its aria-hidden posture are unchanged.
+      className={`flex shrink-0 items-center justify-center rounded-full ${step.tile}`}
       style={{ backgroundColor: color }}
     >
       <Avatar name={player.name} avatar={player.headshotUrl} size={step.avatar} />
