@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import type { DraftStatus } from "@/domain/draft";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
-import { Button, PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
+import { Button, PlayerFace, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import { useLeagueRoomDeps } from "../hooks/deps";
@@ -13,6 +13,35 @@ import { formatPoints, formatWeek } from "../lib/format";
 import { playerOf } from "../lib/player";
 
 const slotKey = (slot: LineupSlotView): string => `${slot.slot}:${slot.slotIndex}`;
+
+/** The ESPN grid's one column template: SLOT | PLAYER | OPP | PROJ | PTS | action. */
+const GRID_COLS = "grid-cols-[52px_minmax(0,1fr)_120px_88px_88px_170px]";
+
+/** This week's projection, right-aligned; dash for a man the snapshot does not name. */
+function ProjCell({ projections, playerId }: { readonly projections: ReadonlyMap<string, number> | undefined; readonly playerId: string | null }) {
+  if (projections === undefined) return <span />;
+  const value = playerId === null ? undefined : projections.get(playerId);
+  return (
+    <span className={`text-right font-display tabular-nums ${value === undefined ? "text-base font-semibold text-text-faint/60" : "text-lg font-semibold text-text-muted"}`}>
+      {value === undefined ? NOT_STARTED_DASH : formatPoints(value)}
+    </span>
+  );
+}
+
+/** This week's points; the dash keeps "has not played" distinct from "scored nothing". */
+function PointsCell({ points, playerId, loud = false }: { readonly points: ReadonlyMap<string, number | null> | undefined; readonly playerId: string | null; readonly loud?: boolean }) {
+  if (points === undefined) return <span />;
+  const value = playerId === null ? null : (points.get(playerId) ?? null);
+  return (
+    <span
+      className={`text-right font-display tabular-nums ${
+        value === null ? "text-base font-semibold text-text-faint/60" : loud ? "text-2xl font-bold text-text-primary" : "text-lg font-bold text-text-muted"
+      }`}
+    >
+      {playerId === null ? "" : value === null ? NOT_STARTED_DASH : formatPoints(value)}
+    </span>
+  );
+}
 
 /**
  * THE SCHEDULE CELL (founder, 2026-08-30: the ESPN row — opponent and kickoff beside every
@@ -41,33 +70,6 @@ function FixtureCell({
 }
 
 /**
- * One roster slot's occupant, drawn as an object — face on the club colour, name, position
- * sticker, club code (law 3). An empty slot reads as the word and nothing else: there is no face
- * to draw, and a placeholder tile pretending to be somebody is the failure `PlayerFace` already
- * refuses for an unknown club.
- */
-function SlotPlayer({ slot, leagueId }: { readonly slot: LineupSlotView; readonly leagueId: string }) {
-  const player = playerOf(slot);
-  if (player === null) return <span className="text-sm text-text-faint">Empty</span>;
-  return (
-    <span className="flex min-w-0 items-center gap-2">
-      <PlayerFace player={player} size="sm" />
-      {/* THE NAME IS THE DOOR TO HIS OWN SCREEN. "Should he be starting?" is the question this
-          panel exists to answer and the panel cannot answer it — a season's shape and where the
-          market has him live one route away, and the name is the thing a manager reaches for.
-          The LINK is the control, never the row around it: the same rule `PlayerRow` keeps, so a
-          list of six bench players has six focus stops with six real names and not one wrapper
-          swallowing them. */}
-      <Link className="truncate text-sm text-accent underline" href={`/app/leagues/${leagueId}/players/${player.id}`}>
-        {player.name}
-      </Link>
-      <PositionBadge position={player.position} size="sm" />
-      {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
-    </span>
-  );
-}
-
-/**
  * Starters and bench for one week.
  *
  * It holds nothing but "which player is in which STARTING slot", and sends exactly that: the
@@ -82,6 +84,7 @@ export function LineupEditor({
   draftStatus,
   pointsByPlayerId,
   fixturesByNflTeam,
+  projectionsByPlayerId,
 }: {
   readonly leagueId: string;
   readonly lineup: LineupBody;
@@ -95,6 +98,10 @@ export function LineupEditor({
    *  "@ KC" + "Sun 4:05p" / "Live" / "Final". A team with no entry is on BYE, and the row says
    *  so — the one schedule fact a lineup manager most needs shouted. */
   readonly fixturesByNflTeam?: ReadonlyMap<string, { readonly opp: string; readonly when: string; readonly status: "scheduled" | "in_progress" | "final" }>;
+  /** This week's PPR projection per playerId, parsed from the harvested tank01_projections
+   *  snapshot — empty/absent when no snapshot matches this week (the dash, never a stale
+   *  number). */
+  readonly projectionsByPlayerId?: ReadonlyMap<string, number>;
   /** Wave-1 review Q10, SETTLED: `home.draftStatus`, threaded from both `LeagueHome` call sites
    *  — the fact itself, not an inference over the lineup's own empty slots. Optional only for a
    *  caller that genuinely does not know it yet (never true at either real call site); `null` and
@@ -139,33 +146,17 @@ export function LineupEditor({
     );
   }
 
-  if (lineup.locked) {
-    // Persona review (first-timer, FIX 4): stating the situation without naming what happens
-    // next reads as a dead end. There IS a next step — it just isn't available yet — so say
-    // when. The season's final week has no next week to point at, so the second sentence is
-    // dropped rather than promising a lineup that will never open.
-    const hasNextWeek = lineup.weekNumber < totalWeeks;
-    return (
-      // `id="lineup"` (F16): a real anchor on a real panel, in BOTH branches — the locked state
-      // is still where `/app/leagues/${id}#lineup` has to land, not just the editable one.
-      <section id="lineup" className="flex flex-col gap-2">
-        <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
-        <p className="text-sm text-text-muted">
-          {hasNextWeek
-            ? `${formatWeek(lineup.weekNumber)} has started, so its lineup cannot change. You can set next week's lineup as soon as this week ends.`
-            : `${formatWeek(lineup.weekNumber)} has started, so its lineup cannot change.`}
-        </p>
-        <ul className="flex flex-col gap-1">
-          {lineup.starters.map((slot) => (
-            <li key={slotKey(slot)} className="flex items-center gap-2">
-              <SlotChip slot={slot.slot} />
-              <SlotPlayer slot={slot} leagueId={leagueId} />
-            </li>
-          ))}
-        </ul>
-      </section>
-    );
-  }
+  // LOCKED IS THE SAME GRID, read-only (founder, 2026-08-30: the ESPN screen — ESPN's locked
+  // week keeps every column and drops the verbs, and a completed-season demo lives in this
+  // state almost permanently). Persona FIX 4's sentence survives as the subtitle: say what
+  // happens next, and drop the promise on the season's final week.
+  const isLocked = lineup.locked;
+  const hasNextWeek = lineup.weekNumber < totalWeeks;
+  const subtitle = isLocked
+    ? hasNextWeek
+      ? `${formatWeek(lineup.weekNumber)} has started, so its lineup cannot change. You can set next week's lineup as soon as this week ends.`
+      : `${formatWeek(lineup.weekNumber)} has started, so its lineup cannot change.`
+    : "Lineups lock for the whole week when its first game kicks off.";
 
   /**
    * AUTO-SAVE (founder, 2026-08-28: "it should auto save the lineup we shouldn't have a save
@@ -274,120 +265,134 @@ export function LineupEditor({
 
   const moving = selected !== null;
 
+  // Totals over the CURRENT starters (the optimistic assignments, not the loaded lineup), known
+  // numbers only — `null` when there is nothing to sum, so the row prints blank over fiction.
+  const starterIds = lineup.starters.map((slot) => assignments[slotKey(slot)] ?? null).filter((id): id is string => id !== null);
+  const knownProj = projectionsByPlayerId === undefined ? [] : starterIds.map((id) => projectionsByPlayerId.get(id)).filter((v): v is number => v !== undefined);
+  const startersProjTotal = knownProj.length === 0 ? null : knownProj.reduce((sum, v) => sum + v, 0);
+  const knownPoints = pointsByPlayerId === undefined ? [] : starterIds.map((id) => pointsByPlayerId.get(id) ?? null).filter((v): v is number => v !== null);
+  const startersPointsTotal = knownPoints.length === 0 ? null : knownPoints.reduce((sum, v) => sum + v, 0);
+
   return (
     // `id="lineup"` (F16): the fragment `actionHref` builds is a real anchor on a real panel.
     <section id="lineup" className="flex flex-col gap-3">
       <div className="flex flex-col gap-0.5">
         <h2 className="font-display text-2xl font-bold text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
         {/* Under its heading, not orphaned at the far edge (the persona pass, 2026-08-30). */}
-        <p className="text-sm text-text-faint">Lineups lock for the whole week when its first game kicks off.</p>
+        <p className="text-sm text-text-faint">{subtitle}</p>
       </div>
 
-      {/* FULL WIDTH (founder, 2026-08-30: "no reason for them to be that small") — the two
-          columns split the whole main column, 1.4:1 starters to bench. */}
-      <div className="grid w-full gap-x-10 gap-y-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
-        {/* STARTERS. Each row is a destination while a move is live: eligible slots carry the
-            amber HERE, ineligible ones dim — which is the whole chart taught by looking, with no
-            tip anywhere (the no-tips ruling's own test case). */}
-        <ul className="flex flex-col">
-          {lineup.starters.map((slot) => {
-            const key = slotKey(slot);
-            const occupantId = assignments[key] ?? null;
-            const occupant = occupantId === null ? undefined : byId.get(occupantId);
-            const face = occupant === undefined ? null : playerOf(occupant);
-            const isSelected = selected === key;
-            const occupantPosition = occupant?.position ?? null;
-            const fromSlotType = selectedSlotType();
-            // BOTH ENDS MUST FIT (founder, 2026-08-28: "if you select a QB it should only
-            // highlight the QBs on your bench... visually show what you can do"). The selected
-            // player must fit THIS slot, and — on a starter-to-starter swap — the displaced
-            // occupant must fit the slot he falls back into. A move that lights is a move that
-            // saves; nothing lights that the server would bounce.
-            const canReceive =
-              moving &&
-              !isSelected &&
-              eligible(slot.slot, selectedPosition) &&
-              (fromSlotType === null || occupantId === null || eligible(fromSlotType, occupantPosition));
-            const dimmed = moving && !isSelected && !canReceive;
-            return (
-              <li
-                key={key}
-                className={`flex items-center gap-3 border-t border-line border-l-[3px] py-3 pl-2 transition-all ${
-                  isSelected
-                    ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent"
-                    : "border-l-transparent"
-                } ${dimmed ? "opacity-40" : ""}`}
-              >
-                {/* Plain micro text, not a bordered chip: the box read as an empty input to the
-                    first-timer. A slot label is a label. */}
-                <span className={`${MICRO_LABEL} w-14 shrink-0 text-right text-text-faint`}>{slot.slot}</span>
-                {face === null ? (
-                  <span className="flex min-w-0 flex-1 items-center gap-2.5 text-sm text-text-faint">
-                    <span aria-hidden="true" className="size-9 rounded-sm border border-dashed border-line" />
-                    Empty
-                  </span>
-                ) : (
-                  <span className="flex min-w-0 flex-1 items-center gap-2.5">
-                    <PlayerFace player={face} size="lg" />
-                    <span className="flex min-w-0 flex-col">
-                      <Link
-                        className="truncate font-display text-2xl font-bold leading-display text-text-primary hover:underline"
-                        href={`/app/leagues/${leagueId}/players/${face.id}`}
-                      >
-                        {face.name}
-                      </Link>
-                      <span className="flex items-center gap-2">
-                        <PositionBadge position={face.position} size="md" />
-                        {face.nflTeam === "" ? null : <span className="font-mono text-sm text-text-faint">{face.nflTeam}</span>}
+      {/* THE ESPN GRID (founder, 2026-08-30: "This is what an espn screen looks like").
+          One full-width table, the incumbent's own column order — SLOT | PLAYER | OPP | PROJ |
+          PTS | action — with a totals row after the starters and the bench in the same grid
+          below it. The two-tap Swap/Here flow is unchanged; only the geometry moved. */}
+      <div className="w-full overflow-x-auto">
+        <div className="min-w-[720px]">
+          <div aria-hidden="true" className={`grid ${GRID_COLS} items-center gap-x-4 border-b border-line pb-1.5 ${MICRO_LABEL} text-text-faint`}>
+            <span className="text-right">Slot</span>
+            <span>Player</span>
+            <span className="text-right">Opp</span>
+            <span className="text-right">Proj</span>
+            <span className="text-right">Pts</span>
+            <span />
+          </div>
+          <ul className="flex flex-col">
+            {lineup.starters.map((slot) => {
+              const key = slotKey(slot);
+              const occupantId = assignments[key] ?? null;
+              const occupant = occupantId === null ? undefined : byId.get(occupantId);
+              const face = occupant === undefined ? null : playerOf(occupant);
+              const isSelected = selected === key;
+              const occupantPosition = occupant?.position ?? null;
+              const fromSlotType = selectedSlotType();
+              // BOTH ENDS MUST FIT (founder, 2026-08-28): the selected player must fit THIS
+              // slot, and on a starter-to-starter swap the displaced occupant must fit the slot
+              // he falls back into. A move that lights is a move that saves.
+              const canReceive =
+                moving &&
+                !isSelected &&
+                eligible(slot.slot, selectedPosition) &&
+                (fromSlotType === null || occupantId === null || eligible(fromSlotType, occupantPosition));
+              const dimmed = moving && !isSelected && !canReceive;
+              return (
+                <li
+                  key={key}
+                  className={`grid ${GRID_COLS} items-center gap-x-4 border-t border-line border-l-[3px] py-2.5 pl-0 transition-all ${
+                    isSelected
+                      ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent"
+                      : "border-l-transparent"
+                  } ${dimmed ? "opacity-40" : ""}`}
+                >
+                  <span className={`${MICRO_LABEL} text-right text-text-faint`}>{slot.slot}</span>
+                  {face === null ? (
+                    <span className="flex min-w-0 items-center gap-2.5 text-sm text-text-faint">
+                      <span aria-hidden="true" className="size-11 rounded-full border border-dashed border-line" />
+                      Empty
+                    </span>
+                  ) : (
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <PlayerFace player={face} size="md" />
+                      <span className="flex min-w-0 flex-col">
+                        <Link
+                          className="truncate font-display text-xl font-bold leading-display text-text-primary hover:underline"
+                          href={`/app/leagues/${leagueId}/players/${face.id}`}
+                        >
+                          {face.name}
+                        </Link>
+                        <span className="flex items-center gap-1.5">
+                          <PositionBadge position={face.position} size="sm" />
+                          {face.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{face.nflTeam}</span>}
+                        </span>
                       </span>
                     </span>
+                  )}
+                  <span className="justify-self-end">{face === null ? null : <FixtureCell fixtures={fixturesByNflTeam} nflTeam={face.nflTeam} />}</span>
+                  <ProjCell projections={projectionsByPlayerId} playerId={occupantId} />
+                  <PointsCell points={pointsByPlayerId} playerId={occupantId} loud />
+                  <span className="flex items-center justify-end gap-2">
+                    {isLocked ? null : canReceive ? (
+                      <Button variant="verb" size="sm" onClick={() => placeHere(key)} aria-label={`Put ${byId.get(selectedPlayerId!)?.playerName ?? "the selected player"} at ${slot.slot}`}>
+                        Here
+                      </Button>
+                    ) : isSelected ? (
+                      <>
+                        <Button variant="secondary" size="sm" onClick={sendToBench}>
+                          To bench
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => setSelected(null)}>
+                          Cancel
+                        </Button>
+                      </>
+                    ) : moving ? null : occupantId === null ? null : (
+                      <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${occupant?.playerName ?? ""}`}>
+                        Swap
+                      </Button>
+                    )}
                   </span>
-                )}
-                {face === null ? null : <FixtureCell fixtures={fixturesByNflTeam} nflTeam={face.nflTeam} />}
-                {/* THE FIGURE (the veteran persona, 2026-08-30: "not a single number on the
-                    entire screen — I set lineups with numbers"). This week's points, straight
-                    from the matchup detail the page already holds; the dash keeps the contract's
-                    "has not played" vs "scored nothing" distinction. */}
-                {pointsByPlayerId === undefined || occupantId === null ? null : (
-                  <span
-                    className={`shrink-0 font-display tabular-nums ${
-                      (pointsByPlayerId.get(occupantId) ?? null) === null ? "text-base font-semibold text-text-faint/60" : "text-2xl font-bold text-text-primary"
-                    }`}
-                  >
-                    {(pointsByPlayerId.get(occupantId) ?? null) === null ? NOT_STARTED_DASH : formatPoints(pointsByPlayerId.get(occupantId)!)}
-                  </span>
-                )}
-                {canReceive ? (
-                  <Button variant="verb" size="sm" onClick={() => placeHere(key)} aria-label={`Put ${byId.get(selectedPlayerId!)?.playerName ?? "the selected player"} at ${slot.slot}`}>
-                    Here
-                  </Button>
-                ) : isSelected ? (
-                  <span className="flex items-center gap-2">
-                    <Button variant="secondary" size="sm" onClick={sendToBench}>
-                      To bench
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setSelected(null)}>
-                      Cancel
-                    </Button>
-                  </span>
-                ) : moving ? null : occupantId === null ? null : (
-                  // GHOST AT REST (persona pass, 2026-08-30: sixteen identical outlined pills
-                  // read as wallpaper — the chrome outshone the players). The verb keeps its
-                  // word (founder ruling: it says "Swap") but drops its border until wanted.
-                  <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${occupant?.playerName ?? ""}`}>
-                    Swap
-                  </Button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
 
-        {/* THE BENCH, derived live. While a bench man is selected the starter slots light; while
-            a starter is selected every bench row is a legal landing (a bench holds anyone), so
-            each carries HERE. */}
-        <div className="flex flex-col">
-          <h3 className={`${MICRO_LABEL} pb-2 text-text-faint`}>Bench</h3>
+          {/* TOTALS — the row ESPN ends its starters on. Sums cover only KNOWN numbers: an
+              absent projection or an unplayed man contributes nothing rather than a fake zero. */}
+          <div className={`grid ${GRID_COLS} items-center gap-x-4 border-t-2 border-line bg-surface-elevated/40 py-2`}>
+            <span />
+            <span className={`${MICRO_LABEL} text-text-faint`}>Totals</span>
+            <span />
+            <span className="text-right font-display text-lg font-bold tabular-nums text-text-muted">
+              {startersProjTotal === null ? "" : formatPoints(startersProjTotal)}
+            </span>
+            <span className="text-right font-display text-xl font-extrabold tabular-nums text-text-primary">
+              {startersPointsTotal === null ? "" : formatPoints(startersPointsTotal)}
+            </span>
+            <span />
+          </div>
+
+          {/* THE BENCH, derived live, in the same grid (ESPN keeps one table). While a starter
+              is selected only the eligible bench men light with HERE; the dimmed rows are the
+              chart, taught by looking. */}
+          <h3 className={`${MICRO_LABEL} border-t border-line pb-1 pt-3 text-text-faint`}>Bench</h3>
           {benchNow.length === 0 ? (
             <p className="text-sm text-text-muted">Nobody on the bench.</p>
           ) : (
@@ -397,53 +402,51 @@ export function LineupEditor({
                 const player = playerOf(slot)!;
                 const isSelected = selected === key;
                 const fromSlotType = selectedSlotType();
-                // Selecting the QB lights only the bench's QBs; selecting the FLEX lights only
-                // RB/WR/TE. The dimmed rows are the chart, taught by looking.
                 const canReceive = moving && fromSlotType !== null && !isSelected && eligible(fromSlotType, player.position);
                 const dimmed = moving && !isSelected && !canReceive;
                 return (
                   <li
                     key={key}
-                    className={`flex items-center gap-2.5 border-t border-line border-l-[3px] py-2.5 pl-2 transition-all ${
+                    className={`grid ${GRID_COLS} items-center gap-x-4 border-t border-line/50 border-l-[3px] py-2 transition-all ${
                       isSelected
                         ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent"
                         : "border-l-transparent"
                     } ${dimmed ? "opacity-40" : ""}`}
                   >
-                    <PlayerFace player={player} size="md" />
-                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <Link
-                        className="truncate text-lg font-medium text-text-primary hover:underline"
-                        href={`/app/leagues/${leagueId}/players/${player.id}`}
-                      >
-                        {player.name}
-                      </Link>
-                      <PositionBadge position={player.position} size="sm" />
-                      {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
-                    </span>
-                    <FixtureCell fixtures={fixturesByNflTeam} nflTeam={player.nflTeam} />
-                    {pointsByPlayerId === undefined ? null : (
-                      <span
-                        className={`shrink-0 font-display tabular-nums ${
-                          (pointsByPlayerId.get(slot.playerId!) ?? null) === null ? "text-base font-semibold text-text-faint/60" : "text-lg font-bold text-text-muted"
-                        }`}
-                      >
-                        {(pointsByPlayerId.get(slot.playerId!) ?? null) === null ? NOT_STARTED_DASH : formatPoints(pointsByPlayerId.get(slot.playerId!)!)}
+                    <span className={`${MICRO_LABEL} text-right text-text-faint`}>BN</span>
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <PlayerFace player={player} size="md" />
+                      <span className="flex min-w-0 flex-col">
+                        <Link
+                          className="truncate text-lg font-semibold text-text-primary hover:underline"
+                          href={`/app/leagues/${leagueId}/players/${player.id}`}
+                        >
+                          {player.name}
+                        </Link>
+                        <span className="flex items-center gap-1.5">
+                          <PositionBadge position={player.position} size="sm" />
+                          {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
+                        </span>
                       </span>
-                    )}
-                    {canReceive ? (
-                      <Button variant="verb" size="sm" onClick={() => swapWithBench(slot.playerId!)} aria-label={`Swap ${player.name} into the lineup`}>
-                        Here
-                      </Button>
-                    ) : isSelected ? (
-                      <Button variant="secondary" size="sm" onClick={() => setSelected(null)}>
-                        Cancel
-                      </Button>
-                    ) : moving ? null : (
-                      <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${player.name}`}>
-                        Swap
-                      </Button>
-                    )}
+                    </span>
+                    <span className="justify-self-end"><FixtureCell fixtures={fixturesByNflTeam} nflTeam={player.nflTeam} /></span>
+                    <ProjCell projections={projectionsByPlayerId} playerId={slot.playerId} />
+                    <PointsCell points={pointsByPlayerId} playerId={slot.playerId} />
+                    <span className="flex items-center justify-end gap-2">
+                      {isLocked ? null : canReceive ? (
+                        <Button variant="verb" size="sm" onClick={() => swapWithBench(slot.playerId!)} aria-label={`Swap ${player.name} into the lineup`}>
+                          Here
+                        </Button>
+                      ) : isSelected ? (
+                        <Button variant="secondary" size="sm" onClick={() => setSelected(null)}>
+                          Cancel
+                        </Button>
+                      ) : moving ? null : (
+                        <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${player.name}`}>
+                          Swap
+                        </Button>
+                      )}
+                    </span>
                   </li>
                 );
               })}

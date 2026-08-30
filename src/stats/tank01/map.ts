@@ -34,7 +34,12 @@ export function mapPlayerList(body: unknown): readonly Player[] {
     const record = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
     const id = str(record.playerID);
     const name = str(record.longName);
-    const position = str(record.pos);
+    // Tank01 spells the kicker position "PK"; the domain (and every incumbent) says "K". Found
+    // live 2026-08-30: the 2025 rebuild seeded ZERO kickers because this filter dropped every
+    // "PK" — the mock dataset said "K" and masked it for a month (the no-mock ruling's poster
+    // child).
+    const rawPosition = str(record.pos);
+    const position = rawPosition === "PK" ? "K" : rawPosition;
     const nflTeam = str(record.team);
     // A player missing any of these cannot be drafted, displayed or scored, so it is dropped
     // rather than emitted with a placeholder that would fail a foreign key at seed time.

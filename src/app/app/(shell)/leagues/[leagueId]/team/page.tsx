@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { LEAGUE_CONFIG } from "@/league/config";
-import { fixtureLabelsByTeam, leagueHome, lineupView, matchupWeek } from "@/league-service";
+import { fixtureLabelsByTeam, leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId } from "@/league-service";
 import { LeagueHome } from "@/league-room/components/league-home";
 import { leagueAct } from "@/lib/leagues/next-act";
 import { readPreferences } from "@/identity-service/preferences";
@@ -32,6 +32,9 @@ export default async function LeagueTeamPage({ params }: { readonly params: Prom
   // The real NFL schedule for this week (Tank01, `nfl_games`): "@ KC · Sun 4:05p" beside every
   // player, and BYE said out loud for a team with no fixture.
   const fixtures = await fixtureLabelsByTeam(getDb(), home.currentWeek);
+  // The Proj column, from the harvested tank01_projections snapshot — empty when no snapshot
+  // matches this week, and the grid prints the dash.
+  const projections = await weeklyProjectionsByPlayerId(getDb(), home.currentWeek);
   const myMatchupDetail =
     week === null || home.myTeamId === null
       ? null
@@ -40,6 +43,7 @@ export default async function LeagueTeamPage({ params }: { readonly params: Prom
     <LeagueHome
       myMatchupDetail={myMatchupDetail}
       fixturesByNflTeam={fixtures}
+      projectionsByPlayerId={projections}
       home={home}
       lineup={lineup}
       helpLevel={preferences.helpLevel}
