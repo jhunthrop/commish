@@ -1,4 +1,5 @@
 import { PlayerFace, SlotChip } from "@/components/ui";
+import { PlayerName } from "./player-peek";
 import { LiveMarker } from "@/components/ui/live-marker";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
@@ -34,7 +35,7 @@ function pairStarters(mine: readonly MatchupLineupEntry[], theirs: readonly Matc
  * The field-relative verdict is a real fact with a real home: the player's own page. It does not
  * belong on the matchup, where colour gets read as status.
  */
-function SlateSide({ entry, align, wonSlot }: { readonly entry: MatchupLineupEntry | undefined; readonly align: "left" | "right"; readonly wonSlot: boolean }) {
+function SlateSide({ entry, align, wonSlot, leagueId }: { readonly entry: MatchupLineupEntry | undefined; readonly align: "left" | "right"; readonly wonSlot: boolean; readonly leagueId: string }) {
   const player = entry === undefined ? null : playerOf(entry);
   const points = entry?.points ?? null;
   const identity =
@@ -44,7 +45,7 @@ function SlateSide({ entry, align, wonSlot }: { readonly entry: MatchupLineupEnt
       <span className={`flex min-w-0 items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
         <PlayerFace player={player} size="md" />
         <span className="flex min-w-0 flex-col">
-          <span className="truncate text-lg font-semibold leading-tight text-text-primary">{player.name}</span>
+          <PlayerName leagueId={leagueId} playerId={player.id} name={player.name} className="truncate text-lg font-semibold leading-tight text-text-primary" />
           <span className="truncate font-mono text-sm text-text-faint">
             {player.position}
             {player.nflTeam === "" ? "" : ` · ${player.nflTeam}`}
@@ -77,6 +78,8 @@ function SlateSide({ entry, align, wonSlot }: { readonly entry: MatchupLineupEnt
 export interface MatchupSlateProps {
   readonly detail: MatchupDetail;
   readonly myTeamId: string | null;
+  /** For the pressable names (founder, 2026-08-30): the peek needs the league whose rules score him. */
+  readonly leagueId: string;
 }
 
 /** Starters still without a stat line — the casual persona's one unanswered question ("who's
@@ -103,7 +106,7 @@ function yetToPlay(entries: readonly MatchupLineupEntry[]): number {
  * Bench regret is deliberately not here: the slate is the game as fielded. The matchup page's
  * own chips carry the bench arithmetic for the one manager it belongs to.
  */
-export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
+export function MatchupSlate({ detail, myTeamId, leagueId }: MatchupSlateProps) {
   // HOME LEFT, AWAY RIGHT — the hero's own order, kept even when the viewer is the away side.
   // The first render put "mine" left and the two components disagreed about which side Bay
   // Bandits was on within one card; a page that swaps a team's side between its scoreboard and
@@ -147,12 +150,14 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
             <SlateSide
               entry={pair.mine}
               align="left"
+              leagueId={leagueId}
               wonSlot={pair.mine?.points != null && pair.mine.points > (pair.theirs?.points ?? -Infinity)}
             />
             <SlotChip slot={(pair.mine ?? pair.theirs)!.slot} className="justify-self-center" />
             <SlateSide
               entry={pair.theirs}
               align="right"
+              leagueId={leagueId}
               wonSlot={pair.theirs?.points != null && pair.theirs.points > (pair.mine?.points ?? -Infinity)}
             />
           </li>
@@ -171,9 +176,9 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
           <ul className="flex flex-col pt-1">
             {pairStarters(mine.bench, theirs.bench).map((pair) => (
               <li key={`bench-${pair.key}`} className="grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] items-center gap-x-3 border-t border-hair border-t-line/50 py-1.5 opacity-80">
-                <SlateSide entry={pair.mine} align="left" wonSlot={false} />
+                <SlateSide entry={pair.mine} align="left" leagueId={leagueId} wonSlot={false} />
                 <span className={`${MICRO_LABEL} justify-self-center text-text-faint`}>BN</span>
-                <SlateSide entry={pair.theirs} align="right" wonSlot={false} />
+                <SlateSide entry={pair.theirs} align="right" leagueId={leagueId} wonSlot={false} />
               </li>
             ))}
           </ul>

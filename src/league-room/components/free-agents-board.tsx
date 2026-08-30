@@ -8,6 +8,7 @@ import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { Position } from "@/domain/player";
 import { useLeagueRoomDeps } from "../hooks/deps";
+import { PlayerName } from "./player-peek";
 
 interface FreeAgentRow {
   readonly id: string;
@@ -178,7 +179,7 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
                 <span className="flex min-w-0 items-center gap-2.5">
                   <PlayerFace player={agent} size="lg" />
                   <span className="flex min-w-0 flex-col">
-                    <span className="truncate font-display text-2xl font-bold leading-display text-text-primary">{agent.name}</span>
+                    <PlayerName leagueId={leagueId} playerId={agent.id} name={agent.name} className="truncate font-display text-2xl font-bold leading-display text-text-primary" />
                     <span className="flex items-center gap-2">
                       <PositionBadge position={agent.position} size="md" />
                       {agent.nflTeam === "" ? null : <span className="font-mono text-sm text-text-faint">{agent.nflTeam}</span>}
@@ -215,7 +216,7 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
                       <li key={mine.id} className="flex items-center gap-2.5 py-1">
                         <PlayerFace player={mine} size="sm" />
                         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <span className="truncate text-sm font-medium text-text-primary">{mine.name}</span>
+                          <PlayerName leagueId={leagueId} playerId={mine.id} name={mine.name} className="truncate text-sm font-medium text-text-primary" />
                           <PositionBadge position={mine.position} size="sm" />
                           {mine.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{mine.nflTeam}</span>}
                         </span>

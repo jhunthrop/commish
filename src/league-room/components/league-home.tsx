@@ -18,6 +18,7 @@ import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupHero, type RecordsByTeamId } from "./matchup-hero";
 import { MatchupSlate } from "./matchup-slate";
+import { PlayerPeekHost } from "./player-peek";
 import { ModerationSummary } from "./moderation-summary";
 import { StandingsTable } from "./standings-table";
 import { WaitingRoom } from "./waiting-room";
@@ -242,6 +243,9 @@ export function LeagueHome({
 
   return (
     <>
+      {/* The one receiver for every pressable player name on this page (founder, 2026-08-30):
+          any `PlayerName` press raises the bottom-sheet peek here. */}
+      <PlayerPeekHost />
       {/* The `Card` primitive, not a hand-rolled copy of it: this header spelled
           `rounded-lg border border-line bg-surface-elevated shadow-card` inline, which is
           `Card`'s own base string with a different padding step. One surface vocabulary, spelled
@@ -373,7 +377,7 @@ export function LeagueHome({
             {/* THE SLATE: the game, player by player, ESPN's mirror — the hero says the totals
                 and the slate says where they came from. Renders only when the page fetched the
                 detail, which is the matchup tab's own read. */}
-            {myMatchupDetail === null ? null : <MatchupSlate detail={myMatchupDetail} myTeamId={home.myTeamId} />}
+            {myMatchupDetail === null ? null : <MatchupSlate detail={myMatchupDetail} myTeamId={home.myTeamId} leagueId={home.leagueId} />}
           </Card>
         )}
         {/* Same visibility the retired "Score Week" button had: the commissioner's control is

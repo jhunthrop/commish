@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import type { DraftStatus } from "@/domain/draft";
 import type { ApiEnvelope } from "@/lib/api/respond";
@@ -9,6 +8,7 @@ import { Button, PlayerFace, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import { useLeagueRoomDeps } from "../hooks/deps";
+import { PlayerName } from "./player-peek";
 import { formatPoints, formatWeek } from "../lib/format";
 import { playerOf } from "../lib/player";
 
@@ -333,12 +333,12 @@ export function LineupEditor({
                     <span className="flex min-w-0 items-center gap-2.5">
                       <PlayerFace player={face} size="md" />
                       <span className="flex min-w-0 flex-col">
-                        <Link
-                          className="truncate font-display text-xl font-bold leading-display text-text-primary hover:underline"
-                          href={`/app/leagues/${leagueId}/players/${face.id}`}
-                        >
-                          {face.name}
-                        </Link>
+                        <PlayerName
+                          leagueId={leagueId}
+                          playerId={face.id}
+                          name={face.name}
+                          className="truncate font-display text-xl font-bold leading-display text-text-primary"
+                        />
                         <span className="flex items-center gap-1.5">
                           <PositionBadge position={face.position} size="sm" />
                           {face.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{face.nflTeam}</span>}
@@ -417,12 +417,12 @@ export function LineupEditor({
                     <span className="flex min-w-0 items-center gap-2.5">
                       <PlayerFace player={player} size="md" />
                       <span className="flex min-w-0 flex-col">
-                        <Link
-                          className="truncate text-lg font-semibold text-text-primary hover:underline"
-                          href={`/app/leagues/${leagueId}/players/${player.id}`}
-                        >
-                          {player.name}
-                        </Link>
+                        <PlayerName
+                          leagueId={leagueId}
+                          playerId={player.id}
+                          name={player.name}
+                          className="truncate text-lg font-semibold text-text-primary"
+                        />
                         <span className="flex items-center gap-1.5">
                           <PositionBadge position={player.position} size="sm" />
                           {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}

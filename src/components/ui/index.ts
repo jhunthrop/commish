@@ -50,6 +50,7 @@ export { PlayerRow } from "./player-row";
 export { PlayerObject, splitName } from "./player-object";
 export { SourceStrip, type SourceValue } from "./source-strip";
 export { SeasonBars, type SeasonWeek } from "./season-bars";
+export { BottomSheet } from "./bottom-sheet";
 export { TierDivider } from "./tier-divider";
 // Sunday v5's three new primitives: law 2's movement arrow, law 1's delta, law 6's lower third.
 export { Movement } from "./movement";

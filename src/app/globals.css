@@ -152,6 +152,18 @@ body {
    `celebrate-peer` is the quiet one — somebody else's moment, an 8px rise and fade.
    `celebrate-self` is the louder one — your own moment, a small scale bounce. DraftBoard's
    sticker-slap below is a SEPARATE animation on the grid cell, not the panel. */
+/* The bottom sheet's rise (founder, 2026-08-30): one short ease-out, no bounce. */
+@keyframes commish-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-sheet-up {
+  animation: commish-sheet-up 0.22s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-up { animation: none; }
+}
+
 @keyframes commish-celebrate-peer {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
