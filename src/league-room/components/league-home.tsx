@@ -246,7 +246,10 @@ export function LeagueHome({
         {/* The draft's one remnant once it is history — quiet, in the masthead, instead of a
             floating sentence row of its own between the masthead and the week. */}
         {home.draftStatus === "complete" ? (
-          <Link className="text-sm font-medium text-text-muted underline hover:text-text-primary" href={`/app/drafts/${home.draftId}`}>
+          // Quiet and unadorned (the scan pass): underlined at the masthead's corner this sat
+          // on the F-pattern's first fixation — prime real estate for a link used once a
+          // season. Hover reveals it is a link; the eye at rest reads past it.
+          <Link className="text-sm text-text-faint transition-colors hover:text-text-primary hover:underline" href={`/app/drafts/${home.draftId}`}>
             View the draft board
           </Link>
         ) : null}

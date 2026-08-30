@@ -32,16 +32,14 @@ export function MessageList({ leagueId, messages, meUserId, hasMore, loadingEarl
   const [reportingId, setReportingId] = useState<string | null>(null);
 
   if (messages.length === 0) {
+    // ONE QUIET LINE, not a showcase (founder, 2026-08-30, the scan pass): the dashed EmptyState
+    // panel made an empty chat the second-loudest element on the league page — a bordered
+    // exhibit of nothing, pulling the eye from the matchup it sits beside. Silence should
+    // recede; the composer below is its own invitation.
     return (
-      <EmptyState
-        title="Nobody has said anything yet"
-        description="Say hello, talk trash, or ask who is actually starting that kicker."
-        action={
-          <a href="#chat-message-input" className="text-sm font-medium text-accent underline">
-            Say hello
-          </a>
-        }
-      />
+      <p className="px-1 py-2 text-sm text-text-faint">
+        Nobody has said anything yet. Say hello, or ask who is actually starting that kicker.
+      </p>
     );
   }
 
