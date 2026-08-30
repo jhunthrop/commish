@@ -255,7 +255,12 @@ export function LeagueHome({
         ) : null}
       </Card>
 
-      <LeagueTabs leagueId={home.leagueId} active={tab} />
+      {/* THE RAIL WAITS FOR THE DRAFT (founder, 2026-08-30: "it shows add free agents but
+          there's no draft"). Pre-draft, five of the six rooms are voids — no matchup, no
+          standings, no roster, a claims endpoint that refuses, nothing tradeable — and the
+          no-empty-rooms rule applies to the rail itself: a league that has not drafted IS the
+          waiting room, and the tabs arrive with the season. */}
+      {home.draftStatus === "complete" ? <LeagueTabs leagueId={home.leagueId} active={tab} /> : null}
 
       {draftJustCompleted ? (
         <DraftCompleteArrival leagueId={home.leagueId} draftId={home.draftId} lineup={lineup!} matchup={home.myMatchup!} />

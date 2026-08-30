@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { LEAGUE_CONFIG } from "@/league/config";
@@ -21,6 +21,8 @@ export default async function LeagueStandingsPage({ params }: { readonly params:
   const { leagueId } = await params;
   const [home, preferences] = await Promise.all([leagueHome(getDb(), leagueId, user.id), readPreferences(getDb(), user)]);
   if (home === null || (home.myTeamId === null && !home.isCommissioner)) notFound();
+  // Pre-draft this room does not exist — a bookmark lands on the waiting room, not a void.
+  if (home.draftStatus !== "complete") redirect(`/app/leagues/${leagueId}`);
   const lineup =
     home.myTeamId === null ? null : await lineupView(getDb(), { leagueId, teamId: home.myTeamId, weekNumber: home.currentWeek });
   const act = leagueAct(home, lineup);

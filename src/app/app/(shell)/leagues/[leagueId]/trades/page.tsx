@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { LeagueTabs } from "@/league-room/components/league-tabs";
@@ -73,6 +73,8 @@ export default async function TradesPage({ params }: PageProps) {
 
   const home = await leagueHome(getDb(), leagueId, user.id);
   if (home === null || home.myTeamId === null) notFound();
+  // Pre-draft this room does not exist — a bookmark lands on the waiting room (2026-08-30).
+  if (home.draftStatus !== "complete") redirect(`/app/leagues/${leagueId}`);
 
   const week = await matchupWeek(getDb(), leagueId, home.currentWeek, user.id, getReferenceCache());
 
