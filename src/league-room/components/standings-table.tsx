@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { TeamStandingsRow } from "../contract";
-import { Avatar, Badge, Button, EmptyState, Movement, Table, type TableColumn, SegmentGroup } from "@/components/ui";
-import { MICRO_LABEL } from "@/components/ui/config";
+import { Avatar, Button, EmptyState, Movement, Table, type TableColumn, SegmentGroup } from "@/components/ui";
 import { formatPoints, formatRecord } from "../lib/format";
 
 type SortKey = "rank" | "pointsFor" | "pointsAgainst";
@@ -20,17 +19,6 @@ const ORDER_BY: Readonly<Record<SortKey, (row: TeamStandingsRow) => number>> = {
   pointsFor: (row) => row.pointsFor,
   pointsAgainst: (row) => row.pointsAgainst,
 };
-
-/**
- * The comparison set both judged columns rank inside, in the words a manager would use. It is one
- * phrase in two registers — the column head prints "vs the league" and `Stat` speaks "Top 8% of
- * the league." — which is why it is a bare noun phrase and not a sentence.
- *
- * A league IS the whole population here: unlike the matchup page, there is nothing wider to
- * compare a team's season against. The direction is what separates the two columns, and `Table`
- * states it out loud ("lower is better") rather than smuggling it into the phrase.
- */
-const LEAGUE_POPULATION = "the league";
 
 /** What the movement column is measured against, in the words the screen reader will say. */
 const MOVEMENT_AGAINST = "last week";
@@ -132,14 +120,16 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
       header: "Team",
       cell: (row) => (
         <span className="flex min-w-0 flex-col gap-0.5">
-          {/* LAW 5, THE CUT'S CONSEQUENCE IN WORDS. The 2px rule above this row (see
-              `rowClassName`) is the shape; this is what the shape means. It prints on exactly one
-              row in the league and only when a real playoff field was passed in. */}
-          {row.teamId === firstOutId ? <span className={`${MICRO_LABEL} text-text-faint`}>The cut · nobody below this line is in</span> : null}
           <span className="flex min-w-0 items-center gap-2">
             <Avatar name={row.ownerDisplayName} avatar={row.ownerAvatar} size="sm" />
-            <span className="min-w-0 truncate font-display text-lg font-bold leading-display text-text-primary">{row.teamName}</span>
-            {showClinchBadges && row.clinched ? <Badge tone="positive">Clinched</Badge> : null}
+            <span className="min-w-0 truncate font-display text-lg font-bold leading-display text-text-primary">
+              {/* x-: the sport's own clinch notation, older than every incumbent and read at a
+                  glance by anyone who has ever seen a standings page — replacing six identical
+                  pills that were a column of wallpaper (the persona pass). The footnote below
+                  the table still spells it out for the first-timer. */}
+              {showClinchBadges && row.clinched ? <span className="text-text-faint">x-</span> : null}
+              {row.teamName}
+            </span>
           </span>
         </span>
       ),
@@ -168,19 +158,22 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
       header: "W-L-T",
       cell: (row) => <span className="font-display text-base font-bold tabular-nums text-text-primary">{formatRecord(row)}</span>,
     },
-    // THE HEAT MAP. The two columns a reader cannot get from the row order — the record above is
-    // what the table is sorted BY, so tinting it would spend the heat on a fact position already
-    // tells, which is the "louder without making a true thing more legible" failure law 6 rejects.
+    // PLAIN, ON PURPOSE (the persona pass, 2026-08-30 — the veteran: "two different arrow
+    // systems in adjacent columns", "a 2% spread painted like a blowout"). The heat map put
+    // carets beside MOVE's arrows meaning something different, tinted near-identical
+    // season totals as verdicts, and cost two sub-header sentences to explain itself. A
+    // standings page has a settled grammar older than the web: plain tabular numbers, and the
+    // reader's own eye down the sorted column. The heat lives where a comparison is the
+    // question, not where the sort order already answered it.
     {
       key: "pointsFor",
       header: "Points for",
-      judged: { value: (row) => row.pointsFor, format: formatPoints, set: LEAGUE_POPULATION },
+      cell: (row) => <span className="font-display font-semibold tabular-nums text-text-primary">{formatPoints(row.pointsFor)}</span>,
     },
     {
       key: "pointsAgainst",
       header: "Points against",
-      // The one column in this product where the biggest number is the worst one.
-      judged: { value: (row) => row.pointsAgainst, format: formatPoints, set: LEAGUE_POPULATION, direction: "lower-is-better" },
+      cell: (row) => <span className="font-display font-semibold tabular-nums text-text-muted">{formatPoints(row.pointsAgainst)}</span>,
       hideOnNarrow: true,
     },
   ];
@@ -237,7 +230,8 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
         // 7-7 logjam resolves. (Persona review: veterans want the tiebreak named.)
         <p className="text-xs text-text-muted">
           Ties in the standings break on points for.
-          {showClinchBadges ? " Clinched means a guaranteed playoff spot." : ""}
+          {firstOutId !== null ? " The heavy line is the playoff cut." : ""}
+          {showClinchBadges ? " x- means a clinched playoff spot." : ""}
           {medianGame ? " Records include each week's median game." : ""}
         </p>
       )}
