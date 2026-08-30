@@ -51,33 +51,30 @@ export function AdvisorPanel({ leagueId, weekNumber }: { readonly leagueId: stri
   return (
     <section aria-label="Lineup advisor" className="flex flex-col gap-2">
       <h2 className={`${EYEBROW} text-text-muted`}>Lineup advisor</h2>
-      <p className="text-sm text-text-muted">Advice only. You make the move.</p>
 
+      {/* ONE ROW (the scan pass, 2026-08-30): a heading, an aside, a labelled field and a
+          right-floated button was four eye stops for one act. The label rides the field, the
+          aside died — "Advice only. You make the move." was a disclaimer the quiet button
+          already implies — and the ask is input-and-button on a single line. */}
       <form
-        className="flex flex-col gap-2"
+        className="flex items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           void ask();
         }}
       >
         <Input
+          className="max-w-md flex-1"
           label="Ask about your lineup"
+          placeholder="Who should I flex this week?"
           value={question}
           maxLength={ADVISOR_CONFIG.maxQuestionLength}
           autoComplete="off"
           onChange={(event) => setQuestion(event.target.value)}
         />
-        <div className="flex justify-end">
-          {/* LAW 5, AND WHAT THE PAGE AUDIT ACTUALLY COUNTS: distinct ink VERBS on one screen.
-              The league home exists for setting a lineup, and "Save lineup" is that act's ink
-              pill. This panel's own words are "Advice only. You make the move." — an aside that
-              decides nothing, shouting at the same volume as the decision it sits under. It is
-              the quiet pill now, which is the same demotion the invite panel took on this page
-              for the same reason. */}
-          <Button variant="secondary" type="submit" loading={thinking} disabled={thinking}>
-            Get advice
-          </Button>
-        </div>
+        <Button variant="secondary" type="submit" loading={thinking} disabled={thinking}>
+          Get advice
+        </Button>
       </form>
 
       {advice === null ? null : (

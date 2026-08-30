@@ -246,7 +246,7 @@ export function LineupEditor({
         <p className="text-sm text-text-muted">Lineups lock for the whole week when its first game kicks off.</p>
       </div>
 
-      <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
+      <div className="grid max-w-4xl gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
         {/* STARTERS. Each row is a destination while a move is live: eligible slots carry the
             amber HERE, ineligible ones dim — which is the whole chart taught by looking, with no
             tip anywhere (the no-tips ruling's own test case). */}

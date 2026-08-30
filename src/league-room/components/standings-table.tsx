@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { TeamStandingsRow } from "../contract";
-import { Avatar, Badge, Button, EmptyState, Movement, Table, type TableColumn } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, Movement, Table, type TableColumn, SegmentGroup } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { formatPoints, formatRecord } from "../lib/format";
 
@@ -107,11 +107,6 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
   const showClinchBadges = rows.length > 0 && rows.some((row) => !row.clinched);
   const firstOutId = firstTeamOutId(rows, playoffTeams);
 
-  const sortable = (key: SortKey, label: string) => (
-    <button type="button" className={sort === key ? "underline decoration-accent underline-offset-4" : "underline"} onClick={() => setSort(key)}>
-      {`Sort by ${label}`}
-    </button>
-  );
 
   const columns: readonly TableColumn<TeamStandingsRow>[] = [
     {
@@ -194,11 +189,22 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
     <section className="flex flex-col gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         <h2 className="font-display text-display-sm font-semibold leading-display text-text-primary">Standings</h2>
-        <div className="flex flex-wrap gap-3 text-sm text-text-muted">
-          {sortable("rank", "standing")}
-          {sortable("pointsFor", "points for")}
-          {sortable("pointsAgainst", "points against")}
-        </div>
+        {/* THE SEGMENTED RAIL, not three underlined sentences (the scan pass, 2026-08-30):
+            "Sort by standing · Sort by points for · Sort by points against" was prose doing a
+            control's job — three links the eye had to READ to compare, saying "Sort by" three
+            times. The rail shows the choice as a choice; a sort is furniture and wears the
+            furniture amber. */}
+        <SegmentGroup
+          label="Sort"
+          labelled={false}
+          options={[
+            { value: "rank", label: "Standing" },
+            { value: "pointsFor", label: "Points for" },
+            { value: "pointsAgainst", label: "Points against" },
+          ]}
+          value={sort}
+          onChange={(value) => setSort(value as SortKey)}
+        />
       </div>
       <Table
         caption="League standings"
