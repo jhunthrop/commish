@@ -90,6 +90,14 @@ function isJudged<T>(column: TableColumn<T>): column is TableJudgedColumn<T> {
 }
 
 export interface TableProps<T> {
+  /**
+   * Claim the full width of the owning column (founder, 2026-08-30: "shouldn't that also be a
+   * full width responsive experience?"). Content-sizing stays the default — it was the cure for
+   * full-bleed tables spreading two related facts 1,270px apart — but inside a CAPPED column the
+   * disease cannot occur, and a standings board that owns its column should fill it rather than
+   * hug its left edge with a void beside it.
+   */
+  readonly fill?: boolean;
   /** Required: the table's accessible name. */
   readonly caption: string;
   /** Show the caption above the table instead of only exposing it to assistive tech. */
@@ -235,6 +243,7 @@ function judgedCell<T>(column: TableJudgedColumn<T>, row: T, values: readonly nu
  * not tinted.
  */
 export function Table<T>({
+  fill = false,
   caption,
   captionVisible = false,
   columns,
@@ -261,7 +270,7 @@ export function Table<T>({
 
   return (
     <div className="w-full overflow-x-auto">
-      <table className="w-auto max-w-full border-collapse text-sm text-text-primary">
+      <table className={`${fill ? "w-full" : "w-auto"} max-w-full border-collapse text-sm text-text-primary`}>
         <caption className={captionVisible ? "mb-2 text-left text-sm font-medium text-text-muted" : "sr-only"}>{caption}</caption>
         <thead>
           <tr className="border-b border-line">

@@ -313,7 +313,7 @@ export function LeagueHome({
           left edge, one rhythm. The RAIL carries the room's ambient life: chat, the terms, the
           members. Below xl they stack in reading order, main first. The lower third stays
           full-bleed at the foot, outside both. */}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] xl:items-start">
+      <div className="mx-auto grid w-full max-w-[1600px] gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] xl:items-start">
         <div className="flex min-w-0 flex-col gap-6">
           {/* THE ROOMS OF THE LEAGUE (founder, 2026-08-28). Matchup is the game; Standings is
               the table; My team is the decision surface (the lineup editor and its advisor,

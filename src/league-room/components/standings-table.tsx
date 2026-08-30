@@ -200,6 +200,7 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
         />
       </div>
       <Table
+        fill
         caption="League standings"
         columns={columns}
         rows={ordered}
