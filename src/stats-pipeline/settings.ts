@@ -5,7 +5,7 @@ import { isIngestionMode, INGESTION_MODES, STATS_INGESTION_CONFIG, type Ingestio
 export interface IngestionSettings {
   readonly mode: IngestionMode;
   readonly pollIntervalMs: number;
-  readonly monthlyRequestBudget: number;
+  readonly dailyRequestBudget: number;
 }
 
 /**
@@ -35,12 +35,12 @@ export function resolveIngestionSettings(): IngestionSettings {
 
   const intervalVar = STATS_INGESTION_CONFIG.envVars.pollIntervalMs;
   const rawInterval = envOrUndefined(intervalVar);
-  const budgetVar = STATS_INGESTION_CONFIG.envVars.monthlyRequestBudget;
+  const budgetVar = STATS_INGESTION_CONFIG.envVars.dailyRequestBudget;
   const rawBudget = envOrUndefined(budgetVar);
 
   return {
     mode,
     pollIntervalMs: rawInterval === undefined ? STATS_INGESTION_CONFIG.pollIntervalMs : parsePositiveInteger(intervalVar, rawInterval),
-    monthlyRequestBudget: rawBudget === undefined ? STATS_INGESTION_CONFIG.monthlyRequestBudget : parsePositiveInteger(budgetVar, rawBudget),
+    dailyRequestBudget: rawBudget === undefined ? STATS_INGESTION_CONFIG.dailyRequestBudget : parsePositiveInteger(budgetVar, rawBudget),
   };
 }

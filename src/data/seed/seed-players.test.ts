@@ -171,7 +171,7 @@ describe("seedPlayers", () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
-      await expect(seedPlayers(db, provider, undefined, stingy)).rejects.toThrow(/STATS_MONTHLY_REQUEST_BUDGET/);
+      await expect(seedPlayers(db, provider, undefined, stingy)).rejects.toThrow(/STATS_DAILY_REQUEST_BUDGET/);
       const partial = await countOf("player_stat_lines");
       expect(partial).toBeGreaterThan(0);
       expect(partial).toBeLessThan(PLAYER_COUNT * SEASON_WEEKS);
@@ -187,7 +187,7 @@ describe("seedPlayers", () => {
 
   it("stops the whole backfill rather than seeding half a season when the ledger denies it", async () => {
     const budget = { reserveBackfill: async () => ({ granted: false as const, denial: "budget-exhausted" as const }) };
-    await expect(seedPlayers(db, provider, undefined, budget)).rejects.toThrow(/STATS_MONTHLY_REQUEST_BUDGET/);
+    await expect(seedPlayers(db, provider, undefined, budget)).rejects.toThrow(/STATS_DAILY_REQUEST_BUDGET/);
     expect(await countOf("players")).toBe(0);
   });
 

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { STATS_INGESTION_CONFIG } from "./config";
 import { resolveIngestionSettings } from "./settings";
 
-const { mode: MODE_VAR, pollIntervalMs: INTERVAL_VAR, monthlyRequestBudget: BUDGET_VAR } = STATS_INGESTION_CONFIG.envVars;
+const { mode: MODE_VAR, pollIntervalMs: INTERVAL_VAR, dailyRequestBudget: BUDGET_VAR } = STATS_INGESTION_CONFIG.envVars;
 
 function clearOverrides(): void {
   delete process.env[MODE_VAR];
@@ -18,7 +18,7 @@ describe("resolveIngestionSettings", () => {
     expect(resolveIngestionSettings()).toEqual({
       mode: STATS_INGESTION_CONFIG.mode,
       pollIntervalMs: STATS_INGESTION_CONFIG.pollIntervalMs,
-      monthlyRequestBudget: STATS_INGESTION_CONFIG.monthlyRequestBudget,
+      dailyRequestBudget: STATS_INGESTION_CONFIG.dailyRequestBudget,
     });
   });
 
@@ -31,7 +31,7 @@ describe("resolveIngestionSettings", () => {
     expect(resolveIngestionSettings()).toEqual({
       mode: STATS_INGESTION_CONFIG.mode,
       pollIntervalMs: STATS_INGESTION_CONFIG.pollIntervalMs,
-      monthlyRequestBudget: STATS_INGESTION_CONFIG.monthlyRequestBudget,
+      dailyRequestBudget: STATS_INGESTION_CONFIG.dailyRequestBudget,
     });
   });
 
@@ -45,9 +45,9 @@ describe("resolveIngestionSettings", () => {
     expect(resolveIngestionSettings().pollIntervalMs).toBe(60_000);
   });
 
-  it("reads STATS_MONTHLY_REQUEST_BUDGET", () => {
+  it("reads STATS_DAILY_REQUEST_BUDGET", () => {
     process.env[BUDGET_VAR] = "12000";
-    expect(resolveIngestionSettings().monthlyRequestBudget).toBe(12_000);
+    expect(resolveIngestionSettings().dailyRequestBudget).toBe(12_000);
   });
 
   it("fails fast on a mode it does not recognize, naming the variable and every legal spelling", () => {
@@ -63,6 +63,6 @@ describe("resolveIngestionSettings", () => {
 
   it("fails fast on a monthly budget that is not a positive integer, naming the variable", () => {
     process.env[BUDGET_VAR] = "0";
-    expect(() => resolveIngestionSettings()).toThrow(/STATS_MONTHLY_REQUEST_BUDGET="0"/);
+    expect(() => resolveIngestionSettings()).toThrow(/STATS_DAILY_REQUEST_BUDGET="0"/);
   });
 });

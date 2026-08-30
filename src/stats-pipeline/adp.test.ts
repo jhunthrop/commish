@@ -140,7 +140,7 @@ describe("ingestAdp", () => {
     };
     const denying = { reserveBackfill: async () => ({ granted: false as const, denial: "budget-exhausted" as const }) };
 
-    await expect(ingestAdp(db, counting, denying)).rejects.toThrow(/STATS_MONTHLY_REQUEST_BUDGET/);
+    await expect(ingestAdp(db, counting, denying)).rejects.toThrow(/STATS_DAILY_REQUEST_BUDGET/);
     expect(listPlayersCalls).toBe(0);
     expect((await readAdps()).every((row) => row.adp === null)).toBe(true);
   });

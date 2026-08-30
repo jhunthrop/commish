@@ -72,7 +72,7 @@ export function getStatsProvider(): StatsProvider {
 }
 
 /**
- * `STATS_INGESTION_MODE`, `STATS_POLL_INTERVAL_MS` and `STATS_MONTHLY_REQUEST_BUDGET`, resolved
+ * `STATS_INGESTION_MODE`, `STATS_POLL_INTERVAL_MS` and `STATS_DAILY_REQUEST_BUDGET`, resolved
  * ONCE per process and shared by the budget and the worker — they have to agree, and resolving
  * them twice is how they would eventually stop agreeing. Memoized alongside the singletons
  * because a bad value throws, and throwing on the first construction rather than on every hot
@@ -88,14 +88,14 @@ export function getIngestionSettings(): IngestionSettings {
  * into its worker, exported separately so `scripts/ingest-once.ts` can report what a tick cost
  * without a second Redis connection or a second wiring of its own. `correctSettledWeek`
  * (`./correction`) defaults to this SAME instance too, deliberately: an operator correction is a
- * third spender against one monthly ceiling, never a ledger of its own — see that module's own
+ * third spender against one daily ceiling, never a ledger of its own — see that module's own
  * docblock for why a second ledger would be the wrong shape entirely.
  */
 export function getIngestionBudget(): RequestBudget {
   globalIngestion.__commishIngestionBudget ??= createRequestBudget({
     redis: getSharedRedis(),
     clock: systemClock,
-    monthlyRequestBudget: getIngestionSettings().monthlyRequestBudget,
+    dailyRequestBudget: getIngestionSettings().dailyRequestBudget,
     // The ledger exists to protect a paid API key. A provider that never reaches a network has no
     // key to protect, and debiting it would spend a real ceiling on imaginary requests.
     metered: getStatsProvider().requestCost === "metered",

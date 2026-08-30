@@ -6,7 +6,7 @@ import { STATS_INGESTION_CONFIG } from "./config";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 
-const INGESTION_CEILING = STATS_INGESTION_CONFIG.monthlyRequestBudget - STATS_INGESTION_CONFIG.reservedForBackfill;
+const INGESTION_CEILING = STATS_INGESTION_CONFIG.dailyRequestBudget - STATS_INGESTION_CONFIG.reservedForBackfill;
 const GRANTED = { granted: true };
 const EXHAUSTED = { granted: false, denial: "budget-exhausted" };
 const UNAVAILABLE = { granted: false, denial: "ledger-unavailable" };
@@ -19,7 +19,7 @@ const clockAt = (iso: string): Clock => ({ now: () => iso });
 const fixedClock = clockAt(AUGUST);
 
 function keyFor(iso: string): string {
-  return STATS_INGESTION_CONFIG.keys.budget(iso.slice(0, 7));
+  return STATS_INGESTION_CONFIG.keys.budget(iso.slice(0, 10));
 }
 
 /** A connection that throws on every command — models a Redis outage without touching docker. */
@@ -60,7 +60,7 @@ afterAll(async () => {
 });
 
 describe("createRequestBudget", () => {
-  it("grants a reservation on a fresh month and remaining() drops by exactly that many", async () => {
+  it("grants a reservation on a fresh day and remaining() drops by exactly that many", async () => {
     const budget = createRequestBudget({ redis, clock: fixedClock });
     expect(await budget.remaining()).toBe(INGESTION_CEILING);
     await expect(budget.reserve(40)).resolves.toEqual(GRANTED);
@@ -77,7 +77,7 @@ describe("createRequestBudget", () => {
     expect(await budget.remaining()).toBe(remainingBeforeDenial);
   });
 
-  it("rolls the ledger over with the month: reservations on either side of a boundary do not share a budget", async () => {
+  it("rolls the ledger over with the day: reservations on either side of a boundary do not share a budget", async () => {
     const augustBudget = createRequestBudget({ redis, clock: clockAt(AUGUST_LATE) });
     const septemberBudget = createRequestBudget({ redis, clock: clockAt(SEPTEMBER) });
 
@@ -88,7 +88,7 @@ describe("createRequestBudget", () => {
     await expect(septemberBudget.reserve(INGESTION_CEILING)).resolves.toEqual(GRANTED);
   });
 
-  it("carries a TTL, so an abandoned month's counter is not immortal", async () => {
+  it("carries a TTL, so an abandoned day's counter is not immortal", async () => {
     const budget = createRequestBudget({ redis, clock: fixedClock });
     await budget.reserve(1);
     const ttl = await control.ttl(keyFor(AUGUST));
@@ -142,7 +142,7 @@ describe("createRequestBudget", () => {
     expect(await budget.remaining()).toBe(0);
   });
 
-  it("the backfill draws on the whole monthly quota, not the ingestion share, and both count into one ledger", async () => {
+  it("the backfill draws on the whole daily quota, not the ingestion share, and both count into one ledger", async () => {
     // `reservedForBackfill` is only a real reservation if the backfill can actually reach it:
     // ingestion is capped at (monthly - reserved), so whatever ingestion leaves untouched at that
     // cap is exactly what a backfill can still spend, and the two together can never exceed the
@@ -153,7 +153,7 @@ describe("createRequestBudget", () => {
 
     await expect(budget.reserveBackfill(STATS_INGESTION_CONFIG.reservedForBackfill)).resolves.toEqual(GRANTED);
     await expect(budget.reserveBackfill(1)).resolves.toEqual(EXHAUSTED);
-    expect(Number(await control.get(keyFor(AUGUST)))).toBe(STATS_INGESTION_CONFIG.monthlyRequestBudget);
+    expect(Number(await control.get(keyFor(AUGUST)))).toBe(STATS_INGESTION_CONFIG.dailyRequestBudget);
   });
 
   it("an unreachable ledger denies a backfill too, rather than letting the largest write in the repo spend uncounted", async () => {
@@ -166,13 +166,13 @@ describe("createRequestBudget", () => {
     }
   });
 
-  it("honors an injected monthly ceiling, which is how STATS_MONTHLY_REQUEST_BUDGET reaches the ledger", async () => {
+  it("honors an injected monthly ceiling, which is how STATS_DAILY_REQUEST_BUDGET reaches the ledger", async () => {
     // The operator lever C2 wired: the edge resolves the env var and hands the number here. A
     // ceiling of 310 leaves 2 for ingestion once the backfill reserve is held back.
     const budget = createRequestBudget({
       redis,
       clock: fixedClock,
-      monthlyRequestBudget: STATS_INGESTION_CONFIG.reservedForBackfill + 2,
+      dailyRequestBudget: STATS_INGESTION_CONFIG.reservedForBackfill + 2,
     });
     expect(await budget.remaining()).toBe(2);
     await expect(budget.reserve(2)).resolves.toEqual(GRANTED);
@@ -187,8 +187,8 @@ describe("createRequestBudget", () => {
     const key = keyFor(AUGUST);
     const budget = createRequestBudget({ redis, clock: fixedClock, metered: false });
 
-    await expect(budget.reserve(STATS_INGESTION_CONFIG.monthlyRequestBudget * 10)).resolves.toEqual(GRANTED);
-    await expect(budget.reserveBackfill(STATS_INGESTION_CONFIG.monthlyRequestBudget * 10)).resolves.toEqual(GRANTED);
+    await expect(budget.reserve(STATS_INGESTION_CONFIG.dailyRequestBudget * 10)).resolves.toEqual(GRANTED);
+    await expect(budget.reserveBackfill(STATS_INGESTION_CONFIG.dailyRequestBudget * 10)).resolves.toEqual(GRANTED);
     // Not "granted and counted" — the ledger key is never touched at all.
     expect(await control.exists(key)).toBe(0);
     // And it reports the whole ceiling, because nothing has been spent. A falling number here
@@ -208,7 +208,7 @@ describe("reserveBackfillOrThrow", () => {
       reserveBackfill: async () => ({ granted: false as const, denial: "ledger-unavailable" as const }),
     };
     await expect(reserveBackfillOrThrow(denying, 3, "the ADP feed")).rejects.toThrow(
-      /the ADP feed \(3 requests, denied: ledger-unavailable\).*STATS_MONTHLY_REQUEST_BUDGET/,
+      /the ADP feed \(3 requests, denied: ledger-unavailable\).*STATS_DAILY_REQUEST_BUDGET/,
     );
   });
 });

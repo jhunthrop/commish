@@ -27,17 +27,16 @@ export const STATS_INGESTION_CONFIG = {
    * reservation landed is exactly what the tick spends upstream. A month is taken as 31 days of
    * uninterrupted ticking, because the worker runs on a timer and not on an NFL calendar.
    *
-   * | Line item                                              | Arithmetic                                  | Requests per month |
-   * |--------------------------------------------------------|---------------------------------------------|--------------------|
-   * | Ticks per month                                        | 86,400,000 / 1,800,000 x 31 days            | 1,488 ticks        |
-   * | Schedule calls, steady state (one examined week)       | 1 x 1,488                                   | 1,488              |
-   * | Schedule calls, the second week on a rollover tick     | 1 x 5 week rollovers                        | 5                  |
-   * | Box scores, `final-only` (each fetched once, ever)     | 16 games x 5 weeks                          | 80                 |
-   * | The correction sweep (see `correctionWindowDays`)      | (1 schedule + 16 box scores) x 3 days x 5   | 255                |
-   * | A sweep cut short by the live week, retried next tick  | 1 schedule x 3 days x 5                     | 15                 |
-   * | **Ingestion total**                                    |                                             | **1,843**          |
-   * | The season backfill (`npm run seed`)                   | see `reservedForBackfill`                   | 308                |
-   * | **Everything**                                         |                                             | **2,151**          |
+   * | Line item                                              | Arithmetic                                  | Requests per day |
+   * |--------------------------------------------------------|---------------------------------------------|------------------|
+   * | Ticks per day                                          | 86,400,000 / 1,800,000                      | 48 ticks         |
+   * | Schedule calls, steady state (one examined week)       | 1 x 48                                      | 48               |
+   * | Schedule calls, the second week on a rollover tick     | 1 on a rollover day                         | 1                |
+   * | Box scores, `final-only` (each fetched once, ever)     | up to a full 16-game week landing in a day  | 16               |
+   * | The correction sweep (see `correctionWindowDays`)      | (1 schedule + 16 box scores) on a sweep day | 17               |
+   * | **Ingestion total, worst day**                         |                                             | **82**           |
+   * | The season backfill (`npm run seed`, one day's run)    | see `reservedForBackfill`                   | 308              |
+   * | **Everything, on a backfill day**                      |                                             | **390**          |
    *
    * The rollover line is one tick, not a tail: the tick that resumes at a week with no
    * `stat_weeks` row examines two weeks and PLANTS both rows, so the tick after it is narrow
@@ -46,33 +45,33 @@ export const STATS_INGESTION_CONFIG = {
    * legitimately stay unsettled, so widening is an incident and not a term. See that field.
    *
    * `live` mode replaces the box-score line with "every game that is not final, every tick" —
-   * roughly 16 games x 14 ticks across a Sunday's game window, about 900 a month on top of the
-   * schedule calls, before Thursday and Monday night. It is a config change and no code change
+   * roughly 16 games x 14 ticks across a Sunday's game window, about 250 extra on a Sunday on
+   * top of the schedule calls. It is a config change and no code change
    * (`STATS_INGESTION_MODE=live`), but it is NOT a free one: turning it on needs a quota, and
-   * `STATS_MONTHLY_REQUEST_BUDGET` has to move with it. Both modes are tested; the mock provider
+   * `STATS_DAILY_REQUEST_BUDGET` has to move with it. Both modes are tested; the mock provider
    * runs either at zero request cost.
    */
   mode: "final-only",
   /**
-   * Ceiling per calendar month across every upstream call the pipeline makes — ingestion and
-   * backfill together.
+   * Ceiling per calendar day (UTC) across every upstream call the pipeline makes — ingestion and
+   * backfill together. DAILY because that is how RapidAPI meters the Tank01 plans (founder
+   * correction, 2026-08-30: "the requests are per day" — the ledger was originally written as a
+   * calendar-month pool).
    *
    * This is a ceiling on what THIS deployment is allowed to spend, not a claim about what the
-   * upstream account allows. Set `STATS_MONTHLY_REQUEST_BUDGET` to the purchased quota; if that
-   * quota is smaller than this default the ledger will start denying partway through the month,
-   * which is the correct and visible failure. The default is the arithmetic above (2,151) rounded
-   * up to 3,000 for headroom — deliberately not the 1,000-request free tier, because a 24/7
-   * worker at a 30-minute cadence cannot fit inside 1,000: 1,488 ticks a month at one schedule
-   * call each is already 1,488 requests before a single box score is fetched.
+   * upstream account allows. Set `STATS_DAILY_REQUEST_BUDGET` to the purchased daily quota; if
+   * that quota is smaller than this default the ledger will start denying partway through the
+   * day, which is the correct and visible failure. The default is the worst-day arithmetic above
+   * (390) rounded up to 500 for headroom.
    */
-  monthlyRequestBudget: 3_000,
+  dailyRequestBudget: 500,
   /**
    * Held back from the ingestion budget so a full-season backfill (`npm run seed`) is never
    * starved by live polling. The measured cost of one backfill against Tank01's 18-week regular
    * season: 2 for `listPlayers` (the player list plus the teams call that mints team defenses),
    * then per week one `listGames` plus one box score per game, 18 x (1 + 16) = 306. Total 308.
-   * `seedPlayers` reserves against this same monthly ledger through `reserveBackfill`, so the
-   * two halves of the month's spending are counted in one place.
+   * `seedPlayers` reserves against this same daily ledger through `reserveBackfill`, so the
+   * two halves of a day's spending are counted in one place.
    */
   reservedForBackfill: 308,
   pollIntervalMs: 30 * 60_000,
@@ -131,7 +130,8 @@ export const STATS_INGESTION_CONFIG = {
   warnIntervalMs: 60 * 60_000,
   keys: {
     snapshot: (week: number): string => `stats:snapshot:${week}`,
-    budget: (month: string): string => `stats:budget:${month}`,
+    /** `day` is a `YYYY-MM-DD` slice of the injected clock — the ledger resets with the quota. */
+    budget: (day: string): string => `stats:budget:${day}`,
     finalGame: (gameId: string): string => `stats:game:${gameId}:final`,
     score: (leagueId: string, week: number): string => `score:${leagueId}:${week}`,
     playerIndex: "stats:players",
@@ -144,7 +144,8 @@ export const STATS_INGESTION_CONFIG = {
   ttlSeconds: {
     /** Generous: a snapshot outliving its week costs one key, losing one mid-Sunday costs a full recompute. */
     snapshot: 14 * 24 * 60 * 60,
-    budget: 40 * 24 * 60 * 60,
+    /** Three days: a day's ledger key needs to outlive its own day in any clock skew, no more. */
+    budget: 3 * 24 * 60 * 60,
     finalGame: 200 * 24 * 60 * 60,
     score: 7 * 24 * 60 * 60,
     /** Belt and braces only. The player index has an explicit invalidation path; this bounds how wrong a missed invalidation can get. */
@@ -156,6 +157,6 @@ export const STATS_INGESTION_CONFIG = {
   envVars: {
     mode: "STATS_INGESTION_MODE",
     pollIntervalMs: "STATS_POLL_INTERVAL_MS",
-    monthlyRequestBudget: "STATS_MONTHLY_REQUEST_BUDGET",
+    dailyRequestBudget: "STATS_DAILY_REQUEST_BUDGET",
   },
 } as const;

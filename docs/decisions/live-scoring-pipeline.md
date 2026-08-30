@@ -81,7 +81,7 @@ widened window would NOT fit, so the tunable and the projection cannot drift apa
 `monthlyRequestBudget` therefore defaults to **3,000**, not 1,000: a 24/7 worker at a thirty-minute
 cadence spends 1,488 requests on schedule calls alone, more than a 1,000-request tier's whole
 ingestion share, before a single box score. That is a ceiling on what THIS deployment is allowed to
-spend, not a claim about the purchased quota — `STATS_MONTHLY_REQUEST_BUDGET` must be set to the
+spend, not a claim about the purchased quota — `STATS_DAILY_REQUEST_BUDGET` must be set to the
 quota actually bought, and if that number is smaller the ledger will start denying partway through
 the month, which is the correct and visible failure.
 
@@ -122,7 +122,7 @@ score move only at the final whistle is not the product — and flipping `STATS_
 is the whole rollout, now that the variable is actually read (`resolveIngestionSettings`,
 `src/stats-pipeline/settings.ts`). It is not a free flip: live mode fetches every non-final game
 every tick, roughly 900 requests a month on top of the schedule calls, so
-`STATS_MONTHLY_REQUEST_BUDGET` moves with it.
+`STATS_DAILY_REQUEST_BUDGET` moves with it.
 
 `STATS_INGESTION_CONFIG.reservedForBackfill` (308 of the 3,000) is held out of the ingestion budget
 `RequestBudget.reserve()` draws against, so a live season's polling can never starve `npm run seed`.
@@ -309,7 +309,7 @@ exists to make:
   import anything from `src/stats/**`.
 - The budget ledger's arithmetic does not change in shape — only its configured
   `monthlyRequestBudget` moves, which is already a config value (and now an environment variable,
-  `STATS_MONTHLY_REQUEST_BUDGET`), not a code path.
+  `STATS_DAILY_REQUEST_BUDGET`), not a code path.
 - The shared contract suite (`describeStatsProviderContract`) does not change. A real vendor
   adapter is verified by the exact same suite the mock and Tank01 already pass, unchanged — that
   is what makes it a proof the seam holds rather than a claim about it.
@@ -501,3 +501,11 @@ split `autoStartDueDrafts` uses, and the same `enforcementAppliesTo` (`@/league-
 enforcement`) the join gate, the creation gate and the trade auto-hold all ask. See
 `docs/decisions/enforcement-and-tiers.md` §6 for the full account of the strategy this trigger
 applies and why only one strategy is declared.
+
+## Amendment 2026-08-30: the ledger is daily, not monthly
+
+RapidAPI meters the Tank01 plans per DAY (founder correction, 2026-08-30). The request ledger now
+counts against a `YYYY-MM-DD` (UTC) Redis key with a 3-day TTL, the env override is
+`STATS_DAILY_REQUEST_BUDGET`, and the shipped default is 500/day (worst ingestion day 82 + one
+full season backfill 308, with headroom). Every earlier mention of a monthly budget in this
+document should be read as the daily ledger.
