@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { LEAGUE_CONFIG } from "@/league/config";
-import { leagueHome, lineupView } from "@/league-service";
+import { leagueHome, lineupView, matchupWeek } from "@/league-service";
 import { LeagueHome } from "@/league-room/components/league-home";
 import { leagueAct } from "@/lib/leagues/next-act";
 import { readPreferences } from "@/identity-service/preferences";
@@ -26,8 +26,16 @@ export default async function LeagueTeamPage({ params }: { readonly params: Prom
   const lineup =
     home.myTeamId === null ? null : await lineupView(getDb(), { leagueId, teamId: home.myTeamId, weekNumber: home.currentWeek });
   const act = leagueAct(home, lineup);
+  // This week's points beside every man in the editor (persona pass, 2026-08-30): the same
+  // matchupWeek read the matchup tab pays, narrowed to the viewer's own game.
+  const week = home.myMatchup === null ? null : await matchupWeek(getDb(), leagueId, home.currentWeek, user.id);
+  const myMatchupDetail =
+    week === null || home.myTeamId === null
+      ? null
+      : week.matchups.find((m) => m.home.teamId === home.myTeamId || m.away.teamId === home.myTeamId) ?? null;
   return (
     <LeagueHome
+      myMatchupDetail={myMatchupDetail}
       home={home}
       lineup={lineup}
       helpLevel={preferences.helpLevel}

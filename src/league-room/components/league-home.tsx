@@ -178,7 +178,8 @@ export function LeagueHome({
    *  their own value, the index passes nothing and gets the matchup. */
   readonly tab?: LeagueTab;
   /** The viewer's own matchup with BOTH LINEUPS (founder, 2026-08-29: score by player, the ESPN
-   *  slate). Fetched by the matchup tab's page only — every other tab passes nothing and pays
+   *  slate). Fetched by the matchup tab's page and — for the editor's points column — the team
+   *  tab's (persona pass, 2026-08-30); every other tab passes nothing and pays
    *  nothing. */
   readonly myMatchupDetail?: MatchupDetail | null;
   readonly home: LeagueHomeBody;
@@ -401,7 +402,26 @@ export function LeagueHome({
           {tab === "team" ? (
             <>
           {lineup === null ? null : (
-            <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} draftStatus={home.draftStatus} />
+            <LineupEditor
+              leagueId={home.leagueId}
+              lineup={lineup}
+              totalWeeks={home.totalWeeks}
+              draftStatus={home.draftStatus}
+              // This week's points beside every man (the veteran persona's missing number),
+              // from the same matchup detail the slate reads — my side's entries only, since
+              // only my players can appear in my editor.
+              pointsByPlayerId={
+                myMatchupDetail === null
+                  ? undefined
+                  : new Map(
+                      [myMatchupDetail.home, myMatchupDetail.away]
+                        .filter((side) => side.teamId === home.myTeamId)
+                        .flatMap((side) => [...side.starters, ...side.bench])
+                        .filter((entry) => entry.playerId !== null)
+                        .map((entry) => [entry.playerId!, entry.points]),
+                    )
+              }
+            />
           )}
 
           {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}

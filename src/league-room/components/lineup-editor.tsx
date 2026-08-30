@@ -7,8 +7,9 @@ import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
 import { Button, PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import { useLeagueRoomDeps } from "../hooks/deps";
-import { formatWeek } from "../lib/format";
+import { formatPoints, formatWeek } from "../lib/format";
 import { playerOf } from "../lib/player";
 
 const slotKey = (slot: LineupSlotView): string => `${slot.slot}:${slot.slotIndex}`;
@@ -53,12 +54,16 @@ export function LineupEditor({
   lineup,
   totalWeeks,
   draftStatus,
+  pointsByPlayerId,
 }: {
   readonly leagueId: string;
   readonly lineup: LineupBody;
   /** The season's last week number. Names the reopening condition in the locked message —
    *  "next week" only means something if there is one. */
   readonly totalWeeks: number;
+  /** This week's points per playerId, when the page holds the matchup detail — the veteran
+   *  persona's missing number ("I set lineups with numbers"). `undefined` player → dash. */
+  readonly pointsByPlayerId?: ReadonlyMap<string, number | null>;
   /** Wave-1 review Q10, SETTLED: `home.draftStatus`, threaded from both `LeagueHome` call sites
    *  — the fact itself, not an inference over the lineup's own empty slots. Optional only for a
    *  caller that genuinely does not know it yet (never true at either real call site); `null` and
@@ -241,9 +246,10 @@ export function LineupEditor({
   return (
     // `id="lineup"` (F16): the fragment `actionHref` builds is a real anchor on a real panel.
     <section id="lineup" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div className="flex flex-col gap-0.5">
         <h2 className="font-display text-xl font-bold text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
-        <p className="text-sm text-text-muted">Lineups lock for the whole week when its first game kicks off.</p>
+        {/* Under its heading, not orphaned at the far edge (the persona pass, 2026-08-30). */}
+        <p className="text-sm text-text-faint">Lineups lock for the whole week when its first game kicks off.</p>
       </div>
 
       <div className="grid max-w-4xl gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-start">
@@ -279,7 +285,9 @@ export function LineupEditor({
                     : "border-l-transparent"
                 } ${dimmed ? "opacity-40" : ""}`}
               >
-                <SlotChip slot={slot.slot} className="w-16 shrink-0 justify-center" />
+                {/* Plain micro text, not a bordered chip: the box read as an empty input to the
+                    first-timer. A slot label is a label. */}
+                <span className={`${MICRO_LABEL} w-14 shrink-0 text-right text-text-faint`}>{slot.slot}</span>
                 {face === null ? (
                   <span className="flex min-w-0 flex-1 items-center gap-2.5 text-sm text-text-faint">
                     <span aria-hidden="true" className="size-9 rounded-sm border border-dashed border-line" />
@@ -302,6 +310,19 @@ export function LineupEditor({
                     </span>
                   </span>
                 )}
+                {/* THE FIGURE (the veteran persona, 2026-08-30: "not a single number on the
+                    entire screen — I set lineups with numbers"). This week's points, straight
+                    from the matchup detail the page already holds; the dash keeps the contract's
+                    "has not played" vs "scored nothing" distinction. */}
+                {pointsByPlayerId === undefined || occupantId === null ? null : (
+                  <span
+                    className={`shrink-0 font-display tabular-nums ${
+                      (pointsByPlayerId.get(occupantId) ?? null) === null ? "text-sm font-semibold text-text-faint/60" : "text-lg font-bold text-text-primary"
+                    }`}
+                  >
+                    {(pointsByPlayerId.get(occupantId) ?? null) === null ? NOT_STARTED_DASH : formatPoints(pointsByPlayerId.get(occupantId)!)}
+                  </span>
+                )}
                 {canReceive ? (
                   <Button variant="verb" size="sm" onClick={() => placeHere(key)} aria-label={`Put ${byId.get(selectedPlayerId!)?.playerName ?? "the selected player"} at ${slot.slot}`}>
                     Here
@@ -316,7 +337,10 @@ export function LineupEditor({
                     </Button>
                   </span>
                 ) : moving ? null : occupantId === null ? null : (
-                  <Button variant="secondary" size="sm" onClick={() => setSelected(key)} aria-label={`Swap ${occupant?.playerName ?? ""}`}>
+                  // GHOST AT REST (persona pass, 2026-08-30: sixteen identical outlined pills
+                  // read as wallpaper — the chrome outshone the players). The verb keeps its
+                  // word (founder ruling: it says "Swap") but drops its border until wanted.
+                  <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${occupant?.playerName ?? ""}`}>
                     Swap
                   </Button>
                 )}
@@ -363,6 +387,15 @@ export function LineupEditor({
                       <PositionBadge position={player.position} size="sm" />
                       {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
                     </span>
+                    {pointsByPlayerId === undefined ? null : (
+                      <span
+                        className={`shrink-0 font-display tabular-nums ${
+                          (pointsByPlayerId.get(slot.playerId!) ?? null) === null ? "text-sm font-semibold text-text-faint/60" : "text-sm font-bold text-text-muted"
+                        }`}
+                      >
+                        {(pointsByPlayerId.get(slot.playerId!) ?? null) === null ? NOT_STARTED_DASH : formatPoints(pointsByPlayerId.get(slot.playerId!)!)}
+                      </span>
+                    )}
                     {canReceive ? (
                       <Button variant="verb" size="sm" onClick={() => swapWithBench(slot.playerId!)} aria-label={`Swap ${player.name} into the lineup`}>
                         Here
@@ -372,7 +405,7 @@ export function LineupEditor({
                         Cancel
                       </Button>
                     ) : moving ? null : (
-                      <Button variant="secondary" size="sm" onClick={() => setSelected(key)} aria-label={`Swap ${player.name}`}>
+                      <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${player.name}`}>
                         Swap
                       </Button>
                     )}
