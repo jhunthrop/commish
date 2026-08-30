@@ -200,6 +200,17 @@ export function LeagueHome({
   readonly playoffTeams?: number | null;
 }) {
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
+  /**
+   * THE STATUS THE SCREEN CAN STAND BEHIND (founder, twice: "Not started" beside two full
+   * scores). `home.weekStatus` is the global stat_weeks calendar; the matchup's own scores are
+   * this league's facts, and when the two disagree the SCORES win — a settled matchup says
+   * Final, a matchup with points on the board says in progress, whatever a stale or seeded
+   * calendar row claims. The calendar keeps its authority only over what it can actually know:
+   * a week with no numbers anywhere.
+   */
+  const hasScores = home.myMatchup !== null && (home.myMatchup.homeScore !== null || home.myMatchup.awayScore !== null);
+  const effectiveWeekStatus =
+    home.myMatchup?.final === true ? "final" : hasScores && home.weekStatus === "scheduled" ? "in_progress" : home.weekStatus;
   // Step 4 (F16): the ONE rule that promotes a panel — never a per-page list of exceptions, the
   // same derived-only discipline the attention queue and the rail's own state already hold. The
   // condition is the SAME fact `nextAction`'s own `fix-lineup` branch reads (`myTeamId !== null`
@@ -322,7 +333,7 @@ export function LeagueHome({
                 states it once, here, beside its own week heading, for a manager with a matchup and
                 a manager on a bye alike. It is still said exactly once: the hero below has no
                 badge of its own. */}
-            <WeekStatusBadge status={home.weekStatus} />
+            <WeekStatusBadge status={effectiveWeekStatus} />
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link className="text-sm text-accent underline" href={`/app/leagues/${home.leagueId}/matchups/${home.currentWeek}`}>
@@ -397,7 +408,11 @@ export function LeagueHome({
             <LeagueChat leagueId={home.leagueId} />
           </div>
 
-          <LeagueTermsPanel terms={home.terms} titleAs="p" />
+          <LeagueTermsPanel
+            terms={home.terms}
+            titleAs="p"
+            draftValue={home.draftStatus === "complete" ? "Complete" : undefined}
+          />
 
           <LeagueMembersPanel
             teams={home.teams}
@@ -406,21 +421,20 @@ export function LeagueHome({
             myTeamId={home.myTeamId}
             compositionCategory={home.compositionCategory}
           />
+
+          {/* THE COMMISSIONER'S TOOLS LIVE IN THE RAIL (persona: "why do my invite and
+              moderation panels sit in the middle of everyone's reading flow on every tab?").
+              They are the commissioner's furniture, not the league's content — beside the
+              members list they concern, on every tab, out of everyone else's way. */}
+          {home.isCommissioner ? (
+            <div id="invite-managers">
+              <InvitePanel leagueId={home.leagueId} leagueName={home.name} />
+            </div>
+          ) : null}
+          {home.isCommissioner ? <ModerationSummary leagueId={home.leagueId} /> : null}
         </div>
       </div>
 
-      {/* `id="invite-managers"`: `WaitingRoom`'s own "Invite someone" link (Task 8, a `when_full`
-          league's filling state) points here — the one real invite surface a commissioner has. */}
-      {home.isCommissioner ? (
-        <div id="invite-managers">
-          <InvitePanel leagueId={home.leagueId} leagueName={home.name} />
-        </div>
-      ) : null}
-
-      {/* Task 8: the commissioner's own window onto platform moderation in their league — a
-          member with extra buttons, not an operator, so this sits behind the identical
-          `isCommissioner` gate `InvitePanel` already does, right beside it. */}
-      {home.isCommissioner ? <ModerationSummary leagueId={home.leagueId} /> : null}
 
       {/*
         LAW 6 — the league home's lower third. Everything above it is a room: a scoreboard, a

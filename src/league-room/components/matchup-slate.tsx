@@ -1,4 +1,5 @@
 import { PlayerFace, SlotChip } from "@/components/ui";
+import { LiveMarker } from "@/components/ui/live-marker";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import type { MatchupDetail, MatchupLineupEntry } from "../contract";
@@ -78,6 +79,13 @@ export interface MatchupSlateProps {
   readonly myTeamId: string | null;
 }
 
+/** Starters still without a stat line — the casual persona's one unanswered question ("who's
+ *  left to play"), said per side, only while the week is genuinely live. A settled week has
+ *  nobody left by definition and a scheduled one has everybody, and both prints would be noise. */
+function yetToPlay(entries: readonly MatchupLineupEntry[]): number {
+  return entries.filter((entry) => entry.playerId !== null && entry.points === null).length;
+}
+
 /**
  * THE SLATE (founder, 2026-08-29: "the matchup tab should show the score by player - think espn
  * fantasy"). ESPN's signature matchup view is the MIRROR: my starter and their starter on the
@@ -115,9 +123,19 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
       }`}
     >
       <div aria-hidden="true" className={`grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] items-center gap-x-3 pb-1.5 ${MICRO_LABEL} text-text-faint`}>
-        <span className="truncate">{homeIsMine ? `${mine.teamName} · you` : mine.teamName}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate">{homeIsMine ? `${mine.teamName} · you` : mine.teamName}</span>
+          {detail.weekStatus === "in_progress" && yetToPlay(mine.starters) > 0 ? (
+            <LiveMarker mono>{`${yetToPlay(mine.starters)} to play`}</LiveMarker>
+          ) : null}
+        </span>
         <span className="text-center">Slot</span>
-        <span className="truncate text-right">{awayIsMine ? `${theirs.teamName} · you` : theirs.teamName}</span>
+        <span className="flex min-w-0 items-center justify-end gap-2">
+          {detail.weekStatus === "in_progress" && yetToPlay(theirs.starters) > 0 ? (
+            <LiveMarker mono>{`${yetToPlay(theirs.starters)} to play`}</LiveMarker>
+          ) : null}
+          <span className="truncate text-right">{awayIsMine ? `${theirs.teamName} · you` : theirs.teamName}</span>
+        </span>
       </div>
       <ul className="flex flex-col">
         {pairs.map((pair) => (
@@ -136,6 +154,27 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
           </li>
         ))}
       </ul>
+
+      {/* THE BENCHES (the veteran persona: "I judge a win by what didn't start"). Behind a
+          native disclosure because bench points are the week's counterfactual, not its result —
+          on request for the manager doing the post-mortem, invisible to everyone else. Muted
+          throughout and NO winner emphasis: nobody wins a bench. */}
+      {mine.bench.length === 0 && theirs.bench.length === 0 ? null : (
+        <details className="border-t border-line pt-2">
+          <summary className={`${MICRO_LABEL} cursor-pointer list-none text-text-faint hover:text-text-muted`}>
+            Benches
+          </summary>
+          <ul className="flex flex-col pt-1">
+            {pairStarters(mine.bench, theirs.bench).map((pair) => (
+              <li key={`bench-${pair.key}`} className="grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] items-center gap-x-3 border-t border-hair border-t-line/50 py-1.5 opacity-80">
+                <SlateSide entry={pair.mine} align="left" wonSlot={false} />
+                <span className={`${MICRO_LABEL} justify-self-center text-text-faint`}>BN</span>
+                <SlateSide entry={pair.theirs} align="right" wonSlot={false} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

@@ -35,6 +35,7 @@ const SCORING_RULE: Readonly<Record<string, string>> = {
 export function LeagueTermsPanel({
   terms,
   titleAs: Title = "h2",
+  draftValue,
 }: {
   readonly terms: LeagueTerms;
   /**
@@ -52,6 +53,10 @@ export function LeagueTermsPanel({
    * what it is.
    */
   readonly titleAs?: "h2" | "p";
+  /** Overrides the Draft row's value. The first-timer persona read "(starting now)" a week
+   *  after the draft finished and panicked — `terms.draftAt` bakes a relative clause at format
+   *  time, and a card must not narrate a moment that has passed. */
+  readonly draftValue?: string;
 }) {
   return (
     <Card as="section" aria-label="League terms" className="flex flex-col gap-3">
@@ -100,7 +105,7 @@ export function LeagueTermsPanel({
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Draft</dt>
-          <dd className="text-text-primary">{terms.draftAt}</dd>
+          <dd className="text-text-primary">{draftValue ?? terms.draftAt}</dd>
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Commissioner</dt>
