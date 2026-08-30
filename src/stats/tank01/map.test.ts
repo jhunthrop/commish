@@ -61,8 +61,8 @@ describe("mapAdpList", () => {
       ],
     };
     expect(mapAdpList(body, listed)).toEqual([
-      { playerId: "10002", adp: 1.6 },
-      { playerId: "10001", adp: 11.4 },
+      { playerId: "10002", adp: 1.6, posAdp: "RB1" },
+      { playerId: "10001", adp: 11.4, posAdp: "QB1" },
     ]);
   });
 
@@ -76,7 +76,7 @@ describe("mapAdpList", () => {
         { posADP: "DST2", overallADP: "163.9", teamAbv: "ZZZ", teamID: "99", longName: "Unlisted DST" },
       ],
     };
-    expect(mapAdpList(body, listed)).toEqual([{ playerId: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`, adp: 152.9 }]);
+    expect(mapAdpList(body, listed)).toEqual([{ playerId: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`, adp: 152.9, posAdp: "DST1" }]);
   });
 
   it("drops an entry with an empty playerID and no team, rather than minting an id from nothing", () => {
@@ -132,8 +132,8 @@ describe("mapGames", () => {
         7,
       ),
     ).toEqual([
-      { gameId: "20261018_CAR@WSH", week: 7, status: "final", homeNflTeam: "WSH", awayNflTeam: "CAR" },
-      { gameId: "20261018_SF@SEA", week: 7, status: "scheduled", homeNflTeam: "SEA", awayNflTeam: "SF" },
+      { gameId: "20261018_CAR@WSH", week: 7, status: "final", homeNflTeam: "WSH", awayNflTeam: "CAR", gameDate: "", kickoffEt: "" },
+      { gameId: "20261018_SF@SEA", week: 7, status: "scheduled", homeNflTeam: "SEA", awayNflTeam: "SF", gameDate: "", kickoffEt: "" },
     ]);
   });
 
@@ -152,33 +152,33 @@ describe("mapGames", () => {
 
   it("stamps every game with the week it was asked for, not a week read off the payload", () => {
     const games = mapGames([{ gameID: "20261018_SF@SEA", away: "SF", home: "SEA", gameWeek: "1" }], 12);
-    expect(games).toEqual([{ gameId: "20261018_SF@SEA", week: 12, status: "in_progress", homeNflTeam: "SEA", awayNflTeam: "SF" }]);
+    expect(games).toEqual([{ gameId: "20261018_SF@SEA", week: 12, status: "in_progress", homeNflTeam: "SEA", awayNflTeam: "SF", gameDate: "", kickoffEt: "" }]);
   });
 
   it("maps every configured spelling, case-insensitively, to its domain status", () => {
     for (const spelling of TANK01_CONFIG.gameStatuses.final) {
       expect(mapGames([{ gameID: "g", away: "A", home: "B", gameStatus: spelling.toUpperCase() }], 1)).toEqual([
-        { gameId: "g", week: 1, status: "final", homeNflTeam: "B", awayNflTeam: "A" },
+        { gameId: "g", week: 1, status: "final", homeNflTeam: "B", awayNflTeam: "A", gameDate: "", kickoffEt: "" },
       ]);
     }
     for (const spelling of TANK01_CONFIG.gameStatuses.scheduled) {
       expect(mapGames([{ gameID: "g", away: "A", home: "B", gameStatus: spelling.toUpperCase() }], 1)).toEqual([
-        { gameId: "g", week: 1, status: "scheduled", homeNflTeam: "B", awayNflTeam: "A" },
+        { gameId: "g", week: 1, status: "scheduled", homeNflTeam: "B", awayNflTeam: "A", gameDate: "", kickoffEt: "" },
       ]);
     }
     for (const spelling of TANK01_CONFIG.gameStatuses.in_progress) {
       expect(mapGames([{ gameID: "g", away: "A", home: "B", gameStatus: spelling.toUpperCase() }], 1)).toEqual([
-        { gameId: "g", week: 1, status: "in_progress", homeNflTeam: "B", awayNflTeam: "A" },
+        { gameId: "g", week: 1, status: "in_progress", homeNflTeam: "B", awayNflTeam: "A", gameDate: "", kickoffEt: "" },
       ]);
     }
   });
 
   it("maps an unrecognized, missing or absent gameStatus to in_progress, the safe default", () => {
     expect(mapGames([{ gameID: "g", away: "A", home: "B", gameStatus: "Weather Delay" }], 1)).toEqual([
-      { gameId: "g", week: 1, status: "in_progress", homeNflTeam: "B", awayNflTeam: "A" },
+      { gameId: "g", week: 1, status: "in_progress", homeNflTeam: "B", awayNflTeam: "A", gameDate: "", kickoffEt: "" },
     ]);
     expect(mapGames([{ gameID: "g", away: "A", home: "B" }], 1)).toEqual([
-      { gameId: "g", week: 1, status: "in_progress", homeNflTeam: "B", awayNflTeam: "A" },
+      { gameId: "g", week: 1, status: "in_progress", homeNflTeam: "B", awayNflTeam: "A", gameDate: "", kickoffEt: "" },
     ]);
   });
 
@@ -248,6 +248,14 @@ describe("mapBoxScoreToStatLines", () => {
       sacks: 0,
       defensiveInterceptions: 0,
       defensiveTouchdowns: 0,
+      // The harvest block (2026-08-30): usage detail the mapper used to discard.
+      targets: 0,
+      carries: 4,
+      passAttempts: 27,
+      passCompletions: 16,
+      fieldGoalsAttempted: 0,
+      offensiveSnaps: 0,
+      offensiveSnapShare: 0,
     });
   });
 
@@ -384,6 +392,14 @@ describe("defensive parsing of shapes the fixtures never exercise", () => {
       {
         playerId: "77777",
         week: 2,
+        // The harvest block (2026-08-30): the player branch always writes these seven.
+        targets: 0,
+        carries: 0,
+        passAttempts: 0,
+        passCompletions: 0,
+        fieldGoalsAttempted: 0,
+        offensiveSnaps: 0,
+        offensiveSnapShare: 0,
         passingYards: 0,
         passingTouchdowns: 0,
         interceptions: 0,
@@ -450,6 +466,9 @@ describe("defensive parsing of shapes the fixtures never exercise", () => {
       {
         playerId: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`,
         week: 7,
+        // The harvest block (2026-08-30): the DEF branch's one harvest field. Absent upstream
+        // value parses to 0, the column's own "not recorded".
+        pointsAllowed: 0,
         passingYards: 0,
         passingTouchdowns: 0,
         interceptions: 0,

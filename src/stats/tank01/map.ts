@@ -122,7 +122,9 @@ export function mapAdpList(body: unknown, listedPlayerIds: ReadonlySet<string>):
     if (playerId === "" || !listedPlayerIds.has(playerId)) continue;
     const adp = Number(entry.overallADP);
     if (!Number.isFinite(adp) || adp <= 0) continue;
-    if (!entries.has(playerId)) entries.set(playerId, { playerId, adp });
+    // The harvest widening (2026-08-30): the market's own position rank rides along when said.
+    const posAdp = str(entry.posADP);
+    if (!entries.has(playerId)) entries.set(playerId, posAdp === "" ? { playerId, adp } : { playerId, adp, posAdp });
   }
   return [...entries.values()];
 }
@@ -240,6 +242,15 @@ export function mapBoxScoreToStatLines(
               sacks: num(defense.sacks),
               defensiveInterceptions: num(defense.defensiveInterceptions),
               defensiveTouchdowns: num(defense.defTD),
+              // The harvest block (2026-08-30). `snapCounts` keys are community-live-verified;
+              // `num()` maps an absent or unparsable value to 0, the column's own "not recorded".
+              targets: num(receiving.targets),
+              carries: num(rushing.carries),
+              passAttempts: num(passing.passAttempts),
+              passCompletions: num(passing.passCompletions),
+              fieldGoalsAttempted: num(kicking.fgAttempts),
+              offensiveSnaps: num(group(entry, "snapCounts").offSnap),
+              offensiveSnapShare: num(group(entry, "snapCounts").offSnapPct),
             },
           ];
         })
@@ -265,6 +276,10 @@ export function mapBoxScoreToStatLines(
       sacks: num(entry.sacks),
       defensiveInterceptions: num(entry.defensiveInterceptions),
       defensiveTouchdowns: num(entry.defTD),
+      // The harvest block (2026-08-30): the audit's scoring-fidelity finding — points allowed
+      // was fetched and discarded on every box score. Persisted now; the scoring formula's
+      // adoption of points-allowed tiers is a separate, founder-visible change.
+      pointsAllowed: num(entry.ptsAllowed),
     });
   }
 

@@ -33,8 +33,8 @@ describe("deriveMockGames", () => {
     const lines = [line("p1", 1), line("p2", 1), line("p3", 1), line("p4", 1)];
     const games = deriveMockGames(1, players, lines, "final");
     expect(games).toEqual([
-      { gameId: "mock-1-CAR-SEA", week: 1, status: "final", homeNflTeam: "CAR", awayNflTeam: "SEA" },
-      { gameId: "mock-1-SF-WAS", week: 1, status: "final", homeNflTeam: "SF", awayNflTeam: "WAS" },
+      { gameId: "mock-1-CAR-SEA", week: 1, status: "final", homeNflTeam: "CAR", awayNflTeam: "SEA", gameDate: "", kickoffEt: "" },
+      { gameId: "mock-1-SF-WAS", week: 1, status: "final", homeNflTeam: "SF", awayNflTeam: "WAS", gameDate: "", kickoffEt: "" },
     ]);
   });
 
@@ -42,7 +42,7 @@ describe("deriveMockGames", () => {
     const players = [player("p1", "SEA"), player("p2", "SF"), player("p3", "WAS")];
     const lines = [line("p1", 1), line("p2", 1), line("p3", 1)];
     const games = deriveMockGames(1, players, lines, "final");
-    expect(games).toEqual([{ gameId: "mock-1-SEA-SF", week: 1, status: "final", homeNflTeam: "SEA", awayNflTeam: "SF" }]);
+    expect(games).toEqual([{ gameId: "mock-1-SEA-SF", week: 1, status: "final", homeNflTeam: "SEA", awayNflTeam: "SF", gameDate: "", kickoffEt: "" }]);
     const pairedTeams = new Set(games.flatMap((game) => [game.homeNflTeam, game.awayNflTeam]));
     expect(pairedTeams.has("WAS")).toBe(false);
   });
@@ -51,7 +51,7 @@ describe("deriveMockGames", () => {
     const players = [player("p1", "SEA"), player("p2", "SF")];
     const lines = [line("p1", 1), line("p2", 1), line("ghost", 1)];
     const games = deriveMockGames(1, players, lines, "final");
-    expect(games).toEqual([{ gameId: "mock-1-SEA-SF", week: 1, status: "final", homeNflTeam: "SEA", awayNflTeam: "SF" }]);
+    expect(games).toEqual([{ gameId: "mock-1-SEA-SF", week: 1, status: "final", homeNflTeam: "SEA", awayNflTeam: "SF", gameDate: "", kickoffEt: "" }]);
   });
 
   it("returns no games for a week with no stat lines", () => {

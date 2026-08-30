@@ -39,6 +39,15 @@ export const TANK01_CONFIG = {
     news: "/getNFLNews",
     bettingOdds: "/getNFLBettingOdds",
     dfs: "/getNFLDFS",
+    /** The harvest widening (founder, 2026-08-30: "make sure we're harvesting all of the data").
+     *  All four probed live before wiring: projections return playerProjections +
+     *  teamDefenseProjections keyed maps with fantasyPointsDefault; injuriesByDate returns
+     *  {injDate, injList[{playerID, designation, team, pos}]}; inactives takes `week` and
+     *  returns per-game home/away player lists; currentInfo is the source's own calendar. */
+    projections: "/getNFLProjections",
+    injuriesByDate: "/getNFLInjuriesByDate",
+    inactives: "/getNFLInactiveList",
+    currentInfo: "/getNFLCurrentInfo",
   },
   /**
    * Which ADP market `/getNFLADP` answers with (`adpType` query parameter). `PPR` because it is

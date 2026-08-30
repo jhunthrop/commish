@@ -53,6 +53,23 @@ export interface StatLine {
   readonly sacks: number;
   readonly defensiveInterceptions: number;
   readonly defensiveTouchdowns: number;
+  // THE HARVEST BLOCK (founder, 2026-08-30: "make sure we're harvesting all of the data").
+  // Usage and context detail the box score already carries and the mapper used to discard.
+  // OPTIONAL, not defaulted: the mock dataset and recorded fixtures predate these fields, and
+  // "absent" honestly means "not recorded", never 0 targets. The persistence edge writes 0 for
+  // an absent value because a column cannot say undefined; scoring reads none of them, and they
+  // are deliberately NOT in STAT_FIELDS — the digest and the provider contract govern the
+  // SCORED fields, and widening that list would make every provider owe numbers it may not have.
+  readonly targets?: number;
+  readonly carries?: number;
+  readonly passAttempts?: number;
+  readonly passCompletions?: number;
+  readonly fieldGoalsAttempted?: number;
+  /** DST rows only: points the defense allowed — the input standard points-allowed tiers score. */
+  readonly pointsAllowed?: number;
+  readonly offensiveSnaps?: number;
+  /** As the source reports it (`snapCounts.offSnapPct`); shape unverified until a live box score exists. */
+  readonly offensiveSnapShare?: number;
 }
 
 /**

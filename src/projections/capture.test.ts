@@ -228,8 +228,9 @@ describe("captureOnce", () => {
         },
       }),
     );
-    // Midweek: the two game-day feeds stand down, and the injury feed fans out over two teams.
-    expect(reserved).toEqual([CAPTURE_FEEDS.length - 2 - 1 + 2]);
+    // Midweek: the three game-day feeds (odds, DFS, inactives) stand down, and the injury feed
+    // fans out over two teams.
+    expect(reserved).toEqual([CAPTURE_FEEDS.length - 3 - 1 + 2]);
   });
 
   it("does nothing and spends nothing when every feed is fresh", async () => {

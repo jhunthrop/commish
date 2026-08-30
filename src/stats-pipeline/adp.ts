@@ -56,11 +56,11 @@ export async function ingestAdp(
   // `unnest` arrays is not expressible here) and `jsonb_to_recordset` turns it back into rows
   // server-side. RETURNING is what makes `playersUpdated` the number of rows that actually took
   // a value rather than the number we hoped would.
-  const feed = JSON.stringify(entries.map((entry) => ({ id: entry.playerId, adp: entry.adp })));
+  const feed = JSON.stringify(entries.map((entry) => ({ id: entry.playerId, adp: entry.adp, pos_adp: entry.posAdp ?? null })));
   const updated = await db.execute(sql`
     update ${players}
-    set adp = data.adp
-    from jsonb_to_recordset(${feed}::jsonb) as data(id text, adp real)
+    set adp = data.adp, pos_adp = data.pos_adp
+    from jsonb_to_recordset(${feed}::jsonb) as data(id text, adp real, pos_adp text)
     where ${players.id} = data.id
     returning ${players.id}
   `);

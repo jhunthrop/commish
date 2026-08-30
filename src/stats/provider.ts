@@ -44,6 +44,9 @@ export interface AdpEntry {
   /** The SAME id `listPlayers()` mints — the contract suite asserts the intersection, because an
    *  ADP keyed to an id nobody lists can never reach a `players` row. */
   readonly playerId: string;
+  /** The market's position rank as the source words it ("RB1"), when it says one — the harvest
+   *  widening (2026-08-30). Absent when the feed omits it; never synthesized from `adp`. */
+  readonly posAdp?: string;
   /** Positive and finite. The contract suite pins both halves; a 0, negative or NaN ADP is a
    *  parsing bug, never a real market position. */
   readonly adp: number;

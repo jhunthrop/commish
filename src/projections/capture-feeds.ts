@@ -151,6 +151,40 @@ export const CAPTURE_FEEDS: readonly CaptureFeed[] = [
     irrecoverable: "ADP drift through the preseason is the market changing its mind, and nobody archives it.",
     requests: () => [{ path: TANK01_CONFIG.paths.adp, query: { adpType: TANK01_CONFIG.adpType } }],
   },
+  // THE HARVEST WIDENING (founder, 2026-08-30: "make sure we're harvesting all of the data from
+  // Tank01"). Four feeds the coverage audit found missing, each probed live before wiring so the
+  // param names below are verified, not transcribed from prose.
+  {
+    source: "tank01_projections",
+    cadence: "daily",
+    irrecoverable: "Projections update through the week as news lands; last Tuesday's number is nobody's archive.",
+    // The one feed that finally uses `context.week` — projections are addressed by week, and the
+    // current season is the endpoint's default so no season param is sent.
+    requests: ({ week }) => [{ path: TANK01_CONFIG.paths.projections, query: { week: String(week) } }],
+  },
+  {
+    source: "tank01_injuries_by_date",
+    cadence: "daily",
+    irrecoverable: "A designation list for a date is overwritten upstream; the dedicated endpoint has no archive.",
+    // One request for the whole league's designations — the cheap sibling of the 32-request
+    // roster sweep above, which stays because it carries descriptions and return dates this
+    // list does not.
+    requests: () => [{ path: TANK01_CONFIG.paths.injuriesByDate, query: {} }],
+  },
+  {
+    source: "tank01_inactives",
+    cadence: "game-day",
+    irrecoverable: "Who was ruled out for a kickoff is a fact about that morning; it is not republished.",
+    requests: ({ week }) => [{ path: TANK01_CONFIG.paths.inactives, query: { week: String(week) } }],
+  },
+  {
+    source: "tank01_player_list",
+    cadence: "weekly",
+    irrecoverable: "Cross-platform IDs, bios, and per-player injury objects drift in place; the list has no history.",
+    // ~4.4MB per snapshot, deduped by digest like every feed — a week with no roster churn
+    // writes nothing.
+    requests: () => [{ path: TANK01_CONFIG.paths.playerList, query: {} }],
+  },
 ];
 
 /**

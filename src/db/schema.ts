@@ -815,6 +815,9 @@ export const players = pgTable(
      * fractional positions ("1.6", "12.8").
      */
     adp: real("adp"),
+    /** The market's position rank as the ADP feed words it ("RB1") — harvest widening 2026-08-30.
+     *  Same single writer as `adp` (`ingestAdp`); NULL until that feed has spoken. */
+    posAdp: text("pos_adp"),
     /**
      * Migration 0045 (founder directive 2026-08-26: "why aren't we showing the players picture?
      * we have the link don't we?"). Tank01's `/getNFLPlayerList` carries `espnHeadshot` per
@@ -850,6 +853,16 @@ export const playerStatLines = pgTable(
     sacks: real("sacks").notNull().default(0),
     defensiveInterceptions: integer("defensive_interceptions").notNull().default(0),
     defensiveTouchdowns: integer("defensive_touchdowns").notNull().default(0),
+    // The harvest block (2026-08-30): usage/context detail, 0 = not recorded (the mock dataset
+    // and every row written before the widening). Scoring reads none of these yet.
+    targets: integer("targets").notNull().default(0),
+    carries: integer("carries").notNull().default(0),
+    passAttempts: integer("pass_attempts").notNull().default(0),
+    passCompletions: integer("pass_completions").notNull().default(0),
+    fieldGoalsAttempted: integer("field_goals_attempted").notNull().default(0),
+    pointsAllowed: integer("points_allowed").notNull().default(0),
+    offensiveSnaps: integer("offensive_snaps").notNull().default(0),
+    offensiveSnapShare: real("offensive_snap_share").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.playerId, t.week] }), index("player_stat_lines_week_idx").on(t.week)],
 );
