@@ -42,16 +42,28 @@ export function createTank01StatsProvider(options: Tank01ProviderOptions): Stats
     return mapGames(body, week);
   }
 
+  // The player list is TODAY'S rosters, whatever season the provider reads — Tank01 has no
+  // per-season list. So the two-teams cross-check below is only true for the CURRENT season; a
+  // historical season's box score legitimately carries players who have since moved teams, and
+  // filtering them against today's roster deletes their whole season (founder, 2026-08-30: "If
+  // a player has switched teams it doesn't show any stats for the previous season" — the 2025
+  // backfill lost every offseason mover).
+  const historical = Number(season) < TANK01_CONFIG.defaultSeason;
+
   async function getGameStatLines(game: GameSummary): Promise<readonly StatLine[]> {
     const list = await fetchPlayers();
     const listedPlayerIds = new Set(list.map((player) => player.id));
+    const box = await client.get(TANK01_CONFIG.paths.boxScore, { gameID: game.gameId });
+    // The listed-players filter Plan A's fix wave added: a stat line for an id nobody lists is
+    // a foreign-key failure at seed time.
+    const lines = mapBoxScoreToStatLines(box, game.week, listedPlayerIds);
+    if (historical) return lines;
+    // Current season only, defense-in-depth: a box score keyed to the wrong fixture would
+    // otherwise attribute real points to a real player in a game they did not play, which no
+    // week-level check can catch.
     const teams = new Set([game.homeNflTeam, game.awayNflTeam]);
     const gameTeamPlayerIds = new Set(list.filter((player) => teams.has(player.nflTeam)).map((player) => player.id));
-    const box = await client.get(TANK01_CONFIG.paths.boxScore, { gameID: game.gameId });
-    // The listed-players filter Plan A's fix wave added, plus the game's own two teams: a box
-    // score keyed to the wrong fixture would otherwise attribute real points to a real player
-    // in a game they did not play, which no week-level check can catch.
-    return mapBoxScoreToStatLines(box, game.week, listedPlayerIds).filter((line) => gameTeamPlayerIds.has(line.playerId));
+    return lines.filter((line) => gameTeamPlayerIds.has(line.playerId));
   }
 
   return {

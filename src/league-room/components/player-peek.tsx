@@ -110,7 +110,18 @@ export function PlayerPeekHost() {
         ) : (
           <>
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <PlayerObject player={body.player} />
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-3">
+                  <PlayerObject player={body.player} />
+                  {/* The designation, said in the verdict channel: "Q"/"O"/"IR" beside the name
+                      is the one fact a manager checks before anything else. Absent = the feed
+                      does not name him, and nothing prints. */}
+                  {body.injuryDesignation === null ? null : (
+                    <span className="rounded-sm bg-negative px-1.5 py-0.5 font-mono text-sm font-bold text-negative-text">{body.injuryDesignation}</span>
+                  )}
+                </div>
+                <p className="text-sm text-text-muted">{body.ownedBy === null ? "Free agent in this league" : `On ${body.ownedBy}`}</p>
+              </div>
               <Link
                 className={`${MICRO_LABEL} pt-2 text-accent underline`}
                 href={`/app/leagues/${target.leagueId}/players/${target.playerId}`}
@@ -124,6 +135,86 @@ export function PlayerPeekHost() {
               <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
             ) : (
               <p className="text-sm text-text-muted">No scored week for him this season.</p>
+            )}
+
+            {/* SEASON TOTALS + GAME LOG (founder, 2026-08-30: ESPN-depth). Raw production from
+                the harvest block, points under THIS league's rules. Columns are position-blind
+                on purpose: a zero column is honest and a per-position table is four tables. */}
+            {body.totals === null ? null : (
+              <div className="flex flex-col gap-2">
+                <h3 className={`${MICRO_LABEL} text-text-faint`}>Season</h3>
+                <div className="flex flex-wrap gap-x-8 gap-y-2">
+                  {[
+                    ["Games", String(body.totals.games)],
+                    ["Carries", String(body.totals.carries)],
+                    ["Rush yds", String(body.totals.rushingYards)],
+                    ["Targets", String(body.totals.targets)],
+                    ["Rec", String(body.totals.receptions)],
+                    ["Rec yds", String(body.totals.receivingYards)],
+                    ["Pass yds", String(body.totals.passingYards)],
+                    ["TD", String(body.totals.touchdowns)],
+                    ["Pts", body.totals.fantasyPoints.toFixed(2)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex flex-col">
+                      <span className={`${MICRO_LABEL} text-text-faint`}>{label}</span>
+                      <span className="font-display text-xl font-bold tabular-nums text-text-primary">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {body.log.length === 0 ? null : (
+              <div className="flex flex-col gap-2">
+                <h3 className={`${MICRO_LABEL} text-text-faint`}>Game log</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm tabular-nums">
+                    <thead>
+                      <tr className={`${MICRO_LABEL} border-b border-line text-text-faint`}>
+                        <th className="py-1 pr-3 text-left font-normal">Wk</th>
+                        <th className="py-1 pr-3 text-right font-normal">Car</th>
+                        <th className="py-1 pr-3 text-right font-normal">Rush</th>
+                        <th className="py-1 pr-3 text-right font-normal">Tgt</th>
+                        <th className="py-1 pr-3 text-right font-normal">Rec</th>
+                        <th className="py-1 pr-3 text-right font-normal">Rec yds</th>
+                        <th className="py-1 pr-3 text-right font-normal">Pass</th>
+                        <th className="py-1 pr-3 text-right font-normal">TD</th>
+                        <th className="py-1 text-right font-normal">Pts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {body.log.map((row) => (
+                        <tr key={row.week} className="border-b border-line/50">
+                          <td className="py-1.5 pr-3 text-text-muted">{row.week}</td>
+                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.carries}</td>
+                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.rushingYards}</td>
+                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.targets}</td>
+                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.receptions}</td>
+                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.receivingYards}</td>
+                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.passingYards}</td>
+                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.touchdowns}</td>
+                          <td className="py-1.5 text-right font-display font-bold text-text-primary">{row.points.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {body.news.length === 0 ? null : (
+              <div className="flex flex-col gap-2">
+                <h3 className={`${MICRO_LABEL} text-text-faint`}>News</h3>
+                <ul className="flex flex-col gap-1.5">
+                  {body.news.map((story) => (
+                    <li key={story.link}>
+                      <a href={story.link} target="_blank" rel="noreferrer" className="text-sm text-text-primary underline hover:text-accent">
+                        {story.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </>
         )}

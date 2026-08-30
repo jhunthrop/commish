@@ -1,6 +1,6 @@
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { matchups, players, playerStatLines, scoringSettings, statWeeks } from "@/db/schema";
+import { captureSnapshots, matchups, players, playerStatLines, rosterSlots, scoringSettings, statWeeks, teams } from "@/db/schema";
 import type { Player, Position } from "@/domain/player";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
@@ -32,6 +32,33 @@ export interface PlayerWeekView {
   readonly week: number;
   readonly points: number | null;
   readonly percentile: number | null;
+}
+
+/** One played week's raw production — the game log's row (founder, 2026-08-30: ESPN-depth card). */
+export interface PlayerGameLogRow {
+  readonly week: number;
+  readonly points: number;
+  readonly carries: number;
+  readonly rushingYards: number;
+  readonly targets: number;
+  readonly receptions: number;
+  readonly receivingYards: number;
+  readonly passingYards: number;
+  /** Offensive touchdowns of every kind, one column — the log is a scan, not a box score. */
+  readonly touchdowns: number;
+}
+
+/** The season summed, from the same lines the log itemizes. */
+export interface PlayerSeasonTotals {
+  readonly games: number;
+  readonly carries: number;
+  readonly rushingYards: number;
+  readonly targets: number;
+  readonly receptions: number;
+  readonly receivingYards: number;
+  readonly passingYards: number;
+  readonly touchdowns: number;
+  readonly fantasyPoints: number;
 }
 
 /**
@@ -79,6 +106,16 @@ export interface PlayerSeasonBody {
   readonly pointsPerGamePercentile: number | null;
   /** Every week of this league's season that has actually been played, in order. */
   readonly weeks: readonly PlayerWeekView[];
+  /** Which of THIS league's teams holds him, or `null` for a free agent here. */
+  readonly ownedBy: string | null;
+  /** His current designation from the harvested injuries feed ("Q", "O", "IR"), or `null` when
+   *  the feed does not name him — absence means healthy as far as the source says. */
+  readonly injuryDesignation: string | null;
+  /** Raw production per played week, newest first — the ESPN-depth game log. */
+  readonly log: readonly PlayerGameLogRow[];
+  readonly totals: PlayerSeasonTotals | null;
+  /** Recent headlines that name him, newest first, from the harvested news feed. */
+  readonly news: readonly { readonly title: string; readonly link: string }[];
 }
 
 type Line = typeof playerStatLines.$inferSelect;
@@ -184,6 +221,49 @@ async function preseasonReadings(
  * board to find one row on it. Skipped entirely for a player the crosswalk could not place, which
  * is the cheap case as well as the correct one.
  */
+/** His designation off the latest harvested injuries snapshot; `null` when the feed does not
+ *  name him. One small read, latest row only. */
+async function injuryDesignationFor(db: Db, playerId: string): Promise<string | null> {
+  const [snapshot] = await db
+    .select({ payload: captureSnapshots.payload })
+    .from(captureSnapshots)
+    .where(eq(captureSnapshots.source, "tank01_injuries_by_date"))
+    .orderBy(desc(captureSnapshots.capturedAt))
+    .limit(1);
+  const body = snapshot?.payload as Record<string, unknown> | undefined;
+  const list = body?.injList;
+  if (!Array.isArray(list)) return null;
+  for (const raw of list) {
+    const entry = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
+    if (entry.playerID === playerId && typeof entry.designation === "string" && entry.designation !== "") return entry.designation;
+  }
+  return null;
+}
+
+/** Headlines that name him, from the latest harvested news snapshot. The feed carries no
+ *  playerID, only titles in Tank01's own "Name: sentence" convention — the prefix is the join,
+ *  strict on purpose: a missed headline costs nothing, another man's headline on his card is
+ *  the failure this guards. */
+async function newsFor(db: Db, name: string): Promise<readonly { readonly title: string; readonly link: string }[]> {
+  const [snapshot] = await db
+    .select({ payload: captureSnapshots.payload })
+    .from(captureSnapshots)
+    .where(eq(captureSnapshots.source, "tank01_news"))
+    .orderBy(desc(captureSnapshots.capturedAt))
+    .limit(1);
+  const body = snapshot?.payload;
+  if (!Array.isArray(body)) return [];
+  const stories: { title: string; link: string }[] = [];
+  for (const raw of body) {
+    const entry = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
+    const title = typeof entry.title === "string" ? entry.title : "";
+    const link = typeof entry.link === "string" ? entry.link : "";
+    if (title.startsWith(`${name}:`) && link !== "") stories.push({ title, link });
+    if (stories.length === 3) break;
+  }
+  return stories;
+}
+
 export async function playerSeason(
   db: Db,
   leagueId: string,
@@ -227,7 +307,54 @@ export async function playerSeason(
 
   const preseason = await preseasonReadings(db, playerId, new Date(clock.now()));
 
+  // The ESPN-depth additions (founder, 2026-08-30): his own raw lines are already in `lines`
+  // (he is his own peer), so the log and the totals cost no extra read.
+  const myLines = lines
+    .filter((line) => line.playerId === playerId)
+    .sort((a, b) => b.week - a.week);
+  const log: PlayerGameLogRow[] = myLines.map((line) => ({
+    week: line.week,
+    points: computeFantasyPoints(line, player.position, rules),
+    carries: line.carries,
+    rushingYards: line.rushingYards,
+    targets: line.targets,
+    receptions: line.receptions,
+    receivingYards: line.receivingYards,
+    passingYards: line.passingYards,
+    touchdowns: line.rushingTouchdowns + line.receivingTouchdowns + line.passingTouchdowns,
+  }));
+  const totals: PlayerSeasonTotals | null =
+    log.length === 0
+      ? null
+      : log.reduce(
+          (sum, row) => ({
+            games: sum.games + 1,
+            carries: sum.carries + row.carries,
+            rushingYards: sum.rushingYards + row.rushingYards,
+            targets: sum.targets + row.targets,
+            receptions: sum.receptions + row.receptions,
+            receivingYards: sum.receivingYards + row.receivingYards,
+            passingYards: sum.passingYards + row.passingYards,
+            touchdowns: sum.touchdowns + row.touchdowns,
+            fantasyPoints: roundPoints(sum.fantasyPoints + row.points),
+          }),
+          { games: 0, carries: 0, rushingYards: 0, targets: 0, receptions: 0, receivingYards: 0, passingYards: 0, touchdowns: 0, fantasyPoints: 0 },
+        );
+
+  const [holder] = await db
+    .select({ teamName: teams.name })
+    .from(rosterSlots)
+    .innerJoin(teams, eq(teams.id, rosterSlots.teamId))
+    .where(and(eq(teams.leagueId, leagueId), eq(rosterSlots.playerId, playerId)))
+    .limit(1);
+  const [injuryDesignation, news] = await Promise.all([injuryDesignationFor(db, playerId), newsFor(db, player.name)]);
+
   return {
+    ownedBy: holder?.teamName ?? null,
+    injuryDesignation,
+    log,
+    totals,
+    news,
     player,
     positionRank: adp === null ? null : 1 + peers.filter((peer) => peer.adp !== null && peer.adp < adp).length,
     adpPercentile: adp === null ? null : percentileOf(adp, rankedAll, "lower"),
