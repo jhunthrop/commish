@@ -121,7 +121,10 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
   };
 
   return (
-    <section className="flex w-full max-w-3xl flex-col gap-3" aria-label="Free agents">
+    // FULL WIDTH (founder, 2026-08-30: "all of these screens need to scale to the window size").
+    // The board fills the main column; the row grid's 1fr player cell claims the growth, the
+    // same fill discipline the standings table set.
+    <section className="flex w-full flex-col gap-3" aria-label="Free agents">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-xl font-bold text-text-primary">Free agents</h2>
         <p role="status" aria-live="polite" className="text-sm text-text-faint">

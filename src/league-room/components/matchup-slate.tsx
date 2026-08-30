@@ -117,13 +117,12 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
 
 
   return (
-    // SCAN WIDTH (founder, 2026-08-30: "how quickly do my eyes scan to the correct
-    // information"). At the main column's full measure each half put ~450px of void between a
-    // name and its number, twenty times. The mirror is right; the card was too wide for it —
-    // capped and centered, the name sits beside its figure and the whole matchup reads in two
-    // vertical strokes down the spine.
+    // FULL WIDTH (founder, 2026-08-30: "all of these screens need to scale to the window
+    // size", superseding the same day's max-w-3xl scan cap). The scan survives the width
+    // because each side's figure sits at the SPINE edge, not the outer edge — the two vertical
+    // strokes down the middle are unchanged however far the names stretch.
     <div
-      className={`mx-auto flex w-full max-w-3xl flex-col border-l-[3px] border-r-[3px] pl-2 pr-2 ${
+      className={`mx-auto flex w-full flex-col border-l-[3px] border-r-[3px] pl-2 pr-2 ${
         homeIsMine ? "border-l-accent border-r-transparent" : awayIsMine ? "border-l-transparent border-r-accent" : "border-l-transparent border-r-transparent"
       }`}
     >
