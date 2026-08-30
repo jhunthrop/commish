@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { RAIL_LABEL } from "@/components/ui/config";
+import { RAIL_LABEL_LG } from "@/components/ui/config";
 
 export type LeagueTab = "matchup" | "standings" | "team" | "players" | "trades" | "activity";
 
@@ -39,7 +39,7 @@ export function LeagueTabs({ leagueId, active }: { readonly leagueId: string; re
   const pathname = usePathname();
   const base = `/app/leagues/${leagueId}`;
   return (
-    <nav aria-label="League" className={`flex flex-wrap items-center gap-5 border-b border-line pb-2 ${RAIL_LABEL} text-text-muted`}>
+    <nav aria-label="League" className={`flex flex-wrap items-center gap-7 border-b border-line pb-2.5 ${RAIL_LABEL_LG} text-text-muted`}>
       {TABS.map(({ tab, label, segment }) => {
         const href = `${base}${segment}`;
         const current = pathname === href || (segment === "" && pathname.startsWith(`${base}/matchups`)) || tab === active && pathname === href;

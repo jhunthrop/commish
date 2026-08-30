@@ -30,12 +30,12 @@ function FixtureCell({
   if (fixtures === undefined || nflTeam === "") return null;
   const fixture = fixtures.get(nflTeam);
   if (fixture === undefined) {
-    return <span className="w-20 shrink-0 text-right font-mono text-xs font-semibold text-negative">Bye</span>;
+    return <span className="w-24 shrink-0 text-right font-mono text-sm font-semibold text-negative">Bye</span>;
   }
   return (
-    <span className="flex w-20 shrink-0 flex-col items-end leading-tight">
-      <span className="font-mono text-xs text-text-muted">{fixture.opp}</span>
-      <span className={`font-mono text-xs ${fixture.status === "in_progress" ? "text-live" : "text-text-faint"}`}>{fixture.when}</span>
+    <span className="flex w-24 shrink-0 flex-col items-end leading-tight">
+      <span className="font-mono text-sm text-text-muted">{fixture.opp}</span>
+      <span className={`font-mono text-sm ${fixture.status === "in_progress" ? "text-live" : "text-text-faint"}`}>{fixture.when}</span>
     </span>
   );
 }
@@ -278,7 +278,7 @@ export function LineupEditor({
     // `id="lineup"` (F16): the fragment `actionHref` builds is a real anchor on a real panel.
     <section id="lineup" className="flex flex-col gap-3">
       <div className="flex flex-col gap-0.5">
-        <h2 className="font-display text-xl font-bold text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
+        <h2 className="font-display text-2xl font-bold text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
         {/* Under its heading, not orphaned at the far edge (the persona pass, 2026-08-30). */}
         <p className="text-sm text-text-faint">Lineups lock for the whole week when its first game kicks off.</p>
       </div>
@@ -312,7 +312,7 @@ export function LineupEditor({
             return (
               <li
                 key={key}
-                className={`flex items-center gap-3 border-t border-line border-l-[3px] py-2 pl-2 transition-all ${
+                className={`flex items-center gap-3 border-t border-line border-l-[3px] py-3 pl-2 transition-all ${
                   isSelected
                     ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent"
                     : "border-l-transparent"
@@ -328,17 +328,17 @@ export function LineupEditor({
                   </span>
                 ) : (
                   <span className="flex min-w-0 flex-1 items-center gap-2.5">
-                    <PlayerFace player={face} size="md" />
+                    <PlayerFace player={face} size="lg" />
                     <span className="flex min-w-0 flex-col">
                       <Link
-                        className="truncate font-display text-lg font-bold leading-display text-text-primary hover:underline"
+                        className="truncate font-display text-2xl font-bold leading-display text-text-primary hover:underline"
                         href={`/app/leagues/${leagueId}/players/${face.id}`}
                       >
                         {face.name}
                       </Link>
-                      <span className="flex items-center gap-1.5">
-                        <PositionBadge position={face.position} size="sm" />
-                        {face.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{face.nflTeam}</span>}
+                      <span className="flex items-center gap-2">
+                        <PositionBadge position={face.position} size="md" />
+                        {face.nflTeam === "" ? null : <span className="font-mono text-sm text-text-faint">{face.nflTeam}</span>}
                       </span>
                     </span>
                   </span>
@@ -351,7 +351,7 @@ export function LineupEditor({
                 {pointsByPlayerId === undefined || occupantId === null ? null : (
                   <span
                     className={`shrink-0 font-display tabular-nums ${
-                      (pointsByPlayerId.get(occupantId) ?? null) === null ? "text-sm font-semibold text-text-faint/60" : "text-lg font-bold text-text-primary"
+                      (pointsByPlayerId.get(occupantId) ?? null) === null ? "text-base font-semibold text-text-faint/60" : "text-2xl font-bold text-text-primary"
                     }`}
                   >
                     {(pointsByPlayerId.get(occupantId) ?? null) === null ? NOT_STARTED_DASH : formatPoints(pointsByPlayerId.get(occupantId)!)}
@@ -404,16 +404,16 @@ export function LineupEditor({
                 return (
                   <li
                     key={key}
-                    className={`flex items-center gap-2.5 border-t border-line border-l-[3px] py-1.5 pl-2 transition-all ${
+                    className={`flex items-center gap-2.5 border-t border-line border-l-[3px] py-2.5 pl-2 transition-all ${
                       isSelected
                         ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent"
                         : "border-l-transparent"
                     } ${dimmed ? "opacity-40" : ""}`}
                   >
-                    <PlayerFace player={player} size="sm" />
+                    <PlayerFace player={player} size="md" />
                     <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
                       <Link
-                        className="truncate text-sm font-medium text-text-primary hover:underline"
+                        className="truncate text-lg font-medium text-text-primary hover:underline"
                         href={`/app/leagues/${leagueId}/players/${player.id}`}
                       >
                         {player.name}
@@ -425,7 +425,7 @@ export function LineupEditor({
                     {pointsByPlayerId === undefined ? null : (
                       <span
                         className={`shrink-0 font-display tabular-nums ${
-                          (pointsByPlayerId.get(slot.playerId!) ?? null) === null ? "text-sm font-semibold text-text-faint/60" : "text-sm font-bold text-text-muted"
+                          (pointsByPlayerId.get(slot.playerId!) ?? null) === null ? "text-base font-semibold text-text-faint/60" : "text-lg font-bold text-text-muted"
                         }`}
                       >
                         {(pointsByPlayerId.get(slot.playerId!) ?? null) === null ? NOT_STARTED_DASH : formatPoints(pointsByPlayerId.get(slot.playerId!)!)}

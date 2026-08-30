@@ -270,7 +270,7 @@ export function Table<T>({
 
   return (
     <div className="w-full overflow-x-auto">
-      <table className={`${fill ? "w-full" : "w-auto"} max-w-full border-collapse text-sm text-text-primary`}>
+      <table className={`${fill ? "w-full" : "w-auto"} max-w-full border-collapse text-base text-text-primary`}>
         <caption className={captionVisible ? "mb-2 text-left text-sm font-medium text-text-muted" : "sr-only"}>{caption}</caption>
         <thead>
           <tr className="border-b border-line">

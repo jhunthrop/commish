@@ -42,10 +42,10 @@ function SlateSide({ entry, align, wonSlot }: { readonly entry: MatchupLineupEnt
       <span className="text-sm text-text-faint">Empty</span>
     ) : (
       <span className={`flex min-w-0 items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-        <PlayerFace player={player} size="sm" />
+        <PlayerFace player={player} size="md" />
         <span className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-semibold leading-tight text-text-primary">{player.name}</span>
-          <span className="truncate font-mono text-xs text-text-faint">
+          <span className="truncate text-lg font-semibold leading-tight text-text-primary">{player.name}</span>
+          <span className="truncate font-mono text-sm text-text-faint">
             {player.position}
             {player.nflTeam === "" ? "" : ` · ${player.nflTeam}`}
           </span>
@@ -57,10 +57,10 @@ function SlateSide({ entry, align, wonSlot }: { readonly entry: MatchupLineupEnt
       data-slot-winner={wonSlot ? "true" : undefined}
       className={`shrink-0 font-display tabular-nums ${
         points === null
-          ? "text-sm font-semibold text-text-faint/60"
+          ? "text-base font-semibold text-text-faint/60"
           : wonSlot
-            ? "text-xl font-extrabold text-text-primary"
-            : "text-lg font-semibold text-text-muted"
+            ? "text-2xl font-extrabold text-text-primary"
+            : "text-xl font-semibold text-text-muted"
       }`}
     >
       {points === null ? NOT_STARTED_DASH : formatPoints(points)}
@@ -126,7 +126,7 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
         homeIsMine ? "border-l-accent border-r-transparent" : awayIsMine ? "border-l-transparent border-r-accent" : "border-l-transparent border-r-transparent"
       }`}
     >
-      <div aria-hidden="true" className={`grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] items-center gap-x-3 pb-1.5 ${MICRO_LABEL} text-text-faint`}>
+      <div aria-hidden="true" className={`grid grid-cols-[minmax(0,1fr)_72px_minmax(0,1fr)] items-center gap-x-4 pb-1.5 ${MICRO_LABEL} text-text-faint`}>
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate">{homeIsMine ? `${mine.teamName} · you` : mine.teamName}</span>
           {detail.weekStatus === "in_progress" && yetToPlay(mine.starters) > 0 ? (
@@ -143,7 +143,7 @@ export function MatchupSlate({ detail, myTeamId }: MatchupSlateProps) {
       </div>
       <ul className="flex flex-col">
         {pairs.map((pair) => (
-          <li key={pair.key} className="grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)] items-center gap-x-3 border-t border-line py-2">
+          <li key={pair.key} className="grid grid-cols-[minmax(0,1fr)_72px_minmax(0,1fr)] items-center gap-x-4 border-t border-line py-3">
             <SlateSide
               entry={pair.mine}
               align="left"

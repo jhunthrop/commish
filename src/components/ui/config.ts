@@ -138,7 +138,7 @@ export const UI_CONFIG = {
      * as spreadsheets and wrong about why. The cause was full-width tables spreading two related
      * facts 1270px apart, not row height, and that has since been fixed separately.
      */
-    denseRowPaddingPx: 11,
+    denseRowPaddingPx: 14,
   },
   waitingRoom: {
     /**
@@ -246,3 +246,8 @@ export const MICRO_LABEL = "font-mono text-xs uppercase tracking-[0.11em]";
  * hand-rolls the class still fails `no-uppercase.source.test.ts`.
  */
 export const RAIL_LABEL = "font-display text-sm font-semibold uppercase tracking-[0.08em]";
+
+/** The rail register one step up, for the surfaces the big-feel pass grew (founder, 2026-08-30:
+ *  "see how flock feels big — I want our site to feel like that too"): the league tab rail and
+ *  the segmented filter strip. Same voice, larger body — never a new voice. */
+export const RAIL_LABEL_LG = "font-display text-base font-semibold uppercase tracking-[0.08em]";

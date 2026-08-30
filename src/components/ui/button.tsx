@@ -71,10 +71,12 @@ const VARIANT: Readonly<Record<ButtonVariant, string>> = {
   ghost: "rounded-md text-text-primary hover:bg-surface-elevated",
 };
 
+// One step up across the scale (the big-feel pass, founder 2026-08-30): controls read as
+// things you press from a sofa, not chrome you squint at.
 const SIZE: Readonly<Record<ButtonSize, string>> = {
-  sm: "min-h-8 px-3 text-sm",
-  md: "min-h-10 px-4 text-md",
-  lg: "min-h-12 px-6 text-lg",
+  sm: "min-h-9 px-3.5 text-sm",
+  md: "min-h-11 px-5 text-md",
+  lg: "min-h-13 px-7 text-lg",
 };
 
 /**

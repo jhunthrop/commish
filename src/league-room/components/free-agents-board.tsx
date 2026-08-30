@@ -126,7 +126,7 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
     // same fill discipline the standings table set.
     <section className="flex w-full flex-col gap-3" aria-label="Free agents">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-bold text-text-primary">Free agents</h2>
+        <h2 className="font-display text-2xl font-bold text-text-primary">Free agents</h2>
         <p role="status" aria-live="polite" className="text-sm text-text-faint">
           {status === "claiming" ? "Claiming…" : status === "claimed" ? "Claimed. He is on your bench." : `${total} available`}
         </p>
@@ -156,7 +156,7 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
         </p>
       )}
 
-      <div aria-hidden="true" className={`grid grid-cols-[44px_minmax(0,1fr)_88px_176px] items-center gap-x-4 pb-1 ${MICRO_LABEL} text-text-faint`}>
+      <div aria-hidden="true" className={`grid grid-cols-[56px_minmax(0,1fr)_112px_176px] items-center gap-x-4 pb-1 ${MICRO_LABEL} text-text-faint`}>
         <span>#</span>
         <span>Player</span>
         <span>ADP</span>
@@ -171,32 +171,32 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
         <ul className="flex flex-col">
           {agents.map((agent, index) => (
             <li key={agent.id} className="border-t border-line">
-              <div className="grid grid-cols-[44px_minmax(0,1fr)_88px_176px] items-center gap-x-4 py-2">
-                <span aria-hidden="true" className="font-display text-2xl font-extrabold tabular-nums text-text-faint">
+              <div className="grid grid-cols-[56px_minmax(0,1fr)_112px_176px] items-center gap-x-4 py-3">
+                <span aria-hidden="true" className="font-display text-3xl font-extrabold tabular-nums text-text-faint">
                   {index + 1}
                 </span>
                 <span className="flex min-w-0 items-center gap-2.5">
-                  <PlayerFace player={agent} size="md" />
+                  <PlayerFace player={agent} size="lg" />
                   <span className="flex min-w-0 flex-col">
-                    <span className="truncate font-display text-lg font-bold leading-display text-text-primary">{agent.name}</span>
-                    <span className="flex items-center gap-1.5">
-                      <PositionBadge position={agent.position} size="sm" />
-                      {agent.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{agent.nflTeam}</span>}
+                    <span className="truncate font-display text-2xl font-bold leading-display text-text-primary">{agent.name}</span>
+                    <span className="flex items-center gap-2">
+                      <PositionBadge position={agent.position} size="md" />
+                      {agent.nflTeam === "" ? null : <span className="font-mono text-sm text-text-faint">{agent.nflTeam}</span>}
                     </span>
                   </span>
                 </span>
-                <span className="font-display text-lg font-bold tabular-nums text-text-muted">
+                <span className="font-display text-2xl font-bold tabular-nums text-text-muted">
                   {agent.adp === null ? NOT_STARTED_DASH : agent.adp.toFixed(1)}
                 </span>
                 <span className="justify-self-end">
                   {!canClaim ? null : droppingFor === agent.id ? (
-                    <Button variant="secondary" size="sm" onClick={() => setDroppingFor(null)}>
+                    <Button variant="secondary" size="md" onClick={() => setDroppingFor(null)}>
                       Cancel
                     </Button>
                   ) : (
                     <Button
                       variant="verb"
-                      size="sm"
+                      size="md"
                       disabled={status === "claiming"}
                       onClick={() => (rosterFull ? setDroppingFor(agent.id) : void claim(agent.id, null))}
                       aria-label={`Add ${agent.name}`}
