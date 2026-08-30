@@ -105,16 +105,18 @@ const dark: Palette = {
   accentText: "#1A1200", // 10.59:1 on the amber fill
   accentGlow: "rgba(255, 182, 39, 0.14)",
   /**
-   * LAW 4, channel two: the verdict pair. `positive` means we rate him HIGHER than the room
-   * does; `negative` means lower. Cyan against warm red, never green against red — that pair is
-   * the worst available for deuteranopia (~1 man in 12) and this audience is overwhelmingly men.
-   *
-   * The pair is also ordered by LUMINANCE, so it survives with the hue channel switched off
-   * entirely: 11.67 against 6.42, a gap of 5.25.
+   * LAW 4, channel two: the verdict pair — GREEN against RED (founder ruling, 2026-08-30,
+   * replacing v5's original cyan/warm-red). Green-red is the hardest pair for deuteranopia
+   * (~1 man in 12), which the original chose cyan to avoid; the founder chose the sport's
+   * universal grammar instead, and the mitigation SURVIVES the change: the pair is strictly
+   * LUMINANCE-ORDERED (1.70x apart — brighter is positive with the hue channel off) and every
+   * verdict carries a caret, a weight step or words beside its colour. Solved jointly with
+   * `live`: negative and live share the red family, so the confusability gate (1.5x) binds
+   * between them too — negative sits 1.69x from live.
    */
-  positive: "#00E5FF", // 11.67:1
-  negative: "#FF998A", // 8.70:1
-  negativeText: "#1A0303", // 9.62:1 on the warm-red fill
+  positive: "#C6F3D9", // 14.72:1
+  negative: "#F99B94", // 8.67:1
+  negativeText: "#1A0303", // 9.59:1 on the red fill
   /**
    * LAW 4, channel three: LIVE, and nothing else ever. Split from `negative` in v5 — through v4
    * one red carried both "happening now" and "this is bad", which a broadcast never conflates.
@@ -172,7 +174,7 @@ const light: Palette = {
   accent: "#9D5707", // law 4 channel one: furniture, you, the verb. 4.62:1
   accentText: "#FFFFFF", // 5.53:1 on the amber fill
   accentGlow: "rgba(157, 87, 7, 0.12)",
-  positive: "#003447", // law 4 channel two, the loud end of the verdict pair. 11.10:1
+  positive: "#033020", // law 4 channel two: deep green, the loud end (founder ruling 2026-08-30). 12.13:1
   /**
    * The quiet end of the verdict pair, and a FIXED POINT: this value is both the text colour and
    * the source of the 10%-of-itself tint it then sits on, so it must clear 4.5:1 against a
@@ -183,13 +185,13 @@ const light: Palette = {
    * ground the loud end of the verdict pair has to go DARKER, not brighter, or `positive` and
    * `negative` cannot both clear the floor and stay 1.5 apart in luminance.
    */
-  negative: "#7F2315", // 8.15:1 plain, and clears its own 10% tint
+  negative: "#861B13", // 8.06:1 plain, clears its own tint, 1.64x from live, 1.51x under positive
   negativeText: "#FFFFFF", // 5.71:1 on the warm-red fill
-  live: "#C81616", // law 4 channel three: live and nothing else. 4.90:1
+  live: "#C20A0A", // law 4 channel three. Re-solved for the red negative's 10% tint composite (was 4.49 on it): 4.82, chain to negative 1.53
   liveText: "#FFFFFF", // 5.77:1 on the live fill
   // A tightening clock. A separate hue from `accent`, never a shade of it — see dark's docblock.
-  warning: "#C81616", // the live channel; see dark's docblock
-  warningGlow: "rgba(200, 22, 22, 0.12)",
+  warning: "#C20A0A", // the live channel; see dark's docblock
+  warningGlow: "rgba(194, 10, 10, 0.12)",
   info: "#105C93", // 5.90:1
   scrim: "#000000",
 };
@@ -301,19 +303,21 @@ const lightPositions: PositionPalette = {
  * (`src/components/ui/stat.tsx`), because only the component can keep it.
  */
 const darkMagnitude: MagnitudePalette = {
-  strong: "#34E4FF", // 11.70:1
-  good: "#69C5D3", // 9.00:1
+  // Re-hued to the green/red verdict pair (founder ruling 2026-08-30); the ordering discipline
+  // is unchanged: strictly decreasing contrast, so the ramp survives with hue switched off.
+  strong: "#74E7A4", // 11.72:1
+  good: "#7DC79C", // 8.99:1
   neutral: dark.textPrimary, // no comparison set behind it: indistinguishable from ordinary text
-  weak: "#FF7A59", // 6.99:1
-  bad: "#F05543", // 5.20:1
+  weak: "#EF846E", // 7.00:1
+  bad: "#F05549", // 5.21:1
 };
 
 const lightMagnitude: MagnitudePalette = {
-  strong: "#004B66", // 7.99:1
-  good: "#205A6F", // 6.38:1
+  strong: "#044E33", // 8.20:1
+  good: "#1F5C45", // 6.56:1
   neutral: light.textPrimary,
-  weak: "#A04028", // 5.39:1
-  bad: "#C63120", // 4.55:1
+  weak: "#9F3C28", // 5.57:1
+  bad: "#C82C20", // 4.58:1
 };
 
 /**

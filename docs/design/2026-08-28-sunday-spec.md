@@ -261,3 +261,17 @@ All three were re-solved and are marked above.
 This is the third time in two design systems that the binding ground has been the thing that
 caught a value, which is why it is stated twice in this document. Change a surface and every
 chroma value against it is unverified until re-measured.
+
+### Amendment, 2026-08-30: the verdict pair is green and red
+
+Founder ruling: the verdict pair moves from cyan/warm-red to the sport's universal green/red,
+across the whole site. The original pair was chosen for deuteranopia (~1 man in 12); the ruling
+trades that for the grammar every scoreboard already speaks, and the mitigations SURVIVE:
+
+- The pair stays strictly luminance-ordered — dark 14.72 vs 8.67 (1.70x), light 12.13 vs 8.06
+  (1.51x) — so brighter-is-positive reads with the hue channel off.
+- Every verdict still carries a caret, a weight step or words beside its colour.
+- `negative` and `live` now share the red family, so the confusability gate binds between them:
+  1.69x apart in dark; light's live/warning re-solved to #C20A0A after the original failed the
+  red negative's own 10%-tint composite by a hair (4.49).
+- The magnitude ramp re-hued to match, both themes strictly decreasing as before.
