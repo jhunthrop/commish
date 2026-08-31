@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registry, registryFrom, stratumKeyFor, type MeasuredEntry, type MeasuredJson } from "./registry";
-import { verdictFor } from "./harness";
+import { registry, registryFrom, stratumKeyFor, verdictForFullWindow, type MeasuredEntry, type MeasuredJson } from "./registry";
 import { LAW_SPECS, type LawSpec } from "./populations";
 import type { PlayerSeasonPoint } from "./types";
 
@@ -25,12 +24,19 @@ function specFixture(over: Partial<LawSpec> = {}): LawSpec {
 }
 
 function measurementFixture(over: Partial<MeasuredEntry> = {}): MeasuredEntry {
-  const base: MeasuredEntry = { effect: -3, ci: [-4, -2], sample: 40, seasons: "2011-2024, held out 2023-2024", verdict: "confirmed" };
+  const base: MeasuredEntry = {
+    effect: -3,
+    ci: [-4, -2],
+    sample: 40,
+    seasons: "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
+    heldOutEffect: -1,
+    verdict: "confirmed",
+  };
   return { ...base, ...over };
 }
 
 describe("registryFrom", () => {
-  it("merges a spec's static fields with its measurement into one Law", () => {
+  it("merges a spec's static fields with its measurement into one Law, dropping heldOutEffect from `measured`", () => {
     const spec = specFixture();
     const measured = measurementFixture();
     const [law] = registryFrom([spec], { fake_law: measured });
@@ -39,7 +45,7 @@ describe("registryFrom", () => {
       id: "fake_law",
       position: "RB",
       claim: spec.claim,
-      measured: { effect: -3, ci: [-4, -2], sample: 40, seasons: "2011-2024, held out 2023-2024" },
+      measured: { effect: -3, ci: [-4, -2], sample: 40, seasons: measured.seasons },
       verdict: "confirmed",
       modelPath: null,
     });
@@ -59,24 +65,27 @@ describe("registryFrom", () => {
     expect(() => registryFrom([spec], measuredJson)).toThrow(/orphaned_law.*no matching LawSpec/);
   });
 
-  it("throws when the stored verdict disagrees with verdictFor's own computation", () => {
+  it("throws when the stored verdict disagrees with verdictForFullWindow's own computation", () => {
     const spec = specFixture({ expectedSign: -1 });
-    // effect is negative and the CI excludes zero, so verdictFor computes "confirmed" — not "weak".
-    const measured = measurementFixture({ effect: -3, ci: [-4, -2], verdict: "weak" });
+    // Full-window CI excludes zero, sign matches, held-out subset agrees in sign — verdictForFullWindow
+    // computes "confirmed", not "weak".
+    const measured = measurementFixture({ effect: -3, ci: [-4, -2], heldOutEffect: -1, verdict: "weak" });
     expect(() => registryFrom([spec], { fake_law: measured })).toThrow(/verdict for "fake_law" is "weak".*computes "confirmed"/);
   });
 
-  it("accepts every verdict shape verdictFor can produce, when the stored verdict matches it", () => {
+  it("accepts every verdict shape verdictForFullWindow can produce, when the stored verdict matches it", () => {
     const cases: readonly MeasuredEntry[] = [
-      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", verdict: "confirmed" }, // CI excludes zero, sign matches
-      { effect: -3, ci: [-1, 1], sample: 40, seasons: "s", verdict: "weak" }, // sign matches, CI spans zero
-      { effect: 3, ci: [2, 4], sample: 40, seasons: "s", verdict: "debunked" }, // sign wrong
+      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", heldOutEffect: -1, verdict: "confirmed" }, // full CI excludes zero, sign matches, held-out agrees
+      { effect: -3, ci: [-1, 1], sample: 40, seasons: "s", heldOutEffect: -1, verdict: "weak" }, // sign matches, full CI spans zero
+      { effect: 3, ci: [2, 4], sample: 40, seasons: "s", heldOutEffect: 1, verdict: "debunked" }, // full sign wrong
+      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", heldOutEffect: 1, verdict: "weak" }, // full confirms, held-out disagrees in sign — capped
+      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", heldOutEffect: null, verdict: "weak" }, // full confirms, zero held-out pairs — capped, never confirmed
     ];
     for (const measured of cases) {
       const spec = specFixture({ expectedSign: -1 });
       expect(() => registryFrom([spec], { fake_law: measured })).not.toThrow();
       const [law] = registryFrom([spec], { fake_law: measured });
-      expect(law!.verdict).toBe(verdictFor(measured, -1));
+      expect(law!.verdict).toBe(verdictForFullWindow(measured, -1, measured.heldOutEffect));
     }
   });
 
@@ -92,14 +101,36 @@ describe("registryFrom", () => {
   });
 });
 
+describe("verdictForFullWindow", () => {
+  const EXPECTED: -1 = -1;
+
+  it("confirms only when the full window's CI excludes zero, the sign matches, AND the held-out subset agrees in sign", () => {
+    expect(verdictForFullWindow({ effect: -3, ci: [-4, -2], sample: 10, seasons: "s" }, EXPECTED, -1)).toBe("confirmed");
+  });
+
+  it("caps a full-window confirm at weak when the held-out subset's sign disagrees", () => {
+    expect(verdictForFullWindow({ effect: -3, ci: [-4, -2], sample: 10, seasons: "s" }, EXPECTED, 1)).toBe("weak");
+  });
+
+  it("caps a full-window confirm at weak when the held-out subset matched zero pairs (null) — never confirmed", () => {
+    expect(verdictForFullWindow({ effect: -3, ci: [-4, -2], sample: 10, seasons: "s" }, EXPECTED, null)).toBe("weak");
+  });
+
+  it("stays weak when the full-window sign matches but its own CI spans zero, regardless of the held-out subset", () => {
+    expect(verdictForFullWindow({ effect: -3, ci: [-1, 1], sample: 10, seasons: "s" }, EXPECTED, -1)).toBe("weak");
+    expect(verdictForFullWindow({ effect: -3, ci: [-1, 1], sample: 10, seasons: "s" }, EXPECTED, null)).toBe("weak");
+  });
+
+  it("stays debunked when the full-window sign disagrees with expectedSign, regardless of the held-out subset", () => {
+    expect(verdictForFullWindow({ effect: 3, ci: [2, 4], sample: 10, seasons: "s" }, EXPECTED, -1)).toBe("debunked");
+    expect(verdictForFullWindow({ effect: 3, ci: [2, 4], sample: 10, seasons: "s" }, EXPECTED, null)).toBe("debunked");
+  });
+});
+
 describe("registry", () => {
   it("reads the committed measured.json against the real LAW_SPECS with no drift", () => {
     const laws = registry();
     expect(laws.map((law) => law.id).sort()).toEqual(LAW_SPECS.map((spec) => spec.id).sort());
-    for (const law of laws) {
-      const spec = LAW_SPECS.find((entry) => entry.id === law.id)!;
-      expect(law.verdict).toBe(verdictFor(law.measured, spec.expectedSign));
-    }
   });
 });
 

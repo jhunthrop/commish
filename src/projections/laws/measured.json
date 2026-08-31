@@ -1,62 +1,68 @@
 {
   "play_caller_fingerprint": {
-    "effect": 0.678333333333334,
+    "effect": -0.4189516129032257,
     "ci": [
-      -1.5921249999999996,
-      2.866666666666667
+      -1.1862459677419357,
+      0.3865060483870966
     ],
-    "sample": 6,
-    "seasons": "2011-2024, held out 2023-2024",
-    "verdict": "weak"
+    "sample": 124,
+    "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
+    "heldOutEffect": 0.678333333333334,
+    "verdict": "debunked"
   },
   "rb_age_curve": {
-    "effect": -1.6380769230769234,
+    "effect": -1.0595348837209304,
     "ci": [
-      -3.665788461538463,
-      0.05054807692307616
+      -2.4256162790697684,
+      0.24827906976744138
     ],
-    "sample": 26,
-    "seasons": "2011-2024, held out 2023-2024",
+    "sample": 43,
+    "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
+    "heldOutEffect": -1.6380769230769234,
     "verdict": "weak"
   },
   "rb_workload_cliff": {
-    "effect": -4.688,
+    "effect": -1.517692307692308,
     "ci": [
-      -8.290275,
-      -1.7652250000000003
+      -3.7454423076923082,
+      0.6981089743589739
     ],
-    "sample": 10,
-    "seasons": "2011-2024, held out 2023-2024",
-    "verdict": "confirmed"
+    "sample": 39,
+    "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
+    "heldOutEffect": -4.688,
+    "verdict": "weak"
   },
   "target_share_persistence": {
-    "effect": 1.5670000000000006,
+    "effect": 0.9711666666666666,
     "ci": [
-      -0.311175,
-      3.271883333333332
+      0.034631250000000266,
+      1.8378833333333329
     ],
-    "sample": 30,
-    "seasons": "2011-2024, held out 2023-2024",
-    "verdict": "weak"
+    "sample": 120,
+    "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
+    "heldOutEffect": 1.5670000000000006,
+    "verdict": "confirmed"
   },
   "td_regression": {
-    "effect": -0.7419310344827581,
+    "effect": -0.8586949685534601,
     "ci": [
-      -1.5596844827586203,
-      0.09287931034482744
+      -1.267500786163522,
+      -0.4827047955974843
     ],
-    "sample": 145,
-    "seasons": "2011-2024, held out 2023-2024",
-    "verdict": "weak"
+    "sample": 636,
+    "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
+    "heldOutEffect": -0.7419310344827583,
+    "verdict": "confirmed"
   },
   "wr_target_competition": {
-    "effect": -1.6812195121951221,
+    "effect": -0.8164351851851849,
     "ci": [
-      -3.3759085365853654,
-      0.23632317073170736
+      -1.5759351851851855,
+      -0.0763252314814816
     ],
-    "sample": 41,
-    "seasons": "2011-2024, held out 2023-2024",
-    "verdict": "weak"
+    "sample": 216,
+    "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
+    "heldOutEffect": -1.6812195121951221,
+    "verdict": "confirmed"
   }
 }

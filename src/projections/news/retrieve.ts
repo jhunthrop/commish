@@ -68,6 +68,12 @@ const REPORT_STATUS_BY_NAME: Readonly<Record<string, number>> = {
   "": REPORT_STATUS.none,
   // "Note" is the league's catch-all for a report row carrying a comment and no game status.
   Note: REPORT_STATUS.none,
+  // "Probable" was RETIRED by the league in 2016; nflverse's pre-2016 files still carry it for a
+  // player expected to play, and the law harness's backfill now reaches those seasons. It named
+  // the mildest positive designation the league published — milder than "Questionable" — and this
+  // ordinal scale has no dedicated bucket below `questionable` other than `none`, so it maps there
+  // rather than throwing on every pre-2016 report row.
+  Probable: REPORT_STATUS.none,
   Questionable: REPORT_STATUS.questionable,
   Doubtful: REPORT_STATUS.doubtful,
   Out: REPORT_STATUS.out,

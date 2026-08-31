@@ -59,7 +59,16 @@ describe("mapInjuries", () => {
     // A silent zero would read as "no designation" for every player in the league the day the league
     // renames a status, and a news layer that had stopped seeing injuries would look exactly like a
     // news layer that had decided nobody was hurt.
-    expect(() => mapInjuries([row({ report_status: "Probable" })], PROJECTED)).toThrow(/vocabulary changed/);
+    expect(() => mapInjuries([row({ report_status: "Out for the season" })], PROJECTED)).toThrow(/vocabulary changed/);
+  });
+
+  it("reads a pre-2016 \"Probable\" designation as no game-status designation, not a throw", () => {
+    // The league retired "Probable" in 2016; nflverse's pre-2016 files still carry it for a player
+    // expected to play, and the laws harness's backfill now reaches those seasons. It named the
+    // mildest positive designation the league published, milder than "Questionable" — this ordinal
+    // scale has no bucket below `questionable` other than `none`, so it lands there.
+    const { observations } = mapInjuries([row({ report_status: "Probable" })], PROJECTED);
+    expect(observations.find((o) => o.metric === INJURY_METRICS.reportStatus)!.value).toBe(REPORT_STATUS.none);
   });
 
   it("reports a player the universe does not project rather than storing him", () => {
