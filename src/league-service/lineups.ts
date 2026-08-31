@@ -8,6 +8,7 @@ import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { benchOf, defaultLineup, deriveBenchSlots, isLineupLocked, startersOf, type WeekStatus } from "@/league";
 import { excludedSetFor } from "@/db/upsert";
+import { startedTeamsForWeek } from "./nfl-schedule";
 import type { LineupBody, LineupSlotView } from "@/league-room/contract";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
 
@@ -184,8 +185,13 @@ export async function setLineup(
     .from(matchups)
     .where(and(eq(matchups.leagueId, input.leagueId), eq(matchups.weekNumber, input.weekNumber)));
   if (week.length === 0) return { ok: false, status: 404, reason: "That week is not part of this league's season." };
-  if (await isWeekLocked(db, input.weekNumber)) {
-    return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup cannot change.` };
+  // PER-GAME LOCKS (roadmap item 2, 2026-08-30): a FINAL week refuses whole, exactly as
+  // before. An IN-PROGRESS week no longer refuses here — the per-slot diff guard below decides,
+  // player by player, because ESPN's model (and every arriving manager's expectation) is that a
+  // player locks at HIS kickoff, not the week's first.
+  const weekStatus = await weekStatusFor(db, input.weekNumber);
+  if (weekStatus === "final") {
+    return { ok: false, status: 409, reason: `Week ${input.weekNumber} has ended, so its lineup cannot change.` };
   }
 
   const roster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, input.teamId));
@@ -203,12 +209,41 @@ export async function setLineup(
   const benchSlots = deriveBenchSlots(owned, startingIds, league.rosterSlots);
 
   const lineup = defaultLineup(league.rosterSlots, [...starterSlots, ...benchSlots]);
-  const playerRows = await db.select({ id: players.id, position: players.position }).from(players);
+  const playerRows = await db.select({ id: players.id, position: players.position, name: players.name, nflTeam: players.nflTeam }).from(players);
   const playerPositions = Object.fromEntries(playerRows.map((row) => [row.id, row.position]));
   const starterConfig = league.rosterSlots.filter((config) => config.slot !== BENCH_SLOT);
 
   const validation = validateLineup({ slotConfig: starterConfig, roster: startersOf(lineup), playerPositions });
   if (!validation.valid) return { ok: false, status: 422, reason: validation.reason };
+
+  // THE PER-SLOT DIFF GUARD. Only for a week already in progress, and only over slots that
+  // CHANGED: both ends of every change must be unlocked. The outgoing man's game started →
+  // he is locked into the slot he occupies; the incoming man's game started → he cannot enter
+  // after the fact (the classic post-kickoff exploit both rules exist to stop). Byes never
+  // lock: a player with no fixture has no kickoff. The kickoff-clock half of
+  // `startedTeamsForWeek` does not race the worker, which is what lets the in-transaction
+  // re-check below stay a FINAL-only check.
+  if (weekStatus === "in_progress") {
+    const previous = await getLineup(db, { teamId: input.teamId, weekNumber: input.weekNumber, slotConfig: league.rosterSlots });
+    const started = await startedTeamsForWeek(db, input.weekNumber, new Date(clock.now()));
+    const playerById = new Map(playerRows.map((row) => [row.id, row]));
+    const isLockedPlayer = (id: string | null): boolean => {
+      if (id === null) return false;
+      const player = playerById.get(id);
+      return player !== undefined && started.has(player.nflTeam);
+    };
+    const nextBySlot = new Map(startersOf(lineup).map((slot) => [`${slot.slot}:${slot.slotIndex}`, slot.playerId]));
+    for (const slot of startersOf(previous)) {
+      const nextId = nextBySlot.get(`${slot.slot}:${slot.slotIndex}`) ?? null;
+      if (nextId === slot.playerId) continue;
+      if (isLockedPlayer(slot.playerId)) {
+        return { ok: false, status: 409, reason: `${playerById.get(slot.playerId!)?.name ?? "That player"}'s game has started, so he is locked in your lineup until the week ends.` };
+      }
+      if (isLockedPlayer(nextId)) {
+        return { ok: false, status: 409, reason: `${playerById.get(nextId!)?.name ?? "That player"}'s game has already started, so he cannot come off your bench this week.` };
+      }
+    }
+  }
 
   const locked = await db.transaction(async (tx) => {
     // The re-check, holding a share lock on the week's row for the rest of this transaction so
@@ -216,7 +251,9 @@ export async function setLineup(
     // week the worker has never reached, which reads as open — exactly as `weekStatusFor` treats
     // it — and is the one case no lock can cover, since there is no row yet to lock.
     const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, input.weekNumber)).for("share");
-    if (isLineupLocked(week?.status ?? "scheduled")) return true;
+    // FINAL-only since the per-game widening: the scheduled->in_progress flip no longer forbids
+    // the write (the diff guard above already ruled on every changed slot by kickoff clock).
+    if ((week?.status ?? "scheduled") === "final") return true;
 
     await tx
       .insert(lineupSlots)
@@ -241,7 +278,11 @@ export async function setLineup(
     });
     return false;
   });
-  if (locked) return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup cannot change.` };
+  if (locked !== false) {
+    return locked === true
+      ? { ok: false, status: 409, reason: `Week ${input.weekNumber} has ended, so its lineup cannot change.` }
+      : locked;
+  }
 
   // After the write commits, never inside it — see the doc comment above. Awaited and caught
   // rather than fire-and-forget: the cache degrades open on its own, so awaiting cannot fail this
@@ -283,9 +324,22 @@ export async function lineupView(
     };
   };
 
+  const status = await weekStatusFor(db, input.weekNumber);
+  // Per-game locks (roadmap item 2): `locked` means the week has ENDED; mid-week the editor
+  // stays open and each started player's id rides in `lockedPlayerIds`.
+  const lockedPlayerIds: string[] = [];
+  if (status === "in_progress") {
+    const started = await startedTeamsForWeek(db, input.weekNumber, new Date());
+    for (const slot of [...startersOf(lineup), ...benchOf(lineup)]) {
+      if (slot.playerId === null) continue;
+      const team = playerById.get(slot.playerId)?.nflTeam ?? "";
+      if (started.has(team)) lockedPlayerIds.push(slot.playerId);
+    }
+  }
   return {
     weekNumber: input.weekNumber,
-    locked: await isWeekLocked(db, input.weekNumber),
+    locked: status === "final",
+    lockedPlayerIds,
     starters: startersOf(lineup).map(toView),
     bench: benchOf(lineup).map(toView),
   };

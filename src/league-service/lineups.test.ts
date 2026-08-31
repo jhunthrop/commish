@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, leagues, lineupSlots, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import { auditEvents, leagues, lineupSlots, nflGames, rosterSlots, statWeeks, teams, users } from "@/db/schema";
 import type { WeekStatus } from "@/league";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
@@ -104,13 +104,41 @@ describe("setLineup", () => {
     ).toEqual({ ok: false, status: 422, reason: "You can only start a player in one spot." });
   });
 
-  it("locks a week the moment its first game kicks off, not when it finishes", async () => {
+  // PER-GAME LOCKS (roadmap item 2, 2026-08-30): an in-progress week no longer locks whole.
+  // Each player locks at HIS kickoff — the following four cases pin the model's edges.
+  it("accepts a mid-week swap between two players whose games have not started", async () => {
     const league = await twoTeamLeague(db, { weeks: 10 });
     await setWeekStatus(3, "in_progress");
-    expect(await isWeekLocked(db, 3)).toBe(true);
-    const result = await setLineup(db, validLineupInput(league, 3));
+    // No nfl_games rows for week 3: nobody has kicked off, so the swap is open.
+    await expect(setLineup(db, validLineupInput(league, 3), undefined, { audit: logger, clock })).resolves.toMatchObject({ ok: true });
+  });
+
+  it("refuses to bench a starter whose game has started", async () => {
+    const league = await twoTeamLeague(db, { weeks: 10 });
+    await setWeekStatus(3, "in_progress");
+    // qb1 (KC) starts and his game kicked off at noon ET; the test clock stands at 17:00Z.
+    await db.insert(nflGames).values({ gameId: "t3kc", week: 3, homeNflTeam: "KC", awayNflTeam: "DEN", gameDate: "20260820", kickoffEt: "12:00p", status: "scheduled" });
+    const result = await setLineup(db, validLineupInput(league, 3), undefined, { audit: logger, clock });
     expect(result).toMatchObject({ ok: false, status: 409 });
-    expect(result.ok ? "" : result.reason).toBe("Week 3 has started, so its lineup cannot change.");
+    expect(result.ok ? "" : result.reason).toBe("QB One's game has started, so he is locked in your lineup until the week ends.");
+  });
+
+  it("refuses to start a bench player whose game has already started", async () => {
+    const league = await twoTeamLeague(db, { weeks: 10 });
+    await setWeekStatus(3, "in_progress");
+    // qb2 (SF) sits on the bench and his game kicked off; qb1's has not.
+    await db.insert(nflGames).values({ gameId: "t3sf", week: 3, homeNflTeam: "SF", awayNflTeam: "SEA", gameDate: "20260820", kickoffEt: "12:00p", status: "scheduled" });
+    const result = await setLineup(db, validLineupInput(league, 3), undefined, { audit: logger, clock });
+    expect(result).toMatchObject({ ok: false, status: 409 });
+    expect(result.ok ? "" : result.reason).toBe("QB Two's game has already started, so he cannot come off your bench this week.");
+  });
+
+  it("locks on the fixture's own status even when no kickoff time was published", async () => {
+    const league = await twoTeamLeague(db, { weeks: 10 });
+    await setWeekStatus(3, "in_progress");
+    await db.insert(nflGames).values({ gameId: "t3kc2", week: 3, homeNflTeam: "KC", awayNflTeam: "DEN", gameDate: "", kickoffEt: "", status: "in_progress" });
+    const result = await setLineup(db, validLineupInput(league, 3), undefined, { audit: logger, clock });
+    expect(result).toMatchObject({ ok: false, status: 409 });
   });
 
   it("leaves a week open while it is still scheduled", async () => {
@@ -127,27 +155,26 @@ describe("setLineup", () => {
     await expect(setLineup(db, validLineupInput(league, 9))).resolves.toMatchObject({ ok: true });
   });
 
-  it("locks a week that has finished, the same as one still in progress", async () => {
+  it("locks a finished week whole — per-game granularity ends when the week does", async () => {
     const league = await twoTeamLeague(db, { weeks: 10 });
     await setWeekStatus(1, "final");
     expect(await isWeekLocked(db, 1)).toBe(true);
     expect(await setLineup(db, validLineupInput(league, 1))).toEqual({
       ok: false,
       status: 409,
-      reason: "Week 1 has started, so its lineup cannot change.",
+      reason: "Week 1 has ended, so its lineup cannot change.",
     });
   });
 
-  it("refuses a save whose week is flipped to in_progress after the up-front lock check passed", async () => {
-    // The read-validate-write hole: the up-front `isWeekLocked` read is followed by four more
-    // round trips (roster, players, validation) before the upsert, and the ingestion worker flips
-    // the week inside `persistTick`'s own transaction with no coordination. A lineup submitted in
-    // that window used to be accepted after kickoff — a manager watching a running back get hurt
-    // at 1:15pm and swapping him out at 1:16.
+  it("refuses a save whose week is flipped to FINAL after the up-front lock check passed", async () => {
+    // The read-validate-write hole, retargeted by the per-game widening: the scheduled ->
+    // in_progress flip no longer forbids a write (the per-slot diff guard rules by kickoff
+    // clock, which cannot race the worker), so the boundary the FOR SHARE re-check defends is
+    // now the flip to FINAL — the correction sweep settling a week under a late save.
     //
     // Driven for real, not simulated: a concurrent transaction updates the week's row and holds
     // it uncommitted, so the up-front check reads the still-committed `scheduled` value while the
-    // re-check's `FOR SHARE` blocks on the uncommitted row and sees `in_progress` once it lands.
+    // re-check's `FOR SHARE` blocks on the uncommitted row and sees `final` once it lands.
     const league = await twoTeamLeague(db, { weeks: 10 });
     await setWeekStatus(2, "scheduled");
 
@@ -156,7 +183,7 @@ describe("setLineup", () => {
       release = resolve;
     });
     const flip = db.transaction(async (tx) => {
-      await tx.update(statWeeks).set({ status: "in_progress" }).where(eq(statWeeks.week, 2));
+      await tx.update(statWeeks).set({ status: "final" }).where(eq(statWeeks.week, 2));
       await flipped;
     });
 
@@ -178,7 +205,7 @@ describe("setLineup", () => {
 
   it("records nothing when the week is locked up front and the write is refused", async () => {
     const league = await twoTeamLeague(db, { weeks: 10 });
-    await setWeekStatus(3, "in_progress");
+    await setWeekStatus(3, "final");
     const result = await setLineup(db, validLineupInput(league, 3), undefined, { audit: logger, clock });
     expect(result.ok).toBe(false);
     expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "lineup_change"))).toHaveLength(0);

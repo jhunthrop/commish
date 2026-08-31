@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { kickoffInstant } from "./kickoff";
 import type { getDb } from "@/db/client";
 import { nflGames } from "@/db/schema";
 
@@ -53,4 +54,33 @@ export async function fixtureLabelsByTeam(db: Db, week: number): Promise<Readonl
     labels.set(game.away, { opp: `@ ${game.home}`, when, status: game.status });
   }
   return labels;
+}
+
+/**
+ * Which NFL teams' games have STARTED this week (per-game lineup locks, founder roadmap item 2,
+ * 2026-08-30 — ESPN's "Lock individually at Scheduled Gametime"). Two independent signals, both
+ * honored: the fixture's own status (the worker flips it, but only as often as it ticks) and the
+ * scheduled kickoff instant (exact, no polling lag). A fixture with no published kickoff locks
+ * on status alone. A team with no fixture is on bye and never locks — there is no game to lock.
+ */
+export async function startedTeamsForWeek(db: Db, week: number, now: Date): Promise<ReadonlySet<string>> {
+  const rows = await db
+    .select({
+      home: nflGames.homeNflTeam,
+      away: nflGames.awayNflTeam,
+      gameDate: nflGames.gameDate,
+      kickoffEt: nflGames.kickoffEt,
+      status: nflGames.status,
+    })
+    .from(nflGames)
+    .where(eq(nflGames.week, week));
+  const started = new Set<string>();
+  for (const game of rows) {
+    const kickoff = kickoffInstant(game.gameDate, game.kickoffEt);
+    if (game.status !== "scheduled" || (kickoff !== null && kickoff.getTime() <= now.getTime())) {
+      started.add(game.home);
+      started.add(game.away);
+    }
+  }
+  return started;
 }

@@ -152,11 +152,14 @@ export function LineupEditor({
   // happens next, and drop the promise on the season's final week.
   const isLocked = lineup.locked;
   const hasNextWeek = lineup.weekNumber < totalWeeks;
+  const lockedPlayers = new Set(lineup.lockedPlayerIds);
   const subtitle = isLocked
     ? hasNextWeek
-      ? `${formatWeek(lineup.weekNumber)} has started, so its lineup cannot change. You can set next week's lineup as soon as this week ends.`
-      : `${formatWeek(lineup.weekNumber)} has started, so its lineup cannot change.`
-    : "Lineups lock for the whole week when its first game kicks off.";
+      ? `${formatWeek(lineup.weekNumber)} has ended, so its lineup cannot change. You can set next week's lineup now.`
+      : `${formatWeek(lineup.weekNumber)} has ended, so its lineup cannot change.`
+    : lockedPlayers.size > 0
+      ? "Each player locks at his own kickoff. A locked player stays put until the week ends."
+      : "Each player locks at his own kickoff.";
 
   /**
    * AUTO-SAVE (founder, 2026-08-28: "it should auto save the lineup we shouldn't have a save
@@ -308,9 +311,11 @@ export function LineupEditor({
               // BOTH ENDS MUST FIT (founder, 2026-08-28): the selected player must fit THIS
               // slot, and on a starter-to-starter swap the displaced occupant must fit the slot
               // he falls back into. A move that lights is a move that saves.
+              const occupantLocked = occupantId !== null && lockedPlayers.has(occupantId);
               const canReceive =
                 moving &&
                 !isSelected &&
+                !occupantLocked &&
                 eligible(slot.slot, selectedPosition) &&
                 (fromSlotType === null || occupantId === null || eligible(fromSlotType, occupantPosition));
               const dimmed = moving && !isSelected && !canReceive;
@@ -363,7 +368,9 @@ export function LineupEditor({
                           Cancel
                         </Button>
                       </>
-                    ) : moving ? null : occupantId === null ? null : (
+                    ) : moving ? null : occupantId === null ? null : occupantLocked ? (
+                      <span className={`${MICRO_LABEL} text-text-faint`}>Locked</span>
+                    ) : (
                       <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${occupant?.playerName ?? ""}`}>
                         Swap
                       </Button>
@@ -402,7 +409,8 @@ export function LineupEditor({
                 const player = playerOf(slot)!;
                 const isSelected = selected === key;
                 const fromSlotType = selectedSlotType();
-                const canReceive = moving && fromSlotType !== null && !isSelected && eligible(fromSlotType, player.position);
+                const benchLocked = lockedPlayers.has(slot.playerId!);
+                const canReceive = moving && fromSlotType !== null && !isSelected && !benchLocked && eligible(fromSlotType, player.position);
                 const dimmed = moving && !isSelected && !canReceive;
                 return (
                   <li
@@ -441,7 +449,9 @@ export function LineupEditor({
                         <Button variant="secondary" size="sm" onClick={() => setSelected(null)}>
                           Cancel
                         </Button>
-                      ) : moving ? null : (
+                      ) : moving ? null : benchLocked ? (
+                        <span className={`${MICRO_LABEL} text-text-faint`}>Locked</span>
+                      ) : (
                         <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${player.name}`}>
                           Swap
                         </Button>

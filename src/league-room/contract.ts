@@ -490,10 +490,14 @@ export interface LineupSlotView {
 export interface LineupBody {
   readonly weekNumber: number;
   /**
-   * True once the week has started (`isLineupLocked`, `@/league/week-status.ts`) — not once it
-   * has been scored. The editor renders read-only rather than disabled-and-silent.
+   * True once the week has ENDED (`stat_weeks` says final) — the whole grid renders read-only.
+   * Mid-week the grid stays open and `lockedPlayerIds` below carries the per-game locks
+   * (roadmap item 2, 2026-08-30: players lock individually at their own kickoff).
    */
   readonly locked: boolean;
+  /** Players whose NFL game has started this week — locked in place until the week ends. Empty
+   *  before the week's first kickoff and irrelevant once `locked` is true. */
+  readonly lockedPlayerIds: readonly string[];
   readonly starters: readonly LineupSlotView[];
   readonly bench: readonly LineupSlotView[];
 }

@@ -102,14 +102,16 @@ describe("PUT /api/leagues/[leagueId]/teams/me/lineup", () => {
     expect((await response.json()).error).toBe("RB is not eligible for the QB slot.");
   });
 
-  it("answers 409 once the week has started", async () => {
+  it("answers 409 once the week has ENDED — mid-week the per-game guard rules instead", async () => {
+    // Per-game locks (roadmap item 2, 2026-08-30): an in_progress week no longer 409s whole;
+    // `lineups.test.ts` pins the per-slot guard. The route-level refusal is the settled week.
     const league = await twoTeamLeague(db);
-    await db.insert(statWeeks).values({ week: 1, status: "in_progress" });
+    await db.insert(statWeeks).values({ week: 1, status: "final" });
     signedInAs("u1");
     const params = Promise.resolve({ leagueId: league.leagueId });
     const response = await putLineup(put({ weekNumber: 1, slots: validSwap }), { params });
     expect(response.status).toBe(409);
-    expect((await response.json()).error).toBe("Week 1 has started, so its lineup cannot change.");
+    expect((await response.json()).error).toBe("Week 1 has ended, so its lineup cannot change.");
   });
 
   it("answers 400 naming the field for a malformed body", async () => {
