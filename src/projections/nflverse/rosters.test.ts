@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { parseCsv } from "./csv";
 import { readFixture, readManifest } from "./fixtures";
-import { ROSTER_SOURCE_CONFIG, mapWeek1Rosters, rosterStatusOf, week1RosterAsOf } from "./rosters";
+import {
+  HISTORICAL_ROSTER_FLOOR,
+  ROSTER_ASSET_FLOOR,
+  ROSTER_SOURCE_CONFIG,
+  mapWeek1Rosters,
+  rosterStatusOf,
+  week1RosterAsOf,
+} from "./rosters";
 
 /**
  * Read against a real slice of the real release, not a hand-written table, for the reason the other
@@ -95,14 +102,40 @@ describe("mapWeek1Rosters", () => {
     expect(ids).toEqual([...ids].sort());
   });
 
-  it("REFUSES a season whose cutdown fell after the date it would stamp", () => {
+  it("REFUSES a season whose cutdown fell after the date it would stamp, with no as-of supplied", () => {
     // 2020's pandemic calendar pushed the cutdown to 5 September, after the first of September this
-    // module claims. Ingesting it would assert we knew a roster five days before it existed.
+    // module claims. Ingesting it without an explicit stamp would assert we knew a roster five days
+    // before it existed.
     expect(() => mapWeek1Rosters(BUFFALO_2024, 2020)).toThrow(/only ingested from 2021/);
   });
 
   it("drops rows for a season the file is not about, rather than mislabelling them", () => {
     expect(mapWeek1Rosters(BUFFALO_2024, 2023)).toHaveLength(0);
+  });
+
+  it("ACCEPTS a season before the fixed-stamp cutover once the caller supplies an honest as-of", () => {
+    // This is `historicalWeek1RosterAsOf`'s whole reason to exist: a caller that has derived its own
+    // honest stamp (from the season's own schedule, not a guessed calendar date) may hand it in
+    // directly, and the module no longer refuses the season on its behalf.
+    const historicalStamp = new Date("2015-09-09T23:59:59.999Z");
+    expect(() => mapWeek1Rosters(BUFFALO_2024, 2015, historicalStamp)).not.toThrow();
+  });
+
+  it("stamps every row with the SUPPLIED as-of, not the fixed first-of-September one", () => {
+    const historicalStamp = new Date("2015-09-09T23:59:59.999Z");
+    const entriesFor2024RowsClaimedAs2024 = mapWeek1Rosters(BUFFALO_2024, 2024, historicalStamp);
+    for (const entry of entriesFor2024RowsClaimedAs2024) expect(entry.asOf).toEqual(historicalStamp);
+  });
+});
+
+describe("ROSTER_ASSET_FLOOR and HISTORICAL_ROSTER_FLOOR", () => {
+  it("record the probed asset floor and the narrower scope this engine actually backfills to", () => {
+    // Probed by hand against the live release on 2026-08-31: 2002 returned a real CSV body and 2001
+    // a genuine HTTP 404. See the constants' own docblocks for the full account.
+    expect(ROSTER_ASSET_FLOOR).toBe(2002);
+    // Matches `MEASURE_SEASONS.from` in `laws/config.ts` — the engine-wide snap-count floor.
+    expect(HISTORICAL_ROSTER_FLOOR).toBe(2013);
+    expect(ROSTER_ASSET_FLOOR).toBeLessThanOrEqual(HISTORICAL_ROSTER_FLOOR);
   });
 });
 

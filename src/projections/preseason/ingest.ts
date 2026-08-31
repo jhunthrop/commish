@@ -2,7 +2,7 @@ import type { Db, ReadonlyDb } from "@/db/client";
 import { nflPlayers } from "@/db/schema";
 import { createNflverseClient, type NflverseClient } from "../nflverse/client";
 import { NFLVERSE_CONFIG } from "../nflverse/config";
-import { mapWeek1Rosters, ROSTER_SOURCE_CONFIG } from "../nflverse/rosters";
+import { HISTORICAL_ROSTER_FLOOR, mapWeek1Rosters, ROSTER_SOURCE_CONFIG, week1RosterAsOf } from "../nflverse/rosters";
 import { allPositions } from "../backtest";
 import { recordObservations } from "../store";
 import { firstKickoffFor, mapDepthChart } from "./depth";
@@ -37,6 +37,37 @@ export interface RosterIngestReport {
 }
 
 /**
+ * THE HONEST STAMP FOR A SEASON BEFORE THE FIXED-STAMP CUTOVER.
+ *
+ * `week1RosterAsOf`'s single hardcoded first-of-September cannot be trusted below
+ * `ROSTER_SOURCE_CONFIG.earliestSeason` — see that constant's own docblock for the two cutdown dates
+ * (2016, 2017) that already fall after it, on top of 2020's pandemic-pushed one. Rather than research
+ * and hardcode every historical cutdown date (a search that gets harder and less certain the further
+ * back it goes), this reads the season's OWN first kickoff from the store — already ingested by
+ * `projections:context` back to 2011 — and stamps one millisecond before it, exactly as
+ * `ingestDepthCharts` below stamps a depth chart. That is always SAFE (a cutdown, whenever it fell,
+ * necessarily preceded the games it enabled) and never LATE enough to matter: the earliest
+ * game-derived observation `preseasonMomentFor` gates on is stamped a day and a half after kickoff,
+ * so a roster stamped a millisecond before kickoff is always visible to a board built for its own
+ * season. The one thing it gives up, deliberately, is claiming the EXACT cutdown date — this module
+ * only ever needs "knowable before the season", never "knowable on this specific day in August".
+ */
+export async function historicalWeek1RosterAsOf(db: ReadonlyDb, season: number): Promise<Date> {
+  if (season < HISTORICAL_ROSTER_FLOOR) {
+    throw new Error(
+      `Week-one rosters are not backfilled before ${HISTORICAL_ROSTER_FLOOR}; ${season} is out of scope. See HISTORICAL_ROSTER_FLOOR.`,
+    );
+  }
+  return new Date((await firstKickoffFor(db, season)).getTime() - 1);
+}
+
+/** `week1RosterAsOf(season)` from the fixed-stamp cutover onward, `historicalWeek1RosterAsOf` before
+ *  it. The one place a caller decides which of the two stamping strategies a season needs. */
+async function week1RosterStampFor(db: ReadonlyDb, season: number): Promise<Date> {
+  return season >= ROSTER_SOURCE_CONFIG.earliestSeason ? week1RosterAsOf(season) : historicalWeek1RosterAsOf(db, season);
+}
+
+/**
  * Reads one season's week-one rosters into the store.
  *
  * Filtered to the ids the universe already holds, because `preseason_rosters.player_id` is a
@@ -53,7 +84,8 @@ export async function ingestWeek1Rosters(
     NFLVERSE_CONFIG.releases.weeklyRosters,
     ROSTER_SOURCE_CONFIG.file(season),
   );
-  const entries = mapWeek1Rosters(rows, season);
+  const asOf = await week1RosterStampFor(db, season);
+  const entries = mapWeek1Rosters(rows, season, asOf);
   const known = await knownPlayerIds(db);
   const insertable = entries.filter((entry) => known.has(entry.playerId));
   const written = await recordPreseasonRosters(db, insertable);

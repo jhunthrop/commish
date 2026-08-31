@@ -101,6 +101,17 @@ describe("preseasonRostersAsOf", () => {
     expect(lamb).toMatchObject({ team: "DAL", position: "WR", draftYear: 2020, draftPick: 17, birthDate: "1999-04-08" });
   });
 
+  it("READS A SEASON BEFORE THE FIXED-STAMP CUTOVER, exactly like any other — the store itself has no opinion on ROSTER_SOURCE_CONFIG.earliestSeason; only the ingestion path does", async () => {
+    // A schedule-derived stamp (`historicalWeek1RosterAsOf`'s own mechanism), not the fixed first of
+    // September — 2015's real cutdown fell later in the calendar than 2024's did.
+    const historicalStamp = new Date("2015-09-09T23:59:59.999Z");
+    await recordPreseasonRosters(db, [entry({ season: 2015, asOf: historicalStamp, playerId: "00-0034857" })]);
+    const rows = await preseasonRostersAsOf(db, { season: 2015, asOf: historicalStamp });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.season).toBe(2015);
+    expect(rows[0]!.asOf).toEqual(historicalStamp);
+  });
+
   it("is ordered by player id, so a board built from it is reproducible run to run", async () => {
     const rows = await preseasonRostersAsOf(db, { season: 2024, asOf: CUTDOWN_2024 });
     expect(rows.map((row) => row.playerId)).toEqual([...rows.map((row) => row.playerId)].sort());
