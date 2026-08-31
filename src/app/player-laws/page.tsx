@@ -25,10 +25,12 @@ import { signedPoints } from "@/components/ui/event-feed-row";
  * `debunked` and the two RB laws measured `weak` are on this page in full, grouped after the
  * confirmed laws but never hidden or hedged into a footnote — the whole point of measuring a
  * folk claim instead of asserting it is publishing what did not hold up, not just what did.
- * `verdictElaboration` says what a `weak` or `debunked` verdict actually means in general terms
- * (an interval that spans zero, an effect that points the wrong way) rather than inventing a
- * specific story per law, which is exactly the hardcoded-prose-that-goes-stale risk law 7 exists
- * to prevent.
+ * `verdictElaboration` says what a `weak` or `debunked` verdict actually means, read straight off
+ * that law's own `verdict` and `measured.ci` (an interval that spans zero, an interval that
+ * clears zero but did not replicate held out, an effect that points the wrong way) rather than
+ * inventing a specific story per law, which is exactly the hardcoded-prose-that-goes-stale risk
+ * law 7 exists to prevent — see that function's own docblock for the two distinct shapes `weak`
+ * can take.
  */
 export const metadata: Metadata = pageTitle("Player laws");
 
@@ -62,21 +64,35 @@ function verdictSentence(verdict: LawVerdict): string {
 }
 
 /**
- * One more sentence per verdict, keyed only by the verdict itself, never by which law carries
- * it — the mechanical characterization law 7 requires instead of hand-written per-law prose that
- * a re-measure could leave stale. Framed once per group (below), so a reader meets it once
- * rather than once per law.
+ * One more sentence per law, derived mechanically from its own `verdict` and `measured.ci` —
+ * never from its `id`, and never assuming today's shape is the only shape a verdict can take.
+ *
+ * `weak` in particular has TWO distinct paths out of `registry.ts`'s `verdictForFullWindow`: the
+ * full-window interval can itself span zero (`verdictFor`'s ordinary "signMatches but not
+ * ciExcludesZero" case), OR the full-window interval can already exclude zero — a candidate
+ * `verdictFor` alone would call confirmed — that gets capped at `weak` because the held-out
+ * subset's own sign disagreed, or matched no pairs at all. Both of today's weak laws
+ * (`rb_workload_cliff`, `rb_age_curve`) happen to take the first path, but a sentence that always
+ * said "the interval spans zero" would go silently wrong the day a law takes the second path
+ * instead, sitting directly above an interval that plainly excludes zero. `ciSpansZero` below
+ * reads the law's own two bounds to tell the two paths apart at render time, so the sentence
+ * stays true on either path without this file ever learning about `heldOutEffect` (not part of
+ * `Law`'s own public shape — `registry.ts`'s `MeasuredEntry` keeps it internal).
  */
-function verdictElaboration(verdict: LawVerdict): string {
-  switch (verdict) {
+function verdictElaboration(law: Law): string {
+  const [low, high] = law.measured.ci;
+  const ciSpansZero = (low > 0) !== (high > 0);
+  switch (law.verdict) {
     case "confirmed":
       return "The measured effect points in the claimed direction, the 95% interval clears zero, and the same direction held on seasons the projection model never trained on.";
     case "weak":
-      return "The measured effect points in the claimed direction, but the 95% interval spans zero, so it cannot be told apart from no effect at all with the seasons measured so far.";
+      return ciSpansZero
+        ? "The measured effect points in the claimed direction, but the 95% interval spans zero, so it cannot be told apart from no effect at all with the seasons measured so far."
+        : "The full-window 95% interval clears zero in the claimed direction, but that direction did not replicate on the held-out seasons, so the page does not call this confirmed.";
     case "debunked":
       return "The measured effect points against the claimed direction, so the popular version of this claim does not hold up under measurement.";
     default: {
-      const exhaustive: never = verdict;
+      const exhaustive: never = law.verdict;
       return exhaustive;
     }
   }
@@ -140,7 +156,6 @@ export default async function PlayerLawsPage() {
 
       {groups.map((group) => (
         <ReadingSection key={group.verdict} id={group.verdict} title={VERDICT_GROUP_TITLE[group.verdict]}>
-          <p>{verdictElaboration(group.verdict)}</p>
           <div className="flex flex-col gap-6">
             {group.laws.map((law) => {
               const { title, body } = splitClaim(law.claim);
@@ -150,6 +165,7 @@ export default async function PlayerLawsPage() {
                   <h3 className="font-display text-lg font-semibold leading-display text-text-primary">{title}</h3>
                   {body === "" ? null : <p>{body}</p>}
                   <p className="font-medium text-text-primary">{verdictSentence(law.verdict)}</p>
+                  <p>{verdictElaboration(law)}</p>
                   <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-text-muted sm:grid-cols-4">
                     <div>
                       <dt className={`${MICRO_LABEL} text-text-faint`}>Effect</dt>
