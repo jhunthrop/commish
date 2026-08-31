@@ -119,7 +119,7 @@ async function measureAll(db: ReadonlyDb): Promise<readonly LawResult[]> {
   return LAW_SPECS.map((spec) => {
     const population = populations.get(spec.id);
     if (population === undefined) {
-      throw new Error(`buildPopulations produced no entry for law "${spec.id}" — LAW_SPECS and buildPopulations have drifted apart.`);
+      throw new Error(`buildPopulations produced no entry for law "${spec.id}": LAW_SPECS and buildPopulations have drifted apart.`);
     }
     return measureLaw(spec, population);
   });
@@ -170,7 +170,7 @@ async function main(): Promise<void> {
       );
       process.exit(1);
     }
-    console.log(`\n${OUTPUT_PATH} matches the measured evidence — no drift.`);
+    console.log(`\n${OUTPUT_PATH} matches the measured evidence. No drift.`);
     return;
   }
 
