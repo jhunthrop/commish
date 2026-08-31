@@ -421,6 +421,13 @@
       "when": 1788199496442,
       "tag": "0059_ambitious_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1788199893133,
+      "tag": "0060_tough_william_stryker",
+      "breakpoints": true
     }
   ]
 }

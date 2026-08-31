@@ -153,12 +153,35 @@ describe("the preseason board store", () => {
   describe("board reasons", () => {
     const AVAILABILITY: BoardReason = { code: "availability", expectedGames: 15.4, floorGames: 12, ceilingGames: 17 };
     const LAW: BoardReason = { code: "law", lawId: "target_share_persistence", effect: 1.8, magnitude: 0.31 };
+    const LAW2: BoardReason = { code: "law", lawId: "wr_target_competition", effect: -2.4, magnitude: 0.35 };
 
     it("round-trips every reason on a board, typed", async () => {
       await storeReasons([entry({ reasons: [AVAILABILITY, LAW] })], AUGUST);
       const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
       const stored = [...(byPlayer.get(CHASE) ?? [])].sort((a, b) => a.code.localeCompare(b.code));
       expect(stored).toEqual([AVAILABILITY, LAW]);
+    });
+
+    /**
+     * The fix round's own case: `target_share_persistence` and `wr_target_competition` can both be
+     * true for the same receiver at once, and the PK's `detail` column (the law id) is what lets
+     * both survive rather than one silently overwriting the other.
+     */
+    it("round-trips BOTH reasons for a player who trips two confirmed laws at once", async () => {
+      await storeReasons([entry({ reasons: [LAW, LAW2] })], AUGUST);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      const stored = [...(byPlayer.get(CHASE) ?? [])].sort((a, b) =>
+        a.code === "law" && b.code === "law" ? a.lawId.localeCompare(b.lawId) : 0,
+      );
+      expect(stored).toEqual([LAW, LAW2]);
+    });
+
+    /** Same `(player, law)` PK, written twice — one row, never two, never an error. */
+    it("upserts the same (player, law) reason written twice to one row", async () => {
+      expect(await storeReasons([entry({ reasons: [LAW] })], AUGUST)).toBe(1);
+      expect(await storeReasons([entry({ reasons: [LAW] })], AUGUST)).toBe(0);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      expect(byPlayer.get(CHASE)).toEqual([LAW]);
     });
 
     it("keys reasons by player, never mixing one man's reasons into another's", async () => {
@@ -189,7 +212,7 @@ describe("the preseason board store", () => {
     it("drops a row with an unrecognised reason code, warning with a count, rather than throwing", async () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       await recordPreseasonBoardReasons(db, [
-        { season: 2024, source: BOARD_SOURCE, playerId: CHASE, code: "retired_variant", payload: { anything: true } },
+        { season: 2024, source: BOARD_SOURCE, playerId: CHASE, code: "retired_variant", detail: "", payload: { anything: true } },
       ]);
       await storeReasons([entry({ reasons: [AVAILABILITY] })], AUGUST);
 

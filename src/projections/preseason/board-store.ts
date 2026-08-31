@@ -92,37 +92,47 @@ export function projectionRows(board: readonly BoardEntry[], stamp: BoardStamp):
   }));
 }
 
-/** One `BoardReason` turned into a row: `code` is the union's own tag, `payload` is every other
- *  field of that variant, verbatim — see `preseasonBoardReasons`'s own docblock for why there is no
- *  `asOf` here, unlike `PreseasonProjectionRow`. */
+/** One `BoardReason` turned into a row: `code` is the union's own tag, `detail` is the
+ *  discriminator WITHIN that tag (see `preseasonBoardReasons`'s own docblock — a law id for `"law"`
+ *  rows, `''` for every other current variant), `payload` is every other field of that variant,
+ *  verbatim — see the same docblock for why there is no `asOf` here, unlike `PreseasonProjectionRow`. */
 export interface PreseasonBoardReasonRow {
   readonly season: number;
   readonly source: string;
   readonly playerId: string;
   readonly code: string;
+  readonly detail: string;
   readonly payload: JsonObject;
 }
 
+/** The discriminator WITHIN a reason's `code` — the field `detail` stores (fix round, superseding
+ *  Task 7's original PK). A `"law"` reason's own `lawId` is the only variant that can repeat for one
+ *  player on one board today, so it is the only one that needs a second key; every other variant is
+ *  `''`, since none of them can fire twice for the same candidate. */
+function reasonDetail(reason: BoardReason): string {
+  return reason.code === "law" ? reason.lawId : "";
+}
+
 /**
- * Every reason on a board, turned into rows — one row per `(player, reason)` pair, `code` and
- * `payload` split exactly as `preseasonBoardReasons` stores them.
- *
- * A KNOWN, ACCEPTED GAP: the table's PK is `(source, season, playerId, code)`, with no field naming
- * WHICH reason of a repeated code a row is. Every code today's board ever emits more than once for
- * the same player is `"law"` (`laws/board-reasons.ts`'s `lawReasonsFor` can return one reason per
- * CONFIRMED law, and a player can satisfy more than one law's condition at once) — `recordPreseason
- * BoardReasons`' `onConflictDoNothing` keeps whichever of those rows the batch inserts first and
- * silently drops the rest, rather than erroring. A player who trips two confirmed laws at once is
- * true today (`target_share_persistence` and `wr_target_competition` can both hold for the same
- * receiver) and stored reasons for him are known to be incomplete until a future migration keys
- * `"law"` rows on `lawId` too.
+ * Every reason on a board, turned into rows — one row per `(player, reason)` pair, `code`/`detail`
+ * and `payload` split exactly as `preseasonBoardReasons` stores them. `detail` (`reasonDetail`) is
+ * what lets a player carry MORE THAN ONE `"law"` reason: `target_share_persistence` and
+ * `wr_target_competition` can both be true for the same receiver, and without a second key inside
+ * `code` the table's PK could hold only one of them.
  */
 export function reasonRows(board: readonly BoardEntry[], stamp: BoardStamp): readonly PreseasonBoardReasonRow[] {
   const rows: PreseasonBoardReasonRow[] = [];
   for (const entry of board) {
     for (const reason of entry.reasons) {
       const { code, ...payload } = reason;
-      rows.push({ season: stamp.season, source: stamp.source, playerId: entry.playerId, code, payload: payload as JsonObject });
+      rows.push({
+        season: stamp.season,
+        source: stamp.source,
+        playerId: entry.playerId,
+        code,
+        detail: reasonDetail(reason),
+        payload: payload as JsonObject,
+      });
     }
   }
   return rows;
@@ -155,12 +165,11 @@ export async function recordPreseasonProjections(db: Db, rows: readonly Preseaso
 /**
  * Writes a board's reasons, idempotently, returning how many rows were ACTUALLY new.
  *
- * `onConflictDoNothing` here is doing double duty. Across two runs it is the same idempotency
- * `recordPreseasonProjections` wants: a rerun of an unchanged board writes nothing new. WITHIN one
- * run it is what keeps `reasonRows`' known PK gap (see its own docblock) from ever throwing — two
- * rows in the same batch sharing a `(source, season, playerId, code)` skip rather than collide,
- * because `DO NOTHING` never attempts to touch a row it has already resolved once, unlike
- * `DO UPDATE`, which errors on being asked to affect the same row twice in one statement.
+ * `onConflictDoNothing`, the same idempotency `recordPreseasonProjections` wants: a rerun of an
+ * unchanged board — the same `(source, season, playerId, code, detail)` rows — writes nothing new
+ * rather than erroring or duplicating. `detail` (`reasonRows`' own `reasonDetail`) is what makes
+ * every row `reasonRows` can ever produce for one board distinct by PK, so unlike Task 7's original
+ * shape this is no longer also standing in for a same-batch collision guard.
  */
 export async function recordPreseasonBoardReasons(db: Db, rows: readonly PreseasonBoardReasonRow[]): Promise<number> {
   let written = 0;
