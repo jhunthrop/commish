@@ -1,5 +1,5 @@
 import { MICRO_LABEL } from "./config";
-import { magnitudeStep, Stat, type StatComparison } from "./stat";
+import type { StatComparison } from "./stat";
 
 export interface SeasonWeek {
   readonly week: number;
@@ -25,41 +25,19 @@ export interface SeasonBarsProps {
 }
 
 /**
- * How loud a bar is drawn. THREE steps, not the ramp's five, because three is what a column of
- * rectangles can actually hold apart at 40px wide: a big week, an ordinary one, a bust. The full
- * five-step verdict is on the number above the bar, where `Stat` renders it in the ramp's own ink
- * with its own caret and weight.
- *
- * **WHY THESE ARE NEUTRAL ROLES AND NOT THE HEAT MAP'S PIGMENTS.** The heat map is a number's own
- * ink and nothing else: `magnitude-budget.source.test.ts` makes `Stat` the only file in the
- * product allowed to name a magnitude colour at all, and `globals.css` states the same boundary
- * at the palette — *"Only `Stat` may name one of these, and only as text."* A bar fill is a new
- * use of that budget and the gate's own bargain is that a new use earns its allowlist entry in
- * review, with a reason. So the bars take the neutral ladder instead, and they lose less than it
- * sounds: `text-primary` → `text-muted` → `edge` is strictly decreasing in contrast against the
- * ground in BOTH themes — brighter at night, darker in daylight, exactly the direction the
- * magnitude ramp itself is ordered in — so the season's shape survives with the hue channel
- * switched off entirely, which was the ordering's whole purpose. `edge` rather than `line` for the
- * quiet step: it is the role proven to clear 3:1 on every surface, so a bust week is still a mark
- * a reader can see rather than a smudge on the ground. The step below it, `line`, measures about
- * 1.15:1 on a daylight card and would draw a bust week as nothing at all.
+ * ONE TONE FOR THE SEASON, FULL INK FOR ITS HIGH (founder, 2026-08-30: "these graphs don't look
+ * good. Also, why does everything have an uptick?"). The first cut put a per-week verdict caret
+ * on every number and a three-tone ladder on every bar — and on a star, MOST weeks beat the
+ * position's typical week, so the caret fired nearly everywhere and the mixed tones read as
+ * incoherence rather than verdicts. Law 4's own lesson, learned on the matchup slate already:
+ * spend the emphasis ONCE. Every bar is `text-muted`; the season-high week alone is full ink
+ * with a bold figure, because "his best week" is the one comparison the geometry can't make
+ * alone at a glance. Height carries everything else — a bust week is a short bar, which needs
+ * no second saying.
  *
  * `bg-text-primary` is itself budgeted — it is the ink pill's fill — and this file carries an
  * allowlist entry in `accent-budget.source.test.ts` stating why a chart bar is not a pill.
  */
-const BAR: Readonly<Record<"loud" | "ordinary" | "quiet", string>> = {
-  loud: "bg-text-primary",
-  ordinary: "bg-text-muted",
-  quiet: "bg-edge",
-};
-
-/** The five-step verdict collapsed onto the three a bar can hold. */
-function barWeight(comparison: StatComparison | undefined): keyof typeof BAR {
-  const step = magnitudeStep(comparison);
-  if (step === "strong" || step === "good") return "loud";
-  if (step === "neutral") return "ordinary";
-  return "quiet";
-}
 
 /** The tallest thing on the chart, and the denominator every bar is drawn against. Negative and
  *  zero weeks are excluded from it: a season whose best week is a fumble does not get a chart
@@ -102,6 +80,7 @@ export function SeasonBars({ weeks, label, className = "" }: SeasonBarsProps) {
   // chart on it, which a reader correctly reads as a rendering fault rather than as an absence.
   if (weeks.every((week) => week.points === null)) return null;
   const max = tallest(weeks);
+  const highWeek = weeks.find((week) => week.points !== null && week.points === max && max > 0)?.week ?? null;
   return (
     // Scrolls rather than compresses: seventeen columns squeezed into 360px is a barcode, and the
     // one thing this chart owes the reader is that two adjacent weeks are comparable by eye.
@@ -119,18 +98,32 @@ export function SeasonBars({ weeks, label, className = "" }: SeasonBarsProps) {
                 &nbsp;
               </span>
             ) : (
-              <Stat srOnlyLabel size="sm" label={`Week ${week.week}`} value={points.toFixed(1)} comparison={week.comparison} />
+              // Plain figures, no per-week caret (the founder's "why does everything have an
+              // uptick?"). The season high alone speaks in full ink and weight.
+              <span
+                className={`font-display text-sm tabular-nums ${
+                  week.week === highWeek ? "font-bold text-text-primary" : "font-medium text-text-muted"
+                }`}
+              >
+                <span className="sr-only">{`Week ${week.week}: `}</span>
+                {points.toFixed(1)}
+              </span>
             )}
             {/* The track is `aria-hidden` for the same reason `PointsShareBar`'s is: the number
                 above it already says everything the geometry says, and a screen reader should
                 hear the number. `items-end` grows every bar off the same baseline. */}
-            <div aria-hidden="true" className="flex h-28 w-full items-end justify-center sm:h-40">
+            <div aria-hidden="true" className="flex h-28 w-full items-end justify-center border-b border-line sm:h-40">
               {/* The bar is capped at 36px and centred rather than filling its column. The column
                   stretches so thirteen of them span the panel, and a bar that stretched with it
                   would be 100px wide and 130px tall on a desktop card — a row of tiles, not a
                   chart. A slim bar against a wide gap is what makes two adjacent weeks read as
                   two heights instead of two blocks. */}
-              {height === 0 ? null : <div className={`w-full max-w-9 rounded-sm ${BAR[barWeight(week.comparison)]}`} style={{ height: `${height}%` }} />}
+              {height === 0 ? null : (
+                <div
+                  className={`w-full max-w-7 rounded-t-sm ${week.week === highWeek ? "bg-text-primary" : "bg-text-muted/60"}`}
+                  style={{ height: `${height}%` }}
+                />
+              )}
             </div>
             {/* The axis: the week number, in the one register this product shouts in. No axis
                 title — a row of numbers under a row of bars in a fantasy product is a week
