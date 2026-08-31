@@ -51,10 +51,18 @@ export const NFLVERSE_CONFIG = {
      * derived and what that derivation is allowed to claim.
      */
     depthCharts: "depth_charts",
+    /**
+     * EVERY NFL DRAFT PICK, one file for the whole history, keyed on the NFL's own `gsis_id` the
+     * same way `players` is. Courtesy of Pro Football Reference; nflverse's own release notes say
+     * it dates back to 1980, and it is what `preseason/rookie-curve.ts` is fit against — see that
+     * module for why a dedicated table beats reusing `preseason_rosters.draft_pick`.
+     */
+    draftPicks: "draft_picks",
   },
-  /** Asset names. Only the universe's is fixed; the other two carry a season. */
+  /** Asset names. Only the ones covering the whole history are fixed; the rest carry a season. */
   files: {
     players: "players.csv",
+    draftPicks: "draft_picks.csv",
   },
   /**
    * How long after a game its numbers become knowable, for the `as_of` stamp.

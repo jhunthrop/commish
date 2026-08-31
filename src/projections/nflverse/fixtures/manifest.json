@@ -26,6 +26,12 @@
       "release": "weekly_rosters",
       "asset": "roster_weekly_2024.csv",
       "filtered": "season=2024, week=1, team=BUF. Week one only, because week one is the only weekly roster whose knowable-before-the-opener claim is true (the league's cutdown to fifty-three is a deadline in late August) and the only one `preseason_rosters` stores. The slice keeps every status the release emits for one club, so the coarsening in `rosterStatusOf` has an active list, a reserve list, a practice squad and a cut list to be tested against rather than only the happy path."
+    },
+    {
+      "file": "draft_picks_2020_slice.csv",
+      "release": "draft_picks",
+      "asset": "draft_picks.csv",
+      "filtered": "season=2020, position in QB/RB/WR/TE. One whole skill-position draft class (78 picks, rounds 1-7) rather than a handful of hand-picked rows, because the curve fit reads pick-to-pick spacing and a thin hand-written table would test our understanding of the shape rather than the shape itself. Keeps two real Cole McDonald rows (round 7, pick 224, blank gsis_id) exactly as the release publishes them — a round-seven quarterback pfr never assigned an NFL id — which is the real case `mapDraftPicks` drops rather than a synthetic one."
     }
   ]
 }

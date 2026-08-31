@@ -174,4 +174,19 @@ describe("capitalShares", () => {
   it("puts an undrafted man on the undrafted cell rather than anywhere on the curve", () => {
     expect(capitalShares("WR", null, priors, CURVE)).toEqual(priors.byBucket.WR.undrafted);
   });
+
+  it("BLENDS TWO ANCHORS AT THE RATE THE DRAFT-CAPITAL CURVE SAYS CAPITAL DECAYS AT, not at the rate the raw pick number counts up", () => {
+    // Task 4: `rookie-curve.ts`'s fitted points curve now underpins this interpolation. Pick 32 sits
+    // almost exactly halfway from the round-1 anchor (16.5) to the round-2 one (48.5) IN RAW PICK
+    // SPACE, so a naive linear-in-pick blend would land roughly halfway between the two bucket
+    // means. The real fitted curve says WR value has already fallen almost the whole way to the
+    // round-2 level by pick 32, and the shares interpolation now follows that shape instead.
+    const round1 = priors.byBucket.WR.round1.targetShare;
+    const round2 = priors.byBucket.WR.round2.targetShare;
+    const naiveLinearWeight = (32 - 16.5) / (48.5 - 16.5);
+    const naiveLinear = round1 + (round2 - round1) * naiveLinearWeight;
+    const curved = capitalShares("WR", 32, priors, CURVE).targetShare;
+    expect(curved).not.toBeCloseTo(naiveLinear, 3);
+    expect(curved).toBeCloseTo(round2, 10);
+  });
 });

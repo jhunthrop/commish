@@ -2093,6 +2093,61 @@ export const preseasonRankings = pgTable(
 );
 
 /**
+ * EVERY NFL DRAFT PICK — the ground truth `preseason/rookie-curve.ts` fits its points curve against.
+ *
+ * `preseason_rosters.draft_pick` already carries a pick number for a rookie season, and reusing it
+ * was the first option this table's own module docblock considered. It does not reach far enough
+ * back: this repository's roster backfill floor is 2013 (`nflverse/rosters.ts`'s
+ * `HISTORICAL_ROSTER_FLOOR`), which is a roster-availability limit, not a draft-history one — the
+ * `draft_picks` release nflverse publishes carries every pick back to 1980, keyed on the same
+ * `gsis_id` every other table here uses. A curve fit on nine draft classes and a curve fit on twenty
+ * are different measurements, and the wider one is the one worth having a dedicated table for.
+ *
+ * A DEDICATED TABLE RATHER THAN `player_week_observations`, for the exact reason
+ * `preseason_rankings`' own docblock gives: a draft pick is a fact about a SEASON, not a WEEK, and
+ * forcing it into week zero of the observation store risks the same silent-leak class that table's
+ * docblock warns about — a fact meant to be read once, at a fixed pick, ending up folded into
+ * whatever moment a different reader's week-0 lookup resolves to.
+ *
+ * `as_of` IS APPROXIMATE ON PURPOSE. The release does not carry the exact day of each pick, and the
+ * NFL draft's three days always fall in April, so every row here is stamped the first of May of its
+ * own `season` — always after the real pick, by at most a few weeks. Nothing in the engine reads
+ * this table through the point-in-time gate today (`rookie-curve.ts`'s fit runs offline and bakes
+ * its output into a committed file, exactly as `preseason/fitted.ts` does for every other prior), so
+ * the approximation costs nothing yet; the column is carried anyway so a future point-in-time reader
+ * never has to be invented from nothing.
+ */
+export const nflDraftPicks = pgTable(
+  "nfl_draft_picks",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** The draft year — a rookie's own pick season, and the season `rookie-curve.ts` reads his
+     *  outcome from. */
+    season: integer("season").notNull(),
+    round: integer("round").notNull(),
+    /** OVERALL pick number, 1-based. Never null: every row here is an actual selection, unlike
+     *  `preseason_rosters.draft_pick`, which also has to represent "undrafted". */
+    pick: integer("pick").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** nflverse's own spelling, unnarrowed, exactly as `nfl_players.position` is. */
+    position: text("position").notNull(),
+    /** The drafting club's nflverse abbreviation. */
+    team: text("team").notNull(),
+    /** THE STAMP. See the module docblock: the first of May of `season`, an approximation. */
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** One player per overall pick per season — the natural key, and what makes a re-ingestion a
+     *  no-op rather than a duplicate. */
+    uniqueIndex("nfl_draft_picks_fact_idx").on(t.season, t.pick),
+    index("nfl_draft_picks_player_idx").on(t.playerId),
+  ],
+);
+
+/**
  * THE ONE EDGE BETWEEN THE TWO ID SPACES THIS PRODUCT HOLDS (migration 0051).
  *
  * `nfl_players`' own docblock refused to guess at this link and said who should draw it: "mapping
