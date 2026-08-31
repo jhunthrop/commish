@@ -108,7 +108,10 @@ function verdictElaboration(law: Law): string {
 function splitClaim(claim: string): { readonly title: string; readonly body: string } {
   const separator = ": ";
   const index = claim.indexOf(separator);
-  return index === -1 ? { title: claim, body: "" } : { title: claim.slice(0, index), body: claim.slice(index + separator.length) };
+  if (index === -1) return { title: claim, body: "" };
+  const body = claim.slice(index + separator.length);
+  // The body was mid-sentence before the split; as standalone prose it opens a sentence.
+  return { title: claim.slice(0, index), body: body.charAt(0).toUpperCase() + body.slice(1) };
 }
 
 /** Every measured figure, formatted, never typed — the four values (spec Part 3) a reader needs
