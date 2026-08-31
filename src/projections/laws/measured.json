@@ -1,13 +1,13 @@
 {
   "play_caller_fingerprint": {
-    "effect": -0.3420967741935481,
+    "effect": -0.17475675675675678,
     "ci": [
-      -1.1249274193548389,
-      0.495415322580645
+      -0.7842797297297295,
+      0.49678783783783764
     ],
-    "sample": 124,
+    "sample": 185,
     "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
-    "heldOutEffect": 0.6783333333333338,
+    "heldOutEffect": -0.7004255319148937,
     "verdict": "debunked"
   },
   "rb_age_curve": {
