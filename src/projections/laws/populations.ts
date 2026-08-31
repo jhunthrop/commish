@@ -430,7 +430,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
   {
     id: "wr_target_competition",
     position: "WR",
-    claim: "Another primary receiver on his team: a wide receiver with a WR/TE teammate whose own season-N target share is at least 20% and at least as large as the receiver's own share loses points per game the following season. Simplified: teammates are read from the season being measured, not from a predicted next-season arrival, because next season's roster is not knowable yet when the measurement is taken.",
+    claim: "Another primary receiver on his team: a wide receiver with a WR/TE teammate whose own target share that same season is at least 20% and at least as large as the receiver's own share loses points per game the following season. Simplified: teammates are read from the season being measured, not from a predicted next-season arrival, because next season's roster is not knowable yet when the measurement is taken.",
     expectedSign: -1,
     eligible: isWr,
     condition: wrTargetCompetitionCondition,
