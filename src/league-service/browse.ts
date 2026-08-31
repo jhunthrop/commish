@@ -483,6 +483,15 @@ async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): P
       pointsPerSack: scoringSettings.pointsPerSack,
       pointsPerDefensiveInterception: scoringSettings.pointsPerDefensiveInterception,
       pointsPerDefensiveTouchdown: scoringSettings.pointsPerDefensiveTouchdown,
+      // The scoring-vocabulary widening (2026-08-30): an explicit pick that omits a weight makes
+      // describeScoring read undefined !== preset and label every league "Custom" (the exact
+      // failure this comment's own review caught).
+      pointsPerTwoPointConversion: scoringSettings.pointsPerTwoPointConversion,
+      pointsPerFieldGoalMissed: scoringSettings.pointsPerFieldGoalMissed,
+      pointsPerExtraPointMissed: scoringSettings.pointsPerExtraPointMissed,
+      pointsPerReturnTouchdown: scoringSettings.pointsPerReturnTouchdown,
+      pointsPerDefensiveFumbleRecovery: scoringSettings.pointsPerDefensiveFumbleRecovery,
+      pointsPerSafety: scoringSettings.pointsPerSafety,
     })
     .from(scoringSettings)
     .where(inArray(scoringSettings.leagueId, [...leagueIds]));

@@ -538,11 +538,15 @@ describe("applyTradeInTx", () => {
     // NEVER reaches `applyTradeInTx` at all: the auto-hold gate refuses to execute it, so
     // `acceptTrade`'s own `holdTradeInTx` branch runs instead — this file's presence here is
     // entirely its dealing code, not its trade.
+    // `claims.ts` (free agency, 2026-08-28) is an ADD/DROP writer — it assigns an unowned
+    // player and vacates a dropped one, never moves an already-owned player between two
+    // rosters, so `applyTradeInTx`'s uniqueness claim stands.
     expect(writers).toEqual([
       "src/data/seed/seed-enforcement.ts",
       "src/data/seed/seed-season-league.ts",
       "src/data/seed/seed-trades.ts",
       "src/draft-service/commit.ts",
+      "src/league-service/claims.ts",
       "src/league-service/trade-transfer.ts",
     ]);
   });

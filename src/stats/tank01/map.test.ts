@@ -256,6 +256,12 @@ describe("mapBoxScoreToStatLines", () => {
       fieldGoalsAttempted: 0,
       offensiveSnaps: 0,
       offensiveSnapShare: 0,
+      // The scoring-vocabulary block (2026-08-30).
+      twoPointConversions: 0,
+      fieldGoalsMissed: 0,
+      extraPointsMissed: 0,
+      kickReturnTouchdowns: 0,
+      puntReturnTouchdowns: 0,
     });
   });
 
@@ -400,6 +406,12 @@ describe("defensive parsing of shapes the fixtures never exercise", () => {
         fieldGoalsAttempted: 0,
         offensiveSnaps: 0,
         offensiveSnapShare: 0,
+        // The scoring-vocabulary block (2026-08-30).
+        twoPointConversions: 0,
+        fieldGoalsMissed: 0,
+        extraPointsMissed: 0,
+        kickReturnTouchdowns: 0,
+        puntReturnTouchdowns: 0,
         passingYards: 0,
         passingTouchdowns: 0,
         interceptions: 0,
@@ -466,9 +478,12 @@ describe("defensive parsing of shapes the fixtures never exercise", () => {
       {
         playerId: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`,
         week: 7,
-        // The harvest block (2026-08-30): the DEF branch's one harvest field. Absent upstream
-        // value parses to 0, the column's own "not recorded".
+        // The harvest + scoring-vocabulary blocks (2026-08-30). Absent upstream values parse
+        // to 0, the column's own "not recorded".
         pointsAllowed: 0,
+        yardsAllowed: 0,
+        defensiveFumblesRecovered: 0,
+        safeties: 0,
         passingYards: 0,
         passingTouchdowns: 0,
         interceptions: 0,

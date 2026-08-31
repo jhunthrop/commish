@@ -256,6 +256,15 @@ export function mapBoxScoreToStatLines(
               fieldGoalsAttempted: num(kicking.fgAttempts),
               offensiveSnaps: num(group(entry, "snapCounts").offSnap),
               offensiveSnapShare: num(group(entry, "snapCounts").offSnapPct),
+              // The scoring-vocabulary block (2026-08-30), probed live against a 2025 box
+              // score: two-point conversions live per phase group, return TDs under Kicking
+              // (kick) and Punting (punt), misses under Kicking.
+              twoPointConversions:
+                num(passing.passingTwoPointConversion) + num(rushing.rushingTwoPointConversion) + num(receiving.receivingTwoPointConversion),
+              fieldGoalsMissed: num(kicking.fgMissed),
+              extraPointsMissed: num(kicking.xpMissed),
+              kickReturnTouchdowns: num(kicking.kickReturnTD),
+              puntReturnTouchdowns: num(group(entry, "Punting").puntReturnTD),
             },
           ];
         })
@@ -281,10 +290,12 @@ export function mapBoxScoreToStatLines(
       sacks: num(entry.sacks),
       defensiveInterceptions: num(entry.defensiveInterceptions),
       defensiveTouchdowns: num(entry.defTD),
-      // The harvest block (2026-08-30): the audit's scoring-fidelity finding — points allowed
-      // was fetched and discarded on every box score. Persisted now; the scoring formula's
-      // adoption of points-allowed tiers is a separate, founder-visible change.
+      // The harvest + scoring-vocabulary blocks (2026-08-30): the DST side carries the tier
+      // inputs and the counting categories directly.
       pointsAllowed: num(entry.ptsAllowed),
+      yardsAllowed: num(entry.ydsAllowed),
+      defensiveFumblesRecovered: num(entry.fumblesRecovered),
+      safeties: num(entry.safeties),
     });
   }
 

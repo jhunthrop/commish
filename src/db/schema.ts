@@ -544,6 +544,14 @@ export const scoringSettings = pgTable("scoring_settings", {
   pointsPerSack: real("points_per_sack").notNull(),
   pointsPerDefensiveInterception: real("points_per_defensive_interception").notNull(),
   pointsPerDefensiveTouchdown: real("points_per_defensive_touchdown").notNull(),
+  // The scoring-vocabulary widening (2026-08-30). Defaults are the incumbent-standard values so
+  // every existing league's sheet gains them without a data migration beyond the DDL default.
+  pointsPerTwoPointConversion: real("points_per_two_point_conversion").notNull().default(2),
+  pointsPerFieldGoalMissed: real("points_per_field_goal_missed").notNull().default(-1),
+  pointsPerExtraPointMissed: real("points_per_extra_point_missed").notNull().default(0),
+  pointsPerReturnTouchdown: real("points_per_return_touchdown").notNull().default(6),
+  pointsPerDefensiveFumbleRecovery: real("points_per_defensive_fumble_recovery").notNull().default(2),
+  pointsPerSafety: real("points_per_safety").notNull().default(2),
 });
 
 export const rosterSlots = pgTable(
@@ -863,6 +871,16 @@ export const playerStatLines = pgTable(
     pointsAllowed: integer("points_allowed").notNull().default(0),
     offensiveSnaps: integer("offensive_snaps").notNull().default(0),
     offensiveSnapShare: real("offensive_snap_share").notNull().default(0),
+    // The scoring-vocabulary block (2026-08-30): every category ESPN's default sheet scores
+    // that the box score carries directly. 0 = not recorded, same contract as the harvest block.
+    twoPointConversions: integer("two_point_conversions").notNull().default(0),
+    fieldGoalsMissed: integer("field_goals_missed").notNull().default(0),
+    extraPointsMissed: integer("extra_points_missed").notNull().default(0),
+    kickReturnTouchdowns: integer("kick_return_touchdowns").notNull().default(0),
+    puntReturnTouchdowns: integer("punt_return_touchdowns").notNull().default(0),
+    yardsAllowed: integer("yards_allowed").notNull().default(0),
+    defensiveFumblesRecovered: integer("defensive_fumbles_recovered").notNull().default(0),
+    safeties: integer("safeties").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.playerId, t.week] }), index("player_stat_lines_week_idx").on(t.week)],
 );

@@ -70,6 +70,20 @@ export interface StatLine {
   readonly offensiveSnaps?: number;
   /** As the source reports it (`snapCounts.offSnapPct`); shape unverified until a live box score exists. */
   readonly offensiveSnapShare?: number;
+  // THE SCORING-VOCABULARY BLOCK (founder, 2026-08-30: a league engine that matches the
+  // expectations people arrive with — ESPN's default sheet scores all of these). Optional for
+  // the same reason as the harvest block: absent means the source predates the widening, and
+  // the engine reads absence as 0.
+  /** Pass + rush + rec two-point conversions, one figure — the presets score all three alike. */
+  readonly twoPointConversions?: number;
+  readonly fieldGoalsMissed?: number;
+  readonly extraPointsMissed?: number;
+  readonly kickReturnTouchdowns?: number;
+  readonly puntReturnTouchdowns?: number;
+  /** DST rows only, like `pointsAllowed`: total yards the defense allowed. */
+  readonly yardsAllowed?: number;
+  readonly defensiveFumblesRecovered?: number;
+  readonly safeties?: number;
 }
 
 /**

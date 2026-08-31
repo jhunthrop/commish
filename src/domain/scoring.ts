@@ -16,6 +16,17 @@ export interface ScoringSettings {
   readonly pointsPerSack: number;
   readonly pointsPerDefensiveInterception: number;
   readonly pointsPerDefensiveTouchdown: number;
+  // The scoring-vocabulary widening (2026-08-30): the categories every incumbent's default
+  // sheet scores. Defense points/yards-allowed TIERS are deliberately not weights here — they
+  // are the fixed industry tier tables, applied by the engine to DEF lines only (see
+  // `computeFantasyPoints`); a tier table is a shape, not a scalar a commissioner tunes v1.
+  readonly pointsPerTwoPointConversion: number;
+  readonly pointsPerFieldGoalMissed: number;
+  readonly pointsPerExtraPointMissed: number;
+  /** Kick + punt return touchdowns by a rostered player. */
+  readonly pointsPerReturnTouchdown: number;
+  readonly pointsPerDefensiveFumbleRecovery: number;
+  readonly pointsPerSafety: number;
 }
 
 export const STANDARD_SCORING: Omit<ScoringSettings, "leagueId"> = {
@@ -34,6 +45,12 @@ export const STANDARD_SCORING: Omit<ScoringSettings, "leagueId"> = {
   pointsPerSack: 1,
   pointsPerDefensiveInterception: 2,
   pointsPerDefensiveTouchdown: 6,
+  pointsPerTwoPointConversion: 2,
+  pointsPerFieldGoalMissed: -1,
+  pointsPerExtraPointMissed: 0,
+  pointsPerReturnTouchdown: 6,
+  pointsPerDefensiveFumbleRecovery: 2,
+  pointsPerSafety: 2,
 };
 
 export const PPR_SCORING: Omit<ScoringSettings, "leagueId"> = {
