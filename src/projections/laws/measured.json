@@ -1,0 +1,62 @@
+{
+  "play_caller_fingerprint": {
+    "effect": 0.678333333333334,
+    "ci": [
+      -1.5921249999999996,
+      2.866666666666667
+    ],
+    "sample": 6,
+    "seasons": "2011-2024, held out 2023-2024",
+    "verdict": "weak"
+  },
+  "rb_age_curve": {
+    "effect": -1.6380769230769234,
+    "ci": [
+      -3.665788461538463,
+      0.05054807692307616
+    ],
+    "sample": 26,
+    "seasons": "2011-2024, held out 2023-2024",
+    "verdict": "weak"
+  },
+  "rb_workload_cliff": {
+    "effect": -4.688,
+    "ci": [
+      -8.290275,
+      -1.7652250000000003
+    ],
+    "sample": 10,
+    "seasons": "2011-2024, held out 2023-2024",
+    "verdict": "confirmed"
+  },
+  "target_share_persistence": {
+    "effect": 1.5670000000000006,
+    "ci": [
+      -0.311175,
+      3.271883333333332
+    ],
+    "sample": 30,
+    "seasons": "2011-2024, held out 2023-2024",
+    "verdict": "weak"
+  },
+  "td_regression": {
+    "effect": -0.7419310344827581,
+    "ci": [
+      -1.5596844827586203,
+      0.09287931034482744
+    ],
+    "sample": 145,
+    "seasons": "2011-2024, held out 2023-2024",
+    "verdict": "weak"
+  },
+  "wr_target_competition": {
+    "effect": -1.6812195121951221,
+    "ci": [
+      -3.3759085365853654,
+      0.23632317073170736
+    ],
+    "sample": 41,
+    "seasons": "2011-2024, held out 2023-2024",
+    "verdict": "weak"
+  }
+}
