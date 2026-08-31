@@ -117,6 +117,12 @@ export interface RookieCurveKnot {
 export type RookieCurvePriors = Readonly<Record<CurvePosition, readonly RookieCurveKnot[]>>;
 
 export interface RookieCurveFitOptions {
+  /**
+   * EXTRA seasons to refuse, beyond the structural `ROOKIE_CURVE_TRAIN_CUTOFF_SEASON` gate every
+   * call gets for free — an interior season a caller wants excluded from one particular fit (a
+   * held-out validation run, say) without moving the module-wide cutoff. Not what keeps 2022+ out:
+   * that is `fitRookieCurve` itself, unconditionally.
+   */
   readonly heldOutSeasons: readonly number[];
 }
 
@@ -165,6 +171,18 @@ function isotonicNonIncreasing(values: readonly number[], weights: readonly numb
 export function fitRookieCurve(observations: readonly RookieCurveObservation[], { heldOutSeasons }: RookieCurveFitOptions): RookieCurvePriors {
   const forbidden = new Set(heldOutSeasons);
   for (const observation of observations) {
+    // STRUCTURAL, not caller discipline: `ROOKIE_CURVE_TRAIN_CUTOFF_SEASON` is the contract this
+    // whole module is fit under, so it is enforced here directly rather than trusted to whatever
+    // `heldOutSeasons` a caller happened to pass. A fix round caught the earlier version of this
+    // gate sitting entirely behind `heldOutSeasons` — `rookie-curve-fit.ts` passed `[]`, so the
+    // guard the module docblock and the generated file's own header advertised never armed.
+    if (observation.season > ROOKIE_CURVE_TRAIN_CUTOFF_SEASON) {
+      throw new Error(
+        `The rookie curve fit was handed ${observation.season}, which is past ROOKIE_CURVE_TRAIN_CUTOFF_SEASON ` +
+          `(${ROOKIE_CURVE_TRAIN_CUTOFF_SEASON}) and therefore held out by construction. A curve fitted on a season ` +
+          `it is later scored on is not a measurement.`,
+      );
+    }
     if (forbidden.has(observation.season)) {
       throw new Error(
         `The rookie curve fit was handed ${observation.season}, which is held out. A curve fitted on a season it is later scored on is not a measurement.`,
@@ -192,22 +210,21 @@ export function fitRookieCurve(observations: readonly RookieCurveObservation[], 
 }
 
 /**
- * `rookieCurve(position, overallPick)` — expected rookie-season points, read from the committed fit
- * and interpolated linearly between its two nearest picks. Clamped at both ends: above the earliest
- * fitted pick there is no measured knot to extrapolate toward, and inventing a steeper first pick
- * would be a curve nobody fitted — the identical discipline `rookies.ts`'s own `alongTheCapitalCurve`
- * applies at the bucket table's own ends.
- *
- * Returns 0 for a position this curve carries no knots for (`K`, `DEF` — never drafted onto a board
- * this engine projects) rather than throwing, so a generic caller iterating every `Position` never
- * has to special-case the two this curve does not cover.
+ * The unclamped read: expected rookie-season points, interpolated linearly between the fit's two
+ * nearest picks and clamped only at the ENDS of the curve (see `rookieCurve`'s own docblock for the
+ * clamp `rookieCurve` itself applies afterward, which is a different thing — a floor at zero, not an
+ * extrapolation guard).
  */
-export function rookieCurve(position: Position, overallPick: number, priors: RookieCurvePriors = FITTED_ROOKIE_CURVE): number {
+function rawRookieCurve(position: Position, overallPick: number, priors: RookieCurvePriors): number {
   if (!isCurvePosition(position)) return 0;
   const knots = priors[position];
   if (knots.length === 0) return 0;
   const first = knots[0]!;
   const last = knots[knots.length - 1]!;
+  // Clamped rather than extrapolated at both ends. Above the earliest fitted pick there is no
+  // measured knot to run toward, and inventing a steeper first pick would be a curve nobody fitted
+  // — the identical discipline `rookies.ts`'s own `alongTheCapitalCurve` applies at the bucket
+  // table's own ends.
   if (overallPick <= first.pick) return first.points;
   if (overallPick >= last.pick) return last.points;
 
@@ -216,4 +233,26 @@ export function rookieCurve(position: Position, overallPick: number, priors: Roo
   const above = knots[aboveIndex - 1]!;
   const weight = (overallPick - above.pick) / (below.pick - above.pick);
   return above.points + (below.points - above.points) * weight;
+}
+
+/**
+ * `rookieCurve(position, overallPick)` — expected rookie-season points, read from the committed fit.
+ *
+ * CLAMPED AT ZERO. The isotonic fit itself is not floored — a handful of the latest QB picks (the
+ * seventh-round/UDFA tail, where a rookie's whole rookie season is a mop-up interception or two and
+ * nothing else) fit to a mean a shade below zero, and that is an honest measurement of what those
+ * picks actually did. It is also not a number a CONSUMER of this curve should ever see: Task 10
+ * reads `rookieCurve` as a POINTS BASELINE inside a blend, and a points baseline is non-negative by
+ * construction — nobody is worth negative fantasy points before a single snap. The sub-zero tail
+ * carries no usable signal past "this pick is worth approximately nothing", which zero already says.
+ * The clamp lives HERE, in the accessor, rather than in the fit: the committed constants stay the
+ * honest, unfloored measurement, and `fitRookieCurve`/`rookie-curve-fitted.ts` are unaffected by it.
+ *
+ * Returns 0 for a position this curve carries no knots for (`K`, `DEF` — never drafted onto a board
+ * this engine projects) rather than throwing, so a generic caller iterating every `Position` never
+ * has to special-case the two this curve does not cover — which the clamp now makes true by
+ * construction rather than by coincidence.
+ */
+export function rookieCurve(position: Position, overallPick: number, priors: RookieCurvePriors = FITTED_ROOKIE_CURVE): number {
+  return Math.max(0, rawRookieCurve(position, overallPick, priors));
 }

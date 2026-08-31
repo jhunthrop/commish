@@ -26,6 +26,9 @@ import { rookieCurve } from "./rookie-curve";
  * a third-round one, and on that evidence the reordering destroys more information than it adds. It
  * is now behind `PreseasonFeatures.rookieLanding` and that flag is OFF.
  *
+ * (Every figure in this docblock, including these, was measured BEFORE Task 4's curve-shaped
+ * interpolation existed, against the original linear-in-pick blend. They are not re-run here.)
+ *
  * WHAT REPLACES IT IS THE PICK NUMBER ITSELF. The buckets below are the level the fit can estimate;
  * they are not the resolution a draft has. Six cells rank the third pick level with the thirty-first
  * and the fitted table caps ties into place on top of that, so a bucket-only board hands a whole

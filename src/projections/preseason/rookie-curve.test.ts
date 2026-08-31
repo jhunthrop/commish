@@ -24,6 +24,21 @@ describe("fitRookieCurve", () => {
     expect(() => fitRookieCurve([observation({ season: 2022 })], { heldOutSeasons: [2022] })).toThrow(/held out/);
   });
 
+  it("REFUSES a season past ROOKIE_CURVE_TRAIN_CUTOFF_SEASON even with an EMPTY held-out list — the constant is the contract, not caller discipline", () => {
+    // Fix round: the earlier version of this gate lived entirely behind `heldOutSeasons`, and
+    // `rookie-curve-fit.ts` calls this with `heldOutSeasons: []` for real — so the guard the module
+    // docblock and the generated file's header both advertised never actually armed. This pins that
+    // it now fires unconditionally, straight off the cutoff constant.
+    const observations = [observation({ season: ROOKIE_CURVE_TRAIN_CUTOFF_SEASON + 1 })];
+    expect(() => fitRookieCurve(observations, { heldOutSeasons: [] })).toThrow(
+      new RegExp(`past ROOKIE_CURVE_TRAIN_CUTOFF_SEASON \\(${ROOKIE_CURVE_TRAIN_CUTOFF_SEASON}\\)`),
+    );
+  });
+
+  it("accepts the cutoff season itself, exactly at the boundary", () => {
+    expect(() => fitRookieCurve([observation({ season: ROOKIE_CURVE_TRAIN_CUTOFF_SEASON })], { heldOutSeasons: [] })).not.toThrow();
+  });
+
   it("takes the mean at a pick with more than one observation across draft classes", () => {
     const priors = fitRookieCurve(
       [observation({ overallPick: 5, points: 100 }), observation({ overallPick: 5, points: 200, season: 2021 })],
@@ -134,6 +149,33 @@ describe("rookieCurve", () => {
     for (let pick = 1; pick < 260; pick += 1) {
       expect(rookieCurve("QB", pick + 1, PRIORS)).toBeLessThanOrEqual(rookieCurve("QB", pick, PRIORS) + 1e-9);
     }
+  });
+
+  it("CLAMPS A SUB-ZERO FITTED VALUE AT ZERO — a points baseline for a blend is non-negative by construction", () => {
+    const negativeTail: RookieCurvePriors = {
+      QB: [
+        { pick: 1, points: 200 },
+        { pick: 250, points: -0.05 },
+      ],
+      RB: [],
+      WR: [],
+      TE: [],
+    };
+    expect(rookieCurve("QB", 250, negativeTail)).toBe(0);
+    // And not just at the exact knot: any pick in the clamped region reads as zero too, never a
+    // negative interpolated-toward value.
+    expect(rookieCurve("QB", 260, negativeTail)).toBe(0);
+  });
+
+  it("PIN: clamps the real committed QB tail (picks 250 and 253, both fit to -0.05) at exactly zero", () => {
+    // The exact case the clamp exists for: `rookie-curve-fitted.ts`'s own QB knots at pick 250 and
+    // 253 are both -0.05, the seventh-round/UDFA tail where a rookie season is a mop-up
+    // interception and nothing else. The FITTED constant stays that honest, unfloored measurement
+    // (checked directly below); the ACCESSOR is what floors it.
+    expect(FITTED_ROOKIE_CURVE.QB.find((knot) => knot.pick === 250)?.points).toBe(-0.05);
+    expect(FITTED_ROOKIE_CURVE.QB.find((knot) => knot.pick === 253)?.points).toBe(-0.05);
+    expect(rookieCurve("QB", 250)).toBe(0);
+    expect(rookieCurve("QB", 253)).toBe(0);
   });
 });
 

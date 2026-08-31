@@ -201,6 +201,11 @@ export const SHIPPED_PRESEASON_FEATURES: PreseasonFeatures = {
    * a whole round one number and lets the availability model break it. Interpolating the fitted
    * means on the pick axis restores the ordering the counterfactual uses, changes no fitted value,
    * and is developed on the fit seasons. See the research document for what it measured.
+   *
+   * Task 4: the interpolation now moves in POINTS space (`rookies.ts`'s `capitalCurveWeight`,
+   * backed by `rookie-curve.ts`) rather than in raw pick space. The measurement above predates that
+   * change and describes the original linear-in-pick blend; it has not been re-run against the
+   * curve-shaped one.
    */
   rookiePickCurve: true,
   /**

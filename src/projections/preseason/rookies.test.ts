@@ -189,4 +189,28 @@ describe("capitalShares", () => {
     expect(curved).not.toBeCloseTo(naiveLinear, 3);
     expect(curved).toBeCloseTo(round2, 10);
   });
+
+  it("FALLS BACK TO THE ORIGINAL LINEAR-IN-PICK BLEND when the curve has no signal for the position", () => {
+    // `rookieCurve` returns 0 for K and DEF unconditionally (`rookie-curve.ts` never fits either —
+    // neither is ever drafted onto a board this engine projects), so `capitalCurveWeight`'s
+    // above/below span is always exactly 0 there and the `!(span > 0)` guard has to take over. K's
+    // OWN committed bucket shares are uniformly zero too, which would make the fallback invisible —
+    // so this synthesises distinct round1/round2 shares for K to make the weight it actually used
+    // observable in the output.
+    const kSharePriors = {
+      ...priors,
+      byBucket: {
+        ...priors.byBucket,
+        K: {
+          ...priors.byBucket.K,
+          round1: { snapShare: 0.8, targetShare: 0, carryShare: 0, passAttemptShare: 0 },
+          round2: { snapShare: 0.2, targetShare: 0, carryShare: 0, passAttemptShare: 0 },
+        },
+      },
+    };
+    const midpointPick = 32.5; // the exact midpoint of the round1 (16.5) and round2 (48.5) anchors
+    const linearWeight = (midpointPick - 16.5) / (48.5 - 16.5);
+    const expectedLinear = 0.8 + (0.2 - 0.8) * linearWeight;
+    expect(capitalShares("K", midpointPick, kSharePriors, CURVE).snapShare).toBeCloseTo(expectedLinear, 10);
+  });
 });
