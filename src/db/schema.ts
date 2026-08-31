@@ -2252,3 +2252,32 @@ export const preseasonProjections = pgTable(
     index("preseason_projections_as_of_idx").on(t.season, t.source, t.asOf),
   ],
 );
+
+/**
+ * WHY A PLAYER SITS WHERE HE SITS ON ONE BOARD — the explanation surface `board-store.ts`'s own
+ * docblock used to say was deliberately NOT stored yet (Task 7 lifts that). Every `BoardReason`
+ * variant a board produced for a player is one row here: `code` is the union's own tag
+ * (`board.ts`'s `BoardReason`), `payload` is every other field of that variant, verbatim.
+ *
+ * NOT VERSIONED BY MOMENT, unlike `preseason_projections` next door: the PK is
+ * `(source, season, player_id, code)` with no `as_of`, so a rerun of the same board replaces this
+ * table's opinion rather than adding a second, dated one. Reasons are the CURRENT explanation for
+ * the CURRENT ranking, not a historical ledger a backtest replays — that claim belongs to the ranks
+ * and points themselves, which `preseason_projections` already carries under its own stamp.
+ */
+export const preseasonBoardReasons = pgTable(
+  "preseason_board_reasons",
+  {
+    source: text("source").notNull(),
+    season: integer("season").notNull(),
+    /** An `nfl_players.id` — a gsis id, the same space every other board row keys on. */
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** The `BoardReason` union's own discriminant — `"availability"`, `"law"`, and so on. */
+    code: text("code").notNull(),
+    /** Every other field of that `BoardReason` variant, verbatim — `code` itself excluded. */
+    payload: jsonb("payload").$type<JsonObject>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.source, t.season, t.playerId, t.code] })],
+);

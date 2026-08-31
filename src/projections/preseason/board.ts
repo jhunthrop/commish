@@ -62,7 +62,20 @@ export type BoardReason =
   | { readonly code: "new_play_caller"; readonly team: string }
   | { readonly code: "rookie"; readonly overallPick: number | null; readonly landingMultiplier: number }
   | { readonly code: "scarcity"; readonly positionRank: number; readonly replacementLevel: number }
-  | { readonly code: "tier_cliff"; readonly playersLeftInTier: number; readonly dropToNextTier: number };
+  | { readonly code: "tier_cliff"; readonly playersLeftInTier: number; readonly dropToNextTier: number }
+  /**
+   * A CONFIRMED law (`laws/registry.ts`) whose own condition is true for this player, for the
+   * season this board projects. `effect` is the law's REGISTRY-MEASURED points/game delta
+   * (`Law.measured.effect`, the same number every law carries everywhere else it is shown) — never
+   * recomputed per player. `magnitude` is the player's OWN value of the exact quantity that law's
+   * condition reads, so the reason says not just "this law applies" but "by how much"; its unit
+   * depends on `lawId` and is documented in full at `laws/board-reasons.ts`'s `magnitudeForLaw`
+   * (touches for `rb_workload_cliff`, years for `rb_age_curve`, a target-share fraction for
+   * `wr_target_competition` and `target_share_persistence`, a share-over-threshold ratio for
+   * `td_regression`, pass-rate-over-expected for `play_caller_fingerprint`). Built by
+   * `laws/board-reasons.ts`'s `lawReasonsFor`, the one place a candidate's facts become this variant.
+   */
+  | { readonly code: "law"; readonly lawId: string; readonly effect: number; readonly magnitude: number };
 
 /** One player as the board receives him: a per-game line, a games distribution, and his causes. */
 export interface BoardCandidate {

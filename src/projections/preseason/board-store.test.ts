@@ -1,13 +1,16 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { recordNflPlayers } from "../universe";
 import type { NflPlayerRow } from "../nflverse/players";
-import type { BoardEntry } from "./board";
+import type { BoardEntry, BoardReason } from "./board";
 import {
   BOARD_SOURCE,
+  boardReasons,
   preseasonProjectionsAsOf,
   preseasonProjectionsFor,
   projectionRows,
+  reasonRows,
+  recordPreseasonBoardReasons,
   recordPreseasonProjections,
 } from "./board-store";
 
@@ -64,6 +67,10 @@ function entry(overrides: Partial<BoardEntry> = {}): BoardEntry {
 
 async function store(board: readonly BoardEntry[], asOf: Date): Promise<number> {
   return recordPreseasonProjections(db, projectionRows(board, { season: 2024, source: BOARD_SOURCE, asOf }));
+}
+
+async function storeReasons(board: readonly BoardEntry[], asOf: Date): Promise<number> {
+  return recordPreseasonBoardReasons(db, reasonRows(board, { season: 2024, source: BOARD_SOURCE, asOf }));
 }
 
 describe("the preseason board store", () => {
@@ -137,5 +144,67 @@ describe("the preseason board store", () => {
     await store([entry()], AUGUST);
     expect(await preseasonProjectionsAsOf(db, { season: 2023, source: BOARD_SOURCE, asOf: FINAL })).toEqual([]);
     expect(await preseasonProjectionsAsOf(db, { season: 2024, source: "some_other_board", asOf: FINAL })).toEqual([]);
+  });
+
+  /**
+   * Task 7 — `reasons` used to be the one thing `board-store.ts`'s own docblock said was
+   * deliberately not stored yet. These are the tests that lift that.
+   */
+  describe("board reasons", () => {
+    const AVAILABILITY: BoardReason = { code: "availability", expectedGames: 15.4, floorGames: 12, ceilingGames: 17 };
+    const LAW: BoardReason = { code: "law", lawId: "target_share_persistence", effect: 1.8, magnitude: 0.31 };
+
+    it("round-trips every reason on a board, typed", async () => {
+      await storeReasons([entry({ reasons: [AVAILABILITY, LAW] })], AUGUST);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      const stored = [...(byPlayer.get(CHASE) ?? [])].sort((a, b) => a.code.localeCompare(b.code));
+      expect(stored).toEqual([AVAILABILITY, LAW]);
+    });
+
+    it("keys reasons by player, never mixing one man's reasons into another's", async () => {
+      await storeReasons(
+        [entry({ reasons: [AVAILABILITY] }), entry({ playerId: LAMB, reasons: [LAW] })],
+        AUGUST,
+      );
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      expect(byPlayer.get(CHASE)).toEqual([AVAILABILITY]);
+      expect(byPlayer.get(LAMB)).toEqual([LAW]);
+    });
+
+    it("says nothing about a player nobody stored a reason for", async () => {
+      await storeReasons([entry({ reasons: [AVAILABILITY] })], AUGUST);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      expect(byPlayer.has(LAMB)).toBe(false);
+    });
+
+    it("is a no-op on a second run of the same board", async () => {
+      expect(await storeReasons([entry({ reasons: [AVAILABILITY, LAW] })], AUGUST)).toBe(2);
+      expect(await storeReasons([entry({ reasons: [AVAILABILITY, LAW] })], AUGUST)).toBe(0);
+    });
+
+    /**
+     * A DROP, NEVER A THROW — a variant retired since the row was written, or a row this store
+     * never wrote at all. `console.warn` names the count so the drop is visible.
+     */
+    it("drops a row with an unrecognised reason code, warning with a count, rather than throwing", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      await recordPreseasonBoardReasons(db, [
+        { season: 2024, source: BOARD_SOURCE, playerId: CHASE, code: "retired_variant", payload: { anything: true } },
+      ]);
+      await storeReasons([entry({ reasons: [AVAILABILITY] })], AUGUST);
+
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+
+      expect(byPlayer.get(CHASE)).toEqual([AVAILABILITY]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toContain("1 row");
+      warn.mockRestore();
+    });
+
+    it("does not hand one board's reasons to a reader asking for another season or another board", async () => {
+      await storeReasons([entry({ reasons: [AVAILABILITY] })], AUGUST);
+      expect((await boardReasons(db, BOARD_SOURCE, 2023)).size).toBe(0);
+      expect((await boardReasons(db, "some_other_board", 2024)).size).toBe(0);
+    });
   });
 });

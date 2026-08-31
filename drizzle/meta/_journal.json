@@ -414,6 +414,13 @@
       "when": 1788137560272,
       "tag": "0058_noisy_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788199496442,
+      "tag": "0059_ambitious_wasp",
+      "breakpoints": true
     }
   ]
 }

@@ -323,14 +323,23 @@ function tdShareThresholds(scoring: ReadonlyMap<string, SeasonScoring>, position
   return new Map([...sharesByPosition].map(([position, shares]) => [position, TD_REGRESSION_MULTIPLIER * median(shares)]));
 }
 
-interface SeasonFacts {
+/** One player's law-condition inputs for one season, alongside the position and per-game scoring
+ *  that pinned them. Exported so a live caller (a preseason board assembling `BoardCandidate`s, not
+ *  just `buildPopulations`'s backtest) can ask the same question `lawReasonsFor` answers with. */
+export interface SeasonFacts {
   readonly position: Position;
   readonly pointsPerGame: number;
   readonly facts: LawConditionFacts;
 }
 
-/** Every antecedent quantity, for every player active in season N, at N+1's schedule-publication gate. */
-async function factsForSeason(
+/**
+ * Every antecedent quantity, for every player active in season N, at N+1's schedule-publication
+ * gate. Exported for two callers now: `buildPopulations`, which calls this once per season across
+ * every law in one pass, and `source.ts`'s `loadPreseason`, which calls it ONCE for the completed
+ * season immediately before the board's own season — the exact "season N" a board for season N+1
+ * needs — so a live board's law reasons and this module's own measurement read the identical gate.
+ */
+export async function factsForSeason(
   db: ReadonlyDb, season: number, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
 ): Promise<Map<string, SeasonFacts>> {
   const asOf = schedulePublishedAsOf(season + 1);
@@ -429,6 +438,16 @@ const LAW_ENTRIES: readonly LawEntry[] = [
     condition: tdRegressionCondition,
   },
 ];
+
+/**
+ * EVERY LAW'S CONDITION PREDICATE, KEYED BY ID — the one place a caller outside this module (Task
+ * 7's `lawReasonsFor`, in `laws/board-reasons.ts`) reaches for "does this law's antecedent hold for
+ * him", so a live board and this module's own `buildPopulations` measurement can never drift apart
+ * by each re-deriving the same condition differently. Built from `LAW_ENTRIES`, never hand-listed.
+ */
+export const LAW_CONDITIONS: ReadonlyMap<string, (facts: LawConditionFacts) => boolean | null> = new Map(
+  LAW_ENTRIES.map((entry) => [entry.id, entry.condition] as const),
+);
 
 /**
  * THE DETERMINISM ANCHOR — the one place every law's population is put into a canonical order

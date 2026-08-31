@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
-import { preseasonProjections } from "@/db/schema";
-import type { BoardEntry } from "./board";
+import { preseasonBoardReasons, preseasonProjections } from "@/db/schema";
+import type { JsonObject } from "@/domain/audit";
+import type { BoardEntry, BoardReason } from "./board";
 
 /**
  * WHERE THE BOARD LANDS — the first writer in this repository that stores a number the model
@@ -65,12 +66,12 @@ export interface BoardStamp {
 /**
  * A board turned into rows, with every number the entry carried and nothing derived here.
  *
- * `reasons` and `seasonLine` are DELIBERATELY NOT STORED yet, and the omission is stated rather
- * than quietly taken: both are real product material — layer 7 says the diagnostic and the
- * explanation are the same artifact — and both are a shape (a discriminated union, a fourteen-field
- * line) that wants its own table rather than a jsonb column nobody can query. The surface this
- * lands for shows a rank. Storing what it needs and saying what is missing is the honest half of
- * the job; storing a blob against a screen that does not exist is the dishonest one.
+ * `reasons` IS NOW STORED (Task 7, `reasonRows`/`preseasonBoardReasons` below) — the omission this
+ * docblock used to state was deliberate and temporary, and Task 7 is that "temporary" arriving:
+ * layer 7 says the diagnostic and the explanation are the same artifact, and a rank with no reason
+ * beside it is half the product. `seasonLine` stays out; it is a fourteen-field line rather than a
+ * short discriminated union, and no surface reads it yet — the same "store what a screen needs,
+ * say what is missing" discipline, just not yet due for that field.
  */
 export function projectionRows(board: readonly BoardEntry[], stamp: BoardStamp): readonly PreseasonProjectionRow[] {
   return board.map((entry) => ({
@@ -89,6 +90,42 @@ export function projectionRows(board: readonly BoardEntry[], stamp: BoardStamp):
     tier: entry.tier,
     asOf: stamp.asOf,
   }));
+}
+
+/** One `BoardReason` turned into a row: `code` is the union's own tag, `payload` is every other
+ *  field of that variant, verbatim — see `preseasonBoardReasons`'s own docblock for why there is no
+ *  `asOf` here, unlike `PreseasonProjectionRow`. */
+export interface PreseasonBoardReasonRow {
+  readonly season: number;
+  readonly source: string;
+  readonly playerId: string;
+  readonly code: string;
+  readonly payload: JsonObject;
+}
+
+/**
+ * Every reason on a board, turned into rows — one row per `(player, reason)` pair, `code` and
+ * `payload` split exactly as `preseasonBoardReasons` stores them.
+ *
+ * A KNOWN, ACCEPTED GAP: the table's PK is `(source, season, playerId, code)`, with no field naming
+ * WHICH reason of a repeated code a row is. Every code today's board ever emits more than once for
+ * the same player is `"law"` (`laws/board-reasons.ts`'s `lawReasonsFor` can return one reason per
+ * CONFIRMED law, and a player can satisfy more than one law's condition at once) — `recordPreseason
+ * BoardReasons`' `onConflictDoNothing` keeps whichever of those rows the batch inserts first and
+ * silently drops the rest, rather than erroring. A player who trips two confirmed laws at once is
+ * true today (`target_share_persistence` and `wr_target_competition` can both hold for the same
+ * receiver) and stored reasons for him are known to be incomplete until a future migration keys
+ * `"law"` rows on `lawId` too.
+ */
+export function reasonRows(board: readonly BoardEntry[], stamp: BoardStamp): readonly PreseasonBoardReasonRow[] {
+  const rows: PreseasonBoardReasonRow[] = [];
+  for (const entry of board) {
+    for (const reason of entry.reasons) {
+      const { code, ...payload } = reason;
+      rows.push({ season: stamp.season, source: stamp.source, playerId: entry.playerId, code, payload: payload as JsonObject });
+    }
+  }
+  return rows;
 }
 
 const INSERT_CHUNK_ROWS = 2_000;
@@ -110,6 +147,30 @@ export async function recordPreseasonProjections(db: Db, rows: readonly Preseaso
       .values(chunk)
       .onConflictDoNothing()
       .returning({ id: preseasonProjections.id });
+    written += inserted.length;
+  }
+  return written;
+}
+
+/**
+ * Writes a board's reasons, idempotently, returning how many rows were ACTUALLY new.
+ *
+ * `onConflictDoNothing` here is doing double duty. Across two runs it is the same idempotency
+ * `recordPreseasonProjections` wants: a rerun of an unchanged board writes nothing new. WITHIN one
+ * run it is what keeps `reasonRows`' known PK gap (see its own docblock) from ever throwing — two
+ * rows in the same batch sharing a `(source, season, playerId, code)` skip rather than collide,
+ * because `DO NOTHING` never attempts to touch a row it has already resolved once, unlike
+ * `DO UPDATE`, which errors on being asked to affect the same row twice in one statement.
+ */
+export async function recordPreseasonBoardReasons(db: Db, rows: readonly PreseasonBoardReasonRow[]): Promise<number> {
+  let written = 0;
+  for (let start = 0; start < rows.length; start += INSERT_CHUNK_ROWS) {
+    const chunk = rows.slice(start, start + INSERT_CHUNK_ROWS).map((row) => ({ ...row }));
+    const inserted = await db
+      .insert(preseasonBoardReasons)
+      .values(chunk)
+      .onConflictDoNothing()
+      .returning({ code: preseasonBoardReasons.code });
     written += inserted.length;
   }
   return written;
@@ -181,4 +242,75 @@ export async function preseasonProjectionsFor(
       ),
     )
     .orderBy(asc(preseasonProjections.playerId), desc(preseasonProjections.asOf));
+}
+
+/** Every `BoardReason` tag this reader knows how to reconstruct — hand-paired with the union in
+ *  `board.ts`, the same literal-and-type pairing this engine keeps everywhere a runtime list stands
+ *  in for a type TypeScript itself erases (`populations.ts`'s `SKILL_POSITIONS`, for one). */
+const KNOWN_REASON_CODES: ReadonlySet<BoardReason["code"]> = new Set([
+  "availability",
+  "offseason_share_gained",
+  "offseason_share_lost",
+  "changed_team",
+  "new_play_caller",
+  "rookie",
+  "scarcity",
+  "tier_cliff",
+  "law",
+]);
+
+function isKnownReasonCode(code: string): code is BoardReason["code"] {
+  return KNOWN_REASON_CODES.has(code as BoardReason["code"]);
+}
+
+/**
+ * One stored row, reconstructed into the exact `BoardReason` it was written from — `reasonRows`
+ * split a reason into `code` (the tag) and `payload` (everything else); this puts them back
+ * together. Trusted rather than re-validated field by field, because every row here was written by
+ * `reasonRows` from a real `BoardReason` — nothing hand-edits this table the way `measured.json` can
+ * be hand-edited, so this is not the boundary `registry.ts`'s `parseMeasuredJson` is.
+ */
+function reasonFromRow(code: string, payload: JsonObject): BoardReason | undefined {
+  if (!isKnownReasonCode(code)) return undefined;
+  return { code, ...payload } as BoardReason;
+}
+
+/**
+ * Every reason a board stored for a season, keyed by player.
+ *
+ * A stored row whose `code` this reader does not recognise — a variant retired since the row was
+ * written, or a hand-edited table — is DROPPED rather than thrown: an explanation surface losing one
+ * reason is a smaller failure than a whole board request failing. `console.warn` names how many were
+ * dropped, once, after the whole read, so the drop is visible rather than silent.
+ */
+export async function boardReasons(
+  db: ReadonlyDb,
+  source: string,
+  season: number,
+): Promise<ReadonlyMap<string, readonly BoardReason[]>> {
+  const rows = await db
+    .select({
+      playerId: preseasonBoardReasons.playerId,
+      code: preseasonBoardReasons.code,
+      payload: preseasonBoardReasons.payload,
+    })
+    .from(preseasonBoardReasons)
+    .where(and(eq(preseasonBoardReasons.source, source), eq(preseasonBoardReasons.season, season)));
+
+  const out = new Map<string, BoardReason[]>();
+  let dropped = 0;
+  for (const row of rows) {
+    const reason = reasonFromRow(row.code, row.payload);
+    if (reason === undefined) {
+      dropped += 1;
+      continue;
+    }
+    const list = out.get(row.playerId);
+    if (list === undefined) out.set(row.playerId, [reason]);
+    else list.push(reason);
+  }
+  if (dropped > 0) {
+    console.warn(`boardReasons: dropped ${dropped} row(s) with an unrecognised reason code for source "${source}", season ${season}.`);
+  }
+  return out;
 }
