@@ -18,6 +18,11 @@ describe("parsePlayCallers", () => {
   it("throws with the line number on a non-numeric week", () => {
     expect(() => parsePlayCallers(row("2024,DET,Ben Johnson,OC,one,18,wikipedia,"))).toThrow(/line 2/);
   });
+  it("parses a CRLF-saved CSV identically to an LF one", () => {
+    const lf = row("2024,DET,Ben Johnson,OC,1,18,both,see note");
+    const crlf = lf.replace(/\n/g, "\r\n");
+    expect(parsePlayCallers(crlf)).toEqual(parsePlayCallers(lf));
+  });
 });
 
 describe("validatePlayCallers", () => {
@@ -40,6 +45,16 @@ describe("validatePlayCallers", () => {
     const problems = validatePlayCallers(rows, [2024], teams, finalWeek).join(" ");
     expect(problems).toContain("DET 2024");
     expect(problems).toContain("KC 2024");
+  });
+  it("names a row whose start_week is after its end_week", () => {
+    const rows = parsePlayCallers(row("2024,DET,Ben Johnson,OC,10,3,wikipedia,"));
+    const problems = validatePlayCallers(rows, [2024], teams, finalWeek);
+    expect(problems).toContain("DET 2024: start_week 10 is after end_week 3.");
+  });
+  it("names a row with an empty name", () => {
+    const rows = parsePlayCallers(row("2024,DET,,OC,1,18,wikipedia,"));
+    const problems = validatePlayCallers(rows, [2024], teams, finalWeek);
+    expect(problems).toContain("DET 2024: empty name for weeks 1-18.");
   });
 });
 

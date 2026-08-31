@@ -51,7 +51,10 @@ function parseWeek(raw: string, line: number, column: string): number {
  * `note` that needed one would be a `note` the validator should reject on other grounds anyway.
  */
 export function parsePlayCallers(csv: string): readonly PlayCallerRow[] {
-  const lines = csv.split("\n");
+  // A CRLF-saved CSV (the common case for a file edited on Windows or exported from Excel) would
+  // otherwise leave a trailing "\r" on every field but the last, corrupting `note` — the only column
+  // free-text enough for the mangling to hide silently instead of tripping the column-count check.
+  const lines = csv.split(/\r?\n/);
   const rows: PlayCallerRow[] = [];
   for (let i = 1; i < lines.length; i += 1) {
     const raw = lines[i]!;
