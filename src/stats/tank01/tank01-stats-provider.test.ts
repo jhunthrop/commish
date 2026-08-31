@@ -81,7 +81,7 @@ describe("Tank01StatsProvider", () => {
       throw new Error(`unexpected request to ${url.pathname}`);
     };
     const subject = createTank01StatsProvider({ apiKey: "test-key", fetch: fetchStub, season: 2026 });
-    const game = { gameId: "20260913_SF@SEA", week: 1, status: "final" as const, homeNflTeam: "SEA", awayNflTeam: "SF" };
+    const game = { gameId: "20260913_SF@SEA", week: 1, status: "final" as const, homeNflTeam: "SEA", awayNflTeam: "SF", gameDate: "20260913", kickoffEt: "4:05p" };
     const lines = await subject.getGameStatLines(game);
     expect(lines.map((line) => line.playerId).sort()).toEqual(["1", "2"]);
   });

@@ -32,7 +32,7 @@ describe("fakeStatsProvider", () => {
   });
 
   it("getGameStatLines answers a scripted game's lines, or an empty list for an unknown game", async () => {
-    const game = { gameId: "g1", week: 1, status: "final" as const, homeNflTeam: "SF", awayNflTeam: "SEA" };
+    const game = { gameId: "g1", week: 1, status: "final" as const, homeNflTeam: "SF", awayNflTeam: "SEA", gameDate: "", kickoffEt: "" };
     const provider = fakeStatsProvider({ games: { 1: [{ ...game, lines: [LINE] }] } });
 
     await expect(provider.getGameStatLines(game)).resolves.toEqual([LINE]);

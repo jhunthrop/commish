@@ -9,9 +9,9 @@ import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
 
 /** Server rank order (wins, then points for, then team id) — never re-derived in a test. */
 export const STANDINGS: readonly TeamStandingsRow[] = [
-  { teamId: "t1", teamName: "Bay Bandits", wins: 9, losses: 4, ties: 0, pointsFor: 1412.5, pointsAgainst: 1200, clinched: true, ownerDisplayName: "Alex Rivera", ownerAvatar: null, rank: 1, previousRank: 2 },
-  { teamId: "t2", teamName: "Iron Owls", wins: 7, losses: 6, ties: 0, pointsFor: 1300, pointsAgainst: 1500, clinched: false, ownerDisplayName: "Jordan Lee", ownerAvatar: null, rank: 2, previousRank: 1 },
-  { teamId: "t3", teamName: "Comet Crew", wins: 5, losses: 8, ties: 0, pointsFor: 1100, pointsAgainst: 1350, clinched: false, ownerDisplayName: "Sam Patel", ownerAvatar: null, rank: 3, previousRank: 3 },
+  { teamId: "t1", teamName: "Bay Bandits", wins: 9, losses: 4, ties: 0, pointsFor: 1412.5, pointsAgainst: 1200, clinched: true, ownerDisplayName: "Alex Rivera", ownerAvatar: null, rank: 1, previousRank: 2, streak: "W3" },
+  { teamId: "t2", teamName: "Iron Owls", wins: 7, losses: 6, ties: 0, pointsFor: 1300, pointsAgainst: 1500, clinched: false, ownerDisplayName: "Jordan Lee", ownerAvatar: null, rank: 2, previousRank: 1, streak: "L1" },
+  { teamId: "t3", teamName: "Comet Crew", wins: 5, losses: 8, ties: 0, pointsFor: 1100, pointsAgainst: 1350, clinched: false, ownerDisplayName: "Sam Patel", ownerAvatar: null, rank: 3, previousRank: 3, streak: "L2" },
 ];
 
 /** Every row clinched, as `clinchedTeamIds` degenerately reports for `playoffTeams >= teamCount`. */

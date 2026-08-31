@@ -33,6 +33,12 @@ const SETTINGS_A: ScoringSettings = {
   pointsPerSack: 1,
   pointsPerDefensiveInterception: 2,
   pointsPerDefensiveTouchdown: 6,
+  pointsPerTwoPointConversion: 2,
+  pointsPerFieldGoalMissed: -1,
+  pointsPerExtraPointMissed: -1,
+  pointsPerReturnTouchdown: 6,
+  pointsPerDefensiveFumbleRecovery: 2,
+  pointsPerSafety: 2,
 };
 
 const SETTINGS_B: ScoringSettings = { ...SETTINGS_A, leagueId: LEAGUE_B, pointsPerReception: 0.5 };

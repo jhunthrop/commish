@@ -172,6 +172,7 @@ describe("toTradeProposal", () => {
     status: "open",
     proposedAt: new Date("2026-08-01T00:00:00.000Z"),
     expiresAt: new Date("2026-08-04T00:00:00.000Z"),
+    reviewEndsAt: null,
     settledAt: null,
     settledByUserId: null,
     reversedAt: null,

@@ -370,7 +370,7 @@ describe("createIngestionWorker", () => {
     const provider = fakeStatsProvider(script);
     vi.spyOn(provider, "listGames").mockImplementation(async (week: number) => {
       if (week === 1) throw new Error("simulated upstream failure for week 1");
-      return script.games[week]?.map(({ gameId, week: w, status, homeNflTeam, awayNflTeam }) => ({ gameId, week: w, status, homeNflTeam, awayNflTeam })) ?? [];
+      return script.games[week]?.map(({ gameId, week: w, status, homeNflTeam, awayNflTeam }) => ({ gameId, week: w, status, homeNflTeam, awayNflTeam, gameDate: "", kickoffEt: "" })) ?? [];
     });
     const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
 

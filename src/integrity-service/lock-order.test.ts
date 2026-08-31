@@ -1187,18 +1187,24 @@ describe("acceptTrade's notice order", () => {
       expiresAt,
     });
 
+    // Trade governance (roadmap item 5): the YES parks the offer `under_review` and writes no
+    // notices — the `trade_executed` inserts this proof is about moved to the FINALIZE re-entry,
+    // so THAT is the transaction driven against the parked join.
+    const accepted = await acceptTrade(pickDb, { tradeId: "trade_an_1", leagueId: "lg_accept_lock", userId: "u_an_bob", clock, deliver: async () => {} });
+    if (!accepted.ok) throw new Error(accepted.reason);
+
     const join = parkedJoin("lg_accept_lock", "u_an_joiner", "team_an_joiner");
     await join.leagueLocked;
 
-    // T_accept: the real acceptTrade, on its own connection, reaching for the SAME league row
-    // through its notice inserts (leagues FOR KEY SHARE) before it reaches the league anchor.
-    const accepting = acceptTrade(pickDb, { tradeId: "trade_an_1", leagueId: "lg_accept_lock", userId: "u_an_bob", clock, deliver: async () => {} });
+    // T_finalize: the real acceptTrade re-entry, on its own connection, reaching for the SAME
+    // league row through its notice inserts (leagues FOR KEY SHARE) before the league anchor.
+    const accepting = acceptTrade(pickDb, { tradeId: "trade_an_1", leagueId: "lg_accept_lock", userId: "u_an_bob", clock, finalizeReview: true, deliver: async () => {} });
 
     expect(await waitForBlockedBackend()).toBe(true);
     join.release();
 
     expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
-    expect(await accepting).toMatchObject({ ok: true });
+    expect(await accepting).toMatchObject({ ok: true, outcome: "executed" });
 
     // Both transactions really did land on the SAME league chain: the join's member_joined, and
     // the acceptance's trade_accepted + roster_move, one batch.
@@ -1291,8 +1297,16 @@ describe("acceptTrade's team-lock order — the mirror-accept deadlock proof", (
       expiresAt,
     });
 
-    // The bystander: holds the ONE row both mirror accepts must reach for first, so releasing it
-    // only once BOTH are genuinely blocked behind it is a real proof of convergence, not a
+    // Trade governance (roadmap item 5): both YESes park their offers `under_review` first —
+    // the roster-moving transaction is now the FINALIZE re-entry, which takes the identical
+    // sorted team locks, so that is the pair raced behind the bystander below.
+    const accepted1 = await acceptTrade(pickDb, { tradeId: "trade_mirror_1", leagueId: "lg_mirror_lock", userId: "u_mirror_bob", clock, deliver: async () => {} });
+    if (!accepted1.ok) throw new Error(accepted1.reason);
+    const accepted2 = await acceptTrade(resolveDb, { tradeId: "trade_mirror_2", leagueId: "lg_mirror_lock", userId: "u_mirror_alice", clock, deliver: async () => {} });
+    if (!accepted2.ok) throw new Error(accepted2.reason);
+
+    // The bystander: holds the ONE row both mirror finalizes must reach for first, so releasing
+    // it only once BOTH are genuinely blocked behind it is a real proof of convergence, not a
     // fixture that happens not to collide.
     let holdsFirstTeamLock: () => void = () => {};
     const firstTeamLocked = new Promise<void>((resolve) => (holdsFirstTeamLock = resolve));
@@ -1305,10 +1319,10 @@ describe("acceptTrade's team-lock order — the mirror-accept deadlock proof", (
     });
     await firstTeamLocked;
 
-    // T_accept1 and T_accept2: the real `acceptTrade`, twice, on TWO separate connections —
-    // one mirror trade each, both reaching for `team_mirror_a` first.
-    const accepting1 = acceptTrade(pickDb, { tradeId: "trade_mirror_1", leagueId: "lg_mirror_lock", userId: "u_mirror_bob", clock, deliver: async () => {} });
-    const accepting2 = acceptTrade(resolveDb, { tradeId: "trade_mirror_2", leagueId: "lg_mirror_lock", userId: "u_mirror_alice", clock, deliver: async () => {} });
+    // T_finalize1 and T_finalize2: the real `acceptTrade` finalize re-entry, twice, on TWO
+    // separate connections — one mirror trade each, both reaching for `team_mirror_a` first.
+    const accepting1 = acceptTrade(pickDb, { tradeId: "trade_mirror_1", leagueId: "lg_mirror_lock", userId: "u_mirror_bob", clock, finalizeReview: true, deliver: async () => {} });
+    const accepting2 = acceptTrade(resolveDb, { tradeId: "trade_mirror_2", leagueId: "lg_mirror_lock", userId: "u_mirror_alice", clock, finalizeReview: true, deliver: async () => {} });
 
     expect(await waitForBlockedBackend()).toBe(true);
     releaseFirstTeamLock();
@@ -1377,6 +1391,9 @@ describe("reverseTradeInTx's week lock", () => {
     if (!proposed.ok) throw new Error(proposed.reason);
     const accepted = await acceptTrade(pickDb, { tradeId: proposed.tradeId, leagueId: "lg_rv_wk", userId: "u_rv_wk_bob", clock, deliver: async () => {} });
     if (!accepted.ok) throw new Error(accepted.reason);
+    // Trade governance: the yes parks `under_review`; the finalize re-entry is what moves rosters.
+    const finalized = await acceptTrade(pickDb, { tradeId: proposed.tradeId, leagueId: "lg_rv_wk", userId: "u_rv_wk_bob", clock, finalizeReview: true, deliver: async () => {} });
+    if (!finalized.ok) throw new Error(finalized.reason);
     const flag = await joinDb.transaction((tx) =>
       raiseFlag(tx, {
         flagType: "trade_fairness",
@@ -1460,6 +1477,9 @@ describe("reverseTradeInTx's team-lock order — racing a fresh accept between t
     if (!firstTrade.ok) throw new Error(firstTrade.reason);
     const firstAccepted = await acceptTrade(pickDb, { tradeId: firstTrade.tradeId, leagueId: "lg_rv_tl", userId: "u_rv_tl_bob", clock, deliver: async () => {} });
     if (!firstAccepted.ok) throw new Error(firstAccepted.reason);
+    // Trade governance: the yes parks `under_review`; the finalize re-entry is what moves rosters.
+    const firstFinalized = await acceptTrade(pickDb, { tradeId: firstTrade.tradeId, leagueId: "lg_rv_tl", userId: "u_rv_tl_bob", clock, finalizeReview: true, deliver: async () => {} });
+    if (!firstFinalized.ok) throw new Error(firstFinalized.reason);
     const flag = await joinDb.transaction((tx) =>
       raiseFlag(tx, {
         flagType: "trade_fairness",
@@ -1485,6 +1505,11 @@ describe("reverseTradeInTx's team-lock order — racing a fresh accept between t
       deliver: async () => {},
     });
     if (!secondTrade.ok) throw new Error(secondTrade.reason);
+    // Trade governance: the second trade's yes lands first (`under_review`) — its FINALIZE
+    // re-entry, the roster-moving transaction with the sorted team locks, is what races the
+    // reversal below.
+    const secondUnderReview = await acceptTrade(pickDb, { tradeId: secondTrade.tradeId, leagueId: "lg_rv_tl", userId: "u_rv_tl_alice", clock, deliver: async () => {} });
+    if (!secondUnderReview.ok) throw new Error(secondUnderReview.reason);
 
     // The bystander: holds the ONE row both operations must reach for first.
     let holdsFirstTeamLock: () => void = () => {};
@@ -1501,7 +1526,7 @@ describe("reverseTradeInTx's team-lock order — racing a fresh accept between t
     const reversing = resolveDb.transaction((tx) =>
       reverseTradeInTx(tx, { tradeId: firstTrade.tradeId, leagueId: "lg_rv_tl", flagId: flag.id, operatorUserId: "u_op_rv_tl", note: "n", clock }),
     );
-    const accepting = acceptTrade(pickDb, { tradeId: secondTrade.tradeId, leagueId: "lg_rv_tl", userId: "u_rv_tl_alice", clock, deliver: async () => {} });
+    const accepting = acceptTrade(pickDb, { tradeId: secondTrade.tradeId, leagueId: "lg_rv_tl", userId: "u_rv_tl_alice", clock, finalizeReview: true, deliver: async () => {} });
 
     expect(await waitForBlockedBackend()).toBe(true);
     releaseFirstTeamLock();
@@ -1800,16 +1825,22 @@ describe("raiseTradeFairnessFlag's after-commit position", () => {
     });
     if (!proposed.ok) throw new Error(proposed.reason);
 
+    // Trade governance (roadmap item 5): the yes parks `under_review`, and the after-commit
+    // fairness flag belongs to EXECUTION — the finalize re-entry is the transaction pair (league
+    // chain, then the platform-chain flag) this proof drives against the parked join.
+    const accepted = await acceptTrade(resolveDb, { tradeId: proposed.tradeId, leagueId: "lg_fair_lock", userId: "u_fl_bob", clock, deliver: async () => {} });
+    if (!accepted.ok) throw new Error(accepted.reason);
+
     const join = parkedJoin("lg_fair_lock", "u_fl_joiner", "team_fl_joiner");
     await join.leagueLocked;
 
-    const accepting = acceptTrade(resolveDb, { tradeId: proposed.tradeId, leagueId: "lg_fair_lock", userId: "u_fl_bob", clock, deliver: async () => {} });
+    const accepting = acceptTrade(resolveDb, { tradeId: proposed.tradeId, leagueId: "lg_fair_lock", userId: "u_fl_bob", clock, finalizeReview: true, deliver: async () => {} });
 
     expect(await waitForBlockedBackend()).toBe(true);
     join.release();
 
     expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
-    expect(await accepting).toMatchObject({ ok: true, fairness: { flagWorthy: true } });
+    expect(await accepting).toMatchObject({ ok: true, outcome: "executed", fairness: { flagWorthy: true } });
 
     // The after-commit flag really landed, on the PLATFORM chain, beside a league chain that
     // carries the join and the acceptance and nothing about the flag.
@@ -2137,6 +2168,9 @@ describe("resolveFlag's trade_reversed branch — two transactions, two chains",
     if (!proposed.ok) throw new Error(proposed.reason);
     const accepted = await acceptTrade(pickDb, { tradeId: proposed.tradeId, leagueId: "lg_rv_res", userId: "u_rvr_bob", clock, deliver: async () => {} });
     if (!accepted.ok) throw new Error(accepted.reason);
+    // Trade governance: the yes parks `under_review`; the finalize re-entry is what moves rosters.
+    const finalized = await acceptTrade(pickDb, { tradeId: proposed.tradeId, leagueId: "lg_rv_res", userId: "u_rvr_bob", clock, finalizeReview: true, deliver: async () => {} });
+    if (!finalized.ok) throw new Error(finalized.reason);
     const flag = await joinDb.transaction((tx) =>
       raiseFlag(tx, {
         flagType: "trade_fairness",
