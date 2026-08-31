@@ -9,6 +9,7 @@ import { recordPreseasonRosters } from "./store";
 import { recordTeamObservations } from "../team-store";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { FITTED_MODEL } from "../model/source";
+import type { Law } from "../laws/types";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -286,5 +287,83 @@ describe("preseasonCandidates", () => {
     ]);
     const candidates = preseasonCandidates(await loadPreseason(db, 2024), ALL_PRESEASON_FEATURES, PRIORS);
     expect(candidates.map((candidate) => candidate.playerId)).not.toContain(VETERAN);
+  });
+});
+
+/**
+ * Fix round (IMPORTANT 2) — THE WHOLE WIRING SEAM, END TO END: `loadPreseason`'s `factsForSeason`
+ * call → `PreseasonInputs.lawFacts` → `preseasonCandidates`' `emit()` → `lawReasonsFor`. Every other
+ * `reasons` assertion in this file is a `.some()` check for an unrelated code and would not notice
+ * this path silently producing nothing.
+ *
+ * A FIXTURE REGISTRY, never `registry()` — the live `measured.json` — so this test's pass/fail can
+ * never move with a future re-measurement. `target_share_persistence`'s own condition is
+ * `targetShare >= 0.24` (`laws/populations.ts`), so this block seeds an EXTRA 2023 participation
+ * row for the veteran, 9 targets against 34 team targets every week (`9/34 ≈ 0.265`, comfortably
+ * over the line and an exact, hand-checkable number) — under `STAT_LINE_SOURCE`, matching
+ * `laws/populations.test.ts`'s own convention, because `factsForSeason`'s `seasonParticipation`
+ * (the shared predicate this seam is built on) reads participation gated by THAT source. The rest
+ * of this file's shared `playerWeek` fixture stamps its usage rows under
+ * `NFLVERSE_SOURCE.snapCounts` instead, for the model's own `usageAsOf` reader — a different
+ * consumer of the same kind of fact, gated by a different source, so it does not supply this one.
+ */
+describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", () => {
+  function fixtureLaw(overrides: Partial<Law> = {}): Law {
+    return {
+      id: "target_share_persistence",
+      position: "WR",
+      claim: "Fixture claim for target_share_persistence, independent of the real registry.",
+      measured: { effect: 1.8, ci: [1.2, 2.4], sample: 250, seasons: "fixture" },
+      verdict: "confirmed",
+      modelPath: null,
+      ...overrides,
+    };
+  }
+
+  beforeEach(async () => {
+    const rows: PlayerWeekObservation[] = [];
+    for (let week = 1; week <= 17; week += 1) {
+      rows.push(
+        observation({ season: 2023, week, playerId: VETERAN, asOf: PRIOR_SEASON_LANDED, source: STAT_LINE_SOURCE, metric: PARTICIPATION_METRICS.targets, value: 9 }),
+        observation({ season: 2023, week, playerId: VETERAN, asOf: PRIOR_SEASON_LANDED, source: STAT_LINE_SOURCE, metric: PARTICIPATION_METRICS.teamTargets, value: 34 }),
+      );
+    }
+    await recordObservations(db, rows);
+  });
+
+  it("attaches a \"law\" reason, carrying the FIXTURE registry's effect and the veteran's own target share as magnitude", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureLaw()]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+
+    const lawReasons = veteran.reasons.filter((reason) => reason.code === "law");
+    expect(lawReasons).toEqual([{ code: "law", lawId: "target_share_persistence", effect: 1.8, magnitude: 9 / 34 }]);
+  });
+
+  it("attaches no \"law\" reason when the fixture registry's matching law is not confirmed", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureLaw({ verdict: "weak" })]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+
+    expect(veteran.reasons.some((reason) => reason.code === "law")).toBe(false);
+  });
+
+  it("attaches no \"law\" reason for a player the registry's confirmed law does not apply to", async () => {
+    // The rookie has no 2023 usage at all (he did not exist in the league yet), so `lawFacts` has
+    // no entry for him and `target_share_persistence`'s condition is never even asked.
+    const inputs = await loadPreseason(db, 2024, [fixtureLaw()]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const rookie = candidates.find((candidate) => candidate.playerId === ROOKIE)!;
+
+    expect(rookie.reasons.some((reason) => reason.code === "law")).toBe(false);
+  });
+
+  it("defaults `loadPreseason`'s laws to the real registry() when none is passed", async () => {
+    // Not asserting on the real registry's CONTENT (which would couple this test to
+    // `measured.json`) — only that the default wiring runs end to end without throwing, matching
+    // every other `loadPreseason(db, 2024)` call site in this file.
+    const inputs = await loadPreseason(db, 2024);
+    expect(inputs.laws.length).toBeGreaterThan(0);
+    expect(() => preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS)).not.toThrow();
   });
 });

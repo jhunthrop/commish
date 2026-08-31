@@ -20,6 +20,8 @@ import { preseasonBoard } from "@/projections/preseason/board";
 import {
   BOARD_SOURCE,
   projectionRows,
+  reasonRows,
+  recordPreseasonBoardReasons,
   recordPreseasonProjections,
 } from "@/projections/preseason/board-store";
 import {
@@ -89,9 +91,15 @@ async function main(): Promise<void> {
     const rows = projectionRows(board, { season, source: BOARD_SOURCE, asOf: inputs.moment });
     const written = await recordPreseasonProjections(db, rows);
 
+    // THE REASON ROWS, mirroring the projection rows above exactly — same board, same stamp, the
+    // second writer this script has always needed and did not have until this fix round.
+    const reasons = reasonRows(board, { season, source: BOARD_SOURCE, asOf: inputs.moment });
+    const reasonsWritten = await recordPreseasonBoardReasons(db, reasons);
+
     console.log(
       `${season}  ${String(board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
-        `${String(written).padStart(4)} new rows (${rows.length - written} already stored)`,
+        `${String(written).padStart(4)} new rows (${rows.length - written} already stored)  ` +
+        `${String(reasonsWritten).padStart(4)} reason rows written`,
     );
     for (const entry of board.slice(0, 5)) {
       console.log(

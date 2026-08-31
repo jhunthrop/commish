@@ -176,12 +176,35 @@ describe("the preseason board store", () => {
       expect(stored).toEqual([LAW, LAW2]);
     });
 
-    /** Same `(player, law)` PK, written twice — one row, never two, never an error. */
-    it("upserts the same (player, law) reason written twice to one row", async () => {
+    /**
+     * Same `(player, law)` PK, written twice with IDENTICAL content — one row, never two, and the
+     * second write is a TRUE no-op (Postgres itself decides via `changedRowWhere`, not a count this
+     * function merely labels): the second call's `RETURNING` is empty because nothing about the
+     * stored row actually changed.
+     */
+    it("upserts the same (player, law) reason written twice with identical content to one row", async () => {
       expect(await storeReasons([entry({ reasons: [LAW] })], AUGUST)).toBe(1);
       expect(await storeReasons([entry({ reasons: [LAW] })], AUGUST)).toBe(0);
       const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
       expect(byPlayer.get(CHASE)).toEqual([LAW]);
+    });
+
+    /**
+     * Fix round (IMPORTANT 1) — the schema's own docblock promises a rerun REPLACES this table's
+     * opinion, which `onConflictDoNothing` never actually delivered: a refreshed `measured.json`
+     * moving a law's `effect`, or a player's magnitude moving with new facts, would have left the
+     * FIRST-written payload stored forever. `onConflictDoUpdate` fixes it — this is the case that
+     * proves it: the SAME `(player, lawId)` key, a genuinely different payload, and the read must
+     * come back with the NEW numbers, not the old ones.
+     */
+    it("replaces a stored reason's payload when a rerun writes CHANGED content for the same (player, law)", async () => {
+      // `asOf` plays no part in this table's identity (no `as_of` column — see its own docblock),
+      // so both writes are stamped identically; only the payload differs between them.
+      const REFIT: BoardReason = { code: "law", lawId: "target_share_persistence", effect: 2.6, magnitude: 0.4 };
+      expect(await storeReasons([entry({ reasons: [LAW] })], AUGUST)).toBe(1);
+      expect(await storeReasons([entry({ reasons: [REFIT] })], AUGUST)).toBe(1);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      expect(byPlayer.get(CHASE)).toEqual([REFIT]);
     });
 
     it("keys reasons by player, never mixing one man's reasons into another's", async () => {

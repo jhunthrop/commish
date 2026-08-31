@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { preseasonBoardReasons, preseasonProjections } from "@/db/schema";
+import { changedRowWhere, excludedSetFor } from "@/db/upsert";
 import type { JsonObject } from "@/domain/audit";
 import type { BoardEntry, BoardReason } from "./board";
 
@@ -162,14 +163,25 @@ export async function recordPreseasonProjections(db: Db, rows: readonly Preseaso
   return written;
 }
 
+/** `preseasonBoardReasons`'s conflict target — the whole PK, `detail` included — as JS property
+ *  names, the shape `excludedSetFor`/`changedRowWhere` (`@/db/upsert`) both key off. */
+const REASON_KEYS: readonly string[] = ["source", "season", "playerId", "code", "detail"];
+
 /**
- * Writes a board's reasons, idempotently, returning how many rows were ACTUALLY new.
+ * Writes a board's reasons, returning how many rows this call ACTUALLY WROTE — a fresh insert, or a
+ * replaced payload on a row that already existed.
  *
- * `onConflictDoNothing`, the same idempotency `recordPreseasonProjections` wants: a rerun of an
- * unchanged board — the same `(source, season, playerId, code, detail)` rows — writes nothing new
- * rather than erroring or duplicating. `detail` (`reasonRows`' own `reasonDetail`) is what makes
- * every row `reasonRows` can ever produce for one board distinct by PK, so unlike Task 7's original
- * shape this is no longer also standing in for a same-batch collision guard.
+ * `onConflictDoUpdate`, not `onConflictDoNothing` (fix round, superseding Task 7's original write):
+ * this table's own docblock promises a rerun REPLACES its opinion, and a payload can genuinely
+ * change between two runs of the "same" board — a refreshed `measured.json` moves a law's own
+ * `effect`, a player's own facts move his `magnitude` — so a writer that only skipped conflicting
+ * rows would leave a stale payload sitting under a row still claiming to be current.
+ *
+ * `changedRowWhere` (the SAME idiom `stats-pipeline/persist.ts` uses for exactly this reason, see
+ * its own docblock) is what keeps a rerun with an UNCHANGED payload a true no-op: Postgres itself
+ * decides, via `WHERE payload IS DISTINCT FROM excluded.payload`, so a row whose incoming payload
+ * matches what's stored is neither updated nor returned by `RETURNING` — the write genuinely did
+ * not happen, rather than merely being labelled a no-op after the fact.
  */
 export async function recordPreseasonBoardReasons(db: Db, rows: readonly PreseasonBoardReasonRow[]): Promise<number> {
   let written = 0;
@@ -178,7 +190,17 @@ export async function recordPreseasonBoardReasons(db: Db, rows: readonly Preseas
     const inserted = await db
       .insert(preseasonBoardReasons)
       .values(chunk)
-      .onConflictDoNothing()
+      .onConflictDoUpdate({
+        target: [
+          preseasonBoardReasons.source,
+          preseasonBoardReasons.season,
+          preseasonBoardReasons.playerId,
+          preseasonBoardReasons.code,
+          preseasonBoardReasons.detail,
+        ],
+        set: excludedSetFor(preseasonBoardReasons, REASON_KEYS),
+        where: changedRowWhere(preseasonBoardReasons, REASON_KEYS),
+      })
       .returning({ code: preseasonBoardReasons.code });
     written += inserted.length;
   }
