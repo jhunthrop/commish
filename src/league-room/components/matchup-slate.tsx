@@ -164,12 +164,12 @@ export function MatchupSlate({ detail, myTeamId, leagueId }: MatchupSlateProps) 
         ))}
       </ul>
 
-      {/* THE BENCHES (the veteran persona: "I judge a win by what didn't start"). Behind a
-          native disclosure because bench points are the week's counterfactual, not its result —
-          on request for the manager doing the post-mortem, invisible to everyone else. Muted
+      {/* THE BENCHES (the veteran persona: "I judge a win by what didn't start"). A native
+          disclosure, OPEN by default since the tab loop (2026-08-30, maximize the space): a
+          settled matchup's post-mortem IS the benches, and hiding them left a void. Muted
           throughout and NO winner emphasis: nobody wins a bench. */}
       {mine.bench.length === 0 && theirs.bench.length === 0 ? null : (
-        <details className="border-t border-line pt-2">
+        <details open className="border-t border-line pt-2">
           <summary className={`${MICRO_LABEL} cursor-pointer list-none text-text-faint hover:text-text-muted`}>
             Benches
           </summary>

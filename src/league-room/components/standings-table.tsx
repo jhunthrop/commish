@@ -71,6 +71,13 @@ function firstTeamOutId(rows: readonly TeamStandingsRow[], playoffTeams: number 
  * non-obvious fact ("records include each week's median game") stays in the footnote where it
  * always was.
  */
+/** Games back of the leader, in the sport's own half-game arithmetic; the leader prints a dash. */
+function gamesBack(row: TeamStandingsRow, leader: TeamStandingsRow | undefined): string {
+  if (leader === undefined || row.teamId === leader.teamId) return "\u2014";
+  const back = (leader.wins - row.wins + (row.losses - leader.losses)) / 2;
+  return back <= 0 ? "\u2014" : back % 1 === 0 ? String(back) : back.toFixed(1);
+}
+
 export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeams }: StandingsTableProps) {
   // NO SORT TABS (founder, 2026-08-30: "we have tabs for points for and points against but we
   // already show them"). Both columns are visible on every row — re-ordering a table the eye
@@ -147,6 +154,18 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
       header: "W-L-T",
       cell: (row) => <span className="font-display text-base font-bold tabular-nums text-text-primary">{formatRecord(row)}</span>,
     },
+    // The tab loop (2026-08-30, maximize the table): the two facts every incumbent's standings
+    // carry that ours did not. Both derived from settled results already in hand — no new read.
+    {
+      key: "streak",
+      header: "Streak",
+      cell: (row) => <span className="font-display tabular-nums text-text-muted">{row.streak ?? "\u2014"}</span>,
+    },
+    {
+      key: "gamesBack",
+      header: "GB",
+      cell: (row) => <span className="font-display tabular-nums text-text-muted">{gamesBack(row, rows[0])}</span>,
+    },
     // PLAIN, ON PURPOSE (the persona pass, 2026-08-30 — the veteran: "two different arrow
     // systems in adjacent columns", "a 2% spread painted like a blowout"). The heat map put
     // carets beside MOVE's arrows meaning something different, tinted near-identical
@@ -197,6 +216,48 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
           />
         }
       />
+      {/* THE PLAYOFF PICTURE (the tab loop, 2026-08-30): the bracket the CURRENT standings
+          imply, said honestly — "if the season ended today" is a real derivation of real
+          results, the exact panel every incumbent's standings page runs. Byes for the top two,
+          3v6 and 4v5, the shipped bracket's own shape. Hidden when the field is smaller than
+          the cut — nothing to bracket. */}
+      {rows.length > 6 ? (
+        <section aria-label="Playoff picture" className="flex flex-col gap-2 border-t border-line pt-4">
+          <div className="flex items-baseline gap-3">
+            <h3 className="font-display text-lg font-bold text-text-primary">Playoff picture</h3>
+            <span className="text-sm text-text-faint">if the season ended today</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="flex flex-col gap-1.5 rounded-md border border-line bg-surface-elevated px-3 py-2.5">
+              <span className="text-xs uppercase tracking-wide text-text-faint">First-round byes</span>
+              {[rows[0], rows[1]].map((row, index) =>
+                row === undefined ? null : (
+                  <span key={row.teamId} className="flex items-baseline gap-2 text-base text-text-primary">
+                    <span className="font-display font-bold tabular-nums text-text-muted">{index + 1}</span>
+                    <span className="truncate">{row.teamName}</span>
+                  </span>
+                ),
+              )}
+            </div>
+            {[
+              { label: "3 vs 6", pair: [rows[2], rows[5]] as const, seeds: [3, 6] as const },
+              { label: "4 vs 5", pair: [rows[3], rows[4]] as const, seeds: [4, 5] as const },
+            ].map((game) => (
+              <div key={game.label} className="flex flex-col gap-1.5 rounded-md border border-line bg-surface-elevated px-3 py-2.5">
+                <span className="text-xs uppercase tracking-wide text-text-faint">{game.label}</span>
+                {game.pair.map((row, index) =>
+                  row === undefined ? null : (
+                    <span key={row.teamId} className="flex items-baseline gap-2 text-base text-text-primary">
+                      <span className="font-display font-bold tabular-nums text-text-muted">{game.seeds[index]}</span>
+                      <span className="truncate">{row.teamName}</span>
+                    </span>
+                  ),
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {rows.length === 0 ? null : (
         // The rule the server ranks by, said out loud: nobody should have to guess how a
         // 7-7 logjam resolves. (Persona review: veterans want the tiebreak named.)

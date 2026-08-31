@@ -82,10 +82,13 @@ export default async function LeaguePage({ params, searchParams }: PageProps) {
     week === null || home.myTeamId === null
       ? null
       : week.matchups.find((m) => m.home.teamId === home.myTeamId || m.away.teamId === home.myTeamId) ?? null;
+  // The whole slate rides along for the Around-the-league strip — same read, zero extra cost.
+  const weekMatchups = week?.matchups ?? [];
 
   return (
     <LeagueHome
       myMatchupDetail={myMatchupDetail}
+      weekMatchups={weekMatchups}
       home={home}
       lineup={lineup}
       helpLevel={preferences.helpLevel}

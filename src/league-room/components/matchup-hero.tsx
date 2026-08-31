@@ -178,6 +178,7 @@ export function MatchupHero({ matchup, myTeamId, records }: MatchupHeroProps) {
   return (
     <div className="flex flex-col gap-3">
       <Scoreboard
+        decided={matchup.final === true}
         home={sideFor(homeTeamName, homeTeamId, homeScore, awayScore)}
         away={sideFor(awayTeamName, awayTeamId, awayScore, homeScore)}
         middle={

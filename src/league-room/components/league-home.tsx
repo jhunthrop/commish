@@ -18,6 +18,7 @@ import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupHero, type RecordsByTeamId } from "./matchup-hero";
 import { MatchupSlate } from "./matchup-slate";
+import { WeekSlateStrip } from "./week-slate-strip";
 import { PlayerPeekHost } from "./player-peek";
 import { ModerationSummary } from "./moderation-summary";
 import { StandingsTable } from "./standings-table";
@@ -163,6 +164,7 @@ export function LeagueHome({
   holdExpired = false,
   tab = "matchup",
   myMatchupDetail = null,
+  weekMatchups = [],
   fixturesByNflTeam,
   projectionsByPlayerId,
   /**
@@ -188,6 +190,9 @@ export function LeagueHome({
   readonly myMatchupDetail?: MatchupDetail | null;
   /** The week's real NFL schedule keyed by team (Tank01 via `nfl_games`), worded for the row —
    *  the team tab passes it so the editor can say "@ KC · Sun 4:05p" and BYE. */
+  /** Every matchup of the current week (the matchup tab's page passes them; other tabs pay
+   *  nothing) — the Around-the-league strip's slate. */
+  readonly weekMatchups?: readonly MatchupDetail[];
   readonly fixturesByNflTeam?: ReadonlyMap<string, FixtureLabel>;
   /** This week's PPR projections (harvested snapshot), for the team tab's Proj column. */
   readonly projectionsByPlayerId?: ReadonlyMap<string, number>;
@@ -378,6 +383,7 @@ export function LeagueHome({
                 and the slate says where they came from. Renders only when the page fetched the
                 detail, which is the matchup tab's own read. */}
             {myMatchupDetail === null ? null : <MatchupSlate detail={myMatchupDetail} myTeamId={home.myTeamId} leagueId={home.leagueId} />}
+            <WeekSlateStrip matchups={weekMatchups} myTeamId={home.myTeamId} leagueId={home.leagueId} />
           </Card>
         )}
         {/* Same visibility the retired "Score Week" button had: the commissioner's control is

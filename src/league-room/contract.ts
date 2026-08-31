@@ -174,6 +174,10 @@ export type InvitePreviewBody = LeagueTerms;
 /** One row of the standings table, ready to render: the pure math plus what the page shows. */
 export interface TeamStandingsRow extends StandingsRow {
   readonly teamName: string;
+  /** The current run, in the sport's own spelling ("W3", "L2"), or null before any settled
+   *  matchup. Head-to-head results only — a median league's phantom second game is a record
+   *  fact, not a streak fact (the tab loop, 2026-08-30). */
+  readonly streak: string | null;
   /**
    * This team's place in the league right now, 1-based — the server's own ranking, never
    * re-derived in React. The table renders it as the row's position numeral, and it stays fixed

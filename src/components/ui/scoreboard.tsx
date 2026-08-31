@@ -58,6 +58,8 @@ export interface ScoreboardProps {
    *  A slot rather than props, because the middle is where a matchup's own story goes and every
    *  week's is different. */
   readonly middle: ReactNode;
+  /** True once the fixture is settled — the winning side's verb becomes "Won". */
+  readonly decided?: boolean;
   readonly className?: string;
 }
 
@@ -94,12 +96,12 @@ type SideName = keyof typeof SIDE_ALIGN;
  * is not a population, so the winning side is marked by the figure itself, a "Leading"
  * micro-label and `data-winning` — every one of which survives a monochrome screen.
  */
-export function Scoreboard({ home, away, middle, className = "" }: ScoreboardProps) {
+export function Scoreboard({ home, away, middle, decided = false, className = "" }: ScoreboardProps) {
   return (
     <div className={`grid items-center gap-x-8 gap-y-5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] ${className}`}>
-      <Side side="home" {...home} />
+      <Side side="home" decided={decided} {...home} />
       <div className="min-w-0">{middle}</div>
-      <Side side="away" {...away} />
+      <Side side="away" decided={decided} {...away} />
     </div>
   );
 }
@@ -113,7 +115,7 @@ export function Scoreboard({ home, away, middle, className = "" }: ScoreboardPro
  * one fixture. `flex-row-reverse` on the away side is what mirrors it without a second markup
  * branch.
  */
-function Side({ side, name, record, score, projected, crest, winning, comparison, sub }: SideProps & { readonly side: SideName }) {
+function Side({ side, name, record, score, projected, crest, winning, comparison, sub, decided }: SideProps & { readonly side: SideName; readonly decided: boolean }) {
   return (
     <div
       data-winning={winning}
@@ -128,12 +130,16 @@ function Side({ side, name, record, score, projected, crest, winning, comparison
             {/* The lead, stated in words. Law 1 spends no pigment on it (see
                 `SideProps.comparison`), so this micro-label IS the channel rather than a
                 decoration beside a coloured number. */}
-            {winning ? <span className={`${MICRO_LABEL} text-text-primary`}>Leading</span> : null}
+            {/* The tab loop (founder, 2026-08-30): a settled game is not "Leading" — the verb
+                changes tense with the fixture. */}
+            {winning ? <span className={`${MICRO_LABEL} text-text-primary`}>{decided ? "Won" : "Leading"}</span> : null}
           </span>
           {sub === undefined ? null : <span className={`flex items-baseline gap-1.5 ${side === "home" ? "sm:justify-end" : ""}`}>{sub}</span>}
         </div>
       </div>
-      <div className="flex shrink-0 flex-col items-start sm:items-center">
+      {/* A settled loser's whole bug quiets (the tab loop, 2026-08-30) — the slate's own
+          winner-brighter grammar, applied to the hero: one emphasis, the side that won. */}
+      <div className={`flex shrink-0 flex-col items-start sm:items-center ${decided && !winning ? "opacity-60" : ""}`}>
         {/* The label stays visible: "Score" at 11px over 84px is law 2's pairing in so many
             words, and an 84px figure with no name on screen is what `Stat` exists to stop. */}
         <Stat label="Score" value={score} size="2xl" comparison={comparison} />

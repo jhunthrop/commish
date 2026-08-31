@@ -68,6 +68,26 @@ function previousRankByTeamId(input: {
  * dead fallback branch entirely rather than documenting why it exists; this function's OWN tests
  * already know the value (they choose it), so threading it through costs them nothing.
  */
+/** The current head-to-head run for one team: walk settled matchups newest-first and count
+ *  consecutive same-outcome results. Ties break a streak rather than extending either kind. */
+function streakFor(teamId: string, matchupRows: readonly { readonly weekNumber: number; readonly homeTeamId: string; readonly awayTeamId: string; readonly homeScore: number | null; readonly awayScore: number | null }[]): string | null {
+  const settled = matchupRows
+    .filter((row) => (row.homeTeamId === teamId || row.awayTeamId === teamId) && row.homeScore !== null && row.awayScore !== null)
+    .sort((a, b) => b.weekNumber - a.weekNumber);
+  let kind: "W" | "L" | null = null;
+  let length = 0;
+  for (const game of settled) {
+    const mine = game.homeTeamId === teamId ? game.homeScore! : game.awayScore!;
+    const theirs = game.homeTeamId === teamId ? game.awayScore! : game.homeScore!;
+    if (mine === theirs) break;
+    const result: "W" | "L" = mine > theirs ? "W" : "L";
+    if (kind === null) kind = result;
+    if (result !== kind) break;
+    length += 1;
+  }
+  return kind === null ? null : `${kind}${length}`;
+}
+
 export async function leagueStandings(
   db: Db,
   leagueId: string,
@@ -96,6 +116,7 @@ export async function leagueStandings(
     return {
       ...row,
       teamName: card.name,
+      streak: streakFor(row.teamId, matchupRows),
       ownerDisplayName: card.ownerDisplayName,
       ownerAvatar: card.ownerAvatarUrl,
       clinched: clinched.has(row.teamId),
