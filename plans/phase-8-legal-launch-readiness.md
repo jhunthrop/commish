@@ -74,3 +74,12 @@ paid product without a license. Before launch, exactly one of:
 2. Remove the Experts column from product surfaces (keep the internal benchmark for model
    evaluation only, or drop it entirely).
 Every other live source is clean: Tank01 is a paid licensed API; nflverse is openly licensed.
+
+Pro Football Reference (added 2026-08-31, founder ruling): the paid PFR/Stathead account feeds
+MODEL-INPUT facts only (coordinator histories, historical context) — internal use, never
+redistributed or displayed as PFR data. Founder accepts the ToS risk with the strict reading on
+record (SR's terms bar automated access regardless of subscription, and their commercial-use
+language is broader than redistribution). Discipline: interface + Stathead CSV exports at human
+request rates, never a crawler; `source` column on every ingested fact; Wikipedia/Wikidata
+(CC BY-SA, sanctioned API) maintained as cross-check and fallback so no model fact is PFR-only.
+Before launch, counsel reviews this entry alongside the FantasyPros one.
