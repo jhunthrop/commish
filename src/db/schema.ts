@@ -460,6 +460,9 @@ export const teams = pgTable(
       .notNull()
       .references(() => users.id),
     name: text("name").notNull(),
+    /** Waivers v1 (roadmap item 4): lower wins the tie for a waivered player; a successful award
+     *  moves the winner to last (max+1), never resets. 0 = never awarded, best claim. */
+    waiverPriority: integer("waiver_priority").notNull().default(0),
   },
   (t) => [
     index("teams_league_id_idx").on(t.leagueId),
@@ -562,6 +565,41 @@ export const scoringSettings = pgTable("scoring_settings", {
  * player is this row; every "is he on a roster here" read that feeds the free-agent pool must
  * check BOTH tables.
  */
+/**
+ * WAIVERS v1 (engine-gap roadmap item 4, 2026-08-30). A dropped player sits on waivers for a
+ * fixed window; claims filed during it are BIDS, resolved when the window closes — by waiver
+ * priority, winner moves to last. `league_waivers` is the window (one row per waivered player
+ * per league); `waiver_claims` are the bids. Processing is LAZY — `processWaivers` runs at the
+ * top of every pool read and claim, so a cleared window resolves on the next touch with no cron
+ * to fail silently.
+ */
+export const leagueWaivers = pgTable(
+  "league_waivers",
+  {
+    leagueId: text("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
+    playerId: text("player_id").notNull().references(() => players.id, { onDelete: "cascade" }),
+    until: timestamp("until", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.playerId] })],
+);
+
+export const waiverClaims = pgTable(
+  "waiver_claims",
+  {
+    id: text("id").primaryKey(),
+    leagueId: text("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
+    teamId: text("team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
+    addPlayerId: text("add_player_id").notNull().references(() => players.id, { onDelete: "cascade" }),
+    dropPlayerId: text("drop_player_id"),
+    status: text("status", { enum: ["pending", "won", "lost"] }).notNull().default("pending"),
+    /** Why a lost claim lost, in the words the loser reads ("Outbid by waiver priority", a refusal). */
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [index("waiver_claims_league_player_idx").on(t.leagueId, t.addPlayerId)],
+);
+
 export const injuredReserve = pgTable(
   "injured_reserve",
   {

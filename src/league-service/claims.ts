@@ -1,7 +1,7 @@
 import { and, asc, eq, ilike, notInArray, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { excludedSetFor } from "@/db/upsert";
-import { injuredReserve, drafts, leagues, lineupSlots, players, rosterSlots, statWeeks, teams } from "@/db/schema";
+import { leagueWaivers, waiverClaims, injuredReserve, drafts, leagues, lineupSlots, players, rosterSlots, statWeeks, teams } from "@/db/schema";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { assignSlot } from "@/draft-engine";
@@ -19,6 +19,9 @@ import { materializeLockedLineupsInTx, toFilledRosterSlots } from "./trade-trans
  *  remain the route for moving a player this valuable. */
 const UNDROPPABLE_ADP_CEILING = 120;
 
+/** Waivers v1: re-exported spelling of the window length lives in ./waivers. */
+import { WAIVER_PERIOD_HOURS } from "./waivers";
+
 export const CLAIM_REFUSALS = {
   leagueMissing: "That league does not exist.",
   notMember: "You do not have a team in this league.",
@@ -27,12 +30,16 @@ export const CLAIM_REFUSALS = {
   notFree: "Another manager holds that player. If you want him, propose a trade.",
   dropNotYours: "You can only drop a player from your own roster.",
   undroppable: "He is too valuable to drop. Trade him instead.",
+  alreadyFiled: "You already have a claim in for him. Waivers decide when the window closes.",
   rosterFull: "Your roster is full. Name a player to drop and the add and the drop happen together.",
   noRoom: "There is no legal slot for that player on your roster, even with the drop.",
 } as const;
 
 export interface FreeAgentRow {
   readonly id: string;
+  /** Waivers v1: when set, he is ON WAIVERS until this instant — a claim files rather than
+   *  executes, and the board says so. */
+  readonly onWaiversUntil?: string | null;
   readonly name: string;
   readonly position: Position;
   readonly nflTeam: string;
@@ -96,7 +103,14 @@ export async function freeAgents(db: Db, input: FreeAgentsInput): Promise<{ read
       .offset(offset),
     db.select({ total: sql<number>`count(*)::int` }).from(players).where(and(...conditions)),
   ]);
-  return { agents: rows, total: count?.total ?? 0 };
+  // Waivers v1: the window rides each row so the board can say "on waivers, clears at X" and
+  // wear Claim instead of Add. One indexed read for the league.
+  const windows = await db
+    .select({ playerId: leagueWaivers.playerId, until: leagueWaivers.until })
+    .from(leagueWaivers)
+    .where(eq(leagueWaivers.leagueId, input.leagueId));
+  const untilByPlayer = new Map(windows.map((row) => [row.playerId, row.until.toISOString()]));
+  return { agents: rows.map((row) => ({ ...row, onWaiversUntil: untilByPlayer.get(row.id) ?? null })), total: count?.total ?? 0 };
 }
 
 export interface ClaimInput {
@@ -110,10 +124,16 @@ export interface ClaimInput {
 export interface ClaimDeps {
   readonly clock: Clock;
   readonly audit?: AuditLogger;
+  /** Waivers v1 (roadmap item 4): the processor sets this when executing an AWARD — the
+   *  on-waivers gate below must not re-file the very claim it is resolving. */
+  readonly viaWaivers?: boolean;
 }
 
 export type ClaimResult =
   | { readonly ok: true; readonly added: string; readonly dropped: string | null }
+  /** The add target was on waivers: the claim was FILED, not executed. `clearsAt` is when the
+   *  window closes and the filed claims resolve by priority. */
+  | { readonly ok: true; readonly waiverFiled: true; readonly clearsAt: string }
   | { readonly ok: false; readonly status: number; readonly reason: string };
 
 /**
@@ -175,6 +195,44 @@ export async function claimPlayer(db: Db, input: ClaimInput, deps: ClaimDeps): P
       .innerJoin(teams, eq(injuredReserve.teamId, teams.id))
       .where(and(eq(teams.leagueId, input.leagueId), eq(injuredReserve.playerId, input.addPlayerId)));
     if (irHolder !== undefined) return refuse(409, CLAIM_REFUSALS.notFree);
+
+    // WAIVERS v1 (roadmap item 4): a claim on a waivered player is FILED, never executed — the
+    // window resolves by priority when it closes. The processor's own award re-enters here with
+    // `viaWaivers` and passes straight through.
+    if (deps.viaWaivers !== true) {
+      const [windowRow] = await tx
+        .select({ until: leagueWaivers.until })
+        .from(leagueWaivers)
+        .where(and(eq(leagueWaivers.leagueId, input.leagueId), eq(leagueWaivers.playerId, input.addPlayerId)));
+      if (windowRow !== undefined && windowRow.until.getTime() > new Date(deps.clock.now()).getTime()) {
+        const [alreadyFiled] = await tx
+          .select({ id: waiverClaims.id })
+          .from(waiverClaims)
+          .innerJoin(teams, eq(teams.id, waiverClaims.teamId))
+          .where(
+            and(
+              eq(waiverClaims.leagueId, input.leagueId),
+              eq(waiverClaims.addPlayerId, input.addPlayerId),
+              eq(waiverClaims.status, "pending"),
+              eq(teams.userId, input.userId),
+            ),
+          );
+        if (alreadyFiled !== undefined) return refuse(409, CLAIM_REFUSALS.alreadyFiled);
+        const [mineTeam] = await tx
+          .select({ id: teams.id })
+          .from(teams)
+          .where(and(eq(teams.leagueId, input.leagueId), eq(teams.userId, input.userId)));
+        if (mineTeam === undefined) return refuse(403, CLAIM_REFUSALS.notMember);
+        await tx.insert(waiverClaims).values({
+          id: `wc_${crypto.randomUUID()}`,
+          leagueId: input.leagueId,
+          teamId: mineTeam.id,
+          addPlayerId: input.addPlayerId,
+          dropPlayerId: input.dropPlayerId ?? null,
+        });
+        return { ok: true, waiverFiled: true, clearsAt: windowRow.until.toISOString() } as const;
+      }
+    }
 
     const slotConfig: readonly RosterSlotConfig[] = league.slotConfig;
 
@@ -244,6 +302,16 @@ export async function claimPlayer(db: Db, input: ClaimInput, deps: ClaimDeps): P
         );
     }
 
+    if (drop !== null) {
+      // The dropped man enters his own waiver window: everyone gets a fair shot at him, by
+      // priority, rather than the dropper's fastest friend.
+      const until = new Date(new Date(deps.clock.now()).getTime() + WAIVER_PERIOD_HOURS * 3_600_000);
+      await tx
+        .insert(leagueWaivers)
+        .values({ leagueId: input.leagueId, playerId: drop, until })
+        .onConflictDoUpdate({ target: [leagueWaivers.leagueId, leagueWaivers.playerId], set: { until } });
+    }
+
     await audit.record(tx, {
       eventType: "roster_move",
       actorId: input.userId,
@@ -252,7 +320,7 @@ export async function claimPlayer(db: Db, input: ClaimInput, deps: ClaimDeps): P
       // `reason`, not `outcome`: the key every `roster_move` renderer switches on
       // (`renderRosterMove`, `@/integrity/activity-view`) — a payload spelled differently is
       // silently invisible in the feed, by that module's own deny-by-default.
-      payload: { reason: "claim", teamId: mine.id, addedPlayerId: addPlayer.id, droppedPlayerId: drop, materializedLineupRows: materialized },
+      payload: { reason: "claim", teamId: mine.id, addedPlayerId: addPlayer.id, droppedPlayerId: drop, materializedLineupRows: materialized, viaWaivers: deps.viaWaivers === true },
       occurredAt: deps.clock.now(),
     });
 

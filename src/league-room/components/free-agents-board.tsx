@@ -12,6 +12,7 @@ import { PlayerName } from "./player-peek";
 
 interface FreeAgentRow {
   readonly id: string;
+  readonly onWaiversUntil?: string | null;
   readonly name: string;
   readonly position: Position;
   readonly nflTeam: string;
@@ -61,7 +62,7 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
   const [position, setPosition] = useState<(typeof POSITIONS)[number]>("ALL");
   const [loading, setLoading] = useState(true);
   const [droppingFor, setDroppingFor] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "claiming" | "claimed">("idle");
+  const [status, setStatus] = useState<"idle" | "claiming" | "claimed" | "filed">("idle");
   const [error, setError] = useState<string | null>(null);
   const fetchSeq = useRef(0);
 
@@ -110,7 +111,8 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
         void load(search, position);
         return;
       }
-      setStatus("claimed");
+      const data = body.data as { waiverFiled?: boolean };
+      setStatus(data.waiverFiled === true ? "filed" : "claimed");
       void load(search, position);
       // The roster and the lineup changed on the server; the My team tab must not tell an
       // older story when the manager lands on it next.
@@ -129,7 +131,13 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-2xl font-bold text-text-primary">Free agents</h2>
         <p role="status" aria-live="polite" className="text-sm text-text-faint">
-          {status === "claiming" ? "Claiming…" : status === "claimed" ? "Claimed. He is on your bench." : `${total} available`}
+          {status === "claiming"
+            ? "Claiming…"
+            : status === "claimed"
+              ? "Claimed. He is on your bench."
+              : status === "filed"
+                ? "Claim filed. Waivers decide when the window closes."
+                : `${total} available`}
         </p>
       </div>
 
@@ -186,8 +194,16 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
                     </span>
                   </span>
                 </span>
-                <span className="font-display text-2xl font-bold tabular-nums text-text-muted">
-                  {agent.adp === null ? NOT_STARTED_DASH : agent.adp.toFixed(1)}
+                <span className="flex flex-col items-start">
+                  <span className="font-display text-2xl font-bold tabular-nums text-text-muted">
+                    {agent.adp === null ? NOT_STARTED_DASH : agent.adp.toFixed(1)}
+                  </span>
+                  {/* Waivers v1: the window, said on the row — a claim on him FILES. */}
+                  {agent.onWaiversUntil == null ? null : (
+                    <span className={`${MICRO_LABEL} text-warning`}>
+                      {`Waivers · clears ${new Date(agent.onWaiversUntil).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`}
+                    </span>
+                  )}
                 </span>
                 <span className="justify-self-end">
                   {!canClaim ? null : droppingFor === agent.id ? (
@@ -200,9 +216,9 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
                       size="md"
                       disabled={status === "claiming"}
                       onClick={() => (rosterFull ? setDroppingFor(agent.id) : void claim(agent.id, null))}
-                      aria-label={`Add ${agent.name}`}
+                      aria-label={agent.onWaiversUntil == null ? `Add ${agent.name}` : `File a waiver claim for ${agent.name}`}
                     >
-                      Add
+                      {agent.onWaiversUntil == null ? "Add" : "Claim"}
                     </Button>
                   )}
                 </span>

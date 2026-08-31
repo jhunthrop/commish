@@ -376,9 +376,12 @@ function renderRosterMove(event: AuditEvent, names: ActivityNames): Rendered | n
     const addedPlayerId = str(event.payload, "addedPlayerId");
     if (teamId === undefined || addedPlayerId === undefined) return null;
     const droppedPlayerId = str(event.payload, "droppedPlayerId");
+    const viaWaivers = event.payload !== null && typeof event.payload === "object" && (event.payload as Record<string, unknown>).viaWaivers === true;
     return {
       icon: "refresh-cw",
-      headline: `${names.team(teamId)} added ${names.player(addedPlayerId)} from free agency.`,
+      headline: viaWaivers
+        ? `${names.team(teamId)} won ${names.player(addedPlayerId)} off waivers.`
+        : `${names.team(teamId)} added ${names.player(addedPlayerId)} from free agency.`,
       detail: droppedPlayerId === undefined ? null : `${names.player(droppedPlayerId)} was dropped to make room.`,
     };
   }

@@ -3,6 +3,7 @@ import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import { claimPlayer, freeAgents } from "@/league-service/claims";
+import { processWaivers } from "@/league-service/waivers";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";
 
 export const runtime = "nodejs";
@@ -22,6 +23,8 @@ const claimSchema = z.object({
  */
 export async function GET(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor, req) => {
+    // Lazy waiver processing (roadmap item 4): the manager who opens the board is the tick.
+    await processWaivers(getDb());
     const url = new URL(req.url);
     const rawPosition = url.searchParams.get("position") ?? "ALL";
     const position = (POSITIONS as readonly string[]).includes(rawPosition) ? (rawPosition as (typeof POSITIONS)[number]) : "ALL";
@@ -38,6 +41,7 @@ export async function GET(request: Request, context: LeagueRouteContext) {
 
 export async function POST(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor, req) => {
+    await processWaivers(getDb());
     if (actor.teamId === null) return fail(NO_TEAM_MESSAGE, 403);
     const parsed = await parseJson(req, claimSchema);
     if (!parsed.ok) return parsed.response;
