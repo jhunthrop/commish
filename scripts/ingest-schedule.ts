@@ -20,7 +20,7 @@ async function main(): Promise<void> {
   const metered = getStatsProvider().requestCost === "metered";
   console.log(
     metered
-      ? `this run debited ${before - remaining} requests; ingestion budget remaining this month: ${remaining}`
+      ? `this run debited ${before - remaining} requests; ingestion budget remaining today: ${remaining}`
       : `this run debited nothing: the configured provider answers locally and costs no upstream requests`,
   );
 }
