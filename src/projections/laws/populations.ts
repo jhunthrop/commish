@@ -392,7 +392,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
   {
     id: "rb_workload_cliff",
     position: "RB",
-    claim: "A running back who racks up 300 or more combined carries and receptions in a season loses points per game the next season — the workload cliff.",
+    claim: "The workload cliff: a running back who racks up 300 or more combined carries and receptions in a season loses points per game the next season.",
     expectedSign: -1,
     eligible: isRb,
     condition: rbWorkloadCliffCondition,
@@ -400,7 +400,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
   {
     id: "rb_age_curve",
     position: "RB",
-    claim: "A running back who is 28 or older at the season opener produces fewer points per game the following season than an otherwise similar younger back — the running back age curve.",
+    claim: "The running back age curve: a running back who is 28 or older at the season opener produces fewer points per game the following season than an otherwise similar younger back.",
     expectedSign: -1,
     eligible: isRb,
     condition: rbAgeCurveCondition,
@@ -408,7 +408,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
   {
     id: "wr_target_competition",
     position: "WR",
-    claim: "A wide receiver with a WR/TE teammate whose own season-N target share is at least 20% and at least as large as the receiver's own share loses points per game the following season — another primary receiver on his team. SIMPLIFIED: this reads season-N's own roster, not a predicted season-N+1 arrival, because no store this engine reads can see next season's roster before it exists.",
+    claim: "Another primary receiver on his team: a wide receiver with a WR/TE teammate whose own season-N target share is at least 20% and at least as large as the receiver's own share loses points per game the following season. SIMPLIFIED: this reads season-N's own roster, not a predicted season-N+1 arrival, because no store this engine reads can see next season's roster before it exists.",
     expectedSign: -1,
     eligible: isWr,
     condition: wrTargetCompetitionCondition,
@@ -416,7 +416,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
   {
     id: "play_caller_fingerprint",
     position: "all",
-    claim: "A pass-catcher (WR or TE) whose team enters a season with a first-year play-caller (the coordinator or head coach who calls the offense's plays) whose own history elsewhere shows a positive pass-rate-over-expected gains points per game — the play-caller fingerprint. SIMPLIFIED: 'his team' is the player's own team as of the measured season, since the following season's actual roster is not knowable at the schedule-publication gate; a player traded before the coaching change is measured against his old team.",
+    claim: "The play-caller fingerprint: a pass-catcher (WR or TE) whose team enters a season with a first-year play-caller (the coordinator or head coach who calls the offense's plays) whose own history elsewhere shows a positive pass-rate-over-expected gains points per game. SIMPLIFIED: 'his team' is the player's own team as of the measured season, since the following season's actual roster is not knowable at the schedule-publication gate; a player traded before the coaching change is measured against his old team.",
     expectedSign: 1,
     eligible: isWrOrTe,
     condition: playCallerFingerprintCondition,
@@ -424,7 +424,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
   {
     id: "target_share_persistence",
     position: "WR",
-    claim: "A wide receiver commanding 24% or more of his team's targets in a season sustains stronger points per game the following season than his raw scoring alone predicts — target share persistence.",
+    claim: "Target share persistence: a wide receiver commanding 24% or more of his team's targets in a season sustains stronger points per game the following season than his raw scoring alone predicts.",
     expectedSign: 1,
     eligible: isWr,
     condition: targetSharePersistenceCondition,
@@ -432,7 +432,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
   {
     id: "td_regression",
     position: "all",
-    claim: "A player whose touchdown points make up at least 1.5x his position's typical share of a regular's own points (players with at least 8 games) in a season loses points per game the following season as touchdown luck reverts — touchdown regression. Covers QB, RB, WR and TE; kickers and defenses are excluded because a touchdown-points share is not a meaningful quantity for them.",
+    claim: "Touchdown regression: a player whose touchdown points make up at least 1.5x his position's typical share of a regular's own points (players with at least 8 games) in a season loses points per game the following season as touchdown luck reverts. Covers QB, RB, WR and TE; kickers and defenses are excluded because a touchdown-points share is not a meaningful quantity for them.",
     expectedSign: -1,
     eligible: isSkillPosition,
     condition: tdRegressionCondition,
