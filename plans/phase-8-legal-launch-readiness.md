@@ -62,3 +62,15 @@
 - Every **[ME]** adapter swap is complete and passing the same test suite that validated the mock/sandbox version
 - Counsel has signed off in writing on the specific Tier 1 state list actually being launched
 - A staging environment has run Phase 1's end-to-end integration test (Step 11) against real (not sandboxed) payment, tax, and data adapters at least once before any state's flag goes live
+
+## Data licensing gate (added 2026-08-30)
+
+The "Experts" rank on player surfaces is FantasyPros ECR obtained by SCRAPING their public
+cheatsheet page (`fetchExpertConsensus`, `src/projections/preseason/publishers.ts` — regex over
+embedded `ecrData`). Acceptable as a dev-time model benchmark; NOT acceptable in a commercial
+paid product without a license. Before launch, exactly one of:
+1. License it: FantasyPros operates a commercial API/partner program — get terms and swap the
+   fetch to the licensed endpoint (the store/crosswalk seam is unchanged).
+2. Remove the Experts column from product surfaces (keep the internal benchmark for model
+   evaluation only, or drop it entirely).
+Every other live source is clean: Tank01 is a paid licensed API; nflverse is openly licensed.

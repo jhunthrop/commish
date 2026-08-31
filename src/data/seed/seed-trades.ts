@@ -311,7 +311,9 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
       // OPEN: a prior run's own propose succeeded and its accept did not (a crash, or a week
       // that was locked at the time — see `WEEK_NUMBER`'s own docblock). Resume from exactly
       // there rather than re-proposing, which would collide on this row's own primary key.
-      const acceptResult = await acceptTrade(db, {
+      // Trade governance (roadmap item 5): a seeder builds HISTORY — the review window is
+      // fast-forwarded through the same finalize re-entry the lazy processor uses.
+      const reviewed = await acceptTrade(db, {
         tradeId: existing.id,
         leagueId: LEAGUE_ID,
         userId: userIdByTeamId.get(existing.counterpartyTeamId)!,
@@ -320,6 +322,19 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
         deliver: deps.deliver,
         audit: deps.audit,
       });
+      const acceptResult =
+        reviewed.ok && reviewed.outcome === "under_review"
+          ? await acceptTrade(db, {
+              tradeId: existing.id,
+              leagueId: LEAGUE_ID,
+              userId: userIdByTeamId.get(existing.counterpartyTeamId)!,
+              clock,
+              notify: deps.notify,
+              deliver: deps.deliver,
+              audit: deps.audit,
+              finalizeReview: true,
+            })
+          : reviewed;
       if (!acceptResult.ok) {
         throw new Error(`seedTrades: resuming the "${fixture.label}" fixture's own acceptance was refused: ${acceptResult.reason}`);
       }
@@ -352,7 +367,7 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
       throw new Error(`seedTrades: the "${fixture.label}" fixture's own proposal was refused: ${proposeResult.reason}`);
     }
 
-    const acceptResult = await acceptTrade(db, {
+    const reviewed = await acceptTrade(db, {
       tradeId: proposeResult.tradeId,
       leagueId: LEAGUE_ID,
       userId: userIdByTeamId.get(getTeamId)!,
@@ -361,6 +376,20 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
       deliver: deps.deliver,
       audit: deps.audit,
     });
+    // Governance fast-forward, same reasoning as the resume branch above.
+    const acceptResult =
+      reviewed.ok && reviewed.outcome === "under_review"
+        ? await acceptTrade(db, {
+            tradeId: proposeResult.tradeId,
+            leagueId: LEAGUE_ID,
+            userId: userIdByTeamId.get(getTeamId)!,
+            clock,
+            notify: deps.notify,
+            deliver: deps.deliver,
+            audit: deps.audit,
+            finalizeReview: true,
+          })
+        : reviewed;
     if (!acceptResult.ok) {
       throw new Error(`seedTrades: the "${fixture.label}" fixture's own acceptance was refused: ${acceptResult.reason}`);
     }

@@ -87,7 +87,31 @@ schedule/injuries/news harvests landing daily, and a modern lineup flow ESPN sti
 
 ## 7. Suggested engine roadmap order
 
-Status, same day: items 1 and 2 SHIPPED. (1) Scoring vocabulary: 2pt, FG/XP misses, return TDs,
+Status, same day (evening loop): items 1-6 SHIPPED; item 7 dispositioned below.
+
+- (3) Injured reserve (membership-table design, injuries-feed eligibility, Q excluded) +
+  market-derived undroppables (ADP <= 120). Lineup protection deferred to the live-season loop
+  (it is a kickoff-time runner).
+- (4) Waivers v1: 24h window on every claim-drop, filed claims, priority award with
+  move-to-last-never-reset, lazy processing on every board/claim touch (no cron to fail
+  silently). Awards execute through claimPlayer itself, so every live-claim guard rules.
+- (5) Trade governance: deadline (week 12) on propose AND accept; acceptance lands
+  `under_review` with a 24h league window; veto votes (floor(n/3)+1, min 3, parties excluded)
+  settle `vetoed` at the threshold; the lazy finalizer re-enters acceptTrade so the whole
+  battle-tested execution path runs unchanged. Eliminated-team locks: deferred with brackets'
+  elimination facts (needs item 6's results to know who is eliminated; ESPN's own default here
+  is off).
+- (6) Playoff bracket engine: 3v6/4v5 with top-two byes, reseeded semifinals, championship;
+  generated at week settlement BEFORE the season-complete stamp, so a season only completes when
+  the championship does; ties advance the better seed; idempotent against stat-correction
+  re-settlement (a published bracket stands). Consolation ladder + 2-week finals: deferred
+  (config-shaped options, not defaults). Playoff-round labels in the UI: follow-up polish.
+- (7) DISPOSITION: divisions, weeks-per-matchup, HFA, and bonus wins are all OFF by default on
+  the reference product — the walked league itself runs divisionless. They are custom-league
+  options, not arriving expectations, and land with the commissioner-settings surface.
+  Multi-season history lands at the first real rollover, as originally stated.
+
+Earlier same day: items 1 and 2 SHIPPED. (1) Scoring vocabulary: 2pt, FG/XP misses, return TDs,
 DEF fumble recoveries/safeties as configurable weights + the industry points/yards-allowed tier
 tables, leagues rebuilt and rescored on real 2025 data (verified: DST-GB wk1 = 11.00 with both
 tiers). FG distance buckets remain deferred (need scoringPlays parsing). (2) Per-game lineup
