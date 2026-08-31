@@ -57,8 +57,9 @@ function mulberry32(seed: number): () => number {
  *
  * Condition rows are visited in descending `matchKey` order (arbitrary but fixed, so results don't
  * depend on input order) and each greedily claims the closest still-unused control within the
- * caliper. A condition row with no control inside the caliper is dropped, which is exactly the
- * "reduced sample" the brief calls out — matching failure is not an error, it's information.
+ * caliper — inclusive: a control at exactly `caliper` away is an admissible match. A condition row
+ * with no control inside the caliper is dropped, which is exactly the "reduced sample" the brief
+ * calls out — matching failure is not an error, it's information.
  */
 export function matchedPairs(
   points: readonly PlayerSeasonPoint[],
@@ -140,13 +141,18 @@ function bootstrapCi(pairs: readonly MatchedPair[], differences: readonly number
 
 /**
  * The measured effect of a matched population: mean paired difference-in-differences, with a
- * seeded-bootstrap 95% CI. An empty `pairs` list produces a zero-sample, zero-width measurement
- * rather than `NaN` — callers (verdicts, the registry) should treat `sample === 0` as "no evidence,"
- * not attempt to interpret the effect number.
+ * seeded-bootstrap 95% CI. An empty `pairs` list THROWS rather than returning a sentinel: a
+ * measurement with zero matched pairs is not "debunked", it is no measurement at all, and any
+ * zero-shaped value returned here would flow into `verdictFor` and come out reading "tested and
+ * failed". A law whose population matched nothing is a population-builder bug (condition too
+ * strict, wrong `matchKey`, caliper too tight), and the one honest response is to fail loudly at
+ * the source so the registry can never stamp a verdict on evidence that does not exist.
  */
 export function measureEffect(pairs: readonly MatchedPair[]): LawMeasurement {
   if (pairs.length === 0) {
-    return { effect: 0, ci: [0, 0], sample: 0, seasons: SEASONS_LABEL };
+    throw new Error(
+      "measureEffect: no matched pairs — an empty matched population is a population-builder bug, never a verdict",
+    );
   }
 
   const differences = pairs.map(pairDifference);
