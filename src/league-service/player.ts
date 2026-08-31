@@ -6,8 +6,11 @@ import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG, seasonProgress } from "@/league";
 import { nflPlayerIdFor } from "@/projections/crosswalk";
+import type { Law } from "@/projections/laws/types";
+import { registry } from "@/projections/laws/registry";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
-import { BOARD_SOURCE, preseasonProjectionsFor } from "@/projections/preseason/board-store";
+import type { BoardReason } from "@/projections/preseason/board";
+import { BOARD_SOURCE, boardReasons, preseasonProjectionsFor } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { preseasonRankingsFor } from "@/projections/preseason/store";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
@@ -116,6 +119,16 @@ export interface PlayerSeasonBody {
   readonly totals: PlayerSeasonTotals | null;
   /** Recent headlines that name him, newest first, from the harvested news feed. */
   readonly news: readonly { readonly title: string; readonly link: string }[];
+  /**
+   * Task 8: every reason the CURRENT season's board stored for him (`boardReasons`, `BOARD_SOURCE`,
+   * `PRODUCT_SEASON`) — the Outlook section's full chain, never truncated to a compact row's top
+   * two the way the draft board's sticker is. Empty for a player the crosswalk could not place or
+   * the board never ranked, the same "absence means nothing to say" rule `boardReasons` itself
+   * keeps.
+   */
+  readonly reasons: readonly BoardReason[];
+  /** The law registry, for `ReasonChip`'s own claim lookup on a `"law"` reason. */
+  readonly laws: readonly Law[];
 }
 
 type Line = typeof playerStatLines.$inferSelect;
@@ -185,14 +198,20 @@ async function preseasonReadings(
   db: Db,
   playerId: string,
   asOf: Date,
-): Promise<{ readonly expertRank: number | null; readonly modelRank: number | null }> {
+): Promise<{ readonly expertRank: number | null; readonly modelRank: number | null; readonly reasons: readonly BoardReason[] }> {
   const nflPlayerId = await nflPlayerIdFor(db, playerId);
-  if (nflPlayerId === null) return { expertRank: null, modelRank: null };
+  if (nflPlayerId === null) return { expertRank: null, modelRank: null, reasons: [] };
 
   const season = PRODUCT_SEASON;
   const [consensus] = await preseasonRankingsFor(db, { season, source: BENCHMARK_SOURCES.ecr, asOf }, [nflPlayerId]);
   const [ours] = await preseasonProjectionsFor(db, { season, source: BOARD_SOURCE, asOf }, [nflPlayerId]);
-  return { expertRank: consensus?.rank ?? null, modelRank: ours?.rank ?? null };
+  // Task 8's own Outlook section. `boardReasons` reads every reason the CURRENT season's board
+  // stored (no `playerId` narrowing exists on that reader yet — see `board-store.ts`), so this
+  // costs one whole-board read per player-season request rather than one row; acceptable for a
+  // bottom-sheet peek opened one player at a time, flagged rather than "fixed" here since a
+  // narrowed reader is outside this task's file list.
+  const reasons = (await boardReasons(db, BOARD_SOURCE, season)).get(nflPlayerId) ?? [];
+  return { expertRank: consensus?.rank ?? null, modelRank: ours?.rank ?? null, reasons };
 }
 
 /**
@@ -216,10 +235,13 @@ async function preseasonReadings(
  * crossed with the played weeks, and BOTH populations — every week at his position, and every
  * peer's points per game — are folded out of that single result rather than queried twice.
  *
- * The three preseason reads are bounded to ONE MAN by construction: the crosswalk is a primary-key
- * lookup and both board reads take his single gsis id, so nothing here loads a five-hundred-name
- * board to find one row on it. Skipped entirely for a player the crosswalk could not place, which
- * is the cheap case as well as the correct one.
+ * THE RANKING READS ARE BOUNDED TO ONE MAN BY CONSTRUCTION: the crosswalk is a primary-key
+ * lookup and both `preseasonRankingsFor`/`preseasonProjectionsFor` reads take his single gsis id,
+ * so nothing here loads a five-hundred-name board to find one row on it. Skipped entirely for a
+ * player the crosswalk could not place, which is the cheap case as well as the correct one.
+ * `boardReasons` (Task 8's Outlook read) is the one exception: it has no per-player narrowing
+ * yet, so it reads every reason the season's board stored and this function keeps only his own —
+ * see `preseasonReadings`'s own inline note.
  */
 /** His designation off the latest harvested injuries snapshot; `null` when the feed does not
  *  name him. One small read, latest row only. */
@@ -363,5 +385,7 @@ export async function playerSeason(
     pointsPerGame,
     pointsPerGamePercentile: pointsPerGame === null ? null : percentileOf(pointsPerGame, peerPointsPerGame(lines, player.position, rules), "higher"),
     weeks,
+    reasons: preseason.reasons,
+    laws: registry(),
   };
 }

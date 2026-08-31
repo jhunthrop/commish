@@ -191,6 +191,8 @@ export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
                 myTeamId={room.myTeamId}
                 landedPickNumber={null}
                 mock={{ botMarkerLabel: room.mock.botMarkerLabel, botBadge: room.mock.botBadge }}
+                reasons={room.reasons}
+                laws={room.laws}
               />
             }
             actions={{

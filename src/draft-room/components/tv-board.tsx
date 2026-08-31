@@ -145,6 +145,8 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
           myTeamId={room.myTeamId}
           landedPickNumber={room.lastPick?.pick.pickNumber ?? null}
           variant="tv"
+          reasons={room.reasons}
+          laws={room.laws}
         />
       </div>
       {/* THE SPOTLIGHT MOVED TO THE FOOT AND BECAME THE LOWER THIRD (Sunday v5, law 6). It was a
