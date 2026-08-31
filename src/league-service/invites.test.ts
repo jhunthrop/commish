@@ -549,7 +549,7 @@ describe("acceptInvite", () => {
 
 describe("invitePreview", () => {
   it("tells you nothing about a league when the code is not valid", async () => {
-    const result = await invitePreview(db, "NOPE99");
+    const result = await invitePreview(db, "NOPE99", clock);
     expect(result).toEqual({ ok: false, reason: "That invite link is not valid. Ask your commissioner for a new one." });
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });
@@ -566,7 +566,7 @@ describe("invitePreview", () => {
     const invite = await createInvite(inviteDeps(), { leagueId: "lg_house_invite", createdByUserId: "u_whoever" });
     if (!invite.ok) throw new Error(invite.reason);
 
-    const result = await invitePreview(db, invite.code);
+    const result = await invitePreview(db, invite.code, clock);
     expect(result).toEqual({ ok: false, reason: "That invite link is not valid. Ask your commissioner for a new one." });
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });
@@ -609,9 +609,9 @@ describe("invitePreview", () => {
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
     if (!invite.ok) throw new Error(invite.reason);
 
-    const preview = await invitePreview(db, invite.code);
+    const preview = await invitePreview(db, invite.code, clock);
     if (!preview.ok) throw new Error(preview.reason);
-    const home = await leagueHome(db, created.leagueId, "u1");
+    const home = await leagueHome(db, created.leagueId, "u1", clock);
 
     expect(home!.terms).toEqual(preview.terms);
   });
@@ -631,7 +631,7 @@ describe("invitePreview", () => {
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "mu1" });
     if (!invite.ok) throw new Error(invite.reason);
 
-    const preview = await invitePreview(db, invite.code);
+    const preview = await invitePreview(db, invite.code, clock);
     if (!preview.ok) throw new Error(preview.reason);
     expect(preview.terms.formatNotes).toEqual(["Every team also plays the league median each week."]);
   });
@@ -651,7 +651,7 @@ describe("invitePreview", () => {
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "wf1" });
     if (!invite.ok) throw new Error(invite.reason);
 
-    const result = await invitePreview(db, invite.code);
+    const result = await invitePreview(db, invite.code, clock);
     if (!result.ok) throw new Error(result.reason);
     expect(result.terms.draftAt).toBe("Starts as soon as it fills");
   });
@@ -672,7 +672,7 @@ describe("invitePreview", () => {
     await acceptInvite(writeDeps(), { code: invite.code, userId: "wf2_3" });
     await acceptInvite(writeDeps(), { code: invite.code, userId: "wf2_4" });
 
-    const result = await invitePreview(db, invite.code);
+    const result = await invitePreview(db, invite.code, clock);
     if (!result.ok) throw new Error(result.reason);
     expect(result.terms.filledTeams).toBe(4);
     expect(result.terms.draftAt).not.toBe("Starts as soon as it fills");
@@ -685,7 +685,7 @@ describe("invitePreview", () => {
     if (!invite.ok) throw new Error(invite.reason);
     await acceptInvite(writeDeps(), { code: invite.code, userId: "u2" });
 
-    const result = await invitePreview(db, invite.code);
+    const result = await invitePreview(db, invite.code, clock);
     if (!result.ok) throw new Error(result.reason);
     expect(result.terms.filledTeams).toBe(2);
   });
@@ -694,12 +694,11 @@ describe("invitePreview", () => {
     const created = await league();
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
     if (!invite.ok) throw new Error(invite.reason);
-    // `invitePreview` takes no injected clock (its own signature is just `(db, code)`), so
-    // unlike `acceptInvite`'s tests this one moves the INVITE's `expiresAt` into the past
-    // relative to the real wall clock, rather than moving a fake `now` forward.
-    await db.update(leagueInvites).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(leagueInvites.code, invite.code));
+    // Walks the INVITE's `expiresAt` one second behind the suite's fixed clock — the preview
+    // reads the same injected clock, so the refusal is deterministic on any real date.
+    await db.update(leagueInvites).set({ expiresAt: new Date(Date.parse(clock.now()) - 1000) }).where(eq(leagueInvites.code, invite.code));
 
-    const result = await invitePreview(db, invite.code);
+    const result = await invitePreview(db, invite.code, clock);
     expect(result).toEqual({ ok: false, reason: "That invite link has expired. Ask your commissioner for a new one." });
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });
@@ -710,7 +709,7 @@ describe("invitePreview", () => {
     if (!once.ok) throw new Error(once.reason);
     await acceptInvite(writeDeps(), { code: once.code, userId: "u2" });
 
-    const result = await invitePreview(db, once.code);
+    const result = await invitePreview(db, once.code, clock);
     expect(result).toEqual({
       ok: false,
       reason: "That invite link has already been used up. Ask your commissioner for a new one.",
@@ -746,7 +745,7 @@ describe("invitePreview", () => {
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
     if (!invite.ok) throw new Error(invite.reason);
 
-    const result = await invitePreview(dbWithNthSelectEmpty(2), invite.code);
+    const result = await invitePreview(dbWithNthSelectEmpty(2), invite.code, clock);
     expect(result).toEqual({ ok: false, reason: "That invite link is not valid. Ask your commissioner for a new one." });
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });
@@ -756,7 +755,7 @@ describe("invitePreview", () => {
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
     if (!invite.ok) throw new Error(invite.reason);
 
-    const result = await invitePreview(dbWithNthSelectEmpty(3), invite.code);
+    const result = await invitePreview(dbWithNthSelectEmpty(3), invite.code, clock);
     if (!result.ok) throw new Error(result.reason);
     expect(result.terms.commissionerName).toBe("Commissioner");
     expect(result.terms.commissionerAvatar).toBeNull();
@@ -770,7 +769,7 @@ describe("invitePreview", () => {
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
     if (!invite.ok) throw new Error(invite.reason);
 
-    const result = await invitePreview(dbWithNthSelectEmpty(4), invite.code);
+    const result = await invitePreview(dbWithNthSelectEmpty(4), invite.code, clock);
     if (!result.ok) throw new Error(result.reason);
     expect(result.terms.scoringLabel).toBe("PPR");
   });
