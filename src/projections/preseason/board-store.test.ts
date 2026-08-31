@@ -1,13 +1,16 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { recordNflPlayers } from "../universe";
 import type { NflPlayerRow } from "../nflverse/players";
-import type { BoardEntry } from "./board";
+import type { BoardEntry, BoardReason } from "./board";
 import {
   BOARD_SOURCE,
+  boardReasons,
   preseasonProjectionsAsOf,
   preseasonProjectionsFor,
   projectionRows,
+  reasonRows,
+  recordPreseasonBoardReasons,
   recordPreseasonProjections,
 } from "./board-store";
 
@@ -64,6 +67,10 @@ function entry(overrides: Partial<BoardEntry> = {}): BoardEntry {
 
 async function store(board: readonly BoardEntry[], asOf: Date): Promise<number> {
   return recordPreseasonProjections(db, projectionRows(board, { season: 2024, source: BOARD_SOURCE, asOf }));
+}
+
+async function storeReasons(board: readonly BoardEntry[], asOf: Date): Promise<number> {
+  return recordPreseasonBoardReasons(db, reasonRows(board, { season: 2024, source: BOARD_SOURCE, asOf }));
 }
 
 describe("the preseason board store", () => {
@@ -137,5 +144,113 @@ describe("the preseason board store", () => {
     await store([entry()], AUGUST);
     expect(await preseasonProjectionsAsOf(db, { season: 2023, source: BOARD_SOURCE, asOf: FINAL })).toEqual([]);
     expect(await preseasonProjectionsAsOf(db, { season: 2024, source: "some_other_board", asOf: FINAL })).toEqual([]);
+  });
+
+  /**
+   * Task 7 — `reasons` used to be the one thing `board-store.ts`'s own docblock said was
+   * deliberately not stored yet. These are the tests that lift that.
+   */
+  describe("board reasons", () => {
+    const AVAILABILITY: BoardReason = { code: "availability", expectedGames: 15.4, floorGames: 12, ceilingGames: 17 };
+    const LAW: BoardReason = { code: "law", lawId: "target_share_persistence", effect: 1.8, magnitude: 0.31 };
+    const LAW2: BoardReason = { code: "law", lawId: "wr_target_competition", effect: -2.4, magnitude: 0.35 };
+
+    it("round-trips every reason on a board, typed", async () => {
+      await storeReasons([entry({ reasons: [AVAILABILITY, LAW] })], AUGUST);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      const stored = [...(byPlayer.get(CHASE) ?? [])].sort((a, b) => a.code.localeCompare(b.code));
+      expect(stored).toEqual([AVAILABILITY, LAW]);
+    });
+
+    /**
+     * The fix round's own case: `target_share_persistence` and `wr_target_competition` can both be
+     * true for the same receiver at once, and the PK's `detail` column (the law id) is what lets
+     * both survive rather than one silently overwriting the other.
+     */
+    it("round-trips BOTH reasons for a player who trips two confirmed laws at once", async () => {
+      await storeReasons([entry({ reasons: [LAW, LAW2] })], AUGUST);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      const stored = [...(byPlayer.get(CHASE) ?? [])].sort((a, b) =>
+        a.code === "law" && b.code === "law" ? a.lawId.localeCompare(b.lawId) : 0,
+      );
+      expect(stored).toEqual([LAW, LAW2]);
+    });
+
+    /**
+     * Same `(player, law)` PK, written twice with IDENTICAL content — one row, never two, and the
+     * second write is a TRUE no-op (Postgres itself decides via `changedRowWhere`, not a count this
+     * function merely labels): the second call's `RETURNING` is empty because nothing about the
+     * stored row actually changed.
+     */
+    it("upserts the same (player, law) reason written twice with identical content to one row", async () => {
+      expect(await storeReasons([entry({ reasons: [LAW] })], AUGUST)).toBe(1);
+      expect(await storeReasons([entry({ reasons: [LAW] })], AUGUST)).toBe(0);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      expect(byPlayer.get(CHASE)).toEqual([LAW]);
+    });
+
+    /**
+     * Fix round (IMPORTANT 1) — the schema's own docblock promises a rerun REPLACES this table's
+     * opinion, which `onConflictDoNothing` never actually delivered: a refreshed `measured.json`
+     * moving a law's `effect`, or a player's magnitude moving with new facts, would have left the
+     * FIRST-written payload stored forever. `onConflictDoUpdate` fixes it — this is the case that
+     * proves it: the SAME `(player, lawId)` key, a genuinely different payload, and the read must
+     * come back with the NEW numbers, not the old ones.
+     */
+    it("replaces a stored reason's payload when a rerun writes CHANGED content for the same (player, law)", async () => {
+      // `asOf` plays no part in this table's identity (no `as_of` column — see its own docblock),
+      // so both writes are stamped identically; only the payload differs between them.
+      const REFIT: BoardReason = { code: "law", lawId: "target_share_persistence", effect: 2.6, magnitude: 0.4 };
+      expect(await storeReasons([entry({ reasons: [LAW] })], AUGUST)).toBe(1);
+      expect(await storeReasons([entry({ reasons: [REFIT] })], AUGUST)).toBe(1);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      expect(byPlayer.get(CHASE)).toEqual([REFIT]);
+    });
+
+    it("keys reasons by player, never mixing one man's reasons into another's", async () => {
+      await storeReasons(
+        [entry({ reasons: [AVAILABILITY] }), entry({ playerId: LAMB, reasons: [LAW] })],
+        AUGUST,
+      );
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      expect(byPlayer.get(CHASE)).toEqual([AVAILABILITY]);
+      expect(byPlayer.get(LAMB)).toEqual([LAW]);
+    });
+
+    it("says nothing about a player nobody stored a reason for", async () => {
+      await storeReasons([entry({ reasons: [AVAILABILITY] })], AUGUST);
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      expect(byPlayer.has(LAMB)).toBe(false);
+    });
+
+    it("is a no-op on a second run of the same board", async () => {
+      expect(await storeReasons([entry({ reasons: [AVAILABILITY, LAW] })], AUGUST)).toBe(2);
+      expect(await storeReasons([entry({ reasons: [AVAILABILITY, LAW] })], AUGUST)).toBe(0);
+    });
+
+    /**
+     * A DROP, NEVER A THROW — a variant retired since the row was written, or a row this store
+     * never wrote at all. `console.warn` names the count so the drop is visible.
+     */
+    it("drops a row with an unrecognised reason code, warning with a count, rather than throwing", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      await recordPreseasonBoardReasons(db, [
+        { season: 2024, source: BOARD_SOURCE, playerId: CHASE, code: "retired_variant", detail: "", payload: { anything: true } },
+      ]);
+      await storeReasons([entry({ reasons: [AVAILABILITY] })], AUGUST);
+
+      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+
+      expect(byPlayer.get(CHASE)).toEqual([AVAILABILITY]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toContain("1 row");
+      warn.mockRestore();
+    });
+
+    it("does not hand one board's reasons to a reader asking for another season or another board", async () => {
+      await storeReasons([entry({ reasons: [AVAILABILITY] })], AUGUST);
+      expect((await boardReasons(db, BOARD_SOURCE, 2023)).size).toBe(0);
+      expect((await boardReasons(db, "some_other_board", 2024)).size).toBe(0);
+    });
   });
 });

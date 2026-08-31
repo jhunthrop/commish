@@ -85,6 +85,89 @@ describe("coachObservations", () => {
   });
 });
 
+describe("coachObservations with play-caller attribution", () => {
+  const noPace: (team: string, seasonYear: number, metric: string) => number | null = () => null;
+  const kcGames2024 = season(2024, "KC", "Andy Reid", 18);
+
+  it("attributes a team-season to the play-caller, not the head coach, where the table covers it", () => {
+    // games say KC's coach is "Andy Reid" all season; the table says Matt Nagy called plays wks 1-18
+    const lookup = (team: string, seasonYear: number) => (team === "KC" && seasonYear === 2024 ? "Matt Nagy" : null);
+    const rows = coachObservations(kcGames2024, noPace, [2024], lookup);
+    const tenure = rows.find((r) => r.metric === COACH_METRICS.tenureSeasons);
+    expect(tenure?.value).toBe(0); // Nagy's first season calling KC's plays => a coaching change
+  });
+
+  it("falls back to the head coach where the lookup answers null", () => {
+    const rows = coachObservations(kcGames2024, noPace, [2024], () => null);
+    const noLookup = coachObservations(kcGames2024, noPace, [2024]);
+    expect(rows).toEqual(noLookup);
+  });
+
+  it("counts tenure across a role change for the same name", () => {
+    // games.csv names a different head coach in 2022 (Josh McDaniels was only the OC that year); the
+    // table attributes 2022's play-calling to him too. He becomes head coach himself in 2023-2024, so
+    // games.csv and the table agree from then on. Same name, three straight seasons => tenure 2 in 2024.
+    const games = [
+      ...season(2022, "NE", "HC Original"),
+      ...season(2023, "NE", "Josh McDaniels"),
+      ...season(2024, "NE", "Josh McDaniels"),
+    ];
+    const lookup = (team: string, seasonYear: number) =>
+      team === "NE" && seasonYear === 2022 ? "Josh McDaniels" : null;
+    const rows = coachObservations(games, noPace, [2024], lookup);
+    const tenure = rows.find((r) => r.season === 2024 && r.team === "NE" && r.metric === COACH_METRICS.tenureSeasons);
+    expect(tenure?.value).toBe(2);
+  });
+});
+
+describe("coachObservations stamps the week-1 identity for the season being stamped, not the modal one", () => {
+  const noPace: (team: string, seasonYear: number, metric: string) => number | null = () => null;
+
+  it("stamps the OPENER's tenure for a midseason-change season, even though the interim ends up modal", () => {
+    // "The Opener" already ran CHI in 2023. Fired after week 8 of 2024; "The Interim" finishes the
+    // season with more starts (9 to 8) and is 2024's MODAL coach. If the modal coach were stamped,
+    // tenure would read 0 (the Interim is new to CHI) instead of 1 (the Opener is continuing) — a
+    // fact nobody could know in May, since the firing has not happened yet at schedule publication.
+    const games = [
+      ...season(2023, "CHI", "The Opener"),
+      ...season(2024, "CHI", "The Opener", 8),
+      ...Array.from({ length: 9 }, (_, index) => game({ season: 2024, week: index + 9, team: "CHI", coach: "The Interim" })),
+    ];
+    // Sanity: the fixture really does make the interim modal, so this exercises the fix.
+    expect(coachByTeamSeason(games).find((row) => row.season === 2024)).toEqual({ season: 2024, team: "CHI", coach: "The Interim" });
+
+    const tenure2024 = coachObservations(games, noPace, [2024]).find((row) => row.metric === COACH_METRICS.tenureSeasons)!;
+    expect(tenure2024.value).toBe(1);
+  });
+
+  it("keeps modal attribution for a COMPLETED prior season when a later season's tenure walks back through it", () => {
+    // 2023 itself had the same kind of midseason change, with "The Interim" modal for 2023. By the
+    // time 2024 is stamped, 2023 is over and its modal coach is fully knowable — so 2024's tenure
+    // chain, walking back through 2023, should see "The Interim" (2023's MODAL coach), not "The
+    // Opener" (2023's week-1 coach) — the asymmetry is between season S's OWN stamp and every prior
+    // season the chain walks through.
+    const games = [
+      ...season(2023, "CHI", "The Opener", 8),
+      ...Array.from({ length: 9 }, (_, index) => game({ season: 2023, week: index + 9, team: "CHI", coach: "The Interim" })),
+      ...season(2024, "CHI", "The Interim", 17), // The Interim kept the job and opens 2024 too.
+    ];
+    const tenure2024 = coachObservations(games, noPace, [2024]).find((row) => row.metric === COACH_METRICS.tenureSeasons)!;
+    // Continuing: 2024's week-1 coach ("The Interim") matches 2023's MODAL coach ("The Interim").
+    expect(tenure2024.value).toBe(1);
+  });
+
+  it("falls back to the week-1 game's own coach where the play-caller lookup has nothing for week 1", () => {
+    const games = season(2024, "SEA", "Week-1 Head Coach", 3);
+    const lookup = (team: string, seasonYear: number, week: number) =>
+      team === "SEA" && seasonYear === 2024 && week === 2 ? "Someone Who Only Coached Week 2" : null;
+    const withLookup = coachObservations(games, noPace, [2024], lookup);
+    const withoutLookup = coachObservations(games, noPace, [2024]);
+    // Week 1's lookup answer is null, so the identity falls back to games.csv's own week-1 coach —
+    // identical to the no-lookup mechanism.
+    expect(withLookup).toEqual(withoutLookup);
+  });
+});
+
 describe("seasonMeans", () => {
   it("averages only the weeks the store actually holds", () => {
     const read = (_team: string, at: WeekRef): number | null => (at.week <= 2 ? at.week * 10 : null);

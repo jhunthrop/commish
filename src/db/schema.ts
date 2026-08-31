@@ -2252,3 +2252,43 @@ export const preseasonProjections = pgTable(
     index("preseason_projections_as_of_idx").on(t.season, t.source, t.asOf),
   ],
 );
+
+/**
+ * WHY A PLAYER SITS WHERE HE SITS ON ONE BOARD — the explanation surface `board-store.ts`'s own
+ * docblock used to say was deliberately NOT stored yet (Task 7 lifts that). Every `BoardReason`
+ * variant a board produced for a player is one row here: `code` is the union's own tag
+ * (`board.ts`'s `BoardReason`), `payload` is every other field of that variant, verbatim.
+ *
+ * `detail` IS THE DISCRIMINATOR WITHIN A CODE (fix round, superseding Task 7's original PK). Every
+ * code the board emits today is single-per-player EXCEPT `"law"`, which fires once per CONFIRMED
+ * law whose condition holds — a receiver can trip `target_share_persistence` and
+ * `wr_target_competition` at once, and a `(source, season, player_id, code)` PK could not hold both
+ * rows. `detail` carries the law id for `"law"` rows and `''` for every other current variant, so
+ * `(source, season, player_id, code, detail)` identifies exactly one reason and a player can carry
+ * one row per confirmed law rather than the first one written winning silently.
+ *
+ * NOT VERSIONED BY MOMENT, unlike `preseason_projections` next door: no `as_of` here, so a rerun of
+ * the same board replaces this table's opinion rather than adding a second, dated one. Reasons are
+ * the CURRENT explanation for the CURRENT ranking, not a historical ledger a backtest replays — that
+ * claim belongs to the ranks and points themselves, which `preseason_projections` already carries
+ * under its own stamp.
+ */
+export const preseasonBoardReasons = pgTable(
+  "preseason_board_reasons",
+  {
+    source: text("source").notNull(),
+    season: integer("season").notNull(),
+    /** An `nfl_players.id` — a gsis id, the same space every other board row keys on. */
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** The `BoardReason` union's own discriminant — `"availability"`, `"law"`, and so on. */
+    code: text("code").notNull(),
+    /** The discriminator WITHIN `code` — a law id for `"law"` rows, `''` for every other variant
+     *  today, since none of them can fire twice for the same player on the same board. */
+    detail: text("detail").notNull().default(""),
+    /** Every other field of that `BoardReason` variant, verbatim — `code` itself excluded. */
+    payload: jsonb("payload").$type<JsonObject>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.source, t.season, t.playerId, t.code, t.detail] })],
+);

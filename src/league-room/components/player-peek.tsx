@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { BottomSheet, PlayerObject, SeasonBars, SourceStrip } from "@/components/ui";
+import { BottomSheet, PlayerObject, ReasonChip, SeasonBars, SourceStrip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { PlayerSeasonBody } from "@/league-service/player";
@@ -131,6 +131,28 @@ export function PlayerPeekHost() {
               </Link>
             </div>
             <SourceStrip label={`Where ${body.player.name} is ranked, by source`} sources={sourcesFor(body)} />
+
+            {/* THE OUTLOOK (Task 8): the board's own "why", in full — every reason
+                `boardReasons` stored for him this season, never truncated to a compact row's
+                top two the way the draft board's sticker is. Absent when the board never ranked
+                him (no crosswalk placement, no board this season), which is the honest state:
+                nothing here invents a reason a store does not carry. */}
+            {body.reasons.length === 0 ? null : (
+              <div className="flex flex-col gap-2">
+                <h3 className={`${MICRO_LABEL} text-text-faint`}>Outlook</h3>
+                <div className="flex flex-col gap-1.5">
+                  {body.reasons.map((reason) => (
+                    <ReasonChip
+                      key={reason.code === "law" ? `law:${reason.lawId}` : reason.code}
+                      reason={reason}
+                      registry={body.laws}
+                      className="w-fit"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {played ? (
               <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
             ) : (

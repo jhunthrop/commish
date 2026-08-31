@@ -19,6 +19,10 @@ import { projectedPosition } from "../nflverse/players";
 import { COACH_METRICS } from "../nflverse/coaches";
 import { SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { indexTeamMetrics } from "../team-context";
+import { factsForSeason, type LawConditionFacts } from "../laws/populations";
+import { lawReasonsFor } from "../laws/board-reasons";
+import { registry } from "../laws/registry";
+import type { Law } from "../laws/types";
 import {
   ageAtSeason,
   expectedGamesPlayed,
@@ -245,6 +249,15 @@ export interface PreseasonInputs {
   readonly gamesPlayed: ReadonlyMap<number, ReadonlyMap<string, number>>;
   /** Where each club put each man on its published week-one depth chart. Empty before ingestion. */
   readonly depthChart: DepthChart;
+  /** The registry every "law" reason (`preseasonCandidates`) is drawn against — only its CONFIRMED
+   *  entries ever speak, per `lawReasonsFor`'s own filter. Defaults to `registry()`; a caller building
+   *  candidates for a test passes its own fixture through `loadPreseason`'s own parameter instead. */
+  readonly laws: readonly Law[];
+  /** Every law's condition inputs for season - 1 — the last COMPLETED season — gated at THIS
+   *  season's own schedule publication (`laws/populations.ts`'s `factsForSeason`), which is exactly
+   *  what a board for THIS season is entitled to know. Keyed by player id; a player absent here has
+   *  no evidence for any law, not evidence that every law's condition is false. */
+  readonly lawFacts: ReadonlyMap<string, LawConditionFacts>;
 }
 
 /** How many prior seasons of usage and outcomes a preseason board reads. */
@@ -345,8 +358,10 @@ async function gamesPlayedBySeason(
   return bySeason;
 }
 
-/** Reads one whole preseason, every row of it through the same gate. */
-export async function loadPreseason(db: ReadonlyDb, season: number): Promise<PreseasonInputs> {
+/** Reads one whole preseason, every row of it through the same gate. `laws` defaults to the real
+ *  `registry()`, the same default-from-a-committed-file pattern `loadAvailabilityObservations` below
+ *  takes with `FITTED_MODEL`; a test passes its own fixture registry instead. */
+export async function loadPreseason(db: ReadonlyDb, season: number, laws: readonly Law[] = registry()): Promise<PreseasonInputs> {
   const moment = await preseasonMomentFor(db, season);
   await assertNothingFromTheSeasonIsVisible(db, season, moment);
 
@@ -391,6 +406,14 @@ export async function loadPreseason(db: ReadonlyDb, season: number): Promise<Pre
     ),
   );
 
+  // "Season N" for every law's own condition: the completed season immediately before this one,
+  // read through `factsForSeason`'s OWN gate (N+1's schedule publication — this season's), which is
+  // exactly the moment a board for THIS season is entitled to know it at. Same call
+  // `buildPopulations` makes for its measurement, so a live board's law reasons can never drift from
+  // the evidence that confirmed the law in the first place.
+  const priorSeasonFacts = await factsForSeason(db, season - 1, positions, PPR_SCORING);
+  const lawFacts = new Map([...priorSeasonFacts].map(([playerId, entry]) => [playerId, entry.facts] as const));
+
   return {
     season,
     moment,
@@ -402,6 +425,8 @@ export async function loadPreseason(db: ReadonlyDb, season: number): Promise<Pre
     teamObservations,
     gamesPlayed: await gamesPlayedBySeason(db, priorSeasons, moment),
     depthChart: await depthChartAsOf(db, season, moment),
+    laws,
+    lawFacts,
   };
 }
 
@@ -686,6 +711,11 @@ export function preseasonCandidates(
       });
     }
     if (newPlayCaller(team)) all.push({ code: "new_play_caller", team });
+    // Task 7 — every CONFIRMED law whose condition held for HIM in the completed season, from the
+    // shared facts `loadPreseason` already computed once for the whole board. A player with no entry
+    // here (no evidence at all for any law) gets none, never a false-condition guess.
+    const lawFacts = inputs.lawFacts.get(playerId);
+    if (lawFacts !== undefined) all.push(...lawReasonsFor(lawFacts, inputs.laws));
     candidates.push({ playerId, position, team, perGame, games, reasons: all });
   };
 

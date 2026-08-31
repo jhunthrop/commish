@@ -3,7 +3,9 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
-import { Avatar, Badge, EYEBROW, Sticker } from "@/components/ui";
+import type { Law } from "@/projections/laws/types";
+import type { BoardReason } from "@/projections/preseason/board";
+import { Avatar, Badge, EYEBROW, ReasonChip, Sticker, strongestLawReasons } from "@/components/ui";
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { plural } from "@/domain/duration";
@@ -30,6 +32,17 @@ export interface DraftBoardProps {
    * `room.mock` — see `MockRoomInfo`'s own docblock (`../contract`).
    */
   readonly mock?: { readonly botMarkerLabel: string; readonly botBadge: string } | null;
+  /**
+   * Task 8: the board's own law-backed reasons, keyed by the SAME `playerId` `playersById` uses
+   * — threaded from the pool API's `reasons` field, which is itself `boardReasons` for the
+   * current season's `BOARD_SOURCE` (see `src/app/api/drafts/[draftId]/players/route.ts`).
+   * `null`/omitted renders every sticker exactly as before this task: a board with no reasons
+   * (a season with no confirmed law, a not-yet-ranked pool) is not an error state here.
+   */
+  readonly reasons?: ReadonlyMap<string, readonly BoardReason[]> | null;
+  /** The law registry, for `ReasonChip`'s own `sr-only` elaboration — plain data, read
+   *  server-side (`registry()` never reaches the browser) and threaded alongside `reasons`. */
+  readonly laws?: readonly Law[];
 }
 
 interface BoardCell {
@@ -200,15 +213,25 @@ function StickerCell({
   variant,
   slap,
   spotlight,
+  reasons,
+  laws,
 }: {
   readonly cell: BoardCell;
   readonly playersById: ReadonlyMap<string, Player>;
   readonly variant: DraftBoardVariant;
   readonly slap: boolean;
   readonly spotlight: boolean;
+  readonly reasons: ReadonlyMap<string, readonly BoardReason[]> | null;
+  readonly laws: readonly Law[];
 }) {
   if (cell.pick !== null) {
     const player = playersById.get(cell.pick.playerId) ?? null;
+    // Task 8: strongest |effect| first, capped at two — law 4's "spend emphasis once" applied to
+    // a sticker that already carries a name, a pick number, a position and a team. `null`
+    // `reasons` (a caller that never threaded the pool's reason map) and an unranked player both
+    // resolve to "no chips", exactly like every other reason surface's "absent means nothing to
+    // say" rule.
+    const chips = strongestLawReasons(reasons?.get(cell.pick.playerId) ?? []);
     const layout = `flex h-full items-center gap-2 px-2 py-2 ${slap ? "animate-sticker-slap" : ""}`;
     const body = (
       <>
@@ -233,6 +256,13 @@ function StickerCell({
             {` · ${player?.position ?? cell.pick.slot} · ${player?.nflTeam ?? cell.pick.slot}`}
             {cell.pick.price === null ? "" : ` · $${cell.pick.price}`}
           </span>
+          {chips.length === 0 ? null : (
+            <div className="flex flex-col gap-0.5">
+              {chips.map((reason) => (
+                <ReasonChip key={reason.lawId} reason={reason} registry={laws} />
+              ))}
+            </div>
+          )}
         </div>
       </>
     );
@@ -290,7 +320,17 @@ function StickerCell({
  * row", and a round's serpentine direction is read off the pick numbers already in it rather
  * than from the alternation rule that produced them (which is the engine's, and stays there).
  */
-export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumber = null, variant = "room", mock = null }: DraftBoardProps) {
+export function DraftBoard({
+  view,
+  teams,
+  playersById,
+  myTeamId,
+  landedPickNumber = null,
+  variant = "room",
+  mock = null,
+  reasons = null,
+  laws = [],
+}: DraftBoardProps) {
   const reduced = usePrefersReducedMotion();
   const byId = teamsById(teams);
   const columnIds = columnIdsOf(view, teams);
@@ -324,6 +364,8 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
       variant={variant}
       slap={cell.pick !== null && cell.pick.pickNumber === slapPickNumber}
       spotlight={!reduced}
+      reasons={reasons}
+      laws={laws}
     />
   );
 

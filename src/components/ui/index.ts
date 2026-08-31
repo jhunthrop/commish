@@ -66,3 +66,6 @@ export { PointsShareBar } from "./points-share-bar";
 export { GameStateChip, pointsForGameState, NOT_STARTED_DASH, type GameState } from "./game-state-chip";
 export { EventFeedRow, signedPoints } from "./event-feed-row";
 export { Pill } from "./pill";
+/** The law-backed explanation chip (Task 8): one `BoardReason` rendered as structured copy, plus
+ *  the pure ranking helper (`strongestLawReasons`) a compact row uses to pick its top two. */
+export { ReasonChip, strongestLawReasons, type LawReason } from "./reason-chip";

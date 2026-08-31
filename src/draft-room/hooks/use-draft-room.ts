@@ -5,6 +5,8 @@ import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { ClientDraftAction, CompletedPick, DraftStateView } from "@/draft-engine";
 import type { ApiEnvelope } from "@/lib/api/respond";
+import type { Law } from "@/projections/laws/types";
+import type { BoardReason } from "@/projections/preseason/board";
 import type { DraftPlayersBody, DraftQueueBody, DraftSnapshotBody, MockRoomInfo, WaitingInfo } from "@/draft-room/contract";
 import { applyDraftEvent } from "@/draft-room/state/apply-event";
 import { optimisticView } from "@/draft-room/state/optimistic";
@@ -36,6 +38,19 @@ interface RoomState {
   readonly error: string | null;
   readonly view: DraftStateView | null;
   readonly players: readonly Player[];
+  /**
+   * Task 8: the pool's own law-backed reasons, keyed by `Player.id` — fetched and cached
+   * alongside `players` (see `needsPlayers` below), never on a resync.
+   *
+   * Optional rather than required, matching `DraftPlayersBody.reasons`'s own docblock: the real
+   * fetch path always populates it, but the room's own test fixtures hand-build this state and
+   * are on the deferred UX ledger rather than reopened for this task. Every reader below treats
+   * `undefined` exactly like an empty map.
+   */
+  readonly reasons?: ReadonlyMap<string, readonly BoardReason[]>;
+  /** The law registry, cached alongside `players`/`reasons` for the same reason: it does not
+   *  change during a draft. Optional for the same reason `reasons` is. */
+  readonly laws?: readonly Law[];
   readonly teams: readonly TeamCard[];
   /** The league's display name, straight off the snapshot. */
   readonly leagueName: string;
@@ -66,6 +81,8 @@ const INITIAL: RoomState = {
   error: null,
   view: null,
   players: [],
+  reasons: new Map(),
+  laws: [],
   teams: [],
   leagueName: "",
   myTeamId: null,
@@ -144,6 +161,8 @@ export function useDraftRoom(draftId: string): DraftRoom {
         }
 
         let fetchedPlayers: readonly Player[] | null = null;
+        let fetchedReasons: ReadonlyMap<string, readonly BoardReason[]> | null = null;
+        let fetchedLaws: readonly Law[] | null = null;
         if (needsPlayers && playersResponse !== null) {
           const players = (await playersResponse.json()) as ApiEnvelope<DraftPlayersBody>;
           if (generation !== generationRef.current) return;
@@ -152,6 +171,12 @@ export function useDraftRoom(draftId: string): DraftRoom {
             return;
           }
           fetchedPlayers = players.data.players;
+          // A `Map` does not survive `JSON.stringify` (`DraftPlayersBody.reasons`'s own
+          // docblock) — this is the one place the wire's plain `Record` becomes the `Map` every
+          // reader below (`DraftBoard`'s own `reasons` prop) expects. `?? {}`/`?? []` cover a
+          // response with no `reasons`/`laws` at all (both optional on the wire type).
+          fetchedReasons = new Map(Object.entries(players.data.reasons ?? {}));
+          fetchedLaws = players.data.laws ?? [];
           playersLoadedForRef.current = draftId;
         }
 
@@ -165,6 +190,8 @@ export function useDraftRoom(draftId: string): DraftRoom {
           error: null,
           view: snapshot.data.draft,
           players: fetchedPlayers ?? prev.players,
+          reasons: fetchedReasons ?? prev.reasons,
+          laws: fetchedLaws ?? prev.laws,
           teams: snapshot.data.teams,
           leagueName: snapshot.data.leagueName,
           myTeamId: snapshot.data.teamId,

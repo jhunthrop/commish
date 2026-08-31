@@ -1,6 +1,8 @@
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
+import type { Law } from "@/projections/laws/types";
+import type { BoardReason } from "@/projections/preseason/board";
 import type { PickFactCopy } from "./state/format";
 
 /**
@@ -114,6 +116,22 @@ export interface DraftSnapshotBody {
 
 export interface DraftPlayersBody {
   readonly players: readonly Player[];
+  /**
+   * Task 8: the board's own law-backed reasons for the players this room can see, keyed by
+   * `Player.id` — a plain `Record`, not a `Map`, since a `Map` does not survive `JSON.stringify`;
+   * `useDraftRoom` rebuilds it into a `Map` on receipt. A player absent from this object is a
+   * player `boardReasons` has nothing for (never ranked, or ranked with no confirmed law true for
+   * him) — the same "absence means nothing to say" rule `boardReasons` itself keeps.
+   *
+   * Optional rather than required: the real route (`GET /api/drafts/[draftId]/players`) always
+   * sets it, but this type is also the shape hand-built test fixtures across the room construct,
+   * and those suites are on the deferred UX ledger rather than reopened for this task. `undefined`
+   * reads exactly like an empty object everywhere this is consumed.
+   */
+  readonly reasons?: Readonly<Record<string, readonly BoardReason[]>>;
+  /** The law registry (`registry()`, read server-side), for `ReasonChip`'s own claim lookup.
+   *  Optional for the same reason `reasons` is. */
+  readonly laws?: readonly Law[];
 }
 
 export interface DraftQueueBody {

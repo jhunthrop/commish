@@ -66,6 +66,8 @@ export function RoomShell({
       queuedPlayerIds={queuedPlayerIds}
       onQueue={onQueueToggle}
       teamCount={room.teams.length}
+      reasons={room.reasons}
+      laws={room.laws}
     />
   );
 
@@ -122,6 +124,8 @@ export function RoomShell({
             myTeamId={room.myTeamId}
             landedPickNumber={room.lastPick?.pick.pickNumber ?? null}
             mock={room.mock ? { botMarkerLabel: room.mock.botMarkerLabel, botBadge: room.mock.botBadge } : null}
+            reasons={room.reasons}
+            laws={room.laws}
           />
           {/* GAMEDAY, LAW 4: the room's history, at density. This band replaced `PickWire` here
               — R1's one truncated mono line, which showed six picks and hid every one before
