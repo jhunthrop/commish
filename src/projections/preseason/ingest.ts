@@ -62,8 +62,9 @@ export async function historicalWeek1RosterAsOf(db: ReadonlyDb, season: number):
 }
 
 /** `week1RosterAsOf(season)` from the fixed-stamp cutover onward, `historicalWeek1RosterAsOf` before
- *  it. The one place a caller decides which of the two stamping strategies a season needs. */
-async function week1RosterStampFor(db: ReadonlyDb, season: number): Promise<Date> {
+ *  it. The one place a caller decides which of the two stamping strategies a season needs. Exported
+ *  so the dispatch itself — not just each branch in isolation — can be pinned by a test. */
+export async function week1RosterStampFor(db: ReadonlyDb, season: number): Promise<Date> {
   return season >= ROSTER_SOURCE_CONFIG.earliestSeason ? week1RosterAsOf(season) : historicalWeek1RosterAsOf(db, season);
 }
 
