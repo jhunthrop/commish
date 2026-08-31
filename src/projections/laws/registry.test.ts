@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parseMeasuredJson, registry, registryFrom, stratumKeyFor, verdictForFullWindow, type MeasuredEntry, type MeasuredJson } from "./registry";
 import { LAW_SPECS, type LawSpec } from "./populations";
 import type { PlayerSeasonPoint } from "./types";
+import { predictOpportunity } from "../model/opportunity";
+import { TOUCHDOWN_RATES } from "../model/efficiency";
+import { fitRedistributionPriors } from "../model/redistribution-fit";
 
 /**
  * `registryFrom` DRIVEN WITH HAND-BUILT FIXTURES — no DB, no `measured.json` on disk. Every test
@@ -144,6 +147,39 @@ describe("parseMeasuredJson", () => {
     // effect typo'd into a string — the kind of hand edit the module's own docblock worries about.
     const malformed = JSON.stringify({ fake_law: { ...measurementFixture(), effect: "-3" } });
     expect(() => parseMeasuredJson(malformed)).toThrow(/malformed measured\.json: "fake_law"\.effect is not a finite number/);
+  });
+});
+
+/**
+ * THE MODEL-WIRING DRIFT GUARD (this wave, 2026-08-31): every confirmed law's `modelPath` names a
+ * real export of a real model file. Importing the symbol directly, rather than resolving the
+ * string at runtime, is the point — a rename of `fitRedistributionPriors`, `predictOpportunity`
+ * or `TOUCHDOWN_RATES` breaks this file at compile time, before the assertion below ever runs,
+ * exactly the "so a rename breaks the test" the field's own docblock (`populations.ts`) promises.
+ */
+describe("modelPath wiring", () => {
+  const WIRED: ReadonlyMap<string, { readonly file: string; readonly symbolName: string; readonly symbol: unknown }> = new Map([
+    [
+      "wr_target_competition",
+      { file: "src/projections/model/redistribution-fit.ts", symbolName: "fitRedistributionPriors", symbol: fitRedistributionPriors },
+    ],
+    [
+      "target_share_persistence",
+      { file: "src/projections/model/opportunity.ts", symbolName: "predictOpportunity", symbol: predictOpportunity },
+    ],
+    ["td_regression", { file: "src/projections/model/efficiency.ts", symbolName: "TOUCHDOWN_RATES", symbol: TOUCHDOWN_RATES }],
+  ]);
+
+  it("names a real, imported exported symbol for every non-null modelPath, and nothing else carries one", () => {
+    for (const spec of LAW_SPECS) {
+      const wired = WIRED.get(spec.id);
+      if (wired === undefined) {
+        expect(spec.modelPath, `${spec.id} has a modelPath but no entry in this test's WIRED map`).toBeNull();
+        continue;
+      }
+      expect(spec.modelPath).toBe(`${wired.file}#${wired.symbolName}`);
+      expect(wired.symbol).toBeDefined();
+    }
   });
 });
 

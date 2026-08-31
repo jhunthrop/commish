@@ -247,6 +247,16 @@ gone stale, see below).
   rather than resolved: the MIA 2021 co-OC pair (collapsed to Godsey, primary per reporting) and the
   103-entry verification queue generally (section 4).
 
+- **`LawSpec.modelPath` (final-review fix wave, 2026-08-31): annotated, not fitted.** It now names
+  the existing fitted feature (`"<file>#<exported symbol>"`) a CONFIRMED law's population already
+  matches — `wr_target_competition` → `redistribution-fit.ts#fitRedistributionPriors`,
+  `target_share_persistence` → `opportunity.ts#predictOpportunity`, `td_regression` →
+  `efficiency.ts#TOUCHDOWN_RATES` — guarded by an import-and-check test (`registry.test.ts`) so a
+  rename orphans the pointer loudly. No new fit and no re-fit ran this wave (controller ruling): the
+  two `weak` RB laws and the `debunked` play-caller law stay `modelPath: null` and remain
+  content-only, whatever their claim's own story, until a model round confirms one of them and gives
+  it a feature of its own.
+
 None of these block the scorecard or the law verdicts above; they are the honest list of loose ends
 a future round should pick up, not defects in what was measured here.
 

@@ -66,6 +66,8 @@ export function RoomShell({
       queuedPlayerIds={queuedPlayerIds}
       onQueue={onQueueToggle}
       teamCount={room.teams.length}
+      reasons={room.reasons}
+      laws={room.laws}
     />
   );
 

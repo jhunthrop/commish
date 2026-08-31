@@ -59,6 +59,24 @@ export interface LawSpec {
   readonly claim: string;
   readonly expectedSign: -1 | 1;
   readonly caliper: number;
+  /**
+   * WHAT `modelPath` MEANS (controller ruling, this wave, 2026-08-31: annotate the existing model,
+   * never build or re-fit one). `null` unless a CONFIRMED law's antecedent is already what an
+   * existing fitted feature computes — in which case this names that feature as
+   * `"<file path from repo root>#<exported symbol>"`, a string `populations.test.ts`'s registry
+   * test resolves by importing the named symbol from the named file, so a rename of either half
+   * breaks that test rather than silently orphaning the pointer.
+   *
+   * Wired this wave: `wr_target_competition` to the offseason share-redistribution feature
+   * (`fitRedistributionPriors`), `target_share_persistence` to the opportunity model's own
+   * target-share shrinkage (`predictOpportunity`), `td_regression` to the efficiency model's
+   * touchdown-rate regression handling (`TOUCHDOWN_RATES`) — the three laws `measured.json` calls
+   * `confirmed`. `play_caller_fingerprint` (debunked), `rb_age_curve` and `rb_workload_cliff`
+   * (both weak) stay `null`: a law that is not confirmed gates nothing, whatever feature might
+   * otherwise seem to fit its story. A future law confirmed with no existing feature to point at
+   * gets one through the normal feature/fit route (`model/fit.ts`) in a model round of its own —
+   * until then it is content-only, exactly like a debunked or weak law's claim.
+   */
   readonly modelPath: string | null;
   readonly population: (db: ReadonlyDb, seasons: readonly number[]) => Promise<readonly PlayerSeasonPoint[]>;
 }
@@ -386,6 +404,8 @@ interface LawEntry {
   readonly expectedSign: -1 | 1;
   readonly eligible: (position: Position) => position is LawPosition;
   readonly condition: (facts: LawConditionFacts) => boolean | null;
+  /** See `LawSpec.modelPath`'s own docblock for what this means and why most laws leave it `null`. */
+  readonly modelPath: string | null;
 }
 
 const LAW_ENTRIES: readonly LawEntry[] = [
@@ -396,6 +416,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
     expectedSign: -1,
     eligible: isRb,
     condition: rbWorkloadCliffCondition,
+    modelPath: null,
   },
   {
     id: "rb_age_curve",
@@ -404,22 +425,25 @@ const LAW_ENTRIES: readonly LawEntry[] = [
     expectedSign: -1,
     eligible: isRb,
     condition: rbAgeCurveCondition,
+    modelPath: null,
   },
   {
     id: "wr_target_competition",
     position: "WR",
-    claim: "Another primary receiver on his team: a wide receiver with a WR/TE teammate whose own season-N target share is at least 20% and at least as large as the receiver's own share loses points per game the following season. SIMPLIFIED: this reads season-N's own roster, not a predicted season-N+1 arrival, because no store this engine reads can see next season's roster before it exists.",
+    claim: "Another primary receiver on his team: a wide receiver with a WR/TE teammate whose own season-N target share is at least 20% and at least as large as the receiver's own share loses points per game the following season. Simplified: teammates are read from the season being measured, not from a predicted next-season arrival, because next season's roster is not knowable yet when the measurement is taken.",
     expectedSign: -1,
     eligible: isWr,
     condition: wrTargetCompetitionCondition,
+    modelPath: "src/projections/model/redistribution-fit.ts#fitRedistributionPriors",
   },
   {
     id: "play_caller_fingerprint",
     position: "all",
-    claim: "The play-caller fingerprint: a pass-catcher (WR or TE) whose team enters a season with a first-year play-caller (the coordinator or head coach who calls the offense's plays) whose own history elsewhere shows a positive pass-rate-over-expected gains points per game. SIMPLIFIED: 'his team' is the player's own team as of the measured season, since the following season's actual roster is not knowable at the schedule-publication gate; a player traded before the coaching change is measured against his old team.",
+    claim: "The play-caller fingerprint: a pass-catcher (WR or TE) whose team enters a season with a first-year play-caller (the coordinator or head coach who calls the offense's plays) whose own history elsewhere shows a positive pass-rate-over-expected gains points per game. Simplified: 'his team' means the team he played for in the season being measured, because next season's actual roster is not knowable at the time the measurement is taken; a player traded before the coaching change is still measured against his old team.",
     expectedSign: 1,
     eligible: isWrOrTe,
     condition: playCallerFingerprintCondition,
+    modelPath: null,
   },
   {
     id: "target_share_persistence",
@@ -428,6 +452,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
     expectedSign: 1,
     eligible: isWr,
     condition: targetSharePersistenceCondition,
+    modelPath: "src/projections/model/opportunity.ts#predictOpportunity",
   },
   {
     id: "td_regression",
@@ -436,6 +461,7 @@ const LAW_ENTRIES: readonly LawEntry[] = [
     expectedSign: -1,
     eligible: isSkillPosition,
     condition: tdRegressionCondition,
+    modelPath: "src/projections/model/efficiency.ts#TOUCHDOWN_RATES",
   },
 ];
 
@@ -521,6 +547,6 @@ export const LAW_SPECS: readonly LawSpec[] = LAW_ENTRIES.map((entry) => ({
   claim: entry.claim,
   expectedSign: entry.expectedSign,
   caliper: POINTS_PER_GAME_CALIPER,
-  modelPath: null,
+  modelPath: entry.modelPath,
   population: (db, seasons) => populationFor(db, seasons, entry.id),
 }));

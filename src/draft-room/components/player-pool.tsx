@@ -3,7 +3,9 @@
 import { Fragment, useMemo, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Badge, Button, EmptyState, Input, Movement, PlayerRow, PositionBadge, TierDivider } from "@/components/ui";
+import type { Law } from "@/projections/laws/types";
+import type { BoardReason } from "@/projections/preseason/board";
+import { Badge, Button, EmptyState, Input, Movement, PlayerRow, PositionBadge, ReasonChip, TierDivider, strongestLawReasons } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { queueButtonLabel } from "../lib/lookups";
 import { formatAdp, poolTiers, positionRanks } from "../lib/tiers";
@@ -41,6 +43,17 @@ export interface PlayerPoolProps {
    * still wins once it exists: it is the seating this draft actually drew.
    */
   readonly teamCount: number;
+  /**
+   * The board's own law-backed reasons, keyed by the same `playerId` `players` carries — the same
+   * map `DraftBoard` already threads to its stickers (Task 8's `boardReasons`, via the pool API's
+   * `reasons` field). `null`/omitted renders every row exactly as before this prop existed: a
+   * board with no reasons (a season with no confirmed law, a not-yet-ranked pool) is not an error
+   * state here, matching `DraftBoard`'s own contract for the same data.
+   */
+  readonly reasons?: ReadonlyMap<string, readonly BoardReason[]> | null;
+  /** The law registry, for `ReasonChip`'s own `sr-only` elaboration — plain data, read
+   *  server-side (`registry()` never reaches the browser) and threaded alongside `reasons`. */
+  readonly laws?: readonly Law[];
 }
 
 interface PoolRow {
@@ -127,7 +140,21 @@ function PositionFilters({ value, onChange }: { readonly value: string; readonly
  * The star is the queue toggle; the button beside it is the act. Both are real, named controls,
  * so the whole pool is walkable from the keyboard.
  */
-export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, actionLabel, submitting, onAct, queuedPlayerIds, onQueue, teamCount }: PlayerPoolProps) {
+export function PlayerPool({
+  players,
+  view,
+  pendingPlayerId,
+  canAct,
+  myTeamId,
+  actionLabel,
+  submitting,
+  onAct,
+  queuedPlayerIds,
+  onQueue,
+  teamCount,
+  reasons = null,
+  laws = [],
+}: PlayerPoolProps) {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(ALL);
   // Task 5: a team that owes a pick may make it any time, so the row-level Draft button below
@@ -269,6 +296,11 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
             // feed does not rank ends the ladder rather than opening an unlabelled band.
             const opensBand = tier !== null && (previousTier === null || previousTier.id !== tier.id);
             const adp = formatAdp(row.player.adp);
+            // Task (rankings surface): strongest |effect| first, capped at two, same rule and
+            // same helper `StickerCell` uses — spend the "why" emphasis once, in one place, per
+            // Sunday v5 law 4. `null`/absent `reasons` and an unranked player both resolve to "no
+            // chips", which is what leaves this row's height untouched (see `PlayerRow.chips`).
+            const lawChips = strongestLawReasons(reasons?.get(row.player.id) ?? []);
             return (
               // A fragment, never a wrapper element: an `<ol>` may hold only list items, and a
               // band divider is a sibling `<li>` of the rows it opens rather than a `<div>`
@@ -289,6 +321,15 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
                         <span data-testid="pool-player-team">{row.player.nflTeam}</span>
                         {adp === null ? null : <span data-testid="pool-player-adp">{` · ${adp}`}</span>}
                       </>
+                    }
+                    chips={
+                      lawChips.length === 0 ? null : (
+                        <>
+                          {lawChips.map((reason) => (
+                            <ReasonChip key={reason.lawId} reason={reason} registry={laws} />
+                          ))}
+                        </>
+                      )
                     }
                     // A steal is a judgement about THIS MOMENT and outranks the standing market
                     // gap: once the board has run past a man's own rank, "still here at pick 44"

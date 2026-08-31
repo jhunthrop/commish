@@ -13,6 +13,14 @@ export interface PlayerRowProps {
    *  caller can put a live chip or a kickoff time in the run without this file learning about
    *  either. */
   readonly meta?: ReactNode;
+  /**
+   * Law-backed reason chips, printed on their OWN line directly under the meta line — the row's
+   * secondary line, same placement as `StickerCell`'s own chip line on the draft board. Omitted
+   * (`undefined`/`null`) for a player with no reasons, which costs the row nothing: this line does
+   * not render at all, so a pool of players with and without reasons never gets a ragged column of
+   * empty space, and a row with nothing to say keeps exactly its old height.
+   */
+  readonly chips?: ReactNode;
   /** The judgement, if the surface has one — a `Stat` in its `inline` orientation ("+11 steal").
    *  `Stat` is the ONLY component allowed to name a magnitude colour
    *  (`magnitude-budget.source.test.ts`), which is exactly why this is a slot and not a prop this
@@ -82,7 +90,7 @@ const SKIN: Readonly<Record<"plain" | "highlight", string>> = {
  * name, and wrapping a second click target around it is how a board ends up with two ways to draft
  * the wrong man.
  */
-export function PlayerRow({ player, positionRank, meta, verdict, action, highlight = false, className = "" }: PlayerRowProps) {
+export function PlayerRow({ player, positionRank, meta, chips, verdict, action, highlight = false, className = "" }: PlayerRowProps) {
   return (
     <div
       data-highlight={highlight ? "true" : undefined}
@@ -118,6 +126,7 @@ export function PlayerRow({ player, positionRank, meta, verdict, action, highlig
               expects a figure. The name now loses width only to the face and the act. */}
           {verdict === undefined || verdict === null ? null : <span className="ml-auto shrink-0 pl-2">{verdict}</span>}
         </span>
+        {chips === undefined || chips === null ? null : <span className="flex flex-wrap items-center gap-1">{chips}</span>}
       </div>
       {action === undefined ? null : <div className="shrink-0">{action}</div>}
     </div>
