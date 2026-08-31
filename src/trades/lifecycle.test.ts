@@ -15,7 +15,9 @@ describe("transitionIsLegal", () => {
 
   it("lets supersede run from open OR held — the world moving on, not a review's own answer", () => {
     for (const status of TRADE_STATUSES) {
-      expect(transitionIsLegal(status, "supersede")).toBe(status === "open" || status === "held");
+      // Trade governance (2026-08-30): an under_review trade dies to the world moving on
+      // exactly like an open or held one.
+      expect(transitionIsLegal(status, "supersede")).toBe(status === "open" || status === "held" || status === "under_review");
     }
   });
 

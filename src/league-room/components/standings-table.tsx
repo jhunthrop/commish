@@ -1,24 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { TeamStandingsRow } from "../contract";
-import { Avatar, Button, EmptyState, Movement, Table, type TableColumn, SegmentGroup } from "@/components/ui";
+import { Avatar, Button, EmptyState, Movement, Table, type TableColumn } from "@/components/ui";
 import { formatPoints, formatRecord } from "../lib/format";
 
-type SortKey = "rank" | "pointsFor" | "pointsAgainst";
 
-/**
- * The canonical ranking — wins, then points for, then team id — is `computeStandings`', on
- * the server, and is never restated here. `rank` therefore sorts by nothing at all and simply
- * keeps the order the server sent. The other two sort by that number alone; because
- * `Array.prototype.sort` is stable, ties fall back to the server's ranking for free. That is
- * display, not a league rule.
- */
-const ORDER_BY: Readonly<Record<SortKey, (row: TeamStandingsRow) => number>> = {
-  rank: () => 0,
-  pointsFor: (row) => row.pointsFor,
-  pointsAgainst: (row) => row.pointsAgainst,
-};
 
 /** What the movement column is measured against, in the words the screen reader will say. */
 const MOVEMENT_AGAINST = "last week";
@@ -85,8 +72,10 @@ function firstTeamOutId(rows: readonly TeamStandingsRow[], playoffTeams: number 
  * always was.
  */
 export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeams }: StandingsTableProps) {
-  const [sort, setSort] = useState<SortKey>("rank");
-  const ordered = useMemo(() => [...rows].sort((a, b) => ORDER_BY[sort](b) - ORDER_BY[sort](a)), [rows, sort]);
+  // NO SORT TABS (founder, 2026-08-30: "we have tabs for points for and points against but we
+  // already show them"). Both columns are visible on every row — re-ordering a table the eye
+  // has already read is chrome doing the reader's job. The server's ranking is the order.
+  const ordered = useMemo(() => [...rows], [rows]);
 
   // `clinchedTeamIds` reports every team clinched from week 1 whenever the playoff field is at
   // least as big as the league (`playoffTeams >= teamCount`) — a real branch, but a signal with
@@ -180,25 +169,7 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
 
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-        <h2 className="font-display text-display-sm font-semibold leading-display text-text-primary">Standings</h2>
-        {/* THE SEGMENTED RAIL, not three underlined sentences (the scan pass, 2026-08-30):
-            "Sort by standing · Sort by points for · Sort by points against" was prose doing a
-            control's job — three links the eye had to READ to compare, saying "Sort by" three
-            times. The rail shows the choice as a choice; a sort is furniture and wears the
-            furniture amber. */}
-        <SegmentGroup
-          label="Sort"
-          labelled={false}
-          options={[
-            { value: "rank", label: "Standing" },
-            { value: "pointsFor", label: "Points for" },
-            { value: "pointsAgainst", label: "Points against" },
-          ]}
-          value={sort}
-          onChange={(value) => setSort(value as SortKey)}
-        />
-      </div>
+      <h2 className="font-display text-display-sm font-semibold leading-display text-text-primary">Standings</h2>
       <Table
         fill
         caption="League standings"
