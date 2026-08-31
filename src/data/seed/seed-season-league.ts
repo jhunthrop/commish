@@ -197,8 +197,15 @@ export async function seedSeasonLeague(
   const schedule = await db.transaction((tx) => writeSchedule(tx, { leagueId, teamIds, weeks: LEAGUE_CONFIG.regularSeasonWeeks }));
 
   let scoredWeeks = 0;
-  for (let week = 1; week <= LEAGUE_CONFIG.regularSeasonWeeks; week++) {
+  // THROUGH THE PLAYOFFS (roadmap item 6, 2026-08-30): settling a week now GENERATES the next
+  // playoff round (`advancePlayoffsInTx`), and a season only completes when the championship
+  // settles — so the seeder keeps settling until the bracket runs out. Three extra weeks for a
+  // full-size league; a demo league smaller than the playoff cut generates no rounds and stops
+  // where it always did.
+  const lastPossibleWeek = LEAGUE_CONFIG.regularSeasonWeeks + 3;
+  for (let week = 1; week <= lastPossibleWeek; week++) {
     const result = await finalizeWeek(db, leagueId, week);
+    if (!result.ok && result.status === 404) break;
     if (result.ok) scoredWeeks += 1;
   }
 

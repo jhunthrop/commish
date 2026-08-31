@@ -314,6 +314,7 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
       // Trade governance (roadmap item 5): a seeder builds HISTORY — the review window is
       // fast-forwarded through the same finalize re-entry the lazy processor uses.
       const reviewed = await acceptTrade(db, {
+        bypassDeadline: true,
         tradeId: existing.id,
         leagueId: LEAGUE_ID,
         userId: userIdByTeamId.get(existing.counterpartyTeamId)!,
@@ -325,6 +326,7 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
       const acceptResult =
         reviewed.ok && reviewed.outcome === "under_review"
           ? await acceptTrade(db, {
+        bypassDeadline: true,
               tradeId: existing.id,
               leagueId: LEAGUE_ID,
               userId: userIdByTeamId.get(existing.counterpartyTeamId)!,
@@ -351,6 +353,8 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
     const getTeamId = pick.get[0]!.teamId;
 
     const proposeResult = await proposeTrade(db, {
+    // Seeder-manufactured history: the calendar deadline is bypassed, every other rule binds.
+    bypassDeadline: true,
       leagueId: LEAGUE_ID,
       userId: userIdByTeamId.get(giveTeamId)!,
       counterpartyTeamId: getTeamId,
@@ -368,6 +372,7 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
     }
 
     const reviewed = await acceptTrade(db, {
+        bypassDeadline: true,
       tradeId: proposeResult.tradeId,
       leagueId: LEAGUE_ID,
       userId: userIdByTeamId.get(getTeamId)!,
@@ -380,6 +385,7 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
     const acceptResult =
       reviewed.ok && reviewed.outcome === "under_review"
         ? await acceptTrade(db, {
+        bypassDeadline: true,
             tradeId: proposeResult.tradeId,
             leagueId: LEAGUE_ID,
             userId: userIdByTeamId.get(getTeamId)!,

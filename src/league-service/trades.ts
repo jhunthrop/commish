@@ -219,6 +219,8 @@ function toTransferAssets(playerIds: readonly string[], positions: ReadonlyMap<s
 }
 
 export interface ProposeTradeInput {
+  /** SEEDERS ONLY — see `AcceptTradeInput.bypassDeadline`. */
+  readonly bypassDeadline?: boolean;
   readonly leagueId: string;
   /** The offer resolves to a team from THIS, never from the request body — see the schema's own
    *  docblock for why there is no `proposerTeamId` field to spoof. */
@@ -293,7 +295,7 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
   // THE WEEK, DERIVED — see this function's own docblock. One read, one definition.
   const weekNumber = await currentWeekOf(db, input.leagueId);
   // TRADE DEADLINE (roadmap item 5): the late-season line every arriving manager expects.
-  if (weekNumber > LEAGUE_CONFIG.tradeDeadlineWeek) {
+  if (input.bypassDeadline !== true && weekNumber > LEAGUE_CONFIG.tradeDeadlineWeek) {
     return { ok: false, status: 409, reason: TRADE_GOVERNANCE_REFUSALS.deadline };
   }
 
@@ -888,6 +890,10 @@ export interface AcceptTradeInput {
   readonly tradeId: string;
   readonly leagueId: string;
   readonly userId: string;
+  /** SEEDERS ONLY (documented at every setter): a fixture manufacturing believable history
+   *  places trades at weeks the calendar no longer allows. Routes never set this — the deadline
+   *  binds every live manager. */
+  readonly bypassDeadline?: boolean;
   /** Trade governance (roadmap item 5): the lazy review finalizer's re-entry. The guarded
    *  update runs FROM `under_review` instead of `open`, skips the expiry gate (an offer's TTL
    *  may lapse during its review), and lands in the ordinary executed path unchanged. Never set
@@ -1121,7 +1127,7 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
       // TRADE DEADLINE (roadmap item 5) — the yes is refused past it, exactly like the offer.
       // A FINALIZE re-entry is exempt: the acceptance beat the deadline, and the review window
       // running past it must not kill a legally-made trade.
-      if (input.finalizeReview !== true && weekNumber > LEAGUE_CONFIG.tradeDeadlineWeek) {
+      if (input.finalizeReview !== true && input.bypassDeadline !== true && weekNumber > LEAGUE_CONFIG.tradeDeadlineWeek) {
         return { ok: false as const, status: 409, reason: TRADE_GOVERNANCE_REFUSALS.deadline };
       }
       const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber)).for("share");

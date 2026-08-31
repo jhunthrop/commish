@@ -193,7 +193,8 @@ async function seedHeldTradeLeague(db: Db, clock: Clock, deps: SeedEnforcementDe
   if (existing !== undefined) {
     if (existing.status === "held") return { leagueId: HELD_TRADE_LEAGUE_ID, tradeId: existing.id, outcome: "held" };
     if (existing.status === "open") {
-      const acceptResult = await acceptTrade(db, { tradeId: existing.id, leagueId: HELD_TRADE_LEAGUE_ID, userId: ownerB, clock, notify: deps.notify, deliver: deps.deliver, audit: deps.audit });
+      const acceptResult = await acceptTrade(db, {
+        bypassDeadline: true, tradeId: existing.id, leagueId: HELD_TRADE_LEAGUE_ID, userId: ownerB, clock, notify: deps.notify, deliver: deps.deliver, audit: deps.audit });
       if (!acceptResult.ok || acceptResult.outcome !== "held") {
         throw new Error(`seedEnforcement: resuming the held-trade fixture didn't hold: ${JSON.stringify(acceptResult)}`);
       }
@@ -230,6 +231,8 @@ async function seedHeldTradeLeague(db: Db, clock: Clock, deps: SeedEnforcementDe
   }
 
   const proposeResult = await proposeTrade(db, {
+    // Seeder-manufactured history: the calendar deadline is bypassed, every other rule binds.
+    bypassDeadline: true,
     leagueId: HELD_TRADE_LEAGUE_ID,
     userId: ownerA,
     counterpartyTeamId: HELD_TRADE_TEAM_B,
@@ -246,7 +249,8 @@ async function seedHeldTradeLeague(db: Db, clock: Clock, deps: SeedEnforcementDe
     throw new Error(`seedEnforcement: the held-trade fixture's own proposal was refused: ${proposeResult.reason}`);
   }
 
-  const acceptResult = await acceptTrade(db, { tradeId: proposeResult.tradeId, leagueId: HELD_TRADE_LEAGUE_ID, userId: ownerB, clock, notify: deps.notify, deliver: deps.deliver, audit: deps.audit });
+  const acceptResult = await acceptTrade(db, {
+        bypassDeadline: true, tradeId: proposeResult.tradeId, leagueId: HELD_TRADE_LEAGUE_ID, userId: ownerB, clock, notify: deps.notify, deliver: deps.deliver, audit: deps.audit });
   if (!acceptResult.ok) {
     throw new Error(`seedEnforcement: the held-trade fixture's own acceptance was refused: ${acceptResult.reason}`);
   }

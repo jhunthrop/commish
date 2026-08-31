@@ -94,7 +94,12 @@ export async function leagueStandings(
   teamCards: readonly TeamCard[],
   medianGame: boolean,
 ): Promise<readonly TeamStandingsRow[]> {
-  const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
+  // REGULAR SEASON ONLY (roadmap item 6's own honesty pin): the bracket engine writes playoff
+  // matchups into the same table, and a championship loss must never subtract from the record
+  // that seeded it. Standings are a regular-season fact.
+  const matchupRows = (await db.select().from(matchups).where(eq(matchups.leagueId, leagueId))).filter(
+    (row) => row.weekNumber <= LEAGUE_CONFIG.regularSeasonWeeks,
+  );
   const medianByWeek = await medianByWeekFor(db, leagueId);
   const standings = computeStandings({ teamIds: teamCards.map((card) => card.id), matchups: matchupRows, medianByWeek });
 

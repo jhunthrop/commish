@@ -5,7 +5,7 @@ import type { Position, StatLine } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
-import { leagueMedian, startersOf } from "@/league";
+import { LEAGUE_CONFIG, leagueMedian, startersOf } from "@/league";
 import { getLineup } from "@/league-service/lineups";
 import { stampSeasonCompleteInTx } from "@/league-service/participation";
 import { advancePlayoffsInTx } from "@/league-service/playoff-advance";
@@ -253,7 +253,10 @@ export async function finalizeWeekInTx(tx: DbTx, leagueId: string, weekNumber: n
   // `src/integrity-service/lock-order.test.ts`; see that file's own note beside
   // `stampSeasonCompleteInTx`'s entry.
   const [league] = await tx.select({ medianGame: leagues.medianGame }).from(leagues).where(eq(leagues.id, leagueId));
-  if (league!.medianGame) {
+  // NEVER for a playoff week (roadmap item 6's own honesty pin): the median game is a
+  // regular-season device — a playoff round is head-to-head, and a phantom median result in a
+  // bracket week would put a second, invented outcome on an elimination game.
+  if (league!.medianGame && weekNumber <= LEAGUE_CONFIG.regularSeasonWeeks) {
     const median = leagueMedian([...scores.values()]);
     await tx.update(weeks).set({ medianScore: median }).where(and(eq(weeks.leagueId, leagueId), eq(weeks.weekNumber, weekNumber)));
   }

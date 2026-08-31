@@ -40,7 +40,9 @@ describe("seedSeasonLeague", () => {
     expect(counts).toEqual({
       teams: DEV_SEED.teamCount,
       weeks: LEAGUE_CONFIG.regularSeasonWeeks,
-      scoredWeeks: LEAGUE_CONFIG.regularSeasonWeeks,
+      // + the three playoff rounds the settlements themselves generate (roadmap item 6):
+      // the seeded season now crowns a real champion.
+      scoredWeeks: LEAGUE_CONFIG.regularSeasonWeeks + 3,
     });
 
     const teamRows = await db.select().from(teams).where(eq(teams.leagueId, DEV_SEED.season.leagueId));
@@ -63,12 +65,16 @@ describe("seedSeasonLeague", () => {
     expect(new Set(owned).size).toBe(owned.length);
 
     const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, DEV_SEED.season.leagueId));
-    expect(matchupRows).toHaveLength(LEAGUE_CONFIG.regularSeasonWeeks * 6);
+    // 84 regular-season games + the 5 playoff games (2 + 2 + 1) the bracket engine generated.
+    expect(matchupRows).toHaveLength(LEAGUE_CONFIG.regularSeasonWeeks * 6 + 5);
     expect(matchupRows.every((row) => row.homeScore !== null && row.awayScore !== null)).toBe(true);
     // Real scores, not a table of zeroes.
     expect(matchupRows.some((row) => (row.homeScore ?? 0) > 0)).toBe(true);
 
-    const standings = computeStandings({ teamIds: teamRows.map((row) => row.id), matchups: matchupRows });
+    // Regular-season rows only, mirroring leagueStandings' own filter: a championship loss
+    // never subtracts from the record that seeded it.
+    const regularSeason = matchupRows.filter((row) => row.weekNumber <= LEAGUE_CONFIG.regularSeasonWeeks);
+    const standings = computeStandings({ teamIds: teamRows.map((row) => row.id), matchups: regularSeason });
     const games = standings.reduce((sum, row) => sum + row.wins + row.losses + row.ties, 0);
     expect(games).toBe(LEAGUE_CONFIG.regularSeasonWeeks * 12);
   });
@@ -151,6 +157,8 @@ describe("VETERAN_SEASON_LEAGUES (Phase 3 Plan D, Task 10, Step 1)", () => {
 describe("MEDIAN_DEMO_LEAGUE (Phase 3.5, Task 10)", () => {
   it("threads medianGame onto the league row and produces a real second (median) result every week", async () => {
     const counts = await seedSeasonLeague(db, clock, undefined, MEDIAN_DEMO_LEAGUE);
+    // A four-team league is smaller than the playoff cut: the bracket engine generates nothing
+    // and the season stays 14 settled weeks.
     expect(counts.scoredWeeks).toBe(LEAGUE_CONFIG.regularSeasonWeeks);
 
     const [league] = await db.select().from(leagues).where(eq(leagues.id, MEDIAN_DEMO_LEAGUE.leagueId));
