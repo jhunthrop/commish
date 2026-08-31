@@ -1,7 +1,7 @@
 import { and, asc, eq, ilike, notInArray, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { excludedSetFor } from "@/db/upsert";
-import { drafts, leagues, lineupSlots, players, rosterSlots, statWeeks, teams } from "@/db/schema";
+import { injuredReserve, drafts, leagues, lineupSlots, players, rosterSlots, statWeeks, teams } from "@/db/schema";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { assignSlot } from "@/draft-engine";
@@ -14,6 +14,11 @@ import { materializeLockedLineupsInTx, toFilledRosterSlots } from "./trade-trans
  * Every reason a claim declines to act, named once — the `RELEASE_REFUSALS` discipline. These
  * are user-facing sentences; the route returns them verbatim.
  */
+/** The market ceiling inside which a player cannot be dropped — ten rounds of a 12-team draft.
+ *  Derived from ADP rather than an editorial list: self-updating, and self-explaining. Trades
+ *  remain the route for moving a player this valuable. */
+const UNDROPPABLE_ADP_CEILING = 120;
+
 export const CLAIM_REFUSALS = {
   leagueMissing: "That league does not exist.",
   notMember: "You do not have a team in this league.",
@@ -21,6 +26,7 @@ export const CLAIM_REFUSALS = {
   playerMissing: "That player does not exist.",
   notFree: "Another manager holds that player. If you want him, propose a trade.",
   dropNotYours: "You can only drop a player from your own roster.",
+  undroppable: "He is too valuable to drop. Trade him instead.",
   rosterFull: "Your roster is full. Name a player to drop and the add and the drop happen together.",
   noRoom: "There is no legal slot for that player on your roster, even with the drop.",
 } as const;
@@ -68,7 +74,15 @@ export async function freeAgents(db: Db, input: FreeAgentsInput): Promise<{ read
     .innerJoin(teams, eq(rosterSlots.teamId, teams.id))
     .where(and(eq(teams.leagueId, input.leagueId), sql`${rosterSlots.playerId} is not null`));
 
-  const conditions = [notInArray(players.id, rosteredInLeague)];
+  // An IR'd player has no roster_slots row but is still OWNED — without this second exclusion
+  // the pool would offer him to the whole league the moment his manager parked him (roadmap
+  // item 3, 2026-08-30).
+  const onInjuredReserve = db
+    .select({ playerId: injuredReserve.playerId })
+    .from(injuredReserve)
+    .innerJoin(teams, eq(injuredReserve.teamId, teams.id))
+    .where(eq(teams.leagueId, input.leagueId));
+  const conditions = [notInArray(players.id, rosteredInLeague), notInArray(players.id, onInjuredReserve)];
   if (input.search !== undefined && input.search.trim() !== "") conditions.push(ilike(players.name, `%${input.search.trim()}%`));
   if (input.position !== undefined && input.position !== "ALL") conditions.push(eq(players.position, input.position));
 
@@ -153,6 +167,14 @@ export async function claimPlayer(db: Db, input: ClaimInput, deps: ClaimDeps): P
       .innerJoin(teams, eq(rosterSlots.teamId, teams.id))
       .where(and(eq(teams.leagueId, input.leagueId), eq(rosterSlots.playerId, input.addPlayerId)));
     if (holder !== undefined) return refuse(409, CLAIM_REFUSALS.notFree);
+    // Owned-but-parked counts as owned (roadmap item 3): an IR membership holds the player
+    // exactly as hard as a roster row does.
+    const [irHolder] = await tx
+      .select({ teamId: injuredReserve.teamId })
+      .from(injuredReserve)
+      .innerJoin(teams, eq(injuredReserve.teamId, teams.id))
+      .where(and(eq(teams.leagueId, input.leagueId), eq(injuredReserve.playerId, input.addPlayerId)));
+    if (irHolder !== undefined) return refuse(409, CLAIM_REFUSALS.notFree);
 
     const slotConfig: readonly RosterSlotConfig[] = league.slotConfig;
 
@@ -166,6 +188,17 @@ export async function claimPlayer(db: Db, input: ClaimInput, deps: ClaimDeps): P
 
     const drop = input.dropPlayerId ?? null;
     if (drop !== null && !current.some((slot) => slot.playerId === drop)) return refuse(400, CLAIM_REFUSALS.dropNotYours);
+
+    // UNDROPPABLES (roadmap item 3, the incumbent's "Observe Undroppable Players List"). Ours is
+    // market-derived rather than editorial: a player the market drafts inside the ceiling is too
+    // valuable to hit the wire — the collusion/rage-quit dump every platform guards against.
+    // Trades remain the honest route for moving him.
+    if (drop !== null) {
+      const [dropRow] = await tx.select({ adp: players.adp }).from(players).where(eq(players.id, drop));
+      if (dropRow?.adp !== null && dropRow !== undefined && dropRow.adp <= UNDROPPABLE_ADP_CEILING) {
+        return refuse(409, CLAIM_REFUSALS.undroppable);
+      }
+    }
 
     const totalSlots = slotConfig.reduce((sum, slot) => sum + slot.count, 0);
     if (drop === null && current.length >= totalSlots) return refuse(409, CLAIM_REFUSALS.rosterFull);
@@ -347,3 +380,4 @@ export async function reverseClaimInTx(tx: DbTx, input: ReverseClaimInput): Prom
 
   return { ok: true };
 }
+

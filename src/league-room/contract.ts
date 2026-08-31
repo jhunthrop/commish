@@ -485,6 +485,9 @@ export interface LineupSlotView {
   readonly nflTeam: string | null;
   readonly headshotUrl: string | null;
   readonly adp: number | null;
+  /** His current designation off the harvested injuries feed ("Q", "O", "IR"), or null when the
+   *  feed does not name him — the chip beside the name, and the Move-to-IR affordance's gate. */
+  readonly injuryDesignation?: string | null;
 }
 
 export interface LineupBody {
@@ -500,6 +503,10 @@ export interface LineupBody {
   readonly lockedPlayerIds: readonly string[];
   readonly starters: readonly LineupSlotView[];
   readonly bench: readonly LineupSlotView[];
+  /** This team's injured reserve (roadmap item 3): owned but off the roster map. `slot` on
+   *  these entries is the BENCH spelling only because the view type demands one — an IR entry
+   *  has no slot, and the editor renders its own IR section. */
+  readonly injuredReserve: readonly LineupSlotView[];
 }
 
 /** What the start/sit advisor answers with. Advice, never an action. */

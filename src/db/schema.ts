@@ -554,6 +554,27 @@ export const scoringSettings = pgTable("scoring_settings", {
   pointsPerSafety: real("points_per_safety").notNull().default(2),
 });
 
+/**
+ * INJURED RESERVE membership (engine-gap roadmap item 3, 2026-08-30). A membership TABLE, not a
+ * roster slot type: placing a player here DELETES his `roster_slots` row — which is what frees
+ * real roster capacity for a claim, with zero changes to slot arithmetic — and activation
+ * assigns him back through `assignSlot`, refusing when the roster is full. Ownership of an IR'd
+ * player is this row; every "is he on a roster here" read that feeds the free-agent pool must
+ * check BOTH tables.
+ */
+export const injuredReserve = pgTable(
+  "injured_reserve",
+  {
+    teamId: text("team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
+    playerId: text("player_id").notNull().references(() => players.id, { onDelete: "cascade" }),
+    /** His designation when placed ("O", "IR") — the fact that justified the placement, kept
+     *  even after the feed moves on. */
+    designationAtPlacement: text("designation_at_placement").notNull(),
+    placedAt: timestamp("placed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.playerId] })],
+);
+
 export const rosterSlots = pgTable(
   "roster_slots",
   {

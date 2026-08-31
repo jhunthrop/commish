@@ -21,6 +21,7 @@ export const LINEUP: LineupBody = {
   weekNumber: 5,
   locked: false,
   lockedPlayerIds: [],
+  injuredReserve: [],
   starters: [
     { slot: "QB", slotIndex: 0, playerId: "qb1", playerName: "Josh Allen", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null },
     { slot: "RB", slotIndex: 0, playerId: "rb1", playerName: "Derrick Henry", position: "RB", nflTeam: "BUF", headshotUrl: null, adp: null },

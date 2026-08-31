@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { DraftStatus } from "@/domain/draft";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
@@ -42,6 +43,17 @@ function PointsCell({ points, playerId, loud = false }: { readonly points: Reado
     </span>
   );
 }
+
+/** The designation chip ("Q", "O", "IR") in the verdict channel — the fact a manager checks
+ *  before anything else, worn beside the name on every row. Absent = the feed does not name
+ *  him, and nothing prints. */
+function DesignationChip({ designation }: { readonly designation: string | null | undefined }) {
+  if (designation === null || designation === undefined) return null;
+  return <span className="rounded-sm bg-negative px-1 py-0.5 font-mono text-xs font-bold leading-none text-negative-text">{designation}</span>;
+}
+
+/** Designations that justify an IR placement — mirrors the server's own set; the server rules. */
+const IR_ELIGIBLE = new Set(["O", "IR", "PUP", "NFI", "SUS", "D"]);
 
 /**
  * THE SCHEDULE CELL (founder, 2026-08-30: the ESPN row — opponent and kickoff beside every
@@ -110,6 +122,27 @@ export function LineupEditor({
   readonly draftStatus?: DraftStatus | null;
 }) {
   const { fetchJson } = useLeagueRoomDeps();
+  const router = useRouter();
+  const [irStatus, setIrStatus] = useState<string | null>(null);
+  const moveInjuredReserve = async (playerId: string, action: "place" | "activate"): Promise<void> => {
+    setIrStatus(null);
+    try {
+      const response = await fetchJson(`/api/leagues/${leagueId}/teams/me/injured-reserve`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ playerId, action }),
+      });
+      const body = (await response.json()) as ApiEnvelope<unknown>;
+      if (!body.ok) {
+        setIrStatus(body.error);
+        return;
+      }
+      // The roster changed shape on the server; this page's props must not tell an older story.
+      router.refresh();
+    } catch {
+      setIrStatus("We could not reach the server. Check your connection and try again.");
+    }
+  };
   const [assignments, setAssignments] = useState<Readonly<Record<string, string | null>>>(
     () => Object.fromEntries(lineup.starters.map((slot) => [slotKey(slot), slot.playerId])),
   );
@@ -346,6 +379,7 @@ export function LineupEditor({
                         />
                         <span className="flex items-center gap-1.5">
                           <PositionBadge position={face.position} size="sm" />
+                          <DesignationChip designation={occupant?.injuryDesignation} />
                           {face.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{face.nflTeam}</span>}
                         </span>
                       </span>
@@ -452,9 +486,16 @@ export function LineupEditor({
                       ) : moving ? null : benchLocked ? (
                         <span className={`${MICRO_LABEL} text-text-faint`}>Locked</span>
                       ) : (
-                        <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${player.name}`}>
-                          Swap
-                        </Button>
+                        <>
+                          {slot.injuryDesignation != null && IR_ELIGIBLE.has(slot.injuryDesignation) && !isLocked ? (
+                            <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => void moveInjuredReserve(slot.playerId!, "place")} aria-label={`Place ${player.name} on injured reserve`}>
+                              To IR
+                            </Button>
+                          ) : null}
+                          <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => setSelected(key)} aria-label={`Swap ${player.name}`}>
+                            Swap
+                          </Button>
+                        </>
                       )}
                     </span>
                   </li>
@@ -462,8 +503,55 @@ export function LineupEditor({
               })}
             </ul>
           )}
+          {/* INJURED RESERVE (roadmap item 3): owned but off the roster map — the parked man
+              frees a real roster spot for a claim, and comes back through Activate when there
+              is room. The server rules on eligibility and capacity; refusals land below in its
+              own words. */}
+          {lineup.injuredReserve.length === 0 ? null : (
+            <>
+              <h3 className={`${MICRO_LABEL} border-t border-line pb-1 pt-3 text-text-faint`}>Injured reserve</h3>
+              <ul className="flex flex-col">
+                {lineup.injuredReserve.map((slot) => {
+                  const player = playerOf(slot);
+                  if (player === null) return null;
+                  return (
+                    <li key={`ir-${slot.playerId!}`} className={`grid ${GRID_COLS} items-center gap-x-4 border-t border-line/50 py-2 opacity-90`}>
+                      <span className={`${MICRO_LABEL} text-right text-text-faint`}>IR</span>
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <PlayerFace player={player} size="md" />
+                        <span className="flex min-w-0 flex-col">
+                          <PlayerName leagueId={leagueId} playerId={player.id} name={player.name} className="truncate text-lg font-semibold text-text-primary" />
+                          <span className="flex items-center gap-1.5">
+                            <PositionBadge position={player.position} size="sm" />
+                            <DesignationChip designation={slot.injuryDesignation} />
+                            {player.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{player.nflTeam}</span>}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="justify-self-end"><FixtureCell fixtures={fixturesByNflTeam} nflTeam={player.nflTeam} /></span>
+                      <span />
+                      <span />
+                      <span className="flex items-center justify-end">
+                        {isLocked ? null : (
+                          <Button variant="ghost" size="sm" className="text-text-muted" onClick={() => void moveInjuredReserve(slot.playerId!, "activate")} aria-label={`Activate ${player.name} from injured reserve`}>
+                            Activate
+                          </Button>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </div>
       </div>
+
+      {irStatus === null ? null : (
+        <p role="alert" className="text-sm text-negative">
+          {irStatus}
+        </p>
+      )}
 
       {/* NO SAVE BUTTON (founder ruling): the swap IS the save. The line below is the only
           evidence, and it stays quiet — "Saving" while the wire is out, "saved" once it lands,

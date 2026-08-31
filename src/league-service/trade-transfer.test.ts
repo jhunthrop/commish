@@ -547,6 +547,9 @@ describe("applyTradeInTx", () => {
       "src/data/seed/seed-trades.ts",
       "src/draft-service/commit.ts",
       "src/league-service/claims.ts",
+      // Activation from injured reserve (roadmap item 3) INSERTS the parked player back into a
+      // roster slot — an add, like a claim, never a transfer between two rosters.
+      "src/league-service/injured-reserve.ts",
       "src/league-service/trade-transfer.ts",
     ]);
   });

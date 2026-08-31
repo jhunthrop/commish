@@ -34,8 +34,8 @@ export const ACTIVITY_VISIBILITY: Readonly<Record<AuditEventType, ActivityVisibi
   /**
    * Task 5 (ruling 12): a roster change caused by a trade is exactly the kind of thing a league
    * feed exists for, unlike the negotiation that led to it. `renderRosterMove` only ever renders
-   * for the four reasons the product writes (`"trade"`, `"trade_reversed"`, `"claim"`,
-   * `"claim_reversed"`) — a `roster_move` this
+   * for the reasons the product writes (`"trade"`, `"trade_reversed"`, `"claim"`,
+   * `"claim_reversed"`, `"ir_placed"`, `"ir_activated"`) — a `roster_move` this
    * process doesn't recognize the reason for renders nothing, the same deny-by-default the rest
    * of this module holds every payload to.
    */
@@ -349,6 +349,28 @@ function renderRosterMove(event: AuditEvent, names: ActivityNames): Rendered | n
 
   // The claim pair (2026-08-28, free agency). Same deny-by-default: a payload missing its ids
   // renders nothing rather than a half-sentence.
+  // The injured-reserve pair (2026-08-30, roadmap item 3). Same deny-by-default.
+  if (reason === "ir_placed") {
+    const teamId = str(event.payload, "teamId");
+    const playerId = str(event.payload, "playerId");
+    if (teamId === undefined || playerId === undefined) return null;
+    return {
+      icon: "refresh-cw",
+      headline: `${names.team(teamId)} placed ${names.player(playerId)} on injured reserve.`,
+      detail: null,
+    };
+  }
+  if (reason === "ir_activated") {
+    const teamId = str(event.payload, "teamId");
+    const playerId = str(event.payload, "playerId");
+    if (teamId === undefined || playerId === undefined) return null;
+    return {
+      icon: "refresh-cw",
+      headline: `${names.team(teamId)} activated ${names.player(playerId)} from injured reserve.`,
+      detail: null,
+    };
+  }
+
   if (reason === "claim") {
     const teamId = str(event.payload, "teamId");
     const addedPlayerId = str(event.payload, "addedPlayerId");

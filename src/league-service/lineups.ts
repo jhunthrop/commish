@@ -9,6 +9,8 @@ import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logg
 import { benchOf, defaultLineup, deriveBenchSlots, isLineupLocked, startersOf, type WeekStatus } from "@/league";
 import { excludedSetFor } from "@/db/upsert";
 import { startedTeamsForWeek } from "./nfl-schedule";
+import { injuryDesignations } from "./injuries";
+import { injuredReserve } from "@/db/schema";
 import type { LineupBody, LineupSlotView } from "@/league-room/contract";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
 
@@ -306,6 +308,7 @@ export async function lineupView(
   const lineup = await getLineup(db, { teamId: input.teamId, weekNumber: input.weekNumber, slotConfig: league.rosterSlots });
   const playerRows = await db.select().from(players);
   const playerById = new Map(playerRows.map((row) => [row.id, row]));
+  const designations = await injuryDesignations(db);
   const toView = (slot: RosterSlot): LineupSlotView => {
     const player = slot.playerId === null ? undefined : playerById.get(slot.playerId);
     return {
@@ -314,6 +317,7 @@ export async function lineupView(
       playerId: slot.playerId,
       playerName: player?.name ?? null,
       position: player?.position ?? null,
+      injuryDesignation: slot.playerId === null ? null : (designations.get(slot.playerId) ?? null),
       // Gameday law 3: the club code and the headshot a lineup editor draws a player WITH. Free —
       // `playerById` above already holds the whole row. `adp` rides along because `Player`
       // (`@/domain/player`) requires it, and a surface handing this slot to `PlayerFace` needs a
@@ -336,11 +340,16 @@ export async function lineupView(
       if (started.has(team)) lockedPlayerIds.push(slot.playerId);
     }
   }
+  // The IR section (roadmap item 3): owned-but-parked, rendered by the editor's own section.
+  const irRows = await db.select({ playerId: injuredReserve.playerId }).from(injuredReserve).where(eq(injuredReserve.teamId, input.teamId));
+  const injuredReserveViews = irRows.map((row, index) => toView({ slot: BENCH_SLOT, slotIndex: index, playerId: row.playerId }));
+
   return {
     weekNumber: input.weekNumber,
     locked: status === "final",
     lockedPlayerIds,
     starters: startersOf(lineup).map(toView),
     bench: benchOf(lineup).map(toView),
+    injuredReserve: injuredReserveViews,
   };
 }
