@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
 import type { Db } from "@/db/client";
 import { recordObservations } from "../store";
 import { recordPlayerTeams, recordTeamObservations, teamObservationsAsOf, type TeamWeekObservation } from "../team-store";
 import { indexTeamMetrics } from "../team-context";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import { coachObservations, seasonMeans } from "./coaches";
+import { parsePlayCallers, playCallerLookup } from "./play-callers";
 import { DEFENCE_METRICS, opponentDefenceObservations, type DefenceWeek } from "../features/context";
 import { recordNflPlayers } from "../universe";
 import { createNflverseClient, type NflverseClient } from "./client";
@@ -200,14 +202,23 @@ export async function ingestPlayByPlay(db: Db, client: NflverseClient, season: n
   };
 }
 
+/** The committed play-caller table, relative to the process's working directory (the repo root). */
+const PLAY_CALLERS_CSV_PATH = "data/play-callers/play-callers.csv";
+
 /**
- * The play-caller table: tenure, and an incoming coach's own pace and pass-rate history.
+ * The play-caller table: tenure, and an incoming play-caller's own pace and pass-rate history.
  *
  * Run AFTER the play-by-play, and the ordering is not incidental: a coach's prior pace is the mean
  * of the situation-neutral pace of every offence he ran before this season, so it can only be
  * computed once those seasons' play-by-play is in the store. Run first, it would write a table of
  * nulls and nothing downstream would complain — the scheme prior would simply fall back to the
  * league for every coaching change, which is exactly the case the feature exists to handle.
+ *
+ * Reads the committed play-caller CSV straight off disk rather than over the network — it ships in
+ * the repo, checked in beside the code that reads it. A missing file is a broken checkout, not a
+ * degraded feature, so this THROWS rather than falling back to head-coach-only silently: an operator
+ * who deleted or renamed the file should see the ingestion fail, not a report that looks clean but
+ * quietly lost the coordinator-level attribution for every team-season.
  */
 export async function ingestCoaches(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
   const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
@@ -217,6 +228,8 @@ export async function ingestCoaches(db: Db, seasons: readonly number[], client =
   const history = Array.from({ length: Math.max(...seasons) - earliest + 1 }, (_, index) => earliest + index);
   const games = mapSchedule(rows, history);
 
+  const playCallers = playCallerLookup(parsePlayCallers(readFileSync(PLAY_CALLERS_CSV_PATH, "utf8")));
+
   const all: TeamWeekObservation[] = [];
   for (const season of history) {
     all.push(
@@ -225,7 +238,7 @@ export async function ingestCoaches(db: Db, seasons: readonly number[], client =
   }
   const metrics = indexTeamMetrics({ playerTeams: [], teamObservations: all });
   const weeks = Array.from({ length: LAST_POSSIBLE_WEEK }, (_, index) => index + 1);
-  return await recordTeamObservations(db, coachObservations(games, seasonMeans(metrics, weeks), seasons));
+  return await recordTeamObservations(db, coachObservations(games, seasonMeans(metrics, weeks), seasons, playCallers));
 }
 
 /**

@@ -85,6 +85,41 @@ describe("coachObservations", () => {
   });
 });
 
+describe("coachObservations with play-caller attribution", () => {
+  const noPace: (team: string, seasonYear: number, metric: string) => number | null = () => null;
+  const kcGames2024 = season(2024, "KC", "Andy Reid", 18);
+
+  it("attributes a team-season to the play-caller, not the head coach, where the table covers it", () => {
+    // games say KC's coach is "Andy Reid" all season; the table says Matt Nagy called plays wks 1-18
+    const lookup = (team: string, seasonYear: number) => (team === "KC" && seasonYear === 2024 ? "Matt Nagy" : null);
+    const rows = coachObservations(kcGames2024, noPace, [2024], lookup);
+    const tenure = rows.find((r) => r.metric === COACH_METRICS.tenureSeasons);
+    expect(tenure?.value).toBe(0); // Nagy's first season calling KC's plays => a coaching change
+  });
+
+  it("falls back to the head coach where the lookup answers null", () => {
+    const rows = coachObservations(kcGames2024, noPace, [2024], () => null);
+    const noLookup = coachObservations(kcGames2024, noPace, [2024]);
+    expect(rows).toEqual(noLookup);
+  });
+
+  it("counts tenure across a role change for the same name", () => {
+    // games.csv names a different head coach in 2022 (Josh McDaniels was only the OC that year); the
+    // table attributes 2022's play-calling to him too. He becomes head coach himself in 2023-2024, so
+    // games.csv and the table agree from then on. Same name, three straight seasons => tenure 2 in 2024.
+    const games = [
+      ...season(2022, "NE", "HC Original"),
+      ...season(2023, "NE", "Josh McDaniels"),
+      ...season(2024, "NE", "Josh McDaniels"),
+    ];
+    const lookup = (team: string, seasonYear: number) =>
+      team === "NE" && seasonYear === 2022 ? "Josh McDaniels" : null;
+    const rows = coachObservations(games, noPace, [2024], lookup);
+    const tenure = rows.find((r) => r.season === 2024 && r.team === "NE" && r.metric === COACH_METRICS.tenureSeasons);
+    expect(tenure?.value).toBe(2);
+  });
+});
+
 describe("seasonMeans", () => {
   it("averages only the weeks the store actually holds", () => {
     const read = (_team: string, at: WeekRef): number | null => (at.week <= 2 ? at.week * 10 : null);

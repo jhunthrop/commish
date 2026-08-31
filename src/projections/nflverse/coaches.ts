@@ -7,22 +7,27 @@ import { schedulePublishedAsOf, SCHEDULE_SOURCE, type TeamGame } from "./schedul
  * THE PLAY-CALLER TABLE — sourced, not curated, and the difference is deliberate.
  *
  * The plan asked for a hand-maintained play-caller by team-season, thirty-two rows a year. We do
- * not ship one, and the reason is the same reason the news pass will require a citation: a table
- * typed from memory is a table of unverifiable claims, and a wrong coordinator in 2022 is a wrong
- * prior that nothing downstream can detect. What we ship instead is the HEAD COACH, which
- * `games.csv` carries for every game back to 1999 from a source we can point at.
+ * not ship one from memory, and the reason is the same reason the news pass requires a citation: a
+ * table typed from memory is a table of unverifiable claims, and a wrong coordinator in 2022 is a
+ * wrong prior that nothing downstream can detect. What we ship is `play-callers.ts` — sourced,
+ * validated, week-accurate — and the fallback beneath it: the HEAD COACH, which `games.csv` carries
+ * for every game back to 1999 from a source we can point at.
  *
- * The cost is real and is stated here rather than buried: where a head coach keeps his job and
- * replaces his coordinator, this table sees no change and the prior does not move. That is the
- * commonest kind of play-calling change there is. The mechanism below is indifferent to which
- * name it is given, so the day a sourced coordinator table exists it drops straight in.
+ * The cost this used to state plainly — a head coach who keeps his job and swaps his coordinator was
+ * invisible to a head-coach-only table, the commonest kind of play-calling change there is — is
+ * RESOLVED for every team-season the play-caller table covers: `coachObservations`'s optional final
+ * argument is that lookup, and where it answers a season it is the name that feeds tenure and the
+ * prior, not the head coach. The mechanism below was always indifferent to which name it is given;
+ * this is that indifference paying off. Where the lookup has nothing for a team-season — an
+ * uncovered span, or no lookup passed at all — the head coach is still the honest fallback, and the
+ * cost is still real for exactly that span.
  *
  * WHAT THE COACHING CHANGE IS FOR. A team's own pace and pass rate are the numeric fingerprint of
  * whoever was calling the plays, and when that person leaves the fingerprint is no longer evidence
- * about this season. So a new coach's arrival does two things: it discounts the team's own history,
- * and it substitutes HIS — the pace and pass-rate-over-expected of the offences he ran elsewhere.
- * A coach with no history we can see falls back to the league, which is the honest answer for a
- * first-time head coach rather than a pretence that his last team tells us something.
+ * about this season. So a new play-caller's arrival does two things: it discounts the team's own
+ * history, and it substitutes HIS — the pace and pass-rate-over-expected of the offences he ran
+ * elsewhere. A coach with no history we can see falls back to the league, which is the honest answer
+ * for a first-time play-caller rather than a pretence that his last team tells us something.
  */
 
 export const COACH_METRICS = {
@@ -84,8 +89,40 @@ export function seasonMeans(read: (team: string, at: WeekRef, metric: string) =>
   };
 }
 
+/** Reads the play-caller's name for one team's week. `null` where the table has nothing to say. */
+export type PlayCallerLookup = (team: string, season: number, week: number) => string | null;
+
 /**
- * Tenure and the incoming coach's own history, as team-week observations.
+ * Replaces `games.csv`'s head coach with the play-caller table's answer, team-season by
+ * team-season, where the table covers it.
+ *
+ * SAME MOST-FREQUENT RULE as `coachByTeamSeason`, now over the lookup's week-accurate answers rather
+ * than the games themselves — a table that named an interim play-caller for three weeks of a
+ * sixteen-week season should not out-vote the eleven weeks it named someone else. A week the lookup
+ * answers `null` casts no vote; a team-season where every week is `null` keeps its `games.csv` coach
+ * unchanged, which is the fallback the mechanism has always had.
+ */
+function attributedByTeamSeason(
+  games: readonly TeamGame[],
+  headCoaches: readonly TeamSeasonCoach[],
+  playCaller: PlayCallerLookup | undefined,
+): readonly TeamSeasonCoach[] {
+  if (playCaller === undefined) return headCoaches;
+  return headCoaches.map(({ season, team, coach }) => {
+    const counts = new Map<string, number>();
+    for (const game of games) {
+      if (game.season !== season || game.team !== team) continue;
+      const name = playCaller(team, season, game.week);
+      if (name !== null) counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    if (counts.size === 0) return { season, team, coach };
+    const attributed = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]![0];
+    return { season, team, coach: attributed };
+  });
+}
+
+/**
+ * Tenure and the incoming play-caller's own history, as team-week observations.
  *
  * STAMPED AT SCHEDULE PUBLICATION, which is the honest moment for both. Head coaching hires are
  * complete by February and the schedule is published in May, and every number that feeds the prior
@@ -95,13 +132,19 @@ export function seasonMeans(read: (team: string, at: WeekRef, metric: string) =>
  * A coach with no measurable history emits NO ROW rather than a league-average one. The consumer
  * has to decide what to do with an unknown coach, and handing it a league mean disguised as a
  * measurement would take that decision away from the one place it is visible.
+ *
+ * `playCaller`, OPTIONAL: the week-accurate table from `play-callers.ts`. Omitted, this is exactly
+ * the head-coach-only mechanism it always was. Passed, tenure and the "history at other teams" walk
+ * below run over the ATTRIBUTED name — role-agnostic, so a coordinator promoted to head coach for
+ * the same team keeps the tenure he already had rather than resetting to zero.
  */
 export function coachObservations(
   games: readonly TeamGame[],
   seasonMean: SeasonMetricLookup,
   seasons: readonly number[],
+  playCaller?: PlayCallerLookup,
 ): readonly TeamWeekObservation[] {
-  const byTeamSeason = coachByTeamSeason(games);
+  const byTeamSeason = attributedByTeamSeason(games, coachByTeamSeason(games), playCaller);
   const coachOf = new Map(byTeamSeason.map((row) => [`${row.season}|${row.team}`, row.coach] as const));
   const wanted = new Set(seasons);
 
