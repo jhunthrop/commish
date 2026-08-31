@@ -3,18 +3,23 @@
  * caliper, model path) with the measured evidence `scripts/measure-laws.ts` wrote to
  * `measured.json`, and refuses to hand out a `Law` the evidence does not actually support.
  *
- * `registryFrom(specs, measuredJson)` is the pure, DB-free core — every test in
+ * `registryFrom(specs, measuredJson)` is the pure, DB-free core — every drift-guard test in
  * `registry.test.ts` drives THIS function with hand-built fixtures, never the real file.
- * `registry()` is the thin wrapper that reads the committed `measured.json` off disk and calls it;
- * nothing in `registry()` is worth a unit test beyond "the file parses", because all the actual
- * logic lives in the pure function.
+ * `parseMeasuredJson(raw)` is the pure shape-validator `registry()` runs the file's text through
+ * before `registryFrom` ever sees it, and is independently testable with a raw string, no file
+ * needed. `registry()` itself is the thin wrapper that reads the committed `measured.json` off
+ * disk and chains the two — nothing in `registry()` beyond that chaining is worth its own test.
  *
- * THREE THINGS THROW, ON PURPOSE, RATHER THAN DEGRADE QUIETLY:
- *   1. A `LawSpec` with no entry in `measuredJson` — a law was added to `LAW_SPECS` and nobody
+ * FOUR THINGS THROW, ON PURPOSE, RATHER THAN DEGRADE QUIETLY:
+ *   1. `measured.json` parses but does not match `MeasuredJson`'s shape (`parseMeasuredJson`) — a
+ *      non-finite `effect`, a `ci` that isn't a 2-tuple, a `verdict` outside the union, and so on.
+ *      The file is generated, never hand-authored, but a hand edit that slips past `JSON.parse`
+ *      deserves a named field and a clear message here, not a `TypeError` several calls deep.
+ *   2. A `LawSpec` with no entry in `measuredJson` — a law was added to `LAW_SPECS` and nobody
  *      re-ran `npm run laws:measure`.
- *   2. A `measuredJson` entry with no matching `LawSpec` — a law was removed/renamed from
+ *   3. A `measuredJson` entry with no matching `LawSpec` — a law was removed/renamed from
  *      `LAW_SPECS` and the stale measurement was never cleaned out of the committed file.
- *   3. A stored `verdict` that disagrees with what `verdictForFullWindow` computes fresh from that
+ *   4. A stored `verdict` that disagrees with what `verdictForFullWindow` computes fresh from that
  *      same entry's `effect`/`ci`/`heldOutEffect` — the file was hand-edited, or the verdict rule
  *      changed since the file was last regenerated, either way the committed verdict can no longer
  *      be trusted at face value.
@@ -48,6 +53,57 @@ export type MeasuredEntry = LawMeasurement & { readonly heldOutEffect: number | 
 
 /** `measured.json`'s whole shape: every law id the file has evidence for. */
 export type MeasuredJson = { readonly [lawId: string]: MeasuredEntry };
+
+const VALID_VERDICTS: ReadonlySet<string> = new Set<LawVerdict>(["confirmed", "weak", "debunked"]);
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * Explicit shape validation for `JSON.parse`'s untyped output, called before `measured.json`'s
+ * content is trusted as `MeasuredJson` anywhere. `measured.json` is generated, never hand-authored
+ * — but this module's own docblock has worried about a hand edit surviving since Task 6 shipped,
+ * and a hand edit that slips past `JSON.parse` (a `ci` bound typo'd into a string, a `sample` that
+ * became `NaN`, a `verdict` outside the union) would otherwise surface as a `TypeError` several
+ * calls deep inside `verdictForFullWindow` or a downstream consumer, with no indication which field
+ * of which law was wrong. This throws `malformed measured.json: <field>` at the one boundary where
+ * untyped JSON becomes a typed `MeasuredJson`, naming the exact law and field.
+ */
+export function parseMeasuredJson(raw: string): MeasuredJson {
+  const parsed: unknown = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("malformed measured.json: root is not an object");
+  }
+
+  for (const [lawId, entry] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new Error(`malformed measured.json: "${lawId}" is not an object`);
+    }
+    const record = entry as Record<string, unknown>;
+
+    if (!isFiniteNumber(record.effect)) {
+      throw new Error(`malformed measured.json: "${lawId}".effect is not a finite number`);
+    }
+    if (!Array.isArray(record.ci) || record.ci.length !== 2 || !isFiniteNumber(record.ci[0]) || !isFiniteNumber(record.ci[1])) {
+      throw new Error(`malformed measured.json: "${lawId}".ci is not a 2-tuple of finite numbers`);
+    }
+    if (!isFiniteNumber(record.sample)) {
+      throw new Error(`malformed measured.json: "${lawId}".sample is not a finite number`);
+    }
+    if (typeof record.seasons !== "string") {
+      throw new Error(`malformed measured.json: "${lawId}".seasons is not a string`);
+    }
+    if (record.heldOutEffect !== null && !isFiniteNumber(record.heldOutEffect)) {
+      throw new Error(`malformed measured.json: "${lawId}".heldOutEffect is not a finite number or null`);
+    }
+    if (typeof record.verdict !== "string" || !VALID_VERDICTS.has(record.verdict)) {
+      throw new Error(`malformed measured.json: "${lawId}".verdict is not one of "confirmed" | "weak" | "debunked"`);
+    }
+  }
+
+  return parsed as MeasuredJson;
+}
 
 /**
  * THE ONE PLACE THE STRATIFICATION RULE LIVES — every law matches within `season` (a 2011 RB and
@@ -126,8 +182,9 @@ export function registryFrom(specs: readonly LawSpec[], measuredJson: MeasuredJs
 export const MEASURED_JSON_PATH = "src/projections/laws/measured.json";
 
 /** The thin file-reading wrapper every real caller uses: the committed `LAW_SPECS` against the
- *  committed `measured.json`, read fresh off disk on every call. */
+ *  committed `measured.json` — shape-validated (`parseMeasuredJson`) and drift-checked
+ *  (`registryFrom`) — read fresh off disk on every call. */
 export function registry(): readonly Law[] {
   const raw = readFileSync(MEASURED_JSON_PATH, "utf-8");
-  return registryFrom(LAW_SPECS, JSON.parse(raw) as MeasuredJson);
+  return registryFrom(LAW_SPECS, parseMeasuredJson(raw));
 }

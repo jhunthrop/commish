@@ -1,24 +1,24 @@
 {
   "play_caller_fingerprint": {
-    "effect": -0.4189516129032257,
+    "effect": -0.3420967741935481,
     "ci": [
-      -1.1862459677419357,
-      0.3865060483870966
+      -1.1249274193548389,
+      0.495415322580645
     ],
     "sample": 124,
     "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
-    "heldOutEffect": 0.678333333333334,
+    "heldOutEffect": 0.6783333333333338,
     "verdict": "debunked"
   },
   "rb_age_curve": {
-    "effect": -1.0595348837209304,
+    "effect": -1.0772093023255813,
     "ci": [
-      -2.4256162790697684,
-      0.24827906976744138
+      -2.4547441860465127,
+      0.23060465116279016
     ],
     "sample": 43,
     "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
-    "heldOutEffect": -1.6380769230769234,
+    "heldOutEffect": -1.6673076923076924,
     "verdict": "weak"
   },
   "rb_workload_cliff": {
@@ -44,21 +44,21 @@
     "verdict": "confirmed"
   },
   "td_regression": {
-    "effect": -0.8586949685534601,
+    "effect": -0.8713679245283027,
     "ci": [
-      -1.267500786163522,
-      -0.4827047955974843
+      -1.2593977987421405,
+      -0.4898215408805035
     ],
     "sample": 636,
     "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
-    "heldOutEffect": -0.7419310344827583,
+    "heldOutEffect": -0.7535172413793103,
     "verdict": "confirmed"
   },
   "wr_target_competition": {
-    "effect": -0.8164351851851849,
+    "effect": -0.8295833333333328,
     "ci": [
-      -1.5759351851851855,
-      -0.0763252314814816
+      -1.5869236111111105,
+      -0.08067129629629603
     ],
     "sample": 216,
     "seasons": "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",

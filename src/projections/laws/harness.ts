@@ -20,7 +20,7 @@
  * depend on when you happened to run the harness.
  */
 
-import { BOOTSTRAP, HELD_OUT_SEASONS, MEASURE_SEASONS } from "./config";
+import { BOOTSTRAP } from "./config";
 import type { LawMeasurement, LawVerdict, PlayerSeasonPoint } from "./types";
 
 /** One condition player-season paired with its matched control. */
@@ -28,8 +28,6 @@ export interface MatchedPair {
   readonly condition: PlayerSeasonPoint;
   readonly control: PlayerSeasonPoint;
 }
-
-const SEASONS_LABEL = `${MEASURE_SEASONS.from}-${MEASURE_SEASONS.to}, held out ${HELD_OUT_SEASONS[0]}-${HELD_OUT_SEASONS[HELD_OUT_SEASONS.length - 1]}`;
 
 /**
  * mulberry32 — a small, fast, seedable PRNG. Chosen over `Math.random` for the one property that
@@ -174,6 +172,14 @@ function bootstrapCi(pairs: readonly MatchedPair[], differences: readonly number
  * failed". A law whose population matched nothing is a population-builder bug (condition too
  * strict, wrong `matchKey`, caliper too tight), and the one honest response is to fail loudly at
  * the source so the registry can never stamp a verdict on evidence that does not exist.
+ *
+ * `seasons` is returned EMPTY on purpose: this harness has no opinion on which seasons `pairs` was
+ * matched over, and it used to guess anyway with a `MEASURE_SEASONS`/`HELD_OUT_SEASONS`-derived
+ * label — a guess that went silently stale the moment a caller measured over anything narrower than
+ * the whole config (which `scripts/measure-laws.ts` now does, for the held-out subset). The
+ * production label — window, any gap seasons, which years direction was replicated on — is
+ * `measure-laws.ts`'s own `seasonsLabel()`, the ONE place that knows what was actually measured;
+ * every caller is expected to overwrite this field the same way.
  */
 export function measureEffect(pairs: readonly MatchedPair[]): LawMeasurement {
   if (pairs.length === 0) {
@@ -186,7 +192,7 @@ export function measureEffect(pairs: readonly MatchedPair[]): LawMeasurement {
   const effect = mean(differences);
   const ci = bootstrapCi(pairs, differences);
 
-  return { effect, ci, sample: pairs.length, seasons: SEASONS_LABEL };
+  return { effect, ci, sample: pairs.length, seasons: "" };
 }
 
 /**

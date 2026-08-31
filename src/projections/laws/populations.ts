@@ -431,6 +431,30 @@ const LAW_ENTRIES: readonly LawEntry[] = [
 ];
 
 /**
+ * THE DETERMINISM ANCHOR — the one place every law's population is put into a canonical order
+ * before any caller (matching, bootstrap) ever sees it.
+ *
+ * `buildPopulations` pushes rows in whatever order `allPositions`'s un-`ORDER BY`ed select and
+ * `factsForSeason`'s `Map` iteration happen to hand back, and Postgres makes NO promise that order
+ * is stable across a table rewrite, a `VACUUM FULL`, or a version upgrade — none of which touch a
+ * single byte of DATA. That raw order flows all the way through `matchedPairsStratified`'s greedy
+ * nearest-neighbor tie-breaks and `bootstrapCi`'s seeded, INDEXED resampling (`harness.ts`) into the
+ * committed `measured.json`'s own bytes: a re-ingest that changed nothing about who played or what
+ * they scored could still change a confidence interval's last few digits, which would make
+ * `npm run laws:measure -- --check` a check on incidental storage order rather than on evidence.
+ * Sorting by `(season, position, playerId)` — fields that exist for every point and together
+ * identify it uniquely — makes every downstream step a pure function of the DATA. Every real caller
+ * reaches this sort by calling `buildPopulations` (or `LawSpec.population`, which calls it too), so
+ * this is the only place the order needs fixing.
+ */
+export function canonicalPointOrder(a: PlayerSeasonPoint, b: PlayerSeasonPoint): number {
+  if (a.season !== b.season) return a.season - b.season;
+  if (a.position !== b.position) return a.position < b.position ? -1 : 1;
+  if (a.playerId !== b.playerId) return a.playerId < b.playerId ? -1 : 1;
+  return 0;
+}
+
+/**
  * EVERY LAW'S POPULATION, IN ONE PASS — `factsForSeason`/`actualPointsPerGame` run ONCE per season
  * regardless of how many of the six laws are being built, rather than once per (law, season) pair.
  * A null condition (see `LawConditionFacts`) drops that player-season from the returned population
@@ -461,6 +485,7 @@ export async function buildPopulations(db: ReadonlyDb, seasons: readonly number[
       }
     }
   }
+  for (const points of out.values()) points.sort(canonicalPointOrder);
   return out;
 }
 

@@ -11,7 +11,9 @@ import { schedulePublishedAsOf, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { recordObservations } from "../store";
 import { recordPlayerTeams, recordTeamObservations } from "../team-store";
 import { recordPreseasonRosters } from "../preseason/store";
-import { buildPopulations, LAW_SPECS } from "./populations";
+import { buildPopulations, canonicalPointOrder, LAW_SPECS } from "./populations";
+import { matchedPairsStratified, measureEffect } from "./harness";
+import type { PlayerSeasonPoint } from "./types";
 
 /**
  * DB-BACKED FIXTURES FOR THE SIX LAW POPULATIONS, following `backtest.test.ts`'s style: one test
@@ -503,5 +505,90 @@ describe("buildPopulations", () => {
     const solo = await specFor("rb_workload_cliff").population(db, [N]);
     expect(batch.get("rb_workload_cliff")).toEqual(solo);
     expect([...batch.keys()].sort()).toEqual(LAW_SPECS.map((entry) => entry.id).sort());
+  });
+
+  it("returns every law's population pre-sorted by (season, position, playerId), regardless of DB/insertion order", async () => {
+    // Player ids and insertion order are deliberately reverse-canonical, so a pass proves the
+    // OUTPUT order is IMPOSED by canonicalPointOrder rather than merely inherited from insertion
+    // order — an un-ORDER-BYed Postgres select makes no promise it preserves insertion order at all.
+    await insertPlayers([
+      ["zRB", "RB"],
+      ["aRB", "RB"],
+      ["zWR", "WR"],
+      ["aWR", "WR"],
+    ]);
+    await storeLines([
+      line(N1, 1, "zRB", { rushingYards: 100 }, BEFORE_GATE),
+      line(N1, 1, "aRB", { rushingYards: 90 }, BEFORE_GATE),
+      line(N, 1, "zWR", { receivingYards: 80, receptions: 8 }, BEFORE_GATE),
+      line(N, 1, "aWR", { receivingYards: 70, receptions: 7 }, BEFORE_GATE),
+    ]);
+    await storeParticipation([
+      { season: N1, week: 1, playerId: "zRB", metric: PARTICIPATION_METRICS.carries, value: 10, asOf: BEFORE_GATE },
+      { season: N1, week: 1, playerId: "aRB", metric: PARTICIPATION_METRICS.carries, value: 10, asOf: BEFORE_GATE },
+    ]);
+
+    const populations = await buildPopulations(db, [N, N1]);
+    for (const points of populations.values()) {
+      for (let i = 1; i < points.length; i += 1) {
+        expect(canonicalPointOrder(points[i - 1]!, points[i]!)).toBeLessThanOrEqual(0);
+      }
+    }
+  });
+});
+
+describe("determinism anchor — canonicalPointOrder", () => {
+  function fixturePoint(over: Partial<PlayerSeasonPoint>): PlayerSeasonPoint {
+    return { playerId: "p", season: 2020, position: "RB", pointsPerGame: 10, nextPointsPerGame: 8, matchKey: 10, condition: true, ...over };
+  }
+
+  // ONE stratum, two conditions TIED on matchKey, and only ONE control inside the caliper of
+  // either — `matchedPairs`'s greedy loop is a stable sort on matchKey followed by first-claims-it
+  // nearest-neighbor assignment, so a tie is broken by ARRAY ORDER alone: whichever condition
+  // appears first in the input claims the one reachable control, and the other is dropped for lack
+  // of an alternative. c1's own year-over-year change (-5) and c2's (-1) are deliberately far
+  // apart, so which one wins swings the measured effect hard rather than by some fragile bootstrap
+  // coincidence — this is a genuinely different SET of matched pairs, not just a reordering of an
+  // identical one.
+  const c1 = fixturePoint({ playerId: "b1", matchKey: 10, pointsPerGame: 10, nextPointsPerGame: 5, condition: true }); // change -5
+  const c2 = fixturePoint({ playerId: "b2", matchKey: 10, pointsPerGame: 10, nextPointsPerGame: 9, condition: true }); // change -1
+  const control = fixturePoint({ playerId: "a1", matchKey: 10.3, pointsPerGame: 10.3, nextPointsPerGame: 8.3, condition: false }); // change -2
+
+  // Canonical (season, position, playerId) order: "a1" < "b1" < "b2".
+  const canonicalOrderPoints: readonly PlayerSeasonPoint[] = [control, c1, c2];
+  // The same three rows, with c2 placed ahead of c1 — a fixed, deterministic reordering an
+  // un-ORDER-BYed Postgres select is free to produce with no data change at all.
+  const shuffledOrderPoints: readonly PlayerSeasonPoint[] = [c2, control, c1];
+
+  const KEY_OF = (point: PlayerSeasonPoint): string => String(point.season);
+  const CALIPER = 1;
+
+  function measure(points: readonly PlayerSeasonPoint[]) {
+    return measureEffect(matchedPairsStratified(points, CALIPER, KEY_OF));
+  }
+
+  it("without the canonical sort, reordering the SAME rows changes which pair matches — and the measured effect — the bug this anchor fixes", () => {
+    // Canonical order processes c1 first (playerId "b1" < "b2"): c1 claims the only control, c2 is
+    // dropped. effect = change(c1) - change(control) = -5 - (-2) = -3.
+    const fromCanonicalOrder = measure(canonicalOrderPoints);
+    expect(fromCanonicalOrder.effect).toBe(-3);
+    expect(fromCanonicalOrder.sample).toBe(1);
+
+    // Shuffled order processes c2 first: c2 claims the only control, c1 is dropped instead.
+    // effect = change(c2) - change(control) = -1 - (-2) = 1 — the SIGN itself flips.
+    const fromShuffledOrder = measure(shuffledOrderPoints);
+    expect(fromShuffledOrder.effect).toBe(1);
+    expect(fromShuffledOrder.sample).toBe(1);
+
+    expect(fromShuffledOrder.effect).not.toBe(fromCanonicalOrder.effect);
+  });
+
+  it("with the canonical sort applied first, sorted-in and shuffled-in populations measure byte-identically", () => {
+    const sortedFromCanonical = [...canonicalOrderPoints].sort(canonicalPointOrder);
+    const sortedFromShuffled = [...shuffledOrderPoints].sort(canonicalPointOrder);
+    // The sort itself collapses both input orders to the same array — the guarantee `buildPopulations` relies on.
+    expect(sortedFromShuffled).toEqual(sortedFromCanonical);
+
+    expect(measure(sortedFromShuffled)).toEqual(measure(sortedFromCanonical));
   });
 });

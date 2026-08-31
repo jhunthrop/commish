@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registry, registryFrom, stratumKeyFor, verdictForFullWindow, type MeasuredEntry, type MeasuredJson } from "./registry";
+import { parseMeasuredJson, registry, registryFrom, stratumKeyFor, verdictForFullWindow, type MeasuredEntry, type MeasuredJson } from "./registry";
 import { LAW_SPECS, type LawSpec } from "./populations";
 import type { PlayerSeasonPoint } from "./types";
 
@@ -131,6 +131,19 @@ describe("registry", () => {
   it("reads the committed measured.json against the real LAW_SPECS with no drift", () => {
     const laws = registry();
     expect(laws.map((law) => law.id).sort()).toEqual(LAW_SPECS.map((spec) => spec.id).sort());
+  });
+});
+
+describe("parseMeasuredJson", () => {
+  it("parses a well-shaped measured.json into a MeasuredJson", () => {
+    const measured = measurementFixture();
+    expect(parseMeasuredJson(JSON.stringify({ fake_law: measured }))).toEqual({ fake_law: measured });
+  });
+
+  it("throws a clear malformed-field message rather than letting a bad hand edit reach registryFrom", () => {
+    // effect typo'd into a string — the kind of hand edit the module's own docblock worries about.
+    const malformed = JSON.stringify({ fake_law: { ...measurementFixture(), effect: "-3" } });
+    expect(() => parseMeasuredJson(malformed)).toThrow(/malformed measured\.json: "fake_law"\.effect is not a finite number/);
   });
 });
 
