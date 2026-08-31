@@ -70,13 +70,13 @@ function verdictSentence(verdict: LawVerdict): string {
  * `weak` in particular has TWO distinct paths out of `registry.ts`'s `verdictForFullWindow`: the
  * full-window interval can itself span zero (`verdictFor`'s ordinary "signMatches but not
  * ciExcludesZero" case), OR the full-window interval can already exclude zero — a candidate
- * `verdictFor` alone would call confirmed — that gets capped at `weak` because the held-out
- * subset's own sign disagreed, or matched no pairs at all. Both of today's weak laws
- * (`rb_workload_cliff`, `rb_age_curve`) happen to take the first path, but a sentence that always
- * said "the interval spans zero" would go silently wrong the day a law takes the second path
+ * `verdictFor` alone would call confirmed — that gets capped at `weak` because a replication fold
+ * disagreed in sign, or because zero folds carried any matched pairs at all. Both of today's weak
+ * laws (`rb_workload_cliff`, `rb_age_curve`) happen to take the first path, but a sentence that
+ * always said "the interval spans zero" would go silently wrong the day a law takes the second path
  * instead, sitting directly above an interval that plainly excludes zero. `ciSpansZero` below
  * reads the law's own two bounds to tell the two paths apart at render time, so the sentence
- * stays true on either path without this file ever learning about `heldOutEffect` (not part of
+ * stays true on either path without this file ever learning about `foldEffects` (not part of
  * `Law`'s own public shape — `registry.ts`'s `MeasuredEntry` keeps it internal).
  */
 function verdictElaboration(law: Law): string {
@@ -84,11 +84,11 @@ function verdictElaboration(law: Law): string {
   const ciSpansZero = (low > 0) !== (high > 0);
   switch (law.verdict) {
     case "confirmed":
-      return "The measured effect points in the claimed direction, the 95% interval clears zero, and the same direction held on seasons the projection model never trained on.";
+      return "The measured effect points in the claimed direction, the 95% interval clears zero, and the same direction held when checked separately on every season used to test it.";
     case "weak":
       return ciSpansZero
         ? "The measured effect points in the claimed direction, but the 95% interval spans zero, so it cannot be told apart from no effect at all with the seasons measured so far."
-        : "The full-window 95% interval clears zero in the claimed direction, but that direction did not replicate on the held-out seasons, so the page does not call this confirmed.";
+        : "The full-window 95% interval clears zero in the claimed direction, but that direction did not hold up when checked separately on every season used to test it, so the page does not call this confirmed.";
     case "debunked":
       return "The measured effect points against the claimed direction, so the popular version of this claim does not hold up under measurement.";
     default: {
@@ -180,8 +180,8 @@ export default async function PlayerLawsPage() {
           Every law here started as a piece of fantasy football folklore. To grade one, we find
           every player-season that fits its claim, match each one to an otherwise similar
           player-season that does not, and compare what actually happened the following season.
-          A law only counts as confirmed when that difference also holds up on seasons the
-          projection model never trained on, not only on the years used to build it.
+          A law only counts as confirmed when that difference also holds up separately on each of
+          several seasons checked one at a time, not only when every season is pooled together.
         </p>
       </ReadingSection>
 

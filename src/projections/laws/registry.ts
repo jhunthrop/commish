@@ -20,7 +20,7 @@
  *   3. A `measuredJson` entry with no matching `LawSpec` — a law was removed/renamed from
  *      `LAW_SPECS` and the stale measurement was never cleaned out of the committed file.
  *   4. A stored `verdict` that disagrees with what `verdictForFullWindow` computes fresh from that
- *      same entry's `effect`/`ci`/`heldOutEffect` — the file was hand-edited, or the verdict rule
+ *      same entry's `effect`/`ci`/`foldEffects` — the file was hand-edited, or the verdict rule
  *      changed since the file was last regenerated, either way the committed verdict can no longer
  *      be trusted at face value.
  * Any of these is silent drift between the code that claims a law's evidence and the evidence
@@ -28,18 +28,20 @@
  * pass unnoticed (see `populations.ts`'s and `harness.ts`'s own docblocks for the rest of that
  * discipline).
  *
- * OUT-OF-SAMPLE DIRECTION REPLICATION (controller ruling, supersedes an earlier held-out-only
- * measurement). `effect`/`ci`/`sample` are measured over every matched pair in the FULL
- * `MEASURE_SEASONS` window — `harness.ts`'s own `matchedPairsStratified`/`measureEffect`, unchanged.
- * A law is no longer graded on the full window's CI alone, because that window now includes the
- * very seasons `projection-fit.ts` fits the model on, and a law confirmed only there would be
- * confirmed on the model's own training data. `verdictForFullWindow` adds one more requirement on
- * top of `harness.ts`'s `verdictFor`: `confirmed` also needs the HELD-OUT SUBSET of those same
- * matched pairs (the ones whose predictor season+1 lands in `HELD_OUT_SEASONS`) to point the same
- * direction. A law whose full-window evidence is strong but whose held-out slice disagrees, or
- * whose held-out slice matched nothing at all, is capped at `weak` — real enough to keep measuring,
- * not demonstrated on seasons the fit never touched. See `scripts/measure-laws.ts`'s header for how
- * the held-out subset is derived (it is a partition of the SAME matched pairs, not a separate match).
+ * OUT-OF-SAMPLE DIRECTION REPLICATION, ROLLING FOLDS (this wave, 2026-08-31 — supersedes an
+ * earlier single held-out-pair measurement). `effect`/`ci`/`sample` are measured over every
+ * matched pair in the FULL `MEASURE_SEASONS` window — `harness.ts`'s own
+ * `matchedPairsStratified`/`measureEffect`, unchanged. A law is no longer graded on the full
+ * window's CI alone, because that window now includes the very seasons `projection-fit.ts` fits
+ * the model on, and a law confirmed only there would be confirmed on the model's own training
+ * data. `verdictForFullWindow` adds one more requirement on top of `harness.ts`'s `verdictFor`:
+ * `confirmed` also needs EVERY REPLICATION FOLD (`config.ts`'s `REPLICATION_FOLDS`, one predictor
+ * season each) that matched at least one pair to point the same direction as the full-window
+ * effect. A law whose full-window evidence is strong but whose folds disagree with each other, or
+ * whose folds all matched zero pairs, is capped at `weak` — real enough to keep measuring, not
+ * demonstrated across seasons checked separately. See `scripts/measure-laws.ts`'s header for how
+ * each fold's subset is derived (it is a partition of the SAME matched pairs by predictor season,
+ * not a separate match).
  */
 
 import { readFileSync } from "node:fs";
@@ -47,9 +49,17 @@ import { LAW_SPECS, type LawSpec } from "./populations";
 import { verdictFor } from "./harness";
 import type { Law, LawMeasurement, LawVerdict, PlayerSeasonPoint } from "./types";
 
-/** One `measured.json` entry: the full-window measurement, the held-out subset's effect (`null` if
- *  the held-out subset matched zero pairs — see `verdictForFullWindow`), and the verdict they imply. */
-export type MeasuredEntry = LawMeasurement & { readonly heldOutEffect: number | null; readonly verdict: LawVerdict };
+/** One replication fold's own effect (`config.ts`'s `REPLICATION_FOLDS`, one entry per predictor
+ *  season) — `effect: null` when that fold's predictor season matched zero pairs. See
+ *  `verdictForFullWindow`'s docblock for how a list of these combines into a verdict. */
+export interface FoldEffect {
+  readonly season: number;
+  readonly effect: number | null;
+}
+
+/** One `measured.json` entry: the full-window measurement, one effect per replication fold, and
+ *  the verdict they imply. */
+export type MeasuredEntry = LawMeasurement & { readonly foldEffects: readonly FoldEffect[]; readonly verdict: LawVerdict };
 
 /** `measured.json`'s whole shape: every law id the file has evidence for. */
 export type MeasuredJson = { readonly [lawId: string]: MeasuredEntry };
@@ -94,8 +104,20 @@ export function parseMeasuredJson(raw: string): MeasuredJson {
     if (typeof record.seasons !== "string") {
       throw new Error(`malformed measured.json: "${lawId}".seasons is not a string`);
     }
-    if (record.heldOutEffect !== null && !isFiniteNumber(record.heldOutEffect)) {
-      throw new Error(`malformed measured.json: "${lawId}".heldOutEffect is not a finite number or null`);
+    if (!Array.isArray(record.foldEffects)) {
+      throw new Error(`malformed measured.json: "${lawId}".foldEffects is not an array`);
+    }
+    for (const fold of record.foldEffects as readonly unknown[]) {
+      if (typeof fold !== "object" || fold === null || Array.isArray(fold)) {
+        throw new Error(`malformed measured.json: "${lawId}".foldEffects has a non-object entry`);
+      }
+      const foldRecord = fold as Record<string, unknown>;
+      if (!isFiniteNumber(foldRecord.season)) {
+        throw new Error(`malformed measured.json: "${lawId}".foldEffects has an entry with a non-finite season`);
+      }
+      if (foldRecord.effect !== null && !isFiniteNumber(foldRecord.effect)) {
+        throw new Error(`malformed measured.json: "${lawId}".foldEffects has an entry with a non-finite effect or null`);
+      }
     }
     if (typeof record.verdict !== "string" || !VALID_VERDICTS.has(record.verdict)) {
       throw new Error(`malformed measured.json: "${lawId}".verdict is not one of "confirmed" | "weak" | "debunked"`);
@@ -124,18 +146,27 @@ export function stratumKeyFor(spec: Pick<LawSpec, "position">, point: Pick<Playe
 
 /**
  * The revised grading rule: `verdictFor`'s full-window CI/sign call, refined by ONE extra step. If
- * the full window alone would call it `confirmed`, that is downgraded to `weak` unless the held-out
- * subset's own effect points the same direction (`heldOutEffect === null` — zero held-out pairs
- * matched — never confirms, exactly like a sign disagreement). `weak` and `debunked` from the
- * full-window rule are untouched: this can only ever pull a `confirmed` down to `weak`, never
- * change a `weak` or a `debunked` into anything else, so every full-window CI/sign case
- * `verdictFor` already handles correctly keeps behaving exactly as it did.
+ * the full window alone would call it `confirmed`, that is downgraded to `weak` unless EVERY fold
+ * that matched at least one pair points the same direction as `expectedSign`. A fold whose own
+ * `effect` is `null` (zero pairs matched that predictor season) is skipped rather than counted
+ * against the law — it contributed no evidence either way — but a law with ZERO folds carrying
+ * any pairs at all is capped at `weak` too, the same as a lone disagreeing fold: "nothing checked
+ * it" is not "it checked out." `weak` and `debunked` from the full-window rule are untouched: this
+ * can only ever pull a `confirmed` down to `weak`, never change a `weak` or a `debunked` into
+ * anything else, so every full-window CI/sign case `verdictFor` already handles correctly keeps
+ * behaving exactly as it did.
  */
-export function verdictForFullWindow(measurement: LawMeasurement, expectedSign: -1 | 1, heldOutEffect: number | null): LawVerdict {
+export function verdictForFullWindow(
+  measurement: LawMeasurement,
+  expectedSign: -1 | 1,
+  foldEffects: readonly FoldEffect[],
+): LawVerdict {
   const fullWindowVerdict = verdictFor(measurement, expectedSign);
   if (fullWindowVerdict !== "confirmed") return fullWindowVerdict;
-  const heldOutSignMatches = heldOutEffect !== null && Math.sign(heldOutEffect) === expectedSign;
-  return heldOutSignMatches ? "confirmed" : "weak";
+  const foldsWithPairs = foldEffects.filter((fold) => fold.effect !== null);
+  if (foldsWithPairs.length === 0) return "weak";
+  const everyFoldAgrees = foldsWithPairs.every((fold) => Math.sign(fold.effect as number) === expectedSign);
+  return everyFoldAgrees ? "confirmed" : "weak";
 }
 
 /** The pure, testable core: merges `specs` with `measuredJson`, throwing on any drift between them. */
@@ -154,11 +185,11 @@ export function registryFrom(specs: readonly LawSpec[], measuredJson: MeasuredJs
     }
 
     const measured: LawMeasurement = { effect: entry.effect, ci: entry.ci, sample: entry.sample, seasons: entry.seasons };
-    const expectedVerdict = verdictForFullWindow(measured, spec.expectedSign, entry.heldOutEffect);
+    const expectedVerdict = verdictForFullWindow(measured, spec.expectedSign, entry.foldEffects);
     if (entry.verdict !== expectedVerdict) {
       throw new Error(
         `registryFrom: measured.json's verdict for "${spec.id}" is "${entry.verdict}" but verdictForFullWindow computes ` +
-          `"${expectedVerdict}" from its own effect/ci/heldOutEffect — the file is stale or was hand-edited. Re-run \`npm run laws:measure\`.`,
+          `"${expectedVerdict}" from its own effect/ci/foldEffects — the file is stale or was hand-edited. Re-run \`npm run laws:measure\`.`,
       );
     }
 

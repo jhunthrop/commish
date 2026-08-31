@@ -6,8 +6,21 @@
       0.4947142857142858
     ],
     "sample": 238,
-    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on 2022-2023",
-    "heldOutEffect": -0.7004255319148937,
+    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "foldEffects": [
+      {
+        "season": 2021,
+        "effect": -0.38689655172413806
+      },
+      {
+        "season": 2022,
+        "effect": -1.0051515151515151
+      },
+      {
+        "season": 2023,
+        "effect": 0.017857142857143127
+      }
+    ],
     "verdict": "debunked"
   },
   "rb_age_curve": {
@@ -17,8 +30,21 @@
       -0.3942251461988304
     ],
     "sample": 171,
-    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on 2022-2023",
-    "heldOutEffect": -1.6673076923076924,
+    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "foldEffects": [
+      {
+        "season": 2021,
+        "effect": -0.17470588235294124
+      },
+      {
+        "season": 2022,
+        "effect": -2.9258333333333333
+      },
+      {
+        "season": 2023,
+        "effect": -0.5885714285714292
+      }
+    ],
     "verdict": "confirmed"
   },
   "rb_workload_cliff": {
@@ -28,8 +54,21 @@
       0.9583895348837201
     ],
     "sample": 43,
-    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on 2022-2023",
-    "heldOutEffect": -4.688,
+    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "foldEffects": [
+      {
+        "season": 2021,
+        "effect": -1.5725000000000002
+      },
+      {
+        "season": 2022,
+        "effect": -5.226
+      },
+      {
+        "season": 2023,
+        "effect": -4.15
+      }
+    ],
     "verdict": "weak"
   },
   "target_share_persistence": {
@@ -39,8 +78,21 @@
       1.7802034883720927
     ],
     "sample": 129,
-    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on 2022-2023",
-    "heldOutEffect": 1.5670000000000006,
+    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "foldEffects": [
+      {
+        "season": 2021,
+        "effect": 0.6131250000000001
+      },
+      {
+        "season": 2022,
+        "effect": 0.8926666666666667
+      },
+      {
+        "season": 2023,
+        "effect": 2.241333333333334
+      }
+    ],
     "verdict": "confirmed"
   },
   "td_regression": {
@@ -50,8 +102,21 @@
       -0.45852719528178204
     ],
     "sample": 763,
-    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on 2022-2023",
-    "heldOutEffect": -0.7535172413793103,
+    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "foldEffects": [
+      {
+        "season": 2021,
+        "effect": -0.572608695652174
+      },
+      {
+        "season": 2022,
+        "effect": -1.1772413793103447
+      },
+      {
+        "season": 2023,
+        "effect": -0.47103448275862075
+      }
+    ],
     "verdict": "confirmed"
   },
   "wr_target_competition": {
@@ -61,8 +126,21 @@
       -0.24620119521912365
     ],
     "sample": 251,
-    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on 2022-2023",
-    "heldOutEffect": -1.6812195121951221,
+    "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "foldEffects": [
+      {
+        "season": 2021,
+        "effect": -1.431875
+      },
+      {
+        "season": 2022,
+        "effect": -2.1499999999999995
+      },
+      {
+        "season": 2023,
+        "effect": -1.2347619047619045
+      }
+    ],
     "verdict": "confirmed"
   }
 }

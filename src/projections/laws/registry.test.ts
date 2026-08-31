@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { parseMeasuredJson, registry, registryFrom, stratumKeyFor, verdictForFullWindow, type MeasuredEntry, type MeasuredJson } from "./registry";
+import {
+  parseMeasuredJson,
+  registry,
+  registryFrom,
+  stratumKeyFor,
+  verdictForFullWindow,
+  type FoldEffect,
+  type MeasuredEntry,
+  type MeasuredJson,
+} from "./registry";
 import { LAW_SPECS, type LawSpec } from "./populations";
 import type { PlayerSeasonPoint } from "./types";
 import { predictOpportunity } from "../model/opportunity";
@@ -26,20 +35,27 @@ function specFixture(over: Partial<LawSpec> = {}): LawSpec {
   };
 }
 
+/** Three folds, all agreeing with a `-1` expected sign — the default "every fold agrees" shape. */
+const AGREEING_FOLDS: readonly FoldEffect[] = [
+  { season: 2021, effect: -1 },
+  { season: 2022, effect: -1 },
+  { season: 2023, effect: -1 },
+];
+
 function measurementFixture(over: Partial<MeasuredEntry> = {}): MeasuredEntry {
   const base: MeasuredEntry = {
     effect: -3,
     ci: [-4, -2],
     sample: 40,
-    seasons: "2013-2023 (2019 missing upstream), direction replicated on 2022-2023",
-    heldOutEffect: -1,
+    seasons: "2013-2023 (2019 missing upstream), direction replicated on predictor seasons 2021-2023",
+    foldEffects: AGREEING_FOLDS,
     verdict: "confirmed",
   };
   return { ...base, ...over };
 }
 
 describe("registryFrom", () => {
-  it("merges a spec's static fields with its measurement into one Law, dropping heldOutEffect from `measured`", () => {
+  it("merges a spec's static fields with its measurement into one Law, dropping foldEffects from `measured`", () => {
     const spec = specFixture();
     const measured = measurementFixture();
     const [law] = registryFrom([spec], { fake_law: measured });
@@ -70,25 +86,41 @@ describe("registryFrom", () => {
 
   it("throws when the stored verdict disagrees with verdictForFullWindow's own computation", () => {
     const spec = specFixture({ expectedSign: -1 });
-    // Full-window CI excludes zero, sign matches, held-out subset agrees in sign — verdictForFullWindow
+    // Full-window CI excludes zero, sign matches, every fold agrees in sign — verdictForFullWindow
     // computes "confirmed", not "weak".
-    const measured = measurementFixture({ effect: -3, ci: [-4, -2], heldOutEffect: -1, verdict: "weak" });
+    const measured = measurementFixture({ effect: -3, ci: [-4, -2], foldEffects: AGREEING_FOLDS, verdict: "weak" });
     expect(() => registryFrom([spec], { fake_law: measured })).toThrow(/verdict for "fake_law" is "weak".*computes "confirmed"/);
   });
 
   it("accepts every verdict shape verdictForFullWindow can produce, when the stored verdict matches it", () => {
+    const oneFoldDisagrees: readonly FoldEffect[] = [
+      { season: 2021, effect: -1 },
+      { season: 2022, effect: 1 }, // disagrees with expectedSign -1
+      { season: 2023, effect: -1 },
+    ];
+    const oneFoldSkippedRestAgree: readonly FoldEffect[] = [
+      { season: 2021, effect: null }, // zero pairs that predictor season — skipped, not counted against the law
+      { season: 2022, effect: -1 },
+      { season: 2023, effect: -1 },
+    ];
+    const zeroFoldsWithPairs: readonly FoldEffect[] = [
+      { season: 2021, effect: null },
+      { season: 2022, effect: null },
+      { season: 2023, effect: null },
+    ];
     const cases: readonly MeasuredEntry[] = [
-      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", heldOutEffect: -1, verdict: "confirmed" }, // full CI excludes zero, sign matches, held-out agrees
-      { effect: -3, ci: [-1, 1], sample: 40, seasons: "s", heldOutEffect: -1, verdict: "weak" }, // sign matches, full CI spans zero
-      { effect: 3, ci: [2, 4], sample: 40, seasons: "s", heldOutEffect: 1, verdict: "debunked" }, // full sign wrong
-      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", heldOutEffect: 1, verdict: "weak" }, // full confirms, held-out disagrees in sign — capped
-      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", heldOutEffect: null, verdict: "weak" }, // full confirms, zero held-out pairs — capped, never confirmed
+      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "confirmed" }, // full CI excludes zero, sign matches, every fold agrees
+      { effect: -3, ci: [-1, 1], sample: 40, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "weak" }, // sign matches, full CI spans zero
+      { effect: 3, ci: [2, 4], sample: 40, seasons: "s", foldEffects: [{ season: 2021, effect: 1 }], verdict: "debunked" }, // full sign wrong
+      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: oneFoldDisagrees, verdict: "weak" }, // full confirms, one fold disagrees — capped
+      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: oneFoldSkippedRestAgree, verdict: "confirmed" }, // full confirms, a zero-pair fold is skipped, the rest agree
+      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: zeroFoldsWithPairs, verdict: "weak" }, // full confirms, zero folds carry any pairs — capped, never confirmed
     ];
     for (const measured of cases) {
       const spec = specFixture({ expectedSign: -1 });
       expect(() => registryFrom([spec], { fake_law: measured })).not.toThrow();
       const [law] = registryFrom([spec], { fake_law: measured });
-      expect(law!.verdict).toBe(verdictForFullWindow(measured, -1, measured.heldOutEffect));
+      expect(law!.verdict).toBe(verdictForFullWindow(measured, -1, measured.foldEffects));
     }
   });
 
@@ -106,27 +138,58 @@ describe("registryFrom", () => {
 
 describe("verdictForFullWindow", () => {
   const EXPECTED: -1 = -1;
+  const FULL_WINDOW_CONFIRMS = { effect: -3, ci: [-4, -2] as const, sample: 10, seasons: "s" };
+  const FULL_WINDOW_SPANS_ZERO = { effect: -3, ci: [-1, 1] as const, sample: 10, seasons: "s" };
+  const FULL_WINDOW_WRONG_SIGN = { effect: 3, ci: [2, 4] as const, sample: 10, seasons: "s" };
 
-  it("confirms only when the full window's CI excludes zero, the sign matches, AND the held-out subset agrees in sign", () => {
-    expect(verdictForFullWindow({ effect: -3, ci: [-4, -2], sample: 10, seasons: "s" }, EXPECTED, -1)).toBe("confirmed");
+  it("confirms when the full window's CI excludes zero, the sign matches, AND every fold agrees in sign", () => {
+    const allFoldsAgree: readonly FoldEffect[] = [
+      { season: 2021, effect: -1 },
+      { season: 2022, effect: -2 },
+      { season: 2023, effect: -0.5 },
+    ];
+    expect(verdictForFullWindow(FULL_WINDOW_CONFIRMS, EXPECTED, allFoldsAgree)).toBe("confirmed");
   });
 
-  it("caps a full-window confirm at weak when the held-out subset's sign disagrees", () => {
-    expect(verdictForFullWindow({ effect: -3, ci: [-4, -2], sample: 10, seasons: "s" }, EXPECTED, 1)).toBe("weak");
+  it("caps a full-window confirm at weak when one fold disagrees in sign", () => {
+    const oneFoldDisagrees: readonly FoldEffect[] = [
+      { season: 2021, effect: -1 },
+      { season: 2022, effect: 1 },
+      { season: 2023, effect: -1 },
+    ];
+    expect(verdictForFullWindow(FULL_WINDOW_CONFIRMS, EXPECTED, oneFoldDisagrees)).toBe("weak");
   });
 
-  it("caps a full-window confirm at weak when the held-out subset matched zero pairs (null) — never confirmed", () => {
-    expect(verdictForFullWindow({ effect: -3, ci: [-4, -2], sample: 10, seasons: "s" }, EXPECTED, null)).toBe("weak");
+  it("skips a fold that matched zero pairs (effect: null) rather than counting it against the law, and still confirms when every other fold agrees", () => {
+    const oneFoldSkipped: readonly FoldEffect[] = [
+      { season: 2021, effect: null },
+      { season: 2022, effect: -1 },
+      { season: 2023, effect: -1 },
+    ];
+    expect(verdictForFullWindow(FULL_WINDOW_CONFIRMS, EXPECTED, oneFoldSkipped)).toBe("confirmed");
   });
 
-  it("stays weak when the full-window sign matches but its own CI spans zero, regardless of the held-out subset", () => {
-    expect(verdictForFullWindow({ effect: -3, ci: [-1, 1], sample: 10, seasons: "s" }, EXPECTED, -1)).toBe("weak");
-    expect(verdictForFullWindow({ effect: -3, ci: [-1, 1], sample: 10, seasons: "s" }, EXPECTED, null)).toBe("weak");
+  it("caps a full-window confirm at weak when zero folds carry any pairs at all — never confirmed on no replication evidence", () => {
+    const zeroFoldsWithPairs: readonly FoldEffect[] = [
+      { season: 2021, effect: null },
+      { season: 2022, effect: null },
+      { season: 2023, effect: null },
+    ];
+    expect(verdictForFullWindow(FULL_WINDOW_CONFIRMS, EXPECTED, zeroFoldsWithPairs)).toBe("weak");
   });
 
-  it("stays debunked when the full-window sign disagrees with expectedSign, regardless of the held-out subset", () => {
-    expect(verdictForFullWindow({ effect: 3, ci: [2, 4], sample: 10, seasons: "s" }, EXPECTED, -1)).toBe("debunked");
-    expect(verdictForFullWindow({ effect: 3, ci: [2, 4], sample: 10, seasons: "s" }, EXPECTED, null)).toBe("debunked");
+  it("stays weak when the full-window sign matches but its own CI spans zero, regardless of the folds", () => {
+    const allFoldsAgree: readonly FoldEffect[] = [{ season: 2021, effect: -1 }];
+    const zeroFoldsWithPairs: readonly FoldEffect[] = [{ season: 2021, effect: null }];
+    expect(verdictForFullWindow(FULL_WINDOW_SPANS_ZERO, EXPECTED, allFoldsAgree)).toBe("weak");
+    expect(verdictForFullWindow(FULL_WINDOW_SPANS_ZERO, EXPECTED, zeroFoldsWithPairs)).toBe("weak");
+  });
+
+  it("stays debunked when the full-window sign disagrees with expectedSign, regardless of the folds", () => {
+    const allFoldsAgree: readonly FoldEffect[] = [{ season: 2021, effect: -1 }];
+    const zeroFoldsWithPairs: readonly FoldEffect[] = [{ season: 2021, effect: null }];
+    expect(verdictForFullWindow(FULL_WINDOW_WRONG_SIGN, EXPECTED, allFoldsAgree)).toBe("debunked");
+    expect(verdictForFullWindow(FULL_WINDOW_WRONG_SIGN, EXPECTED, zeroFoldsWithPairs)).toBe("debunked");
   });
 });
 
