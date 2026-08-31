@@ -63,6 +63,46 @@ function planted(n: number, plantedEffect: number, seed = 7): readonly PlayerSea
 }
 
 /**
+ * SYSTEMATIC WITHIN-CALIPER MISMATCH — the population that separates true difference-in-
+ * differences from a matched next-minus-next. Every condition row sits exactly 0.4 ABOVE its one
+ * admissible control (caliper 0.5; neighboring controls are 0.6 away, inadmissible), so the
+ * baseline gap never averages out. On this population, with drift k = 0.2:
+ *   true DiD           = planted - k * 0.4        = planted - 0.08
+ *   matched next-next  = planted + 0.4 * (1 - k)  = planted + 0.32
+ * The band asserted below admits the first and excludes the second — an estimator that fails to
+ * subtract the baseline gap cannot pass. (The alternating generator above keeps this gap
+ * mean-zero on purpose, for the null test; this one makes it systematic on purpose, for this.)
+ */
+function systematicMismatch(n: number, plantedEffect: number, seed = 13): readonly PlayerSeasonPoint[] {
+  const next = lcg(seed);
+  const noise = (): number => next() - 0.5;
+  const delta = 0.4;
+
+  const points: PlayerSeasonPoint[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const base = 10 + (i % 20);
+    const conditionNow = base + delta;
+    points.push({
+      playerId: `sys-condition-${i}`,
+      season: 2020,
+      pointsPerGame: conditionNow,
+      nextPointsPerGame: drifted(conditionNow, noise(), plantedEffect),
+      matchKey: conditionNow,
+      condition: true,
+    });
+    points.push({
+      playerId: `sys-control-${i}`,
+      season: 2020,
+      pointsPerGame: base,
+      nextPointsPerGame: drifted(base, noise(), 0),
+      matchKey: base,
+      condition: false,
+    });
+  }
+  return points;
+}
+
+/**
  * THE REGRESSION MIRAGE — the exact scenario the folk "cliff" laws are born from: a condition
  * group that sits at systematically HIGH baselines (career years), a strong shared drift pulling
  * everyone back toward the mean, and a pool of unremarkable low-baseline controls. A raw
@@ -156,6 +196,14 @@ it("never matches outside the caliper and reports the reduced sample", () => {
   expect(pairs).toHaveLength(0);
   // And a zero-match population is never a measurement — see the throw test below.
   expect(() => measureEffect(pairs)).toThrow(/no matched pairs/);
+});
+
+it("subtracts a systematic baseline gap: DiD lands at planted - k*delta, matched next-minus-next cannot", () => {
+  const pairs = matchedPairs(systematicMismatch(400, -1.0), 0.5);
+  const m = measureEffect(pairs);
+  // True DiD: -1.0 - 0.2 * 0.4 = -1.08. Matched next-minus-next: -1.0 + 0.4 * 0.8 = -0.68,
+  // far outside this band. The 0.15 tolerance covers seeded noise only.
+  expect(Math.abs(m.effect - -1.08)).toBeLessThan(0.15);
 });
 
 it("recovers a planted effect through the regression mirage, where a raw before/after reads a -4.8 cliff", () => {
