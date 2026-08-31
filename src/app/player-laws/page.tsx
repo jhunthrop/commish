@@ -135,9 +135,37 @@ function groupByVerdict(laws: readonly Law[]): readonly { readonly verdict: LawV
   );
 }
 
+/**
+ * WHAT A CONFIRMED LAW ACTUALLY DOES, DERIVED MECHANICALLY FROM `modelPath` (fix round, I7).
+ *
+ * Only a confirmed law with a wired `modelPath` (`populations.ts`'s own docblock: "null means the
+ * law is content only, no model wiring") actually feeds the fitted ranking model a board reads.
+ * EVERY confirmed law still shows up as a reason chip beside a player's name (`board-reasons.ts`'s
+ * `lawReasonsFor` gates on `verdict === "confirmed"` alone, never on `modelPath`), so "every
+ * confirmed law feeds the board's own rankings" was true only by coincidence, for exactly as long as
+ * every confirmed law happened to also be wired — which stopped being true the day a law could be
+ * confirmed with no feature yet built for it (`populations.ts`'s own `modelPath` docblock names this
+ * exact case). Reading `law.modelPath` at render time, for every law `registry()` actually returns,
+ * is what keeps this sentence honest as that count changes without anyone remembering to edit copy.
+ */
+function boardConsequenceSentence(laws: readonly Law[]): string {
+  const confirmed = laws.filter((law) => law.verdict === "confirmed");
+  const wired = confirmed.filter((law) => law.modelPath !== null);
+  const chipSentence = "A reason chip beside a player's name states a confirmed law's measured effect the same way this page does.";
+  if (confirmed.length === 0) return chipSentence;
+  if (wired.length === confirmed.length) {
+    return `Every confirmed law here feeds the board's own rankings, and ${chipSentence.charAt(0).toLowerCase()}${chipSentence.slice(1)}`;
+  }
+  if (wired.length === 0) {
+    return `None of the confirmed laws here are wired into the board's rankings yet. ${chipSentence}`;
+  }
+  return `${wired.length} of ${confirmed.length} confirmed laws here feed the board's own rankings. ${chipSentence}`;
+}
+
 export default async function PlayerLawsPage() {
   const user = await getCurrentUser();
-  const groups = groupByVerdict(registry());
+  const laws = registry();
+  const groups = groupByVerdict(laws);
 
   return (
     <ReadingFrame
@@ -195,10 +223,7 @@ export default async function PlayerLawsPage() {
       ))}
 
       <ReadingSection id="see-it-live" title="Where these show up">
-        <p>
-          Every confirmed law here feeds the board&apos;s own rankings, and a reason chip beside a
-          player&apos;s name states its measured effect the same way this page does.
-        </p>
+        <p>{boardConsequenceSentence(laws)}</p>
         <p>
           <Link href="/browse" className="font-medium text-accent underline">
             See who is drafting soon

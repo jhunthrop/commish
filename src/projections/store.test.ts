@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { nflPlayers } from "@/db/schema";
-import { observationsAsOf, recordObservations, type PlayerWeekObservation } from "./store";
+import { deleteObservationsBySource, observationsAsOf, recordObservations, type PlayerWeekObservation } from "./store";
 
 const db = createTestDb();
 
@@ -59,6 +59,57 @@ describe("recordObservations", () => {
 
   it("refuses a non-finite value rather than storing a NaN the metrics will later throw on", async () => {
     await expect(recordObservations(db, [observation({ value: Number.NaN })])).rejects.toThrow(/finite/i);
+  });
+});
+
+describe("deleteObservationsBySource — the self-superseding write path", () => {
+  it("deletes only the named season and source, leaving everything else untouched", async () => {
+    await recordObservations(db, [
+      observation({ source: "nflverse_pbp_derived", metric: "rushing_yards", value: 40 }),
+      observation({ source: "nflverse_pbp_derived", season: 2023, metric: "rushing_yards", value: 41 }),
+      observation({ source: "nflverse_player_week", metric: "rushing_yards", value: 42 }),
+    ]);
+
+    const deletedCount = await deleteObservationsBySource(db, 2024, "nflverse_pbp_derived");
+    expect(deletedCount).toBe(1);
+
+    const known = await observationsAsOf(db, { season: 2024, week: 2, asOf: TUESDAY });
+    expect(known.map((row) => [row.season, row.source])).toEqual([[2024, "nflverse_player_week"]]);
+  });
+
+  it("lets a corrected derivation actually land, where onConflictDoNothing alone would keep the stale value", async () => {
+    // The bug I5 exists to close: two writes at the SAME as-of, SAME key, DIFFERENT value — exactly
+    // what a fixed derivation produces on a re-run. Without the delete, `recordObservations`'s
+    // `onConflictDoNothing` silently keeps the first (now wrong) value forever.
+    await recordObservations(db, [observation({ source: "nflverse_pbp_derived", value: 999 })]);
+
+    await deleteObservationsBySource(db, 2024, "nflverse_pbp_derived");
+    await recordObservations(db, [observation({ source: "nflverse_pbp_derived", value: 40 })]);
+
+    const known = await observationsAsOf(db, { season: 2024, week: 2, asOf: TUESDAY, source: "nflverse_pbp_derived" });
+    expect(known.map((row) => row.value)).toEqual([40]);
+  });
+
+  it("returns 0 and disturbs nothing when the source has no rows for that season", async () => {
+    await recordObservations(db, [observation({ source: "nflverse_player_week" })]);
+    expect(await deleteObservationsBySource(db, 2024, "nflverse_pbp_derived")).toBe(0);
+    expect(await observationsAsOf(db, { season: 2024, week: 2, asOf: TUESDAY })).toHaveLength(1);
+  });
+
+  it("narrows to the named metrics when given, leaving other metrics under the SAME source alone", async () => {
+    // The real case (I4): `nflverse_player_week` carries both participation metrics (`targets`) and
+    // published stat-line metrics (`receiving_yards`) under one source string. An unscoped delete
+    // would take out the stat line too.
+    await recordObservations(db, [
+      observation({ source: "nflverse_player_week", metric: "targets", value: 0 }),
+      observation({ source: "nflverse_player_week", metric: "receiving_yards", value: 72 }),
+    ]);
+
+    const deletedCount = await deleteObservationsBySource(db, 2024, "nflverse_player_week", ["targets"]);
+    expect(deletedCount).toBe(1);
+
+    const known = await observationsAsOf(db, { season: 2024, week: 2, asOf: TUESDAY });
+    expect(known.map((row) => row.metric)).toEqual(["receiving_yards"]);
   });
 });
 

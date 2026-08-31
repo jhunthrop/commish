@@ -3,7 +3,7 @@ import type { Position, StatLine } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring/compute";
 import { allPositions } from "../backtest";
-import { STAT_LINE_SOURCE } from "../lines";
+import { statLinesAsOf, STAT_LINE_SOURCE } from "../lines";
 import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import { PARTICIPATION_METRICS } from "../nflverse/map";
 import { COACH_METRICS } from "../nflverse/coaches";
@@ -71,12 +71,21 @@ export interface LawSpec {
    * Wired this wave: `wr_target_competition` to the offseason share-redistribution feature
    * (`fitRedistributionPriors`), `target_share_persistence` to the opportunity model's own
    * target-share shrinkage (`predictOpportunity`), `td_regression` to the efficiency model's
-   * touchdown-rate regression handling (`TOUCHDOWN_RATES`) — the three laws `measured.json` calls
-   * `confirmed`. `play_caller_fingerprint` (debunked), `rb_age_curve` and `rb_workload_cliff`
-   * (both weak) stay `null`: a law that is not confirmed gates nothing, whatever feature might
-   * otherwise seem to fit its story. A future law confirmed with no existing feature to point at
-   * gets one through the normal feature/fit route (`model/fit.ts`) in a model round of its own —
-   * until then it is content-only, exactly like a debunked or weak law's claim.
+   * touchdown-rate regression handling (`TOUCHDOWN_RATES`) — the three laws `measured.json` called
+   * `confirmed` at the time this wiring was decided.
+   *
+   * UPDATED, fix round (2026-08-31): `rb_age_curve` is now ALSO `confirmed` in `measured.json`
+   * (sample 43 -> 171 across two later changes — see `nflverse/derived-stat-lines.ts`'s own docblock
+   * and `scripts/measure-laws.ts`'s falsification run for the honest attribution of that growth), and
+   * its `modelPath` stays `null` regardless: this wave's controller ruling was to ANNOTATE the model
+   * that already existed, never to build or re-fit one, and no existing fitted feature happens to
+   * compute `rb_age_curve`'s antecedent (raw age at season start) the way the other three laws'
+   * antecedents already matched something `model/fit.ts` had built. `play_caller_fingerprint`
+   * (debunked) and `rb_workload_cliff` (still weak) stay `null` for the ordinary reason: a law that
+   * is not confirmed gates nothing, whatever feature might otherwise seem to fit its story. A future
+   * law confirmed with no existing feature to point at — `rb_age_curve` included — gets one through
+   * the normal feature/fit route (`model/fit.ts`) in a model round of its own; until then it is
+   * content-only, exactly like a debunked or weak law's claim.
    */
   readonly modelPath: string | null;
   readonly population: (db: ReadonlyDb, seasons: readonly number[]) => Promise<readonly PlayerSeasonPoint[]>;
@@ -178,17 +187,25 @@ function touchdownPointsOf(line: StatLine, rules: ScoringRules): number {
 /**
  * Points, games and touchdown points per player, summed over one season as of one moment.
  *
- * Reads through `statLinesAsOfForMeasurement`, not the bare `statLinesAsOf` — the ONE seam in the
- * whole engine where a pbp-derived stat line (`nflverse/derived-stat-lines.ts`) is allowed to stand
- * in for a published one, and only for a season named in `STAT_LINE_GAPS`. Every other reader of
- * `statLinesAsOf` (preseason, `projection-fit.ts`, the report scripts) is untouched by that
- * fallback: the laws harness is the only caller measuring across the 2019 hole, and a product
- * surface must never render a row nflverse did not itself publish.
+ * `admitDerived` is the EXPLICIT gate a fix round closed (C2): `factsForSeason`, this function's
+ * caller, is used by TWO consumers, not one — `buildPopulations` (the laws harness) AND
+ * `preseason/source.ts`'s `loadPreseason` (a PRODUCT SURFACE). Before this parameter existed,
+ * `seasonScoring` called `statLinesAsOfForMeasurement` unconditionally, so BOTH consumers silently
+ * got the pbp-derived fallback for a gap season — including the preseason board, which is exactly
+ * the "must never render a row nflverse did not itself publish" rule this whole design exists to
+ * keep. `admitDerived: true` calls `statLinesAsOfForMeasurement` (admits a derived row for a
+ * `STAT_LINE_GAPS` season); `admitDerived: false` calls the bare `statLinesAsOf` (published only,
+ * nothing for a gap season, exactly what every OTHER `statLinesAsOf` reader already sees). The laws
+ * harness passes `true` from both `factsForSeason` and `actualPointsPerGame`; `loadPreseason` passes
+ * `false` — see that call site's own comment.
  */
 async function seasonScoring(
   db: ReadonlyDb, season: number, asOf: Date, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+  admitDerived: boolean,
 ): Promise<Map<string, SeasonScoring>> {
-  const rows = await statLinesAsOfForMeasurement(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
+  const rows = admitDerived
+    ? await statLinesAsOfForMeasurement(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf })
+    : await statLinesAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
   const out = new Map<string, SeasonScoring>();
   for (const { line } of rows) {
     const position = positions.get(line.playerId);
@@ -208,11 +225,13 @@ function pointsPerGame(entry: SeasonScoring | undefined): number | null {
   return entry !== undefined && entry.games > 0 ? roundPoints(entry.points / entry.games) : null;
 }
 
-/** THE UNGATED READ — a season's real outcome, corrections included, at `FINAL_OUTCOME`. */
+/** THE UNGATED READ — a season's real outcome, corrections included, at `FINAL_OUTCOME`. `admitDerived`
+ *  passes straight through to `seasonScoring` — see that function's own docblock. */
 async function actualPointsPerGame(
   db: ReadonlyDb, season: number, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+  admitDerived: boolean,
 ): Promise<Map<string, number>> {
-  const scoring = await seasonScoring(db, season, FINAL_OUTCOME, positions, rules);
+  const scoring = await seasonScoring(db, season, FINAL_OUTCOME, positions, rules, admitDerived);
   const out = new Map<string, number>();
   for (const [playerId, entry] of scoring) {
     const ppg = pointsPerGame(entry);
@@ -366,12 +385,20 @@ export interface SeasonFacts {
  * every law in one pass, and `source.ts`'s `loadPreseason`, which calls it ONCE for the completed
  * season immediately before the board's own season — the exact "season N" a board for season N+1
  * needs — so a live board's law reasons and this module's own measurement read the identical gate.
+ *
+ * `admitDerived` is what keeps those two callers from silently sharing MORE than the gate (fix
+ * round, C2): `buildPopulations` passes `true` (the laws harness is exactly where a pbp-derived
+ * gap-season stat line belongs), `loadPreseason` passes `false` (the board reads published history
+ * only, forever — see that call site's own comment for what a `true` there would have meant: a
+ * 2020-season board's rb_age_curve chip partly computed from 2019 play-by-play, never checked by the
+ * validation bar that gates the LAWS harness's own use of it).
  */
 export async function factsForSeason(
   db: ReadonlyDb, season: number, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+  admitDerived: boolean,
 ): Promise<Map<string, SeasonFacts>> {
   const asOf = schedulePublishedAsOf(season + 1);
-  const scoring = await seasonScoring(db, season, asOf, positions, rules);
+  const scoring = await seasonScoring(db, season, asOf, positions, rules, admitDerived);
   const participation = await seasonParticipation(db, season, asOf);
   const teams = await seasonTeams(db, season, asOf);
   const roster = await preseasonRostersAsOf(db, { season, asOf });
@@ -515,13 +542,17 @@ export function canonicalPointOrder(a: PlayerSeasonPoint, b: PlayerSeasonPoint):
  * A null condition (see `LawConditionFacts`) drops that player-season from the returned population
  * entirely, for that law only — a player can be dropped from one law's population and present in
  * another's the same season.
+ *
+ * `admitDerived: true` on BOTH calls — the laws harness is exactly where a pbp-derived gap-season
+ * stat line belongs (`factsForSeason`'s own docblock explains why `loadPreseason`, `factsForSeason`'s
+ * other caller, passes `false` instead).
  */
 export async function buildPopulations(db: ReadonlyDb, seasons: readonly number[]): Promise<ReadonlyMap<string, readonly PlayerSeasonPoint[]>> {
   const positions = await allPositions(db);
   const out = new Map<string, PlayerSeasonPoint[]>(LAW_ENTRIES.map((entry) => [entry.id, []]));
   for (const season of seasons) {
-    const seasonFacts = await factsForSeason(db, season, positions, PPR_SCORING);
-    const nextActual = await actualPointsPerGame(db, season + 1, positions, PPR_SCORING);
+    const seasonFacts = await factsForSeason(db, season, positions, PPR_SCORING, true);
+    const nextActual = await actualPointsPerGame(db, season + 1, positions, PPR_SCORING, true);
     for (const [playerId, entry] of seasonFacts) {
       const { position } = entry;
       for (const law of LAW_ENTRIES) {

@@ -408,10 +408,17 @@ export async function loadPreseason(db: ReadonlyDb, season: number, laws: readon
 
   // "Season N" for every law's own condition: the completed season immediately before this one,
   // read through `factsForSeason`'s OWN gate (N+1's schedule publication — this season's), which is
-  // exactly the moment a board for THIS season is entitled to know it at. Same call
-  // `buildPopulations` makes for its measurement, so a live board's law reasons can never drift from
-  // the evidence that confirmed the law in the first place.
-  const priorSeasonFacts = await factsForSeason(db, season - 1, positions, PPR_SCORING);
+  // exactly the moment a board for THIS season is entitled to know it at. The same call
+  // `buildPopulations` makes for its measurement, EXCEPT the last argument: `admitDerived: false`
+  // here, `true` there (fix round, C2). A live board's law reasons must never drift from the
+  // evidence that confirmed the law, but they also must never render a row nflverse did not itself
+  // publish — a `true` here would let a board whose prior season is 2019 (any board for the 2020
+  // season) compute its law facts partly from pbp-derived play-by-play the validation bar never
+  // checked, mixing a MEASUREMENT convenience into a number a real manager reads. The honest cost:
+  // a 2020-season board's `touches`/`touchdownPointsShare`/etc. facts for a player's 2019 season
+  // read as `null` (no evidence), exactly as they did before this task existed to fill the hole —
+  // the tri-state rule (`LawConditionFacts`'s own docblock) already does the right thing with that.
+  const priorSeasonFacts = await factsForSeason(db, season - 1, positions, PPR_SCORING, false);
   const lawFacts = new Map([...priorSeasonFacts].map(([playerId, entry]) => [playerId, entry.facts] as const));
 
   return {

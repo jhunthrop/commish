@@ -87,10 +87,17 @@ function isHeldOutPair(pair: MatchedPair): boolean {
   return HELD_OUT_PREDICTOR_SEASONS.has(pair.condition.season);
 }
 
-/** e.g. "2013-2023 (2019 pbp-derived, missing upstream), direction replicated on 2022-2023". */
+/**
+ * e.g. "2013-2023 (2019 rebuilt from play-by-play), direction replicated on 2022-2023".
+ *
+ * This string renders verbatim on `/player-laws` (`measuredFigures`'s "Seasons" figure) — a reader
+ * there is not expected to know what "pbp" or "derived" mean. Fix round, M1: an earlier version said
+ * "pbp-derived", which is precise for an engineer reading this file and jargon for everyone who
+ * reads the page it produces.
+ */
 function seasonsLabel(): string {
   const window = `${MEASURE_SEASONS.from}-${MEASURE_SEASONS.to - 1}`;
-  const gapNote = STAT_LINE_GAPS.length === 0 ? "" : ` (${STAT_LINE_GAPS.join(", ")} pbp-derived, missing upstream)`;
+  const gapNote = STAT_LINE_GAPS.length === 0 ? "" : ` (${STAT_LINE_GAPS.join(", ")} rebuilt from play-by-play)`;
   const heldOutPredictors = [...HELD_OUT_PREDICTOR_SEASONS].sort((a, b) => a - b);
   const replicated = `${heldOutPredictors[0]}-${heldOutPredictors[heldOutPredictors.length - 1]}`;
   return `${window}${gapNote}, direction replicated on ${replicated}`;

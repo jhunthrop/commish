@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Db } from "@/db/client";
 import type { SeasonStatLine } from "../lines";
-import { recordObservations } from "../store";
+import { deleteObservationsBySource, recordObservations } from "../store";
 import { recordPlayerTeams, recordTeamObservations, teamObservationsAsOf, type TeamWeekObservation } from "../team-store";
 import { indexTeamMetrics } from "../team-context";
 import { LAST_POSSIBLE_WEEK } from "../store";
@@ -12,15 +12,21 @@ import { recordNflPlayers } from "../universe";
 import { createNflverseClient, NflverseError, type NflverseClient } from "./client";
 import type { CsvRow } from "./csv";
 import { NFLVERSE_CONFIG } from "./config";
-import { DERIVED_STAT_LINE_COLUMNS, DerivedStatLineAggregator, deriveStatLines, derivedStatLineObservations } from "./derived-stat-lines";
-import { mapParticipation, participationObservations, weekAsOfFromSnapCounts, NFLVERSE_SOURCE } from "./map";
+import {
+  DERIVED_STAT_LINE_SOURCE,
+  DerivedStatLineAggregator,
+  deriveStatLines,
+  derivedStatLineObservations,
+  weekAsOfFromDerivedLines,
+} from "./derived-stat-lines";
+import { mapParticipation, participationObservations, weekAsOfFromSnapCounts, NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "./map";
 import { PlayByPlayAggregator, playProfileObservations, PBP_COLUMNS } from "./pbp";
 import { PlayerPlayAggregator, playerTouchObservations, PBP_PLAYER_COLUMNS } from "./pbp-players";
 import { allPositions } from "../backtest";
 import { mapInjuries } from "../news/retrieve";
 import { buildPlayerUniverse, mapNflPlayers, nflPlayerRows, type PlayerUniverse } from "./players";
 import { kickoffAsOf, mapSchedule, scheduleObservations, SCHEDULE_SOURCE_CONFIG } from "./schedule";
-import { mapStatLines, statLineObservations } from "./stat-lines";
+import { mapStatLines, statLineObservations, STAT_LINE_GAPS } from "./stat-lines";
 import { lineContinuityObservations, mapPlayerTeams } from "./team-map";
 
 /**
@@ -65,6 +71,14 @@ export interface SeasonIngestReport {
    * same rows the ingestion was: two derivations of one stamp is how a leak gets in.
    */
   readonly weekAsOf: ReadonlyMap<number, Date>;
+  /**
+   * TRUE when this season's weekly stats file did not exist, so `participationRows` counts rows
+   * whose `targets`/`carries`/`pass_attempts`/team totals were WITHHELD rather than written — see
+   * the comment above the filter in `ingestSeason`. Fix round, M5: a caller reading only
+   * `participationRows` would otherwise read "6218 participation rows" and reasonably assume full
+   * participation data landed, when for a gap season only the two snap-count-sourced metrics did.
+   */
+  readonly playerWeekUnavailable: boolean;
 }
 
 /** Fetches and stores the historical player universe. Run once, before any season. */
@@ -76,8 +90,7 @@ export async function ingestPlayerUniverse(db: Db, client: NflverseClient): Prom
 }
 
 /**
- * The weekly player-stats file, or an empty release for the one season nflverse never published
- * one (see `nflverse/stat-lines.ts`'s `STAT_LINE_GAPS`).
+ * The weekly player-stats file, or an empty release for a season nflverse never published one for.
  *
  * `client.ts`'s own docblock is explicit that `not_found` "is the ordinary case of asking for a
  * season nflverse has not published yet and is NOT an alarm" — before this, `ingestSeason` did not
@@ -85,12 +98,41 @@ export async function ingestPlayerUniverse(db: Db, client: NflverseClient): Prom
  * 2019 at all. Catching ONLY `not_found`, and only for this one asset, keeps that promise: an
  * `upstream` failure (GitHub or the release being down) or a `malformed` one (the schema moved) must
  * still throw and stop the backfill, because those two ARE alarms.
+ *
+ * FIX ROUND, M7: `STAT_LINE_GAPS` (`stat-lines.ts`) is the one season this 404 is EXPECTED for. A
+ * season NOT on that list returning empty here is a different fact entirely — nflverse dropped or
+ * renamed a release this engine has never seen missing — and silently treating it the same as the
+ * known 2019 hole would let a real upstream break through as a quiet, thin backfill instead of a
+ * loud one. `console.warn` rather than a throw: the fallback to `[]` is still safe (the false-zero
+ * participation bug this same fix round closed means an unexpected gap degrades honestly, to
+ * absent data, not to wrong data) so this is an operator's problem to investigate, not a reason to
+ * abort a backfill that is otherwise proceeding correctly for every other season.
  */
+/** The six participation metrics `mapParticipation` builds from `playerWeek` rather than from snap
+ *  counts — see `ingestSeason`'s own comment on why these, and only these, are withheld (and, if
+ *  found stale, cleaned up under I4) for a season whose weekly stats file does not exist. */
+const PLAYERWEEK_PARTICIPATION_METRICS: readonly string[] = [
+  PARTICIPATION_METRICS.targets,
+  PARTICIPATION_METRICS.teamTargets,
+  PARTICIPATION_METRICS.carries,
+  PARTICIPATION_METRICS.teamCarries,
+  PARTICIPATION_METRICS.passAttempts,
+  PARTICIPATION_METRICS.teamPassAttempts,
+];
+
 async function fetchPlayerWeek(client: NflverseClient, season: number): Promise<readonly CsvRow[]> {
   try {
     return await client.getCsv(NFLVERSE_CONFIG.releases.playerWeek, `stats_player_week_${season}.csv`);
   } catch (error) {
-    if (error instanceof NflverseError && error.kind === "not_found") return [];
+    if (error instanceof NflverseError && error.kind === "not_found") {
+      if (!STAT_LINE_GAPS.includes(season)) {
+        console.warn(
+          `WARNING: nflverse has no weekly stats for ${season}, and ${season} is not in STAT_LINE_GAPS. ` +
+            `This is not the known 2019 hole; investigate before trusting this season's participation or stat lines.`,
+        );
+      }
+      return [];
+    }
     throw error;
   }
 }
@@ -121,6 +163,25 @@ export async function ingestSeason(
     (row) => playerWeek.length > 0 || row.source !== NFLVERSE_SOURCE.playerWeek,
   );
 
+  // FIX ROUND, I4: this filter alone stops the poisoning going FORWARD, but any environment that
+  // ran the earlier buggy `ingestSeason` before this fix already has the false zeros sitting in its
+  // store, and `recordObservations`'s `onConflictDoNothing` would keep them there forever — nothing
+  // about re-running this ingestion, on its own, removes a row it no longer writes. So when
+  // `playerWeek` is empty, this ALSO deletes any pre-existing rows for exactly the six
+  // playerWeek-sourced participation metrics, scoped by metric (not by source alone) so a
+  // published stat line sharing the same source string is never touched. Idempotent and loud: the
+  // second run of this against an already-clean season finds and removes nothing, and the first run
+  // against a poisoned one says so.
+  if (playerWeek.length === 0) {
+    const removedFalseZeros = await deleteObservationsBySource(db, season, NFLVERSE_SOURCE.playerWeek, PLAYERWEEK_PARTICIPATION_METRICS);
+    if (removedFalseZeros > 0) {
+      console.warn(
+        `WARNING: removed ${removedFalseZeros} stale false-zero participation observations for ${season} ` +
+          `(targets/carries/pass_attempts written by a version of ingestSeason that predates this fix).`,
+      );
+    }
+  }
+
   const observationsWritten =
     (await recordObservations(db, participationRows)) +
     (await recordObservations(db, statLineObservations(statLines.statLines)));
@@ -149,6 +210,7 @@ export async function ingestSeason(
     statLineResolution: statLines.resolutionRate,
     unresolved: [...unresolved.values()],
     weekAsOf,
+    playerWeekUnavailable: playerWeek.length === 0,
   };
 }
 
@@ -238,6 +300,49 @@ export async function ingestPlayByPlay(db: Db, client: NflverseClient, season: n
   };
 }
 
+/** Everything one season's pbp-derived stat-line COMPUTATION reports about itself — no write. */
+export interface DerivedStatLineComputation {
+  readonly season: number;
+  readonly playsRead: number;
+  readonly unknownPlayers: number;
+  readonly derivedLines: readonly SeasonStatLine[];
+}
+
+/**
+ * ONE SEASON OF PLAY-BY-PLAY, REDUCED TO PBP-DERIVED STAT-LINE OUTCOMES — a SECOND, INDEPENDENT
+ * stream of the same release `ingestPlayByPlay` reads, not a third aggregator folded into that call.
+ *
+ * The two are kept apart deliberately. `ingestPlayByPlay` is the CONTEXT ingestion
+ * (`scripts/projection-context.ts`): it runs over the whole backfill window every time the seasons
+ * change and writes team-week and player-touch FEATURES. This is the GAP-SEASON derivation
+ * (`scripts/projection-backfill.ts`'s gap-season branch): it runs only for the seasons named in
+ * `STAT_LINE_GAPS` (today, only 2019) plus the one non-gap season the spec requires as a validation
+ * control (2018), and it computes stat-line OUTCOMES. Folding this into `ingestPlayByPlay` would make
+ * every context backfill — every season, every time — pay for a stat-line derivation almost nothing
+ * ever reads (`statLinesAsOfForMeasurement` only ever admits a gap season's rows). A second download
+ * of two seasons' worth of play-by-play costs minutes on a run that already happens rarely; paying
+ * that cost on every one of the twelve seasons `projection-context.ts` touches, every time it is run,
+ * would not be free by comparison.
+ *
+ * NEVER WRITES (fix round, M3/I3). `scripts/projection-backfill.ts`'s validation run needs 2018's
+ * derived lines purely to compare against 2018's published ones in memory — it is not a gap season
+ * and its derived rows have no reason to exist in the store at all. `ingestDerivedStatLines` below is
+ * the ONLY writer; it wraps this function and adds the write, so the validation path (which calls
+ * this function directly) touches the database with reads only, by construction, not by convention.
+ */
+export async function computeDerivedStatLines(db: Db, client: NflverseClient, season: number): Promise<DerivedStatLineComputation> {
+  const aggregator = new DerivedStatLineAggregator();
+  const playsRead = await client.streamCsv("pbp", `play_by_play_${season}.csv`, DerivedStatLineAggregator.COLUMNS, (row) =>
+    aggregator.add(row),
+  );
+  const lines = aggregator.lines();
+
+  const projected = new Set((await allPositions(db)).keys());
+  const { statLines, unknownPlayers } = deriveStatLines(lines, weekAsOfFromDerivedLines(lines, NFLVERSE_CONFIG.publicationLagHours), projected);
+
+  return { season, playsRead, unknownPlayers: unknownPlayers.length, derivedLines: statLines };
+}
+
 /** Everything one season's pbp-derived stat-line ingestion reports about itself. */
 export interface DerivedStatLineIngestReport {
   readonly season: number;
@@ -254,46 +359,36 @@ export interface DerivedStatLineIngestReport {
 }
 
 /**
- * ONE SEASON OF PLAY-BY-PLAY, REDUCED TO PBP-DERIVED STAT-LINE OUTCOMES — a SECOND, INDEPENDENT
- * stream of the same release `ingestPlayByPlay` reads, not a third aggregator folded into that call.
+ * `computeDerivedStatLines` PLUS THE WRITE — the ONLY function in this module that puts a derived
+ * stat line in the store.
  *
- * The two are kept apart deliberately. `ingestPlayByPlay` is the CONTEXT ingestion
- * (`scripts/projection-context.ts`): it runs over the whole backfill window every time the seasons
- * change and writes team-week and player-touch FEATURES. This is the GAP-SEASON ingestion
- * (`scripts/projection-backfill.ts`'s gap-season branch): it runs only for the seasons named in
- * `STAT_LINE_GAPS` (today, only 2019) plus the one non-gap season the spec requires as a validation
- * control (2018), and it writes stat-line OUTCOMES. Folding this into `ingestPlayByPlay` would make
- * every context backfill — every season, every time — pay for a stat-line derivation almost nothing
- * ever reads (`statLinesAsOfForMeasurement` only ever admits a gap season's rows). A second download
- * of two seasons' worth of play-by-play costs minutes on a run that already happens rarely; paying
- * that cost on every one of the twelve seasons `projection-context.ts` touches, every time it is run,
- * would not be free by comparison.
- *
- * Writes ALWAYS, gap season or not — this function does not consult `STAT_LINE_GAPS` at all. The
- * gating that keeps a non-gap season's derived rows out of any measurement is entirely on the READ
- * side (`statLinesAsOfForMeasurement`), so writing 2018's derived rows here for the validation run is
- * harmless: nothing will ever admit them, and the caller (the backfill script) decides which seasons
- * are worth the download.
+ * SELF-SUPERSEDING (fix round, I5). Deletes every existing `DERIVED_STAT_LINE_SOURCE` row for this
+ * season, then writes the freshly computed ones, in ONE transaction. Without the delete,
+ * `recordObservations`'s `onConflictDoNothing` would keep a STALE value forever the moment the
+ * derivation itself changes: a corrected formula recomputes the SAME season under the SAME `as_of`
+ * (the game's own kickoff never moves), so a re-run's rows collide on the exact unique-index key the
+ * old, wrong rows already occupy, and the insert would silently do nothing. This is exactly what
+ * happened to the first version of this derivation's already-landed 2019 rows when the missing
+ * `two_point_attempt` column (C1) was fixed — the corrected rows would not have replaced the
+ * inflated ones without this delete. Recomputable-by-construction is what makes the delete safe: a
+ * derived row is never a primary record of anything, only ever the current best recomputation of it.
  */
 export async function ingestDerivedStatLines(db: Db, client: NflverseClient, season: number): Promise<DerivedStatLineIngestReport> {
-  const aggregator = new DerivedStatLineAggregator();
-  const columns = [...new Set([...PBP_COLUMNS, ...DERIVED_STAT_LINE_COLUMNS])];
-  const playsRead = await client.streamCsv("pbp", `play_by_play_${season}.csv`, columns, (row) => aggregator.add(row));
+  const computation = await computeDerivedStatLines(db, client, season);
+  const observations = derivedStatLineObservations(computation.derivedLines);
 
-  const projected = new Set((await allPositions(db)).keys());
-  const { statLines, unknownPlayers } = deriveStatLines(
-    aggregator.lines(),
-    (line) => kickoffAsOf(line.gameDate, NFLVERSE_CONFIG.publicationLagHours),
-    projected,
-  );
+  const observationsWritten = await db.transaction(async (tx) => {
+    await deleteObservationsBySource(tx, season, DERIVED_STAT_LINE_SOURCE);
+    return recordObservations(tx, observations);
+  });
 
   return {
     season,
-    playsRead,
-    statLines: statLines.length,
-    observationsWritten: await recordObservations(db, derivedStatLineObservations(statLines)),
-    unknownPlayers: unknownPlayers.length,
-    derivedLines: statLines,
+    playsRead: computation.playsRead,
+    statLines: computation.derivedLines.length,
+    observationsWritten,
+    unknownPlayers: computation.unknownPlayers,
+    derivedLines: computation.derivedLines,
   };
 }
 

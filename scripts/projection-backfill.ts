@@ -21,23 +21,27 @@
 // such season inside the requested range, this ALSO derives stat lines from that season's own
 // play-by-play (`ingestDerivedStatLines`, `nflverse/derived-stat-lines.ts`) and writes them under the
 // second source id `DERIVED_STAT_LINE_SOURCE` — never mixed with the published rows, and admitted by
-// a measurement read only for a gap season (`statLinesAsOfForMeasurement`, wired into
-// `laws/populations.ts`). Derived rows never render on a product surface.
+// a measurement read only when the LAWS HARNESS explicitly asks for it (`buildPopulations` passes
+// `admitDerived: true`; the preseason board's own read of the same function passes `false` — see
+// `laws/populations.ts`'s `factsForSeason`). Derived rows never render on a product surface.
 //
-// THE VALIDATION BAR. Deriving from play-by-play is only trustworthy if it can be shown to agree
-// with a season nflverse DID publish. Whenever a gap season falls in the requested range, this also
-// derives the fixed control season 2018 the identical way and compares its season points against
+// THE VALIDATION BAR RUNS FIRST, AND WRITES NOTHING (fix round, I3/M3). Deriving from play-by-play
+// is only trustworthy if it can be shown to agree with a season nflverse DID publish, so whenever a
+// gap season falls in the requested range, this derives the fixed control season 2018 the identical
+// way BEFORE the gap season's own derivation is ever written — through `computeDerivedStatLines`,
+// which streams and derives but never touches the store — and compares its season points against
 // 2018's own published line: `seasonPointsAgreement` (a pure, unit-tested function) computes the
-// rank correlation across players with at least eight games. The spec's bar is 0.99 — below that,
-// the honest outcome is to say so and leave 2019 as a hole rather than ship a derivation nobody
-// checked.
+// rank correlation, mean absolute error and games-found distribution across players with at least
+// eight games. The spec's bar is 0.99 rank correlation; below that this exits before
+// `deriveGapSeasons` ever runs, so a validation failure can never be followed by a write of the
+// unproven derivation.
 import { createDb } from "@/db/client";
 import type { Db } from "@/db/client";
 import { allPositions } from "@/projections/backtest";
 import { statLinesAsOf } from "@/projections/lines";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { seasonPointsAgreement } from "@/projections/nflverse/derived-stat-lines";
-import { ingestDerivedStatLines, ingestPlayerUniverse, ingestSeason } from "@/projections/nflverse/ingest";
+import { computeDerivedStatLines, ingestDerivedStatLines, ingestPlayerUniverse, ingestSeason } from "@/projections/nflverse/ingest";
 import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import type { NflverseClient } from "@/projections/nflverse/client";
@@ -77,9 +81,11 @@ function percent(value: number | null): string {
 }
 
 /**
- * Derives and writes stat lines for every requested season nflverse never published — the gap-season
- * branch. Idempotent, like every ingestion here: a re-run of a season already landed writes 0 new
- * observations.
+ * Derives and WRITES stat lines for every requested season nflverse never published — the gap-season
+ * branch, and the only place in this script that writes a derived stat line. Idempotent, like every
+ * ingestion here: a re-run of a season already landed at the SAME derivation writes 0 new
+ * observations; a re-run after the derivation itself changed replaces the old rows outright
+ * (`ingestDerivedStatLines`'s own delete-then-write, I5) rather than leaving them stale.
  */
 async function deriveGapSeasons(db: Db, client: NflverseClient, seasons: readonly number[]): Promise<void> {
   for (const season of seasons.filter((year) => STAT_LINE_GAPS.includes(year))) {
@@ -93,16 +99,21 @@ async function deriveGapSeasons(db: Db, client: NflverseClient, seasons: readonl
 }
 
 /**
- * THE VALIDATION RUN. Derives `STAT_LINE_VALIDATION_SEASON` (2018) from its own play-by-play the
- * identical way a gap season is derived, reads that same season's PUBLISHED line back out of the
- * store, and prints the measured agreement. Runs only when a gap season is actually in the requested
- * range — there is no reason to pay for this download on a backfill that never touches 2019.
+ * THE VALIDATION RUN — writes nothing (`computeDerivedStatLines`, never `ingestDerivedStatLines`).
+ * Derives `STAT_LINE_VALIDATION_SEASON` (2018) from its own play-by-play the identical way a gap
+ * season is derived, reads that same season's PUBLISHED line back out of the store, and prints the
+ * measured agreement: rank correlation (the spec-binding bar), mean absolute error in points, and
+ * the derived-minus-published games-found distribution — three different ways the derivation could
+ * be wrong, since a correlation alone cannot see a constant bias or a systematically wrong game
+ * count. Runs only when a gap season is actually in the requested range — there is no reason to pay
+ * for this download on a backfill that never touches 2019 — and, called BEFORE `deriveGapSeasons`
+ * (fix round, I3), returns `false` on a failed bar so `main` can refuse to run the write at all.
  */
-async function validateAgainstPublished(db: Db, client: NflverseClient, seasons: readonly number[]): Promise<void> {
-  if (!seasons.some((year) => STAT_LINE_GAPS.includes(year))) return;
+async function validateAgainstPublished(db: Db, client: NflverseClient, seasons: readonly number[]): Promise<boolean> {
+  if (!seasons.some((year) => STAT_LINE_GAPS.includes(year))) return true;
 
   console.log(`\nvalidating the derivation against ${STAT_LINE_VALIDATION_SEASON} (published, not a gap season):`);
-  const derivedReport = await ingestDerivedStatLines(db, client, STAT_LINE_VALIDATION_SEASON);
+  const computation = await computeDerivedStatLines(db, client, STAT_LINE_VALIDATION_SEASON);
   const published = await statLinesAsOf(db, {
     season: STAT_LINE_VALIDATION_SEASON,
     week: { from: 1, to: LAST_POSSIBLE_WEEK },
@@ -110,27 +121,37 @@ async function validateAgainstPublished(db: Db, client: NflverseClient, seasons:
   });
   if (published.length === 0) {
     console.log(
-      `  ${STAT_LINE_VALIDATION_SEASON} has no published stat lines in this store; run projections:backfill for ` +
-        `${STAT_LINE_VALIDATION_SEASON} first, then re-run this validation.`,
+      `  ${STAT_LINE_VALIDATION_SEASON} has no published stat lines in this store yet. The play-by-play half of ` +
+        `this validation already streamed just now (${computation.playsRead} plays read, nothing written) and does ` +
+        `not need a separate step; only the PUBLISHED half is missing. Run projections:backfill for ` +
+        `${STAT_LINE_VALIDATION_SEASON} first (which fetches the weekly stats file), then re-run this validation.`,
     );
-    return;
+    return false;
   }
 
   const positions = await allPositions(db);
-  const agreement = seasonPointsAgreement(derivedReport.derivedLines, published, positions);
+  const agreement = seasonPointsAgreement(computation.derivedLines, published, positions);
   const passed = agreement.rankCorrelation !== null && agreement.rankCorrelation >= MINIMUM_AGREEMENT;
+  const mae = agreement.meanAbsoluteError === null ? "n/a" : agreement.meanAbsoluteError.toFixed(2);
+  const { min, max, mean, exactMatches } = agreement.gamesDelta;
   console.log(
     `  season-points rank correlation: ${agreement.rankCorrelation === null ? "n/a" : agreement.rankCorrelation.toFixed(4)} ` +
       `across ${agreement.sampleSize} players with >= 8 games (bar is ${MINIMUM_AGREEMENT.toFixed(2)})`,
   );
+  console.log(`  season-points mean absolute error: ${mae} pts per player`);
+  console.log(
+    `  derived games minus published games: min ${min}, max ${max}, mean ${mean.toFixed(2)}, ` +
+      `${exactMatches} of ${agreement.sampleSize} players an exact match`,
+  );
   if (!passed) {
     console.error(
-      `\nThe derivation did not clear the validation bar. Do not treat the gap season's derived stat ` +
-        `lines as trustworthy without investigating where the disagreement concentrates.`,
+      `\nThe derivation did not clear the validation bar. The gap season is NOT being derived or written. ` +
+        `Investigate where the disagreement concentrates before running this again.`,
     );
-    process.exit(3);
+    return false;
   }
   console.log("  bar cleared; the gap season's derivation is trusted.");
+  return true;
 }
 
 async function main(): Promise<void> {
@@ -159,16 +180,29 @@ async function main(): Promise<void> {
         `${report.observationsWritten} new observations | universe ${percent(report.participationResolution)} participation, ` +
         `${percent(report.statLineResolution)} weekly stats${worst < MINIMUM_RESOLUTION && !STAT_LINE_GAPS.includes(season) ? "  <-- BELOW THE BAR" : ""}`,
     );
+    if (report.playerWeekUnavailable) {
+      // M5: without this line, "6218 participation rows" reads as full participation data. It is
+      // not — only the two snap-count-sourced metrics (offensive snaps, team offensive snaps) landed
+      // for this season; targets, carries, pass attempts and their team totals were withheld rather
+      // than written as false zeros (see `ingestSeason`'s own comment on why).
+      console.log(`    targets/carries/pass_attempts withheld for ${season}: no weekly stats file upstream`);
+    }
     for (const unresolved of [...report.unresolved].sort((a, b) => b.occurrences - a.occurrences).slice(0, 5)) {
       console.log(`    unresolved: ${unresolved.name} (${unresolved.id}) x${unresolved.occurrences}`);
     }
   }
   console.log(`\n${observations} new observations across ${seasons.length} seasons`);
 
-  await deriveGapSeasons(db, client, seasons);
-  await validateAgainstPublished(db, client, seasons);
+  // Validation runs BEFORE the gap-season write, and the write never runs if it fails (fix round,
+  // I3): a derivation nobody has just proven agrees with a published season has no business landing
+  // in the store, even under a source id nothing renders.
+  const validated = await validateAgainstPublished(db, client, seasons);
+  if (validated) {
+    await deriveGapSeasons(db, client, seasons);
+  }
 
   await db.$client.end();
+  if (!validated) process.exit(3);
   if (thin) {
     console.error(`\nAt least one season resolved below ${(MINIMUM_RESOLUTION * 100).toFixed(0)}%. Do not fit a model on it without saying so.`);
     process.exit(2);

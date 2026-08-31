@@ -3,10 +3,11 @@ import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring/compute";
 import { statLinesAsOf, statMetricName, STAT_LINE_SOURCE, type SeasonStatLine } from "../lines";
-import { spearman, type Observation } from "../metrics";
+import { meanAbsoluteError, spearman, type Observation } from "../metrics";
 import type { ObservationQuery, PlayerWeekObservation } from "../store";
 import { NFLVERSE_CONFIG } from "./config";
 import type { CsvRow } from "./csv";
+import { kickoffAsOf } from "./schedule";
 import { STAT_LINE_GAPS } from "./stat-lines";
 
 /**
@@ -36,13 +37,33 @@ import { STAT_LINE_GAPS } from "./stat-lines";
  *  on `STAT_LINE_GAPS` for why this file, not `laws/config.ts`, owns the gap-season list too. */
 export const DERIVED_STAT_LINE_SOURCE = "nflverse_pbp_derived";
 
-/** The columns this aggregation adds to the stream `pbp.ts`/`pbp-players.ts` already ask for. */
-export const DERIVED_STAT_LINE_COLUMNS: readonly string[] = [
+/**
+ * EVERY COLUMN `DerivedStatLineAggregator.add` READS, SELF-SUFFICIENT — not a delta against
+ * `pbp.ts`/`pbp-players.ts`'s own column lists.
+ *
+ * A fix-round review caught the bug this shape exists to prevent: the first version of this list
+ * omitted `two_point_attempt` because `pbp.ts`'s `PBP_COLUMNS` (unioned in by `ingest.ts`) happened
+ * to cover most of what `add()` needed, so the gap went unnoticed by both the code and its own unit
+ * tests — the tests built `CsvRow`s by hand with every field present, which cannot catch a column
+ * the real stream never requests. Declaring the FULL list here, on the aggregator itself
+ * (`DerivedStatLineAggregator.COLUMNS`, aliased below for callers that only want the array), makes
+ * "does the stream carry everything `add()` reads" answerable by reading one array instead of
+ * cross-referencing three files, and lets a test build rows from exactly this list to prove it.
+ */
+const READ_COLUMNS: readonly string[] = [
+  "season",
+  "week",
+  "season_type",
+  "game_date",
+  "play_type",
+  "two_point_attempt",
   "passer_player_id",
   "passing_yards",
   "pass_touchdown",
   "interception",
   "rusher_player_id",
+  "rush_attempt",
+  "qb_kneel",
   "rushing_yards",
   "rush_touchdown",
   "receiver_player_id",
@@ -110,6 +131,10 @@ function identifier(row: CsvRow, column: string): string | null {
  * docblock for why nothing here consults the crosswalk.
  */
 export class DerivedStatLineAggregator {
+  /** The aggregator's own declaration of what it reads from the stream — see `READ_COLUMNS`'s
+   *  docblock for why this lives on the class rather than as a hand-maintained list elsewhere. */
+  static readonly COLUMNS: readonly string[] = READ_COLUMNS;
+
   private readonly tallies = new Map<string, DerivedTally>();
 
   private tallyFor(season: number, week: number, playerId: string, gameDate: string): DerivedTally {
@@ -192,6 +217,38 @@ export class DerivedStatLineAggregator {
   }
 }
 
+/**
+ * Callers that just want the array without touching the class — `ingest.ts` streams these into
+ * `client.streamCsv`. Identical to `DerivedStatLineAggregator.COLUMNS` (same array reference).
+ */
+export const DERIVED_STAT_LINE_COLUMNS: readonly string[] = DerivedStatLineAggregator.COLUMNS;
+
+/**
+ * WEEK-MAX AS-OF — mirroring `map.ts`'s `weekAsOfFromSnapCounts`, not stamping from each play's own
+ * game date (I6, fix round: "stand-ins mirror the thing they stand in for").
+ *
+ * A derived row stands in for a row the published weekly file would have carried, and that file is
+ * released once a week, after the week's LAST game finishes — `weekAsOfFromSnapCounts`'s own
+ * docblock: "a week's stats are not complete until its Monday night game is over — dating the week
+ * from its Thursday opener would make four days of results visible to a replay before they
+ * existed." Stamping each player from his OWN game's kickoff (this function's first version) broke
+ * that discipline: a Thursday-night player's derived line would have become visible to a replay up
+ * to four days before the equivalent published file ever would have, which is a leak in miniature —
+ * earlier than the source it stands in for, not merely a different one.
+ */
+export function weekAsOfFromDerivedLines(
+  lines: readonly DerivedPlayerWeekLine[],
+  lagHours: number = NFLVERSE_CONFIG.publicationLagHours,
+): ReadonlyMap<number, Date> {
+  const byWeek = new Map<number, Date>();
+  for (const line of lines) {
+    const stamp = kickoffAsOf(line.gameDate, lagHours);
+    const known = byWeek.get(line.week);
+    if (known === undefined || stamp > known) byWeek.set(line.week, stamp);
+  }
+  return byWeek;
+}
+
 export interface DeriveStatLinesResult {
   readonly statLines: readonly SeasonStatLine[];
   /** Everyone the play-by-play attributed a stat to that the universe does not project. Named and
@@ -206,10 +263,16 @@ export interface DeriveStatLinesResult {
  * so a new stat field fails to compile there instead of silently arriving as zero, and this mirrors
  * it: the five fields play-by-play cannot attribute to a person are spelled out at zero rather than
  * left to a spread's default.
+ *
+ * `weekAsOf` takes a MAP rather than a per-line callback — `weekAsOfFromDerivedLines`'s own
+ * docblock explains why every player in a week must share one stamp, on `stat-lines.ts`'s
+ * `mapStatLines` precedent: a fact whose as-of cannot be found THROWS rather than defaulting to a
+ * stamp of its own, because a week this function is given a tally for but no as-of for is a caller
+ * bug (the map was not built from the same `lines`), not a legitimately-unknowable moment.
  */
 export function deriveStatLines(
   lines: readonly DerivedPlayerWeekLine[],
-  asOfFor: (line: DerivedPlayerWeekLine) => Date,
+  weekAsOf: ReadonlyMap<number, Date>,
   /** GSIS ids the store knows about. A stat attributed to anybody else is reported, never stored. */
   known: ReadonlySet<string>,
 ): DeriveStatLinesResult {
@@ -219,6 +282,12 @@ export function deriveStatLines(
     if (!known.has(tally.playerId)) {
       unknown.add(tally.playerId);
       continue;
+    }
+    const asOf = weekAsOf.get(tally.week);
+    if (asOf === undefined) {
+      throw new Error(
+        `No as-of is known for week ${tally.week}; weekAsOf must come from weekAsOfFromDerivedLines built on these same lines.`,
+      );
     }
     const line: StatLine = {
       playerId: tally.playerId,
@@ -238,7 +307,7 @@ export function deriveStatLines(
       defensiveInterceptions: 0,
       defensiveTouchdowns: 0,
     };
-    statLines.push({ season: tally.season, asOf: asOfFor(tally), line });
+    statLines.push({ season: tally.season, asOf, line });
   }
   return { statLines, unknownPlayers: [...unknown].sort() };
 }
@@ -266,12 +335,20 @@ export function derivedStatLineObservations(rows: readonly SeasonStatLine[]): re
  * THE ADMISSION WRAPPER — the one seam where a pbp-derived row is allowed to stand in for a
  * published one, and the only one.
  *
- * `statLinesAsOf` itself is untouched: every other caller (preseason, `projection-fit.ts`, the
- * report scripts) keeps reading exactly what it always read — nothing, for a gap season, because
- * nflverse published nothing there. That is deliberate: derived rows exist for MEASUREMENT and must
- * never render on a product surface, so the fallback is opt-in, one function, one caller
- * (`laws/populations.ts`'s `seasonScoring`) — not a change to the shared reader every surface goes
- * through.
+ * `statLinesAsOf` itself is untouched: every caller that never invokes this wrapper (preseason's
+ * outcome reads, `projection-fit.ts`, the report scripts) keeps reading exactly what it always
+ * read — nothing, for a gap season, because nflverse published nothing there.
+ *
+ * FIX ROUND, C2: this function is NOT gated to one caller by construction — anything that calls it
+ * gets the fallback. The gate that matters lives one level up, at `laws/populations.ts`'s
+ * `seasonScoring`, which takes an explicit `admitDerived: boolean` and calls this function only when
+ * `true`. `buildPopulations` (the laws harness) passes `true` for both the predictor and the outcome
+ * read; `preseason/source.ts`'s `loadPreseason` — which also calls `factsForSeason`, `seasonScoring`'s
+ * other consumer — passes `false`, so the preseason board never mixes a derived law-fact into a
+ * history it is otherwise reading published-only. An earlier version of this file's docblock claimed
+ * "one caller" as if that were still true after `factsForSeason` was reused outside the laws harness;
+ * it was not, and the explicit boolean is what makes the claim true again — by construction, not by
+ * every future caller happening to remember.
  *
  * For a non-gap season this returns precisely what `statLinesAsOf` alone would have; a published row
  * always wins over a derived one for the same week and player, though in practice the two sources
@@ -302,10 +379,25 @@ export async function statLinesAsOfForMeasurement(
  * Pure and I/O-free like every function in `metrics.ts`, on purpose: the spec requires this exact
  * comparison to run twice — once against fixtures in a test, once for real inside the backfill
  * script — and a function that needed a database could only be the second of those.
+ *
+ * FIX ROUND, I1: the rank correlation alone answers "does the ORDER agree" but not "how far off is a
+ * given player's total" or "is the derivation finding the same GAMES the published file found" — both
+ * of which a 0.9999 correlation can hide (a correlation is insensitive to a constant per-player bias,
+ * and to games found or missed as long as the ranking survives it). `meanAbsoluteError` (points) and
+ * `gamesDelta` (derived games played minus published games played, over the same matched,
+ * `minGames`-filtered player set the correlation is measured over) are reported alongside it so the
+ * backfill script's validation run has more than one number to judge the derivation by.
  */
 export interface SeasonPointsAgreement {
   readonly rankCorrelation: number | null;
   readonly sampleSize: number;
+  /** Points, same units as `effect` on `/player-laws` — how far a derived season's total strayed
+   *  from the published one, on average, over the matched sample. */
+  readonly meanAbsoluteError: number | null;
+  /** `derivedGames - publishedGames`, over the matched sample. Zero everywhere means the derivation
+   *  found a stat line in exactly the weeks the published file did; a nonzero mean means it is
+   *  finding (or missing) games the published file does not (or does). */
+  readonly gamesDelta: { readonly min: number; readonly max: number; readonly mean: number; readonly exactMatches: number };
 }
 
 interface SeasonPoints {
@@ -345,11 +437,26 @@ export function seasonPointsAgreement(
   const published = seasonPointsByPlayer(publishedLines, positions, rules);
 
   const observations: Observation[] = [];
+  const gameDeltas: number[] = [];
   for (const [playerId, derivedEntry] of derived) {
     const publishedEntry = published.get(playerId);
     if (publishedEntry === undefined) continue;
     if (Math.min(derivedEntry.games, publishedEntry.games) < minGames) continue;
     observations.push({ predicted: derivedEntry.points, actual: publishedEntry.points });
+    gameDeltas.push(derivedEntry.games - publishedEntry.games);
   }
-  return { rankCorrelation: spearman(observations), sampleSize: observations.length };
+  return {
+    rankCorrelation: spearman(observations),
+    sampleSize: observations.length,
+    meanAbsoluteError: meanAbsoluteError(observations),
+    gamesDelta:
+      gameDeltas.length === 0
+        ? { min: 0, max: 0, mean: 0, exactMatches: 0 }
+        : {
+            min: Math.min(...gameDeltas),
+            max: Math.max(...gameDeltas),
+            mean: gameDeltas.reduce((sum, delta) => sum + delta, 0) / gameDeltas.length,
+            exactMatches: gameDeltas.filter((delta) => delta === 0).length,
+          },
+  };
 }
