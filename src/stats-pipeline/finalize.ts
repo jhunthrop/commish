@@ -8,6 +8,7 @@ import type { Clock } from "@/domain/timing";
 import { leagueMedian, startersOf } from "@/league";
 import { getLineup } from "@/league-service/lineups";
 import { stampSeasonCompleteInTx } from "@/league-service/participation";
+import { advancePlayoffsInTx } from "@/league-service/playoff-advance";
 import { scoreLineup, type ScoringRules } from "@/scoring";
 import type { ScoreCache } from "./score-cache";
 
@@ -256,6 +257,11 @@ export async function finalizeWeekInTx(tx: DbTx, leagueId: string, weekNumber: n
     const median = leagueMedian([...scores.values()]);
     await tx.update(weeks).set({ medianScore: median }).where(and(eq(weeks.leagueId, leagueId), eq(weeks.weekNumber, weekNumber)));
   }
+
+  // THE BRACKET'S ADVANCE (roadmap item 6) — BEFORE the season-complete stamp, and the order is
+  // the design: the next playoff round's unscored matchups exist by the time the stamp asks
+  // "any unscored matchup left?", so a season only completes when the championship itself does.
+  await advancePlayoffsInTx(tx, leagueId, weekNumber);
 
   await stampSeasonCompleteInTx(tx, leagueId, occurredAt);
 

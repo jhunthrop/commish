@@ -1,3 +1,4 @@
+import { acceptTradeAndFinalize } from "./test-support";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { DbTx } from "@/db/client";
@@ -99,7 +100,7 @@ async function seedAcceptedTrade(opts: { readonly flagId: string; readonly weekN
     deliver: async () => {},
   });
   if (!proposed.ok) throw new Error(proposed.reason);
-  const accepted = await acceptTrade(db, { tradeId: proposed.tradeId, leagueId: created.leagueId, userId: userB, clock, deliver: async () => {} });
+  const accepted = await acceptTradeAndFinalize(db, { tradeId: proposed.tradeId, leagueId: created.leagueId, userId: userB, clock, deliver: async () => {} });
   if (!accepted.ok) throw new Error(accepted.reason);
 
   await db.transaction((tx) =>
@@ -173,7 +174,7 @@ describe("reverseTradeInTx", () => {
       deliver: async () => {},
     });
     if (!secondProposed.ok) throw new Error(secondProposed.reason);
-    const secondAccepted = await acceptTrade(db, { tradeId: secondProposed.tradeId, leagueId: fx.leagueId, userId: userC, clock, deliver: async () => {} });
+    const secondAccepted = await acceptTradeAndFinalize(db, { tradeId: secondProposed.tradeId, leagueId: fx.leagueId, userId: userC, clock, deliver: async () => {} });
     expect(secondAccepted.ok).toBe(true);
 
     const result = await db.transaction((tx) =>

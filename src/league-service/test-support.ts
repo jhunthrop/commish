@@ -3,6 +3,7 @@ import type { Db } from "@/db/client";
 import type { RosterSlotConfig } from "@/domain/roster";
 import type { ScoringPresetName } from "@/domain/scoring";
 import { drafts, lineupSlots, matchups, players, playerStatLines, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import { acceptTrade } from "./trades";
 import { createLeague } from "./creation";
 import { writeSchedule } from "./schedule";
 
@@ -358,4 +359,19 @@ export async function foreignLeague(db: Db): Promise<ForeignLeague> {
     .set({ playerId })
     .where(and(eq(rosterSlots.teamId, fixture.teamId), eq(rosterSlots.slot, "BENCH"), eq(rosterSlots.slotIndex, 0)));
   return { teamId: fixture.teamId, playerId };
+}
+
+/**
+ * Trade governance (roadmap item 5) test bridge: acceptance now lands `under_review`, and these
+ * suites assert EXECUTION. Accept, then finalize through the same re-entry the lazy processor
+ * uses — same clock, so every occurredAt/settledAt assertion holds. A refusal or a hold passes
+ * straight through untouched.
+ */
+export async function acceptTradeAndFinalize(
+  db: Parameters<typeof acceptTrade>[0],
+  input: Parameters<typeof acceptTrade>[1],
+): ReturnType<typeof acceptTrade> {
+  const first = await acceptTrade(db, input);
+  if (!first.ok || first.outcome !== "under_review") return first;
+  return acceptTrade(db, { ...input, finalizeReview: true });
 }

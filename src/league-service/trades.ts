@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, gt, inArray, ne, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, ne, or, sql } from "drizzle-orm";
 import { assembleAdvisorContext, valuePlayers } from "@/ai-advisor/context";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
@@ -34,6 +34,14 @@ import type { ScoreCache } from "@/stats-pipeline/score-cache";
 import { enforcementAppliesTo } from "./enforcement";
 import { currentWeekOf } from "./schedule";
 import { applyTradeInTx, plannedTransfer, TransferRefusedError, type FilledRosterSlot, type TransferAsset } from "./trade-transfer";
+import { LEAGUE_CONFIG } from "@/league";
+
+export const TRADE_GOVERNANCE_REFUSALS = {
+  deadline: "The trade deadline has passed for this season.",
+  notUnderReview: "That trade is not under league review.",
+  partyCannotVeto: "You are part of this trade, so your vote does not count toward a veto.",
+  alreadyVetoed: "You already cast your veto on this trade.",
+} as const;
 
 /**
  * `trade_proposals`, ISO-stringed at the boundary — the same "`Date` only inside Drizzle"
@@ -284,6 +292,10 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
 
   // THE WEEK, DERIVED — see this function's own docblock. One read, one definition.
   const weekNumber = await currentWeekOf(db, input.leagueId);
+  // TRADE DEADLINE (roadmap item 5): the late-season line every arriving manager expects.
+  if (weekNumber > LEAGUE_CONFIG.tradeDeadlineWeek) {
+    return { ok: false, status: 409, reason: TRADE_GOVERNANCE_REFUSALS.deadline };
+  }
 
   const proposerAssetIds = assetPlayerIds(input.proposerAssets);
   const counterpartyAssetIds = assetPlayerIds(input.counterpartyAssets);
@@ -876,6 +888,11 @@ export interface AcceptTradeInput {
   readonly tradeId: string;
   readonly leagueId: string;
   readonly userId: string;
+  /** Trade governance (roadmap item 5): the lazy review finalizer's re-entry. The guarded
+   *  update runs FROM `under_review` instead of `open`, skips the expiry gate (an offer's TTL
+   *  may lapse during its review), and lands in the ordinary executed path unchanged. Never set
+   *  by a route — the processor passes the stored counterparty's own userId. */
+  readonly finalizeReview?: boolean;
   readonly clock?: Clock;
   readonly audit?: AuditLogger;
   readonly notify?: typeof notifyAffectedMember;
@@ -899,6 +916,15 @@ export interface AcceptTradeInput {
 }
 
 export type AcceptTradeResult =
+  | {
+      readonly ok: true;
+      readonly tradeId: string;
+      /** Trade governance: the yes landed and the league's review window opened — nothing has
+       *  executed yet. `reviewEndsAt` is when the unvetoed trade will. */
+      readonly outcome: "under_review";
+      readonly reviewEndsAt: string;
+      readonly fairness: TradeFairnessEvaluation;
+    }
   | {
       readonly ok: true;
       readonly tradeId: string;
@@ -1038,6 +1064,14 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
   let outcome:
     | {
         readonly ok: true;
+        readonly outcome: "under_review";
+        readonly tradeId: string;
+        readonly reviewEndsAt: string;
+        readonly fairness: TradeFairnessEvaluation;
+        readonly notices: readonly MemberNotice[];
+      }
+    | {
+        readonly ok: true;
         readonly outcome: "executed";
         readonly tradeId: string;
         readonly supersededCount: number;
@@ -1084,6 +1118,12 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
       // only lock that coordinates with `persistTick` flipping the LIVE week. `currentWeekOf`
       // runs on `tx`, so the answer is the one this transaction will act on.
       const weekNumber = await currentWeekOf(tx, input.leagueId);
+      // TRADE DEADLINE (roadmap item 5) — the yes is refused past it, exactly like the offer.
+      // A FINALIZE re-entry is exempt: the acceptance beat the deadline, and the review window
+      // running past it must not kill a legally-made trade.
+      if (input.finalizeReview !== true && weekNumber > LEAGUE_CONFIG.tradeDeadlineWeek) {
+        return { ok: false as const, status: 409, reason: TRADE_GOVERNANCE_REFUSALS.deadline };
+      }
       const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber)).for("share");
       if (isLineupLocked(week?.status ?? "scheduled")) {
         return { ok: false as const, status: 409, reason: `Week ${weekNumber} has started, so rosters can't change until it ends.` };
@@ -1147,7 +1187,8 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
       // has exactly one answer across every automated action this phase takes. A private league's
       // manager never has a trade held, however lopsided: the platform is never that league's
       // commissioner, so it is never that league's business either.
-      const shouldHold = fairness.hold && enforcementAppliesTo({ isPublicMatchmade: league.isPublicMatchmade });
+      const shouldHold =
+        input.finalizeReview !== true && fairness.hold && enforcementAppliesTo({ isPublicMatchmade: league.isPublicMatchmade });
 
       // STEP 5 — THE GUARDED UPDATE, the one true authorization gate and the LAST write before
       // either branch below. Still safe as a plain return on failure: a `WHERE` that matches zero
@@ -1166,19 +1207,27 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
       // own `trade_released` branch re-derives the week AGAIN at the moment of release rather than
       // trusting this one — see that branch's own docblock for why. Not a foreign-key column
       // either way, so this still takes no lock beyond the ones step 5's own docblock enumerates.
+      const finalize = input.finalizeReview === true;
+      const reviewEndsAt = new Date(new Date(now).getTime() + LEAGUE_CONFIG.tradeReviewHours * 3_600_000);
       const [row] = await tx
         .update(tradeProposals)
         .set(
           shouldHold
             ? { status: "held", weekNumber }
-            : { status: "accepted", settledAt: new Date(now), settledByUserId: input.userId, weekNumber },
+            : finalize
+              ? { status: "accepted", settledAt: new Date(now), settledByUserId: input.userId, weekNumber, reviewEndsAt: null }
+              // Trade governance (roadmap item 5): the yes opens the LEAGUE's window. Nothing
+              // executes below on this branch — the finalizer re-enters with `finalizeReview`.
+              : { status: "under_review", weekNumber, reviewEndsAt },
         )
         .where(
           and(
             eq(tradeProposals.id, input.tradeId),
             eq(tradeProposals.leagueId, input.leagueId),
-            eq(tradeProposals.status, "open"),
-            gt(tradeProposals.expiresAt, new Date(now)),
+            eq(tradeProposals.status, finalize ? "under_review" : "open"),
+            // An offer's TTL may lapse while its review runs; expiry gates the YES, not the
+            // finalize of a yes already given.
+            finalize ? sql`true` : gt(tradeProposals.expiresAt, new Date(now)),
             eq(tradeProposals.counterpartyTeamId, actorTeamId),
           ),
         )
@@ -1201,6 +1250,17 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
           newId: input.newId ?? (() => crypto.randomUUID()),
           raiseFlag: input.raiseFlag ?? raiseFlag,
         });
+      }
+
+      if (!finalize) {
+        return {
+          ok: true as const,
+          outcome: "under_review" as const,
+          tradeId: row.id,
+          reviewEndsAt: reviewEndsAt.toISOString(),
+          fairness,
+          notices: [] as readonly MemberNotice[],
+        };
       }
 
       await applyTradeInTx(tx, {
@@ -1377,6 +1437,13 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
 
   if (!outcome.ok) return outcome;
   for (const notice of outcome.notices) await deliver(notice);
+
+  if (outcome.outcome === "under_review") {
+    // NOTHING FURTHER RUNS, same reasoning as `held`: no roster moved, no scores changed, and
+    // the fairness flag question belongs to execution — the finalizer's own re-entry raises it
+    // when the trade actually goes through.
+    return { ok: true, outcome: "under_review", tradeId: outcome.tradeId, reviewEndsAt: outcome.reviewEndsAt, fairness: outcome.fairness };
+  }
 
   if (outcome.outcome === "held") {
     // NOTHING FURTHER RUNS. No score-cache eviction (no roster moved, no week's scores changed),

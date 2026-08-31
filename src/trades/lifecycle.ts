@@ -41,15 +41,27 @@ export const TRADE_STATUSES = [
    * business in the first place.
    */
   "blocked",
+  /**
+   * Trade governance (roadmap item 5, 2026-08-30). Both managers agreed and the LEAGUE's review
+   * window opened: nothing has executed, no player moved, no offer superseded. NOT TERMINAL —
+   * the window closes into `accepted` (executed, the lazy finalizer re-entering `acceptTrade`)
+   * or `vetoed` (the league said no). A held trade never reaches review: the operator's fairness
+   * question outranks the league's.
+   */
+  "under_review",
+  /** The league voted it down inside the review window. TERMINAL, and distinct from `rejected`
+   *  and `blocked` for the same reason those are distinct from each other: WHO said no is the
+   *  fact a manager reads. */
+  "vetoed",
 ] as const;
 export type TradeStatus = (typeof TRADE_STATUSES)[number];
 
 export const TERMINAL_STATUSES: Readonly<Record<TradeStatus, boolean>> = {
   open: false, accepted: true, rejected: true, withdrawn: true, expired: true, superseded: true,
-  held: false, blocked: true,
+  held: false, blocked: true, under_review: false, vetoed: true,
 };
 
-export type TradeTransition = "accept" | "reject" | "withdraw" | "expire" | "supersede" | "hold" | "release" | "block";
+export type TradeTransition = "accept" | "reject" | "withdraw" | "expire" | "supersede" | "hold" | "release" | "block" | "review" | "finalize" | "veto";
 
 /** Which status each transition produces. Exhaustive: a new transition without a target will
  *  not compile. */
@@ -60,6 +72,9 @@ const TARGET_OF: Readonly<Record<TradeTransition, TradeStatus>> = {
   // decision (the trade the two managers agreed to actually executes); `block` is its
   // `trade_blocked` decision.
   hold: "held", release: "accepted", block: "blocked",
+  // Trade governance: `review` is acceptance's new landing (the window opens), `finalize` is the
+  // unvetoed window closing into a real execution, `veto` is the league's no.
+  review: "under_review", finalize: "accepted", veto: "vetoed",
 };
 
 /**
@@ -73,8 +88,11 @@ const TARGET_OF: Readonly<Record<TradeTransition, TradeStatus>> = {
  * out of `held`, and only of `held`: an operator has no decision that reaches an `open` offer.
  */
 const SOURCE_OF: Readonly<Record<TradeTransition, readonly TradeStatus[]>> = {
-  accept: ["open"], reject: ["open"], withdraw: ["open"], expire: ["open"], supersede: ["open", "held"],
+  accept: ["open"], reject: ["open"], withdraw: ["open"], expire: ["open"],
+  // A trade under review dies to the world moving on exactly like an open or held one.
+  supersede: ["open", "held", "under_review"],
   hold: ["open"], release: ["held"], block: ["held"],
+  review: ["open"], finalize: ["under_review"], veto: ["under_review"],
 };
 
 /**

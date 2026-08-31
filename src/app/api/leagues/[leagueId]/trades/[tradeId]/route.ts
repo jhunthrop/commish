@@ -6,6 +6,8 @@ import { acceptTrade, rejectTrade, withdrawTrade } from "@/league-service/trades
 import { getScoreCache } from "@/league-service/score-cache-instance";
 import { tradeDecisionSchema } from "@/league-service/trade-schemas";
 import { tradeRateLimited } from "../_shared";
+import { processTradeReviews } from "@/league-service/trade-review";
+import { getDb as getDbForReviews } from "@/db/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +38,7 @@ interface RouteContext {
  */
 export async function POST(request: Request, context: RouteContext) {
   return withLeagueMemberActor(request, context, async (actor, req) => {
+    await processTradeReviews(getDbForReviews());
     if (actor.teamId === null) return fail(NO_TEAM_MESSAGE, 403);
     const limited = tradeRateLimited(actor.userId);
     if (limited !== null) return limited;
@@ -50,8 +53,8 @@ export async function POST(request: Request, context: RouteContext) {
       // Plan D, Task 5: `outcome` tells "executed" and "held" apart, and the wire status says
       // which honestly — a manager who accepted a trade that then held is not looking at an
       // accepted offer, and `TradeStatus` (`@/trades/lifecycle`) already has the word for it.
-      const status = result.outcome === "held" ? "held" : "accepted";
-      return ok<{ readonly tradeId: string; readonly status: "accepted" | "held" }>({ tradeId: result.tradeId, status });
+      const status = result.outcome === "held" ? "held" : result.outcome === "under_review" ? "under_review" : "accepted";
+      return ok<{ readonly tradeId: string; readonly status: "accepted" | "held" | "under_review" }>({ tradeId: result.tradeId, status });
     }
 
     const settle = parsed.value.action === "reject" ? rejectTrade : withdrawTrade;

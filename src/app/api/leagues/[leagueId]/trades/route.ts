@@ -3,6 +3,7 @@ import { fail, ok, parseJson } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";
 import { listTrades, proposeTrade, type ProposeTradeResult } from "@/league-service/trades";
+import { processTradeReviews } from "@/league-service/trade-review";
 import { proposeTradeSchema } from "@/league-service/trade-schemas";
 import type { TradesPageBody } from "@/trades/contract";
 import { tradeRateLimited } from "./_shared";
@@ -15,6 +16,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor) => {
     if (actor.teamId === null) return fail(NO_TEAM_MESSAGE, 403);
+    // Lazy review finalization (roadmap item 5): the manager who opens the inbox is the tick.
+    await processTradeReviews(getDb());
     const page = await listTrades(getDb(), { leagueId: actor.leagueId, teamId: actor.teamId });
     return ok<TradesPageBody>(page);
   });

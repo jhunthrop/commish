@@ -600,6 +600,17 @@ export const waiverClaims = pgTable(
   (t) => [index("waiver_claims_league_player_idx").on(t.leagueId, t.addPlayerId)],
 );
 
+/** Trade governance (roadmap item 5): one veto vote per member per trade under review. */
+export const tradeVetoes = pgTable(
+  "trade_vetoes",
+  {
+    tradeId: text("trade_id").notNull().references(() => tradeProposals.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    castAt: timestamp("cast_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.tradeId, t.userId] })],
+);
+
 export const injuredReserve = pgTable(
   "injured_reserve",
   {
@@ -1451,6 +1462,9 @@ export const tradeProposals = pgTable(
     settledAt: timestamp("settled_at", { withTimezone: true }),
     settledByUserId: text("settled_by_user_id").references(() => users.id),
     reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    /** Trade governance (roadmap item 5): when review ends and an unvetoed trade executes. Set
+     *  when acceptance stamps `under_review`; null on every other status. */
+    reviewEndsAt: timestamp("review_ends_at", { withTimezone: true }),
     /** The `integrity_flags.id` whose resolution ordered the reversal. No foreign key, matching
      *  `member_notices.audit_event_id`'s own reasoning: this column is provenance, and a FK here
      *  would take a lock on `integrity_flags` inside a transaction that already holds a chain

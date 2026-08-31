@@ -256,6 +256,8 @@ const NO_LONGER_HELD_EXPLANATION: Readonly<Record<TradeStatus, string | null>> =
   open: "This trade is no longer waiting on a decision.",
   rejected: "This trade is no longer waiting on a decision.",
   withdrawn: "This trade is no longer waiting on a decision.",
+  under_review: "This trade left the hold queue and is under league review instead.",
+  vetoed: "The league vetoed this trade, so there is nothing left to decide.",
   expired: "This trade is no longer waiting on a decision.",
 };
 

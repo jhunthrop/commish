@@ -60,15 +60,15 @@ describe("SeasonBars", () => {
     });
   });
 
-  it("bands the bars by outcome, and the band is never the only channel", async () => {
+  it("spends emphasis exactly once: the season high in full ink, every other bar one quiet tone", async () => {
+    // The 2026-08-30 redesign (founder: "why does everything have an uptick?"): no per-week
+    // verdict carets, no tone ladder — height carries the season, and only its high speaks.
     await renderSurface(<SeasonBars label="Weeks" weeks={SEASON} />, ({ container }) => {
-      // Three steps, ordered by contrast against the ground in BOTH themes, so the season's
-      // shape survives with the hue channel switched off. The number above each bar carries the
-      // full five-step verdict, its caret and its weight.
-      expect(container.querySelector("[data-week='1'] [style]")).toHaveClass("bg-text-primary");
-      expect(container.querySelector("[data-week='2'] [style]")).toHaveClass("bg-text-muted");
-      expect(container.querySelector("[data-week='1'] [data-magnitude]")).toHaveAttribute("data-magnitude", "strong");
-      expect(container.querySelector("[data-week='4'] [data-magnitude]")).toHaveAttribute("data-magnitude", "bad");
+      const bars = [...container.querySelectorAll("[data-testid='season-week'] [style]")];
+      const loud = bars.filter((bar) => bar.className.includes("bg-text-primary"));
+      expect(loud).toHaveLength(1);
+      expect(container.querySelector("[data-week='2'] [style]")).toHaveClass("bg-text-muted/60");
+      expect(container.querySelector("[data-magnitude]")).toBeNull();
     });
   });
 

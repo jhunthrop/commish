@@ -13,7 +13,7 @@ import { notifyAffectedMember } from "@/integrity-service/notify";
 import { raiseTradeFairnessFlag, sweepUnflaggedTrades } from "@/integrity-service/trade-fairness";
 import type { TradeAsset } from "@/trades/assets";
 import { TRADE_CONFIG } from "@/trades/config";
-import { seasonCurrentWeek } from "./test-support";
+import { seasonCurrentWeek , acceptTradeAndFinalize } from "./test-support";
 import { applyTradeInTx } from "./trade-transfer";
 import {
   acceptTrade,
@@ -1031,7 +1031,7 @@ describe("listTrades", () => {
     const accepted = await proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_te_a"], receive: ["p_bench_b2"] }));
     expect(accepted).toMatchObject({ ok: true });
     if (!accepted.ok) return;
-    await acceptTrade(db, { tradeId: accepted.tradeId, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW) });
+    await acceptTradeAndFinalize(db, { tradeId: accepted.tradeId, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW) });
 
     const bystanderView = await listTrades(db, { leagueId: "lg_1", teamId: "team_c" });
     expect(bystanderView.inbox).toEqual([]);
@@ -1147,7 +1147,7 @@ describe("acceptTrade", () => {
   }
 
   async function acceptAs(userId: string, tradeId: string, extra: Partial<Parameters<typeof acceptTrade>[1]> = {}) {
-    return acceptTrade(db, { tradeId, leagueId: "lg_1", userId, clock: fixedClock(NOW), deliver: deliverNoticeFake, ...extra });
+    return acceptTradeAndFinalize(db, { tradeId, leagueId: "lg_1", userId, clock: fixedClock(NOW), deliver: deliverNoticeFake, ...extra });
   }
 
   /** Three completed weeks (1-3) of a monster line for `p_rb1`, so a `weekNumber: 4` trade
@@ -1273,7 +1273,7 @@ describe("acceptTrade", () => {
 
   it("refuses to answer an offer that has aged out", async () => {
     const trade = await openAcceptTrade(db, { proposedAt: "2026-08-01T00:00:00.000Z" });
-    const result = await acceptTrade(db, {
+    const result = await acceptTradeAndFinalize(db, {
       tradeId: trade.id,
       leagueId: "lg_1",
       userId: "u_bob",
@@ -1322,11 +1322,13 @@ describe("acceptTrade", () => {
     const trade = await openAcceptTrade(db, { give: ["p_rb1", "p_te1"], get: ["p_wr1"] });
     const result = await acceptAs("u_bob", trade.id);
     expect(result).toMatchObject({ ok: false, status: 409, reason: expect.stringContaining("no room") });
+    // Trade governance: the YES committed (`under_review`) before execution refused, so the row
+    // stays under review — retryable on the next touch — while every roster stays put.
     await expectNoAcceptanceTookPlace(db, trade.id, [
       { playerId: "p_rb1", teamId: "team_a" },
       { playerId: "p_te1", teamId: "team_a" },
       { playerId: "p_wr1", teamId: "team_b" },
-    ]);
+    ], "under_review");
   });
 
   it("settles every other open offer naming a player that just moved, and calls it superseded", async () => {
@@ -1432,7 +1434,7 @@ describe("acceptTrade", () => {
     });
 
     const otherDb = createTestDb();
-    const accepting = acceptTrade(otherDb, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake });
+    const accepting = acceptTradeAndFinalize(otherDb, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake });
     await new Promise((resolve) => setTimeout(resolve, 150));
     release();
     await flip;
@@ -1466,7 +1468,7 @@ describe("acceptTrade", () => {
         calls.push({ leagueId, week });
       },
     };
-    const result = await acceptTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake, cache });
+    const result = await acceptTradeAndFinalize(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake, cache });
     expect(result).toMatchObject({ ok: true });
     expect(calls).toEqual([{ leagueId: "lg_1", week: 4 }]);
   });
@@ -1474,16 +1476,18 @@ describe("acceptTrade", () => {
   it("rolls back the whole acceptance when the audit append fails", async () => {
     const trade = await openAcceptTrade(db);
     await expect(
-      acceptTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake, audit: failingAudit }),
+      acceptTradeAndFinalize(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake, audit: failingAudit }),
     ).rejects.toThrow("audit append failed");
-    expect((await tradeRow(db, trade.id)).status).toBe("open");
+    // Governance: the acceptance's own transaction committed `under_review`; only the finalize
+    // rolled back. Rosters and notices untouched — the retryable middle state, by design.
+    expect((await tradeRow(db, trade.id)).status).toBe("under_review");
     expect(await ownerTeamOf(db, "p_rb1")).toBe("team_a");
     expect(await noticesFor(db, "u_alice")).toEqual([]);
   });
 
   it("works end to end with every dependency defaulted to the real implementation", async () => {
     const trade = await openAcceptTrade(db);
-    const result = await acceptTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW) });
+    const result = await acceptTradeAndFinalize(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW) });
     expect(result).toMatchObject({ ok: true });
   });
 
@@ -1502,7 +1506,7 @@ describe("acceptTrade", () => {
       errors.push(args);
     };
     try {
-      const result = await acceptTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake, cache: failingCache });
+      const result = await acceptTradeAndFinalize(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake, cache: failingCache });
       expect(result).toMatchObject({ ok: true });
     } finally {
       console.error = originalError;

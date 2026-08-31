@@ -108,6 +108,12 @@ function AssetList({ heading, assets, playersById, rosterById }: { readonly head
  *  than folded into this settled-state sentence. */
 function settledCopy(trade: TradeProposalView, meTeamId: string): string | null {
   if (trade.status === "open" || trade.status === "held") return null;
+  if (trade.status === "under_review") {
+    return "Both managers agreed. The league has a day to object before the trade goes through.";
+  }
+  if (trade.status === "vetoed") {
+    return "The league vetoed this trade. Both rosters stayed exactly as they were.";
+  }
   if (trade.status === "blocked") {
     return "After a fairness review, this trade was blocked. Both rosters stayed exactly as they were.";
   }

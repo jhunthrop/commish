@@ -1,3 +1,4 @@
+import { processTradeReviews } from "./trade-review";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 
 vi.hoisted(() => {
@@ -238,16 +239,23 @@ describe("POST /api/leagues/[leagueId]/trades/[tradeId]", () => {
     expect(response.status).toBe(400);
   });
 
-  it("lets the counterparty accept, moving both rosters and answering the settled status", async () => {
+  it("lets the counterparty accept — the yes opens league review, and the finalizer moves the rosters", async () => {
     await seedRouteLeague();
     const trade = await openTrade();
     signedInAs("u_bob");
     const response = await postDecision("lg_1", trade.id, { action: "accept" });
     expect(response.status).toBe(200);
     const body = (await response.json()).data;
-    expect(body).toEqual({ tradeId: trade.id, status: "accepted" });
+    expect(body).toMatchObject({ tradeId: trade.id, status: "under_review" });
 
-    const teamARoster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, "team_a"));
+    // Nothing moved yet: the league has its window.
+    let teamARoster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, "team_a"));
+    expect(teamARoster.some((row) => row.playerId === "p_rb_b")).toBe(false);
+
+    // The lazy finalizer, a day later, executes the unvetoed trade.
+    const later = { now: () => new Date(Date.now() + 25 * 3_600_000).toISOString() };
+    await processTradeReviews(db, later);
+    teamARoster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, "team_a"));
     const teamBRoster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, "team_b"));
     expect(teamARoster.some((row) => row.playerId === "p_rb_b")).toBe(true);
     expect(teamBRoster.some((row) => row.playerId === "p_rb_a")).toBe(true);

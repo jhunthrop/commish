@@ -45,6 +45,11 @@ export const LEAGUE_CONFIG = {
   regularSeasonWeeks: 14,
   maxWeeks: 18,
   playoffTeams: 6,
+  /** Trade governance (roadmap item 5): no proposing or accepting after this week's trades are
+   *  in — the incumbent-standard late-season deadline, two weeks before the playoff cut. */
+  tradeDeadlineWeek: 12,
+  /** How long an accepted trade sits under league review before it executes unvetoed. */
+  tradeReviewHours: 24,
   invite: {
     codeLength: 8,
     /** No I, L, O, 0 or 1 — a short code gets read aloud and typed by hand. */
