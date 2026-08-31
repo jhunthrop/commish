@@ -5,6 +5,11 @@ Ledger: `.superpowers/sdd/2026-08-31-prediction-laws/progress.md`.
 Reproduce the scorecard with `npm run projections:preseason 2023 2024`. Reproduce the law
 measurement with `npm run laws:measure -- --check`. Both read the dev DB only, no network.
 
+**Every number below was verified against a live re-run on 2026-08-31** (`npm run projections:preseason
+2023 2024`, `npm run projections:preseason:diagnose 2023 2024`, `npm run laws:measure -- --check`),
+against the dev DB in this worktree, after the store fix in section 1. A future reader can re-derive
+every table from those three commands plus the file reads section 4 and 5 name.
+
 This is Task 10, the last task of the plan. Its job is to say plainly whether this round beat the
 market, not to make it sound like it did. It did not, on either held-out season, though the gap
 against ADP in 2023 is now inside a hundredth of a rank correlation point, which a different fifty
@@ -196,29 +201,48 @@ head-coach-only mechanism, never worse.
 
 ## 5. What was deferred
 
-From `.superpowers/sdd/2026-08-31-prediction-laws/progress.md`, minors carried forward rather than
-fixed in-round (file:line pointers where the ledger gives one):
+From `.superpowers/sdd/2026-08-31-prediction-laws/progress.md`, re-verified line by line against the
+tree on 2026-08-31 rather than copied from the ledger as-is (two of the ledger's own pointers had
+gone stale, see below).
 
-- `play-callers.ts:134`: a CRLF-only line split would corrupt the `note` field silently.
-- `play-callers.ts:224`: the gap-detection message prints a sentinel `0` when the first row starts
-  past week 1.
-- Empty-name and `startWeek > endWeek` validation checks scan every row in the CSV rather than only
-  the requested seasons (defensible today; worth confirming at the first real multi-decade call).
-- `coaches.ts`'s `attributedByTeamSeason` rescans the full games list per team-season (an offline,
-  one-time-per-ingest cost, noted rather than fixed).
+- **The `onConflictDoNothing` silent-shadowing hazard, section 1's own bug, is a standing risk in
+  `team-store.ts`, not a one-time cleanup.** `recordTeamObservations`'s unique key
+  (`season, week, team, source, metric, asOf`) does not include `value`, and nothing in the store
+  detects or reports a conflict; a row already written under an old derivation silently blocks a
+  corrected one forever, with no error and no log line. Section 1's bug (head-coach vs play-caller
+  attribution) is one instance of a general class: any future change to how a `team_week_observations`
+  metric is derived will hit this same silent trap unless it is designed around. Candidate fix, not
+  attempted here (code changes are out of scope for this task): either a value-aware upsert
+  (`onConflictDoUpdate` when the new value differs from the old, matching `assertFiniteValues`' own
+  "contradiction is a bug" stance rather than papering over it) or a derivation-version column folded
+  into the unique key, so a changed derivation writes a new row instead of silently losing to an old
+  one. Not fixed here; flagged as the most consequential open item this round leaves behind.
+- `play-callers.ts:147`: the gap-detection message prints a sentinel `0` when the first row starts
+  past week 1 (`coveredThrough` initializes to `0`, so the message reads "gap... between 0 and
+  ${r.startWeek}" rather than naming week 1). Confirmed still present at this line; the CRLF-split
+  concern the ledger separately carried at `play-callers.ts:134` is NOT still open: `parsePlayCallers`
+  already splits on `/\r?\n/` (line 57), fixed during Task 2, and is removed from this list.
+- Empty-name (`play-callers.ts:127`) and `startWeek > endWeek` (`play-callers.ts:130`) validation
+  checks scan every row in the CSV rather than only the requested seasons (defensible today; worth
+  confirming at the first real multi-decade call).
+- `coaches.ts:105`'s `attributedByTeamSeason` rescans the full games list per team-season (an
+  offline, one-time-per-ingest cost, noted rather than fixed).
 - No automated test exercises `ingestCoaches`' `ENOENT` throw when `play-callers.csv` is missing (no
   `ingest.test.ts` file exists to hold it).
-- `populations.ts`'s `incomingCoachFactsByTeam` reads `tenureIsZero: false` when a team has a PROE
-  row but no tenure row for the same team-week, a pre-existing edge case, flagged but not closed.
-- `populations.ts` sits at 482 lines against the file-size convention; the stated split point is a
-  new `laws/season-facts.ts`.
-- `preseason_rosters` only carries birth dates from 2021 forward, which caps `rb_age_curve`'s
-  full-window sample below what a deeper backfill could give it. Directly relevant to why that law
-  reads `weak` rather than confirmed or debunked outright; more data could move it either way.
-- `PlayerPeek`'s Outlook panel scans the whole board's `boardReasons` per open rather than narrowing
-  per player, a UI performance minor, not a correctness one.
+- `populations.ts:296`'s `incomingCoachFactsByTeam` reads `tenureIsZero: false` when a team has a
+  PROE row but no tenure row for the same team-week, a pre-existing edge case, flagged but not closed.
+- `populations.ts` sits at 526 lines against the file-size convention (grown from 482 at Task 5's own
+  close-out, still short of a split); the stated split point is a new `laws/season-facts.ts`.
+- `preseason_rosters` only carries birth dates from 2021 forward (verified: the table itself holds no
+  rows before season 2021), which caps `rb_age_curve`'s full-window sample below what a deeper
+  backfill could give it. Directly relevant to why that law reads `weak` rather than confirmed or
+  debunked outright; more data could move it either way.
+- `PlayerPeek`'s Outlook panel (`league-service/player.ts:213`) calls `boardReasons` for the whole
+  board and then looks up one player, rather than narrowing the query itself, a UI performance
+  minor, not a correctness one.
 - The `/player-laws` footer registration is tied up in the deferred UX-ledger footer reconciliation
-  (locked-array tests elsewhere in the app), so it lives in the storefront nav only for now.
+  (locked-array tests elsewhere in the app); confirmed it still lives only in `STOREFRONT_NAV`
+  (`public-bar.tsx`), not either footer list.
 - Two data-provenance judgment calls in the play-caller table remain queued for PFR verification
   rather than resolved: the MIA 2021 co-OC pair (collapsed to Godsey, primary per reporting) and the
   103-entry verification queue generally (section 4).
@@ -256,14 +280,25 @@ against the actual outcome by segment (positive residual means that side ranked 
   Consistent with this, RB is a weak starter-band position against ECR in section 2's per-band table
   (2023: ECR 0.358 vs ours 0.118; 2024: ECR 0.503 vs ours 0.470), though section F's finding is not
   RB-specific; it spans every position.
-- **The starter band (ranks 51–150) is still the hardest band**, as the prior `beating-consensus`
-  document also found: it is not the worst band on either single benchmark in isolation this round,
-  but it is where the board's per-position breakdown (section 2's diagnose section C) shows RB and TE
-  losing to ECR on both seasons, while WR and QB are roughly matched or ahead.
+- **The starter band (ranks 51-150) is still the hardest band**, as the prior `beating-consensus`
+  document also found, and the position-level detail inside it (diagnose section C) corrects an
+  earlier draft of this hypothesis rather than confirming it: WR does NOT sit "matched or ahead" on
+  both seasons. 2023 WR wins the starter band against ECR (+0.034, n=36); 2024 WR loses it
+  (-0.132, n=33, ECR 0.291 vs ours 0.159), a real and non-trivial reversal, not noise at this n. That
+  2024 starter-band loss is the same direction as, and strengthens, the WR-miscalibration finding two
+  bullets up: the board is not just worse than the market's own bias on WR overall, it is also worse
+  than expert consensus specifically inside the band a draft is mostly made of, in the same season.
+  TE is the position that actually loses the starter band on BOTH seasons (2023 -0.218, 2024 -0.311,
+  n=15 each, a thin sample), the more consistent two-season pattern of the two, though small n makes
+  it the weaker evidence. RB loses badly in 2023 (-0.240) and is nearly matched in 2024 (-0.033); QB
+  is ahead in 2023 (+0.106) and nearly matched in 2024 (-0.034). WR and TE, not RB and TE, are the
+  positions worth the next round's attention on this evidence.
 
 None of this was tuned against in this round; it is read off the diagnostic instrument this task was
 asked to pick, not acted on. The honest summary: the board's edge over the market is real in the
 bands where the market prices with least confidence (the deep pool, inconsistently across the two
-seasons) and its deficit is concentrated in WR calibration and veteran-RB rate inflation, both
-specific enough to be worked next, neither fixed by this round's play-caller and six-law work, which
-never touched the weekly rate or availability models at all.
+seasons) and its deficit is concentrated in WR calibration (both against the market's own bias and,
+now corrected above, against expert consensus inside the starter band) and the established-player
+(years 4-6) rate over-projection, both specific enough to be worked next, neither fixed by this
+round's play-caller and six-law work, which never touched the weekly rate or availability models at
+all.
