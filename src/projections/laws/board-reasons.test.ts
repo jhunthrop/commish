@@ -35,6 +35,7 @@ function lawFixture(id: string, verdict: LawVerdict, effect = -2.5): Law {
     measured: { effect, ci: [effect - 1, effect + 1], sample: 100, seasons: "fixture" },
     verdict,
     modelPath: null,
+    hasFoldEvidence: true,
   };
 }
 

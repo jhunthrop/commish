@@ -200,6 +200,7 @@ export function registryFrom(specs: readonly LawSpec[], measuredJson: MeasuredJs
       measured,
       verdict: entry.verdict,
       modelPath: spec.modelPath,
+      hasFoldEvidence: entry.foldEffects.some((fold) => fold.effect !== null),
     };
   });
 }

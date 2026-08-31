@@ -67,7 +67,34 @@ describe("registryFrom", () => {
       measured: { effect: -3, ci: [-4, -2], sample: 40, seasons: measured.seasons },
       verdict: "confirmed",
       modelPath: null,
+      hasFoldEvidence: true,
     });
+  });
+
+  it("derives hasFoldEvidence as false when every fold matched zero pairs, even though the verdict itself is unaffected by this alone", () => {
+    const zeroFoldsWithPairs = measurementFixture({
+      foldEffects: [
+        { season: 2021, effect: null },
+        { season: 2022, effect: null },
+        { season: 2023, effect: null },
+      ],
+      verdict: "weak", // full window would confirm, but zero folds with pairs caps it at weak
+    });
+    const [law] = registryFrom([specFixture()], { fake_law: zeroFoldsWithPairs });
+    expect(law!.hasFoldEvidence).toBe(false);
+  });
+
+  it("derives hasFoldEvidence as true when at least one fold matched a pair, even one that disagreed", () => {
+    const oneFoldDisagrees = measurementFixture({
+      foldEffects: [
+        { season: 2021, effect: -1 },
+        { season: 2022, effect: 1 },
+        { season: 2023, effect: -1 },
+      ],
+      verdict: "weak", // full window would confirm, but a disagreeing fold caps it at weak
+    });
+    const [law] = registryFrom([specFixture()], { fake_law: oneFoldDisagrees });
+    expect(law!.hasFoldEvidence).toBe(true);
   });
 
   it("throws when a LawSpec has no entry in measured.json", () => {

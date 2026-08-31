@@ -16,18 +16,20 @@
  * with the full-window effect before a law can be `confirmed` — a fold that disagrees, or zero
  * folds matching any pairs at all, caps the verdict at `weak`.
  *
- * BLEND-SAFETY NOTE FOR LATER TASKS: predictor seasons at or before 2021 remain the only FITTING
- * window anywhere else in this plan (`src/projections/model/fitted.ts`'s own `FIT_SEASONS`).
- * Folds named here are evaluation-only and must never be folded back into a fitting window in
- * either direction. Fold 2021 overlaps that fitting window on purpose, not by oversight: a law
- * confirmed on 2022 and 2023 alone, with 2021 left unchecked, would still be confirmed on nothing
- * but out-of-fit evidence, which sounds safe but is not the actual bar. The bar is that a law
- * confirmed here has to also point the right way on the very seasons the model trained on — a law
- * that fails that check is telling you the model's own training data does not behave the way the
- * law claims, which is exactly the kind of contradiction this harness exists to surface, not paper
- * over by only checking the folds already known to be safe. Requiring ALL THREE folds to agree,
- * the two out-of-fit folds (2022, 2023) included, is what keeps the in-fit fold from being enough
- * on its own to confirm a law: a law confirmed only in-fit cannot confirm.
+ * BLEND-SAFETY NOTE, CORRECTED (fix round, 2026-08-31): `src/projections/model/fitted.ts`'s own
+ * `FIT_SEASONS` is `[2021, 2022]`, not `2021` alone. TWO of these three folds, 2021 AND 2022, sit
+ * inside the projection model's fitting window; only 2023 is genuinely out-of-fit. That makes 2023
+ * this replication guard's actual teeth: a law that agrees on 2021 and 2022, both seasons the
+ * model already trained on, and disagrees on 2023, the one season it never saw, is confirmed on
+ * nothing the model didn't already get to fit to. Requiring ALL THREE folds to agree, 2023
+ * included, is what stops the two in-fit folds from being enough on their own to confirm a law —
+ * a law confirmed only in-fit cannot confirm.
+ *
+ * `REPLICATION_FOLDS` repeats these season numbers rather than importing `FIT_SEASONS` from
+ * `model/fitted.ts` — folds are evaluation-only and must never be folded back into a fitting
+ * window in either direction, and keeping the two lists textually separate is part of that. The
+ * cost is that they can drift apart silently: RE-CHECK THIS NOTE, AND WHICH FOLDS IT NAMES AS
+ * IN-FIT VS. OUT-OF-FIT, ANY TIME `FIT_SEASONS` CHANGES.
  */
 export const REPLICATION_FOLDS: readonly number[] = [2021, 2022, 2023];
 

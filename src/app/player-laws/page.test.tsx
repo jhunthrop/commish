@@ -23,6 +23,7 @@ function lawFixture(over: Partial<Law> = {}): Law {
     measured: { effect: -1, ci: [-2, -0.5], sample: 100, seasons: "2013-2023" },
     verdict: "confirmed",
     modelPath: null,
+    hasFoldEvidence: true,
     ...over,
   };
 }
@@ -61,5 +62,34 @@ describe("PlayerLawsPage — boardConsequenceSentence", () => {
     registryMock.mockReturnValue([lawFixture({ id: "a", modelPath: "src/x.ts#y" })]);
     render(await PlayerLawsPage());
     expect(screen.getByText(/a reason chip beside a player's name states/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * `verdictElaboration`'s two fold-driven `weak` paths (fix round, MINOR): a full-window CI that
+ * already excludes zero gets capped at `weak` either because a replication fold disagreed
+ * (`hasFoldEvidence: true`) or because zero folds matched any pairs at all
+ * (`hasFoldEvidence: false`) — two different facts, two different sentences, both driven by the
+ * one boolean `Law` exposes rather than by anything typed per law.
+ */
+describe("PlayerLawsPage — verdictElaboration's weak paths", () => {
+  const capsAtWeak = { measured: { effect: -1, ci: [-2, -0.5] as const, sample: 100, seasons: "2013-2023" }, verdict: "weak" as const };
+
+  it("says a fold disagreed when hasFoldEvidence is true and the CI already excludes zero", async () => {
+    registryMock.mockReturnValue([lawFixture({ ...capsAtWeak, hasFoldEvidence: true })]);
+    render(await PlayerLawsPage());
+    expect(screen.getByText(/at least one season checked separately pointed the other way/)).toBeInTheDocument();
+  });
+
+  it("says no fold had evidence when hasFoldEvidence is false and the CI already excludes zero", async () => {
+    registryMock.mockReturnValue([lawFixture({ ...capsAtWeak, hasFoldEvidence: false })]);
+    render(await PlayerLawsPage());
+    expect(screen.getByText(/none of the seasons checked separately had enough matched pairs/)).toBeInTheDocument();
+  });
+
+  it("reports the CI-spans-zero path regardless of hasFoldEvidence", async () => {
+    registryMock.mockReturnValue([lawFixture({ measured: { effect: -1, ci: [-1, 1], sample: 100, seasons: "2013-2023" }, verdict: "weak", hasFoldEvidence: false })]);
+    render(await PlayerLawsPage());
+    expect(screen.getByText(/the 95% interval spans zero/)).toBeInTheDocument();
   });
 });

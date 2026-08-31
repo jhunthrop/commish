@@ -316,6 +316,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
       measured: { effect: 1.8, ci: [1.2, 2.4], sample: 250, seasons: "fixture" },
       verdict: "confirmed",
       modelPath: null,
+      hasFoldEvidence: true,
       ...overrides,
     };
   }

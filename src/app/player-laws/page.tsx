@@ -22,15 +22,15 @@ import { signedPoints } from "@/components/ui/event-feed-row";
  * the same three fields for all six, so a seventh law slots in with no new prose to write.
  *
  * DEBUNKED AND WEAK LAWS GET EQUAL BILLING (spec Part 3). `play_caller_fingerprint` measured
- * `debunked` and the two RB laws measured `weak` are on this page in full, grouped after the
+ * `debunked` and `rb_workload_cliff` measured `weak` are on this page in full, grouped after the
  * confirmed laws but never hidden or hedged into a footnote — the whole point of measuring a
  * folk claim instead of asserting it is publishing what did not hold up, not just what did.
  * `verdictElaboration` says what a `weak` or `debunked` verdict actually means, read straight off
- * that law's own `verdict` and `measured.ci` (an interval that spans zero, an interval that
- * clears zero but did not replicate held out, an effect that points the wrong way) rather than
- * inventing a specific story per law, which is exactly the hardcoded-prose-that-goes-stale risk
- * law 7 exists to prevent — see that function's own docblock for the two distinct shapes `weak`
- * can take.
+ * that law's own `verdict`, `measured.ci` and `hasFoldEvidence` (an interval that spans zero, an
+ * interval that clears zero but a fold disagreed, an interval that clears zero but no fold had
+ * evidence, an effect that points the wrong way) rather than inventing a specific story per law,
+ * which is exactly the hardcoded-prose-that-goes-stale risk law 7 exists to prevent — see that
+ * function's own docblock for the distinct shapes `weak` can take.
  */
 export const metadata: Metadata = pageTitle("Player laws");
 
@@ -64,20 +64,25 @@ function verdictSentence(verdict: LawVerdict): string {
 }
 
 /**
- * One more sentence per law, derived mechanically from its own `verdict` and `measured.ci` —
- * never from its `id`, and never assuming today's shape is the only shape a verdict can take.
+ * One more sentence per law, derived mechanically from its own `verdict`, `measured.ci` and
+ * `hasFoldEvidence` — never from its `id`, and never assuming today's shape is the only shape a
+ * verdict can take.
  *
- * `weak` in particular has TWO distinct paths out of `registry.ts`'s `verdictForFullWindow`: the
- * full-window interval can itself span zero (`verdictFor`'s ordinary "signMatches but not
- * ciExcludesZero" case), OR the full-window interval can already exclude zero — a candidate
- * `verdictFor` alone would call confirmed — that gets capped at `weak` because a replication fold
- * disagreed in sign, or because zero folds carried any matched pairs at all. Both of today's weak
- * laws (`rb_workload_cliff`, `rb_age_curve`) happen to take the first path, but a sentence that
- * always said "the interval spans zero" would go silently wrong the day a law takes the second path
- * instead, sitting directly above an interval that plainly excludes zero. `ciSpansZero` below
- * reads the law's own two bounds to tell the two paths apart at render time, so the sentence
- * stays true on either path without this file ever learning about `foldEffects` (not part of
- * `Law`'s own public shape — `registry.ts`'s `MeasuredEntry` keeps it internal).
+ * `weak` in particular has THREE distinct paths out of `registry.ts`'s `verdictForFullWindow`:
+ * (1) the full-window interval can itself span zero (`verdictFor`'s ordinary "signMatches but not
+ * ciExcludesZero" case) — `ciSpansZero` below catches this one first, regardless of folds. OR the
+ * full-window interval can already exclude zero — a candidate `verdictFor` alone would call
+ * confirmed — and get capped at `weak` for one of two fold-driven reasons: (2) a replication fold
+ * disagreed in sign (`hasFoldEvidence: true` — some fold had pairs to check, and at least one of
+ * them pointed the other way), or (3) zero folds carried any matched pairs at all
+ * (`hasFoldEvidence: false` — nothing existed to check the direction against). Today's one weak
+ * law, `rb_workload_cliff`, takes path (1), but a sentence that always said "the interval spans
+ * zero" would go silently wrong the day a law takes path (2) or (3) instead, sitting directly
+ * above an interval that plainly excludes zero. `ciSpansZero` and `law.hasFoldEvidence` together
+ * tell all three paths apart at render time, so the sentence stays true on any of them without
+ * this file ever learning about `foldEffects` itself (not part of `Law`'s own public shape —
+ * `registry.ts`'s `MeasuredEntry` keeps it internal; `hasFoldEvidence` is the one derived boolean
+ * `Law` exposes instead).
  */
 function verdictElaboration(law: Law): string {
   const [low, high] = law.measured.ci;
@@ -86,9 +91,12 @@ function verdictElaboration(law: Law): string {
     case "confirmed":
       return "The measured effect points in the claimed direction, the 95% interval clears zero, and the same direction held when checked separately on every season used to test it.";
     case "weak":
-      return ciSpansZero
-        ? "The measured effect points in the claimed direction, but the 95% interval spans zero, so it cannot be told apart from no effect at all with the seasons measured so far."
-        : "The full-window 95% interval clears zero in the claimed direction, but that direction did not hold up when checked separately on every season used to test it, so the page does not call this confirmed.";
+      if (ciSpansZero) {
+        return "The measured effect points in the claimed direction, but the 95% interval spans zero, so it cannot be told apart from no effect at all with the seasons measured so far.";
+      }
+      return law.hasFoldEvidence
+        ? "The full-window 95% interval clears zero in the claimed direction, but at least one season checked separately pointed the other way, so the page does not call this confirmed."
+        : "The full-window 95% interval clears zero in the claimed direction, but none of the seasons checked separately had enough matched pairs to test it against, so the page does not call this confirmed.";
     case "debunked":
       return "The measured effect points against the claimed direction, so the popular version of this claim does not hold up under measurement.";
     default: {

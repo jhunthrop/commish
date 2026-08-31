@@ -32,6 +32,17 @@ export interface Law {
   readonly verdict: LawVerdict;
   /** The fitted feature this law gates; null means the law is content only, no model wiring. */
   readonly modelPath: string | null;
+  /**
+   * Whether at least one replication fold (`config.ts`'s `REPLICATION_FOLDS`) matched any pairs at
+   * all. `registry.ts`'s `verdictForFullWindow` caps a `weak` verdict at that grade for two
+   * distinct reasons when the full-window CI already excludes zero: a fold disagreed in sign
+   * (`hasFoldEvidence: true` — some fold had evidence, and it disagreed), or zero folds matched any
+   * pairs (`hasFoldEvidence: false` — nothing to check it against). `foldEffects` itself stays out
+   * of `Law`'s own shape (`registry.ts`'s `MeasuredEntry` keeps it internal); this one boolean is
+   * the minimal derived fact a consumer like `/player-laws` needs to tell those two cases apart
+   * without learning about folds at all.
+   */
+  readonly hasFoldEvidence: boolean;
 }
 
 /**
