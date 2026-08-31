@@ -10,6 +10,7 @@ import { MICRO_LABEL } from "@/components/ui/config";
 import { NOT_STARTED_DASH } from "@/components/ui/game-state-chip";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { PlayerName } from "./player-peek";
+import { DesignationChip } from "./designation-chip";
 import { formatPoints, formatWeek } from "../lib/format";
 import { playerOf } from "../lib/player";
 
@@ -42,14 +43,6 @@ function PointsCell({ points, playerId, loud = false }: { readonly points: Reado
       {playerId === null ? "" : value === null ? NOT_STARTED_DASH : formatPoints(value)}
     </span>
   );
-}
-
-/** The designation chip ("Q", "O", "IR") in the verdict channel — the fact a manager checks
- *  before anything else, worn beside the name on every row. Absent = the feed does not name
- *  him, and nothing prints. */
-function DesignationChip({ designation }: { readonly designation: string | null | undefined }) {
-  if (designation === null || designation === undefined) return null;
-  return <span className="rounded-sm bg-negative px-1 py-0.5 font-mono text-xs font-bold leading-none text-negative-text">{designation}</span>;
 }
 
 /** Designations that justify an IR placement — mirrors the server's own set; the server rules. */

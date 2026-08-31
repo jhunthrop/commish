@@ -1,5 +1,6 @@
 import Link from "next/link";
-import type { LeagueHomeBody, LineupBody, MatchupDetail, MatchupSummary } from "../contract";
+import type { ReactNode } from "react";
+import type { LeagueHomeBody, LineupBody, MatchupDetail, MatchupSummary, TradeRoomContext } from "../contract";
 import { ButtonLink, Card, Crest, EYEBROW, LowerThird, Movement, PageTitle, PlayerFace, PositionBadge } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import { LeagueTabs, type LeagueTab } from "./league-tabs";
@@ -20,6 +21,7 @@ import { MatchupHero, type RecordsByTeamId } from "./matchup-hero";
 import { MatchupSlate } from "./matchup-slate";
 import { WeekSlateStrip } from "./week-slate-strip";
 import { PlayerPeekHost } from "./player-peek";
+import { TradeInbox } from "./trade-inbox";
 import { ModerationSummary } from "./moderation-summary";
 import { StandingsTable } from "./standings-table";
 import { WaitingRoom } from "./waiting-room";
@@ -165,6 +167,8 @@ export function LeagueHome({
   tab = "matchup",
   myMatchupDetail = null,
   weekMatchups = [],
+  tradeContext = null,
+  activityContent = null,
   fixturesByNflTeam,
   projectionsByPlayerId,
   /**
@@ -196,6 +200,11 @@ export function LeagueHome({
   readonly fixturesByNflTeam?: ReadonlyMap<string, FixtureLabel>;
   /** This week's PPR projections (harvested snapshot), for the team tab's Proj column. */
   readonly projectionsByPlayerId?: ReadonlyMap<string, number>;
+  /** The trades tab's room context (rosters, counterparties) — its page passes it; every other
+   *  tab pays nothing. */
+  readonly tradeContext?: TradeRoomContext | null;
+  /** The activity tab's assembled content (its page builds the bands; only it pays the reads). */
+  readonly activityContent?: ReactNode;
   readonly home: LeagueHomeBody;
   readonly lineup: LineupBody | null;
   /** Forwarded from `LeaguePage`. Omitted only by tests that don't care about this branch —
@@ -397,6 +406,26 @@ export function LeagueHome({
 
 
             </>
+          ) : null}
+          {tab === "activity" && activityContent !== null ? (
+            <section className="flex w-full flex-col gap-3" aria-label="League activity">
+              <h2 className="font-display text-2xl font-bold text-text-primary">League activity</h2>
+              {activityContent}
+            </section>
+          ) : null}
+          {tab === "trades" && tradeContext !== null ? (
+            <section className="flex w-full flex-col gap-3" aria-label="Trades">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="font-display text-2xl font-bold text-text-primary">Trades</h2>
+                {/* Governance's own sentence (roadmap item 5) — the old page said trades
+                    complete on agreement, which stopped being true the day the review window
+                    shipped. */}
+                <p className="text-sm text-text-faint">
+                  Both managers agree, then the league has a day to object before the trade goes through. The deadline is week 12.
+                </p>
+              </div>
+              <TradeInbox leagueId={home.leagueId} context={tradeContext} />
+            </section>
           ) : null}
           {tab === "players" ? (
             <FreeAgentsBoard

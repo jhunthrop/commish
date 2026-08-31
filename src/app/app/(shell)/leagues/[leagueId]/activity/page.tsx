@@ -1,4 +1,3 @@
-import { LeagueTabs } from "@/league-room/components/league-tabs";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
@@ -6,8 +5,13 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import { leagueNameFor } from "@/draft-service/teams";
 import { listLeagueActivity } from "@/integrity-service/activity";
+import { leagueHome } from "@/league-service";
+import { LEAGUE_CONFIG } from "@/league/config";
+import { leagueAct } from "@/lib/leagues/next-act";
+import { readPreferences } from "@/identity-service/preferences";
+import { LeagueHome } from "@/league-room/components/league-home";
 import { listNotices, quoteFor } from "@/integrity-service/notify";
-import { LowerThird, PageTitle } from "@/components/ui";
+
 import { ActivityFeed } from "@/league-room/components/activity-feed";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
@@ -57,11 +61,15 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
   if (!membership.ok) notFound();
   if (membership.membership.teamId === null && !membership.membership.isCommissioner) notFound();
 
-  const [activity, noticesPage, leagueName] = await Promise.all([
+  const [activity, noticesPage, leagueName, home, preferences] = await Promise.all([
     listLeagueActivity(getDb(), { leagueId, viewerUserId: user.id, before }),
     listNotices(getDb(), user.id),
     leagueNameFor(getDb(), leagueId),
+    leagueHome(getDb(), leagueId, user.id),
+    readPreferences(getDb(), user),
   ]);
+  if (home === null) notFound();
+  void leagueName;
 
   // The viewer's OWN notices for THIS league — a separate band from the chronological feed
   // below, because "what happened here" and "what happened to me" are two different questions
@@ -71,29 +79,21 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
   // down to this league rather than asking the service for something narrower.
   const leagueNotices = noticesPage.notices.filter((notice) => notice.leagueId === leagueId);
 
-  return (
+  // The same shell as every other tab (the tab loop, 2026-08-30). The bands this page owns —
+  // the viewer's platform notices, the privacy sentence, the feed — ride into LeagueHome's
+  // activity branch; LeagueHome's own lower third stands for the page's.
+  const content = (
     <>
-      <header className="flex flex-col gap-1">
-        <LeagueTabs leagueId={leagueId} active="activity" />
-        <PageTitle>League activity</PageTitle>
-        <p className="text-sm text-text-muted">{leagueName}</p>
-      </header>
-
       {leagueNotices.length === 0 ? null : (
         <section className="flex flex-col gap-2" aria-label="What the platform did">
-          <h2 className="text-lg font-medium text-text-primary">What the platform did</h2>
+          <h3 className="text-lg font-medium text-text-primary">What the platform did</h3>
           <ul className="flex flex-col">
             {leagueNotices.map((notice) => {
               const quote = quoteFor(notice);
               return (
                 <li key={notice.id} className="flex flex-col gap-1 border-b border-line py-3 last:border-b-0">
                   <p className="break-words font-medium text-text-primary">{notice.title}</p>
-                  <p className="break-words text-sm text-text-muted">
-                    {notice.body}
-                  </p>
-                  {/* Fix round 1, FIX 7, as corrected: the author-facing PHRASE the stored
-                      reason maps to (`quoteFor`), laid out as a real quotation rather than
-                      folded into `body`'s own sentence. Never the stored token. */}
+                  <p className="break-words text-sm text-text-muted">{notice.body}</p>
                   {quote === null ? null : (
                     <blockquote className="break-words border-l-2 border-line pl-3 text-sm italic text-text-muted">{`"${quote}"`}</blockquote>
                   )}
@@ -103,34 +103,21 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
           </ul>
         </section>
       )}
-
-      {/* Fix round 1, FIX 5: the persona panel's high-stakes-veteran question, answered
-          plainly rather than left implicit in `lineup_change` simply never appearing here for
-          anyone but its own actor. */}
-      <p className="text-sm text-text-muted">Lineup changes appear only in your own history. Nobody else in this league can see them.</p>
-
+      <p className="text-sm text-text-faint">Lineup changes appear only in your own history. Nobody else in this league can see them.</p>
       <ActivityFeed rows={activity.rows} leagueId={leagueId} nextBefore={activity.nextBefore} />
-
-      {/*
-        LAW 6, AND ITS "NOTHING PENDING" CASE. A history is the one surface in the league that is
-        not waiting on anybody: everything here already happened, and the only control is a quiet
-        way to read further back. So the strip carries what the page is showing and NO verb at
-        all, which is law 6's own diagnostic satisfied rather than skipped — a screen with no
-        lower-third verb either needs no decision or is hiding one, and this is the first case.
-
-        A league where genuinely nothing has happened gets no strip either. Three zeros under an
-        empty state is a foot for a page with no body, and "nothing pending renders nothing" is
-        the same ruling one level up.
-      */}
-      {activity.rows.length === 0 && leagueNotices.length === 0 && activity.nextBefore === null ? null : (
-        <LowerThird
-          cells={[
-            { label: "On this page", value: activity.rows.length },
-            { label: "Notices for you", value: leagueNotices.length },
-            { label: "Older entries", value: activity.nextBefore === null ? "None left" : "Yes" },
-          ]}
-        />
-      )}
     </>
+  );
+  const act = leagueAct(home, null);
+  return (
+    <LeagueHome
+      home={home}
+      lineup={null}
+      helpLevel={preferences.helpLevel}
+      nextActionKind={act?.kind ?? null}
+      act={act}
+      playoffTeams={LEAGUE_CONFIG.playoffTeams}
+      tab="activity"
+      activityContent={content}
+    />
   );
 }

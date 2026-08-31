@@ -9,10 +9,13 @@ import type { ApiEnvelope } from "@/lib/api/respond";
 import type { Position } from "@/domain/player";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { PlayerName } from "./player-peek";
+import { DesignationChip } from "./designation-chip";
 
 interface FreeAgentRow {
   readonly id: string;
   readonly onWaiversUntil?: string | null;
+  readonly injuryDesignation?: string | null;
+  readonly posAdp?: string | null;
   readonly name: string;
   readonly position: Position;
   readonly nflTeam: string;
@@ -190,7 +193,9 @@ export function FreeAgentsBoard({ leagueId, myRoster, rosterFull, canClaim }: Fr
                     <PlayerName leagueId={leagueId} playerId={agent.id} name={agent.name} className="truncate font-display text-2xl font-bold leading-display text-text-primary" />
                     <span className="flex items-center gap-2">
                       <PositionBadge position={agent.position} size="md" />
+                      <DesignationChip designation={agent.injuryDesignation} />
                       {agent.nflTeam === "" ? null : <span className="font-mono text-sm text-text-faint">{agent.nflTeam}</span>}
+                      {agent.posAdp == null ? null : <span className="font-mono text-sm text-text-faint">{`· ${agent.posAdp}`}</span>}
                     </span>
                   </span>
                 </span>

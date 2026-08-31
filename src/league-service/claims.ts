@@ -21,6 +21,7 @@ const UNDROPPABLE_ADP_CEILING = 120;
 
 /** Waivers v1: re-exported spelling of the window length lives in ./waivers. */
 import { WAIVER_PERIOD_HOURS } from "./waivers";
+import { injuryDesignations } from "./injuries";
 
 export const CLAIM_REFUSALS = {
   leagueMissing: "That league does not exist.",
@@ -40,6 +41,10 @@ export interface FreeAgentRow {
   /** Waivers v1: when set, he is ON WAIVERS until this instant — a claim files rather than
    *  executes, and the board says so. */
   readonly onWaiversUntil?: string | null;
+  /** His current designation off the harvested injuries feed ("Q", "O"), or null. */
+  readonly injuryDesignation?: string | null;
+  /** The market's position rank as the ADP feed words it ("RB12"), or null. */
+  readonly posAdp?: string | null;
   readonly name: string;
   readonly position: Position;
   readonly nflTeam: string;
@@ -95,7 +100,7 @@ export async function freeAgents(db: Db, input: FreeAgentsInput): Promise<{ read
 
   const [rows, [count]] = await Promise.all([
     db
-      .select({ id: players.id, name: players.name, position: players.position, nflTeam: players.nflTeam, headshotUrl: players.headshotUrl, adp: players.adp })
+      .select({ id: players.id, name: players.name, position: players.position, nflTeam: players.nflTeam, headshotUrl: players.headshotUrl, adp: players.adp, posAdp: players.posAdp })
       .from(players)
       .where(and(...conditions))
       .orderBy(sql`${players.adp} asc nulls last`, asc(players.name))
@@ -110,7 +115,13 @@ export async function freeAgents(db: Db, input: FreeAgentsInput): Promise<{ read
     .from(leagueWaivers)
     .where(eq(leagueWaivers.leagueId, input.leagueId));
   const untilByPlayer = new Map(windows.map((row) => [row.playerId, row.until.toISOString()]));
-  return { agents: rows.map((row) => ({ ...row, onWaiversUntil: untilByPlayer.get(row.id) ?? null })), total: count?.total ?? 0 };
+  // The tab loop (2026-08-30): the harvested designations ride every pool row — the one fact a
+  // manager checks before a claim.
+  const designations = await injuryDesignations(db);
+  return {
+    agents: rows.map((row) => ({ ...row, onWaiversUntil: untilByPlayer.get(row.id) ?? null, injuryDesignation: designations.get(row.id) ?? null })),
+    total: count?.total ?? 0,
+  };
 }
 
 export interface ClaimInput {

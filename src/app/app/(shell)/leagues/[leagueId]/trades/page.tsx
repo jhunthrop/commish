@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { LeagueTabs } from "@/league-room/components/league-tabs";
-import { PageTitle } from "@/components/ui";
 import { leagueHome, matchupWeek } from "@/league-service";
+import { LEAGUE_CONFIG } from "@/league/config";
+import { leagueAct } from "@/lib/leagues/next-act";
+import { readPreferences } from "@/identity-service/preferences";
+import { LeagueHome } from "@/league-room/components/league-home";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { MatchupLineupEntry, MatchupWeekBody, TradeCounterpartyOption, TradeRoomContext, TradeRosterPlayer } from "@/league-room/contract";
-import { TradeInbox } from "@/league-room/components/trade-inbox";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
 export const dynamic = "force-dynamic";
@@ -90,27 +91,21 @@ export default async function TradesPage({ params }: PageProps) {
     leagueName: home.name,
   };
 
+  // The same shell as every other tab (the tab loop, 2026-08-30): masthead, tab rail, right
+  // rail, lower third — only the main column changes. The old standalone page dropped the
+  // masthead and the rail, and carried a pre-governance sentence besides.
+  const preferences = await readPreferences(getDb(), user);
+  const act = leagueAct(home, null);
   return (
-    <>
-      <header className="flex flex-col gap-1">
-        <LeagueTabs leagueId={leagueId} active="trades" />
-        <PageTitle>Trades</PageTitle>
-        <p className="text-sm text-text-muted">{home.name}</p>
-        {/* Persona panel (commissioner, step 4): founder decision #6 ships immediate execution
-            with no approval step and no veto window, a real departure from platforms where a
-            commissioner can deny a trade. Said plainly, here, rather than left for a
-            commissioner to discover the first time they try to stop one and can't.
-            D7 (competition review): the old sentence ("There's no review step, for anyone.")
-            was a page-level literal that never learned about Plan D's own fairness-review
-            carve-out for a lopsided public-league trade — it rendered false, 400px above
-            `HeldTradeBanner`, on any page that held one. This states the rule INCLUDING its
-            exception, in one sentence, so the header can never contradict the banner beneath
-            it again. */}
-        <p className="text-sm text-text-muted">
-          Trades complete as soon as both sides agree. Public leagues hold back a lopsided trade for a short fairness review first.
-        </p>
-      </header>
-      <TradeInbox leagueId={leagueId} context={context} />
-    </>
+    <LeagueHome
+      home={home}
+      lineup={null}
+      helpLevel={preferences.helpLevel}
+      nextActionKind={act?.kind ?? null}
+      act={act}
+      playoffTeams={LEAGUE_CONFIG.playoffTeams}
+      tab="trades"
+      tradeContext={context}
+    />
   );
 }
