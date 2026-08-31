@@ -94,6 +94,33 @@ export function matchedPairs(
   return pairs;
 }
 
+/**
+ * `matchedPairs`, run separately WITHIN each stratum `keyOf` names, never across strata.
+ *
+ * A caliper on `matchKey` alone cannot stop a within-caliper pair from crossing a boundary that
+ * matters more than points/game does: a 2011 RB and a 2024 WR can sit inside a 2-point caliper of
+ * each other while sharing nothing else — different era, different position, different baseline
+ * distribution entirely. Every law matches within `season` (cross-era pairing is never legitimate);
+ * a law whose population spans more than one position (`Law["position"] === "all"`, or a WR+TE
+ * population like `play_caller_fingerprint`) additionally stratifies by `position`, since a WR's
+ * and a TE's points/game distributions do not overlap enough for a shared caliper to mean the same
+ * thing for both. `keyOf` is the caller's choice of which strata matter for a given law.
+ */
+export function matchedPairsStratified(
+  points: readonly PlayerSeasonPoint[],
+  caliper: number,
+  keyOf: (point: PlayerSeasonPoint) => string,
+): readonly MatchedPair[] {
+  const byStratum = new Map<string, PlayerSeasonPoint[]>();
+  for (const point of points) {
+    const key = keyOf(point);
+    const stratum = byStratum.get(key) ?? [];
+    stratum.push(point);
+    byStratum.set(key, stratum);
+  }
+  return [...byStratum.values()].flatMap((stratum) => matchedPairs(stratum, caliper));
+}
+
 function yearOverYearChange(point: PlayerSeasonPoint): number {
   // Matching already guarantees `nextPointsPerGame` is non-null for every paired point.
   return point.nextPointsPerGame! - point.pointsPerGame;

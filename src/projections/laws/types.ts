@@ -43,6 +43,8 @@ export interface Law {
 export interface PlayerSeasonPoint {
   readonly playerId: string;
   readonly season: number;
+  /** QB/RB/WR/TE, season N — the stratum a law spanning more than one position must match within. */
+  readonly position: "QB" | "RB" | "WR" | "TE";
   /** Season N, PPR per game. */
   readonly pointsPerGame: number;
   /** Season N+1, PPR per game; null = did not play. */

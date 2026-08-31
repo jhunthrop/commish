@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchedPairs, measureEffect, verdictFor } from "./harness";
+import { matchedPairs, matchedPairsStratified, measureEffect, verdictFor } from "./harness";
 import type { PlayerSeasonPoint } from "./types";
 
 /** Strength of the regression-to-the-mean drift both synthetic groups share, and the mean they
@@ -45,6 +45,7 @@ function planted(n: number, plantedEffect: number, seed = 7): readonly PlayerSea
     points.push({
       playerId: `condition-${i}`,
       season: 2020,
+      position: "RB",
       pointsPerGame: conditionNow,
       nextPointsPerGame: drifted(conditionNow, noise(), plantedEffect),
       matchKey: conditionNow,
@@ -53,6 +54,7 @@ function planted(n: number, plantedEffect: number, seed = 7): readonly PlayerSea
     points.push({
       playerId: `control-${i}`,
       season: 2020,
+      position: "RB",
       pointsPerGame: base,
       nextPointsPerGame: drifted(base, noise(), 0),
       matchKey: base,
@@ -85,6 +87,7 @@ function systematicMismatch(n: number, plantedEffect: number, seed = 13): readon
     points.push({
       playerId: `sys-condition-${i}`,
       season: 2020,
+      position: "RB",
       pointsPerGame: conditionNow,
       nextPointsPerGame: drifted(conditionNow, noise(), plantedEffect),
       matchKey: conditionNow,
@@ -93,6 +96,7 @@ function systematicMismatch(n: number, plantedEffect: number, seed = 13): readon
     points.push({
       playerId: `sys-control-${i}`,
       season: 2020,
+      position: "RB",
       pointsPerGame: base,
       nextPointsPerGame: drifted(base, noise(), 0),
       matchKey: base,
@@ -125,6 +129,7 @@ function regressionMirage(n: number, plantedEffect: number, seed = 11): readonly
     points.push({
       playerId: `mirage-condition-${i}`,
       season: 2020,
+      position: "RB",
       pointsPerGame: base,
       nextPointsPerGame: mirageDrift(base, plantedEffect),
       matchKey: base,
@@ -133,6 +138,7 @@ function regressionMirage(n: number, plantedEffect: number, seed = 11): readonly
     points.push({
       playerId: `mirage-partner-${i}`,
       season: 2020,
+      position: "RB",
       pointsPerGame: base + partnerOffset,
       nextPointsPerGame: mirageDrift(base + partnerOffset, 0),
       matchKey: base + partnerOffset,
@@ -141,6 +147,7 @@ function regressionMirage(n: number, plantedEffect: number, seed = 11): readonly
     points.push({
       playerId: `mirage-decoy-${i}`,
       season: 2020,
+      position: "RB",
       pointsPerGame: decoyBase,
       nextPointsPerGame: mirageDrift(decoyBase, 0),
       matchKey: decoyBase,
@@ -169,6 +176,7 @@ it("never matches outside the caliper and reports the reduced sample", () => {
     {
       playerId: "condition-near",
       season: 2020,
+      position: "RB",
       pointsPerGame: 10,
       nextPointsPerGame: 9,
       matchKey: 10,
@@ -177,6 +185,7 @@ it("never matches outside the caliper and reports the reduced sample", () => {
     {
       playerId: "condition-far",
       season: 2020,
+      position: "RB",
       pointsPerGame: 10,
       nextPointsPerGame: 9,
       matchKey: 10,
@@ -185,6 +194,7 @@ it("never matches outside the caliper and reports the reduced sample", () => {
     {
       playerId: "control-only",
       season: 2020,
+      position: "RB",
       pointsPerGame: 20,
       nextPointsPerGame: 19,
       matchKey: 20,
@@ -239,6 +249,7 @@ describe("matchedPairs", () => {
       {
         playerId: "condition-out",
         season: 2020,
+        position: "RB",
         pointsPerGame: 10,
         nextPointsPerGame: null,
         matchKey: 10,
@@ -247,6 +258,7 @@ describe("matchedPairs", () => {
       {
         playerId: "control-out",
         season: 2020,
+        position: "RB",
         pointsPerGame: 10,
         nextPointsPerGame: null,
         matchKey: 10,
@@ -255,6 +267,7 @@ describe("matchedPairs", () => {
       {
         playerId: "condition-returns",
         season: 2020,
+        position: "RB",
         pointsPerGame: 15,
         nextPointsPerGame: 14,
         matchKey: 15,
@@ -263,6 +276,7 @@ describe("matchedPairs", () => {
       {
         playerId: "control-returns",
         season: 2020,
+        position: "RB",
         pointsPerGame: 15,
         nextPointsPerGame: 13,
         matchKey: 15,
@@ -274,6 +288,62 @@ describe("matchedPairs", () => {
     expect(pairs).toHaveLength(1);
     expect(pairs[0]!.condition.playerId).toBe("condition-returns");
     expect(pairs[0]!.control.playerId).toBe("control-returns");
+  });
+});
+
+/** Two strata sharing an OVERLAPPING matchKey range but different baselines and different planted
+ *  effects — proof `keyOf` keeps them apart, not merely a caliper that happens to separate them. */
+function stratumPoints(n: number, position: "RB" | "WR", baseOffset: number, plantedEffect: number, seed: number): readonly PlayerSeasonPoint[] {
+  const next = lcg(seed);
+  const noise = (): number => next() - 0.5;
+  const points: PlayerSeasonPoint[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const base = baseOffset + (i % 20);
+    const offset = i % 2 === 0 ? 0.3 : -0.3;
+    const conditionNow = base + offset;
+    points.push({
+      playerId: `${position}-condition-${i}`,
+      season: 2020,
+      position,
+      pointsPerGame: conditionNow,
+      nextPointsPerGame: drifted(conditionNow, noise(), plantedEffect),
+      matchKey: conditionNow,
+      condition: true,
+    });
+    points.push({
+      playerId: `${position}-control-${i}`,
+      season: 2020,
+      position,
+      pointsPerGame: base,
+      nextPointsPerGame: drifted(base, noise(), 0),
+      matchKey: base,
+      condition: false,
+    });
+  }
+  return points;
+}
+
+describe("matchedPairsStratified", () => {
+  it("never pairs across strata, even when matchKeys overlap and baselines differ", () => {
+    // RB: base 10-29, planted -2.0. WR: base 12-31 (overlapping RB's range), no planted effect.
+    // Unstratified, plenty of RB-condition/WR-control pairs would fall inside the 0.5 caliper.
+    const rb = stratumPoints(200, "RB", 10, -2.0, 31);
+    const wr = stratumPoints(200, "WR", 12, 0, 37);
+    const pairs = matchedPairsStratified([...rb, ...wr], 0.5, (p) => p.position);
+
+    expect(pairs.length).toBeGreaterThan(0);
+    expect(pairs.every((pair) => pair.condition.position === pair.control.position)).toBe(true);
+
+    // Each stratum's own effect is recovered independently — RB's -2.0 never bleeds into WR's null.
+    const rbPairs = pairs.filter((pair) => pair.condition.position === "RB");
+    const wrPairs = pairs.filter((pair) => pair.condition.position === "WR");
+    expect(measureEffect(rbPairs).effect).toBeLessThan(-1.0);
+    expect(Math.abs(measureEffect(wrPairs).effect)).toBeLessThan(0.5);
+  });
+
+  it("matches identically to matchedPairs within a single stratum", () => {
+    const points = stratumPoints(50, "RB", 10, -1.0, 41);
+    expect(matchedPairsStratified(points, 0.5, (p) => p.position)).toEqual(matchedPairs(points, 0.5));
   });
 });
 

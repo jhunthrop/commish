@@ -129,14 +129,30 @@ function attributedByTeamSeason(
  * comes from seasons strictly BEFORE the one being stamped — so nothing here can reach forward.
  * The stamp is the same one the rest of the schedule carries, so a replay sees them together.
  *
+ * THE IDENTITY BEING STAMPED FOR SEASON S IS ITS WEEK-1 PLAY-CALLER, NOT ITS MODAL ONE — and this
+ * is the one asymmetry in the whole mechanism, so it earns its own paragraph. `coachByTeamSeason`'s
+ * most-frequent rule is right for describing a COMPLETED season (whoever called the most plays did
+ * set the offence's tendencies), but season S is not complete at the moment this stamp is made: it
+ * is May, before S has been played at all. A team that fires its play-caller in November of S and
+ * finishes the season with an interim who ends up with more starts would have its MODAL attribution
+ * for S be the interim — a fact nobody could know in May, correlated with exactly the bad offensive
+ * season that made the firing happen. Stamping that as "the coach going into S" would leak S's own
+ * outcome into S's own antecedent. The week-1 identity — the play-caller lookup's answer for week 1,
+ * or the week-1 game's own listed coach where the lookup has nothing — is the one identity fully
+ * knowable at schedule publication, so it is the one used both to look up TENURE (is he new to this
+ * team) and to select WHOSE prior history feeds the pace/PROE fingerprint. Every season strictly
+ * BEFORE S, by contrast, is complete by the time S is stamped, so `coachByTeamSeason`'s modal
+ * attribution for those seasons carries no such leak — the tenure chain and "history at other teams"
+ * walk below both read `coachOf`, which stays modal, exactly as before.
+ *
  * A coach with no measurable history emits NO ROW rather than a league-average one. The consumer
  * has to decide what to do with an unknown coach, and handing it a league mean disguised as a
  * measurement would take that decision away from the one place it is visible.
  *
  * `playCaller`, OPTIONAL: the week-accurate table from `play-callers.ts`. Omitted, this is exactly
- * the head-coach-only mechanism it always was. Passed, tenure and the "history at other teams" walk
- * below run over the ATTRIBUTED name — role-agnostic, so a coordinator promoted to head coach for
- * the same team keeps the tenure he already had rather than resetting to zero.
+ * the head-coach-only mechanism it always was. Passed, both the week-1 identity and the "history at
+ * other teams" walk run over ATTRIBUTED names — role-agnostic, so a coordinator promoted to head
+ * coach for the same team keeps the tenure he already had rather than resetting to zero.
  */
 export function coachObservations(
   games: readonly TeamGame[],
@@ -144,6 +160,8 @@ export function coachObservations(
   seasons: readonly number[],
   playCaller?: PlayCallerLookup,
 ): readonly TeamWeekObservation[] {
+  // The historical table: modal per team-season, used ONLY for seasons strictly before the one
+  // being stamped (`coachOf`, `historyOf`) — both fully knowable by the time S is stamped.
   const byTeamSeason = attributedByTeamSeason(games, coachByTeamSeason(games), playCaller);
   const coachOf = new Map(byTeamSeason.map((row) => [`${row.season}|${row.team}`, row.coach] as const));
   const wanted = new Set(seasons);
@@ -152,9 +170,18 @@ export function coachObservations(
   const historyOf = (coach: string, season: number): readonly TeamSeasonCoach[] =>
     byTeamSeason.filter((row) => row.coach === coach && row.season < season);
 
+  // Season S's OWN identity: the week-1 attribution, never the modal one — see the docblock above.
+  const teamSeasons = new Set(games.filter((game) => wanted.has(game.season)).map((game) => `${game.season}|${game.team}`));
+
   const rows: TeamWeekObservation[] = [];
-  for (const { season, team, coach } of byTeamSeason) {
-    if (!wanted.has(season)) continue;
+  for (const key of teamSeasons) {
+    const separator = key.indexOf("|");
+    const season = Number(key.slice(0, separator));
+    const team = key.slice(separator + 1);
+    const week1 = games.find((game) => game.season === season && game.team === team && game.week === 1);
+    if (week1 === undefined) continue; // No week-1 game recorded — nothing knowable to stamp yet.
+    const coach = playCaller?.(team, season, 1) ?? week1.coach;
+
     let tenure = 0;
     while (coachOf.get(`${season - tenure - 1}|${team}`) === coach) tenure += 1;
 

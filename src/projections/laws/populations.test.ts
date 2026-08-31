@@ -11,7 +11,7 @@ import { schedulePublishedAsOf, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { recordObservations } from "../store";
 import { recordPlayerTeams, recordTeamObservations } from "../team-store";
 import { recordPreseasonRosters } from "../preseason/store";
-import { LAW_SPECS } from "./populations";
+import { buildPopulations, LAW_SPECS } from "./populations";
 
 /**
  * DB-BACKED FIXTURES FOR THE SIX LAW POPULATIONS, following `backtest.test.ts`'s style: one test
@@ -20,7 +20,9 @@ import { LAW_SPECS } from "./populations";
  * Season N is 2023, season N+1 is 2024, and `GATE` is the as-of every builder reads season N
  * through — `schedulePublishedAsOf(2024)`. Every "does not leak" test adds a fact that is either
  * about the wrong season or stamped after `GATE`, and asserts the population's `condition` is
- * unmoved — the same proof `backtest.test.ts` runs for a late stat correction.
+ * unmoved — the same proof `backtest.test.ts` runs for a late stat correction. Every "drops from
+ * both pools" test seeds a player with a real StatLine but NO evidence for one law's antecedent,
+ * and asserts he is entirely ABSENT from that law's population — never present with `condition: false`.
  */
 
 const db = createTestDb();
@@ -48,6 +50,11 @@ function line(season: number, week: number, playerId: string, over: Partial<Stat
       ...over,
     },
   };
+}
+
+/** All-zero weeks — a player who "played" but recorded nothing, so `games` still counts them. */
+function fillerWeeks(season: number, playerId: string, weeks: readonly number[], asOf: Date): readonly SeasonStatLine[] {
+  return weeks.map((week) => line(season, week, playerId, {}, asOf));
 }
 
 async function storeLines(lines: readonly SeasonStatLine[]): Promise<void> {
@@ -121,6 +128,7 @@ describe("rb_workload_cliff", () => {
     expect(heavy.condition).toBe(true);
     expect(heavy.pointsPerGame).toBe(180); // 1000*0.1 + 200*0.1 + 60*1
     expect(heavy.matchKey).toBe(180);
+    expect(heavy.position).toBe("RB");
 
     // light: 100 carries + 50 receptions = 150 touches.
     expect(light.condition).toBe(false);
@@ -136,6 +144,14 @@ describe("rb_workload_cliff", () => {
     const points = await spec.population(db, [N]);
     const light = points.find((p) => p.playerId === "light")!;
     expect(light.condition).toBe(false);
+  });
+
+  it("drops a player with no participation row entirely — unknown touches, never zero touches", async () => {
+    await insertPlayers([["noCarries", "RB"]]);
+    await storeLines([line(N, 1, "noCarries", { rushingYards: 100, receptions: 5 }, BEFORE_GATE)]);
+    // No carries observation recorded for "noCarries" at all — not even a zero.
+    const points = await spec.population(db, [N]);
+    expect(points.some((p) => p.playerId === "noCarries")).toBe(false);
   });
 });
 
@@ -172,6 +188,14 @@ describe("rb_age_curve", () => {
     const points = await spec.population(db, [N]);
     expect(points.find((p) => p.playerId === "young")!.condition).toBe(false);
   });
+
+  it("drops a player with no roster row entirely — unknown age, never a false condition", async () => {
+    await insertPlayers([["noRoster", "RB"]]);
+    await storeLines([line(N, 1, "noRoster", { rushingYards: 100, receptions: 5 }, BEFORE_GATE)]);
+    // No preseason roster row for "noRoster" at all — no birth date is knowable.
+    const points = await spec.population(db, [N]);
+    expect(points.some((p) => p.playerId === "noRoster")).toBe(false);
+  });
 });
 
 describe("wr_target_competition", () => {
@@ -190,8 +214,11 @@ describe("wr_target_competition", () => {
     ]);
     await storeParticipation([
       { season: N, week: 1, playerId: "wr1", metric: PARTICIPATION_METRICS.targets, value: 100, asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "wr1", metric: PARTICIPATION_METRICS.teamTargets, value: 150, asOf: BEFORE_GATE },
       { season: N, week: 1, playerId: "wr2", metric: PARTICIPATION_METRICS.targets, value: 20, asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "wr2", metric: PARTICIPATION_METRICS.teamTargets, value: 150, asOf: BEFORE_GATE },
       { season: N, week: 1, playerId: "te1", metric: PARTICIPATION_METRICS.targets, value: 10, asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "te1", metric: PARTICIPATION_METRICS.teamTargets, value: 150, asOf: BEFORE_GATE },
     ]);
     await storeLines([
       line(N, 1, "wr1", { receivingYards: 800, receptions: 100 }, BEFORE_GATE),
@@ -199,8 +226,10 @@ describe("wr_target_competition", () => {
     ]);
   });
 
-  it("flags the incumbent whose teammates claim more than 60% of the team's WR/TE targets", async () => {
-    // Team WR/TE targets: 100 + 20 + 10 = 130. wr1's teammates hold 30/130 (23%); wr2's hold 110/130 (85%).
+  it("flags a receiver whose WR/TE teammate has an individual share >= 20% and >= his own", async () => {
+    // Own shares: wr1 100/150=66.7%, wr2 20/150=13.3%, te1 10/150=6.7%.
+    // wr1's best teammate share is 13.3% (wr2) — never clears 20%. wr2's best teammate share is
+    // 66.7% (wr1) — clears 20% and exceeds wr2's own 13.3%.
     const points = await spec.population(db, [N]);
     const wr1 = points.find((p) => p.playerId === "wr1")!;
     const wr2 = points.find((p) => p.playerId === "wr2")!;
@@ -212,11 +241,57 @@ describe("wr_target_competition", () => {
     expect(points.some((p) => p.playerId === "te1")).toBe(false);
   });
 
-  it("does not let a late-filed target correction flip the condition", async () => {
-    // A correction that would make wr2 the dominant target claimer, filed after the gate.
-    await storeParticipation([{ season: N, week: 1, playerId: "wr2", metric: PARTICIPATION_METRICS.targets, value: 200, asOf: AFTER_GATE }]);
+  it("does not let a late-filed teammate target correction flip the condition", async () => {
+    // A correction that would make te1 wr1's dominant teammate, filed after the gate.
+    await storeParticipation([{ season: N, week: 1, playerId: "te1", metric: PARTICIPATION_METRICS.targets, value: 300, asOf: AFTER_GATE }]);
     const points = await spec.population(db, [N]);
-    expect(points.find((p) => p.playerId === "wr2")!.condition).toBe(true);
+    expect(points.find((p) => p.playerId === "wr1")!.condition).toBe(false);
+  });
+
+  it("drops a player with no team edge entirely — unknown teammates, never a false condition", async () => {
+    await insertPlayers([["noTeam", "WR"]]);
+    await storeLines([line(N, 1, "noTeam", { receivingYards: 100, receptions: 10 }, BEFORE_GATE)]);
+    // No recordPlayerTeams row for "noTeam" at all.
+    const points = await spec.population(db, [N]);
+    expect(points.some((p) => p.playerId === "noTeam")).toBe(false);
+  });
+
+  it("groups teammates week by week, not by a single season-final team, when a player is traded", async () => {
+    await insertPlayers([
+      ["traded", "WR"],
+      ["wrSFteammate", "WR"],
+    ]);
+    await recordPlayerTeams(db, [
+      { season: N, week: 1, playerId: "traded", team: "SF", asOf: BEFORE_GATE },
+      { season: N, week: 2, playerId: "traded", team: "SF", asOf: BEFORE_GATE },
+      { season: N, week: 3, playerId: "traded", team: "DAL", asOf: BEFORE_GATE },
+      { season: N, week: 4, playerId: "traded", team: "DAL", asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "wrSFteammate", team: "SF", asOf: BEFORE_GATE },
+      { season: N, week: 2, playerId: "wrSFteammate", team: "SF", asOf: BEFORE_GATE },
+    ]);
+    await storeParticipation(
+      [1, 2, 3, 4].flatMap((week) => [
+        { season: N, week, playerId: "traded", metric: PARTICIPATION_METRICS.targets, value: 30, asOf: BEFORE_GATE },
+        { season: N, week, playerId: "traded", metric: PARTICIPATION_METRICS.teamTargets, value: 100, asOf: BEFORE_GATE },
+      ]),
+    );
+    await storeParticipation(
+      [1, 2].flatMap((week) => [
+        { season: N, week, playerId: "wrSFteammate", metric: PARTICIPATION_METRICS.targets, value: 5, asOf: BEFORE_GATE },
+        { season: N, week, playerId: "wrSFteammate", metric: PARTICIPATION_METRICS.teamTargets, value: 100, asOf: BEFORE_GATE },
+      ]),
+    );
+    await storeLines([
+      line(N, 1, "traded", { receivingYards: 100, receptions: 10 }, BEFORE_GATE),
+      line(N, 1, "wrSFteammate", { receivingYards: 50, receptions: 5 }, BEFORE_GATE),
+    ]);
+
+    const points = await spec.population(db, [N]);
+    const wrSFteammate = points.find((p) => p.playerId === "wrSFteammate")!;
+    // traded's SEASON share (SF weeks 1-2 plus DAL weeks 3-4) is 120/400 = 30%, reachable as
+    // wrSFteammate's teammate only if grouping is done week by week (both on SF in weeks 1-2) —
+    // a single season-final-team grouping (DAL) would lose him as a teammate entirely.
+    expect(wrSFteammate.condition).toBe(true);
   });
 });
 
@@ -251,7 +326,7 @@ describe("play_caller_fingerprint", () => {
     ]);
   });
 
-  it("flags WR/TE on a team with a first-year coach whose own history skews pass-heavy", async () => {
+  it("flags WR/TE on a team with a first-year play-caller whose own history skews pass-heavy", async () => {
     const points = await spec.population(db, [N]);
     expect(points.find((p) => p.playerId === "wrKC")!.condition).toBe(true);
     expect(points.find((p) => p.playerId === "teKC")!.condition).toBe(true);
@@ -266,6 +341,15 @@ describe("play_caller_fingerprint", () => {
     ]);
     const points = await spec.population(db, [N]);
     expect(points.find((p) => p.playerId === "wrBUF")!.condition).toBe(false);
+  });
+
+  it("drops a player whose team has no coach facts at all — unknown, never a false condition", async () => {
+    await insertPlayers([["wrMIA", "WR"]]);
+    await recordPlayerTeams(db, [{ season: N, week: 1, playerId: "wrMIA", team: "MIA", asOf: BEFORE_GATE }]);
+    await storeLines([line(N, 1, "wrMIA", { receivingYards: 100, receptions: 10 }, BEFORE_GATE)]);
+    // No coachObservations rows for MIA's season-N+1 at all.
+    const points = await spec.population(db, [N]);
+    expect(points.some((p) => p.playerId === "wrMIA")).toBe(false);
   });
 });
 
@@ -311,15 +395,20 @@ describe("td_regression", () => {
       ["rbB", "RB"],
       ["rbC", "RB"],
     ]);
+    // Each gets 8 games (the median's regulars floor) — week 1 carries the real stats, weeks 2-8
+    // are scoreless fillers, so games/shares match the pre-fix single-week fixture exactly.
     await storeLines([
       // Shares: 6/60=0.10, 12/80=0.15, 36/72=0.50 — median 0.15, threshold 1.5*0.15=0.225.
       line(N, 1, "rbA", { rushingYards: 540, rushingTouchdowns: 1 }, BEFORE_GATE),
+      ...fillerWeeks(N, "rbA", [2, 3, 4, 5, 6, 7, 8], BEFORE_GATE),
       line(N, 1, "rbB", { rushingYards: 680, rushingTouchdowns: 2 }, BEFORE_GATE),
+      ...fillerWeeks(N, "rbB", [2, 3, 4, 5, 6, 7, 8], BEFORE_GATE),
       line(N, 1, "rbC", { rushingYards: 360, rushingTouchdowns: 6 }, BEFORE_GATE),
+      ...fillerWeeks(N, "rbC", [2, 3, 4, 5, 6, 7, 8], BEFORE_GATE),
     ]);
   });
 
-  it("flags a touchdown-points share at least 1.5x the position-season median", async () => {
+  it("flags a touchdown-points share at least 1.5x the position-season median among regulars", async () => {
     const points = await spec.population(db, [N]);
     expect(points.find((p) => p.playerId === "rbA")!.condition).toBe(false);
     expect(points.find((p) => p.playerId === "rbB")!.condition).toBe(false);
@@ -330,5 +419,89 @@ describe("td_regression", () => {
     await storeLines([line(N1, 1, "rbA", { rushingYards: 100, rushingTouchdowns: 10 }, BEFORE_GATE)]);
     const points = await spec.population(db, [N]);
     expect(points.find((p) => p.playerId === "rbA")!.condition).toBe(false);
+  });
+
+  it("excludes a sub-8-game player-season from the median, so a one-game flare-up cannot swing it", async () => {
+    // A one-game player with a huge share would drag the median up if counted; it must not be.
+    await insertPlayers([["oneGameFlash", "RB"]]);
+    await storeLines([line(N, 1, "oneGameFlash", { rushingYards: 10, rushingTouchdowns: 5 }, BEFORE_GATE)]);
+    const points = await spec.population(db, [N]);
+    // rbC's verdict is unchanged by oneGameFlash's presence — the threshold still comes from rbA/rbB/rbC alone.
+    expect(points.find((p) => p.playerId === "rbC")!.condition).toBe(true);
+    expect(points.find((p) => p.playerId === "rbA")!.condition).toBe(false);
+  });
+});
+
+describe("season-N+1 actuals — the deliberately ungated read", () => {
+  const spec = specFor("rb_workload_cliff");
+
+  it("yields the exact next-season points/game for a seeded N+1 line", async () => {
+    await insertPlayers([["player", "RB"]]);
+    await storeLines([
+      line(N, 1, "player", { rushingYards: 1000, receptions: 60 }, BEFORE_GATE),
+      line(N1, 1, "player", { rushingYards: 200, receptions: 10 }, BEFORE_GATE), // 20 + 10 = 30
+    ]);
+    await storeParticipation([{ season: N, week: 1, playerId: "player", metric: PARTICIPATION_METRICS.carries, value: 10, asOf: BEFORE_GATE }]);
+    const points = await spec.population(db, [N]);
+    expect(points.find((p) => p.playerId === "player")!.nextPointsPerGame).toBe(30);
+  });
+
+  it("gives null for a player absent from season N+1 entirely", async () => {
+    await insertPlayers([["gone", "RB"]]);
+    await storeLines([line(N, 1, "gone", { rushingYards: 100, receptions: 5 }, BEFORE_GATE)]);
+    await storeParticipation([{ season: N, week: 1, playerId: "gone", metric: PARTICIPATION_METRICS.carries, value: 10, asOf: BEFORE_GATE }]);
+    const points = await spec.population(db, [N]);
+    expect(points.find((p) => p.playerId === "gone")!.nextPointsPerGame).toBeNull();
+  });
+
+  it("includes a late-filed N+1 correction — the actuals read is deliberately ungated", async () => {
+    await insertPlayers([["corrected", "RB"]]);
+    await storeLines([
+      line(N, 1, "corrected", { rushingYards: 100, receptions: 5 }, BEFORE_GATE),
+      // Filed AFTER the season-N gate — irrelevant here, since actuals are read at FINAL_OUTCOME.
+      line(N1, 1, "corrected", { rushingYards: 100, receptions: 5 }, AFTER_GATE),
+    ]);
+    await storeParticipation([{ season: N, week: 1, playerId: "corrected", metric: PARTICIPATION_METRICS.carries, value: 10, asOf: BEFORE_GATE }]);
+    const points = await spec.population(db, [N]);
+    expect(points.find((p) => p.playerId === "corrected")!.nextPointsPerGame).toBe(15); // 10 + 5
+  });
+
+  it("computes each season's points/game as the correct per-game quotient over a multi-week season", async () => {
+    await insertPlayers([["multiWeek", "RB"]]);
+    await storeLines([
+      // Season N: 3 weeks, 30 points total => 10.0 ppg, not 30.
+      line(N, 1, "multiWeek", { rushingYards: 100 }, BEFORE_GATE),
+      line(N, 2, "multiWeek", { rushingYards: 100 }, BEFORE_GATE),
+      line(N, 3, "multiWeek", { rushingYards: 100 }, BEFORE_GATE),
+      // Season N+1: 1 week, 40 points => 40.0 ppg, not divided by season N's 3 games.
+      line(N1, 1, "multiWeek", { rushingYards: 400 }, BEFORE_GATE),
+    ]);
+    await storeParticipation([{ season: N, week: 1, playerId: "multiWeek", metric: PARTICIPATION_METRICS.carries, value: 10, asOf: BEFORE_GATE }]);
+    const points = await spec.population(db, [N]);
+    const found = points.find((p) => p.playerId === "multiWeek")!;
+    expect(found.pointsPerGame).toBe(10); // (10 + 10 + 10) / 3
+    expect(found.nextPointsPerGame).toBe(40); // 40 / 1
+  });
+});
+
+describe("buildPopulations", () => {
+  it("computes every law's population in one shared pass, matching each law's own population()", async () => {
+    await insertPlayers([
+      ["heavy", "RB"],
+      ["light", "RB"],
+    ]);
+    await storeLines([
+      line(N, 1, "heavy", { rushingYards: 1000, receivingYards: 200, receptions: 60 }, BEFORE_GATE),
+      line(N, 1, "light", { rushingYards: 400, receivingYards: 100, receptions: 50 }, BEFORE_GATE),
+    ]);
+    await storeParticipation([
+      { season: N, week: 1, playerId: "heavy", metric: PARTICIPATION_METRICS.carries, value: 250, asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "light", metric: PARTICIPATION_METRICS.carries, value: 100, asOf: BEFORE_GATE },
+    ]);
+
+    const batch = await buildPopulations(db, [N]);
+    const solo = await specFor("rb_workload_cliff").population(db, [N]);
+    expect(batch.get("rb_workload_cliff")).toEqual(solo);
+    expect([...batch.keys()].sort()).toEqual(LAW_SPECS.map((entry) => entry.id).sort());
   });
 });

@@ -25,10 +25,22 @@ import type { Law, PlayerSeasonPoint } from "./types";
  * mirrors it: season N's covariate is read gated at `schedulePublishedAsOf(N + 1)` (`factsForSeason`),
  * and N+1's outcome is read ungated at `FINAL_OUTCOME` (`actualPointsPerGame`), two calls apart.
  *
+ * THE ONE NAMED EXCEPTION is `allPositions` (reused from `backtest.ts`), which carries no as-of at
+ * all — the same exception `backtest.ts` itself takes, and for the same reason: a player's POSITION
+ * is not a fact a Sunday-night stat correction restates, so gating it would buy nothing and reading
+ * it once, outside every season loop, is honest rather than a leak.
+ *
+ * NO-EVIDENCE IS NOT FALSE. Every `LawConditionFacts` field and every exported condition predicate
+ * is tri-state (`boolean | null`, or the underlying quantity is `T | null`): a player with no
+ * participation row, no team edge, or no roster row for a fact a law needs returns `null` from that
+ * predicate, and `buildPopulations`/`buildPopulation` DROP that player-season from the population
+ * entirely — from neither the condition pool nor the control pool. Collapsing "we don't know" to
+ * `false` would publish an evidence gap as a matched control, which is a different and false claim.
+ *
  * TWO SIMPLIFICATIONS RECUR, both forced by one fact: nothing about a player's SEASON N+1 team is
  * knowable at that gate (transactions aren't a source this engine reads; N+1 week-one rosters aren't
- * filed until cutdown, months later). Builders that would want "his team next season" use his own
- * SEASON N team instead (`seasonTeams`), and every `claim` that relies on it says so.
+ * filed until cutdown, months later). `play_caller_fingerprint` wants "his team next season" and uses
+ * his own SEASON N team instead (`seasonTeams`), stated in its `claim`.
  *
  * `PARTICIPATION_METRICS` (targets, carries, team denominators) are read through `observationsAsOf`
  * directly rather than `statLinesAsOf`, which deliberately filters them out ("not stat fields... an
@@ -36,6 +48,9 @@ import type { Law, PlayerSeasonPoint } from "./types";
  */
 
 const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");
+
+/** The four positions a law population ever emits a `PlayerSeasonPoint` for. */
+type LawPosition = PlayerSeasonPoint["position"];
 
 /** One law's static content plus the population its measurement is drawn from. */
 export interface LawSpec {
@@ -49,66 +64,74 @@ export interface LawSpec {
 }
 
 /**
- * PER-PLAYER QUANTITIES every law's antecedent reads. Exported so a future board caller (Task 7)
- * can ask "does this law's condition hold for him" with the exact predicate it was measured with.
+ * PER-PLAYER QUANTITIES every law's antecedent reads, tri-state throughout — `null` means "no
+ * evidence", never "condition false". Exported so a future board caller (Task 7) can ask "does this
+ * law's condition hold for him" with the exact predicate it was measured with.
  */
 export interface LawConditionFacts {
-  /** Carries + receptions, season N (rb_workload_cliff). */
-  readonly touches: number;
-  /** Years old at season N's opener, or null if unknown (rb_age_curve). */
+  /** Carries + receptions, season N; null with no participation row at all (rb_workload_cliff). */
+  readonly touches: number | null;
+  /** Years old at season N's opener; null if no birth date is known (rb_age_curve). */
   readonly age: number | null;
-  /** Share of the team's WR/TE targets claimed by teammates, season N (wr_target_competition). */
-  readonly otherWrTeTargetShare: number | null;
-  /** The season-N team's season-N+1 coach — zero tenure and a positive prior PROE (play_caller_fingerprint). */
-  readonly incomingCoachTenureIsZero: boolean;
+  /** Best individual season-N target share among his own WR/TE teammates; null with no team edge
+   *  at all (wr_target_competition). */
+  readonly bestTeammateTargetShare: number | null;
+  /** The season-N team's season-N+1 play-caller has zero tenure with it; null with no team edge or
+   *  no coach facts for that team at all (play_caller_fingerprint). */
+  readonly incomingCoachTenureIsZero: boolean | null;
+  /** That incoming play-caller's own prior pass-rate-over-expected; null if unmeasured. */
   readonly incomingCoachPriorPassRateOverExpected: number | null;
-  /** Share of the team's targets claimed, season N (target_share_persistence). */
+  /** Share of the team's targets claimed, season N; null with no participation row (target_share_persistence). */
   readonly targetShare: number | null;
-  /** Share of own points from touchdowns, and 1.5x the position-season median (td_regression). */
+  /** Share of own points from touchdowns, season N (td_regression). */
   readonly touchdownPointsShare: number | null;
+  /** 1.5x his position's median touchdown-points share among regulars, season N (td_regression). */
   readonly touchdownPointsShareThreshold: number | null;
 }
 
 const WORKLOAD_CLIFF_TOUCHES = 300;
 const AGE_CLIFF_YEARS = 28;
-const TARGET_COMPETITION_SHARE = 0.6;
+/** A teammate's own season-N target share, to count as "another primary receiver" (wr_target_competition). */
+const TEAMMATE_PRIMARY_RECEIVER_SHARE = 0.2;
 const TARGET_SHARE_PERSISTENCE_MIN = 0.24;
 const TD_REGRESSION_MULTIPLIER = 1.5;
+/** A player-season needs at least this many games to count toward the td_regression median — thin,
+ *  low-usage seasons swing a median without representing what a "regular" typically does. */
+const MIN_GAMES_FOR_TD_MEDIAN = 8;
 /** Points/game — the band within which two player-seasons count as "otherwise similar". */
 const POINTS_PER_GAME_CALIPER = 2;
-const SKILL_POSITIONS: ReadonlySet<Position> = new Set(["QB", "RB", "WR", "TE"]);
+const SKILL_POSITIONS: ReadonlySet<LawPosition> = new Set(["QB", "RB", "WR", "TE"]);
 
-export function rbWorkloadCliffCondition(facts: LawConditionFacts): boolean {
-  return facts.touches >= WORKLOAD_CLIFF_TOUCHES;
+/** `null` propagates: a law's antecedent is unknown, never false, when its inputs are unknown. */
+export function rbWorkloadCliffCondition(facts: LawConditionFacts): boolean | null {
+  return facts.touches === null ? null : facts.touches >= WORKLOAD_CLIFF_TOUCHES;
 }
-export function rbAgeCurveCondition(facts: LawConditionFacts): boolean {
-  return facts.age !== null && facts.age >= AGE_CLIFF_YEARS;
+export function rbAgeCurveCondition(facts: LawConditionFacts): boolean | null {
+  return facts.age === null ? null : facts.age >= AGE_CLIFF_YEARS;
 }
-export function wrTargetCompetitionCondition(facts: LawConditionFacts): boolean {
-  return facts.otherWrTeTargetShare !== null && facts.otherWrTeTargetShare > TARGET_COMPETITION_SHARE;
+export function wrTargetCompetitionCondition(facts: LawConditionFacts): boolean | null {
+  if (facts.targetShare === null || facts.bestTeammateTargetShare === null) return null;
+  return facts.bestTeammateTargetShare >= TEAMMATE_PRIMARY_RECEIVER_SHARE && facts.bestTeammateTargetShare >= facts.targetShare;
 }
-export function playCallerFingerprintCondition(facts: LawConditionFacts): boolean {
-  return (
-    facts.incomingCoachTenureIsZero &&
-    facts.incomingCoachPriorPassRateOverExpected !== null &&
-    facts.incomingCoachPriorPassRateOverExpected > 0
-  );
+export function playCallerFingerprintCondition(facts: LawConditionFacts): boolean | null {
+  if (facts.incomingCoachTenureIsZero === null) return null;
+  if (!facts.incomingCoachTenureIsZero) return false;
+  return facts.incomingCoachPriorPassRateOverExpected === null ? null : facts.incomingCoachPriorPassRateOverExpected > 0;
 }
-export function targetSharePersistenceCondition(facts: LawConditionFacts): boolean {
-  return facts.targetShare !== null && facts.targetShare >= TARGET_SHARE_PERSISTENCE_MIN;
+export function targetSharePersistenceCondition(facts: LawConditionFacts): boolean | null {
+  return facts.targetShare === null ? null : facts.targetShare >= TARGET_SHARE_PERSISTENCE_MIN;
 }
-export function tdRegressionCondition(facts: LawConditionFacts): boolean {
-  return (
-    facts.touchdownPointsShare !== null &&
-    facts.touchdownPointsShareThreshold !== null &&
-    facts.touchdownPointsShare >= facts.touchdownPointsShareThreshold
-  );
+export function tdRegressionCondition(facts: LawConditionFacts): boolean | null {
+  if (facts.touchdownPointsShare === null || facts.touchdownPointsShareThreshold === null) return null;
+  return facts.touchdownPointsShare >= facts.touchdownPointsShareThreshold;
 }
 
-const isRb = (position: Position): boolean => position === "RB";
-const isWr = (position: Position): boolean => position === "WR";
-const isWrOrTe = (position: Position): boolean => position === "WR" || position === "TE";
-const isTdRegressionEligible = (position: Position): boolean => SKILL_POSITIONS.has(position);
+function isSkillPosition(position: Position): position is LawPosition {
+  return SKILL_POSITIONS.has(position as LawPosition);
+}
+const isRb = (position: Position): position is LawPosition => position === "RB";
+const isWr = (position: Position): position is LawPosition => position === "WR";
+const isWrOrTe = (position: Position): position is LawPosition => position === "WR" || position === "TE";
 
 // Shared season-aggregation helpers.
 
@@ -121,11 +144,15 @@ interface SeasonScoring {
 
 const EMPTY_SEASON_SCORING: SeasonScoring = { points: 0, games: 0, touchdownPoints: 0, receptions: 0 };
 
+/** Points from a scoring play: passing/rushing/receiving TDs, return TDs and two-point conversions —
+ *  every scoring-play term `computeFantasyPoints` (the denominator) also counts (MINOR 1). */
 function touchdownPointsOf(line: StatLine, rules: ScoringRules): number {
   return (
     line.passingTouchdowns * rules.pointsPerPassingTouchdown +
     line.rushingTouchdowns * rules.pointsPerRushingTouchdown +
-    line.receivingTouchdowns * rules.pointsPerReceivingTouchdown
+    line.receivingTouchdowns * rules.pointsPerReceivingTouchdown +
+    ((line.kickReturnTouchdowns ?? 0) + (line.puntReturnTouchdowns ?? 0)) * rules.pointsPerReturnTouchdown +
+    (line.twoPointConversions ?? 0) * rules.pointsPerTwoPointConversion
   );
 }
 
@@ -173,18 +200,20 @@ interface SeasonParticipation {
 }
 
 const EMPTY_PARTICIPATION: SeasonParticipation = { targets: 0, teamTargets: 0, carries: 0 };
-const PARTICIPATION_SEASON_METRICS: readonly string[] = [
+const PARTICIPATION_SEASON_METRICS: ReadonlySet<string> = new Set([
   PARTICIPATION_METRICS.targets,
   PARTICIPATION_METRICS.teamTargets,
   PARTICIPATION_METRICS.carries,
-];
+]);
 
-/** Targets, team targets and carries per player, summed over one season as of one moment. */
+/** Targets, team targets and carries per player, summed over one season as of one moment. A player
+ *  with NO row here has no participation evidence at all, distinct from a player whose row sums to
+ *  zero — callers must keep that distinction (see `factsForSeason`'s `touches`/`targetShare`). */
 async function seasonParticipation(db: ReadonlyDb, season: number, asOf: Date): Promise<Map<string, SeasonParticipation>> {
   const rows = await observationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf, source: STAT_LINE_SOURCE });
   const out = new Map<string, SeasonParticipation>();
   for (const row of rows) {
-    if (!PARTICIPATION_SEASON_METRICS.includes(row.metric)) continue;
+    if (!PARTICIPATION_SEASON_METRICS.has(row.metric)) continue;
     const existing = out.get(row.playerId) ?? EMPTY_PARTICIPATION;
     out.set(row.playerId, {
       targets: existing.targets + (row.metric === PARTICIPATION_METRICS.targets ? row.value : 0),
@@ -195,7 +224,14 @@ async function seasonParticipation(db: ReadonlyDb, season: number, asOf: Date): 
   return out;
 }
 
-/** Each player's LATEST team of a season — the proxy for "his team" the module docblock explains. */
+/** A player's own season target share: his own targets over his own team_targets, summed across
+ *  weeks. Self-consistent even for a traded player — each week's row already carries THAT week's
+ *  actual team's totals, so no team-of-record grouping is needed here (unlike teammate grouping). */
+function targetShareOf(participated: SeasonParticipation | undefined): number | null {
+  return participated !== undefined && participated.teamTargets > 0 ? participated.targets / participated.teamTargets : null;
+}
+
+/** Each player's LATEST team of a season — the proxy for "his team" `play_caller_fingerprint` uses. */
 async function seasonTeams(db: ReadonlyDb, season: number, asOf: Date): Promise<Map<string, string>> {
   const rows = await playerTeamsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
   const latest = new Map<string, { week: number; team: string }>();
@@ -206,29 +242,50 @@ async function seasonTeams(db: ReadonlyDb, season: number, asOf: Date): Promise<
   return new Map([...latest].map(([playerId, { team }]) => [playerId, team]));
 }
 
-/** Share of a team's WR/TE target volume claimed by everyone EXCEPT the player himself. */
-function otherWrTeTargetShares(
-  participation: ReadonlyMap<string, SeasonParticipation>, positions: ReadonlyMap<string, Position>, teams: ReadonlyMap<string, string>,
-): Map<string, number> {
-  const byTeam = new Map<string, { playerId: string; targets: number }[]>();
-  for (const [playerId, position] of positions) {
-    if (!isWrOrTe(position)) continue;
-    const team = teams.get(playerId);
-    if (team === undefined) continue;
-    const list = byTeam.get(team) ?? [];
-    list.push({ playerId, targets: participation.get(playerId)?.targets ?? 0 });
-    byTeam.set(team, list);
+/**
+ * The best individual target share among a WR/TE's own teammates, grouped WEEK BY WEEK rather than
+ * by a single season-of-record team — a traded player's early-season targets belong to his OLD
+ * team's roster and his late-season ones to his NEW team's, and a single "his team" grouping would
+ * misattribute one or the other. Two players count as teammates if they shared a team in ANY week.
+ * A player present in `playerTeamsAsOf` for at least one week (has SOME team edge) is a key in the
+ * returned map even when he has zero qualifying teammates (a real, known zero); a player absent from
+ * `playerTeamsAsOf` entirely is absent from the map (unknown, not zero — see `factsForSeason`).
+ */
+async function bestTeammateTargetShares(
+  db: ReadonlyDb, season: number, asOf: Date, positions: ReadonlyMap<string, Position>, participation: ReadonlyMap<string, SeasonParticipation>,
+): Promise<Map<string, number>> {
+  const rows = await playerTeamsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
+  const byWeekTeam = new Map<string, string[]>();
+  for (const row of rows) {
+    const position = positions.get(row.playerId);
+    if (position === undefined || !isWrOrTe(position)) continue;
+    const key = `${row.week}|${row.team}`;
+    const list = byWeekTeam.get(key) ?? [];
+    list.push(row.playerId);
+    byWeekTeam.set(key, list);
   }
-  const shares = new Map<string, number>();
-  for (const list of byTeam.values()) {
-    const total = list.reduce((sum, entry) => sum + entry.targets, 0);
-    if (total === 0) continue;
-    for (const entry of list) shares.set(entry.playerId, (total - entry.targets) / total);
+  const teammates = new Map<string, Set<string>>();
+  for (const roster of byWeekTeam.values()) {
+    for (const playerId of roster) {
+      const set = teammates.get(playerId) ?? new Set<string>();
+      for (const other of roster) if (other !== playerId) set.add(other);
+      teammates.set(playerId, set);
+    }
   }
-  return shares;
+  const best = new Map<string, number>();
+  for (const [playerId, teammateIds] of teammates) {
+    let max = 0;
+    for (const id of teammateIds) {
+      const share = targetShareOf(participation.get(id));
+      if (share !== null && share > max) max = share;
+    }
+    best.set(playerId, max);
+  }
+  return best;
 }
 
-/** Season-N+1 coaching facts by team, stamped at N+1's own schedule publication (see `coaches.ts`). */
+/** Season-N+1 play-caller facts by team, stamped at N+1's own schedule publication (see `coaches.ts`).
+ *  A team absent here — no row at all — is unknown, not a non-new coach with no history. */
 async function incomingCoachFactsByTeam(
   db: ReadonlyDb, nextSeason: number, asOf: Date,
 ): Promise<Map<string, { tenureIsZero: boolean; priorPassRateOverExpected: number | null }>> {
@@ -252,12 +309,13 @@ function median(values: readonly number[]): number {
   return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
 }
 
-/** 1.5x the position-season median touchdown-points share, over the skill positions only. */
+/** 1.5x the position-season median touchdown-points share, over skill-position REGULARS only —
+ *  `MIN_GAMES_FOR_TD_MEDIAN` games, so a handful of one-game flukes cannot swing the whole median. */
 function tdShareThresholds(scoring: ReadonlyMap<string, SeasonScoring>, positions: ReadonlyMap<string, Position>): Map<Position, number> {
   const sharesByPosition = new Map<Position, number[]>();
   for (const [playerId, entry] of scoring) {
     const position = positions.get(playerId);
-    if (position === undefined || !isTdRegressionEligible(position) || entry.points <= 0) continue;
+    if (position === undefined || !isSkillPosition(position) || entry.points <= 0 || entry.games < MIN_GAMES_FOR_TD_MEDIAN) continue;
     const list = sharesByPosition.get(position) ?? [];
     list.push(entry.touchdownPoints / entry.points);
     sharesByPosition.set(position, list);
@@ -281,9 +339,9 @@ async function factsForSeason(
   const teams = await seasonTeams(db, season, asOf);
   const roster = await preseasonRostersAsOf(db, { season, asOf });
   const coachFacts = await incomingCoachFactsByTeam(db, season + 1, asOf);
+  const teammateShares = await bestTeammateTargetShares(db, season, asOf, positions, participation);
 
   const birthDates = new Map(roster.map((row) => [row.playerId, row.birthDate] as const));
-  const otherShares = otherWrTeTargetShares(participation, positions, teams);
   const thresholds = tdShareThresholds(scoring, positions);
 
   const out = new Map<string, SeasonFacts>();
@@ -298,13 +356,12 @@ async function factsForSeason(
       position,
       pointsPerGame: ppg,
       facts: {
-        touches: (participated?.carries ?? 0) + scored.receptions,
+        touches: participated === undefined ? null : participated.carries + scored.receptions,
         age: ageAtSeason(birthDates.get(playerId) ?? null, season),
-        otherWrTeTargetShare: otherShares.get(playerId) ?? null,
-        incomingCoachTenureIsZero: coach?.tenureIsZero ?? false,
+        bestTeammateTargetShare: teammateShares.get(playerId) ?? null,
+        incomingCoachTenureIsZero: coach?.tenureIsZero ?? null,
         incomingCoachPriorPassRateOverExpected: coach?.priorPassRateOverExpected ?? null,
-        targetShare:
-          participated !== undefined && participated.teamTargets > 0 ? participated.targets / participated.teamTargets : null,
+        targetShare: targetShareOf(participated),
         touchdownPointsShare: scored.points > 0 ? scored.touchdownPoints / scored.points : null,
         touchdownPointsShareThreshold: thresholds.get(position) ?? null,
       },
@@ -313,83 +370,113 @@ async function factsForSeason(
   return out;
 }
 
-/** THE ONE BUILDER every `LawSpec` composes: gated N facts paired with N+1's ungated actual. */
-async function buildPopulation(
-  db: ReadonlyDb, seasons: readonly number[], eligible: (position: Position) => boolean, condition: (facts: LawConditionFacts) => boolean,
-): Promise<readonly PlayerSeasonPoint[]> {
-  const positions = await allPositions(db);
-  const points: PlayerSeasonPoint[] = [];
-  for (const season of seasons) {
-    const seasonFacts = await factsForSeason(db, season, positions, PPR_SCORING);
-    const nextActual = await actualPointsPerGame(db, season + 1, positions, PPR_SCORING);
-    for (const [playerId, entry] of seasonFacts) {
-      if (!eligible(entry.position)) continue;
-      points.push({
-        playerId,
-        season,
-        pointsPerGame: entry.pointsPerGame,
-        nextPointsPerGame: nextActual.get(playerId) ?? null,
-        matchKey: entry.pointsPerGame,
-        condition: condition(entry.facts),
-      });
-    }
-  }
-  return points;
+interface LawEntry {
+  readonly id: string;
+  readonly position: Law["position"];
+  readonly claim: string;
+  readonly expectedSign: -1 | 1;
+  readonly eligible: (position: Position) => position is LawPosition;
+  readonly condition: (facts: LawConditionFacts) => boolean | null;
 }
 
-export const LAW_SPECS: readonly LawSpec[] = [
+const LAW_ENTRIES: readonly LawEntry[] = [
   {
     id: "rb_workload_cliff",
     position: "RB",
     claim: "A running back who racks up 300 or more combined carries and receptions in a season loses points per game the next season — the workload cliff.",
     expectedSign: -1,
-    caliper: POINTS_PER_GAME_CALIPER,
-    modelPath: null,
-    population: (db, seasons) => buildPopulation(db, seasons, isRb, rbWorkloadCliffCondition),
+    eligible: isRb,
+    condition: rbWorkloadCliffCondition,
   },
   {
     id: "rb_age_curve",
     position: "RB",
     claim: "A running back who is 28 or older at the season opener produces fewer points per game the following season than an otherwise similar younger back — the running back age curve.",
     expectedSign: -1,
-    caliper: POINTS_PER_GAME_CALIPER,
-    modelPath: null,
-    population: (db, seasons) => buildPopulation(db, seasons, isRb, rbAgeCurveCondition),
+    eligible: isRb,
+    condition: rbAgeCurveCondition,
   },
   {
     id: "wr_target_competition",
     position: "WR",
-    claim: "A wide receiver whose teammates at WR/TE combined for more than 60% of the team's target volume among that group loses points per game the following season — target competition. SIMPLIFIED: this measures competition already on the roster in the measured season (teammates' share of the team's own WR/TE targets), not a predicted season-N+1 arrival, because no store this engine reads can see next season's roster before it exists. The effect is measured on the incumbent receiver.",
+    claim: "A wide receiver with a WR/TE teammate whose own season-N target share is at least 20% and at least as large as the receiver's own share loses points per game the following season — another primary receiver on his team. SIMPLIFIED: this reads season-N's own roster, not a predicted season-N+1 arrival, because no store this engine reads can see next season's roster before it exists.",
     expectedSign: -1,
-    caliper: POINTS_PER_GAME_CALIPER,
-    modelPath: null,
-    population: (db, seasons) => buildPopulation(db, seasons, isWr, wrTargetCompetitionCondition),
+    eligible: isWr,
+    condition: wrTargetCompetitionCondition,
   },
   {
     id: "play_caller_fingerprint",
     position: "all",
-    claim: "A pass-catcher (WR or TE) whose team enters a season with a first-year head coach whose own history elsewhere shows a positive pass-rate-over-expected gains points per game — the play-caller fingerprint. SIMPLIFIED: 'his team' is the player's own team as of the measured season, since the following season's actual roster is not knowable at the schedule-publication gate; a player traded before the coaching change is measured against his old team.",
+    claim: "A pass-catcher (WR or TE) whose team enters a season with a first-year play-caller (the coordinator or head coach who calls the offense's plays) whose own history elsewhere shows a positive pass-rate-over-expected gains points per game — the play-caller fingerprint. SIMPLIFIED: 'his team' is the player's own team as of the measured season, since the following season's actual roster is not knowable at the schedule-publication gate; a player traded before the coaching change is measured against his old team.",
     expectedSign: 1,
-    caliper: POINTS_PER_GAME_CALIPER,
-    modelPath: null,
-    population: (db, seasons) => buildPopulation(db, seasons, isWrOrTe, playCallerFingerprintCondition),
+    eligible: isWrOrTe,
+    condition: playCallerFingerprintCondition,
   },
   {
     id: "target_share_persistence",
     position: "WR",
     claim: "A wide receiver commanding 24% or more of his team's targets in a season sustains stronger points per game the following season than his raw scoring alone predicts — target share persistence.",
     expectedSign: 1,
-    caliper: POINTS_PER_GAME_CALIPER,
-    modelPath: null,
-    population: (db, seasons) => buildPopulation(db, seasons, isWr, targetSharePersistenceCondition),
+    eligible: isWr,
+    condition: targetSharePersistenceCondition,
   },
   {
     id: "td_regression",
     position: "all",
-    claim: "A player whose touchdown points make up at least 1.5x his position's typical share of a player's own points in a season loses points per game the following season as touchdown luck reverts — touchdown regression. Covers QB, RB, WR and TE; kickers and defenses are excluded because a touchdown-points share is not a meaningful quantity for them.",
+    claim: "A player whose touchdown points make up at least 1.5x his position's typical share of a regular's own points (players with at least 8 games) in a season loses points per game the following season as touchdown luck reverts — touchdown regression. Covers QB, RB, WR and TE; kickers and defenses are excluded because a touchdown-points share is not a meaningful quantity for them.",
     expectedSign: -1,
-    caliper: POINTS_PER_GAME_CALIPER,
-    modelPath: null,
-    population: (db, seasons) => buildPopulation(db, seasons, isTdRegressionEligible, tdRegressionCondition),
+    eligible: isSkillPosition,
+    condition: tdRegressionCondition,
   },
 ];
+
+/**
+ * EVERY LAW'S POPULATION, IN ONE PASS — `factsForSeason`/`actualPointsPerGame` run ONCE per season
+ * regardless of how many of the six laws are being built, rather than once per (law, season) pair.
+ * A null condition (see `LawConditionFacts`) drops that player-season from the returned population
+ * entirely, for that law only — a player can be dropped from one law's population and present in
+ * another's the same season.
+ */
+export async function buildPopulations(db: ReadonlyDb, seasons: readonly number[]): Promise<ReadonlyMap<string, readonly PlayerSeasonPoint[]>> {
+  const positions = await allPositions(db);
+  const out = new Map<string, PlayerSeasonPoint[]>(LAW_ENTRIES.map((entry) => [entry.id, []]));
+  for (const season of seasons) {
+    const seasonFacts = await factsForSeason(db, season, positions, PPR_SCORING);
+    const nextActual = await actualPointsPerGame(db, season + 1, positions, PPR_SCORING);
+    for (const [playerId, entry] of seasonFacts) {
+      const { position } = entry;
+      for (const law of LAW_ENTRIES) {
+        if (!law.eligible(position)) continue;
+        const condition = law.condition(entry.facts);
+        if (condition === null) continue;
+        out.get(law.id)!.push({
+          playerId,
+          season,
+          position,
+          pointsPerGame: entry.pointsPerGame,
+          nextPointsPerGame: nextActual.get(playerId) ?? null,
+          matchKey: entry.pointsPerGame,
+          condition,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** One law's population, implemented over the shared batch path — kept for tests and for `LawSpec`'s
+ *  narrower contract; a caller building all six should use `buildPopulations` directly instead. */
+async function populationFor(db: ReadonlyDb, seasons: readonly number[], lawId: string): Promise<readonly PlayerSeasonPoint[]> {
+  const all = await buildPopulations(db, seasons);
+  return all.get(lawId) ?? [];
+}
+
+export const LAW_SPECS: readonly LawSpec[] = LAW_ENTRIES.map((entry) => ({
+  id: entry.id,
+  position: entry.position,
+  claim: entry.claim,
+  expectedSign: entry.expectedSign,
+  caliper: POINTS_PER_GAME_CALIPER,
+  modelPath: null,
+  population: (db, seasons) => populationFor(db, seasons, entry.id),
+}));
