@@ -15,6 +15,8 @@ import { LeagueHome } from "./league-home";
 const JUST_DRAFTED_LINEUP: LineupBody = {
   weekNumber: 1,
   locked: false,
+  lockedPlayerIds: [],
+  injuredReserve: [],
   starters: [
     { slot: "QB", slotIndex: 0, playerId: "p1", playerName: "Josh Allen", position: "QB", nflTeam: "BUF", headshotUrl: null, adp: null },
     { slot: "RB", slotIndex: 0, playerId: "p2", playerName: "Derrick Henry", position: "RB", nflTeam: "BUF", headshotUrl: null, adp: null },

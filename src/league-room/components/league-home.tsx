@@ -444,11 +444,9 @@ export function LeagueHome({
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
-          {/* The chat's fixed height: in ordinary flow its `h-full min-h-0` chain has nothing
-              bounded to fill and would grow to every held message (L2, final review). */}
-          <div className="h-96">
-            <LeagueChat leagueId={home.leagueId} />
-          </div>
+          {/* Natural height (founder, 2026-08-30: the rail's chat card was mostly a fixed-height
+              void). The card hugs its content; MessageList bounds its own scroll. */}
+          <LeagueChat leagueId={home.leagueId} />
 
           <LeagueTermsPanel
             terms={home.terms}

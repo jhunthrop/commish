@@ -67,30 +67,33 @@ export function ChatComposer({ sending, onSend, gifSearchEnabled, onSearchGifs }
         void submit();
       }}
     >
-      <Input
-        id="chat-message-input"
-        label="Message"
-        value={body}
-        maxLength={CHAT_CONFIG.maxBodyLength}
-        autoComplete="off"
-        onChange={(event) => setBody(event.target.value)}
-      />
-      <div className={`flex items-center gap-2 ${gifSearchEnabled ? "justify-between" : "justify-end"}`}>
-        {gifSearchEnabled ? (
-          <Button type="button" variant="secondary" size="sm" onClick={() => setPickerOpen(true)}>
-            Add a GIF
-          </Button>
-        ) : null}
-        {/* SECONDARY, not the default ink. The composer renders inside the league home, whose one
-            ink action is the week's act (set your lineup, watch the scores). A chat sidebar's Send
-            competing with that is law 5's exact failure: two loud verbs, and the manager has to
-            decide which of them the page wanted. Chat is a thing you can do here, not the thing
-            you came for. Not `verb` either: that fill is the money channel, and sending a message
-            moves no money. */}
-        <Button type="submit" variant="secondary" loading={sending} disabled={sending}>
+      {/* ONE ROW (founder, 2026-08-30: the composer floated its Send on its own line over a
+          void). The field keeps its visible label (the product's own rule); Send sits beside
+          the input at its own height. SECONDARY, not ink: the page's one ink action is the
+          week's act, and chat is a thing you can do here, not the thing you came for. Not
+          `verb` either — that fill is the money channel, and a message moves no money. */}
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <Input
+            id="chat-message-input"
+            label="Message"
+            value={body}
+            maxLength={CHAT_CONFIG.maxBodyLength}
+            autoComplete="off"
+            onChange={(event) => setBody(event.target.value)}
+          />
+        </div>
+        <Button type="submit" variant="secondary" size="sm" className="mb-0.5" loading={sending} disabled={sending}>
           Send
         </Button>
       </div>
+      {gifSearchEnabled ? (
+        <div>
+          <Button type="button" variant="ghost" size="sm" className="text-text-muted" onClick={() => setPickerOpen(true)}>
+            Add a GIF
+          </Button>
+        </div>
+      ) : null}
       {error === null ? null : (
         <p role="alert" className="text-sm text-negative">
           {error}

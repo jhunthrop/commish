@@ -33,7 +33,7 @@ export function LeagueChat({ leagueId }: { readonly leagueId: string }) {
   }
 
   return (
-    <Card as="section" aria-label="League chat" className="flex h-full min-h-0 flex-col gap-2">
+    <Card as="section" aria-label="League chat" className="flex flex-col gap-2">
       <header className="flex items-baseline justify-between gap-2">
         <h2 className={`${EYEBROW} text-text-muted`}>League chat</h2>
         {chat.connection === "reconnecting" ? (

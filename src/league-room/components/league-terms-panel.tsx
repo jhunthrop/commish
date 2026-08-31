@@ -67,53 +67,42 @@ export function LeagueTermsPanel({
       <Title className="min-w-0 [overflow-wrap:anywhere] font-display text-2xl font-semibold leading-display text-text-primary">
         {terms.name}
       </Title>
-      <dl className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+      {/* ONE GRID (founder, 2026-08-30: the rail's facts card mixed inline and stacked rows —
+          no rhythm). Every fact is label-column + value-column at one size; a fact's aside is a
+          faint second line under its value, never a layout of its own. */}
+      <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-2.5">
           <dt className={`${EYEBROW} text-text-muted`}>Format</dt>
           <dd className="text-text-primary">{FORMAT_LABEL[terms.format]}</dd>
-        </div>
         {/* Veteran persona review, fix round 1: the money fact is what a real-money decision
             reads first — Stake moves to position 2, right after Format, label and disclosure
             kept tightly paired. */}
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Stake</dt>
           <dd className="flex flex-col gap-1 text-text-primary">
             <span>{terms.stakeLabel}</span>
-            <span className="text-sm text-text-muted">{terms.stakeDisclosure}</span>
+            <span className="text-sm text-text-faint">{terms.stakeDisclosure}</span>
           </dd>
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Size</dt>
           {/* F17: SeatMeter owns the seat sentence everywhere it counts seats — this row used to
               write its own "N of N managers" phrasing, a fourth wording of the same count. */}
           <dd className="text-text-primary">
             <SeatMeter filled={terms.filledTeams} total={terms.teamCount} />
           </dd>
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Scoring</dt>
           <dd className="flex flex-col gap-1 text-text-primary">
             <span>{terms.scoringLabel}</span>
             {SCORING_RULE[terms.scoringLabel] === undefined ? null : (
-              <span className="text-sm text-text-muted">{SCORING_RULE[terms.scoringLabel]}</span>
+              <span className="text-sm text-text-faint">{SCORING_RULE[terms.scoringLabel]}</span>
             )}
           </dd>
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Roster</dt>
           <dd className="text-text-primary">{terms.rosterLine}</dd>
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Draft</dt>
           <dd className="text-text-primary">{draftValue ?? terms.draftAt}</dd>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Commissioner</dt>
           <dd className="inline-flex items-center gap-2 text-text-primary">
             <Avatar name={terms.commissionerName} avatar={terms.commissionerAvatar} size="sm" />
             {terms.commissionerName}
           </dd>
-        </div>
         {/* Empty for a league that opted into neither the median game nor superflex — no
             "Notes" row at all, rather than an empty one, the same "nothing to show" idiom
             `StandingsTable`'s clinch badges already follow. */}

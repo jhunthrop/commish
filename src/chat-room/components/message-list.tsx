@@ -44,7 +44,7 @@ export function MessageList({ leagueId, messages, meUserId, hasMore, loadingEarl
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+    <div className="flex max-h-72 min-h-0 flex-col gap-2 overflow-y-auto">
       {hasMore ? (
         <Button variant="secondary" size="sm" loading={loadingEarlier} disabled={loadingEarlier} onClick={onLoadEarlier}>
           Load earlier messages
