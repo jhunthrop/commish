@@ -87,6 +87,14 @@ schedule/injuries/news harvests landing daily, and a modern lineup flow ESPN sti
 
 ## 7. Suggested engine roadmap order
 
+Status, same day: items 1 and 2 SHIPPED. (1) Scoring vocabulary: 2pt, FG/XP misses, return TDs,
+DEF fumble recoveries/safeties as configurable weights + the industry points/yards-allowed tier
+tables, leagues rebuilt and rescored on real 2025 data (verified: DST-GB wk1 = 11.00 with both
+tiers). FG distance buckets remain deferred (need scoringPlays parsing). (2) Per-game lineup
+locks: kickoffInstant (ET->UTC via Intl, DST-correct), startedTeamsForWeek (status OR clock),
+per-slot diff guard in setLineup, lockedPlayerIds in the editor. Claims/trades keep week-level
+conservatism deliberately.
+
 1. **Scoring vocabulary completion** — 2pt conversions, FG distance buckets + misses, DEF
    points/yards-allowed tiers, return TDs; widen StatLine + mapper (mostly in the box score
    already) and `scoring_settings`. Rescore is safe: correction sweep machinery exists.
