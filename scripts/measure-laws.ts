@@ -20,14 +20,18 @@
 // season, so filtering matched pairs down to held-out predictor seasons gives exactly the pairs a
 // held-out-only match would have produced anyway, for free.
 //
-// TWO FLOORS SET `MEASURE_SEASONS.from` AND PUNCH A HOLE IN THE MIDDLE OF THE WINDOW — both are
-// upstream nflverse facts, not choices, and neither needs special-case code here: `config.ts`
-// documents the snap-count floor (2013) in full, and `STAT_LINE_GAPS` below names the mid-window
-// hole (nflverse's `stats_player_week_2019.csv` release does not exist — a deterministic 404, so no
-// 2019 stat-line season is ever built). A player-season whose outcome falls in a gap year already
-// has no `nextPointsPerGame` to match on, and the tri-state "no evidence is not false" rule
-// (`populations.ts`) drops it from both pools — the hole shows up as fewer matched pairs, never as
-// a crash or a silently wrong zero.
+// ONE FLOOR SETS `MEASURE_SEASONS.from`, AND A ONCE-MID-WINDOW HOLE IS NOW FILLED — both are
+// upstream nflverse facts, not choices: `config.ts` documents the snap-count floor (2013) in full,
+// and `STAT_LINE_GAPS` (`nflverse/stat-lines.ts`) names the seasons whose published weekly stats
+// file nflverse never released — `stats_player_week_2019.csv` is a deterministic 404. THAT USED TO
+// mean no 2019 stat-line season was ever built and a player-season whose outcome fell there dropped
+// out of both pools. It no longer does: `populations.ts`'s `seasonScoring` reads through
+// `nflverse/derived-stat-lines.ts`'s `statLinesAsOfForMeasurement`, which admits a pbp-derived stat
+// line for exactly the seasons named in `STAT_LINE_GAPS` — nowhere else, and never on a product
+// surface. A player-season whose outcome falls in a gap year is measured on the derived line now;
+// the tri-state "no evidence is not false" rule (`populations.ts`) still drops a player-season with
+// genuinely no line at all (derived or published) from both pools, which is the only way this
+// window can still come up short of a full season's worth of matched pairs.
 //
 // STRATIFICATION lives in one place: `registry.ts`'s `stratumKeyFor`. See that function's docblock
 // for the season/position rule.
@@ -55,13 +59,11 @@ import type { ReadonlyDb } from "@/db/client";
 import { matchedPairsStratified, measureEffect, type MatchedPair } from "@/projections/laws/harness";
 import { HELD_OUT_SEASONS, MEASURE_SEASONS } from "@/projections/laws/config";
 import { buildPopulations, LAW_SPECS, type LawSpec } from "@/projections/laws/populations";
+import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
 import { MEASURED_JSON_PATH, stratumKeyFor, verdictForFullWindow, type MeasuredEntry, type MeasuredJson } from "@/projections/laws/registry";
 import type { LawMeasurement, LawVerdict, PlayerSeasonPoint } from "@/projections/laws/types";
 
 const OUTPUT_PATH = MEASURED_JSON_PATH;
-
-/** Seasons inside `MEASURE_SEASONS` whose stat-line CSV nflverse never published. See header. */
-const STAT_LINE_GAPS: readonly number[] = [2019];
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -85,10 +87,10 @@ function isHeldOutPair(pair: MatchedPair): boolean {
   return HELD_OUT_PREDICTOR_SEASONS.has(pair.condition.season);
 }
 
-/** e.g. "2013-2023 (2019 missing upstream), direction replicated on 2022-2023". */
+/** e.g. "2013-2023 (2019 pbp-derived, missing upstream), direction replicated on 2022-2023". */
 function seasonsLabel(): string {
   const window = `${MEASURE_SEASONS.from}-${MEASURE_SEASONS.to - 1}`;
-  const gapNote = STAT_LINE_GAPS.length === 0 ? "" : ` (${STAT_LINE_GAPS.join(", ")} missing upstream)`;
+  const gapNote = STAT_LINE_GAPS.length === 0 ? "" : ` (${STAT_LINE_GAPS.join(", ")} pbp-derived, missing upstream)`;
   const heldOutPredictors = [...HELD_OUT_PREDICTOR_SEASONS].sort((a, b) => a - b);
   const replicated = `${heldOutPredictors[0]}-${heldOutPredictors[heldOutPredictors.length - 1]}`;
   return `${window}${gapNote}, direction replicated on ${replicated}`;

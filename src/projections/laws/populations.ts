@@ -3,7 +3,8 @@ import type { Position, StatLine } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring/compute";
 import { allPositions } from "../backtest";
-import { statLinesAsOf, STAT_LINE_SOURCE } from "../lines";
+import { STAT_LINE_SOURCE } from "../lines";
+import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import { PARTICIPATION_METRICS } from "../nflverse/map";
 import { COACH_METRICS } from "../nflverse/coaches";
 import { schedulePublishedAsOf, SCHEDULE_SOURCE } from "../nflverse/schedule";
@@ -174,11 +175,20 @@ function touchdownPointsOf(line: StatLine, rules: ScoringRules): number {
   );
 }
 
-/** Points, games and touchdown points per player, summed over one season as of one moment. */
+/**
+ * Points, games and touchdown points per player, summed over one season as of one moment.
+ *
+ * Reads through `statLinesAsOfForMeasurement`, not the bare `statLinesAsOf` — the ONE seam in the
+ * whole engine where a pbp-derived stat line (`nflverse/derived-stat-lines.ts`) is allowed to stand
+ * in for a published one, and only for a season named in `STAT_LINE_GAPS`. Every other reader of
+ * `statLinesAsOf` (preseason, `projection-fit.ts`, the report scripts) is untouched by that
+ * fallback: the laws harness is the only caller measuring across the 2019 hole, and a product
+ * surface must never render a row nflverse did not itself publish.
+ */
 async function seasonScoring(
   db: ReadonlyDb, season: number, asOf: Date, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
 ): Promise<Map<string, SeasonScoring>> {
-  const rows = await statLinesAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
+  const rows = await statLinesAsOfForMeasurement(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
   const out = new Map<string, SeasonScoring>();
   for (const { line } of rows) {
     const position = positions.get(line.playerId);
