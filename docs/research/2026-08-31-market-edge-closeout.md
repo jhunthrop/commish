@@ -399,3 +399,125 @@ on 96 TEs). One display caveat, not a pricing defect: `board-top.ts` prints the 
 disagrees with the pricing position on 7 of 759 2026 rows (e.g. Velus Jones Jr., value rank 636, prints
 as RB while priced, and law-gated, as WR), so a printed chip can look cross-position on those rows even
 though the gate held.
+
+## Addendum (2026-09-01, vegas-laws plan Task 4): two win-total laws price the board, re-measured
+
+Discovery ran again over a candidate family widened by two new quantities built on the team win
+totals ingested this round (`incomingTeamWinTotal`, the published Vegas line for the season being
+predicted attached to the player's season-N team, and `incomingTeamWinTotalDelta`, that line minus
+the team's actual wins). The family grew from 1,737 candidates to 2,487, the testable family
+Benjamini-Hochberg corrects over from 1,249 to 1,800, and all four previously confirmed discovered
+laws survived byte-identical under the stricter correction. Full detail lives in the vegas-laws
+ledger; what belongs here is what reached the board and what it did to this document's own bar.
+
+### The two new laws
+
+```
+and:WR:threshold:WR:incomingTeamWinTotal:q70+threshold:WR:snapShare:q70
+  effect +1.5166 ppg   ci [+0.8626, +2.1891]   trainEffect +1.2997   n=244
+  folds  2021 +3.3704 (25)   2022 +2.3979 (28)   2023 +2.4080 (20)
+  claim  A wide receiver whose share of his team's offensive snaps that season is 69.3% or more and
+         whose team's Vegas win total for the season ahead is 9.0 or more gains points per game the
+         following season.
+
+and:WR:threshold:WR:incomingTeamWinTotal:q80+threshold:WR:snapShare:q70
+  effect +1.8172 ppg   ci [+1.1038, +2.5610]   trainEffect +1.5304   n=196
+  folds  2021 +2.6920 (25)   2022 +3.1417 (24)   2023 +2.4080 (20)
+  claim  the same shape, at a win total of 9.5 or more.
+```
+
+`incomingTeamWinTotalDelta` produced no survivor at any position or level. Both confirmed laws are
+positive and both are wide-receiver AND-pairs, which is the opposite direction from the collapse
+hypothesis that motivated the round; the generator carries no low-side threshold template, so the
+collapse shape was not directly testable this round and that limitation is recorded rather than
+folded into the positive result.
+
+### What the board did with them
+
+`BOARD_SOURCE` moved to `commish_board_v7_ppr_12` and all five seasons were re-persisted (2021 661
+rows, 2022 694, 2023 654, 2024 653, 2026 759 live). Unlike the v6 bump, this one is expected to move
+the archives: every season has published lines, so a receiver who clears both marks is priced
+differently than he was.
+
+| season | rows | points moved | value ranks moved | max point delta |
+|---|---|---|---|---|
+| 2021 | 661 | 26 | 429 | 2.69 |
+| 2022 | 694 | 26 | 38 | 2.60 |
+| 2023 | 654 | 27 | 48 | 2.64 |
+| 2024 | 653 | 16 | 310 | 2.67 |
+| 2026 | 759 | 22 | 39 | 2.67 |
+
+Scoped honestly, by read-only SQL against the store rather than by assertion: **every one of the 117
+rows whose points moved is a wide receiver who gained one of the two new chips. Zero non-WR rows
+moved on points, and zero rows moved on points without a chip change.** Twenty-three receivers
+gained a chip and did NOT move on points; all twenty-three are `market_unlisted`, whose price comes
+from the tail-capped fallback that reads no law reasons at all. The rank movement is the usual
+downstream cascade off a handful of price changes (mean value-rank move 1.0 to 7.0 places, max 38 in
+2021), and the tier renumbering that comes with it: 2024, for instance, has ten fewer tiers under v7,
+so 51 players carry a `tier_cliff` reason under v6 and not under v7, every one of them with unchanged
+points and a changed tier.
+
+The chip audit, also read-only against the store: the two new chips appear on **263 rows, all of them
+wide receivers, none of them below its own fitted threshold** (the q70 chip's minimum stored win
+total is 9.0, the q80 chip's is 9.5, and no chip has an unresolvable line).
+
+### The blend refit
+
+`blend-fitted.ts` was regenerated because the fit's own candidates carry law reasons. **The winning
+cell did not move** (`lawCapPoints` 2, `availabilityCapPoints` 20, `totalCapPoints` 40) and not one
+fitted constant changed a digit; only the generated header moved: train rho 0.6054 -> 0.6055, and
+the laws channel's share of the train-time lift over pure market 4.6% -> 5.6%.
+
+### The held-out scorecard, re-measured
+
+Both runs are the full 404-line scorecard, the v6 arm reproduced on this same store by restoring the
+pre-round `discovered.json` and `blend-fitted.ts` (its figures reproduce the previous addendum's
+published numbers exactly, which is what makes the comparison a measurement rather than a memory).
+
+| | v6 | v7 (two new laws) |
+|---|---|---|
+| 2024 blend rho (pooled) | 0.5293 | 0.5273 |
+| **2024 blend vs ADP gap** | **+0.1021 [+0.0070, +0.2102] BEYOND NOISE** | **+0.1002 [+0.0041, +0.2089] BEYOND NOISE** |
+| 2024 starter band gap | +0.2355 [+0.0421, +0.4377] WON BEYOND NOISE | +0.2345 [+0.0408, +0.4377] WON BEYOND NOISE |
+| 2024 blend vs raw gap | +0.1161 [+0.0312, +0.1998] BEYOND NOISE | +0.1142 [+0.0289, +0.1969] BEYOND NOISE |
+| 2024 blend vs ECR gap | +0.0312 [-0.0463, +0.1169] within noise | +0.0293 [-0.0503, +0.1160] within noise |
+| 2023 blend rho (pooled) | 0.5318 | 0.5304 |
+| 2023 blend vs ADP gap (in-fit) | +0.0566 [-0.0526, +0.1680] within noise | +0.0553 [-0.0551, +0.1676] within noise |
+
+**THE BAR HOLDS.** The decisive 2024 pooled blend-vs-ADP gap is still BEYOND NOISE with its interval
+excluding zero, and the starter band still WON BEYOND NOISE. No line anywhere in either run reads
+LOST BEYOND NOISE.
+
+**One verdict classification changed, and it is reported rather than buried.** Comparing all 404
+lines with the numbers masked, exactly one classification differs: **2024, WR only, blend vs naive,
+elite band**, +0.2363 [+0.0042, +0.5048] WON BEYOND NOISE under v6 becomes +0.2226 [-0.0099, +0.4892]
+within noise under v7. The interval was already hugging zero (lower bound +0.0042) and slipped just
+under it; the point estimate moved 0.0137. Every other classification in both seasons, every arm and
+every band, is identical.
+
+**The honest reading of the direction.** Every headline point estimate moved slightly DOWN, and the
+2024 WR-only arm is where it concentrates: blend rho 0.4811 -> 0.4729, and `blend vs law-ablated`
+went from +0.0049 to -0.0033. On the pooled 2024 population the same arm reads -0.0021 -> -0.0041,
+both within noise, and `law-ablated vs ADP` is unchanged to the digit (+0.1043 [+0.0040, +0.2140]),
+which is exactly what it should be: ablating the laws removes the new chips along with the old ones.
+So the two new laws do not improve the held-out ordering on the one decisive season the bar rests on,
+and on 2024 WRs specifically they cost a little. That is not a contradiction of their own evidence
+(fold effects of +2.4 to +3.4 ppg on the outcome they were measured against, replicated in every fold
+including the one outside the model's fitting window), it is the same lesson section 3 already
+recorded: this board's held-out rank correlation is dominated by the market anchor and the
+availability channel, and every law together carries a small enough share of the lift that a
+2-point-per-player chip cannot show up as a rank-correlation win on 176 rows. The laws earn their
+place on measured evidence about points per game; the scorecard measures something the whole law
+channel barely moves either way.
+
+### The 2026 board
+
+The top 50 is the same 50 names in nearly the same order. Fifteen of them carry the new chips
+(Ja'Marr Chase, Jaxon Smith-Njigba, Amon-Ra St. Brown, CeeDee Lamb, George Pickens, A.J. Brown, Zay
+Flowers, DeVonta Smith, Nico Collins, Rashee Rice, Ladd McConkey, Jameson Williams, DJ Moore, Tee
+Higgins, Davante Adams), each gaining 1.8 to 2.7 points. No player entered or left the top 50 and no
+player moved more than three places (Jameson Williams, value rank 38 to 35); the rest are adjacent
+swaps around the receivers who gained.
+
+Both drift checks exit 0 after all of it (`laws:measure -- --check`, `laws:discover -- --check`),
+which is the proof that a board is not a law input: re-pricing five seasons cannot move a measurement.
