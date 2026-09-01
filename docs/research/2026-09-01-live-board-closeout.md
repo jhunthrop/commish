@@ -107,7 +107,7 @@ Persisted live at `2026-09-01T17:52:51.667Z`, source `commish_board_v6_ppr_12`: 
 reason rows.** (The v6 re-persist is the final fix round's, section 4.1 below. The rows quoted here
 are v6's; the top 50 is point-for-point identical to v5's, for the reason that section explains.)
 
-### Headline rows (top 10 of 759, value-rank primary; full top 50 in `final-fix-report.md`)
+### The top 50 (value-rank primary, the plan's acceptance deliverable)
 
 ```
 rank ptsRank   name                     pos  team       points  adp       laws
@@ -121,6 +121,46 @@ rank ptsRank   name                     pos  team       points  adp       laws
   8. pts#6     Amon-Ra St. Brown        WR   DET     273.2 pts  adp 6.4
   9. pts#7     CeeDee Lamb              WR   DAL     271.1 pts  adp 10.3
  10. pts#28    James Cook               RB   BUF     233.2 pts  adp 12.1
+ 11. pts#29    De'Von Achane            RB   MIA     233.2 pts  adp 10.2
+ 12. pts#30    Derrick Henry            RB   BAL     231.4 pts  adp 16.5    rb_age_curve, td_regression
+ 13. pts#12    Justin Jefferson         WR   MIN     262.3 pts  adp 11.7
+ 14. pts#13    Drake London             WR   ATL     260.5 pts  adp 12.3
+ 15. pts#39    Christian McCaffrey      RB   SF      224.9 pts  adp 6.5     rb_age_curve
+ 16. pts#14    George Pickens           WR   DAL     255.0 pts  adp 19.9
+ 17. pts#44    Trey McBride             TE   ARI     213.6 pts  adp 29.0
+ 18. pts#45    Brock Bowers             TE   LV      213.6 pts  adp 34.8
+ 19. pts#15    A.J. Brown               WR   NE      251.0 pts  adp 17.1    threshold:WR:age:q70
+ 20. pts#16    Chris Olave              WR   NO      250.8 pts  adp 19.0
+ 21. pts#43    Ashton Jeanty            RB   LV      214.4 pts  adp 21.4
+ 22. pts#47    Kenneth Walker III       RB   KC      212.6 pts  adp 21.3
+ 23. pts#4     Josh Allen               QB   BUF     298.6 pts  adp 33.7
+ 24. pts#53    Saquon Barkley           RB   PHI     205.0 pts  adp 18.8    rb_age_curve
+ 25. pts#26    Zay Flowers              WR   BAL     234.5 pts  adp 25.7
+ 26. pts#31    DeVonta Smith            WR   PHI     231.2 pts  adp 29.5
+ 27. pts#33    Nico Collins             WR   HOU     229.6 pts  adp 21.1
+ 28. pts#38    Tetairoa McMillan        WR   CAR     227.8 pts  adp 31.3
+ 29. pts#40    Rashee Rice              WR   KC      219.8 pts  adp 16.1    threshold:WR:touchdownPointsShare:q80
+ 30. pts#41    Emeka Egbuka             WR   TB      218.7 pts  adp 35.3
+ 31. pts#42    Ladd McConkey            WR   LAC     217.1 pts  adp 37.9
+ 32. pts#62    Travis Etienne           RB   NO      182.9 pts  adp 37.8
+ 33. pts#63    Kyren Williams           RB   LA      182.9 pts  adp 31.8
+ 34. pts#64    Breece Hall              RB   NYJ     182.9 pts  adp 33.2
+ 35. pts#65    Javonte Williams         RB   DAL     182.2 pts  adp 36.8    td_regression
+ 36. pts#46    Garrett Wilson           WR   NYJ     212.8 pts  adp 26.7    threshold:WR:touchdownPointsShare:q80
+ 37. pts#48    Jaylen Waddle            WR   DEN     211.1 pts  adp 44.7
+ 38. pts#49    Jameson Williams         WR   DET     211.1 pts  adp 45.2
+ 39. pts#8     Lamar Jackson            QB   BAL     270.0 pts  adp 57.0
+ 40. pts#68    Omarion Hampton          RB   LAC     178.5 pts  adp 22.5
+ 41. pts#50    DJ Moore                 WR   BUF     208.2 pts  adp 47.7    td_regression, threshold:WR:age:q70, threshold:WR:touchdownPointsShare:q80
+ 42. pts#51    Carnell Tate             WR   TEN     206.5 pts  adp 79.8
+ 43. pts#52    Tee Higgins              WR   CIN     205.3 pts  adp 36.2    td_regression, threshold:WR:touchdownPointsShare:q80
+ 44. pts#9     Dak Prescott             QB   DAL     263.5 pts  adp 65.1
+ 45. pts#10    Joe Burrow               QB   CIN     263.5 pts  adp 56.3
+ 46. pts#11    Drake Maye               QB   NE      263.5 pts  adp 52.0
+ 47. pts#89    Colston Loveland         TE   CHI     162.5 pts  adp 55.5
+ 48. pts#90    Tyler Warren             TE   IND     162.5 pts  adp 65.4
+ 49. pts#55    Davante Adams            WR   LA      198.3 pts  adp 41.9    td_regression, threshold:WR:age:q70, threshold:WR:touchdownPointsShare:q80
+ 50. pts#86    Josh Jacobs              RB   GB      165.3 pts  adp 32.0    td_regression
 ```
 
 Jeremiyah Love sits at value#1 despite pts#2: the rookie replacement channel (draft-capital pricing,
