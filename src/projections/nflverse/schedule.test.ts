@@ -102,4 +102,18 @@ describe("scheduleObservations — the two stamps that make the point-in-time cl
     const indoors = scheduleObservations(mapSchedule([game({ roof: "dome", temp: "", wind: "" })], [2024]));
     expect(indoors.map((row) => row.metric)).not.toContain(SCHEDULE_METRICS.windSpeed);
   });
+
+  /**
+   * I5 (fix round): the kickoff-instant metric is the ONE fact `firstKickoffFor` (`team-store.ts`)
+   * is allowed to read a season's first kickoff from, precisely BECAUSE it does not depend on a
+   * betting line existing — unlike `pointSpread`, which a real game can legitimately carry none of.
+   */
+  it("stamps the kickoff-instant metric for EVERY scheduled game, even one with no betting line at all", () => {
+    const lineless = scheduleObservations(mapSchedule([game({ spread_line: "", total_line: "" })], [2024]));
+    const row = lineless.find((r) => r.team === "BUF" && r.metric === SCHEDULE_METRICS.kickoffInstant)!;
+    expect(row.asOf).toEqual(kickoffAsOf("2024-10-13", 24));
+    expect(row.source).toBe(SCHEDULE_SOURCE.kickoff);
+    // And, unlike `pointSpread`, it is there even though this game carries no line.
+    expect(lineless.some((r) => r.team === "BUF" && r.metric === SCHEDULE_METRICS.pointSpread)).toBe(false);
+  });
 });

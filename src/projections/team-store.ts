@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, min } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { playerWeekTeams, teamWeekObservations } from "@/db/schema";
 import type { WeekRange } from "./store";
+import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "./nflverse/schedule";
 
 /**
  * THE TEAM-LEVEL POINT-IN-TIME STORE — `store.ts` one level up, and deliberately its twin.
@@ -180,4 +181,47 @@ export async function playerTeamsAsOf(
     .from(playerWeekTeams)
     .where(and(eq(playerWeekTeams.season, season), weekPredicate, lte(playerWeekTeams.asOf, asOf)))
     .orderBy(asc(playerWeekTeams.week), asc(playerWeekTeams.playerId), desc(playerWeekTeams.asOf));
+}
+
+/**
+ * THE ONE DEFINITION OF "A SEASON'S FIRST KICKOFF" (fix round, live-board Task 2 — I4/I5).
+ *
+ * Before this, three call sites each ran their own copy of essentially this query — `preseason/
+ * depth.ts`'s own `firstKickoffFor`, `preseason/source.ts`'s live-moment path, and
+ * `replay-moments.ts`'s `playerGameMomentsFor` — and all three keyed off `SCHEDULE_METRICS.
+ * pointSpread`, the CONTINGENT stamp (`scheduleObservations` only emits it when the file carries a
+ * line). Checked directly against 2026: a real, scheduled game can carry no line at all past week
+ * six, so a minimum taken over lined games can silently return a moment AFTER the season's actual
+ * first kickoff — the exact leak `SCHEDULE_METRICS.kickoffInstant`'s own docblock names. This reads
+ * that metric instead: UNCONDITIONAL, emitted for every scheduled game regardless of pricing.
+ *
+ * `null` (not a throw) when the store holds no kickoff instants for `season` at all — every caller
+ * that needs a season to genuinely have one uses `requireFirstKickoffFor` below instead.
+ */
+export async function firstKickoffFor(db: ReadonlyDb, season: number): Promise<Date | null> {
+  const [row] = await db
+    .select({ earliest: min(teamWeekObservations.asOf) })
+    .from(teamWeekObservations)
+    .where(
+      and(
+        eq(teamWeekObservations.season, season),
+        eq(teamWeekObservations.source, SCHEDULE_SOURCE.kickoff),
+        eq(teamWeekObservations.metric, SCHEDULE_METRICS.kickoffInstant),
+      ),
+    );
+  return row?.earliest ?? null;
+}
+
+/** `firstKickoffFor`, throwing rather than returning `null` — the shape every pre-existing call
+ *  site (`preseason/depth.ts`'s `firstKickoffFor` re-export, `preseason/ingest.ts`) already
+ *  depended on before this consolidation, and the one `source.ts`'s replay-adjacent call sites use
+ *  when a missing schedule is a refusal rather than a value a caller must branch on. */
+export async function requireFirstKickoffFor(db: ReadonlyDb, season: number): Promise<Date> {
+  const kickoff = await firstKickoffFor(db, season);
+  if (kickoff === null) {
+    throw new Error(
+      `The store holds no ${season} kickoff instants, so the season's first kickoff cannot be derived. Run \`npm run projections:context\` first.`,
+    );
+  }
+  return kickoff;
 }

@@ -40,6 +40,7 @@ import { RANK_BANDS, spearman, type Observation, type RankBandName } from "@/pro
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
+import { gradableInputs } from "@/projections/preseason/scorecard";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -175,7 +176,9 @@ async function subjectsFor(
   everyone: readonly Subject[];
   ranks: ReadonlyMap<string, ReadonlyMap<string, number>>;
 }> {
-  const inputs = await loadPreseason(db, season);
+  // Fix round I3: `gradableInputs` is the convergence point every grading script calls through,
+  // immediately after `loadPreseason` — see its own docblock in `preseason/scorecard.ts`.
+  const inputs = gradableInputs(await loadPreseason(db, season));
   const positions = await allPositions(db);
   const { points: actual, games: actualGames } = await actualSeasonPoints(db, season, positions);
   const board = buildBoard(inputs);

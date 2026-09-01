@@ -24,8 +24,10 @@ function kickoffRow(season: number, asOf: Date, overrides: Partial<TeamWeekObser
     week: 1,
     team: "BUF",
     source: SCHEDULE_SOURCE.kickoff,
-    metric: SCHEDULE_METRICS.pointSpread,
-    value: -2.5,
+    // The UNCONDITIONAL marker (fix round, I4/I5) — `firstKickoffFor` no longer reads `pointSpread`,
+    // a stamp that can legitimately be missing for a real scheduled game.
+    metric: SCHEDULE_METRICS.kickoffInstant,
+    value: 1,
     asOf,
     ...overrides,
   };
@@ -56,7 +58,7 @@ describe("historicalWeek1RosterAsOf", () => {
     );
   });
 
-  it("names the context command when the store holds no closing lines for the season", async () => {
+  it("names the context command when the store holds no kickoff instants for the season", async () => {
     // No `recordTeamObservations` call above this line — the store is empty for 2015, so
     // `firstKickoffFor` (which this function reads through, unwrapped) has to refuse rather than
     // derive a stamp from nothing, and the message has to tell an operator what to run.

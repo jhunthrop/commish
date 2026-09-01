@@ -87,6 +87,7 @@ import {
 } from "@/projections/preseason/fitted";
 import { FITTED_MODEL } from "@/projections/model/source";
 import { loadPreseason, preseasonCandidates, SHIPPED_PRESEASON_FEATURES, type PreseasonPriors } from "@/projections/preseason/source";
+import { gradableInputs } from "@/projections/preseason/scorecard";
 import type { ReadonlyDb } from "@/db/client";
 
 const OUTPUT = "src/projections/market/blend-fitted.ts";
@@ -142,7 +143,11 @@ async function actualSeasonPoints(db: ReadonlyDb, season: number, positions: Rea
  *  who never recorded a stat line — the identical counting choice `market/curve.ts`'s own train
  *  loader makes). */
 async function rowsForSeason(db: ReadonlyDb, season: number): Promise<{ readonly rows: readonly BlendTrainRow[]; readonly droppedCount: number }> {
-  const inputs = await loadPreseason(db, season);
+  // Fix round I3: `gradableInputs` is the convergence point every grading script calls through,
+  // immediately after `loadPreseason` — see its own docblock in `preseason/scorecard.ts`. This
+  // script's train rows feed the blend's own fitted constants from `actualSeasonPoints` below, so a
+  // live board reaching this function would poison a fit with a non-existent outcome.
+  const inputs = gradableInputs(await loadPreseason(db, season));
   const candidates = preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, PRIORS);
   const { entries: market, droppedCount } = await marketBoard(db, season);
   const marketByPlayer = new Map(market.map((entry) => [entry.playerId, entry] as const));

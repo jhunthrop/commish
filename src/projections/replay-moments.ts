@@ -154,11 +154,20 @@ export async function gameWeekMomentsFor(db: ReadonlyDb, season: number): Promis
  * is still refused, because his game was already played. That is the honest line and it is drawn per
  * player because that is where the real world draws it.
  *
- * THE MOMENT IS THE KICKOFF ITSELF, read from the schedule's own start time. `schedule.ts` stamps
- * the closing line at `kickoffInstant`, so the minimum of a club's kickoff-stamped line facts IS
- * that club's kickoff, and there is no arithmetic left to get wrong. A fact stamped at that instant
- * is admitted, which is the intent rather than an accident: the closing line is settled at kickoff
- * and a manager setting a lineup has it. A fact stamped one millisecond later is refused.
+ * THE MOMENT IS THE KICKOFF ITSELF, read from the schedule's own start time. `schedule.ts`'s
+ * `kickoffInstant` function computes it and `SCHEDULE_METRICS.kickoffInstant` (fix round, I4/I5)
+ * stamps it, UNCONDITIONALLY, for every scheduled game — so the minimum of a club's kickoff-stamped
+ * marker facts IS that club's kickoff, and there is no arithmetic left to get wrong. A fact stamped
+ * at that instant is admitted, which is the intent rather than an accident: the closing line is
+ * settled at kickoff and a manager setting a lineup has it. A fact stamped one millisecond later is
+ * refused.
+ *
+ * READS `SCHEDULE_METRICS.kickoffInstant`, NOT `pointSpread` (fix round, I4/I5 — this function used
+ * to key off the betting line, the SAME latent defect `team-store.ts`'s own `firstKickoffFor`
+ * docblock names: a real, scheduled game can carry no line at all past week six of a real season, so
+ * a lined-games-only read would have silently returned `null` for a game the market never priced,
+ * rather than that game's real kickoff). One shared metric, three former near-duplicates
+ * (`depth.ts`, `source.ts`'s live path, this function) now converged on it.
  *
  * Returns null for a club with no scheduled game that week, and the caller falls back to the
  * whole-week moment rather than inventing one.
@@ -178,10 +187,7 @@ export async function playerGameMomentsFor(
       and(
         eq(teamWeekObservations.season, season),
         eq(teamWeekObservations.source, SCHEDULE_SOURCE.kickoff),
-        // The LINE specifically. The same source also carries the recorded weather, which keeps the
-        // publication-lag stamp because it is an observation taken during the game rather than at
-        // its start, and a minimum over both would return a number that is not a kickoff.
-        eq(teamWeekObservations.metric, SCHEDULE_METRICS.pointSpread),
+        eq(teamWeekObservations.metric, SCHEDULE_METRICS.kickoffInstant),
       ),
     )
     .groupBy(teamWeekObservations.week, teamWeekObservations.team);

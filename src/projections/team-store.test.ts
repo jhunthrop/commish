@@ -1,10 +1,13 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { nflPlayers } from "@/db/schema";
+import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "./nflverse/schedule";
 import {
+  firstKickoffFor,
   playerTeamsAsOf,
   recordPlayerTeams,
   recordTeamObservations,
+  requireFirstKickoffFor,
   teamObservationsAsOf,
   type PlayerWeekTeam,
   type TeamWeekObservation,
@@ -128,5 +131,71 @@ describe("playerTeamsAsOf — a trade is knowable only once it has been played",
   it("re-recording an identical edge writes nothing", async () => {
     await recordPlayerTeams(db, [playerTeam()]);
     expect(await recordPlayerTeams(db, [playerTeam()])).toBe(0);
+  });
+});
+
+function kickoffFact(over: Partial<TeamWeekObservation> = {}): TeamWeekObservation {
+  return {
+    season: 2024,
+    week: 1,
+    team: "BUF",
+    source: SCHEDULE_SOURCE.kickoff,
+    metric: SCHEDULE_METRICS.kickoffInstant,
+    value: 1,
+    asOf: TUESDAY,
+    ...over,
+  };
+}
+
+/**
+ * `firstKickoffFor`/`requireFirstKickoffFor` — the one shared definition of "a season's first
+ * kickoff" (fix round, I4/I5), consolidating what `depth.ts`, `source.ts`'s live path and
+ * `replay-moments.ts`'s `playerGameMomentsFor` each used to compute separately.
+ */
+describe("firstKickoffFor / requireFirstKickoffFor", () => {
+  it("returns the earliest kickoff instant across every team and week in the season", async () => {
+    await recordTeamObservations(db, [
+      kickoffFact({ asOf: new Date("2024-09-08T17:00:00.000Z") }),
+      kickoffFact({ team: "CLE", week: 6, asOf: TUESDAY }),
+    ]);
+    expect(await firstKickoffFor(db, 2024)).toEqual(new Date("2024-09-08T17:00:00.000Z"));
+  });
+
+  it("returns null, not a throw, when the store holds no kickoff instants for the season", async () => {
+    expect(await firstKickoffFor(db, 2024)).toBeNull();
+  });
+
+  /**
+   * I5, the load-bearing case: a MISSING betting line must never hide the game that actually kicked
+   * off first. `pointSpread` is deliberately never recorded here at all — this is the metric a
+   * lined-games-only reader (the pre-fix-round `firstKickoffFor`/`playerGameMomentsFor`) would have
+   * seen NOTHING for, and would therefore have missed this game's kickoff entirely, potentially
+   * reporting the season's SECOND game as though it were the first.
+   */
+  it("finds the season's first kickoff even when that game carries no betting line at all", async () => {
+    const openerKickoff = new Date("2024-09-05T23:20:00.000Z");
+    await recordTeamObservations(db, [
+      // The season's real opener: a kickoff-instant row and NOTHING under `pointSpread` — exactly
+      // what a game past the market's pricing window (2026, week 6+) looks like in the store.
+      kickoffFact({ team: "KC", week: 1, asOf: openerKickoff }),
+      // A LATER, lined game — the kind a `pointSpread`-keyed minimum would have wrongly reported as
+      // the season's first kickoff.
+      { ...kickoffFact({ team: "BUF", week: 1, asOf: new Date(openerKickoff.getTime() + 3 * 86_400_000) }) },
+      {
+        season: 2024,
+        week: 1,
+        team: "BUF",
+        source: SCHEDULE_SOURCE.kickoff,
+        metric: SCHEDULE_METRICS.pointSpread,
+        value: -3,
+        asOf: new Date(openerKickoff.getTime() + 3 * 86_400_000),
+      },
+    ]);
+    expect(await firstKickoffFor(db, 2024)).toEqual(openerKickoff);
+    expect(await requireFirstKickoffFor(db, 2024)).toEqual(openerKickoff);
+  });
+
+  it("requireFirstKickoffFor names the context command when the store holds nothing for the season", async () => {
+    await expect(requireFirstKickoffFor(db, 2024)).rejects.toThrow(/projections:context/);
   });
 });

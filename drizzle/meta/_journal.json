@@ -442,6 +442,13 @@
       "when": 1788267701055,
       "tag": "0062_unknown_black_bird",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1788269288448,
+      "tag": "0063_heavy_jackal",
+      "breakpoints": true
     }
   ]
 }

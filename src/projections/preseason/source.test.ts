@@ -375,7 +375,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
   });
 
   it("attaches a \"law\" reason, carrying the FIXTURE registry's effect and the veteran's own target share as magnitude", async () => {
-    const inputs = await loadPreseason(db, 2024, [fixtureLaw()]);
+    const inputs = await loadPreseason(db, 2024, { laws: [fixtureLaw()] });
     const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
     const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
 
@@ -384,7 +384,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
   });
 
   it("attaches no \"law\" reason when the fixture registry's matching law is not confirmed", async () => {
-    const inputs = await loadPreseason(db, 2024, [fixtureLaw({ verdict: "weak" })]);
+    const inputs = await loadPreseason(db, 2024, { laws: [fixtureLaw({ verdict: "weak" })] });
     const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
     const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
 
@@ -394,7 +394,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
   it("attaches no \"law\" reason for a player the registry's confirmed law does not apply to", async () => {
     // The rookie has no 2023 usage at all (he did not exist in the league yet), so `lawFacts` has
     // no entry for him and `target_share_persistence`'s condition is never even asked.
-    const inputs = await loadPreseason(db, 2024, [fixtureLaw()]);
+    const inputs = await loadPreseason(db, 2024, { laws: [fixtureLaw()] });
     const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
     const rookie = candidates.find((candidate) => candidate.playerId === ROOKIE)!;
 
@@ -423,7 +423,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
    * with hand-built facts would never notice, because it never asks the real reader anything.
    */
   it("attaches a DISCOVERED \"law\" reason through the REAL discoveryFactsForSeason path, not hand-built facts", async () => {
-    const inputs = await loadPreseason(db, 2024, [fixtureDiscoveredLaw()]);
+    const inputs = await loadPreseason(db, 2024, { laws: [fixtureDiscoveredLaw()] });
     const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
     const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
 
@@ -432,7 +432,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
   });
 
   it("attaches no DISCOVERED \"law\" reason when the fixture law is not confirmed, even with real tripping evidence", async () => {
-    const inputs = await loadPreseason(db, 2024, [fixtureDiscoveredLaw({ verdict: "weak" })]);
+    const inputs = await loadPreseason(db, 2024, { laws: [fixtureDiscoveredLaw({ verdict: "weak" })] });
     const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
     const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
 
@@ -440,7 +440,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
   });
 
   it("attaches no DISCOVERED \"law\" reason for the rookie, who has no 2023 evidence at all", async () => {
-    const inputs = await loadPreseason(db, 2024, [fixtureDiscoveredLaw()]);
+    const inputs = await loadPreseason(db, 2024, { laws: [fixtureDiscoveredLaw()] });
     const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
     const rookie = candidates.find((candidate) => candidate.playerId === ROOKIE)!;
 
@@ -448,7 +448,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
   });
 
   it("attaches BOTH a tribal and a discovered \"law\" reason for the same player when both fixtures fire", async () => {
-    const inputs = await loadPreseason(db, 2024, [fixtureLaw(), fixtureDiscoveredLaw()]);
+    const inputs = await loadPreseason(db, 2024, { laws: [fixtureLaw(), fixtureDiscoveredLaw()] });
     const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
     const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
 
@@ -472,7 +472,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
  */
 describe("blendBoard's identity, through a production-reachable route (I4 fix round)", () => {
   it("returns marketPoints exactly for a real candidate whose games.expected matches the constants' own implied-games table", async () => {
-    const inputs = await loadPreseason(db, 2024, []);
+    const inputs = await loadPreseason(db, 2024, { laws: [] });
     const candidates = preseasonCandidates(inputs, { ...ALL_PRESEASON_FEATURES, availability: false }, PRIORS);
     const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
     expect(veteran.games.expected).toBe(17); // the real ablation route: seventeenGamesForEveryone(2024)
@@ -551,12 +551,19 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
         week: 1,
         team: "BUF",
         source: SCHEDULE_SOURCE.kickoff,
-        metric: SCHEDULE_METRICS.pointSpread,
-        value: -3,
+        // The UNCONDITIONAL marker (fix round, I4/I5) — `liveMomentFor` reads through
+        // `firstKickoffFor`, which no longer keys off `pointSpread`.
+        metric: SCHEDULE_METRICS.kickoffInstant,
+        value: 1,
         asOf: kickoff,
       },
     ]);
   }
+
+  /** A moment strictly before `FIRST_KICKOFF` and strictly AFTER `week1RosterAsOf(LIVE_SEASON)` (1
+   *  September) — the window every test below needs `liveMomentFor` to land in so it both succeeds
+   *  (before kickoff) and can actually see the seeded roster (at or after cutdown). */
+  const clockBeforeKickoff: Clock = { now: () => new Date(FIRST_KICKOFF.getTime() - 24 * 60 * 60 * 1000).toISOString() };
 
   async function seedLiveRoster(season: number): Promise<void> {
     await recordPreseasonRosters(db, [
@@ -581,7 +588,13 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
       expect(explicitMoment.kind).toBe("replay");
 
       const viaDefault = await loadPreseason(db, 2024);
-      const viaExplicitMoment = await loadPreseason(db, 2024, undefined, explicitMoment);
+      const viaExplicitMoment = await loadPreseason(db, 2024, { boardMoment: explicitMoment });
+
+      // M10: SELF-CONTAINED, not merely mutually consistent. Pinning `viaDefault.moment` to the
+      // fixture's own independently-known ground truth (`TARGET_SEASON_LANDED - 1ms`, the exact
+      // value `preseasonMomentFor`'s own describe block above pins) means this test would fail if
+      // BOTH paths agreed on the same WRONG moment, not only if they merely agreed with each other.
+      expect(viaDefault.moment.getTime()).toBe(TARGET_SEASON_LANDED.getTime() - 1);
 
       expect(viaExplicitMoment.moment.getTime()).toBe(viaDefault.moment.getTime());
       expect(viaExplicitMoment.momentKind).toBe("replay");
@@ -594,8 +607,14 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
   });
 
   describe("(b) the live arm's read guard — stricter than the replay assertion", () => {
+    // Fix round, C2: every live moment below is constructed THROUGH `liveMomentFor` — a hand-built
+    // `{ kind: "live", at }` is no longer even legal here (see the "(C2)" describe block below for
+    // what happens if one is attempted anyway), and doing it this way is stronger for free: it
+    // exercises the SAME `liveMomentFor` derivation a real caller would go through, not a
+    // hand-picked `Date` this test alone believes is "before kickoff".
     it("THROWS, naming the guard, when the store holds a season-S observation of ANY kind, at ANY as-of", async () => {
       await seedLiveRoster(LIVE_SEASON);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
       // A depth-chart row is a PRE_GAME source the REPLAY arm's own carve-out would admit (it is
       // stamped well before kickoff). The live arm admits nothing from the season at all.
       await recordObservations(db, [
@@ -610,16 +629,72 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
         }),
       ]);
 
-      const liveMoment: BoardMoment = { kind: "live", at: new Date(FIRST_KICKOFF.getTime() - 1) };
-      await expect(loadPreseason(db, LIVE_SEASON, undefined, liveMoment)).rejects.toThrow(/live board/i);
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      await expect(loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment })).rejects.toThrow(/live board/i);
+    });
+
+    /**
+     * M11 — the companion to the PRE_GAME case above, on the OTHER side of the guard's scope: a
+     * GAME-DERIVED fact (`STAT_LINE_SOURCE`, the exact source the replay arm's own
+     * `earliestGameDerivedStamp` reads), stamped even AFTER the live moment itself. If the live
+     * guard were accidentally scoped to `PRE_GAME_SOURCES` alone — the one thing the replay arm
+     * carves out — this fact would sail through unnoticed, because it is neither a depth-chart row
+     * nor an injury filing. It is refused for the identical reason: the guard reads
+     * `player_week_observations` for the season, full stop, regardless of source.
+     */
+    it("THROWS on a game-derived STAT_LINE_SOURCE observation too, not only a PRE_GAME one", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      await recordObservations(db, [
+        observation({
+          season: LIVE_SEASON,
+          week: 1,
+          playerId: VETERAN,
+          source: STAT_LINE_SOURCE,
+          metric: statMetricName("receptions"),
+          value: 4,
+          asOf: new Date(FIRST_KICKOFF.getTime() + 2 * 24 * 60 * 60 * 1000),
+        }),
+      ]);
+
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      await expect(loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment })).rejects.toThrow(/live board/i);
     });
 
     it("succeeds and reports momentKind \"live\" when the store holds nothing at all for the season", async () => {
       await seedLiveRoster(LIVE_SEASON);
-      const liveMoment: BoardMoment = { kind: "live", at: new Date(FIRST_KICKOFF.getTime() - 1) };
-      const inputs = await loadPreseason(db, LIVE_SEASON, undefined, liveMoment);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      const inputs = await loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment });
       expect(inputs.momentKind).toBe("live");
       expect(inputs.moment.getTime()).toBe(liveMoment.at.getTime());
+    });
+  });
+
+  /**
+   * C2 — BoardMoment is UNFORGEABLE. TypeScript's structural typing does nothing to stop a caller
+   * writing `{ kind: "replay", at: new Date() }` and handing it straight to `loadPreseason`: the
+   * object is shaped exactly like a real `BoardMoment`, and the type checker cannot tell it apart
+   * from one `replayMomentFor` actually derived. That gap is the third leakage defect in one line —
+   * a live board persisted and graded as though it were a claim about a finished season — and the
+   * fix is a runtime brand (a private `WeakSet`, `source.ts`'s own `BRANDED_MOMENTS`) `loadPreseason`
+   * checks on any caller-supplied moment before using it for anything.
+   */
+  describe("(C2) BoardMoment cannot be hand-built", () => {
+    it("REFUSES a hand-constructed replay BoardMoment, naming the two real constructors", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      const forged: BoardMoment = { kind: "replay", at: new Date("2026-01-01T00:00:00.000Z") };
+      await expect(loadPreseason(db, LIVE_SEASON, { boardMoment: forged })).rejects.toThrow(
+        /replayMomentFor|liveMomentFor/,
+      );
+    });
+
+    it("REFUSES a hand-constructed live BoardMoment too, not only a forged replay one", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      const forged: BoardMoment = { kind: "live", at: new Date("2026-01-01T00:00:00.000Z") };
+      await expect(loadPreseason(db, LIVE_SEASON, { boardMoment: forged })).rejects.toThrow(
+        /replayMomentFor|liveMomentFor/,
+      );
     });
   });
 

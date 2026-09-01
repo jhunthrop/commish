@@ -28,7 +28,7 @@ import {
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
 } from "@/projections/preseason/fitted";
-import { actualSeasonPoints, boardPoints, boardValues, scoreOrdering } from "@/projections/preseason/scorecard";
+import { actualSeasonPoints, boardPoints, boardValues, gradableInputs, scoreOrdering } from "@/projections/preseason/scorecard";
 import {
   SHIPPED_PRESEASON_FEATURES,
   loadPreseason,
@@ -157,7 +157,9 @@ async function main(): Promise<void> {
   );
 
   for (const season of TARGET_SEASONS) {
-    const inputs = await loadPreseason(db, season);
+    // Fix round I3: `gradableInputs` is the convergence point every grading script calls through,
+    // immediately after `loadPreseason` — see its own docblock in `preseason/scorecard.ts`.
+    const inputs = gradableInputs(await loadPreseason(db, season));
     const actual = await actualSeasonPoints(db, season, positions);
     const everyone = new Set(actual.keys());
 

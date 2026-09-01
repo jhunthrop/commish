@@ -65,6 +65,14 @@ export const auditActorTypeEnum = pgEnum("audit_actor_type", ["user", "system"])
  * row can never be ambiguous mid-migration or under a future third kind.
  */
 export const chatMessageKindEnum = pgEnum("chat_message_kind", ["text", "gif"]);
+/**
+ * Live-board round, Task 2, fix round (M8). `projections/preseason/source.ts`'s `BoardMoment` is a
+ * closed, two-value discriminated union by design — not a vocabulary any later plan is expected to
+ * extend casually the way `member_notices.notice_type` is (see that enum's own contrasting note) —
+ * so it gets a real Postgres enum rather than the bare `text` column Task 2 originally shipped with
+ * no value constraint at all. `preseason_projections.moment_kind` is its one consumer today.
+ */
+export const boardMomentKindEnum = pgEnum("board_moment_kind", ["replay", "live"]);
 
 /** Phase 4, Task 2 (migration 0035). Derived from the money vocabulary (`@/money/accounts`), the
  *  `AUDIT_EVENT_TYPES` shape: the pg enum and the union are one list, never two to keep in step. */
@@ -2301,10 +2309,23 @@ export const preseasonProjections = pgTable(
      *  for a moment derived from a completed season, `'live'` for one taken before a season's own
      *  first kickoff. DEFAULT `'replay'` (Task 2, the live-board round) so the four historical
      *  seasons already in this table when the column was added mean exactly what they always meant,
-     *  with no backfill required. The scorecard's own `assertGradableMoment`
+     *  with no backfill required. The scorecard's own `assertGradableMoment` / `gradableInputs`
      *  (`preseason/scorecard.ts`) refuses to grade any row where this is `'live'` — there is no
-     *  actual outcome yet for a season that has not been played. */
-    momentKind: text("moment_kind").notNull().default("replay").$type<"replay" | "live">(),
+     *  actual outcome yet for a season that has not been played. `boardMomentKindEnum` (fix round,
+     *  M8) constrains the column's own values at the database, not merely in application code, the
+     *  same guarantee every other closed vocabulary in this file gets.
+     *
+     *  NOT PART OF THE FACT IDENTITY BELOW (fix round, M7 — a deliberate omission, documented rather
+     *  than silent). `preseason_projections_fact_idx` keys on `(season, source, player_id, as_of)`
+     *  without `moment_kind`, and that is safe rather than an oversight: the two arms are
+     *  TEMPORALLY EXCLUSIVE for one season. A REPLAY moment can only be DERIVED once `season` has
+     *  game-derived data in the store (`preseasonMomentFor` throws otherwise); a LIVE moment can
+     *  only be derived while `season`'s first kickoff is still in the future (`liveMomentFor` throws
+     *  otherwise). No `season` can be in both states at once, so for a fixed `(season, source)` no
+     *  `as_of` value could ever be written once under each kind — `moment_kind` is a fact ABOUT the
+     *  row the identity already pins, never a second axis a row could vary along. Adding it to the
+     *  index would cost a wider key for a collision that provably cannot occur. */
+    momentKind: boardMomentKindEnum("moment_kind").notNull().default("replay"),
     /** When the fit ran. Operational only — the gap between this and `as_of` is how stale a board
      *  on a screen is, and it is never a filter. */
     computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),

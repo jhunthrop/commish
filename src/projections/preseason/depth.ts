@@ -1,12 +1,9 @@
-import { and, eq, min } from "drizzle-orm";
-import type { ReadonlyDb } from "@/db/client";
-import { teamWeekObservations } from "@/db/schema";
 import type { Position } from "@/domain/player";
 import type { CsvRow } from "../nflverse/csv";
 import { NFLVERSE_CONFIG } from "../nflverse/config";
-import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import type { PredictedOpportunity } from "../model/opportunity";
 import type { PlayerWeekObservation } from "../store";
+import { requireFirstKickoffFor } from "../team-store";
 
 /**
  * THE DEPTH CHART — who is behind whom, which is the one thing August knows and this board did not.
@@ -35,7 +32,10 @@ import type { PlayerWeekObservation } from "../store";
  * carry a season and a week and NO DATE — the 2020-to-2024 schema has no timestamp column at all —
  * so the stamp has to be derived rather than read. It is derived as the LATEST instant that is
  * provably before the season's first kickoff: one millisecond before that kickoff, which
- * `firstKickoffFor` recovers from the store's own closing-line stamps. A week-1 depth chart is filed by the league's own process before week 1 is played,
+ * `firstKickoffFor` (re-exported here from `team-store.ts`'s own consolidated definition — fix
+ * round, I4/I5) recovers from the store's own UNCONDITIONAL kickoff-instant stamps, never from the
+ * betting line, which can legitimately be missing for a real scheduled game. A week-1 depth chart is
+ * filed by the league's own process before week 1 is played,
  * so this stamp is LATER than the real publication, which is the direction that cannot claim
  * knowledge we did not have. What it cannot rule out is that nflverse scraped the file late in that
  * window; the file contains orderings rather than outcomes, so the exposure is a club reshuffling
@@ -107,30 +107,14 @@ export interface MapDepthChartResult {
 /**
  * THE INSTANT A PRE-GAME FACT ABOUT `season` MAY CLAIM: the season's first kickoff.
  *
- * Recovered from the store rather than from a calendar, following `replay-moments.ts`.
- * `schedule.ts` stamps every closing line at the game's own start time, so the earliest of them is
- * the first ball thrown in the season. Anything stamped before it is, by definition, something a
- * person could have known without watching any football.
+ * Re-exported under this module's own established name — `ingest.ts` and every test in this
+ * directory already import `firstKickoffFor` from here — but the definition itself now lives in
+ * `team-store.ts`, consolidated with `source.ts`'s live-moment path onto the SAME unconditional
+ * kickoff-instant metric (fix round, I4/I5: three near-identical queries against
+ * `SCHEDULE_METRICS.pointSpread`, a stamp that can legitimately be missing, became one against
+ * `SCHEDULE_METRICS.kickoffInstant`, which cannot).
  */
-export async function firstKickoffFor(db: ReadonlyDb, season: number): Promise<Date> {
-  const [row] = await db
-    .select({ earliest: min(teamWeekObservations.asOf) })
-    .from(teamWeekObservations)
-    .where(
-      and(
-        eq(teamWeekObservations.season, season),
-        eq(teamWeekObservations.source, SCHEDULE_SOURCE.kickoff),
-        eq(teamWeekObservations.metric, SCHEDULE_METRICS.pointSpread),
-      ),
-    );
-  const earliest = row?.earliest ?? null;
-  if (earliest === null) {
-    throw new Error(
-      `The store holds no ${season} closing lines, so the season's first kickoff cannot be derived. Run \`npm run projections:context\` first.`,
-    );
-  }
-  return new Date(earliest);
-}
+export const firstKickoffFor = requireFirstKickoffFor;
 
 /**
  * Turns one season's `depth_charts_YYYY.csv` into stamped observations.

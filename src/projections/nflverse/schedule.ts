@@ -54,6 +54,22 @@ export const SCHEDULE_METRICS = {
   /** Recorded, not forecast — which is exactly why it is kickoff-stamped. */
   temperature: "temperature_f",
   windSpeed: "wind_mph",
+  /**
+   * THE KICKOFF INSTANT ITSELF, unconditional — the ONE fact `scheduleObservations` promises for
+   * EVERY scheduled game, whether or not the file carries a betting line for it. A plain marker
+   * (value `1`; the fact this metric carries is its `as_of`, not its `value`).
+   *
+   * `pointSpread`'s own kickoff stamp is contingent: `scheduleObservations` only emits it
+   * `if (game.pointSpread !== null)`, and a real market line can be MISSING for a real, scheduled
+   * game — checked directly against 2026: a game past week 6 can carry no line at all, because a
+   * book stops pricing a game that far out. Any reader that needs "when did this team's game kick
+   * off" (a season's own FIRST kickoff, in particular) and keys off `pointSpread` for it is reading
+   * a fact that can silently go missing for exactly the games most likely to matter — a lined-games
+   * minimum can return a moment AFTER the season has actually started, because the game that really
+   * kicked off first happened to be the one with no line yet. This metric is the honest,
+   * unconditional answer `firstKickoffFor` (`team-store.ts`) reads instead.
+   */
+  kickoffInstant: "kickoff_instant",
 } as const;
 
 /** One regular-season game, from one team's point of view. Every game yields two of these. */
@@ -295,6 +311,10 @@ export function scheduleObservations(games: readonly TeamGame[]): readonly TeamW
       { ...published, metric: SCHEDULE_METRICS.homeField, value: game.home ? 1 : 0 },
       { ...published, metric: SCHEDULE_METRICS.indoors, value: game.indoors ? 1 : 0 },
       { ...published, metric: SCHEDULE_METRICS.divisionGame, value: game.divisionGame ? 1 : 0 },
+      // UNCONDITIONAL, unlike every kickoff-stamped row below it — every scheduled game has a
+      // kickoff whether or not the market ever priced it. See SCHEDULE_METRICS.kickoffInstant's own
+      // docblock for why nothing that needs "when did this game kick off" may key off pointSpread.
+      { ...atKickoff, metric: SCHEDULE_METRICS.kickoffInstant, value: 1 },
     ];
     if (game.pointSpread !== null) {
       rows.push({ ...atKickoff, metric: SCHEDULE_METRICS.pointSpread, value: game.pointSpread });
