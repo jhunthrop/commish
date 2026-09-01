@@ -176,8 +176,8 @@ export function lawReasonsFor(
         throw new Error(`lawReasonsFor: "${law.id}" has no condition predicate in LAW_CONDITIONS — a law and populations.ts have drifted.`);
       }
       // C1 — THE POSITION GATE, tribal arm: `LAW_ELIGIBILITY` is built from the IDENTICAL
-      // `LAW_ENTRIES` `LAW_CONDITIONS` is, so a defined `condition` above guarantees a defined
-      // `eligible` here — no separate drift check needed, only the gate itself.
+      // `LAW_ENTRIES` `LAW_CONDITIONS` is, so a defined `condition` above should guarantee a
+      // defined `eligible`; the throw below still guards the invariant against future drift.
       const eligible = LAW_ELIGIBILITY.get(law.id);
       if (eligible === undefined) {
         throw new Error(`lawReasonsFor: "${law.id}" has no eligibility predicate in LAW_ELIGIBILITY — a law and populations.ts have drifted.`);

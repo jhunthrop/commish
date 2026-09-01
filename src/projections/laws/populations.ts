@@ -578,7 +578,8 @@ export const LAW_CONDITIONS: ReadonlyMap<string, (facts: LawConditionFacts) => b
  * (`measured.json`, fitted ONLY over the RB population `buildPopulations` builds via `isRb`) reached
  * a wide receiver's board row the instant his own age cleared the same numeric threshold, a claim
  * the harness never tested and the registry's own `position: "RB"` field never gated. `lawReasonsFor`
- * now checks `LAW_ELIGIBILITY.get(law.id)?.(playerPosition)` before it will ever evaluate a tribal
+ * now resolves `LAW_ELIGIBILITY.get(law.id)` (throwing on a missing entry) and requires
+ * `eligible(playerPosition)` before it will ever evaluate a tribal
  * law's condition at all — the exact predicate the measurement used, reused rather than
  * re-approximated from `Law.position` (a bare string equality would mishandle `"all"`, which
  * `eligible` already resolves correctly for `play_caller_fingerprint`/`td_regression`).

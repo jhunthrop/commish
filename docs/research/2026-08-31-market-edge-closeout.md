@@ -360,7 +360,7 @@ rebuilding the identical 2024 board with the gate fix on vs off moved 45 of 653 
 `projectedPoints` (max delta 5.22 pts), rippling into 128 points-rank and 372 value-rank reorders.
 
 **Fixed** (`laws/board-reasons.ts`): both arms gated by the player's own position before a law's
-condition is ever evaluated — tribal via a new `LAW_ELIGIBILITY` map built from the identical
+condition is ever evaluated: tribal via a new `LAW_ELIGIBILITY` map built from the identical
 `LAW_ENTRIES` the measurement harness already gates its own population with (measured-on = applied-to,
 one predicate); discovered via `candidate.position === player position`. `BOARD_SOURCE` bumped to v5
 (`commish_board_v5_ppr_12`) since a replay season's deterministic `as_of` would otherwise collide with
@@ -382,15 +382,20 @@ NOISE classification above is identical under the gate fix. The largest point-es
 these figures is 0.0035 rho (the starter band gap), far too small to flip any 95% interval's
 relationship to zero. The defect was real and worth fixing (up to 5.22 pts/player, materially reordering
 individual rows) but too small and too evenly spread across the ranking to have been propping up or
-hiding the scorecard's own headline conclusion — consistent with section 3's channel decomposition,
+hiding the scorecard's own headline conclusion, consistent with section 3's channel decomposition,
 where laws already carried only 4.5-4.6% of the measured lift over pure market and the availability
 channel did nearly all of the work. `blend-fitted.ts`'s own train-time constants were regenerated for
 the same reason (the fit's own candidates carry law reasons too): winning cell moved from
 (availabilityCapPoints=40, totalCapPoints=20) to (20, 40), rho 0.6053 -> 0.6054, laws' train-time share
-4.5% -> 4.6% — immaterial, but a real refit, documented in that file's own regenerated header.
+4.5% -> 4.6%: immaterial, but a real refit, documented in that file's own regenerated header.
 
 On the re-persisted 2026 live board itself, the fix is visible directly: law chips are now
 position-scoped (`rb_age_curve` firing on RB names like Henry/McCaffrey/Barkley, WR age on WR names
-like A.J. Brown/Adams/DJ Moore, TD-share on Rice/Higgins) and no cross-position chip appears anywhere
-on the board — the defect this whole fix round exists to close, confirmed absent on the real, final
-board.
+like A.J. Brown/Adams/DJ Moore, TD-share on Rice/Higgins). Measured at the pricing layer
+(`nfl_players.position`, the position both gate arms and the measurement harness resolve), a direct
+store query finds ZERO cross-position chips under v5 across all five persisted seasons, where v4's
+2024 board carried them at scale (`rb_age_curve` on 27 QBs, 27 TEs and 39 WRs; `wr_target_competition`
+on 96 TEs). One display caveat, not a pricing defect: `board-top.ts` prints the roster position, which
+disagrees with the pricing position on 7 of 759 2026 rows (e.g. Velus Jones Jr., value rank 636, prints
+as RB while priced, and law-gated, as WR), so a printed chip can look cross-position on those rows even
+though the gate held.
