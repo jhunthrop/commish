@@ -124,7 +124,7 @@ function trainSeasons(): readonly number[] {
  * What every player actually scored over one completed regular season — the identical
  * `statLinesAsOfForMeasurement`-backed sum `market/curve.ts`'s `loadMarketCurveObservations` and
  * `preseason/rookie-curve.ts`'s `loadRookieCurveObservations` each already read, so a season inside
- * `STAT_LINE_GAPS` (2019) never comes back silently zeroed for this script either.
+ * `STAT_LINE_GAPS` (2019, 2025) never comes back silently zeroed for this script either.
  */
 async function actualSeasonPoints(db: ReadonlyDb, season: number, positions: ReadonlyMap<string, Position>): Promise<ReadonlyMap<string, number>> {
   const lines = await statLinesAsOfForMeasurement(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: FINAL_OUTCOME });

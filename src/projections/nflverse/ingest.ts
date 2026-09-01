@@ -316,7 +316,7 @@ export interface DerivedStatLineComputation {
  * (`scripts/projection-context.ts`): it runs over the whole backfill window every time the seasons
  * change and writes team-week and player-touch FEATURES. This is the GAP-SEASON derivation
  * (`scripts/projection-backfill.ts`'s gap-season branch): it runs only for the seasons named in
- * `STAT_LINE_GAPS` (today, only 2019) plus the one non-gap season the spec requires as a validation
+ * `STAT_LINE_GAPS` (today, 2019 and 2025) plus the one non-gap season the spec requires as a validation
  * control (2018), and it computes stat-line OUTCOMES. Folding this into `ingestPlayByPlay` would make
  * every context backfill — every season, every time — pay for a stat-line derivation almost nothing
  * ever reads (`statLinesAsOfForMeasurement` only ever admits a gap season's rows). A second download

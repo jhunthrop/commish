@@ -50,8 +50,50 @@ export type { SeasonStatLine };
  * keeping its own copy, and `derived-stat-lines.ts`'s admission wrapper reads the same list — so the
  * seasons the laws harness treats as a hole and the seasons the derivation exists to fill can never
  * drift apart.
+ *
+ * 2025 ADDED (live-board Task 1). Checked live against the nflverse release on 2026-09-01:
+ * `stats_player_week_2025.csv` is still a 404 (re-checked from the 2026-08-28 research note in
+ * `docs/research/2026-08-28-live-season.md`, which found the same thing four days earlier), while
+ * `play_by_play_2025.csv` and `snap_counts_2025.csv` are both published. Unlike 2019 — a season with
+ * a published year on both sides of it — 2025 is the CURRENT season and has no published twin of its
+ * own to validate against directly; `MEASURE_SEASONS` (`laws/config.ts`) ends its predictor window at
+ * 2024, so admitting 2025 here changes nothing any drift guard measures until a future round moves
+ * that window. `scripts/projection-backfill.ts`'s gap-season branch derives 2025 exactly as it
+ * derives 2019, gated by the SAME `MINIMUM_AGREEMENT` bar measured against the SAME fixed control
+ * season (2018) — that bar proves the DERIVATION METHOD is trustworthy, not that any one gap season's
+ * own numbers are; for a season with no published twin, `derivedSeasonSanityReport`
+ * (`derived-stat-lines.ts`) is what the backfill prints instead of a fabricated agreement number.
  */
-export const STAT_LINE_GAPS: readonly number[] = [2019];
+export const STAT_LINE_GAPS: readonly number[] = [2019, 2025];
+
+/**
+ * THE LIVE-ADMISSION SEAM — which `STAT_LINE_GAPS` seasons a PRODUCT-FACING live board (the live-board
+ * plan's Task 4) is allowed to admit derived rows for. Named and documented here, beside
+ * `STAT_LINE_GAPS`, but consumed nowhere yet — this task only decides the shape; Task 4 is the first
+ * reader.
+ *
+ * NOT THE SAME SET AS `STAT_LINE_GAPS`, ON PURPOSE. `STAT_LINE_GAPS` answers "does nflverse publish a
+ * weekly stats file for this season" and exists to keep the laws harness's historical BACKTEST
+ * measurement whole — `laws/populations.ts`'s `admitDerived: true` reads every gap season in that list
+ * indiscriminately, 2019 included, because a backtest is allowed to read any season it has validated
+ * derivation for. A live board is a different kind of reader: it renders derived numbers to a real
+ * manager, for the season a league is actually playing right now. 2019 has no business reaching that
+ * surface — it is eleven-plus-year-old history whose only job is filling a hole in a historical
+ * measurement, never something a manager opens a player screen and sees a "live" number for. Reusing
+ * `STAT_LINE_GAPS` as the live gate would silently let 2019 through the day someone re-ran a
+ * `2015..2019` backfill and forgot the distinction existed.
+ *
+ * THE SHAPE, DECIDED HERE FOR TASK 4: an explicit allowlist, not a boolean flag threaded through
+ * `statLinesAsOfForMeasurement`/`seasonScoring`. A live board's own moment (`BoardMoment`, Task 2) is
+ * expected to call a seam that checks `LIVE_ADMITTED_DERIVED_SEASONS.includes(season)` before ever
+ * reading `DERIVED_STAT_LINE_SOURCE` for a season, the same shape `laws/populations.ts`'s
+ * `admitDerived: boolean` already established for the backtest reader — except keyed per season
+ * rather than per caller, because "safe for a live board" and "safe for the laws harness" are
+ * different questions with different answers for the same season list. Growing this list (a future
+ * season nflverse again fails to publish, mid-season) is a one-line addition here, reviewed on its own
+ * merits, never an automatic consequence of a season landing in `STAT_LINE_GAPS`.
+ */
+export const LIVE_ADMITTED_DERIVED_SEASONS: readonly number[] = [2025];
 
 export interface MapStatLinesInput {
   readonly playerWeek: readonly CsvRow[];

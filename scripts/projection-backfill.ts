@@ -17,8 +17,8 @@
 // nflverse is free, so unlike `ingest-once.ts` this spends no upstream request budget.
 //
 // THE GAP-SEASON BRANCH. `ingestSeason`'s published weekly stats file does not exist for any season
-// named in `STAT_LINE_GAPS` (today, only 2019 — a deterministic 404, not a transient one). For every
-// such season inside the requested range, this ALSO derives stat lines from that season's own
+// named in `STAT_LINE_GAPS` (today, 2019 and 2025 — a deterministic 404, not a transient one). For
+// every such season inside the requested range, this ALSO derives stat lines from that season's own
 // play-by-play (`ingestDerivedStatLines`, `nflverse/derived-stat-lines.ts`) and writes them under the
 // second source id `DERIVED_STAT_LINE_SOURCE` — never mixed with the published rows, and admitted by
 // a measurement read only when the LAWS HARNESS explicitly asks for it (`buildPopulations` passes
@@ -35,12 +35,22 @@
 // eight games. The spec's bar is 0.99 rank correlation; below that this exits before
 // `deriveGapSeasons` ever runs, so a validation failure can never be followed by a write of the
 // unproven derivation.
+//
+// THE SANITY REPORT (2025, and any future live gap season). The 2018-vs-2018 bar above proves the
+// DERIVATION METHOD agrees with a season nflverse did publish; it says nothing about any one gap
+// season's own numbers, because a gap season by definition has no published twin of its own to check
+// them against. For 2019 that gap sat between two published years and the method bar alone was judged
+// enough; 2025 is the season a live board is being built for right now, so `deriveGapSeasons` also
+// prints `derivedSeasonSanityReport` (`nflverse/derived-stat-lines.ts`) for it: per-week derived row
+// counts, the derived season's games-per-player distribution shape read beside the most recent
+// published season's own shape, and the derived rows' position mix. Descriptive, not a bar — there is
+// no rank correlation to report and none is fabricated to stand in for one.
 import { createDb } from "@/db/client";
 import type { Db } from "@/db/client";
 import { allPositions } from "@/projections/backtest";
 import { statLinesAsOf } from "@/projections/lines";
 import { createNflverseClient } from "@/projections/nflverse/client";
-import { seasonPointsAgreement } from "@/projections/nflverse/derived-stat-lines";
+import { derivedSeasonSanityReport, seasonPointsAgreement, type DerivedSeasonSanityReport } from "@/projections/nflverse/derived-stat-lines";
 import { computeDerivedStatLines, ingestDerivedStatLines, ingestPlayerUniverse, ingestSeason } from "@/projections/nflverse/ingest";
 import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
@@ -64,6 +74,12 @@ const STAT_LINE_VALIDATION_SEASON = 2018;
  *  is trustworthy. Below this, the honest outcome is to report why, not to ship it. */
 const MINIMUM_AGREEMENT = 0.99;
 
+/** The most recent season nflverse has fully published, and the shape the sanity report reads a
+ *  live gap season's games-per-player distribution beside. Fixed, like `STAT_LINE_VALIDATION_SEASON`
+ *  — a moving comparison season would make two backfill runs print numbers that are not comparable
+ *  to each other for reasons that have nothing to do with 2025 itself. */
+const SANITY_COMPARISON_SEASON = 2024;
+
 /** A season nothing has ever corrected past — the same "ungated, final" moment `laws/populations.ts`
  *  reads published actuals at. */
 const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");
@@ -81,20 +97,62 @@ function percent(value: number | null): string {
 }
 
 /**
+ * Prints `derivedSeasonSanityReport`'s shape, in place of the agreement number a gap season with no
+ * published twin has none of. Plain hyphens only, no em-dashes — the same discipline every other
+ * printed line in this script already keeps.
+ */
+function printSanityReport(report: DerivedSeasonSanityReport): void {
+  console.log(
+    `  sanity report (no published twin for ${report.season}; games-per-player shape read beside ` +
+      `${report.comparisonSeason}, published):`,
+  );
+  console.log(`    weekly derived rows: ${report.weeklyRowCounts.map((row) => `wk${row.week}=${row.rows}`).join(", ") || "(none)"}`);
+  console.log(
+    `    position mix, ${report.season} derived: ` +
+      (report.positionMix.map((entry) => `${entry.position}=${entry.rows} (${(entry.share * 100).toFixed(1)}%)`).join(", ") || "(none)"),
+  );
+  for (const [label, distribution] of [
+    [`${report.season} derived`, report.gamesDistribution],
+    [`${report.comparisonSeason} published`, report.comparisonGamesDistribution],
+  ] as const) {
+    console.log(
+      `    games per player, ${label}: n=${distribution.playerCount}, min=${distribution.min}, max=${distribution.max}, ` +
+        `mean=${distribution.mean.toFixed(2)}, median=${distribution.median}`,
+    );
+    console.log(`      buckets: ${distribution.buckets.map((bucket) => `${bucket.label}=${bucket.count}`).join(", ")}`);
+  }
+}
+
+/**
  * Derives and WRITES stat lines for every requested season nflverse never published — the gap-season
  * branch, and the only place in this script that writes a derived stat line. Idempotent, like every
  * ingestion here: a re-run of a season already landed at the SAME derivation writes 0 new
  * observations; a re-run after the derivation itself changed replaces the old rows outright
  * (`ingestDerivedStatLines`'s own delete-then-write, I5) rather than leaving them stale.
+ *
+ * Also prints the sanity report for each gap season it derives (see the file's own top-of-file
+ * comment on why): `SANITY_COMPARISON_SEASON`'s published lines and the position map are each fetched
+ * once, outside the loop, since every gap season's report reads the same comparison season.
  */
 async function deriveGapSeasons(db: Db, client: NflverseClient, seasons: readonly number[]): Promise<void> {
-  for (const season of seasons.filter((year) => STAT_LINE_GAPS.includes(year))) {
+  const gapSeasons = seasons.filter((year) => STAT_LINE_GAPS.includes(year));
+  if (gapSeasons.length === 0) return;
+
+  const positions = await allPositions(db);
+  const comparisonLines = await statLinesAsOf(db, {
+    season: SANITY_COMPARISON_SEASON,
+    week: { from: 1, to: LAST_POSSIBLE_WEEK },
+    asOf: FINAL_OUTCOME,
+  });
+
+  for (const season of gapSeasons) {
     const report = await ingestDerivedStatLines(db, client, season);
     console.log(
       `${season}: GAP SEASON, no published weekly stats upstream. Derived from play-by-play: ` +
         `${report.playsRead} plays -> ${report.statLines} stat lines, ${report.observationsWritten} new observations` +
         (report.unknownPlayers === 0 ? "" : `, ${report.unknownPlayers} stat-takers the universe does not project`),
     );
+    printSanityReport(derivedSeasonSanityReport(season, report.derivedLines, SANITY_COMPARISON_SEASON, comparisonLines, positions));
   }
 }
 

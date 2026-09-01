@@ -405,6 +405,138 @@ interface SeasonPoints {
   readonly games: number;
 }
 
+/**
+ * THE SANITY REPORT — for a gap season with no published twin of its own (2025, and any future live
+ * season nflverse has not yet published `stats_player_week_<season>.csv` for). `seasonPointsAgreement`
+ * above answers "does the derivation agree with a published season" and needs a published line to
+ * agree WITH; a live gap season has none, so asking that question of it can only ever produce either
+ * a refusal or a fabricated number standing in for one. This reports SHAPE instead: how many derived
+ * rows landed each week, what the games-per-player distribution looks like against a real published
+ * season's own distribution, and how the derived rows split by position. None of it is an agreement
+ * bar — nothing here is scored against a threshold, and there is deliberately no field a caller could
+ * mistake for a correlation or a pass/fail (see the docstring on the type itself).
+ *
+ * Pure, like every function in this file: `scripts/projection-backfill.ts` builds `comparisonLines`
+ * from a published season already in the store and passes both seasons' lines straight through.
+ */
+export interface PositionMixEntry {
+  readonly position: Position;
+  readonly rows: number;
+  readonly share: number;
+}
+
+/**
+ * Fixed bucket edges rather than data-derived quantiles: a season's real range is well known (a
+ * seventeen-game regular season, playoffs excluded by `NFLVERSE_CONFIG.seasonType`), so two
+ * different seasons' distributions can be read side by side in identical buckets, and a season with
+ * zero players still reports a full, legible shape instead of an empty list.
+ */
+const GAMES_BUCKETS: ReadonlyArray<{ readonly label: string; readonly min: number; readonly max: number }> = [
+  { label: "1-4", min: 1, max: 4 },
+  { label: "5-8", min: 5, max: 8 },
+  { label: "9-12", min: 9, max: 12 },
+  { label: "13-17", min: 13, max: 17 },
+  { label: "18+", min: 18, max: Infinity },
+];
+
+export interface GamesDistribution {
+  readonly playerCount: number;
+  readonly min: number;
+  readonly max: number;
+  readonly mean: number;
+  readonly median: number;
+  readonly buckets: ReadonlyArray<{ readonly label: string; readonly count: number }>;
+}
+
+function gamesPerPlayer(lines: readonly SeasonStatLine[]): number[] {
+  const counts = new Map<string, number>();
+  for (const { line } of lines) {
+    counts.set(line.playerId, (counts.get(line.playerId) ?? 0) + 1);
+  }
+  return [...counts.values()].sort((a, b) => a - b);
+}
+
+function gamesDistribution(lines: readonly SeasonStatLine[]): GamesDistribution {
+  const counts = gamesPerPlayer(lines);
+  const playerCount = counts.length;
+  if (playerCount === 0) {
+    return { playerCount: 0, min: 0, max: 0, mean: 0, median: 0, buckets: GAMES_BUCKETS.map(({ label }) => ({ label, count: 0 })) };
+  }
+  const total = counts.reduce((sum, games) => sum + games, 0);
+  const mid = Math.floor(playerCount / 2);
+  const median = playerCount % 2 === 0 ? (counts[mid - 1]! + counts[mid]!) / 2 : counts[mid]!;
+  return {
+    playerCount,
+    min: counts[0]!,
+    max: counts[playerCount - 1]!,
+    mean: total / playerCount,
+    median,
+    buckets: GAMES_BUCKETS.map(({ label, min, max }) => ({
+      label,
+      count: counts.filter((games) => games >= min && games <= max).length,
+    })),
+  };
+}
+
+/** Sorted by row count descending, so the printed report reads most-represented position first. A
+ *  stat-taker the position map does not carry is dropped rather than counted under an invented
+ *  position — the same discipline `seasonPointsByPlayer` already applies. */
+function positionMix(lines: readonly SeasonStatLine[], positions: ReadonlyMap<string, Position>): readonly PositionMixEntry[] {
+  const counts = new Map<Position, number>();
+  let total = 0;
+  for (const { line } of lines) {
+    const position = positions.get(line.playerId);
+    if (position === undefined) continue;
+    counts.set(position, (counts.get(position) ?? 0) + 1);
+    total += 1;
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([position, rows]) => ({ position, rows, share: rows / total }));
+}
+
+function weeklyRowCounts(lines: readonly SeasonStatLine[]): ReadonlyArray<{ readonly week: number; readonly rows: number }> {
+  const counts = new Map<number, number>();
+  for (const { line } of lines) {
+    counts.set(line.week, (counts.get(line.week) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([week, rows]) => ({ week, rows }));
+}
+
+/**
+ * NO AGREEMENT FIELD, BY CONSTRUCTION. This type has no `rankCorrelation`, no `meanAbsoluteError`, no
+ * pass/fail — unlike `SeasonPointsAgreement` above, which exists to hold exactly those. A gap season
+ * with no published twin has nothing to be scored against, and adding a field here that LOOKED like
+ * one would be the fabrication this report exists to refuse.
+ */
+export interface DerivedSeasonSanityReport {
+  readonly season: number;
+  /** The published season the games-distribution SHAPE is read beside — never averaged or diffed
+   *  against `season`'s own rows, since the two describe different players. */
+  readonly comparisonSeason: number;
+  readonly weeklyRowCounts: ReadonlyArray<{ readonly week: number; readonly rows: number }>;
+  readonly positionMix: readonly PositionMixEntry[];
+  readonly gamesDistribution: GamesDistribution;
+  readonly comparisonGamesDistribution: GamesDistribution;
+}
+
+export function derivedSeasonSanityReport(
+  season: number,
+  derivedLines: readonly SeasonStatLine[],
+  comparisonSeason: number,
+  comparisonLines: readonly SeasonStatLine[],
+  positions: ReadonlyMap<string, Position>,
+): DerivedSeasonSanityReport {
+  return {
+    season,
+    comparisonSeason,
+    weeklyRowCounts: weeklyRowCounts(derivedLines),
+    positionMix: positionMix(derivedLines, positions),
+    gamesDistribution: gamesDistribution(derivedLines),
+    comparisonGamesDistribution: gamesDistribution(comparisonLines),
+  };
+}
+
 function seasonPointsByPlayer(
   lines: readonly SeasonStatLine[],
   positions: ReadonlyMap<string, Position>,

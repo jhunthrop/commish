@@ -9,6 +9,7 @@ import {
   DERIVED_STAT_LINE_SOURCE,
   DerivedStatLineAggregator,
   deriveStatLines,
+  derivedSeasonSanityReport,
   derivedStatLineObservations,
   seasonPointsAgreement,
   statLinesAsOfForMeasurement,
@@ -324,6 +325,128 @@ describe("seasonPointsAgreement", () => {
   });
 });
 
+describe("derivedSeasonSanityReport — the no-published-twin path (2025 and any future live gap season)", () => {
+  const positions: ReadonlyMap<string, Position> = new Map([
+    ["qb1", "QB"],
+    ["rb1", "RB"],
+    ["rb2", "RB"],
+    ["wr1", "WR"],
+  ]);
+
+  function line(playerId: string, week: number, season = 2025): SeasonStatLine {
+    return {
+      season,
+      asOf: new Date("2025-12-01T00:00:00.000Z"),
+      line: {
+        playerId,
+        week,
+        passingYards: 0,
+        passingTouchdowns: 0,
+        interceptions: 0,
+        rushingYards: 0,
+        rushingTouchdowns: 0,
+        receivingYards: 0,
+        receivingTouchdowns: 0,
+        receptions: 0,
+        fumblesLost: 0,
+        fieldGoalsMade: 0,
+        extraPointsMade: 0,
+        sacks: 0,
+        defensiveInterceptions: 0,
+        defensiveTouchdowns: 0,
+      },
+    };
+  }
+
+  function weeks(playerId: string, playerWeeks: readonly number[], season = 2025): readonly SeasonStatLine[] {
+    return playerWeeks.map((week) => line(playerId, week, season));
+  }
+
+  it("counts derived rows per week, independent of player", () => {
+    const derived = [...weeks("qb1", [1, 2]), ...weeks("rb1", [1])];
+    const report = derivedSeasonSanityReport(2025, derived, 2024, [], positions);
+    expect(report.weeklyRowCounts).toEqual([
+      { week: 1, rows: 2 },
+      { week: 2, rows: 1 },
+    ]);
+  });
+
+  it("carries the season and comparison season through unchanged", () => {
+    const report = derivedSeasonSanityReport(2025, [], 2024, [], positions);
+    expect(report.season).toBe(2025);
+    expect(report.comparisonSeason).toBe(2024);
+  });
+
+  it("computes position mix over the derived rows only, sorted by row count descending", () => {
+    const derived = [...weeks("rb1", [1, 2, 3]), ...weeks("wr1", [1]), ...weeks("qb1", [1, 2])];
+    const report = derivedSeasonSanityReport(2025, derived, 2024, [], positions);
+    expect(report.positionMix).toEqual([
+      { position: "RB", rows: 3, share: 0.5 },
+      { position: "QB", rows: 2, share: expect.closeTo(2 / 6) },
+      { position: "WR", rows: 1, share: expect.closeTo(1 / 6) },
+    ]);
+  });
+
+  it("drops a stat-taker the position map does not carry from the position mix, rather than fabricating one", () => {
+    const derived = weeks("ghost", [1]);
+    const report = derivedSeasonSanityReport(2025, derived, 2024, [], positions);
+    expect(report.positionMix).toEqual([]);
+  });
+
+  it("computes the derived season's games-per-player distribution shape", () => {
+    const derived = [...weeks("rb1", [1, 2, 3, 4]), ...weeks("rb2", [1, 2])];
+    const report = derivedSeasonSanityReport(2025, derived, 2024, [], positions);
+    expect(report.gamesDistribution).toEqual({
+      playerCount: 2,
+      min: 2,
+      max: 4,
+      mean: 3,
+      median: 3,
+      buckets: [
+        { label: "1-4", count: 2 },
+        { label: "5-8", count: 0 },
+        { label: "9-12", count: 0 },
+        { label: "13-17", count: 0 },
+        { label: "18+", count: 0 },
+      ],
+    });
+  });
+
+  it("computes the comparison season's games-per-player distribution independently, never mixing the two seasons' rows", () => {
+    const derived = weeks("rb1", [1, 2], 2025);
+    const comparison = weeks("rb1", [1, 2, 3, 4, 5, 6, 7, 8, 9], 2024);
+    const report = derivedSeasonSanityReport(2025, derived, 2024, comparison, positions);
+    expect(report.gamesDistribution.playerCount).toBe(1);
+    expect(report.gamesDistribution.max).toBe(2);
+    expect(report.comparisonGamesDistribution.playerCount).toBe(1);
+    expect(report.comparisonGamesDistribution.max).toBe(9);
+  });
+
+  it("reports an empty-but-shaped distribution for zero players, never a fabricated summary", () => {
+    const report = derivedSeasonSanityReport(2025, [], 2024, [], positions);
+    expect(report.gamesDistribution).toEqual({
+      playerCount: 0,
+      min: 0,
+      max: 0,
+      mean: 0,
+      median: 0,
+      buckets: [
+        { label: "1-4", count: 0 },
+        { label: "5-8", count: 0 },
+        { label: "9-12", count: 0 },
+        { label: "13-17", count: 0 },
+        { label: "18+", count: 0 },
+      ],
+    });
+  });
+
+  it("never carries an agreement or correlation field — a no-published-twin season has none to report", () => {
+    const report = derivedSeasonSanityReport(2025, weeks("rb1", [1]), 2024, [], positions);
+    const keys = Object.keys(report);
+    expect(keys.some((key) => /correlation|agreement/i.test(key))).toBe(false);
+  });
+});
+
 /**
  * `statLinesAsOfForMeasurement` — DB-BACKED (fix round, I2). Everything above this point is pure;
  * this is the one function in the file that reads the store, and the admission rule it enforces
@@ -333,8 +456,8 @@ describe("seasonPointsAgreement", () => {
 describe("statLinesAsOfForMeasurement", () => {
   const db = createTestDb();
 
-  // 2019 is the one real STAT_LINE_GAPS season; 2018 is not. Using the real seasons rather than a
-  // fixture list keeps this test honest about what the constant actually says today.
+  // 2019 is a real STAT_LINE_GAPS season; 2018 is not. Using real seasons rather than a fixture
+  // list keeps this test honest about what the constant actually says today.
   const GAP_SEASON = 2019;
   const NON_GAP_SEASON = 2018;
   const AS_OF = new Date("2019-12-01T00:00:00.000Z");
