@@ -261,6 +261,18 @@ export interface MarketPriorEntry {
   readonly marketPoints: number;
 }
 
+/** `marketBoard`'s own result: the resolved entries, and how many published rows were dropped along
+ *  the way. `droppedCount` is the fix this docblock's own earlier draft promised and never actually
+ *  returned — Task 10 (`market/blend.ts`, the first real consumer of a market board) is what caught
+ *  it: a board whose whole point is "spend disagreement only where the model can name it" cannot
+ *  itself hand its own gaps to a caller only as a length a caller might remember to subtract. */
+export interface MarketBoardResult {
+  readonly entries: readonly MarketPriorEntry[];
+  /** Published ADP rows this function could not resolve to a position — see the function's own
+   *  docblock for the two ways that happens. Zero when every published row resolved. */
+  readonly droppedCount: number;
+}
+
 /**
  * ONE SEASON'S MARKET BOARD — the ADP snapshot a preseason board is entitled to see, resolved to
  * our own player ids and priced through the fitted curve.
@@ -272,26 +284,30 @@ export interface MarketPriorEntry {
  *
  * A ranked player whose position cannot be resolved from that season's own roster snapshot (no
  * roster row at all, or a roster row this curve does not carry a position for) is DROPPED rather
- * than guessed at — never silently, since the caller can always compare the returned length against
- * the published board's own size.
+ * than guessed at — counted in `droppedCount` rather than silently absorbed into a shorter
+ * `entries` array a caller would have to diff against the published board's own size to notice.
  */
 export async function marketBoard(
   db: ReadonlyDb,
   season: number,
   priors: MarketCurvePriors = FITTED_MARKET_CURVE,
-): Promise<readonly MarketPriorEntry[]> {
+): Promise<MarketBoardResult> {
   const asOf = await preseasonMomentFor(db, season);
   const board = await preseasonRankingsAsOf(db, { season, source: BENCHMARK_SOURCES.adp, asOf });
-  if (board.length === 0) return [];
+  if (board.length === 0) return { entries: [], droppedCount: 0 };
   const roster = await preseasonRostersAsOf(db, { season, asOf });
   const positionOf = new Map(roster.map((row) => [row.playerId, row.position] as const));
 
   const entries: MarketPriorEntry[] = [];
+  let droppedCount = 0;
   for (const row of board) {
     const raw = positionOf.get(row.playerId);
     const position = raw === undefined ? null : projectedPosition(raw);
-    if (position === null || !isCurvePosition(position)) continue;
+    if (position === null || !isCurvePosition(position)) {
+      droppedCount += 1;
+      continue;
+    }
     entries.push({ playerId: row.playerId, position, adpRank: row.rank, marketPoints: marketCurve(position, row.rank, priors) });
   }
-  return entries;
+  return { entries, droppedCount };
 }

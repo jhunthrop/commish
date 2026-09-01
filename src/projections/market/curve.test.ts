@@ -299,25 +299,27 @@ describe("loadMarketCurveObservations and marketBoard", () => {
       await recordObservations(db, [statLine({ value: 0 })]);
 
       const priors: MarketCurvePriors = { QB: [], RB: [{ adpRank: 3, points: 300 }, { adpRank: 4, points: 280 }], WR: [], TE: [] };
-      const board = await marketBoard(db, 2020, priors);
-      expect(board).toEqual([
+      const { entries, droppedCount } = await marketBoard(db, 2020, priors);
+      expect(entries).toEqual([
         { playerId: PLAYER_A, position: "RB", adpRank: 3.4, marketPoints: marketCurve("RB", 3.4, priors) },
       ]);
+      expect(droppedCount).toBe(0);
     });
 
-    it("drops a ranked row that cannot be resolved to a position, and reports the count via the returned length", async () => {
+    it("drops a ranked row that cannot be resolved to a position, and reports the count via droppedCount", async () => {
       await recordPreseasonRankings(db, [ranking(), ranking({ playerId: PLAYER_D, rank: 8 })]);
       await recordPreseasonRosters(db, [roster()]); // PLAYER_D carries no roster row for 2020
       await recordObservations(db, [statLine({ value: 0 })]);
 
-      const board = await marketBoard(db, 2020);
-      expect(board).toHaveLength(1);
-      expect(board[0]!.playerId).toBe(PLAYER_A);
+      const { entries, droppedCount } = await marketBoard(db, 2020);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.playerId).toBe(PLAYER_A);
+      expect(droppedCount).toBe(1);
     });
 
-    it("answers empty when the store holds no ADP board for the season, never a guess", async () => {
+    it("answers empty, with a zero dropped count, when the store holds no ADP board for the season, never a guess", async () => {
       await recordObservations(db, [statLine({ season: 2021, value: 0, asOf: GAME_DERIVED_STAMP(2021) })]);
-      expect(await marketBoard(db, 2021)).toEqual([]);
+      expect(await marketBoard(db, 2021)).toEqual({ entries: [], droppedCount: 0 });
     });
   });
 });
