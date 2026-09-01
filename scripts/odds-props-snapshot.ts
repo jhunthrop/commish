@@ -1,4 +1,4 @@
-// Fetches every upcoming NFL event within the next 8 days, then each event's player-prop odds
+// Fetches every upcoming NFL event within the next 14 days, then each event's player-prop odds
 // across the four verified markets (player_pass_yds, player_reception_yds, player_receptions,
 // player_rush_yds), and writes every bookmaker's every Over/Under pair to the player props
 // archive. The archive is append-only: a repeated run inserts a fresh set of rows, it never
