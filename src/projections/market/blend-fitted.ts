@@ -6,9 +6,9 @@ import type { BlendConstants } from "./blend";
  * Fit by a grid search over predictor seasons up to and including `BLEND_TRAIN_CUTOFF_SEASON`
  * (2021), scored by rank correlation against those seasons' own outcomes. `impliedGamesByPosition`
  * is the market curve's own train population's mean games played, per position
- * (`fitImpliedGamesByPosition`); `unlistedRescale` and `marketTailByPosition` price and cap the
- * unlisted fallback (see `market/blend.ts`'s own docblocks — QB is a deliberate fit-validity
- * exception, not a data gap). See `scripts/blend-fit.ts` for the grid.
+ * (`fitImpliedGamesByPosition`); `marketTailByPosition` caps the unlisted fallback at the market's
+ * own cheapest drafted man per position (see `market/blend.ts`'s own docblocks). See
+ * `scripts/blend-fit.ts` for the grid.
  *
  * THE WINNING SCORE: spearman rho = 0.6053 on the train rows.
  *
@@ -33,28 +33,6 @@ export const FITTED_BLEND_CONSTANTS: BlendConstants = {
     "RB": 12.3271719038817,
     "WR": 13.404217926186291,
     "TE": 12.934911242603551
-  },
-  "unlistedRescale": {
-    "QB": {
-      "slope": 1,
-      "intercept": 0,
-      "domainMin": 0
-    },
-    "RB": {
-      "slope": 0.3719085798778845,
-      "intercept": 89.85361579934586,
-      "domainMin": 2.59
-    },
-    "WR": {
-      "slope": 0.38534914842128803,
-      "intercept": 99.12625634852364,
-      "domainMin": 0.84
-    },
-    "TE": {
-      "slope": 0.27716666853940797,
-      "intercept": 101.39878197825,
-      "domainMin": 0.68
-    }
   },
   "marketTailByPosition": {
     "QB": 172.5111111111111,

@@ -11,7 +11,7 @@
 //      balloons after blending (QB going from a normal ~15-20% to over half) is a structural
 //      distortion a single best-rank number cannot see at all.
 //   2. UNLISTED PLAYERS ABOVE THEIR OWN POSITIONAL TAIL — this should be exactly ZERO on a correct
-//      build (`market/blend.ts`'s `rescaledUnlistedPoints` caps every unlisted candidate at
+//      build (`market/blend.ts`'s `tailCappedUnlistedPoints` caps every unlisted candidate at
 //      `constants.marketTailByPosition[position]` unconditionally), so this metric is the diagnostic
 //      re-verifying the structural guarantee LIVE rather than trusting the code that promises it.
 //

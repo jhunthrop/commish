@@ -9,7 +9,6 @@ import {
   blendBoard,
   detectPlateau,
   fitMarketTailByPosition,
-  fitUnlistedRescale,
   seasonPointsOf,
   scoreBlendConstants,
   withLawsAblated,
@@ -23,12 +22,8 @@ const SEASON = 2020;
  *  across every position keeps most tests focused on one axis at a time. */
 const IMPLIED_GAMES = 14;
 
-/** Identity rescale (slope 1, intercept 0) — most tests never exercise the unlisted fallback's own
- *  rescale, and identity keeps `seasonPointsOf(raw)` an honest comparison where they don't. */
-const IDENTITY_RESCALE = { slope: 1, intercept: 0, domainMin: 0 } as const;
-
 /** Set far above anything a test's raw points could reach, so the structural tail guard
- *  (`rescaledUnlistedPoints`'s own `Math.min`) never silently interferes with a test that is not
+ *  (`tailCappedUnlistedPoints`'s own `Math.min`) never silently interferes with a test that is not
  *  specifically exercising it — a test that DOES want the guard overrides this per-position. */
 const NO_TAIL = 100_000;
 
@@ -39,7 +34,6 @@ const CONSTANTS: BlendConstants = {
   availabilityCapPoints: 40,
   totalCapPoints: 50,
   impliedGamesByPosition: { QB: IMPLIED_GAMES, RB: IMPLIED_GAMES, WR: IMPLIED_GAMES, TE: IMPLIED_GAMES },
-  unlistedRescale: { QB: IDENTITY_RESCALE, RB: IDENTITY_RESCALE, WR: IDENTITY_RESCALE, TE: IDENTITY_RESCALE },
   marketTailByPosition: { QB: NO_TAIL, RB: NO_TAIL, WR: NO_TAIL, TE: NO_TAIL },
 };
 
@@ -227,7 +221,7 @@ describe("blendBoard", () => {
     expect(seasonPointsOf(blended!)).toBeCloseTo(200, 6);
   });
 
-  it("FALLS BACK to the raw model points (through the IDENTITY rescale) for a player absent from the market board, tagging the reason", () => {
+  it("FALLS BACK to the raw model points for a player absent from the market board, tagging the reason", () => {
     const raw = candidate({ perGame: line({ receivingYards: 50 }) });
     const rawSeasonPoints = seasonPointsOf(raw);
     const [blended] = blendBoard([], [raw], { season: SEASON, constants: CONSTANTS, laws: [] });
@@ -236,56 +230,39 @@ describe("blendBoard", () => {
     expect(blended!.reasons).not.toContainEqual(expect.objectContaining({ code: "market_anchor" }));
   });
 
-  it("RESCALES an unlisted candidate's raw points per constants.unlistedRescale (C2 fix round)", () => {
-    const raw = candidate({ perGame: line({ receivingYards: 50 }) });
-    const rawSeasonPoints = seasonPointsOf(raw);
-    const rescaled: BlendConstants = {
-      ...CONSTANTS,
-      unlistedRescale: { ...CONSTANTS.unlistedRescale, RB: { slope: 0.5, intercept: 10, domainMin: 0 } },
-    };
-    const [blended] = blendBoard([], [raw], { season: SEASON, constants: rescaled, laws: [] });
-    expect(seasonPointsOf(blended!)).toBeCloseTo(0.5 * rawSeasonPoints + 10, 2);
-  });
-
-  it("FLOORS a rescaled unlisted candidate's points at zero rather than going negative", () => {
-    const raw = candidate({ perGame: line({ receivingYards: 5 }) });
-    const rescaled: BlendConstants = {
-      ...CONSTANTS,
-      unlistedRescale: { ...CONSTANTS.unlistedRescale, RB: { slope: 1, intercept: -10_000, domainMin: 0 } },
-    };
-    const [blended] = blendBoard([], [raw], { season: SEASON, constants: rescaled, laws: [] });
-    expect(seasonPointsOf(blended!)).toBe(0);
-  });
-
-  it("PIN (fix round 2, ruling 4a): an unlisted candidate is NEVER priced above his position's own market tail, however high the rescale alone would take him", () => {
+  it("PIN (fix round 2, ruling 4a; SIMPLIFIED fix round 3, IMPORTANT 1): an unlisted candidate is NEVER priced above his position's own market tail, however high his raw points are", () => {
     const raw = candidate({ perGame: line({ receivingYards: 500 }) }); // an enormous raw number
-    const generousRescale: BlendConstants = {
-      ...CONSTANTS,
-      unlistedRescale: { ...CONSTANTS.unlistedRescale, RB: { slope: 10, intercept: 1000, domainMin: 0 } }, // would blow past any tail
-      marketTailByPosition: { ...CONSTANTS.marketTailByPosition, RB: 51 }, // the real fitted RB tail is ~51
-    };
-    const [blended] = blendBoard([], [raw], { season: SEASON, constants: generousRescale, laws: [] });
-    expect(seasonPointsOf(blended!)).toBeCloseTo(51, 2);
-  });
-
-  it("the tail guard also caps a raw pass-through (below domainMin), not only a rescaled value", () => {
-    const raw = candidate({ perGame: line({ receivingYards: 500 }) });
     const constants: BlendConstants = {
       ...CONSTANTS,
-      unlistedRescale: { ...CONSTANTS.unlistedRescale, RB: { slope: 1, intercept: 0, domainMin: 1_000_000 } }, // always the raw pass-through branch
-      marketTailByPosition: { ...CONSTANTS.marketTailByPosition, RB: 51 },
+      marketTailByPosition: { ...CONSTANTS.marketTailByPosition, RB: 51 }, // the real fitted RB tail is ~51
     };
     const [blended] = blendBoard([], [raw], { season: SEASON, constants, laws: [] });
     expect(seasonPointsOf(blended!)).toBeCloseTo(51, 2);
   });
 
-  it("does NOT cap an unlisted candidate whose rescaled points already sit below the tail", () => {
+  it("does NOT cap an unlisted candidate whose raw points already sit below the tail", () => {
     const raw = candidate({ perGame: line({ receivingYards: 5 }) }); // a modest raw number
     const constants: BlendConstants = { ...CONSTANTS, marketTailByPosition: { ...CONSTANTS.marketTailByPosition, RB: 51 } };
     const rawSeasonPoints = seasonPointsOf(raw);
     const [blended] = blendBoard([], [raw], { season: SEASON, constants, laws: [] });
     expect(seasonPointsOf(blended!)).toBeCloseTo(rawSeasonPoints, 6);
     expect(seasonPointsOf(blended!)).toBeLessThan(51);
+  });
+
+  it("ORDERING-PRESERVED PIN (fix round 3, IMPORTANT 1): two unlisted players keep their raw model's own order — the exact property the dead affine rescale erased by collapsing every unlisted candidate at a position to the identical tail value", () => {
+    const strongerRaw = candidate({ playerId: "stronger", perGame: line({ playerId: "stronger", receivingYards: 40 }) });
+    const weakerRaw = candidate({ playerId: "weaker", perGame: line({ playerId: "weaker", receivingYards: 10 }) });
+    const strongerPoints = seasonPointsOf(strongerRaw);
+    const weakerPoints = seasonPointsOf(weakerRaw);
+    expect(strongerPoints).toBeGreaterThan(weakerPoints); // sanity: the fixtures really do differ
+
+    const constants: BlendConstants = { ...CONSTANTS, marketTailByPosition: { ...CONSTANTS.marketTailByPosition, RB: 1000 } }; // above both raw values, so neither is capped
+    const blended = blendBoard([], [strongerRaw, weakerRaw], { season: SEASON, constants, laws: [] });
+    const stronger = blended.find((c) => c.playerId === "stronger")!;
+    const weaker = blended.find((c) => c.playerId === "weaker")!;
+    expect(seasonPointsOf(stronger)).toBeCloseTo(strongerPoints, 6);
+    expect(seasonPointsOf(weaker)).toBeCloseTo(weakerPoints, 6);
+    expect(seasonPointsOf(stronger)).toBeGreaterThan(seasonPointsOf(weaker));
   });
 
   it("carries every OTHER candidate's own fields through unchanged (team, position, games)", () => {
@@ -358,67 +335,6 @@ describe("scoreBlendConstants — the grid search's own scoring rule", () => {
   it("returns null when there is no variance to correlate, exactly like `spearman` itself", () => {
     const rows = [row({ market: market({ playerId: "a", marketPoints: 100 }), candidate: candidate({ playerId: "a" }), actualPoints: 90 })];
     expect(scoreBlendConstants(rows, CONSTANTS, { heldOutSeasons: [], laws: [] })).toBeNull();
-  });
-});
-
-describe("fitUnlistedRescale — the C2 fix round's OLS affine fit", () => {
-  function trainRow(overrides: Partial<BlendTrainRow> = {}): BlendTrainRow {
-    return { season: 2019, market: market(), candidate: candidate(), actualPoints: 0, ...overrides };
-  }
-
-  it("REFUSES a row past BLEND_TRAIN_CUTOFF_SEASON — a rescale fitted on a season it will later be scored on is not a measurement", () => {
-    expect(() => fitUnlistedRescale([trainRow({ season: BLEND_TRAIN_CUTOFF_SEASON + 1 })])).toThrow(
-      new RegExp(`past BLEND_TRAIN_CUTOFF_SEASON \\(${BLEND_TRAIN_CUTOFF_SEASON}\\)`),
-    );
-  });
-
-  it("recovers a PERFECT linear relationship exactly (slope, then intercept)", () => {
-    // marketPoints = 2 * rawPoints + 5, exactly, for every RB row.
-    const rows = [10, 20, 30, 40].map((raw) =>
-      trainRow({
-        candidate: candidate({ position: "RB", perGame: line({ receivingYards: raw / IMPLIED_GAMES / 0.1 }) }),
-        market: market({ position: "RB", marketPoints: 2 * raw + 5 }),
-      }),
-    );
-    const table = fitUnlistedRescale(rows);
-    expect(table.RB.slope).toBeCloseTo(2, 6);
-    expect(table.RB.intercept).toBeCloseTo(5, 4);
-  });
-
-  it("falls back to the IDENTITY transform (slope 1, intercept 0) for a position with fewer than two rows", () => {
-    const rows = [trainRow({ candidate: candidate({ position: "TE" }), market: market({ position: "TE", marketPoints: 999 }) })];
-    expect(fitUnlistedRescale(rows).TE).toEqual({ slope: 1, intercept: 0, domainMin: 0 });
-  });
-
-  it("falls back to the IDENTITY transform when every row's raw points are identical (zero variance, nothing to regress on)", () => {
-    const rows = [
-      trainRow({ candidate: candidate({ position: "WR" }), market: market({ position: "WR", marketPoints: 100 }) }),
-      trainRow({ candidate: candidate({ position: "WR" }), market: market({ position: "WR", marketPoints: 300 }) }),
-    ];
-    expect(fitUnlistedRescale(rows).WR).toEqual({ slope: 1, intercept: 0, domainMin: 0 });
-  });
-
-  it("fits every position independently", () => {
-    const rows = [
-      trainRow({ candidate: candidate({ position: "RB", perGame: line({ receivingYards: 10 }) }), market: market({ position: "RB", marketPoints: 50 }) }),
-      trainRow({ candidate: candidate({ position: "RB", perGame: line({ receivingYards: 20 }) }), market: market({ position: "RB", marketPoints: 150 }) }),
-      trainRow({ candidate: candidate({ position: "WR", perGame: line({ receivingYards: 5 }) }), market: market({ position: "WR", marketPoints: 999 }) }),
-      trainRow({ candidate: candidate({ position: "WR", perGame: line({ receivingYards: 15 }) }), market: market({ position: "WR", marketPoints: 999 }) }),
-    ];
-    const table = fitUnlistedRescale(rows);
-    expect(table.WR.slope).toBeCloseTo(0, 6); // WR's market points never move — flat fit.
-  });
-
-  it("FIT-VALIDITY RULING (fix round 2, ruling 1): QB is ALWAYS the identity transform, never OLS-fit, however much (and however linear) the QB train data looks", () => {
-    // A PERFECT linear relationship for QB, exactly the shape that recovered slope=2/intercept=5 for
-    // RB above — QB must still come back as the untouched identity transform.
-    const rows = [10, 20, 30, 40].map((raw) =>
-      trainRow({
-        candidate: candidate({ position: "QB", perGame: line({ receivingYards: raw / IMPLIED_GAMES / 0.1 }) }),
-        market: market({ position: "QB", marketPoints: 2 * raw + 5 }),
-      }),
-    );
-    expect(fitUnlistedRescale(rows).QB).toEqual({ slope: 1, intercept: 0, domainMin: 0 });
   });
 });
 

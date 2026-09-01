@@ -43,23 +43,23 @@
 // was the best-scoring choice. Every one of GRID^3 cells is scored and its own rho logged below,
 // not only the winner.
 //
-// THE UNLISTED FALLBACK'S OWN RESCALE (C2 fix round 1, TIGHTENED FIX ROUND 2) — `fitUnlistedRescale`
-// (`market/blend.ts`), an OLS affine fit per position over every TRAIN row's own (raw model points,
-// market points) pair, committed alongside the cap constants. A diagnostic run over 2023/2024 found
-// the raw model's own unlisted fallback landing implausibly high (an unlisted player at overall rank
-// 20 in 2023, rank 43 in 2024) against the market-anchored blend around it. Fix round 1's own single
-// rescale REGRESSED the board: QB's fitted intercept (fit over a listed population dominated by real
-// starters) inflated backup-caliber unlisted quarterbacks toward starter-level output — the top of
-// the unlisted list came back roughly 55% quarterbacks, most undrafted, priced above the market's
-// own deepest drafted QB. Fix round 2 ships TWO independent corrections: QB's own transform is now
-// unconditionally the identity (`fitUnlistedRescale`'s own `IDENTITY_ONLY_POSITIONS` docblock — a
-// fit-validity ruling, not a data shortage), and EVERY position now carries a structural tail cap
-// (`fitMarketTailByPosition`, `BlendConstants.marketTailByPosition`) that guarantees an unlisted
-// player's final number can never exceed the market's own cheapest drafted man at his position.
-// `scripts/blend-diagnostic.ts` is the committed, re-runnable check for both — position mix of the
-// board's own top 100 and the count of unlisted players still priced above their positional tail,
-// never the single "best unlisted rank" number that hid the QB regression from fix round 1's own
-// diagnostic.
+// THE UNLISTED FALLBACK'S OWN PRICING (C2 fix round 1, TIGHTENED fix round 2, SIMPLIFIED fix round
+// 3, IMPORTANT 1) — an unlisted candidate's raw model season points, capped at
+// `fitMarketTailByPosition`'s own structural tail (`BlendConstants.marketTailByPosition`), nothing
+// else. Fix round 1 shipped an additional affine rescale layer (`fitUnlistedRescale`, an OLS fit per
+// position over every TRAIN row's own (raw model points, market points) pair) to correct the raw
+// model's own unlisted fallback landing implausibly high (an unlisted player at overall rank 20 in
+// 2023, rank 43 in 2024). Fix round 2 found that rescale REGRESSED the board at QB (a fitted
+// intercept inflating backup-caliber unlisted quarterbacks toward starter-level output) and forced
+// QB to the identity transform as a fit-validity exception. Fix round 3's own audit found the
+// rescale dead everywhere else too: every fitted intercept at RB/WR/TE already sat above that
+// position's own tail, so `Math.min(rescaled, tail)` always discarded the rescale's output in favour
+// of the tail — the layer never changed a single shipped number, it only collapsed every unlisted
+// candidate at a position to the identical tail value, erasing the raw model's own ordering among
+// them. The rescale is gone; `Math.min(rawPoints, tail)` is the whole rule now.
+// `scripts/blend-diagnostic.ts` is the committed, re-runnable check — position mix of the board's
+// own top 100 and the count of unlisted players still priced above their positional tail, never the
+// single "best unlisted rank" number that hid the QB regression from fix round 1's own diagnostic.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
@@ -68,7 +68,6 @@ import {
   BLEND_TRAIN_CUTOFF_SEASON,
   detectPlateau,
   fitMarketTailByPosition,
-  fitUnlistedRescale,
   scoreBlendConstants,
   type BlendConstants,
   type BlendTrainRow,
@@ -182,9 +181,9 @@ function header(summary: FitSummary): string {
  * Fit by a grid search over predictor seasons up to and including \`BLEND_TRAIN_CUTOFF_SEASON\`
  * (2021), scored by rank correlation against those seasons' own outcomes. \`impliedGamesByPosition\`
  * is the market curve's own train population's mean games played, per position
- * (\`fitImpliedGamesByPosition\`); \`unlistedRescale\` and \`marketTailByPosition\` price and cap the
- * unlisted fallback (see \`market/blend.ts\`'s own docblocks — QB is a deliberate fit-validity
- * exception, not a data gap). See \`scripts/blend-fit.ts\` for the grid.
+ * (\`fitImpliedGamesByPosition\`); \`marketTailByPosition\` caps the unlisted fallback at the market's
+ * own cheapest drafted man per position (see \`market/blend.ts\`'s own docblocks). See
+ * \`scripts/blend-fit.ts\` for the grid.
  *
  * THE WINNING SCORE: spearman rho = ${summary.bestScore.toFixed(4)} on the train rows.
  *
@@ -242,16 +241,7 @@ async function main(): Promise<void> {
   // times `rows.length` rows would mean hundreds of thousands of redundant file reads.
   const laws = registry();
 
-  console.log("\nfitting the unlisted fallback's own per-position rescale (C2, QB is fix round 2's fit-validity exception)...");
-  const unlistedRescale = fitUnlistedRescale(rows);
-  for (const position of ["QB", "RB", "WR", "TE"] as const) {
-    const { slope, intercept, domainMin } = unlistedRescale[position];
-    console.log(
-      `  ${position}: marketPoints ~= ${slope.toFixed(3)} * rawPoints + ${intercept.toFixed(2)}  (applied only for rawPoints >= ${domainMin.toFixed(1)})`,
-    );
-  }
-
-  console.log("\nfitting the structural tail guard, per position (fix round 2, ruling 2)...");
+  console.log("\nfitting the structural tail guard, per position (fix round 2, ruling 2) — the unlisted fallback's only pricing rule (fix round 3, IMPORTANT 1)...");
   const marketTailByPosition = fitMarketTailByPosition(rows);
   for (const position of ["QB", "RB", "WR", "TE"] as const) {
     console.log(`  ${position}: ${marketTailByPosition[position].toFixed(1)} pts (the market's own cheapest drafted man at this position)`);
@@ -271,7 +261,6 @@ async function main(): Promise<void> {
           availabilityCapPoints,
           totalCapPoints,
           impliedGamesByPosition,
-          unlistedRescale,
           marketTailByPosition,
         };
         const score = scoreBlendConstants(rows, constants, { heldOutSeasons: [], laws });

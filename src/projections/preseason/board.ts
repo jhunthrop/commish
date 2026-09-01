@@ -65,11 +65,16 @@ export type BoardReason =
   | { readonly code: "tier_cliff"; readonly playersLeftInTier: number; readonly dropToNextTier: number }
   /**
    * Task 10 (`market/blend.ts`'s `blendBoard`) could not find this player on the market's own ADP
-   * board, so his season points are the raw model's own number rather than a market-anchored blend.
-   * NOT a claim that the model is wrong about him — an unranked player is usually a deep camp body
-   * neither a real draft board nor `blendBoard` has an opinion worth blending — only that the two
-   * numbers a manager can compare on every other row (what the market thinks, what evidence moved
-   * him off it) do not exist for this one.
+   * board, so his season points are `Math.min(rawModelPoints, marketTailByPosition[position])` —
+   * the raw model's own number, capped so he can never outrank the market's own cheapest drafted man
+   * at his position (`market/blend.ts`'s `tailCappedUnlistedPoints`, fix round 3, IMPORTANT 1 —
+   * SIMPLIFIED from an earlier two-layer version that also ran an affine rescale first). Since the
+   * cap can bind, his final number is NOT always a pure, unedited model output; the reason itself
+   * carries no field that says whether it did, so neither this docblock nor `reason-chip.tsx`'s
+   * copy for this code claims one way or the other. NOT a claim that the model is wrong about him —
+   * an unranked player is usually a deep camp body neither a real draft board nor `blendBoard` has an
+   * opinion worth blending — only that the two numbers a manager can compare on every other row (what
+   * the market thinks, what evidence moved him off it) do not exist for this one.
    */
   | { readonly code: "market_unlisted" }
   /**

@@ -70,8 +70,29 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * the entire time they existed, so there is nothing about "v2 specifically" worth a reader
  * addressing by name going forward. Every reader of `BOARD_SOURCE` (the drafts-players route, the
  * player screen) picks up the corrected blend automatically, with no call-site change.
+ *
+ * BUMPED AGAIN TO v4 (fix round 3, IMPORTANT 1, 2026-09-01 — the identical unique-key problem, a
+ * third time). Fix round 2's own tail guard was correct, but the affine rescale layer it capped
+ * (`unlistedRescale`) was dead: every fitted intercept at RB/WR/TE already sat above that position's
+ * own tail, so the tail's `Math.min` discarded the rescale's output for every candidate, collapsing
+ * every unlisted player at a position to the SAME tail value and erasing the raw model's own
+ * ordering among them. A live check against v3's own stored rows confirmed the damage directly:
+ * multiple DISTINCT unlisted WRs were stored at the identical 85.79-point WR tail in 2024, and
+ * re-running the corrected pricing (`market/blend.ts`'s `tailCappedUnlistedPoints`, the rescale layer
+ * removed) against those SAME player ids returned distinct, ordered numbers instead (6.94, 65.40,
+ * 19.40, 83.39, 8.84, 71.54 among them) — a real, large points change for unlisted RB/WR/TE
+ * candidates, not a no-op refactor. QB is the one position where v3's stored numbers are unaffected:
+ * `unlistedRescale.QB` was already the identity transform (fix round 2's own fit-validity ruling), so
+ * `tailCappedUnlistedPoints` reproduces QB's old output exactly — the discrepancy is real only at
+ * RB/WR/TE, but the fix is not position-scoped in the store, so the WHOLE board moves to a fresh
+ * source rather than only the affected positions. `commish_board_v4_ppr_12` is, again, a fresh value
+ * with no existing rows, for the identical structural reason v2 and v3 needed one: `preseason_projections`'
+ * own `(season, source, as_of)` unique key means a rerun under an unchanged source name silently
+ * keeps serving the old, wrong numbers forever. v3 is NOT kept as a second permanent named constant,
+ * for the same reason v2 was not: its own stored rows were wrong (at RB/WR/TE) the entire time they
+ * existed.
  */
-export const BOARD_SOURCE = "commish_board_v3_ppr_12";
+export const BOARD_SOURCE = "commish_board_v4_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {

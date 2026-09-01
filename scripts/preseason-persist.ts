@@ -1,5 +1,6 @@
 // Builds the shipped preseason board for one or more seasons and WRITES IT DOWN — the market-blended
-// board, under BOARD_SOURCE (v2), AND the raw model board, under BOARD_SOURCE_V1_RAW (v1), so both
+// board, under BOARD_SOURCE (see board-store.ts's own docblock for its current value and the
+// source-bump history behind it), AND the raw model board, under BOARD_SOURCE_V1_RAW (v1), so both
 // halves of Task 11's own scorecard comparison stay addressable and CURRENT.
 // Run: npm run projections:preseason:persist [season ...]   (defaults to every ingested season)
 //
@@ -116,12 +117,12 @@ async function main(): Promise<void> {
         `${String(v1.written).padStart(4)} new projection rows  ${String(v1.reasonsWritten).padStart(4)} reason rows written`,
     );
 
-    const v2 = await persistBoard(db, inputs, BOARD_SOURCE, false);
+    const blended = await persistBoard(db, inputs, BOARD_SOURCE, false);
     console.log(
-      `${season}  [v2 blend, ${BOARD_SOURCE}]  ${String(v2.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
-        `${String(v2.written).padStart(4)} new projection rows  ${String(v2.reasonsWritten).padStart(4)} reason rows written`,
+      `${season}  [blend, ${BOARD_SOURCE}]  ${String(blended.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
+        `${String(blended.written).padStart(4)} new projection rows  ${String(blended.reasonsWritten).padStart(4)} reason rows written`,
     );
-    for (const entry of v2.board.slice(0, 5)) {
+    for (const entry of blended.board.slice(0, 5)) {
       console.log(
         `      ${String(entry.rank).padStart(3)} ${entry.position} ${(names.get(entry.playerId) ?? entry.playerId).padEnd(22)}` +
           `proj ${entry.projectedPoints.toFixed(0).padStart(4)}  ${entry.position}${entry.positionRank}`,

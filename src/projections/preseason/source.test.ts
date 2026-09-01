@@ -480,14 +480,8 @@ describe("blendBoard's identity, through a production-reachable route (I4 fix ro
       // Deliberately matches veteran.games.expected (17) so the availability-gap delta is exactly
       // zero — the one condition under which the identity is exercised.
       impliedGamesByPosition: { QB: 17, RB: 17, WR: 17, TE: 17 },
-      // Identity — this test is listed (marketEntry exists), so unlistedRescale/marketTailByPosition
-      // never apply, but BlendConstants still requires both.
-      unlistedRescale: {
-        QB: { slope: 1, intercept: 0, domainMin: 0 },
-        RB: { slope: 1, intercept: 0, domainMin: 0 },
-        WR: { slope: 1, intercept: 0, domainMin: 0 },
-        TE: { slope: 1, intercept: 0, domainMin: 0 },
-      },
+      // This test is listed (marketEntry exists), so marketTailByPosition never applies, but
+      // BlendConstants still requires it.
       marketTailByPosition: { QB: 100_000, RB: 100_000, WR: 100_000, TE: 100_000 },
     };
     const [blended] = blendBoard([marketEntry], [veteran], { season: 2024, constants, laws: [] });

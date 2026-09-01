@@ -39,10 +39,11 @@ describe("discoveredHeadline", () => {
     expect(discoveredHeadline(181.5, law)).toBe("182 carries and receptions");
   });
 
-  it("renders a \"two_decimal\" unit with plain rounding (age), never ceiling", () => {
+  it("renders a \"two_decimal\" unit with plain rounding (age), never ceiling, NOUN-FIRST (the age unit's own generic word-order rule)", () => {
     const law = discoveredLawFixture({ primaryQuantityNoun: "age", primaryQuantityUnit: "two_decimal" });
     // Ceiling (the THRESHOLD rule) would read "27.73"; plain rounding (the MAGNITUDE rule) reads "27.72".
-    expect(discoveredHeadline(27.723, law)).toBe("27.72 age");
+    // Word order is noun-first for "two_decimal" specifically (`wordOrderFor`) — "age 27.72", not "27.72 age".
+    expect(discoveredHeadline(27.723, law)).toBe("age 27.72");
   });
 
   it("renders a \"one_decimal\" unit with plain rounding", () => {
@@ -100,10 +101,10 @@ describe("ReasonChip — market_anchor and market_unlisted (I6/M8 fix round)", (
     expect(screen.getByText(/Market 210\.4 pts, -3\.2 from evidence/)).toBeInTheDocument();
   });
 
-  it("renders market_unlisted's own plain sentence", () => {
+  it("renders market_unlisted's own neutral copy (fix round 3, IMPORTANT 2: the old copy claimed model-only pricing, which is no longer true under min(raw, tail))", () => {
     const reason: BoardReason = { code: "market_unlisted" };
     render(<ReasonChip reason={reason} registry={[]} />);
-    expect(screen.getByText(/No market ADP; model-only projection/)).toBeInTheDocument();
+    expect(screen.getByText(/^No market ADP$/)).toBeInTheDocument();
   });
 });
 

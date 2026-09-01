@@ -85,13 +85,29 @@ function formatMagnitude(unit: PrimaryQuantityUnit, value: number): string {
 }
 
 /**
+ * WORD ORDER, keyed by `PrimaryQuantityUnit` — a GENERIC rule, never a per-law or per-quantity
+ * special case. Every unit reads "{value} {noun}" ("182 carries and receptions", "23.5%
+ * touchdown-points share") except `"two_decimal"`, which reads noun-first, "{noun} {value}" ("age
+ * 27.72"): `templates.ts`'s `QUANTITY_DEFS` assigns `magnitudeUnit: "two_decimal"` to exactly one
+ * quantity today, age, and "27.72 age" reads like a units label stapled after a number, where "age
+ * 27.72" reads as a stated fact the way "age 29 season" (`LAW_HEADLINES.rb_age_curve`, this file's
+ * own hand-written TRIBAL headline) already does. The rule is stated on the UNIT, not on the
+ * quantity id or the noun string, so it generalises automatically to any future `"two_decimal"`
+ * quantity without a new case here.
+ */
+function wordOrderFor(unit: PrimaryQuantityUnit): "value-first" | "noun-first" {
+  return unit === "two_decimal" ? "noun-first" : "value-first";
+}
+
+/**
  * A DISCOVERED law's headline, MECHANICALLY built from its own `Law` record's persisted
  * `primaryQuantityNoun`/`primaryQuantityUnit` — never a hand entry, because a discovered id changes
- * between discovery rounds. `"{formatMagnitude(unit, magnitude)} {noun}"`, e.g.
- * "182 carries and receptions" or "27.72 age" — no em-dash, matching every other user-facing string
- * in this engine, because neither `formatMagnitude`'s output nor a persisted `primaryQuantityNoun`
- * ever contains one (`discovery/templates.ts`'s own `shortLabel`s are hand-written prose fragments,
- * none of which use one either).
+ * between discovery rounds. `"{formatMagnitude(unit, magnitude)} {noun}"` for every unit except
+ * `"two_decimal"`, which flips to `"{noun} {formatMagnitude(unit, magnitude)}"` (`wordOrderFor`,
+ * above) — e.g. "182 carries and receptions", but "age 27.72". No em-dash, matching every other
+ * user-facing string in this engine, because neither `formatMagnitude`'s output nor a persisted
+ * `primaryQuantityNoun` ever contains one (`discovery/templates.ts`'s own `shortLabel`s are
+ * hand-written prose fragments, none of which use one either).
  *
  * `undefined` when `law`'s presentation fields are `null` — a TRIBAL law passed here by mistake, or
  * (defensively) a discovered law whose fields somehow came back unset; `lawHeadline` falls back to
@@ -102,7 +118,8 @@ function formatMagnitude(unit: PrimaryQuantityUnit, value: number): string {
  */
 export function discoveredHeadline(magnitude: number, law: Law): string | undefined {
   if (law.primaryQuantityNoun === null || law.primaryQuantityUnit === null) return undefined;
-  return `${formatMagnitude(law.primaryQuantityUnit, magnitude)} ${law.primaryQuantityNoun}`;
+  const value = formatMagnitude(law.primaryQuantityUnit, magnitude);
+  return wordOrderFor(law.primaryQuantityUnit) === "noun-first" ? `${law.primaryQuantityNoun} ${value}` : `${value} ${law.primaryQuantityNoun}`;
 }
 
 function lawHeadline(lawId: string, magnitude: number, law: Law | undefined): string {
@@ -143,7 +160,7 @@ function copyFor(reason: BoardReason, law: Law | undefined): string {
     case "tier_cliff":
       return `${reason.playersLeftInTier} left in tier, ${reason.dropToNextTier.toFixed(1)} pt drop to the next`;
     case "market_unlisted":
-      return "No market ADP; model-only projection";
+      return "No market ADP";
     case "market_anchor":
       return `Market ${reason.marketPoints.toFixed(1)} pts, ${signedPoints(reason.delta)} from evidence`;
     default: {
