@@ -153,16 +153,42 @@ function kickoffFact(over: Partial<TeamWeekObservation> = {}): TeamWeekObservati
  * `replay-moments.ts`'s `playerGameMomentsFor` each used to compute separately.
  */
 describe("firstKickoffFor / requireFirstKickoffFor", () => {
-  it("returns the earliest kickoff instant across every team and week in the season", async () => {
+  it("returns the earliest kickoff instant across every team in WEEK ONE", async () => {
     await recordTeamObservations(db, [
       kickoffFact({ asOf: new Date("2024-09-08T17:00:00.000Z") }),
-      kickoffFact({ team: "CLE", week: 6, asOf: TUESDAY }),
+      kickoffFact({ team: "CLE", asOf: new Date("2024-09-08T20:00:00.000Z") }),
     ]);
     expect(await firstKickoffFor(db, 2024)).toEqual(new Date("2024-09-08T17:00:00.000Z"));
   });
 
   it("returns null, not a throw, when the store holds no kickoff instants for the season", async () => {
     expect(await firstKickoffFor(db, 2024)).toBeNull();
+  });
+
+  /**
+   * I1 (fix round review) — THE SINGLE POINT EVERYTHING ELSE REDUCES TO. Before this, the query took
+   * `min(asOf)` over EVERY week's kickoff row, with no week predicate at all: a season whose week-1
+   * ingest had not landed yet, but whose later weeks had, would silently report a LATER week's
+   * kickoff as though it were the season's first — unlocking both a fake live moment past a real
+   * October game and an ingest cutoff that trusts an in-season instant. This pins the fix two ways.
+   */
+  it("IGNORES a later week's kickoff even when it is stamped EARLIER than week one's own — week one only, never a minimum across weeks", async () => {
+    await recordTeamObservations(db, [
+      kickoffFact({ week: 1, team: "KC", asOf: new Date("2024-09-08T17:00:00.000Z") }),
+      // Stamped BEFORE week one's own kickoff — a data quirk (a correction, a late-arriving row) that
+      // must not let a later week win the "first kickoff" claim regardless of its own as-of.
+      kickoffFact({ week: 6, team: "CLE", asOf: new Date("2024-09-01T00:00:00.000Z") }),
+    ]);
+    expect(await firstKickoffFor(db, 2024)).toEqual(new Date("2024-09-08T17:00:00.000Z"));
+  });
+
+  it("returns null — never a WRONG instant — when week one is absent from a partially-ingested schedule, even though later weeks are present", async () => {
+    await recordTeamObservations(db, [
+      kickoffFact({ week: 2, team: "KC", asOf: new Date("2024-09-15T17:00:00.000Z") }),
+      kickoffFact({ week: 6, team: "CLE", asOf: new Date("2024-10-13T17:00:00.000Z") }),
+    ]);
+    expect(await firstKickoffFor(db, 2024)).toBeNull();
+    await expect(requireFirstKickoffFor(db, 2024)).rejects.toThrow(/projections:context/);
   });
 
   /**

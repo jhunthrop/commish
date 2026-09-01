@@ -10,6 +10,7 @@ import { recordPreseasonRosters } from "./store";
 import { recordTeamObservations } from "../team-store";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { DEPTH_METRIC, DEPTH_SOURCE } from "./depth";
+import { INJURY_METRICS, INJURY_SOURCE } from "../news/retrieve";
 import { FITTED_MODEL } from "../model/source";
 import type { Law } from "../laws/types";
 import { blendBoard, seasonPointsOf, shippedPreseasonCandidates, type BlendConstants } from "../market/blend";
@@ -682,6 +683,35 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
       const inputs = await loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment });
       expect(inputs.momentKind).toBe("live");
       expect(inputs.depthChart.get(VETERAN)).toBe("first");
+    });
+
+    /**
+     * M3 (fix round review) — the PRE-GAME class's OTHER member, admitted the identical way. Nothing
+     * in `preseasonCandidates` reads an injury filing (`PRESEASON_MODEL_FEATURES.news` is off, and
+     * `ProjectionInput.news` is always `[]` on this board), so there is no board-visible field to
+     * assert a value landed in, unlike `depthChart` above. What this pins is narrower and just as
+     * real: the guard itself does not throw on an `INJURY_SOURCE` row, proving the admission is a
+     * genuine two-member `PRE_GAME_SOURCES` class rather than something that happens to work for
+     * `DEPTH_SOURCE` alone.
+     */
+    it("an INJURY_SOURCE row is admitted by the guard too, even though nothing downstream reads it yet (news is off)", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      await recordObservations(db, [
+        observation({
+          season: LIVE_SEASON,
+          week: 1,
+          playerId: VETERAN,
+          source: INJURY_SOURCE,
+          metric: INJURY_METRICS.reportStatus,
+          value: 1,
+          asOf: new Date(FIRST_KICKOFF.getTime() - 5 * 24 * 60 * 60 * 1000),
+        }),
+      ]);
+
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      const inputs = await loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment });
+      expect(inputs.momentKind).toBe("live");
     });
 
     it("a PRE-GAME (depth chart) row stamped AFTER now is invisible via the ordinary gate — no throw, just gated", async () => {

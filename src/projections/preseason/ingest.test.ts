@@ -160,4 +160,24 @@ describe("ingestDepthCharts's cutoff (Task 3, ruling B — min(now, firstKickoff
     expect(report.asOf).toEqual(new Date(KICKOFF.getTime() - 1));
     expect(report.asOf.getTime()).not.toBe(now.getTime());
   });
+
+  /**
+   * M4 (fix round review) — I1 and ruling B COMPOSED, not just each proven in isolation. A later
+   * week's kickoff row, stamped EARLIER than week one's own, sits in the store alongside week one's;
+   * the after-kickoff cutoff must still resolve from WEEK ONE's real kickoff (via the now
+   * week-scoped `firstKickoffFor`), not silently drift to the earlier, later-week stamp the pre-I1
+   * query would have picked.
+   */
+  it("the after-kickoff cutoff still resolves from WEEK ONE's kickoff when a later week's row is stamped earlier (I1 x ruling B)", async () => {
+    const earlierLaterWeekStamp = new Date(KICKOFF.getTime() - 3 * 24 * 60 * 60 * 1000);
+    await recordTeamObservations(db, [kickoffRow(SEASON, earlierLaterWeekStamp, { week: 6, team: "CLE" })]);
+
+    const now = new Date(KICKOFF.getTime() + 10 * 24 * 60 * 60 * 1000); // 10 days after kickoff
+    const dt = "2026-08-20T00:00:00Z";
+    const clock: Clock = { now: () => now.toISOString() };
+
+    const report = await ingestDepthCharts(db, SEASON, fakeClient(datedDepthChartCsv(dt)), clock);
+    expect(report.asOf).toEqual(new Date(KICKOFF.getTime() - 1));
+    expect(report.asOf.getTime()).not.toBe(earlierLaterWeekStamp.getTime() - 1);
+  });
 });

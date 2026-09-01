@@ -494,6 +494,22 @@ export async function liveMomentFor(db: ReadonlyDb, season: number, clock: Clock
  * chart, where the old convention's future-dated stamp used to make an already-published chart
  * invisible to a `now`-bounded live moment for no reason but its own stamping choice.
  *
+ * WHY A PRE-GAME ROW NEEDS NO CONTAINMENT CHECK OF ITS OWN (fix round review, I2). A GAME-DERIVED
+ * row's mere EXISTENCE is refused above because existing at all already proves the season started —
+ * there is no honest way for a box score to exist before its game. A PRE-GAME row proves nothing of
+ * the kind: `INJURY_SOURCE`'s own stamp is honest PER GAME (a filing two days before ONE game), and a
+ * filing existing in the store says nothing about whether THIS SEASON has started — an injury report
+ * is exactly as normal a thing to find in the store for a season still a week from kickoff as for one
+ * three weeks in. So this guard could not use "does a pre-game row exist" as its containment test even
+ * if it wanted to; that question has no useful answer from a pre-game row alone. The actual guarantee
+ * that a live board is never looking at a started season is NOT this guard's job at all — it is
+ * `liveMomentFor`'s own throw (arm 1, above: "a started season has a REPLAY moment, not a live one"),
+ * which refuses to construct a live `BoardMoment` in the first place once `now` reaches the season's
+ * first kickoff. By the time ANY guard below runs, containment has already been decided; this guard's
+ * OWN job is narrower and different — refusing a game-derived row that should not exist yet regardless
+ * of what the clock says, which is defense in depth against arm 1 having been wrong or bypassed, not a
+ * second way of checking whether the season started.
+ *
  * SCOPE, STATED PLAINLY (carried from the fix round's I6, still true). This guard reads
  * `player_week_observations` ONLY — the table `assertNothingFromTheSeasonIsVisible` also reads, and
  * nothing else. It says nothing about two other kinds of season-S fact `loadPreseason` reads below,
@@ -502,11 +518,20 @@ export async function liveMomentFor(db: ReadonlyDb, season: number, clock: Clock
  *     `asOf: moment` like everything else, so a roster fact stamped after the live moment is simply
  *     invisible. It needs no extra refusal because it is the one thing about season S a board is
  *     explicitly ALLOWED to see, replay or live alike.
- *   - Season-S's TEAM facts (`teamObservationsAsOf`) are governed by SOURCE-CLASS: the same
- *     `.filter((observation) => observation.source !== SCHEDULE_SOURCE.kickoff)` the replay arm
- *     already applies below runs for the live arm too, so the schedule's May-published half passes
- *     and its kickoff-stamped half (the closing line, the recorded weather) is refused by source,
- *     not by this guard.
+ *   - Season-S's TEAM facts (`teamObservationsAsOf`) are filtered by a ONE-ELEMENT DENYLIST, not a
+ *     "source class" in the `PRE_GAME_SOURCES` sense (fix round review, M2 — the previous wording
+ *     overclaimed this). The shared `.filter((observation) => observation.source !==
+ *     SCHEDULE_SOURCE.kickoff)` below excludes exactly one source, `SCHEDULE_SOURCE.kickoff` (the
+ *     closing line, the recorded weather), and runs identically for both arms because it is the SAME
+ *     call, not because the live arm specifically needs it. For the LIVE arm this filter is actually
+ *     REDUNDANT, not load-bearing: `liveMomentFor` guarantees `moment` is always strictly BEFORE the
+ *     season's own kickoff, so `teamObservationsAsOf`'s own `asOf: moment` bound alone already excludes
+ *     every kickoff-stamped row before the denylist filter gets a chance to. The denylist earns its
+ *     keep on the REPLAY arm instead, where `moment` can legitimately land AFTER kickoff (a completed
+ *     game's stat line is stamped a day and a half later, so the replay moment can sit past its own
+ *     kickoff) and the moment bound alone would let a closing line through. THE LIVE ARM'S REAL SAFETY
+ *     HERE IS THE MOMENT BOUND, not this filter — stated plainly so a future change to the denylist is
+ *     understood as a replay-arm concern first.
  */
 async function assertNoGameDerivedObservationOfTheLiveSeasonIsVisible(db: ReadonlyDb, season: number, moment: Date): Promise<void> {
   const earliest = await earliestGameDerivedStamp(db, season);

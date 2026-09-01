@@ -197,6 +197,18 @@ export async function playerTeamsAsOf(
  *
  * `null` (not a throw) when the store holds no kickoff instants for `season` at all — every caller
  * that needs a season to genuinely have one uses `requireFirstKickoffFor` below instead.
+ *
+ * WEEK ONE, EXPLICITLY (fix round review, I1) — THE SINGLE POINT EVERYTHING ELSE IN THIS CHAIN
+ * REDUCES TO. Before this, the query took `min(asOf)` over EVERY week's kickoff row for the season,
+ * with no week predicate at all. That is silently wrong the moment a season's ingest is PARTIAL: a
+ * store holding week 2 onward but not week 1 yet (an ingest that started mid-week, or a schedule
+ * release updated out of order) would report week 2's kickoff as though it were the season's first —
+ * and everything downstream trusts that value as a bound. `preseason/source.ts`'s `liveMomentFor`
+ * would cap "now" against a fake, later kickoff and could produce a live moment for a season that has
+ * actually already started (past the REAL first kickoff, before the FAKE one this query reported);
+ * `preseason/ingest.ts`'s `ingestDepthCharts` would compute an ingest cutoff from the same fake
+ * instant. Both are the exact leak this whole chain of fixes exists to close. `eq(week, 1)` makes the
+ * value definitionally week one's kickoff — never a later week's, whatever that week's own store state.
  */
 export async function firstKickoffFor(db: ReadonlyDb, season: number): Promise<Date | null> {
   const [row] = await db
@@ -205,6 +217,7 @@ export async function firstKickoffFor(db: ReadonlyDb, season: number): Promise<D
     .where(
       and(
         eq(teamWeekObservations.season, season),
+        eq(teamWeekObservations.week, 1),
         eq(teamWeekObservations.source, SCHEDULE_SOURCE.kickoff),
         eq(teamWeekObservations.metric, SCHEDULE_METRICS.kickoffInstant),
       ),

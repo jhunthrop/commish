@@ -51,6 +51,20 @@ import { requireFirstKickoffFor } from "../team-store";
  * which made an already-published chart invisible to the live board's own `now`-bounded gate for no
  * reason but the stamping convention's own choice. See `mapDepthChart`'s docblock below for the
  * mechanics of the split.
+ *
+ * ARCHIVE COMPARABILITY IS NOW INGESTION-SCHEDULE-DEPENDENT, for a dated-schema season, IN A WAY IT
+ * NEVER WAS BEFORE (fix round review, I4). A LEGACY season's permanently-stored chart is definitionally
+ * the last one before kickoff, because the legacy file only ever carries ONE week-one listing per
+ * season and the kickoff-eve convention stamps whatever that listing is. A DATED season's permanently-
+ * stored chart is whatever snapshot was LATEST AT THE MOMENT SOMEONE RAN THE INGEST — if that run
+ * happens well before kickoff (this task's own 2026 re-ingest ran 1 September, nine days before the
+ * 10 September kickoff), the stored chart is an early snapshot, not necessarily the club's final
+ * pre-kickoff word, even though later snapshots the CSV itself will go on to publish exist and are
+ * knowable to a later run. This is not a correctness defect in the STAMP (each row still honestly
+ * claims its own real `dt`, never a date it was not knowable by) — it is a claim about what "the"
+ * 2026 chart on file means for comparison against an archived season's chart, and the two are only
+ * comparable if the dated season's ingest is ALSO run right before its own kickoff. See this task's
+ * own report for the operational step this implies.
  */
 
 /** Where a depth-chart fact came from. Matches the store's `source` column. */
@@ -124,6 +138,13 @@ export interface MapDepthChartResult {
  * kickoff-instant metric (fix round, I4/I5: three near-identical queries against
  * `SCHEDULE_METRICS.pointSpread`, a stamp that can legitimately be missing, became one against
  * `SCHEDULE_METRICS.kickoffInstant`, which cannot).
+ *
+ * SCOPED TO WEEK ONE, EXPLICITLY (Task 3 fix round review, I1 — this bullet was stale before that
+ * fix landed, since `team-store.ts`'s query used to take a minimum across every week with no week
+ * predicate at all). A partially-ingested schedule holding week 2 onward but not week 1 yet would
+ * otherwise return a LATER week's kickoff as though it were the season's first, which this module's
+ * own `asOf` derivations below trust as a bound. `team-store.ts`'s `firstKickoffFor` now filters on
+ * `week = 1` for exactly that reason; see its own docblock for the full account.
  */
 export const firstKickoffFor = requireFirstKickoffFor;
 
