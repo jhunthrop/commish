@@ -1,5 +1,5 @@
 // Runs the FDR-controlled law discovery trial (Task 7) — every candidate `generateCandidates()`
-// produces (1,737 today), screened on TRAIN predictor seasons under Benjamini-Hochberg at q=0.10,
+// produces (2,487 today), screened on TRAIN predictor seasons under Benjamini-Hochberg at q=0.10,
 // then replicated on the full window — and writes `src/projections/laws/discovered.json`. Run:
 //   npm run laws:discover                (measures, writes discovered.json)
 //   npm run laws:discover -- --check     (recomputes, exits 1 on any drift from the committed file)
@@ -25,6 +25,7 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { DISCOVERY_TRAIN_SEASONS, MEASURE_SEASONS, REPLICATION_FOLDS } from "@/projections/laws/config";
 import { discoveryFactsForSeason } from "@/projections/laws/discovery-facts";
 import { actualPointsPerGame, factsForSeason } from "@/projections/laws/populations";
+import { preseasonMomentFor } from "@/projections/preseason/source";
 import { generateCandidates } from "@/projections/laws/discovery/generate";
 import { MIN_TRAIN_PAIRS, runDiscoveryPipeline, type DiscoverySeasonRow } from "@/projections/laws/discovery/measure";
 import { DISCOVERED_JSON_PATH, MIN_OUT_OF_TRAIN_FOLD_PAIRS, MIN_REPLICATION_PAIRS, type DiscoveredJson } from "@/projections/laws/registry";
@@ -69,12 +70,17 @@ function seasonsLabel(): string {
 }
 
 /** Every season's `DiscoverySeasonRow`s, read ONCE regardless of candidate count — see this file's
- *  own header for why this batching matters at 1,737 candidates. */
+ *  own header for why this batching matters at 2,487 candidates. */
 async function buildSeasonRows(db: ReadonlyDb, seasons: readonly number[]): Promise<readonly DiscoverySeasonRow[]> {
   const positions = await allPositions(db);
   const rows: DiscoverySeasonRow[] = [];
   for (const season of seasons) {
-    const discoveryFacts = await discoveryFactsForSeason(db, season, positions, PPR_SCORING, true);
+    // `preseasonMomentFor(season + 1)` — the moment the season being PREDICTED had a preseason board
+    // and nothing its games produced was knowable yet, which is the only gate a market line published
+    // in August of that season is readable at. Identical derivation to a replay board's own moment;
+    // see `discoveryFactsForSeason`'s `incomingAsOf` docblock.
+    const incomingAsOf = await preseasonMomentFor(db, season + 1);
+    const discoveryFacts = await discoveryFactsForSeason(db, season, positions, PPR_SCORING, true, incomingAsOf);
     const seasonFacts = await factsForSeason(db, season, positions, PPR_SCORING, true);
     const nextActual = await actualPointsPerGame(db, season + 1, positions, PPR_SCORING, true);
     for (const [playerId, facts] of discoveryFacts) {

@@ -3,10 +3,16 @@ import type { Position } from "@/domain/player";
 import type { ScoringRules } from "@/scoring/compute";
 import { NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "../nflverse/map";
 import { PBP_METRICS, PBP_SOURCE } from "../nflverse/pbp";
-import { schedulePublishedAsOf } from "../nflverse/schedule";
+import {
+  regularSeasonGamesPerTeam,
+  SCHEDULE_METRICS,
+  SCHEDULE_SOURCE,
+  schedulePublishedAsOf,
+} from "../nflverse/schedule";
 import { ageAtSeason } from "../preseason/availability";
 import { LAST_POSSIBLE_WEEK, observationsAsOf } from "../store";
 import { teamObservationsAsOf } from "../team-store";
+import { VEGAS_METRICS, VEGAS_SOURCE } from "../vegas/ingest";
 import { usageAsOf, type PlayerWeekUsage } from "../usage";
 import { isSkillPosition, pointsPerGame, seasonContext, targetShareOf, type LawPosition } from "./populations";
 
@@ -59,6 +65,33 @@ export interface DiscoveryQuantityValues {
    *  from the incoming coach's PRIOR pace, which this generator does not surface as its own
    *  quantity (the team's own current pace is the one the brief names "team pace"). */
   readonly teamPaceSecondsPerPlay: number | null;
+  /**
+   * The Vegas regular-season win total published for the season BEING PREDICTED (season+1), for the
+   * team this player finished season N with — the market's own preseason judgment of a TEAM, which
+   * is a different quantity from anything else in this list (every other entry is a fact about the
+   * player or about his team's completed season).
+   *
+   * SAME SHAPE AS THE INCOMING-COACH PAIR ABOVE, deliberately: a season+1 context fact, knowable
+   * before season+1 kicks off, attached to season N's facts row and keyed by season N's team. It
+   * inherits that shape's own known approximation with it — a player who CHANGES teams in the
+   * offseason is credited with his old team's incoming context, because who he will play for next
+   * season is not knowable at all from a store that ends with season N. `incomingCoachTenureSeasons`
+   * has always had exactly this property; a second, different answer for the same question would be
+   * worse than one consistent one.
+   */
+  readonly incomingTeamWinTotal: number | null;
+  /**
+   * That win total minus the team's ACTUAL regular-season wins in season N, both halves store-read:
+   * the market's judgment of the season ahead against what the team just did. Negative means the
+   * market expects a fall (the founder's Achane case is a large negative); positive, a rise.
+   *
+   * TRI-STATE ON BOTH HALVES: `null` when the team-season carries no published line, and `null`
+   * when season N's record is not fully derivable from the store (see `seasonActualWinsByTeam` —
+   * a season the store holds no schedule for, or a team whose completed-game count falls short of
+   * the season's own full complement, which is the same completeness rule
+   * `scripts/validate-win-totals.ts`'s `computeSeasonWins` applies against the raw file).
+   */
+  readonly incomingTeamWinTotalDelta: number | null;
 }
 
 /** One player's discovery quantities for one season, plus the SAME quantities one season earlier —
@@ -175,6 +208,69 @@ async function seasonTeamPaceByTeam(db: ReadonlyDb, season: number, asOf: Date):
 }
 
 /**
+ * The published win total for one season, by team, read at the moment that season's PRESEASON was
+ * knowable rather than at the previous season's schedule-publication gate.
+ *
+ * WEEK ONE, EXACTLY — `vegas/ingest.ts` writes one row per team per season at week 1 and does not
+ * replicate it across the season (see that module's `OBSERVATION_WEEK` docblock). An exact-week read
+ * at any other week would return nothing and this quantity would be silently null everywhere, which
+ * is why the week is named here rather than inherited from a range: `incomingCoachFactsByTeam`
+ * (`populations.ts`) reads its own season+1 facts at `week: 1` for the same reason.
+ *
+ * WHY A SEPARATE `asOf` FROM EVERY OTHER READ IN THIS MODULE, and why that is not a carve-out. A win
+ * total is published in AUGUST of the season it prices; every other read here is gated at
+ * `schedulePublishedAsOf(season + 1)`, the twentieth of May, because that is when the schedule and
+ * the incoming play-caller became knowable. Reading a market line stamped in August at a May gate
+ * returns nothing at all, for every team, in every season. The honest gate for a preseason market
+ * fact is the moment a PRESEASON BOARD for that season would be built, which is what callers pass:
+ * `preseason/source.ts` passes its own `BoardMoment` (the replay arm is one millisecond before the
+ * earliest thing season+1's games produced; the live arm is the clock, guaranteed before kickoff),
+ * and the two harness scripts pass `preseasonMomentFor(season + 1)`, the identical derivation. No
+ * outcome of the season being predicted is reachable at either, which is the property that matters;
+ * the read itself is `teamObservationsAsOf` like every other one in this file.
+ */
+async function incomingWinTotalByTeam(db: ReadonlyDb, nextSeason: number, incomingAsOf: Date): Promise<Map<string, number>> {
+  const rows = await teamObservationsAsOf(db, { season: nextSeason, week: 1, asOf: incomingAsOf, source: VEGAS_SOURCE });
+  const out = new Map<string, number>();
+  for (const row of rows) if (row.metric === VEGAS_METRICS.winTotal) out.set(row.team, row.value);
+  return out;
+}
+
+/**
+ * Each team's ACTUAL regular-season wins in one season, summed from the schedule store's own
+ * per-game result rows (`SCHEDULE_METRICS.gameResult`, a win 1, a tie 0.5, a loss 0).
+ *
+ * COMPLETE SEASONS ONLY. A team whose visible completed games fall short of the season's own full
+ * complement (`regularSeasonGamesPerTeam`) is ABSENT from the returned map rather than credited with
+ * a partial record: a running total taken mid-season is not a record, and the reader downstream
+ * treats absence as unknown, never as zero wins. This is the same rule, on the same constant, that
+ * `scripts/validate-win-totals.ts`'s `computeSeasonWins` applies to the raw file — which is what
+ * makes the CSV's own `actual_wins` column and this store-derived number provably the same fact
+ * (Task 1 validated the column against that derivation, 0 mismatches over all 479 verifiable
+ * team-seasons). Two documented consequences, both honest rather than worked around: a season the
+ * store holds no schedule for yields no records at all, and 2022 BUF/CIN, whose seventeenth game was
+ * cancelled and never made up, are unknown for that season exactly as they are blank in the CSV.
+ */
+async function seasonActualWinsByTeam(db: ReadonlyDb, season: number, asOf: Date): Promise<Map<string, number>> {
+  const rows = await teamObservationsAsOf(db, {
+    season,
+    week: { from: 1, to: LAST_POSSIBLE_WEEK },
+    asOf,
+    source: SCHEDULE_SOURCE.kickoff,
+  });
+  const tallies = new Map<string, { wins: number; games: number }>();
+  for (const row of rows) {
+    if (row.metric !== SCHEDULE_METRICS.gameResult) continue;
+    const existing = tallies.get(row.team) ?? { wins: 0, games: 0 };
+    tallies.set(row.team, { wins: existing.wins + row.value, games: existing.games + 1 });
+  }
+  const required = regularSeasonGamesPerTeam(season);
+  const out = new Map<string, number>();
+  for (const [team, { wins, games }] of tallies) if (games === required) out.set(team, wins);
+  return out;
+}
+
+/**
  * Every discovery quantity, for every player active in ONE season, at that season's OWN N+1
  * schedule-publication gate — the same `asOf` `factsForSeason` would use for THIS season, so a
  * caller building both a season's `current` and its `prior` half (`discoveryFactsForSeason`) reads
@@ -185,14 +281,21 @@ async function seasonTeamPaceByTeam(db: ReadonlyDb, season: number, asOf: Date):
  * `admitDerived` passes straight through to `seasonContext` (and so to `seasonScoring`) — see
  * `discoveryFactsForSeason`'s own docblock for why this is an explicit parameter rather than a
  * hardcoded policy.
+ *
+ * `incomingAsOf` gates the ONE fact class this module reads that is published after May of the
+ * predicted season: the win total (see `incomingWinTotalByTeam`). Everything else, the incoming
+ * play-caller included, stays on `asOf`.
  */
 async function discoveryQuantitiesForSeason(
-  db: ReadonlyDb, targetSeason: number, asOf: Date, positions: ReadonlyMap<string, Position>, rules: ScoringRules, admitDerived: boolean,
+  db: ReadonlyDb, targetSeason: number, asOf: Date, incomingAsOf: Date, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+  admitDerived: boolean,
 ): Promise<Map<string, DiscoveryQuantityValues>> {
   const { scoring, participation, teams, roster, coachFacts, birthDates } = await seasonContext(db, targetSeason, asOf, positions, rules, admitDerived);
   const usage = await seasonUsageAggregates(db, targetSeason, asOf);
   const snapCounts = await seasonSnapCounts(db, targetSeason, asOf);
   const pace = await seasonTeamPaceByTeam(db, targetSeason, asOf);
+  const winTotals = await incomingWinTotalByTeam(db, targetSeason + 1, incomingAsOf);
+  const actualWins = await seasonActualWinsByTeam(db, targetSeason, asOf);
   const draftYears = new Map(roster.map((row) => [row.playerId, row.draftYear] as const));
 
   const out = new Map<string, DiscoveryQuantityValues>();
@@ -205,6 +308,8 @@ async function discoveryQuantitiesForSeason(
     const coach = team === undefined ? undefined : coachFacts.get(team);
     const usageAgg = usage.get(playerId);
     const draftYear = draftYears.get(playerId) ?? null;
+    const winTotal = team === undefined ? null : (winTotals.get(team) ?? null);
+    const wins = team === undefined ? null : (actualWins.get(team) ?? null);
     out.set(playerId, {
       touches: participated === undefined ? null : participated.carries + scored.receptions,
       age: ageAtSeason(birthDates.get(playerId) ?? null, targetSeason),
@@ -217,6 +322,9 @@ async function discoveryQuantitiesForSeason(
       incomingCoachPriorPassRateOverExpected: coach?.priorPassRateOverExpected ?? null,
       experienceYear: draftYear === null ? null : targetSeason - draftYear + 1,
       teamPaceSecondsPerPlay: team === undefined ? null : (pace.get(team) ?? null),
+      incomingTeamWinTotal: winTotal,
+      // Tri-state on BOTH halves: unknown either side makes the gap unknown, never a zero gap.
+      incomingTeamWinTotalDelta: winTotal === null || wins === null ? null : winTotal - wins,
     });
   }
   return out;
@@ -234,13 +342,22 @@ async function discoveryQuantitiesForSeason(
  * the call site" failure `seasonContext`'s own docblock names). Its caller — Task 7's discovery
  * pipeline — passes `true`, the same choice `buildPopulations` makes: the laws harness (discovery
  * included) is exactly where a pbp-derived gap-season stat line belongs.
+ *
+ * `incomingAsOf` is EXPLICIT for the identical reason (Task 3): it is the moment season N+1's
+ * PRESEASON was knowable, and it gates the one fact class here that a May-of-N+1 gate cannot see at
+ * all (see `incomingWinTotalByTeam`). Both halves share it, exactly as both halves already share
+ * `asOf` and for the same reason: the prior half's own incoming season is N, whose line was
+ * published a year earlier, so a gate set at N+1's preseason is later than that half needs and still
+ * admits nothing any season produced on the field. The two harness scripts pass
+ * `preseasonMomentFor(season + 1)`; `loadPreseason` passes its own `BoardMoment`.
  */
 export async function discoveryFactsForSeason(
   db: ReadonlyDb, season: number, positions: ReadonlyMap<string, Position>, rules: ScoringRules, admitDerived: boolean,
+  incomingAsOf: Date,
 ): Promise<Map<string, DiscoveryFacts>> {
   const asOf = schedulePublishedAsOf(season + 1);
-  const current = await discoveryQuantitiesForSeason(db, season, asOf, positions, rules, admitDerived);
-  const prior = await discoveryQuantitiesForSeason(db, season - 1, asOf, positions, rules, admitDerived);
+  const current = await discoveryQuantitiesForSeason(db, season, asOf, incomingAsOf, positions, rules, admitDerived);
+  const prior = await discoveryQuantitiesForSeason(db, season - 1, asOf, incomingAsOf, positions, rules, admitDerived);
 
   const out = new Map<string, DiscoveryFacts>();
   for (const [playerId, values] of current) {

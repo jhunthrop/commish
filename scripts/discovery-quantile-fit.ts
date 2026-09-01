@@ -15,6 +15,7 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { DISCOVERY_TRAIN_SEASONS } from "@/projections/laws/config";
 import { discoveryFactsForSeason } from "@/projections/laws/discovery-facts";
 import { computeQuantileTable, QUANTITY_DEFS, type QuantityRow } from "@/projections/laws/discovery/templates";
+import { preseasonMomentFor } from "@/projections/preseason/source";
 
 const OUTPUT = "src/projections/laws/discovery/quantiles.ts";
 
@@ -49,7 +50,10 @@ async function main(): Promise<void> {
   for (let season = DISCOVERY_TRAIN_SEASONS.from; season <= DISCOVERY_TRAIN_SEASONS.to; season++) {
     // `admitDerived: true` — the laws harness (discovery included) is exactly where a pbp-derived
     // gap-season stat line belongs, the same choice `buildPopulations` makes for the tribal laws.
-    const facts = await discoveryFactsForSeason(db, season, positions, PPR_SCORING, true);
+    // The same `incomingAsOf` `scripts/discover-laws.ts` passes, for the same reason: a quantile
+    // fitted at a gate the quantity is invisible at would be fitted on nothing at all.
+    const incomingAsOf = await preseasonMomentFor(db, season + 1);
+    const facts = await discoveryFactsForSeason(db, season, positions, PPR_SCORING, true, incomingAsOf);
     for (const { position, current } of facts.values()) {
       rows.push({ season, position, values: current });
     }

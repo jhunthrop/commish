@@ -25,7 +25,7 @@ import { PlayerPlayAggregator, playerTouchObservations, PBP_PLAYER_COLUMNS } fro
 import { allPositions } from "../backtest";
 import { mapInjuries } from "../news/retrieve";
 import { buildPlayerUniverse, mapNflPlayers, nflPlayerRows, type PlayerUniverse } from "./players";
-import { kickoffAsOf, mapSchedule, scheduleObservations, SCHEDULE_SOURCE_CONFIG } from "./schedule";
+import { gameResultObservations, kickoffAsOf, mapSchedule, scheduleObservations, SCHEDULE_SOURCE_CONFIG } from "./schedule";
 import { mapStatLines, statLineObservations, STAT_LINE_GAPS } from "./stat-lines";
 import { lineContinuityObservations, mapPlayerTeams } from "./team-map";
 
@@ -251,6 +251,20 @@ function createScheduleClient(): NflverseClient {
 export async function ingestSchedule(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
   const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
   return await recordTeamObservations(db, scheduleObservations(mapSchedule(rows, seasons)));
+}
+
+/**
+ * The game-RESULT rows only, for a store that already holds every other schedule fact.
+ *
+ * `ingestSchedule` above writes results too (they are part of `scheduleObservations` now), so a
+ * store built from scratch never needs this. It exists for the store that already exists: running
+ * the full schedule ingestion again to pick up one added metric would also write every row the
+ * upstream file has gained since the last run, which is a data change nobody asked for and which no
+ * `--check` baseline in this repo would attribute correctly. See `gameResultObservations`.
+ */
+export async function ingestGameResults(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
+  const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  return await recordTeamObservations(db, gameResultObservations(mapSchedule(rows, seasons)));
 }
 
 /**

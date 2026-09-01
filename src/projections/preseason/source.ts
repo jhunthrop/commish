@@ -727,7 +727,14 @@ export async function loadPreseason(
   // above and `PreseasonInputs.discoveryFacts`'s own docblock) — a discovered law's own condition is
   // a `DiscoveryFacts` predicate, a different fact shape than a tribal law's `LawConditionFacts`, so
   // it needs its own read rather than a projection off `priorSeasonFacts`.
-  const discoveryFacts = await discoveryFactsForSeason(db, season - 1, positions, PPR_SCORING, priorSeasonAdmitDerived);
+  // `incomingAsOf` is THIS BOARD'S OWN MOMENT (Task 3), which is the honest gate for a preseason
+  // market fact about the season being projected: the replay arm is one millisecond before anything
+  // this season's games produced, and the live arm is the clock, which `liveMomentFor` has already
+  // proven is before the season's first kickoff. A win total published in August of `season` is
+  // readable at either; nothing `season` produced on the field is readable at either. See
+  // `discoveryFactsForSeason`'s own `incomingAsOf` docblock for why this cannot ride on the
+  // May-of-`season` gate the rest of that read uses.
+  const discoveryFacts = await discoveryFactsForSeason(db, season - 1, positions, PPR_SCORING, priorSeasonAdmitDerived, moment);
 
   return {
     season,

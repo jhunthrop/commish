@@ -46,8 +46,26 @@ export interface CandidateLaw {
 /**
  * THE HARD CAP. Never exceeded by returning MORE than this many candidates — see `enforceCap`'s own
  * docblock for what happens if the structural design below ever produces more.
+ *
+ * RAISED FROM 2,000 TO 3,000 (Task 3, the vegas-laws plan), deliberately and once. Two quantities
+ * joined the vocabulary that round, and the AND family grows QUADRATICALLY in the threshold-single
+ * count: 1,737 candidates became 2,487, which the old cap would have trimmed. That trim is not a
+ * neutral subsample — `enforceCap`'s own docblock says so in bold — and at 2,000 it would have kept
+ * AND candidates alone ("and:" sorts before "delta:" and "threshold:") and silently dropped EVERY
+ * single-condition candidate in the family, including the four confirmed laws' own ids. A cap that
+ * would delete the existing evidence rather than bound it is the wrong number, not a constraint to
+ * respect.
+ *
+ * WHAT THE CAP IS AND IS NOT. It is a determinism-and-bias guard on the generator, plus a bound on
+ * how long a run takes. It is NOT the multiple-comparisons control: that is Benjamini-Hochberg at
+ * q=0.10 over the testable family (`discovery/measure.ts`), which grows STRICTER as the family
+ * grows, never looser. Raising the cap therefore cannot make a candidate easier to confirm; it makes
+ * every candidate harder, which is the honest cost of a wider vocabulary and exactly the cost the
+ * plan asked to be paid in the open. 3,000 leaves the current 2,487 real headroom without inviting
+ * an unbounded vocabulary: the next expansion faces this same explicit decision rather than
+ * discovering a silent trim in its output.
  */
-export const CANDIDATE_CAP = 2000;
+export const CANDIDATE_CAP = 3000;
 
 /** Three-valued (Kleene) AND: `false` wins over `null` (an antecedent already known to fail makes the
  *  whole AND false regardless of the other half being unknown), but `null` wins over `true` (a known
@@ -139,8 +157,8 @@ interface ThresholdSingle {
  *   - AND: pairwise ANDs of two THRESHOLD candidates on DISTINCT quantities within the same
  *     position. THIS IS THE DOCUMENTED PRUNING RULE the brief asks for: an AND of every single
  *     condition (threshold and delta both, same-quantity pairs included) would multiply the count by
- *     roughly the single-condition count per position, which at eleven quantities across four
- *     positions clears the 2,000 cap by a wide margin. Restricting AND-pairs to threshold-only,
+ *     roughly the single-condition count per position, which at thirteen quantities across four
+ *     positions clears the cap by a wide margin. Restricting AND-pairs to threshold-only,
  *     distinct-quantity combinations is a structural choice made ONCE here, not a random subsample
  *     applied after the fact — the same candidate set is produced on every run, deterministically,
  *     and stays under the cap without `enforceCap` ever needing to trim it (see that function's own
@@ -174,6 +192,11 @@ export function generateCandidatesFrom(quantiles: QuantileTable): readonly Candi
         singles.push({ def, level, clause: thresholdClause, id: thresholdId, condition: thresholdConditionFn });
         thresholdSinglesByPosition.set(position, singles);
 
+        // A quantity that is ITSELF a difference declares that it has no meaningful year-over-year
+        // template (`QuantityDef.supportsYearOverYearDelta`, `templates.ts`) and produces threshold
+        // and AND candidates only. Read off the quantity rather than branched on an id here, so the
+        // three template families below stay mechanical.
+        if (!def.supportsYearOverYearDelta) continue;
         for (const direction of ["rose_into", "fell_out_of"] as const) {
           const deltaClause: DeltaClause = { kind: "delta", quantityId: def.id, quantileLevel: level, direction };
           deltaCandidates.push({

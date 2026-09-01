@@ -1,6 +1,7 @@
 import type { TeamWeekObservation } from "../team-store";
 import { NFLVERSE_CONFIG } from "./config";
 import type { CsvRow } from "./csv";
+import { finalWeekOf } from "./team-eras";
 
 /**
  * THE SCHEDULE — opponent, rest, venue, weather and the closing betting line, from the one free
@@ -70,7 +71,37 @@ export const SCHEDULE_METRICS = {
    * unconditional answer `firstKickoffFor` (`team-store.ts`) reads instead.
    */
   kickoffInstant: "kickoff_instant",
+  /**
+   * WHO WON, from this team's own side: `1` a win, `0.5` a tie, `0` a loss. Emitted only for a game
+   * the file has BOTH scores for, so an unplayed or in-progress game contributes no row at all
+   * rather than a zero a reader could not tell from a loss.
+   *
+   * The one schedule fact a season's regular-season RECORD can be summed from, which
+   * `laws/discovery-facts.ts`'s `incomingTeamWinTotalDelta` needs and the store had no way to answer
+   * before: `mapSchedule` has carried `pointsFor`/`pointsAgainst` since the beginning, but
+   * `scheduleObservations` never wrote them anywhere, so every consumer wanting a team's record had
+   * to re-fetch and re-derive it from the raw file (which `scripts/validate-win-totals.ts` did, and
+   * still does as its own independent check). A win is a fact about a game, not a scoreline, so this
+   * stores the RESULT rather than the two scores: the scores are a bigger claim than any reader
+   * needs today, and half a win for a tie is the same convention `computeSeasonWins` already used.
+   *
+   * `afterTheGame`-stamped under `SCHEDULE_SOURCE.kickoff`, with the recorded weather rather than
+   * with the schedule half: a result is the most game-derived fact there is, and the kickoff source
+   * is exactly the class every preseason read (`preseason/source.ts`'s own team-facts denylist)
+   * already refuses for the season it is projecting.
+   */
+  gameResult: "game_result",
 } as const;
+
+/**
+ * How many regular-season games one team plays in `season` — one fewer than the week count, for the
+ * bye. Lives here beside the schedule the count is about; `scripts/validate-win-totals.ts` imports
+ * and re-exports it so the validator and the laws harness can never disagree about how long a
+ * regular season is (the same DRY direction Task 2 moved the win-totals CSV shape in).
+ */
+export function regularSeasonGamesPerTeam(season: number): number {
+  return finalWeekOf(season) - 1;
+}
 
 /** One regular-season game, from one team's point of view. Every game yields two of these. */
 export interface TeamGame {
@@ -330,6 +361,29 @@ export function scheduleObservations(games: readonly TeamGame[]): readonly TeamW
     }
     if (game.temperature !== null) rows.push({ ...afterTheGame, metric: SCHEDULE_METRICS.temperature, value: game.temperature });
     if (game.windSpeed !== null) rows.push({ ...afterTheGame, metric: SCHEDULE_METRICS.windSpeed, value: game.windSpeed });
+    const result = gameResultOf(game);
+    if (result !== null) rows.push({ ...afterTheGame, metric: SCHEDULE_METRICS.gameResult, value: result });
     return rows;
   });
+}
+
+/** One game's result from this team's side: `1` a win, `0.5` a tie, `0` a loss, `null` for a game
+ *  the file carries no final score for. Half a win for a tie is the convention
+ *  `scripts/validate-win-totals.ts`'s `computeSeasonWins` already used against the raw file, kept
+ *  identical here so a store-derived record and a file-derived one cannot disagree. */
+function gameResultOf(game: TeamGame): number | null {
+  if (game.pointsFor === null || game.pointsAgainst === null) return null;
+  if (game.pointsFor > game.pointsAgainst) return 1;
+  return game.pointsFor === game.pointsAgainst ? 0.5 : 0;
+}
+
+/**
+ * The RESULT rows alone, for the one-off ingestion that backfills this metric into a store already
+ * holding every other schedule fact (`nflverse/ingest.ts`'s `ingestGameResults`). Writing the full
+ * `scheduleObservations` output for that backfill would also insert any row the upstream file has
+ * GAINED since the last real ingestion (a newly scheduled 2026 game, a restated line), quietly
+ * moving data no task asked to move; this narrows the write to exactly the metric being added.
+ */
+export function gameResultObservations(games: readonly TeamGame[]): readonly TeamWeekObservation[] {
+  return scheduleObservations(games).filter((row) => row.metric === SCHEDULE_METRICS.gameResult);
 }

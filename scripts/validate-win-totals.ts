@@ -15,8 +15,14 @@ import { eq } from "drizzle-orm";
 import { createDb, type ReadonlyDb } from "@/db/client";
 import { teamWeekObservations } from "@/db/schema";
 import { firstKickoffFor } from "@/projections/team-store";
-import { finalWeekOf, nflTeamsBySeason } from "@/projections/nflverse/team-eras";
-import { mapSchedule, SCHEDULE_SOURCE, SCHEDULE_SOURCE_CONFIG, type TeamGame } from "@/projections/nflverse/schedule";
+import { nflTeamsBySeason } from "@/projections/nflverse/team-eras";
+import {
+  mapSchedule,
+  regularSeasonGamesPerTeam,
+  SCHEDULE_SOURCE,
+  SCHEDULE_SOURCE_CONFIG,
+  type TeamGame,
+} from "@/projections/nflverse/schedule";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import {
   FIRST_WIN_TOTALS_SEASON,
@@ -161,10 +167,11 @@ export function checkActualWins(rows: readonly WinTotalRow[], expectedWins: Read
   return violations;
 }
 
-/** Regular-season games one team plays in `season`: one fewer than the week count, for the bye. */
-export function regularSeasonGamesPerTeam(season: number): number {
-  return finalWeekOf(season) - 1;
-}
+// `regularSeasonGamesPerTeam` moved to `src/projections/nflverse/schedule.ts` in Task 3, beside the
+// schedule it is a fact about, so the laws harness's own store-derived record (`discovery-facts.ts`)
+// and this validator can never disagree about how long a regular season is. Re-exported here so
+// `validate-win-totals.test.ts`'s existing import needs no change.
+export { regularSeasonGamesPerTeam };
 
 /** Regular-season win total from a set of games, counting a tie as half a win. `null` when the
  *  team's regular season is not yet complete (fewer completed games than the season requires). */

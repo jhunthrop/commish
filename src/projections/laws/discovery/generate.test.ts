@@ -15,6 +15,8 @@ const NO_VALUES: DiscoveryQuantityValues = {
   incomingCoachPriorPassRateOverExpected: null,
   experienceYear: null,
   teamPaceSecondsPerPlay: null,
+  incomingTeamWinTotal: null,
+  incomingTeamWinTotalDelta: null,
 };
 
 /** A two-quantity, one-position fixture: RB `touches` and RB `age`, both with round thresholds so

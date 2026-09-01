@@ -34,6 +34,8 @@ const NO_VALUES: DiscoveryQuantityValues = {
   incomingCoachPriorPassRateOverExpected: null,
   experienceYear: null,
   teamPaceSecondsPerPlay: null,
+  incomingTeamWinTotal: null,
+  incomingTeamWinTotalDelta: null,
 };
 
 function factsWithTouches(touches: number | null): DiscoveryFacts {

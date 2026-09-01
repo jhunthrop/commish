@@ -230,7 +230,7 @@ function LawArticle({ law }: { readonly law: Law }) {
  * zero pairs — most of them DID match, just fewer than `MIN_TRAIN_PAIRS`, and the old wording was
  * false for the large majority of that count. (NEW-2) the stray "candidates above" — there is no
  * candidate LISTING above this sentence for "above" to refer to — is gone; this sentence describes
- * the whole 1,737-candidate family the page never lists in full, not something rendered nearby.
+ * the whole 2,487-candidate family the page never lists in full, not something rendered nearby.
  */
 function discoveryMethodologySentence(counts: PipelineCounts): string {
   return (

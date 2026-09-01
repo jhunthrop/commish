@@ -60,6 +60,23 @@ export interface QuantityDef {
    *  ceiling rounding, which is for a THRESHOLD's committed number, not a player's fact — see
    *  `PrimaryQuantityUnit`'s own docblock (`../types.ts`). */
   readonly magnitudeUnit: PrimaryQuantityUnit;
+  /**
+   * Whether the YEAR-OVER-YEAR delta template (`generate.ts`'s `deltaConditionOf`: did this quantity
+   * cross its own quantile mark between season N-1 and season N) means anything for this quantity.
+   *
+   * `true` for every quantity in the registry but one, and the exception is the point of the flag:
+   * `incomingTeamWinTotalDelta` IS ALREADY A DELTA (a win total minus a record), so a YoY template
+   * over it asks whether a first difference crossed a threshold that a second difference already
+   * crossed the year before — a second-order quantity nobody could state in plain words, let alone
+   * act on, and six candidates per position of pure multiple-comparisons cost for it. Excluded here,
+   * at the quantity, rather than special-cased inside the generator: the generator's three template
+   * families stay mechanical, and a future quantity that is itself a difference declares the same
+   * fact about itself in the same place.
+   *
+   * THRESHOLD and AND are unaffected — "the market says this team falls by three wins or more" is a
+   * perfectly ordinary threshold, and it is the shape the founder's Achane case actually has.
+   */
+  readonly supportsYearOverYearDelta: boolean;
 }
 
 const ALL_SKILL_POSITIONS: readonly LawPosition[] = ["QB", "RB", "WR", "TE"];
@@ -122,6 +139,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatWhole,
     shortLabel: "carries and receptions",
     magnitudeUnit: "whole",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "age",
@@ -131,6 +149,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatAgeYears,
     shortLabel: "age",
     magnitudeUnit: "two_decimal",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "targetShare",
@@ -140,6 +159,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatPercent,
     shortLabel: "target share",
     magnitudeUnit: "percent",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "touchdownPointsShare",
@@ -149,6 +169,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatPercent,
     shortLabel: "touchdown-points share",
     magnitudeUnit: "percent",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "redZoneTouchShare",
@@ -158,6 +179,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatPercent,
     shortLabel: "red-zone touch share",
     magnitudeUnit: "percent",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "targetDepth",
@@ -167,6 +189,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatOneDecimal,
     shortLabel: "target depth",
     magnitudeUnit: "one_decimal",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "snapShare",
@@ -176,6 +199,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatPercent,
     shortLabel: "snap share",
     magnitudeUnit: "percent",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "incomingCoachTenureSeasons",
@@ -192,6 +216,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatWhole,
     shortLabel: "incoming coach's tenure",
     magnitudeUnit: "whole",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "incomingCoachPriorPassRateOverExpected",
@@ -201,6 +226,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatOneDecimal,
     shortLabel: "incoming coach's prior pass rate",
     magnitudeUnit: "one_decimal",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "experienceYear",
@@ -215,6 +241,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatWhole,
     shortLabel: "experience",
     magnitudeUnit: "whole",
+    supportsYearOverYearDelta: true,
   },
   {
     id: "teamPaceSecondsPerPlay",
@@ -224,6 +251,43 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     formatValue: formatOneDecimal,
     shortLabel: "team pace",
     magnitudeUnit: "one_decimal",
+    supportsYearOverYearDelta: true,
+  },
+  /**
+   * THE TWO TEAM-MARKET QUANTITIES (Task 3, the vegas-laws plan) — the market's own preseason
+   * judgment of a TEAM, which nothing else in this vocabulary carries. Appended at the END of the
+   * registry deliberately: `computeQuantileTable` walks this array in order and the fit script
+   * serializes the table in that order, so appending keeps the regenerated `quantiles.ts` a purely
+   * additive diff, which is what lets a reader see at a glance that no existing quantity's committed
+   * thresholds moved. Candidate ids are unaffected either way (`generateCandidatesFrom` sorts them
+   * canonically before returning).
+   *
+   * ALL FOUR POSITIONS, like the incoming-coach pair they mirror: a team's expected quality is a fact
+   * about the offence every skill player is in, not about one position group.
+   */
+  {
+    id: "incomingTeamWinTotal",
+    noun: "team's Vegas win total for the season ahead",
+    positions: ALL_SKILL_POSITIONS,
+    get: (v) => v.incomingTeamWinTotal,
+    formatValue: formatOneDecimal,
+    shortLabel: "incoming team win total",
+    magnitudeUnit: "one_decimal",
+    // A win total genuinely can rise into or fall out of the top band year over year, and a team the
+    // market newly believes in is an ordinary, sayable claim. Kept.
+    supportsYearOverYearDelta: true,
+  },
+  {
+    id: "incomingTeamWinTotalDelta",
+    noun: "team's Vegas win total for the season ahead minus its actual wins in the season just played",
+    positions: ALL_SKILL_POSITIONS,
+    get: (v) => v.incomingTeamWinTotalDelta,
+    formatValue: formatOneDecimal,
+    shortLabel: "win total minus prior wins",
+    magnitudeUnit: "one_decimal",
+    // The ONE exclusion in the registry — see `supportsYearOverYearDelta`'s own docblock: this
+    // quantity is itself a difference, so a year-over-year template over it is a second difference.
+    supportsYearOverYearDelta: false,
   },
 ];
 

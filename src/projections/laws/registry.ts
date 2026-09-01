@@ -266,7 +266,7 @@ export function verdictForFullWindow(
 }
 
 /**
- * THE DISCOVERY TRIAL (Task 7, 2026-08-31) — `discovery/generate.ts`'s 1,737 mechanically generated
+ * THE DISCOVERY TRIAL (Task 7, 2026-08-31) — `discovery/generate.ts`'s 2,487 mechanically generated
  * candidates, false-discovery-controlled and replicated into `discovered.json`. See
  * `discovery/measure.ts`'s own docblock for the full pipeline (train-window screening,
  * Benjamini-Hochberg at q=0.10, full-window replication); the pieces below are the merge/drift-guard
@@ -342,7 +342,7 @@ export type DiscoveredEntry = MeasuredEntry & {
  *
  * `candidates` (fix round 2, NEW-5 RULING — renamed from `tested`, which claimed something false:
  * the whole family is not "tested" in any sense a reader would recognize, only screened for
- * eligibility) is the whole candidate family `discovery/generate.ts` produced (1,737 today).
+ * eligibility) is the whole candidate family `discovery/generate.ts` produced (2,487 today).
  * `untestable` (fix round 2, NEW-1 — the OLD wording, "zero matched pairs", was also false: most of
  * this count DID match, just under `MIN_TRAIN_PAIRS`) is every candidate that could not be matched
  * on enough training seasons — fewer than `MIN_TRAIN_PAIRS` (20) matched pairs on the TRAIN window,
@@ -468,14 +468,14 @@ export function parseDiscoveredJson(raw: string): DiscoveredJson {
  * fix round — every id in `discoveredJson.laws` must exist in `candidateIds`, defaulted to the REAL
  * `generateCandidates()`'s own ids (pure, no DB — see that function's own docblock; a default
  * parameter expression is evaluated fresh on EVERY call that omits `candidateIds`, not once at
- * import time, so this ~1,737-candidate generator runs PER CALL, not "for free" — cheap in practice
+ * import time, so this ~2,487-candidate generator runs PER CALL, not "for free" — cheap in practice
  * since the underlying quantile table is itself a committed constant, but worth naming accurately
  * rather than implying a one-time cost that isn't real); a `discovered.json` id with no matching
  * candidate means the generator and the committed file have drifted apart, the exact "orphaned
  * measurement" shape
  * `registryFrom` already guards against for `LAW_SPECS`. `candidateIds` is a parameter (not simply
  * called internally with no override) so `registry.test.ts` can drive this with a small hand-built
- * set rather than the real ~1,737-candidate one, the identical `specs`-as-parameter discipline
+ * set rather than the real ~2,487-candidate one, the identical `specs`-as-parameter discipline
  * `registryFrom` itself uses. (2) The stored `verdict` must equal what `verdictForDiscoveredLaw`
  * computes fresh from that same entry's own effect/ci/sample/foldEffects.
  */

@@ -9,10 +9,11 @@ import { NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "../nflverse/map";
 import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "../nflverse/pbp-players";
 import { PBP_METRICS, PBP_SOURCE } from "../nflverse/pbp";
 import { COACH_METRICS } from "../nflverse/coaches";
-import { schedulePublishedAsOf, SCHEDULE_SOURCE } from "../nflverse/schedule";
+import { schedulePublishedAsOf, SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { recordObservations } from "../store";
 import { recordPlayerTeams, recordTeamObservations } from "../team-store";
 import { recordPreseasonRosters } from "../preseason/store";
+import { VEGAS_METRICS, VEGAS_SOURCE } from "../vegas/ingest";
 import { discoveryFactsForSeason } from "./discovery-facts";
 
 /**
@@ -32,6 +33,13 @@ const N1 = 2024;
 const GATE = schedulePublishedAsOf(N1);
 const BEFORE_GATE = new Date("2023-09-01T00:00:00.000Z");
 const AFTER_GATE = new Date("2024-06-01T00:00:00.000Z");
+/** The moment season N+1's PRESEASON was knowable — the gate the win-total read alone runs through
+ *  (`discoveryFactsForSeason`'s `incomingAsOf`). Late August of N+1 here, which is where a real
+ *  preseason moment for that season lands and which is deliberately LATER than `GATE`. */
+const INCOMING_GATE = new Date("2024-08-25T00:00:00.000Z");
+const AFTER_INCOMING_GATE = new Date("2024-09-15T00:00:00.000Z");
+/** Where a real win total lands: August of the season it prices, months after `GATE`. */
+const VEGAS_STAMP = new Date("2024-08-15T00:00:00.000Z");
 
 function line(season: number, week: number, playerId: string, over: Partial<StatLine>, asOf: Date): SeasonStatLine {
   return {
@@ -84,6 +92,29 @@ async function storePbpTeamFacts(rows: readonly TeamRow[]): Promise<void> {
   await recordTeamObservations(db, rows.map((row) => ({ ...row, source: PBP_SOURCE })));
 }
 
+/** One team-season's published win total, at week one — the row shape `vegas/ingest.ts` writes. */
+async function storeWinTotal(season: number, team: string, value: number, asOf: Date): Promise<void> {
+  await recordTeamObservations(db, [{ season, week: 1, team, source: VEGAS_SOURCE, metric: VEGAS_METRICS.winTotal, value, asOf }]);
+}
+
+/** One team's season of game results, one row per week from week one — a win 1, a tie 0.5, a loss 0,
+ *  stamped inside season N and under the kickoff (game-derived) source, exactly as
+ *  `scheduleObservations` writes them. */
+async function storeGameResults(team: string, results: readonly number[]): Promise<void> {
+  await recordTeamObservations(
+    db,
+    results.map((value, index) => ({
+      season: N,
+      week: index + 1,
+      team,
+      source: SCHEDULE_SOURCE.kickoff,
+      metric: SCHEDULE_METRICS.gameResult,
+      value,
+      asOf: BEFORE_GATE,
+    })),
+  );
+}
+
 async function insertPlayers(entries: readonly (readonly [string, string])[]): Promise<void> {
   await db.insert(nflPlayers).values(
     entries.map(([id, position]) => ({ id, pfrId: id, name: id, position, latestTeam: null, rookieSeason: 2015, lastSeason: 2026 })),
@@ -121,13 +152,13 @@ describe("discoveryFactsForSeason — new quantities, tri-state", () => {
       { season: N, week: 2, playerId: "hub", metric: PARTICIPATION_METRICS.teamOffensiveSnaps, value: 60, asOf: BEFORE_GATE },
     ]);
     await storeLines([line(N, 2, "hub", {}, BEFORE_GATE)]);
-    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
     // (60+40) / (65+60) = 100/125 = 0.8, NOT the mean of (60/65=0.923) and (40/60=0.667).
     expect(facts.get("hub")!.current.snapShare).toBeCloseTo(0.8, 5);
   });
 
   it("snapShare is null with no snap-count evidence at all", async () => {
-    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
     expect(facts.get("hub")!.current.snapShare).toBeNull();
   });
 
@@ -155,7 +186,7 @@ describe("discoveryFactsForSeason — new quantities, tri-state", () => {
       { season: N, week: 1, playerId: "hub", metric: PBP_PLAYER_METRICS.airYards, value: 40, asOf: BEFORE_GATE },
       { season: N, week: 1, playerId: "hub", metric: PBP_PLAYER_METRICS.airYardTargets, value: 5, asOf: BEFORE_GATE },
     ]);
-    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
     expect(facts.get("hub")!.current.redZoneTouchShare).toBeCloseTo((4 + 1) / (15 + 5), 5);
     expect(facts.get("hub")!.current.targetDepth).toBeCloseTo(40 / 5, 5);
     // No play-by-play evidence at all for "quiet" -> null, never zero.
@@ -166,7 +197,7 @@ describe("discoveryFactsForSeason — new quantities, tri-state", () => {
   it("incomingCoachTenureSeasons is the raw count, and null with no team edge at all", async () => {
     await recordPlayerTeams(db, [{ season: N, week: 1, playerId: "hub", team: "KC", asOf: BEFORE_GATE }]);
     await storeCoachFacts([{ season: N1, week: 1, team: "KC", metric: COACH_METRICS.tenureSeasons, value: 0, asOf: GATE }]);
-    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
     expect(facts.get("hub")!.current.incomingCoachTenureSeasons).toBe(0);
     expect(facts.get("quiet")!.current.incomingCoachTenureSeasons).toBeNull();
   });
@@ -175,7 +206,7 @@ describe("discoveryFactsForSeason — new quantities, tri-state", () => {
     await recordPreseasonRosters(db, [
       { season: N, team: "KC", playerId: "hub", position: "RB", status: "active", birthDate: null, draftYear: 2020, draftPick: 30, draftClub: "KC", asOf: BEFORE_GATE },
     ]);
-    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
     expect(facts.get("hub")!.current.experienceYear).toBe(N - 2020 + 1);
     expect(facts.get("quiet")!.current.experienceYear).toBeNull();
   });
@@ -187,7 +218,7 @@ describe("discoveryFactsForSeason — new quantities, tri-state", () => {
       { season: N, week: 2, team: "KC", metric: PBP_METRICS.paceSecondsPerPlay, value: 28, asOf: BEFORE_GATE },
     ]);
     await storeLines([line(N, 2, "hub", {}, BEFORE_GATE)]);
-    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
     expect(facts.get("hub")!.current.teamPaceSecondsPerPlay).toBeCloseTo(29, 5);
     expect(facts.get("quiet")!.current.teamPaceSecondsPerPlay).toBeNull();
   });
@@ -199,8 +230,92 @@ describe("discoveryFactsForSeason — new quantities, tri-state", () => {
       // A late correction, stamped AFTER the gate this replay reads through — must not move the answer.
       { season: N, week: 1, playerId: "hub", metric: PARTICIPATION_METRICS.offensiveSnaps, value: 65, asOf: AFTER_GATE },
     ]);
-    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
     expect(facts.get("hub")!.current.snapShare).toBeCloseTo(60 / 65, 5);
+  });
+});
+
+/**
+ * THE TWO TEAM-MARKET QUANTITIES (Task 3). Everything here turns on the gate: the win total is
+ * published in AUGUST of the season it prices, months after `schedulePublishedAsOf(N+1)`, so a read
+ * on the ordinary gate returns nothing for every team in every season and BOTH quantities would be
+ * silently null everywhere. `incomingAsOf` is what makes them readable, and the last test in this
+ * block is the one that would have caught the bug.
+ */
+describe("discoveryFactsForSeason — incoming team win total and its delta", () => {
+  const players = [["hub", "RB"], ["quiet", "RB"]] as const;
+
+  beforeEach(async () => {
+    await insertPlayers(players);
+    await storeLines([
+      line(N, 1, "hub", { rushingYards: 800, receptions: 20 }, BEFORE_GATE),
+      line(N, 1, "quiet", { rushingYards: 300, receptions: 10 }, BEFORE_GATE),
+    ]);
+    await recordPlayerTeams(db, [{ season: N, week: 1, playerId: "hub", team: "KC", asOf: BEFORE_GATE }]);
+  });
+
+  it("reads season N+1's own published line, for the team the player finished season N with", async () => {
+    await storeWinTotal(N1, "KC", 11.5, VEGAS_STAMP);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.incomingTeamWinTotal).toBe(11.5);
+    // No team edge at all -> unknown, never a league-average line.
+    expect(facts.get("quiet")!.current.incomingTeamWinTotal).toBeNull();
+  });
+
+  it("is null for a team-season the store holds no line for, rather than a default", async () => {
+    await storeWinTotal(N1, "BUF", 10.5, VEGAS_STAMP);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.incomingTeamWinTotal).toBeNull();
+  });
+
+  it("subtracts the store's own schedule-derived record, counting a tie as half a win", async () => {
+    await storeWinTotal(N1, "KC", 11.5, VEGAS_STAMP);
+    // Seventeen results, the full complement for a 2023 regular season: eleven wins, one tie.
+    await storeGameResults("KC", [...Array(11).fill(1), 0.5, ...Array(5).fill(0)] as readonly number[]);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.incomingTeamWinTotalDelta).toBeCloseTo(11.5 - 11.5, 10);
+  });
+
+  it("is negative when the market prices a collapse, which is the case this quantity exists for", async () => {
+    await storeWinTotal(N1, "KC", 7.5, VEGAS_STAMP);
+    await storeGameResults("KC", [...Array(13).fill(1), ...Array(4).fill(0)] as readonly number[]);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.incomingTeamWinTotalDelta).toBeCloseTo(7.5 - 13, 10);
+  });
+
+  it("leaves the delta null on a season whose record is not fully in the store, never a partial total", async () => {
+    await storeWinTotal(N1, "KC", 11.5, VEGAS_STAMP);
+    await storeGameResults("KC", [1, 1, 1]); // three games of seventeen
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.incomingTeamWinTotal).toBe(11.5); // the line half is still known
+    expect(facts.get("hub")!.current.incomingTeamWinTotalDelta).toBeNull();
+  });
+
+  it("leaves the delta null when the line is missing but the record is known", async () => {
+    await storeGameResults("KC", [...Array(11).fill(1), ...Array(6).fill(0)] as readonly number[]);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.incomingTeamWinTotalDelta).toBeNull();
+  });
+
+  /**
+   * THE FIRING-COUNT TRAP, as a test. A win total stamped in August of N+1 sits AFTER
+   * `schedulePublishedAsOf(N+1)`, so reading it on the gate the rest of this module uses returns
+   * nothing — for every team, in every season, silently. This proves the separate `incomingAsOf` is
+   * load-bearing rather than decorative, and that it still refuses a line stamped after itself.
+   */
+  it("is invisible on the May gate and visible on the preseason gate, and refuses anything later", async () => {
+    await storeWinTotal(N1, "KC", 11.5, VEGAS_STAMP);
+    const onTheMayGate = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, GATE);
+    expect(onTheMayGate.get("hub")!.current.incomingTeamWinTotal).toBeNull();
+
+    const onThePreseasonGate = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(onThePreseasonGate.get("hub")!.current.incomingTeamWinTotal).toBe(11.5);
+
+    await storeWinTotal(N1, "SF", 12.5, AFTER_INCOMING_GATE);
+    await recordPlayerTeams(db, [{ season: N, week: 2, playerId: "quiet", team: "SF", asOf: BEFORE_GATE }]);
+    await storeLines([line(N, 2, "quiet", {}, BEFORE_GATE)]);
+    const stillGated = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(stillGated.get("quiet")!.current.incomingTeamWinTotal).toBeNull();
   });
 });
 
@@ -210,7 +325,7 @@ describe("discoveryFactsForSeason — the prior-season half", () => {
   it("prior is null when the player has no evidence at all for season N-1", async () => {
     await insertPlayers(players);
     await storeLines([line(N, 1, "vet", { rushingYards: 500, receptions: 20 }, BEFORE_GATE)]);
-    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
     expect(facts.get("vet")!.prior).toBeNull();
   });
 
@@ -224,7 +339,7 @@ describe("discoveryFactsForSeason — the prior-season half", () => {
       { season: N - 1, week: 1, playerId: "vet", metric: PARTICIPATION_METRICS.offensiveSnaps, value: 30, asOf: new Date("2022-09-01T00:00:00.000Z") },
       { season: N - 1, week: 1, playerId: "vet", metric: PARTICIPATION_METRICS.teamOffensiveSnaps, value: 60, asOf: new Date("2022-09-01T00:00:00.000Z") },
     ]);
-    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
     expect(facts.get("vet")!.prior).not.toBeNull();
     expect(facts.get("vet")!.prior!.snapShare).toBeCloseTo(0.5, 5);
     expect(facts.get("vet")!.current.snapShare).toBeNull(); // no season-N snap evidence stored above
@@ -244,7 +359,7 @@ describe("discoveryFactsForSeason — position scope", () => {
       ["dline", "DEF"],
       ["rb", "RB"],
     ]);
-    const facts = await discoveryFactsForSeason(db, N, positions, PPR_SCORING, true);
+    const facts = await discoveryFactsForSeason(db, N, positions, PPR_SCORING, true, INCOMING_GATE);
     expect(facts.has("kicker")).toBe(false);
     expect(facts.has("dline")).toBe(false);
     expect(facts.has("rb")).toBe(true);

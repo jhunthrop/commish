@@ -71,6 +71,8 @@ const NO_QUANTITIES: DiscoveryQuantityValues = {
   incomingCoachPriorPassRateOverExpected: null,
   experienceYear: null,
   teamPaceSecondsPerPlay: null,
+  incomingTeamWinTotal: null,
+  incomingTeamWinTotalDelta: null,
 };
 
 function discoveryFactsFixture(
