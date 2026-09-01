@@ -14,12 +14,10 @@ import { createDb, type ReadonlyDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import type { Position } from "@/domain/player";
-import { computeFantasyPoints } from "@/scoring/compute";
 import { allPositions } from "@/projections/backtest";
 import { nflPlayers } from "@/db/schema";
-import { statLinesAsOf } from "@/projections/lines";
 import { FITTED_MODEL } from "@/projections/model/source";
-import { RANK_BANDS, scoreCard, type Observation, type RankBandName, type ScoreCard } from "@/projections/metrics";
+import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { shippedPreseasonCandidates } from "@/projections/market/blend";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
@@ -30,6 +28,7 @@ import {
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
 } from "@/projections/preseason/fitted";
+import { actualSeasonPoints, boardPoints, boardValues, scoreOrdering } from "@/projections/preseason/scorecard";
 import {
   SHIPPED_PRESEASON_FEATURES,
   loadPreseason,
@@ -45,7 +44,6 @@ import { preseasonRankingsAsOf } from "@/projections/preseason/store";
 
 const SEASONS = process.argv.slice(2).map(Number);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : [2023, 2024];
-const LAST_REGULAR_WEEK = 18;
 
 /** Far past any correction: outcomes and benchmarks alike are scored against, never fed in. */
 const FINAL = new Date("9999-12-31T00:00:00.000Z");
@@ -105,71 +103,6 @@ function delta(before: ScoreCard, after: ScoreCard): string {
   if (before.rankCorrelation === null || after.rankCorrelation === null) return "   n/a";
   const difference = after.rankCorrelation - before.rankCorrelation;
   return `${difference >= 0 ? "+" : ""}${difference.toFixed(4)}`;
-}
-
-/** What every player on a board actually scored over the regular season. Zero for a man who never played. */
-async function actualSeasonPoints(
-  db: ReadonlyDb,
-  season: number,
-  positions: ReadonlyMap<string, Position>,
-): Promise<ReadonlyMap<string, number>> {
-  const rows = await statLinesAsOf(db, { season, week: { from: 1, to: LAST_REGULAR_WEEK }, asOf: FINAL });
-  const totals = new Map<string, number>();
-  for (const row of rows) {
-    const position = positions.get(row.line.playerId);
-    if (position === undefined) continue;
-    totals.set(row.line.playerId, (totals.get(row.line.playerId) ?? 0) + computeFantasyPoints(row.line, position, PPR_SCORING));
-  }
-  return totals;
-}
-
-/**
- * Scores one ordering against outcomes, banded by a COMMON prior where one is given.
- *
- * Banding by a shared ranking rather than by each source's own is the fix every previous research
- * document in this engine asked for and none could apply: model v1 and model v2 both record that a
- * band-by-band comparison between sources is "indicative rather than exact" because the two arms do
- * not hold the same players in a band, and both name average draft position as the fix. This phase
- * ingested it, so the fix is available here for the first time.
- */
-function scoreOrdering(
-  predicted: ReadonlyMap<string, number>,
-  actual: ReadonlyMap<string, number>,
-  eligible: ReadonlySet<string>,
-  bandBy: ReadonlyMap<string, number> | null,
-): { readonly overall: ScoreCard; readonly byBand: Readonly<Record<RankBandName, ScoreCard>> } {
-  const rows = [...predicted.entries()]
-    .filter(([playerId]) => eligible.has(playerId) && actual.has(playerId))
-    .map(([playerId, value]) => ({ playerId, value, actual: actual.get(playerId)! }));
-
-  const order = [...rows].sort((a, b) => {
-    if (bandBy === null) return b.value - a.value || a.playerId.localeCompare(b.playerId);
-    return (bandBy.get(a.playerId) ?? Infinity) - (bandBy.get(b.playerId) ?? Infinity) || a.playerId.localeCompare(b.playerId);
-  });
-  const bandOf = new Map(order.map((row, index) => [row.playerId, index + 1] as const));
-
-  const observationsIn = (from: number, to: number): readonly Observation[] =>
-    rows
-      .filter((row) => {
-        const rank = bandOf.get(row.playerId)!;
-        return rank >= from && rank <= to;
-      })
-      .map((row) => ({ predicted: row.value, actual: row.actual }));
-
-  return {
-    overall: scoreCard(rows.map((row) => ({ predicted: row.value, actual: row.actual }))),
-    byBand: Object.fromEntries(
-      RANK_BANDS.map((band) => [band.name, scoreCard(observationsIn(band.from, band.to))]),
-    ) as Record<RankBandName, ScoreCard>,
-  };
-}
-
-function boardValues(board: readonly BoardEntry[]): ReadonlyMap<string, number> {
-  return new Map(board.map((entry) => [entry.playerId, entry.valueOverReplacement] as const));
-}
-
-function boardPoints(board: readonly BoardEntry[]): ReadonlyMap<string, number> {
-  return new Map(board.map((entry) => [entry.playerId, entry.projectedPoints] as const));
 }
 
 /** The rookie class ordered by draft capital and nothing else. The `before` arm Task 3 has to beat. */

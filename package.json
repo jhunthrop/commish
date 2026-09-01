@@ -57,6 +57,7 @@
     "projections:crosswalk": "dotenv -e .env.local -- tsx scripts/build-crosswalk.ts",
     "projections:ecr:current": "dotenv -e .env.local -- tsx scripts/ingest-current-ecr.ts",
     "projections:preseason:persist": "dotenv -e .env.local -- tsx scripts/preseason-persist.ts",
+    "projections:market-edge:scorecard": "dotenv -e .env.local -- tsx scripts/market-edge-scorecard.ts",
     "laws:measure": "dotenv -e .env.local -- tsx scripts/measure-laws.ts",
     "laws:discover:quantiles": "dotenv -e .env.local -- tsx scripts/discovery-quantile-fit.ts",
     "laws:discover": "dotenv -e .env.local -- tsx scripts/discover-laws.ts"
