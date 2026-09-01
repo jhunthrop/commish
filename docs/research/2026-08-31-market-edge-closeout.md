@@ -461,6 +461,16 @@ The chip audit, also read-only against the store: the two new chips appear on **
 wide receivers, none of them below its own fitted threshold** (the q70 chip's minimum stored win
 total is 9.0, the q80 chip's is 9.5, and no chip has an unresolvable line).
 
+One structural property of this pair, surfaced by the review and stated here rather than smoothed
+over: the two laws are NESTED (every team clearing the q80 win-total threshold clears q70 by
+construction), so 103 of the 117 repriced receivers carry both chips and receive both train effects
+summed (1.2997 + 1.5304 = 2.8301 points before exposure scaling) for what is one underlying signal.
+`lawCapPoints` (2 points) caps each law's delta separately, per the constants' documented semantics;
+it does not cap the pair's sum, which only `totalCapPoints` (40) bounds. The refit and the held-out
+scorecard above both measured exactly this configuration, so no verdict changes; whether nested laws
+should deduplicate in the pricing channel, or the channel should gain a fitted per-player cap, is
+queued for the next fit round beside the rookie-cap question.
+
 ### The blend refit
 
 `blend-fitted.ts` was regenerated because the fit's own candidates carry law reasons. **The winning
