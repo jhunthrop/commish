@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DiscoveryQuantityValues } from "../discovery-facts";
+import { DISCOVERY_QUANTILES } from "./quantiles";
 import {
   computeQuantileTable,
   MIN_QUANTILE_SAMPLE,
+  quantityIdsOf,
+  QUANTILE_LEVELS,
   QUANTITY_DEFS,
   renderClaim,
   renderSignedClaim,
@@ -11,6 +14,7 @@ import {
   type QuantileTable,
   type QuantityRow,
 } from "./templates";
+import type { LawPosition } from "../populations";
 
 const NO_VALUES: DiscoveryQuantityValues = {
   touches: null,
@@ -135,31 +139,32 @@ describe("renderSignedClaim", () => {
     expect(claim).not.toContain("top");
   });
 
-  it("prefixes a mechanical 'Title: ' the same way a hand-authored tribal claim does, for splitClaim to colon-split", () => {
+  it("prefixes a mechanical 'Title (value): ' the same way a hand-authored tribal claim does, for splitClaim to colon-split", () => {
     const claim = renderSignedClaim(parts, -1, QUANTILES);
-    expect(claim.startsWith("Running back carries and receptions: ")).toBe(true);
+    expect(claim.startsWith("Running back carries and receptions (150): ")).toBe(true);
   });
 
   it("commits to 'loses' for a negative sign", () => {
     expect(renderSignedClaim(parts, -1, QUANTILES)).toBe(
-      "Running back carries and receptions: A running back whose combined carries and receptions that season is 150 or more loses points per game the following season.",
+      "Running back carries and receptions (150): A running back whose combined carries and receptions that season is 150 or more loses points per game the following season.",
     );
   });
 
   it("commits to 'gains' for a positive sign", () => {
     expect(renderSignedClaim(parts, 1, QUANTILES)).toBe(
-      "Running back carries and receptions: A running back whose combined carries and receptions that season is 150 or more gains points per game the following season.",
+      "Running back carries and receptions (150): A running back whose combined carries and receptions that season is 150 or more gains points per game the following season.",
     );
   });
 
   it("renders a delta clause's rise/fall wording with the real value, not a percentage", () => {
     const rose: ClaimParts = { position: "WR", clause: { kind: "delta", quantityId: "targetShare", quantileLevel: 0.7, direction: "rose_into" } };
     const fell: ClaimParts = { position: "WR", clause: { kind: "delta", quantityId: "targetShare", quantileLevel: 0.7, direction: "fell_out_of" } };
+    // Percent renders at one decimal (fix round 2, NEW-3) — "15.0%", not "15%".
     expect(renderSignedClaim(rose, 1, QUANTILES)).toContain(
-      "share of his team's targets that season rose to 15% or more after being below that mark the season before",
+      "share of his team's targets that season rose to 15.0% or more after being below that mark the season before",
     );
     expect(renderSignedClaim(fell, -1, QUANTILES)).toContain(
-      "share of his team's targets that season fell below 15% after being at or above that mark the season before",
+      "share of his team's targets that season fell below 15.0% after being at or above that mark the season before",
     );
   });
 
@@ -173,8 +178,9 @@ describe("renderSignedClaim", () => {
       },
     };
     const claim = renderSignedClaim(and, -1, QUANTILES);
+    // Age renders at two decimals (fix round 2, NEW-3) — "27.00", not "27.0".
     expect(claim).toContain(
-      "combined carries and receptions that season is 200 or more and whose age at that season's opener is 27.0 or more",
+      "combined carries and receptions that season is 200 or more and whose age at that season's opener is 27.00 or more",
     );
   });
 
@@ -190,12 +196,18 @@ describe("renderSignedClaim", () => {
 });
 
 describe("renderTitle", () => {
-  it("names position + quantity short label for a single clause", () => {
+  const QUANTILES: QuantileTable = {
+    touches: { RB: { 0.7: 100, 0.8: 150, 0.9: 200 } },
+    age: { RB: { 0.7: 27, 0.8: 28, 0.9: 30 } },
+    targetShare: { WR: { 0.7: 0.15, 0.8: 0.19, 0.9: 0.23 } },
+  };
+
+  it("names position + quantity short label + real value for a single clause", () => {
     const parts: ClaimParts = { position: "RB", clause: { kind: "threshold", quantityId: "touches", quantileLevel: 0.8 } };
-    expect(renderTitle(parts)).toBe("Running back carries and receptions");
+    expect(renderTitle(parts, QUANTILES)).toBe("Running back carries and receptions (150)");
   });
 
-  it("joins two short labels with '+' for an AND clause", () => {
+  it("joins two short labels, each with its own value, with '+' for an AND clause", () => {
     const parts: ClaimParts = {
       position: "RB",
       clause: {
@@ -204,12 +216,98 @@ describe("renderTitle", () => {
         right: { kind: "threshold", quantityId: "age", quantileLevel: 0.7 },
       },
     };
-    expect(renderTitle(parts)).toBe("Running back carries and receptions + age");
+    expect(renderTitle(parts, QUANTILES)).toBe("Running back carries and receptions (200) + age (27.00)");
   });
 
   it("never emits an em-dash or a colon (it is meant to be the half BEFORE splitClaim's colon)", () => {
     const parts: ClaimParts = { position: "WR", clause: { kind: "threshold", quantityId: "targetShare", quantileLevel: 0.9 } };
-    expect(renderTitle(parts)).not.toMatch(/[—:]/);
+    expect(renderTitle(parts, QUANTILES)).not.toMatch(/[—:]/);
+  });
+
+  it("FIX ROUND 2 — gives two candidates sharing a quantity at different quantile levels distinct titles, never byte-identical", () => {
+    const lower: ClaimParts = { position: "RB", clause: { kind: "threshold", quantityId: "touches", quantileLevel: 0.7 } };
+    const higher: ClaimParts = { position: "RB", clause: { kind: "threshold", quantityId: "touches", quantileLevel: 0.9 } };
+    expect(renderTitle(lower, QUANTILES)).not.toBe(renderTitle(higher, QUANTILES));
+  });
+});
+
+describe("quantityIdsOf (NESTING RULING, fix round 2)", () => {
+  it("returns a single-element set for a threshold clause", () => {
+    const clause: ClaimParts["clause"] = { kind: "threshold", quantityId: "touches", quantileLevel: 0.8 };
+    expect(quantityIdsOf(clause)).toEqual(new Set(["touches"]));
+  });
+
+  it("returns a single-element set for a delta clause", () => {
+    const clause: ClaimParts["clause"] = { kind: "delta", quantityId: "age", quantileLevel: 0.7, direction: "rose_into" };
+    expect(quantityIdsOf(clause)).toEqual(new Set(["age"]));
+  });
+
+  it("unions both halves of an AND clause, deduplicated", () => {
+    const clause: ClaimParts["clause"] = {
+      kind: "and",
+      left: { kind: "threshold", quantityId: "touches", quantileLevel: 0.9 },
+      right: { kind: "threshold", quantityId: "age", quantileLevel: 0.7 },
+    };
+    expect(quantityIdsOf(clause)).toEqual(new Set(["touches", "age"]));
+  });
+
+  it("collapses an AND of the SAME quantity at two levels to a single-element set (never happens in practice — generate.ts's own pruning rule — but the function itself must still be correct)", () => {
+    const clause: ClaimParts["clause"] = {
+      kind: "and",
+      left: { kind: "threshold", quantityId: "age", quantileLevel: 0.7 },
+      right: { kind: "threshold", quantityId: "age", quantileLevel: 0.9 },
+    };
+    expect(quantityIdsOf(clause)).toEqual(new Set(["age"]));
+  });
+});
+
+/**
+ * NEW-3 (fix round 2) — every `formatValue` must round in the `>=`-PRESERVING direction: the
+ * displayed number must itself satisfy `displayed >= threshold`, never fall short of it, so
+ * "displayed value or more" is never a superset of what the real predicate ("threshold or more")
+ * actually includes.
+ */
+describe("formatValue — the >=-preserving rounding direction (NEW-3)", () => {
+  function defFor(id: string) {
+    const def = QUANTITY_DEFS.find((d) => d.id === id);
+    if (def === undefined) throw new Error(`no QuantityDef for "${id}"`);
+    return def;
+  }
+
+  it("touches: 237.29999999999995 rounds UP to 238, never down to 237 (a player with exactly 237 touches does not satisfy >= 237.3)", () => {
+    expect(defFor("touches").formatValue(237.29999999999995)).toBe("238");
+  });
+
+  it("touches: an already-exact integer threshold is unchanged", () => {
+    expect(defFor("touches").formatValue(129)).toBe("129");
+  });
+
+  it("touchdownPointsShare: 19.489% (0.19489) rounds UP to 19.5%, never down to 19% (a player at 19.2% must not read as satisfying the claim)", () => {
+    expect(defFor("touchdownPointsShare").formatValue(0.19489)).toBe("19.5%");
+  });
+
+  it("age: rounds up at the second decimal, never down", () => {
+    // 26.664750131761778 -> ceil at 2 decimals -> 26.67, never 26.66.
+    expect(defFor("age").formatValue(26.664750131761778)).toBe("26.67");
+  });
+
+  it("property test: for every real committed quantile in DISCOVERY_QUANTILES, the rendered value parsed back is always >= the raw threshold", () => {
+    for (const def of QUANTITY_DEFS) {
+      const forQuantity = DISCOVERY_QUANTILES[def.id];
+      if (forQuantity === undefined) continue;
+      for (const position of Object.keys(forQuantity) as LawPosition[]) {
+        const thresholds = forQuantity[position];
+        if (thresholds === undefined) continue;
+        for (const level of QUANTILE_LEVELS) {
+          const threshold = thresholds[level];
+          const formatted = def.formatValue(threshold);
+          const parsedBack = formatted.endsWith("%") ? parseFloat(formatted) / 100 : parseFloat(formatted);
+          expect(parsedBack, `${def.id}/${position}/${level}: formatted "${formatted}" parsed back to ${parsedBack}, below threshold ${threshold}`).toBeGreaterThanOrEqual(
+            threshold,
+          );
+        }
+      }
+    }
   });
 });
 

@@ -472,21 +472,21 @@ describe("verdictForDiscoveredLaw", () => {
 describe("parseDiscoveredJson", () => {
   it("parses a well-shaped discovered.json into a DiscoveredJson", () => {
     const entry = discoveredEntryFixture();
-    const raw = JSON.stringify({ counts: { tested: 1737, untestable: 900, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
+    const raw = JSON.stringify({ counts: { candidates: 1737, untestable: 900, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
     expect(parseDiscoveredJson(raw)).toEqual({
-      counts: { tested: 1737, untestable: 900, bhSurvivors: 1, replicated: 1 },
+      counts: { candidates: 1737, untestable: 900, bhSurvivors: 1, replicated: 1 },
       laws: { fake_candidate: entry },
     });
   });
 
   it("throws when counts is missing a field", () => {
-    const raw = JSON.stringify({ counts: { tested: 1737, untestable: 900, bhSurvivors: 1 }, laws: {} });
+    const raw = JSON.stringify({ counts: { candidates: 1737, untestable: 900, bhSurvivors: 1 }, laws: {} });
     expect(() => parseDiscoveredJson(raw)).toThrow(/counts\.replicated is not a finite number/);
   });
 
   it("throws on the same malformed measured-entry fields parseMeasuredJson catches", () => {
     const malformed = JSON.stringify({
-      counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+      counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
       laws: { fake_candidate: { ...discoveredEntryFixture(), effect: "-3" } },
     });
     expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.effect is not a finite number/);
@@ -494,7 +494,7 @@ describe("parseDiscoveredJson", () => {
 
   it("throws when origin is not \"discovered\"", () => {
     const malformed = JSON.stringify({
-      counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+      counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
       laws: { fake_candidate: { ...discoveredEntryFixture(), origin: "tribal" } },
     });
     expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.origin is not "discovered"/);
@@ -502,7 +502,7 @@ describe("parseDiscoveredJson", () => {
 
   it("throws when expectedSign is not -1 or 1", () => {
     const malformed = JSON.stringify({
-      counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+      counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
       laws: { fake_candidate: { ...discoveredEntryFixture(), expectedSign: 0 } },
     });
     expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.expectedSign is not -1 or 1/);
@@ -510,7 +510,7 @@ describe("parseDiscoveredJson", () => {
 
   it("throws when template is not one of threshold | delta | and", () => {
     const malformed = JSON.stringify({
-      counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+      counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
       laws: { fake_candidate: { ...discoveredEntryFixture(), template: "bogus" } },
     });
     expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.template is not one of/);
@@ -518,13 +518,13 @@ describe("parseDiscoveredJson", () => {
 
   it("throws when a foldEffects entry's pairs is negative", () => {
     const entry = discoveredEntryFixture({ foldEffects: [{ season: 2021, pairs: -1, effect: -1 }] });
-    const malformed = JSON.stringify({ counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
+    const malformed = JSON.stringify({ counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
     expect(() => parseDiscoveredJson(malformed)).toThrow(/non-finite or negative pairs count/);
   });
 
   it("throws when a foldEffects entry's pairs === 0 disagrees with its own effect being non-null", () => {
     const entry = discoveredEntryFixture({ foldEffects: [{ season: 2021, pairs: 0, effect: -1 }] });
-    const malformed = JSON.stringify({ counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
+    const malformed = JSON.stringify({ counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
     expect(() => parseDiscoveredJson(malformed)).toThrow(/pairs === 0 and effect === null disagree/);
   });
 });
@@ -538,7 +538,7 @@ const FAKE_CANDIDATE_IDS: ReadonlySet<string> = new Set(["fake_candidate"]);
 describe("discoveredLawsFrom", () => {
   it("merges a discovered entry into a Law, origin: \"discovered\", modelPath always null", () => {
     const entry = discoveredEntryFixture();
-    const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } };
+    const discoveredJson: DiscoveredJson = { counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } };
     const [law] = discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS);
     expect(law).toEqual({
       id: "fake_candidate",
@@ -554,12 +554,12 @@ describe("discoveredLawsFrom", () => {
 
   it("throws when the stored verdict disagrees with verdictForDiscoveredLaw's own computation", () => {
     const entry = discoveredEntryFixture({ sample: MIN_REPLICATION_PAIRS - 1, verdict: "confirmed" }); // should be "weak" — thin sample
-    const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 0 }, laws: { fake_candidate: entry } };
+    const discoveredJson: DiscoveredJson = { counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 0 }, laws: { fake_candidate: entry } };
     expect(() => discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS)).toThrow(/verdict for "fake_candidate" is "confirmed".*computes "weak"/);
   });
 
   it("returns an empty array for zero survivors — a legitimate, publishable result", () => {
-    const discoveredJson: DiscoveredJson = { counts: { tested: 1737, untestable: 1737, bhSurvivors: 0, replicated: 0 }, laws: {} };
+    const discoveredJson: DiscoveredJson = { counts: { candidates: 1737, untestable: 1737, bhSurvivors: 0, replicated: 0 }, laws: {} };
     expect(discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS)).toEqual([]);
   });
 
@@ -572,7 +572,7 @@ describe("discoveredLawsFrom", () => {
       ],
       verdict: "weak",
     });
-    const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 0 }, laws: { fake_candidate: entry } };
+    const discoveredJson: DiscoveredJson = { counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 0 }, laws: { fake_candidate: entry } };
     const [law] = discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS);
     expect(law!.hasFoldEvidence).toBe(false);
   });
@@ -582,7 +582,7 @@ describe("discoveredLawsFrom", () => {
   describe("the orphan guard (IMPORTANT 5 RULING)", () => {
     it("throws when discovered.json has an entry with no matching candidate in the given candidateIds set", () => {
       const entry = discoveredEntryFixture();
-      const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { orphaned_id: entry } };
+      const discoveredJson: DiscoveredJson = { counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { orphaned_id: entry } };
       expect(() => discoveredLawsFrom(discoveredJson, new Set(["some_other_id"]))).toThrow(
         /orphaned_id.*no matching candidate in generateCandidates\(\)/,
       );
@@ -590,7 +590,7 @@ describe("discoveredLawsFrom", () => {
 
     it("accepts an entry whose id IS in the given candidateIds set", () => {
       const entry = discoveredEntryFixture();
-      const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } };
+      const discoveredJson: DiscoveredJson = { counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } };
       expect(() => discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS)).not.toThrow();
     });
 
@@ -598,7 +598,7 @@ describe("discoveredLawsFrom", () => {
       const [firstRealId] = generateCandidates().map((candidate) => candidate.id);
       const entry = discoveredEntryFixture();
       const discoveredJson: DiscoveredJson = {
-        counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+        counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
         laws: { [firstRealId!]: entry },
       };
       expect(() => discoveredLawsFrom(discoveredJson)).not.toThrow();
@@ -606,7 +606,7 @@ describe("discoveredLawsFrom", () => {
 
     it("defaults candidateIds to the REAL generateCandidates() ids when not given, and rejects a fake one", () => {
       const entry = discoveredEntryFixture();
-      const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { not_a_real_candidate_id: entry } };
+      const discoveredJson: DiscoveredJson = { counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { not_a_real_candidate_id: entry } };
       expect(() => discoveredLawsFrom(discoveredJson)).toThrow(/not_a_real_candidate_id.*no matching candidate/);
     });
   });

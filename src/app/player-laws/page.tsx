@@ -5,11 +5,13 @@ import { pageTitle } from "@/components/app-shell/page-metadata";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { ReadingFrame, ReadingSection } from "@/components/app-shell/reading-frame";
 import { discoveredPipelineCounts, registry, type PipelineCounts } from "@/projections/laws/registry";
+import { generateCandidates } from "@/projections/laws/discovery/generate";
+import { quantityIdsOf, type QuantityId } from "@/projections/laws/discovery/templates";
 import type { Law, LawMeasurement, LawVerdict } from "@/projections/laws/types";
 import { signedPoints } from "@/components/ui/event-feed-row";
 
 /**
- * THE PLAYER-LAWS REFERENCE (Task 9, Sunday v5, 2026-08-31; fix round 1, same date).
+ * THE PLAYER-LAWS REFERENCE (Task 9, Sunday v5, 2026-08-31; fix round 1 and 2, same date).
  *
  * `/league-rules`'s own pattern, applied to every claim `registry()` carries: a full-bleed masthead,
  * a measured prose column, chapters with anchors. This page's own subject makes ONE rule
@@ -32,14 +34,23 @@ import { signedPoints } from "@/components/ui/event-feed-row";
  * which is exactly the hardcoded-prose-that-goes-stale risk law 7 exists to prevent — see that
  * function's own docblock for the distinct shapes `weak` can take.
  *
- * DISCOVERED LAWS ARE GATED, TRIBAL LAWS ARE NOT (fix round, CRITICAL 3). The tribal verdict groups
- * above publish every tribal law regardless of verdict (Part 3's own rule, unchanged). The
+ * DISCOVERED LAWS ARE GATED, TRIBAL LAWS ARE NOT (fix round 1, CRITICAL 3). The tribal verdict
+ * groups above publish every tribal law regardless of verdict (Part 3's own rule, unchanged). The
  * "Discovered laws" section below is different on purpose: it publishes only `origin: "discovered"`
  * laws that reached `verdict: "confirmed"` — the other BH survivors (weak or debunked after
  * replication) stay in the committed `discovered.json` as the honest record, never hidden, but this
- * page is not the place a reader sees 37 near-misses next to 13 real findings; the pipeline's own
- * top-level accounting (`discoveredPipelineCounts()`) is what tells that fuller story, in ONE
- * methodology sentence per `discoveryMethodologySentence`'s own docblock.
+ * page is not the place a reader sees the full survivor list next to the real findings; the
+ * pipeline's own top-level accounting (`discoveredPipelineCounts()`) is what tells that fuller
+ * story, in ONE methodology sentence per `discoveryMethodologySentence`'s own docblock.
+ *
+ * ONE CARD PER FINDING, NOT ONE PER CANDIDATE (fix round 2, NESTING RULING). Two or more confirmed
+ * discovered laws can be nested or overlapping restatements of the SAME underlying finding — the
+ * screen tests every quantile level of every quantity independently, so a real signal on
+ * "touchdown-points share" routinely surfaces as several candidates at once (a single-clause law at
+ * one quantile level, and AND-pairs that include the same quantity at others). `groupIntoFamilies`
+ * collapses these into ONE card per family before rendering — see that function's own docblock for
+ * the exact rule — so a reader sees one finding with its own nested variants named plainly, not
+ * three or four cards that each look like an independent discovery.
  */
 export const metadata: Metadata = pageTitle("Player laws");
 
@@ -119,13 +130,13 @@ function verdictElaboration(law: Law): string {
 /**
  * Every law's `claim` is written "Title: plain-words description" — a tribal law's title is a
  * hand-authored name (`populations.ts`'s `LAW_ENTRIES`, e.g. "The workload cliff"); a discovered
- * law's title is mechanically built from its position and quantity/quantities' own short labels
- * (`discovery/templates.ts`'s `renderTitle`, composed into the claim by that same module's
- * `renderSignedClaim` — see its own docblock for why the two kinds of law can share ONE claim shape).
- * This splits on the first `": "` so the title becomes this section's own heading and the rest
- * stays exactly the sentence a reader already gets in a board's reason chip (`reason-chip.tsx`). A
- * claim with no colon (should not happen; defensive only) renders whole as the heading with an
- * empty body rather than throwing on a content page.
+ * law's title is mechanically built from its position, quantity/quantities' own short labels, AND
+ * their real committed threshold values (`discovery/templates.ts`'s `renderTitle`, composed into
+ * the claim by that same module's `renderSignedClaim` — see its own docblock for why the two kinds
+ * of law can share ONE claim shape). This splits on the first `": "` so the title becomes this
+ * section's own heading and the rest stays exactly the sentence a reader already gets in a board's
+ * reason chip (`reason-chip.tsx`). A claim with no colon (should not happen; defensive only) renders
+ * whole as the heading with an empty body rather than throwing on a content page.
  */
 function splitClaim(claim: string): { readonly title: string; readonly body: string } {
   const separator = ": ";
@@ -136,6 +147,21 @@ function splitClaim(claim: string): { readonly title: string; readonly body: str
   return { title: claim.slice(0, index), body: body.charAt(0).toUpperCase() + body.slice(1) };
 }
 
+/**
+ * The card's own SHORT seasons label — just the window (and any gap-season note), never the full
+ * replication-provenance sentence, which can run well past 200 characters for a discovered law and
+ * breaks the figure grid's own layout (fix round 2, NEW-4). The committed file keeps the FULL
+ * record (`measured.seasons`, untouched by this); this is presentation-only, extracting everything
+ * before the first comma — every `seasonsLabel()` (`measure-laws.ts`, `discover-laws.ts`) builds its
+ * own string with the window-and-gap-note as that leading, comma-terminated clause, by construction.
+ * The out-of-sample caveat itself (2021 sits inside a discovered law's own train window) stays in
+ * the discovered section's own methodology sentence, not repeated on every card.
+ */
+function shortSeasonsLabel(seasons: string): string {
+  const commaIndex = seasons.indexOf(",");
+  return commaIndex === -1 ? seasons : seasons.slice(0, commaIndex);
+}
+
 /** Every measured figure, formatted, never typed — the four values (spec Part 3) a reader needs
  *  to judge a law for themselves: signed effect, the 95% interval, the sample and the seasons. */
 function measuredFigures(measured: LawMeasurement): { readonly effect: string; readonly interval: string; readonly sample: string; readonly seasons: string } {
@@ -144,7 +170,7 @@ function measuredFigures(measured: LawMeasurement): { readonly effect: string; r
     effect: `${signedPoints(measured.effect)} pts per game`,
     interval: `${signedPoints(low)} to ${signedPoints(high)} pts per game`,
     sample: `${Math.round(measured.sample)} player-seasons`,
-    seasons: measured.seasons,
+    seasons: shortSeasonsLabel(measured.seasons),
   };
 }
 
@@ -191,35 +217,43 @@ function LawArticle({ law }: { readonly law: Law }) {
 }
 
 /**
- * THE DISCOVERED-LAWS SECTION'S ONE METHODOLOGY SENTENCE (fix round, CRITICAL 3), built from
- * `discoveredPipelineCounts()` — never a number typed into this file's own copy, the identical "read
- * it at render time" discipline every other figure on this page keeps. States the whole funnel
- * (tested -> untestable -> BH survivors -> replicated) AND, per IMPORTANT 1 RULING, that only 2022
- * and 2023 are genuinely out-of-sample for a discovered law (2021 sits inside the discovery screen's
- * own training window — see `discovery/measure.ts`'s docblock, step 4, and `registry.ts`'s
- * `verdictForDiscoveredLaw` for where that distinction changes a verdict).
+ * THE DISCOVERED-LAWS SECTION'S ONE METHODOLOGY SENTENCE (fix round 1, CRITICAL 3; reworded fix
+ * round 2, NEW-1 and NEW-2), built from `discoveredPipelineCounts()` — never a number typed into
+ * this file's own copy, the identical "read it at render time" discipline every other figure on
+ * this page keeps. States the whole funnel (candidates -> untestable -> BH survivors -> replicated)
+ * AND, per IMPORTANT 1 RULING, that only 2022 and 2023 are genuinely out-of-sample for a discovered
+ * law (2021 sits inside the discovery screen's own training window — see `discovery/measure.ts`'s
+ * docblock, step 4, and `registry.ts`'s `verdictForDiscoveredLaw` for where that distinction changes
+ * a verdict).
+ *
+ * TWO WORDING FIXES, FIX ROUND 2: (NEW-1) "untestable" no longer claims those candidates matched
+ * zero pairs — most of them DID match, just fewer than `MIN_TRAIN_PAIRS`, and the old wording was
+ * false for the large majority of that count. (NEW-2) the stray "candidates above" — there is no
+ * candidate LISTING above this sentence for "above" to refer to — is gone; this sentence describes
+ * the whole 1,737-candidate family the page never lists in full, not something rendered nearby.
  */
 function discoveryMethodologySentence(counts: PipelineCounts): string {
   return (
-    `Every one of the ${counts.tested} mechanically generated candidates above is measured the same way: matched to a similar ` +
-    `player-season, screened for a false-discovery rate of at most 10% across the whole candidate family, then required to ` +
-    `replicate on seasons the screen never trained on. ${counts.untestable} could not be matched on the training window and were ` +
-    `excluded rather than scored; ${counts.bhSurvivors} survived the false-discovery screen; ${counts.replicated} of those also ` +
-    `replicated on 2022 or 2023, the two seasons genuinely outside the screen's own training window (2021 sits inside it). Only ` +
-    `the ${counts.replicated} law${counts.replicated === 1 ? "" : "s"} below cleared every bar; the rest of the survivors are ` +
-    `recorded, with their own non-confirmed verdict, in the committed discovery file.`
+    `Every discovered candidate is measured the same way: matched to a similar player-season, screened for a false-discovery ` +
+    `rate of at most 10% across the whole ${counts.candidates}-candidate family, then required to replicate on seasons the ` +
+    `screen never trained on. ${counts.untestable} could not be matched on enough training seasons (fewer than 20 matched ` +
+    `pairs) and were excluded rather than scored; ${counts.bhSurvivors} survived the false-discovery screen; ` +
+    `${counts.replicated} of those also replicated on 2022 or 2023, the two seasons genuinely outside the screen's own ` +
+    `training window (2021 sits inside it). Only the ${counts.replicated} finding${counts.replicated === 1 ? "" : "s"} below ` +
+    `cleared every bar; the rest of the survivors are recorded, with their own non-confirmed verdict, in the committed ` +
+    `discovery file.`
   );
 }
 
 /**
- * WHAT A CONFIRMED LAW ACTUALLY DOES, DERIVED MECHANICALLY, ORIGIN-AWARE (fix round, CRITICAL 3 —
+ * WHAT A CONFIRMED LAW ACTUALLY DOES, DERIVED MECHANICALLY, ORIGIN-AWARE (fix round 1, CRITICAL 3 —
  * this sentence used to read `laws` as one undifferentiated list; now that `registry()` merges
  * discovered laws in too, that would either mislabel a discovered law's own board absence as "not
  * wired to the model" — a narrower, misleading claim, since a discovered law does not even reach a
  * board's reason chip yet, model wiring or not — or silently count it toward a "confirmed" total the
  * tribal sentence's own numbers were never written to include).
  *
- * TRIBAL: unchanged from the original (fix round, I7) — only a confirmed TRIBAL law with a wired
+ * TRIBAL: unchanged from the original (fix round 1, I7) — only a confirmed TRIBAL law with a wired
  * `modelPath` (`populations.ts`'s own docblock: "null means the law is content only, no model
  * wiring") actually feeds the fitted ranking model a board reads. EVERY confirmed tribal law still
  * shows up as a reason chip beside a player's name (`board-reasons.ts`'s `lawReasonsFor` gates on
@@ -255,6 +289,178 @@ function boardConsequenceSentence(laws: readonly Law[]): string {
   return `${tribalSentence} The ${discoveredConfirmed.length} confirmed discovered ${plural} not show up as a reason chip or feed the board's rankings yet.`;
 }
 
+// ---------------------------------------------------------------------------------------------
+// NESTING RULING (fix round 2) — one card per finding family, never one per surviving candidate.
+// ---------------------------------------------------------------------------------------------
+
+/** Every real candidate's own quantity set + position, keyed by id — built ONCE per render from the
+ *  pure, no-DB `generateCandidates()` (never re-parsing `Law.id` as a string; the id already names a
+ *  real candidate, `discoveredLawsFrom`'s own orphan guard already checked that at merge time). */
+function candidateInfoById(): ReadonlyMap<string, { readonly quantityIds: ReadonlySet<QuantityId>; readonly position: string }> {
+  const out = new Map<string, { quantityIds: ReadonlySet<QuantityId>; position: string }>();
+  for (const candidate of generateCandidates()) {
+    out.set(candidate.id, { quantityIds: quantityIdsOf(candidate.claimParts.clause), position: candidate.position });
+  }
+  return out;
+}
+
+function setsEqual<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
+  if (a.size !== b.size) return false;
+  for (const item of a) if (!b.has(item)) return false;
+  return true;
+}
+
+function isStrictSubset<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
+  if (a.size >= b.size) return false;
+  for (const item of a) if (!b.has(item)) return false;
+  return true;
+}
+
+interface DiscoveredFamily {
+  readonly representative: Law;
+  readonly nested: readonly Law[];
+}
+
+/**
+ * NESTING RULING (fix round 2, adopting the reviewer's stronger fix): confirmed discovered laws
+ * drawn from the SAME POSITION, sharing an identical quantity set (ignoring thresholds) OR one
+ * nested inside the other via STRICT CONTAINMENT, collapse into ONE page card — the representative
+ * is the member with the LARGEST full-window sample, and every other member of the family is listed
+ * on that card as a nested variant (`DiscoveredFamilyArticle`, below).
+ *
+ * POSITION IS A REQUIRED, ADDED CONDITION beyond the ruling's own literal wording: a WR
+ * touchdown-points-share law and an RB touchdown-points-share law share a quantity NAME but are
+ * drawn from entirely different populations — collapsing them would misrepresent two distinct
+ * findings as one, the same reason `stratumKeyFor` (`registry.ts`) never lets a match cross a
+ * position boundary either.
+ *
+ * Implemented as union-find over `laws`' own indices: two laws are connected when `related` holds;
+ * the resulting connected components are each family. Ties in sample size (should not happen with
+ * real floating-point data) break on id, so the grouping is fully deterministic regardless of
+ * `laws`' own input order.
+ */
+function groupIntoFamilies(laws: readonly Law[]): readonly DiscoveredFamily[] {
+  const info = candidateInfoById();
+  const infoFor = (law: Law): { readonly quantityIds: ReadonlySet<QuantityId>; readonly position: string } => {
+    const found = info.get(law.id);
+    if (found === undefined) {
+      throw new Error(`groupIntoFamilies: "${law.id}" has no matching candidate in generateCandidates() — a discovered law and the generator have drifted.`);
+    }
+    return found;
+  };
+
+  const n = laws.length;
+  const parent = Array.from({ length: n }, (_unused, index) => index);
+  function find(index: number): number {
+    let root = index;
+    while (parent[root] !== root) root = parent[root]!;
+    parent[index] = root;
+    return root;
+  }
+  function union(a: number, b: number): void {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent[rootA] = rootB;
+  }
+
+  for (let i = 0; i < n; i += 1) {
+    for (let j = i + 1; j < n; j += 1) {
+      const a = infoFor(laws[i]!);
+      const b = infoFor(laws[j]!);
+      if (a.position !== b.position) continue;
+      const related = setsEqual(a.quantityIds, b.quantityIds) || isStrictSubset(a.quantityIds, b.quantityIds) || isStrictSubset(b.quantityIds, a.quantityIds);
+      if (related) union(i, j);
+    }
+  }
+
+  const groups = new Map<number, number[]>();
+  for (let i = 0; i < n; i += 1) {
+    const root = find(i);
+    const list = groups.get(root) ?? [];
+    list.push(i);
+    groups.set(root, list);
+  }
+
+  const families: DiscoveredFamily[] = [...groups.values()].map((indices) => {
+    const sorted = [...indices].sort((x, y) => {
+      const sampleDiff = laws[y]!.measured.sample - laws[x]!.measured.sample; // largest sample first
+      if (sampleDiff !== 0) return sampleDiff;
+      return laws[x]!.id < laws[y]!.id ? -1 : 1; // deterministic tie-break
+    });
+    const [repIndex, ...restIndices] = sorted;
+    return { representative: laws[repIndex!]!, nested: restIndices.map((idx) => laws[idx]!) };
+  });
+
+  return families.sort((a, b) => (a.representative.id < b.representative.id ? -1 : 1));
+}
+
+/**
+ * MECHANICAL TRIBAL OVERLAP TABLE (fix round 2, NESTING RULING) — every tribal law whose own
+ * antecedent is structurally a single named discovery quantity's threshold, keyed by that quantity,
+ * naming which of ITS OWN positions the tribal law's population is drawn from. A discovered family
+ * whose own quantity set includes one of these AND whose own position is among the tribal law's own
+ * positions gets ONE plain overlap sentence (`overlapNoteFor`) — the same underlying quantity, a
+ * different framing (a hand-picked cliff vs. a fitted quantile), both independently measured. Object-
+ * derived, not a single hardcoded id check: a future confirmed discovered law on `touches` (RB) or
+ * `age` (RB) or `targetShare` (WR) gets the identical treatment with no new code, only whatever
+ * `overlapNoteFor` finds when it looks a family's own quantities up here.
+ */
+const TRIBAL_QUANTITY_OVERLAP: ReadonlyMap<QuantityId, { readonly tribalLawId: string; readonly positions: readonly string[] }> = new Map([
+  ["touches", { tribalLawId: "rb_workload_cliff", positions: ["RB"] }],
+  ["age", { tribalLawId: "rb_age_curve", positions: ["RB"] }],
+  ["touchdownPointsShare", { tribalLawId: "td_regression", positions: ["QB", "RB", "WR", "TE"] }],
+  ["targetShare", { tribalLawId: "target_share_persistence", positions: ["WR"] }],
+]);
+
+function overlapNoteFor(family: DiscoveredFamily, tribalLaws: readonly Law[], info: ReadonlyMap<string, { readonly quantityIds: ReadonlySet<QuantityId>; readonly position: string }>): string | null {
+  const members = [family.representative, ...family.nested];
+  const quantityIds = new Set<QuantityId>();
+  let position: string | null = null;
+  for (const member of members) {
+    const found = info.get(member.id);
+    if (found === undefined) continue;
+    position = found.position;
+    for (const quantityId of found.quantityIds) quantityIds.add(quantityId);
+  }
+  if (position === null) return null;
+
+  for (const quantityId of quantityIds) {
+    const overlap = TRIBAL_QUANTITY_OVERLAP.get(quantityId);
+    if (overlap === undefined || !overlap.positions.includes(position)) continue;
+    const tribalLaw = tribalLaws.find((law) => law.id === overlap.tribalLawId);
+    if (tribalLaw === undefined) continue;
+    const { title: tribalTitle } = splitClaim(tribalLaw.claim);
+    return `This finding shares its own quantity with the tribal law "${tribalTitle}": the same underlying measurement, framed and tested independently.`;
+  }
+  return null;
+}
+
+/** One finding family, rendered: the representative's own `LawArticle`, plus a plain-text line
+ *  naming every nested variant's own threshold/effect/sample (NESTING RULING: "the representative's
+ *  card lists the nested variants in one plain line"), plus a mechanical tribal-overlap note when
+ *  one applies. */
+function DiscoveredFamilyArticle({ family, overlapNote }: { readonly family: DiscoveredFamily; readonly overlapNote: string | null }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <LawArticle law={family.representative} />
+      {family.nested.length === 0 ? null : (
+        <p className="text-sm text-text-muted">
+          Also holds, at a different threshold:{" "}
+          {family.nested
+            .map((law) => {
+              const { title } = splitClaim(law.claim);
+              const figures = measuredFigures(law.measured);
+              return `${title} (effect ${figures.effect}, ${figures.sample})`;
+            })
+            .join("; ")}
+          .
+        </p>
+      )}
+      {overlapNote === null ? null : <p className="text-sm text-text-muted">{overlapNote}</p>}
+    </div>
+  );
+}
+
 export default async function PlayerLawsPage() {
   const user = await getCurrentUser();
   const laws = registry();
@@ -262,6 +468,8 @@ export default async function PlayerLawsPage() {
   const confirmedDiscovered = laws.filter((law) => law.origin === "discovered" && law.verdict === "confirmed");
   const groups = groupByVerdict(tribalLaws);
   const discoveredCounts = discoveredPipelineCounts();
+  const families = groupIntoFamilies(confirmedDiscovered);
+  const candidateInfo = candidateInfoById();
   const totalClaims = tribalLaws.length + confirmedDiscovered.length;
 
   return (
@@ -274,11 +482,18 @@ export default async function PlayerLawsPage() {
     >
       <ReadingSection id="how-measured" title="How these are measured">
         <p>
-          Every law here started as a piece of fantasy football folklore. To grade one, we find
-          every player-season that fits its claim, match each one to an otherwise similar
-          player-season that does not, and compare what actually happened the following season.
-          A law only counts as confirmed when that difference also holds up separately on each of
-          several seasons checked one at a time, not only when every season is pooled together.
+          Every law here is graded the same way: find every player-season that fits its claim, match
+          each one to an otherwise similar player-season that does not, and compare what actually
+          happened the following season. A law only counts as confirmed when that difference also
+          holds up separately on each of several seasons checked one at a time, not only when every
+          season is pooled together.
+        </p>
+        <p>
+          The tribal laws below started as pieces of fantasy football folklore, one antecedent
+          hand-picked and tested on its own. The discovered laws further down started differently:
+          {" "}{discoveredCounts.candidates} candidates, generated mechanically by crossing every
+          tracked quantity against every quantile level, screened by the identical matched-baseline
+          method described above.
         </p>
       </ReadingSection>
 
@@ -294,15 +509,15 @@ export default async function PlayerLawsPage() {
 
       <ReadingSection id="discovered" title="Discovered laws">
         <p>{discoveryMethodologySentence(discoveredCounts)}</p>
-        {confirmedDiscovered.length === 0 ? (
+        {families.length === 0 ? (
           <p>
             No discovered candidate has replicated yet. The pipeline&apos;s own full record, including every
             survivor that did not, is committed alongside this page&apos;s own source.
           </p>
         ) : (
           <div className="flex flex-col gap-6">
-            {confirmedDiscovered.map((law) => (
-              <LawArticle key={law.id} law={law} />
+            {families.map((family) => (
+              <DiscoveredFamilyArticle key={family.representative.id} family={family} overlapNote={overlapNoteFor(family, tribalLaws, candidateInfo)} />
             ))}
           </div>
         )}

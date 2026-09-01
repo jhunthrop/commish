@@ -58,11 +58,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createDb } from "@/db/client";
 import type { ReadonlyDb } from "@/db/client";
-import { matchedPairsStratified, measureEffect, type MatchedPair } from "@/projections/laws/harness";
+import { matchedPairsStratified, measureEffect } from "@/projections/laws/harness";
 import { MEASURE_SEASONS, REPLICATION_FOLDS } from "@/projections/laws/config";
 import { buildPopulations, LAW_SPECS, type LawSpec } from "@/projections/laws/populations";
 import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
 import {
+  foldEffectsFor,
   MEASURED_JSON_PATH,
   stratumKeyFor,
   verdictForFullWindow,
@@ -87,15 +88,6 @@ function measurementSeasons(): readonly number[] {
   const seasons: number[] = [];
   for (let season = MEASURE_SEASONS.from; season <= MEASURE_SEASONS.to - 1; season += 1) seasons.push(season);
   return seasons;
-}
-
-/** A matched pair belongs to the fold named by its (shared, stratified-on) predictor season. See
- *  header — this is a partition of the full window's own matched pairs, not a second match. */
-function foldEffectsFor(pairs: readonly MatchedPair[]): readonly FoldEffect[] {
-  return REPLICATION_FOLDS.map((season) => {
-    const foldPairs = pairs.filter((pair) => pair.condition.season === season);
-    return { season, pairs: foldPairs.length, effect: foldPairs.length === 0 ? null : measureEffect(foldPairs).effect };
-  });
 }
 
 /**

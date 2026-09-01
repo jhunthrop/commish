@@ -10,7 +10,7 @@ const registryMock = vi.hoisted(() => vi.fn<() => readonly Law[]>());
 const discoveredPipelineCountsMock = vi.hoisted(() => vi.fn<() => PipelineCounts>());
 vi.mock("@/projections/laws/registry", () => ({ registry: registryMock, discoveredPipelineCounts: discoveredPipelineCountsMock }));
 
-const DEFAULT_COUNTS: PipelineCounts = { tested: 1737, untestable: 34, bhSurvivors: 50, replicated: 13 };
+const DEFAULT_COUNTS: PipelineCounts = { candidates: 1737, untestable: 488, bhSurvivors: 10, replicated: 4 };
 discoveredPipelineCountsMock.mockReturnValue(DEFAULT_COUNTS);
 
 /**
@@ -34,9 +34,17 @@ function lawFixture(over: Partial<Law> = {}): Law {
   };
 }
 
+// Real committed candidate ids (`generateCandidates()`'s own output) — `groupIntoFamilies` looks
+// every discovered `Law.id` up there, so a fixture using a fake id would throw. "touches" (RB) and
+// "age" (WR) are deliberately DIFFERENT quantities AND different positions, so they never collapse
+// into one family under the NESTING RULING (fix round 2).
+const RB_TOUCHES_ID = "threshold:RB:touches:q80";
+const WR_AGE_ID = "threshold:WR:age:q70";
+const WR_TD_SHARE_ID = "threshold:WR:touchdownPointsShare:q80";
+
 function discoveredLawFixture(over: Partial<Law> = {}): Law {
   return {
-    id: "threshold:RB:touches:q80",
+    id: RB_TOUCHES_ID,
     position: "RB",
     claim: "Running back carries and receptions: A running back whose combined carries and receptions that season is 182 or more gains points per game the following season.",
     measured: { effect: 1.5, ci: [0.5, 2.5], sample: 200, seasons: "2013-2023" },
@@ -50,38 +58,50 @@ function discoveredLawFixture(over: Partial<Law> = {}): Law {
 
 describe("PlayerLawsPage — the mechanical claim count (fix round, CRITICAL 3)", () => {
   it("counts tribal laws plus confirmed discovered laws, never a hardcoded number", async () => {
-    registryMock.mockReturnValue([lawFixture({ id: "a" }), lawFixture({ id: "b" }), discoveredLawFixture({ id: "c" })]);
+    registryMock.mockReturnValue([lawFixture({ id: "a" }), lawFixture({ id: "b" }), discoveredLawFixture({ id: WR_AGE_ID })]);
     render(await PlayerLawsPage());
     expect(screen.getByText(/^3 claims about fantasy production, tested against what actually happened rather than assumed true\.$/)).toBeInTheDocument();
   });
 
   it("excludes a non-confirmed discovered law from the count", async () => {
-    registryMock.mockReturnValue([lawFixture({ id: "a" }), discoveredLawFixture({ id: "c", verdict: "weak" })]);
+    registryMock.mockReturnValue([lawFixture({ id: "a" }), discoveredLawFixture({ id: WR_AGE_ID, verdict: "weak" })]);
     render(await PlayerLawsPage());
     expect(screen.getByText(/^1 claims? about fantasy production/)).toBeInTheDocument();
   });
 });
 
-describe("PlayerLawsPage — the discovered-laws section (fix round, CRITICAL 3)", () => {
+describe("PlayerLawsPage — the discovered-laws section (fix round 1, CRITICAL 3; fix round 2, NESTING RULING)", () => {
   it("renders only CONFIRMED discovered laws, never weak or debunked ones", async () => {
     registryMock.mockReturnValue([
       lawFixture({ id: "tribal" }),
-      discoveredLawFixture({ id: "confirmed-one", verdict: "confirmed" }),
-      discoveredLawFixture({ id: "weak-one", verdict: "weak", claim: "Weak title: weak body sentence." }),
+      discoveredLawFixture({ id: WR_AGE_ID, verdict: "confirmed" }),
+      discoveredLawFixture({ id: WR_TD_SHARE_ID, verdict: "weak", claim: "Weak title: weak body sentence." }),
     ]);
     render(await PlayerLawsPage());
-    expect(document.getElementById("confirmed-one")).not.toBeNull();
-    expect(document.getElementById("weak-one")).toBeNull();
+    expect(document.getElementById(WR_AGE_ID)).not.toBeNull();
+    expect(document.getElementById(WR_TD_SHARE_ID)).toBeNull();
   });
 
   it("states the pipeline's own methodology sentence with the real counts, never a hardcoded number", async () => {
-    discoveredPipelineCountsMock.mockReturnValueOnce({ tested: 1737, untestable: 34, bhSurvivors: 50, replicated: 13 });
+    discoveredPipelineCountsMock.mockReturnValueOnce({ candidates: 1737, untestable: 488, bhSurvivors: 10, replicated: 4 });
     registryMock.mockReturnValue([discoveredLawFixture()]);
     render(await PlayerLawsPage());
-    expect(screen.getByText(/Every one of the 1737 mechanically generated candidates/)).toBeInTheDocument();
-    expect(screen.getByText(/34 could not be matched on the training window/)).toBeInTheDocument();
-    expect(screen.getByText(/50 survived the false-discovery screen/)).toBeInTheDocument();
-    expect(screen.getByText(/13 of those also replicated on 2022 or 2023/)).toBeInTheDocument();
+    expect(screen.getByText(/screened for a false-discovery rate of at most 10% across the whole 1737-candidate family/)).toBeInTheDocument();
+    expect(screen.getByText(/488 could not be matched on enough training seasons \(fewer than 20 matched pairs\)/)).toBeInTheDocument();
+    expect(screen.getByText(/10 survived the false-discovery screen/)).toBeInTheDocument();
+    expect(screen.getByText(/4 of those also replicated on 2022 or 2023/)).toBeInTheDocument();
+  });
+
+  it("NEW-1 — never claims the untestable candidates matched zero pairs", async () => {
+    registryMock.mockReturnValue([discoveredLawFixture()]);
+    render(await PlayerLawsPage());
+    expect(screen.queryByText(/zero matched pairs/)).not.toBeInTheDocument();
+  });
+
+  it("NEW-2 — never references a candidate listing 'above' that the page does not render", async () => {
+    registryMock.mockReturnValue([discoveredLawFixture()]);
+    render(await PlayerLawsPage());
+    expect(screen.queryByText(/candidates above/)).not.toBeInTheDocument();
   });
 
   it("shows an honest empty state when zero discovered laws have confirmed yet", async () => {
@@ -94,6 +114,41 @@ describe("PlayerLawsPage — the discovered-laws section (fix round, CRITICAL 3)
     registryMock.mockReturnValue([lawFixture({ modelPath: "src/x.ts#y" }), discoveredLawFixture()]);
     render(await PlayerLawsPage());
     expect(screen.getByText(/The 1 confirmed discovered law does not show up as a reason chip or feed the board's rankings yet\./)).toBeInTheDocument();
+  });
+
+  it("NESTING RULING — collapses two confirmed discovered laws sharing a quantity set into one card, with the larger-sample one as representative", async () => {
+    const big = discoveredLawFixture({ id: WR_AGE_ID, measured: { effect: -1.1, ci: [-1.5, -0.7], sample: 483, seasons: "2013-2023" } });
+    const small = discoveredLawFixture({
+      id: "threshold:WR:age:q90",
+      measured: { effect: -2.0, ci: [-3.0, -1.0], sample: 20, seasons: "2013-2023" },
+      claim: "Wide receiver age (30.00): A wide receiver whose age at that season's opener is 30.00 or more loses points per game the following season.",
+    });
+    registryMock.mockReturnValue([small, big]); // input order should not matter — sample decides representative
+    render(await PlayerLawsPage());
+    expect(document.getElementById(WR_AGE_ID)).not.toBeNull(); // the larger-sample law is the representative's own card
+    expect(document.getElementById("threshold:WR:age:q90")).toBeNull(); // the smaller-sample one is nested, not its own card
+    expect(screen.getByText(/Also holds, at a different threshold:/)).toBeInTheDocument();
+  });
+
+  it("NESTING RULING — a lone confirmed discovered law with no family gets no 'Also holds' line", async () => {
+    registryMock.mockReturnValue([discoveredLawFixture()]);
+    render(await PlayerLawsPage());
+    expect(screen.queryByText(/Also holds, at a different threshold:/)).not.toBeInTheDocument();
+  });
+
+  it("NESTING RULING — a discovered family sharing a quantity with a tribal law gets the mechanical overlap note", async () => {
+    registryMock.mockReturnValue([
+      { ...lawFixture(), id: "td_regression", claim: "Touchdown regression: a player whose touchdown points make up a lot loses points." },
+      discoveredLawFixture({ id: WR_TD_SHARE_ID }),
+    ]);
+    render(await PlayerLawsPage());
+    expect(screen.getByText(/This finding shares its own quantity with the tribal law "Touchdown regression"/)).toBeInTheDocument();
+  });
+
+  it("NESTING RULING — a discovered family with no tribal overlap gets no overlap note", async () => {
+    registryMock.mockReturnValue([discoveredLawFixture({ id: WR_AGE_ID })]); // age/WR — no tribal law maps to it (rb_age_curve is RB-only)
+    render(await PlayerLawsPage());
+    expect(screen.queryByText(/shares its own quantity with the tribal law/)).not.toBeInTheDocument();
   });
 });
 

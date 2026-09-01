@@ -1,7 +1,13 @@
-import { REPLICATION_FOLDS } from "../config";
 import { matchedPairsStratified, measureEffect, bootstrapStatistics, type MatchedPair } from "../harness";
 import { canonicalPointOrder, POINTS_PER_GAME_CALIPER, type LawPosition } from "../populations";
-import { stratumKeyFor, verdictForDiscoveredLaw, type DiscoveredEntry, type DiscoveredJson, type FoldEffect } from "../registry";
+import {
+  foldEffectsFor,
+  stratumKeyFor,
+  verdictForDiscoveredLaw,
+  type DiscoveredEntry,
+  type DiscoveredJson,
+  type FoldEffect,
+} from "../registry";
 import type { LawMeasurement, LawVerdict, PlayerSeasonPoint } from "../types";
 import type { DiscoveryFacts } from "../discovery-facts";
 import type { CandidateLaw } from "./generate";
@@ -110,7 +116,9 @@ import { renderSignedClaim } from "./templates";
  *      itself carry `>= MIN_OUT_OF_TRAIN_FOLD_PAIRS` (5) matched pairs AND agree in direction with the
  *      full-window effect (IMPORTANT 2 RULING). `FoldEffect.pairs` (new field, this fix round) is what
  *      makes that pair-count check possible without a second, separate matching pass — see
- *      `foldEffectsFor` below. Only a `confirmed` verdict here means the candidate REPLICATED on
+ *      `registry.ts`'s own `foldEffectsFor` (fix round 2, NEW-7: now the ONE shared implementation,
+ *      imported here and by `scripts/measure-laws.ts` both, rather than duplicated between them).
+ *      Only a `confirmed` verdict here means the candidate REPLICATED on
  *      evidence the discovery screen itself never trained on: BH already controlled how many false
  *      alarms are expected across the whole screened family, and this is the pipeline's confirmatory
  *      check that a specific survivor's own OUT-OF-SAMPLE evidence, not merely its in-sample evidence,
@@ -369,21 +377,6 @@ export function measureCandidateOnTrain(candidate: CandidateLaw, trainRows: read
   return { pValue: twoSidedPValue(effect, se, df), expectedSign: signOf(effect), trainEffect: effect };
 }
 
-/** One BH survivor's fold effects — a PARTITION of its own full-window matched pairs by predictor
- *  season, the identical "no second match, just filter the pairs already built" discipline
- *  `scripts/measure-laws.ts`'s own `foldEffectsFor` uses for the six tribal laws (see that script's
- *  header for why this is safe: stratified matching keys on season, so a pair's two sides already
- *  share one). `pairs` (new field, fix round IMPORTANT 2) is the raw count for that fold, always
- *  present even when it is zero — `effect` is `null` exactly when `pairs === 0`, and
- *  `verdictForDiscoveredLaw`'s own out-of-train gate reads `pairs` directly rather than re-deriving a
- *  count from `effect`'s own presence. */
-function foldEffectsFor(pairs: readonly MatchedPair[]): readonly FoldEffect[] {
-  return REPLICATION_FOLDS.map((season) => {
-    const foldPairs = pairs.filter((pair) => pair.condition.season === season);
-    return { season, pairs: foldPairs.length, effect: foldPairs.length === 0 ? null : measureEffect(foldPairs).effect };
-  });
-}
-
 /** Step 4 + step 5 of the pipeline, for one BH survivor: full-window measurement, fold effects, and
  *  the verdict `verdictForDiscoveredLaw` computes from them (CI/sign/fold-agreement, the origin-blind
  *  `>= 40` pair floor, AND the out-of-train fold gate — see `registry.ts`'s own docblock for the full
@@ -468,7 +461,7 @@ export function runDiscoveryPipeline(
   }
 
   return {
-    counts: { tested: candidates.length, untestable, bhSurvivors: survivors.length, replicated },
+    counts: { candidates: candidates.length, untestable, bhSurvivors: survivors.length, replicated },
     laws,
   };
 }

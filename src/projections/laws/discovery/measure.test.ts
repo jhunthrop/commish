@@ -411,9 +411,9 @@ describe("runDiscoveryPipeline", () => {
   const rows: readonly DiscoverySeasonRow[] = [...strongRows, ...nullRows];
   const candidates: readonly CandidateLaw[] = [TOUCHES_CANDIDATE, AGE_CANDIDATE, UNTESTABLE_CANDIDATE];
 
-  it("counts tested/untestable/bhSurvivors/replicated consistently with the fixture", () => {
+  it("counts candidates/untestable/bhSurvivors/replicated consistently with the fixture", () => {
     const result = runDiscoveryPipeline(candidates, rows, TRAIN_SEASON_MAX, SEASONS_LABEL);
-    expect(result.counts.tested).toBe(3);
+    expect(result.counts.candidates).toBe(3);
     // UNTESTABLE_CANDIDATE (condition always null) AND AGE_CANDIDATE (every fixture row's
     // facts.current.age is null via NO_VALUES, so its condition is null too) both match zero pairs.
     expect(result.counts.untestable).toBe(2);
@@ -436,7 +436,7 @@ describe("runDiscoveryPipeline", () => {
     expect(entry!.claim).not.toContain("scores differently");
     expect(entry!.claim).not.toContain("top 20%");
     expect(entry!.claim).not.toMatch(/—/);
-    expect(entry!.claim.startsWith("Running back carries and receptions: ")).toBe(true);
+    expect(entry!.claim.startsWith("Running back carries and receptions (182): ")).toBe(true);
   });
 
   it("never asserts a candidate for AGE_CANDIDATE in the untestable position (age is a genuine null-effect test, not untestable)", () => {
@@ -456,7 +456,7 @@ describe("runDiscoveryPipeline", () => {
 
   it("produces zero survivors cleanly when every candidate is untestable — a legitimate, publishable result", () => {
     const result = runDiscoveryPipeline([UNTESTABLE_CANDIDATE], rows, TRAIN_SEASON_MAX, SEASONS_LABEL);
-    expect(result.counts).toEqual({ tested: 1, untestable: 1, bhSurvivors: 0, replicated: 0 });
+    expect(result.counts).toEqual({ candidates: 1, untestable: 1, bhSurvivors: 0, replicated: 0 });
     expect(result.laws).toEqual({});
   });
 });

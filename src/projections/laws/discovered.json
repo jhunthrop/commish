@@ -1,6 +1,6 @@
 {
   "counts": {
-    "tested": 1737,
+    "candidates": 1737,
     "untestable": 488,
     "bhSurvivors": 10,
     "replicated": 4
@@ -35,7 +35,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "and",
-      "claim": "Wide receiver age + experience: A wide receiver whose age at that season's opener is 27.0 or more and whose number of seasons in the league (counting that season itself) is 5 or more loses points per game the following season.",
+      "claim": "Wide receiver age (26.97) + experience (5): A wide receiver whose age at that season's opener is 26.97 or more and whose number of seasons in the league (counting that season itself) is 5 or more loses points per game the following season.",
       "expectedSign": -1
     },
     "and:WR:threshold:WR:age:q70+threshold:WR:experienceYear:q80": {
@@ -67,7 +67,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "and",
-      "claim": "Wide receiver age + experience: A wide receiver whose age at that season's opener is 27.0 or more and whose number of seasons in the league (counting that season itself) is 6 or more loses points per game the following season.",
+      "claim": "Wide receiver age (26.97) + experience (6): A wide receiver whose age at that season's opener is 26.97 or more and whose number of seasons in the league (counting that season itself) is 6 or more loses points per game the following season.",
       "expectedSign": -1
     },
     "and:WR:threshold:WR:incomingCoachTenureSeasons:q70+threshold:WR:touchdownPointsShare:q70": {
@@ -99,7 +99,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "and",
-      "claim": "Wide receiver touchdown-points share + incoming coach's tenure: A wide receiver whose share of his own fantasy points that came from touchdowns that season is 19% or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more loses points per game the following season.",
+      "claim": "Wide receiver touchdown-points share (19.5%) + incoming coach's tenure (1): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 19.5% or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more loses points per game the following season.",
       "expectedSign": -1
     },
     "and:WR:threshold:WR:incomingCoachTenureSeasons:q70+threshold:WR:touchdownPointsShare:q80": {
@@ -131,7 +131,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "and",
-      "claim": "Wide receiver touchdown-points share + incoming coach's tenure: A wide receiver whose share of his own fantasy points that came from touchdowns that season is 23% or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more loses points per game the following season.",
+      "claim": "Wide receiver touchdown-points share (23.2%) + incoming coach's tenure (1): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 23.2% or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more loses points per game the following season.",
       "expectedSign": -1
     },
     "threshold:TE:touchdownPointsShare:q70": {
@@ -163,7 +163,7 @@
       "origin": "discovered",
       "position": "TE",
       "template": "threshold",
-      "claim": "Tight end touchdown-points share: A tight end whose share of his own fantasy points that came from touchdowns that season is 23% or more loses points per game the following season.",
+      "claim": "Tight end touchdown-points share (23.3%): A tight end whose share of his own fantasy points that came from touchdowns that season is 23.3% or more loses points per game the following season.",
       "expectedSign": -1
     },
     "threshold:WR:age:q70": {
@@ -195,7 +195,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "threshold",
-      "claim": "Wide receiver age: A wide receiver whose age at that season's opener is 27.0 or more loses points per game the following season.",
+      "claim": "Wide receiver age (26.97): A wide receiver whose age at that season's opener is 26.97 or more loses points per game the following season.",
       "expectedSign": -1
     },
     "threshold:WR:experienceYear:q70": {
@@ -227,7 +227,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "threshold",
-      "claim": "Wide receiver experience: A wide receiver whose number of seasons in the league (counting that season itself) is 5 or more loses points per game the following season.",
+      "claim": "Wide receiver experience (5): A wide receiver whose number of seasons in the league (counting that season itself) is 5 or more loses points per game the following season.",
       "expectedSign": -1
     },
     "threshold:WR:experienceYear:q80": {
@@ -259,7 +259,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "threshold",
-      "claim": "Wide receiver experience: A wide receiver whose number of seasons in the league (counting that season itself) is 6 or more loses points per game the following season.",
+      "claim": "Wide receiver experience (6): A wide receiver whose number of seasons in the league (counting that season itself) is 6 or more loses points per game the following season.",
       "expectedSign": -1
     },
     "threshold:WR:touchdownPointsShare:q70": {
@@ -291,7 +291,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "threshold",
-      "claim": "Wide receiver touchdown-points share: A wide receiver whose share of his own fantasy points that came from touchdowns that season is 19% or more loses points per game the following season.",
+      "claim": "Wide receiver touchdown-points share (19.5%): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 19.5% or more loses points per game the following season.",
       "expectedSign": -1
     },
     "threshold:WR:touchdownPointsShare:q80": {
@@ -323,7 +323,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "threshold",
-      "claim": "Wide receiver touchdown-points share: A wide receiver whose share of his own fantasy points that came from touchdowns that season is 23% or more loses points per game the following season.",
+      "claim": "Wide receiver touchdown-points share (23.2%): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 23.2% or more loses points per game the following season.",
       "expectedSign": -1
     }
   }

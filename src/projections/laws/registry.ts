@@ -51,9 +51,9 @@
  */
 
 import { readFileSync } from "node:fs";
-import { DISCOVERY_TRAIN_SEASONS } from "./config";
+import { DISCOVERY_TRAIN_SEASONS, REPLICATION_FOLDS } from "./config";
 import { LAW_SPECS, type LawSpec } from "./populations";
-import { verdictFor } from "./harness";
+import { measureEffect, verdictFor, type MatchedPair } from "./harness";
 import { generateCandidates, type CandidateTemplate } from "./discovery/generate";
 import type { Law, LawMeasurement, LawVerdict, PlayerSeasonPoint } from "./types";
 
@@ -67,6 +67,26 @@ export interface FoldEffect {
   readonly season: number;
   readonly pairs: number;
   readonly effect: number | null;
+}
+
+/**
+ * ONE LAW'S FOLD EFFECTS — a PARTITION of its own full-window matched pairs by predictor season
+ * (`config.ts`'s `REPLICATION_FOLDS`), never a second, separate match: because stratified matching
+ * keys on season (`stratumKeyFor`, below), a pair's two sides already share one, so filtering the
+ * full-window's own matched pairs down to one predictor season at a time gives exactly the pairs a
+ * per-season match would have produced anyway, for free.
+ *
+ * SHARED (fix round 2, NEW-7 — this used to be duplicated, nearly verbatim, between
+ * `scripts/measure-laws.ts` and `discovery/measure.ts`, the same computation written twice with no
+ * single source of truth) by both real callers (`measure-laws.ts` for the six tribal laws,
+ * `discovery/measure.ts` for a BH survivor) and driven directly by hand-built fixtures in
+ * `registry.test.ts`.
+ */
+export function foldEffectsFor(pairs: readonly MatchedPair[]): readonly FoldEffect[] {
+  return REPLICATION_FOLDS.map((season) => {
+    const foldPairs = pairs.filter((pair) => pair.condition.season === season);
+    return { season, pairs: foldPairs.length, effect: foldPairs.length === 0 ? null : measureEffect(foldPairs).effect };
+  });
 }
 
 /** One `measured.json` entry: the full-window measurement, one effect per replication fold, and
@@ -273,15 +293,26 @@ export type DiscoveredEntry = MeasuredEntry & {
   readonly expectedSign: -1 | 1;
 };
 
-/** The discovery pipeline's own accounting, at the top level of `discovered.json` — see
- *  `discovery/measure.ts`'s `runDiscoveryPipeline` for how each count is derived. `tested` is the
- *  whole candidate family `discovery/generate.ts` produced (1,737 today); `untestable` is the subset
- *  whose train-window population matched zero pairs (expected for narrow AND conditions, never an
- *  error); `bhSurvivors` is how many of the remaining TESTABLE candidates survived
- *  Benjamini-Hochberg at q=0.10; `replicated` is how many of those survivors' full-window
- *  measurement came back `confirmed` under `verdictForDiscoveredLaw`. */
+/**
+ * The discovery pipeline's own accounting, at the top level of `discovered.json` — see
+ * `discovery/measure.ts`'s `runDiscoveryPipeline` for how each count is derived.
+ *
+ * `candidates` (fix round 2, NEW-5 RULING — renamed from `tested`, which claimed something false:
+ * the whole family is not "tested" in any sense a reader would recognize, only screened for
+ * eligibility) is the whole candidate family `discovery/generate.ts` produced (1,737 today).
+ * `untestable` (fix round 2, NEW-1 — the OLD wording, "zero matched pairs", was also false: most of
+ * this count DID match, just under `MIN_TRAIN_PAIRS`) is every candidate that could not be matched
+ * on enough training seasons — fewer than `MIN_TRAIN_PAIRS` (20) matched pairs on the TRAIN window,
+ * whether that shortfall is zero pairs or nineteen. `bhSurvivors` is how many of the remaining
+ * TESTABLE candidates (`candidates - untestable`) survived Benjamini-Hochberg at q=0.10 —
+ * `parseDiscoveredJson` (NEW-6 RULING) checks this equals the committed file's own `laws` entry
+ * count, so the count and the entries it claims to describe can never silently drift apart.
+ * `replicated` is how many of those survivors' full-window measurement came back `confirmed` under
+ * `verdictForDiscoveredLaw` — `parseDiscoveredJson` checks this equals the committed file's own count
+ * of `laws` entries whose `verdict` is `"confirmed"`, the identical cross-check for the same reason.
+ */
 export interface PipelineCounts {
-  readonly tested: number;
+  readonly candidates: number;
   readonly untestable: number;
   readonly bhSurvivors: number;
   readonly replicated: number;
@@ -305,6 +336,12 @@ const VALID_TEMPLATES: ReadonlySet<string> = new Set(["threshold", "delta", "and
  * (see that function's docblock) plus the discovered-only fields: `assertMeasuredEntryShape` covers
  * the `MeasuredEntry` half every law entry carries; the checks below cover `counts` and the
  * origin/position/template/claim/expectedSign half that makes an entry a `DiscoveredEntry`.
+ *
+ * NEW-6 RULING (fix round 2): `counts.bhSurvivors` must equal the actual number of `laws` entries,
+ * and `counts.replicated` must equal the actual number of `laws` entries whose own `verdict` is
+ * `"confirmed"` — both counts CLAIM to describe the committed entries, and nothing before this
+ * enforced that claim; a hand-edited or stale `counts` block could silently disagree with what the
+ * file's own `laws` object actually holds.
  */
 export function parseDiscoveredJson(raw: string): DiscoveredJson {
   const parsed: unknown = JSON.parse(raw);
@@ -318,7 +355,7 @@ export function parseDiscoveredJson(raw: string): DiscoveredJson {
     throw new Error("malformed discovered.json: counts is not an object");
   }
   const countsRecord = counts as Record<string, unknown>;
-  for (const field of ["tested", "untestable", "bhSurvivors", "replicated"] as const) {
+  for (const field of ["candidates", "untestable", "bhSurvivors", "replicated"] as const) {
     if (!isFiniteNumber(countsRecord[field])) {
       throw new Error(`malformed discovered.json: counts.${field} is not a finite number`);
     }
@@ -328,8 +365,10 @@ export function parseDiscoveredJson(raw: string): DiscoveredJson {
   if (typeof laws !== "object" || laws === null || Array.isArray(laws)) {
     throw new Error("malformed discovered.json: laws is not an object");
   }
+  const lawsRecord = laws as Record<string, unknown>;
 
-  for (const [lawId, entry] of Object.entries(laws as Record<string, unknown>)) {
+  let confirmedCount = 0;
+  for (const [lawId, entry] of Object.entries(lawsRecord)) {
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
       throw new Error(`malformed discovered.json: laws."${lawId}" is not an object`);
     }
@@ -351,6 +390,17 @@ export function parseDiscoveredJson(raw: string): DiscoveredJson {
     if (record.expectedSign !== -1 && record.expectedSign !== 1) {
       throw new Error(`malformed discovered.json: "${lawId}".expectedSign is not -1 or 1`);
     }
+    if (record.verdict === "confirmed") confirmedCount += 1;
+  }
+
+  const lawCount = Object.keys(lawsRecord).length;
+  if (countsRecord.bhSurvivors !== lawCount) {
+    throw new Error(`malformed discovered.json: counts.bhSurvivors is ${String(countsRecord.bhSurvivors)} but laws has ${lawCount} entries`);
+  }
+  if (countsRecord.replicated !== confirmedCount) {
+    throw new Error(
+      `malformed discovered.json: counts.replicated is ${String(countsRecord.replicated)} but laws has ${confirmedCount} confirmed entries`,
+    );
   }
 
   return parsed as DiscoveredJson;
@@ -363,9 +413,13 @@ export function parseDiscoveredJson(raw: string): DiscoveredJson {
  * see `LawSpec.modelPath`'s own docblock; nothing here builds or re-fits a model). Drift-checked TWO
  * ways, mirroring `registryFrom`'s own pair of checks for tribal entries: (1) IMPORTANT 5 RULING,
  * fix round — every id in `discoveredJson.laws` must exist in `candidateIds`, defaulted to the REAL
- * `generateCandidates()`'s own ids (pure, no DB — see that function's own docblock for why calling it
- * costs nothing at import time); a `discovered.json` id with no matching candidate means the
- * generator and the committed file have drifted apart, the exact "orphaned measurement" shape
+ * `generateCandidates()`'s own ids (pure, no DB — see that function's own docblock; a default
+ * parameter expression is evaluated fresh on EVERY call that omits `candidateIds`, not once at
+ * import time, so this ~1,737-candidate generator runs PER CALL, not "for free" — cheap in practice
+ * since the underlying quantile table is itself a committed constant, but worth naming accurately
+ * rather than implying a one-time cost that isn't real); a `discovered.json` id with no matching
+ * candidate means the generator and the committed file have drifted apart, the exact "orphaned
+ * measurement" shape
  * `registryFrom` already guards against for `LAW_SPECS`. `candidateIds` is a parameter (not simply
  * called internally with no override) so `registry.test.ts` can drive this with a small hand-built
  * set rather than the real ~1,737-candidate one, the identical `specs`-as-parameter discipline

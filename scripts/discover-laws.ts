@@ -100,8 +100,10 @@ function renderDiscoveredJson(discoveredJson: DiscoveredJson): string {
 function printSummary(candidateCount: number, discoveredJson: DiscoveredJson): void {
   const { counts, laws } = discoveredJson;
   console.log(`\nDISCOVERY TRIAL -- ${candidateCount} candidates`);
-  console.log(`  tested:       ${counts.tested}`);
-  console.log(`  untestable:   ${counts.untestable}  (zero matched pairs on the train window -- expected for narrow AND conditions)`);
+  console.log(`  candidates:   ${counts.candidates}`);
+  console.log(
+    `  untestable:   ${counts.untestable}  (could not be matched on enough training seasons -- fewer than ${MIN_TRAIN_PAIRS} matched pairs)`,
+  );
   console.log(`  bhSurvivors:  ${counts.bhSurvivors}  (Benjamini-Hochberg at q=0.10 over the testable family, min ${MIN_TRAIN_PAIRS} train pairs)`);
   console.log(
     `  replicated:   ${counts.replicated}  (full-window confirmed: CI excludes zero, sign matches, every fold agrees, >= ${MIN_REPLICATION_PAIRS} pairs, ` +

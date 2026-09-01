@@ -64,14 +64,46 @@ const PASS_CATCHER_POSITIONS: readonly LawPosition[] = ["WR", "TE"];
  * stable across runs (the other half is `QUANTILE_LEVELS`' own fixed order and the canonical id-sort
  * `generateCandidatesFrom` applies before returning).
  */
-/** Whole-number formatting — touches, tenure seasons, experience years: no fractional value in the
- *  underlying quantity is ever meaningful to a reader, even though a quantile interpolation can land
- *  on one (e.g. `237.29999999999995`). */
-const formatWhole = (value: number): string => `${Math.round(value)}`;
-/** One-decimal formatting — age, target depth, pace, all genuinely continuous quantities. */
-const formatOneDecimal = (value: number): string => value.toFixed(1);
-/** Percentage formatting for a 0..1 share/rate. */
-const formatPercent = (value: number): string => `${Math.round(value * 100)}%`;
+/**
+ * ROUNDING DIRECTION (fix round 2, NEW-3) — every `formatValue` below rounds AWAY from the
+ * threshold, toward larger numbers, never toward nearer ones. The clause this renders is always
+ * "value >= threshold"; rounding DOWN (or to nearest) can understate the real threshold — a
+ * touches threshold of `237.3` rounded to nearest gives "237 or more", but a player with EXACTLY
+ * 237 touches does NOT satisfy `237 >= 237.3`, so the rendered claim would falsely include him. The
+ * fix is to round toward the CEILING at whatever precision is displayed, so the displayed number is
+ * always itself `>= threshold`, and "displayed value or more" is never a superset of "the real
+ * threshold or more" — provably so, per `templates.test.ts`'s own property test, which checks this
+ * for every real committed quantile the discovery quantile table carries.
+ *
+ * `ceilToDecimals` rounds the scaled value to 6 decimal places BEFORE ceiling, to strip the
+ * floating-point representation noise a raw `value * 10**decimals` can carry (e.g. `0.19 * 1000`
+ * can compute as `190.00000000000003`, which would otherwise ceiling up to 191 instead of staying
+ * at 190 for a threshold that already sits exactly on a displayable boundary) — a purely cosmetic
+ * tightness concern, never a correctness one either way, but worth not introducing for free.
+ */
+function ceilToDecimals(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  const scaled = Math.round(value * factor * 1e6) / 1e6;
+  return Math.ceil(scaled) / factor;
+}
+
+/** Whole-number formatting, CEILING — touches, tenure seasons, experience years: no fractional
+ *  value in the underlying quantity is ever meaningful to a reader, even though a quantile
+ *  interpolation can land on one (e.g. `237.29999999999995`, which must display as `238`, never
+ *  `237` — see this section's own docblock). */
+const formatWhole = (value: number): string => `${Math.ceil(ceilToDecimals(value, 6))}`;
+/** One-decimal formatting, CEILING — target depth, pace, incoming coach's prior pass rate: genuinely
+ *  continuous quantities where one decimal is precise enough that a second would not change what a
+ *  reader could act on, unlike age (see `formatAgeYears` below) or a percent share. */
+const formatOneDecimal = (value: number): string => ceilToDecimals(value, 1).toFixed(1);
+/** Age, specifically — TWO decimals (fix round 2: one extra beyond the general one-decimal case),
+ *  because age is the single most load-bearing continuous quantity across the confirmed discovered
+ *  laws today, and a whole extra digit of precision costs nothing for a reader to skim past. */
+const formatAgeYears = (value: number): string => ceilToDecimals(value, 2).toFixed(2);
+/** Percentage formatting for a 0..1 share/rate, ONE decimal (fix round 2: was whole-percent
+ *  rounded to nearest, which could understate a threshold like `19.489%` as "19%" — a player at
+ *  19.2% would then misread the claim as satisfied when the real predicate needs 19.489%). */
+const formatPercent = (value: number): string => `${ceilToDecimals(value * 100, 1).toFixed(1)}%`;
 
 export const QUANTITY_DEFS: readonly QuantityDef[] = [
   {
@@ -87,7 +119,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     noun: "age at that season's opener",
     positions: ALL_SKILL_POSITIONS,
     get: (v) => v.age,
-    formatValue: formatOneDecimal,
+    formatValue: formatAgeYears,
     shortLabel: "age",
   },
   {
@@ -324,30 +356,57 @@ function signedClauseText(clause: Clause, position: LawPosition, quantiles: Quan
   }
 }
 
-/** `clauseNouns`'s only use is `renderTitle`'s mechanical heading — the SHORT label per quantity in
- *  the clause, position-independent, never the full sentence-shaped noun `clauseText`/
- *  `signedClauseText` use. */
-function clauseShortLabels(clause: Clause): readonly string[] {
+/** Every quantity a clause reads, deduplicated — the DISCOVERY FAMILY a candidate belongs to,
+ *  ignoring thresholds/quantile levels/direction entirely. `/player-laws`'s nesting collapse
+ *  (NESTING RULING, fix round 2) uses this to detect two confirmed discovered laws sharing, or
+ *  strictly nesting, the same quantities — see that page's own `groupIntoFamilies` docblock for the
+ *  full rule (position must ALSO match; this function alone does not know about position). */
+export function quantityIdsOf(clause: Clause): ReadonlySet<QuantityId> {
   switch (clause.kind) {
     case "threshold":
     case "delta":
-      return [quantityDef(clause.quantityId).shortLabel];
+      return new Set([clause.quantityId]);
     case "and":
-      return [...clauseShortLabels(clause.left), ...clauseShortLabels(clause.right)];
+      return new Set([...quantityIdsOf(clause.left), ...quantityIdsOf(clause.right)]);
+  }
+}
+
+/** `clauseNouns`'s only use is `renderTitle`'s mechanical heading — the SHORT label PLUS the real
+ *  committed threshold VALUE per quantity in the clause (fix round 2: `renderTitle` used to omit
+ *  the value entirely, which meant two candidates sharing a quantity at two different quantile
+ *  levels — "touchdown-points share >= 19%" and "...>= 23%" — rendered byte-identical headings;
+ *  see `renderTitle`'s own docblock for why that specifically had to stop). */
+function clauseShortLabelsWithValue(clause: Clause, position: LawPosition, quantiles: QuantileTable): readonly string[] {
+  switch (clause.kind) {
+    case "threshold":
+    case "delta": {
+      const def = quantityDef(clause.quantityId);
+      const value = thresholdValueFor(quantiles, position, clause.quantityId, clause.quantileLevel);
+      return [`${def.shortLabel} (${def.formatValue(value)})`];
+    }
+    case "and":
+      return [
+        ...clauseShortLabelsWithValue(clause.left, position, quantiles),
+        ...clauseShortLabelsWithValue(clause.right, position, quantiles),
+      ];
   }
 }
 
 /**
  * A short, MECHANICAL title for a discovered candidate's claim — position, plus its quantity/quantities'
- * own short labels, joined with "+" for an AND clause. Never a full sentence and never hand-authored
- * per candidate: this is `/player-laws`'s discovered-section heading, playing the same role a tribal
- * law's own hand-written name ("The workload cliff") plays for `splitClaim`'s colon-split — see
- * `renderSignedClaim`'s own docblock for how the two compose into one `claim` string.
+ * own short labels AND their real committed threshold values (fix round 2 — see `clauseShortLabelsWithValue`'s
+ * own docblock for why the value is no longer optional: without it, no two headings for the same
+ * quantity at different quantile levels are guaranteed distinct, which both reads as a duplicate to a
+ * person and breaks `/player-laws`'s nesting-collapse card, which lists nested variants BY this title).
+ * Joined with "+" for an AND clause. Never a full sentence and never hand-authored per candidate: this
+ * is `/player-laws`'s discovered-section heading, playing the same role a tribal law's own hand-written
+ * name ("The workload cliff") plays for `splitClaim`'s colon-split — see `renderSignedClaim`'s own
+ * docblock for how the two compose into one `claim` string.
  */
-export function renderTitle(parts: ClaimParts): string {
+export function renderTitle(parts: ClaimParts, quantiles: QuantileTable): string {
   const singular = POSITION_SINGULAR[parts.position];
   const capitalized = singular.charAt(0).toUpperCase() + singular.slice(1);
-  return `${capitalized} ${clauseShortLabels(parts.clause).join(" + ")}`;
+  return `${capitalized} ${clauseShortLabelsWithValue(parts.clause, parts.position, quantiles).join(" + ")}`;
 }
 
 /**
@@ -369,7 +428,7 @@ export function renderSignedClaim(parts: ClaimParts, sign: -1 | 1, quantiles: Qu
   const singular = POSITION_SINGULAR[parts.position];
   const article = /^[aeiou]/i.test(singular) ? "An" : "A";
   const sentence = `${article} ${singular} whose ${signedClauseText(parts.clause, parts.position, quantiles)} ${SIGNED_OUTCOME_CLAUSE[sign]}`;
-  return `${renderTitle(parts)}: ${sentence}`;
+  return `${renderTitle(parts, quantiles)}: ${sentence}`;
 }
 
 /** One quantity's fitted train-window thresholds, at the three quantile levels this generator uses. */
