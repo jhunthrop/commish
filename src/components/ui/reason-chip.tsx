@@ -142,6 +142,8 @@ function copyFor(reason: BoardReason, law: Law | undefined): string {
       return `Position rank ${reason.positionRank}, replacement level ${reason.replacementLevel.toFixed(1)} pts per game`;
     case "tier_cliff":
       return `${reason.playersLeftInTier} left in tier, ${reason.dropToNextTier.toFixed(1)} pt drop to the next`;
+    case "market_unlisted":
+      return "No market ADP; model-only projection";
     default: {
       // Exhaustiveness guard: a future `BoardReason` variant with no case above fails `tsc`
       // here rather than rendering silently wrong copy.

@@ -64,6 +64,15 @@ export type BoardReason =
   | { readonly code: "scarcity"; readonly positionRank: number; readonly replacementLevel: number }
   | { readonly code: "tier_cliff"; readonly playersLeftInTier: number; readonly dropToNextTier: number }
   /**
+   * Task 10 (`market/blend.ts`'s `blendBoard`) could not find this player on the market's own ADP
+   * board, so his season points are the raw model's own number rather than a market-anchored blend.
+   * NOT a claim that the model is wrong about him — an unranked player is usually a deep camp body
+   * neither a real draft board nor `blendBoard` has an opinion worth blending — only that the two
+   * numbers a manager can compare on every other row (what the market thinks, what evidence moved
+   * him off it) do not exist for this one.
+   */
+  | { readonly code: "market_unlisted" }
+  /**
    * A CONFIRMED law (`laws/registry.ts`), TRIBAL OR DISCOVERED, whose own condition is true for this
    * player, for the season this board projects. `effect` is the law's REGISTRY-MEASURED points/game
    * delta (`Law.measured.effect`, the same number every law carries everywhere else it is shown) —

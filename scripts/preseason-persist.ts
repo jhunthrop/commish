@@ -16,6 +16,7 @@ import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/doma
 import type { Position } from "@/domain/player";
 import { nflPlayers } from "@/db/schema";
 import type { LeagueShape } from "@/projections/decide/replacement";
+import { shippedPreseasonCandidates } from "@/projections/market/blend";
 import { preseasonBoard } from "@/projections/preseason/board";
 import {
   BOARD_SOURCE,
@@ -31,12 +32,7 @@ import {
   FITTED_ROOKIE_PRIORS,
 } from "@/projections/preseason/fitted";
 import { FITTED_MODEL } from "@/projections/model/source";
-import {
-  SHIPPED_PRESEASON_FEATURES,
-  loadPreseason,
-  preseasonCandidates,
-  type PreseasonPriors,
-} from "@/projections/preseason/source";
+import { loadPreseason, type PreseasonPriors } from "@/projections/preseason/source";
 
 /** Every season the preseason ingestion has ever run for. A board needs three prior seasons of
  *  usage, which is why the floor is not the backfill's floor. */
@@ -82,7 +78,11 @@ async function main(): Promise<void> {
 
   for (const season of TARGET_SEASONS) {
     const inputs = await loadPreseason(db, season);
-    const board = preseasonBoard(preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, PRIORS), {
+    // THE SHIPPED BOARD IS MARKET-BLENDED (Task 10) — `shippedPreseasonCandidates` defaults to the
+    // blend; pass `{ raw: true }` to get the pre-blend model board back, which is what the Task 11
+    // scorecard comparison reads instead.
+    const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS);
+    const board = preseasonBoard(candidates, {
       season,
       asOf: inputs.moment,
       rules: PPR_SCORING,
