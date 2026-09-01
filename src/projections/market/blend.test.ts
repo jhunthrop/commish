@@ -7,6 +7,8 @@ import type { MarketPriorEntry } from "./curve";
 import {
   BLEND_TRAIN_CUTOFF_SEASON,
   blendBoard,
+  detectPlateau,
+  fitMarketTailByPosition,
   fitUnlistedRescale,
   seasonPointsOf,
   scoreBlendConstants,
@@ -25,6 +27,11 @@ const IMPLIED_GAMES = 14;
  *  rescale, and identity keeps `seasonPointsOf(raw)` an honest comparison where they don't. */
 const IDENTITY_RESCALE = { slope: 1, intercept: 0, domainMin: 0 } as const;
 
+/** Set far above anything a test's raw points could reach, so the structural tail guard
+ *  (`rescaledUnlistedPoints`'s own `Math.min`) never silently interferes with a test that is not
+ *  specifically exercising it — a test that DOES want the guard overrides this per-position. */
+const NO_TAIL = 100_000;
+
 /** Small, easy-to-reason-about constants — never the committed fit, so a test never breaks
  *  silently when the real grid search re-fits. */
 const CONSTANTS: BlendConstants = {
@@ -33,6 +40,7 @@ const CONSTANTS: BlendConstants = {
   totalCapPoints: 50,
   impliedGamesByPosition: { QB: IMPLIED_GAMES, RB: IMPLIED_GAMES, WR: IMPLIED_GAMES, TE: IMPLIED_GAMES },
   unlistedRescale: { QB: IDENTITY_RESCALE, RB: IDENTITY_RESCALE, WR: IDENTITY_RESCALE, TE: IDENTITY_RESCALE },
+  marketTailByPosition: { QB: NO_TAIL, RB: NO_TAIL, WR: NO_TAIL, TE: NO_TAIL },
 };
 
 function line(overrides: Partial<StatLine> = {}): StatLine {
@@ -249,6 +257,37 @@ describe("blendBoard", () => {
     expect(seasonPointsOf(blended!)).toBe(0);
   });
 
+  it("PIN (fix round 2, ruling 4a): an unlisted candidate is NEVER priced above his position's own market tail, however high the rescale alone would take him", () => {
+    const raw = candidate({ perGame: line({ receivingYards: 500 }) }); // an enormous raw number
+    const generousRescale: BlendConstants = {
+      ...CONSTANTS,
+      unlistedRescale: { ...CONSTANTS.unlistedRescale, RB: { slope: 10, intercept: 1000, domainMin: 0 } }, // would blow past any tail
+      marketTailByPosition: { ...CONSTANTS.marketTailByPosition, RB: 51 }, // the real fitted RB tail is ~51
+    };
+    const [blended] = blendBoard([], [raw], { season: SEASON, constants: generousRescale, laws: [] });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(51, 2);
+  });
+
+  it("the tail guard also caps a raw pass-through (below domainMin), not only a rescaled value", () => {
+    const raw = candidate({ perGame: line({ receivingYards: 500 }) });
+    const constants: BlendConstants = {
+      ...CONSTANTS,
+      unlistedRescale: { ...CONSTANTS.unlistedRescale, RB: { slope: 1, intercept: 0, domainMin: 1_000_000 } }, // always the raw pass-through branch
+      marketTailByPosition: { ...CONSTANTS.marketTailByPosition, RB: 51 },
+    };
+    const [blended] = blendBoard([], [raw], { season: SEASON, constants, laws: [] });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(51, 2);
+  });
+
+  it("does NOT cap an unlisted candidate whose rescaled points already sit below the tail", () => {
+    const raw = candidate({ perGame: line({ receivingYards: 5 }) }); // a modest raw number
+    const constants: BlendConstants = { ...CONSTANTS, marketTailByPosition: { ...CONSTANTS.marketTailByPosition, RB: 51 } };
+    const rawSeasonPoints = seasonPointsOf(raw);
+    const [blended] = blendBoard([], [raw], { season: SEASON, constants, laws: [] });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(rawSeasonPoints, 6);
+    expect(seasonPointsOf(blended!)).toBeLessThan(51);
+  });
+
   it("carries every OTHER candidate's own fields through unchanged (team, position, games)", () => {
     const original = candidate({ team: "SF", position: "WR" });
     const [blended] = blendBoard([market({ marketPoints: 150, position: "WR" })], [original], { season: SEASON, constants: CONSTANTS, laws: [] });
@@ -368,5 +407,87 @@ describe("fitUnlistedRescale — the C2 fix round's OLS affine fit", () => {
     ];
     const table = fitUnlistedRescale(rows);
     expect(table.WR.slope).toBeCloseTo(0, 6); // WR's market points never move — flat fit.
+  });
+
+  it("FIT-VALIDITY RULING (fix round 2, ruling 1): QB is ALWAYS the identity transform, never OLS-fit, however much (and however linear) the QB train data looks", () => {
+    // A PERFECT linear relationship for QB, exactly the shape that recovered slope=2/intercept=5 for
+    // RB above — QB must still come back as the untouched identity transform.
+    const rows = [10, 20, 30, 40].map((raw) =>
+      trainRow({
+        candidate: candidate({ position: "QB", perGame: line({ receivingYards: raw / IMPLIED_GAMES / 0.1 }) }),
+        market: market({ position: "QB", marketPoints: 2 * raw + 5 }),
+      }),
+    );
+    expect(fitUnlistedRescale(rows).QB).toEqual({ slope: 1, intercept: 0, domainMin: 0 });
+  });
+});
+
+describe("fitMarketTailByPosition — the fix round 2 structural guard's own fit", () => {
+  function trainRow(overrides: Partial<BlendTrainRow> = {}): BlendTrainRow {
+    return { season: 2019, market: market(), candidate: candidate(), actualPoints: 0, ...overrides };
+  }
+
+  it("REFUSES a row past BLEND_TRAIN_CUTOFF_SEASON", () => {
+    expect(() => fitMarketTailByPosition([trainRow({ season: BLEND_TRAIN_CUTOFF_SEASON + 1 })])).toThrow(
+      new RegExp(`past BLEND_TRAIN_CUTOFF_SEASON \\(${BLEND_TRAIN_CUTOFF_SEASON}\\)`),
+    );
+  });
+
+  it("takes the SMALLEST marketPoints seen at each position — the curve's own value at the deepest listed rank, by monotonicity", () => {
+    const rows = [
+      trainRow({ candidate: candidate({ position: "RB" }), market: market({ position: "RB", marketPoints: 200 }) }),
+      trainRow({ candidate: candidate({ position: "RB" }), market: market({ position: "RB", marketPoints: 51 }) }),
+      trainRow({ candidate: candidate({ position: "RB" }), market: market({ position: "RB", marketPoints: 120 }) }),
+      trainRow({ candidate: candidate({ position: "WR" }), market: market({ position: "WR", marketPoints: 300 }) }),
+      trainRow({ candidate: candidate({ position: "QB" }), market: market({ position: "QB", marketPoints: 250 }) }),
+      trainRow({ candidate: candidate({ position: "TE" }), market: market({ position: "TE", marketPoints: 80 }) }),
+    ];
+    const tails = fitMarketTailByPosition(rows);
+    expect(tails.RB).toBe(51);
+    expect(tails.WR).toBe(300);
+  });
+
+  it("throws for a position with zero train rows — an empty population is a fit-input bug, not a zero", () => {
+    const rows = [
+      trainRow({ candidate: candidate({ position: "RB" }), market: market({ position: "RB" }) }),
+      trainRow({ candidate: candidate({ position: "WR" }), market: market({ position: "WR" }) }),
+      trainRow({ candidate: candidate({ position: "TE" }), market: market({ position: "TE" }) }),
+    ];
+    expect(() => fitMarketTailByPosition(rows)).toThrow(/no train rows at position "QB"/);
+  });
+});
+
+describe("detectPlateau — the fix round 2 plateau guard (ruling 4b)", () => {
+  const CEILING = 80;
+
+  function cell(overrides: Partial<BlendConstants> = {}, score: number | null = 0.6): { readonly constants: BlendConstants; readonly score: number | null } {
+    return { constants: { ...CONSTANTS, ...overrides }, score };
+  }
+
+  it("counts every cell within tolerance of the best score, the winner included", () => {
+    const cells = [cell({ lawCapPoints: 0 }, 0.605), cell({ lawCapPoints: 2 }, 0.6053), cell({ lawCapPoints: 5 }, 0.4)];
+    const report = detectPlateau(cells, 0.6053, CEILING, 1e-3);
+    expect(report.tiedCellCount).toBe(2);
+  });
+
+  it("flags anyTiedAtCeiling when a tied cell sits at the ceiling on ANY cap axis", () => {
+    const cells = [cell({ availabilityCapPoints: CEILING }, 0.6053), cell({ availabilityCapPoints: 40 }, 0.6053)];
+    expect(detectPlateau(cells, 0.6053, CEILING).anyTiedAtCeiling).toBe(true);
+  });
+
+  it("does NOT flag anyTiedAtCeiling when no tied cell reaches the ceiling on any axis", () => {
+    const cells = [cell({ availabilityCapPoints: 40, totalCapPoints: 20, lawCapPoints: 2 }, 0.6053)];
+    expect(detectPlateau(cells, 0.6053, CEILING).anyTiedAtCeiling).toBe(false);
+  });
+
+  it("excludes a null-score cell from the tied count, never treating null as a match", () => {
+    const cells = [cell({}, null), cell({ lawCapPoints: 2 }, 0.6053)];
+    expect(detectPlateau(cells, 0.6053, CEILING).tiedCellCount).toBe(1);
+  });
+
+  it("respects a custom tolerance", () => {
+    const cells = [cell({}, 0.6), cell({ lawCapPoints: 2 }, 0.6053)];
+    expect(detectPlateau(cells, 0.6053, CEILING, 1e-4).tiedCellCount).toBe(1);
+    expect(detectPlateau(cells, 0.6053, CEILING, 0.1).tiedCellCount).toBe(2);
   });
 });

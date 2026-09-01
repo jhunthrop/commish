@@ -43,22 +43,36 @@
 // was the best-scoring choice. Every one of GRID^3 cells is scored and its own rho logged below,
 // not only the winner.
 //
-// THE UNLISTED FALLBACK'S OWN RESCALE (C2 fix round) — `fitUnlistedRescale` (`market/blend.ts`), an
-// OLS affine fit per position over every TRAIN row's own (raw model points, market points) pair,
-// committed alongside the cap constants. A diagnostic run over 2023/2024 found the raw model's
-// unlisted fallback landing implausibly high (an unlisted player at overall rank 20 in 2023, rank
-// 43 in 2024) against the market-anchored blend around it — both comfortably inside the decision
-// rule's own "any unlisted player lands top-100" trigger, so the rescale ships.
+// THE UNLISTED FALLBACK'S OWN RESCALE (C2 fix round 1, TIGHTENED FIX ROUND 2) — `fitUnlistedRescale`
+// (`market/blend.ts`), an OLS affine fit per position over every TRAIN row's own (raw model points,
+// market points) pair, committed alongside the cap constants. A diagnostic run over 2023/2024 found
+// the raw model's own unlisted fallback landing implausibly high (an unlisted player at overall rank
+// 20 in 2023, rank 43 in 2024) against the market-anchored blend around it. Fix round 1's own single
+// rescale REGRESSED the board: QB's fitted intercept (fit over a listed population dominated by real
+// starters) inflated backup-caliber unlisted quarterbacks toward starter-level output — the top of
+// the unlisted list came back roughly 55% quarterbacks, most undrafted, priced above the market's
+// own deepest drafted QB. Fix round 2 ships TWO independent corrections: QB's own transform is now
+// unconditionally the identity (`fitUnlistedRescale`'s own `IDENTITY_ONLY_POSITIONS` docblock — a
+// fit-validity ruling, not a data shortage), and EVERY position now carries a structural tail cap
+// (`fitMarketTailByPosition`, `BlendConstants.marketTailByPosition`) that guarantees an unlisted
+// player's final number can never exceed the market's own cheapest drafted man at his position.
+// `scripts/blend-diagnostic.ts` is the committed, re-runnable check for both — position mix of the
+// board's own top 100 and the count of unlisted players still priced above their positional tail,
+// never the single "best unlisted rank" number that hid the QB regression from fix round 1's own
+// diagnostic.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Position } from "@/domain/player";
 import {
   BLEND_TRAIN_CUTOFF_SEASON,
+  detectPlateau,
+  fitMarketTailByPosition,
   fitUnlistedRescale,
   scoreBlendConstants,
   type BlendConstants,
   type BlendTrainRow,
+  type ScoredCell,
 } from "@/projections/market/blend";
 import { fitImpliedGamesByPosition, loadMarketCurveObservations, marketBoard } from "@/projections/market/curve";
 import { registry } from "@/projections/laws/registry";
@@ -144,7 +158,22 @@ async function rowsForSeason(db: ReadonlyDb, season: number): Promise<{ readonly
   return { rows, droppedCount };
 }
 
-function header(): string {
+/** Everything about the winning cell fix round 2's own review asked to have RECORDED, not just
+ *  printed to a console a reader may never see: the score itself, how large the plateau around it
+ *  is, and the channel decomposition (pure market -> availability admitted -> laws admitted too). */
+interface FitSummary {
+  readonly bestScore: number;
+  readonly pureMarketScore: number | null;
+  readonly availabilityOnlyScore: number | null;
+  readonly plateau: { readonly tiedCellCount: number; readonly anyTiedAtCeiling: boolean };
+  readonly ceiling: number;
+}
+
+function header(summary: FitSummary): string {
+  const lawShare =
+    summary.pureMarketScore !== null && summary.availabilityOnlyScore !== null && summary.bestScore !== summary.availabilityOnlyScore
+      ? (((summary.bestScore - summary.availabilityOnlyScore) / (summary.bestScore - summary.pureMarketScore)) * 100).toFixed(1)
+      : "n/a";
   return `import type { BlendConstants } from "./blend";
 
 /**
@@ -153,14 +182,28 @@ function header(): string {
  * Fit by a grid search over predictor seasons up to and including \`BLEND_TRAIN_CUTOFF_SEASON\`
  * (2021), scored by rank correlation against those seasons' own outcomes. \`impliedGamesByPosition\`
  * is the market curve's own train population's mean games played, per position
- * (\`fitImpliedGamesByPosition\`). See \`scripts/blend-fit.ts\` for the grid and the chosen
- * combination's score.
+ * (\`fitImpliedGamesByPosition\`); \`unlistedRescale\` and \`marketTailByPosition\` price and cap the
+ * unlisted fallback (see \`market/blend.ts\`'s own docblocks — QB is a deliberate fit-validity
+ * exception, not a data gap). See \`scripts/blend-fit.ts\` for the grid.
+ *
+ * THE WINNING SCORE: spearman rho = ${summary.bestScore.toFixed(4)} on the train rows.
+ *
+ * THE PLATEAU (fix round 2, ruling 4b): ${summary.plateau.tiedCellCount} of this grid's own cells
+ * scored within 1e-4 of the winner — a genuine plateau, not a single sharp peak.
+ * ${summary.plateau.anyTiedAtCeiling ? `At least one of those tied cells sits at this grid's own ceiling (${summary.ceiling}) on a cap axis — a wider grid might still move the winner.` : `None of the tied cells sits at this grid's own ceiling (${summary.ceiling}) — the search found a genuine interior optimum, not one pinned to the edge of what it was allowed to try.`}
+ *
+ * THE CHANNEL DECOMPOSITION — pure market (every cap at zero) ${summary.pureMarketScore === null ? "n/a" : summary.pureMarketScore.toFixed(4)},
+ * availability admitted alone (lawCapPoints at zero, the winning availability/total caps otherwise)
+ * ${summary.availabilityOnlyScore === null ? "n/a" : summary.availabilityOnlyScore.toFixed(4)}, laws admitted too (the winning cell in full)
+ * ${summary.bestScore.toFixed(4)} — laws' own share of the total lift over pure market is ${lawShare}%. Written down so
+ * Task 11's own ablation of this board is not a surprise: the availability channel does almost all
+ * of the work, laws add a real but small amount on top.
  */
 `;
 }
 
-function render(constants: BlendConstants): string {
-  return `${header()}
+function render(constants: BlendConstants, summary: FitSummary): string {
+  return `${header(summary)}
 export const FITTED_BLEND_CONSTANTS: BlendConstants = ${JSON.stringify(constants, null, 2)};
 `;
 }
@@ -199,7 +242,7 @@ async function main(): Promise<void> {
   // times `rows.length` rows would mean hundreds of thousands of redundant file reads.
   const laws = registry();
 
-  console.log("\nfitting the unlisted fallback's own per-position rescale (C2)...");
+  console.log("\nfitting the unlisted fallback's own per-position rescale (C2, QB is fix round 2's fit-validity exception)...");
   const unlistedRescale = fitUnlistedRescale(rows);
   for (const position of ["QB", "RB", "WR", "TE"] as const) {
     const { slope, intercept, domainMin } = unlistedRescale[position];
@@ -208,16 +251,29 @@ async function main(): Promise<void> {
     );
   }
 
+  console.log("\nfitting the structural tail guard, per position (fix round 2, ruling 2)...");
+  const marketTailByPosition = fitMarketTailByPosition(rows);
+  for (const position of ["QB", "RB", "WR", "TE"] as const) {
+    console.log(`  ${position}: ${marketTailByPosition[position].toFixed(1)} pts (the market's own cheapest drafted man at this position)`);
+  }
+
   console.log(`\nGRID (${GRID.join(", ")}), every cell scored (I2 fix round — no pruning):\n`);
   console.log(`${"lawCap".padStart(7)}  ${"availCap".padStart(9)}  ${"totalCap".padStart(9)}  ${"rho".padStart(8)}`);
 
   let best: { constants: BlendConstants; score: number } | null = null;
   let pureMarketScore: number | null = null;
-  const cells: { readonly constants: BlendConstants; readonly score: number | null }[] = [];
+  const cells: ScoredCell[] = [];
   for (const lawCapPoints of GRID) {
     for (const availabilityCapPoints of GRID) {
       for (const totalCapPoints of GRID) {
-        const constants: BlendConstants = { lawCapPoints, availabilityCapPoints, totalCapPoints, impliedGamesByPosition, unlistedRescale };
+        const constants: BlendConstants = {
+          lawCapPoints,
+          availabilityCapPoints,
+          totalCapPoints,
+          impliedGamesByPosition,
+          unlistedRescale,
+          marketTailByPosition,
+        };
         const score = scoreBlendConstants(rows, constants, { heldOutSeasons: [], laws });
         cells.push({ constants, score });
         console.log(
@@ -246,17 +302,35 @@ async function main(): Promise<void> {
       `totalCapPoints=${best.constants.totalCapPoints}  (spearman rho=${best.score.toFixed(4)} on the train rows, ` +
       `${beatsPureMarket ? "beats" : "does NOT beat"} the pure-market baseline)`,
   );
-  const onCeiling =
-    best.constants.availabilityCapPoints === GRID[GRID.length - 1] || best.constants.totalCapPoints === GRID[GRID.length - 1];
-  if (onCeiling) {
-    console.log(
-      `\nNOTE: the best cell sits at this grid's own ceiling (${GRID[GRID.length - 1]}) on the availability and/or total axis — ` +
-        `no interior optimum appeared. The blend is, on these train seasons, effectively UNCONSTRAINED on that axis rather than ` +
-        `meaningfully capped; see market/blend.ts's own docblock, which names this rather than implying a real cap is doing work.`,
-    );
-  }
 
-  const rendered = render(best.constants);
+  // THE CHANNEL DECOMPOSITION (fix round 2) — the winning cell with lawCapPoints forced to zero,
+  // isolating how much of the winner's own lift over pure market comes from the availability channel
+  // alone versus laws on top of it.
+  const availabilityOnlyConstants: BlendConstants = { ...best.constants, lawCapPoints: 0 };
+  const availabilityOnlyScore = scoreBlendConstants(rows, availabilityOnlyConstants, { heldOutSeasons: [], laws });
+  console.log(
+    `\nCHANNEL DECOMPOSITION: pure market ${pureMarketScore === null ? "n/a" : pureMarketScore.toFixed(4)}  ->  availability admitted alone ` +
+      `${availabilityOnlyScore === null ? "n/a" : availabilityOnlyScore.toFixed(4)}  ->  laws admitted too (the winner) ${best.score.toFixed(4)}`,
+  );
+
+  // THE PLATEAU GUARD (fix round 2, ruling 4b) — every cell within 1e-4 of the winner, not just the
+  // winner itself; see `detectPlateau`'s own docblock for why that distinction matters.
+  const ceiling = GRID[GRID.length - 1];
+  const plateau = detectPlateau(cells, best.score, ceiling);
+  console.log(
+    `\nPLATEAU: ${plateau.tiedCellCount} of ${cells.length} cells scored within 1e-4 of the winner. ` +
+      (plateau.anyTiedAtCeiling
+        ? `At least one tied cell sits at this grid's own ceiling (${ceiling}) on a cap axis — a wider grid might still move the winner.`
+        : `None of the tied cells sits at this grid's own ceiling (${ceiling}) — a genuine interior optimum.`),
+  );
+
+  const rendered = render(best.constants, {
+    bestScore: best.score,
+    pureMarketScore,
+    availabilityOnlyScore,
+    plateau,
+    ceiling,
+  });
 
   if (check) {
     const committed = readFileSync(OUTPUT, "utf-8");

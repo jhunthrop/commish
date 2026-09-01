@@ -59,6 +59,20 @@ import { isCurvePosition, marketBoard, type CurvePosition, type ImpliedGamesByPo
  * categories — only the composed point total and the outlook derived from it are ever stored or
  * shown — so discarding the model's real rushing/receiving/passing composition in favour of a
  * single carrier field costs the product nothing.
+ *
+ * AN UNLISTED CANDIDATE'S PRICING, IN TWO LAYERS (C2 fix round 1, tightened in fix round 2). Layer
+ * one is `constants.unlistedRescale`: a per-position affine map from raw model points onto the
+ * market's own scale, fit on train listed players — EXCEPT at QB, which is unconditionally the
+ * identity transform (`IDENTITY_ONLY_POSITIONS`'s own docblock: QB's listed population is bimodal,
+ * starters and backups, and a single affine line is not a valid model of it — fitting one anyway
+ * priced backup-caliber unlisted quarterbacks as though they were starters). Layer two,
+ * `constants.marketTailByPosition`, is a STRUCTURAL guarantee independent of layer one: no unlisted
+ * player's final number can exceed the market's own cheapest drafted man at his position, whatever
+ * layer one said. `scripts/blend-diagnostic.ts` is the committed, runnable check for both layers
+ * together — the metrics that actually catch a regression here are the position mix of the board's
+ * own top 100 and the count of unlisted players still priced above their own positional tail, never
+ * a single "best unlisted rank" number, which fix round 1's own diagnostic proved can look fine while
+ * an entire position quietly breaks underneath it.
  */
 
 /**
@@ -138,10 +152,30 @@ export interface BlendConstants {
    * OLS, over every TRAIN-season LISTED player (where both numbers exist to compare) — applied to
    * an unlisted candidate's own raw season points before they ever reach the board, so an unlisted
    * player is priced on the SAME scale a listed one would be, not the raw model's own uncalibrated
-   * one. See `admittedDelta`'s sibling, the unlisted branch inside `blendBoard`, for where this is
-   * applied.
+   * one. EXCEPT AT QB (fix round 2, ruling 1): re-running fix round 1's own diagnostic found this
+   * fit's own intercept inflating backup-caliber unlisted quarterbacks toward starter-level output —
+   * a fit-validity failure, not a data shortage, so QB unconditionally uses the identity transform
+   * instead (`fitUnlistedRescale`'s own `IDENTITY_ONLY_POSITIONS` docblock has the full argument).
+   * See `admittedDelta`'s sibling, the unlisted branch inside `blendBoard`, for where this is applied
+   * — always alongside `marketTailByPosition`, below, never on its own.
    */
   readonly unlistedRescale: UnlistedRescaleByPosition;
+  /**
+   * THE STRUCTURAL TAIL GUARD, per position (fix round 2, ruling 2). The market curve's own value at
+   * the DEEPEST listed ADP rank the TRAIN population reached at that position — equivalently (by the
+   * curve's own monotone-non-increasing construction) the smallest `marketPoints` any TRAIN listed
+   * player at that position carried. `fitMarketTailByPosition` computes it straight off the SAME
+   * `BlendTrainRow`s `fitUnlistedRescale` already reads.
+   *
+   * `rescaledUnlistedPoints` caps every unlisted candidate's own final points at this value: AN
+   * UNLISTED PLAYER NEVER OUTRANKS THE CHEAPEST PLAYER THE MARKET ACTUALLY DRAFTED AT HIS POSITION.
+   * This is deliberately aggressive — the real fitted RB tail sits around 51 points, well below a
+   * useful bench piece's own raw model number — and it is accepted as such: a real unlisted player is
+   * overwhelmingly a late-offseason signing or a genuine camp body, and `market_unlisted`'s own reason
+   * chip is exactly the surface that explains why he is priced this conservatively rather than the
+   * number silently looking wrong with no explanation attached.
+   */
+  readonly marketTailByPosition: MarketTailByPosition;
 }
 
 /** One position's own affine rescale: `marketPoints ≈ slope × rawPoints + intercept`, valid for a
@@ -156,6 +190,10 @@ export interface UnlistedRescaleCoefficients {
 }
 
 export type UnlistedRescaleByPosition = Readonly<Record<CurvePosition, UnlistedRescaleCoefficients>>;
+
+/** The structural tail guard's own committed table — see `BlendConstants.marketTailByPosition`'s
+ *  own docblock for what each value means and why it caps the unlisted fallback. */
+export type MarketTailByPosition = Readonly<Record<CurvePosition, number>>;
 
 export interface BlendEvidenceOptions {
   /** The season being blended. Carried for provenance and for any future clause that needs it;
@@ -216,25 +254,41 @@ function rescaleFor(position: Position, table: UnlistedRescaleByPosition): Unlis
   return table[position];
 }
 
+/** The identical narrow-and-lookup discipline `impliedGamesFor` uses, for `marketTailByPosition`. */
+function marketTailFor(position: Position, table: MarketTailByPosition): number {
+  if (!isCurvePosition(position)) {
+    throw new Error(`market/blend.ts: no market-tail entry for position "${position}" — the blend only ever runs for QB/RB/WR/TE.`);
+  }
+  return table[position];
+}
+
 /**
- * AN UNLISTED CANDIDATE'S OWN RESCALED SEASON POINTS (C2 fix round) — his raw model season points,
- * run through `constants.unlistedRescale`'s own per-position affine fit, floored at zero (a points
- * baseline is non-negative by construction, the identical discipline `marketCurve`/`rookieCurve`
- * apply at their own accessors).
+ * AN UNLISTED CANDIDATE'S OWN RESCALED SEASON POINTS (C2 fix round; the tail guard is fix round 2's
+ * own ruling 2) — his raw model season points, run through `constants.unlistedRescale`'s own
+ * per-position affine fit, then capped at `constants.marketTailByPosition` — never above the
+ * cheapest player the market itself drafted at his position, whatever the affine fit alone would
+ * have said. `Math.max(0, ...)` inside the affine branch is a points baseline's own non-negative
+ * floor, the identical discipline `marketCurve`/`rookieCurve` apply at their own accessors; the
+ * `Math.min(..., tail)` afterward is the SEPARATE, newer guard — see `BlendConstants.marketTailByPosition`'s
+ * own docblock for why it exists and why it is deliberately aggressive.
  *
- * NEVER EXTRAPOLATED BELOW `domainMin` — a real finding from this fix round's own diagnostic. The
+ * NEVER EXTRAPOLATED BELOW `domainMin` — a real finding from fix round 1's own diagnostic. The
  * fit's own intercept is large (the market's typical points for a BARELY-drafted player, since the
  * regression is fit ONLY over LISTED, drafted-quality rows); applying it uncorrected to a deep
  * camp body's near-zero raw points invents a market opinion for a player the fit never saw evidence
  * about, HANDING HIM A SPURIOUS FLOOR rather than leaving his own (already reasonable, near-zero)
  * raw number alone. A raw value at or above `domainMin` — inside the population the fit actually
- * regressed over — is rescaled; a raw value below it passes through UNCHANGED.
+ * regressed over — is rescaled; a raw value below it passes through UNCHANGED. EITHER WAY, the tail
+ * cap still applies afterward: `domainMin` protects against extrapolating the SLOPE/INTERCEPT past
+ * their own evidence, the tail protects against ANY unlisted number, rescaled or not, beating the
+ * market's own cheapest drafted man.
  */
 function rescaledUnlistedPoints(candidate: BoardCandidate, constants: BlendConstants): number {
   const { slope, intercept, domainMin } = rescaleFor(candidate.position, constants.unlistedRescale);
   const raw = seasonPointsOf(candidate);
-  if (raw < domainMin) return raw;
-  return Math.max(0, slope * raw + intercept);
+  const rescaled = raw < domainMin ? raw : Math.max(0, slope * raw + intercept);
+  const tail = marketTailFor(candidate.position, constants.marketTailByPosition);
+  return Math.min(rescaled, tail);
 }
 
 /**
@@ -319,11 +373,12 @@ function admittedDelta(
  * roster) is silently absent from the output, exactly as it always was for the raw board: this
  * function is additive information on top of the model's own set, never a second, wider universe.
  *
- * AN UNLISTED CANDIDATE'S POINTS ARE RESCALED, NOT PASSED THROUGH RAW (C2 fix round, 2026-08-31): a
- * diagnostic run found the raw model's own unlisted fallback landing implausibly high without it —
- * see `BlendConstants.unlistedRescale`'s own docblock for the finding and the fix. His `reasons`
- * still carry `market_unlisted`, unchanged: rescaling is a POINTS correction, not a claim that a
- * market opinion exists for him.
+ * AN UNLISTED CANDIDATE'S POINTS ARE RESCALED AND TAIL-CAPPED, NOT PASSED THROUGH RAW (C2 fix round
+ * 1, tightened fix round 2): a diagnostic run found the raw model's own unlisted fallback landing
+ * implausibly high without it — see `BlendConstants.unlistedRescale`'s and
+ * `BlendConstants.marketTailByPosition`'s own docblocks for the finding and the fix, `rescaledUnlistedPoints`
+ * for where both layers combine. His `reasons` still carry `market_unlisted`, unchanged: rescaling is
+ * a POINTS correction, not a claim that a market opinion exists for him.
  *
  * EVERY LISTED CANDIDATE CARRIES A NEW `"market_anchor"` REASON (I6 fix round, 2026-08-31): the
  * market entry he was blended against and the total admitted delta, so a reader of his reason list
@@ -478,8 +533,82 @@ export function scoreBlendConstants(rows: readonly BlendTrainRow[], constants: B
   return spearman(observations);
 }
 
+/** One grid cell the search scored: the constants it tried, and the score `scoreBlendConstants`
+ *  returned for them (`null` exactly when `spearman` itself would be). */
+export interface ScoredCell {
+  readonly constants: BlendConstants;
+  readonly score: number | null;
+}
+
+/** What `detectPlateau` found about the neighbourhood around the grid search's own winner. */
+export interface PlateauReport {
+  /** How many cells (the winner included) scored within `tolerance` of the best score. */
+  readonly tiedCellCount: number;
+  /** Whether ANY of those tied cells sits at the grid's own ceiling on `lawCapPoints`,
+   *  `availabilityCapPoints` or `totalCapPoints` — a plateau reaching the edge of the search means a
+   *  wider grid might still move the winner, which a single-cell "best" number cannot say on its own. */
+  readonly anyTiedAtCeiling: boolean;
+}
+
+/**
+ * THE PLATEAU GUARD (fix round 2, ruling 4b — rewritten from an earlier version that only asked
+ * whether the SINGLE winning cell sat at the grid's own ceiling). A grid search over a rank
+ * correlation routinely produces MANY cells within noise of each other — `scripts/blend-fit.ts`'s own
+ * real run found the winner tied, within `tolerance`, with dozens of neighbouring cells — and asking
+ * only "is THE winner at the ceiling" can miss a genuine plateau that touches the ceiling somewhere
+ * else in the tied set while the arbitrarily-first-sorted winner happens not to. This checks every
+ * cell within `tolerance` of `bestScore`, not just the winner itself, and reports both how large that
+ * tied set is (so a reader can see "this is a plateau, not a sharp peak") and whether any of it sits
+ * at `ceiling` on any of the three cap axes.
+ */
+export function detectPlateau(cells: readonly ScoredCell[], bestScore: number, ceiling: number, tolerance = 1e-4): PlateauReport {
+  const tied = cells.filter((cell) => cell.score !== null && Math.abs(cell.score - bestScore) <= tolerance);
+  const anyTiedAtCeiling = tied.some(
+    (cell) =>
+      cell.constants.lawCapPoints === ceiling || cell.constants.availabilityCapPoints === ceiling || cell.constants.totalCapPoints === ceiling,
+  );
+  return { tiedCellCount: tied.length, anyTiedAtCeiling };
+}
+
 function mean(values: readonly number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+/** The identity transform: no rescale at all, the raw model's own number carried straight through
+ *  (subject to `rescaledUnlistedPoints`'s own tail cap, unaffected by this constant). */
+const IDENTITY_TRANSFORM: UnlistedRescaleCoefficients = { slope: 1, intercept: 0, domainMin: 0 };
+
+/**
+ * A FIT-VALIDITY RULING, NOT A DATA SHORTAGE (fix round 2, ruling 1) — QB never gets an OLS fit at
+ * all, unconditionally forced to `IDENTITY_TRANSFORM` regardless of how much train data exists for
+ * it. Fix round 1's own diagnostic is the evidence: a single affine map fit over QB's LISTED
+ * population (dominated by real starters, whose raw and market points already track closely)
+ * produced a large positive intercept (177.85) that, applied to an UNLISTED quarterback — almost by
+ * definition a backup, since a real starter is drafted — inflated him toward starter-level output.
+ * The rescaled top of the "unlisted" list came back roughly 55% quarterbacks, 35 to 40 of them
+ * undrafted, every one priced above the deepest QB the market itself drafted. RB/WR/TE do not show
+ * this failure: their listed populations are far more continuous by depth (a real market drafts
+ * RBs/WRs three and four deep per team, not the two-per-team, mostly-starters shape a QB room has),
+ * so their fitted transforms measurably compress raw points toward market scale and keep their own
+ * fitted coefficients. QB's own population is BIMODAL — a small cluster of real starters and a much
+ * larger, structurally different cluster of backups no single line can fit — and the honest response
+ * to a model class that is invalid for a population is to stop fitting it, not to fit it anyway and
+ * rely on the tail guard to clean up after it (the tail guard, `marketTailByPosition`, still applies
+ * to QB regardless of this ruling — it is a second, independent guarantee, not a substitute for this
+ * one).
+ */
+const IDENTITY_ONLY_POSITIONS: ReadonlySet<CurvePosition> = new Set(["QB"]);
+
+function assertTrainSeasonsFor(rows: readonly BlendTrainRow[], caller: string): void {
+  for (const row of rows) {
+    if (row.season > BLEND_TRAIN_CUTOFF_SEASON) {
+      throw new Error(
+        `${caller} was handed a row for ${row.season}, which is past BLEND_TRAIN_CUTOFF_SEASON ` +
+          `(${BLEND_TRAIN_CUTOFF_SEASON}) and therefore held out by construction. A fit scored on a ` +
+          `season it is later judged on is not a measurement.`,
+      );
+    }
+  }
 }
 
 /**
@@ -489,34 +618,33 @@ function mean(values: readonly number[]): number {
  * only exists for a player who is on BOTH boards (`rowsForSeason`'s own join), so this is exactly
  * the "listed player, both numbers known" population the fit needs, with zero new DB reads.
  *
- * `slope = covariance(raw, market) / variance(raw)`, `intercept = mean(market) - slope * mean(raw)`
- * — the closed-form single-variable OLS solution. A position with fewer than two rows, or with
- * every row's raw points identical (zero variance — nothing to regress on), falls back to the
- * IDENTITY transform (`slope: 1, intercept: 0`, i.e. no rescale at all) rather than dividing by
- * zero or fitting a line through one point: an under-populated position gets the raw model's own
- * number unchanged, which is exactly what shipped before this fix round and is a safe default, not
- * a silent guess.
+ * QB SKIPS THE FIT ENTIRELY — see `IDENTITY_ONLY_POSITIONS`'s own docblock (fix round 2, ruling 1).
+ *
+ * For RB/WR/TE: `slope = covariance(raw, market) / variance(raw)`,
+ * `intercept = mean(market) - slope * mean(raw)` — the closed-form single-variable OLS solution. A
+ * position with fewer than two rows, or with every row's raw points identical (zero variance —
+ * nothing to regress on), ALSO falls back to `IDENTITY_TRANSFORM` rather than dividing by zero or
+ * fitting a line through one point: an under-populated position gets the raw model's own number
+ * unchanged, which is exactly what shipped before fix round 1 and is a safe default, not a silent
+ * guess. This is a data-shortage fallback, a different reason than QB's own fit-validity ruling, but
+ * the identical output shape.
  *
  * THE GATE IS UNCONDITIONAL, matching `scoreBlendConstants`'s own: every row's season is checked
  * against `BLEND_TRAIN_CUTOFF_SEASON` directly, never trusted to whichever rows a caller happened
  * to load.
  */
 export function fitUnlistedRescale(rows: readonly BlendTrainRow[]): UnlistedRescaleByPosition {
-  for (const row of rows) {
-    if (row.season > BLEND_TRAIN_CUTOFF_SEASON) {
-      throw new Error(
-        `fitUnlistedRescale was handed a row for ${row.season}, which is past BLEND_TRAIN_CUTOFF_SEASON ` +
-          `(${BLEND_TRAIN_CUTOFF_SEASON}) and therefore held out by construction. A rescale fitted on a season ` +
-          `it is later scored on is not a measurement.`,
-      );
-    }
-  }
+  assertTrainSeasonsFor(rows, "fitUnlistedRescale");
 
   const result = {} as Record<CurvePosition, UnlistedRescaleCoefficients>;
   for (const position of ["QB", "RB", "WR", "TE"] as const) {
+    if (IDENTITY_ONLY_POSITIONS.has(position)) {
+      result[position] = IDENTITY_TRANSFORM;
+      continue;
+    }
     const atPosition = rows.filter((row) => row.candidate.position === position);
     if (atPosition.length < 2) {
-      result[position] = { slope: 1, intercept: 0, domainMin: 0 };
+      result[position] = IDENTITY_TRANSFORM;
       continue;
     }
     const xs = atPosition.map((row) => seasonPointsOf(row.candidate));
@@ -532,11 +660,38 @@ export function fitUnlistedRescale(rows: readonly BlendTrainRow[]): UnlistedResc
       varianceX += dx * dx;
     }
     if (varianceX === 0) {
-      result[position] = { slope: 1, intercept: 0, domainMin: 0 };
+      result[position] = IDENTITY_TRANSFORM;
       continue;
     }
     const slope = covariance / varianceX;
     result[position] = { slope, intercept: meanY - slope * meanX, domainMin };
+  }
+  return result;
+}
+
+/**
+ * FITS `BlendConstants.marketTailByPosition` (fix round 2, ruling 2) — per position, the SMALLEST
+ * `marketPoints` any TRAIN listed row carried. By the market curve's own monotone-non-increasing
+ * construction (`fitMarketCurve`'s own PAVA guarantee), the smallest `marketPoints` observed IS the
+ * curve's value at the deepest ADP rank the train population reached — this is the cheap, exact way
+ * to compute "the curve's value at the deepest listed rank" without re-deriving a rank or calling
+ * `marketCurve` a second time; the value is already sitting on every `BlendTrainRow`'s own `market`
+ * field.
+ *
+ * THE GATE IS UNCONDITIONAL, identical to `fitUnlistedRescale`'s own. A position with zero rows
+ * throws — a real train population always has some coverage at every skill position, and a silent
+ * `Infinity`/`NaN` tail would be a worse failure than a clear one.
+ */
+export function fitMarketTailByPosition(rows: readonly BlendTrainRow[]): MarketTailByPosition {
+  assertTrainSeasonsFor(rows, "fitMarketTailByPosition");
+
+  const result = {} as Record<CurvePosition, number>;
+  for (const position of ["QB", "RB", "WR", "TE"] as const) {
+    const atPosition = rows.filter((row) => row.candidate.position === position);
+    if (atPosition.length === 0) {
+      throw new Error(`fitMarketTailByPosition: no train rows at position "${position}" — an empty population is a fit-input bug, not a zero.`);
+    }
+    result[position] = Math.min(...atPosition.map((row) => row.market.marketPoints));
   }
   return result;
 }

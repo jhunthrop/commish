@@ -2263,9 +2263,10 @@ export const preseasonProjections = pgTable(
     id: bigserial("id", { mode: "number" }).primaryKey(),
     season: integer("season").notNull(),
     /** Which board said it — model version and league format together, as the benchmark sources
-     *  name market and format together. `commish_board_v2_ppr_12` (C3 fix round, 2026-08-31 — the
-     *  shipped, market-blended board; `commish_board_v1_ppr_12` is the raw model's own historical
-     *  source, kept for provenance). */
+     *  name market and format together. `commish_board_v3_ppr_12` (fix round 2, 2026-08-31 — the
+     *  shipped, market-blended board, bumped a second time after a real correctness bug in v2's own
+     *  stored pricing; see `board-store.ts`'s own `BOARD_SOURCE` docblock). `commish_board_v1_ppr_12`
+     *  is the raw model's own historical source, kept for provenance. */
     source: text("source").notNull(),
     /** An `nfl_players.id` (a gsis id), the space the whole engine keys on. The product reaches it
      *  through `player_crosswalk`, never by name. */

@@ -6,8 +6,22 @@ import type { BlendConstants } from "./blend";
  * Fit by a grid search over predictor seasons up to and including `BLEND_TRAIN_CUTOFF_SEASON`
  * (2021), scored by rank correlation against those seasons' own outcomes. `impliedGamesByPosition`
  * is the market curve's own train population's mean games played, per position
- * (`fitImpliedGamesByPosition`). See `scripts/blend-fit.ts` for the grid and the chosen
- * combination's score.
+ * (`fitImpliedGamesByPosition`); `unlistedRescale` and `marketTailByPosition` price and cap the
+ * unlisted fallback (see `market/blend.ts`'s own docblocks — QB is a deliberate fit-validity
+ * exception, not a data gap). See `scripts/blend-fit.ts` for the grid.
+ *
+ * THE WINNING SCORE: spearman rho = 0.6053 on the train rows.
+ *
+ * THE PLATEAU (fix round 2, ruling 4b): 24 of this grid's own cells
+ * scored within 1e-4 of the winner — a genuine plateau, not a single sharp peak.
+ * At least one of those tied cells sits at this grid's own ceiling (80) on a cap axis — a wider grid might still move the winner.
+ *
+ * THE CHANNEL DECOMPOSITION — pure market (every cap at zero) 0.5892,
+ * availability admitted alone (lawCapPoints at zero, the winning availability/total caps otherwise)
+ * 0.6046, laws admitted too (the winning cell in full)
+ * 0.6053 — laws' own share of the total lift over pure market is 4.5%. Written down so
+ * Task 11's own ablation of this board is not a surprise: the availability channel does almost all
+ * of the work, laws add a real but small amount on top.
  */
 
 export const FITTED_BLEND_CONSTANTS: BlendConstants = {
@@ -22,9 +36,9 @@ export const FITTED_BLEND_CONSTANTS: BlendConstants = {
   },
   "unlistedRescale": {
     "QB": {
-      "slope": 0.33280557374031683,
-      "intercept": 177.84561058213876,
-      "domainMin": 18.88
+      "slope": 1,
+      "intercept": 0,
+      "domainMin": 0
     },
     "RB": {
       "slope": 0.3719085798778845,
@@ -41,5 +55,11 @@ export const FITTED_BLEND_CONSTANTS: BlendConstants = {
       "intercept": 101.39878197825,
       "domainMin": 0.68
     }
+  },
+  "marketTailByPosition": {
+    "QB": 172.5111111111111,
+    "RB": 45.964999999999996,
+    "WR": 85.79333333333332,
+    "TE": 85.5624999999996
   }
 };

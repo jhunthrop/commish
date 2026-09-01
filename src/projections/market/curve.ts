@@ -161,9 +161,11 @@ export async function loadMarketCurveObservations(db: ReadonlyDb, seasons: reado
   return observations;
 }
 
-/** Per position, the market curve's own train population's mean `gamesPlayed` — a `Position`, not
- *  just a `CurvePosition`, keyed record, so `market/blend.ts`'s own per-candidate `Position` lookup
- *  never needs a second narrowing check. */
+/** Per position, the market curve's own train population's mean `gamesPlayed` — keyed by
+ *  `CurvePosition` (QB/RB/WR/TE), NOT the wider `Position` type (fix round 2, correcting a docstring
+ *  that had this backwards). A caller indexing with a candidate's own `Position` field (which could
+ *  be `K`/`DEF`) still has to narrow first — `market/blend.ts`'s `impliedGamesFor` does exactly
+ *  that, via `isCurvePosition`, before it ever indexes this table. */
 export type ImpliedGamesByPosition = Readonly<Record<CurvePosition, number>>;
 
 /**

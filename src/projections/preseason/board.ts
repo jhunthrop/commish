@@ -75,7 +75,9 @@ export type BoardReason =
   /**
    * I6 (fix round, 2026-08-31) — on every LISTED blended candidate, the market entry `blendBoard`
    * anchored him to and the total admitted delta it moved him by: his blended season points are
-   * `marketPoints + delta` exactly. Lets a reader see not just WHAT moved a player (the law/
+   * `marketPoints + delta`, FLOORED AT ZERO (fix round 2 — an earlier version of this docstring said
+   * "exactly," overstating it; `blendBoard`'s own `Math.max(0, marketPoints + delta)` can clip a
+   * large enough negative delta). Lets a reader see not just WHAT moved a player (the law/
    * availability reasons already on the list) but WHERE he started and BY HOW MUCH the blend
    * actually spent. `delta` can be negative (moved below market), zero (no admitted evidence, or
    * every admitted delta capped to nothing), or — for a listed rookie — `rookieCurve − marketPoints`,

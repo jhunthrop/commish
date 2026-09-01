@@ -257,6 +257,18 @@ async function main(): Promise<void> {
     // about, so neither is credited for breadth. Model v1 established that discipline and the same
     // reasoning applies with more force here, because a published board stops at about two hundred
     // names and ours does not.
+    //
+    // SELF-REFERENTIAL CAVEAT (fix round 2, review finding): `board` here is the SHIPPED,
+    // MARKET-BLENDED board (M6 fix round 1) — and `BENCHMARK_SOURCES.adp` (`ffc_adp_ppr_12`) is the
+    // EXACT SAME feed `market/curve.ts`'s market curve, and therefore `market/blend.ts`'s own
+    // `marketPoints` anchor, is built from. For every LISTED player, "our board" below is not an
+    // independent read scored against the market — it is a number anchored to that market's own
+    // rank, plus a capped delta, being compared back against the market's own rank. A strong
+    // "AGAINST MARKET (ADP)" correlation here is expected by construction, not evidence the blend
+    // adds anything; it does NOT hold for "AGAINST CONSENSUS (ECR)" below, a genuinely independent
+    // feed, or for `rawBoard`'s own numbers (never blended). Task 11's own scorecard must weight the
+    // ECR comparison and the raw-vs-blend delta as the load-bearing evidence, and read the ADP
+    // comparison here as a sanity check on the blend's own arithmetic rather than a result.
     for (const [label, source] of [
       ["market (ADP)", BENCHMARK_SOURCES.adp],
       ["consensus (ECR)", BENCHMARK_SOURCES.ecr],

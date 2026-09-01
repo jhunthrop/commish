@@ -48,17 +48,30 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * shape that valued it. A refit is a new value here, never an overwrite of rows a manager has
  * already been shown.
  *
- * BUMPED TO v2 (C3 fix round, 2026-08-31): Task 10 wired `shippedPreseasonCandidates`'s market
+ * BUMPED TO v2 (C3 fix round 1, 2026-08-31): Task 10 wired `shippedPreseasonCandidates`'s market
  * blend in as the board `scripts/preseason-persist.ts` writes, but `preseason_projections`' own
  * unique key (`season, source, as_of`) meant a rerun under the UNCHANGED v1 source name never wrote
  * a single new projection row — every row already existed from before the blend, so the blend's own
  * point totals never reached the store a live product surface reads, even though its REASONS did
- * (a different table, no `as_of`, always overwritten). `commish_board_v2_ppr_12` is a fresh value
- * with no existing rows, so persisting under it writes the blended board's own projections for
- * real, for the first time. Every reader of `BOARD_SOURCE` (the drafts-players route, the player
- * screen) picks up the blended board automatically, with no call-site change.
+ * (a different table, no `as_of`, always overwritten).
+ *
+ * BUMPED AGAIN TO v3 (fix round 2, 2026-08-31 — NOT preserved as its own named historical constant
+ * the way v1/raw is): the SAME unique-key problem recurred one level up. Fix round 1's own blend had
+ * a real correctness bug (an unlisted quarterback's rescale inflated him toward starter-level
+ * output); fix round 2 fixed the bug in code, re-ran the grid search, and re-ran persist under the
+ * STILL-v2 source name expecting fresh numbers — and got zero new projection rows again, for the
+ * identical reason: v2's own `(season, source, as_of)` rows already existed from fix round 1's own
+ * run, so the corrected pricing never reached the store either, even though the reasons table (no
+ * `as_of`) silently updated to describe numbers the projections table was not actually showing.
+ * `commish_board_v3_ppr_12` is, again, a fresh value with no existing rows. Unlike
+ * `BOARD_SOURCE_V1_RAW`, v2 is NOT kept as a second permanent named constant: v1/raw serves an
+ * ongoing, identified purpose (the raw-vs-blend comparison Task 11's scorecard needs both halves
+ * of), while v2 was a blend that never finished shipping correctly — its own stored rows were wrong
+ * the entire time they existed, so there is nothing about "v2 specifically" worth a reader
+ * addressing by name going forward. Every reader of `BOARD_SOURCE` (the drafts-players route, the
+ * player screen) picks up the corrected blend automatically, with no call-site change.
  */
-export const BOARD_SOURCE = "commish_board_v2_ppr_12";
+export const BOARD_SOURCE = "commish_board_v3_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {
