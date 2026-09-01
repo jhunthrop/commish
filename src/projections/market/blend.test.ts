@@ -5,10 +5,12 @@ import type { BoardCandidate, BoardReason } from "../preseason/board";
 import { rookieCurve } from "../preseason/rookie-curve";
 import type { MarketPriorEntry } from "./curve";
 import {
+  assertLiveMarketCoverage,
   BLEND_TRAIN_CUTOFF_SEASON,
   blendBoard,
   detectPlateau,
   fitMarketTailByPosition,
+  MINIMUM_LISTED_PER_POSITION,
   seasonPointsOf,
   scoreBlendConstants,
   withLawsAblated,
@@ -405,5 +407,79 @@ describe("detectPlateau — the fix round 2 plateau guard (ruling 4b)", () => {
     const cells = [cell({}, 0.6), cell({ lawCapPoints: 2 }, 0.6053)];
     expect(detectPlateau(cells, 0.6053, CEILING, 1e-4).tiedCellCount).toBe(1);
     expect(detectPlateau(cells, 0.6053, CEILING, 0.1).tiedCellCount).toBe(2);
+  });
+});
+
+/**
+ * `assertLiveMarketCoverage` (Task 4 fix round 2, I1) — the degeneracy guard, upgraded from a
+ * whole-board zero check to a PER-POSITION COVERAGE FLOOR. Unit-tested directly (rather than only
+ * through `shippedPreseasonCandidates`'s own DB-backed tests in `source.test.ts`) because the
+ * function's whole job is arithmetic over `candidates`/`market`, and a pure test can enumerate the
+ * truth table exhaustively without a database.
+ */
+describe("assertLiveMarketCoverage — the per-position coverage floor (Task 4 fix round 2, I1)", () => {
+  function inputsFixture(momentKind: "live" | "replay" = "live") {
+    return { season: SEASON, moment: new Date("2026-09-01T00:00:00.000Z"), momentKind };
+  }
+
+  it("refuses a LIVE board with ZERO listed market players overall, regardless of what candidates holds", () => {
+    expect(() => assertLiveMarketCoverage(inputsFixture(), [candidate()], [])).toThrow(/ZERO listed market players/);
+  });
+
+  it("does NOT refuse a REPLAY board with zero listed market players — an established, legitimate state", () => {
+    expect(() => assertLiveMarketCoverage(inputsFixture("replay"), [candidate()], [])).not.toThrow();
+  });
+
+  it("refuses a LIVE board when a position ON OUR OWN BOARD has fewer than the floor listed, naming it", () => {
+    const candidates = [candidate({ playerId: "rb-1", position: "RB" }), candidate({ playerId: "wr-1", position: "WR" })];
+    const thinRb = Array.from({ length: MINIMUM_LISTED_PER_POSITION - 1 }, (_, i) => market({ playerId: `rb-market-${i}`, position: "RB" }));
+    const healthyWr = Array.from({ length: MINIMUM_LISTED_PER_POSITION }, (_, i) => market({ playerId: `wr-market-${i}`, position: "WR" }));
+    expect(() => assertLiveMarketCoverage(inputsFixture(), candidates, [...thinRb, ...healthyWr])).toThrow(
+      new RegExp(`RB \\(${MINIMUM_LISTED_PER_POSITION - 1} listed\\)`),
+    );
+  });
+
+  it("does NOT refuse when every position on the board clears the floor", () => {
+    const candidates = [candidate({ playerId: "rb-1", position: "RB" }), candidate({ playerId: "wr-1", position: "WR" })];
+    const healthyRb = Array.from({ length: MINIMUM_LISTED_PER_POSITION }, (_, i) => market({ playerId: `rb-market-${i}`, position: "RB" }));
+    const healthyWr = Array.from({ length: MINIMUM_LISTED_PER_POSITION }, (_, i) => market({ playerId: `wr-market-${i}`, position: "WR" }));
+    expect(() => assertLiveMarketCoverage(inputsFixture(), candidates, [...healthyRb, ...healthyWr])).not.toThrow();
+  });
+
+  it("is exactly the boundary: MINIMUM_LISTED_PER_POSITION itself does NOT refuse, only strictly fewer", () => {
+    const candidates = [candidate({ playerId: "rb-1", position: "RB" })];
+    const exactlyAtFloor = Array.from({ length: MINIMUM_LISTED_PER_POSITION }, (_, i) => market({ playerId: `rb-market-${i}`, position: "RB" }));
+    expect(() => assertLiveMarketCoverage(inputsFixture(), candidates, exactlyAtFloor)).not.toThrow();
+
+    const oneBelowFloor = exactlyAtFloor.slice(1);
+    expect(() => assertLiveMarketCoverage(inputsFixture(), candidates, oneBelowFloor)).toThrow();
+  });
+
+  it("ignores a position with NO candidates of our own, even when the market lists nobody there either", () => {
+    // Our board only prices WR here; the market carrying zero QB rows says nothing about a
+    // position we never asked it about.
+    const candidates = [candidate({ playerId: "wr-1", position: "WR" })];
+    const healthyWr = Array.from({ length: MINIMUM_LISTED_PER_POSITION }, (_, i) => market({ playerId: `wr-market-${i}`, position: "WR" }));
+    expect(() => assertLiveMarketCoverage(inputsFixture(), candidates, healthyWr)).not.toThrow();
+  });
+
+  it("names EVERY thin position at once, not only the first it finds", () => {
+    const candidates = [
+      candidate({ playerId: "rb-1", position: "RB" }),
+      candidate({ playerId: "wr-1", position: "WR" }),
+      candidate({ playerId: "te-1", position: "TE" }),
+    ];
+    const thinRb = [market({ playerId: "rb-market-0", position: "RB" })];
+    const healthyWr = Array.from({ length: MINIMUM_LISTED_PER_POSITION }, (_, i) => market({ playerId: `wr-market-${i}`, position: "WR" }));
+    const thinTe = [market({ playerId: "te-market-0", position: "TE" })];
+    let error: Error | undefined;
+    try {
+      assertLiveMarketCoverage(inputsFixture(), candidates, [...thinRb, ...healthyWr, ...thinTe]);
+    } catch (caught) {
+      error = caught as Error;
+    }
+    expect(error?.message).toMatch(/RB \(1 listed\)/);
+    expect(error?.message).toMatch(/TE \(1 listed\)/);
+    expect(error?.message).not.toMatch(/WR \(/);
   });
 });

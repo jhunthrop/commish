@@ -590,6 +590,81 @@ export interface ShippedCandidatesOptions {
   readonly laws?: readonly Law[];
 }
 
+/** How many LISTED market players a position needs before a LIVE board trusts its own pricing for
+ *  that position — named and documented here rather than left as a bare literal at the call site,
+ *  the same discipline `MINIMUM_RESOLUTION` (`preseason-ingest.ts`) and `MINIMUM_AGREEMENT`
+ *  (`derived-stat-lines.ts`) already keep for their own thresholds. Five is deliberately generous:
+ *  a real twelve-team league starts at most 2-3 players per skill position, so five listed players
+ *  is still a thin market by any normal season's standard, but it is enough for
+ *  `tailCappedUnlistedPoints`'s own tail (a real quantile of REAL listed prices) to mean something
+ *  rather than being a single, arbitrary fitted constant every unlisted candidate collapses onto. */
+export const MINIMUM_LISTED_PER_POSITION = 5;
+
+/**
+ * THE DEGENERACY GUARD (Task 4 fix round ruling, found by the first real live persist this engine
+ * ever ran) — NOW A PER-POSITION COVERAGE FLOOR (Task 4 fix round 2, I1), not only a whole-board
+ * zero check. The original version caught the incident it was built for (every position 100%
+ * unlisted, all 759 candidates tail-capped) but would have missed the SAME failure mode confined to
+ * ONE position — twenty-six tied QBs sitting on an otherwise healthy, well-anchored board, which is
+ * exactly as dishonest a number but would not have tripped `market.length === 0`.
+ *
+ * TWO CHECKS, BOTH SCOPED TO `momentKind === "live"` (a REPLAY board with a thin or unbenchmarked
+ * historical season's market is an established, already-tested, legitimate state — see the
+ * existing `raw: false` fixture in `source.test.ts`, which relies on exactly this staying silent):
+ *
+ *   1. ZERO LISTED PLAYERS OVERALL — the original guard, kept as an unconditional safety net rather
+ *      than folded entirely into the per-position check below, because the per-position check is
+ *      SCOPED TO POSITIONS `candidates` (our own model board) ACTUALLY CONTAINS. A board with an
+ *      empty `candidates` array (nothing of our own to price at all — a real, if narrow, state a
+ *      test can construct) would iterate zero positions in the per-position loop and never notice a
+ *      wholly empty market; this check catches that case regardless of what `candidates` contains.
+ *   2. PER POSITION, AMONG THE POSITIONS `candidates` ACTUALLY HAS SOMEONE AT: fewer than
+ *      `MINIMUM_LISTED_PER_POSITION` listed market players for that position refuses, naming every
+ *      thin position at once rather than stopping at the first.
+ *
+ * Never a defence against a NORMAL board with a fully anchored market: `tailCappedUnlistedPoints`'s
+ * fallback exists precisely because a real board always carries some unlisted deep-bench players,
+ * and that is fine — this guard fires only when a whole POSITION has too few real prices to anchor
+ * against, the shape a market blackout (this task's own incident) or a genuinely thin future season
+ * produces.
+ */
+export function assertLiveMarketCoverage(
+  inputs: Pick<PreseasonInputs, "season" | "moment" | "momentKind">,
+  candidates: readonly BoardCandidate[],
+  market: readonly MarketPriorEntry[],
+): void {
+  if (inputs.momentKind !== "live") return;
+  if (market.length === 0) {
+    throw new Error(
+      `${inputs.season}'s LIVE board resolved ZERO listed market players at ${inputs.moment.toISOString()}. ` +
+        "Every candidate would fall back to the position tail cap, degenerately tying every player at a " +
+        "position to the identical value -- this board must not be persisted. The usual cause is the ADP " +
+        "benchmark's own publication stamp sitting after the live moment (publishers.ts's " +
+        "fetchAverageDraftPosition docblock): verify the benchmark is ingested AND visible at this moment " +
+        "before persisting again.",
+    );
+  }
+  const listedCountByPosition = new Map<Position, number>();
+  for (const entry of market) {
+    listedCountByPosition.set(entry.position, (listedCountByPosition.get(entry.position) ?? 0) + 1);
+  }
+  const positionsOnBoard = new Set(candidates.map((candidate) => candidate.position).filter(isCurvePosition));
+  const thin = [...positionsOnBoard]
+    .map((position) => ({ position, listed: listedCountByPosition.get(position) ?? 0 }))
+    .filter(({ listed }) => listed < MINIMUM_LISTED_PER_POSITION)
+    .sort((a, b) => (a.position < b.position ? -1 : 1));
+  if (thin.length > 0) {
+    const named = thin.map(({ position, listed }) => `${position} (${listed} listed)`).join(", ");
+    throw new Error(
+      `${inputs.season}'s LIVE board resolves fewer than ${MINIMUM_LISTED_PER_POSITION} listed market players at ` +
+        `${named} at ${inputs.moment.toISOString()}. Every unlisted candidate at a position this thin would fall ` +
+        "back to the SAME position tail cap, degenerately tying most or all of that position's own board rows " +
+        "-- this board must not be persisted. Verify the ADP benchmark is ingested AND visible at this moment " +
+        "for the named position(s) before persisting again.",
+    );
+  }
+}
+
 /**
  * THE SHIPPED CANDIDATE PIPELINE — market-blended by default, and the one function
  * `scripts/preseason-persist.ts` calls to build the board it writes down.
@@ -620,27 +695,7 @@ export async function shippedPreseasonCandidates(
   // `marketBoard` docblock: that function used to derive this itself, unconditionally through the
   // replay-only `preseasonMomentFor`, which throws for a season that has not kicked off yet).
   const { entries: market, droppedCount } = await marketBoard(db, inputs.season, inputs.moment);
-  // THE DEGENERACY GUARD (Task 4 fix round ruling, found by the first real live persist this
-  // engine ever ran). Zero listed players on a LIVE board is not an ordinary "thin benchmark"
-  // outcome the way it can legitimately be on a REPLAY board of a thin historical season: EVERY
-  // candidate falls back to `tailCappedUnlistedPoints`'s position tail, and because that fallback
-  // was built for the few deep-bench stragglers a normal, mostly-listed board leaves unlisted, a
-  // 100%-unlisted class collapses every player at a position to the IDENTICAL tail value (confirmed
-  // live: 26 distinct QBs tied at 172.51, the RAW model underneath NOT tied). A board that ties its
-  // own QB1 through QB26 is not a board; refusing to write it down is the only honest option. Never
-  // an issue for a REPLAY board, scoped to `momentKind === "live"` on purpose: a replay board with
-  // no ADP for its season is an established, tested, legitimate state (thin or unbenchmarked
-  // history), not a leak.
-  if (market.length === 0 && inputs.momentKind === "live") {
-    throw new Error(
-      `${inputs.season}'s LIVE board resolved ZERO listed market players at ${inputs.moment.toISOString()}. ` +
-        "Every candidate would fall back to the position tail cap, degenerately tying every player at a " +
-        "position to the identical value -- this board must not be persisted. The usual cause is the ADP " +
-        "benchmark's own publication stamp sitting after the live moment (publishers.ts's " +
-        "fetchAverageDraftPosition docblock): verify the benchmark is ingested AND visible at this moment " +
-        "before persisting again.",
-    );
-  }
+  assertLiveMarketCoverage(inputs, candidates, market);
   if (droppedCount > 0) {
     console.warn(`market/blend.ts: marketBoard for ${inputs.season} dropped ${droppedCount} ADP row(s) with an unresolved position.`);
   }

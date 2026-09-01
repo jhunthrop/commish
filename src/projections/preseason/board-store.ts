@@ -92,8 +92,33 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * keeps serving the old, wrong numbers forever. v3 is NOT kept as a second permanent named constant,
  * for the same reason v2 was not: its own stored rows were wrong (at RB/WR/TE) the entire time they
  * existed.
+ *
+ * BUMPED AGAIN TO v5 (live-board plan, Task 4 fix round 2, C1 — a FOURTH occurrence of the identical
+ * unique-key problem, this time from a defect that predates every one of the three bumps above and
+ * therefore contaminates every archive season, not only the live one that surfaced it). C1's own fix
+ * gated `laws/board-reasons.ts`'s `lawReasonsFor` by player position — before it, a law's condition
+ * was evaluated against ANY player regardless of the position it was measured on, so
+ * `rb_age_curve`'s effect (fitted ONLY over RBs) could reach a wide receiver's board row, and a
+ * discovered WR-only candidate could reach an RB's. `blendBoard` reads exactly these "law" reasons
+ * to compute a player's admitted price delta, so a stale, wrongly-attributed law reason moved a
+ * REAL, ALREADY-SHIPPED archive season's stored points, not only a future live one. Measured
+ * directly against 2024 (replay, `as_of` fixed and deterministic — the REPLAY arm this bump exists
+ * for): rebuilding the identical 2024 board pre-fix vs. post-fix moved 45 of 653 players' own
+ * `projectedPoints` (max delta 5.22 pts), which rippled into 128 players' points-only `rank` and 372
+ * players' `valueRank` changing even where their OWN points did not move (a`45→128→372` cascade —
+ * price, then position, then draft-value order, three different-sized populations because each is a
+ * broader ripple of the one before it). `commish_board_v5_ppr_12` is a fresh value with no existing
+ * rows, for the identical structural reason v2/v3/v4 needed one: a REPLAY season's own `as_of` is
+ * DERIVED and DETERMINISTIC (`preseasonMomentFor`), so a rerun under the unchanged v4 name would
+ * collide with `(season, source, as_of)` on every one of the four archive seasons and the corrected
+ * points would never reach the store, exactly as v2 and v3's own re-runs silently kept serving stale
+ * numbers before. The RAW board (`BOARD_SOURCE_V1_RAW`) is UNAFFECTED and was verified as such: a
+ * "law" reason is a descriptive attachment `preseasonCandidates`'s own per-game line never reads,
+ * only `blendBoard` does, so v1's own points are byte-identical before and after C1's fix. v4 is NOT
+ * kept as a second permanent named constant, for the same reason v2/v3 were not: its own stored rows
+ * were wrong (cross-position law contamination) the entire time they existed.
  */
-export const BOARD_SOURCE = "commish_board_v4_ppr_12";
+export const BOARD_SOURCE = "commish_board_v5_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {

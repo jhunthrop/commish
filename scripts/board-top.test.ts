@@ -4,6 +4,7 @@ import { formatBoardTopRow, formatBoardTopTable, type BoardTopRow } from "./boar
 function row(overrides: Partial<BoardTopRow> = {}): BoardTopRow {
   return {
     rank: 1,
+    pointsRank: 3,
     name: "Sample Player",
     position: "WR",
     team: "BUF",
@@ -35,8 +36,21 @@ describe("formatBoardTopRow", () => {
   });
 
   it("prints nothing extra where no law chip fired", () => {
+    // M2 (fix round 2): the earlier version of this assertion was `endsWith(...) || !includes("law")`
+    // -- the second half of that OR is true of every row this formatter can ever produce (no field
+    // ever contains the literal substring "law" outside a real law id), so the assertion passed
+    // whether or not the "nothing extra" behavior actually held. This version checks the ACTUAL
+    // claim directly: with no law ids, the line's trimmed end is exactly the ADP fragment, and no
+    // comma (the law-joining separator) appears anywhere.
     const line = formatBoardTopRow(row({ lawIds: [] }));
-    expect(line.trim().endsWith("adp 12.6") || !line.includes("law")).toBe(true);
+    expect(line.trimEnd().endsWith("adp 12.6")).toBe(true);
+    expect(line).not.toContain(",");
+  });
+
+  it("prints the points-only rank as a secondary column, never as the primary `rank`", () => {
+    const line = formatBoardTopRow(row({ rank: 5, pointsRank: 42 }));
+    expect(line).toContain("5.");
+    expect(line).toContain("pts#42");
   });
 
   it("right-pads the rank to a stable column width across single and multi-digit ranks", () => {

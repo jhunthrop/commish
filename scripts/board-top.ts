@@ -1,5 +1,7 @@
-// Prints the top N of one season's persisted board: rank, name, position, NFL team, blended points,
-// ADP rank and the law chips (registry ids) that fired for him.
+// Prints the top N of one season's persisted board, ordered by DRAFT VALUE (value over
+// replacement) -- the founder-facing ordering, per Task 4 fix round 2's own I3 ruling -- with the
+// points-only rank, name, position, NFL team, blended points, ADP rank and the law chips (registry
+// ids) that fired for him.
 // Run: npm run projections:board:top [season] [n]   (n defaults to 50)
 //
 // READS THE STORE ONLY, the same discipline `preseason-report.ts` holds: this script never builds a
@@ -42,10 +44,24 @@ function parseArgs(argv: readonly string[]): { readonly season: number; readonly
   return { season, n };
 }
 
-/** One row of the printed table — every field the deliverable names: rank, name, position, NFL
- *  team, blended points, ADP rank and the law chips (registry ids) that fired for him. */
+/**
+ * One row of the printed table — every field the deliverable names: rank, name, position, NFL
+ * team, blended points, ADP rank and the law chips (registry ids) that fired for him.
+ *
+ * `rank` IS THE VALUE-OVER-REPLACEMENT RANK (Task 4 fix round 2, I3 ruling), not the points rank —
+ * the founder-facing table leads with the DRAFT-VALUE view, `board.ts`'s own `valueRank`, because
+ * that is the ordering a manager actually drafts by (`decide/replacement.ts`'s own argument: a
+ * quarterback who scores 330 and a back who scores 300 are not a thirty-point gap when the twelfth
+ * quarterback scores 290 and the thirty-first back scores 150 — points alone conflates "who scores
+ * more" with "who is worth more to draft"). The pure points rank — `board.ts`'s own default
+ * ordering, and the one every earlier version of this script printed as `rank` — is kept as
+ * `pointsRank`, a secondary column, so neither view is lost.
+ */
 export interface BoardTopRow {
   readonly rank: number;
+  /** The points-only rank (`board.ts`'s `BoardEntry.rank`) — printed alongside, never as the
+   *  primary sort, per the same ruling. */
+  readonly pointsRank: number;
   readonly name: string;
   /** nflverse's own spelling, straight off the week-one roster row — the raw `string` `preseason/
    *  store.ts`'s `PreseasonRosterRow` already carries, never re-narrowed to the domain `Position`
@@ -62,6 +78,7 @@ export interface BoardTopRow {
 }
 
 const RANK_WIDTH = 4;
+const PTS_RANK_WIDTH = 9;
 const NAME_WIDTH = 24;
 const POSITION_WIDTH = 4;
 const TEAM_WIDTH = 5;
@@ -71,20 +88,37 @@ const ADP_WIDTH = 6;
 /** One printed line — a fixed-width table row, in the house voice (no em dash, ever). */
 export function formatBoardTopRow(row: BoardTopRow): string {
   const rank = `${row.rank}.`.padStart(RANK_WIDTH);
+  const pointsRank = `pts#${row.pointsRank}`.padEnd(PTS_RANK_WIDTH);
   const name = row.name.padEnd(NAME_WIDTH);
   const position = row.position.padEnd(POSITION_WIDTH);
   const team = row.team.padEnd(TEAM_WIDTH);
   const points = `${row.projectedPoints.toFixed(1)} pts`.padStart(POINTS_WIDTH + 4);
   const adp = `adp ${row.adpRank === null ? "n/a" : row.adpRank.toFixed(1)}`.padEnd(ADP_WIDTH + 4);
   const laws = row.lawIds.length === 0 ? "" : `  ${row.lawIds.join(", ")}`;
-  return `${rank} ${name} ${position} ${team} ${points}  ${adp}${laws}`;
+  return `${rank} ${pointsRank} ${name} ${position} ${team} ${points}  ${adp}${laws}`;
 }
 
-const HEADER = `${"rank".padStart(RANK_WIDTH)} ${"name".padEnd(NAME_WIDTH)} ${"pos".padEnd(POSITION_WIDTH)} ${"team".padEnd(TEAM_WIDTH)} ${"points".padStart(POINTS_WIDTH + 4)}  ${"adp".padEnd(ADP_WIDTH + 4)}laws`;
+const HEADER = `${"rank".padStart(RANK_WIDTH)} ${"ptsRank".padEnd(PTS_RANK_WIDTH)} ${"name".padEnd(NAME_WIDTH)} ${"pos".padEnd(POSITION_WIDTH)} ${"team".padEnd(TEAM_WIDTH)} ${"points".padStart(POINTS_WIDTH + 4)}  ${"adp".padEnd(ADP_WIDTH + 4)}laws`;
 
 /** The whole printed table: one header line, then one line per row, in the order given. */
 export function formatBoardTopTable(rows: readonly BoardTopRow[]): string {
   return [HEADER, ...rows.map(formatBoardTopRow)].join("\n");
+}
+
+/**
+ * A SENTINEL ERROR CLASS (Task 4 fix round 2, M1) for the one throw below that is a DEFENSIVE
+ * assertion rather than an ordinary, expected failure (a missing season, a bad CLI argument): a
+ * player on the persisted board with no matching roster row should be structurally unreachable,
+ * because `preseasonCandidates` (`preseason/source.ts`) can only ever emit a candidate for a
+ * playerId it read off THAT SAME roster in the first place. Naming the class lets a caller (or a
+ * future test) distinguish "the store is internally inconsistent" from every other `Error` this
+ * script can throw, rather than matching on message text alone.
+ */
+export class BoardRosterMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BoardRosterMismatchError";
+  }
 }
 
 async function main(): Promise<void> {
@@ -110,14 +144,25 @@ async function main(): Promise<void> {
   const positionOf = new Map(roster.map((row) => [row.playerId, row.position] as const));
   const adpRankOf = new Map(adp.map((row) => [row.playerId, row.rank] as const));
 
-  const top = [...projections].sort((a, b) => a.rank - b.rank).slice(0, n);
+  // I3 ruling: PRIMARY ordering is `valueRank` (the draft-value view), never `rank` (the pure
+  // points rank) — see `BoardTopRow`'s own docblock for the argument. `rank` still prints, as
+  // `pointsRank`, a column rather than the sort.
+  const top = [...projections].sort((a, b) => a.valueRank - b.valueRank).slice(0, n);
   const rows: BoardTopRow[] = top.map((entry) => {
     const position = positionOf.get(entry.playerId);
     if (position === undefined) {
-      throw new Error(`${entry.playerId} is on the persisted ${season} board but not on its week-one roster snapshot.`);
+      // M3: softened from an earlier version's flat assertion that this "is" the state found —
+      // this should be UNREACHABLE (see `BoardRosterMismatchError`'s own docblock for why), and the
+      // wording says so rather than describing a normal, expected case.
+      throw new BoardRosterMismatchError(
+        `${entry.playerId} is on the persisted ${season} board with no matching week-one roster row. ` +
+          "This should be unreachable -- every candidate on the board was built FROM that same roster " +
+          "-- so if it fires, the store's own board and roster snapshots have drifted apart.",
+      );
     }
     return {
-      rank: entry.rank,
+      rank: entry.valueRank,
+      pointsRank: entry.rank,
       name: nameOf.get(entry.playerId) ?? entry.playerId,
       position,
       team: teamOf.get(entry.playerId) ?? "n/a",

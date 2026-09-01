@@ -138,6 +138,51 @@ async function persistBoard(
   return { board, written, reasonsWritten };
 }
 
+/**
+ * ONE SEASON, BOTH BOARDS — extracted out of `main`'s loop body (Task 4 fix round 2, I5) so the
+ * ORDERING GUARANTEE below is a unit anyone can call and test, not an implicit property of two
+ * lines sitting in a particular order inside a `for` loop.
+ *
+ * THE BLENDED BOARD IS BUILT AND WRITTEN FIRST, DELIBERATELY — the review's own finding: the
+ * degeneracy guard (`market/blend.ts`'s `assertLiveMarketCoverage`) lives inside
+ * `shippedPreseasonCandidates`'s `raw: false` path, so it can only ever fire while building the
+ * BLENDED board. Before this fix, `main`'s loop built and WROTE v1 (raw) first, then built the
+ * blend second — so a degenerate live market let v1's 759 rows land in `preseason_projections`
+ * before the guard ever got a chance to run, leaving a raw board on record for a season that was
+ * about to be refused outright. Calling the blended `persistBoard` first means the guard's own
+ * `throw` (if it fires) propagates out of THIS function before the v1 call below is ever reached —
+ * no `try`/`catch`, no flag, just call order, which is the whole point: the ordering IS the
+ * guarantee, not a workaround around a guard that fires too late.
+ */
+export async function persistSeason(
+  db: Db,
+  season: number,
+  clock: Clock,
+  names: ReadonlyMap<string, string>,
+): Promise<void> {
+  const boardMoment = await boardMomentFor(db, season, clock);
+  const inputs = await loadPreseason(db, season, { boardMoment });
+  console.log(`${season}  moment kind: ${boardMoment.kind}  taken at ${inputs.moment.toISOString()}`);
+
+  const blended = await persistBoard(db, inputs, BOARD_SOURCE, false);
+  console.log(
+    `${season}  [blend, ${BOARD_SOURCE}]  ${String(blended.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
+      `${String(blended.written).padStart(4)} new projection rows  ${String(blended.reasonsWritten).padStart(4)} reason rows written`,
+  );
+  for (const entry of blended.board.slice(0, 5)) {
+    console.log(
+      `      ${String(entry.rank).padStart(3)} ${entry.position} ${(names.get(entry.playerId) ?? entry.playerId).padEnd(22)}` +
+        `proj ${entry.projectedPoints.toFixed(0).padStart(4)}  ${entry.position}${entry.positionRank}`,
+    );
+  }
+
+  const v1 = await persistBoard(db, inputs, BOARD_SOURCE_V1_RAW, true);
+  console.log(
+    `${season}  [v1 raw, ${BOARD_SOURCE_V1_RAW}]  ${String(v1.board.length).padStart(4)} players  ` +
+      `${String(v1.written).padStart(4)} new projection rows  ${String(v1.reasonsWritten).padStart(4)} reason rows written`,
+  );
+}
+
 async function main(): Promise<void> {
   const db = createDb(requireEnv("DATABASE_URL"));
   const names = new Map(
@@ -145,35 +190,19 @@ async function main(): Promise<void> {
   );
 
   for (const season of TARGET_SEASONS) {
-    const boardMoment = await boardMomentFor(db, season, SYSTEM_CLOCK);
-    const inputs = await loadPreseason(db, season, { boardMoment });
-    console.log(`${season}  moment kind: ${boardMoment.kind}  taken at ${inputs.moment.toISOString()}`);
-
-    const v1 = await persistBoard(db, inputs, BOARD_SOURCE_V1_RAW, true);
-    console.log(
-      `${season}  [v1 raw, ${BOARD_SOURCE_V1_RAW}]  ${String(v1.board.length).padStart(4)} players  ` +
-        `${String(v1.written).padStart(4)} new projection rows  ${String(v1.reasonsWritten).padStart(4)} reason rows written`,
-    );
-
-    const blended = await persistBoard(db, inputs, BOARD_SOURCE, false);
-    console.log(
-      `${season}  [blend, ${BOARD_SOURCE}]  ${String(blended.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
-        `${String(blended.written).padStart(4)} new projection rows  ${String(blended.reasonsWritten).padStart(4)} reason rows written`,
-    );
-    for (const entry of blended.board.slice(0, 5)) {
-      console.log(
-        `      ${String(entry.rank).padStart(3)} ${entry.position} ${(names.get(entry.playerId) ?? entry.playerId).padEnd(22)}` +
-          `proj ${entry.projectedPoints.toFixed(0).padStart(4)}  ${entry.position}${entry.positionRank}`,
-      );
-    }
+    await persistSeason(db, season, SYSTEM_CLOCK, names);
   }
 
   await db.$client.end();
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error: unknown) => {
-    console.error(error);
-    process.exit(1);
-  });
+// Runs `main` only when this file is the process entry point, never when a test imports
+// `persistSeason` — the identical guard `scripts/board-top.ts` carries for the identical reason.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main()
+    .then(() => process.exit(0))
+    .catch((error: unknown) => {
+      console.error(error);
+      process.exit(1);
+    });
+}
