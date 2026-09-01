@@ -15,17 +15,28 @@
 import { writeFileSync } from "node:fs";
 import { createDb, type Db } from "@/db/client";
 import { nflPlayers } from "@/db/schema";
-import type { Position } from "@/domain/player";
+import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
+import { PPR_SCORING } from "@/domain/scoring";
+import { computeFantasyPoints } from "@/scoring/compute";
 import { statLinesAsOf, type SeasonStatLine } from "@/projections/lines";
-import { RATES, TOUCHDOWN_RATES, type EfficiencyPriors, type RateName } from "@/projections/model/efficiency";
-import { fitEfficiencyPriors, fitOpportunityPriors } from "@/projections/model/fit";
+import { composeStatLine } from "@/projections/model/compose";
+import { experienceCohort, RATES, TOUCHDOWN_RATES, type EfficiencyPriors, type RateName } from "@/projections/model/efficiency";
+import {
+  fitEfficiencyPriors,
+  fitExperienceMultiplier,
+  fitOpportunityPriors,
+  fitShareShrinkageForPosition,
+  type ExperienceObservation,
+} from "@/projections/model/fit";
 import { fitLinePriors, type LinePriors } from "@/projections/model/line-fit";
+import type { OpportunityShrinkage } from "@/projections/model/opportunity";
 import { fitSchemePriors, type SchemePriors } from "@/projections/model/scheme-fit";
 import { fitRedistributionPriors, type RedistributionPriors } from "@/projections/model/redistribution-fit";
 import { fitGameContextPriors, type GameContextPriors } from "@/projections/model/context-fit";
 import { fitRedZonePriors, type RedZoneFitReport } from "@/projections/model/red-zone-fit";
 import { fitTargetDepthPriors, type TargetDepthFitReport } from "@/projections/model/target-depth-fit";
 import { fitNewsPriors, type NewsFitReport } from "@/projections/model/news-fit";
+import { firstRosterSeasonsThrough } from "@/projections/preseason/store";
 import { observationsAsOf, type PlayerWeekObservation } from "@/projections/store";
 import { INJURY_SOURCE } from "@/projections/news/retrieve";
 import { projectedPosition } from "@/projections/nflverse/players";
@@ -43,6 +54,23 @@ const HISTORY_SEASONS = [2020] as const;
 const FIT_SEASONS = [2021, 2022] as const;
 /** Never seen by any fit. Both of them, so a result can be checked on two independent seasons. */
 const HELD_OUT_SEASONS = [2023, 2024] as const;
+
+/**
+ * TASK 5's ACCEPTANCE DECISIONS — read `npm run projections:calibrate`'s before/after table, then
+ * edit these two lists to match, before running `npm run projections:fit`. A position measured but
+ * absent from its list is a recorded negative result (`task-5-report.md`), never a silent drop: the
+ * measured number still prints in `fitted.ts`'s provenance docblock either way.
+ *
+ * BOTH EMPTY, having run the real calibration report (2026-08-31, see task-5-report.md): the
+ * WR/TE share-shrinkage search landed on exactly the pooled-optimal shrinkage for both positions
+ * (season 2, inSeason 0.25 — byte-identical to the base, a null result by construction), and the
+ * years-4-6 experience multiplier came back within 3% of neutral for all four skill positions and
+ * DEGRADED WR's own starter band on the validation fold (-0.0032), the diagnosis's own named target.
+ * Neither fix earned its place; both are reverted here rather than shipped on the strength of the
+ * fit alone.
+ */
+const ACCEPTED_SHARE_SHRINKAGE_POSITIONS: readonly Position[] = [];
+const ACCEPTED_EXPERIENCE_POSITIONS: readonly Position[] = [];
 
 /**
  * Fitting reads FINAL, corrected numbers deliberately — the same choice `backtest.ts` makes for
@@ -109,6 +137,96 @@ async function contextForSeasons(db: Db, seasons: readonly number[]): Promise<Te
     teamObservations.push(...(await teamObservationsAsOf(db, span)));
   }
   return { playerTeams, teamObservations };
+}
+
+const SKILL_POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE"];
+
+/**
+ * ONE PLAYER-SEASON'S EXPERIENCE OBSERVATION — real touches, real outcome, and what an
+ * experience-blind version of the just-fitted rates would have scored him for over the same touches.
+ *
+ * Season totals rather than per-week joins, following `seasonPointsAgreement`'s own precedent
+ * (Task 2): the ratio this fit needs is a totals ratio, and totals commute with summing week by
+ * week, so there is nothing per-week evidence would add here that a season sum does not already
+ * carry more simply.
+ */
+function experienceObservations(
+  usage: readonly PlayerWeekUsage[],
+  history: readonly SeasonStatLine[],
+  positions: ReadonlyMap<string, Position>,
+  firstRosterSeason: ReadonlyMap<string, number>,
+  efficiency: EfficiencyPriors,
+  seasons: readonly number[],
+): readonly ExperienceObservation[] {
+  const allowed = new Set(seasons);
+  const zeroLine = Object.fromEntries(STAT_FIELDS.map((field) => [field, 0])) as Omit<StatLine, "playerId" | "week">;
+
+  const volume = new Map<string, { targets: number; carries: number; passAttempts: number }>();
+  for (const row of usage) {
+    if (!allowed.has(row.season)) continue;
+    const key = `${row.season}|${row.playerId}`;
+    const cell = volume.get(key) ?? { targets: 0, carries: 0, passAttempts: 0 };
+    cell.targets += row.targets;
+    cell.carries += row.carries;
+    cell.passAttempts += row.passAttempts;
+    volume.set(key, cell);
+  }
+
+  const outcome = new Map<string, Omit<StatLine, "playerId" | "week">>();
+  for (const row of history) {
+    if (!allowed.has(row.season)) continue;
+    const key = `${row.season}|${row.line.playerId}`;
+    const cell = outcome.get(key) ?? { ...zeroLine };
+    outcome.set(key, Object.fromEntries(STAT_FIELDS.map((field) => [field, cell[field] + row.line[field]])) as Omit<StatLine, "playerId" | "week">);
+  }
+
+  // A minimum touch floor, matching `MIN_OPPORTUNITIES_FOR_SPREAD`'s own spirit (fit.ts): a
+  // player-season with a handful of touches is almost entirely sampling noise and would inflate the
+  // apparent spread the fit is trying to measure, not inform it.
+  const MIN_SEASON_TOUCHES = 20;
+
+  const observations: ExperienceObservation[] = [];
+  for (const [key, touches] of volume) {
+    const [seasonText, playerId] = key.split("|") as [string, string];
+    const season = Number(seasonText);
+    const totalTouches = touches.targets + touches.carries + touches.passAttempts;
+    if (totalTouches < MIN_SEASON_TOUCHES) continue;
+    const position = positions.get(playerId);
+    if (position === undefined || !SKILL_POSITIONS.includes(position)) continue;
+    const rates = efficiency.byPosition[position];
+    if (rates === undefined) continue;
+    const realized = outcome.get(key) ?? zeroLine;
+
+    const actualPoints = computeFantasyPoints({ playerId, week: 0, ...realized }, position, PPR_SCORING);
+    // `targetShare`/`carryShare`/`passAttemptShare` set to 1 and `teamTargets`/`teamCarries`/
+    // `teamPassAttempts` set to the player's REAL season touches makes `predictedVolume` return
+    // exactly those touches back out — the trick that lets `composeStatLine` be reused here instead
+    // of duplicating its arithmetic.
+    const populationLine = composeStatLine(
+      playerId,
+      0,
+      {
+        playerId,
+        snapShare: 0,
+        targetShare: 1,
+        carryShare: 1,
+        passAttemptShare: 1,
+        teamTargets: touches.targets,
+        teamCarries: touches.carries,
+        teamPassAttempts: touches.passAttempts,
+      },
+      rates,
+    );
+    const populationPoints = computeFantasyPoints(populationLine, position, PPR_SCORING);
+
+    observations.push({
+      position,
+      cohort: experienceCohort(season, firstRosterSeason.get(playerId) ?? null),
+      actualPoints,
+      populationPoints,
+    });
+  }
+  return observations;
 }
 
 function renderLine(line: LinePriors): string {
@@ -195,7 +313,46 @@ ${volume("passAttempts", scheme.passAttempts)}
 `;
 }
 
-function renderEfficiency(efficiency: EfficiencyPriors): string {
+/**
+ * TASK 5 — the years-4-6 experience term, gated by the calibration report's before/after starter-band
+ * scorecard (`npm run projections:calibrate`) rather than shipped on the strength of the fit alone.
+ *
+ * `measured` carries EVERY position the fit found a cohort for, `kept` carries only the ones the
+ * calibration report confirmed improve the target cohort without degrading the others on the
+ * validation fold (predictor 2021, outcome 2022). A position measured and not kept is a recorded
+ * negative result, not a bug — its number is still printed here so the decision is checkable.
+ */
+function renderExperienceMultiplier(measured: Readonly<Partial<Record<Position, number>>>, kept: ReadonlySet<Position>): string {
+  const lines = SKILL_POSITIONS.map((position) => {
+    const value = measured[position];
+    const status = value === undefined ? "no cohort measured" : kept.has(position) ? "KEPT" : "measured, NOT kept — see task-5-report.md";
+    return `   *   ${position.padEnd(2)} ${value === undefined ? " n/a  " : value.toFixed(4).padStart(6)}  (${status})`;
+  });
+  const entries = SKILL_POSITIONS.filter((position) => kept.has(position) && measured[position] !== undefined)
+    .map((position) => `    ${position}: ${measured[position]!.toFixed(6)},`)
+    .join("\n");
+  return `  /**
+   * TASK 5 — the years-4-6 experience term, fitted on FIT_SEASONS (2021, 2022) as a ratio of
+   * totals: actual points over what the position's experience-blind rates (this same object,
+   * before the term existed) would have scored, given the player's real season touches. Measured
+   * for every skill position; kept only where \`npm run projections:calibrate\` confirmed the
+   * target cohort improves without degrading the others on the validation fold (predictor 2021,
+   * outcome 2022). See \`docs/research/2026-08-31-prediction-laws-closeout.md\` for the diagnosis
+   * and \`task-5-report.md\` for the acceptance table.
+   *
+${lines.join("\n")}
+   */${
+     kept.size === 0
+       ? ""
+       : `
+  experienceMultiplier: {
+${entries}
+  },`
+   }
+`;
+}
+
+function renderEfficiency(efficiency: EfficiencyPriors, experience: Readonly<Partial<Record<Position, number>>>, kept: ReadonlySet<Position>): string {
   const names = Object.keys(RATES) as RateName[];
   const row = (position: string) =>
     `    ${position}: {\n${names
@@ -213,7 +370,7 @@ ${["QB", "RB", "WR", "TE", "K", "DEF"].map(row).join("\n")}
   regression: {
 ${names.map((name) => `    ${name}: ${efficiency.regression[name].toFixed(2)},`).join("\n")}
   },
-};
+${renderExperienceMultiplier(experience, kept)}};
 `;
 }
 
@@ -314,6 +471,46 @@ ${["QB", "RB", "WR", "TE", "K", "DEF"].map(depth).join("\n")}
 `;
 }
 
+/** TASK 5's WR/TE share-shrinkage measurement, one entry per position the fit was asked to cover. */
+export interface ShareShrinkageMeasurement {
+  readonly position: Position;
+  readonly shrinkage: OpportunityShrinkage;
+  readonly kept: boolean;
+}
+
+function renderShareShrinkageByPosition(measurements: readonly ShareShrinkageMeasurement[]): string {
+  const kept = measurements.filter((measurement) => measurement.kept);
+  const status = measurements
+    .map((measurement) => `   *   ${measurement.position} season ${measurement.shrinkage.season}, inSeason ${measurement.shrinkage.inSeason} (${measurement.kept ? "KEPT" : "measured, NOT kept — see task-5-report.md"})`)
+    .join("\n");
+  if (kept.length === 0) {
+    return `  /**
+   * TASK 5 — WR/TE share-shrinkage recalibration, measured on FIT_SEASONS (2021, 2022) and NOT
+   * kept: \`npm run projections:calibrate\` did not confirm an improvement without degrading other
+   * positions on the validation fold (predictor 2021, outcome 2022). Recorded here as a negative
+   * result rather than silently dropped — see \`task-5-report.md\`.
+${status}
+   */\n`;
+  }
+  const entries = kept
+    .map((measurement) => `    ${measurement.position}: { season: ${measurement.shrinkage.season}, inSeason: ${measurement.shrinkage.inSeason} },`)
+    .join("\n");
+  return `  /**
+   * TASK 5 — WR/TE share-shrinkage recalibration. \`fitOpportunityPriors\`'s own grid search chooses
+   * one \`shrinkage\` shared by every position, minimising the POOLED error; this is the same search
+   * over the same grids and the same fit window (FIT_SEASONS, 2021-2022 only), run again per
+   * position and kept only where \`npm run projections:calibrate\` confirmed the starter band
+   * improves on the validation fold (predictor 2021, outcome 2022) without degrading the other
+   * positions. See \`docs/research/2026-08-31-prediction-laws-closeout.md\` for the diagnosis and
+   * \`task-5-report.md\` for the acceptance table.
+${status}
+   */
+  shareShrinkageByPosition: {
+${entries}
+  },
+`;
+}
+
 function render(
   fit: ReturnType<typeof fitOpportunityPriors>,
   efficiency: EfficiencyPriors,
@@ -325,6 +522,9 @@ function render(
   targetDepth: TargetDepthFitReport,
   news: NewsFitReport,
   generatedFrom: readonly number[],
+  shareShrinkage: readonly ShareShrinkageMeasurement[],
+  experienceMultiplier: Readonly<Partial<Record<Position, number>>>,
+  experienceKept: ReadonlySet<Position>,
 ): string {
   const { priors } = fit;
   const role = (position: string) => {
@@ -368,9 +568,9 @@ ${["QB", "RB", "WR", "TE", "K", "DEF"].map(role).join("\n")}
   },
   shrinkage: { season: ${priors.shrinkage.season}, inSeason: ${priors.shrinkage.inSeason}, teamVolume: ${priors.shrinkage.teamVolume} },
   leagueTeamVolume: { targets: ${priors.leagueTeamVolume.targets.toFixed(4)}, carries: ${priors.leagueTeamVolume.carries.toFixed(4)}, passAttempts: ${priors.leagueTeamVolume.passAttempts.toFixed(4)} },
-};
+${renderShareShrinkageByPosition(shareShrinkage)}};
 
-${renderEfficiency(efficiency)}
+${renderEfficiency(efficiency, experienceMultiplier, experienceKept)}
 ${renderLine(line)}
 ${renderScheme(scheme)}
 ${renderRedistribution(redistribution)}
@@ -413,6 +613,29 @@ async function main(): Promise<void> {
     console.log(
       `  ${name.padEnd(30)} ${efficiency.regression[name].toFixed(1).padStart(9)}${touchdown ? "   <- touchdown rate" : ""}${ceiling ? "   (no measurable spread between players, regressed entirely to role)" : ""}`,
     );
+  }
+
+  // TASK 5 — WR/TE share-shrinkage recalibration, on the same FIT_SEASONS window as everything else.
+  console.log(`\nshare shrinkage per position, fitted on ${FIT_SEASONS.join(", ")} (base: season ${fit.priors.shrinkage.season}, inSeason ${fit.priors.shrinkage.inSeason}):`);
+  const shareShrinkageInput = { usage, positions, seasons: [...FIT_SEASONS], heldOut: [...HELD_OUT_SEASONS] };
+  const shareShrinkage: ShareShrinkageMeasurement[] = (["WR", "TE"] as const).map((position) => {
+    const shrinkage = fitShareShrinkageForPosition(shareShrinkageInput, position, fit.priors);
+    const kept = ACCEPTED_SHARE_SHRINKAGE_POSITIONS.includes(position);
+    console.log(`  ${position}  season ${shrinkage.season}, inSeason ${shrinkage.inSeason}  (${kept ? "KEPT" : "measured, not kept"})`);
+    return { position, shrinkage, kept };
+  });
+
+  // TASK 5 — the years-4-6 experience term on layer 2's per-game rate priors.
+  const firstRosterSeason = await firstRosterSeasonsThrough(db, Math.max(...FIT_SEASONS));
+  const experienceObs = experienceObservations(usage, history, positions, firstRosterSeason, efficiency, [...FIT_SEASONS]);
+  const experienceMultiplier = fitExperienceMultiplier(experienceObs);
+  console.log(`\nyears-4-6 experience multiplier, fitted on ${FIT_SEASONS.join(", ")} (${experienceObs.length} player-seasons of evidence):`);
+  const experienceKept = new Set<Position>();
+  for (const position of SKILL_POSITIONS) {
+    const value = experienceMultiplier[position];
+    const kept = value !== undefined && ACCEPTED_EXPERIENCE_POSITIONS.includes(position);
+    if (kept) experienceKept.add(position);
+    console.log(`  ${position}  ${value === undefined ? "no cohort measured" : `x${value.toFixed(4)}`}  (${value === undefined ? "n/a" : kept ? "KEPT" : "measured, not kept"})`);
   }
 
   const context = await contextForSeasons(db, [...HISTORY_SEASONS, ...FIT_SEASONS]);
@@ -518,7 +741,21 @@ async function main(): Promise<void> {
 
   writeFileSync(
     OUTPUT,
-    render(fit, efficiency, linePriors, schemePriors, redistributionPriors, gameContextPriors, redZone, targetDepth, news, FIT_SEASONS),
+    render(
+      fit,
+      efficiency,
+      linePriors,
+      schemePriors,
+      redistributionPriors,
+      gameContextPriors,
+      redZone,
+      targetDepth,
+      news,
+      FIT_SEASONS,
+      shareShrinkage,
+      experienceMultiplier,
+      experienceKept,
+    ),
   );
   console.log(`\nwrote ${OUTPUT}`);
 

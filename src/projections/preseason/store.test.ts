@@ -4,6 +4,7 @@ import { nflPlayers } from "@/db/schema";
 import { recordNflPlayers } from "../universe";
 import { week1RosterAsOf, type PreseasonRosterEntry } from "../nflverse/rosters";
 import {
+  firstRosterSeasonsThrough,
   preseasonRankingsAsOf,
   preseasonRostersAsOf,
   recordPreseasonRankings,
@@ -147,5 +148,41 @@ describe("the foreign key to the historical universe", () => {
   it("refuses a player the universe does not hold, rather than orphaning a row", async () => {
     await expect(recordPreseasonRosters(db, [entry({ playerId: "00-9999999" })])).rejects.toThrow();
     void nflPlayers;
+  });
+});
+
+describe("firstRosterSeasonsThrough", () => {
+  it("returns the earliest season a player has a stamped row", async () => {
+    await recordPreseasonRosters(db, [
+      entry({ playerId: "00-0034857", season: 2018, asOf: week1RosterAsOf(2018) }),
+      entry({ playerId: "00-0034857", season: 2020, asOf: week1RosterAsOf(2020) }),
+      entry({ playerId: "00-0034857", season: 2024, asOf: CUTDOWN_2024 }),
+    ]);
+    const firstSeasons = await firstRosterSeasonsThrough(db, 2024);
+    expect(firstSeasons.get("00-0034857")).toBe(2018);
+  });
+
+  it("is bounded by the season asked for, never reading a later row into an earlier answer", async () => {
+    await recordPreseasonRosters(db, [
+      entry({ playerId: "00-0034857", season: 2020, asOf: week1RosterAsOf(2020) }),
+      entry({ playerId: "00-0034857", season: 2024, asOf: CUTDOWN_2024 }),
+    ]);
+    expect((await firstRosterSeasonsThrough(db, 2021)).get("00-0034857")).toBe(2020);
+    expect((await firstRosterSeasonsThrough(db, 2019)).get("00-0034857")).toBeUndefined();
+  });
+
+  it("is silent about a player with no roster row at all", async () => {
+    const firstSeasons = await firstRosterSeasonsThrough(db, 2024);
+    expect(firstSeasons.has("00-0036358")).toBe(false);
+  });
+
+  it("keeps players independent", async () => {
+    await recordPreseasonRosters(db, [
+      entry({ playerId: "00-0034857", season: 2018, asOf: week1RosterAsOf(2018) }),
+      entry({ playerId: "00-0036358", season: 2020, team: "DAL", position: "WR", asOf: week1RosterAsOf(2020) }),
+    ]);
+    const firstSeasons = await firstRosterSeasonsThrough(db, 2024);
+    expect(firstSeasons.get("00-0034857")).toBe(2018);
+    expect(firstSeasons.get("00-0036358")).toBe(2020);
   });
 });

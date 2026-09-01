@@ -2,8 +2,8 @@ import type { Position, StatLine } from "@/domain/player";
 import type { SeasonStatLine } from "../lines";
 import { meanAbsoluteError, rootMeanSquaredError, spearman, type Observation } from "../metrics";
 import type { PlayerWeekUsage } from "../usage";
-import { RATES, type EfficiencyPriors, type RateName } from "./efficiency";
-import { lastObservedPriors, predictOpportunity, type OpportunityPriors, type RolePrior } from "./opportunity";
+import { experienceCohort, RATES, type EfficiencyPriors, type RateName } from "./efficiency";
+import { lastObservedPriors, predictOpportunity, type OpportunityPriors, type OpportunityShrinkage, type RolePrior } from "./opportunity";
 
 /**
  * FITTING — where every number in the model comes from, and the one place the held-out discipline
@@ -275,6 +275,50 @@ export function fitOpportunityPriors(input: FitInput): OpportunityFit {
 }
 
 /**
+ * `opportunityObservations`, narrowed to one position — the instrument the WR/TE share-shrinkage
+ * refit is scored against.
+ *
+ * Filtering `input.positions` down to one position before replaying is enough: `predictOpportunity`
+ * already skips any player its `positions` map does not resolve, and `opportunityObservations` only
+ * ever matches an actual row against a prediction that survived that filter — so a player of any
+ * other position simply produces no observation, without either function needing to know why.
+ */
+export function opportunityObservationsForPosition(input: FitInput, priors: OpportunityPriors, position: Position): readonly Observation[] {
+  const narrowed: FitInput = { ...input, positions: new Map([...input.positions].filter(([, value]) => value === position)) };
+  return opportunityObservations(narrowed, priors);
+}
+
+/**
+ * ONE POSITION'S OWN SHARE SHRINKAGE — the WR/TE starter-band recalibration.
+ *
+ * `fitOpportunityPriors`'s grid search chooses `season`/`inSeason` to minimise the POOLED error
+ * across every position at once; a position whose own error surface has a different minimum is
+ * masked by that pooling. This is the same search, over the same grids and the same fit window, run
+ * again with the objective narrowed to one position — `recencyDecay` and `teamVolume` are held at
+ * `basePriors`' already-fitted values rather than re-searched, because decay is a property of how
+ * fast a role changes in-season, not of which position is being scored, and re-searching it here
+ * would be hunting for a second explanation of the same signal `fitOpportunityPriors` already spent.
+ *
+ * Never widens past `basePriors`' own fit window — `opportunityObservationsForPosition` replays
+ * exactly `input.seasons`, and `fitted.ts`'s provenance docblock states which seasons those were.
+ */
+export function fitShareShrinkageForPosition(input: FitInput, position: Position, basePriors: OpportunityPriors): OpportunityShrinkage {
+  let best: OpportunityShrinkage = basePriors.shrinkage;
+  let bestError = Number.POSITIVE_INFINITY;
+  for (const season of SEASON_SHRINKAGE_GRID) {
+    for (const inSeason of IN_SEASON_SHRINKAGE_GRID) {
+      const candidate: OpportunityPriors = { ...basePriors, shrinkage: { season, inSeason, teamVolume: basePriors.shrinkage.teamVolume } };
+      const error = rootMeanSquaredError(opportunityObservationsForPosition(input, candidate, position)) ?? Number.POSITIVE_INFINITY;
+      if (error < bestError) {
+        bestError = error;
+        best = candidate.shrinkage;
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * THE EFFICIENCY FIT — position mean rates, and how many opportunities of prior each rate is worth.
  *
  * A VARIANCE RATIO rather than a grid search, and the reason is specific rather than stylistic.
@@ -440,4 +484,54 @@ export function fitEfficiencyPriors(input: EfficiencyFitInput): EfficiencyPriors
     byPosition,
     regression: Object.fromEntries(names.map((name) => [name, fitRegressionConstant(input, name)])) as Record<RateName, number>,
   };
+}
+
+/**
+ * THE YEARS-4-6 EXPERIENCE TERM — what one player-season contributes to the fit.
+ *
+ * `populationPoints` is deliberately NOT "what the model projected him for" — it is what an
+ * EXPERIENCE-BLIND version of layer 2's own fitted rates (`byPosition`, before this term exists)
+ * would have scored him for, given the touches he ACTUALLY got that season. Holding opportunity at
+ * its real, observed value isolates the rate layer's own miscalibration for this cohort from
+ * everything layer 1 might separately be getting wrong about how much he played — the two are
+ * different defects with different fixes, and conflating them would let a bad experience term hide
+ * behind a good (or bad) opportunity one, or the reverse.
+ */
+export interface ExperienceObservation {
+  readonly position: Position;
+  readonly cohort: ReturnType<typeof experienceCohort>;
+  /** What he actually scored, under the league's own rules, over the season. */
+  readonly actualPoints: number;
+  /** What the position's experience-blind rates would have scored him, given his real touches. */
+  readonly populationPoints: number;
+}
+
+/**
+ * ONE MULTIPLIER PER POSITION, as a ratio of totals — actual points over what the position's own
+ * experience-blind rates predicted, pooled over every player-season in the cohort.
+ *
+ * A ratio of totals rather than a mean of per-player ratios, matching `preseason/career.ts`'s own
+ * `fitCareerPriors` and for the same reason: a mean of ratios lets a player with a handful of points
+ * and a near-zero population estimate swing the number on his own, and the totals-ratio instead asks
+ * the question a rate layer is actually judged on — did this cohort's actual production match what
+ * an experience-blind model predicted for the touches it actually got.
+ *
+ * A position absent from the observations, or whose population total is zero, is OMITTED rather
+ * than defaulted to `1` — `experienceMultiplierFor` already treats an absent position as a no-op, so
+ * there is nothing this function needs to assert about a position it measured nothing for.
+ */
+export function fitExperienceMultiplier(observations: readonly ExperienceObservation[]): Readonly<Partial<Record<Position, number>>> {
+  const totals = new Map<Position, { actual: number; population: number }>();
+  for (const observation of observations) {
+    if (observation.cohort !== "year4to6") continue;
+    const cell = totals.get(observation.position) ?? { actual: 0, population: 0 };
+    cell.actual += observation.actualPoints;
+    cell.population += observation.populationPoints;
+    totals.set(observation.position, cell);
+  }
+  const result: Partial<Record<Position, number>> = {};
+  for (const [position, cell] of totals) {
+    if (cell.population > 0) result[position] = cell.actual / cell.population;
+  }
+  return result;
 }

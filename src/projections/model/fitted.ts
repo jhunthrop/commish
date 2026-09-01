@@ -40,6 +40,14 @@ export const FITTED_OPPORTUNITY_PRIORS: OpportunityPriors = {
   },
   shrinkage: { season: 2, inSeason: 0.25, teamVolume: 4 },
   leagueTeamVolume: { targets: 32.5891, carries: 26.9490, passAttempts: 33.8970 },
+  /**
+   * TASK 5 — WR/TE share-shrinkage recalibration, measured on FIT_SEASONS (2021, 2022) and NOT
+   * kept: `npm run projections:calibrate` did not confirm an improvement without degrading other
+   * positions on the validation fold (predictor 2021, outcome 2022). Recorded here as a negative
+   * result rather than silently dropped — see `task-5-report.md`.
+   *   WR season 2, inSeason 0.25 (measured, NOT kept — see task-5-report.md)
+   *   TE season 2, inSeason 0.25 (measured, NOT kept — see task-5-report.md)
+   */
 };
 
 export const FITTED_EFFICIENCY_PRIORS: EfficiencyPriors = {
@@ -127,6 +135,20 @@ export const FITTED_EFFICIENCY_PRIORS: EfficiencyPriors = {
     interceptionsPerAttempt: 1103.93,
     fumblesLostPerPlay: 10000.00,
   },
+  /**
+   * TASK 5 — the years-4-6 experience term, fitted on FIT_SEASONS (2021, 2022) as a ratio of
+   * totals: actual points over what the position's experience-blind rates (this same object,
+   * before the term existed) would have scored, given the player's real season touches. Measured
+   * for every skill position; kept only where `npm run projections:calibrate` confirmed the
+   * target cohort improves without degrading the others on the validation fold (predictor 2021,
+   * outcome 2022). See `docs/research/2026-08-31-prediction-laws-closeout.md` for the diagnosis
+   * and `task-5-report.md` for the acceptance table.
+   *
+   *   QB 1.0023  (measured, NOT kept — see task-5-report.md)
+   *   RB 1.0289  (measured, NOT kept — see task-5-report.md)
+   *   WR 0.9954  (measured, NOT kept — see task-5-report.md)
+   *   TE 1.0020  (measured, NOT kept — see task-5-report.md)
+   */
 };
 
 /**
@@ -163,9 +185,9 @@ export const FITTED_SCHEME_PRIORS: SchemePriors = {
     passRate: 0.551676,
     passRateOverExpected: -1.739790,
   },
-  targets: { tempo: 0.106880, passLean: 0.204816 },
-  carries: { tempo: 0.100079, passLean: -0.125394 },
-  passAttempts: { tempo: 0.028265, passLean: 0.227550 },
+  targets: { tempo: -0.010902, passLean: 0.274025 },
+  carries: { tempo: 0.127628, passLean: -0.110578 },
+  passAttempts: { tempo: -0.075442, passLean: 0.293032 },
 };
 
 /**

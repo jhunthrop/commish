@@ -70,6 +70,24 @@ export interface OpportunityPriors {
   readonly shrinkage: OpportunityShrinkage;
   /** League mean team volume per game — what a team with no record of its own is assumed to run. */
   readonly leagueTeamVolume: { readonly targets: number; readonly carries: number; readonly passAttempts: number };
+  /**
+   * PER-POSITION OVERRIDES of `shrinkage.season`/`shrinkage.inSeason`, for the SHARE predictions only
+   * — never `teamVolume`, which is a team-level quantity no one position's shrinkage should move.
+   *
+   * `shrinkage` above is one grid search shared by every position, chosen to minimise the POOLED
+   * error across all four of them; a position whose own error surface has a different minimum is
+   * masked by that pooling, which is exactly the mechanism the starter-band diagnosis pointed at for
+   * WR and TE (`docs/research/2026-08-31-prediction-laws-closeout.md`). A position absent here falls
+   * back to `shrinkage` unchanged. See `fit.ts`'s `fitShareShrinkageForPosition` and `fitted.ts`'s
+   * provenance docblock for the fit window and the acceptance decision each entry recorded.
+   */
+  readonly shareShrinkageByPosition?: Readonly<Partial<Record<Position, Pick<OpportunityShrinkage, "season" | "inSeason">>>>;
+}
+
+/** `priors.shrinkage`, overridden per position where `shareShrinkageByPosition` names one. */
+function shareShrinkageFor(priors: OpportunityPriors, position: Position): OpportunityShrinkage {
+  const override = priors.shareShrinkageByPosition?.[position];
+  return override === undefined ? priors.shrinkage : { ...priors.shrinkage, ...override };
 }
 
 /**
@@ -96,7 +114,14 @@ const LAST_WEEK_ONLY_DECAY = 0.01;
  * role prior. That is the best a memoryless predictor can do, and it is the thing to beat.
  */
 export function lastObservedPriors(priors: OpportunityPriors): OpportunityPriors {
-  return { ...priors, recencyDecay: LAST_WEEK_ONLY_DECAY, shrinkage: { season: 0, inSeason: 0, teamVolume: 0 } };
+  // `shareShrinkageByPosition` is cleared too, not just `shrinkage` — left in place it would let a
+  // WR/TE override reintroduce shrinkage into what is supposed to be the zero-shrinkage floor.
+  return {
+    ...priors,
+    recencyDecay: LAST_WEEK_ONLY_DECAY,
+    shrinkage: { season: 0, inSeason: 0, teamVolume: 0 },
+    shareShrinkageByPosition: undefined,
+  };
 }
 
 /** One player's predicted opportunity for one week. Shares, plus the volume they are taken over. */
@@ -243,16 +268,19 @@ export function predictOpportunity(
     if (position === undefined) continue;
     const role = priors.byPosition[position];
     const playerHistory = byPlayer.get(playerId)!;
+    // The position's own shrinkage, substituted in wholesale so `predictShare` needs no change of
+    // its own — it already only ever reads `priors.recencyDecay` and `priors.shrinkage`.
+    const sharePriors: OpportunityPriors = { ...priors, shrinkage: shareShrinkageFor(priors, position) };
 
-    const snapShare = predictShare(playerHistory, "snapShare", role.snapShare, priors, week);
+    const snapShare = predictShare(playerHistory, "snapShare", role.snapShare, sharePriors, week);
     predictions.set(playerId, {
       playerId,
       snapShare,
       // Every other share regresses toward the role's slope against the snap share we just
       // predicted — the depth chart, read through the only signal we have for one.
-      targetShare: predictShare(playerHistory, "targetShare", clampShare(role.targetsPerSnap * snapShare), priors, week),
-      carryShare: predictShare(playerHistory, "carryShare", clampShare(role.carriesPerSnap * snapShare), priors, week),
-      passAttemptShare: predictShare(playerHistory, "passAttemptShare", clampShare(role.passAttemptsPerSnap * snapShare), priors, week),
+      targetShare: predictShare(playerHistory, "targetShare", clampShare(role.targetsPerSnap * snapShare), sharePriors, week),
+      carryShare: predictShare(playerHistory, "carryShare", clampShare(role.carriesPerSnap * snapShare), sharePriors, week),
+      passAttemptShare: predictShare(playerHistory, "passAttemptShare", clampShare(role.passAttemptsPerSnap * snapShare), sharePriors, week),
       teamTargets: predictVolume(playerHistory, "teamTargets", priors.leagueTeamVolume.targets, priors, week),
       teamCarries: predictVolume(playerHistory, "teamCarries", priors.leagueTeamVolume.carries, priors, week),
       teamPassAttempts: predictVolume(playerHistory, "teamPassAttempts", priors.leagueTeamVolume.passAttempts, priors, week),

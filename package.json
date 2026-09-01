@@ -31,6 +31,7 @@
     "projections:backfill": "dotenv -e .env.local -- tsx scripts/projection-backfill.ts",
     "projections:fit": "dotenv -e .env.local -- tsx scripts/projection-fit.ts",
     "projections:ablate": "dotenv -e .env.local -- tsx scripts/projection-ablate.ts",
+    "projections:calibrate": "dotenv -e .env.local -- tsx scripts/calibration-report.ts",
     "projections:context": "dotenv -e .env.local -- tsx scripts/projection-context.ts",
     "audit:verify": "dotenv -e .env.local -- tsx scripts/verify-audit-chain.ts",
     "reviews:remove": "dotenv -e .env.local -- tsx scripts/remove-review.ts",

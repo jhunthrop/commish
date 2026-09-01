@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, min } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { preseasonRankings, preseasonRosters } from "@/db/schema";
 import type { PreseasonRosterEntry, RosterStatus } from "../nflverse/rosters";
@@ -108,6 +108,30 @@ export async function preseasonRostersAsOf(
     .where(and(eq(preseasonRosters.season, season), lte(preseasonRosters.asOf, asOf)))
     .orderBy(asc(preseasonRosters.playerId), desc(preseasonRosters.asOf));
   return rows.map((row) => ({ ...row, status: row.status as RosterStatus }));
+}
+
+/**
+ * A player's FIRST season with a stamped week-one roster row, through a given season.
+ *
+ * `MIN(season)` grouped by player, bounded by `throughSeason` rather than read open-ended: a career
+ * fact used to predict `throughSeason` may not be built from a roster row that postdates it, the
+ * same discipline every other point-in-time read in this engine keeps, even though a debut season is
+ * itself immutable once it happens (unlike a corrected stat line, there is no "later, truer" first
+ * roster year to prefer, so there is no `asOf` gate here — only the season bound).
+ *
+ * NOT the player's true NFL debut. `preseason-rosters.ts`'s backfill floor is `HISTORICAL_ROSTER_FLOOR`
+ * (2013); a veteran who debuted earlier has no row before it, so his "first" season here is really
+ * "first season this table can see him in". Callers that turn this into a career-year band (see
+ * `model/efficiency.ts`'s `experienceCohort`) have to treat a first season AT the floor as censored
+ * rather than as a literal rookie year.
+ */
+export async function firstRosterSeasonsThrough(db: ReadonlyDb, throughSeason: number): Promise<ReadonlyMap<string, number>> {
+  const rows = await db
+    .select({ playerId: preseasonRosters.playerId, firstSeason: min(preseasonRosters.season) })
+    .from(preseasonRosters)
+    .where(lte(preseasonRosters.season, throughSeason))
+    .groupBy(preseasonRosters.playerId);
+  return new Map(rows.filter((row) => row.firstSeason !== null).map((row) => [row.playerId, row.firstSeason!] as const));
 }
 
 /**

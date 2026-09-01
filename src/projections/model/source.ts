@@ -79,7 +79,7 @@ export function modelProjection(
     priors.context,
   );
   const rates = contextualiseRates(
-    predictRates(history, usage, { season, week, positions }, priors.efficiency),
+    predictRates(history, usage, { season, week, positions, firstRosterSeason: input.firstRosterSeason }, priors.efficiency),
     input,
     features,
     priors.context,

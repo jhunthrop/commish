@@ -3,12 +3,14 @@ import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
 import type { SeasonStatLine } from "../lines";
 import type { PlayerWeekUsage } from "../usage";
 import {
+  experienceCohort,
   predictRates,
   RATES,
   TOUCHDOWN_RATES,
   type EfficiencyPriors,
   type RateName,
 } from "./efficiency";
+import { HISTORICAL_ROSTER_FLOOR } from "../nflverse/rosters";
 import { FITTED_EFFICIENCY_PRIORS } from "./fitted";
 
 function line(season: number, week: number, playerId: string, over: Partial<StatLine>): SeasonStatLine {
@@ -165,6 +167,78 @@ describe("predictRates", () => {
       PRIORS,
     ).get("wr")!;
     for (const value of Object.values(rates)) expect(value).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("experienceCohort", () => {
+  it("places years 4 through 6 in the cohort and nothing else", () => {
+    expect(experienceCohort(2024, 2021)).toBe("year4to6"); // career year 4
+    expect(experienceCohort(2024, 2020)).toBe("year4to6"); // career year 5
+    expect(experienceCohort(2024, 2019)).toBe("year4to6"); // career year 6
+    expect(experienceCohort(2024, 2022)).toBe("other"); // career year 3
+    expect(experienceCohort(2024, 2018)).toBe("other"); // career year 7
+  });
+
+  it("returns other for a player with no known first roster season", () => {
+    expect(experienceCohort(2024, null)).toBe("other");
+  });
+
+  it("refuses to place a player before his own debut", () => {
+    expect(experienceCohort(2020, 2024)).toBe("other");
+  });
+
+  it("treats a first-season-at-the-backfill-floor player as right-censored, never as young", () => {
+    // A first row exactly at HISTORICAL_ROSTER_FLOOR could belong to a rookie or a fifteen-year
+    // veteran the backfill cannot see behind; a raw career year of 4-6 from it is a lower bound, not
+    // a measurement, so this must NOT land in the cohort.
+    const floorSeason = HISTORICAL_ROSTER_FLOOR;
+    expect(experienceCohort(floorSeason + 5, floorSeason)).toBe("other"); // raw year 6, censored
+    // Once the raw year is unambiguously past the cohort regardless of censoring, the floor no
+    // longer matters — this is the ordinary "other" case, not a special one.
+    expect(experienceCohort(floorSeason + 9, floorSeason)).toBe("other"); // raw year 10
+  });
+});
+
+describe("predictRates: the years-4-6 experience term", () => {
+  const priorsWithExperience: EfficiencyPriors = { ...PRIORS, experienceMultiplier: { WR: 0.85 } };
+
+  it("scales every rate for a player in the cohort, uniformly", () => {
+    const history = [line(2024, 1, "wr", { receivingYards: 0 })];
+    const usageRows = [usage(2024, 1, "wr", { targets: 5 })];
+    const firstRosterSeason = new Map([["wr", 2021]]); // career year 4 in 2024
+    const withTerm = predictRates(history, usageRows, { season: 2024, week: 2, positions: POSITIONS, firstRosterSeason }, priorsWithExperience).get("wr")!;
+    const withoutTerm = predictRates(history, usageRows, { season: 2024, week: 2, positions: POSITIONS }, priorsWithExperience).get("wr")!;
+    for (const name of Object.keys(RATES) as RateName[]) {
+      expect(withTerm[name]).toBeCloseTo(withoutTerm[name] * 0.85, 10);
+    }
+  });
+
+  it("is a no-op for a player outside the cohort, even with the multiplier configured", () => {
+    const history = [line(2024, 1, "wr", { receivingYards: 0 })];
+    const usageRows = [usage(2024, 1, "wr", { targets: 5 })];
+    const firstRosterSeason = new Map([["wr", 2024]]); // career year 1
+    const withMap = predictRates(history, usageRows, { season: 2024, week: 2, positions: POSITIONS, firstRosterSeason }, priorsWithExperience).get("wr")!;
+    const withoutMap = predictRates(history, usageRows, { season: 2024, week: 2, positions: POSITIONS }, priorsWithExperience).get("wr")!;
+    expect(withMap).toEqual(withoutMap);
+  });
+
+  it("is a no-op for a position the fit found nothing for", () => {
+    const history = [line(2024, 1, "rb", { rushingYards: 0 })];
+    const usageRows = [usage(2024, 1, "rb", { targets: 0, carries: 5 })];
+    const firstRosterSeason = new Map([["rb", 2021]]); // career year 4, but RB is absent from experienceMultiplier
+    const rates = predictRates(history, usageRows, { season: 2024, week: 2, positions: POSITIONS, firstRosterSeason }, priorsWithExperience).get("rb")!;
+    const baseline = predictRates(history, usageRows, { season: 2024, week: 2, positions: POSITIONS }, priorsWithExperience).get("rb")!;
+    expect(rates).toEqual(baseline);
+  });
+
+  it("guards against a non-finite or non-positive fitted multiplier", () => {
+    const badPriors: EfficiencyPriors = { ...PRIORS, experienceMultiplier: { WR: 0 } };
+    const history = [line(2024, 1, "wr", { receivingYards: 0 })];
+    const usageRows = [usage(2024, 1, "wr", { targets: 5 })];
+    const firstRosterSeason = new Map([["wr", 2021]]);
+    const rates = predictRates(history, usageRows, { season: 2024, week: 2, positions: POSITIONS, firstRosterSeason }, badPriors).get("wr")!;
+    const baseline = predictRates(history, usageRows, { season: 2024, week: 2, positions: POSITIONS }, badPriors).get("wr")!;
+    expect(rates).toEqual(baseline);
   });
 });
 

@@ -5,6 +5,7 @@ import { projectedPosition } from "./nflverse/players";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { statLinesAsOf, type SeasonStatLine } from "./lines";
 import { predictOpportunity, type OpportunityPriors } from "./model/opportunity";
+import { firstRosterSeasonsThrough } from "./preseason/store";
 import { observationsAsOf, LAST_POSSIBLE_WEEK, type PlayerWeekObservation } from "./store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "./team-store";
 import { latestTeams, type TeamContext } from "./team-context";
@@ -71,6 +72,14 @@ export interface ProjectionInput {
    * impossible.
    */
   readonly news: readonly PlayerWeekObservation[];
+  /**
+   * A player's first season with a stamped week-one roster row (Task 1's historical backfill),
+   * OPTIONAL: only the weekly model's experience term (`model/efficiency.ts`) reads it, and only
+   * where `priors.efficiency.experienceMultiplier` is also set. Omitted, that term is a no-op. Never
+   * gated by `asOf` — see `firstRosterSeasonsThrough`'s own docblock for why a debut season carries
+   * no later, truer version to prefer.
+   */
+  readonly firstRosterSeason?: ReadonlyMap<string, number>;
 }
 
 export interface ProjectionSource {
@@ -355,6 +364,9 @@ async function replayWeeks(
   // and never will: a man's position is not restated by a Sunday-night stat correction, and reading
   // it per week would be eighteen identical queries pretending to be a point-in-time read.
   const positions = await allPositions(db);
+  // Also read once, outside the loop, and for the same reason: a debut season does not move once it
+  // has happened, so re-reading it per week would be eighteen identical queries.
+  const firstRosterSeason = await firstRosterSeasonsThrough(db, season);
   const outcomes: WeekOutcome[] = [];
 
   for (const week of inOrder) {
@@ -411,7 +423,7 @@ async function replayWeeks(
     };
 
     const news = await newsPerPlayer(db, season, week, asOf, asOfForPlayerGame, teamContext);
-    const input: ProjectionInput = { season, week, asOf, history, usage, positions, teamContext, news };
+    const input: ProjectionInput = { season, week, asOf, history, usage, positions, teamContext, news, firstRosterSeason };
     const projected: ReadonlyMap<string, number>[] = [];
     for (const source of sources) {
       projected.push(asPoints(await source.project(input)));

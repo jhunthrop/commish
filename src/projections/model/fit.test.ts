@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { Position } from "@/domain/player";
 import type { PlayerWeekUsage } from "../usage";
-import { fitLeagueTeamVolume, fitOpportunityPriors, fitRolePriors, scoreShares, opportunityObservations } from "./fit";
+import {
+  fitExperienceMultiplier,
+  fitLeagueTeamVolume,
+  fitOpportunityPriors,
+  fitRolePriors,
+  fitShareShrinkageForPosition,
+  scoreShares,
+  opportunityObservations,
+  opportunityObservationsForPosition,
+  type ExperienceObservation,
+} from "./fit";
 import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "./fitted";
 import { lastObservedPriors } from "./opportunity";
 
@@ -120,5 +130,92 @@ describe("scoreShares", () => {
     const model = scoreShares(opportunityObservations(input, FITTED_OPPORTUNITY_PRIORS));
     const floor = scoreShares(opportunityObservations(input, lastObservedPriors(FITTED_OPPORTUNITY_PRIORS)));
     expect(model.rootMeanSquaredError!).toBeLessThan(floor.rootMeanSquaredError!);
+  });
+});
+
+describe("opportunityObservationsForPosition", () => {
+  it("narrows to one position, and pools to the same total as scoring every position separately", () => {
+    const rows = [
+      usage({ season: 2021, week: 1, playerId: "wr1", snapShare: 0.8, targetShare: 0.2 }),
+      usage({ season: 2021, week: 2, playerId: "wr1", snapShare: 0.8, targetShare: 0.2 }),
+      usage({ season: 2021, week: 1, playerId: "rb1", snapShare: 0.4, targetShare: 0.05 }),
+      usage({ season: 2021, week: 2, playerId: "rb1", snapShare: 0.4, targetShare: 0.05 }),
+    ];
+    const input = { usage: rows, positions: POSITIONS, seasons: [2021] };
+    const wrOnly = opportunityObservationsForPosition(input, FITTED_OPPORTUNITY_PRIORS, "WR");
+    const rbOnly = opportunityObservationsForPosition(input, FITTED_OPPORTUNITY_PRIORS, "RB");
+    const pooled = opportunityObservations(input, FITTED_OPPORTUNITY_PRIORS);
+    expect(wrOnly.length).toBeGreaterThan(0);
+    expect(rbOnly.length).toBeGreaterThan(0);
+    expect(wrOnly.length + rbOnly.length).toBe(pooled.length);
+  });
+
+  it("returns nothing for a position absent from the history", () => {
+    const rows = [usage({ season: 2021, week: 1, playerId: "wr1", snapShare: 0.8, targetShare: 0.2 })];
+    const input = { usage: rows, positions: POSITIONS, seasons: [2021] };
+    expect(opportunityObservationsForPosition(input, FITTED_OPPORTUNITY_PRIORS, "TE")).toEqual([]);
+  });
+});
+
+describe("fitShareShrinkageForPosition", () => {
+  it("searches the same grids fitOpportunityPriors does, never past the input's own seasons", () => {
+    // A player whose target share swings wildly week to week, on the fit's own seasons — the search
+    // should be able to find SOME shrinkage worth reporting rather than erroring.
+    const rows = [0.4, 0.02, 0.35, 0.03, 0.38, 0.05].map((value, index) =>
+      usage({ season: 2021, week: index + 1, playerId: "wr1", snapShare: 0.8, targetShare: value }),
+    );
+    const shrinkage = fitShareShrinkageForPosition({ usage: rows, positions: POSITIONS, seasons: [2021] }, "WR", FITTED_OPPORTUNITY_PRIORS);
+    expect(shrinkage.season).toBeGreaterThanOrEqual(0);
+    expect(shrinkage.inSeason).toBeGreaterThanOrEqual(0);
+    // teamVolume is never re-searched — carried through from the base priors untouched.
+    expect(shrinkage.teamVolume).toBe(FITTED_OPPORTUNITY_PRIORS.shrinkage.teamVolume);
+  });
+
+  it("never beats the base shrinkage by more than the base priors' own error, restricted to the position", () => {
+    const rows = [
+      usage({ season: 2021, week: 1, playerId: "wr1", snapShare: 0.8, targetShare: 0.25 }),
+      usage({ season: 2021, week: 2, playerId: "wr1", snapShare: 0.8, targetShare: 0.25 }),
+    ];
+    const input = { usage: rows, positions: POSITIONS, seasons: [2021] };
+    const fitted = fitShareShrinkageForPosition(input, "WR", FITTED_OPPORTUNITY_PRIORS);
+    const candidatePriors = { ...FITTED_OPPORTUNITY_PRIORS, shrinkage: { ...fitted, teamVolume: FITTED_OPPORTUNITY_PRIORS.shrinkage.teamVolume } };
+    const fittedError = scoreShares(opportunityObservationsForPosition(input, candidatePriors, "WR")).rootMeanSquaredError!;
+    const baseError = scoreShares(opportunityObservationsForPosition(input, FITTED_OPPORTUNITY_PRIORS, "WR")).rootMeanSquaredError!;
+    expect(fittedError).toBeLessThanOrEqual(baseError + 1e-9);
+  });
+});
+
+describe("fitExperienceMultiplier", () => {
+  function observation(over: Partial<ExperienceObservation>): ExperienceObservation {
+    return { position: "WR", cohort: "year4to6", actualPoints: 100, populationPoints: 100, ...over };
+  }
+
+  it("is a ratio of totals, not a mean of per-player ratios", () => {
+    const observations = [
+      observation({ actualPoints: 120, populationPoints: 100 }),
+      observation({ actualPoints: 80, populationPoints: 100 }),
+    ];
+    // A mean of ratios would give 1.1 average; the totals ratio is 200/200 = 1.
+    expect(fitExperienceMultiplier(observations).WR).toBeCloseTo(1, 10);
+  });
+
+  it("ignores observations outside the years-4-6 cohort", () => {
+    const observations = [observation({ cohort: "other", actualPoints: 10, populationPoints: 1000 })];
+    expect(fitExperienceMultiplier(observations).WR).toBeUndefined();
+  });
+
+  it("omits a position with zero population total rather than reporting a division artifact", () => {
+    const observations = [observation({ populationPoints: 0 })];
+    expect(fitExperienceMultiplier(observations).WR).toBeUndefined();
+  });
+
+  it("keeps positions independent", () => {
+    const observations = [
+      observation({ position: "WR", actualPoints: 80, populationPoints: 100 }),
+      observation({ position: "TE", actualPoints: 120, populationPoints: 100 }),
+    ];
+    const result = fitExperienceMultiplier(observations);
+    expect(result.WR).toBeCloseTo(0.8, 10);
+    expect(result.TE).toBeCloseTo(1.2, 10);
   });
 });
