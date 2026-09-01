@@ -26,6 +26,12 @@ lines (facts, not copyrightable expression); use is internal model input with at
 ruling. If that reading is ever wrong, the schema is source-agnostic and the documented fallback is
 a `covers.com` archive parse.
 
+**Independent line cross-check (added at the final whole-branch review, which caught it as the one
+spec requirement neither performed nor deferred):** three spot seasons spanning the dataset's eras
+(2005, 2013, 2019) compared line by line against the covers.com sportsoddshistory archive, an
+archive independent of the nfelosrs source. **96 of 96 lines match with zero mismatches**; full
+record in `data/win-totals/README.md`, comparison script preserved in the round workspace.
+
 **Validation, full real run:**
 
 ```

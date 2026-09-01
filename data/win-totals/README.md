@@ -117,3 +117,19 @@ Checks, independently, and never averaged away:
 `scripts/validate-win-totals.test.ts` drives the four pure check functions from fixture rows with
 no database or network involved, so the logic is provable before it ever touches Postgres or
 nflverse.
+
+## Independent line cross-check (covers.com archive, per the spec)
+
+Performed 2026-09-01 against the covers.com sportsoddshistory archived win-total tables
+(`covers.com/sportsoddshistory/nfl-win/?y=YEAR`), an archive independent of the nfelosrs
+source this dataset was curated from. Three spot seasons spanning the dataset's eras were
+compared line by line, all 32 teams each:
+
+- 2005: 32 of 32 lines match exactly.
+- 2013: 32 of 32 lines match exactly.
+- 2019: 32 of 32 lines match exactly.
+
+96 of 96 lines agree with zero mismatches (comparison script preserved in the round's
+workspace, `covers-crosscheck.ts`; era relocations mapped per the table above). Odds were
+not compared: books and capture dates differ between archives, and the spec's cross-check
+targets the lines themselves.
