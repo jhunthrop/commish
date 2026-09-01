@@ -82,11 +82,19 @@ export interface PlayerSeasonTotals {
  *   constant's own docblock for the full history). `commish_board_v1_ppr_12` is the raw model's own
  *   historical source, kept for provenance but no longer what a live product surface reads. Read
  *   through the same crosswalk.
- *   It is EMPTY FOR THE CURRENT SEASON and stated as such rather than
- *   backfilled from a season that has finished: the board needs three prior seasons of ingested
- *   usage and a replay moment derived from games already played, and the store holds 2021 to 2024.
- *   Showing 2024's number beside this year's consensus would be the most plausible-looking lie
- *   this product could tell. `docs/research/2026-08-28-live-season.md` scopes what closes it.
+ *   IT NOW FILLS FOR THE CURRENT SEASON (live-board plan, Task 4): `scripts/preseason-persist.ts`
+ *   builds and stores a row for it through the LIVE arm of `BoardMoment` (`preseason/source.ts`),
+ *   never by borrowing a finished season's number — the plausible-looking lie this docblock used to
+ *   warn against, back when the board held only 2021-2024 and nothing newer, would have been
+ *   showing 2024's number beside THIS year's consensus. That is not what happens now: `modelRank`
+ *   is a real projection built FOR the current season, from its own week-one roster and market,
+ *   never a neighbour's. THE HONEST LINE THIS CELL CARRIES INSTEAD: a live-taken row is
+ *   UNMEASURED, not merely unfilled — `preseason/scorecard.ts`'s `assertGradableMoment` refuses to
+ *   grade a `momentKind: "live"` board against anything, structurally, because the season it
+ *   projects has not been played yet. So `modelRank` for the current season is exactly as real as
+ *   the market's and the experts' own ranks beside it, and carries no accuracy claim neither of
+ *   those two ever carried either — there is no scorecard rho to quote for ANY of the three cells
+ *   until the season is over, and none of them has ever pretended otherwise.
  *
  * BOTH ARE READ AT `now`, through the same `as_of <=` gate the backtest uses. A product surface
  * lives in the present, so "everything knowable now" is both the honest read and exactly the
@@ -107,7 +115,8 @@ export interface PlayerSeasonBody {
    */
   readonly expertRank: number | null;
   /** Our own board's overall rank for this season, or `null` where there is no board for him.
-   *  Empty for every player while the current season has no board — see the type's docblock. */
+   *  A real, unborrowed projection for the current season once the live board is persisted, never
+   *  measured against an outcome the season has not produced yet — see the type's own docblock. */
   readonly modelRank: number | null;
   /** Points per game over the weeks he actually played, under THIS league's scoring rules. */
   readonly pointsPerGame: number | null;

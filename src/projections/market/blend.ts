@@ -615,7 +615,11 @@ export async function shippedPreseasonCandidates(
 ): Promise<readonly BoardCandidate[]> {
   const candidates = preseasonCandidates(inputs, features, priors);
   if (raw) return candidates;
-  const { entries: market, droppedCount } = await marketBoard(db, inputs.season);
+  // `inputs.moment` — never a second, internal `preseasonMomentFor` call — so a LIVE board's market
+  // prior is taken at the SAME moment the rest of the board was built at (Task 4, `curve.ts`'s own
+  // `marketBoard` docblock: that function used to derive this itself, unconditionally through the
+  // replay-only `preseasonMomentFor`, which throws for a season that has not kicked off yet).
+  const { entries: market, droppedCount } = await marketBoard(db, inputs.season, inputs.moment);
   if (droppedCount > 0) {
     console.warn(`market/blend.ts: marketBoard for ${inputs.season} dropped ${droppedCount} ADP row(s) with an unresolved position.`);
   }

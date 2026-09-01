@@ -31,6 +31,7 @@ import { factsForSeason, type LawConditionFacts } from "../laws/populations";
 import { lawReasonsFor } from "../laws/board-reasons";
 import { registry } from "../laws/registry";
 import type { Law } from "../laws/types";
+import { LIVE_ADMITTED_DERIVED_SEASONS } from "../nflverse/stat-lines";
 import {
   ageAtSeason,
   expectedGamesPlayed,
@@ -274,15 +275,18 @@ export interface PreseasonInputs {
   /** Every TRIBAL law's condition inputs for season - 1 — the last COMPLETED season — gated at THIS
    *  season's own schedule publication (`laws/populations.ts`'s `factsForSeason`), which is exactly
    *  what a board for THIS season is entitled to know. Keyed by player id; a player absent here has
-   *  no evidence for any tribal law, not evidence that every tribal law's condition is false. */
+   *  no evidence for any tribal law, not evidence that every tribal law's condition is false.
+   *
+   *  `admitDerived` is `false` for a REPLAY board, always — see `lawFactsAdmitDerived`'s own
+   *  docblock (Task 4) for the ONE narrow exception a LIVE board's own prior season can hit. */
   readonly lawFacts: ReadonlyMap<string, LawConditionFacts>;
   /** Every DISCOVERED law's condition inputs for the SAME season - 1, read through the identical
-   *  gate and the identical `admitDerived: false` (`laws/discovery-facts.ts`'s
-   *  `discoveryFactsForSeason`) — see `lawFacts`'s own docblock for why a live board never admits a
-   *  pbp-derived gap-season fact (the C2 containment ruling); it applies here for exactly the same
-   *  reason, so a discovered law's own live-board magnitude can never be built from evidence the
-   *  tribal harness's own validation bar never checked. Keyed by player id; a player absent here has
-   *  no evidence for any discovered law, not evidence that every discovered law's condition is false. */
+   *  gate and the SAME `admitDerived` value `lawFacts` above was built with
+   *  (`laws/discovery-facts.ts`'s `discoveryFactsForSeason`) — a discovered law's own live-board
+   *  magnitude is admitted or refused by the identical rule a tribal law's is, so the two origins
+   *  can never disagree about which seasons a live board is allowed to read derived evidence for.
+   *  Keyed by player id; a player absent here has no evidence for any discovered law, not evidence
+   *  that every discovered law's condition is false. */
   readonly discoveryFacts: ReadonlyMap<string, DiscoveryFacts>;
 }
 
@@ -566,6 +570,38 @@ async function gamesPlayedBySeason(
  * `undefined` just to reach the one it means — `source.test.ts`'s own
  * `loadPreseason(db, LIVE_SEASON, undefined, liveMoment)` before this fix round is the example.
  */
+/**
+ * TASK 4 — THE LIVE PATH'S NARROW DERIVED ADMISSION (extends the C2 containment ruling `factsForSeason`
+ * and `discoveryFactsForSeason` document on their own `admitDerived` parameters, per the live-board
+ * plan's Part 1 ruling: "the LIVE board path may admit derived stat lines for gap seasons where NO
+ * published feed exists").
+ *
+ * `admitDerived: false`, unconditionally, was the correct call for every board this engine had ever
+ * built, because every board's prior season had a published nflverse feed to fall back on. A LIVE
+ * board's prior season is no longer guaranteed that: `season - 1` can be `2025`, which
+ * `nflverse/stat-lines.ts`'s `STAT_LINE_GAPS` lists as a gap season with NO published twin at
+ * all — `stats_player_week_2025.csv` is still a 404, and unlike 2019 (a published year on both
+ * sides of it) there is no future ingestion that will ever fill this hole, because 2025 IS the
+ * season immediately behind a live 2026 board. A blanket `false` would not protect a manager from a
+ * worse number here; it would silently starve every law fact for a player's 2025 season (the
+ * tri-state rule reading every field `null`, "no evidence"), on a season the pbp-derived path
+ * already cleared the identical 0.9999-rank / 0.28-MAE validation bar that gates every OTHER gap
+ * season this engine has ever shipped a law fact from (`derivedSeasonSanityReport`,
+ * `nflverse/derived-stat-lines.ts`).
+ *
+ * THE ADMISSION IS NARROWED TO EXACTLY `LIVE_ADMITTED_DERIVED_SEASONS` (`nflverse/stat-lines.ts`),
+ * never a blanket `admitDerived: true`, and ONLY on the LIVE arm: this returns `true` only when
+ * `momentKind === "live"` AND `priorSeason` is in that allowlist — deliberately NOT
+ * `STAT_LINE_GAPS`, whose own docblock explains why (it also lists 2019, eleven-plus-year-old
+ * history with no business reaching a live product surface). A REPLAY board's law facts are
+ * UNCHANGED by this task: every published measurement in `measured.json`/`discovered.json` was fit
+ * with `admitDerived: false` at this exact seam and stays exactly reproducible, because a replay
+ * board never satisfies the first half of the conjunction below.
+ */
+function lawFactsAdmitDerived(momentKind: BoardMoment["kind"], priorSeason: number): boolean {
+  return momentKind === "live" && LIVE_ADMITTED_DERIVED_SEASONS.includes(priorSeason);
+}
+
 export interface LoadPreseasonOptions {
   /** The registry every "law" reason is drawn against. Defaults to the real `registry()`, the same
    *  default-from-a-committed-file pattern `loadAvailabilityObservations` below takes with
@@ -645,23 +681,28 @@ export async function loadPreseason(
   // "Season N" for every law's own condition: the completed season immediately before this one,
   // read through `factsForSeason`'s OWN gate (N+1's schedule publication — this season's), which is
   // exactly the moment a board for THIS season is entitled to know it at. The same call
-  // `buildPopulations` makes for its measurement, EXCEPT the last argument: `admitDerived: false`
-  // here, `true` there (fix round, C2). A live board's law reasons must never drift from the
-  // evidence that confirmed the law, but they also must never render a row nflverse did not itself
-  // publish — a `true` here would let a board whose prior season is 2019 (any board for the 2020
+  // `buildPopulations` makes for its measurement, EXCEPT the last argument: `admitDerived` here is
+  // `false` for every REPLAY board (fix round, C2, unchanged) and `true` ONLY for a LIVE board whose
+  // prior season is in `LIVE_ADMITTED_DERIVED_SEASONS` (Task 4 — see `lawFactsAdmitDerived`'s own
+  // docblock for the no-published-alternative justification). A live board's law reasons must never
+  // drift from the evidence that confirmed the law, but they also must never render a row nflverse
+  // did not itself publish OR silently starve a player of a season that had nowhere else to come
+  // from — a bare `true` here would let a board whose prior season is 2019 (any board for the 2020
   // season) compute its law facts partly from pbp-derived play-by-play the validation bar never
-  // checked, mixing a MEASUREMENT convenience into a number a real manager reads. The honest cost:
-  // a 2020-season board's `touches`/`touchdownPointsShare`/etc. facts for a player's 2019 season
-  // read as `null` (no evidence), exactly as they did before this task existed to fill the hole —
-  // the tri-state rule (`LawConditionFacts`'s own docblock) already does the right thing with that.
-  const priorSeasonFacts = await factsForSeason(db, season - 1, positions, PPR_SCORING, false);
+  // checked, mixing a MEASUREMENT convenience into a number a real manager reads; the narrowed
+  // allowlist is what keeps that door shut while still opening it for 2025 alone. The honest cost
+  // when `admitDerived` is `false`: a board's `touches`/`touchdownPointsShare`/etc. facts for a
+  // player's prior season read as `null` (no evidence) — the tri-state rule (`LawConditionFacts`'s
+  // own docblock) already does the right thing with that.
+  const priorSeasonAdmitDerived = lawFactsAdmitDerived(resolvedMoment.kind, season - 1);
+  const priorSeasonFacts = await factsForSeason(db, season - 1, positions, PPR_SCORING, priorSeasonAdmitDerived);
   const lawFacts = new Map([...priorSeasonFacts].map(([playerId, entry]) => [playerId, entry.facts] as const));
 
-  // The SAME season, the SAME gate, the SAME `admitDerived: false` (see `lawFacts`'s own comment
-  // just above and `PreseasonInputs.discoveryFacts`'s own docblock) — a discovered law's own
-  // condition is a `DiscoveryFacts` predicate, a different fact shape than a tribal law's
-  // `LawConditionFacts`, so it needs its own read rather than a projection off `priorSeasonFacts`.
-  const discoveryFacts = await discoveryFactsForSeason(db, season - 1, positions, PPR_SCORING, false);
+  // The SAME season, the SAME gate, the SAME `admitDerived` value (see `lawFacts`'s own comment just
+  // above and `PreseasonInputs.discoveryFacts`'s own docblock) — a discovered law's own condition is
+  // a `DiscoveryFacts` predicate, a different fact shape than a tribal law's `LawConditionFacts`, so
+  // it needs its own read rather than a projection off `priorSeasonFacts`.
+  const discoveryFacts = await discoveryFactsForSeason(db, season - 1, positions, PPR_SCORING, priorSeasonAdmitDerived);
 
   return {
     season,

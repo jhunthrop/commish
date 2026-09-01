@@ -48,16 +48,17 @@ const POSITION_PLURAL: Readonly<Record<Position, string>> = {
  * aggregations of the same crowd, and we compare the market against expert consensus against our
  * own model, which is a disagreement somebody can be right or wrong about.
  *
- * TWO OF THE THREE REACH THIS PAGE, and the third prints a dash and says nothing.
- * `PlayerSeasonBody`'s docblock carries the full account; the short version is that expert
- * consensus now arrives through the crosswalk for this season, and our own board holds four
- * finished seasons and none of this one, because it needs games that have not been played yet.
+ * ALL THREE NOW REACH THIS PAGE (live-board plan, Task 4). `PlayerSeasonBody`'s docblock carries
+ * the full account; the short version is that expert consensus arrives through the crosswalk for
+ * this season, and our own board's `modelRank` now fills too, once `scripts/preseason-persist.ts`
+ * has stored a LIVE-taken row for the current season — never borrowed from a finished one.
  *
- * A DASH IS NEVER FILLED FROM A NEIGHBOURING SEASON, and the temptation to do it is the reason
- * this paragraph exists. The board has a number for this man in 2024 and it would render
- * beautifully. It would also be a claim about a season that has ended, printed in the same row and
- * the same ink as a consensus published this week, with nothing on the screen to tell them apart.
- * The dash is the honest report that this product holds an opinion it cannot yet show you.
+ * A DASH IS NEVER FILLED FROM A NEIGHBOURING SEASON, and that discipline is why `modelRank` prints
+ * a dash for a player the live board genuinely has no row for, rather than reaching back to 2024
+ * for one. The board's own docblock section on this cell states the honest line for the number
+ * that DOES show: a live-taken projection is real and un-borrowed, but it is UNMEASURED — the
+ * scorecard structurally refuses to grade a season that has not been played, so this cell carries
+ * no accuracy claim, exactly as the market and expert-consensus cells beside it never have either.
  *
  * ONLY ONE CELL IS TINTED. Points per game is a verdict about the player and has a population
  * behind it. The three draft-position cells are one quantity read by different sources: colouring

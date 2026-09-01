@@ -28,6 +28,7 @@ import { createDb, type Db } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import type { Position } from "@/domain/player";
+import type { Clock } from "@/domain/timing";
 import { nflPlayers } from "@/db/schema";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { shippedPreseasonCandidates } from "@/projections/market/blend";
@@ -47,13 +48,48 @@ import {
   FITTED_ROOKIE_PRIORS,
 } from "@/projections/preseason/fitted";
 import { FITTED_MODEL } from "@/projections/model/source";
-import { loadPreseason, type PreseasonInputs, type PreseasonPriors } from "@/projections/preseason/source";
+import {
+  liveMomentFor,
+  loadPreseason,
+  replayMomentFor,
+  type BoardMoment,
+  type PreseasonInputs,
+  type PreseasonPriors,
+} from "@/projections/preseason/source";
 
 /** Every season the preseason ingestion has ever run for. A board needs three prior seasons of
- *  usage, which is why the floor is not the backfill's floor. */
-const INGESTED_SEASONS = [2021, 2022, 2023, 2024];
+ *  usage, which is why the floor is not the backfill's floor. 2026 joined this list the day its
+ *  week-one rosters, depth charts and ADP landed (live-board plan, Task 4) — it builds through the
+ *  LIVE arm below rather than the replay arm every prior season here still uses. */
+const INGESTED_SEASONS = [2021, 2022, 2023, 2024, 2026];
 const SEASONS = process.argv.slice(2).map(Number);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : INGESTED_SEASONS;
+
+const SYSTEM_CLOCK: Clock = { now: () => new Date().toISOString() };
+
+/**
+ * ONE SEASON'S BOARD MOMENT — LIVE if its first kickoff is still ahead, REPLAY otherwise.
+ *
+ * `liveMomentFor` is the only function that can tell the two cases apart, and it does so by
+ * throwing: it refuses the instant `clock.now()` reaches `season`'s first scheduled kickoff,
+ * because a started season has a REPLAY moment, never a live one (`source.ts`'s own `BoardMoment`
+ * docblock). That throw is exactly the signal this script needs, so it is caught rather than
+ * avoided — narrowly, matching only the "already started" message `liveMomentFor` raises for that
+ * one reason. A season with NO ingested schedule at all raises a DIFFERENT message ("no ingested
+ * schedule") for a genuinely different problem (missing data, not a started season), and that one
+ * is left to propagate: silently falling back to a replay moment for it would build a board off
+ * `preseasonMomentFor`'s own unrelated derivation and call the resulting confusion a schedule gap.
+ */
+async function boardMomentFor(db: Db, season: number, clock: Clock): Promise<BoardMoment> {
+  try {
+    return await liveMomentFor(db, season, clock);
+  } catch (error: unknown) {
+    if (error instanceof Error && /has already started/.test(error.message)) {
+      return await replayMomentFor(db, season);
+    }
+    throw error;
+  }
+}
 
 /**
  * The league the board is computed for, identical to `preseason-report.ts`' shape and for the same
@@ -109,7 +145,9 @@ async function main(): Promise<void> {
   );
 
   for (const season of TARGET_SEASONS) {
-    const inputs = await loadPreseason(db, season);
+    const boardMoment = await boardMomentFor(db, season, SYSTEM_CLOCK);
+    const inputs = await loadPreseason(db, season, { boardMoment });
+    console.log(`${season}  moment kind: ${boardMoment.kind}  taken at ${inputs.moment.toISOString()}`);
 
     const v1 = await persistBoard(db, inputs, BOARD_SOURCE_V1_RAW, true);
     console.log(

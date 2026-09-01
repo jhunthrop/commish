@@ -5,6 +5,7 @@ import { recordNflPlayers } from "../universe";
 import { PARTICIPATION_METRICS, NFLVERSE_SOURCE } from "../nflverse/map";
 import { week1RosterAsOf } from "../nflverse/rosters";
 import { STAT_LINE_SOURCE, statMetricName } from "../lines";
+import { DERIVED_STAT_LINE_SOURCE } from "../nflverse/derived-stat-lines";
 import { recordObservations, type PlayerWeekObservation } from "../store";
 import { recordPreseasonRosters } from "./store";
 import { recordTeamObservations } from "../team-store";
@@ -803,6 +804,96 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
     it("throws", async () => {
       const clock: Clock = { now: () => "2026-01-01T00:00:00.000Z" };
       await expect(liveMomentFor(db, LIVE_SEASON, clock)).rejects.toThrow(/schedule/i);
+    });
+  });
+
+  /**
+   * (f) TASK 4 — `lawFactsAdmitDerived`'s wiring, proven end to end rather than only argued in its
+   * own docblock. `factsForSeason` drops a player from its returned map entirely when it finds no
+   * scoring for him (`laws/populations.ts`: `if (scored === undefined || ppg === null) continue;`)
+   * — the cleanest possible probe for "did `admitDerived` actually reach the read": a player whose
+   * WHOLE prior season exists ONLY under `DERIVED_STAT_LINE_SOURCE` is PRESENT in
+   * `lawFacts`/`discoveryFacts` when admitted and ABSENT when not, with no fixture registry or
+   * population threshold needed to see it either way.
+   */
+  describe("(f) Task 4 — admitDerived on the live arm, narrowed to LIVE_ADMITTED_DERIVED_SEASONS", () => {
+    /** VETERAN's whole `season` exists ONLY under `DERIVED_STAT_LINE_SOURCE` — the shape a real gap
+     *  season takes today (no `stats_player_week_2025.csv` upstream). Stamped well before the
+     *  following season's own `schedulePublishedAsOf` gate (20 May), so it is visible whenever
+     *  `admitDerived` is `true`. */
+    async function seedDerivedOnlySeason(season: number): Promise<void> {
+      const rows: PlayerWeekObservation[] = [];
+      for (let week = 1; week <= 17; week += 1) {
+        rows.push(
+          observation({
+            season, week, playerId: VETERAN, source: DERIVED_STAT_LINE_SOURCE,
+            metric: statMetricName("receivingYards"), value: 78,
+            asOf: new Date(Date.UTC(season + 1, 0, 8)),
+          }),
+        );
+      }
+      await recordObservations(db, rows);
+    }
+
+    it("ADMITS a DERIVED-only 2025 season into lawFacts/discoveryFacts on the LIVE 2026 board (2025 is the allowlist)", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      await seedDerivedOnlySeason(2025);
+
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      const inputs = await loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment });
+      expect(inputs.momentKind).toBe("live");
+      expect(inputs.lawFacts.has(VETERAN)).toBe(true);
+      expect(inputs.discoveryFacts.has(VETERAN)).toBe(true);
+    });
+
+    it("does NOT admit a DERIVED-only 2025 season on a REPLAY board, even though 2025 is in the allowlist — the LIVE half of the conjunction is what actually gates it", async () => {
+      // A REPLAY 2026 board: the season has its own game-derived stamp, so `loadPreseason`'s default
+      // (no `boardMoment`) resolves the REPLAY arm. `season - 1` is still 2025, still admitted by
+      // the allowlist alone, but `momentKind` is "replay" — the other half of the conjunction.
+      await seedLiveRoster(LIVE_SEASON);
+      await recordObservations(db, [
+        observation({
+          season: LIVE_SEASON, week: 1, playerId: VETERAN, source: STAT_LINE_SOURCE,
+          metric: statMetricName("receptions"), value: 4,
+          asOf: new Date(FIRST_KICKOFF.getTime() + 2 * 24 * 60 * 60 * 1000),
+        }),
+      ]);
+      await seedDerivedOnlySeason(2025);
+
+      const inputs = await loadPreseason(db, LIVE_SEASON);
+      expect(inputs.momentKind).toBe("replay");
+      expect(inputs.lawFacts.has(VETERAN)).toBe(false);
+      expect(inputs.discoveryFacts.has(VETERAN)).toBe(false);
+    });
+
+    it("does NOT admit a DERIVED-only prior season on a LIVE board when that prior season is not in the allowlist", async () => {
+      // A second live season, one year further on: LIVE_SEASON_2's own prior season is 2026, which
+      // `LIVE_ADMITTED_DERIVED_SEASONS` does not list — only the LIVE half of the conjunction held.
+      const LIVE_SEASON_2 = 2027;
+      const FIRST_KICKOFF_2 = new Date("2027-09-03T23:20:00.000Z");
+      const clockBeforeKickoff2: Clock = { now: () => new Date(FIRST_KICKOFF_2.getTime() - 24 * 60 * 60 * 1000).toISOString() };
+
+      await recordPreseasonRosters(db, [
+        {
+          season: LIVE_SEASON_2, team: "BUF", playerId: VETERAN, position: "WR", status: "active",
+          birthDate: "1998-04-08", draftYear: 2020, draftPick: 17, draftClub: "BUF",
+          asOf: week1RosterAsOf(LIVE_SEASON_2),
+        },
+      ]);
+      await recordTeamObservations(db, [
+        {
+          season: LIVE_SEASON_2, week: 1, team: "BUF", source: SCHEDULE_SOURCE.kickoff,
+          metric: SCHEDULE_METRICS.kickoffInstant, value: 1, asOf: FIRST_KICKOFF_2,
+        },
+      ]);
+      await seedDerivedOnlySeason(2026);
+
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON_2, clockBeforeKickoff2);
+      const inputs = await loadPreseason(db, LIVE_SEASON_2, { boardMoment: liveMoment });
+      expect(inputs.momentKind).toBe("live");
+      expect(inputs.lawFacts.has(VETERAN)).toBe(false);
+      expect(inputs.discoveryFacts.has(VETERAN)).toBe(false);
     });
   });
 });

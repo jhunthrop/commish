@@ -336,11 +336,9 @@ describe("loadMarketCurveObservations and marketBoard", () => {
     it("resolves the board's own ADP snapshot to our player ids, priced through the fitted curve", async () => {
       await recordPreseasonRankings(db, [ranking({ rank: 3.4 })]);
       await recordPreseasonRosters(db, [roster()]);
-      // A game-derived observation defines the board's own as-of moment.
-      await recordObservations(db, [statLine({ value: 0 })]);
 
       const priors: MarketCurvePriors = { QB: [], RB: [{ adpRank: 3, points: 300 }, { adpRank: 4, points: 280 }], WR: [], TE: [] };
-      const { entries, droppedCount } = await marketBoard(db, 2020, priors);
+      const { entries, droppedCount } = await marketBoard(db, 2020, GAME_DERIVED_STAMP(2020), priors);
       expect(entries).toEqual([
         { playerId: PLAYER_A, position: "RB", adpRank: 3.4, marketPoints: marketCurve("RB", 3.4, priors) },
       ]);
@@ -350,17 +348,28 @@ describe("loadMarketCurveObservations and marketBoard", () => {
     it("drops a ranked row that cannot be resolved to a position, and reports the count via droppedCount", async () => {
       await recordPreseasonRankings(db, [ranking(), ranking({ playerId: PLAYER_D, rank: 8 })]);
       await recordPreseasonRosters(db, [roster()]); // PLAYER_D carries no roster row for 2020
-      await recordObservations(db, [statLine({ value: 0 })]);
 
-      const { entries, droppedCount } = await marketBoard(db, 2020);
+      const { entries, droppedCount } = await marketBoard(db, 2020, GAME_DERIVED_STAMP(2020));
       expect(entries).toHaveLength(1);
       expect(entries[0]!.playerId).toBe(PLAYER_A);
       expect(droppedCount).toBe(1);
     });
 
     it("answers empty, with a zero dropped count, when the store holds no ADP board for the season, never a guess", async () => {
-      await recordObservations(db, [statLine({ season: 2021, value: 0, asOf: GAME_DERIVED_STAMP(2021) })]);
-      expect(await marketBoard(db, 2021)).toEqual({ entries: [], droppedCount: 0 });
+      expect(await marketBoard(db, 2021, GAME_DERIVED_STAMP(2021))).toEqual({ entries: [], droppedCount: 0 });
+    });
+
+    it("takes `asOf` from the caller rather than deriving it internally — a LIVE board's own moment, which `preseasonMomentFor` cannot resolve for an unstarted season, still resolves an ADP board", async () => {
+      // The point of Task 4's fix: no game-derived observation exists for 2020 anywhere in this
+      // test, so `preseasonMomentFor(db, 2020)` would THROW here. `marketBoard` never calls it.
+      await recordPreseasonRankings(db, [ranking({ rank: 3.4, asOf: EARLY_AUGUST(2020) })]);
+      await recordPreseasonRosters(db, [roster()]);
+
+      const liveAsOf = new Date(EARLY_AUGUST(2020).getTime() + 1);
+      const { entries } = await marketBoard(db, 2020, liveAsOf);
+      expect(entries).toEqual([
+        { playerId: PLAYER_A, position: "RB", adpRank: 3.4, marketPoints: marketCurve("RB", 3.4, FITTED_MARKET_CURVE) },
+      ]);
     });
   });
 });

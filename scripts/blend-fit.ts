@@ -149,7 +149,7 @@ async function rowsForSeason(db: ReadonlyDb, season: number): Promise<{ readonly
   // live board reaching this function would poison a fit with a non-existent outcome.
   const inputs = gradableInputs(await loadPreseason(db, season));
   const candidates = preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, PRIORS);
-  const { entries: market, droppedCount } = await marketBoard(db, season);
+  const { entries: market, droppedCount } = await marketBoard(db, season, inputs.moment);
   const marketByPlayer = new Map(market.map((entry) => [entry.playerId, entry] as const));
   const actual = await actualSeasonPoints(db, season, inputs.positions);
 

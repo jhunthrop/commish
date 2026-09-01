@@ -7,7 +7,6 @@ import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import { projectedPosition } from "../nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import { BENCHMARK_SOURCES } from "../preseason/benchmarks";
-import { preseasonMomentFor } from "../preseason/source";
 import { preseasonRankingsAsOf, preseasonRostersAsOf } from "../preseason/store";
 import { FITTED_MARKET_CURVE } from "./curve-fitted";
 
@@ -334,10 +333,21 @@ export interface MarketBoardResult {
  * ONE SEASON'S MARKET BOARD — the ADP snapshot a preseason board is entitled to see, resolved to
  * our own player ids and priced through the fitted curve.
  *
- * Taken at `preseasonMomentFor(season)`, THE BOARD'S OWN AS-OF: the identical moment
- * `preseason/source.ts`'s `loadPreseason` builds a whole board at, so a market prior can drop
- * straight into the same blend without smuggling in a later date's ADP than the rest of the board
- * saw.
+ * `asOf` IS CALLER-SUPPLIED (Task 4, live-board plan) rather than derived internally. Before this
+ * task, this function computed its own `asOf` by calling `preseasonMomentFor(season)` — THE REPLAY
+ * ARM'S OWN DERIVATION, unconditionally. That was silently correct for every board this engine had
+ * ever built, because every board WAS a replay, but it hard-codes an assumption `preseason/
+ * source.ts`'s `BoardMoment` (Task 2) broke: a LIVE board's own moment is `liveMomentFor`'s `now`,
+ * capped before kickoff, and `preseasonMomentFor` THROWS for a season with no game-derived
+ * observations of its own — exactly the state a season that has not kicked off is always in. A
+ * caller building a live board would have hit that throw the instant `shippedPreseasonCandidates`
+ * (`market/blend.ts`) reached this function, even though every other read in `loadPreseason` had
+ * already resolved the SAME question correctly. The fix is to stop deriving it a second time: the
+ * caller already has the board's own resolved moment (`PreseasonInputs.moment`, replay or live
+ * alike) and hands it in directly, so this function asks no question `loadPreseason` has not already
+ * answered. BYTE-IDENTICAL for every existing replay caller, because `PreseasonInputs.moment` for
+ * the replay arm IS `preseasonMomentFor`'s own return value — `loadPreseason` builds it from exactly
+ * that call when no explicit `BoardMoment` is supplied.
  *
  * A ranked player whose position cannot be resolved from that season's own roster snapshot (no
  * roster row at all, or a roster row this curve does not carry a position for) is DROPPED rather
@@ -347,9 +357,9 @@ export interface MarketBoardResult {
 export async function marketBoard(
   db: ReadonlyDb,
   season: number,
+  asOf: Date,
   priors: MarketCurvePriors = FITTED_MARKET_CURVE,
 ): Promise<MarketBoardResult> {
-  const asOf = await preseasonMomentFor(db, season);
   const board = await preseasonRankingsAsOf(db, { season, source: BENCHMARK_SOURCES.adp, asOf });
   if (board.length === 0) return { entries: [], droppedCount: 0 };
   const roster = await preseasonRostersAsOf(db, { season, asOf });
