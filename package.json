@@ -31,6 +31,7 @@
     "projections:backfill": "dotenv -e .env.local -- tsx scripts/projection-backfill.ts",
     "projections:fit": "dotenv -e .env.local -- tsx scripts/projection-fit.ts",
     "projections:ablate": "dotenv -e .env.local -- tsx scripts/projection-ablate.ts",
+    "projections:calibrate": "dotenv -e .env.local -- tsx scripts/calibration-report.ts",
     "projections:context": "dotenv -e .env.local -- tsx scripts/projection-context.ts",
     "audit:verify": "dotenv -e .env.local -- tsx scripts/verify-audit-chain.ts",
     "reviews:remove": "dotenv -e .env.local -- tsx scripts/remove-review.ts",
@@ -47,12 +48,19 @@
     "projections:decisions": "dotenv -e .env.local -- tsx scripts/decision-report.ts",
     "projections:preseason:ingest": "dotenv -e .env.local -- tsx scripts/preseason-ingest.ts",
     "projections:preseason:fit": "dotenv -e .env.local -- tsx scripts/preseason-fit.ts",
+    "projections:rookie-curve:fit": "dotenv -e .env.local -- tsx scripts/rookie-curve-fit.ts",
+    "projections:market:fit": "dotenv -e .env.local -- tsx scripts/market-curve-fit.ts",
+    "projections:blend:fit": "dotenv -e .env.local -- tsx scripts/blend-fit.ts",
+    "projections:blend:diagnose": "dotenv -e .env.local -- tsx scripts/blend-diagnostic.ts",
     "projections:preseason": "dotenv -e .env.local -- tsx scripts/preseason-report.ts",
     "projections:preseason:diagnose": "dotenv -e .env.local -- tsx scripts/preseason-diagnose.ts",
     "projections:crosswalk": "dotenv -e .env.local -- tsx scripts/build-crosswalk.ts",
     "projections:ecr:current": "dotenv -e .env.local -- tsx scripts/ingest-current-ecr.ts",
     "projections:preseason:persist": "dotenv -e .env.local -- tsx scripts/preseason-persist.ts",
-    "laws:measure": "dotenv -e .env.local -- tsx scripts/measure-laws.ts"
+    "projections:market-edge:scorecard": "dotenv -e .env.local -- tsx scripts/market-edge-scorecard.ts",
+    "laws:measure": "dotenv -e .env.local -- tsx scripts/measure-laws.ts",
+    "laws:discover:quantiles": "dotenv -e .env.local -- tsx scripts/discovery-quantile-fit.ts",
+    "laws:discover": "dotenv -e .env.local -- tsx scripts/discover-laws.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

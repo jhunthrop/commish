@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Position } from "@/domain/player";
 import type { PlayerWeekUsage } from "../usage";
-import { predictOpportunity, type OpportunityPriors } from "./opportunity";
+import { lastObservedPriors, predictOpportunity, type OpportunityPriors } from "./opportunity";
 
 /**
  * Priors chosen to be READABLE rather than realistic — the fitted ones live in `fitted.ts` and are
@@ -174,5 +174,48 @@ describe("predictOpportunity", () => {
     const predicted = predictFor(history, 7).get("star")!;
     expect(predicted.teamTargets).toBeLessThan(PRIORS.leagueTeamVolume.targets);
     expect(predicted.teamCarries).toBeGreaterThan(PRIORS.leagueTeamVolume.carries);
+  });
+});
+
+describe("shareShrinkageByPosition", () => {
+  // Five identical weeks against a role prior of 0.25: with the base shrinkage (season 4) the
+  // in-season mean of 0.5 is pulled toward the role, and with an override of season 0 (no shrinkage
+  // at all) the player's own record should win outright.
+  const history = Array.from({ length: 5 }, (_, index) =>
+    usage({ season: 2023, week: index + 1, playerId: "star", snapShare: 0.9, targetShare: 0.5 }),
+  );
+
+  it("overrides the position's own share shrinkage, and only that position's", () => {
+    const overridden: OpportunityPriors = {
+      ...PRIORS,
+      shareShrinkageByPosition: { WR: { season: 0, inSeason: 0 } },
+    };
+    const withOverride = predictOpportunity(history, { season: 2023, week: 6, positions: POSITIONS }, overridden).get("star")!;
+    const withoutOverride = predictOpportunity(history, { season: 2023, week: 6, positions: POSITIONS }, PRIORS).get("star")!;
+    expect(withOverride.targetShare).toBeCloseTo(0.5, 10);
+    expect(withOverride.targetShare).toBeGreaterThan(withoutOverride.targetShare);
+
+    // "back" is RB, unnamed in `shareShrinkageByPosition`: identical either way.
+    const backHistory = [usage({ season: 2023, week: 1, playerId: "back", snapShare: 0.6, targetShare: 0.2 })];
+    const backWith = predictOpportunity(backHistory, { season: 2023, week: 2, positions: POSITIONS }, overridden).get("back")!;
+    const backWithout = predictOpportunity(backHistory, { season: 2023, week: 2, positions: POSITIONS }, PRIORS).get("back")!;
+    expect(backWith).toEqual(backWithout);
+  });
+
+  it("never overrides team volume, which is not named in the override", () => {
+    const overridden: OpportunityPriors = { ...PRIORS, shareShrinkageByPosition: { WR: { season: 0, inSeason: 0 } } };
+    const withOverride = predictOpportunity(history, { season: 2023, week: 6, positions: POSITIONS }, overridden).get("star")!;
+    const withoutOverride = predictOpportunity(history, { season: 2023, week: 6, positions: POSITIONS }, PRIORS).get("star")!;
+    expect(withOverride.teamTargets).toBe(withoutOverride.teamTargets);
+  });
+
+  it("lastObservedPriors clears the override, so the floor is genuinely shrinkage-free everywhere", () => {
+    const overridden: OpportunityPriors = { ...PRIORS, shareShrinkageByPosition: { WR: { season: 20, inSeason: 20 } } };
+    const floor = predictOpportunity(history, { season: 2023, week: 6, positions: POSITIONS }, lastObservedPriors(overridden)).get(
+      "star",
+    )!;
+    // With the override still in place a season-20 shrinkage would pull hard toward the role prior
+    // (0.25); the floor must ignore it entirely and read the last observed week (0.5) instead.
+    expect(floor.targetShare).toBeCloseTo(0.5, 10);
   });
 });

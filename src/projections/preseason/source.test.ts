@@ -10,6 +10,8 @@ import { recordTeamObservations } from "../team-store";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { FITTED_MODEL } from "../model/source";
 import type { Law } from "../laws/types";
+import { blendBoard, seasonPointsOf, shippedPreseasonCandidates, type BlendConstants } from "../market/blend";
+import type { MarketPriorEntry } from "../market/curve";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -22,6 +24,7 @@ import {
   preseasonCandidates,
   preseasonMomentFor,
   rookieSegmentFor,
+  SHIPPED_PRESEASON_FEATURES,
   type PreseasonPriors,
 } from "./source";
 
@@ -314,8 +317,43 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
       position: "WR",
       claim: "Fixture claim for target_share_persistence, independent of the real registry.",
       measured: { effect: 1.8, ci: [1.2, 2.4], sample: 250, seasons: "fixture" },
+      trainEffect: 1.8,
       verdict: "confirmed",
       modelPath: null,
+      hasFoldEvidence: true,
+      origin: "tribal",
+      primaryQuantityId: null,
+      primaryQuantityNoun: null,
+      primaryQuantityUnit: null,
+      ...overrides,
+    };
+  }
+
+  /**
+   * A REAL discovered candidate id (Task 8 fix round, IMPORTANT 1) — `preseasonCandidates`'
+   * `lawReasonsFor` call site never overrides `candidates` (`board-reasons.ts`'s own default
+   * parameter), so it always matches a discovered `Law.id` against the REAL
+   * `generateCandidates()`'s own output, never a fixture candidate. `threshold:WR:targetShare:q80`
+   * is real (the committed `DISCOVERY_QUANTILES` table fits a WR `targetShare` quantile at every
+   * level) and its primary quantity is `targetShare` — the SAME quantity `target_share_persistence`
+   * reads, off the SAME `beforeEach` participation rows this describe block already seeds (9
+   * targets / 34 team targets weekly, `9/34 ≈ 0.265`), so no new seeding is needed to trip it: 0.265
+   * clears every one of the real WR `targetShare` quantile marks (0.152/0.188/0.234 at q70/q80/q90).
+   */
+  function fixtureDiscoveredLaw(overrides: Partial<Law> = {}): Law {
+    return {
+      id: "threshold:WR:targetShare:q80",
+      position: "WR",
+      claim: "Fixture claim for a discovered targetShare law, independent of the real discovered.json.",
+      measured: { effect: 2.1, ci: [1.4, 2.8], sample: 250, seasons: "fixture" },
+      trainEffect: 2.1,
+      verdict: "confirmed",
+      modelPath: null,
+      hasFoldEvidence: true,
+      origin: "discovered",
+      primaryQuantityId: "targetShare",
+      primaryQuantityNoun: "target share",
+      primaryQuantityUnit: "percent",
       ...overrides,
     };
   }
@@ -365,5 +403,119 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
     const inputs = await loadPreseason(db, 2024);
     expect(inputs.laws.length).toBeGreaterThan(0);
     expect(() => preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS)).not.toThrow();
+  });
+
+  /**
+   * THE DISCOVERED-ORIGIN SIBLING OF THIS DESCRIBE BLOCK'S OWN TRIBAL TESTS ABOVE (Task 8 fix round,
+   * IMPORTANT 1) — the SAME wiring seam (`loadPreseason`'s `discoveryFactsForSeason` call ->
+   * `PreseasonInputs.discoveryFacts` -> `preseasonCandidates`'s `emit()` -> `lawReasonsFor`), driven
+   * through the REAL `discoveryFactsForSeason` -> `discoveryQuantitiesForSeason` reader rather than
+   * a hand-built `DiscoveryFacts` object the way `board-reasons.test.ts`'s own fixtures do. This is
+   * the guard against a silent-all-nulls failure the unit fixtures cannot catch: if
+   * `discoveryQuantitiesForSeason`'s own store reads ever drifted from what `PARTICIPATION_METRICS`/
+   * `STAT_LINE_SOURCE` actually publish, every `DiscoveryQuantityValues` field would come back
+   * `null` for every real player and every discovered law would silently stop firing — a unit test
+   * with hand-built facts would never notice, because it never asks the real reader anything.
+   */
+  it("attaches a DISCOVERED \"law\" reason through the REAL discoveryFactsForSeason path, not hand-built facts", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureDiscoveredLaw()]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+
+    const lawReasons = veteran.reasons.filter((reason) => reason.code === "law");
+    expect(lawReasons).toEqual([{ code: "law", lawId: "threshold:WR:targetShare:q80", effect: 2.1, magnitude: 9 / 34 }]);
+  });
+
+  it("attaches no DISCOVERED \"law\" reason when the fixture law is not confirmed, even with real tripping evidence", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureDiscoveredLaw({ verdict: "weak" })]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+
+    expect(veteran.reasons.some((reason) => reason.code === "law")).toBe(false);
+  });
+
+  it("attaches no DISCOVERED \"law\" reason for the rookie, who has no 2023 evidence at all", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureDiscoveredLaw()]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const rookie = candidates.find((candidate) => candidate.playerId === ROOKIE)!;
+
+    expect(rookie.reasons.some((reason) => reason.code === "law")).toBe(false);
+  });
+
+  it("attaches BOTH a tribal and a discovered \"law\" reason for the same player when both fixtures fire", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureLaw(), fixtureDiscoveredLaw()]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+
+    const lawReasons = veteran.reasons.filter((reason) => reason.code === "law");
+    expect(lawReasons.map((reason) => (reason.code === "law" ? reason.lawId : null)).sort()).toEqual([
+      "target_share_persistence",
+      "threshold:WR:targetShare:q80",
+    ]);
+  });
+});
+
+/**
+ * I4 (fix round, 2026-08-31) — THE IDENTITY PIN, THROUGH A PRODUCTION-REACHABLE ROUTE. `blend.test.ts`
+ * pins `blendBoard`'s own identity (no admitted evidence -> marketPoints exactly) against a
+ * hand-built `BoardCandidate`; this test pins the SAME identity against a candidate this describe
+ * block's own `preseasonCandidates` actually produced, with `features.availability: false` — the
+ * real ablation route (`gives everybody seventeen games...`, above) that is the ONLY way a real
+ * board's own `games.expected` becomes a clean, exact number rather than a fitted distribution's own
+ * continuous mean. `laws: []` on `loadPreseason` keeps the candidate free of any real confirmed
+ * law's own reason, so the only evidence source left to neutralise is the availability gap itself.
+ */
+describe("blendBoard's identity, through a production-reachable route (I4 fix round)", () => {
+  it("returns marketPoints exactly for a real candidate whose games.expected matches the constants' own implied-games table", async () => {
+    const inputs = await loadPreseason(db, 2024, []);
+    const candidates = preseasonCandidates(inputs, { ...ALL_PRESEASON_FEATURES, availability: false }, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+    expect(veteran.games.expected).toBe(17); // the real ablation route: seventeenGamesForEveryone(2024)
+
+    const marketEntry: MarketPriorEntry = { playerId: VETERAN, position: "WR", adpRank: 12, marketPoints: 233.47 };
+    const constants: BlendConstants = {
+      lawCapPoints: 20,
+      availabilityCapPoints: 40,
+      totalCapPoints: 40,
+      // Deliberately matches veteran.games.expected (17) so the availability-gap delta is exactly
+      // zero — the one condition under which the identity is exercised.
+      impliedGamesByPosition: { QB: 17, RB: 17, WR: 17, TE: 17 },
+      // This test is listed (marketEntry exists), so marketTailByPosition never applies, but
+      // BlendConstants still requires it.
+      marketTailByPosition: { QB: 100_000, RB: 100_000, WR: 100_000, TE: 100_000 },
+    };
+    const [blended] = blendBoard([marketEntry], [veteran], { season: 2024, constants, laws: [] });
+
+    expect(seasonPointsOf(blended!)).toBeCloseTo(233.47, 6);
+    expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 233.47, delta: 0 });
+  });
+});
+
+/** M9 (fix round) — `shippedPreseasonCandidates`'s own `{ raw: true }` seam, through the real DB
+ *  path rather than only inferred from reading the source. No ADP board is ingested anywhere in
+ *  this file's fixtures, so the BLENDED path (the default) falls back every candidate to
+ *  `market_unlisted`; the RAW path never touches the market at all and carries no such reason. */
+describe("shippedPreseasonCandidates's raw flag (M9 fix round)", () => {
+  it("raw: true returns exactly preseasonCandidates's own output, with no market_unlisted or market_anchor reason", async () => {
+    const inputs = await loadPreseason(db, 2024);
+    // shippedPreseasonCandidates defaults `features` to SHIPPED_PRESEASON_FEATURES, not
+    // ALL_PRESEASON_FEATURES — the "expected" side has to match that default, not this file's own
+    // usual ablation-testing default, or the two sides diverge on unrelated feature flags
+    // (rookieLanding in particular) rather than on the raw/blended distinction this test is about.
+    const expected = preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, PRIORS);
+    const raw = await shippedPreseasonCandidates(db, inputs, PRIORS, { raw: true });
+    expect(raw).toEqual(expected);
+    for (const candidate of raw) {
+      expect(candidate.reasons.some((reason) => reason.code === "market_unlisted" || reason.code === "market_anchor")).toBe(false);
+    }
+  });
+
+  it("raw: false (the default) runs the blend, tagging every candidate market_unlisted when no ADP board exists", async () => {
+    const inputs = await loadPreseason(db, 2024);
+    const blended = await shippedPreseasonCandidates(db, inputs, PRIORS);
+    expect(blended.length).toBeGreaterThan(0);
+    for (const candidate of blended) {
+      expect(candidate.reasons).toContainEqual({ code: "market_unlisted" });
+    }
   });
 });

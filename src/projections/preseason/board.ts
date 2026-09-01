@@ -64,15 +64,45 @@ export type BoardReason =
   | { readonly code: "scarcity"; readonly positionRank: number; readonly replacementLevel: number }
   | { readonly code: "tier_cliff"; readonly playersLeftInTier: number; readonly dropToNextTier: number }
   /**
-   * A CONFIRMED law (`laws/registry.ts`) whose own condition is true for this player, for the
-   * season this board projects. `effect` is the law's REGISTRY-MEASURED points/game delta
-   * (`Law.measured.effect`, the same number every law carries everywhere else it is shown) — never
-   * recomputed per player. `magnitude` is the player's OWN value of the exact quantity that law's
-   * condition reads, so the reason says not just "this law applies" but "by how much"; its unit
-   * depends on `lawId` and is documented in full at `laws/board-reasons.ts`'s `magnitudeForLaw`
-   * (touches for `rb_workload_cliff`, years for `rb_age_curve`, a target-share fraction for
-   * `wr_target_competition` and `target_share_persistence`, a share-over-threshold ratio for
-   * `td_regression`, pass-rate-over-expected for `play_caller_fingerprint`). Built by
+   * Task 10 (`market/blend.ts`'s `blendBoard`) could not find this player on the market's own ADP
+   * board, so his season points are `Math.min(rawModelPoints, marketTailByPosition[position])` —
+   * the raw model's own number, capped so he can never outrank the market's own cheapest drafted man
+   * at his position (`market/blend.ts`'s `tailCappedUnlistedPoints`, fix round 3, IMPORTANT 1 —
+   * SIMPLIFIED from an earlier two-layer version that also ran an affine rescale first). Since the
+   * cap can bind, his final number is NOT always a pure, unedited model output; the reason itself
+   * carries no field that says whether it did, so neither this docblock nor `reason-chip.tsx`'s
+   * copy for this code claims one way or the other. NOT a claim that the model is wrong about him —
+   * an unranked player is usually a deep camp body neither a real draft board nor `blendBoard` has an
+   * opinion worth blending — only that the two numbers a manager can compare on every other row (what
+   * the market thinks, what evidence moved him off it) do not exist for this one.
+   */
+  | { readonly code: "market_unlisted" }
+  /**
+   * I6 (fix round, 2026-08-31) — on every LISTED blended candidate, the market entry `blendBoard`
+   * anchored him to and the total admitted delta it moved him by: his blended season points are
+   * `marketPoints + delta`, FLOORED AT ZERO (fix round 2 — an earlier version of this docstring said
+   * "exactly," overstating it; `blendBoard`'s own `Math.max(0, marketPoints + delta)` can clip a
+   * large enough negative delta). Lets a reader see not just WHAT moved a player (the law/
+   * availability reasons already on the list) but WHERE he started and BY HOW MUCH the blend
+   * actually spent. `delta` can be negative (moved below market), zero (no admitted evidence, or
+   * every admitted delta capped to nothing), or — for a listed rookie — `rookieCurve − marketPoints`,
+   * an uncapped full substitution rather than an additive term. M8 RULING: deliberately excluded
+   * from `reason-chip.tsx`'s `strongestLawReasons` (the two-chip compact board surface stays
+   * LAW-ONLY); renders only where a full reason list does, e.g. PlayerPeek's own outlook.
+   */
+  | { readonly code: "market_anchor"; readonly marketPoints: number; readonly delta: number }
+  /**
+   * A CONFIRMED law (`laws/registry.ts`), TRIBAL OR DISCOVERED, whose own condition is true for this
+   * player, for the season this board projects. `effect` is the law's REGISTRY-MEASURED points/game
+   * delta (`Law.measured.effect`, the same number every law carries everywhere else it is shown) —
+   * never recomputed per player. `magnitude` is the player's OWN value of the exact quantity that
+   * law's condition reads, so the reason says not just "this law applies" but "by how much"; its
+   * unit depends on `lawId` and is documented in full at `laws/board-reasons.ts`'s `magnitudeForLaw`
+   * for a tribal law (touches for `rb_workload_cliff`, years for `rb_age_curve`, a target-share
+   * fraction for `wr_target_competition` and `target_share_persistence`, a share-over-threshold
+   * ratio for `td_regression`, pass-rate-over-expected for `play_caller_fingerprint`) and at that same
+   * module's `magnitudeForDiscoveredLaw` for a discovered one (the primary quantity's own current-
+   * season value, per `discovery/templates.ts`'s `primaryQuantityIdOf`). Built by
    * `laws/board-reasons.ts`'s `lawReasonsFor`, the one place a candidate's facts become this variant.
    */
   | { readonly code: "law"; readonly lawId: string; readonly effect: number; readonly magnitude: number };

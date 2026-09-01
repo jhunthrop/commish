@@ -57,12 +57,20 @@ function emptyLine(playerId: string, week: number): StatLine {
  * it carries, so a missing metric on a player who HAS a line means the feed positively recorded
  * nothing there. A player with no line at all simply does not appear, which is the "absent" case,
  * and it stays distinguishable.
+ *
+ * `source` defaults to `STAT_LINE_SOURCE` — every caller except one leaves it there and gets
+ * exactly the published nflverse line, unchanged. The one exception is
+ * `nflverse/derived-stat-lines.ts`'s `statLinesAsOfForMeasurement`, which passes
+ * `DERIVED_STAT_LINE_SOURCE` to read the pbp-derived fallback for a gap season — the only reason
+ * this parameter exists at all, so a product surface reaching for a different source has to go out
+ * of its way to do it rather than stumbling into it.
  */
 export async function statLinesAsOf(
   db: ReadonlyDb,
   query: Omit<ObservationQuery, "source">,
+  source: string = STAT_LINE_SOURCE,
 ): Promise<readonly SeasonStatLine[]> {
-  const observations = await observationsAsOf(db, { ...query, source: STAT_LINE_SOURCE });
+  const observations = await observationsAsOf(db, { ...query, source });
 
   // Insertion order is the store's own `(week, playerId, …)` ordering, which a Map preserves — so
   // the result is deterministic and a `ScoreCard` computed from it is reproducible.

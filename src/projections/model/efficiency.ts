@@ -1,5 +1,6 @@
 import type { Position, StatLine } from "@/domain/player";
 import type { SeasonStatLine } from "../lines";
+import { HISTORICAL_ROSTER_FLOOR } from "../nflverse/rosters";
 import type { PlayerWeekUsage } from "../usage";
 
 /**
@@ -72,6 +73,14 @@ export interface EfficiencyPriors {
   readonly byPosition: Readonly<Record<Position, Readonly<Record<RateName, number>>>>;
   /** How many OPPORTUNITIES of prior each rate is worth. Larger means regressed harder. */
   readonly regression: Readonly<Record<RateName, number>>;
+  /**
+   * THE YEARS-4-6 EXPERIENCE TERM — one scalar per position, applied to every rate uniformly for a
+   * player in his 4th through 6th season. See `experienceCohort` for how the cohort is computed and
+   * `fitted.ts` for the fit window and the measured ratio behind each entry. A position absent here,
+   * or present at exactly `1`, is a position the fit found no correction for — "let the fitted
+   * magnitude decide" means a near-neutral measurement gets no term rather than a token one.
+   */
+  readonly experienceMultiplier?: Readonly<Partial<Record<Position, number>>>;
 }
 
 export type PlayerRates = Readonly<Record<RateName, number>>;
@@ -81,6 +90,52 @@ export interface EfficiencyContext {
   /** The week being predicted. Nothing at or after it is evidence. */
   readonly week: number;
   readonly positions: ReadonlyMap<string, Position>;
+  /**
+   * A player's first season with a stamped week-one roster row (`firstRosterSeasonsThrough`),
+   * OPTIONAL: omitted, the experience term is a no-op everywhere, exactly like every other optional
+   * context this engine threads through a layer that predates the feature. The preseason model does
+   * not pass this — it has its own, independent career-stage curve (`preseason/career.ts`), fitted a
+   * different way, on a different clock; this map and that curve are never meant to agree by
+   * construction, only to both have earned their place separately.
+   */
+  readonly firstRosterSeason?: ReadonlyMap<string, number>;
+}
+
+/**
+ * THE COHORT A PLAYER'S CAREER YEAR FALLS IN, for the one band this layer corrects.
+ *
+ * Career year is `season - firstRosterSeason + 1`, not the roster release's own draft/entry year —
+ * a second, independent measurement of the same underlying idea `preseason/career.ts` already uses,
+ * built from Task 1's historical roster backfill instead of from `preseason_rosters.draft_year`.
+ *
+ * RIGHT-CENSORED AT THE BACKFILL FLOOR. `firstRosterSeasonsThrough` only sees rows back to
+ * `HISTORICAL_ROSTER_FLOOR`; a player whose first stamped row IS that floor season may have debuted
+ * any number of years earlier; his true career year is a LOWER bound, not a measurement. Placing him
+ * in the "year 4-6" cohort on that basis would assert a career stage the data cannot support, so a
+ * floor-anchored player computing to 6 years or fewer is excluded from the cohort outright rather
+ * than guessed into it — he is scored as "other" (no term), never as a false rookie-adjacent player.
+ */
+export function experienceCohort(season: number, firstRosterSeason: number | null): "year4to6" | "other" {
+  if (firstRosterSeason === null || !Number.isInteger(firstRosterSeason)) return "other";
+  const careerYear = season - firstRosterSeason + 1;
+  if (careerYear < 1) return "other";
+  if (firstRosterSeason <= HISTORICAL_ROSTER_FLOOR && careerYear <= 6) return "other";
+  return careerYear >= 4 && careerYear <= 6 ? "year4to6" : "other";
+}
+
+/** The bounded, guarded multiplier for one player — `1` (a no-op) for anyone not in the cohort. */
+function experienceMultiplierFor(
+  position: Position,
+  playerId: string,
+  season: number,
+  firstRosterSeason: ReadonlyMap<string, number> | undefined,
+  priors: EfficiencyPriors,
+): number {
+  if (firstRosterSeason === undefined || priors.experienceMultiplier === undefined) return 1;
+  const cohort = experienceCohort(season, firstRosterSeason.get(playerId) ?? null);
+  if (cohort !== "year4to6") return 1;
+  const multiplier = priors.experienceMultiplier[position];
+  return multiplier === undefined || !(multiplier > 0) || !Number.isFinite(multiplier) ? 1 : multiplier;
 }
 
 /** One player's totals over the history a prediction may see. */
@@ -111,7 +166,7 @@ function emptyTotals(): Totals {
 export function predictRates(
   history: readonly SeasonStatLine[],
   usage: readonly PlayerWeekUsage[],
-  { season, week, positions }: EfficiencyContext,
+  { season, week, positions, firstRosterSeason }: EfficiencyContext,
   priors: EfficiencyPriors,
 ): ReadonlyMap<string, PlayerRates> {
   const visible = (rowSeason: number, rowWeek: number): boolean =>
@@ -145,6 +200,7 @@ export function predictRates(
     if (position === undefined) continue;
     const player = totals.get(playerId)!;
     const rolePrior = priors.byPosition[position];
+    const experienceMultiplier = experienceMultiplierFor(position, playerId, season, firstRosterSeason, priors);
     predictions.set(
       playerId,
       Object.fromEntries(
@@ -155,7 +211,7 @@ export function predictRates(
           // No opportunities means no evidence, which is the prior — not a rate of zero. A receiver
           // who has not been thrown to has not been proven bad at catching.
           const value = opportunities <= 0 ? prior : (player.numerators[name] + k * prior) / (opportunities + k);
-          return [name, Math.max(0, value)];
+          return [name, Math.max(0, value * experienceMultiplier)];
         }),
       ) as PlayerRates,
     );

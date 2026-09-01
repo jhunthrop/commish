@@ -14,13 +14,12 @@ import { createDb, type ReadonlyDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import type { Position } from "@/domain/player";
-import { computeFantasyPoints } from "@/scoring/compute";
 import { allPositions } from "@/projections/backtest";
 import { nflPlayers } from "@/db/schema";
-import { statLinesAsOf } from "@/projections/lines";
 import { FITTED_MODEL } from "@/projections/model/source";
-import { RANK_BANDS, scoreCard, type Observation, type RankBandName, type ScoreCard } from "@/projections/metrics";
+import { RANK_BANDS, type ScoreCard } from "@/projections/metrics";
 import type { LeagueShape } from "@/projections/decide/replacement";
+import { shippedPreseasonCandidates } from "@/projections/market/blend";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { overlapTiers, preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
 import {
@@ -29,6 +28,7 @@ import {
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
 } from "@/projections/preseason/fitted";
+import { actualSeasonPoints, boardPoints, boardValues, scoreOrdering } from "@/projections/preseason/scorecard";
 import {
   SHIPPED_PRESEASON_FEATURES,
   loadPreseason,
@@ -44,7 +44,6 @@ import { preseasonRankingsAsOf } from "@/projections/preseason/store";
 
 const SEASONS = process.argv.slice(2).map(Number);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : [2023, 2024];
-const LAST_REGULAR_WEEK = 18;
 
 /** Far past any correction: outcomes and benchmarks alike are scored against, never fed in. */
 const FINAL = new Date("9999-12-31T00:00:00.000Z");
@@ -106,71 +105,6 @@ function delta(before: ScoreCard, after: ScoreCard): string {
   return `${difference >= 0 ? "+" : ""}${difference.toFixed(4)}`;
 }
 
-/** What every player on a board actually scored over the regular season. Zero for a man who never played. */
-async function actualSeasonPoints(
-  db: ReadonlyDb,
-  season: number,
-  positions: ReadonlyMap<string, Position>,
-): Promise<ReadonlyMap<string, number>> {
-  const rows = await statLinesAsOf(db, { season, week: { from: 1, to: LAST_REGULAR_WEEK }, asOf: FINAL });
-  const totals = new Map<string, number>();
-  for (const row of rows) {
-    const position = positions.get(row.line.playerId);
-    if (position === undefined) continue;
-    totals.set(row.line.playerId, (totals.get(row.line.playerId) ?? 0) + computeFantasyPoints(row.line, position, PPR_SCORING));
-  }
-  return totals;
-}
-
-/**
- * Scores one ordering against outcomes, banded by a COMMON prior where one is given.
- *
- * Banding by a shared ranking rather than by each source's own is the fix every previous research
- * document in this engine asked for and none could apply: model v1 and model v2 both record that a
- * band-by-band comparison between sources is "indicative rather than exact" because the two arms do
- * not hold the same players in a band, and both name average draft position as the fix. This phase
- * ingested it, so the fix is available here for the first time.
- */
-function scoreOrdering(
-  predicted: ReadonlyMap<string, number>,
-  actual: ReadonlyMap<string, number>,
-  eligible: ReadonlySet<string>,
-  bandBy: ReadonlyMap<string, number> | null,
-): { readonly overall: ScoreCard; readonly byBand: Readonly<Record<RankBandName, ScoreCard>> } {
-  const rows = [...predicted.entries()]
-    .filter(([playerId]) => eligible.has(playerId) && actual.has(playerId))
-    .map(([playerId, value]) => ({ playerId, value, actual: actual.get(playerId)! }));
-
-  const order = [...rows].sort((a, b) => {
-    if (bandBy === null) return b.value - a.value || a.playerId.localeCompare(b.playerId);
-    return (bandBy.get(a.playerId) ?? Infinity) - (bandBy.get(b.playerId) ?? Infinity) || a.playerId.localeCompare(b.playerId);
-  });
-  const bandOf = new Map(order.map((row, index) => [row.playerId, index + 1] as const));
-
-  const observationsIn = (from: number, to: number): readonly Observation[] =>
-    rows
-      .filter((row) => {
-        const rank = bandOf.get(row.playerId)!;
-        return rank >= from && rank <= to;
-      })
-      .map((row) => ({ predicted: row.value, actual: row.actual }));
-
-  return {
-    overall: scoreCard(rows.map((row) => ({ predicted: row.value, actual: row.actual }))),
-    byBand: Object.fromEntries(
-      RANK_BANDS.map((band) => [band.name, scoreCard(observationsIn(band.from, band.to))]),
-    ) as Record<RankBandName, ScoreCard>,
-  };
-}
-
-function boardValues(board: readonly BoardEntry[]): ReadonlyMap<string, number> {
-  return new Map(board.map((entry) => [entry.playerId, entry.valueOverReplacement] as const));
-}
-
-function boardPoints(board: readonly BoardEntry[]): ReadonlyMap<string, number> {
-  return new Map(board.map((entry) => [entry.playerId, entry.projectedPoints] as const));
-}
-
 /** The rookie class ordered by draft capital and nothing else. The `before` arm Task 3 has to beat. */
 function draftCapitalOnly(inputs: PreseasonInputs, eligible: ReadonlySet<string>): ReadonlyMap<string, number> {
   return new Map(
@@ -184,6 +118,10 @@ function draftCapitalOnly(inputs: PreseasonInputs, eligible: ReadonlySet<string>
   );
 }
 
+/** THE RAW MODEL BOARD — never blended. Every ablation below toggles a MODEL feature, and an
+ *  ablation compared against a market-blended "after" arm would be measuring two changes (the
+ *  feature AND the blend) at once; ablations stay on this function's own output, "before" and
+ *  "after" alike, so what moved is always the one flag being tested. */
 function build(inputs: PreseasonInputs, features: PreseasonFeatures): readonly BoardEntry[] {
   return preseasonBoard(preseasonCandidates(inputs, features, PRIORS), {
     season: inputs.season,
@@ -191,6 +129,19 @@ function build(inputs: PreseasonInputs, features: PreseasonFeatures): readonly B
     rules: PPR_SCORING,
     shape: SHAPE,
   });
+}
+
+/**
+ * THE SHIPPED BOARD (M6 fix round, 2026-08-31) — market-blended, via `shippedPreseasonCandidates`'s
+ * own default. This is what a reader of this script's headline numbers (the top 20, the scorecard
+ * against the outcome, the comparison against the published market/consensus benchmarks) should be
+ * shown: the board this engine actually ships, not an intermediate the market blend never touched.
+ * The raw model stays reachable, unchanged, as `build`'s own output — every ablation below reads
+ * that, never this.
+ */
+async function buildShipped(db: ReadonlyDb, inputs: PreseasonInputs): Promise<readonly BoardEntry[]> {
+  const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS);
+  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
 }
 
 function printBands(label: string, banded: ReturnType<typeof scoreOrdering>): void {
@@ -214,9 +165,10 @@ async function main(): Promise<void> {
     console.log(`${season} PRESEASON BOARD, 12-team PPR, taken at ${inputs.moment.toISOString()}`);
     console.log(`${"=".repeat(96)}\n`);
 
-    const board = build(inputs, SHIPPED_PRESEASON_FEATURES);
+    const rawBoard = build(inputs, SHIPPED_PRESEASON_FEATURES);
+    const board = await buildShipped(db, inputs);
     console.log(
-      `board: ${board.length} players from a ${inputs.roster.length}-man week-one roster, ` +
+      `board (shipped, market-blended): ${board.length} players from a ${inputs.roster.length}-man week-one roster, ` +
         `${inputs.usage.length} prior usage rows, ${inputs.teamObservations.length} team facts`,
     );
 
@@ -238,6 +190,18 @@ async function main(): Promise<void> {
     // about, so neither is credited for breadth. Model v1 established that discipline and the same
     // reasoning applies with more force here, because a published board stops at about two hundred
     // names and ours does not.
+    //
+    // SELF-REFERENTIAL CAVEAT (fix round 2, review finding): `board` here is the SHIPPED,
+    // MARKET-BLENDED board (M6 fix round 1) — and `BENCHMARK_SOURCES.adp` (`ffc_adp_ppr_12`) is the
+    // EXACT SAME feed `market/curve.ts`'s market curve, and therefore `market/blend.ts`'s own
+    // `marketPoints` anchor, is built from. For every LISTED player, "our board" below is not an
+    // independent read scored against the market — it is a number anchored to that market's own
+    // rank, plus a capped delta, being compared back against the market's own rank. A strong
+    // "AGAINST MARKET (ADP)" correlation here is expected by construction, not evidence the blend
+    // adds anything; it does NOT hold for "AGAINST CONSENSUS (ECR)" below, a genuinely independent
+    // feed, or for `rawBoard`'s own numbers (never blended). Task 11's own scorecard must weight the
+    // ECR comparison and the raw-vs-blend delta as the load-bearing evidence, and read the ADP
+    // comparison here as a sanity check on the blend's own arithmetic rather than a result.
     for (const [label, source] of [
       ["market (ADP)", BENCHMARK_SOURCES.adp],
       ["consensus (ECR)", BENCHMARK_SOURCES.ecr],
@@ -279,8 +243,9 @@ async function main(): Promise<void> {
             scoreOrdering(draftCapitalOnly(inputs, eligible), actual, eligible, null)
           : scoreOrdering(boardPoints(without), actual, eligible, null);
       // Ablated on the ORDERING THE BOARD SHIPS, which is points. Measuring an ablation on a view
-      // the board does not lead with would be answering a question nobody asks.
-      const after = scoreOrdering(boardPoints(board), actual, eligible, null);
+      // the board does not lead with would be answering a question nobody asks. `rawBoard`, not the
+      // market-blended `board` (M6 fix round) — see `build`'s own docblock for why.
+      const after = scoreOrdering(boardPoints(rawBoard), actual, eligible, null);
       console.log(
         `  ${ablation.name.padEnd(14)} on ${ablation.segment.padEnd(18)} ${rho(before.overall)} -> ${rho(after.overall)}  ` +
           `${delta(before.overall, after.overall)}   n=${after.overall.sampleSize} (before n=${before.overall.sampleSize})` +

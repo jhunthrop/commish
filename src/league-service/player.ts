@@ -7,7 +7,7 @@ import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG, seasonProgress } from "@/league";
 import { nflPlayerIdFor } from "@/projections/crosswalk";
 import type { Law } from "@/projections/laws/types";
-import { registry } from "@/projections/laws/registry";
+import { chipEligibleLaws, registry } from "@/projections/laws/registry";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import type { BoardReason } from "@/projections/preseason/board";
 import { BOARD_SOURCE, boardReasons, preseasonProjectionsFor } from "@/projections/preseason/board-store";
@@ -76,8 +76,13 @@ export interface PlayerSeasonTotals {
  *   `player_crosswalk` — the id join that did not exist when this docblock was first written and
  *   was the reason the cell printed a dash. It resolves for a player the crosswalk placed AND the
  *   publisher ranked, which for the current season is 441 of the 518 names on the board.
- * - **Our own board** is `preseason_projections`, source `commish_board_v1_ppr_12`, read through
- *   the same crosswalk. It is EMPTY FOR THE CURRENT SEASON and stated as such rather than
+ * - **Our own board** is `preseason_projections`, source `commish_board_v4_ppr_12` (`BOARD_SOURCE`,
+ *   `board-store.ts` — the market-blended board, bumped to v4 in fix round 3 after a real correctness
+ *   bug in v3's own stored unlisted pricing, following the same v2/v3 bumps before it; see that
+ *   constant's own docblock for the full history). `commish_board_v1_ppr_12` is the raw model's own
+ *   historical source, kept for provenance but no longer what a live product surface reads. Read
+ *   through the same crosswalk.
+ *   It is EMPTY FOR THE CURRENT SEASON and stated as such rather than
  *   backfilled from a season that has finished: the board needs three prior seasons of ingested
  *   usage and a replay moment derived from games already played, and the store holds 2021 to 2024.
  *   Showing 2024's number beside this year's consensus would be the most plausible-looking lie
@@ -386,6 +391,8 @@ export async function playerSeason(
     pointsPerGamePercentile: pointsPerGame === null ? null : percentileOf(pointsPerGame, peerPointsPerGame(lines, player.position, rules), "higher"),
     weeks,
     reasons: preseason.reasons,
-    laws: registry(),
+    // Chip-eligible only (IMPORTANT 3 RULING, fix round; widened Task 8) — every tribal law plus
+    // every CONFIRMED discovered one; see `chipEligibleLaws`'s own docblock.
+    laws: chipEligibleLaws(registry()),
   };
 }

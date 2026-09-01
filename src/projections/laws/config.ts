@@ -7,8 +7,31 @@
  * failure mode this harness exists to prevent.
  */
 
-/** Seasons excluded from measurement — reserved for backtesting the model that laws gate. */
-export const HELD_OUT_SEASONS = [2023, 2024] as const;
+/**
+ * ROLLING REPLICATION FOLDS — PREDICTOR seasons (outcome = predictor + 1), replacing the old
+ * single held-out-pair-of-years shape. `scripts/measure-laws.ts` partitions the full window's own
+ * matched pairs into one subset per fold (a pair's predictor season decides its fold, the same
+ * partition-not-a-second-match property the old held-out subset had); `registry.ts`'s
+ * `verdictForFullWindow` requires EVERY fold that matched at least one pair to agree in direction
+ * with the full-window effect before a law can be `confirmed` — a fold that disagrees, or zero
+ * folds matching any pairs at all, caps the verdict at `weak`.
+ *
+ * BLEND-SAFETY NOTE, CORRECTED (fix round, 2026-08-31): `src/projections/model/fitted.ts`'s own
+ * `FIT_SEASONS` is `[2021, 2022]`, not `2021` alone. TWO of these three folds, 2021 AND 2022, sit
+ * inside the projection model's fitting window; only 2023 is genuinely out-of-fit. That makes 2023
+ * this replication guard's actual teeth: a law that agrees on 2021 and 2022, both seasons the
+ * model already trained on, and disagrees on 2023, the one season it never saw, is confirmed on
+ * nothing the model didn't already get to fit to. Requiring ALL THREE folds to agree, 2023
+ * included, is what stops the two in-fit folds from being enough on their own to confirm a law —
+ * a law confirmed only in-fit cannot confirm.
+ *
+ * `REPLICATION_FOLDS` repeats these season numbers rather than importing `FIT_SEASONS` from
+ * `model/fitted.ts` — folds are evaluation-only and must never be folded back into a fitting
+ * window in either direction, and keeping the two lists textually separate is part of that. The
+ * cost is that they can drift apart silently: RE-CHECK THIS NOTE, AND WHICH FOLDS IT NAMES AS
+ * IN-FIT VS. OUT-OF-FIT, ANY TIME `FIT_SEASONS` CHANGES.
+ */
+export const REPLICATION_FOLDS: readonly number[] = [2021, 2022, 2023];
 
 /**
  * The full window a law's evidence is drawn from, held-out seasons included in the range.
@@ -16,14 +39,62 @@ export const HELD_OUT_SEASONS = [2023, 2024] as const;
  * `from: 2013` is the earlier of two floors nflverse itself imposes, not a choice: snap counts (what
  * `touches`/`targetShare` are built from) are unusable before 2013 — 2012 is missing its own week 1
  * and 2011 has no snap-count file at all, so a population that reached back to 2011 would be reading
- * rows nflverse never published rather than measuring anything. Within the window, 2019 is a HOLE:
- * nflverse's `stats_player_week_2019.csv` release does not exist (a deterministic 404), so no
- * stat-line season for 2019 is ever built. That hole needs no special-case code anywhere in this
- * harness — every `PlayerSeasonPoint` whose season-N+1 outcome cannot be read already drops out
- * under the tri-state "no evidence is not false" rule (`populations.ts`'s own docblock), and a
- * missing 2019 stat line is exactly that: no evidence, not a zero.
+ * rows nflverse never published rather than measuring anything.
+ *
+ * WITHIN THE WINDOW, 2019 WAS A HOLE, AND IS NOW FILLED (updated, fix round). nflverse's
+ * `stats_player_week_2019.csv` release does not exist (a deterministic 404) — that upstream fact has
+ * not changed — but this harness no longer treats a missing 2019 stat line as no-evidence-by-default.
+ * `laws/populations.ts`'s `factsForSeason`/`actualPointsPerGame` read through
+ * `nflverse/derived-stat-lines.ts`'s `statLinesAsOfForMeasurement` with `admitDerived: true`
+ * (`buildPopulations`'s own call), which admits a pbp-derived stat line for exactly the seasons named
+ * in `STAT_LINE_GAPS` — validated, before it ever ships, against a season nflverse DID publish
+ * (`seasonPointsAgreement`'s 0.99 rank-correlation bar; see `scripts/projection-backfill.ts`). A
+ * `PlayerSeasonPoint` whose season-N+1 outcome falls in 2019 is measured on the derived line now. The
+ * tri-state "no evidence is not false" rule (`populations.ts`'s own docblock) still applies to a
+ * player-season with genuinely no line at all — derived included — which is the only way this window
+ * still comes up short of a full season's worth of matched pairs.
+ *
+ * A PRODUCT SURFACE NEVER SEES THIS FALLBACK. `factsForSeason`'s `admitDerived` parameter is explicit
+ * precisely so the laws harness's own use of the derivation cannot leak into `preseason/source.ts`'s
+ * `loadPreseason` (a live board), which passes `admitDerived: false` and reads published history
+ * only, forever.
  */
 export const MEASURE_SEASONS = { from: 2013, to: 2024 } as const;
 
 /** Bootstrap resampling: how many pair-resamples, and the seed that makes runs reproducible. */
 export const BOOTSTRAP = { resamples: 1000, seed: 20260831 } as const;
+
+/**
+ * THE DISCOVERY TRAIN WINDOW — predictor seasons the candidate generator's quantile thresholds
+ * (`discovery/quantiles.ts`) and Task 7's own BH-controlled testing pass are both fitted/tested on,
+ * and on nothing later. `to: 2021` rather than `REPLICATION_FOLDS`' own range is deliberate: those
+ * folds are for REPLICATING an already-surviving law across seasons a model may or may not have
+ * fit on, while this window is for DISCOVERING candidates in the first place, and letting discovery
+ * see 2022-2024 would let a candidate's very existence be chosen by seasons its own later
+ * measurement is supposed to confirm against — the discovery-time analogue of `factsForSeason`
+ * never reading the outcome season it is predicting.
+ */
+export const DISCOVERY_TRAIN_SEASONS = { from: MEASURE_SEASONS.from, to: 2021 } as const;
+
+/**
+ * THE LAW TRAIN CUTOFF (C1 fix round, 2026-08-31) — the predictor-season boundary
+ * `registry.ts`'s `trainEffectFor` measures every law's OWN train-only effect against, restricted
+ * to pairs whose predictor season is at or before this value. `market/blend.ts`'s law delta reads
+ * a law's `trainEffect`, never its full-window `measured.effect`: the full window runs through
+ * `MEASURE_SEASONS.to - 1` (2023), which overlaps the final-bar seasons (2023, 2024) `blend.ts`'s
+ * own docblock calls untouchable by any fitting — a delta sized off the full-window effect would
+ * let 2023/2024 outcome information leak into a score later judged on those same seasons.
+ *
+ * SAME VALUE AS `DISCOVERY_TRAIN_SEASONS.to`, KEPT TEXTUALLY SEPARATE (see `REPLICATION_FOLDS`'s own
+ * docblock for why: two constants that happen to agree today must not be silently assumed to track
+ * each other forever). `DISCOVERY_TRAIN_SEASONS.to` bounds what a discovered candidate's OWN
+ * antecedent may be screened on; `LAW_TRAIN_CUTOFF_SEASON` bounds what ANY law's (tribal or
+ * discovered) `trainEffect` may be MEASURED on, a related but distinct question a discovered law
+ * already answers for itself via `measureCandidateOnTrain`'s own `trainEffect` (carried straight
+ * through rather than recomputed — see `discovery/measure.ts`). Also the same boundary Task 10's
+ * market curve, rookie curve and blend fit constants train through (`MARKET_CURVE_TRAIN_CUTOFF_SEASON`,
+ * `ROOKIE_CURVE_TRAIN_CUTOFF_SEASON`, `BLEND_TRAIN_CUTOFF_SEASON`, each 2021) — one predictor-season
+ * boundary the whole engine treats as the edge of what a train-time number may see, named once per
+ * module rather than imported across module boundaries.
+ */
+export const LAW_TRAIN_CUTOFF_SEASON = 2021;

@@ -26,6 +26,33 @@ import { projectedPosition, type PlayerRef, type PlayerUniverse, type Unresolved
  *  one definition, so a mapper and a backtest can never disagree about what an outcome looks like. */
 export type { SeasonStatLine };
 
+/**
+ * Seasons inside the laws harness's measurement window whose PUBLISHED weekly stats file nflverse
+ * never released — `stats_player_week_2019.csv` is a deterministic 404, not a transient failure.
+ *
+ * NAMED HERE, beside the mapper it describes, rather than in `laws/config.ts` (the harness's own
+ * fixed-constants file, and the brief's other sanctioned home): this is a fact about THIS mapper's
+ * own upstream release, not a laws-harness tuning knob.
+ *
+ * THE REAL REASON, CORRECTED (fix round, M2): an earlier version of this note claimed the choice
+ * "avoids a real import cycle" — that was overclaimed. `laws/config.ts` has no imports of its own
+ * today, so `derived-stat-lines.ts` importing it would not create a cycle in the literal sense (A
+ * imports B imports A). The actual reason is a LAYERING INVERSION: every dependency between `laws/`
+ * and `nflverse/` in this codebase runs one way, `laws/*` depending on `nflverse/*` (`populations.ts`
+ * imports `nflverse/pbp.ts`, `nflverse/coaches.ts`, `nflverse/schedule.ts`, and now
+ * `nflverse/derived-stat-lines.ts` itself). If this list lived in `laws/config.ts`,
+ * `derived-stat-lines.ts` — an nflverse ingestion module — would need to import FROM `laws/`, the one
+ * direction nothing else in the codebase goes. That is a convention this codebase keeps on purpose
+ * (an ingestion adapter should not need to know the harness built on top of it exists), not an
+ * accident of the module graph avoiding an accidental cycle.
+ *
+ * ONE EXPORTED HOME (controller ruling P1): `measure-laws.ts` imports this constant rather than
+ * keeping its own copy, and `derived-stat-lines.ts`'s admission wrapper reads the same list — so the
+ * seasons the laws harness treats as a hole and the seasons the derivation exists to fill can never
+ * drift apart.
+ */
+export const STAT_LINE_GAPS: readonly number[] = [2019];
+
 export interface MapStatLinesInput {
   readonly playerWeek: readonly CsvRow[];
   /** From `weekAsOfFromSnapCounts` — the weekly stats file carries no date of its own. */

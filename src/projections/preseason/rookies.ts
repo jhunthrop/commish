@@ -1,5 +1,6 @@
 import type { Position } from "@/domain/player";
 import type { PredictedOpportunity } from "../model/opportunity";
+import { rookieCurve } from "./rookie-curve";
 
 /**
  * ROOKIES — no NFL history at all, so DRAFT CAPITAL carries them.
@@ -25,13 +26,23 @@ import type { PredictedOpportunity } from "../model/opportunity";
  * a third-round one, and on that evidence the reordering destroys more information than it adds. It
  * is now behind `PreseasonFeatures.rookieLanding` and that flag is OFF.
  *
+ * (Every figure in this docblock, including these, was measured BEFORE Task 4's curve-shaped
+ * interpolation existed, against the original linear-in-pick blend. They are not re-run here.)
+ *
  * WHAT REPLACES IT IS THE PICK NUMBER ITSELF. The buckets below are the level the fit can estimate;
  * they are not the resolution a draft has. Six cells rank the third pick level with the thirty-first
  * and the fitted table caps ties into place on top of that, so a bucket-only board hands a whole
  * round a single number and lets availability break it. `capitalShares` interpolates between the
- * buckets on the pick axis, which keeps every fitted mean where the fit put it and makes the class
- * order by draft capital in between — the ordering the counterfactual uses and the one this module
- * had to beat.
+ * buckets, which keeps every fitted mean where the fit put it and makes the class order by draft
+ * capital in between — the ordering the counterfactual uses and the one this module had to beat.
+ *
+ * TASK 4: THE INTERPOLATION ITSELF NOW FOLLOWS A MEASURED SHAPE RATHER THAN THE RAW PICK NUMBER.
+ * `rookie-curve.ts` fits expected rookie-season POINTS directly against outcomes, isotonic in the
+ * pick, and `capitalCurveWeight` uses it to decide how far along two bucket anchors a pick sits —
+ * in points space, not in pick-count space. Every fitted bucket MEAN is untouched by this; only the
+ * blend BETWEEN two of them moves, and only where the curve has a real, non-degenerate signal to
+ * offer (it falls back to the original linear-in-pick blend otherwise). See `rookie-curve.ts`'s own
+ * module docblock for what is fit and on which seasons.
  *
  * THE DISTRIBUTION IS WIDER, AND NOT BY A RULE WRITTEN HERE. `availability.ts` narrows its spread
  * with the length of a player's record; a rookie's record is empty, so his distribution comes out
@@ -175,6 +186,33 @@ export interface RookieFeatures {
 }
 
 /**
+ * WHERE ONE PICK SITS BETWEEN TWO ANCHORS, IN POINTS SPACE RATHER THAN IN RAW PICK SPACE.
+ *
+ * `alongTheCapitalCurve` used to blend linearly in the pick NUMBER — pick 40 was exactly 40% of the
+ * way from the round-1 anchor to the round-2 one, regardless of what draft capital is actually worth
+ * at either end. `rookie-curve.ts`'s draft-capital curve measures that shape directly, in expected
+ * rookie-season POINTS, fit on real outcomes rather than assumed to be a straight line — see its own
+ * module docblock for why the shape is not one. This is the baseline that curve now underpins: the
+ * weight a pick gets between two bucket anchors comes from how far its OWN fitted points value sits
+ * between the two anchors' points values, so a class still orders by draft capital (every fitted
+ * bucket mean is exactly where the fit put it, unchanged) but the picks IN BETWEEN move at the rate
+ * the curve says capital actually decays at, not at the rate the pick number happens to count up.
+ *
+ * FALLS BACK TO LINEAR-IN-PICK when the curve has no signal to offer — `span` non-positive covers a
+ * position the curve carries no knots for (K, DEF) and the degenerate case where the curve reads
+ * identically at both anchors. Never throws and never divides by zero.
+ */
+function capitalCurveWeight(position: Position, abovePick: number, overallPick: number, belowPick: number): number {
+  const linear = (overallPick - abovePick) / (belowPick - abovePick);
+  const aboveValue = rookieCurve(position, abovePick);
+  const belowValue = rookieCurve(position, belowPick);
+  const span = aboveValue - belowValue;
+  if (!(span > 0)) return linear;
+  const pickValue = rookieCurve(position, overallPick);
+  return Math.min(1, Math.max(0, (aboveValue - pickValue) / span));
+}
+
+/**
  * Where one bucket table lands for one pick, blending the two cells the pick falls between.
  *
  * Shared by the share table and the game-rate table so the two can never interpolate differently,
@@ -182,6 +220,7 @@ export interface RookieFeatures {
  */
 function alongTheCapitalCurve<T>(
   cells: Readonly<Record<DraftBucket, T>>,
+  position: Position,
   overallPick: number | null,
   pickCurve: boolean,
   blend: (above: T, below: T, weight: number) => T,
@@ -200,7 +239,7 @@ function alongTheCapitalCurve<T>(
   const index = anchors.findIndex((anchor) => overallPick <= anchor.pick);
   const above = anchors[index - 1]!;
   const below = anchors[index]!;
-  return blend(above.cell, below.cell, (overallPick - above.pick) / (below.pick - above.pick));
+  return blend(above.cell, below.cell, capitalCurveWeight(position, above.pick, overallPick, below.pick));
 }
 
 /** The shares draft capital alone implies, interpolated between the fitted bucket means. */
@@ -210,7 +249,7 @@ export function capitalShares(
   priors: RookiePriors,
   { pickCurve }: RookieFeatures,
 ): RookieShares {
-  return alongTheCapitalCurve(priors.byBucket[position], overallPick, pickCurve, (above, below, weight) => {
+  return alongTheCapitalCurve(priors.byBucket[position], position, overallPick, pickCurve, (above, below, weight) => {
     const between = (high: number, low: number): number => high + (low - high) * weight;
     return {
       snapShare: between(above.snapShare, below.snapShare),
@@ -241,6 +280,7 @@ export function capitalGameRate(
 ): number {
   return alongTheCapitalCurve(
     priors.gameRate[position],
+    position,
     overallPick,
     pickCurve,
     (above, below, weight) => above + (below - above) * weight,

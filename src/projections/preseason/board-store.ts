@@ -30,13 +30,69 @@ import type { BoardEntry, BoardReason } from "./board";
  */
 
 /**
+ * THE HISTORICAL RAW-MODEL SOURCE (C3 fix round, 2026-08-31 — superseded as the SHIPPED board by
+ * `BOARD_SOURCE`, below, which now names the blended one). Kept as its own named constant, never
+ * deleted: every row ever written under it is the raw, pre-blend board's own honest history, and a
+ * reader comparing "what the raw model alone said" against "what shipped" (Task 11's own scorecard,
+ * a backtest) needs a stable name for the first half of that comparison. `scripts/preseason-persist.ts`
+ * writes fresh rows here too, via `shippedPreseasonCandidates`'s own `{ raw: true }` seam, so this
+ * source's own reasons stay CURRENT (never a stale mix of pre-blend projections next to blended-board
+ * reasons — the exact drift a fix round found and this constant's split existence now prevents).
+ */
+export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
+
+/**
  * Which board said it. Model version AND league format in one value, exactly as the benchmark
  * sources name market and format in one (`ffc_adp_ppr_12`), because a projected point total is
  * meaningless without the rules that composed it and a rank is meaningless without the roster
  * shape that valued it. A refit is a new value here, never an overwrite of rows a manager has
  * already been shown.
+ *
+ * BUMPED TO v2 (C3 fix round 1, 2026-08-31): Task 10 wired `shippedPreseasonCandidates`'s market
+ * blend in as the board `scripts/preseason-persist.ts` writes, but `preseason_projections`' own
+ * unique key (`season, source, as_of`) meant a rerun under the UNCHANGED v1 source name never wrote
+ * a single new projection row — every row already existed from before the blend, so the blend's own
+ * point totals never reached the store a live product surface reads, even though its REASONS did
+ * (a different table, no `as_of`, always overwritten).
+ *
+ * BUMPED AGAIN TO v3 (fix round 2, 2026-08-31 — NOT preserved as its own named historical constant
+ * the way v1/raw is): the SAME unique-key problem recurred one level up. Fix round 1's own blend had
+ * a real correctness bug (an unlisted quarterback's rescale inflated him toward starter-level
+ * output); fix round 2 fixed the bug in code, re-ran the grid search, and re-ran persist under the
+ * STILL-v2 source name expecting fresh numbers — and got zero new projection rows again, for the
+ * identical reason: v2's own `(season, source, as_of)` rows already existed from fix round 1's own
+ * run, so the corrected pricing never reached the store either, even though the reasons table (no
+ * `as_of`) silently updated to describe numbers the projections table was not actually showing.
+ * `commish_board_v3_ppr_12` is, again, a fresh value with no existing rows. Unlike
+ * `BOARD_SOURCE_V1_RAW`, v2 is NOT kept as a second permanent named constant: v1/raw serves an
+ * ongoing, identified purpose (the raw-vs-blend comparison Task 11's scorecard needs both halves
+ * of), while v2 was a blend that never finished shipping correctly — its own stored rows were wrong
+ * the entire time they existed, so there is nothing about "v2 specifically" worth a reader
+ * addressing by name going forward. Every reader of `BOARD_SOURCE` (the drafts-players route, the
+ * player screen) picks up the corrected blend automatically, with no call-site change.
+ *
+ * BUMPED AGAIN TO v4 (fix round 3, IMPORTANT 1, 2026-09-01 — the identical unique-key problem, a
+ * third time). Fix round 2's own tail guard was correct, but the affine rescale layer it capped
+ * (`unlistedRescale`) was dead: every fitted intercept at RB/WR/TE already sat above that position's
+ * own tail, so the tail's `Math.min` discarded the rescale's output for every candidate, collapsing
+ * every unlisted player at a position to the SAME tail value and erasing the raw model's own
+ * ordering among them. A live check against v3's own stored rows confirmed the damage directly:
+ * multiple DISTINCT unlisted WRs were stored at the identical 85.79-point WR tail in 2024, and
+ * re-running the corrected pricing (`market/blend.ts`'s `tailCappedUnlistedPoints`, the rescale layer
+ * removed) against those SAME player ids returned distinct, ordered numbers instead (6.94, 65.40,
+ * 19.40, 83.39, 8.84, 71.54 among them) — a real, large points change for unlisted RB/WR/TE
+ * candidates, not a no-op refactor. QB is the one position where v3's stored numbers are unaffected:
+ * `unlistedRescale.QB` was already the identity transform (fix round 2's own fit-validity ruling), so
+ * `tailCappedUnlistedPoints` reproduces QB's old output exactly — the discrepancy is real only at
+ * RB/WR/TE, but the fix is not position-scoped in the store, so the WHOLE board moves to a fresh
+ * source rather than only the affected positions. `commish_board_v4_ppr_12` is, again, a fresh value
+ * with no existing rows, for the identical structural reason v2 and v3 needed one: `preseason_projections`'
+ * own `(season, source, as_of)` unique key means a rerun under an unchanged source name silently
+ * keeps serving the old, wrong numbers forever. v3 is NOT kept as a second permanent named constant,
+ * for the same reason v2 was not: its own stored rows were wrong (at RB/WR/TE) the entire time they
+ * existed.
  */
-export const BOARD_SOURCE = "commish_board_v1_ppr_12";
+export const BOARD_SOURCE = "commish_board_v4_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {
@@ -288,6 +344,8 @@ const KNOWN_REASON_CODES: ReadonlySet<BoardReason["code"]> = new Set([
   "scarcity",
   "tier_cliff",
   "law",
+  "market_unlisted",
+  "market_anchor",
 ]);
 
 function isKnownReasonCode(code: string): code is BoardReason["code"] {

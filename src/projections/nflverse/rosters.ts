@@ -33,18 +33,50 @@ export const ROSTER_SOURCE_CONFIG = {
   week: 1,
   seasonType: "REG",
   /**
-   * The first season this ingestion will accept, and it is a correctness bound rather than a
-   * convenience.
+   * THE FIXED-STAMP CUTOVER, not the first ingestible season — see `HISTORICAL_ROSTER_FLOOR` for
+   * that. This is the season from which `week1RosterAsOf`'s single hardcoded date, the first of
+   * September, is honest ON ITS OWN, with no season-specific lookup needed.
    *
    * `week1RosterAsOf` claims the roster was settled by the first of September. That is true of every
    * season from 2021 onwards — the final cutdown ran 31 August 2021, 30 August 2022, 29 August 2023
    * and 27 August 2024, and no opener since 2021 has fallen before 5 September. It is FALSE of 2020,
    * whose pandemic calendar pushed the cutdown to 5 September, after the stamp this module would
-   * give it. Ingesting 2020 would therefore assert we knew a roster five days before it existed, so
-   * it is refused rather than approximated.
+   * give it — and it is false further back too: the cutdown ran 3 September in 2016 and 2 September
+   * in 2017, both after the date this constant would stamp them with. A single calendar date cannot
+   * be honest for every season in the file, so seasons before this cutover are stamped a different
+   * way — see `mapWeek1Rosters`'s `asOf` parameter and `preseason/ingest.ts`'s
+   * `historicalWeek1RosterAsOf`, which derives the stamp from the season's own schedule instead of
+   * guessing a date.
    */
   earliestSeason: 2021,
 } as const;
+
+/**
+ * THE ASSET FLOOR — how far back nflverse's `weekly_rosters` release itself reaches.
+ *
+ * Probed directly against the release on 2026-08-31 by requesting each season's asset downward from
+ * 2020: every season from 2002 through 2024 returned a real CSV body with the expected columns
+ * (`roster_weekly_2013.csv` and `roster_weekly_2020.csv` both checked by hand), and 2001 returned a
+ * genuine HTTP 404 rather than an empty or malformed file. Below 2002 there is nothing to ingest —
+ * the file does not exist — so no ingestion decision belongs there.
+ *
+ * NOT the floor this engine actually backfills to. See `HISTORICAL_ROSTER_FLOOR`, which is narrower
+ * for a reason of its own and is what `preseason-ingest.ts` and `HISTORICAL_ROSTER_FLOOR`'s consumers
+ * should read. This constant exists so that decision is visible and not rediscovered by re-probing.
+ */
+export const ROSTER_ASSET_FLOOR = 2002;
+
+/**
+ * THE FLOOR THIS ENGINE ACTUALLY BACKFILLS TO — a scope bound, not an asset bound.
+ *
+ * Matches `MEASURE_SEASONS.from` (`laws/config.ts`): snap counts are unusable before 2013, so no
+ * law's population and no `rb_age_curve` measurement can reach earlier than that regardless of
+ * whether a roster exists for it. Ingesting 2002-2012 rosters would be real rows nothing in the
+ * engine reads yet. `ROSTER_ASSET_FLOOR` is kept alongside this constant rather than folded into it,
+ * so the next feature that DOES need an earlier season knows the asset is already there and only
+ * this scope decision needs to change.
+ */
+export const HISTORICAL_ROSTER_FLOOR = 2013;
 
 /**
  * When a season's week-one roster became knowable: the first of September that year.
@@ -53,8 +85,10 @@ export const ROSTER_SOURCE_CONFIG = {
  * two-sided here and both sides matter. Too EARLY and we claim to have read a roster before the
  * cutdown that produced it, which is leakage. Too LATE and the stamp slides past the opener, at
  * which point a preseason board could not see it at all and the whole ingestion would be pointless.
- * The first of September sits between the two for every season this module accepts, and
- * `ROSTER_SOURCE_CONFIG.earliestSeason` is what keeps it that way.
+ * The first of September sits between the two for every season from `ROSTER_SOURCE_CONFIG.
+ * earliestSeason` onward — see that constant's own docblock for why it does not sit between the two
+ * for every season the asset carries, and `preseason/ingest.ts`'s `historicalWeek1RosterAsOf` for
+ * how the seasons before it are stamped instead.
  */
 export function week1RosterAsOf(season: number): Date {
   return new Date(Date.UTC(season, 8, 1));
@@ -136,14 +170,16 @@ function whole(row: CsvRow, column: string, atLeast: number): number | null {
  * A player listed twice in week 1 (claimed off waivers mid-week, so he appears for two clubs) keeps
  * the LAST row, because the table stores one row per player per season and the later listing is the
  * one the season started under.
+ *
+ * `asOf` IS OPTIONAL AND THAT IS THE WHOLE OF THE DESIGN. Omitting it keeps the original behaviour —
+ * `week1RosterAsOf(season)`, refused below `ROSTER_SOURCE_CONFIG.earliestSeason` because no single
+ * calendar date is honest that far back. Passing it explicitly hands the caller responsibility for
+ * the claim instead, which is what `preseason/ingest.ts` does for a season before the cutover: it
+ * derives a stamp from that season's OWN schedule (`historicalWeek1RosterAsOf`) rather than asking
+ * this pure, network-free function to guess one.
  */
-export function mapWeek1Rosters(rows: readonly CsvRow[], season: number): readonly PreseasonRosterEntry[] {
-  if (season < ROSTER_SOURCE_CONFIG.earliestSeason) {
-    throw new Error(
-      `Week-one rosters are only ingested from ${ROSTER_SOURCE_CONFIG.earliestSeason} onwards; ${season}'s cutdown fell after the date this module would stamp it with. See ROSTER_SOURCE_CONFIG.earliestSeason.`,
-    );
-  }
-  const asOf = week1RosterAsOf(season);
+export function mapWeek1Rosters(rows: readonly CsvRow[], season: number, asOf?: Date): readonly PreseasonRosterEntry[] {
+  const stamp = asOf ?? defaultWeek1RosterAsOf(season);
   const byPlayer = new Map<string, PreseasonRosterEntry>();
   for (const row of rows) {
     if (Number(text(row, "week") ?? "") !== ROSTER_SOURCE_CONFIG.week) continue;
@@ -170,8 +206,19 @@ export function mapWeek1Rosters(rows: readonly CsvRow[], season: number): readon
       draftYear: whole(row, "entry_year", 1936) ?? whole(row, "rookie_year", 1936),
       draftPick: whole(row, "draft_number", 1),
       draftClub: text(row, "draft_club"),
-      asOf,
+      asOf: stamp,
     });
   }
   return [...byPlayer.values()].sort((a, b) => a.playerId.localeCompare(b.playerId));
+}
+
+/** `week1RosterAsOf(season)`, refused below the fixed-stamp cutover. See `mapWeek1Rosters`'s own
+ *  docblock for why a caller can bypass this by supplying `asOf` itself. */
+function defaultWeek1RosterAsOf(season: number): Date {
+  if (season < ROSTER_SOURCE_CONFIG.earliestSeason) {
+    throw new Error(
+      `Week-one rosters are only ingested from ${ROSTER_SOURCE_CONFIG.earliestSeason} onwards without an explicit as-of stamp; ${season}'s cutdown may have fallen after the date this module would guess. See ROSTER_SOURCE_CONFIG.earliestSeason.`,
+    );
+  }
+  return week1RosterAsOf(season);
 }

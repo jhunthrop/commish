@@ -428,6 +428,13 @@
       "when": 1788199893133,
       "tag": "0060_tough_william_stryker",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1788217021958,
+      "tag": "0061_lush_wild_child",
+      "breakpoints": true
     }
   ]
 }

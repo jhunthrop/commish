@@ -4,11 +4,12 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring/compute";
 import { allPositions } from "../backtest";
 import { statLinesAsOf, STAT_LINE_SOURCE } from "../lines";
+import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import { PARTICIPATION_METRICS } from "../nflverse/map";
 import { COACH_METRICS } from "../nflverse/coaches";
 import { schedulePublishedAsOf, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { ageAtSeason } from "../preseason/availability";
-import { preseasonRostersAsOf } from "../preseason/store";
+import { preseasonRostersAsOf, type PreseasonRosterRow } from "../preseason/store";
 import { LAST_POSSIBLE_WEEK, observationsAsOf } from "../store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "../team-store";
 import type { Law, PlayerSeasonPoint } from "./types";
@@ -49,8 +50,10 @@ import type { Law, PlayerSeasonPoint } from "./types";
 
 const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");
 
-/** The four positions a law population ever emits a `PlayerSeasonPoint` for. */
-type LawPosition = PlayerSeasonPoint["position"];
+/** The four positions a law population ever emits a `PlayerSeasonPoint` for. Exported so the
+ *  discovery candidate generator (`discovery/templates.ts`) can scope a quantity to the positions
+ *  it is meaningful for without re-deriving this union. */
+export type LawPosition = PlayerSeasonPoint["position"];
 
 /** One law's static content plus the population its measurement is drawn from. */
 export interface LawSpec {
@@ -70,12 +73,21 @@ export interface LawSpec {
    * Wired this wave: `wr_target_competition` to the offseason share-redistribution feature
    * (`fitRedistributionPriors`), `target_share_persistence` to the opportunity model's own
    * target-share shrinkage (`predictOpportunity`), `td_regression` to the efficiency model's
-   * touchdown-rate regression handling (`TOUCHDOWN_RATES`) — the three laws `measured.json` calls
-   * `confirmed`. `play_caller_fingerprint` (debunked), `rb_age_curve` and `rb_workload_cliff`
-   * (both weak) stay `null`: a law that is not confirmed gates nothing, whatever feature might
-   * otherwise seem to fit its story. A future law confirmed with no existing feature to point at
-   * gets one through the normal feature/fit route (`model/fit.ts`) in a model round of its own —
-   * until then it is content-only, exactly like a debunked or weak law's claim.
+   * touchdown-rate regression handling (`TOUCHDOWN_RATES`) — the three laws `measured.json` called
+   * `confirmed` at the time this wiring was decided.
+   *
+   * UPDATED, fix round (2026-08-31): `rb_age_curve` is now ALSO `confirmed` in `measured.json`
+   * (sample 43 -> 171 across two later changes — see `nflverse/derived-stat-lines.ts`'s own docblock
+   * and `scripts/measure-laws.ts`'s falsification run for the honest attribution of that growth), and
+   * its `modelPath` stays `null` regardless: this wave's controller ruling was to ANNOTATE the model
+   * that already existed, never to build or re-fit one, and no existing fitted feature happens to
+   * compute `rb_age_curve`'s antecedent (raw age at season start) the way the other three laws'
+   * antecedents already matched something `model/fit.ts` had built. `play_caller_fingerprint`
+   * (debunked) and `rb_workload_cliff` (still weak) stay `null` for the ordinary reason: a law that
+   * is not confirmed gates nothing, whatever feature might otherwise seem to fit its story. A future
+   * law confirmed with no existing feature to point at — `rb_age_curve` included — gets one through
+   * the normal feature/fit route (`model/fit.ts`) in a model round of its own; until then it is
+   * content-only, exactly like a debunked or weak law's claim.
    */
   readonly modelPath: string | null;
   readonly population: (db: ReadonlyDb, seasons: readonly number[]) => Promise<readonly PlayerSeasonPoint[]>;
@@ -116,8 +128,10 @@ const TD_REGRESSION_MULTIPLIER = 1.5;
 /** A player-season needs at least this many games to count toward the td_regression median — thin,
  *  low-usage seasons swing a median without representing what a "regular" typically does. */
 const MIN_GAMES_FOR_TD_MEDIAN = 8;
-/** Points/game — the band within which two player-seasons count as "otherwise similar". */
-const POINTS_PER_GAME_CALIPER = 2;
+/** Points/game — the band within which two player-seasons count as "otherwise similar". Exported so
+ *  `discovery/measure.ts` (Task 7) matches discovered candidates with the identical caliper the six
+ *  tribal laws use, rather than a second magic number meaning the same thing. */
+export const POINTS_PER_GAME_CALIPER = 2;
 const SKILL_POSITIONS: ReadonlySet<LawPosition> = new Set(["QB", "RB", "WR", "TE"]);
 
 /** `null` propagates: a law's antecedent is unknown, never false, when its inputs are unknown. */
@@ -144,7 +158,9 @@ export function tdRegressionCondition(facts: LawConditionFacts): boolean | null 
   return facts.touchdownPointsShare >= facts.touchdownPointsShareThreshold;
 }
 
-function isSkillPosition(position: Position): position is LawPosition {
+/** Exported so `discovery-facts.ts`'s `discoveryFactsForSeason` can scope its own output to the same
+ *  four positions, without re-declaring `SKILL_POSITIONS` a second place. */
+export function isSkillPosition(position: Position): position is LawPosition {
   return SKILL_POSITIONS.has(position as LawPosition);
 }
 const isRb = (position: Position): position is LawPosition => position === "RB";
@@ -174,11 +190,28 @@ function touchdownPointsOf(line: StatLine, rules: ScoringRules): number {
   );
 }
 
-/** Points, games and touchdown points per player, summed over one season as of one moment. */
+/**
+ * Points, games and touchdown points per player, summed over one season as of one moment.
+ *
+ * `admitDerived` is the EXPLICIT gate a fix round closed (C2): `factsForSeason`, this function's
+ * caller, is used by TWO consumers, not one — `buildPopulations` (the laws harness) AND
+ * `preseason/source.ts`'s `loadPreseason` (a PRODUCT SURFACE). Before this parameter existed,
+ * `seasonScoring` called `statLinesAsOfForMeasurement` unconditionally, so BOTH consumers silently
+ * got the pbp-derived fallback for a gap season — including the preseason board, which is exactly
+ * the "must never render a row nflverse did not itself publish" rule this whole design exists to
+ * keep. `admitDerived: true` calls `statLinesAsOfForMeasurement` (admits a derived row for a
+ * `STAT_LINE_GAPS` season); `admitDerived: false` calls the bare `statLinesAsOf` (published only,
+ * nothing for a gap season, exactly what every OTHER `statLinesAsOf` reader already sees). The laws
+ * harness passes `true` from both `factsForSeason` and `actualPointsPerGame`; `loadPreseason` passes
+ * `false` — see that call site's own comment.
+ */
 async function seasonScoring(
   db: ReadonlyDb, season: number, asOf: Date, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+  admitDerived: boolean,
 ): Promise<Map<string, SeasonScoring>> {
-  const rows = await statLinesAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
+  const rows = admitDerived
+    ? await statLinesAsOfForMeasurement(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf })
+    : await statLinesAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
   const out = new Map<string, SeasonScoring>();
   for (const { line } of rows) {
     const position = positions.get(line.playerId);
@@ -194,15 +227,22 @@ async function seasonScoring(
   return out;
 }
 
-function pointsPerGame(entry: SeasonScoring | undefined): number | null {
+/** Exported so `discovery-facts.ts` can apply the SAME "did he play, and how much" gate
+ *  `factsForSeason` does, over a `SeasonScoring` entry read off the shared `seasonContext`. */
+export function pointsPerGame(entry: SeasonScoring | undefined): number | null {
   return entry !== undefined && entry.games > 0 ? roundPoints(entry.points / entry.games) : null;
 }
 
-/** THE UNGATED READ — a season's real outcome, corrections included, at `FINAL_OUTCOME`. */
-async function actualPointsPerGame(
+/** THE UNGATED READ — a season's real outcome, corrections included, at `FINAL_OUTCOME`. `admitDerived`
+ *  passes straight through to `seasonScoring` — see that function's own docblock. Exported so
+ *  `scripts/discover-laws.ts` (Task 7) reads season N+1's actual the identical way `buildPopulations`
+ *  does for the six tribal laws, rather than a second "actuals" read of its own — the discipline
+ *  Task 7's own brief calls out by name: never reimplement this read. */
+export async function actualPointsPerGame(
   db: ReadonlyDb, season: number, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+  admitDerived: boolean,
 ): Promise<Map<string, number>> {
-  const scoring = await seasonScoring(db, season, FINAL_OUTCOME, positions, rules);
+  const scoring = await seasonScoring(db, season, FINAL_OUTCOME, positions, rules, admitDerived);
   const out = new Map<string, number>();
   for (const [playerId, entry] of scoring) {
     const ppg = pointsPerGame(entry);
@@ -244,8 +284,9 @@ async function seasonParticipation(db: ReadonlyDb, season: number, asOf: Date): 
 
 /** A player's own season target share: his own targets over his own team_targets, summed across
  *  weeks. Self-consistent even for a traded player — each week's row already carries THAT week's
- *  actual team's totals, so no team-of-record grouping is needed here (unlike teammate grouping). */
-function targetShareOf(participated: SeasonParticipation | undefined): number | null {
+ *  actual team's totals, so no team-of-record grouping is needed here (unlike teammate grouping).
+ *  Exported so `discovery-facts.ts` reads the identical definition rather than a second one. */
+export function targetShareOf(participated: SeasonParticipation | undefined): number | null {
   return participated !== undefined && participated.teamTargets > 0 ? participated.targets / participated.teamTargets : null;
 }
 
@@ -302,18 +343,24 @@ async function bestTeammateTargetShares(
   return best;
 }
 
+/** One team's incoming-play-caller facts, RAW rather than pre-collapsed to a boolean — the discovery
+ *  generator wants the tenure count itself (`incomingCoachTenureSeasons`), not just "is it zero".
+ *  Exported as part of `SeasonContext`'s own shape. */
+export interface IncomingCoachFacts {
+  readonly tenureSeasons: number | null;
+  readonly priorPassRateOverExpected: number | null;
+}
+
 /** Season-N+1 play-caller facts by team, stamped at N+1's own schedule publication (see `coaches.ts`).
  *  A team absent here — no row at all — is unknown, not a non-new coach with no history. */
-async function incomingCoachFactsByTeam(
-  db: ReadonlyDb, nextSeason: number, asOf: Date,
-): Promise<Map<string, { tenureIsZero: boolean; priorPassRateOverExpected: number | null }>> {
+async function incomingCoachFactsByTeam(db: ReadonlyDb, nextSeason: number, asOf: Date): Promise<Map<string, IncomingCoachFacts>> {
   const rows = await teamObservationsAsOf(db, { season: nextSeason, week: 1, asOf, source: SCHEDULE_SOURCE.schedule });
-  const out = new Map<string, { tenureIsZero: boolean; priorPassRateOverExpected: number | null }>();
+  const out = new Map<string, IncomingCoachFacts>();
   for (const row of rows) {
     if (row.metric !== COACH_METRICS.tenureSeasons && row.metric !== COACH_METRICS.priorPassRateOverExpected) continue;
-    const existing = out.get(row.team) ?? { tenureIsZero: false, priorPassRateOverExpected: null };
+    const existing = out.get(row.team) ?? { tenureSeasons: null, priorPassRateOverExpected: null };
     out.set(row.team, {
-      tenureIsZero: row.metric === COACH_METRICS.tenureSeasons ? row.value === 0 : existing.tenureIsZero,
+      tenureSeasons: row.metric === COACH_METRICS.tenureSeasons ? row.value : existing.tenureSeasons,
       priorPassRateOverExpected:
         row.metric === COACH_METRICS.priorPassRateOverExpected ? row.value : existing.priorPassRateOverExpected,
     });
@@ -351,24 +398,63 @@ export interface SeasonFacts {
 }
 
 /**
+ * ONE SEASON'S CONTEXT, SHARED — the store reads `factsForSeason` and `discovery-facts.ts`'s
+ * `discoveryFactsForSeason` BOTH need before either can compute its own, different set of
+ * quantities: scoring, participation, teams, roster and incoming-coach facts, for one season as of
+ * one moment.
+ *
+ * EXTRACTED after a fix round found `discoveryQuantitiesForSeason` re-reading all five of these
+ * stores a second time, on its own, with `admitDerived` HARDCODED to `true` where `factsForSeason`
+ * took it as a parameter — exactly the kind of silent divergence a shared helper exists to close.
+ * `admitDerived` stays an EXPLICIT parameter HERE too, for the reason `seasonScoring`'s own docblock
+ * gives it one: burying a hardcoded policy inside a shared helper would make it invisible at either
+ * call site, and the entire point of the flag is that a reader can see, at the call site, which
+ * policy applies — `factsForSeason` passes its own parameter through; `discoveryFactsForSeason`
+ * (`discovery-facts.ts`) now takes the same parameter itself and passes it through identically.
+ */
+export interface SeasonContext {
+  readonly scoring: Map<string, SeasonScoring>;
+  readonly participation: Map<string, SeasonParticipation>;
+  readonly teams: Map<string, string>;
+  readonly roster: readonly PreseasonRosterRow[];
+  readonly coachFacts: Map<string, IncomingCoachFacts>;
+  readonly birthDates: Map<string, string | null>;
+}
+
+export async function seasonContext(
+  db: ReadonlyDb, season: number, asOf: Date, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+  admitDerived: boolean,
+): Promise<SeasonContext> {
+  const scoring = await seasonScoring(db, season, asOf, positions, rules, admitDerived);
+  const participation = await seasonParticipation(db, season, asOf);
+  const teams = await seasonTeams(db, season, asOf);
+  const roster = await preseasonRostersAsOf(db, { season, asOf });
+  const coachFacts = await incomingCoachFactsByTeam(db, season + 1, asOf);
+  const birthDates = new Map(roster.map((row) => [row.playerId, row.birthDate] as const));
+  return { scoring, participation, teams, roster, coachFacts, birthDates };
+}
+
+/**
  * Every antecedent quantity, for every player active in season N, at N+1's schedule-publication
  * gate. Exported for two callers now: `buildPopulations`, which calls this once per season across
  * every law in one pass, and `source.ts`'s `loadPreseason`, which calls it ONCE for the completed
  * season immediately before the board's own season — the exact "season N" a board for season N+1
  * needs — so a live board's law reasons and this module's own measurement read the identical gate.
+ *
+ * `admitDerived` is what keeps those two callers from silently sharing MORE than the gate (fix
+ * round, C2): `buildPopulations` passes `true` (the laws harness is exactly where a pbp-derived
+ * gap-season stat line belongs), `loadPreseason` passes `false` (the board reads published history
+ * only, forever — see that call site's own comment for what a `true` there would have meant: a
+ * 2020-season board's rb_age_curve chip partly computed from 2019 play-by-play, never checked by the
+ * validation bar that gates the LAWS harness's own use of it).
  */
 export async function factsForSeason(
   db: ReadonlyDb, season: number, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+  admitDerived: boolean,
 ): Promise<Map<string, SeasonFacts>> {
   const asOf = schedulePublishedAsOf(season + 1);
-  const scoring = await seasonScoring(db, season, asOf, positions, rules);
-  const participation = await seasonParticipation(db, season, asOf);
-  const teams = await seasonTeams(db, season, asOf);
-  const roster = await preseasonRostersAsOf(db, { season, asOf });
-  const coachFacts = await incomingCoachFactsByTeam(db, season + 1, asOf);
+  const { scoring, participation, teams, coachFacts, birthDates } = await seasonContext(db, season, asOf, positions, rules, admitDerived);
   const teammateShares = await bestTeammateTargetShares(db, season, asOf, positions, participation);
-
-  const birthDates = new Map(roster.map((row) => [row.playerId, row.birthDate] as const));
   const thresholds = tdShareThresholds(scoring, positions);
 
   const out = new Map<string, SeasonFacts>();
@@ -386,7 +472,7 @@ export async function factsForSeason(
         touches: participated === undefined ? null : participated.carries + scored.receptions,
         age: ageAtSeason(birthDates.get(playerId) ?? null, season),
         bestTeammateTargetShare: teammateShares.get(playerId) ?? null,
-        incomingCoachTenureIsZero: coach?.tenureIsZero ?? null,
+        incomingCoachTenureIsZero: coach?.tenureSeasons === undefined || coach.tenureSeasons === null ? null : coach.tenureSeasons === 0,
         incomingCoachPriorPassRateOverExpected: coach?.priorPassRateOverExpected ?? null,
         targetShare: targetShareOf(participated),
         touchdownPointsShare: scored.points > 0 ? scored.touchdownPoints / scored.points : null,
@@ -505,13 +591,17 @@ export function canonicalPointOrder(a: PlayerSeasonPoint, b: PlayerSeasonPoint):
  * A null condition (see `LawConditionFacts`) drops that player-season from the returned population
  * entirely, for that law only — a player can be dropped from one law's population and present in
  * another's the same season.
+ *
+ * `admitDerived: true` on BOTH calls — the laws harness is exactly where a pbp-derived gap-season
+ * stat line belongs (`factsForSeason`'s own docblock explains why `loadPreseason`, `factsForSeason`'s
+ * other caller, passes `false` instead).
  */
 export async function buildPopulations(db: ReadonlyDb, seasons: readonly number[]): Promise<ReadonlyMap<string, readonly PlayerSeasonPoint[]>> {
   const positions = await allPositions(db);
   const out = new Map<string, PlayerSeasonPoint[]>(LAW_ENTRIES.map((entry) => [entry.id, []]));
   for (const season of seasons) {
-    const seasonFacts = await factsForSeason(db, season, positions, PPR_SCORING);
-    const nextActual = await actualPointsPerGame(db, season + 1, positions, PPR_SCORING);
+    const seasonFacts = await factsForSeason(db, season, positions, PPR_SCORING, true);
+    const nextActual = await actualPointsPerGame(db, season + 1, positions, PPR_SCORING, true);
     for (const [playerId, entry] of seasonFacts) {
       const { position } = entry;
       for (const law of LAW_ENTRIES) {
