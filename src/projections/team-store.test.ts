@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { nflPlayers } from "@/db/schema";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "./nflverse/schedule";
+import { VEGAS_METRICS, VEGAS_SOURCE } from "./vegas/ingest";
 import {
   firstKickoffFor,
   playerTeamsAsOf,
@@ -223,5 +224,35 @@ describe("firstKickoffFor / requireFirstKickoffFor", () => {
 
   it("requireFirstKickoffFor names the context command when the store holds nothing for the season", async () => {
     await expect(requireFirstKickoffFor(db, 2024)).rejects.toThrow(/projections:context/);
+  });
+});
+
+/**
+ * TASK 2 (vegas win totals) NEEDED NO SCHEMA CHANGE HERE, AND THIS PROVES IT RATHER THAN JUST
+ * ASSERTING IT. `team_week_observations` is a generic `(season, week, team, source, metric, value,
+ * as_of)` store — the same table `coachObservations`, `scheduleObservations` and every other
+ * producer in `nflverse/ingest.ts` already write into with their own `source`/metric vocabulary.
+ * `src/projections/vegas/ingest.ts` adds a THIRD vocabulary (`VEGAS_SOURCE`/`VEGAS_METRICS`) the
+ * identical way — through `recordTeamObservations` and `teamObservationsAsOf`, no new column, no
+ * new table, no branch in this file. This test writes real vegas-shaped rows straight through the
+ * store's own public API to demonstrate that.
+ */
+describe("a third metric vocabulary (vegas win totals) needs no change to this store", () => {
+  it("records and reads back all three vegas metrics through the same generic API", async () => {
+    const asOf = new Date("2024-08-30T00:00:00.000Z");
+    const stamp = { season: 2024, week: 1, team: "BUF", source: VEGAS_SOURCE, asOf } as const;
+    await recordTeamObservations(db, [
+      { ...stamp, metric: VEGAS_METRICS.winTotal, value: 10.5 },
+      { ...stamp, metric: VEGAS_METRICS.overPrice, value: -115 },
+      { ...stamp, metric: VEGAS_METRICS.underPrice, value: -105 },
+    ]);
+    const known = await teamObservationsAsOf(db, { season: 2024, week: 1, asOf: new Date("9999-12-31T00:00:00.000Z"), source: VEGAS_SOURCE });
+    expect(known.map((row) => [row.metric, row.value]).sort()).toEqual(
+      [
+        [VEGAS_METRICS.winTotal, 10.5],
+        [VEGAS_METRICS.overPrice, -115],
+        [VEGAS_METRICS.underPrice, -105],
+      ].sort(),
+    );
   });
 });

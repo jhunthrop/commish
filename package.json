@@ -62,7 +62,8 @@
     "laws:measure": "dotenv -e .env.local -- tsx scripts/measure-laws.ts",
     "laws:discover:quantiles": "dotenv -e .env.local -- tsx scripts/discovery-quantile-fit.ts",
     "laws:discover": "dotenv -e .env.local -- tsx scripts/discover-laws.ts",
-    "projections:win-totals:validate": "dotenv -e .env.local -- tsx scripts/validate-win-totals.ts"
+    "projections:win-totals:validate": "dotenv -e .env.local -- tsx scripts/validate-win-totals.ts",
+    "projections:vegas:ingest": "dotenv -e .env.local -- tsx scripts/vegas-win-totals-ingest.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

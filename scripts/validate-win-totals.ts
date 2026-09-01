@@ -18,60 +18,25 @@ import { firstKickoffFor } from "@/projections/team-store";
 import { finalWeekOf, nflTeamsBySeason } from "@/projections/nflverse/team-eras";
 import { mapSchedule, SCHEDULE_SOURCE, SCHEDULE_SOURCE_CONFIG, type TeamGame } from "@/projections/nflverse/schedule";
 import { createNflverseClient } from "@/projections/nflverse/client";
-import { parseCsv } from "@/projections/nflverse/csv";
+import {
+  FIRST_WIN_TOTALS_SEASON,
+  LAST_WIN_TOTALS_SEASON,
+  parseWinTotalsCsv,
+  WIN_TOTALS_CSV_PATH,
+  WIN_TOTALS_SEASONS,
+  type WinTotalRow,
+} from "@/projections/vegas/ingest";
 
-export const WIN_TOTALS_CSV_PATH = "data/win-totals/win-totals.csv";
-export const FIRST_WIN_TOTALS_SEASON = 2003;
-export const LAST_WIN_TOTALS_SEASON = 2026;
-
-/** Every season the curated CSV covers, 2003 through 2026 inclusive. */
-export const WIN_TOTALS_SEASONS: readonly number[] = Array.from(
-  { length: LAST_WIN_TOTALS_SEASON - FIRST_WIN_TOTALS_SEASON + 1 },
-  (_, i) => FIRST_WIN_TOTALS_SEASON + i,
-);
-
-export interface WinTotalRow {
-  readonly season: number;
-  readonly team: string;
-  readonly winTotal: number;
-  readonly overPrice: number;
-  readonly underPrice: number;
-  /** `null`, never `0` — a season with no recorded wins is unknown, not winless. */
-  readonly actualWins: number | null;
-  readonly source: string;
-  readonly sourceDate: string;
-}
+// The CSV shape (`WinTotalRow`, `parseWinTotalsCsv`) and the path/season-range constants moved to
+// `src/projections/vegas/ingest.ts` in Task 2, which is now the canonical reader of this file inside
+// `src/` — a script importing them from `src/` is this repo's normal direction of dependency (this
+// script already does exactly that for `firstKickoffFor` and `nflTeamsBySeason`). Re-exported here
+// so `validate-win-totals.test.ts`'s existing `from "./validate-win-totals"` import needs no change.
+export { FIRST_WIN_TOTALS_SEASON, LAST_WIN_TOTALS_SEASON, parseWinTotalsCsv, WIN_TOTALS_CSV_PATH, WIN_TOTALS_SEASONS, type WinTotalRow };
 
 export interface Violation {
   readonly kind: string;
   readonly message: string;
-}
-
-function requiredNumber(raw: string, column: string, season: string, team: string): number {
-  const value = Number(raw);
-  if (!Number.isFinite(value)) {
-    throw new Error(`win-totals.csv row (season ${season}, team ${team}) has an unreadable ${column} (got ${JSON.stringify(raw)}).`);
-  }
-  return value;
-}
-
-/** Parses the curated CSV into typed rows. Throws on any unreadable numeric column. */
-export function parseWinTotalsCsv(text: string): readonly WinTotalRow[] {
-  return parseCsv(text).map((row) => {
-    const season = requiredNumber(row.season ?? "", "season", row.season ?? "", row.team ?? "");
-    const team = row.team ?? "";
-    const actualWinsRaw = (row.actual_wins ?? "").trim();
-    return {
-      season,
-      team,
-      winTotal: requiredNumber(row.win_total ?? "", "win_total", row.season ?? "", team),
-      overPrice: requiredNumber(row.over_price ?? "", "over_price", row.season ?? "", team),
-      underPrice: requiredNumber(row.under_price ?? "", "under_price", row.season ?? "", team),
-      actualWins: actualWinsRaw === "" ? null : requiredNumber(actualWinsRaw, "actual_wins", row.season ?? "", team),
-      source: row.source ?? "",
-      sourceDate: row.source_date ?? "",
-    };
-  });
 }
 
 /**
