@@ -236,7 +236,8 @@ Recorded here, with pointers, rather than fixed in this round:
    whichever Postgres inserted first and silently discard the other; `team-store.ts` currently guards
    only the within-batch case (`assertFiniteValues` throws on a genuine intra-batch contradiction), not
    the general hazard across separate insert calls. Carried forward unresolved from the predecessor
-   round's own close-out (`docs/research/2026-08-31-market-edge-closeout.md`, section 5) and unrelated
+   round's own close-out (`docs/research/2026-08-31-market-edge-closeout.md`, section 8, which itself
+   traces the origin to `2026-08-31-prediction-laws-closeout.md`, section 5) and unrelated
    to any task this round touched, so it was not re-touched here either.
 
 6. **The tsc baseline: 43 pre-existing errors, verify at merge.** Every task this round ran
@@ -244,7 +245,8 @@ Recorded here, with pointers, rather than fixed in this round:
    the round touched, spread across roughly 13 deferred-ledger UI test files (component prop-shape
    mismatches unrelated to the projections engine). A re-reviewer separately observed the baseline
    reading 60 in those same files "from unrelated concurrent work" partway through the round
-   (`progress.md`, Task 2 section); the note there commits to verifying at merge time that the baseline
+   (`progress.md`, the standalone note after Task 3's completion); the note there commits to verifying
+   at merge time that the baseline
    this branch carries matches main's own state, not assuming 43 or 60 without checking against
    whatever main actually has when this branch lands.
 
