@@ -143,13 +143,44 @@ function percentile(sorted: readonly number[], p: number): number {
   return sorted[lower]! * (1 - weight) + sorted[upper]! * weight;
 }
 
+function standardDeviation(values: readonly number[]): number {
+  const m = mean(values);
+  const variance = values.reduce((sum, value) => sum + (value - m) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+/** The bootstrap effect, its standard error, and its 95% CI, computed from the SAME resample draws —
+ *  `measureEffect` and Task 7's discovery pipeline (`discovery/measure.ts`, which needs `se` for its
+ *  normal-approximation p-value; see that module's own docblock for why) both build on this rather
+ *  than each running its own bootstrap loop, so a law's CI and a discovered candidate's p-value are
+ *  never computed from two different resample sequences. */
+export interface BootstrapStatistics {
+  readonly effect: number;
+  readonly se: number;
+  readonly ci: readonly [number, number];
+}
+
 /**
- * Bootstraps the 95% CI by resampling PAIRS with replacement — never individual points, which
- * would break the condition/control coupling the matching just built. `BOOTSTRAP.resamples` draws,
- * each of `pairs.length` pairs, mean difference per draw, then the 2.5th/97.5th percentile of the
- * resulting distribution.
+ * Resamples PAIRS with replacement — never individual points, which would break the
+ * condition/control coupling the matching just built. `BOOTSTRAP.resamples` draws, each of
+ * `pairs.length` pairs, mean difference per draw; `se` is that resample distribution's own standard
+ * deviation, `ci` its 2.5th/97.5th percentile. An empty `pairs` list THROWS rather than returning a
+ * sentinel: a measurement with zero matched pairs is not "debunked", it is no measurement at all, and
+ * any zero-shaped value returned here would flow into `verdictFor` and come out reading "tested and
+ * failed". A law whose population matched nothing is a population-builder bug (condition too strict,
+ * wrong `matchKey`, caliper too tight), and the one honest response is to fail loudly at the source so
+ * the registry can never stamp a verdict on evidence that does not exist.
  */
-function bootstrapCi(pairs: readonly MatchedPair[], differences: readonly number[]): readonly [number, number] {
+export function bootstrapStatistics(pairs: readonly MatchedPair[]): BootstrapStatistics {
+  if (pairs.length === 0) {
+    throw new Error(
+      "bootstrapStatistics: no matched pairs — an empty matched population is a population-builder bug, never a verdict",
+    );
+  }
+
+  const differences = pairs.map(pairDifference);
+  const effect = mean(differences);
+
   const random = mulberry32(BOOTSTRAP.seed);
   const resampleMeans: number[] = [];
   for (let resample = 0; resample < BOOTSTRAP.resamples; resample += 1) {
@@ -160,18 +191,18 @@ function bootstrapCi(pairs: readonly MatchedPair[], differences: readonly number
     }
     resampleMeans.push(total / pairs.length);
   }
-  resampleMeans.sort((a, b) => a - b);
-  return [percentile(resampleMeans, 0.025), percentile(resampleMeans, 0.975)];
+  const se = standardDeviation(resampleMeans);
+  const sorted = [...resampleMeans].sort((a, b) => a - b);
+  const ci: readonly [number, number] = [percentile(sorted, 0.025), percentile(sorted, 0.975)];
+
+  return { effect, se, ci };
 }
 
 /**
  * The measured effect of a matched population: mean paired difference-in-differences, with a
- * seeded-bootstrap 95% CI. An empty `pairs` list THROWS rather than returning a sentinel: a
- * measurement with zero matched pairs is not "debunked", it is no measurement at all, and any
- * zero-shaped value returned here would flow into `verdictFor` and come out reading "tested and
- * failed". A law whose population matched nothing is a population-builder bug (condition too
- * strict, wrong `matchKey`, caliper too tight), and the one honest response is to fail loudly at
- * the source so the registry can never stamp a verdict on evidence that does not exist.
+ * seeded-bootstrap 95% CI — `bootstrapStatistics`'s `effect`/`ci`, repackaged into `LawMeasurement`'s
+ * shape (dropping `se`, which only `discovery/measure.ts`'s p-value computation needs). Throws
+ * exactly when `bootstrapStatistics` does, for the identical reason (see that function's docblock).
  *
  * `seasons` is returned EMPTY on purpose: this harness has no opinion on which seasons `pairs` was
  * matched over, and it used to guess anyway with a `MEASURE_SEASONS`/`HELD_OUT_SEASONS`-derived
@@ -182,16 +213,7 @@ function bootstrapCi(pairs: readonly MatchedPair[], differences: readonly number
  * every caller is expected to overwrite this field the same way.
  */
 export function measureEffect(pairs: readonly MatchedPair[]): LawMeasurement {
-  if (pairs.length === 0) {
-    throw new Error(
-      "measureEffect: no matched pairs — an empty matched population is a population-builder bug, never a verdict",
-    );
-  }
-
-  const differences = pairs.map(pairDifference);
-  const effect = mean(differences);
-  const ci = bootstrapCi(pairs, differences);
-
+  const { effect, ci } = bootstrapStatistics(pairs);
   return { effect, ci, sample: pairs.length, seasons: "" };
 }
 

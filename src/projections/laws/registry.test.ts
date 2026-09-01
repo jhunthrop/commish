@@ -1,10 +1,18 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  DISCOVERED_JSON_PATH,
+  discoveredLawsFrom,
+  MIN_REPLICATION_PAIRS,
+  parseDiscoveredJson,
   parseMeasuredJson,
   registry,
   registryFrom,
   stratumKeyFor,
+  verdictForDiscoveredLaw,
   verdictForFullWindow,
+  type DiscoveredEntry,
+  type DiscoveredJson,
   type FoldEffect,
   type MeasuredEntry,
   type MeasuredJson,
@@ -68,6 +76,7 @@ describe("registryFrom", () => {
       verdict: "confirmed",
       modelPath: null,
       hasFoldEvidence: true,
+      origin: "tribal",
     });
   });
 
@@ -221,9 +230,23 @@ describe("verdictForFullWindow", () => {
 });
 
 describe("registry", () => {
-  it("reads the committed measured.json against the real LAW_SPECS with no drift", () => {
+  it("reads the committed measured.json against the real LAW_SPECS with no drift, tagged tribal", () => {
     const laws = registry();
-    expect(laws.map((law) => law.id).sort()).toEqual(LAW_SPECS.map((spec) => spec.id).sort());
+    const tribal = laws.filter((law) => law.origin === "tribal");
+    expect(tribal.map((law) => law.id).sort()).toEqual(LAW_SPECS.map((spec) => spec.id).sort());
+  });
+
+  it("merges in the committed discovered.json's own BH survivors, tagged discovered, with no drift", () => {
+    const laws = registry();
+    const discoveredJson = parseDiscoveredJson(readFileSync(DISCOVERED_JSON_PATH, "utf-8"));
+    const discovered = laws.filter((law) => law.origin === "discovered");
+    expect(discovered.map((law) => law.id).sort()).toEqual(Object.keys(discoveredJson.laws).sort());
+    for (const law of discovered) expect(law.modelPath).toBeNull();
+  });
+
+  it("never produces a duplicate id across the tribal and discovered halves", () => {
+    const ids = registry().map((law) => law.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 
@@ -294,5 +317,159 @@ describe("stratumKeyFor", () => {
     const spec = specFixture({ position: "all" });
     expect(stratumKeyFor(spec, point({ season: 2019, position: "TE" }))).toBe("2019|TE");
     expect(stratumKeyFor(spec, point({ season: 2019, position: "WR" }))).toBe("2019|WR");
+  });
+});
+
+/**
+ * `verdictForDiscoveredLaw`, `parseDiscoveredJson`, `discoveredLawsFrom` — the DISCOVERED half of the
+ * registry (Task 7, 2026-08-31), driven with hand-built fixtures the same way the tribal describe
+ * blocks above drive `registryFrom`/`parseMeasuredJson`/`verdictForFullWindow`.
+ */
+
+const FOLDS_AGREE_NEGATIVE: readonly FoldEffect[] = [
+  { season: 2021, effect: -1 },
+  { season: 2022, effect: -1.5 },
+  { season: 2023, effect: -0.5 },
+];
+
+function discoveredEntryFixture(over: Partial<DiscoveredEntry> = {}): DiscoveredEntry {
+  const base: DiscoveredEntry = {
+    effect: -3,
+    ci: [-4, -2],
+    sample: 40,
+    seasons: "2013-2023",
+    foldEffects: FOLDS_AGREE_NEGATIVE,
+    verdict: "confirmed",
+    origin: "discovered",
+    position: "RB",
+    template: "threshold",
+    claim: "A running back whose combined carries and receptions that season is in the top 20% of running backs loses points per game the following season.",
+    expectedSign: -1,
+  };
+  return { ...base, ...over };
+}
+
+describe("verdictForDiscoveredLaw", () => {
+  const FULL_WINDOW_CONFIRMS = { effect: -3, ci: [-4, -2] as const, sample: 40, seasons: "s" };
+
+  it("confirms exactly when verdictForFullWindow would AND the sample is at least MIN_REPLICATION_PAIRS", () => {
+    expect(verdictForDiscoveredLaw(FULL_WINDOW_CONFIRMS, -1, FOLDS_AGREE_NEGATIVE)).toBe("confirmed");
+  });
+
+  it("caps a full-window confirm at weak when the sample is below MIN_REPLICATION_PAIRS, even with every fold agreeing", () => {
+    const thinSample = { ...FULL_WINDOW_CONFIRMS, sample: MIN_REPLICATION_PAIRS - 1 };
+    expect(verdictForDiscoveredLaw(thinSample, -1, FOLDS_AGREE_NEGATIVE)).toBe("weak");
+  });
+
+  it("confirms right at the MIN_REPLICATION_PAIRS boundary (inclusive)", () => {
+    const atBoundary = { ...FULL_WINDOW_CONFIRMS, sample: MIN_REPLICATION_PAIRS };
+    expect(verdictForDiscoveredLaw(atBoundary, -1, FOLDS_AGREE_NEGATIVE)).toBe("confirmed");
+  });
+
+  it("never upgrades a weak or debunked verdictForFullWindow result regardless of sample size", () => {
+    const spansZero = { effect: -3, ci: [-1, 1] as const, sample: 1000, seasons: "s" };
+    const wrongSign = { effect: 3, ci: [2, 4] as const, sample: 1000, seasons: "s" };
+    expect(verdictForDiscoveredLaw(spansZero, -1, FOLDS_AGREE_NEGATIVE)).toBe("weak");
+    expect(verdictForDiscoveredLaw(wrongSign, -1, FOLDS_AGREE_NEGATIVE)).toBe("debunked");
+  });
+
+  it("still caps at weak when a fold disagrees, regardless of sample size", () => {
+    const oneFoldDisagrees: readonly FoldEffect[] = [
+      { season: 2021, effect: -1 },
+      { season: 2022, effect: 1 },
+      { season: 2023, effect: -1 },
+    ];
+    expect(verdictForDiscoveredLaw(FULL_WINDOW_CONFIRMS, -1, oneFoldDisagrees)).toBe("weak");
+  });
+});
+
+describe("parseDiscoveredJson", () => {
+  it("parses a well-shaped discovered.json into a DiscoveredJson", () => {
+    const entry = discoveredEntryFixture();
+    const raw = JSON.stringify({ counts: { tested: 1737, untestable: 900, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
+    expect(parseDiscoveredJson(raw)).toEqual({
+      counts: { tested: 1737, untestable: 900, bhSurvivors: 1, replicated: 1 },
+      laws: { fake_candidate: entry },
+    });
+  });
+
+  it("throws when counts is missing a field", () => {
+    const raw = JSON.stringify({ counts: { tested: 1737, untestable: 900, bhSurvivors: 1 }, laws: {} });
+    expect(() => parseDiscoveredJson(raw)).toThrow(/counts\.replicated is not a finite number/);
+  });
+
+  it("throws on the same malformed measured-entry fields parseMeasuredJson catches", () => {
+    const malformed = JSON.stringify({
+      counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+      laws: { fake_candidate: { ...discoveredEntryFixture(), effect: "-3" } },
+    });
+    expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.effect is not a finite number/);
+  });
+
+  it("throws when origin is not \"discovered\"", () => {
+    const malformed = JSON.stringify({
+      counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+      laws: { fake_candidate: { ...discoveredEntryFixture(), origin: "tribal" } },
+    });
+    expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.origin is not "discovered"/);
+  });
+
+  it("throws when expectedSign is not -1 or 1", () => {
+    const malformed = JSON.stringify({
+      counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+      laws: { fake_candidate: { ...discoveredEntryFixture(), expectedSign: 0 } },
+    });
+    expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.expectedSign is not -1 or 1/);
+  });
+
+  it("throws when template is not one of threshold | delta | and", () => {
+    const malformed = JSON.stringify({
+      counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+      laws: { fake_candidate: { ...discoveredEntryFixture(), template: "bogus" } },
+    });
+    expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.template is not one of/);
+  });
+});
+
+describe("discoveredLawsFrom", () => {
+  it("merges a discovered entry into a Law, origin: \"discovered\", modelPath always null", () => {
+    const entry = discoveredEntryFixture();
+    const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } };
+    const [law] = discoveredLawsFrom(discoveredJson);
+    expect(law).toEqual({
+      id: "fake_candidate",
+      position: "RB",
+      claim: entry.claim,
+      measured: { effect: -3, ci: [-4, -2], sample: 40, seasons: "2013-2023" },
+      verdict: "confirmed",
+      modelPath: null,
+      hasFoldEvidence: true,
+      origin: "discovered",
+    });
+  });
+
+  it("throws when the stored verdict disagrees with verdictForDiscoveredLaw's own computation", () => {
+    const entry = discoveredEntryFixture({ sample: MIN_REPLICATION_PAIRS - 1, verdict: "confirmed" }); // should be "weak" — thin sample
+    const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 0 }, laws: { fake_candidate: entry } };
+    expect(() => discoveredLawsFrom(discoveredJson)).toThrow(/verdict for "fake_candidate" is "confirmed".*computes "weak"/);
+  });
+
+  it("returns an empty array for zero survivors — a legitimate, publishable result", () => {
+    const discoveredJson: DiscoveredJson = { counts: { tested: 1737, untestable: 1737, bhSurvivors: 0, replicated: 0 }, laws: {} };
+    expect(discoveredLawsFrom(discoveredJson)).toEqual([]);
+  });
+
+  it("derives hasFoldEvidence false when every fold matched zero pairs", () => {
+    const entry = discoveredEntryFixture({
+      foldEffects: [
+        { season: 2021, effect: null },
+        { season: 2022, effect: null },
+        { season: 2023, effect: null },
+      ],
+      verdict: "weak",
+    });
+    const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 0 }, laws: { fake_candidate: entry } };
+    const [law] = discoveredLawsFrom(discoveredJson);
+    expect(law!.hasFoldEvidence).toBe(false);
   });
 });

@@ -5,6 +5,7 @@ import {
   MIN_QUANTILE_SAMPLE,
   QUANTITY_DEFS,
   renderClaim,
+  renderSignedClaim,
   type ClaimParts,
   type QuantityRow,
 } from "./templates";
@@ -108,6 +109,37 @@ describe("renderClaim", () => {
     const b = renderClaim({ position: "RB", clause: { kind: "delta", quantityId: "age", quantileLevel: 0.7, direction: "fell_out_of" } });
     expect(a.endsWith("scores differently in points per game the following season.")).toBe(true);
     expect(b.endsWith("scores differently in points per game the following season.")).toBe(true);
+  });
+});
+
+describe("renderSignedClaim", () => {
+  const parts: ClaimParts = {
+    position: "RB",
+    clause: { kind: "threshold", quantityId: "touches", quantileLevel: 0.8 },
+  };
+
+  it("shares renderClaim's own intro verbatim, differing only in the trailing outcome clause", () => {
+    const neutral = renderClaim(parts);
+    const negative = renderSignedClaim(parts, -1);
+    const introOnly = neutral.replace(/scores differently in points per game the following season\.$/, "");
+    expect(negative.startsWith(introOnly)).toBe(true);
+  });
+
+  it("commits to 'loses' for a negative sign", () => {
+    expect(renderSignedClaim(parts, -1)).toBe(
+      "A running back whose combined carries and receptions that season is in the top 20% of running backs loses points per game the following season.",
+    );
+  });
+
+  it("commits to 'gains' for a positive sign", () => {
+    expect(renderSignedClaim(parts, 1)).toBe(
+      "A running back whose combined carries and receptions that season is in the top 20% of running backs gains points per game the following season.",
+    );
+  });
+
+  it("never emits an em-dash", () => {
+    expect(renderSignedClaim(parts, -1)).not.toMatch(/—/);
+    expect(renderSignedClaim(parts, 1)).not.toMatch(/—/);
   });
 });
 

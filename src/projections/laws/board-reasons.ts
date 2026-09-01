@@ -63,11 +63,23 @@ export function magnitudeForLaw(lawId: string, facts: LawConditionFacts): number
  * `laws` is a parameter rather than a call to `registry()` inside here, so this stays the pure,
  * DB-free, disk-free core every caller — a live board via `laws/board-reasons.ts`'s only export, and
  * a future test with a hand-built registry fixture — can drive identically.
+ *
+ * ORIGIN-SCOPED (Task 7, 2026-08-31): `registry()` now merges `origin: "discovered"` laws in
+ * alongside the six tribal ones (`registry.ts`'s own docblock). A discovered law's antecedent is a
+ * `discovery/generate.ts` candidate's own `condition(DiscoveryFacts)` predicate, a completely
+ * different fact shape than this function's `LawConditionFacts` — `LAW_CONDITIONS` was built from
+ * `LAW_ENTRIES` (the six tribal laws) alone and was never meant to answer for a discovered law's id.
+ * Wiring a discovered law's condition into a live board is Task 8's own concern (chip/deviation
+ * eligibility for `confirmed` discovered laws); until then, a non-tribal law is skipped here exactly
+ * like a `weak`/`debunked` one — silently contributing nothing, never a drift error, because it is
+ * not drift: `LAW_CONDITIONS` was never supposed to cover it. A `confirmed` TRIBAL law missing from
+ * `LAW_CONDITIONS` is still the real bug this throw exists to catch.
  */
 export function lawReasonsFor(facts: LawConditionFacts, laws: readonly Law[]): readonly BoardReason[] {
   const reasons: BoardReason[] = [];
   for (const law of laws) {
     if (law.verdict !== "confirmed") continue;
+    if (law.origin !== "tribal") continue;
     const condition = LAW_CONDITIONS.get(law.id);
     if (condition === undefined) {
       throw new Error(`lawReasonsFor: "${law.id}" has no condition predicate in LAW_CONDITIONS — a law and populations.ts have drifted.`);

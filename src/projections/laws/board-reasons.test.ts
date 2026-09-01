@@ -36,6 +36,7 @@ function lawFixture(id: string, verdict: LawVerdict, effect = -2.5): Law {
     verdict,
     modelPath: null,
     hasFoldEvidence: true,
+    origin: "tribal",
   };
 }
 
@@ -130,8 +131,22 @@ describe("lawReasonsFor", () => {
     ]);
   });
 
-  it("throws when a law id in the registry has no condition predicate — registry and populations.ts have drifted", () => {
+  it("throws when a TRIBAL law id in the registry has no condition predicate — registry and populations.ts have drifted", () => {
     const laws: readonly Law[] = [lawFixture("not_a_real_law", "confirmed")];
     expect(() => lawReasonsFor(factsFixture(), laws)).toThrow(/not_a_real_law.*no condition predicate/);
+  });
+
+  it("skips a CONFIRMED DISCOVERED law silently rather than throwing — its condition is a DiscoveryFacts predicate, not a LawConditionFacts one", () => {
+    const discovered: Law = { ...lawFixture("threshold:RB:touches:q70", "confirmed"), origin: "discovered" };
+    expect(() => lawReasonsFor(factsFixture(), [discovered])).not.toThrow();
+    expect(lawReasonsFor(factsFixture(), [discovered])).toEqual([]);
+  });
+
+  it("keeps a tribal confirmed-and-true law alongside a skipped discovered one", () => {
+    const facts = factsFixture({ targetShare: 0.3 });
+    const tribal = lawFixture("target_share_persistence", "confirmed", 1.8);
+    const discovered: Law = { ...lawFixture("threshold:WR:targetShare:q70", "confirmed"), origin: "discovered" };
+    const reasons = lawReasonsFor(facts, [tribal, discovered]);
+    expect(reasons).toEqual<readonly BoardReason[]>([{ code: "law", lawId: "target_share_persistence", effect: 1.8, magnitude: 0.3 }]);
   });
 });

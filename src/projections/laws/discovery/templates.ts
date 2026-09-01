@@ -189,15 +189,41 @@ function clauseText(clause: Clause, position: LawPosition): string {
 
 const OUTCOME_CLAUSE = "scores differently in points per game the following season.";
 
+/** The sign-committed outcome clause `renderSignedClaim` closes a claim with, once a candidate's
+ *  train-window effect sign is known — see that function's own docblock for why this is a SEPARATE
+ *  clause from `OUTCOME_CLAUSE` rather than a template `renderClaim` fills in: the generator itself
+ *  never knows a sign, only Task 7's measurement does. */
+const SIGNED_OUTCOME_CLAUSE: Readonly<Record<-1 | 1, string>> = {
+  [-1]: "loses points per game the following season.",
+  [1]: "gains points per game the following season.",
+};
+
+/** The shared, sign-agnostic half of a rendered claim: the article, the position noun, and the
+ *  clause's own English — both `renderClaim` and `renderSignedClaim` differ only in which trailing
+ *  outcome clause they append to this. */
+function claimIntro(parts: ClaimParts): string {
+  const singular = POSITION_SINGULAR[parts.position];
+  const article = /^[aeiou]/i.test(singular) ? "An" : "A";
+  return `${article} ${singular} whose ${clauseText(parts.clause, parts.position)}`;
+}
+
 /**
  * THE ONE TESTED RENDERER. Mechanical end to end: every word is either a fixed template fragment or
  * a `QUANTITY_DEFS` noun, never prose written per candidate. No em-dashes, matching every other
  * user-facing string in this engine.
  */
 export function renderClaim(parts: ClaimParts): string {
-  const singular = POSITION_SINGULAR[parts.position];
-  const article = /^[aeiou]/i.test(singular) ? "An" : "A";
-  return `${article} ${singular} whose ${clauseText(parts.clause, parts.position)} ${OUTCOME_CLAUSE}`;
+  return `${claimIntro(parts)} ${OUTCOME_CLAUSE}`;
+}
+
+/**
+ * `renderClaim`'s sign-committed sibling — Task 7 (`discovery/measure.ts`) calls this once a BH
+ * survivor's train-window effect sign is known, so `discovered.json`'s own claim reads "gains" or
+ * "loses" rather than the neutral "scores differently" every unmeasured candidate carries. Same
+ * mechanical discipline as `renderClaim`: no prose written per candidate, no em-dashes.
+ */
+export function renderSignedClaim(parts: ClaimParts, sign: -1 | 1): string {
+  return `${claimIntro(parts)} ${SIGNED_OUTCOME_CLAUSE[sign]}`;
 }
 
 /** One quantity's fitted train-window thresholds, at the three quantile levels this generator uses. */

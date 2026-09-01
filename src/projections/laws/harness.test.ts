@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchedPairs, matchedPairsStratified, measureEffect, verdictFor } from "./harness";
+import { bootstrapStatistics, matchedPairs, matchedPairsStratified, measureEffect, verdictFor } from "./harness";
 import type { PlayerSeasonPoint } from "./types";
 
 /** Strength of the regression-to-the-mean drift both synthetic groups share, and the mean they
@@ -241,6 +241,30 @@ it("is reproducible: two runs yield identical measurements", () => {
   const a = measureEffect(matchedPairs(planted(100, -1), 0.5));
   const b = measureEffect(matchedPairs(planted(100, -1), 0.5));
   expect(a).toEqual(b);
+});
+
+describe("bootstrapStatistics", () => {
+  it("agrees with measureEffect's own effect and ci, computed from the identical resample draws", () => {
+    const pairs = matchedPairs(planted(200, -2.0), 0.5);
+    const { effect, ci } = bootstrapStatistics(pairs);
+    const m = measureEffect(pairs);
+    expect(effect).toBe(m.effect);
+    expect(ci).toEqual(m.ci);
+  });
+
+  it("reports a positive standard error for a real matched population", () => {
+    const pairs = matchedPairs(planted(200, -2.0), 0.5);
+    expect(bootstrapStatistics(pairs).se).toBeGreaterThan(0);
+  });
+
+  it("throws the same 'no matched pairs' error measureEffect does on an empty pairs list", () => {
+    expect(() => bootstrapStatistics([])).toThrow(/no matched pairs/);
+  });
+
+  it("is reproducible across repeated calls with the identical pairs", () => {
+    const pairs = matchedPairs(planted(100, -1), 0.5);
+    expect(bootstrapStatistics(pairs)).toEqual(bootstrapStatistics(pairs));
+  });
 });
 
 describe("matchedPairs", () => {

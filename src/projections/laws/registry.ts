@@ -47,6 +47,7 @@
 import { readFileSync } from "node:fs";
 import { LAW_SPECS, type LawSpec } from "./populations";
 import { verdictFor } from "./harness";
+import type { CandidateTemplate } from "./discovery/generate";
 import type { Law, LawMeasurement, LawVerdict, PlayerSeasonPoint } from "./types";
 
 /** One replication fold's own effect (`config.ts`'s `REPLICATION_FOLDS`, one entry per predictor
@@ -71,6 +72,49 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 /**
+ * The `LawMeasurement & { foldEffects; verdict }` half of a `measured.json`/`discovered.json` entry
+ * shape-checked ONE way, shared by `parseMeasuredJson` and `parseDiscoveredJson` (Task 7) — a
+ * discovered entry carries every field a measured one does, plus its own origin/position/template/
+ * claim/expectedSign fields `parseDiscoveredJson` checks afterward. `prefix` is each caller's own
+ * `"malformed <file>.json:"` opener, so the two files' error messages stay distinguishable while the
+ * field-by-field checks themselves are written exactly once.
+ */
+function assertMeasuredEntryShape(prefix: string, lawId: string, record: Record<string, unknown>): void {
+  if (!isFiniteNumber(record.effect)) {
+    throw new Error(`${prefix} "${lawId}".effect is not a finite number`);
+  }
+  if (!Array.isArray(record.ci) || record.ci.length !== 2 || !isFiniteNumber(record.ci[0]) || !isFiniteNumber(record.ci[1])) {
+    throw new Error(`${prefix} "${lawId}".ci is not a 2-tuple of finite numbers`);
+  }
+  if (!isFiniteNumber(record.sample)) {
+    throw new Error(`${prefix} "${lawId}".sample is not a finite number`);
+  }
+  if (typeof record.seasons !== "string") {
+    throw new Error(`${prefix} "${lawId}".seasons is not a string`);
+  }
+  if (!Array.isArray(record.foldEffects)) {
+    throw new Error(`${prefix} "${lawId}".foldEffects is not an array`);
+  }
+  for (const fold of record.foldEffects as readonly unknown[]) {
+    if (typeof fold !== "object" || fold === null || Array.isArray(fold)) {
+      throw new Error(`${prefix} "${lawId}".foldEffects has a non-object entry`);
+    }
+    const foldRecord = fold as Record<string, unknown>;
+    if (!isFiniteNumber(foldRecord.season)) {
+      throw new Error(`${prefix} "${lawId}".foldEffects has an entry with a non-finite season`);
+    }
+    if (foldRecord.effect !== null && !isFiniteNumber(foldRecord.effect)) {
+      throw new Error(`${prefix} "${lawId}".foldEffects has an entry with a non-finite effect or null`);
+    }
+  }
+  if (typeof record.verdict !== "string" || !VALID_VERDICTS.has(record.verdict)) {
+    throw new Error(`${prefix} "${lawId}".verdict is not one of "confirmed" | "weak" | "debunked"`);
+  }
+}
+
+const MEASURED_JSON_PREFIX = "malformed measured.json:";
+
+/**
  * Explicit shape validation for `JSON.parse`'s untyped output, called before `measured.json`'s
  * content is trusted as `MeasuredJson` anywhere. `measured.json` is generated, never hand-authored
  * — but this module's own docblock has worried about a hand edit surviving since Task 6 shipped,
@@ -90,38 +134,7 @@ export function parseMeasuredJson(raw: string): MeasuredJson {
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
       throw new Error(`malformed measured.json: "${lawId}" is not an object`);
     }
-    const record = entry as Record<string, unknown>;
-
-    if (!isFiniteNumber(record.effect)) {
-      throw new Error(`malformed measured.json: "${lawId}".effect is not a finite number`);
-    }
-    if (!Array.isArray(record.ci) || record.ci.length !== 2 || !isFiniteNumber(record.ci[0]) || !isFiniteNumber(record.ci[1])) {
-      throw new Error(`malformed measured.json: "${lawId}".ci is not a 2-tuple of finite numbers`);
-    }
-    if (!isFiniteNumber(record.sample)) {
-      throw new Error(`malformed measured.json: "${lawId}".sample is not a finite number`);
-    }
-    if (typeof record.seasons !== "string") {
-      throw new Error(`malformed measured.json: "${lawId}".seasons is not a string`);
-    }
-    if (!Array.isArray(record.foldEffects)) {
-      throw new Error(`malformed measured.json: "${lawId}".foldEffects is not an array`);
-    }
-    for (const fold of record.foldEffects as readonly unknown[]) {
-      if (typeof fold !== "object" || fold === null || Array.isArray(fold)) {
-        throw new Error(`malformed measured.json: "${lawId}".foldEffects has a non-object entry`);
-      }
-      const foldRecord = fold as Record<string, unknown>;
-      if (!isFiniteNumber(foldRecord.season)) {
-        throw new Error(`malformed measured.json: "${lawId}".foldEffects has an entry with a non-finite season`);
-      }
-      if (foldRecord.effect !== null && !isFiniteNumber(foldRecord.effect)) {
-        throw new Error(`malformed measured.json: "${lawId}".foldEffects has an entry with a non-finite effect or null`);
-      }
-    }
-    if (typeof record.verdict !== "string" || !VALID_VERDICTS.has(record.verdict)) {
-      throw new Error(`malformed measured.json: "${lawId}".verdict is not one of "confirmed" | "weak" | "debunked"`);
-    }
+    assertMeasuredEntryShape(MEASURED_JSON_PREFIX, lawId, entry as Record<string, unknown>);
   }
 
   return parsed as MeasuredJson;
@@ -169,6 +182,169 @@ export function verdictForFullWindow(
   return everyFoldAgrees ? "confirmed" : "weak";
 }
 
+/**
+ * THE DISCOVERY TRIAL (Task 7, 2026-08-31) — `discovery/generate.ts`'s 1,737 mechanically generated
+ * candidates, false-discovery-controlled and replicated into `discovered.json`. See
+ * `discovery/measure.ts`'s own docblock for the full pipeline (train-window screening,
+ * Benjamini-Hochberg at q=0.10, full-window replication); the pieces below are the merge/drift-guard
+ * half, living here rather than there for the identical reason `verdictForFullWindow` and
+ * `stratumKeyFor` do: `registry()` is the one place tribal and discovered evidence both have to
+ * agree with what they claim, and every drift-guard test drives these functions with hand-built
+ * fixtures, never the real files.
+ */
+
+/** The minimum full-window matched-pair sample a BH-surviving discovered candidate needs, on top of
+ *  `verdictForFullWindow`'s own CI/sign/fold-agreement bar, before its verdict can read `confirmed`.
+ *  BH controls the false-discovery rate at the SCREENING stage across the whole 1,737-candidate
+ *  family; a survivor's own full-window sample can still be thin, and this is the pipeline's
+ *  additional confirmatory bar against exactly that. 40 is in the same range the six tribal laws'
+ *  own `measured.json` samples sit in, not a novel number invented for this rule. */
+export const MIN_REPLICATION_PAIRS = 40;
+
+/**
+ * A DISCOVERED candidate's verdict: `verdictForFullWindow`'s own CI/sign/fold-agreement rule, plus
+ * ONE more gate that function does not apply on its own — `confirmed` also needs at least
+ * `MIN_REPLICATION_PAIRS` full-window matched pairs. Exactly like `verdictForFullWindow`'s own
+ * relationship to `verdictFor`, this can only ever pull a `confirmed` down to `weak`; a `weak` or
+ * `debunked` verdict from `verdictForFullWindow` passes through unchanged.
+ */
+export function verdictForDiscoveredLaw(
+  measurement: LawMeasurement,
+  expectedSign: -1 | 1,
+  foldEffects: readonly FoldEffect[],
+): LawVerdict {
+  const base = verdictForFullWindow(measurement, expectedSign, foldEffects);
+  if (base !== "confirmed") return base;
+  return measurement.sample >= MIN_REPLICATION_PAIRS ? "confirmed" : "weak";
+}
+
+/** One `discovered.json` law entry: everything a `MeasuredEntry` carries, plus what makes it a
+ *  DISCOVERED law rather than a tribal one — its origin tag, which position/template it was
+ *  generated for, its rendered (sign-committed) claim, and the sign its own train-window effect
+ *  determined rather than a person asserting one up front. */
+export type DiscoveredEntry = MeasuredEntry & {
+  readonly origin: "discovered";
+  readonly position: Law["position"];
+  readonly template: CandidateTemplate;
+  readonly claim: string;
+  readonly expectedSign: -1 | 1;
+};
+
+/** The discovery pipeline's own accounting, at the top level of `discovered.json` — see
+ *  `discovery/measure.ts`'s `runDiscoveryPipeline` for how each count is derived. `tested` is the
+ *  whole candidate family `discovery/generate.ts` produced (1,737 today); `untestable` is the subset
+ *  whose train-window population matched zero pairs (expected for narrow AND conditions, never an
+ *  error); `bhSurvivors` is how many of the remaining TESTABLE candidates survived
+ *  Benjamini-Hochberg at q=0.10; `replicated` is how many of those survivors' full-window
+ *  measurement came back `confirmed` under `verdictForDiscoveredLaw`. */
+export interface PipelineCounts {
+  readonly tested: number;
+  readonly untestable: number;
+  readonly bhSurvivors: number;
+  readonly replicated: number;
+}
+
+/** `discovered.json`'s whole shape: the pipeline's own accounting, plus one `DiscoveredEntry` per
+ *  BH survivor (confirmed and non-confirmed alike — a survivor that failed replication stays in the
+ *  file with its own non-confirmed verdict; see `discovery/measure.ts`'s docblock for why that is
+ *  the honest record rather than a row to drop). */
+export interface DiscoveredJson {
+  readonly counts: PipelineCounts;
+  readonly laws: { readonly [lawId: string]: DiscoveredEntry };
+}
+
+const DISCOVERED_JSON_PREFIX = "malformed discovered.json:";
+const VALID_POSITIONS: ReadonlySet<string> = new Set(["QB", "RB", "WR", "TE", "all"]);
+const VALID_TEMPLATES: ReadonlySet<string> = new Set(["threshold", "delta", "and"]);
+
+/**
+ * Explicit shape validation for `discovered.json`, mirroring `parseMeasuredJson`'s own discipline
+ * (see that function's docblock) plus the discovered-only fields: `assertMeasuredEntryShape` covers
+ * the `MeasuredEntry` half every law entry carries; the checks below cover `counts` and the
+ * origin/position/template/claim/expectedSign half that makes an entry a `DiscoveredEntry`.
+ */
+export function parseDiscoveredJson(raw: string): DiscoveredJson {
+  const parsed: unknown = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("malformed discovered.json: root is not an object");
+  }
+  const root = parsed as Record<string, unknown>;
+
+  const counts = root.counts;
+  if (typeof counts !== "object" || counts === null || Array.isArray(counts)) {
+    throw new Error("malformed discovered.json: counts is not an object");
+  }
+  const countsRecord = counts as Record<string, unknown>;
+  for (const field of ["tested", "untestable", "bhSurvivors", "replicated"] as const) {
+    if (!isFiniteNumber(countsRecord[field])) {
+      throw new Error(`malformed discovered.json: counts.${field} is not a finite number`);
+    }
+  }
+
+  const laws = root.laws;
+  if (typeof laws !== "object" || laws === null || Array.isArray(laws)) {
+    throw new Error("malformed discovered.json: laws is not an object");
+  }
+
+  for (const [lawId, entry] of Object.entries(laws as Record<string, unknown>)) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new Error(`malformed discovered.json: laws."${lawId}" is not an object`);
+    }
+    const record = entry as Record<string, unknown>;
+    assertMeasuredEntryShape(DISCOVERED_JSON_PREFIX, lawId, record);
+
+    if (record.origin !== "discovered") {
+      throw new Error(`malformed discovered.json: "${lawId}".origin is not "discovered"`);
+    }
+    if (typeof record.position !== "string" || !VALID_POSITIONS.has(record.position)) {
+      throw new Error(`malformed discovered.json: "${lawId}".position is not a valid Law position`);
+    }
+    if (typeof record.template !== "string" || !VALID_TEMPLATES.has(record.template)) {
+      throw new Error(`malformed discovered.json: "${lawId}".template is not one of "threshold" | "delta" | "and"`);
+    }
+    if (typeof record.claim !== "string") {
+      throw new Error(`malformed discovered.json: "${lawId}".claim is not a string`);
+    }
+    if (record.expectedSign !== -1 && record.expectedSign !== 1) {
+      throw new Error(`malformed discovered.json: "${lawId}".expectedSign is not -1 or 1`);
+    }
+  }
+
+  return parsed as DiscoveredJson;
+}
+
+/**
+ * The pure, testable core for the DISCOVERED half of the registry: one `Law` per `discovered.json`
+ * entry, `origin: "discovered"` throughout, `modelPath: null` throughout (a discovered law gets
+ * wired to a fitted feature the same way a confirmed tribal law would, in a model round of its own —
+ * see `LawSpec.modelPath`'s own docblock; nothing here builds or re-fits a model). Drift-checked the
+ * same way `registryFrom` checks tribal entries: the stored `verdict` must equal what
+ * `verdictForDiscoveredLaw` computes fresh from that same entry's own effect/ci/sample/foldEffects.
+ */
+export function discoveredLawsFrom(discoveredJson: DiscoveredJson): readonly Law[] {
+  return Object.entries(discoveredJson.laws).map(([id, entry]) => {
+    const measured: LawMeasurement = { effect: entry.effect, ci: entry.ci, sample: entry.sample, seasons: entry.seasons };
+    const expectedVerdict = verdictForDiscoveredLaw(measured, entry.expectedSign, entry.foldEffects);
+    if (entry.verdict !== expectedVerdict) {
+      throw new Error(
+        `discoveredLawsFrom: discovered.json's verdict for "${id}" is "${entry.verdict}" but verdictForDiscoveredLaw computes ` +
+          `"${expectedVerdict}" from its own effect/ci/sample/foldEffects — the file is stale or was hand-edited. Re-run \`npm run laws:discover\`.`,
+      );
+    }
+
+    return {
+      id,
+      position: entry.position,
+      claim: entry.claim,
+      measured,
+      verdict: entry.verdict,
+      modelPath: null,
+      hasFoldEvidence: entry.foldEffects.some((fold) => fold.effect !== null),
+      origin: "discovered" as const,
+    };
+  });
+}
+
 /** The pure, testable core: merges `specs` with `measuredJson`, throwing on any drift between them. */
 export function registryFrom(specs: readonly LawSpec[], measuredJson: MeasuredJson): readonly Law[] {
   const specIds = new Set(specs.map((spec) => spec.id));
@@ -201,6 +377,7 @@ export function registryFrom(specs: readonly LawSpec[], measuredJson: MeasuredJs
       verdict: entry.verdict,
       modelPath: spec.modelPath,
       hasFoldEvidence: entry.foldEffects.some((fold) => fold.effect !== null),
+      origin: "tribal" as const,
     };
   });
 }
@@ -213,10 +390,22 @@ export function registryFrom(specs: readonly LawSpec[], measuredJson: MeasuredJs
  */
 export const MEASURED_JSON_PATH = "src/projections/laws/measured.json";
 
+/** Where `discovered.json` lives — the same repo-root-relative convention as `MEASURED_JSON_PATH`,
+ *  written through by `scripts/discover-laws.ts`. */
+export const DISCOVERED_JSON_PATH = "src/projections/laws/discovered.json";
+
 /** The thin file-reading wrapper every real caller uses: the committed `LAW_SPECS` against the
- *  committed `measured.json` — shape-validated (`parseMeasuredJson`) and drift-checked
- *  (`registryFrom`) — read fresh off disk on every call. */
+ *  committed `measured.json` (shape-validated by `parseMeasuredJson`, drift-checked by
+ *  `registryFrom`), merged with `discovered.json`'s own BH survivors (shape-validated by
+ *  `parseDiscoveredJson`, drift-checked by `discoveredLawsFrom`) — both read fresh off disk on
+ *  every call. Tribal laws come first, in `LAW_SPECS`' own order, exactly as before Task 7; discovered
+ *  laws follow, in `discovered.json`'s own key order (BH-survivor id order, itself deterministic —
+ *  see `discovery/measure.ts`'s docblock). */
 export function registry(): readonly Law[] {
-  const raw = readFileSync(MEASURED_JSON_PATH, "utf-8");
-  return registryFrom(LAW_SPECS, parseMeasuredJson(raw));
+  const measuredRaw = readFileSync(MEASURED_JSON_PATH, "utf-8");
+  const discoveredRaw = readFileSync(DISCOVERED_JSON_PATH, "utf-8");
+  return [
+    ...registryFrom(LAW_SPECS, parseMeasuredJson(measuredRaw)),
+    ...discoveredLawsFrom(parseDiscoveredJson(discoveredRaw)),
+  ];
 }

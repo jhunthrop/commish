@@ -24,6 +24,7 @@ function lawFixture(over: Partial<Law> = {}): Law {
     verdict: "confirmed",
     modelPath: null,
     hasFoldEvidence: true,
+    origin: "tribal",
     ...over,
   };
 }

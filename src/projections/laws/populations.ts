@@ -128,8 +128,10 @@ const TD_REGRESSION_MULTIPLIER = 1.5;
 /** A player-season needs at least this many games to count toward the td_regression median — thin,
  *  low-usage seasons swing a median without representing what a "regular" typically does. */
 const MIN_GAMES_FOR_TD_MEDIAN = 8;
-/** Points/game — the band within which two player-seasons count as "otherwise similar". */
-const POINTS_PER_GAME_CALIPER = 2;
+/** Points/game — the band within which two player-seasons count as "otherwise similar". Exported so
+ *  `discovery/measure.ts` (Task 7) matches discovered candidates with the identical caliper the six
+ *  tribal laws use, rather than a second magic number meaning the same thing. */
+export const POINTS_PER_GAME_CALIPER = 2;
 const SKILL_POSITIONS: ReadonlySet<LawPosition> = new Set(["QB", "RB", "WR", "TE"]);
 
 /** `null` propagates: a law's antecedent is unknown, never false, when its inputs are unknown. */
@@ -232,8 +234,11 @@ export function pointsPerGame(entry: SeasonScoring | undefined): number | null {
 }
 
 /** THE UNGATED READ — a season's real outcome, corrections included, at `FINAL_OUTCOME`. `admitDerived`
- *  passes straight through to `seasonScoring` — see that function's own docblock. */
-async function actualPointsPerGame(
+ *  passes straight through to `seasonScoring` — see that function's own docblock. Exported so
+ *  `scripts/discover-laws.ts` (Task 7) reads season N+1's actual the identical way `buildPopulations`
+ *  does for the six tribal laws, rather than a second "actuals" read of its own — the discipline
+ *  Task 7's own brief calls out by name: never reimplement this read. */
+export async function actualPointsPerGame(
   db: ReadonlyDb, season: number, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
   admitDerived: boolean,
 ): Promise<Map<string, number>> {

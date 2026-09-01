@@ -33,6 +33,20 @@ export interface Law {
   /** The fitted feature this law gates; null means the law is content only, no model wiring. */
   readonly modelPath: string | null;
   /**
+   * Where this law came from (Task 7, 2026-08-31): `"tribal"` is one of the six hand-picked
+   * `LAW_SPECS` (`populations.ts`), measured against a claim and an expected sign someone stated up
+   * front. `"discovered"` is one of `discovery/generate.ts`'s mechanically generated candidates that
+   * survived Benjamini-Hochberg false-discovery control over the whole 1,737-candidate family and
+   * then replicated on the full window (`discovery/measure.ts`'s own docblock has the full pipeline).
+   * A discovered law's `expectedSign` was never asserted by a person — it is the sign its own
+   * train-window effect happened to point, which is why its `claim` only exists post-measurement
+   * (`discovery/templates.ts`'s `renderSignedClaim`) rather than being authored alongside a
+   * `LawSpec`. `registry()` merges both kinds; `hasFoldEvidence` and `verdict` mean the identical
+   * thing for either origin, computed by `verdictForFullWindow` (tribal) or `verdictForDiscoveredLaw`
+   * (discovered) respectively.
+   */
+  readonly origin: "tribal" | "discovered";
+  /**
    * Whether at least one replication fold (`config.ts`'s `REPLICATION_FOLDS`) matched any pairs at
    * all. `registry.ts`'s `verdictForFullWindow` caps a `weak` verdict at that grade for two
    * distinct reasons when the full-window CI already excludes zero: a fold disagreed in sign
