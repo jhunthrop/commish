@@ -29,8 +29,8 @@ import { requireFirstKickoffFor } from "../team-store";
  * band it targets rather than on the pooled number.
  *
  * WHAT IT IS ALLOWED TO CLAIM, and this is the delicate part. nflverse's historical depth charts
- * carry a season and a week and NO DATE — the 2020-to-2024 schema has no timestamp column at all —
- * so the stamp has to be derived rather than read. It is derived as the LATEST instant that is
+ * carry a season and a week and NO DATE — the 2020-to-2025 LEGACY schema has no timestamp column at
+ * all — so the stamp has to be derived rather than read. It is derived as the LATEST instant that is
  * provably before the season's first kickoff: one millisecond before that kickoff, which
  * `firstKickoffFor` (re-exported here from `team-store.ts`'s own consolidated definition — fix
  * round, I4/I5) recovers from the store's own UNCONDITIONAL kickoff-instant stamps, never from the
@@ -40,6 +40,17 @@ import { requireFirstKickoffFor } from "../team-store";
  * knowledge we did not have. What it cannot rule out is that nflverse scraped the file late in that
  * window; the file contains orderings rather than outcomes, so the exposure is a club reshuffling
  * after a Thursday game, and the research document states it as a weakness rather than hiding it.
+ *
+ * THE DATED SCHEMA (2026 onward) NEEDS NO SUCH DERIVATION, and stamps DIFFERENTLY as of Task 3
+ * (ruling B). Every dated-schema row carries its own real `dt` — the actual instant ESPN published
+ * that snapshot — so `mapDatedDepthChart` stamps each observation with that `dt` directly rather
+ * than with the kickoff-eve convention above. That convention was built for a schema with nothing
+ * better to say; a schema that DOES carry a real publication instant should say it, and the old
+ * uniform choice had a real cost for a season that had not yet kicked off: a chart stamped at
+ * `kickoff - 1ms` sits AFTER `now` for as long as the season's live moment is capped before kickoff,
+ * which made an already-published chart invisible to the live board's own `now`-bounded gate for no
+ * reason but the stamping convention's own choice. See `mapDepthChart`'s docblock below for the
+ * mechanics of the split.
  */
 
 /** Where a depth-chart fact came from. Matches the store's `source` column. */
@@ -162,11 +173,17 @@ export const firstKickoffFor = requireFirstKickoffFor;
  *   being capped at three the way the legacy `depth_team` column was. `depthRankFor` already buckets
  *   any number past 2 into `"third"`, so this needs no new bucketing — it is fed the same way
  *   `depth_team` always was.
- * - THE OUTPUT STAMP STAYS THE CALLER'S `asOf`, uniformly, on every observation from either schema.
- *   The dated file's own `dt` is used ONLY to pick which snapshot counts as week one; it is not
- *   promoted into the written `as_of`. Doing that would give the dated seasons a materially
- *   different (and more precise) knowability claim than every legacy season carries, which is a
- *   change to what the point-in-time store means rather than a schema adapter's job to make.
+ * - THE OUTPUT STAMP NOW SPLITS BY SCHEMA (Task 3, ruling B — this bullet was written differently
+ *   before that ruling; see git history for the uniform version it replaced). The LEGACY path
+ *   (`mapLegacyDepthChart`) still stamps every observation with the caller's `asOf`, uniformly,
+ *   byte-identical to before: every published measurement was fitted against that convention and
+ *   must not move, and the legacy schema carries no better instant to promote anyway. The DATED path
+ *   (`mapDatedDepthChart`) now stamps each observation with the CHOSEN SNAPSHOT'S OWN `dt` instead —
+ *   the real instant the file says this ordering was published, which is a strictly EARLIER and more
+ *   honest claim than the cutoff it replaces. The `asOf`/cutoff parameter keeps its old job on the
+ *   dated path too: it still decides WHICH snapshot counts (see `ingestDepthCharts`'s own
+ *   `min(now, kickoff - 1ms)`, Task 3's other half of this same change) — it is simply no longer
+ *   promoted into the written row once that snapshot is chosen.
  */
 export function mapDepthChart(
   rows: readonly CsvRow[],
@@ -242,6 +259,13 @@ function mapDatedDepthChart(
   // finding no `week === "1"` row: an empty chart, not a thrown error. `ingestDepthCharts` still
   // reports it (`entriesRead` is zero), and a caller that expected rows notices from the count.
   if (snapshot === null) return { observations: [], unknownPlayers: [] };
+  // THE SNAPSHOT'S OWN REAL PUBLICATION INSTANT (Task 3, ruling B) — what every row from this
+  // snapshot is stamped with, in place of the caller's `asOf` cutoff. See `mapDepthChart`'s own
+  // docblock, "THE OUTPUT STAMP NOW SPLITS BY SCHEMA", for why: this is the honest moment ESPN
+  // published this ordering, strictly before `asOf` by construction (the loop above only ever keeps
+  // a `dt` at or before it), and a strictly earlier, more honest claim than stamping every row with
+  // the cutoff itself.
+  const publishedAt = new Date(snapshotTime);
 
   const best = new Map<string, number>();
   const unknown = new Set<string>();
@@ -258,7 +282,7 @@ function mapDatedDepthChart(
     }
     best.set(playerId, Math.min(best.get(playerId) ?? Number.POSITIVE_INFINITY, depth));
   }
-  return finish(best, unknown, season, asOf);
+  return finish(best, unknown, season, publishedAt);
 }
 
 /** Turns the best-rank map both schemas build into the shared result shape. */

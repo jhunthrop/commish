@@ -103,7 +103,10 @@ async function main(): Promise<void> {
     const depth = await ingestDepthCharts(db, season, client);
     console.log(
       `${season}: ${depth.entriesRead} week-one offensive depth-chart entries, ${depth.written} new, ` +
-        `${depth.unknownToUniverse} not in the universe, stamped ${depth.asOf.toISOString()}`,
+        // "cutoff" rather than "stamped": since Task 3's publication-instant change, a DATED season's
+        // rows each carry their own snapshot's real `dt`, not this uniform value. See
+        // `DepthChartIngestReport.asOf`'s own docblock.
+        `${depth.unknownToUniverse} not in the universe, cutoff ${depth.asOf.toISOString()}`,
     );
 
     const identities = await rosterIdentities(db, season);

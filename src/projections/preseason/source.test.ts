@@ -606,43 +606,42 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
     });
   });
 
-  describe("(b) the live arm's read guard — stricter than the replay assertion", () => {
+  describe("(b) the live arm's read guard — CLASS-SCOPED (Task 3, ruling A)", () => {
     // Fix round, C2: every live moment below is constructed THROUGH `liveMomentFor` — a hand-built
     // `{ kind: "live", at }` is no longer even legal here (see the "(C2)" describe block below for
     // what happens if one is attempted anyway), and doing it this way is stronger for free: it
     // exercises the SAME `liveMomentFor` derivation a real caller would go through, not a
     // hand-picked `Date` this test alone believes is "before kickoff".
-    it("THROWS, naming the guard, when the store holds a season-S observation of ANY kind, at ANY as-of", async () => {
+    it("THROWS on a game-derived observation for the season, at ANY as-of — a box score existing at all means the season started", async () => {
       await seedLiveRoster(LIVE_SEASON);
       await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
-      // A depth-chart row is a PRE_GAME source the REPLAY arm's own carve-out would admit (it is
-      // stamped well before kickoff). The live arm admits nothing from the season at all.
       await recordObservations(db, [
         observation({
           season: LIVE_SEASON,
           week: 1,
           playerId: VETERAN,
-          source: DEPTH_SOURCE,
-          metric: DEPTH_METRIC,
-          value: 1,
+          source: STAT_LINE_SOURCE,
+          metric: statMetricName("receptions"),
+          value: 4,
+          // Stamped BEFORE the live moment on purpose — the old guard's "any row for the season"
+          // rule would have caught this for free; the new class-scoped guard has to reach the same
+          // verdict for a DIFFERENT reason (it is game-derived, full stop, never a comparison against
+          // the moment), and this stamp proves that reasoning rather than reusing the moment check.
           asOf: new Date(FIRST_KICKOFF.getTime() - 5 * 24 * 60 * 60 * 1000),
         }),
       ]);
 
       const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
       await expect(loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment })).rejects.toThrow(/live board/i);
+      await expect(loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment })).rejects.toThrow(/game-derived/i);
     });
 
     /**
-     * M11 — the companion to the PRE_GAME case above, on the OTHER side of the guard's scope: a
-     * GAME-DERIVED fact (`STAT_LINE_SOURCE`, the exact source the replay arm's own
-     * `earliestGameDerivedStamp` reads), stamped even AFTER the live moment itself. If the live
-     * guard were accidentally scoped to `PRE_GAME_SOURCES` alone — the one thing the replay arm
-     * carves out — this fact would sail through unnoticed, because it is neither a depth-chart row
-     * nor an injury filing. It is refused for the identical reason: the guard reads
-     * `player_week_observations` for the season, full stop, regardless of source.
+     * M11's companion, carried forward: a game-derived fact stamped even AFTER the live moment
+     * itself still throws — "at ANY as-of" has to mean both directions, not only "not yet in the
+     * future".
      */
-    it("THROWS on a game-derived STAT_LINE_SOURCE observation too, not only a PRE_GAME one", async () => {
+    it("THROWS on a game-derived STAT_LINE_SOURCE observation stamped AFTER the live moment too", async () => {
       await seedLiveRoster(LIVE_SEASON);
       await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
       await recordObservations(db, [
@@ -659,6 +658,55 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
 
       const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
       await expect(loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment })).rejects.toThrow(/live board/i);
+    });
+
+    it("a PRE-GAME (depth chart) row stamped BEFORE now is VISIBLE — no throw, no carve-out needed", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      // `now` (clockBeforeKickoff) is FIRST_KICKOFF minus one day; this row is stamped five days
+      // before kickoff, so it is BEFORE now and must flow through the ORDINARY as-of gate, exactly
+      // like a replay board's depth chart.
+      await recordObservations(db, [
+        observation({
+          season: LIVE_SEASON,
+          week: 1,
+          playerId: VETERAN,
+          source: DEPTH_SOURCE,
+          metric: DEPTH_METRIC,
+          value: 1,
+          asOf: new Date(FIRST_KICKOFF.getTime() - 5 * 24 * 60 * 60 * 1000),
+        }),
+      ]);
+
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      const inputs = await loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment });
+      expect(inputs.momentKind).toBe("live");
+      expect(inputs.depthChart.get(VETERAN)).toBe("first");
+    });
+
+    it("a PRE-GAME (depth chart) row stamped AFTER now is invisible via the ordinary gate — no throw, just gated", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      // The kickoff-eve convention's own stamp (kickoff - 1ms) — AFTER `now` (kickoff - 1 day) — is
+      // exactly the case the pre-Task-3 depth ingestion produced for a live season. It must not
+      // throw; it must simply not appear on the board, the same silent point-in-time behaviour every
+      // other reader in this engine already has.
+      await recordObservations(db, [
+        observation({
+          season: LIVE_SEASON,
+          week: 1,
+          playerId: VETERAN,
+          source: DEPTH_SOURCE,
+          metric: DEPTH_METRIC,
+          value: 1,
+          asOf: new Date(FIRST_KICKOFF.getTime() - 1),
+        }),
+      ]);
+
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      const inputs = await loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment });
+      expect(inputs.momentKind).toBe("live");
+      expect(inputs.depthChart.has(VETERAN)).toBe(false);
     });
 
     it("succeeds and reports momentKind \"live\" when the store holds nothing at all for the season", async () => {

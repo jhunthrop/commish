@@ -151,8 +151,18 @@ describe("mapDepthChart, the dated schema (2026 onward)", () => {
       2026,
       CUTOFF,
     );
+    // Task 3, ruling B: stamped at the SNAPSHOT'S OWN `dt` (the real publication instant), not at
+    // CUTOFF — see the dedicated describe block below for the case that makes this unambiguous.
     expect(mapped.observations).toEqual([
-      { season: 2026, week: 1, playerId: "00-0000001", source: DEPTH_SOURCE, metric: DEPTH_METRIC, value: 1, asOf: CUTOFF },
+      {
+        season: 2026,
+        week: 1,
+        playerId: "00-0000001",
+        source: DEPTH_SOURCE,
+        metric: DEPTH_METRIC,
+        value: 1,
+        asOf: new Date("2026-08-31T14:44:50Z"),
+      },
     ]);
   });
 
@@ -178,6 +188,19 @@ describe("mapDepthChart, the dated schema (2026 onward)", () => {
     );
     expect(mapped.observations).toHaveLength(1);
     expect(mapped.observations[0]!.value).toBe(1);
+    expect(mapped.observations[0]!.asOf).toEqual(new Date("2026-08-31T14:44:50Z"));
+  });
+
+  it("STAMPS AT THE SNAPSHOT'S OWN dt, NOT at the cutoff (Task 3, ruling B)", () => {
+    // The cutoff (one millisecond before kickoff) and the snapshot's real publication instant are
+    // deliberately far apart here, so a stamp of CUTOFF and a stamp of the real dt cannot be
+    // confused for each other by coincidence.
+    const dt = "2026-08-20T09:15:00Z";
+    const mapped = mapDepthChart([datedRow({ dt })], projected, 2026, CUTOFF);
+    expect(mapped.observations).toHaveLength(1);
+    expect(mapped.observations[0]!.asOf).toEqual(new Date(dt));
+    expect(mapped.observations[0]!.asOf.getTime()).not.toBe(CUTOFF.getTime());
+    expect(mapped.observations[0]!.asOf.getTime()).toBeLessThan(CUTOFF.getTime());
   });
 
   it("KEEPS A MAN'S BEST RANK where the offensive group lists him more than once", () => {

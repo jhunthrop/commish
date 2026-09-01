@@ -1,8 +1,14 @@
 import type { Db, ReadonlyDb } from "@/db/client";
 import { nflPlayers } from "@/db/schema";
+import type { Clock } from "@/domain/timing";
 import { createNflverseClient, type NflverseClient } from "../nflverse/client";
 import { NFLVERSE_CONFIG } from "../nflverse/config";
-import { HISTORICAL_ROSTER_FLOOR, mapWeek1Rosters, ROSTER_SOURCE_CONFIG, week1RosterAsOf } from "../nflverse/rosters";
+import {
+  HISTORICAL_ROSTER_FLOOR,
+  mapWeek1Rosters,
+  ROSTER_SOURCE_CONFIG,
+  week1RosterAsOfBoundedBy,
+} from "../nflverse/rosters";
 import { allPositions } from "../backtest";
 import { recordObservations } from "../store";
 import { firstKickoffFor, mapDepthChart } from "./depth";
@@ -61,12 +67,27 @@ export async function historicalWeek1RosterAsOf(db: ReadonlyDb, season: number):
   return new Date((await firstKickoffFor(db, season)).getTime() - 1);
 }
 
-/** `week1RosterAsOf(season)` from the fixed-stamp cutover onward, `historicalWeek1RosterAsOf` before
- *  it. The one place a caller decides which of the two stamping strategies a season needs. Exported
- *  so the dispatch itself — not just each branch in isolation — can be pinned by a test. */
-export async function week1RosterStampFor(db: ReadonlyDb, season: number): Promise<Date> {
-  return season >= ROSTER_SOURCE_CONFIG.earliestSeason ? week1RosterAsOf(season) : historicalWeek1RosterAsOf(db, season);
+/**
+ * `week1RosterAsOfBoundedBy(season, fetchedAt)` from the fixed-stamp cutover onward,
+ * `historicalWeek1RosterAsOf` before it. The one place a caller decides which of the two stamping
+ * strategies a season needs. Exported so the dispatch itself — not just each branch in isolation —
+ * can be pinned by a test.
+ *
+ * `fetchedAt` (Task 3, ruling C) matters ONLY to the fixed-stamp branch — the honest bound on the
+ * September-1 convention, mirroring `parseExpertConsensus`'s own `earlierOf`. The historical branch
+ * ignores it entirely: `historicalWeek1RosterAsOf` derives its stamp from the season's own kickoff,
+ * never from a clock, so there is nothing for a fetch instant to bound there.
+ */
+export async function week1RosterStampFor(db: ReadonlyDb, season: number, fetchedAt: Date): Promise<Date> {
+  return season >= ROSTER_SOURCE_CONFIG.earliestSeason
+    ? week1RosterAsOfBoundedBy(season, fetchedAt)
+    : historicalWeek1RosterAsOf(db, season);
 }
+
+/** The real wall clock, read by both ingest functions below exactly where `client`'s own default
+ *  (`createNflverseClient()`) already reads real configuration in this same file — overridable in a
+ *  test the identical way `client` already is. */
+const REAL_CLOCK: Clock = { now: () => new Date().toISOString() };
 
 /**
  * Reads one season's week-one rosters into the store.
@@ -80,12 +101,17 @@ export async function ingestWeek1Rosters(
   db: Db,
   season: number,
   client: NflverseClient = createNflverseClient(),
+  clock: Clock = REAL_CLOCK,
 ): Promise<RosterIngestReport> {
   const rows = await client.getCsv(
     NFLVERSE_CONFIG.releases.weeklyRosters,
     ROSTER_SOURCE_CONFIG.file(season),
   );
-  const asOf = await week1RosterStampFor(db, season);
+  // Read AFTER the fetch, never before: the claim is "we had this file", and a clock read before a
+  // slow request would date the claim to before the bytes existed. Mirrors `fetchExpertConsensus`'s
+  // own "read AFTER the body" comment in `preseason/publishers.ts`.
+  const fetchedAt = new Date(clock.now());
+  const asOf = await week1RosterStampFor(db, season, fetchedAt);
   const entries = mapWeek1Rosters(rows, season, asOf);
   const known = await knownPlayerIds(db);
   const insertable = entries.filter((entry) => known.has(entry.playerId));
@@ -111,7 +137,15 @@ export interface DepthChartIngestReport {
   readonly entriesRead: number;
   /** How many were written. A re-run of a landed ingestion reports 0. */
   readonly written: number;
-  /** The stamp every row carries. Printed so an operator can check the claim rather than trust it. */
+  /**
+   * THE CUTOFF this run used to pick which snapshot counts as week one — `min(now, firstKickoff -
+   * 1ms)` (Task 3, ruling B). For a LEGACY season (the week/game_type/formation schema, 2019-2025)
+   * this is ALSO the stamp every row carries, unchanged from before this ruling — that path is
+   * byte-identical. For a DATED season (2026 onward) each row instead carries its own snapshot's
+   * real `dt` (see `mapDepthChart`'s docblock); this field is only the ceiling that snapshot could
+   * not exceed, not the stamp itself. Printed so an operator can check the claim rather than trust
+   * it either way.
+   */
   readonly asOf: Date;
   /** Depth-chart rows naming a player the universe does not project. */
   readonly unknownToUniverse: number;
@@ -124,14 +158,26 @@ export interface DepthChartIngestReport {
  * that file writes is a fact a game produced, and this one is a claim about what was knowable before
  * any game was played. `firstGameDayFor` derives the stamp and `depth.ts` documents what it may and
  * may not claim.
+ *
+ * THE CUTOFF IS `min(now, firstKickoff - 1ms)`, NOT `firstKickoff - 1ms` ALONE (Task 3, ruling B).
+ * For an already-played season `firstKickoff - 1ms` is always in the past, so `now` never binds and
+ * this is byte-identical to the ingestion every archived season already ran under. For a season that
+ * has not kicked off yet, `firstKickoff - 1ms` is a FUTURE instant, and letting it stand as the
+ * cutoff would mean selecting a snapshot as though we had already seen everything up to the eve of
+ * kickoff — a claim this ingestion has no grounds for on the day it actually runs. Bounding by `now`
+ * keeps the claim honest: we can only pick from what has actually been published as of the moment we
+ * are doing the picking.
  */
 export async function ingestDepthCharts(
   db: Db,
   season: number,
   client: NflverseClient = createNflverseClient(),
+  clock: Clock = REAL_CLOCK,
 ): Promise<DepthChartIngestReport> {
   const rows = await client.getCsv(NFLVERSE_CONFIG.releases.depthCharts, `depth_charts_${season}.csv`);
-  const asOf = new Date((await firstKickoffFor(db, season)).getTime() - 1);
+  const kickoffEve = new Date((await firstKickoffFor(db, season)).getTime() - 1);
+  const now = new Date(clock.now());
+  const asOf = now.getTime() < kickoffEve.getTime() ? now : kickoffEve;
   // The universe of PROJECTED players, exactly as `ingestInjuryReports` narrows: a lineman's
   // place on a depth chart has nowhere to go, and the store is keyed on a player the board carries.
   const mapped = mapDepthChart(rows, new Set((await allPositions(db)).keys()), season, asOf);

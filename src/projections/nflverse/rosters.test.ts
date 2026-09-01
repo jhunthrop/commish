@@ -8,6 +8,7 @@ import {
   mapWeek1Rosters,
   rosterStatusOf,
   week1RosterAsOf,
+  week1RosterAsOfBoundedBy,
 } from "./rosters";
 
 /**
@@ -27,6 +28,28 @@ describe("week1RosterAsOf", () => {
     // The 2024 opener was 5 September. A stamp on or after it would be admitted by no preseason
     // moment and the whole ingestion would be inert.
     expect(week1RosterAsOf(2024).getTime()).toBeLessThan(Date.UTC(2024, 8, 5));
+  });
+});
+
+describe("week1RosterAsOfBoundedBy (Task 3, ruling C — mirrors parseExpertConsensus's own earlerOf bound)", () => {
+  it("keeps the September-1 convention unchanged for an ARCHIVE — the fetch happens long after it", () => {
+    // Ingesting 2024 today (long after its own 1 September) must not move the stamp: every
+    // measurement taken under the fixed convention has to stay pinned to it exactly.
+    const fetchedAt = new Date("2026-09-01T12:00:00.000Z");
+    expect(week1RosterAsOfBoundedBy(2024, fetchedAt)).toEqual(week1RosterAsOf(2024));
+  });
+
+  it("bounds to the fetch instant for a season whose file is fetched BEFORE its own first of September", () => {
+    const fetchedAt = new Date("2026-08-20T15:00:00.000Z");
+    const bounded = week1RosterAsOfBoundedBy(2026, fetchedAt);
+    expect(bounded).toEqual(fetchedAt);
+    expect(bounded.getTime()).toBeLessThan(week1RosterAsOf(2026).getTime());
+  });
+
+  it("is the EARLIER of the two, inclusive of the boundary", () => {
+    const exact = week1RosterAsOf(2026);
+    expect(week1RosterAsOfBoundedBy(2026, exact)).toEqual(exact);
+    expect(week1RosterAsOfBoundedBy(2026, new Date(exact.getTime() + 1))).toEqual(exact);
   });
 });
 

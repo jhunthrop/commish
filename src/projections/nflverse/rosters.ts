@@ -94,6 +94,38 @@ export function week1RosterAsOf(season: number): Date {
   return new Date(Date.UTC(season, 8, 1));
 }
 
+/** The earlier of two moments. Named rather than inlined because `Math.min` over `getTime` reads as
+ *  arithmetic, and this is a claim about knowledge. Kept as its own tiny copy rather than imported
+ *  from `preseason/publishers.ts` (whose `parseExpertConsensus` this function otherwise mirrors
+ *  exactly) so this module — the lower layer nothing in `preseason/` may depend the other way round —
+ *  stays free of an import into the higher one. */
+function earlierOf(left: Date, right: Date): Date {
+  return left.getTime() <= right.getTime() ? left : right;
+}
+
+/**
+ * `week1RosterAsOf(season)`, bounded by the moment WE fetched the file it stamps — the same
+ * treatment `parseExpertConsensus` gives its own convention date (Task 3, ruling C; see
+ * `preseason/publishers.ts`'s `earlierOf`, which this mirrors in shape rather than shares).
+ *
+ * For an ARCHIVE the fetch happens long after the season's own first of September, so the convention
+ * wins unchanged and every measurement taken under it is untouched — this is what "archives unchanged"
+ * means concretely: `earlierOf` never even has a case to decide for a season already years in the
+ * past. For a season whose file is fetched BEFORE its own first of September has arrived, the honest
+ * bound is the moment we actually saw it, not a calendar date still ahead of us: claiming the
+ * convention date there would assert we knew a roster before we had fetched the file it comes from,
+ * which is the identical leak `parseExpertConsensus`'s own docblock names for the FantasyPros board.
+ *
+ * `week1RosterAsOf` itself is untouched by this — it stays the pure convention constant every other
+ * caller (this module's own tests, `mapWeek1Rosters`'s omitted-`asOf` default) still reads directly.
+ * The bound is applied here, one layer up, exactly where `parseExpertConsensus` applies its own: at
+ * the point a caller is about to turn "the convention" into "the claim", never inside the convention
+ * function itself.
+ */
+export function week1RosterAsOfBoundedBy(season: number, fetchedAt: Date): Date {
+  return earlierOf(week1RosterAsOf(season), fetchedAt);
+}
+
 /** The four statuses that survive the coarsening. Ordered by how much football they imply. */
 export const ROSTER_STATUSES = ["active", "reserve", "practice_squad", "off_roster"] as const;
 export type RosterStatus = (typeof ROSTER_STATUSES)[number];

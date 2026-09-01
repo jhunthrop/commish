@@ -465,53 +465,54 @@ export async function liveMomentFor(db: ReadonlyDb, season: number, clock: Clock
 }
 
 /**
- * THE LIVE ARM'S OWN READ GUARD — STRICTER than `assertNothingFromTheSeasonIsVisible` above, and
- * deliberately so. The replay assertion refuses a game-derived fact stamped AT OR BEFORE the moment,
- * and carves PRE_GAME_SOURCES out entirely, because a completed season's injury filings and published
- * depth chart really were knowable before its opener. A LIVE board has no such history to lean on: the
- * season it projects has not been played AT ALL, so ANY player-week observation stamped from it —
- * any source, any as-of, including one that would predate the live moment itself — is either a defect
- * in the ingestion this board is supposed to run ahead of, or a leak. Refusing it outright, at the
- * load seam, is what makes a live board structurally unable to smuggle one in through any store read
- * `loadPreseason` performs below.
+ * THE LIVE ARM'S OWN READ GUARD — CLASS-SCOPED (Task 3, ruling A), replacing the fix round's
+ * "refuse the whole table" version. That version blocked Task 4 outright: it refused the 2026 depth
+ * chart Task 3 now stamps at its own real publication instant (see `depth.ts`'s `mapDatedDepthChart`),
+ * even though that chart is exactly the kind of fact a live board is supposed to be able to read.
  *
- * SCOPE, STATED PLAINLY (fix round, I6). This guard reads `player_week_observations` ONLY — the
- * table `assertNothingFromTheSeasonIsVisible` also reads, and nothing else. It says nothing about
- * two other kinds of season-S fact `loadPreseason` reads below, because each is already governed by
- * a DIFFERENT mechanism and does not need this one:
+ * THE RULE NOW: a GAME-DERIVED fact about `season` is refused at ANY as-of, full stop — STRICTER than
+ * the replay assertion below, and deliberately so. `assertNothingFromTheSeasonIsVisible` only refuses
+ * a game-derived stamp AT OR BEFORE its moment, because a completed season's early weeks are honestly
+ * in the past relative to a later preseason board. A live board has no such history to lean on: the
+ * season it projects has not been played AT ALL, so a single game-derived row existing in the store —
+ * at any as-of, including one that would predate the live moment itself — means the season has
+ * started, full stop. `earliestGameDerivedStamp` (used by the replay assertion above, via
+ * `PRE_GAME_SOURCES`'s own exclusion) is reused here for exactly that reason: the two assertions ask
+ * almost the same question of the same rows, and the live arm's answer to "does one exist at all" is
+ * "then refuse", never "then compare it to my moment".
+ *
+ * A pre-game fact (`PRE_GAME_SOURCES` — the injury wire, a published depth chart) is NOT refused by
+ * this guard at all. It flows through the ORDINARY as-of gate every other reader in this engine uses,
+ * at `moment = now` for the live arm exactly as at `moment = the replay instant` for the replay arm,
+ * no carve-out and no special case: `depthChartAsOf` below reads it with `asOf: moment` like
+ * everything else, so a pre-game row stamped before `now` is visible and one stamped after `now` is
+ * simply invisible, silently, the same point-in-time discipline every reader here already carries.
+ * This is what makes the fix safe rather than a loophole: nothing about the ordinary gate lets a
+ * pre-game row claim knowledge from AFTER the moment it is read at, and Task 3's own stamp fix
+ * (`mapDatedDepthChart` stamping a dated-schema row at its own real `dt` instead of the old
+ * kickoff-eve convention) is precisely what makes that gate tell the truth for a live season's depth
+ * chart, where the old convention's future-dated stamp used to make an already-published chart
+ * invisible to a `now`-bounded live moment for no reason but its own stamping choice.
+ *
+ * SCOPE, STATED PLAINLY (carried from the fix round's I6, still true). This guard reads
+ * `player_week_observations` ONLY — the table `assertNothingFromTheSeasonIsVisible` also reads, and
+ * nothing else. It says nothing about two other kinds of season-S fact `loadPreseason` reads below,
+ * because each is already governed by a DIFFERENT mechanism and does not need this one:
  *   - Season-S's week-one ROSTER (`preseasonRostersAsOf`) is governed by AS-OF: it is read with
  *     `asOf: moment` like everything else, so a roster fact stamped after the live moment is simply
- *     invisible, the ordinary point-in-time discipline every reader in this engine already carries.
- *     It needs no extra refusal because it is the one thing about season S a board is explicitly
- *     ALLOWED to see, replay or live alike.
+ *     invisible. It needs no extra refusal because it is the one thing about season S a board is
+ *     explicitly ALLOWED to see, replay or live alike.
  *   - Season-S's TEAM facts (`teamObservationsAsOf`) are governed by SOURCE-CLASS: the same
  *     `.filter((observation) => observation.source !== SCHEDULE_SOURCE.kickoff)` the replay arm
  *     already applies below runs for the live arm too, so the schedule's May-published half passes
  *     and its kickoff-stamped half (the closing line, the recorded weather) is refused by source,
  *     not by this guard.
- *
- * THE ASYMMETRY THIS LEAVES, NAMED RATHER THAN HIDDEN (C1, ruled OUT of this fix round — see
- * `progress.md`). This guard is coarser than the replay assertion in the one direction that matters
- * for a live board actually shipping: it refuses `PRE_GAME_SOURCES` (the injury wire, a published
- * depth chart) outright, even though a fact from either could genuinely be knowable before a real
- * kickoff — exactly the case the replay arm's own carve-out exists for. A live board built under
- * THIS guard can therefore never read a real week-one depth chart, even one legitimately published
- * before the season it describes. That is deliberate for THIS round (audit test (b) pins it), and it
- * is not the final shape: the ruling is that this guard's REPLACEMENT is joint work with Task 3's own
- * stamp fix, moving from "refuse the whole table" to "refuse by SOURCE CLASS, gated by each source's
- * own PUBLICATION stamp" — the identical shape `PRE_GAME_SOURCES` already earns the replay arm, made
- * safe for a season with no completed games to bound it by. Until that lands, this guard stays
- * exactly this strict.
  */
-async function assertNoObservationOfTheLiveSeasonIsVisible(db: ReadonlyDb, season: number, moment: Date): Promise<void> {
-  const [row] = await db
-    .select({ earliest: min(playerWeekObservations.asOf) })
-    .from(playerWeekObservations)
-    .where(eq(playerWeekObservations.season, season));
-  const earliest = row?.earliest ?? null;
+async function assertNoGameDerivedObservationOfTheLiveSeasonIsVisible(db: ReadonlyDb, season: number, moment: Date): Promise<void> {
+  const earliest = await earliestGameDerivedStamp(db, season);
   if (earliest !== null) {
     throw new Error(
-      `A ${season} LIVE board taken at ${moment.toISOString()} can see a ${season} player-week observation stamped ${earliest.toISOString()}. A live board refuses every observation from the season it projects, not merely ones before its own moment. If ${season} truly has data in the store, it has started, and it needs a REPLAY moment instead.`,
+      `A ${season} LIVE board taken at ${moment.toISOString()} can see a ${season} game-derived observation stamped ${earliest.toISOString()}. A live board refuses every GAME-DERIVED observation from the season it projects, at ANY as-of, not merely ones before its own moment — a box score existing at all means the season has started, and a started season needs a REPLAY moment instead.`,
     );
   }
 }
@@ -551,9 +552,9 @@ export interface LoadPreseasonOptions {
    * `preseasonMomentFor`'s own unchanged derivation wrapped in the replay arm. A caller may instead
    * hand in an explicit `BoardMoment`, constructed ONLY by `replayMomentFor` or `liveMomentFor` (see
    * `BoardMoment`'s own docblock — `assertBranded` below refuses anything else): the REPLAY arm
-   * still runs `assertNothingFromTheSeasonIsVisible` unchanged; the LIVE arm runs the stricter
-   * `assertNoObservationOfTheLiveSeasonIsVisible` instead, and every read below still uses the
-   * resolved moment as its own `asOf` cutoff exactly as it always has.
+   * still runs `assertNothingFromTheSeasonIsVisible` unchanged; the LIVE arm runs the class-scoped
+   * `assertNoGameDerivedObservationOfTheLiveSeasonIsVisible` instead (Task 3, ruling A), and every
+   * read below still uses the resolved moment as its own `asOf` cutoff exactly as it always has.
    */
   readonly boardMoment?: BoardMoment;
 }
@@ -572,7 +573,7 @@ export async function loadPreseason(
   if (resolvedMoment.kind === "replay") {
     await assertNothingFromTheSeasonIsVisible(db, season, moment);
   } else {
-    await assertNoObservationOfTheLiveSeasonIsVisible(db, season, moment);
+    await assertNoGameDerivedObservationOfTheLiveSeasonIsVisible(db, season, moment);
   }
 
   const roster = await preseasonRostersAsOf(db, { season, asOf: moment });
