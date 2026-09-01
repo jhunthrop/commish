@@ -8,6 +8,7 @@ import { recordPreseasonRankings, recordPreseasonRosters, type PreseasonRankingR
 import { recordObservations, type PlayerWeekObservation } from "../store";
 import { FITTED_MARKET_CURVE } from "./curve-fitted";
 import {
+  fitImpliedGamesByPosition,
   fitMarketCurve,
   loadMarketCurveObservations,
   marketBoard,
@@ -18,7 +19,7 @@ import {
 } from "./curve";
 
 function observation(overrides: Partial<MarketCurveObservation> = {}): MarketCurveObservation {
-  return { season: 2020, position: "RB", adpRank: 10, points: 100, ...overrides };
+  return { season: 2020, position: "RB", adpRank: 10, points: 100, gamesPlayed: 14, ...overrides };
 }
 
 describe("fitMarketCurve", () => {
@@ -164,6 +165,46 @@ describe("marketCurve", () => {
   });
 });
 
+describe("fitImpliedGamesByPosition", () => {
+  /** Every position covered by exactly one placeholder observation, so a test isolating ONE
+   *  position's own numbers never trips the empty-population throw for the other three. */
+  const EVERY_POSITION_COVERED: readonly MarketCurveObservation[] = [
+    observation({ position: "QB" }),
+    observation({ position: "RB" }),
+    observation({ position: "WR" }),
+    observation({ position: "TE" }),
+  ];
+
+  it("averages gamesPlayed per position, unweighted across player-seasons", () => {
+    const observations: readonly MarketCurveObservation[] = [
+      ...EVERY_POSITION_COVERED,
+      observation({ position: "RB", gamesPlayed: 16 }),
+      observation({ position: "RB", gamesPlayed: 10 }),
+      observation({ position: "WR", gamesPlayed: 17 }),
+    ];
+    const table = fitImpliedGamesByPosition(observations);
+    // RB: the two planted values (16, 10) plus EVERY_POSITION_COVERED's own RB placeholder (14).
+    expect(table.RB).toBeCloseTo((16 + 10 + 14) / 3, 10);
+    // WR: the one planted value (17) plus the placeholder (14).
+    expect(table.WR).toBeCloseTo((17 + 14) / 2, 10);
+  });
+
+  it("throws for a position with zero observations — an empty population is a fit-input bug, not a zero", () => {
+    const observations: readonly MarketCurveObservation[] = [observation({ position: "RB" })];
+    expect(() => fitImpliedGamesByPosition(observations)).toThrow(/no market-curve observations at position "QB"/);
+  });
+
+  it("counts a zero-games observation (a drafted man who never played) toward the mean, never dropping him", () => {
+    const observations: readonly MarketCurveObservation[] = [
+      ...EVERY_POSITION_COVERED,
+      observation({ position: "TE", gamesPlayed: 16 }),
+      observation({ position: "TE", gamesPlayed: 0 }),
+    ];
+    // TE: the placeholder (14) plus the two planted values (16, 0).
+    expect(fitImpliedGamesByPosition(observations).TE).toBeCloseTo((14 + 16 + 0) / 3, 10);
+  });
+});
+
 describe("the committed fit", () => {
   it("PIN: is monotone non-increasing across ADP ranks 1..300, at every skill position", () => {
     // The premise the whole curve exists to serve: a market that drafted a player earlier can never
@@ -251,22 +292,22 @@ describe("loadMarketCurveObservations and marketBoard", () => {
         statLine({ season: 2020, week: 2, playerId: PLAYER_A, value: 50 }),
       ]);
       const observations = await loadMarketCurveObservations(db, [2020]);
-      // 150 rushing yards at PPR_SCORING.pointsPerRushingYard (0.1) each => 15 points.
-      expect(observations).toEqual([{ season: 2020, position: "RB", adpRank: 3, points: 15 }]);
+      // 150 rushing yards at PPR_SCORING.pointsPerRushingYard (0.1) each => 15 points, over 2 weeks.
+      expect(observations).toEqual([{ season: 2020, position: "RB", adpRank: 3, points: 15, gamesPlayed: 2 }]);
     });
 
     it("rounds a fractional published ADP rank to the nearest whole slot for the fit bucket", async () => {
       await recordPreseasonRankings(db, [ranking({ rank: 12.6 })]);
       await recordPreseasonRosters(db, [roster()]);
       const observations = await loadMarketCurveObservations(db, [2020]);
-      expect(observations).toEqual([{ season: 2020, position: "RB", adpRank: 13, points: 0 }]);
+      expect(observations).toEqual([{ season: 2020, position: "RB", adpRank: 13, points: 0, gamesPlayed: 0 }]);
     });
 
     it("counts a ranked player who never recorded a single stat line at ZERO, never dropping him", async () => {
       await recordPreseasonRankings(db, [ranking({ playerId: PLAYER_B, rank: 40 })]);
       await recordPreseasonRosters(db, [roster({ playerId: PLAYER_B })]);
       const observations = await loadMarketCurveObservations(db, [2020]);
-      expect(observations).toEqual([{ season: 2020, position: "RB", adpRank: 40, points: 0 }]);
+      expect(observations).toEqual([{ season: 2020, position: "RB", adpRank: 40, points: 0, gamesPlayed: 0 }]);
     });
 
     it("reads a season via the pbp-derived fallback when it falls in a published stats gap", async () => {
@@ -276,14 +317,14 @@ describe("loadMarketCurveObservations and marketBoard", () => {
         statLine({ season: 2019, week: 1, playerId: PLAYER_C, value: 200, source: DERIVED_STAT_LINE_SOURCE, asOf: GAME_DERIVED_STAMP(2019) }),
       ]);
       const observations = await loadMarketCurveObservations(db, [2019]);
-      expect(observations).toEqual([{ season: 2019, position: "RB", adpRank: 3, points: 20 }]);
+      expect(observations).toEqual([{ season: 2019, position: "RB", adpRank: 3, points: 20, gamesPlayed: 1 }]);
     });
 
     it("drops a ranked player whose position cannot be resolved from that season's own roster snapshot", async () => {
       await recordPreseasonRankings(db, [ranking(), ranking({ playerId: PLAYER_D, rank: 8 })]);
       await recordPreseasonRosters(db, [roster()]); // PLAYER_D never given a roster row
       const observations = await loadMarketCurveObservations(db, [2020]);
-      expect(observations).toEqual([{ season: 2020, position: "RB", adpRank: 3, points: 0 }]);
+      expect(observations).toEqual([{ season: 2020, position: "RB", adpRank: 3, points: 0, gamesPlayed: 0 }]);
     });
 
     it("answers empty for a season with no ADP board ingested, never a guess", async () => {

@@ -7,6 +7,7 @@
     ],
     "sample": 238,
     "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "trainEffect": 0.11167539267015711,
     "foldEffects": [
       {
         "season": 2021,
@@ -34,6 +35,7 @@
     ],
     "sample": 171,
     "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "trainEffect": -1.175241379310345,
     "foldEffects": [
       {
         "season": 2021,
@@ -61,6 +63,7 @@
     ],
     "sample": 43,
     "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "trainEffect": -0.023636363636363778,
     "foldEffects": [
       {
         "season": 2021,
@@ -88,6 +91,7 @@
     ],
     "sample": 129,
     "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "trainEffect": 0.6762626262626263,
     "foldEffects": [
       {
         "season": 2021,
@@ -115,6 +119,7 @@
     ],
     "sample": 763,
     "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "trainEffect": -0.8410355987055016,
     "foldEffects": [
       {
         "season": 2021,
@@ -142,6 +147,7 @@
     ],
     "sample": 251,
     "seasons": "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons 2021-2023",
+    "trainEffect": -0.7881428571428569,
     "foldEffects": [
       {
         "season": 2021,

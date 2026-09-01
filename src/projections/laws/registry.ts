@@ -51,7 +51,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { DISCOVERY_TRAIN_SEASONS, REPLICATION_FOLDS } from "./config";
+import { DISCOVERY_TRAIN_SEASONS, LAW_TRAIN_CUTOFF_SEASON, REPLICATION_FOLDS } from "./config";
 import { LAW_SPECS, type LawSpec } from "./populations";
 import { measureEffect, verdictFor, type MatchedPair } from "./harness";
 import { generateCandidates, type CandidateTemplate } from "./discovery/generate";
@@ -89,9 +89,38 @@ export function foldEffectsFor(pairs: readonly MatchedPair[]): readonly FoldEffe
   });
 }
 
-/** One `measured.json` entry: the full-window measurement, one effect per replication fold, and
- *  the verdict they imply. */
-export type MeasuredEntry = LawMeasurement & { readonly foldEffects: readonly FoldEffect[]; readonly verdict: LawVerdict };
+/**
+ * A TRIBAL LAW'S OWN `trainEffect` (C1 fix round, 2026-08-31) — the SAME matched-pairs measurement
+ * `measureEffect` runs for the full window, restricted to the subset of `pairs` whose predictor
+ * season is `<= LAW_TRAIN_CUTOFF_SEASON` (2021). A PARTITION of the full window's own matched pairs,
+ * never a second, separate match — the identical "stratified matching already keys on season, so
+ * filtering by season is free" property `foldEffectsFor` above relies on.
+ *
+ * `market/blend.ts`'s law delta reads a law's `trainEffect` (`Law.trainEffect`, set from this
+ * function's output by `registryFrom`/below), never `measured.effect`: the full-window measurement
+ * spans predictor seasons through `MEASURE_SEASONS.to - 1` (2023), which is exactly the leak this
+ * fix round's C1 finding named — a law's applied magnitude carrying information from the seasons
+ * the blend is later scored on. `measureEffect` throws on zero matched pairs (see its own docblock);
+ * left uncaught here for the identical reason `discovery/measure.ts`'s FULL-WINDOW step leaves it
+ * uncaught rather than pre-checking a floor: every one of today's six tribal laws' full-window
+ * populations spans `MEASURE_SEASONS.from`-2023 (2013-2023), and `LAW_TRAIN_CUTOFF_SEASON` (2021)
+ * leaves nine of those eleven years inside the train partition — a law with real full-window
+ * evidence having ZERO train pairs would be a population-builder bug, not an expected shortfall.
+ */
+export function trainEffectFor(pairs: readonly MatchedPair[]): number {
+  const trainPairs = pairs.filter((pair) => pair.condition.season <= LAW_TRAIN_CUTOFF_SEASON);
+  return measureEffect(trainPairs).effect;
+}
+
+/** One `measured.json` entry: the full-window measurement, the SAME measurement restricted to
+ *  train-only predictor seasons (`trainEffect` — C1 fix round; see `trainEffectFor`'s own docblock
+ *  for why this is a sibling field rather than nested inside `LawMeasurement`), one effect per
+ *  replication fold, and the verdict they imply. */
+export type MeasuredEntry = LawMeasurement & {
+  readonly trainEffect: number;
+  readonly foldEffects: readonly FoldEffect[];
+  readonly verdict: LawVerdict;
+};
 
 /** `measured.json`'s whole shape: every law id the file has evidence for. */
 export type MeasuredJson = { readonly [lawId: string]: MeasuredEntry };
@@ -113,6 +142,9 @@ function isFiniteNumber(value: unknown): value is number {
 function assertMeasuredEntryShape(prefix: string, lawId: string, record: Record<string, unknown>): void {
   if (!isFiniteNumber(record.effect)) {
     throw new Error(`${prefix} "${lawId}".effect is not a finite number`);
+  }
+  if (!isFiniteNumber(record.trainEffect)) {
+    throw new Error(`${prefix} "${lawId}".trainEffect is not a finite number`);
   }
   if (!Array.isArray(record.ci) || record.ci.length !== 2 || !isFiniteNumber(record.ci[0]) || !isFiniteNumber(record.ci[1])) {
     throw new Error(`${prefix} "${lawId}".ci is not a 2-tuple of finite numbers`);
@@ -472,6 +504,7 @@ export function discoveredLawsFrom(
       position: entry.position,
       claim: entry.claim,
       measured,
+      trainEffect: entry.trainEffect,
       verdict: entry.verdict,
       modelPath: null,
       hasFoldEvidence: entry.foldEffects.some((fold) => fold.effect !== null),
@@ -512,6 +545,7 @@ export function registryFrom(specs: readonly LawSpec[], measuredJson: MeasuredJs
       position: spec.position,
       claim: spec.claim,
       measured,
+      trainEffect: entry.trainEffect,
       verdict: entry.verdict,
       modelPath: spec.modelPath,
       hasFoldEvidence: entry.foldEffects.some((fold) => fold.effect !== null),

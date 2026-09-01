@@ -8,6 +8,7 @@
   "laws": {
     "and:WR:threshold:WR:age:q70+threshold:WR:experienceYear:q70": {
       "effect": -1.1634893617021278,
+      "trainEffect": -1.179646739130435,
       "ci": [
         -1.6439106382978717,
         -0.6775249999999996
@@ -43,6 +44,7 @@
     },
     "and:WR:threshold:WR:age:q70+threshold:WR:experienceYear:q80": {
       "effect": -1.052626506024096,
+      "trainEffect": -1.0782769230769234,
       "ci": [
         -1.550872289156626,
         -0.5660283132530115
@@ -78,6 +80,7 @@
     },
     "and:WR:threshold:WR:incomingCoachTenureSeasons:q70+threshold:WR:touchdownPointsShare:q70": {
       "effect": -1.0628398791540774,
+      "trainEffect": -1.0795185185185183,
       "ci": [
         -1.603186555891239,
         -0.5146427492447131
@@ -113,6 +116,7 @@
     },
     "and:WR:threshold:WR:incomingCoachTenureSeasons:q70+threshold:WR:touchdownPointsShare:q80": {
       "effect": -1.7326027397260269,
+      "trainEffect": -1.6570949720670394,
       "ci": [
         -2.367230593607305,
         -1.1114977168949762
@@ -148,6 +152,7 @@
     },
     "threshold:TE:touchdownPointsShare:q70": {
       "effect": -0.711010452961672,
+      "trainEffect": -0.8874058577405856,
       "ci": [
         -1.152527874564459,
         -0.2354233449477349
@@ -183,6 +188,7 @@
     },
     "threshold:WR:age:q70": {
       "effect": -1.1393995859213255,
+      "trainEffect": -1.1572105263157904,
       "ci": [
         -1.545473602484471,
         -0.6917365424430643
@@ -218,6 +224,7 @@
     },
     "threshold:WR:experienceYear:q70": {
       "effect": -0.9749105691056912,
+      "trainEffect": -0.9400626304801672,
       "ci": [
         -1.3223670731707309,
         -0.5995252032520324
@@ -253,6 +260,7 @@
     },
     "threshold:WR:experienceYear:q80": {
       "effect": -0.9755309734513272,
+      "trainEffect": -0.946458923512748,
       "ci": [
         -1.452254424778761,
         -0.5443738938053094
@@ -288,6 +296,7 @@
     },
     "threshold:WR:touchdownPointsShare:q70": {
       "effect": -0.8717009345794389,
+      "trainEffect": -0.9166063348416289,
       "ci": [
         -1.2841906542056085,
         -0.4121962616822434
@@ -323,6 +332,7 @@
     },
     "threshold:WR:touchdownPointsShare:q80": {
       "effect": -1.285436046511627,
+      "trainEffect": -1.1967482517482513,
       "ci": [
         -1.7927638081395343,
         -0.7940501453488377

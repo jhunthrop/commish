@@ -62,9 +62,13 @@ import { FITTED_MARKET_CURVE } from "./curve-fitted";
 
 /** The four positions this curve is fit for — the whole preseason board projects nothing else. */
 const CURVE_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
-type CurvePosition = (typeof CURVE_POSITIONS)[number];
+/** Exported (I3+I5 fix round) so `market/blend.ts` can type `BlendConstants.impliedGamesByPosition`
+ *  and safely narrow a `BoardCandidate.position` before indexing it, without duplicating this
+ *  module's own four-position vocabulary. */
+export type CurvePosition = (typeof CURVE_POSITIONS)[number];
 
-function isCurvePosition(position: Position): position is CurvePosition {
+/** Exported alongside `CurvePosition` for the identical reason. */
+export function isCurvePosition(position: Position): position is CurvePosition {
   return (CURVE_POSITIONS as readonly Position[]).includes(position);
 }
 
@@ -103,6 +107,16 @@ export interface MarketCurveObservation {
    * "what does he score conditional on staying healthy".
    */
   readonly points: number;
+  /**
+   * Games he actually appeared in that season (I3+I5 fix round, 2026-08-31) — the count of weekly
+   * stat-line rows this same read already has in hand, at zero extra DB cost. ZERO for the same
+   * never-recorded-a-line player `points` is zero for, for the identical reason: a drafted man who
+   * never played is real evidence about what his ADP slot actually delivered, not a row to drop.
+   * `fitImpliedGamesByPosition` (below) averages this field, per position, over the curve's own
+   * train population — the market's OWN implicit games-played assumption, which `market/blend.ts`'s
+   * clause (b) measures a gap against instead of a naive full-season count.
+   */
+  readonly gamesPlayed: number;
 }
 
 /**
@@ -141,10 +155,51 @@ export async function loadMarketCurveObservations(db: ReadonlyDb, seasons: reado
       if (position === null || !isCurvePosition(position)) continue;
       const weeks = byPlayer.get(row.playerId) ?? [];
       const points = weeks.reduce((sum, line) => sum + computeFantasyPoints(line, position, PPR_SCORING), 0);
-      observations.push({ season, position, adpRank: roundedRank(row.rank), points });
+      observations.push({ season, position, adpRank: roundedRank(row.rank), points, gamesPlayed: weeks.length });
     }
   }
   return observations;
+}
+
+/** Per position, the market curve's own train population's mean `gamesPlayed` — a `Position`, not
+ *  just a `CurvePosition`, keyed record, so `market/blend.ts`'s own per-candidate `Position` lookup
+ *  never needs a second narrowing check. */
+export type ImpliedGamesByPosition = Readonly<Record<CurvePosition, number>>;
+
+/**
+ * THE MARKET'S OWN IMPLICIT GAMES-PLAYED ASSUMPTION (I3+I5 fix round, 2026-08-31) — per position,
+ * the mean `gamesPlayed` across every `MarketCurveObservation` handed in, unweighted across
+ * player-seasons exactly like `fitMarketCurve`'s own rank-bucket means before PAVA smooths them.
+ *
+ * REPLACES `teamGamesIn(season)` AS CLAUSE (b)'s DENOMINATOR in `market/blend.ts`. The bug that
+ * finding fixes: `marketPoints` is already an empirical average over REAL player-seasons at that
+ * ADP rank, most of which missed at least a few games to injury or a benching — the market curve
+ * itself already prices that attrition in. Comparing the model's own `expectedGames` against a
+ * naive full `teamGames` assumption (17, or 16 pre-2021) DOUBLE-COUNTS that same attrition for
+ * nearly every player on the board, since almost nobody's `expectedGames` reaches a full season —
+ * systematically dragging the blend below market for the ordinary case, not only the genuinely
+ * injury-flagged one. This function measures what the market curve's own training population
+ * ACTUALLY averaged, per position, so clause (b)'s gap is measured against the market's real
+ * assumption rather than an assumption nobody's number actually implies.
+ *
+ * Throws on an empty observation list for a position with real full-window evidence at every other
+ * position — the identical "an empty population is a population-builder bug, not a zero" discipline
+ * `harness.ts`'s `bootstrapStatistics` enforces; a position with LITERALLY ZERO train observations
+ * would silently divide by zero otherwise, and this repository has never treated `0/0` as an honest
+ * answer to "what does the market typically see."
+ */
+export function fitImpliedGamesByPosition(observations: readonly MarketCurveObservation[]): ImpliedGamesByPosition {
+  const result = {} as Record<CurvePosition, number>;
+  for (const position of CURVE_POSITIONS) {
+    const atPosition = observations.filter((observation) => observation.position === position);
+    if (atPosition.length === 0) {
+      throw new Error(
+        `fitImpliedGamesByPosition: no market-curve observations at position "${position}" — an empty population is a fit-input bug, not a zero.`,
+      );
+    }
+    result[position] = atPosition.reduce((sum, observation) => sum + observation.gamesPlayed, 0) / atPosition.length;
+  }
+  return result;
 }
 
 /** One fitted point on the curve: the rounded rank a mean was measured at, and the isotonic value there. */

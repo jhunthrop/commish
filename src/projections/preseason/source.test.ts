@@ -10,6 +10,8 @@ import { recordTeamObservations } from "../team-store";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { FITTED_MODEL } from "../model/source";
 import type { Law } from "../laws/types";
+import { blendBoard, seasonPointsOf, shippedPreseasonCandidates, type BlendConstants } from "../market/blend";
+import type { MarketPriorEntry } from "../market/curve";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -22,6 +24,7 @@ import {
   preseasonCandidates,
   preseasonMomentFor,
   rookieSegmentFor,
+  SHIPPED_PRESEASON_FEATURES,
   type PreseasonPriors,
 } from "./source";
 
@@ -314,6 +317,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
       position: "WR",
       claim: "Fixture claim for target_share_persistence, independent of the real registry.",
       measured: { effect: 1.8, ci: [1.2, 2.4], sample: 250, seasons: "fixture" },
+      trainEffect: 1.8,
       verdict: "confirmed",
       modelPath: null,
       hasFoldEvidence: true,
@@ -342,6 +346,7 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
       position: "WR",
       claim: "Fixture claim for a discovered targetShare law, independent of the real discovered.json.",
       measured: { effect: 2.1, ci: [1.4, 2.8], sample: 250, seasons: "fixture" },
+      trainEffect: 2.1,
       verdict: "confirmed",
       modelPath: null,
       hasFoldEvidence: true,
@@ -447,5 +452,75 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
       "target_share_persistence",
       "threshold:WR:targetShare:q80",
     ]);
+  });
+});
+
+/**
+ * I4 (fix round, 2026-08-31) — THE IDENTITY PIN, THROUGH A PRODUCTION-REACHABLE ROUTE. `blend.test.ts`
+ * pins `blendBoard`'s own identity (no admitted evidence -> marketPoints exactly) against a
+ * hand-built `BoardCandidate`; this test pins the SAME identity against a candidate this describe
+ * block's own `preseasonCandidates` actually produced, with `features.availability: false` — the
+ * real ablation route (`gives everybody seventeen games...`, above) that is the ONLY way a real
+ * board's own `games.expected` becomes a clean, exact number rather than a fitted distribution's own
+ * continuous mean. `laws: []` on `loadPreseason` keeps the candidate free of any real confirmed
+ * law's own reason, so the only evidence source left to neutralise is the availability gap itself.
+ */
+describe("blendBoard's identity, through a production-reachable route (I4 fix round)", () => {
+  it("returns marketPoints exactly for a real candidate whose games.expected matches the constants' own implied-games table", async () => {
+    const inputs = await loadPreseason(db, 2024, []);
+    const candidates = preseasonCandidates(inputs, { ...ALL_PRESEASON_FEATURES, availability: false }, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+    expect(veteran.games.expected).toBe(17); // the real ablation route: seventeenGamesForEveryone(2024)
+
+    const marketEntry: MarketPriorEntry = { playerId: VETERAN, position: "WR", adpRank: 12, marketPoints: 233.47 };
+    const constants: BlendConstants = {
+      lawCapPoints: 20,
+      availabilityCapPoints: 40,
+      totalCapPoints: 40,
+      // Deliberately matches veteran.games.expected (17) so the availability-gap delta is exactly
+      // zero — the one condition under which the identity is exercised.
+      impliedGamesByPosition: { QB: 17, RB: 17, WR: 17, TE: 17 },
+      // Identity — this test is listed (marketEntry exists), so unlistedRescale never applies, but
+      // BlendConstants still requires it.
+      unlistedRescale: {
+        QB: { slope: 1, intercept: 0, domainMin: 0 },
+        RB: { slope: 1, intercept: 0, domainMin: 0 },
+        WR: { slope: 1, intercept: 0, domainMin: 0 },
+        TE: { slope: 1, intercept: 0, domainMin: 0 },
+      },
+    };
+    const [blended] = blendBoard([marketEntry], [veteran], { season: 2024, constants, laws: [] });
+
+    expect(seasonPointsOf(blended!)).toBeCloseTo(233.47, 6);
+    expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 233.47, delta: 0 });
+  });
+});
+
+/** M9 (fix round) — `shippedPreseasonCandidates`'s own `{ raw: true }` seam, through the real DB
+ *  path rather than only inferred from reading the source. No ADP board is ingested anywhere in
+ *  this file's fixtures, so the BLENDED path (the default) falls back every candidate to
+ *  `market_unlisted`; the RAW path never touches the market at all and carries no such reason. */
+describe("shippedPreseasonCandidates's raw flag (M9 fix round)", () => {
+  it("raw: true returns exactly preseasonCandidates's own output, with no market_unlisted or market_anchor reason", async () => {
+    const inputs = await loadPreseason(db, 2024);
+    // shippedPreseasonCandidates defaults `features` to SHIPPED_PRESEASON_FEATURES, not
+    // ALL_PRESEASON_FEATURES — the "expected" side has to match that default, not this file's own
+    // usual ablation-testing default, or the two sides diverge on unrelated feature flags
+    // (rookieLanding in particular) rather than on the raw/blended distinction this test is about.
+    const expected = preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, PRIORS);
+    const raw = await shippedPreseasonCandidates(db, inputs, PRIORS, { raw: true });
+    expect(raw).toEqual(expected);
+    for (const candidate of raw) {
+      expect(candidate.reasons.some((reason) => reason.code === "market_unlisted" || reason.code === "market_anchor")).toBe(false);
+    }
+  });
+
+  it("raw: false (the default) runs the blend, tagging every candidate market_unlisted when no ADP board exists", async () => {
+    const inputs = await loadPreseason(db, 2024);
+    const blended = await shippedPreseasonCandidates(db, inputs, PRIORS);
+    expect(blended.length).toBeGreaterThan(0);
+    for (const candidate of blended) {
+      expect(candidate.reasons).toContainEqual({ code: "market_unlisted" });
+    }
   });
 });

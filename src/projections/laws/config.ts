@@ -75,3 +75,26 @@ export const BOOTSTRAP = { resamples: 1000, seed: 20260831 } as const;
  * never reading the outcome season it is predicting.
  */
 export const DISCOVERY_TRAIN_SEASONS = { from: MEASURE_SEASONS.from, to: 2021 } as const;
+
+/**
+ * THE LAW TRAIN CUTOFF (C1 fix round, 2026-08-31) — the predictor-season boundary
+ * `registry.ts`'s `trainEffectFor` measures every law's OWN train-only effect against, restricted
+ * to pairs whose predictor season is at or before this value. `market/blend.ts`'s law delta reads
+ * a law's `trainEffect`, never its full-window `measured.effect`: the full window runs through
+ * `MEASURE_SEASONS.to - 1` (2023), which overlaps the final-bar seasons (2023, 2024) `blend.ts`'s
+ * own docblock calls untouchable by any fitting — a delta sized off the full-window effect would
+ * let 2023/2024 outcome information leak into a score later judged on those same seasons.
+ *
+ * SAME VALUE AS `DISCOVERY_TRAIN_SEASONS.to`, KEPT TEXTUALLY SEPARATE (see `REPLICATION_FOLDS`'s own
+ * docblock for why: two constants that happen to agree today must not be silently assumed to track
+ * each other forever). `DISCOVERY_TRAIN_SEASONS.to` bounds what a discovered candidate's OWN
+ * antecedent may be screened on; `LAW_TRAIN_CUTOFF_SEASON` bounds what ANY law's (tribal or
+ * discovered) `trainEffect` may be MEASURED on, a related but distinct question a discovered law
+ * already answers for itself via `measureCandidateOnTrain`'s own `trainEffect` (carried straight
+ * through rather than recomputed — see `discovery/measure.ts`). Also the same boundary Task 10's
+ * market curve, rookie curve and blend fit constants train through (`MARKET_CURVE_TRAIN_CUTOFF_SEASON`,
+ * `ROOKIE_CURVE_TRAIN_CUTOFF_SEASON`, `BLEND_TRAIN_CUTOFF_SEASON`, each 2021) — one predictor-season
+ * boundary the whole engine treats as the edge of what a train-time number may see, named once per
+ * module rather than imported across module boundaries.
+ */
+export const LAW_TRAIN_CUTOFF_SEASON = 2021;

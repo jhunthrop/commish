@@ -1,6 +1,6 @@
-// Fits the blend's cap/scale constants via a small grid search against the store's own historical
-// market boards, model boards and season outcomes, generating the committed
-// `src/projections/market/blend-fitted.ts`.
+// Fits the blend's cap constants (and the market's own implied-games table) via a grid search
+// against the store's own historical market boards, model boards and season outcomes, generating
+// the committed `src/projections/market/blend-fitted.ts`.
 // Run: npm run projections:blend:fit
 //      npm run projections:blend:fit -- --check   (recomputes, exits 1 on any drift)
 //
@@ -9,26 +9,59 @@
 // identical reason: the lower bound is the floor this repository's weekly stat lines are actually
 // backfilled to, and the upper bound is this task's own boundary, enforced structurally inside
 // `scoreBlendConstants` itself so a mistake here fails loudly rather than quietly leaking a later
-// season into the score. The final-bar seasons, 2023 and 2024, are never read by this script at all.
+// season into the score.
 //
-// THE GRID. Three constants, four values each — `lawCapPoints`, `availabilityCapPoints`,
-// `totalCapPoints` — the same small, hand-picked ladder for every one of them (2, 5, 10, 20, 40
-// season points), scored by rank correlation (`spearman`, `metrics.ts`) pooled across every train
-// season and every skill position. 5^3 = 125 combinations, each a full blend of every train row —
-// small enough to run in one pass with no pruning. `totalCapPoints` combinations below the larger of
-// the other two are skipped: a total cap tighter than either individual cap would make that cap
-// unreachable, so scoring it would waste a grid cell without ever exercising the constant it names.
+// WHAT "NEVER READ" ACTUALLY MEANS HERE (C1(iii)/M1 fix round, correcting an earlier, false claim
+// this header made — "the final-bar seasons, 2023 and 2024, are never read by this script at all").
+// No 2023/2024 STAT LINE, ADP row or model input is read by this script, and no OUTCOME from those
+// seasons ever reaches a score `scoreBlendConstants` returns: `admittedDelta` (`market/blend.ts`)
+// reads a law's `trainEffect`, never its full-window `effect` (C1(i)), so a law's own APPLIED
+// MAGNITUDE never carries information from 2023/2024. What is NOT bounded by any of that is LAW
+// SELECTION: `loadPreseason`'s default `laws` is `registry()`, and whether a law is CONFIRMED at
+// all (`verdictForFullWindow`/`verdictForDiscoveredLaw`, `laws/registry.ts`) requires agreement
+// across `REPLICATION_FOLDS` (2021, 2022, 2023) — so 2023's own year-over-year outcomes help decide
+// WHICH laws exist as `"law"` BoardReasons for this script to blend at all, even though they never
+// set HOW MUCH a confirmed law moves a player once it fires. The bound: this is a selection effect
+// over a small, discrete set (six tribal laws plus a handful of discovered survivors), not a
+// continuous leak into any one row's score, and every other consumer of `registry()`'s confirmed
+// laws already lives with it (the raw board's own law reasons, `/player-laws`) — this script
+// inherits the selection effect rather than introducing a new one.
+//
+// THE IMPLIED-GAMES TABLE (I3+I5 fix round) — `market/curve.ts`'s `fitImpliedGamesByPosition`, run
+// on the market curve's OWN train population (`loadMarketCurveObservations` over the identical
+// season range this script itself trains on). Committed alongside the cap constants as one field of
+// the same `BlendConstants` object, with the SAME provenance: both are fit on TRAIN seasons only.
+//
+// THE GRID (I2 fix round, correcting the earlier grid's two mistakes). `lawCapPoints`,
+// `availabilityCapPoints` and `totalCapPoints` each range over GRID — INCLUDING ZERO, so the
+// zero-deviation "pure market, no admitted evidence at all" baseline is itself one of the scored
+// cells rather than an unreachable edge case — with EVERY combination scored: the earlier version
+// skipped any cell where `totalCapPoints` sat below the larger of the other two, on the theory that
+// such a cell could never exercise `totalCapPoints`. That reasoning was backwards — a TIGHT total
+// cap is exactly the binding, informative region this search needs to see (it is what makes the
+// blend cautious), and pruning it away meant the search could never discover that a tight total cap
+// was the best-scoring choice. Every one of GRID^3 cells is scored and its own rho logged below,
+// not only the winner.
+//
+// THE UNLISTED FALLBACK'S OWN RESCALE (C2 fix round) — `fitUnlistedRescale` (`market/blend.ts`), an
+// OLS affine fit per position over every TRAIN row's own (raw model points, market points) pair,
+// committed alongside the cap constants. A diagnostic run over 2023/2024 found the raw model's
+// unlisted fallback landing implausibly high (an unlisted player at overall rank 20 in 2023, rank
+// 43 in 2024) against the market-anchored blend around it — both comfortably inside the decision
+// rule's own "any unlisted player lands top-100" trigger, so the rescale ships.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Position } from "@/domain/player";
 import {
   BLEND_TRAIN_CUTOFF_SEASON,
+  fitUnlistedRescale,
   scoreBlendConstants,
   type BlendConstants,
   type BlendTrainRow,
 } from "@/projections/market/blend";
-import { marketBoard } from "@/projections/market/curve";
+import { fitImpliedGamesByPosition, loadMarketCurveObservations, marketBoard } from "@/projections/market/curve";
+import { registry } from "@/projections/laws/registry";
 import { statLinesAsOfForMeasurement } from "@/projections/nflverse/derived-stat-lines";
 import { HISTORICAL_ROSTER_FLOOR } from "@/projections/nflverse/rosters";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
@@ -44,7 +77,10 @@ import { loadPreseason, preseasonCandidates, SHIPPED_PRESEASON_FEATURES, type Pr
 import type { ReadonlyDb } from "@/db/client";
 
 const OUTPUT = "src/projections/market/blend-fitted.ts";
-const GRID = [2, 5, 10, 20, 40] as const;
+/** I2/I3+I5 fix round: zero included (the pure-market baseline), extended upward from the earlier
+ *  [2,5,10,20,40] ladder toward 80 to give the availability/total axes real room for an interior
+ *  optimum — see the real run's own printed verdict on whether one appeared. */
+const GRID = [0, 2, 5, 10, 20, 40, 80] as const;
 
 /** Far past any correction: a fit measures completed seasons, never a point-in-time product read. */
 const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");
@@ -114,9 +150,11 @@ function header(): string {
 /**
  * GENERATED by \`npm run projections:blend:fit\`. Do not edit by hand.
  *
- * Fit by a small grid search over predictor seasons up to and including \`BLEND_TRAIN_CUTOFF_SEASON\`
- * (2021), scored by rank correlation against those seasons' own outcomes. See
- * \`scripts/blend-fit.ts\` for the grid and the chosen combination's score.
+ * Fit by a grid search over predictor seasons up to and including \`BLEND_TRAIN_CUTOFF_SEASON\`
+ * (2021), scored by rank correlation against those seasons' own outcomes. \`impliedGamesByPosition\`
+ * is the market curve's own train population's mean games played, per position
+ * (\`fitImpliedGamesByPosition\`). See \`scripts/blend-fit.ts\` for the grid and the chosen
+ * combination's score.
  */
 `;
 }
@@ -143,38 +181,80 @@ async function main(): Promise<void> {
         `${droppedCount} market row(s) dropped (unresolved position)`,
     );
   }
+
+  console.log("\nfitting the market's own implied games-played table (I3+I5)...");
+  const marketCurveObservations = await loadMarketCurveObservations(db, seasons);
+  const impliedGamesByPosition = fitImpliedGamesByPosition(marketCurveObservations);
+  for (const position of ["QB", "RB", "WR", "TE"] as const) {
+    console.log(`  ${position}: ${impliedGamesByPosition[position].toFixed(2)} implied games`);
+  }
+
   await db.$client.end();
 
   console.log(`\nfit on ${rows.length} (player, season) rows across seasons ${seasons.join(", ")}`);
 
+  // `laws` computed ONCE, off the real committed registry, and passed to every grid cell explicitly
+  // — `scoreBlendConstants`/`blendBoard` would otherwise default to calling `registry()` (a disk
+  // read + JSON parse) on every single row of every single grid cell, which at GRID.length^3 cells
+  // times `rows.length` rows would mean hundreds of thousands of redundant file reads.
+  const laws = registry();
+
+  console.log("\nfitting the unlisted fallback's own per-position rescale (C2)...");
+  const unlistedRescale = fitUnlistedRescale(rows);
+  for (const position of ["QB", "RB", "WR", "TE"] as const) {
+    const { slope, intercept, domainMin } = unlistedRescale[position];
+    console.log(
+      `  ${position}: marketPoints ~= ${slope.toFixed(3)} * rawPoints + ${intercept.toFixed(2)}  (applied only for rawPoints >= ${domainMin.toFixed(1)})`,
+    );
+  }
+
+  console.log(`\nGRID (${GRID.join(", ")}), every cell scored (I2 fix round — no pruning):\n`);
+  console.log(`${"lawCap".padStart(7)}  ${"availCap".padStart(9)}  ${"totalCap".padStart(9)}  ${"rho".padStart(8)}`);
+
   let best: { constants: BlendConstants; score: number } | null = null;
-  let scored = 0;
-  let skipped = 0;
+  let pureMarketScore: number | null = null;
+  const cells: { readonly constants: BlendConstants; readonly score: number | null }[] = [];
   for (const lawCapPoints of GRID) {
     for (const availabilityCapPoints of GRID) {
       for (const totalCapPoints of GRID) {
-        if (totalCapPoints < Math.max(lawCapPoints, availabilityCapPoints)) {
-          skipped += 1;
-          continue;
-        }
-        const constants: BlendConstants = { lawCapPoints, availabilityCapPoints, totalCapPoints };
-        const score = scoreBlendConstants(rows, constants, { heldOutSeasons: [] });
-        scored += 1;
+        const constants: BlendConstants = { lawCapPoints, availabilityCapPoints, totalCapPoints, impliedGamesByPosition, unlistedRescale };
+        const score = scoreBlendConstants(rows, constants, { heldOutSeasons: [], laws });
+        cells.push({ constants, score });
+        console.log(
+          `${String(lawCapPoints).padStart(7)}  ${String(availabilityCapPoints).padStart(9)}  ${String(totalCapPoints).padStart(9)}  ` +
+            `${score === null ? "n/a".padStart(8) : score.toFixed(4).padStart(8)}`,
+        );
+        if (lawCapPoints === 0 && availabilityCapPoints === 0 && totalCapPoints === 0) pureMarketScore = score;
         if (score !== null && (best === null || score > best.score)) best = { constants, score };
       }
     }
   }
 
-  console.log(`scored ${scored} grid cells (${skipped} skipped: totalCapPoints below the larger of the other two caps)`);
+  console.log(`\nscored ${cells.length} grid cells (every combination — I2 fix round removed the earlier pruning rule)`);
+  console.log(
+    `\nPURE MARKET BASELINE (lawCapPoints=0, availabilityCapPoints=0, totalCapPoints=0 — zero deviation from marketPoints for every ` +
+      `listed player): rho=${pureMarketScore === null ? "n/a" : pureMarketScore.toFixed(4)}`,
+  );
 
   if (best === null) {
     throw new Error("The blend grid search found no scoreable combination — every cell returned null from `spearman`.");
   }
 
+  const beatsPureMarket = pureMarketScore !== null && best.score > pureMarketScore;
   console.log(
     `\nBEST: lawCapPoints=${best.constants.lawCapPoints}  availabilityCapPoints=${best.constants.availabilityCapPoints}  ` +
-      `totalCapPoints=${best.constants.totalCapPoints}  (spearman rho=${best.score.toFixed(4)} on the train rows)`,
+      `totalCapPoints=${best.constants.totalCapPoints}  (spearman rho=${best.score.toFixed(4)} on the train rows, ` +
+      `${beatsPureMarket ? "beats" : "does NOT beat"} the pure-market baseline)`,
   );
+  const onCeiling =
+    best.constants.availabilityCapPoints === GRID[GRID.length - 1] || best.constants.totalCapPoints === GRID[GRID.length - 1];
+  if (onCeiling) {
+    console.log(
+      `\nNOTE: the best cell sits at this grid's own ceiling (${GRID[GRID.length - 1]}) on the availability and/or total axis — ` +
+        `no interior optimum appeared. The blend is, on these train seasons, effectively UNCONSTRAINED on that axis rather than ` +
+        `meaningfully capped; see market/blend.ts's own docblock, which names this rather than implying a real cap is doing work.`,
+    );
+  }
 
   const rendered = render(best.constants);
 

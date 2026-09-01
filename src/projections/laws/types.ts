@@ -42,6 +42,18 @@ export interface Law {
   /** Plain words, user-facing. */
   readonly claim: string;
   readonly measured: LawMeasurement;
+  /**
+   * THE SAME MATCHED-PAIRS MEASUREMENT AS `measured.effect`, RESTRICTED TO PREDICTOR SEASONS
+   * `<= LAW_TRAIN_CUTOFF_SEASON` (C1 fix round, 2026-08-31 — `config.ts`'s `trainEffectFor` docblock
+   * has the full boundary rationale). A SIBLING field of `measured` rather than nested inside
+   * `LawMeasurement` itself: `LawMeasurement` is the generic "one window's measurement" shape
+   * `harness.ts`'s `measureEffect` returns for ANY window (full or train), and a train
+   * measurement having its own nested "train effect" would be self-referential. `market/blend.ts`'s
+   * law delta reads THIS field, never `measured.effect` — the full-window number spans seasons this
+   * engine's blend fit is forbidden to fit on. `/player-laws` and every other reader of a law's
+   * claim keep showing `measured.effect`, the full-window number, unchanged.
+   */
+  readonly trainEffect: number;
   readonly verdict: LawVerdict;
   /** The fitted feature this law gates; null means the law is content only, no model wiring. */
   readonly modelPath: string | null;

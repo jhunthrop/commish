@@ -73,6 +73,18 @@ export type BoardReason =
    */
   | { readonly code: "market_unlisted" }
   /**
+   * I6 (fix round, 2026-08-31) — on every LISTED blended candidate, the market entry `blendBoard`
+   * anchored him to and the total admitted delta it moved him by: his blended season points are
+   * `marketPoints + delta` exactly. Lets a reader see not just WHAT moved a player (the law/
+   * availability reasons already on the list) but WHERE he started and BY HOW MUCH the blend
+   * actually spent. `delta` can be negative (moved below market), zero (no admitted evidence, or
+   * every admitted delta capped to nothing), or — for a listed rookie — `rookieCurve − marketPoints`,
+   * an uncapped full substitution rather than an additive term. M8 RULING: deliberately excluded
+   * from `reason-chip.tsx`'s `strongestLawReasons` (the two-chip compact board surface stays
+   * LAW-ONLY); renders only where a full reason list does, e.g. PlayerPeek's own outlook.
+   */
+  | { readonly code: "market_anchor"; readonly marketPoints: number; readonly delta: number }
+  /**
    * A CONFIRMED law (`laws/registry.ts`), TRIBAL OR DISCOVERED, whose own condition is true for this
    * player, for the season this board projects. `effect` is the law's REGISTRY-MEASURED points/game
    * delta (`Law.measured.effect`, the same number every law carries everywhere else it is shown) —

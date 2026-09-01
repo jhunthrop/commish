@@ -57,6 +57,7 @@ const AGREEING_FOLDS: readonly FoldEffect[] = [
 function measurementFixture(over: Partial<MeasuredEntry> = {}): MeasuredEntry {
   const base: MeasuredEntry = {
     effect: -3,
+    trainEffect: -2.5,
     ci: [-4, -2],
     sample: 40,
     seasons: "2013-2023 (2019 missing upstream), direction replicated on predictor seasons 2021-2023",
@@ -77,6 +78,7 @@ describe("registryFrom", () => {
       position: "RB",
       claim: spec.claim,
       measured: { effect: -3, ci: [-4, -2], sample: 40, seasons: measured.seasons },
+      trainEffect: measured.trainEffect,
       verdict: "confirmed",
       modelPath: null,
       hasFoldEvidence: true,
@@ -152,13 +154,13 @@ describe("registryFrom", () => {
       { season: 2023, pairs: 0, effect: null },
     ];
     const cases: readonly MeasuredEntry[] = [
-      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "confirmed" }, // full CI excludes zero, sign matches, every fold agrees
-      { effect: -3, ci: [-1, 1], sample: 40, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "weak" }, // sign matches, full CI spans zero
-      { effect: 3, ci: [2, 4], sample: 40, seasons: "s", foldEffects: [{ season: 2021, pairs: 10, effect: 1 }], verdict: "debunked" }, // full sign wrong
-      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: oneFoldDisagrees, verdict: "weak" }, // full confirms, one fold disagrees — capped
-      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: oneFoldSkippedRestAgree, verdict: "confirmed" }, // full confirms, a zero-pair fold is skipped, the rest agree
-      { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: zeroFoldsWithPairs, verdict: "weak" }, // full confirms, zero folds carry any pairs — capped, never confirmed
-      { effect: -3, ci: [-4, -2], sample: MIN_REPLICATION_PAIRS - 1, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "weak" }, // full confirms, every fold agrees, but sample is below the floor — capped
+      { effect: -3, trainEffect: -2.5, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "confirmed" }, // full CI excludes zero, sign matches, every fold agrees
+      { effect: -3, trainEffect: -2.5, ci: [-1, 1], sample: 40, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "weak" }, // sign matches, full CI spans zero
+      { effect: 3, trainEffect: 2.5, ci: [2, 4], sample: 40, seasons: "s", foldEffects: [{ season: 2021, pairs: 10, effect: 1 }], verdict: "debunked" }, // full sign wrong
+      { effect: -3, trainEffect: -2.5, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: oneFoldDisagrees, verdict: "weak" }, // full confirms, one fold disagrees — capped
+      { effect: -3, trainEffect: -2.5, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: oneFoldSkippedRestAgree, verdict: "confirmed" }, // full confirms, a zero-pair fold is skipped, the rest agree
+      { effect: -3, trainEffect: -2.5, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: zeroFoldsWithPairs, verdict: "weak" }, // full confirms, zero folds carry any pairs — capped, never confirmed
+      { effect: -3, trainEffect: -2.5, ci: [-4, -2], sample: MIN_REPLICATION_PAIRS - 1, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "weak" }, // full confirms, every fold agrees, but sample is below the floor — capped
     ];
     for (const measured of cases) {
       const spec = specFixture({ expectedSign: -1 });
@@ -375,6 +377,7 @@ const FOLDS_AGREE_NEGATIVE: readonly FoldEffect[] = [
 function discoveredEntryFixture(over: Partial<DiscoveredEntry> = {}): DiscoveredEntry {
   const base: DiscoveredEntry = {
     effect: -3,
+    trainEffect: -2.5,
     ci: [-4, -2],
     sample: 40,
     seasons: "2013-2023",
@@ -614,6 +617,7 @@ describe("discoveredLawsFrom", () => {
       position: "RB",
       claim: entry.claim,
       measured: { effect: -3, ci: [-4, -2], sample: 40, seasons: "2013-2023" },
+      trainEffect: entry.trainEffect,
       verdict: "confirmed",
       modelPath: null,
       hasFoldEvidence: true,
@@ -691,6 +695,7 @@ describe("chipEligibleLaws", () => {
       position: "RB",
       claim: "Fixture claim.",
       measured: { effect: -1, ci: [-2, -0.5], sample: 100, seasons: "s" },
+      trainEffect: -1,
       verdict: "confirmed",
       modelPath: null,
       hasFoldEvidence: true,

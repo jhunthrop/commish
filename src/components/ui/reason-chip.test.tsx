@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
-import { discoveredHeadline, ReasonChip } from "./reason-chip";
+import { discoveredHeadline, ReasonChip, strongestLawReasons } from "./reason-chip";
 
 /**
  * `discoveredHeadline`'s GENERIC RENDERER, PINNED against small hand-built `Law` fixtures — never
@@ -21,6 +21,7 @@ function discoveredLawFixture(over: Partial<Law> = {}): Law {
     position: "RB",
     claim: "Fixture claim for a discovered law.",
     measured: { effect: -1.4, ci: [-2, -0.8], sample: 100, seasons: "fixture" },
+    trainEffect: -1.4,
     verdict: "confirmed",
     modelPath: null,
     hasFoldEvidence: true,
@@ -89,5 +90,38 @@ describe("ReasonChip — a discovered law's reason", () => {
     const reason: BoardReason = { code: "law", lawId: "not_a_real_candidate_id", effect: -1.4, magnitude: 182 };
     render(<ReasonChip reason={reason} registry={[]} />);
     expect(screen.getByText(/Not a real candidate id: measured -1\.4 pts per game/)).toBeInTheDocument();
+  });
+});
+
+describe("ReasonChip — market_anchor and market_unlisted (I6/M8 fix round)", () => {
+  it("renders market_anchor's own marketPoints and signed delta", () => {
+    const reason: BoardReason = { code: "market_anchor", marketPoints: 210.4, delta: -3.2 };
+    render(<ReasonChip reason={reason} registry={[]} />);
+    expect(screen.getByText(/Market 210\.4 pts, -3\.2 from evidence/)).toBeInTheDocument();
+  });
+
+  it("renders market_unlisted's own plain sentence", () => {
+    const reason: BoardReason = { code: "market_unlisted" };
+    render(<ReasonChip reason={reason} registry={[]} />);
+    expect(screen.getByText(/No market ADP; model-only projection/)).toBeInTheDocument();
+  });
+});
+
+describe("strongestLawReasons — the two-chip compact surface stays LAW-ONLY (M8 pin)", () => {
+  it("never returns a market_anchor or market_unlisted reason, however many law reasons are present", () => {
+    const reasons: readonly BoardReason[] = [
+      { code: "market_anchor", marketPoints: 200, delta: 5 },
+      { code: "market_unlisted" },
+      { code: "law", lawId: "rb_age_curve", effect: -1.25, magnitude: 31 },
+      { code: "availability", expectedGames: 14, floorGames: 10, ceilingGames: 17 },
+    ];
+    const strongest = strongestLawReasons(reasons);
+    expect(strongest.every((reason) => reason.code === "law")).toBe(true);
+    expect(strongest).toEqual([{ code: "law", lawId: "rb_age_curve", effect: -1.25, magnitude: 31 }]);
+  });
+
+  it("returns an empty list when the only reasons present are market_anchor/market_unlisted, never falling back to them", () => {
+    const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: 5 }, { code: "market_unlisted" }];
+    expect(strongestLawReasons(reasons)).toEqual([]);
   });
 });

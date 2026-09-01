@@ -48,6 +48,7 @@ function lawFixture(
     position: "WR",
     claim: `Fixture claim for ${id}.`,
     measured: { effect, ci: [effect - 1, effect + 1], sample: 100, seasons: "fixture" },
+    trainEffect: effect,
     verdict,
     modelPath: null,
     hasFoldEvidence: true,

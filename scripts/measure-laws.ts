@@ -66,6 +66,7 @@ import {
   foldEffectsFor,
   MEASURED_JSON_PATH,
   stratumKeyFor,
+  trainEffectFor,
   verdictForFullWindow,
   type FoldEffect,
   type MeasuredEntry,
@@ -112,19 +113,24 @@ function seasonsLabel(): string {
 interface LawResult {
   readonly id: string;
   readonly measurement: LawMeasurement;
+  /** The SAME matched-pairs measurement, restricted to predictor seasons <= LAW_TRAIN_CUTOFF_SEASON
+   *  (C1 fix round) — see `registry.ts`'s `trainEffectFor` for the full rationale. */
+  readonly trainEffect: number;
   readonly foldEffects: readonly FoldEffect[];
   readonly verdict: LawVerdict;
 }
 
-/** One law's full-window measurement, plus one effect per replication fold (see header). */
+/** One law's full-window measurement, its train-only effect (C1 fix round), plus one effect per
+ *  replication fold (see header). */
 function measureLaw(spec: LawSpec, population: readonly PlayerSeasonPoint[]): LawResult {
   const pairs = matchedPairsStratified(population, spec.caliper, (point) => stratumKeyFor(spec, point));
   const fullWindow = measureEffect(pairs); // throws loudly on zero matched pairs — never caught here
   const measurement: LawMeasurement = { ...fullWindow, seasons: seasonsLabel() };
+  const trainEffect = trainEffectFor(pairs);
 
   const foldEffects = foldEffectsFor(pairs);
 
-  return { id: spec.id, measurement, foldEffects, verdict: verdictForFullWindow(measurement, spec.expectedSign, foldEffects) };
+  return { id: spec.id, measurement, trainEffect, foldEffects, verdict: verdictForFullWindow(measurement, spec.expectedSign, foldEffects) };
 }
 
 async function measureAll(db: ReadonlyDb): Promise<readonly LawResult[]> {
@@ -143,7 +149,7 @@ function toMeasuredJson(results: readonly LawResult[]): MeasuredJson {
   const sorted = [...results].sort((a, b) => a.id.localeCompare(b.id));
   const entries = sorted.map((result): readonly [string, MeasuredEntry] => [
     result.id,
-    { ...result.measurement, foldEffects: result.foldEffects, verdict: result.verdict },
+    { ...result.measurement, trainEffect: result.trainEffect, foldEffects: result.foldEffects, verdict: result.verdict },
   ]);
   return Object.fromEntries(entries) as MeasuredJson;
 }
@@ -158,17 +164,17 @@ const FOLD_COLUMN_WIDTH = 10;
 
 function printTable(results: readonly LawResult[]): void {
   const foldHeaders = REPLICATION_FOLDS.map((season) => `fold ${season}`.padStart(FOLD_COLUMN_WIDTH)).join("   ");
-  const header = `${"law".padEnd(26)}${"effect".padStart(8)}   ${"95% CI".padStart(17)}   ${"n".padStart(4)}   ${foldHeaders}   verdict`;
+  const header = `${"law".padEnd(26)}${"effect".padStart(8)}   ${"train".padStart(8)}   ${"95% CI".padStart(17)}   ${"n".padStart(4)}   ${foldHeaders}   verdict`;
   console.log(`\n${header}`);
   console.log("-".repeat(header.length));
-  for (const { id, measurement, foldEffects, verdict } of [...results].sort((a, b) => a.id.localeCompare(b.id))) {
+  for (const { id, measurement, trainEffect, foldEffects, verdict } of [...results].sort((a, b) => a.id.localeCompare(b.id))) {
     const [low, high] = measurement.ci;
     const ci = `[${low.toFixed(3).padStart(7)}, ${high.toFixed(3).padStart(7)}]`;
     const foldCells = foldEffects
       .map((fold) => (fold.effect === null ? "n/a" : fold.effect.toFixed(3)).padStart(FOLD_COLUMN_WIDTH))
       .join("   ");
     console.log(
-      `${id.padEnd(26)}${measurement.effect.toFixed(3).padStart(8)}   ${ci}   ${String(measurement.sample).padStart(4)}   ${foldCells}   ${verdict}`,
+      `${id.padEnd(26)}${measurement.effect.toFixed(3).padStart(8)}   ${trainEffect.toFixed(3).padStart(8)}   ${ci}   ${String(measurement.sample).padStart(4)}   ${foldCells}   ${verdict}`,
     );
   }
 }

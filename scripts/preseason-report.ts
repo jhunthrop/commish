@@ -21,6 +21,7 @@ import { statLinesAsOf } from "@/projections/lines";
 import { FITTED_MODEL } from "@/projections/model/source";
 import { RANK_BANDS, scoreCard, type Observation, type RankBandName, type ScoreCard } from "@/projections/metrics";
 import type { LeagueShape } from "@/projections/decide/replacement";
+import { shippedPreseasonCandidates } from "@/projections/market/blend";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { overlapTiers, preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
 import {
@@ -184,6 +185,10 @@ function draftCapitalOnly(inputs: PreseasonInputs, eligible: ReadonlySet<string>
   );
 }
 
+/** THE RAW MODEL BOARD — never blended. Every ablation below toggles a MODEL feature, and an
+ *  ablation compared against a market-blended "after" arm would be measuring two changes (the
+ *  feature AND the blend) at once; ablations stay on this function's own output, "before" and
+ *  "after" alike, so what moved is always the one flag being tested. */
 function build(inputs: PreseasonInputs, features: PreseasonFeatures): readonly BoardEntry[] {
   return preseasonBoard(preseasonCandidates(inputs, features, PRIORS), {
     season: inputs.season,
@@ -191,6 +196,19 @@ function build(inputs: PreseasonInputs, features: PreseasonFeatures): readonly B
     rules: PPR_SCORING,
     shape: SHAPE,
   });
+}
+
+/**
+ * THE SHIPPED BOARD (M6 fix round, 2026-08-31) — market-blended, via `shippedPreseasonCandidates`'s
+ * own default. This is what a reader of this script's headline numbers (the top 20, the scorecard
+ * against the outcome, the comparison against the published market/consensus benchmarks) should be
+ * shown: the board this engine actually ships, not an intermediate the market blend never touched.
+ * The raw model stays reachable, unchanged, as `build`'s own output — every ablation below reads
+ * that, never this.
+ */
+async function buildShipped(db: ReadonlyDb, inputs: PreseasonInputs): Promise<readonly BoardEntry[]> {
+  const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS);
+  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
 }
 
 function printBands(label: string, banded: ReturnType<typeof scoreOrdering>): void {
@@ -214,9 +232,10 @@ async function main(): Promise<void> {
     console.log(`${season} PRESEASON BOARD, 12-team PPR, taken at ${inputs.moment.toISOString()}`);
     console.log(`${"=".repeat(96)}\n`);
 
-    const board = build(inputs, SHIPPED_PRESEASON_FEATURES);
+    const rawBoard = build(inputs, SHIPPED_PRESEASON_FEATURES);
+    const board = await buildShipped(db, inputs);
     console.log(
-      `board: ${board.length} players from a ${inputs.roster.length}-man week-one roster, ` +
+      `board (shipped, market-blended): ${board.length} players from a ${inputs.roster.length}-man week-one roster, ` +
         `${inputs.usage.length} prior usage rows, ${inputs.teamObservations.length} team facts`,
     );
 
@@ -279,8 +298,9 @@ async function main(): Promise<void> {
             scoreOrdering(draftCapitalOnly(inputs, eligible), actual, eligible, null)
           : scoreOrdering(boardPoints(without), actual, eligible, null);
       // Ablated on the ORDERING THE BOARD SHIPS, which is points. Measuring an ablation on a view
-      // the board does not lead with would be answering a question nobody asks.
-      const after = scoreOrdering(boardPoints(board), actual, eligible, null);
+      // the board does not lead with would be answering a question nobody asks. `rawBoard`, not the
+      // market-blended `board` (M6 fix round) — see `build`'s own docblock for why.
+      const after = scoreOrdering(boardPoints(rawBoard), actual, eligible, null);
       console.log(
         `  ${ablation.name.padEnd(14)} on ${ablation.segment.padEnd(18)} ${rho(before.overall)} -> ${rho(after.overall)}  ` +
           `${delta(before.overall, after.overall)}   n=${after.overall.sampleSize} (before n=${before.overall.sampleSize})` +

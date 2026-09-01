@@ -311,6 +311,7 @@ const KNOWN_REASON_CODES: ReadonlySet<BoardReason["code"]> = new Set([
   "tier_cliff",
   "law",
   "market_unlisted",
+  "market_anchor",
 ]);
 
 function isKnownReasonCode(code: string): code is BoardReason["code"] {

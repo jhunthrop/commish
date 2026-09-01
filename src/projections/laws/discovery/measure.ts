@@ -424,14 +424,14 @@ export function runDiscoveryPipeline(
   const trainRows = rows.filter((row) => row.season <= trainSeasonMax);
 
   let untestable = 0;
-  const testable: { readonly candidate: CandidateLaw; readonly pValue: number; readonly expectedSign: -1 | 1 }[] = [];
+  const testable: { readonly candidate: CandidateLaw; readonly pValue: number; readonly expectedSign: -1 | 1; readonly trainEffect: number }[] = [];
   for (const candidate of candidates) {
     const result = measureCandidateOnTrain(candidate, trainRows);
     if (result === null) {
       untestable += 1;
       continue;
     }
-    testable.push({ candidate, pValue: result.pValue, expectedSign: result.expectedSign });
+    testable.push({ candidate, pValue: result.pValue, expectedSign: result.expectedSign, trainEffect: result.trainEffect });
   }
 
   const survivorIds = benjaminiHochberg(
@@ -442,7 +442,7 @@ export function runDiscoveryPipeline(
 
   const laws: Record<string, DiscoveredEntry> = {};
   let replicated = 0;
-  for (const { candidate, expectedSign } of survivors) {
+  for (const { candidate, expectedSign, trainEffect } of survivors) {
     const { measurement, foldEffects, verdict } = measureCandidateFullWindow(candidate, rows, expectedSign, seasonsLabel);
     if (verdict === "confirmed") replicated += 1;
     // The candidate's own PRESENTATION data (Task 8 fix round) — written here, once, so a client
@@ -452,6 +452,11 @@ export function runDiscoveryPipeline(
     const primaryQuantityDef = primaryQuantityDefOf(candidate.claimParts.clause);
     laws[candidate.id] = {
       effect: measurement.effect,
+      // trainEffect (C1 fix round) is CARRIED STRAIGHT THROUGH from `measureCandidateOnTrain`'s own
+      // step-1 result, never recomputed here: it is the identical `DISCOVERY_TRAIN_SEASONS`-bounded
+      // measurement `trainEffectFor` would produce, and this pipeline already paid for one bootstrap
+      // pass to get it — a second call would burn 1,000 more seeded resamples for the same number.
+      trainEffect,
       ci: measurement.ci,
       sample: measurement.sample,
       seasons: measurement.seasons,
