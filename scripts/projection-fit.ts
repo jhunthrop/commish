@@ -166,9 +166,12 @@ function experienceObservations(
     if (!allowed.has(row.season)) continue;
     const key = `${row.season}|${row.playerId}`;
     const cell = volume.get(key) ?? { targets: 0, carries: 0, passAttempts: 0 };
-    cell.targets += row.targets;
-    cell.carries += row.carries;
-    cell.passAttempts += row.passAttempts;
+    // A count the season never published adds nothing — `usage.ts` leaves it `null` rather than
+    // zero so a gap season cannot quietly deflate a player's whole-season volume. This fit's own
+    // seasons all publish theirs.
+    cell.targets += row.targets ?? 0;
+    cell.carries += row.carries ?? 0;
+    cell.passAttempts += row.passAttempts ?? 0;
     volume.set(key, cell);
   }
 

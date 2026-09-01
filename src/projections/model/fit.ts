@@ -2,7 +2,7 @@ import type { Position, StatLine } from "@/domain/player";
 import type { SeasonStatLine } from "../lines";
 import { meanAbsoluteError, rootMeanSquaredError, spearman, type Observation } from "../metrics";
 import type { PlayerWeekUsage } from "../usage";
-import { experienceCohort, RATES, type EfficiencyPriors, type RateName } from "./efficiency";
+import { experienceCohort, opportunitiesFor, RATES, type EfficiencyPriors, type RateName } from "./efficiency";
 import { lastObservedPriors, predictOpportunity, type OpportunityPriors, type OpportunityShrinkage, type RolePrior } from "./opportunity";
 
 /**
@@ -151,20 +151,28 @@ export function fitRolePriors(input: FitInput): Readonly<Record<Position, RolePr
  */
 export function fitLeagueTeamVolume(input: FitInput): OpportunityPriors["leagueTeamVolume"] {
   const allowed = new Set(input.seasons);
-  const teamWeeks = new Map<string, PlayerWeekUsage>();
+  const teamWeeks = new Map<string, { readonly targets: number; readonly carries: number; readonly passAttempts: number }>();
   for (const row of input.usage) {
     if (!allowed.has(row.season)) continue;
+    // A season whose weekly stats file was never published carries no team totals at all, and there
+    // is nothing to average — `usage.ts` leaves them `null` rather than zero so this reads as the
+    // absence it is. Every season this fit window covers publishes them.
+    if (row.teamTargets === null || row.teamCarries === null || row.teamPassAttempts === null) continue;
     if (row.teamTargets === 0 && row.teamCarries === 0) continue;
     // Team identity is not in the store, but a team-week is uniquely identified by its own volume
     // triple within a season and week — two offences producing identical targets, carries AND
     // attempts in the same week is a collision that costs one sample, not a wrong answer.
-    teamWeeks.set(`${row.season}|${row.week}|${row.teamTargets}|${row.teamCarries}|${row.teamPassAttempts}`, row);
+    teamWeeks.set(`${row.season}|${row.week}|${row.teamTargets}|${row.teamCarries}|${row.teamPassAttempts}`, {
+      targets: row.teamTargets,
+      carries: row.teamCarries,
+      passAttempts: row.teamPassAttempts,
+    });
   }
   const rows = [...teamWeeks.values()];
   return {
-    targets: mean(rows.map((row) => row.teamTargets)),
-    carries: mean(rows.map((row) => row.teamCarries)),
-    passAttempts: mean(rows.map((row) => row.teamPassAttempts)),
+    targets: mean(rows.map((row) => row.targets)),
+    carries: mean(rows.map((row) => row.carries)),
+    passAttempts: mean(rows.map((row) => row.passAttempts)),
   };
 }
 
@@ -377,9 +385,10 @@ function rateWeeks(input: EfficiencyFitInput, name: RateName): readonly RateWeek
     const line = lines.get(`${row.season}|${row.week}|${row.playerId}`);
     const position = input.positions.get(row.playerId);
     if (line === undefined || position === undefined) continue;
-    const opportunities =
-      spec.denominator === "plays" ? row.targets + row.carries + row.passAttempts : row[spec.denominator];
-    if (opportunities <= 0) continue;
+    // `null` is a week whose opportunity count was never published, not a week of no opportunity —
+    // see `opportunitiesFor`'s own docblock. Either way it is not a rate observation.
+    const opportunities = opportunitiesFor(row, spec.denominator);
+    if (opportunities === null || opportunities <= 0) continue;
     weeks.push({ playerId: row.playerId, position, opportunities, rate: line[spec.numerator] / opportunities });
   }
   return weeks;

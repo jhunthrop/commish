@@ -156,7 +156,9 @@ export function fitSchemePriors(input: SchemeFitInput): SchemePriors {
           const sorted = [...entry.predicted[field]].sort((a, b) => a - b);
           const predicted = sorted[Math.floor(sorted.length / 2)] ?? 0;
           const actual = entry.actual[field];
-          if (predicted <= 0 || actual <= 0) continue;
+          // `null` is a season whose team volumes were never published (`usage.ts`'s withheld-is-null
+          // seam), which is not a residual this fit can measure. Every season it runs over has them.
+          if (actual === null || predicted <= 0 || actual <= 0) continue;
           points[field].push({
             tempo: Math.log(ratios.tempo),
             passLean: Math.log(ratios.passLean),

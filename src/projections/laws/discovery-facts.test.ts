@@ -146,6 +146,12 @@ describe("discoveryFactsForSeason — new quantities, tri-state", () => {
       { season: N, week: 1, playerId: "hub", metric: PBP_PLAYER_METRICS.targets, value: 5, asOf: BEFORE_GATE },
       { season: N, week: 1, playerId: "hub", metric: PBP_PLAYER_METRICS.redZoneCarries, value: 4, asOf: BEFORE_GATE },
       { season: N, week: 1, playerId: "hub", metric: PBP_PLAYER_METRICS.redZoneTargets, value: 1, asOf: BEFORE_GATE },
+      // The inside-ten pair is written too, because the ingestion writes all eight members of the
+      // group for every tally it emits and `usageAsOf` now THROWS on a partial one rather than
+      // reading a missing member as a zero (final fix round, M1). A fixture that seeded six of eight
+      // was standing in for a store shape that does not exist.
+      { season: N, week: 1, playerId: "hub", metric: PBP_PLAYER_METRICS.insideTenCarries, value: 2, asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "hub", metric: PBP_PLAYER_METRICS.insideTenTargets, value: 0, asOf: BEFORE_GATE },
       { season: N, week: 1, playerId: "hub", metric: PBP_PLAYER_METRICS.airYards, value: 40, asOf: BEFORE_GATE },
       { season: N, week: 1, playerId: "hub", metric: PBP_PLAYER_METRICS.airYardTargets, value: 5, asOf: BEFORE_GATE },
     ]);

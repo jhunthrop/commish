@@ -147,7 +147,7 @@ const DISCOVERED_CANDIDATES_BY_ID: ReadonlyMap<string, CandidateLaw> = new Map(
  * too): the caller (`preseason/source.ts`'s `loadPreseason`) reads BOTH `factsForSeason` and
  * `discoveryFactsForSeason` with `admitDerived: false` on EVERY REPLAY board and on a LIVE board's
  * prior season UNLESS that season is one of the narrow, explicitly named exceptions
- * `LIVE_ADMITTED_DERIVED_SEASONS` allows (Task 4 main round, `lawFactsAdmitDerived`) — so a
+ * `LIVE_ADMITTED_DERIVED_SEASONS` allows (Task 4 main round, `admitsDerivedPriorSeason`) — so a
  * pbp-derived gap-season stat line (e.g. 2019) never reaches a live board's law reasons through
  * EITHER origin outside that named allowlist. `admitDerived: true` unconditionally stays scoped to
  * the tribal/discovery HARNESSES' own measurement (`buildPopulations`, `discovery/measure.ts`),

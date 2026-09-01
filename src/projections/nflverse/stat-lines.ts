@@ -69,8 +69,14 @@ export const STAT_LINE_GAPS: readonly number[] = [2019, 2025];
 /**
  * THE LIVE-ADMISSION SEAM — which `STAT_LINE_GAPS` seasons a PRODUCT-FACING live board (the live-board
  * plan's Task 4) is allowed to admit derived rows for. Named and documented here, beside
- * `STAT_LINE_GAPS`, but consumed nowhere yet — this task only decides the shape; Task 4 is the first
- * reader.
+ * `STAT_LINE_GAPS`.
+ *
+ * ITS ONE READER is `preseason/source.ts`'s `admitsDerivedPriorSeason`, which every read in
+ * `loadPreseason` that consumes `season - 1` asks — the law facts, the discovery facts, the model's
+ * outcome history and its opportunity counts alike. (An earlier version of this docblock said
+ * "consumed nowhere yet"; that was true when the shape was decided and false the moment Task 4
+ * landed. The final fix round then widened the reader from the law facts alone to the whole
+ * prior-season read, which is what makes "one answer per board" true rather than aspirational.)
  *
  * NOT THE SAME SET AS `STAT_LINE_GAPS`, ON PURPOSE. `STAT_LINE_GAPS` answers "does nflverse publish a
  * weekly stats file for this season" and exists to keep the laws harness's historical BACKTEST

@@ -201,10 +201,12 @@ export function fitRedZonePriors(input: RedZoneFitInput): RedZoneFitReport {
     if (line === undefined || rows === undefined) continue;
     const rates = input.efficiency.byPosition[position];
     const at = { rows, season: row.season, week: row.week, position } as const;
-    if (row.carries > 0) {
+    // `null` is a week whose count was never published, not a week of no carries or no targets —
+    // `usage.ts`'s own withheld-is-null seam. Neither is an exposure this fit can weight.
+    if (row.carries !== null && row.carries > 0) {
       rushing.push({ ...at, count: line.line.rushingTouchdowns, exposure: row.carries * rates.rushingTouchdownsPerCarry });
     }
-    if (row.targets > 0) {
+    if (row.targets !== null && row.targets > 0) {
       receiving.push({ ...at, count: line.line.receivingTouchdowns, exposure: row.targets * rates.receivingTouchdownsPerTarget });
     }
   }

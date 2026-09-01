@@ -138,16 +138,42 @@ function experienceMultiplierFor(
   return multiplier === undefined || !(multiplier > 0) || !Number.isFinite(multiplier) ? 1 : multiplier;
 }
 
-/** One player's totals over the history a prediction may see. */
+/** Every denominator a rate can be taken over. */
+const DENOMINATORS = ["targets", "carries", "passAttempts", "plays"] as const;
+
+type Denominator = (typeof DENOMINATORS)[number];
+
+/**
+ * THE OPPORTUNITIES ONE WEEK OFFERS A RATE, or `null` where the season never published the count.
+ *
+ * `usage.ts`'s participation counts are nullable for exactly one reason (see its own
+ * `shareOrNull` docblock): a gap season's weekly stats file does not exist, so the backfill withheld
+ * the counts rather than writing false zeros, and this reader must not put them back. Null here is
+ * NOT the same statement as zero: zero opportunities is a man who played and was never thrown to,
+ * null is a season nobody counted. Both end at the position prior downstream, but only one of them
+ * is a fact.
+ *
+ * `plays` — the denominator a fumble belongs to — sums the components that ARE known and is null
+ * only when none of the three is. A gap season's receiver contributes his targets and carries; his
+ * pass attempts, which no feed carries for him, are simply not in the sum.
+ */
+export function opportunitiesFor(row: PlayerWeekUsage, denominator: Denominator): number | null {
+  if (denominator !== "plays") return row[denominator];
+  const known = [row.targets, row.carries, row.passAttempts].filter((count): count is number => count !== null);
+  return known.length === 0 ? null : known.reduce((sum, count) => sum + count, 0);
+}
+
+/** One player's totals over the history a prediction may see. A denominator is `null` until a week
+ *  actually carries it, so "never counted" stays distinct from "counted, and it was zero". */
 interface Totals {
   readonly numerators: Record<RateName, number>;
-  readonly denominators: Record<"targets" | "carries" | "passAttempts" | "plays", number>;
+  readonly denominators: Record<Denominator, number | null>;
 }
 
 function emptyTotals(): Totals {
   return {
     numerators: Object.fromEntries((Object.keys(RATES) as RateName[]).map((name) => [name, 0])) as Record<RateName, number>,
-    denominators: { targets: 0, carries: 0, passAttempts: 0, plays: 0 },
+    denominators: { targets: null, carries: null, passAttempts: null, plays: null },
   };
 }
 
@@ -184,11 +210,16 @@ export function predictRates(
     const line = lines.get(`${row.season}|${row.week}|${row.playerId}`);
     if (line === undefined) continue;
     const running = totals.get(row.playerId) ?? emptyTotals();
-    running.denominators.targets += row.targets;
-    running.denominators.carries += row.carries;
-    running.denominators.passAttempts += row.passAttempts;
-    running.denominators.plays += row.targets + row.carries + row.passAttempts;
+    for (const denominator of DENOMINATORS) {
+      const opportunities = opportunitiesFor(row, denominator);
+      if (opportunities === null) continue;
+      running.denominators[denominator] = (running.denominators[denominator] ?? 0) + opportunities;
+    }
+    // A week contributes a rate's NUMERATOR exactly when it contributes that rate's denominator.
+    // Counting the yards of a week whose targets nobody wrote down would divide real production by
+    // a smaller opportunity count and read a gap in the feed as elite efficiency.
     for (const name of Object.keys(RATES) as RateName[]) {
+      if (opportunitiesFor(row, RATES[name].denominator) === null) continue;
       running.numerators[name] += line[RATES[name].numerator];
     }
     totals.set(row.playerId, running);
@@ -209,8 +240,9 @@ export function predictRates(
           const k = priors.regression[name];
           const prior = rolePrior[name];
           // No opportunities means no evidence, which is the prior — not a rate of zero. A receiver
-          // who has not been thrown to has not been proven bad at catching.
-          const value = opportunities <= 0 ? prior : (player.numerators[name] + k * prior) / (opportunities + k);
+          // who has not been thrown to has not been proven bad at catching, and neither has one
+          // whose season nobody published an opportunity count for (`null`).
+          const value = opportunities === null || opportunities <= 0 ? prior : (player.numerators[name] + k * prior) / (opportunities + k);
           return [name, Math.max(0, value * experienceMultiplier)];
         }),
       ) as PlayerRates,

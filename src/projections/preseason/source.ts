@@ -21,7 +21,7 @@ import {
   type TeamWeekObservation,
 } from "../team-store";
 import type { TeamContext } from "../team-context";
-import { usageAsOf, type PlayerWeekUsage } from "../usage";
+import { admitTouchesAsOpportunity, usageAsOf, type PlayerWeekUsage } from "../usage";
 import { projectedPosition } from "../nflverse/players";
 import { COACH_METRICS } from "../nflverse/coaches";
 import { SCHEDULE_SOURCE } from "../nflverse/schedule";
@@ -32,6 +32,7 @@ import { lawReasonsFor } from "../laws/board-reasons";
 import { registry } from "../laws/registry";
 import type { Law } from "../laws/types";
 import { LIVE_ADMITTED_DERIVED_SEASONS } from "../nflverse/stat-lines";
+import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import {
   ageAtSeason,
   expectedGamesPlayed,
@@ -277,7 +278,7 @@ export interface PreseasonInputs {
    *  what a board for THIS season is entitled to know. Keyed by player id; a player absent here has
    *  no evidence for any tribal law, not evidence that every tribal law's condition is false.
    *
-   *  `admitDerived` is `false` for a REPLAY board, always — see `lawFactsAdmitDerived`'s own
+   *  `admitDerived` is `false` for a REPLAY board, always — see `admitsDerivedPriorSeason`'s own
    *  docblock (Task 4) for the ONE narrow exception a LIVE board's own prior season can hit. */
   readonly lawFacts: ReadonlyMap<string, LawConditionFacts>;
   /** Every DISCOVERED law's condition inputs for the SAME season - 1, read through the identical
@@ -598,7 +599,23 @@ async function gamesPlayedBySeason(
  * with `admitDerived: false` at this exact seam and stays exactly reproducible, because a replay
  * board never satisfies the first half of the conjunction below.
  */
-function lawFactsAdmitDerived(momentKind: BoardMoment["kind"], priorSeason: number): boolean {
+/**
+ * FINAL FIX ROUND (whole-branch review, H1) — RENAMED FROM `lawFactsAdmitDerived`, because the law
+ * facts are no longer the only reader.
+ *
+ * Task 4 wired this predicate into `factsForSeason`/`discoveryFactsForSeason` and stopped there, and
+ * the whole-branch review found the half that was left behind: the MODEL arm of the same live board
+ * read `season - 1` through the published-only `statLinesAsOf` and through a `usageAsOf` that
+ * synthesized zeros, so a 2026 live board's `predictRates` joined against an EMPTY 2025 and every one
+ * of 759 players silently took the position-prior efficiency. Nothing threw, because "no evidence
+ * means the prior" is the designed fallback — the failure looked exactly like a healthy board.
+ *
+ * The predicate itself is UNCHANGED: live arm AND an allowlisted prior season, never a blanket
+ * `admitDerived: true` and never `STAT_LINE_GAPS`. What changed is that every read in `loadPreseason`
+ * that consumes `season - 1` now asks it, so the board has ONE answer to "may this board see the
+ * derived prior season" instead of two that disagreed.
+ */
+function admitsDerivedPriorSeason(momentKind: BoardMoment["kind"], priorSeason: number): boolean {
   return momentKind === "live" && LIVE_ADMITTED_DERIVED_SEASONS.includes(priorSeason);
 }
 
@@ -653,8 +670,16 @@ export async function loadPreseason(
   for (let prior = season - HISTORY_SEASONS; prior <= season - 1; prior += 1) {
     priorSeasons.push(prior);
     const span = { season: prior, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf: moment } as const;
-    history.push(...(await statLinesAsOf(db, span)));
-    usage.push(...(await usageAsOf(db, span)));
+    // THE MODEL ARM'S HALF OF THE SAME ADMISSION (final fix round, H1 — see
+    // `admitsDerivedPriorSeason`). On every replay board and every published prior season this is
+    // the bare `statLinesAsOf`/`usageAsOf` pair it has always been, byte for byte. On a LIVE board
+    // whose prior season is allowlisted it is the derived outcome lines plus the play-by-play's own
+    // touch counts standing in for the opportunity counts that season's missing weekly stats file
+    // never carried — the two halves of a rate, both admitted or neither.
+    const admitDerived = admitsDerivedPriorSeason(resolvedMoment.kind, prior);
+    history.push(...(admitDerived ? await statLinesAsOfForMeasurement(db, span) : await statLinesAsOf(db, span)));
+    const priorUsage = await usageAsOf(db, span);
+    usage.push(...(admitDerived ? admitTouchesAsOpportunity(priorUsage, positions) : priorUsage));
     priorPlayerTeams.push(...(await playerTeamsAsOf(db, span)));
     teamObservations.push(...(await teamObservationsAsOf(db, span)));
   }
@@ -683,7 +708,7 @@ export async function loadPreseason(
   // exactly the moment a board for THIS season is entitled to know it at. The same call
   // `buildPopulations` makes for its measurement, EXCEPT the last argument: `admitDerived` here is
   // `false` for every REPLAY board (fix round, C2, unchanged) and `true` ONLY for a LIVE board whose
-  // prior season is in `LIVE_ADMITTED_DERIVED_SEASONS` (Task 4 — see `lawFactsAdmitDerived`'s own
+  // prior season is in `LIVE_ADMITTED_DERIVED_SEASONS` (Task 4 — see `admitsDerivedPriorSeason`'s own
   // docblock for the no-published-alternative justification). A live board's law reasons must never
   // drift from the evidence that confirmed the law, but they also must never render a row nflverse
   // did not itself publish OR silently starve a player of a season that had nowhere else to come
@@ -694,7 +719,7 @@ export async function loadPreseason(
   // when `admitDerived` is `false`: a board's `touches`/`touchdownPointsShare`/etc. facts for a
   // player's prior season read as `null` (no evidence) — the tri-state rule (`LawConditionFacts`'s
   // own docblock) already does the right thing with that.
-  const priorSeasonAdmitDerived = lawFactsAdmitDerived(resolvedMoment.kind, season - 1);
+  const priorSeasonAdmitDerived = admitsDerivedPriorSeason(resolvedMoment.kind, season - 1);
   const priorSeasonFacts = await factsForSeason(db, season - 1, positions, PPR_SCORING, priorSeasonAdmitDerived);
   const lawFacts = new Map([...priorSeasonFacts].map(([playerId, entry]) => [playerId, entry.facts] as const));
 

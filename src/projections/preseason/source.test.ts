@@ -6,6 +6,8 @@ import { PARTICIPATION_METRICS, NFLVERSE_SOURCE } from "../nflverse/map";
 import { week1RosterAsOf } from "../nflverse/rosters";
 import { STAT_LINE_SOURCE, statMetricName } from "../lines";
 import { DERIVED_STAT_LINE_SOURCE } from "../nflverse/derived-stat-lines";
+import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "../nflverse/pbp-players";
+import { predictRates } from "../model/efficiency";
 import { recordObservations, type PlayerWeekObservation } from "../store";
 import { BENCHMARK_SOURCES } from "./benchmarks";
 import { recordPreseasonRankings, recordPreseasonRosters } from "./store";
@@ -809,7 +811,7 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
   });
 
   /**
-   * (f) TASK 4 — `lawFactsAdmitDerived`'s wiring, proven end to end rather than only argued in its
+   * (f) TASK 4 — `admitsDerivedPriorSeason`'s wiring, proven end to end rather than only argued in its
    * own docblock. `factsForSeason` drops a player from its returned map entirely when it finds no
    * scoring for him (`laws/populations.ts`: `if (scored === undefined || ppg === null) continue;`)
    * — the cleanest possible probe for "did `admitDerived` actually reach the read": a player whose
@@ -895,6 +897,89 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
       expect(inputs.momentKind).toBe("live");
       expect(inputs.lawFacts.has(VETERAN)).toBe(false);
       expect(inputs.discoveryFacts.has(VETERAN)).toBe(false);
+    });
+
+    /**
+     * FINAL FIX ROUND (whole-branch review, H1). Task 4 wired the admission into the LAW facts and
+     * nowhere else, so the MODEL arm of the very same live board still read `season - 1` through the
+     * published-only `statLinesAsOf` and found nothing: `predictRates` returns an empty map and every
+     * player on the board falls to `priors.model.efficiency.byPosition[position]`, which looks like a
+     * healthy board because "no evidence means the prior" is the designed fallback. These two tests
+     * pin BOTH halves of the same conjunction the law facts already obey.
+     */
+    async function seedGapSeasonUsageAndOutcomes(season: number): Promise<void> {
+      const rows: PlayerWeekObservation[] = [];
+      for (let week = 1; week <= 17; week += 1) {
+        const stamp = { season, week, playerId: VETERAN, asOf: new Date(Date.UTC(season + 1, 0, 8)) } as const;
+        // The snap-counts file, which nflverse DOES publish for a gap season.
+        rows.push(
+          observation({ ...stamp, source: NFLVERSE_SOURCE.snapCounts, metric: PARTICIPATION_METRICS.offensiveSnaps, value: 55 }),
+          observation({ ...stamp, source: NFLVERSE_SOURCE.snapCounts, metric: PARTICIPATION_METRICS.teamOffensiveSnaps, value: 65 }),
+        );
+        // The play-by-play's own touch counts — the honest denominator the weekly stats file would
+        // have carried. All eight members, the way the ingestion writes them.
+        for (const [metric, value] of [
+          [PBP_PLAYER_METRICS.carries, 1],
+          [PBP_PLAYER_METRICS.targets, 9],
+          [PBP_PLAYER_METRICS.redZoneCarries, 0],
+          [PBP_PLAYER_METRICS.redZoneTargets, 1],
+          [PBP_PLAYER_METRICS.insideTenCarries, 0],
+          [PBP_PLAYER_METRICS.insideTenTargets, 0],
+          [PBP_PLAYER_METRICS.airYards, 70],
+          [PBP_PLAYER_METRICS.airYardTargets, 9],
+        ] as const) {
+          rows.push(observation({ ...stamp, source: PBP_PLAYER_SOURCE, metric, value }));
+        }
+        // The outcomes, derived from the same play-by-play, under the derived source alone.
+        for (const [field, value] of [["receptions", 6], ["receivingYards", 78], ["receivingTouchdowns", 1]] as const) {
+          rows.push(observation({ ...stamp, source: DERIVED_STAT_LINE_SOURCE, metric: statMetricName(field), value }));
+        }
+      }
+      await recordObservations(db, rows);
+    }
+
+    it("ADMITS the derived prior season into the MODEL arm's history and opportunity on a LIVE board", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      await seedGapSeasonUsageAndOutcomes(2025);
+
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      const inputs = await loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment });
+
+      expect(inputs.history.some((row) => row.season === 2025)).toBe(true);
+      const usage2025 = inputs.usage.filter((row) => row.season === 2025);
+      expect(usage2025.length).toBe(17);
+      // The play-by-play's counts stand in for the withheld weekly ones, so layer 2 has a real
+      // denominator to take a rate over instead of an absence that reads as the position prior.
+      expect(usage2025.every((row) => row.targets === 9)).toBe(true);
+      // What has no honest substitute stays absent: a team total cannot come off a player feed.
+      expect(usage2025.every((row) => row.teamTargets === null)).toBe(true);
+
+      const rates = predictRates(inputs.history, inputs.usage, { season: LIVE_SEASON, week: 1, positions: inputs.positions }, PRIORS.model.efficiency);
+      const measured = rates.get(VETERAN);
+      expect(measured).toBeDefined();
+      // 6 receptions on 9 targets, every week, is emphatically not the WR position mean.
+      expect(measured!.receptionsPerTarget).not.toBeCloseTo(PRIORS.model.efficiency.byPosition.WR.receptionsPerTarget, 6);
+      expect(measured!.receptionsPerTarget).toBeGreaterThan(PRIORS.model.efficiency.byPosition.WR.receptionsPerTarget);
+    });
+
+    it("does NOT admit it into the model arm on a REPLAY board — the live half of the conjunction gates this read too", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      await recordObservations(db, [
+        observation({
+          season: LIVE_SEASON, week: 1, playerId: VETERAN, source: STAT_LINE_SOURCE,
+          metric: statMetricName("receptions"), value: 4,
+          asOf: new Date(FIRST_KICKOFF.getTime() + 2 * 24 * 60 * 60 * 1000),
+        }),
+      ]);
+      await seedGapSeasonUsageAndOutcomes(2025);
+
+      const inputs = await loadPreseason(db, LIVE_SEASON);
+      expect(inputs.momentKind).toBe("replay");
+      expect(inputs.history.some((row) => row.season === 2025)).toBe(false);
+      const usage2025 = inputs.usage.filter((row) => row.season === 2025);
+      expect(usage2025.length).toBe(17);
+      expect(usage2025.every((row) => row.targets === null)).toBe(true);
     });
   });
 

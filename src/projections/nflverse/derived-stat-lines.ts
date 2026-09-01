@@ -343,12 +343,20 @@ export function derivedStatLineObservations(rows: readonly SeasonStatLine[]): re
  * gets the fallback. The gate that matters lives one level up, at `laws/populations.ts`'s
  * `seasonScoring`, which takes an explicit `admitDerived: boolean` and calls this function only when
  * `true`. `buildPopulations` (the laws harness) passes `true` for both the predictor and the outcome
- * read; `preseason/source.ts`'s `loadPreseason` — which also calls `factsForSeason`, `seasonScoring`'s
- * other consumer — passes `false`, so the preseason board never mixes a derived law-fact into a
- * history it is otherwise reading published-only. An earlier version of this file's docblock claimed
- * "one caller" as if that were still true after `factsForSeason` was reused outside the laws harness;
- * it was not, and the explicit boolean is what makes the claim true again — by construction, not by
- * every future caller happening to remember.
+ * read. An earlier version of this file's docblock claimed "one caller" as if that were still true
+ * after `factsForSeason` was reused outside the laws harness; it was not, and the explicit boolean is
+ * what makes the claim true again — by construction, not by every future caller happening to
+ * remember.
+ *
+ * `preseason/source.ts`'s `loadPreseason` is the OTHER consumer, and what it passes is CONDITIONAL,
+ * not `false` (this docblock said `false` unconditionally until the final fix round, which was true
+ * of every board built before the live arm existed and false afterwards). It passes
+ * `admitsDerivedPriorSeason(momentKind, priorSeason)` — `false` on every replay board and on every
+ * prior season outside `LIVE_ADMITTED_DERIVED_SEASONS`, so a replay board still never mixes a derived
+ * row into a history it is otherwise reading published-only; `true` for a LIVE board whose prior
+ * season nflverse never published at all, where the alternative is not a published number but no
+ * number. `loadPreseason` calls this function DIRECTLY for that season's outcome history as well,
+ * through the same predicate.
  *
  * For a non-gap season this returns precisely what `statLinesAsOf` alone would have; a published row
  * always wins over a derived one for the same week and player, though in practice the two sources

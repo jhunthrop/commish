@@ -144,7 +144,10 @@ function observationsFor(input: TargetDepthFitInput): readonly DepthObservation[
     for (const week of [...new Set(thisSeason.map((row) => row.week))].sort((a, b) => a - b)) {
       const rates = predictRates(input.history, usageHistory, { season, week, positions: input.positions }, input.efficiency);
       for (const row of thisSeason) {
-        if (row.week !== week || row.targets <= 0) continue;
+        // `null` targets is a season whose weekly stats file was never published, not a week with
+        // none — `usage.ts`'s withheld-is-null seam. Neither carries a target-depth observation.
+        if (row.week !== week || row.targets === null || row.targets <= 0) continue;
+        const targets = row.targets;
         const position = input.positions.get(row.playerId);
         const line = lines.get(`${season}|${week}|${row.playerId}`);
         const playerRates = rates.get(row.playerId);
@@ -155,11 +158,11 @@ function observationsFor(input: TargetDepthFitInput): readonly DepthObservation[
           season,
           week,
           position,
-          targets: row.targets,
+          targets,
           receptions: line.line.receptions,
           receivingYards: line.line.receivingYards,
-          predictedReceptions: row.targets * playerRates.receptionsPerTarget,
-          predictedYards: row.targets * playerRates.receivingYardsPerTarget,
+          predictedReceptions: targets * playerRates.receptionsPerTarget,
+          predictedYards: targets * playerRates.receivingYardsPerTarget,
         });
       }
     }

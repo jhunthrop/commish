@@ -110,11 +110,16 @@ export function formatBoardTopTable(rows: readonly BoardTopRow[]): string {
  * assertion rather than an ordinary, expected failure (a missing season, a bad CLI argument): a
  * player on the persisted board with no matching roster row should be structurally unreachable,
  * because `preseasonCandidates` (`preseason/source.ts`) can only ever emit a candidate for a
- * playerId it read off THAT SAME roster in the first place. Naming the class lets a caller (or a
- * future test) distinguish "the store is internally inconsistent" from every other `Error` this
- * script can throw, rather than matching on message text alone.
+ * playerId it read off THAT SAME roster in the first place. Naming the class puts "the store is
+ * internally inconsistent" in the thrown error's own `name`, where an operator reading a stack trace
+ * sees it without matching on message text.
+ *
+ * NOT EXPORTED (final fix round, L1). The earlier version exported it for "a future test", which is
+ * the speculative export the house rules discourage: nothing outside this file catches it, and this
+ * script's own test imports only the formatting functions. An importer can be given one the day one
+ * exists.
  */
-export class BoardRosterMismatchError extends Error {
+class BoardRosterMismatchError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "BoardRosterMismatchError";

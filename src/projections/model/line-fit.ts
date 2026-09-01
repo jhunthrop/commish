@@ -100,7 +100,9 @@ export function teamProduction(
     const playerKey = `${row.season}|${row.week}|${row.playerId}`;
     const team = teamOf.get(playerKey);
     const line = lines.get(playerKey);
-    if (team === undefined || line === undefined) continue;
+    // A season with no published weekly stats file has no carry or attempt count to add up
+    // (`usage.ts` leaves them `null` rather than zero); every season this fit runs over has one.
+    if (team === undefined || line === undefined || row.carries === null || row.passAttempts === null) continue;
     const key = `${row.season}|${row.week}|${team}`;
     const running =
       totals.get(key) ??
