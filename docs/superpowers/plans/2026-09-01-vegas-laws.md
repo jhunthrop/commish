@@ -88,7 +88,43 @@
 **Files:**
 - Create: `docs/research/2026-09-01-vegas-laws-closeout.md`
 
-- [ ] Steps: record the dataset provenance and validation results; the stamp-visibility audit; the verdict-change table; confirmed laws with effect sizes and CIs, or the null, stated with equal prominence; the founder's Achane question answered directly with whatever the harness found; deferrals (player props + props-as-anchor design awaiting the Odds API tier decision; implied offense totals from game lines; The Odds API key wiring once provided). Commit `docs(research): vegas laws close-out`.
+- [ ] Steps: record the dataset provenance and validation results; the stamp-visibility audit; the verdict-change table; confirmed laws with effect sizes and CIs, or the null, stated with equal prominence; the founder's Achane question answered directly with whatever the harness found; deferrals (the historical props backfill and props-as-anchor measurement round, designed from Task 6's schema; implied offense totals from game lines). Commit `docs(research): vegas laws close-out`.
+
+---
+
+### Task 6: The player-props archive starts now (amended 2026-09-01, founder key received)
+
+The Odds API key (env `ODDS_API_KEY`, 20,000 credits/month, verified live) exposes on this
+tier: current NFL game-level player props (verified: `player_pass_yds`,
+`player_reception_yds`, `player_receptions`, `player_rush_yds` returning real week-1 lines)
+AND the historical snapshot archive (verified: a 2024-09-04 snapshot returned 200). Season-long
+player props do not exist as API markets; the player-level signal is weekly game props. Every
+week not archived from here forward is history we cannot buy back at this tier's cost, so the
+forward archive starts in THIS round; the historical backfill (2023-2025) and any
+props-as-anchor measurement are the NEXT round, designed in the close-out's deferrals.
+
+**Files:**
+- Create: migration + `src/projections/odds/props-store.ts` (append-only player-prop
+  observations: event id, commence time, bookmaker, market, player name string as given,
+  line, over price, under price, `fetched_at` stamp; NO name resolution to nfl_players yet,
+  the raw string is the honest record and resolution is the next round's problem)
+- Create: `scripts/odds-props-snapshot.ts` (npm `projections:odds:snapshot`): fetches all
+  upcoming NFL events, then the four verified player markets per event (US region,
+  DraftKings preferred, store whatever books return), writes observations, prints per-event
+  and per-market counts and the credits used/remaining from the response headers. Fail fast
+  on missing `ODDS_API_KEY`. No em-dashes in output.
+- Test: engine-style tests on the parse/store path with a fixture JSON payload (the real
+  fetch is not exercised in tests)
+
+**Interfaces:**
+- Consumes: `ODDS_API_KEY` from env; The Odds API v4 events + event-odds endpoints.
+- Produces: the archive table and one REAL first snapshot (week 1, run at implementation
+  time), with counts pasted in the report. Explicitly NOT consumed by any model, board, or
+  law in this round.
+
+- [ ] Steps: TDD parse/store -> migration dev+test DBs -> run the real snapshot once ->
+  paste counts + credit usage -> serial suites -> commit `feat(odds): the player props
+  archive begins`.
 
 ---
 
