@@ -656,13 +656,14 @@ describe("chipEligibleLaws", () => {
     expect(chipEligibleLaws(laws).map((law) => law.id)).toEqual(["a", "b"]);
   });
 
-  it("drops every discovered law today, confirmed or not — Task 8's own predicate to flip", () => {
+  it("keeps a CONFIRMED discovered law alongside every tribal one (Task 8's own widened predicate)", () => {
     const laws: readonly Law[] = [
       lawFixture({ id: "tribal_one", origin: "tribal" }),
       lawFixture({ id: "discovered_confirmed", origin: "discovered", verdict: "confirmed" }),
       lawFixture({ id: "discovered_weak", origin: "discovered", verdict: "weak" }),
+      lawFixture({ id: "discovered_debunked", origin: "discovered", verdict: "debunked" }),
     ];
-    expect(chipEligibleLaws(laws).map((law) => law.id)).toEqual(["tribal_one"]);
+    expect(chipEligibleLaws(laws).map((law) => law.id)).toEqual(["tribal_one", "discovered_confirmed"]);
   });
 });
 

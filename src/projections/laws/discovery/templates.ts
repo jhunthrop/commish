@@ -371,6 +371,32 @@ export function quantityIdsOf(clause: Clause): ReadonlySet<QuantityId> {
   }
 }
 
+/**
+ * THE PRIMARY QUANTITY A CLAUSE'S MAGNITUDE IS READ FROM (Task 8) — itself, for a single clause
+ * (`threshold` or `delta`); the LEFT (structurally first) clause's own quantity, for an `and`. This is
+ * the brief's own "AND laws use the primary quantity's value, defined as the first clause's quantity"
+ * rule, written exactly once here so a live board (`laws/board-reasons.ts`'s
+ * `magnitudeForDiscoveredLaw`) and a chip's own headline (`ReasonChip`'s `discoveredHeadline`) can
+ * never read two different "which quantity is this number" answers for the same candidate.
+ *
+ * `generate.ts`'s own AND-pairing rule builds every AND from two THRESHOLD singles (never a nested
+ * AND, never a delta half — see that module's own docblock), so `clause.left` is always itself a
+ * `ThresholdClause` for every candidate this generator can produce today; the recursion below still
+ * handles a hypothetical AND-of-AND correctly rather than assuming that shape.
+ */
+export function primaryQuantityIdOf(clause: Clause): QuantityId {
+  return clause.kind === "and" ? primaryQuantityIdOf(clause.left) : clause.quantityId;
+}
+
+/** `primaryQuantityIdOf`'s own `QuantityDef` — the same id-to-def lookup `clauseText`/
+ *  `signedClauseText` already do internally (`quantityDef`, private to this module), exposed here so
+ *  a caller outside it can read a clause's primary quantity's `get`/`formatValue`/`shortLabel`
+ *  without re-deriving the lookup a second place. Throws exactly like `quantityDef` itself would — a
+ *  clause naming a `quantityId` absent from `QUANTITY_DEFS` is drift, not a renderable gap. */
+export function primaryQuantityDefOf(clause: Clause): QuantityDef {
+  return quantityDef(primaryQuantityIdOf(clause));
+}
+
 /** `clauseNouns`'s only use is `renderTitle`'s mechanical heading — the SHORT label PLUS the real
  *  committed threshold VALUE per quantity in the clause (fix round 2: `renderTitle` used to omit
  *  the value entirely, which meant two candidates sharing a quantity at two different quantile

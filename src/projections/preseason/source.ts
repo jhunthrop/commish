@@ -19,6 +19,7 @@ import { projectedPosition } from "../nflverse/players";
 import { COACH_METRICS } from "../nflverse/coaches";
 import { SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { indexTeamMetrics } from "../team-context";
+import { discoveryFactsForSeason, type DiscoveryFacts } from "../laws/discovery-facts";
 import { factsForSeason, type LawConditionFacts } from "../laws/populations";
 import { lawReasonsFor } from "../laws/board-reasons";
 import { registry } from "../laws/registry";
@@ -258,11 +259,19 @@ export interface PreseasonInputs {
    *  entries ever speak, per `lawReasonsFor`'s own filter. Defaults to `registry()`; a caller building
    *  candidates for a test passes its own fixture through `loadPreseason`'s own parameter instead. */
   readonly laws: readonly Law[];
-  /** Every law's condition inputs for season - 1 — the last COMPLETED season — gated at THIS
+  /** Every TRIBAL law's condition inputs for season - 1 — the last COMPLETED season — gated at THIS
    *  season's own schedule publication (`laws/populations.ts`'s `factsForSeason`), which is exactly
    *  what a board for THIS season is entitled to know. Keyed by player id; a player absent here has
-   *  no evidence for any law, not evidence that every law's condition is false. */
+   *  no evidence for any tribal law, not evidence that every tribal law's condition is false. */
   readonly lawFacts: ReadonlyMap<string, LawConditionFacts>;
+  /** Every DISCOVERED law's condition inputs for the SAME season - 1, read through the identical
+   *  gate and the identical `admitDerived: false` (`laws/discovery-facts.ts`'s
+   *  `discoveryFactsForSeason`) — see `lawFacts`'s own docblock for why a live board never admits a
+   *  pbp-derived gap-season fact (the C2 containment ruling); it applies here for exactly the same
+   *  reason, so a discovered law's own live-board magnitude can never be built from evidence the
+   *  tribal harness's own validation bar never checked. Keyed by player id; a player absent here has
+   *  no evidence for any discovered law, not evidence that every discovered law's condition is false. */
+  readonly discoveryFacts: ReadonlyMap<string, DiscoveryFacts>;
 }
 
 /** How many prior seasons of usage and outcomes a preseason board reads. */
@@ -426,6 +435,12 @@ export async function loadPreseason(db: ReadonlyDb, season: number, laws: readon
   const priorSeasonFacts = await factsForSeason(db, season - 1, positions, PPR_SCORING, false);
   const lawFacts = new Map([...priorSeasonFacts].map(([playerId, entry]) => [playerId, entry.facts] as const));
 
+  // The SAME season, the SAME gate, the SAME `admitDerived: false` (see `lawFacts`'s own comment
+  // just above and `PreseasonInputs.discoveryFacts`'s own docblock) — a discovered law's own
+  // condition is a `DiscoveryFacts` predicate, a different fact shape than a tribal law's
+  // `LawConditionFacts`, so it needs its own read rather than a projection off `priorSeasonFacts`.
+  const discoveryFacts = await discoveryFactsForSeason(db, season - 1, positions, PPR_SCORING, false);
+
   return {
     season,
     moment,
@@ -439,6 +454,7 @@ export async function loadPreseason(db: ReadonlyDb, season: number, laws: readon
     depthChart: await depthChartAsOf(db, season, moment),
     laws,
     lawFacts,
+    discoveryFacts,
   };
 }
 
@@ -723,11 +739,13 @@ export function preseasonCandidates(
       });
     }
     if (newPlayCaller(team)) all.push({ code: "new_play_caller", team });
-    // Task 7 — every CONFIRMED law whose condition held for HIM in the completed season, from the
-    // shared facts `loadPreseason` already computed once for the whole board. A player with no entry
-    // here (no evidence at all for any law) gets none, never a false-condition guess.
-    const lawFacts = inputs.lawFacts.get(playerId);
-    if (lawFacts !== undefined) all.push(...lawReasonsFor(lawFacts, inputs.laws));
+    // Task 7/8 — every CONFIRMED law, tribal or discovered, whose condition held for HIM in the
+    // completed season, from the shared facts `loadPreseason` already computed once for the whole
+    // board. A player absent from BOTH maps gets nothing, never a false-condition guess; absent from
+    // only one still lets the OTHER origin's laws speak for him (`lawReasonsFor`'s own docblock).
+    const lawFacts = inputs.lawFacts.get(playerId) ?? null;
+    const discoveryFacts = inputs.discoveryFacts.get(playerId) ?? null;
+    if (lawFacts !== null || discoveryFacts !== null) all.push(...lawReasonsFor(lawFacts, discoveryFacts, inputs.laws));
     candidates.push({ playerId, position, team, perGame, games, reasons: all });
   };
 

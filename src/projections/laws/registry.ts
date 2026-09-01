@@ -525,22 +525,22 @@ export function registry(): readonly Law[] {
 }
 
 /**
- * CHIP-ELIGIBLE LAWS (fix round, IMPORTANT 3 RULING) — the subset of `registry()`'s own laws a
- * client-facing consumer may cite by id: a draft room's reason chip (`ReasonChip`), whose claim
- * lookup is exactly what the drafts-players API route and the player panel thread `laws` through
- * `registry()` for. TODAY that is every TRIBAL law, and nothing else: `board-reasons.ts`'s
- * `lawReasonsFor` only ever produces a reason for a tribal-origin CONFIRMED law (see that function's
- * own docblock) — a discovered law's condition is a `DiscoveryFacts` predicate, a shape `LAW_CONDITIONS`
- * was never built to answer for, so no chip can name one yet regardless of its verdict.
+ * CHIP-ELIGIBLE LAWS (fix round, IMPORTANT 3 RULING; widened Task 8, 2026-08-31) — the subset of
+ * `registry()`'s own laws a client-facing consumer may cite by id: a draft room's reason chip
+ * (`ReasonChip`), whose claim lookup is exactly what the drafts-players API route and the player
+ * panel thread `laws` through `registry()` for. Every TRIBAL law, plus every CONFIRMED DISCOVERED
+ * one — a `weak` or `debunked` discovered law stays excluded, the same bar every discovered law
+ * already has to clear before `laws/board-reasons.ts`'s `lawReasonsFor` will ever fire a reason for
+ * it (see that function's own docblock: a discovered law's condition is a `DiscoveryFacts` predicate,
+ * matched to its id through `generateCandidates()`, now wired identically to a tribal law's
+ * `LawConditionFacts` predicate).
  *
- * THIS IS THE ONE PREDICATE Task 8 flips the day a discovered law's own condition is wired into a
- * live board: widen it to `law.origin === "tribal" || (law.origin === "discovered" && law.verdict ===
- * "confirmed")` and both call sites (the drafts players route, the player panel) pick up the wider
- * set with no call-site change, because both already call this helper rather than filtering
- * `registry()`'s output themselves.
+ * Both call sites (the drafts players route, the player panel) pick up the wider set with no
+ * call-site change, because both already call this helper rather than filtering `registry()`'s
+ * output themselves.
  */
 export function chipEligibleLaws(laws: readonly Law[]): readonly Law[] {
-  return laws.filter((law) => law.origin === "tribal");
+  return laws.filter((law) => law.origin === "tribal" || (law.origin === "discovered" && law.verdict === "confirmed"));
 }
 
 /** The discovery pipeline's own top-level accounting (`discovery/measure.ts`'s `runDiscoveryPipeline`

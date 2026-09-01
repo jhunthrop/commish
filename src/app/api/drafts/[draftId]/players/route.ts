@@ -54,8 +54,8 @@ export async function GET(request: Request, context: RouteContext) {
     const body: DraftPlayersBody = {
       players,
       reasons: await reasonsByLeaguePlayerId(db, players),
-      // Chip-eligible only (IMPORTANT 3 RULING, fix round) — today that is every tribal law; see
-      // `chipEligibleLaws`'s own docblock for the one predicate Task 8 flips.
+      // Chip-eligible only (IMPORTANT 3 RULING, fix round; widened Task 8) — every tribal law plus
+      // every CONFIRMED discovered one; see `chipEligibleLaws`'s own docblock.
       laws: chipEligibleLaws(registry()),
     };
     return ok(body);

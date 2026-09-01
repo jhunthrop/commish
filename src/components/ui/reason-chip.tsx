@@ -1,15 +1,20 @@
-import type { BoardReason } from "@/projections/preseason/board";
+import { generateCandidates, type CandidateLaw } from "@/projections/laws/discovery/generate";
+import { primaryQuantityDefOf } from "@/projections/laws/discovery/templates";
 import type { Law } from "@/projections/laws/types";
+import type { BoardReason } from "@/projections/preseason/board";
 import { Badge } from "./badge";
 import { signedPoints } from "./event-feed-row";
 
 /**
  * ONE REASON, ONE CHIP — the board's own "why" made legible next to a player, everywhere a
  * surface already carries his `BoardReason[]` (Task 7's `boardReasons`). Every number on the
- * chip comes straight off the reason itself (law 7: never type a number into copy); this file's
- * only hand-written vocabulary is the short HEADLINE a law's own id maps to, and a headline never
- * carries a figure of its own — the figure is always the reason's `magnitude` or `effect`,
- * formatted here and nowhere invented.
+ * chip comes straight off the reason itself (law 7: never type a number into copy); a TRIBAL law's
+ * headline is this file's own hand-written vocabulary (`LAW_HEADLINES`, six entries, one per
+ * `LAW_SPECS` id), and a DISCOVERED law's headline is built mechanically instead
+ * (`discoveredHeadline`, below) from its own candidate's template parts, because a discovered id
+ * changes between discovery rounds and a hand entry per id could never stay in sync. Either way a
+ * headline never carries a figure of its own — the figure is always the reason's `magnitude` or
+ * `effect`, formatted here and nowhere invented.
  *
  * A "law" reason renders `{headline}: measured {signed effect} pts per game` — the pattern the
  * task itself specifies ("Age 29 season: measured -1.8 pts per game", "Crowded target room:
@@ -22,7 +27,8 @@ import { signedPoints } from "./event-feed-row";
  */
 
 /**
- * Per-law headline, keyed by `Law.id` — the one hand-written vocabulary this file carries. Each
+ * Per-TRIBAL-law headline, keyed by `Law.id` — the one HAND-WRITTEN vocabulary this file carries
+ * (see `discoveredHeadline`, below, for the discovered half, which is mechanical instead). Each
  * function reads ONLY the reason's own `magnitude` (never a second number), in the unit
  * `laws/board-reasons.ts`'s `magnitudeForLaw` documents for that law id. `wr_target_competition`
  * and `play_caller_fingerprint` render a fixed qualitative headline rather than a raw share —
@@ -45,9 +51,53 @@ function fallbackHeadline(lawId: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/**
+ * EVERY DISCOVERED CANDIDATE, INDEXED BY ID — the same "build once at module load from the real,
+ * DB-free `generateCandidates()`" pattern `laws/board-reasons.ts`'s own
+ * `DISCOVERED_CANDIDATES_BY_ID` uses, for the identical reason: a discovered `lawId` is not in
+ * `LAW_HEADLINES` (that map is hand-written for the six tribal laws only) and this component needs
+ * the candidate's own `claimParts` to render a headline for it mechanically.
+ */
+const DISCOVERED_CANDIDATES_BY_ID: ReadonlyMap<string, CandidateLaw> = new Map(
+  generateCandidates().map((candidate) => [candidate.id, candidate] as const),
+);
+
+/**
+ * A DISCOVERED law's headline, MECHANICALLY built from its own candidate's template parts — never a
+ * hand entry, because a discovered id changes between discovery rounds (`generateCandidates()`'s own
+ * ~1,737-candidate family is regenerated, and which ids survive to `confirmed` moves, every round).
+ * Uses the SAME "primary quantity" rule `laws/board-reasons.ts`'s `magnitudeForDiscoveredLaw`
+ * computes the chip's own `magnitude` number with (`discovery/templates.ts`'s `primaryQuantityIdOf`),
+ * so the figure in the headline and the quantity it names can never disagree: `"{formatted value}
+ * {quantity's short label}"`, e.g. "182 carries and receptions" or "27.72 age" — no em-dash, matching
+ * every other user-facing string in this engine, because neither `formatValue`'s output nor
+ * `shortLabel` ever contains one.
+ *
+ * `undefined` when `lawId` matches no candidate in `candidates` (a stale reason from a since-
+ * regenerated discovery round, against the real default) — `lawHeadline` falls back to
+ * `fallbackHeadline` in that case, the same graceful degradation a renamed tribal law already gets;
+ * this is a render path, not the registry's own drift guard.
+ *
+ * `candidates` defaults to the real `DISCOVERED_CANDIDATES_BY_ID`, but is a parameter (the identical
+ * `lawReasonsFor`-style discipline `board-reasons.ts` uses) so a test can pin this function's output
+ * against a small hand-built candidate instead of the real, discovery-round-dependent ~1,737-entry
+ * one.
+ */
+export function discoveredHeadline(
+  lawId: string,
+  magnitude: number,
+  candidates: ReadonlyMap<string, CandidateLaw> = DISCOVERED_CANDIDATES_BY_ID,
+): string | undefined {
+  const candidate = candidates.get(lawId);
+  if (candidate === undefined) return undefined;
+  const def = primaryQuantityDefOf(candidate.claimParts.clause);
+  return `${def.formatValue(magnitude)} ${def.shortLabel}`;
+}
+
 function lawHeadline(lawId: string, magnitude: number): string {
   const build = LAW_HEADLINES[lawId];
-  return build === undefined ? fallbackHeadline(lawId) : build(magnitude);
+  if (build !== undefined) return build(magnitude);
+  return discoveredHeadline(lawId, magnitude) ?? fallbackHeadline(lawId);
 }
 
 /** A fraction as a signed whole-number percent: "+4%", "-12%". The same "sign is the
