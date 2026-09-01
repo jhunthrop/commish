@@ -449,6 +449,13 @@
       "when": 1788269288448,
       "tag": "0063_heavy_jackal",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1788300628253,
+      "tag": "0064_player_prop_observations",
+      "breakpoints": true
     }
   ]
 }

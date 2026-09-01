@@ -2380,3 +2380,58 @@ export const preseasonBoardReasons = pgTable(
   },
   (t) => [primaryKey({ columns: [t.source, t.season, t.playerId, t.code, t.detail] })],
 );
+
+/**
+ * THE PLAYER-PROPS ARCHIVE — append-only, forward-looking, and deliberately NOT idempotent
+ * (vegas-laws Task 6).
+ *
+ * Every other observation store in this file (`player_week_observations`, `team_week_observations`)
+ * treats a repeated write as a no-op: the fact key is stable, so re-running an ingestion should not
+ * duplicate it. A player prop line is not that kind of fact. The Over/Under a book posts on a
+ * Tuesday and the number still up Friday morning are two DIFFERENT observations of the same
+ * player-market-bookmaker pairing, and the line's own movement between them is exactly the signal a
+ * later round (props-as-anchor measurement, deferred out of this round) will want to read.
+ * Collapsing repeated snapshots onto one row the way `onConflictDoNothing` does elsewhere would
+ * erase that movement, so this table carries no unique constraint on the fact key at all: a
+ * repeated snapshot inserts new rows, stamped with its own `fetched_at`, and nothing here ever
+ * updates or deletes a row. Deduping down to "the latest line before some moment" is a reader's job
+ * for a later round, not this table's.
+ *
+ * `player_name` IS THE RAW STRING THE API RETURNS (an outcome's `description` field), not a
+ * resolved `nfl_players.id`. Resolving names against the crosswalk is real work — suffixes,
+ * nicknames, mid-season trades all need handling — and doing it half-heartedly here would make this
+ * table lie about a name it could not actually match. The honest record is the string as given;
+ * name resolution is the next round's problem, stated in the brief this table was built from.
+ */
+export const playerPropObservations = pgTable(
+  "player_prop_observations",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** The Odds API's own event id — stable across every snapshot of one game. */
+    eventId: text("event_id").notNull(),
+    commenceTime: timestamp("commence_time", { withTimezone: true }).notNull(),
+    /** Bookmaker key as the API returns it — `draftkings`, `fanduel`, and so on. Every book a
+     *  response carries is stored, not just one preferred book. */
+    bookmaker: text("bookmaker").notNull(),
+    /** One of the four verified markets — `player_pass_yds`, `player_reception_yds`,
+     *  `player_receptions`, `player_rush_yds`. Free text, matching this store's sibling tables. */
+    market: text("market").notNull(),
+    /** The outcome's own `description` field, verbatim. See the table doc for why this is never
+     *  resolved to a player id here. */
+    playerName: text("player_name").notNull(),
+    point: doublePrecision("point").notNull(),
+    /** American odds — always an integer on this API. */
+    overPrice: integer("over_price").notNull(),
+    underPrice: integer("under_price").notNull(),
+    /** When THIS snapshot run fetched the line. No default: the writer always states it
+     *  explicitly, the same discipline `as_of` carries elsewhere in this file, so a row's stamp is
+     *  never an accident of when Postgres happened to run the insert. */
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    /** The read this table serves today: per-event, per-market counts for one snapshot run's own
+     *  report. */
+    index("player_prop_observations_event_market_idx").on(t.eventId, t.market),
+    index("player_prop_observations_fetched_at_idx").on(t.fetchedAt),
+  ],
+);
