@@ -49,6 +49,7 @@
     "projections:preseason:ingest": "dotenv -e .env.local -- tsx scripts/preseason-ingest.ts",
     "projections:preseason:fit": "dotenv -e .env.local -- tsx scripts/preseason-fit.ts",
     "projections:rookie-curve:fit": "dotenv -e .env.local -- tsx scripts/rookie-curve-fit.ts",
+    "projections:market:fit": "dotenv -e .env.local -- tsx scripts/market-curve-fit.ts",
     "projections:preseason": "dotenv -e .env.local -- tsx scripts/preseason-report.ts",
     "projections:preseason:diagnose": "dotenv -e .env.local -- tsx scripts/preseason-diagnose.ts",
     "projections:crosswalk": "dotenv -e .env.local -- tsx scripts/build-crosswalk.ts",

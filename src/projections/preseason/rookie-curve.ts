@@ -2,6 +2,7 @@ import type { Position } from "@/domain/player";
 import type { ReadonlyDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring/compute";
+import { isotonicNonIncreasing } from "../isotonic";
 import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import { draftPicksFor } from "../nflverse/draft-picks";
 import { projectedPosition } from "../nflverse/players";
@@ -124,41 +125,6 @@ export interface RookieCurveFitOptions {
    * that is `fitRookieCurve` itself, unconditionally.
    */
   readonly heldOutSeasons: readonly number[];
-}
-
-/**
- * A weighted isotonic (pool-adjacent-violators) fit, constrained NON-INCREASING in `x`.
- *
- * Implemented as the textbook INCREASING PAVA over the negated values and negated back, rather than
- * a second, separately-written decreasing variant — one algorithm, proven once, used both ways.
- * `xs` must already be sorted ascending and carries no duplicates; `fitRookieCurve` guarantees both
- * by building it from a `Map` keyed on the pick.
- */
-function isotonicNonIncreasing(values: readonly number[], weights: readonly number[]): readonly number[] {
-  interface Block {
-    value: number;
-    weight: number;
-    count: number;
-  }
-  const blocks: Block[] = [];
-  for (let index = 0; index < values.length; index += 1) {
-    let block: Block = { value: -values[index]!, weight: weights[index]!, count: 1 };
-    blocks.push(block);
-    // Pool this new block into whatever precedes it until the sequence is non-decreasing again —
-    // the whole of PAVA: a violation (this block's mean below the one before it) can only be fixed
-    // by merging, and merging can only ever cascade backward, never forward.
-    while (blocks.length > 1 && blocks[blocks.length - 2]!.value > block.value) {
-      const previous = blocks[blocks.length - 2]!;
-      const merged: Block = {
-        value: (previous.value * previous.weight + block.value * block.weight) / (previous.weight + block.weight),
-        weight: previous.weight + block.weight,
-        count: previous.count + block.count,
-      };
-      blocks.splice(blocks.length - 2, 2, merged);
-      block = merged;
-    }
-  }
-  return blocks.flatMap((block) => Array<number>(block.count).fill(-block.value));
 }
 
 /**
