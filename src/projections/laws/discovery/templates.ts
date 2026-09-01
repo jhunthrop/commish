@@ -35,12 +35,23 @@ export type QuantityId = keyof DiscoveryQuantityValues;
 
 /** One quantity's identity: how to read it off `DiscoveryQuantityValues`, which positions it means
  *  something for, and the noun phrase `renderClaim` speaks it with (unit included in the words, so
- *  a sentence never needs a separate unit token). */
+ *  a sentence never needs a separate unit token).
+ *
+ *  `formatValue` and `shortLabel` are the fix-round additions `renderSignedClaim`/`renderTitle` need
+ *  (a committed candidate's claim now states the actual committed threshold — "129 or more" — rather
+ *  than a quantile percentage; `renderClaim`, the neutral pre-measurement renderer, is UNCHANGED and
+ *  keeps using `noun`/the quantile-percent label, since it never has a real number to show). */
 export interface QuantityDef {
   readonly id: QuantityId;
   readonly noun: string;
   readonly positions: readonly LawPosition[];
   readonly get: (values: DiscoveryQuantityValues) => number | null;
+  /** Formats a raw threshold VALUE (not a quantile level) into the plain-words token
+   *  `renderSignedClaim` drops into "... is {formatValue(value)} or more". */
+  readonly formatValue: (value: number) => string;
+  /** A two-or-three-word label for `renderTitle`'s mechanical heading — never a full sentence, never
+   *  hand-authored prose about a specific candidate. */
+  readonly shortLabel: string;
 }
 
 const ALL_SKILL_POSITIONS: readonly LawPosition[] = ["QB", "RB", "WR", "TE"];
@@ -53,62 +64,115 @@ const PASS_CATCHER_POSITIONS: readonly LawPosition[] = ["WR", "TE"];
  * stable across runs (the other half is `QUANTILE_LEVELS`' own fixed order and the canonical id-sort
  * `generateCandidatesFrom` applies before returning).
  */
+/** Whole-number formatting — touches, tenure seasons, experience years: no fractional value in the
+ *  underlying quantity is ever meaningful to a reader, even though a quantile interpolation can land
+ *  on one (e.g. `237.29999999999995`). */
+const formatWhole = (value: number): string => `${Math.round(value)}`;
+/** One-decimal formatting — age, target depth, pace, all genuinely continuous quantities. */
+const formatOneDecimal = (value: number): string => value.toFixed(1);
+/** Percentage formatting for a 0..1 share/rate. */
+const formatPercent = (value: number): string => `${Math.round(value * 100)}%`;
+
 export const QUANTITY_DEFS: readonly QuantityDef[] = [
-  { id: "touches", noun: "combined carries and receptions that season", positions: ["RB"], get: (v) => v.touches },
-  { id: "age", noun: "age at that season's opener", positions: ALL_SKILL_POSITIONS, get: (v) => v.age },
+  {
+    id: "touches",
+    noun: "combined carries and receptions that season",
+    positions: ["RB"],
+    get: (v) => v.touches,
+    formatValue: formatWhole,
+    shortLabel: "carries and receptions",
+  },
+  {
+    id: "age",
+    noun: "age at that season's opener",
+    positions: ALL_SKILL_POSITIONS,
+    get: (v) => v.age,
+    formatValue: formatOneDecimal,
+    shortLabel: "age",
+  },
   {
     id: "targetShare",
     noun: "share of his team's targets that season",
     positions: RECEIVING_POSITIONS,
     get: (v) => v.targetShare,
+    formatValue: formatPercent,
+    shortLabel: "target share",
   },
   {
     id: "touchdownPointsShare",
     noun: "share of his own fantasy points that came from touchdowns that season",
     positions: ALL_SKILL_POSITIONS,
     get: (v) => v.touchdownPointsShare,
+    formatValue: formatPercent,
+    shortLabel: "touchdown-points share",
   },
   {
     id: "redZoneTouchShare",
     noun: "share of his own carries and targets that came in the red zone that season",
     positions: RECEIVING_POSITIONS,
     get: (v) => v.redZoneTouchShare,
+    formatValue: formatPercent,
+    shortLabel: "red-zone touch share",
   },
   {
     id: "targetDepth",
     noun: "average depth of target, in yards, that season",
     positions: PASS_CATCHER_POSITIONS,
     get: (v) => v.targetDepth,
+    formatValue: formatOneDecimal,
+    shortLabel: "target depth",
   },
   {
     id: "snapShare",
     noun: "share of his team's offensive snaps that season",
     positions: ALL_SKILL_POSITIONS,
     get: (v) => v.snapShare,
+    formatValue: formatPercent,
+    shortLabel: "snap share",
   },
   {
     id: "incomingCoachTenureSeasons",
-    noun: "team's incoming play-caller's seasons of tenure with that team",
+    // Reworded (fix round): the ORIGINAL "team's incoming play-caller's seasons of tenure with that
+    // team" read fine against the neutral "is in the top N% of {plural}" template `renderClaim`
+    // still uses, but reads clunky once `renderSignedClaim` states an actual value ("... seasons of
+    // tenure with that team is 3 or more") — moving "in seasons" to a trailing appositive fixes it
+    // ("... tenure with that team, in seasons, is 3 or more"). No test pins the old wording verbatim
+    // (`templates.test.ts`'s exact-string `renderClaim` assertions use `touches`/`targetShare`/`age`
+    // only), so this reword is safe for both renderers.
+    noun: "team's incoming play-caller's tenure with that team, in seasons,",
     positions: ALL_SKILL_POSITIONS,
     get: (v) => v.incomingCoachTenureSeasons,
+    formatValue: formatWhole,
+    shortLabel: "incoming coach's tenure",
   },
   {
     id: "incomingCoachPriorPassRateOverExpected",
     noun: "team's incoming play-caller's own pass rate over expected at his previous teams",
     positions: ALL_SKILL_POSITIONS,
     get: (v) => v.incomingCoachPriorPassRateOverExpected,
+    formatValue: formatOneDecimal,
+    shortLabel: "incoming coach's prior pass rate",
   },
   {
     id: "experienceYear",
-    noun: "number of seasons in the league, counting that season itself",
+    // Reworded (fix round): the ORIGINAL "number of seasons in the league, counting that season
+    // itself" produced a comma splice once `renderSignedClaim` appended "is 8 or more" right after
+    // the internal comma clause with no comma of its own — "...counting that season itself is 8 or
+    // more" reads as a run-on. Parenthesizing the aside removes the internal comma entirely, so no
+    // splice is possible regardless of what follows.
+    noun: "number of seasons in the league (counting that season itself)",
     positions: ALL_SKILL_POSITIONS,
     get: (v) => v.experienceYear,
+    formatValue: formatWhole,
+    shortLabel: "experience",
   },
   {
     id: "teamPaceSecondsPerPlay",
     noun: "team's own seconds per offensive play that season",
     positions: ALL_SKILL_POSITIONS,
     get: (v) => v.teamPaceSecondsPerPlay,
+    formatValue: formatOneDecimal,
+    shortLabel: "team pace",
   },
 ];
 
@@ -199,8 +263,9 @@ const SIGNED_OUTCOME_CLAUSE: Readonly<Record<-1 | 1, string>> = {
 };
 
 /** The shared, sign-agnostic half of a rendered claim: the article, the position noun, and the
- *  clause's own English — both `renderClaim` and `renderSignedClaim` differ only in which trailing
- *  outcome clause they append to this. */
+ *  clause's own English — `renderClaim` is the only caller left (its own quantile-percent
+ *  `clauseText`); `renderSignedClaim` builds its sentence from `signedClauseText` instead, see that
+ *  function's own docblock for why the two diverge. */
 function claimIntro(parts: ClaimParts): string {
   const singular = POSITION_SINGULAR[parts.position];
   const article = /^[aeiou]/i.test(singular) ? "An" : "A";
@@ -216,14 +281,95 @@ export function renderClaim(parts: ClaimParts): string {
   return `${claimIntro(parts)} ${OUTCOME_CLAUSE}`;
 }
 
+/** Looks up ONE clause's actual committed threshold — never a quantile PERCENTAGE, the real number
+ *  `quantiles` (almost always the committed `DISCOVERY_QUANTILES`) fitted for this exact
+ *  (quantity, position, level) triple. Throws rather than guessing: a candidate whose own clause
+ *  names a triple missing from `quantiles` means the candidate and the table it claims to be drawn
+ *  from have drifted apart — a population-builder bug, not a renderable gap. */
+function thresholdValueFor(quantiles: QuantileTable, position: LawPosition, quantityId: QuantityId, level: QuantileLevel): number {
+  const value = quantiles[quantityId]?.[position]?.[level];
+  if (value === undefined) {
+    throw new Error(
+      `renderSignedClaim: no committed quantile for ${quantityId}/${position}/${level} — the quantile table and this candidate's own clause have drifted apart.`,
+    );
+  }
+  return value;
+}
+
+/**
+ * `clauseText`'s VALUE-COMMITTED sibling (fix round, 2026-08-31 — replaces an earlier version of
+ * `renderSignedClaim` that reused `clauseText`'s own "top N% of {plural}" wording verbatim, the same
+ * wording `renderClaim` still uses BEFORE a candidate is measured). A committed law's claim states
+ * the ACTUAL threshold the discovery quantile table fitted — "129 or more" — never a re-stated
+ * percentage a reader cannot check against anything: the quantile table is itself committed
+ * (`quantiles.ts`), so rendering its own numbers is mechanical, not a hand-authored translation.
+ */
+function signedClauseText(clause: Clause, position: LawPosition, quantiles: QuantileTable): string {
+  switch (clause.kind) {
+    case "threshold": {
+      const def = quantityDef(clause.quantityId);
+      const value = thresholdValueFor(quantiles, position, clause.quantityId, clause.quantileLevel);
+      return `${def.noun} is ${def.formatValue(value)} or more`;
+    }
+    case "delta": {
+      const def = quantityDef(clause.quantityId);
+      const value = thresholdValueFor(quantiles, position, clause.quantityId, clause.quantileLevel);
+      const formatted = def.formatValue(value);
+      return clause.direction === "rose_into"
+        ? `${def.noun} rose to ${formatted} or more after being below that mark the season before`
+        : `${def.noun} fell below ${formatted} after being at or above that mark the season before`;
+    }
+    case "and":
+      return `${signedClauseText(clause.left, position, quantiles)} and whose ${signedClauseText(clause.right, position, quantiles)}`;
+  }
+}
+
+/** `clauseNouns`'s only use is `renderTitle`'s mechanical heading — the SHORT label per quantity in
+ *  the clause, position-independent, never the full sentence-shaped noun `clauseText`/
+ *  `signedClauseText` use. */
+function clauseShortLabels(clause: Clause): readonly string[] {
+  switch (clause.kind) {
+    case "threshold":
+    case "delta":
+      return [quantityDef(clause.quantityId).shortLabel];
+    case "and":
+      return [...clauseShortLabels(clause.left), ...clauseShortLabels(clause.right)];
+  }
+}
+
+/**
+ * A short, MECHANICAL title for a discovered candidate's claim — position, plus its quantity/quantities'
+ * own short labels, joined with "+" for an AND clause. Never a full sentence and never hand-authored
+ * per candidate: this is `/player-laws`'s discovered-section heading, playing the same role a tribal
+ * law's own hand-written name ("The workload cliff") plays for `splitClaim`'s colon-split — see
+ * `renderSignedClaim`'s own docblock for how the two compose into one `claim` string.
+ */
+export function renderTitle(parts: ClaimParts): string {
+  const singular = POSITION_SINGULAR[parts.position];
+  const capitalized = singular.charAt(0).toUpperCase() + singular.slice(1);
+  return `${capitalized} ${clauseShortLabels(parts.clause).join(" + ")}`;
+}
+
 /**
  * `renderClaim`'s sign-committed sibling — Task 7 (`discovery/measure.ts`) calls this once a BH
- * survivor's train-window effect sign is known, so `discovered.json`'s own claim reads "gains" or
- * "loses" rather than the neutral "scores differently" every unmeasured candidate carries. Same
- * mechanical discipline as `renderClaim`: no prose written per candidate, no em-dashes.
+ * survivor's train-window effect sign is known, with the SAME committed `quantiles` table
+ * (`DISCOVERY_QUANTILES`) the candidate was generated from, so `discovered.json`'s own claim reads
+ * "gains"/"loses" points AND the actual committed threshold value, never the neutral quantile-percent
+ * text `renderClaim` still carries for an unmeasured candidate.
+ *
+ * THE RETURNED STRING IS "Title: sentence", the identical shape every tribal `LawSpec.claim` already
+ * has (`populations.ts`'s hand-authored "The workload cliff: a running back who..."). `/player-laws`'s
+ * `splitClaim` colon-splits EITHER kind without knowing which it has — see that function's own
+ * docblock, which was written expecting "a seventh law slots in with no new prose to write"; a
+ * discovered law is exactly that seventh (and eighth, and so on) law, and composing the title in HERE
+ * rather than teaching the page a second claim shape is what keeps that promise. `renderTitle` supplies
+ * the title half; nothing here is prose written per candidate, and no em-dash appears in either half.
  */
-export function renderSignedClaim(parts: ClaimParts, sign: -1 | 1): string {
-  return `${claimIntro(parts)} ${SIGNED_OUTCOME_CLAUSE[sign]}`;
+export function renderSignedClaim(parts: ClaimParts, sign: -1 | 1, quantiles: QuantileTable): string {
+  const singular = POSITION_SINGULAR[parts.position];
+  const article = /^[aeiou]/i.test(singular) ? "An" : "A";
+  const sentence = `${article} ${singular} whose ${signedClauseText(parts.clause, parts.position, quantiles)} ${SIGNED_OUTCOME_CLAUSE[sign]}`;
+  return `${renderTitle(parts)}: ${sentence}`;
 }
 
 /** One quantity's fitted train-window thresholds, at the three quantile levels this generator uses. */

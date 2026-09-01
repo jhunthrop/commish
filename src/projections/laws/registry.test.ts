@@ -1,8 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  chipEligibleLaws,
   DISCOVERED_JSON_PATH,
   discoveredLawsFrom,
+  discoveredPipelineCounts,
+  MIN_OUT_OF_TRAIN_FOLD_PAIRS,
   MIN_REPLICATION_PAIRS,
   parseDiscoveredJson,
   parseMeasuredJson,
@@ -18,7 +21,8 @@ import {
   type MeasuredJson,
 } from "./registry";
 import { LAW_SPECS, type LawSpec } from "./populations";
-import type { PlayerSeasonPoint } from "./types";
+import { generateCandidates } from "./discovery/generate";
+import type { Law, PlayerSeasonPoint } from "./types";
 import { predictOpportunity } from "../model/opportunity";
 import { TOUCHDOWN_RATES } from "../model/efficiency";
 import { fitRedistributionPriors } from "../model/redistribution-fit";
@@ -45,9 +49,9 @@ function specFixture(over: Partial<LawSpec> = {}): LawSpec {
 
 /** Three folds, all agreeing with a `-1` expected sign — the default "every fold agrees" shape. */
 const AGREEING_FOLDS: readonly FoldEffect[] = [
-  { season: 2021, effect: -1 },
-  { season: 2022, effect: -1 },
-  { season: 2023, effect: -1 },
+  { season: 2021, pairs: 10, effect: -1 },
+  { season: 2022, pairs: 10, effect: -1 },
+  { season: 2023, pairs: 10, effect: -1 },
 ];
 
 function measurementFixture(over: Partial<MeasuredEntry> = {}): MeasuredEntry {
@@ -83,9 +87,9 @@ describe("registryFrom", () => {
   it("derives hasFoldEvidence as false when every fold matched zero pairs, even though the verdict itself is unaffected by this alone", () => {
     const zeroFoldsWithPairs = measurementFixture({
       foldEffects: [
-        { season: 2021, effect: null },
-        { season: 2022, effect: null },
-        { season: 2023, effect: null },
+        { season: 2021, pairs: 0, effect: null },
+        { season: 2022, pairs: 0, effect: null },
+        { season: 2023, pairs: 0, effect: null },
       ],
       verdict: "weak", // full window would confirm, but zero folds with pairs caps it at weak
     });
@@ -96,9 +100,9 @@ describe("registryFrom", () => {
   it("derives hasFoldEvidence as true when at least one fold matched a pair, even one that disagreed", () => {
     const oneFoldDisagrees = measurementFixture({
       foldEffects: [
-        { season: 2021, effect: -1 },
-        { season: 2022, effect: 1 },
-        { season: 2023, effect: -1 },
+        { season: 2021, pairs: 10, effect: -1 },
+        { season: 2022, pairs: 10, effect: 1 },
+        { season: 2023, pairs: 10, effect: -1 },
       ],
       verdict: "weak", // full window would confirm, but a disagreeing fold caps it at weak
     });
@@ -130,27 +134,28 @@ describe("registryFrom", () => {
 
   it("accepts every verdict shape verdictForFullWindow can produce, when the stored verdict matches it", () => {
     const oneFoldDisagrees: readonly FoldEffect[] = [
-      { season: 2021, effect: -1 },
-      { season: 2022, effect: 1 }, // disagrees with expectedSign -1
-      { season: 2023, effect: -1 },
+      { season: 2021, pairs: 10, effect: -1 },
+      { season: 2022, pairs: 10, effect: 1 }, // disagrees with expectedSign -1
+      { season: 2023, pairs: 10, effect: -1 },
     ];
     const oneFoldSkippedRestAgree: readonly FoldEffect[] = [
-      { season: 2021, effect: null }, // zero pairs that predictor season — skipped, not counted against the law
-      { season: 2022, effect: -1 },
-      { season: 2023, effect: -1 },
+      { season: 2021, pairs: 0, effect: null }, // zero pairs that predictor season — skipped, not counted against the law
+      { season: 2022, pairs: 10, effect: -1 },
+      { season: 2023, pairs: 10, effect: -1 },
     ];
     const zeroFoldsWithPairs: readonly FoldEffect[] = [
-      { season: 2021, effect: null },
-      { season: 2022, effect: null },
-      { season: 2023, effect: null },
+      { season: 2021, pairs: 0, effect: null },
+      { season: 2022, pairs: 0, effect: null },
+      { season: 2023, pairs: 0, effect: null },
     ];
     const cases: readonly MeasuredEntry[] = [
       { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "confirmed" }, // full CI excludes zero, sign matches, every fold agrees
       { effect: -3, ci: [-1, 1], sample: 40, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "weak" }, // sign matches, full CI spans zero
-      { effect: 3, ci: [2, 4], sample: 40, seasons: "s", foldEffects: [{ season: 2021, effect: 1 }], verdict: "debunked" }, // full sign wrong
+      { effect: 3, ci: [2, 4], sample: 40, seasons: "s", foldEffects: [{ season: 2021, pairs: 10, effect: 1 }], verdict: "debunked" }, // full sign wrong
       { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: oneFoldDisagrees, verdict: "weak" }, // full confirms, one fold disagrees — capped
       { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: oneFoldSkippedRestAgree, verdict: "confirmed" }, // full confirms, a zero-pair fold is skipped, the rest agree
       { effect: -3, ci: [-4, -2], sample: 40, seasons: "s", foldEffects: zeroFoldsWithPairs, verdict: "weak" }, // full confirms, zero folds carry any pairs — capped, never confirmed
+      { effect: -3, ci: [-4, -2], sample: MIN_REPLICATION_PAIRS - 1, seasons: "s", foldEffects: AGREEING_FOLDS, verdict: "weak" }, // full confirms, every fold agrees, but sample is below the floor — capped
     ];
     for (const measured of cases) {
       const spec = specFixture({ expectedSign: -1 });
@@ -174,58 +179,88 @@ describe("registryFrom", () => {
 
 describe("verdictForFullWindow", () => {
   const EXPECTED: -1 = -1;
-  const FULL_WINDOW_CONFIRMS = { effect: -3, ci: [-4, -2] as const, sample: 10, seasons: "s" };
-  const FULL_WINDOW_SPANS_ZERO = { effect: -3, ci: [-1, 1] as const, sample: 10, seasons: "s" };
-  const FULL_WINDOW_WRONG_SIGN = { effect: 3, ci: [2, 4] as const, sample: 10, seasons: "s" };
+  // sample: 40 clears MIN_REPLICATION_PAIRS (the origin-blind floor, IMPORTANT 4 RULING) — these
+  // fixtures are about the CI/sign/fold-agreement rule; the floor gets its own describe block below.
+  const FULL_WINDOW_CONFIRMS = { effect: -3, ci: [-4, -2] as const, sample: 40, seasons: "s" };
+  const FULL_WINDOW_SPANS_ZERO = { effect: -3, ci: [-1, 1] as const, sample: 40, seasons: "s" };
+  const FULL_WINDOW_WRONG_SIGN = { effect: 3, ci: [2, 4] as const, sample: 40, seasons: "s" };
 
   it("confirms when the full window's CI excludes zero, the sign matches, AND every fold agrees in sign", () => {
     const allFoldsAgree: readonly FoldEffect[] = [
-      { season: 2021, effect: -1 },
-      { season: 2022, effect: -2 },
-      { season: 2023, effect: -0.5 },
+      { season: 2021, pairs: 10, effect: -1 },
+      { season: 2022, pairs: 10, effect: -2 },
+      { season: 2023, pairs: 10, effect: -0.5 },
     ];
     expect(verdictForFullWindow(FULL_WINDOW_CONFIRMS, EXPECTED, allFoldsAgree)).toBe("confirmed");
   });
 
   it("caps a full-window confirm at weak when one fold disagrees in sign", () => {
     const oneFoldDisagrees: readonly FoldEffect[] = [
-      { season: 2021, effect: -1 },
-      { season: 2022, effect: 1 },
-      { season: 2023, effect: -1 },
+      { season: 2021, pairs: 10, effect: -1 },
+      { season: 2022, pairs: 10, effect: 1 },
+      { season: 2023, pairs: 10, effect: -1 },
     ];
     expect(verdictForFullWindow(FULL_WINDOW_CONFIRMS, EXPECTED, oneFoldDisagrees)).toBe("weak");
   });
 
   it("skips a fold that matched zero pairs (effect: null) rather than counting it against the law, and still confirms when every other fold agrees", () => {
     const oneFoldSkipped: readonly FoldEffect[] = [
-      { season: 2021, effect: null },
-      { season: 2022, effect: -1 },
-      { season: 2023, effect: -1 },
+      { season: 2021, pairs: 0, effect: null },
+      { season: 2022, pairs: 10, effect: -1 },
+      { season: 2023, pairs: 10, effect: -1 },
     ];
     expect(verdictForFullWindow(FULL_WINDOW_CONFIRMS, EXPECTED, oneFoldSkipped)).toBe("confirmed");
   });
 
   it("caps a full-window confirm at weak when zero folds carry any pairs at all — never confirmed on no replication evidence", () => {
     const zeroFoldsWithPairs: readonly FoldEffect[] = [
-      { season: 2021, effect: null },
-      { season: 2022, effect: null },
-      { season: 2023, effect: null },
+      { season: 2021, pairs: 0, effect: null },
+      { season: 2022, pairs: 0, effect: null },
+      { season: 2023, pairs: 0, effect: null },
     ];
     expect(verdictForFullWindow(FULL_WINDOW_CONFIRMS, EXPECTED, zeroFoldsWithPairs)).toBe("weak");
   });
 
   it("stays weak when the full-window sign matches but its own CI spans zero, regardless of the folds", () => {
-    const allFoldsAgree: readonly FoldEffect[] = [{ season: 2021, effect: -1 }];
-    const zeroFoldsWithPairs: readonly FoldEffect[] = [{ season: 2021, effect: null }];
+    const allFoldsAgree: readonly FoldEffect[] = [{ season: 2021, pairs: 10, effect: -1 }];
+    const zeroFoldsWithPairs: readonly FoldEffect[] = [{ season: 2021, pairs: 0, effect: null }];
     expect(verdictForFullWindow(FULL_WINDOW_SPANS_ZERO, EXPECTED, allFoldsAgree)).toBe("weak");
     expect(verdictForFullWindow(FULL_WINDOW_SPANS_ZERO, EXPECTED, zeroFoldsWithPairs)).toBe("weak");
   });
 
   it("stays debunked when the full-window sign disagrees with expectedSign, regardless of the folds", () => {
-    const allFoldsAgree: readonly FoldEffect[] = [{ season: 2021, effect: -1 }];
-    const zeroFoldsWithPairs: readonly FoldEffect[] = [{ season: 2021, effect: null }];
+    const allFoldsAgree: readonly FoldEffect[] = [{ season: 2021, pairs: 10, effect: -1 }];
+    const zeroFoldsWithPairs: readonly FoldEffect[] = [{ season: 2021, pairs: 0, effect: null }];
     expect(verdictForFullWindow(FULL_WINDOW_WRONG_SIGN, EXPECTED, allFoldsAgree)).toBe("debunked");
     expect(verdictForFullWindow(FULL_WINDOW_WRONG_SIGN, EXPECTED, zeroFoldsWithPairs)).toBe("debunked");
+  });
+
+  /** IMPORTANT 4 RULING (fix round): origin-blind — this floor used to apply to discovered
+   *  candidates only, via `verdictForDiscoveredLaw`'s own extra step; it is now inside
+   *  `verdictForFullWindow` itself, so a TRIBAL law is graded by the identical rule. */
+  describe("the MIN_REPLICATION_PAIRS floor, origin-blind", () => {
+    const allFoldsAgree: readonly FoldEffect[] = [
+      { season: 2021, pairs: 10, effect: -1 },
+      { season: 2022, pairs: 10, effect: -2 },
+      { season: 2023, pairs: 10, effect: -0.5 },
+    ];
+
+    it("caps a full-window confirm at weak when the sample is below MIN_REPLICATION_PAIRS, even with every fold agreeing", () => {
+      const thinSample = { ...FULL_WINDOW_CONFIRMS, sample: MIN_REPLICATION_PAIRS - 1 };
+      expect(verdictForFullWindow(thinSample, EXPECTED, allFoldsAgree)).toBe("weak");
+    });
+
+    it("confirms right at the MIN_REPLICATION_PAIRS boundary (inclusive)", () => {
+      const atBoundary = { ...FULL_WINDOW_CONFIRMS, sample: MIN_REPLICATION_PAIRS };
+      expect(verdictForFullWindow(atBoundary, EXPECTED, allFoldsAgree)).toBe("confirmed");
+    });
+
+    it("never upgrades a weak or debunked result regardless of sample size", () => {
+      const spansZero = { ...FULL_WINDOW_SPANS_ZERO, sample: 10_000 };
+      const wrongSign = { ...FULL_WINDOW_WRONG_SIGN, sample: 10_000 };
+      expect(verdictForFullWindow(spansZero, EXPECTED, allFoldsAgree)).toBe("weak");
+      expect(verdictForFullWindow(wrongSign, EXPECTED, allFoldsAgree)).toBe("debunked");
+    });
   });
 });
 
@@ -326,10 +361,12 @@ describe("stratumKeyFor", () => {
  * blocks above drive `registryFrom`/`parseMeasuredJson`/`verdictForFullWindow`.
  */
 
+// 2021 sits INSIDE the discovery train window (IMPORTANT 1/2 RULINGS) — 2022 and 2023 are the two
+// genuinely out-of-train folds, both carrying >= MIN_OUT_OF_TRAIN_FOLD_PAIRS (5) here by default.
 const FOLDS_AGREE_NEGATIVE: readonly FoldEffect[] = [
-  { season: 2021, effect: -1 },
-  { season: 2022, effect: -1.5 },
-  { season: 2023, effect: -0.5 },
+  { season: 2021, pairs: 10, effect: -1 },
+  { season: 2022, pairs: 10, effect: -1.5 },
+  { season: 2023, pairs: 10, effect: -0.5 },
 ];
 
 function discoveredEntryFixture(over: Partial<DiscoveredEntry> = {}): DiscoveredEntry {
@@ -352,11 +389,11 @@ function discoveredEntryFixture(over: Partial<DiscoveredEntry> = {}): Discovered
 describe("verdictForDiscoveredLaw", () => {
   const FULL_WINDOW_CONFIRMS = { effect: -3, ci: [-4, -2] as const, sample: 40, seasons: "s" };
 
-  it("confirms exactly when verdictForFullWindow would AND the sample is at least MIN_REPLICATION_PAIRS", () => {
+  it("confirms when verdictForFullWindow would AND at least one out-of-train fold (2022/2023) carries >= MIN_OUT_OF_TRAIN_FOLD_PAIRS", () => {
     expect(verdictForDiscoveredLaw(FULL_WINDOW_CONFIRMS, -1, FOLDS_AGREE_NEGATIVE)).toBe("confirmed");
   });
 
-  it("caps a full-window confirm at weak when the sample is below MIN_REPLICATION_PAIRS, even with every fold agreeing", () => {
+  it("caps a full-window confirm at weak when the sample is below MIN_REPLICATION_PAIRS, even with every fold agreeing (delegates to verdictForFullWindow's own floor)", () => {
     const thinSample = { ...FULL_WINDOW_CONFIRMS, sample: MIN_REPLICATION_PAIRS - 1 };
     expect(verdictForDiscoveredLaw(thinSample, -1, FOLDS_AGREE_NEGATIVE)).toBe("weak");
   });
@@ -375,11 +412,60 @@ describe("verdictForDiscoveredLaw", () => {
 
   it("still caps at weak when a fold disagrees, regardless of sample size", () => {
     const oneFoldDisagrees: readonly FoldEffect[] = [
-      { season: 2021, effect: -1 },
-      { season: 2022, effect: 1 },
-      { season: 2023, effect: -1 },
+      { season: 2021, pairs: 10, effect: -1 },
+      { season: 2022, pairs: 10, effect: 1 },
+      { season: 2023, pairs: 10, effect: -1 },
     ];
     expect(verdictForDiscoveredLaw(FULL_WINDOW_CONFIRMS, -1, oneFoldDisagrees)).toBe("weak");
+  });
+
+  /** IMPORTANT 1 + IMPORTANT 2 RULINGS (fix round): 2021 sits INSIDE the discovery train window, so
+   *  a discovered law confirmed on fold agreement alone — even every fold agreeing, even a huge
+   *  sample — still needs a genuinely OUT-OF-TRAIN fold (2022 or 2023) to itself carry enough pairs
+   *  to trust. `verdictForFullWindow`'s own "every fold with pairs agrees" rule cannot see this
+   *  distinction; only `verdictForDiscoveredLaw` does. */
+  describe("the out-of-train replication gate (2021 is in-train; only 2022/2023 count)", () => {
+    it("caps at weak when the ONLY fold with pairs is 2021 (in-train) — no out-of-train evidence at all", () => {
+      const only2021: readonly FoldEffect[] = [
+        { season: 2021, pairs: 10, effect: -1 },
+        { season: 2022, pairs: 0, effect: null },
+        { season: 2023, pairs: 0, effect: null },
+      ];
+      // verdictForFullWindow itself would already cap this at weak (zero folds with pairs beyond
+      // 2021 disagreeing is moot — but to isolate the OUT-OF-TRAIN gate specifically, note this
+      // case is ALSO caught by verdictForFullWindow's "every fold with pairs agrees" rule passing
+      // (2021 is the only fold with pairs, and it agrees) — the interesting assertion is that
+      // verdictForDiscoveredLaw does NOT confirm here even though verdictForFullWindow alone would.
+      expect(verdictForFullWindow(FULL_WINDOW_CONFIRMS, -1, only2021)).toBe("confirmed");
+      expect(verdictForDiscoveredLaw(FULL_WINDOW_CONFIRMS, -1, only2021)).toBe("weak");
+    });
+
+    it("caps at weak when an out-of-train fold has pairs but BELOW MIN_OUT_OF_TRAIN_FOLD_PAIRS", () => {
+      const thinOutOfTrain: readonly FoldEffect[] = [
+        { season: 2021, pairs: 10, effect: -1 },
+        { season: 2022, pairs: MIN_OUT_OF_TRAIN_FOLD_PAIRS - 1, effect: -1 },
+        { season: 2023, pairs: 0, effect: null },
+      ];
+      expect(verdictForDiscoveredLaw(FULL_WINDOW_CONFIRMS, -1, thinOutOfTrain)).toBe("weak");
+    });
+
+    it("confirms right at the MIN_OUT_OF_TRAIN_FOLD_PAIRS boundary (inclusive) on a single out-of-train fold", () => {
+      const atBoundary: readonly FoldEffect[] = [
+        { season: 2021, pairs: 10, effect: -1 },
+        { season: 2022, pairs: MIN_OUT_OF_TRAIN_FOLD_PAIRS, effect: -1 },
+        { season: 2023, pairs: 0, effect: null },
+      ];
+      expect(verdictForDiscoveredLaw(FULL_WINDOW_CONFIRMS, -1, atBoundary)).toBe("confirmed");
+    });
+
+    it("confirms when 2023 alone (not 2022) clears the out-of-train floor", () => {
+      const only2023: readonly FoldEffect[] = [
+        { season: 2021, pairs: 10, effect: -1 },
+        { season: 2022, pairs: 0, effect: null },
+        { season: 2023, pairs: MIN_OUT_OF_TRAIN_FOLD_PAIRS, effect: -1 },
+      ];
+      expect(verdictForDiscoveredLaw(FULL_WINDOW_CONFIRMS, -1, only2023)).toBe("confirmed");
+    });
   });
 });
 
@@ -429,13 +515,31 @@ describe("parseDiscoveredJson", () => {
     });
     expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.template is not one of/);
   });
+
+  it("throws when a foldEffects entry's pairs is negative", () => {
+    const entry = discoveredEntryFixture({ foldEffects: [{ season: 2021, pairs: -1, effect: -1 }] });
+    const malformed = JSON.stringify({ counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
+    expect(() => parseDiscoveredJson(malformed)).toThrow(/non-finite or negative pairs count/);
+  });
+
+  it("throws when a foldEffects entry's pairs === 0 disagrees with its own effect being non-null", () => {
+    const entry = discoveredEntryFixture({ foldEffects: [{ season: 2021, pairs: 0, effect: -1 }] });
+    const malformed = JSON.stringify({ counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
+    expect(() => parseDiscoveredJson(malformed)).toThrow(/pairs === 0 and effect === null disagree/);
+  });
 });
+
+// `discoveredLawsFrom`'s orphan guard (IMPORTANT 5 RULING) defaults to the REAL `generateCandidates()`
+// ids, so every fixture below that isn't specifically testing the orphan guard passes its own small
+// `candidateIds` set explicitly — the same "specs as a parameter" discipline `registryFrom`'s own
+// tests use for `LAW_SPECS`, so a fixture id like "fake_candidate" never needs to be a real one.
+const FAKE_CANDIDATE_IDS: ReadonlySet<string> = new Set(["fake_candidate"]);
 
 describe("discoveredLawsFrom", () => {
   it("merges a discovered entry into a Law, origin: \"discovered\", modelPath always null", () => {
     const entry = discoveredEntryFixture();
     const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } };
-    const [law] = discoveredLawsFrom(discoveredJson);
+    const [law] = discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS);
     expect(law).toEqual({
       id: "fake_candidate",
       position: "RB",
@@ -451,25 +555,97 @@ describe("discoveredLawsFrom", () => {
   it("throws when the stored verdict disagrees with verdictForDiscoveredLaw's own computation", () => {
     const entry = discoveredEntryFixture({ sample: MIN_REPLICATION_PAIRS - 1, verdict: "confirmed" }); // should be "weak" — thin sample
     const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 0 }, laws: { fake_candidate: entry } };
-    expect(() => discoveredLawsFrom(discoveredJson)).toThrow(/verdict for "fake_candidate" is "confirmed".*computes "weak"/);
+    expect(() => discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS)).toThrow(/verdict for "fake_candidate" is "confirmed".*computes "weak"/);
   });
 
   it("returns an empty array for zero survivors — a legitimate, publishable result", () => {
     const discoveredJson: DiscoveredJson = { counts: { tested: 1737, untestable: 1737, bhSurvivors: 0, replicated: 0 }, laws: {} };
-    expect(discoveredLawsFrom(discoveredJson)).toEqual([]);
+    expect(discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS)).toEqual([]);
   });
 
   it("derives hasFoldEvidence false when every fold matched zero pairs", () => {
     const entry = discoveredEntryFixture({
       foldEffects: [
-        { season: 2021, effect: null },
-        { season: 2022, effect: null },
-        { season: 2023, effect: null },
+        { season: 2021, pairs: 0, effect: null },
+        { season: 2022, pairs: 0, effect: null },
+        { season: 2023, pairs: 0, effect: null },
       ],
       verdict: "weak",
     });
     const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 0 }, laws: { fake_candidate: entry } };
-    const [law] = discoveredLawsFrom(discoveredJson);
+    const [law] = discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS);
     expect(law!.hasFoldEvidence).toBe(false);
+  });
+
+  /** IMPORTANT 5 RULING (fix round): the registryFrom-equivalent orphan guard for discovered.json.
+   */
+  describe("the orphan guard (IMPORTANT 5 RULING)", () => {
+    it("throws when discovered.json has an entry with no matching candidate in the given candidateIds set", () => {
+      const entry = discoveredEntryFixture();
+      const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { orphaned_id: entry } };
+      expect(() => discoveredLawsFrom(discoveredJson, new Set(["some_other_id"]))).toThrow(
+        /orphaned_id.*no matching candidate in generateCandidates\(\)/,
+      );
+    });
+
+    it("accepts an entry whose id IS in the given candidateIds set", () => {
+      const entry = discoveredEntryFixture();
+      const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } };
+      expect(() => discoveredLawsFrom(discoveredJson, FAKE_CANDIDATE_IDS)).not.toThrow();
+    });
+
+    it("defaults candidateIds to the REAL generateCandidates() ids when not given, and accepts a real one", () => {
+      const [firstRealId] = generateCandidates().map((candidate) => candidate.id);
+      const entry = discoveredEntryFixture();
+      const discoveredJson: DiscoveredJson = {
+        counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+        laws: { [firstRealId!]: entry },
+      };
+      expect(() => discoveredLawsFrom(discoveredJson)).not.toThrow();
+    });
+
+    it("defaults candidateIds to the REAL generateCandidates() ids when not given, and rejects a fake one", () => {
+      const entry = discoveredEntryFixture();
+      const discoveredJson: DiscoveredJson = { counts: { tested: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { not_a_real_candidate_id: entry } };
+      expect(() => discoveredLawsFrom(discoveredJson)).toThrow(/not_a_real_candidate_id.*no matching candidate/);
+    });
+  });
+});
+
+describe("chipEligibleLaws", () => {
+  function lawFixture(over: Partial<Law> = {}): Law {
+    return {
+      id: "fixture_law",
+      position: "RB",
+      claim: "Fixture claim.",
+      measured: { effect: -1, ci: [-2, -0.5], sample: 100, seasons: "s" },
+      verdict: "confirmed",
+      modelPath: null,
+      hasFoldEvidence: true,
+      origin: "tribal",
+      ...over,
+    };
+  }
+
+  it("keeps every tribal law regardless of verdict", () => {
+    const laws: readonly Law[] = [lawFixture({ id: "a", verdict: "confirmed" }), lawFixture({ id: "b", verdict: "weak" })];
+    expect(chipEligibleLaws(laws).map((law) => law.id)).toEqual(["a", "b"]);
+  });
+
+  it("drops every discovered law today, confirmed or not — Task 8's own predicate to flip", () => {
+    const laws: readonly Law[] = [
+      lawFixture({ id: "tribal_one", origin: "tribal" }),
+      lawFixture({ id: "discovered_confirmed", origin: "discovered", verdict: "confirmed" }),
+      lawFixture({ id: "discovered_weak", origin: "discovered", verdict: "weak" }),
+    ];
+    expect(chipEligibleLaws(laws).map((law) => law.id)).toEqual(["tribal_one"]);
+  });
+});
+
+describe("discoveredPipelineCounts", () => {
+  it("reads the committed discovered.json's own top-level counts", () => {
+    const raw = readFileSync(DISCOVERED_JSON_PATH, "utf-8");
+    const expected = parseDiscoveredJson(raw).counts;
+    expect(discoveredPipelineCounts()).toEqual(expected);
   });
 });

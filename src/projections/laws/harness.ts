@@ -33,8 +33,14 @@ export interface MatchedPair {
  * mulberry32 — a small, fast, seedable PRNG. Chosen over `Math.random` for the one property that
  * matters here: given the same seed, it produces the same sequence forever, on every machine. That
  * determinism is the whole point of pinning `BOOTSTRAP.seed` in config.
+ *
+ * Exported (fix round, 2026-08-31) so test fixtures needing a seeded RNG — `discovery/measure.test.ts`'s
+ * null battery in particular — use the SAME 32-bit-integer PRNG production does, not a hand-rolled
+ * `a*x+c mod m` LCG whose naive floating-point multiplication silently loses precision once `x`
+ * approaches 2^31 (`1103515245 * x` exceeds `Number.MAX_SAFE_INTEGER` well before `x` does), which is
+ * exactly the "fixture LCG overflow" a review of this file's own test suite caught.
  */
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let state = seed;
   return () => {
     state |= 0;

@@ -7,7 +7,7 @@ import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG, seasonProgress } from "@/league";
 import { nflPlayerIdFor } from "@/projections/crosswalk";
 import type { Law } from "@/projections/laws/types";
-import { registry } from "@/projections/laws/registry";
+import { chipEligibleLaws, registry } from "@/projections/laws/registry";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import type { BoardReason } from "@/projections/preseason/board";
 import { BOARD_SOURCE, boardReasons, preseasonProjectionsFor } from "@/projections/preseason/board-store";
@@ -386,6 +386,8 @@ export async function playerSeason(
     pointsPerGamePercentile: pointsPerGame === null ? null : percentileOf(pointsPerGame, peerPointsPerGame(lines, player.position, rules), "higher"),
     weeks,
     reasons: preseason.reasons,
-    laws: registry(),
+    // Chip-eligible only (IMPORTANT 3 RULING, fix round) — today that is every tribal law; see
+    // `chipEligibleLaws`'s own docblock for the one predicate Task 8 flips.
+    laws: chipEligibleLaws(registry()),
   };
 }

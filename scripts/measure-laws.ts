@@ -94,7 +94,7 @@ function measurementSeasons(): readonly number[] {
 function foldEffectsFor(pairs: readonly MatchedPair[]): readonly FoldEffect[] {
   return REPLICATION_FOLDS.map((season) => {
     const foldPairs = pairs.filter((pair) => pair.condition.season === season);
-    return { season, effect: foldPairs.length === 0 ? null : measureEffect(foldPairs).effect };
+    return { season, pairs: foldPairs.length, effect: foldPairs.length === 0 ? null : measureEffect(foldPairs).effect };
   });
 }
 

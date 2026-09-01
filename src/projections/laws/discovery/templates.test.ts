@@ -6,7 +6,9 @@ import {
   QUANTITY_DEFS,
   renderClaim,
   renderSignedClaim,
+  renderTitle,
   type ClaimParts,
+  type QuantileTable,
   type QuantityRow,
 } from "./templates";
 
@@ -113,33 +115,101 @@ describe("renderClaim", () => {
 });
 
 describe("renderSignedClaim", () => {
+  // Not the real committed `DISCOVERY_QUANTILES` — see `generate.ts`'s own docblock for why the
+  // renderer is tested against a synthetic table: this is about the RENDERING mechanism, never about
+  // what a real fit happened to measure the last time someone ran it.
+  const QUANTILES: QuantileTable = {
+    touches: { RB: { 0.7: 100, 0.8: 150, 0.9: 200 } },
+    age: { RB: { 0.7: 27, 0.8: 28, 0.9: 30 } },
+    targetShare: { WR: { 0.7: 0.15, 0.8: 0.19, 0.9: 0.23 } },
+  };
   const parts: ClaimParts = {
     position: "RB",
     clause: { kind: "threshold", quantityId: "touches", quantileLevel: 0.8 },
   };
 
-  it("shares renderClaim's own intro verbatim, differing only in the trailing outcome clause", () => {
-    const neutral = renderClaim(parts);
-    const negative = renderSignedClaim(parts, -1);
-    const introOnly = neutral.replace(/scores differently in points per game the following season\.$/, "");
-    expect(negative.startsWith(introOnly)).toBe(true);
+  it("renders the real committed threshold value, never a quantile percentage", () => {
+    const claim = renderSignedClaim(parts, -1, QUANTILES);
+    expect(claim).toContain("combined carries and receptions that season is 150 or more");
+    expect(claim).not.toContain("%");
+    expect(claim).not.toContain("top");
+  });
+
+  it("prefixes a mechanical 'Title: ' the same way a hand-authored tribal claim does, for splitClaim to colon-split", () => {
+    const claim = renderSignedClaim(parts, -1, QUANTILES);
+    expect(claim.startsWith("Running back carries and receptions: ")).toBe(true);
   });
 
   it("commits to 'loses' for a negative sign", () => {
-    expect(renderSignedClaim(parts, -1)).toBe(
-      "A running back whose combined carries and receptions that season is in the top 20% of running backs loses points per game the following season.",
+    expect(renderSignedClaim(parts, -1, QUANTILES)).toBe(
+      "Running back carries and receptions: A running back whose combined carries and receptions that season is 150 or more loses points per game the following season.",
     );
   });
 
   it("commits to 'gains' for a positive sign", () => {
-    expect(renderSignedClaim(parts, 1)).toBe(
-      "A running back whose combined carries and receptions that season is in the top 20% of running backs gains points per game the following season.",
+    expect(renderSignedClaim(parts, 1, QUANTILES)).toBe(
+      "Running back carries and receptions: A running back whose combined carries and receptions that season is 150 or more gains points per game the following season.",
     );
   });
 
+  it("renders a delta clause's rise/fall wording with the real value, not a percentage", () => {
+    const rose: ClaimParts = { position: "WR", clause: { kind: "delta", quantityId: "targetShare", quantileLevel: 0.7, direction: "rose_into" } };
+    const fell: ClaimParts = { position: "WR", clause: { kind: "delta", quantityId: "targetShare", quantileLevel: 0.7, direction: "fell_out_of" } };
+    expect(renderSignedClaim(rose, 1, QUANTILES)).toContain(
+      "share of his team's targets that season rose to 15% or more after being below that mark the season before",
+    );
+    expect(renderSignedClaim(fell, -1, QUANTILES)).toContain(
+      "share of his team's targets that season fell below 15% after being at or above that mark the season before",
+    );
+  });
+
+  it("joins an AND clause's two halves with 'and whose', each stating its own value", () => {
+    const and: ClaimParts = {
+      position: "RB",
+      clause: {
+        kind: "and",
+        left: { kind: "threshold", quantityId: "touches", quantileLevel: 0.9 },
+        right: { kind: "threshold", quantityId: "age", quantileLevel: 0.7 },
+      },
+    };
+    const claim = renderSignedClaim(and, -1, QUANTILES);
+    expect(claim).toContain(
+      "combined carries and receptions that season is 200 or more and whose age at that season's opener is 27.0 or more",
+    );
+  });
+
+  it("throws when the quantile table has no entry for the clause's own (quantity, position, level) — table and candidate have drifted", () => {
+    const missing: ClaimParts = { position: "TE", clause: { kind: "threshold", quantityId: "touches", quantileLevel: 0.8 } };
+    expect(() => renderSignedClaim(missing, -1, QUANTILES)).toThrow(/no committed quantile for touches\/TE\/0\.8/);
+  });
+
   it("never emits an em-dash", () => {
-    expect(renderSignedClaim(parts, -1)).not.toMatch(/—/);
-    expect(renderSignedClaim(parts, 1)).not.toMatch(/—/);
+    expect(renderSignedClaim(parts, -1, QUANTILES)).not.toMatch(/—/);
+    expect(renderSignedClaim(parts, 1, QUANTILES)).not.toMatch(/—/);
+  });
+});
+
+describe("renderTitle", () => {
+  it("names position + quantity short label for a single clause", () => {
+    const parts: ClaimParts = { position: "RB", clause: { kind: "threshold", quantityId: "touches", quantileLevel: 0.8 } };
+    expect(renderTitle(parts)).toBe("Running back carries and receptions");
+  });
+
+  it("joins two short labels with '+' for an AND clause", () => {
+    const parts: ClaimParts = {
+      position: "RB",
+      clause: {
+        kind: "and",
+        left: { kind: "threshold", quantityId: "touches", quantileLevel: 0.9 },
+        right: { kind: "threshold", quantityId: "age", quantileLevel: 0.7 },
+      },
+    };
+    expect(renderTitle(parts)).toBe("Running back carries and receptions + age");
+  });
+
+  it("never emits an em-dash or a colon (it is meant to be the half BEFORE splitClaim's colon)", () => {
+    const parts: ClaimParts = { position: "WR", clause: { kind: "threshold", quantityId: "targetShare", quantileLevel: 0.9 } };
+    expect(renderTitle(parts)).not.toMatch(/[—:]/);
   });
 });
 

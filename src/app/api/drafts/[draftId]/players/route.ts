@@ -8,7 +8,7 @@ import type { BoardReason } from "@/projections/preseason/board";
 import { nflPlayerIdsFor } from "@/projections/crosswalk";
 import { BOARD_SOURCE, boardReasons } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { registry } from "@/projections/laws/registry";
+import { chipEligibleLaws, registry } from "@/projections/laws/registry";
 import { withLeagueMember, type RouteContext } from "../_shared";
 
 export const runtime = "nodejs";
@@ -54,7 +54,9 @@ export async function GET(request: Request, context: RouteContext) {
     const body: DraftPlayersBody = {
       players,
       reasons: await reasonsByLeaguePlayerId(db, players),
-      laws: registry(),
+      // Chip-eligible only (IMPORTANT 3 RULING, fix round) — today that is every tribal law; see
+      // `chipEligibleLaws`'s own docblock for the one predicate Task 8 flips.
+      laws: chipEligibleLaws(registry()),
     };
     return ok(body);
   });

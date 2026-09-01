@@ -10,19 +10,25 @@
  * needed. `registry()` itself is the thin wrapper that reads the committed `measured.json` off
  * disk and chains the two — nothing in `registry()` beyond that chaining is worth its own test.
  *
- * FOUR THINGS THROW, ON PURPOSE, RATHER THAN DEGRADE QUIETLY:
- *   1. `measured.json` parses but does not match `MeasuredJson`'s shape (`parseMeasuredJson`) — a
- *      non-finite `effect`, a `ci` that isn't a 2-tuple, a `verdict` outside the union, and so on.
- *      The file is generated, never hand-authored, but a hand edit that slips past `JSON.parse`
- *      deserves a named field and a clear message here, not a `TypeError` several calls deep.
+ * FIVE THINGS THROW, ON PURPOSE, RATHER THAN DEGRADE QUIETLY (fifth added Task 7, discovered laws):
+ *   1. `measured.json` (or `discovered.json`) parses but does not match its own shape
+ *      (`parseMeasuredJson`/`parseDiscoveredJson`, sharing `assertMeasuredEntryShape` for the half
+ *      both files carry) — a non-finite `effect`, a `ci` that isn't a 2-tuple, a `verdict` outside
+ *      the union, and so on. Both files are generated, never hand-authored, but a hand edit that
+ *      slips past `JSON.parse` deserves a named field and a clear message here, not a `TypeError`
+ *      several calls deep.
  *   2. A `LawSpec` with no entry in `measuredJson` — a law was added to `LAW_SPECS` and nobody
  *      re-ran `npm run laws:measure`.
  *   3. A `measuredJson` entry with no matching `LawSpec` — a law was removed/renamed from
- *      `LAW_SPECS` and the stale measurement was never cleaned out of the committed file.
- *   4. A stored `verdict` that disagrees with what `verdictForFullWindow` computes fresh from that
- *      same entry's `effect`/`ci`/`foldEffects` — the file was hand-edited, or the verdict rule
- *      changed since the file was last regenerated, either way the committed verdict can no longer
- *      be trusted at face value.
+ *      `LAW_SPECS` and the stale measurement was never cleaned out of the committed file. A
+ *      `discovered.json` entry with no matching id in `generateCandidates()` is the identical shape
+ *      of drift for the discovered half (`discoveredLawsFrom`'s own orphan guard, IMPORTANT 5
+ *      RULING, fix round).
+ *   4. A stored `verdict` that disagrees with what `verdictForFullWindow` (tribal) or
+ *      `verdictForDiscoveredLaw` (discovered) computes fresh from that same entry's own
+ *      `effect`/`ci`/`sample`/`foldEffects` — the file was hand-edited, or the verdict rule changed
+ *      since the file was last regenerated, either way the committed verdict can no longer be
+ *      trusted at face value.
  * Any of these is silent drift between the code that claims a law's evidence and the evidence
  * itself, and the whole point of measuring laws instead of asserting them is that drift cannot
  * pass unnoticed (see `populations.ts`'s and `harness.ts`'s own docblocks for the rest of that
@@ -45,16 +51,21 @@
  */
 
 import { readFileSync } from "node:fs";
+import { DISCOVERY_TRAIN_SEASONS } from "./config";
 import { LAW_SPECS, type LawSpec } from "./populations";
 import { verdictFor } from "./harness";
-import type { CandidateTemplate } from "./discovery/generate";
+import { generateCandidates, type CandidateTemplate } from "./discovery/generate";
 import type { Law, LawMeasurement, LawVerdict, PlayerSeasonPoint } from "./types";
 
 /** One replication fold's own effect (`config.ts`'s `REPLICATION_FOLDS`, one entry per predictor
- *  season) — `effect: null` when that fold's predictor season matched zero pairs. See
- *  `verdictForFullWindow`'s docblock for how a list of these combines into a verdict. */
+ *  season) — `effect: null` when that fold's predictor season matched zero pairs. `pairs` (fix
+ *  round, IMPORTANT 2) is the RAW matched-pair count for that fold, always present — `effect` is
+ *  `null` exactly when `pairs === 0`. See `verdictForFullWindow`'s docblock for how a list of these
+ *  combines into a verdict, and `verdictForDiscoveredLaw`'s for why `pairs` matters on its own,
+ *  beyond whether `effect` is null. */
 export interface FoldEffect {
   readonly season: number;
+  readonly pairs: number;
   readonly effect: number | null;
 }
 
@@ -103,8 +114,14 @@ function assertMeasuredEntryShape(prefix: string, lawId: string, record: Record<
     if (!isFiniteNumber(foldRecord.season)) {
       throw new Error(`${prefix} "${lawId}".foldEffects has an entry with a non-finite season`);
     }
+    if (!isFiniteNumber(foldRecord.pairs) || foldRecord.pairs < 0) {
+      throw new Error(`${prefix} "${lawId}".foldEffects has an entry with a non-finite or negative pairs count`);
+    }
     if (foldRecord.effect !== null && !isFiniteNumber(foldRecord.effect)) {
       throw new Error(`${prefix} "${lawId}".foldEffects has an entry with a non-finite effect or null`);
+    }
+    if ((foldRecord.pairs === 0) !== (foldRecord.effect === null)) {
+      throw new Error(`${prefix} "${lawId}".foldEffects has an entry where pairs === 0 and effect === null disagree`);
     }
   }
   if (typeof record.verdict !== "string" || !VALID_VERDICTS.has(record.verdict)) {
@@ -157,17 +174,30 @@ export function stratumKeyFor(spec: Pick<LawSpec, "position">, point: Pick<Playe
   return spec.position === "all" ? `${point.season}|${point.position}` : `${point.season}`;
 }
 
+/** The minimum full-window matched-pair sample ANY law — tribal or discovered — needs before its
+ *  verdict can read `confirmed`, on top of `verdictForFullWindow`'s own CI/sign/fold-agreement bar.
+ *  ORIGIN-BLIND (fix round, IMPORTANT 4 RULING — this floor used to apply to discovered candidates
+ *  only; a review found no principled reason a tribal law's own full-window sample should be exempt
+ *  from the identical bar a discovered one has to clear). Every one of the six tribal laws' current
+ *  `measured.json` samples clears this comfortably (the smallest confirmed one sits at 129), so this
+ *  origin-blind widening changes no tribal verdict today — the check simply stops being a
+ *  discovery-only special case. 40 is in that same range, not a novel number invented for either
+ *  rule. */
+export const MIN_REPLICATION_PAIRS = 40;
+
 /**
- * The revised grading rule: `verdictFor`'s full-window CI/sign call, refined by ONE extra step. If
- * the full window alone would call it `confirmed`, that is downgraded to `weak` unless EVERY fold
- * that matched at least one pair points the same direction as `expectedSign`. A fold whose own
- * `effect` is `null` (zero pairs matched that predictor season) is skipped rather than counted
- * against the law — it contributed no evidence either way — but a law with ZERO folds carrying
- * any pairs at all is capped at `weak` too, the same as a lone disagreeing fold: "nothing checked
- * it" is not "it checked out." `weak` and `debunked` from the full-window rule are untouched: this
- * can only ever pull a `confirmed` down to `weak`, never change a `weak` or a `debunked` into
- * anything else, so every full-window CI/sign case `verdictFor` already handles correctly keeps
- * behaving exactly as it did.
+ * The revised grading rule: `verdictFor`'s full-window CI/sign call, refined by TWO extra steps
+ * (origin-blind — this ONE function now grades both tribal and discovered laws identically; only
+ * `verdictForDiscoveredLaw`, below, adds a THIRD step specific to discovery). If the full window
+ * alone would call it `confirmed`: (1) it is downgraded to `weak` unless EVERY fold that matched at
+ * least one pair points the same direction as `expectedSign` — a fold whose own `effect` is `null`
+ * (zero pairs matched that predictor season) is skipped rather than counted against the law, but a
+ * law with ZERO folds carrying any pairs at all is capped at `weak` too, the same as a lone
+ * disagreeing fold: "nothing checked it" is not "it checked out"; (2) it is downgraded to `weak`
+ * unless the full-window sample is at least `MIN_REPLICATION_PAIRS`. `weak` and `debunked` from the
+ * full-window rule are untouched: both new steps can only ever pull a `confirmed` down to `weak`,
+ * never change a `weak` or a `debunked` into anything else, so every full-window CI/sign case
+ * `verdictFor` already handles correctly keeps behaving exactly as it did.
  */
 export function verdictForFullWindow(
   measurement: LawMeasurement,
@@ -179,7 +209,8 @@ export function verdictForFullWindow(
   const foldsWithPairs = foldEffects.filter((fold) => fold.effect !== null);
   if (foldsWithPairs.length === 0) return "weak";
   const everyFoldAgrees = foldsWithPairs.every((fold) => Math.sign(fold.effect as number) === expectedSign);
-  return everyFoldAgrees ? "confirmed" : "weak";
+  if (!everyFoldAgrees) return "weak";
+  return measurement.sample >= MIN_REPLICATION_PAIRS ? "confirmed" : "weak";
 }
 
 /**
@@ -193,20 +224,29 @@ export function verdictForFullWindow(
  * fixtures, never the real files.
  */
 
-/** The minimum full-window matched-pair sample a BH-surviving discovered candidate needs, on top of
- *  `verdictForFullWindow`'s own CI/sign/fold-agreement bar, before its verdict can read `confirmed`.
- *  BH controls the false-discovery rate at the SCREENING stage across the whole 1,737-candidate
- *  family; a survivor's own full-window sample can still be thin, and this is the pipeline's
- *  additional confirmatory bar against exactly that. 40 is in the same range the six tribal laws'
- *  own `measured.json` samples sit in, not a novel number invented for this rule. */
-export const MIN_REPLICATION_PAIRS = 40;
+/** The minimum PAIR COUNT an out-of-train replication fold (2022 or 2023 — never 2021, which sits
+ *  inside `DISCOVERY_TRAIN_SEASONS`) needs before it can count toward a discovered law's own
+ *  out-of-sample confirmation (IMPORTANT 2 RULING). A fold with only a handful of pairs agreeing by
+ *  chance is not "replicated on evidence the screen never saw" — it is noise with the right sign,
+ *  and 5 is the floor below which that distinction cannot be trusted. */
+export const MIN_OUT_OF_TRAIN_FOLD_PAIRS = 5;
 
 /**
- * A DISCOVERED candidate's verdict: `verdictForFullWindow`'s own CI/sign/fold-agreement rule, plus
- * ONE more gate that function does not apply on its own — `confirmed` also needs at least
- * `MIN_REPLICATION_PAIRS` full-window matched pairs. Exactly like `verdictForFullWindow`'s own
- * relationship to `verdictFor`, this can only ever pull a `confirmed` down to `weak`; a `weak` or
- * `debunked` verdict from `verdictForFullWindow` passes through unchanged.
+ * A DISCOVERED candidate's verdict: `verdictForFullWindow`'s own CI/sign/fold-agreement/sample-floor
+ * rule (now origin-blind, see that function's own docblock), plus ONE more gate specific to
+ * discovery (IMPORTANT 1 + IMPORTANT 2 RULINGS, fix round). `REPLICATION_FOLDS` is
+ * `[2021, 2022, 2023]`, but `DISCOVERY_TRAIN_SEASONS.to` is 2021 — THIS candidate's own antecedent
+ * and quantile thresholds were fitted using 2021 as a train season, so a discovered law's 2021 fold
+ * is NOT out-of-sample the way a tribal law's is (a tribal law has no train/fit step at all; every
+ * fold is equally out-of-sample for it). `confirmed` here additionally requires at least one
+ * OUT-OF-TRAIN fold (season > `DISCOVERY_TRAIN_SEASONS.to`, i.e. 2022 or 2023) to itself carry
+ * `>= MIN_OUT_OF_TRAIN_FOLD_PAIRS` matched pairs. That fold's DIRECTION agreement is already
+ * guaranteed by `verdictForFullWindow`'s own "every fold with pairs agrees" requirement (a
+ * prerequisite for `base === "confirmed"` in the first place) — this step only adds the missing
+ * "and at least one of them was a real out-of-sample test, not a token one," never re-checking sign.
+ * Exactly like `verdictForFullWindow`'s own relationship to `verdictFor`, this can only ever pull a
+ * `confirmed` down to `weak`; a `weak` or `debunked` verdict from `verdictForFullWindow` passes
+ * through unchanged.
  */
 export function verdictForDiscoveredLaw(
   measurement: LawMeasurement,
@@ -215,7 +255,10 @@ export function verdictForDiscoveredLaw(
 ): LawVerdict {
   const base = verdictForFullWindow(measurement, expectedSign, foldEffects);
   if (base !== "confirmed") return base;
-  return measurement.sample >= MIN_REPLICATION_PAIRS ? "confirmed" : "weak";
+  const hasOutOfTrainReplication = foldEffects.some(
+    (fold) => fold.season > DISCOVERY_TRAIN_SEASONS.to && fold.effect !== null && fold.pairs >= MIN_OUT_OF_TRAIN_FOLD_PAIRS,
+  );
+  return hasOutOfTrainReplication ? "confirmed" : "weak";
 }
 
 /** One `discovered.json` law entry: everything a `MeasuredEntry` carries, plus what makes it a
@@ -317,11 +360,28 @@ export function parseDiscoveredJson(raw: string): DiscoveredJson {
  * The pure, testable core for the DISCOVERED half of the registry: one `Law` per `discovered.json`
  * entry, `origin: "discovered"` throughout, `modelPath: null` throughout (a discovered law gets
  * wired to a fitted feature the same way a confirmed tribal law would, in a model round of its own —
- * see `LawSpec.modelPath`'s own docblock; nothing here builds or re-fits a model). Drift-checked the
- * same way `registryFrom` checks tribal entries: the stored `verdict` must equal what
- * `verdictForDiscoveredLaw` computes fresh from that same entry's own effect/ci/sample/foldEffects.
+ * see `LawSpec.modelPath`'s own docblock; nothing here builds or re-fits a model). Drift-checked TWO
+ * ways, mirroring `registryFrom`'s own pair of checks for tribal entries: (1) IMPORTANT 5 RULING,
+ * fix round — every id in `discoveredJson.laws` must exist in `candidateIds`, defaulted to the REAL
+ * `generateCandidates()`'s own ids (pure, no DB — see that function's own docblock for why calling it
+ * costs nothing at import time); a `discovered.json` id with no matching candidate means the
+ * generator and the committed file have drifted apart, the exact "orphaned measurement" shape
+ * `registryFrom` already guards against for `LAW_SPECS`. `candidateIds` is a parameter (not simply
+ * called internally with no override) so `registry.test.ts` can drive this with a small hand-built
+ * set rather than the real ~1,737-candidate one, the identical `specs`-as-parameter discipline
+ * `registryFrom` itself uses. (2) The stored `verdict` must equal what `verdictForDiscoveredLaw`
+ * computes fresh from that same entry's own effect/ci/sample/foldEffects.
  */
-export function discoveredLawsFrom(discoveredJson: DiscoveredJson): readonly Law[] {
+export function discoveredLawsFrom(
+  discoveredJson: DiscoveredJson,
+  candidateIds: ReadonlySet<string> = new Set(generateCandidates().map((candidate) => candidate.id)),
+): readonly Law[] {
+  for (const id of Object.keys(discoveredJson.laws)) {
+    if (!candidateIds.has(id)) {
+      throw new Error(`discoveredLawsFrom: discovered.json has an entry for "${id}" with no matching candidate in generateCandidates() — an orphaned discovery.`);
+    }
+  }
+
   return Object.entries(discoveredJson.laws).map(([id, entry]) => {
     const measured: LawMeasurement = { effect: entry.effect, ci: entry.ci, sample: entry.sample, seasons: entry.seasons };
     const expectedVerdict = verdictForDiscoveredLaw(measured, entry.expectedSign, entry.foldEffects);
@@ -408,4 +468,33 @@ export function registry(): readonly Law[] {
     ...registryFrom(LAW_SPECS, parseMeasuredJson(measuredRaw)),
     ...discoveredLawsFrom(parseDiscoveredJson(discoveredRaw)),
   ];
+}
+
+/**
+ * CHIP-ELIGIBLE LAWS (fix round, IMPORTANT 3 RULING) — the subset of `registry()`'s own laws a
+ * client-facing consumer may cite by id: a draft room's reason chip (`ReasonChip`), whose claim
+ * lookup is exactly what the drafts-players API route and the player panel thread `laws` through
+ * `registry()` for. TODAY that is every TRIBAL law, and nothing else: `board-reasons.ts`'s
+ * `lawReasonsFor` only ever produces a reason for a tribal-origin CONFIRMED law (see that function's
+ * own docblock) — a discovered law's condition is a `DiscoveryFacts` predicate, a shape `LAW_CONDITIONS`
+ * was never built to answer for, so no chip can name one yet regardless of its verdict.
+ *
+ * THIS IS THE ONE PREDICATE Task 8 flips the day a discovered law's own condition is wired into a
+ * live board: widen it to `law.origin === "tribal" || (law.origin === "discovered" && law.verdict ===
+ * "confirmed")` and both call sites (the drafts players route, the player panel) pick up the wider
+ * set with no call-site change, because both already call this helper rather than filtering
+ * `registry()`'s output themselves.
+ */
+export function chipEligibleLaws(laws: readonly Law[]): readonly Law[] {
+  return laws.filter((law) => law.origin === "tribal");
+}
+
+/** The discovery pipeline's own top-level accounting (`discovery/measure.ts`'s `runDiscoveryPipeline`
+ *  is what computes it), read fresh off `discovered.json` — `/player-laws`'s discovered section uses
+ *  this for its one methodology sentence (tested/untestable/bhSurvivors/replicated), never a number
+ *  typed into that page's own copy. The same "read through registry.ts, never parse the file a second
+ *  place" discipline `registry()` itself keeps. */
+export function discoveredPipelineCounts(): PipelineCounts {
+  const raw = readFileSync(DISCOVERED_JSON_PATH, "utf-8");
+  return parseDiscoveredJson(raw).counts;
 }

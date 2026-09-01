@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Law } from "@/projections/laws/types";
+import type { PipelineCounts } from "@/projections/laws/registry";
 import PlayerLawsPage from "./page";
 
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn(async () => null) }));
 
 const registryMock = vi.hoisted(() => vi.fn<() => readonly Law[]>());
-vi.mock("@/projections/laws/registry", () => ({ registry: registryMock }));
+const discoveredPipelineCountsMock = vi.hoisted(() => vi.fn<() => PipelineCounts>());
+vi.mock("@/projections/laws/registry", () => ({ registry: registryMock, discoveredPipelineCounts: discoveredPipelineCountsMock }));
+
+const DEFAULT_COUNTS: PipelineCounts = { tested: 1737, untestable: 34, bhSurvivors: 50, replicated: 13 };
+discoveredPipelineCountsMock.mockReturnValue(DEFAULT_COUNTS);
 
 /**
  * `boardConsequenceSentence` (fix round, I7): the page's own "where these show up" sentence used to
@@ -28,6 +33,69 @@ function lawFixture(over: Partial<Law> = {}): Law {
     ...over,
   };
 }
+
+function discoveredLawFixture(over: Partial<Law> = {}): Law {
+  return {
+    id: "threshold:RB:touches:q80",
+    position: "RB",
+    claim: "Running back carries and receptions: A running back whose combined carries and receptions that season is 182 or more gains points per game the following season.",
+    measured: { effect: 1.5, ci: [0.5, 2.5], sample: 200, seasons: "2013-2023" },
+    verdict: "confirmed",
+    modelPath: null,
+    hasFoldEvidence: true,
+    origin: "discovered",
+    ...over,
+  };
+}
+
+describe("PlayerLawsPage — the mechanical claim count (fix round, CRITICAL 3)", () => {
+  it("counts tribal laws plus confirmed discovered laws, never a hardcoded number", async () => {
+    registryMock.mockReturnValue([lawFixture({ id: "a" }), lawFixture({ id: "b" }), discoveredLawFixture({ id: "c" })]);
+    render(await PlayerLawsPage());
+    expect(screen.getByText(/^3 claims about fantasy production, tested against what actually happened rather than assumed true\.$/)).toBeInTheDocument();
+  });
+
+  it("excludes a non-confirmed discovered law from the count", async () => {
+    registryMock.mockReturnValue([lawFixture({ id: "a" }), discoveredLawFixture({ id: "c", verdict: "weak" })]);
+    render(await PlayerLawsPage());
+    expect(screen.getByText(/^1 claims? about fantasy production/)).toBeInTheDocument();
+  });
+});
+
+describe("PlayerLawsPage — the discovered-laws section (fix round, CRITICAL 3)", () => {
+  it("renders only CONFIRMED discovered laws, never weak or debunked ones", async () => {
+    registryMock.mockReturnValue([
+      lawFixture({ id: "tribal" }),
+      discoveredLawFixture({ id: "confirmed-one", verdict: "confirmed" }),
+      discoveredLawFixture({ id: "weak-one", verdict: "weak", claim: "Weak title: weak body sentence." }),
+    ]);
+    render(await PlayerLawsPage());
+    expect(document.getElementById("confirmed-one")).not.toBeNull();
+    expect(document.getElementById("weak-one")).toBeNull();
+  });
+
+  it("states the pipeline's own methodology sentence with the real counts, never a hardcoded number", async () => {
+    discoveredPipelineCountsMock.mockReturnValueOnce({ tested: 1737, untestable: 34, bhSurvivors: 50, replicated: 13 });
+    registryMock.mockReturnValue([discoveredLawFixture()]);
+    render(await PlayerLawsPage());
+    expect(screen.getByText(/Every one of the 1737 mechanically generated candidates/)).toBeInTheDocument();
+    expect(screen.getByText(/34 could not be matched on the training window/)).toBeInTheDocument();
+    expect(screen.getByText(/50 survived the false-discovery screen/)).toBeInTheDocument();
+    expect(screen.getByText(/13 of those also replicated on 2022 or 2023/)).toBeInTheDocument();
+  });
+
+  it("shows an honest empty state when zero discovered laws have confirmed yet", async () => {
+    registryMock.mockReturnValue([lawFixture()]);
+    render(await PlayerLawsPage());
+    expect(screen.getByText(/No discovered candidate has replicated yet/)).toBeInTheDocument();
+  });
+
+  it("boardConsequenceSentence names confirmed discovered laws as not yet chip- or model-eligible", async () => {
+    registryMock.mockReturnValue([lawFixture({ modelPath: "src/x.ts#y" }), discoveredLawFixture()]);
+    render(await PlayerLawsPage());
+    expect(screen.getByText(/The 1 confirmed discovered law does not show up as a reason chip or feed the board's rankings yet\./)).toBeInTheDocument();
+  });
+});
 
 describe("PlayerLawsPage — boardConsequenceSentence", () => {
   it("says every confirmed law feeds the rankings when every confirmed law is wired", async () => {

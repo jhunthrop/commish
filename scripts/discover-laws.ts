@@ -26,8 +26,8 @@ import { DISCOVERY_TRAIN_SEASONS, MEASURE_SEASONS, REPLICATION_FOLDS } from "@/p
 import { discoveryFactsForSeason } from "@/projections/laws/discovery-facts";
 import { actualPointsPerGame, factsForSeason } from "@/projections/laws/populations";
 import { generateCandidates } from "@/projections/laws/discovery/generate";
-import { runDiscoveryPipeline, type DiscoverySeasonRow } from "@/projections/laws/discovery/measure";
-import { DISCOVERED_JSON_PATH, type DiscoveredJson } from "@/projections/laws/registry";
+import { MIN_TRAIN_PAIRS, runDiscoveryPipeline, type DiscoverySeasonRow } from "@/projections/laws/discovery/measure";
+import { DISCOVERED_JSON_PATH, MIN_OUT_OF_TRAIN_FOLD_PAIRS, MIN_REPLICATION_PAIRS, type DiscoveredJson } from "@/projections/laws/registry";
 import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
 
 const OUTPUT_PATH = DISCOVERED_JSON_PATH;
@@ -49,8 +49,13 @@ function fullWindowSeasons(): readonly number[] {
 }
 
 /** e.g. "2013-2023 (2019 rebuilt from play-by-play), direction discovered on predictor seasons
- *  2013-2021, replicated on predictor seasons 2021-2023" — `discovered.json`'s own `seasons` label,
- *  the discovery analogue of `measure-laws.ts`'s `seasonsLabel`. */
+ *  2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train
+ *  window; only 2022 and 2023 are genuinely out-of-sample for a discovered law)" — `discovered.json`'s
+ *  own `seasons` label, the discovery analogue of `measure-laws.ts`'s `seasonsLabel`. The
+ *  parenthetical (fix round, IMPORTANT 1 RULING) is the one place a reader of the committed file
+ *  itself, not just this repo's source, learns that a discovered law's 2021 fold is not the same kind
+ *  of evidence its 2022/2023 folds are — see `discovery/measure.ts`'s own docblock (step 4) and
+ *  `registry.ts`'s `verdictForDiscoveredLaw` for where that distinction actually changes a verdict. */
 function seasonsLabel(): string {
   const window = `${MEASURE_SEASONS.from}-${MEASURE_SEASONS.to - 1}`;
   const gapNote = STAT_LINE_GAPS.length === 0 ? "" : ` (${STAT_LINE_GAPS.join(", ")} rebuilt from play-by-play)`;
@@ -58,7 +63,8 @@ function seasonsLabel(): string {
   const replicated = folds.length === 1 ? `${folds[0]}` : `${folds[0]}-${folds[folds.length - 1]}`;
   return (
     `${window}${gapNote}, direction discovered on predictor seasons ` +
-    `${DISCOVERY_TRAIN_SEASONS.from}-${DISCOVERY_TRAIN_SEASONS.to}, replicated on predictor seasons ${replicated}`
+    `${DISCOVERY_TRAIN_SEASONS.from}-${DISCOVERY_TRAIN_SEASONS.to}, replicated on predictor seasons ${replicated} ` +
+    `(${DISCOVERY_TRAIN_SEASONS.to} sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)`
   );
 }
 
@@ -96,8 +102,11 @@ function printSummary(candidateCount: number, discoveredJson: DiscoveredJson): v
   console.log(`\nDISCOVERY TRIAL -- ${candidateCount} candidates`);
   console.log(`  tested:       ${counts.tested}`);
   console.log(`  untestable:   ${counts.untestable}  (zero matched pairs on the train window -- expected for narrow AND conditions)`);
-  console.log(`  bhSurvivors:  ${counts.bhSurvivors}  (Benjamini-Hochberg at q=0.10 over the testable family)`);
-  console.log(`  replicated:   ${counts.replicated}  (full-window confirmed: CI excludes zero, sign matches, every fold agrees, >= 40 pairs)`);
+  console.log(`  bhSurvivors:  ${counts.bhSurvivors}  (Benjamini-Hochberg at q=0.10 over the testable family, min ${MIN_TRAIN_PAIRS} train pairs)`);
+  console.log(
+    `  replicated:   ${counts.replicated}  (full-window confirmed: CI excludes zero, sign matches, every fold agrees, >= ${MIN_REPLICATION_PAIRS} pairs, ` +
+      `and at least one out-of-train fold with >= ${MIN_OUT_OF_TRAIN_FOLD_PAIRS} pairs)`,
+  );
 
   const entries = Object.entries(laws).sort(([a], [b]) => a.localeCompare(b));
   if (entries.length === 0) {
