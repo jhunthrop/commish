@@ -343,3 +343,54 @@ Re-verified against the tree on 2026-09-01 rather than copied from the ledger as
 
 None of these block the scorecard or any verdict above; they are the honest list of loose ends a
 future round should pick up.
+
+## Addendum (2026-09-01, live-board plan Task 4 fix round 2): the position-gate defect, measured
+
+A review of Task 4 (the 2026 live board) found a PRICING defect predating this whole round:
+`laws/board-reasons.ts`'s `lawReasonsFor` carried no position gate of its own. A tribal law's condition
+was evaluated against any player's `LawConditionFacts` regardless of the position the law was measured
+on (`rb_age_curve`, fitted only over RBs via `buildPopulations`'s own `eligible(position)` gate, could
+fire on a WR whose age cleared the same numeric threshold); a discovered candidate's condition against
+any player regardless of the position it was generated for. `blend.ts`'s `blendBoard` reads exactly
+these "law" reasons to compute a player's admitted price delta, so this moved REAL, ALREADY-SHIPPED
+board points, not only a future live board's.
+
+**Magnitude, measured directly against 2024 (the decisive season this document's own bar rests on):**
+rebuilding the identical 2024 board with the gate fix on vs off moved 45 of 653 players' own
+`projectedPoints` (max delta 5.22 pts), rippling into 128 points-rank and 372 value-rank reorders.
+
+**Fixed** (`laws/board-reasons.ts`): both arms gated by the player's own position before a law's
+condition is ever evaluated — tribal via a new `LAW_ELIGIBILITY` map built from the identical
+`LAW_ENTRIES` the measurement harness already gates its own population with (measured-on = applied-to,
+one predicate); discovered via `candidate.position === player position`. `BOARD_SOURCE` bumped to v5
+(`commish_board_v5_ppr_12`) since a replay season's deterministic `as_of` would otherwise collide with
+the unique key and silently keep serving the stale numbers, the same trap v2/v3/v4 were each bumped to
+close.
+
+**The held-out scorecard, re-measured under the fix, both decisive-season figures beside the published
+ones:**
+
+| | published | re-measured (gate fix) |
+|---|---|---|
+| 2024 blend rho | 0.5301 | 0.5293 |
+| 2024 blend vs ADP gap | +0.1029 [+0.0081, +0.2099] BEYOND NOISE | +0.1021 [+0.0070, +0.2102] BEYOND NOISE |
+| 2024 starter band gap | +0.2390 [+0.0403, +0.4443] WON BEYOND NOISE | +0.2355 [+0.0421, +0.4377] WON BEYOND NOISE |
+| 2023 blend vs ADP gap (in-fit) | +0.0570 [-0.0515, +0.1685] within noise | +0.0566 [-0.0526, +0.1680] within noise |
+
+**THE BAR STILL HOLDS, unchanged in every verdict.** Every BEYOND NOISE / within noise / WON BEYOND
+NOISE classification above is identical under the gate fix. The largest point-estimate move on any of
+these figures is 0.0035 rho (the starter band gap), far too small to flip any 95% interval's
+relationship to zero. The defect was real and worth fixing (up to 5.22 pts/player, materially reordering
+individual rows) but too small and too evenly spread across the ranking to have been propping up or
+hiding the scorecard's own headline conclusion — consistent with section 3's channel decomposition,
+where laws already carried only 4.5-4.6% of the measured lift over pure market and the availability
+channel did nearly all of the work. `blend-fitted.ts`'s own train-time constants were regenerated for
+the same reason (the fit's own candidates carry law reasons too): winning cell moved from
+(availabilityCapPoints=40, totalCapPoints=20) to (20, 40), rho 0.6053 -> 0.6054, laws' train-time share
+4.5% -> 4.6% — immaterial, but a real refit, documented in that file's own regenerated header.
+
+On the re-persisted 2026 live board itself, the fix is visible directly: law chips are now
+position-scoped (`rb_age_curve` firing on RB names like Henry/McCaffrey/Barkley, WR age on WR names
+like A.J. Brown/Adams/DJ Moore, TD-share on Rice/Higgins) and no cross-position chip appears anywhere
+on the board — the defect this whole fix round exists to close, confirmed absent on the real, final
+board.
