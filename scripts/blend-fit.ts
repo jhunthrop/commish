@@ -189,7 +189,7 @@ function header(summary: FitSummary): string {
  *
  * THE PLATEAU (fix round 2, ruling 4b): ${summary.plateau.tiedCellCount} of this grid's own cells
  * scored within 1e-4 of the winner — a genuine plateau, not a single sharp peak.
- * ${summary.plateau.anyTiedAtCeiling ? `At least one of those tied cells sits at this grid's own ceiling (${summary.ceiling}) on a cap axis — a wider grid might still move the winner.` : `None of the tied cells sits at this grid's own ceiling (${summary.ceiling}) — the search found a genuine interior optimum, not one pinned to the edge of what it was allowed to try.`}
+ * ${summary.plateau.anyTiedAtCeiling ? `At least one of those tied cells sits at this grid's own ceiling (${summary.ceiling}) on a cap axis; a wider grid might still move the winner.` : `None of the tied cells sits at this grid's own ceiling (${summary.ceiling}); the search found a genuine interior optimum, not one pinned to the edge of what it was allowed to try.`}
  *
  * THE CHANNEL DECOMPOSITION — pure market (every cap at zero) ${summary.pureMarketScore === null ? "n/a" : summary.pureMarketScore.toFixed(4)},
  * availability admitted alone (lawCapPoints at zero, the winning availability/total caps otherwise)
@@ -241,13 +241,13 @@ async function main(): Promise<void> {
   // times `rows.length` rows would mean hundreds of thousands of redundant file reads.
   const laws = registry();
 
-  console.log("\nfitting the structural tail guard, per position (fix round 2, ruling 2) — the unlisted fallback's only pricing rule (fix round 3, IMPORTANT 1)...");
+  console.log("\nfitting the structural tail guard, per position (fix round 2, ruling 2), the unlisted fallback's only pricing rule (fix round 3, IMPORTANT 1)...");
   const marketTailByPosition = fitMarketTailByPosition(rows);
   for (const position of ["QB", "RB", "WR", "TE"] as const) {
     console.log(`  ${position}: ${marketTailByPosition[position].toFixed(1)} pts (the market's own cheapest drafted man at this position)`);
   }
 
-  console.log(`\nGRID (${GRID.join(", ")}), every cell scored (I2 fix round — no pruning):\n`);
+  console.log(`\nGRID (${GRID.join(", ")}), every cell scored (I2 fix round, no pruning):\n`);
   console.log(`${"lawCap".padStart(7)}  ${"availCap".padStart(9)}  ${"totalCap".padStart(9)}  ${"rho".padStart(8)}`);
 
   let best: { constants: BlendConstants; score: number } | null = null;
@@ -275,14 +275,14 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(`\nscored ${cells.length} grid cells (every combination — I2 fix round removed the earlier pruning rule)`);
+  console.log(`\nscored ${cells.length} grid cells (every combination; the I2 fix round removed the earlier pruning rule)`);
   console.log(
-    `\nPURE MARKET BASELINE (lawCapPoints=0, availabilityCapPoints=0, totalCapPoints=0 — zero deviation from marketPoints for every ` +
+    `\nPURE MARKET BASELINE (lawCapPoints=0, availabilityCapPoints=0, totalCapPoints=0, zero deviation from marketPoints for every ` +
       `listed player): rho=${pureMarketScore === null ? "n/a" : pureMarketScore.toFixed(4)}`,
   );
 
   if (best === null) {
-    throw new Error("The blend grid search found no scoreable combination — every cell returned null from `spearman`.");
+    throw new Error("The blend grid search found no scoreable combination; every cell returned null from `spearman`.");
   }
 
   const beatsPureMarket = pureMarketScore !== null && best.score > pureMarketScore;
@@ -309,8 +309,8 @@ async function main(): Promise<void> {
   console.log(
     `\nPLATEAU: ${plateau.tiedCellCount} of ${cells.length} cells scored within 1e-4 of the winner. ` +
       (plateau.anyTiedAtCeiling
-        ? `At least one tied cell sits at this grid's own ceiling (${ceiling}) on a cap axis — a wider grid might still move the winner.`
-        : `None of the tied cells sits at this grid's own ceiling (${ceiling}) — a genuine interior optimum.`),
+        ? `At least one tied cell sits at this grid's own ceiling (${ceiling}) on a cap axis; a wider grid might still move the winner.`
+        : `None of the tied cells sits at this grid's own ceiling (${ceiling}); a genuine interior optimum.`),
   );
 
   const rendered = render(best.constants, {

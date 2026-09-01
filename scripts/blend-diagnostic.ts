@@ -95,7 +95,7 @@ async function main(): Promise<void> {
     const blendedBoard = preseasonBoard(blendedCandidates, { season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
     const rawBoard = preseasonBoard(rawCandidates, { season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
 
-    console.log(`\nMETRIC 1 — TOP ${TOP_N} POSITION MIX, blended vs raw:`);
+    console.log(`\nMETRIC 1: TOP ${TOP_N} POSITION MIX, blended vs raw:`);
     printPositionMix("blended", positionMix(blendedBoard, TOP_N), Math.min(TOP_N, blendedBoard.length));
     printPositionMix("raw", positionMix(rawBoard, TOP_N), Math.min(TOP_N, rawBoard.length));
 
@@ -124,8 +124,8 @@ async function main(): Promise<void> {
       }
     }
     console.log(
-      `\nMETRIC 2 — unlisted players (${unlistedByPlayer.size} total) priced ABOVE their own positional tail: ${overTail}` +
-        (overTail === 0 ? "  (the structural guarantee holds)" : "  (STRUCTURAL GUARANTEE VIOLATED)"),
+      `\nMETRIC 2: unlisted players (${unlistedByPlayer.size} total) priced ABOVE their own positional tail: ${overTail}` +
+        (overTail === 0 ? "  (the structural guarantee holds)" : "  (THE STRUCTURAL GUARANTEE DID NOT HOLD)"),
     );
     for (const offender of offenders.slice(0, 10)) {
       console.log(`    ${offender.position} ${offender.playerId}  ${offender.points.toFixed(1)} pts  (tail ${offender.tail.toFixed(1)})`);
