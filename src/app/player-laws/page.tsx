@@ -404,6 +404,15 @@ function groupIntoFamilies(laws: readonly Law[]): readonly DiscoveredFamily[] {
  * derived, not a single hardcoded id check: a future confirmed discovered law on `touches` (RB) or
  * `age` (RB) or `targetShare` (WR) gets the identical treatment with no new code, only whatever
  * `overlapNoteFor` finds when it looks a family's own quantities up here.
+ *
+ * HAND-MAINTAINED, WITH A SILENT FAILURE MODE (fix round 2 concern, copied in here fix round 3): this
+ * table is not generated from `LAW_SPECS` and nothing forces it to stay in sync the way
+ * `discoveredLawsFrom`'s own orphan guard forces `discovered.json` to stay in sync with
+ * `generateCandidates()`. A future tribal law added without a matching entry here simply produces no
+ * overlap note — silently, never a drift error. That is the right failure mode for what this table
+ * is (a soft editorial nicety, one plain sentence, never a correctness guarantee a reader depends
+ * on), but it is worth naming here rather than only in this task's own report: nobody adding a
+ * seventh tribal law should expect this table to complain if they forget it.
  */
 const TRIBAL_QUANTITY_OVERLAP: ReadonlyMap<QuantityId, { readonly tribalLawId: string; readonly positions: readonly string[] }> = new Map([
   ["touches", { tribalLawId: "rb_workload_cliff", positions: ["RB"] }],

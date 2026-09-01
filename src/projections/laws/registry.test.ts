@@ -527,6 +527,30 @@ describe("parseDiscoveredJson", () => {
     const malformed = JSON.stringify({ counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
     expect(() => parseDiscoveredJson(malformed)).toThrow(/pairs === 0 and effect === null disagree/);
   });
+
+  /**
+   * NEW-6 RULING's own failure path (fix round 3 — round 2 added the cross-check but every existing
+   * fixture happened to already satisfy it, so the throw itself was never exercised). Both checks
+   * fire on the SAME shape of drift: `counts` claims a number that disagrees with what `laws` (the
+   * actual committed entries) holds.
+   */
+  it("throws when counts.bhSurvivors disagrees with the actual number of laws entries", () => {
+    const entry = discoveredEntryFixture(); // verdict: "confirmed" by default
+    const malformed = JSON.stringify({
+      counts: { candidates: 1737, untestable: 900, bhSurvivors: 2, replicated: 1 }, // claims 2, laws has 1
+      laws: { fake_candidate: entry },
+    });
+    expect(() => parseDiscoveredJson(malformed)).toThrow(/counts\.bhSurvivors is 2 but laws has 1 entries/);
+  });
+
+  it("throws when counts.replicated disagrees with the actual number of confirmed laws entries", () => {
+    const entry = discoveredEntryFixture(); // verdict: "confirmed" by default
+    const malformed = JSON.stringify({
+      counts: { candidates: 1737, untestable: 900, bhSurvivors: 1, replicated: 0 }, // claims 0 confirmed, laws has 1
+      laws: { fake_candidate: entry },
+    });
+    expect(() => parseDiscoveredJson(malformed)).toThrow(/counts\.replicated is 0 but laws has 1 confirmed entries/);
+  });
 });
 
 // `discoveredLawsFrom`'s orphan guard (IMPORTANT 5 RULING) defaults to the REAL `generateCandidates()`

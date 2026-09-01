@@ -104,6 +104,21 @@ describe("PlayerLawsPage — the discovered-laws section (fix round 1, CRITICAL 
     expect(screen.queryByText(/candidates above/)).not.toBeInTheDocument();
   });
 
+  it("NEW-4 — the card shows only the short (pre-comma) seasons window; the full replication-provenance record is never rendered", async () => {
+    const longSeasons =
+      "2013-2023, direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 " +
+      "(2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)";
+    registryMock.mockReturnValue([discoveredLawFixture({ measured: { effect: 1.5, ci: [0.5, 2.5], sample: 200, seasons: longSeasons } })]);
+    render(await PlayerLawsPage());
+    // The record itself (the fixture object passed to registry()) still carries the full string —
+    // shortSeasonsLabel is a presentation-only transform, never a mutation of the underlying Law.
+    expect(longSeasons).toContain("direction discovered on predictor seasons");
+    // The card renders only the short window.
+    expect(screen.getByText("2013-2023")).toBeInTheDocument();
+    expect(screen.queryByText(longSeasons)).not.toBeInTheDocument();
+    expect(screen.queryByText(/direction discovered on predictor seasons/)).not.toBeInTheDocument();
+  });
+
   it("shows an honest empty state when zero discovered laws have confirmed yet", async () => {
     registryMock.mockReturnValue([lawFixture()]);
     render(await PlayerLawsPage());
