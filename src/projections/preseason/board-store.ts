@@ -137,8 +137,26 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * claim: v5 and v6 rows sit side by side for 2021-2024 and a read-only comparison either finds them
  * identical or does not. v5 is not kept as a named constant — unlike v2/v3/v4 its archive rows are
  * not wrong, they are simply the same numbers under an older name.
+ *
+ * BUMPED AGAIN TO v7 (vegas-laws plan, Task 4 — the SIXTH occurrence of the identical unique-key
+ * problem, and the first one whose fix is expected to move the ARCHIVES ON PURPOSE). Discovery
+ * confirmed two new laws over a quantity this engine had never carried: a team's published Vegas
+ * win total for the season being projected
+ * (`and:WR:threshold:WR:incomingTeamWinTotal:q70+threshold:WR:snapShare:q70` and its q80 sibling,
+ * both WR, both positive). `blendBoard` reads exactly the "law" reasons `lawReasonsFor` emits, so a
+ * newly confirmed law is a price change for every player whose condition it holds for, on every
+ * season that has a line — which, unlike the v6 round's live-arm-only admission, is ALL FIVE. The
+ * archives are therefore expected to differ from v6, and the honest proof is not a byte-identical
+ * comparison but a scoped one: every moved row is a wide receiver gaining or losing one of the two
+ * new chips, or a rank rippling off one who did.
+ *
+ * WHY A BUMP IS STILL THE POINT: `(season, source, as_of)` would silently refuse every archive row
+ * on a v6 re-persist (a replay `as_of` is derived and deterministic), so the new pricing would never
+ * reach the store while the reasons table, which has no `as_of`, updated underneath it — the exact
+ * silent-stale failure v2 through v5 each shipped once. v6 is not kept as a named constant: like v5
+ * its rows are not wrong, they are the same board before two laws it could not yet know about.
  */
-export const BOARD_SOURCE = "commish_board_v6_ppr_12";
+export const BOARD_SOURCE = "commish_board_v7_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {

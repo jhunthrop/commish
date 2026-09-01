@@ -11,7 +11,9 @@ import { predictRates } from "../model/efficiency";
 import { recordObservations, type PlayerWeekObservation } from "../store";
 import { BENCHMARK_SOURCES } from "./benchmarks";
 import { recordPreseasonRankings, recordPreseasonRosters } from "./store";
-import { recordTeamObservations } from "../team-store";
+import { recordPlayerTeams, recordTeamObservations, type PlayerWeekTeam, type TeamWeekObservation } from "../team-store";
+import { VEGAS_METRICS, VEGAS_SOURCE } from "../vegas/ingest";
+import { lawReasonsFor } from "../laws/board-reasons";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { DEPTH_METRIC, DEPTH_SOURCE } from "./depth";
 import { INJURY_METRICS, INJURY_SOURCE } from "../news/retrieve";
@@ -461,6 +463,178 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
     expect(lawReasons.map((reason) => (reason.code === "law" ? reason.lawId : null)).sort()).toEqual([
       "target_share_persistence",
       "threshold:WR:targetShare:q80",
+    ]);
+  });
+});
+
+/**
+ * THE WIN-TOTAL LAWS ON THE BOARD (vegas-laws Task 4) — the ONE fact class in `DiscoveryFacts` that
+ * is published AFTER the May gate the rest of that module reads on, proven to reach a board row
+ * through the real `loadPreseason` -> `discoveryFactsForSeason(..., incomingAsOf = the board's own
+ * moment)` path rather than through hand-built facts.
+ *
+ * The law fixtures carry the REAL discovered ids (`and:WR:threshold:WR:incomingTeamWinTotal:q70 +
+ * threshold:WR:snapShare:q70`, and its q80 sibling), because `preseasonCandidates`' own
+ * `lawReasonsFor` call site never overrides `board-reasons.ts`'s default candidate map: a discovered
+ * `Law.id` is always matched against the real `generateCandidates()` output. Their verdicts and
+ * effects are fixtures, so a future re-discovery cannot move this test's pass/fail.
+ *
+ * The numbers are exact and hand-checkable against the committed `DISCOVERY_QUANTILES` table:
+ *
+ *   - snap share: this file's shared `playerWeek` fixture writes 55 offensive snaps against 65 team
+ *     snaps every week under `NFLVERSE_SOURCE.snapCounts`, which is the source
+ *     `discovery-facts.ts`'s own `seasonSnapCounts` reads. 55/65 = 0.8462, over the WR q70 mark of
+ *     0.6926 (and over q80's 0.7749, which is why only the two fixtures' win-total halves separate
+ *     them below).
+ *   - incoming win total: 10.5 for BUF, over the WR q70 mark of 9.0 AND the q80 mark of 9.5.
+ *
+ * "Incoming" means season 2024's line attached to a player's season-2023 team, which is why every
+ * fixture player below needs a 2023 `playerWeekTeams` edge: `discoveryQuantitiesForSeason` resolves
+ * his team from the season it is describing, then looks the NEXT season's line up under it.
+ */
+describe("the win-total laws — the board's own incoming-line path (vegas-laws Task 4)", () => {
+  const WIN_TOTAL_QB = "00-0000003";
+  const NO_LINE_WR = "00-0000004";
+  const LATE_LINE_WR = "00-0000005";
+  /** August of the season being projected: after May's schedule gate, before the board's moment. */
+  const LINE_PUBLISHED = new Date("2024-08-15T00:00:00.000Z");
+  /** The same fact, stamped after the season started. A board must not be able to see it. */
+  const LINE_PUBLISHED_LATE = new Date("2024-09-20T00:00:00.000Z");
+  const SNAP_SHARE = 55 / 65;
+
+  function winTotalLaw(overrides: Partial<Law> = {}): Law {
+    return {
+      id: "and:WR:threshold:WR:incomingTeamWinTotal:q70+threshold:WR:snapShare:q70",
+      position: "WR",
+      claim: "Fixture claim for the q70 win-total law, independent of the real discovered.json.",
+      measured: { effect: 1.5, ci: [0.9, 2.2], sample: 244, seasons: "fixture" },
+      trainEffect: 1.3,
+      verdict: "confirmed",
+      modelPath: null,
+      hasFoldEvidence: true,
+      origin: "discovered",
+      primaryQuantityId: "snapShare",
+      primaryQuantityNoun: "snap share",
+      primaryQuantityUnit: "percent",
+      ...overrides,
+    };
+  }
+
+  function winTotalLawQ80(): Law {
+    return winTotalLaw({
+      id: "and:WR:threshold:WR:incomingTeamWinTotal:q80+threshold:WR:snapShare:q70",
+      claim: "Fixture claim for the q80 win-total law, independent of the real discovered.json.",
+      measured: { effect: 1.8, ci: [1.1, 2.6], sample: 196, seasons: "fixture" },
+      trainEffect: 1.5,
+    });
+  }
+
+  /** One more fixture player: the universe row, a full 2023, his 2023 team edges, his 2024 roster. */
+  async function seedPlayer(playerId: string, position: "WR" | "QB", team: string): Promise<void> {
+    await recordNflPlayers(db, [
+      { id: playerId, espnId: null, pfrId: null, name: `Fixture ${playerId}`, position, latestTeam: team, rookieSeason: 2020, lastSeason: 2024 },
+    ]);
+    const rows: PlayerWeekObservation[] = [];
+    const teamRows: PlayerWeekTeam[] = [];
+    for (let week = 1; week <= 17; week += 1) {
+      rows.push(...playerWeek(2023, week, playerId, PRIOR_SEASON_LANDED, 1));
+      teamRows.push({ season: 2023, week, playerId, team, asOf: PRIOR_SEASON_LANDED });
+    }
+    await recordObservations(db, rows);
+    await recordPlayerTeams(db, teamRows);
+    await recordPreseasonRosters(db, [
+      {
+        season: 2024,
+        team,
+        playerId,
+        position,
+        status: "active",
+        birthDate: "1998-04-08",
+        draftYear: 2020,
+        draftPick: 17,
+        draftClub: team,
+        asOf: week1RosterAsOf(2024),
+      },
+    ]);
+  }
+
+  function winTotalRow(team: string, value: number, asOf: Date): TeamWeekObservation {
+    // Week ONE, exactly — `vegas/ingest.ts` writes one row per team-season and does not replicate it
+    // across the season, and `incomingWinTotalByTeam` reads that week exactly.
+    return { season: 2024, week: 1, team, source: VEGAS_SOURCE, metric: VEGAS_METRICS.winTotal, value, asOf };
+  }
+
+  beforeEach(async () => {
+    // The veteran this file already seeds is the FIRING wide receiver; he needs only his 2023 team.
+    const veteranTeams: PlayerWeekTeam[] = [];
+    for (let week = 1; week <= 17; week += 1) veteranTeams.push({ season: 2023, week, playerId: VETERAN, team: "BUF", asOf: PRIOR_SEASON_LANDED });
+    await recordPlayerTeams(db, veteranTeams);
+    await seedPlayer(WIN_TOTAL_QB, "QB", "BUF");
+    await seedPlayer(NO_LINE_WR, "WR", "NYJ");
+    await seedPlayer(LATE_LINE_WR, "WR", "MIA");
+    await recordTeamObservations(db, [
+      winTotalRow("BUF", 10.5, LINE_PUBLISHED),
+      winTotalRow("MIA", 10.5, LINE_PUBLISHED_LATE),
+      // NYJ deliberately absent: the tri-state arm.
+    ]);
+  });
+
+  async function lawReasonsOf(playerId: string, laws: readonly Law[]): Promise<readonly string[]> {
+    const inputs = await loadPreseason(db, 2024, { laws });
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const candidate = candidates.find((entry) => entry.playerId === playerId)!;
+    return candidate.reasons.flatMap((reason) => (reason.code === "law" ? [reason.lawId] : []));
+  }
+
+  it("resolves the NEXT season's published win total on the board's own moment, which the May gate would have nulled", async () => {
+    const inputs = await loadPreseason(db, 2024);
+    expect(inputs.discoveryFacts.get(VETERAN)!.current.incomingTeamWinTotal).toBe(10.5);
+    expect(inputs.discoveryFacts.get(VETERAN)!.current.snapShare).toBeCloseTo(SNAP_SHARE, 12);
+  });
+
+  it("gives a WIDE RECEIVER over both marks the chip, carrying the law's effect and his own snap share", async () => {
+    const inputs = await loadPreseason(db, 2024, { laws: [winTotalLaw(), winTotalLawQ80()] });
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+
+    expect(veteran.reasons.filter((reason) => reason.code === "law")).toEqual([
+      { code: "law", lawId: "and:WR:threshold:WR:incomingTeamWinTotal:q70+threshold:WR:snapShare:q70", effect: 1.5, magnitude: SNAP_SHARE },
+      { code: "law", lawId: "and:WR:threshold:WR:incomingTeamWinTotal:q80+threshold:WR:snapShare:q70", effect: 1.8, magnitude: SNAP_SHARE },
+    ]);
+  });
+
+  it("gives a QUARTERBACK with the IDENTICAL numbers no chip — the position gate, not the arithmetic", async () => {
+    const inputs = await loadPreseason(db, 2024, { laws: [winTotalLaw()] });
+    const quarterback = inputs.discoveryFacts.get(WIN_TOTAL_QB)!;
+    // His numbers are the receiver's, to the digit, and they DO trip the candidate's own condition:
+    // the same facts under a WR position produce the chip. Only `lawReasonsFor`'s position gate
+    // stands between him and a law measured over wide receivers alone.
+    expect(quarterback.current.incomingTeamWinTotal).toBe(10.5);
+    expect(quarterback.current.snapShare).toBeCloseTo(SNAP_SHARE, 12);
+    expect(lawReasonsFor("WR", null, quarterback, [winTotalLaw()])).toHaveLength(1);
+
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const board = candidates.find((candidate) => candidate.playerId === WIN_TOTAL_QB)!;
+    expect(board.position).toBe("QB");
+    expect(board.reasons.some((reason) => reason.code === "law")).toBe(false);
+  });
+
+  it("gives a receiver whose team has NO published line no chip — unknown, never a false zero", async () => {
+    const inputs = await loadPreseason(db, 2024, { laws: [winTotalLaw()] });
+    expect(inputs.discoveryFacts.get(NO_LINE_WR)!.current.incomingTeamWinTotal).toBeNull();
+    expect(await lawReasonsOf(NO_LINE_WR, [winTotalLaw()])).toEqual([]);
+  });
+
+  it("gives a receiver whose line is stamped AFTER the board's moment no chip — the gate is real", async () => {
+    const inputs = await loadPreseason(db, 2024, { laws: [winTotalLaw()] });
+    expect(inputs.discoveryFacts.get(LATE_LINE_WR)!.current.incomingTeamWinTotal).toBeNull();
+    expect(await lawReasonsOf(LATE_LINE_WR, [winTotalLaw()])).toEqual([]);
+  });
+
+  it("gives a receiver over the q70 line but UNDER the q80 line only the q70 chip", async () => {
+    await recordTeamObservations(db, [{ ...winTotalRow("BUF", 9.0, LINE_PUBLISHED), asOf: new Date(LINE_PUBLISHED.getTime() + 1) }]);
+    expect(await lawReasonsOf(VETERAN, [winTotalLaw(), winTotalLawQ80()])).toEqual([
+      "and:WR:threshold:WR:incomingTeamWinTotal:q70+threshold:WR:snapShare:q70",
     ]);
   });
 });

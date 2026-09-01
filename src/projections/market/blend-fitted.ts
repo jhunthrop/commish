@@ -10,7 +10,7 @@ import type { BlendConstants } from "./blend";
  * own cheapest drafted man per position (see `market/blend.ts`'s own docblocks). See
  * `scripts/blend-fit.ts` for the grid.
  *
- * THE WINNING SCORE: spearman rho = 0.6054 on the train rows.
+ * THE WINNING SCORE: spearman rho = 0.6055 on the train rows.
  *
  * THE PLATEAU (fix round 2, ruling 4b): 12 of this grid's own cells
  * scored within 1e-4 of the winner — a genuine plateau, not a single sharp peak.
@@ -19,7 +19,7 @@ import type { BlendConstants } from "./blend";
  * THE CHANNEL DECOMPOSITION — pure market (every cap at zero) 0.5892,
  * availability admitted alone (lawCapPoints at zero, the winning availability/total caps otherwise)
  * 0.6046, laws admitted too (the winning cell in full)
- * 0.6054 — laws' own share of the total lift over pure market is 4.6%. Written down so
+ * 0.6055 — laws' own share of the total lift over pure market is 5.6%. Written down so
  * Task 11's own ablation of this board is not a surprise: the availability channel does almost all
  * of the work, laws add a real but small amount on top.
  */

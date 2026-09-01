@@ -76,10 +76,10 @@ export interface PlayerSeasonTotals {
  *   `player_crosswalk` — the id join that did not exist when this docblock was first written and
  *   was the reason the cell printed a dash. It resolves for a player the crosswalk placed AND the
  *   publisher ranked, which for the current season is 441 of the 518 names on the board.
- * - **Our own board** is `preseason_projections`, source `commish_board_v6_ppr_12` (`BOARD_SOURCE`,
- *   `board-store.ts` — the market-blended board, bumped to v6 in the live-board final fix round so
- *   the live arm's derived-prior-season fix could be re-persisted beside v5's rows rather than
- *   colliding with them, following the v2/v3/v4/v5 bumps before it; see that constant's own docblock
+ * - **Our own board** is `preseason_projections`, source `commish_board_v7_ppr_12` (`BOARD_SOURCE`,
+ *   `board-store.ts` — the market-blended board, bumped to v7 in the vegas-laws round so the two
+ *   newly confirmed win-total laws could price every season beside v6's rows rather than colliding
+ *   with them, following the v2/v3/v4/v5/v6 bumps before it; see that constant's own docblock
  *   for the full history). `commish_board_v1_ppr_12` is the raw model's own historical source, kept for provenance
  *   but no longer what a live product surface reads. Read through the same crosswalk.
  *   IT NOW FILLS FOR THE CURRENT SEASON (live-board plan, Task 4): `scripts/preseason-persist.ts`
