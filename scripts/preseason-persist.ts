@@ -95,7 +95,7 @@ async function persistBoard(
 ): Promise<{ readonly board: readonly BoardEntry[]; readonly written: number; readonly reasonsWritten: number }> {
   const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, { raw });
   const board = preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
-  const rows = projectionRows(board, { season: inputs.season, source, asOf: inputs.moment });
+  const rows = projectionRows(board, { season: inputs.season, source, asOf: inputs.moment, momentKind: inputs.momentKind });
   const written = await recordPreseasonProjections(db, rows);
   const reasons = reasonRows(board, { season: inputs.season, source, asOf: inputs.moment });
   const reasonsWritten = await recordPreseasonBoardReasons(db, reasons);

@@ -178,7 +178,7 @@ describe("playerSeason's preseason readings", () => {
     await recordPreseasonProjections(db, [
       { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: CHASE, rank: 9, positionRank: 4, projectedPoints: 288.1,
         valueOverReplacement: 96.4, valueRank: 12, expectedGames: 16.1, floorPoints: 230.5, medianPoints: 288.1,
-        ceilingPoints: 316.9, tier: 1, asOf: LAST_WEEK },
+        ceilingPoints: 316.9, tier: 1, asOf: LAST_WEEK, momentKind: "replay" },
     ]);
     const body = (await playerSeason(db, leagueId, "rb1", clock))!;
     expect(body.expertRank).toBe(14);
@@ -217,7 +217,7 @@ describe("playerSeason's preseason readings", () => {
     await recordPreseasonProjections(db, [
       { season: PRODUCT_SEASON - 2, source: BOARD_SOURCE, playerId: CHASE, rank: 9, positionRank: 4, projectedPoints: 288.1,
         valueOverReplacement: 96.4, valueRank: 12, expectedGames: 16.1, floorPoints: 230.5, medianPoints: 288.1,
-        ceilingPoints: 316.9, tier: 1, asOf: LAST_WEEK },
+        ceilingPoints: 316.9, tier: 1, asOf: LAST_WEEK, momentKind: "replay" },
     ]);
     expect((await playerSeason(db, leagueId, "rb1", clock))!.modelRank).toBeNull();
   });

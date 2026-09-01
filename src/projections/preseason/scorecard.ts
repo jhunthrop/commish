@@ -5,6 +5,7 @@ import { computeFantasyPoints } from "@/scoring/compute";
 import { statLinesAsOf } from "@/projections/lines";
 import { RANK_BANDS, scoreCard, type Observation, type RankBandName, type ScoreCard } from "@/projections/metrics";
 import type { BoardEntry } from "./board";
+import type { BoardMoment } from "./source";
 
 /**
  * THE BENCHMARK SCORECARD MACHINERY — extracted from `scripts/preseason-report.ts` (where it was
@@ -15,6 +16,29 @@ import type { BoardEntry } from "./board";
  */
 
 const LAST_REGULAR_WEEK = 18;
+
+/**
+ * TASK 2 — "A LIVE BOARD MUST BE STRUCTURALLY UNGRADEABLE."
+ *
+ * Every scorecard in this engine scores a board's projections against `actualSeasonPoints` — what
+ * players really scored, over a REGULAR SEASON THAT HAS ALREADY BEEN PLAYED. A board taken at a LIVE
+ * moment (`source.ts`'s `BoardMoment`) is a claim about a season that has not been played yet: there
+ * is no actual outcome for it, and running it through this machinery anyway would not fail loudly —
+ * it would silently score against whatever the store happens to hold (nothing, today; a leaked
+ * partial season, tomorrow) and print a number that looks like a measurement and is not one.
+ *
+ * Called once, at the top of every grading run (`scripts/market-edge-scorecard.ts`'s own main loop),
+ * before a single board is built or scored — the same "refuse before doing any work" shape
+ * `loadPreseason`'s own leakage guards use, applied to the one thing THIS module is responsible for:
+ * a board only this file's readers ever compare to reality.
+ */
+export function assertGradableMoment(momentKind: BoardMoment["kind"], season: number): void {
+  if (momentKind === "live") {
+    throw new Error(
+      `${season}'s board was taken at a LIVE moment. The season has not been played yet, so there is no actual outcome to grade it against. The scorecard only grades REPLAY boards; a live board is structurally ungradeable.`,
+    );
+  }
+}
 
 /** Far past any correction: outcomes are scored against, never fed in. */
 const FINAL = new Date("9999-12-31T00:00:00.000Z");

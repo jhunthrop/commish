@@ -1,7 +1,8 @@
 import { and, eq, min, notInArray } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
+import type { Clock } from "@/domain/timing";
 import type { Position, StatLine } from "@/domain/player";
-import { playerWeekObservations } from "@/db/schema";
+import { playerWeekObservations, teamWeekObservations } from "@/db/schema";
 import { allPositions, type ProjectionInput } from "../backtest";
 import { statLinesAsOf, type SeasonStatLine } from "../lines";
 import { composeStatLine } from "../model/compose";
@@ -17,7 +18,7 @@ import type { TeamContext } from "../team-context";
 import { usageAsOf, type PlayerWeekUsage } from "../usage";
 import { projectedPosition } from "../nflverse/players";
 import { COACH_METRICS } from "../nflverse/coaches";
-import { SCHEDULE_SOURCE } from "../nflverse/schedule";
+import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { indexTeamMetrics } from "../team-context";
 import { discoveryFactsForSeason, type DiscoveryFacts } from "../laws/discovery-facts";
 import { factsForSeason, type LawConditionFacts } from "../laws/populations";
@@ -245,6 +246,11 @@ export interface PreseasonInputs {
   readonly season: number;
   /** The last instant before anything about this season became knowable. */
   readonly moment: Date;
+  /** Which arm of `BoardMoment` `moment` came from — `"replay"` for every board this engine has
+   *  ever built, `"live"` for one taken before the season it projects has even kicked off. Carried
+   *  through so a downstream reader (the persisted `moment_kind` column, the scorecard's own
+   *  `assertGradableMoment`) never has to re-derive or guess which kind of claim a board is. */
+  readonly momentKind: BoardMoment["kind"];
   readonly roster: readonly PreseasonRosterRow[];
   readonly positions: ReadonlyMap<string, Position>;
   readonly history: readonly SeasonStatLine[];
@@ -356,6 +362,113 @@ async function assertNothingFromTheSeasonIsVisible(db: ReadonlyDb, season: numbe
   }
 }
 
+/**
+ * TASK 2 — THE LIVE MOMENT (`docs/research/2026-08-28-live-season.md`).
+ *
+ * A board has always been taken at ONE moment, and until now that moment was always a REPLAY: one
+ * millisecond before the earliest thing a COMPLETED season revealed, derived by `preseasonMomentFor`
+ * above and asserted against by `assertNothingFromTheSeasonIsVisible`. Every backtest, every
+ * published measurement and every stored row in `preseason_projections` is that arm, and this type
+ * exists to make it nameable rather than to change it: the replay arm below wraps
+ * `preseasonMomentFor`'s own derivation with byte-identical behaviour, nothing about it moves.
+ *
+ * The LIVE arm is the other honest answer to "when was this board taken": for a season that has not
+ * kicked off yet, there is no completed game to derive a moment from, and the only truthful moment is
+ * NOW — capped so it can never reach the season's own first kickoff, because a moment at or past
+ * kickoff belongs to a season that has started, and a started season has a REPLAY moment. The two
+ * arms must never be confused for each other, which is why this is a discriminated union rather than
+ * a second optional field: a caller pattern-matches on `kind` rather than inferring which claim a
+ * `Date` is making from context.
+ */
+export type BoardMoment =
+  | { readonly kind: "replay"; readonly at: Date }
+  | { readonly kind: "live"; readonly at: Date };
+
+/** The replay arm, as a `BoardMoment` — `preseasonMomentFor`'s own derivation, untouched, wrapped so
+ *  a caller can hand `loadPreseason` an explicit moment without re-deriving it by hand. */
+export async function replayMomentFor(db: ReadonlyDb, season: number): Promise<BoardMoment> {
+  return { kind: "replay", at: await preseasonMomentFor(db, season) };
+}
+
+/**
+ * The earliest scheduled kickoff of `season`, from the already-ingested schedule
+ * (`nflverse/schedule.ts`'s own kickoff stamp, the SAME source and metric
+ * `replay-moments.ts`'s `playerGameMomentsFor` reads a per-game kickoff instant from). `null` when
+ * the schedule has not been ingested at all — `liveMomentFor` refuses rather than guessing.
+ */
+async function firstScheduledKickoffFor(db: ReadonlyDb, season: number): Promise<Date | null> {
+  const [row] = await db
+    .select({ earliest: min(teamWeekObservations.asOf) })
+    .from(teamWeekObservations)
+    .where(
+      and(
+        eq(teamWeekObservations.season, season),
+        eq(teamWeekObservations.source, SCHEDULE_SOURCE.kickoff),
+        eq(teamWeekObservations.metric, SCHEDULE_METRICS.pointSpread),
+      ),
+    );
+  const earliest = row?.earliest ?? null;
+  return earliest === null ? null : new Date(earliest);
+}
+
+/**
+ * THE LIVE ARM'S OWN MOMENT: `min(now, one millisecond before the season's first scheduled kickoff)`.
+ *
+ * THROWS when `season`'s first kickoff has already passed as of `clock.now()` — a started season has
+ * a REPLAY moment (`replayMomentFor`/`preseasonMomentFor` above), never a live one, and building a
+ * "live" board for a season already under way would be the exact confusion `BoardMoment`'s two arms
+ * exist to make impossible. THROWS when the store holds no ingested schedule for `season` at all,
+ * for the same reason `preseasonMomentFor` refuses rather than defaulting: an honest moment is a fact
+ * about the real world, and a moment computed with no schedule to check it against would be a guess.
+ *
+ * Because the throw above fires whenever `now` is at or past kickoff, the `min(...)` this function is
+ * named for only ever resolves to `now` in practice — `now < kickoff` and both are integer
+ * millisecond instants, so `now <= kickoff - 1` always holds once the throw has NOT fired. The `min`
+ * is kept anyway because it is the honest statement of the rule ("this moment can never reach
+ * kickoff"), not merely its consequence under today's guard.
+ */
+export async function liveMomentFor(db: ReadonlyDb, season: number, clock: Clock): Promise<BoardMoment> {
+  const kickoff = await firstScheduledKickoffFor(db, season);
+  if (kickoff === null) {
+    throw new Error(
+      `The store holds no ingested schedule for ${season}, so its live moment cannot be derived. Run \`npm run projections:context\` first.`,
+    );
+  }
+  const now = new Date(clock.now());
+  if (now.getTime() >= kickoff.getTime()) {
+    throw new Error(
+      `${season}'s first scheduled kickoff (${kickoff.toISOString()}) is not after ${now.toISOString()}. ${season} has already started, so it has a REPLAY moment, not a live one. Use \`replayMomentFor\`/\`preseasonMomentFor\` instead.`,
+    );
+  }
+  const cap = new Date(kickoff.getTime() - 1);
+  const at = new Date(Math.min(now.getTime(), cap.getTime()));
+  return { kind: "live", at };
+}
+
+/**
+ * THE LIVE ARM'S OWN READ GUARD — STRICTER than `assertNothingFromTheSeasonIsVisible` above, and
+ * deliberately so. The replay assertion refuses a game-derived fact stamped AT OR BEFORE the moment,
+ * and carves PRE_GAME_SOURCES out entirely, because a completed season's injury filings and published
+ * depth chart really were knowable before its opener. A LIVE board has no such history to lean on: the
+ * season it projects has not been played AT ALL, so ANY player-week observation stamped from it —
+ * any source, any as-of, including one that would predate the live moment itself — is either a defect
+ * in the ingestion this board is supposed to run ahead of, or a leak. Refusing it outright, at the
+ * load seam, is what makes a live board structurally unable to smuggle one in through any store read
+ * `loadPreseason` performs below.
+ */
+async function assertNoObservationOfTheLiveSeasonIsVisible(db: ReadonlyDb, season: number, moment: Date): Promise<void> {
+  const [row] = await db
+    .select({ earliest: min(playerWeekObservations.asOf) })
+    .from(playerWeekObservations)
+    .where(eq(playerWeekObservations.season, season));
+  const earliest = row?.earliest ?? null;
+  if (earliest !== null) {
+    throw new Error(
+      `A ${season} LIVE board taken at ${moment.toISOString()} can see a ${season} player-week observation stamped ${earliest.toISOString()}. A live board refuses every observation from the season it projects, not merely ones before its own moment. If ${season} truly has data in the store, it has started, and it needs a REPLAY moment instead.`,
+    );
+  }
+}
+
 /** How many games each player appeared in, per season, from the store's own opportunity rows. */
 async function gamesPlayedBySeason(
   db: ReadonlyDb,
@@ -372,12 +485,31 @@ async function gamesPlayedBySeason(
   return bySeason;
 }
 
-/** Reads one whole preseason, every row of it through the same gate. `laws` defaults to the real
- *  `registry()`, the same default-from-a-committed-file pattern `loadAvailabilityObservations` below
- *  takes with `FITTED_MODEL`; a test passes its own fixture registry instead. */
-export async function loadPreseason(db: ReadonlyDb, season: number, laws: readonly Law[] = registry()): Promise<PreseasonInputs> {
-  const moment = await preseasonMomentFor(db, season);
-  await assertNothingFromTheSeasonIsVisible(db, season, moment);
+/**
+ * Reads one whole preseason, every row of it through the same gate. `laws` defaults to the real
+ * `registry()`, the same default-from-a-committed-file pattern `loadAvailabilityObservations` below
+ * takes with `FITTED_MODEL`; a test passes its own fixture registry instead.
+ *
+ * `boardMoment` (Task 2) defaults to `undefined`, which resolves to `replayMomentFor(db, season)` —
+ * BYTE-IDENTICAL to every call site's behaviour before this parameter existed, since that is exactly
+ * `preseasonMomentFor`'s own unchanged derivation wrapped in the replay arm. A caller may instead hand
+ * in an explicit `BoardMoment`: the REPLAY arm still runs `assertNothingFromTheSeasonIsVisible`
+ * unchanged; the LIVE arm runs the stricter `assertNoObservationOfTheLiveSeasonIsVisible` instead, and
+ * every read below still uses the resolved moment as its own `asOf` cutoff exactly as it always has.
+ */
+export async function loadPreseason(
+  db: ReadonlyDb,
+  season: number,
+  laws: readonly Law[] = registry(),
+  boardMoment?: BoardMoment,
+): Promise<PreseasonInputs> {
+  const resolvedMoment = boardMoment ?? (await replayMomentFor(db, season));
+  const moment = resolvedMoment.at;
+  if (resolvedMoment.kind === "replay") {
+    await assertNothingFromTheSeasonIsVisible(db, season, moment);
+  } else {
+    await assertNoObservationOfTheLiveSeasonIsVisible(db, season, moment);
+  }
 
   const roster = await preseasonRostersAsOf(db, { season, asOf: moment });
   if (roster.length === 0) {
@@ -444,6 +576,7 @@ export async function loadPreseason(db: ReadonlyDb, season: number, laws: readon
   return {
     season,
     moment,
+    momentKind: resolvedMoment.kind,
     roster,
     positions,
     history,

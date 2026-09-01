@@ -59,7 +59,7 @@ import {
   FITTED_DEPTH_PRIORS,
   FITTED_ROOKIE_PRIORS,
 } from "@/projections/preseason/fitted";
-import { actualSeasonPoints, boardPoints, scoreOrdering } from "@/projections/preseason/scorecard";
+import { actualSeasonPoints, assertGradableMoment, boardPoints, scoreOrdering } from "@/projections/preseason/scorecard";
 import { loadPreseason, type PreseasonPriors } from "@/projections/preseason/source";
 import { preseasonRankingsAsOf } from "@/projections/preseason/store";
 import { bootstrapRankCorrelationDifference, type RankCorrelationDifferenceRow } from "@/projections/rank-correlation-bootstrap";
@@ -176,6 +176,11 @@ async function main(): Promise<void> {
 
   for (const season of TARGET_SEASONS) {
     const inputs = await loadPreseason(db, season);
+    // Task 2: a live board has no actual outcome to grade against — refuse before building or
+    // scoring a single board. `loadPreseason(db, season)` above never passes an explicit
+    // `BoardMoment`, so this always resolves to the replay arm today; the guard is defence in depth
+    // for the day a live moment reaches this call site.
+    assertGradableMoment(inputs.momentKind, season);
     const actual = await actualSeasonPoints(db, season, positions);
 
     const rawBoard = await buildBoard(db, inputs, { raw: true });

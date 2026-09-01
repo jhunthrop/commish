@@ -2297,6 +2297,14 @@ export const preseasonProjections = pgTable(
     /** THE STAMP: the preseason moment the board was taken at. Never `defaultNow()`, for the
      *  reason every other stamp in this engine is not. */
     asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    /** WHICH ARM OF `BoardMoment` (`projections/preseason/source.ts`) `asOf` came from — `'replay'`
+     *  for a moment derived from a completed season, `'live'` for one taken before a season's own
+     *  first kickoff. DEFAULT `'replay'` (Task 2, the live-board round) so the four historical
+     *  seasons already in this table when the column was added mean exactly what they always meant,
+     *  with no backfill required. The scorecard's own `assertGradableMoment`
+     *  (`preseason/scorecard.ts`) refuses to grade any row where this is `'live'` — there is no
+     *  actual outcome yet for a season that has not been played. */
+    momentKind: text("moment_kind").notNull().default("replay").$type<"replay" | "live">(),
     /** When the fit ran. Operational only — the gap between this and `as_of` is how stale a board
      *  on a screen is, and it is never a filter. */
     computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),

@@ -4,6 +4,7 @@ import { preseasonBoardReasons, preseasonProjections } from "@/db/schema";
 import { changedRowWhere, excludedSetFor } from "@/db/upsert";
 import type { JsonObject } from "@/domain/audit";
 import type { BoardEntry, BoardReason } from "./board";
+import type { BoardMoment } from "./source";
 
 /**
  * WHERE THE BOARD LANDS — the first writer in this repository that stores a number the model
@@ -111,6 +112,10 @@ export interface PreseasonProjectionRow {
   readonly ceilingPoints: number;
   readonly tier: number;
   readonly asOf: Date;
+  /** Which arm of `BoardMoment` (`source.ts`) `asOf` came from — Task 2. `'replay'` for every board
+   *  this engine has ever stored; `'live'` is the one value `scorecard.ts`'s `assertGradableMoment`
+   *  refuses to grade. */
+  readonly momentKind: BoardMomentKind;
 }
 
 export interface BoardStamp {
@@ -118,6 +123,21 @@ export interface BoardStamp {
   readonly source: string;
   /** `PreseasonInputs.moment` and nothing else. See the module docblock. */
   readonly asOf: Date;
+}
+
+/** `source.ts`'s `BoardMoment["kind"]`, named locally so this module never has to import the whole
+ *  `BoardMoment` union just to talk about which arm a stamp came from. */
+export type BoardMomentKind = BoardMoment["kind"];
+
+/**
+ * `BoardStamp` plus the moment kind — what `projectionRows` needs to fill the `moment_kind` column.
+ * Kept separate from `BoardStamp` itself rather than folded into it: `preseasonProjectionsAsOf` and
+ * `preseasonProjectionsFor` below both take a bare `BoardStamp` to READ a board (season, source and
+ * as-of are the whole identity of a read), and their call sites across the product never had a moment
+ * kind to supply. Only a WRITE needs to say which arm produced the row.
+ */
+export interface PreseasonProjectionStamp extends BoardStamp {
+  readonly momentKind: BoardMomentKind;
 }
 
 /**
@@ -130,7 +150,7 @@ export interface BoardStamp {
  * short discriminated union, and no surface reads it yet — the same "store what a screen needs,
  * say what is missing" discipline, just not yet due for that field.
  */
-export function projectionRows(board: readonly BoardEntry[], stamp: BoardStamp): readonly PreseasonProjectionRow[] {
+export function projectionRows(board: readonly BoardEntry[], stamp: PreseasonProjectionStamp): readonly PreseasonProjectionRow[] {
   return board.map((entry) => ({
     season: stamp.season,
     source: stamp.source,
@@ -146,6 +166,7 @@ export function projectionRows(board: readonly BoardEntry[], stamp: BoardStamp):
     ceilingPoints: entry.outlook.ceiling,
     tier: entry.tier,
     asOf: stamp.asOf,
+    momentKind: stamp.momentKind,
   }));
 }
 
@@ -278,6 +299,7 @@ const SELECTED = {
   ceilingPoints: preseasonProjections.ceilingPoints,
   tier: preseasonProjections.tier,
   asOf: preseasonProjections.asOf,
+  momentKind: preseasonProjections.momentKind,
 } as const;
 
 /**

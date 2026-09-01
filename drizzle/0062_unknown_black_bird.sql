@@ -1,0 +1,1 @@
+ALTER TABLE "preseason_projections" ADD COLUMN "moment_kind" text DEFAULT 'replay' NOT NULL;

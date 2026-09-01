@@ -66,7 +66,7 @@ function entry(overrides: Partial<BoardEntry> = {}): BoardEntry {
 }
 
 async function store(board: readonly BoardEntry[], asOf: Date): Promise<number> {
-  return recordPreseasonProjections(db, projectionRows(board, { season: 2024, source: BOARD_SOURCE, asOf }));
+  return recordPreseasonProjections(db, projectionRows(board, { season: 2024, source: BOARD_SOURCE, asOf, momentKind: "replay" }));
 }
 
 async function storeReasons(board: readonly BoardEntry[], asOf: Date): Promise<number> {
@@ -100,7 +100,17 @@ describe("the preseason board store", () => {
       ceilingPoints: 359.0,
       tier: 0,
       asOf: AUGUST,
+      momentKind: "replay",
     });
+  });
+
+  it("records the moment kind a board was taken at (Task 2), never confusing a live row for a replay one", async () => {
+    await recordPreseasonProjections(
+      db,
+      projectionRows([entry({ playerId: LAMB })], { season: 2024, source: BOARD_SOURCE, asOf: AUGUST, momentKind: "live" }),
+    );
+    const [row] = await preseasonProjectionsAsOf(db, { season: 2024, source: BOARD_SOURCE, asOf: FINAL });
+    expect(row?.momentKind).toBe("live");
   });
 
   /** The gate, which is the only thing standing between a 2024 board and a 2025 file. */

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Clock } from "@/domain/timing";
 import { recordNflPlayers } from "../universe";
 import { PARTICIPATION_METRICS, NFLVERSE_SOURCE } from "../nflverse/map";
 import { week1RosterAsOf } from "../nflverse/rosters";
@@ -8,6 +9,7 @@ import { recordObservations, type PlayerWeekObservation } from "../store";
 import { recordPreseasonRosters } from "./store";
 import { recordTeamObservations } from "../team-store";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
+import { DEPTH_METRIC, DEPTH_SOURCE } from "./depth";
 import { FITTED_MODEL } from "../model/source";
 import type { Law } from "../laws/types";
 import { blendBoard, seasonPointsOf, shippedPreseasonCandidates, type BlendConstants } from "../market/blend";
@@ -20,11 +22,14 @@ import {
 } from "./fitted";
 import {
   ALL_PRESEASON_FEATURES,
+  liveMomentFor,
   loadPreseason,
   preseasonCandidates,
   preseasonMomentFor,
+  replayMomentFor,
   rookieSegmentFor,
   SHIPPED_PRESEASON_FEATURES,
+  type BoardMoment,
   type PreseasonPriors,
 } from "./source";
 
@@ -517,5 +522,134 @@ describe("shippedPreseasonCandidates's raw flag (M9 fix round)", () => {
     for (const candidate of blended) {
       expect(candidate.reasons).toContainEqual({ code: "market_unlisted" });
     }
+  });
+});
+
+/**
+ * TASK 2 — THE LIVE MOMENT, AUDIT FIRST.
+ *
+ * `docs/research/2026-08-28-live-season.md` names the shape: a discriminated `BoardMoment`, whose
+ * REPLAY arm wraps `preseasonMomentFor`'s existing derivation byte-identical, and whose LIVE arm is
+ * `min(now, first-kickoff-minus-one-ms)` with a THROW the instant the season has already started (a
+ * started season has a replay moment, never a live one) or has no ingested schedule at all. The live
+ * arm's own READ GUARD is stricter than the replay assertion: it refuses ANY player-week observation
+ * stamped from the season being projected, regardless of source or of its own as-of, so a live board
+ * can never see a fact the replay arm's own `PRE_GAME_SOURCES` carve-out would have admitted.
+ *
+ * A season with no observations of its own at all (a genuinely unstarted one, this suite's LIVE_SEASON)
+ * so every test below seeds only what it is actually testing.
+ */
+describe("BoardMoment — the live arm (Task 2 audit)", () => {
+  const LIVE_SEASON = 2026;
+  // A Thursday-night opener, well after `week1RosterAsOf(2026)` (1 September).
+  const FIRST_KICKOFF = new Date("2026-09-04T23:20:00.000Z");
+
+  async function seedFirstKickoff(season: number, kickoff: Date): Promise<void> {
+    await recordTeamObservations(db, [
+      {
+        season,
+        week: 1,
+        team: "BUF",
+        source: SCHEDULE_SOURCE.kickoff,
+        metric: SCHEDULE_METRICS.pointSpread,
+        value: -3,
+        asOf: kickoff,
+      },
+    ]);
+  }
+
+  async function seedLiveRoster(season: number): Promise<void> {
+    await recordPreseasonRosters(db, [
+      {
+        season,
+        team: "BUF",
+        playerId: VETERAN,
+        position: "WR",
+        status: "active",
+        birthDate: "1998-04-08",
+        draftYear: 2020,
+        draftPick: 17,
+        draftClub: "BUF",
+        asOf: week1RosterAsOf(season),
+      },
+    ]);
+  }
+
+  describe("(a) both arms, pinned — the replay arm threaded through BoardMoment stays byte-identical", () => {
+    it("produces the SAME board whether loadPreseason resolves the replay moment itself or is handed one explicitly", async () => {
+      const explicitMoment = await replayMomentFor(db, 2024);
+      expect(explicitMoment.kind).toBe("replay");
+
+      const viaDefault = await loadPreseason(db, 2024);
+      const viaExplicitMoment = await loadPreseason(db, 2024, undefined, explicitMoment);
+
+      expect(viaExplicitMoment.moment.getTime()).toBe(viaDefault.moment.getTime());
+      expect(viaExplicitMoment.momentKind).toBe("replay");
+      expect(viaDefault.momentKind).toBe("replay");
+
+      const boardViaDefault = preseasonCandidates(viaDefault, ALL_PRESEASON_FEATURES, PRIORS);
+      const boardViaExplicitMoment = preseasonCandidates(viaExplicitMoment, ALL_PRESEASON_FEATURES, PRIORS);
+      expect(boardViaExplicitMoment).toEqual(boardViaDefault);
+    });
+  });
+
+  describe("(b) the live arm's read guard — stricter than the replay assertion", () => {
+    it("THROWS, naming the guard, when the store holds a season-S observation of ANY kind, at ANY as-of", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      // A depth-chart row is a PRE_GAME source the REPLAY arm's own carve-out would admit (it is
+      // stamped well before kickoff). The live arm admits nothing from the season at all.
+      await recordObservations(db, [
+        observation({
+          season: LIVE_SEASON,
+          week: 1,
+          playerId: VETERAN,
+          source: DEPTH_SOURCE,
+          metric: DEPTH_METRIC,
+          value: 1,
+          asOf: new Date(FIRST_KICKOFF.getTime() - 5 * 24 * 60 * 60 * 1000),
+        }),
+      ]);
+
+      const liveMoment: BoardMoment = { kind: "live", at: new Date(FIRST_KICKOFF.getTime() - 1) };
+      await expect(loadPreseason(db, LIVE_SEASON, undefined, liveMoment)).rejects.toThrow(/live board/i);
+    });
+
+    it("succeeds and reports momentKind \"live\" when the store holds nothing at all for the season", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      const liveMoment: BoardMoment = { kind: "live", at: new Date(FIRST_KICKOFF.getTime() - 1) };
+      const inputs = await loadPreseason(db, LIVE_SEASON, undefined, liveMoment);
+      expect(inputs.momentKind).toBe("live");
+      expect(inputs.moment.getTime()).toBe(liveMoment.at.getTime());
+    });
+  });
+
+  describe("(d) liveMomentFor — before kickoff `at` is now; at or after kickoff it throws", () => {
+    it("returns `at = now` when now is strictly before the season's first scheduled kickoff", async () => {
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      const now = new Date(FIRST_KICKOFF.getTime() - 10 * 24 * 60 * 60 * 1000);
+      const clock: Clock = { now: () => now.toISOString() };
+
+      const moment = await liveMomentFor(db, LIVE_SEASON, clock);
+      expect(moment).toEqual({ kind: "live", at: now });
+    });
+
+    it("throws the instant now reaches the season's first kickoff — a started season has a replay moment", async () => {
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      const clock: Clock = { now: () => FIRST_KICKOFF.toISOString() };
+      await expect(liveMomentFor(db, LIVE_SEASON, clock)).rejects.toThrow(/kickoff|started/i);
+    });
+
+    it("throws once the season's first kickoff is in the past", async () => {
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      const clock: Clock = { now: () => new Date(FIRST_KICKOFF.getTime() + 60_000).toISOString() };
+      await expect(liveMomentFor(db, LIVE_SEASON, clock)).rejects.toThrow(/kickoff|started/i);
+    });
+  });
+
+  describe("(e) liveMomentFor refuses a season with no ingested schedule, rather than defaulting to a date", () => {
+    it("throws", async () => {
+      const clock: Clock = { now: () => "2026-01-01T00:00:00.000Z" };
+      await expect(liveMomentFor(db, LIVE_SEASON, clock)).rejects.toThrow(/schedule/i);
+    });
   });
 });
