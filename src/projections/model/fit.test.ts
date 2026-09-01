@@ -12,7 +12,7 @@ import {
   opportunityObservationsForPosition,
   type ExperienceObservation,
 } from "./fit";
-import { FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "./fitted";
+import { FITTED_EFFICIENCY_PRIORS, FITTED_OPPORTUNITY_PRIORS, FIT_SEASONS, HELD_OUT_SEASONS } from "./fitted";
 import { lastObservedPriors } from "./opportunity";
 
 function usage(over: Partial<PlayerWeekUsage> & Pick<PlayerWeekUsage, "season" | "week" | "playerId">): PlayerWeekUsage {
@@ -108,6 +108,24 @@ describe("the committed fit", () => {
     for (const position of ["QB", "RB", "WR", "TE"] as const) {
       expect(FITTED_OPPORTUNITY_PRIORS.byPosition[position].snapShare).toBeGreaterThan(0);
     }
+  });
+
+  /**
+   * TASK 5's ACCEPTANCE DECISIONS, PINNED. Both the WR/TE share-shrinkage recalibration and the
+   * years-4-6 experience multiplier were measured for real (`npm run projections:calibrate`,
+   * predictor 2021 outcome 2022) and REVERTED: the share-shrinkage search landed exactly on the
+   * pooled base (a null result), and the experience multiplier came back within 3% of neutral for
+   * every skill position while degrading WR's own starter band, the diagnosis's own named target
+   * (see `task-5-report.md`). "The shipped model is provably identical with or without Task 5's
+   * mechanism" was previously only a one-off manual calibration run's finding; this test is what
+   * makes it a standing guarantee. It fails loudly — forcing a fresh acceptance decision rather than
+   * a silent re-activation — the moment either field is populated again: by a hand edit, or by a
+   * `projections:fit` re-run whose `ACCEPTED_SHARE_SHRINKAGE_POSITIONS`/`ACCEPTED_EXPERIENCE_POSITIONS`
+   * were left non-empty from a future, different measurement.
+   */
+  it("ships neither reverted Task 5 term — the calibration mechanisms stay inert until a fresh acceptance decision keeps one", () => {
+    expect(FITTED_OPPORTUNITY_PRIORS.shareShrinkageByPosition).toBeUndefined();
+    expect(FITTED_EFFICIENCY_PRIORS.experienceMultiplier).toBeUndefined();
   });
 
   it("regresses at all — the floor it beats is the version that does not", () => {
