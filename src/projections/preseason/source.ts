@@ -1007,9 +1007,13 @@ export function preseasonCandidates(
     // completed season, from the shared facts `loadPreseason` already computed once for the whole
     // board. A player absent from BOTH maps gets nothing, never a false-condition guess; absent from
     // only one still lets the OTHER origin's laws speak for him (`lawReasonsFor`'s own docblock).
+    // `position` is HIS OWN position (Task 4 fix round, C1) — `lawReasonsFor` gates every law's own
+    // condition against it, so a law measured on one position (`rb_age_curve`, RB-only) can never
+    // speak for a different one just because `LawConditionFacts` happens to carry a value in the
+    // same-named field.
     const lawFacts = inputs.lawFacts.get(playerId) ?? null;
     const discoveryFacts = inputs.discoveryFacts.get(playerId) ?? null;
-    if (lawFacts !== null || discoveryFacts !== null) all.push(...lawReasonsFor(lawFacts, discoveryFacts, inputs.laws));
+    if (lawFacts !== null || discoveryFacts !== null) all.push(...lawReasonsFor(position, lawFacts, discoveryFacts, inputs.laws));
     candidates.push({ playerId, position, team, perGame, games, reasons: all });
   };
 

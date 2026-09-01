@@ -562,6 +562,32 @@ export const LAW_CONDITIONS: ReadonlyMap<string, (facts: LawConditionFacts) => b
 );
 
 /**
+ * EVERY TRIBAL LAW'S ELIGIBILITY PREDICATE, KEYED BY ID (Task 4 fix round, C1) — the SAME
+ * `eligible` function `buildPopulations` (below) gates a law's own MEASUREMENT population with, at
+ * the identical call site this docblock names: `if (!law.eligible(position)) continue;`. Built from
+ * `LAW_ENTRIES`, the same source `LAW_CONDITIONS` is built from, for the same reason: a law and a
+ * live board's own reasons must never drift apart by each re-deriving "who this law is even about"
+ * differently.
+ *
+ * MEASURED-ON = APPLIED-TO, ONE PREDICATE. Before this export existed, `laws/board-reasons.ts`'s
+ * `lawReasonsFor` had NO position gate of its own at all — a tribal law's `condition` predicate was
+ * evaluated against ANY player's `LawConditionFacts`, regardless of position, because
+ * `LawConditionFacts` carries the same field names (`touches`, `age`, `targetShare`, ...) for every
+ * position and a condition like `rbAgeCurveCondition` cannot tell from the facts alone that it was
+ * never measured on a WR. The bug this let through: `rb_age_curve`'s own confirmed effect
+ * (`measured.json`, fitted ONLY over the RB population `buildPopulations` builds via `isRb`) reached
+ * a wide receiver's board row the instant his own age cleared the same numeric threshold, a claim
+ * the harness never tested and the registry's own `position: "RB"` field never gated. `lawReasonsFor`
+ * now checks `LAW_ELIGIBILITY.get(law.id)?.(playerPosition)` before it will ever evaluate a tribal
+ * law's condition at all — the exact predicate the measurement used, reused rather than
+ * re-approximated from `Law.position` (a bare string equality would mishandle `"all"`, which
+ * `eligible` already resolves correctly for `play_caller_fingerprint`/`td_regression`).
+ */
+export const LAW_ELIGIBILITY: ReadonlyMap<string, (position: Position) => boolean> = new Map(
+  LAW_ENTRIES.map((entry) => [entry.id, entry.eligible] as const),
+);
+
+/**
  * THE DETERMINISM ANCHOR — the one place every law's population is put into a canonical order
  * before any caller (matching, bootstrap) ever sees it.
  *
