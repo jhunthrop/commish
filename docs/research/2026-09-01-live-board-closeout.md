@@ -103,10 +103,11 @@ though it type-checks, verified by a runtime test constructing exactly that lite
 
 ## 4. The 2026 board
 
-Persisted live at `2026-09-01T16:53:50.090Z`, source `commish_board_v5_ppr_12`: **759 players, 3,554
-reason rows.**
+Persisted live at `2026-09-01T17:52:51.667Z`, source `commish_board_v6_ppr_12`: **759 players, 3,554
+reason rows.** (The v6 re-persist is the final fix round's, section 4.1 below. The rows quoted here
+are v6's; the top 50 is point-for-point identical to v5's, for the reason that section explains.)
 
-### Headline rows (top 10 of 759, value-rank primary; full top 50 in `task-4-report.md`)
+### Headline rows (top 10 of 759, value-rank primary; full top 50 in `final-fix-report.md`)
 
 ```
 rank ptsRank   name                     pos  team       points  adp       laws
@@ -126,6 +127,59 @@ Jeremiyah Love sits at value#1 despite pts#2: the rookie replacement channel (dr
 not a market anchor) ranks him ahead of his own raw-points rank, the documented characteristic of that
 channel (see section 5's rookie-cap deferral below).
 
+### 4.1 The live model arm was starved of 2025, and now is not
+
+The whole-branch review found one HIGH defect that no per-task review could have seen, because each
+task's own half of it was right on its own terms. Task 1 derived 2025 from play-by-play and,
+correctly, withheld the participation metrics (targets, carries, pass attempts and their team totals)
+that the missing weekly stats file would have carried, rather than writing them as false zeros. Task 4
+then admitted derived 2025 into the live board's LAW facts and stopped there. The MODEL arm of the
+same board still read `season - 1` through the published-only stat-line reader and through a usage
+reader that put those zeros back at read time, so the 2026 board's `predictRates` joined against an
+empty 2025 and **every one of 759 players silently took the position-prior efficiency**: Puka Nacua
+and a practice-squad receiver carried identical per-opportunity rates. Nothing threw, because "no
+evidence means the prior" is the designed fallback. The failure looked exactly like a healthy board.
+
+The fix, ruled as a fix rather than a documented limitation because the spec's own Part 1 admission
+covers the live path as a whole: `loadPreseason` now asks ONE predicate for every read that consumes
+the prior season, so the model's outcome history and its opportunity counts see the derived 2025 that
+the law facts already saw. The play-by-play's own touch counts stand in for the withheld opportunity
+counts, which is honest for targets at every position and for carries at every position except
+quarterback (measured against 2024, the one season carrying both feeds: pbp targets within 0.7% of the
+published count, pbp carries within 0.5% at RB/TE/WR, but only 37.7% at QB, because a quarterback's
+scrambles are most of his rush attempts and the derived stat line counts them). A quarterback's
+rushing rates, and every position's passing rates, therefore stay on the position prior, which is what
+no evidence is supposed to mean.
+
+**What moved, honestly.** The raw model arm moved a great deal: 437 of 759 players, up to 25.2 points,
+in the direction the diagnosis predicted (De'Von Achane +25.2, Bijan Robinson +22.7, Jaxon
+Smith-Njigba +21.1, Puka Nacua +19.0 on the raw board; Jerry Jeudy -18.6). The RB raw top end went
+286.3 to 309.0. **The shipped board's top 50 did not move at all, and that is the point**: all 212
+ADP-listed players are priced by the market anchor, which was rebuilding a healthy-looking spread on
+top of a starved model the whole time. The masking was total, which is why only a read of the code
+found it. Where the model does have authority, the board moved: 245 of the 547 unlisted players
+changed price (max 4.84 points, Dont'e Thornton Jr. 74.1 to 69.3), and 307 players changed value rank.
+The first value rank that differs at all between the two boards is **167**: everything a manager sees
+in the first fourteen rounds is identical, and everything below it is now priced off a measured 2025
+instead of a position mean.
+
+**What this fix does NOT restore.** 2025 has no team totals from any feed, so target, carry and
+pass-attempt SHARES still fall back to the role's slope against the measured 2025 snap share, and team
+volumes to the league mean. The 2026 raw arm's pass-catcher top end therefore remains compressed
+against a fully published archive season (2026 WR raw max 233.0 against 2023's 358.8). That is a real
+limitation of a season nflverse never published a weekly stats file for, not a defect: the honest
+alternative is a number no feed supports.
+
+**The replay invariant, proven rather than argued.** The admission is live-arm-only by construction,
+so every replay season must be untouched. `BOARD_SOURCE` was bumped to `commish_board_v6_ppr_12` for
+exactly this reason (`preseason_projections`' `(season, source, as_of)` key means a re-persist under
+the old name would silently do nothing on the archives and leave the claim uncheckable), all five
+seasons were re-persisted, and a read-only full-row comparison of v5 against v6 across 2,662 archive
+rows found **zero differences on any stored column, and zero board-reason differences**. The
+market-edge scorecard, which grades replay seasons only, was re-run on the v6 state and its 404-line
+output is **byte-identical** to the v5 run (`scorecard-final-v6.txt` against `scorecard-final-v5.txt`,
+empty diff). Both law drift checks exit 0.
+
 ### Chip statistics
 
 The board's law chips were priced through a position gate landed this round (`LAW_ELIGIBILITY`,
@@ -133,10 +187,10 @@ tribal; `candidate.position === position`, discovered) after a review found no s
 existed: a tribal law measured only over RBs could fire, and price, a WR clearing the same numeric
 threshold. Computed fresh, read-only, against the live store (`chip-stats.sh`, `psql` against
 `preseason_board_reasons` and `preseason_projections`, `season = 2026`, `source =
-'commish_board_v5_ppr_12'`):
+'commish_board_v6_ppr_12'`):
 
 ```
-total 2026 v5 candidates: 759
+total 2026 v6 candidates: 759
 players carrying >=1 law chip: 141
 total law reason rows: 181
 firings per law id:
@@ -148,7 +202,9 @@ firings per law id:
 
 These four figures (68/64/37/12, sum 181) match `task-4-report.md`'s own count from the real,
 un-persisted rebuild that first exercised the fixed gate, confirmed independently here against the
-persisted store rather than recomputed. A direct SQL check under v5 across all five persisted seasons
+persisted store rather than recomputed, and re-confirmed unchanged against the v6 board after the
+final fix round (a law fact is computed from the prior season's scoring, which the fix did not touch).
+A direct SQL check under v5 across all five persisted seasons
 found zero cross-position chips, where v4's 2024 board had carried them at scale (`rb_age_curve` on 27
 QBs, 27 TEs, and 39 WRs; `wr_target_competition` on 96 TEs), and the addendum documents one remaining
 display-only caveat: `board-top.ts` prints roster position, which disagrees with the pricing position
@@ -167,7 +223,9 @@ the **re-measured (post-gate-fix) figures**, not the originally published ones: 
 defect (section 4) moved real, already-shipped board points on every archive season, so the scorecard
 was re-run after the fix, on the fully re-persisted v5 boards with regenerated blend-fit constants.
 Quoting the re-measured figures, from `docs/research/2026-08-31-market-edge-closeout.md`'s addendum
-and `.superpowers/sdd/2026-09-01-live-board/scorecard-final-v5.txt`:
+and `.superpowers/sdd/2026-09-01-live-board/scorecard-final-v5.txt`. The final fix round (section 4.1)
+re-ran the same scorecard on the v6 state and the output was byte-identical, so every figure below
+stands under v6 unchanged, with an empty diff as the evidence rather than a re-typed table:
 
 **2024 (decisive, out-of-fit), all four positions pooled:**
 
