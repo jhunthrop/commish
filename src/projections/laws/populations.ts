@@ -5,13 +5,15 @@ import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring/
 import { allPositions } from "../backtest";
 import { statLinesAsOf, STAT_LINE_SOURCE } from "../lines";
 import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
-import { PARTICIPATION_METRICS } from "../nflverse/map";
+import { NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "../nflverse/map";
 import { COACH_METRICS } from "../nflverse/coaches";
+import { PBP_METRICS, PBP_SOURCE } from "../nflverse/pbp";
 import { schedulePublishedAsOf, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { ageAtSeason } from "../preseason/availability";
 import { preseasonRostersAsOf } from "../preseason/store";
 import { LAST_POSSIBLE_WEEK, observationsAsOf } from "../store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "../team-store";
+import { usageAsOf, type PlayerWeekUsage } from "../usage";
 import type { Law, PlayerSeasonPoint } from "./types";
 
 /**
@@ -50,8 +52,10 @@ import type { Law, PlayerSeasonPoint } from "./types";
 
 const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");
 
-/** The four positions a law population ever emits a `PlayerSeasonPoint` for. */
-type LawPosition = PlayerSeasonPoint["position"];
+/** The four positions a law population ever emits a `PlayerSeasonPoint` for. Exported so the
+ *  discovery candidate generator (`discovery/templates.ts`) can scope a quantity to the positions
+ *  it is meaningful for without re-deriving this union. */
+export type LawPosition = PlayerSeasonPoint["position"];
 
 /** One law's static content plus the population its measurement is drawn from. */
 export interface LawSpec {
@@ -331,18 +335,23 @@ async function bestTeammateTargetShares(
   return best;
 }
 
+/** One team's incoming-play-caller facts, RAW rather than pre-collapsed to a boolean — the discovery
+ *  generator wants the tenure count itself (`incomingCoachTenureSeasons`), not just "is it zero". */
+interface IncomingCoachFacts {
+  readonly tenureSeasons: number | null;
+  readonly priorPassRateOverExpected: number | null;
+}
+
 /** Season-N+1 play-caller facts by team, stamped at N+1's own schedule publication (see `coaches.ts`).
  *  A team absent here — no row at all — is unknown, not a non-new coach with no history. */
-async function incomingCoachFactsByTeam(
-  db: ReadonlyDb, nextSeason: number, asOf: Date,
-): Promise<Map<string, { tenureIsZero: boolean; priorPassRateOverExpected: number | null }>> {
+async function incomingCoachFactsByTeam(db: ReadonlyDb, nextSeason: number, asOf: Date): Promise<Map<string, IncomingCoachFacts>> {
   const rows = await teamObservationsAsOf(db, { season: nextSeason, week: 1, asOf, source: SCHEDULE_SOURCE.schedule });
-  const out = new Map<string, { tenureIsZero: boolean; priorPassRateOverExpected: number | null }>();
+  const out = new Map<string, IncomingCoachFacts>();
   for (const row of rows) {
     if (row.metric !== COACH_METRICS.tenureSeasons && row.metric !== COACH_METRICS.priorPassRateOverExpected) continue;
-    const existing = out.get(row.team) ?? { tenureIsZero: false, priorPassRateOverExpected: null };
+    const existing = out.get(row.team) ?? { tenureSeasons: null, priorPassRateOverExpected: null };
     out.set(row.team, {
-      tenureIsZero: row.metric === COACH_METRICS.tenureSeasons ? row.value === 0 : existing.tenureIsZero,
+      tenureSeasons: row.metric === COACH_METRICS.tenureSeasons ? row.value : existing.tenureSeasons,
       priorPassRateOverExpected:
         row.metric === COACH_METRICS.priorPassRateOverExpected ? row.value : existing.priorPassRateOverExpected,
     });
@@ -423,13 +432,245 @@ export async function factsForSeason(
         touches: participated === undefined ? null : participated.carries + scored.receptions,
         age: ageAtSeason(birthDates.get(playerId) ?? null, season),
         bestTeammateTargetShare: teammateShares.get(playerId) ?? null,
-        incomingCoachTenureIsZero: coach?.tenureIsZero ?? null,
+        incomingCoachTenureIsZero: coach?.tenureSeasons === undefined || coach.tenureSeasons === null ? null : coach.tenureSeasons === 0,
         incomingCoachPriorPassRateOverExpected: coach?.priorPassRateOverExpected ?? null,
         targetShare: targetShareOf(participated),
         touchdownPointsShare: scored.points > 0 ? scored.touchdownPoints / scored.points : null,
         touchdownPointsShareThreshold: thresholds.get(position) ?? null,
       },
     });
+  }
+  return out;
+}
+
+/**
+ * THE DISCOVERY CANDIDATE QUANTITIES — a SIBLING to `LawConditionFacts`/`factsForSeason`, not an
+ * edit to either. The six tribal laws' antecedents are hand-picked and fixed; a candidate generator
+ * (`discovery/templates.ts`) instead needs a wider, uniform vocabulary of quantities it can cross
+ * with quantile thresholds and position, without touching what the tribal harness or the live board
+ * (`board-reasons.ts`) already reads. Every field below is read through the SAME as-of-gated store
+ * functions `factsForSeason` uses — `seasonScoring`, `seasonParticipation`, `seasonTeams`,
+ * `preseasonRostersAsOf`, `incomingCoachFactsByTeam` — plus two new aggregates over stores the laws
+ * harness had not read from before (`usageAsOf` for snap/red-zone/target-depth, `teamObservationsAsOf`
+ * for the team's own pace), never a new raw ingestion path.
+ *
+ * TRI-STATE, EXACTLY AS EVERYWHERE ELSE: a quantity with no underlying evidence is `null`, never a
+ * zero or a false. `discovery/generate.ts`'s threshold and delta conditions read these fields and
+ * propagate that `null` straight through — a missing quantity makes a candidate's condition unknown,
+ * not false, including inside an AND-pair (Kleene logic: `false AND unknown = false`, but
+ * `true AND unknown = unknown`).
+ */
+export interface DiscoveryQuantityValues {
+  /** Carries + receptions, the season in question. Meaningful for RB. */
+  readonly touches: number | null;
+  /** Years old at that season's opener. */
+  readonly age: number | null;
+  /** Share of the team's targets claimed. Meaningful for RB/WR/TE. */
+  readonly targetShare: number | null;
+  /** Share of own fantasy points that came from touchdowns. */
+  readonly touchdownPointsShare: number | null;
+  /** Share of the player's OWN carries+targets (the play-by-play's own counts, never the box
+   *  score's) that were inside the twenty. Meaningful for RB/WR/TE. */
+  readonly redZoneTouchShare: number | null;
+  /** Average depth of target, in yards — air yards over the targets that carried a readable one.
+   *  Meaningful for WR/TE. */
+  readonly targetDepth: number | null;
+  /** Share of the team's offensive snaps played. */
+  readonly snapShare: number | null;
+  /** The team's incoming (season+1) play-caller's own tenure with that team, in seasons; zero is a
+   *  coaching change. Raw count, unlike `LawConditionFacts.incomingCoachTenureIsZero`. */
+  readonly incomingCoachTenureSeasons: number | null;
+  /** That incoming play-caller's own prior pass-rate-over-expected, at the teams he ran before. */
+  readonly incomingCoachPriorPassRateOverExpected: number | null;
+  /** Seasons in the league, counting the season itself — `season - draftYear + 1`. */
+  readonly experienceYear: number | null;
+  /** The player's OWN team's situation-neutral seconds per offensive play, that season — distinct
+   *  from the incoming coach's PRIOR pace, which this generator does not surface as its own
+   *  quantity (the team's own current pace is the one the brief names "team pace"). */
+  readonly teamPaceSecondsPerPlay: number | null;
+}
+
+/** One player's discovery quantities for one season, plus the SAME quantities one season earlier —
+ *  the shape the delta template (`discovery/templates.ts`) needs to ask "did this cross a quantile
+ *  from last season to this one". `prior: null` means no evidence AT ALL for the earlier season (he
+ *  did not play it, or nothing about him is in the store for it) — distinct from `prior` being
+ *  present with an individual field still `null`. */
+export interface DiscoveryFacts {
+  readonly position: LawPosition;
+  readonly current: DiscoveryQuantityValues;
+  readonly prior: DiscoveryQuantityValues | null;
+}
+
+/** One player's offensive-snap participation, summed over a season — a RATIO OF SUMS taken from the
+ *  snap-counts file alone (`NFLVERSE_SOURCE.snapCounts`), the same source `usageAsOf`'s own
+ *  `snapShare` is built from, read here directly because `usageAsOf`'s per-week SHARE is what it
+ *  exposes rather than the raw counts a season total needs. */
+interface SeasonSnapCounts {
+  readonly snaps: number;
+  readonly teamSnaps: number;
+}
+
+async function seasonSnapCounts(db: ReadonlyDb, season: number, asOf: Date): Promise<Map<string, SeasonSnapCounts>> {
+  const rows = await observationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf, source: NFLVERSE_SOURCE.snapCounts });
+  const out = new Map<string, SeasonSnapCounts>();
+  for (const row of rows) {
+    if (row.metric !== PARTICIPATION_METRICS.offensiveSnaps && row.metric !== PARTICIPATION_METRICS.teamOffensiveSnaps) continue;
+    const existing = out.get(row.playerId) ?? { snaps: 0, teamSnaps: 0 };
+    out.set(row.playerId, {
+      snaps: existing.snaps + (row.metric === PARTICIPATION_METRICS.offensiveSnaps ? row.value : 0),
+      teamSnaps: existing.teamSnaps + (row.metric === PARTICIPATION_METRICS.teamOffensiveSnaps ? row.value : 0),
+    });
+  }
+  return out;
+}
+
+function snapShareOf(counts: SeasonSnapCounts | undefined): number | null {
+  return counts !== undefined && counts.teamSnaps > 0 ? counts.snaps / counts.teamSnaps : null;
+}
+
+/** One player's play-by-play touches, aggregated over a season, from `usageAsOf`'s own touches
+ *  group — present only for the weeks the play-by-play stream has been ingested for. Kept as
+ *  running sums rather than shares so a season spanning a mid-year trade adds correctly before any
+ *  ratio is taken, and every numerator/denominator pair below is taken from THIS one feed
+ *  (`usage.ts`'s own "both halves from the same file" discipline). */
+interface SeasonUsageAggregate {
+  readonly pbpCarries: number;
+  readonly pbpTargets: number;
+  readonly redZoneTouches: number;
+  readonly airYards: number;
+  readonly airYardTargets: number;
+  /** Whether the play-by-play stream has seen this player at all, any week. `redZoneTouchShare` and
+   *  `targetDepth` are `null` rather than zero when this is `false` — no evidence, not no usage. */
+  readonly hasPbpEvidence: boolean;
+}
+
+const EMPTY_USAGE_AGGREGATE: SeasonUsageAggregate = {
+  pbpCarries: 0,
+  pbpTargets: 0,
+  redZoneTouches: 0,
+  airYards: 0,
+  airYardTargets: 0,
+  hasPbpEvidence: false,
+};
+
+function accumulateUsage(existing: SeasonUsageAggregate, row: PlayerWeekUsage): SeasonUsageAggregate {
+  const touches = row.touches;
+  return {
+    pbpCarries: existing.pbpCarries + (touches === null ? 0 : touches.carries),
+    pbpTargets: existing.pbpTargets + (touches === null ? 0 : touches.targets),
+    redZoneTouches: existing.redZoneTouches + (touches === null ? 0 : touches.redZoneCarries + touches.redZoneTargets),
+    airYards: existing.airYards + (touches === null ? 0 : touches.airYards),
+    airYardTargets: existing.airYardTargets + (touches === null ? 0 : touches.airYardTargets),
+    hasPbpEvidence: existing.hasPbpEvidence || touches !== null,
+  };
+}
+
+/** The play-by-play's own red-zone/air-yard breakdown, summed per player over one season as of one
+ *  moment. Rides on `usageAsOf`'s OWN row, which it only emits for a player-week that ALSO has a
+ *  snap-count team denominator (`usage.ts`'s "a row without the snap denominator is not a usable
+ *  week") — so a week with play-by-play touches but no matching snap-count file is invisible here
+ *  too, the same way it would be to `usageAsOf`'s own callers. */
+async function seasonUsageAggregates(db: ReadonlyDb, season: number, asOf: Date): Promise<Map<string, SeasonUsageAggregate>> {
+  const rows = await usageAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
+  const out = new Map<string, SeasonUsageAggregate>();
+  for (const row of rows) out.set(row.playerId, accumulateUsage(out.get(row.playerId) ?? EMPTY_USAGE_AGGREGATE, row));
+  return out;
+}
+
+function redZoneTouchShareOf(usage: SeasonUsageAggregate | undefined): number | null {
+  if (usage === undefined || !usage.hasPbpEvidence) return null;
+  const denominator = usage.pbpCarries + usage.pbpTargets;
+  return denominator > 0 ? usage.redZoneTouches / denominator : null;
+}
+
+function targetDepthOf(usage: SeasonUsageAggregate | undefined): number | null {
+  if (usage === undefined || !usage.hasPbpEvidence) return null;
+  return usage.airYardTargets > 0 ? usage.airYards / usage.airYardTargets : null;
+}
+
+/** Each team's mean situation-neutral seconds per play over a season, from the play-by-play's own
+ *  team-week facts — the TEAM's own pace that season, distinct from `incomingCoachFactsByTeam`'s
+ *  incoming play-caller's PRIOR pace at other teams. */
+async function seasonTeamPaceByTeam(db: ReadonlyDb, season: number, asOf: Date): Promise<Map<string, number>> {
+  const rows = await teamObservationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf, source: PBP_SOURCE });
+  const sums = new Map<string, { total: number; weeks: number }>();
+  for (const row of rows) {
+    if (row.metric !== PBP_METRICS.paceSecondsPerPlay) continue;
+    const existing = sums.get(row.team) ?? { total: 0, weeks: 0 };
+    sums.set(row.team, { total: existing.total + row.value, weeks: existing.weeks + 1 });
+  }
+  return new Map([...sums].map(([team, { total, weeks }]) => [team, total / weeks]));
+}
+
+/**
+ * Every discovery quantity, for every player active in ONE season, at that season's OWN N+1
+ * schedule-publication gate — the same `asOf` `factsForSeason` would use for THIS season, so a
+ * caller building both a season's `current` and its `prior` half (`discoveryFactsForSeason`) reads
+ * the earlier season at a strictly later-than-necessary but still perfectly safe gate: everything
+ * about `targetSeason` is already history by `schedulePublishedAsOf(targetSeason + 1)` regardless of
+ * whether `targetSeason` is this candidate's "current" season or its "prior" one.
+ */
+async function discoveryQuantitiesForSeason(
+  db: ReadonlyDb, targetSeason: number, asOf: Date, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+): Promise<Map<string, DiscoveryQuantityValues>> {
+  const scoring = await seasonScoring(db, targetSeason, asOf, positions, rules, true);
+  const participation = await seasonParticipation(db, targetSeason, asOf);
+  const teams = await seasonTeams(db, targetSeason, asOf);
+  const roster = await preseasonRostersAsOf(db, { season: targetSeason, asOf });
+  const coachFacts = await incomingCoachFactsByTeam(db, targetSeason + 1, asOf);
+  const usage = await seasonUsageAggregates(db, targetSeason, asOf);
+  const snapCounts = await seasonSnapCounts(db, targetSeason, asOf);
+  const pace = await seasonTeamPaceByTeam(db, targetSeason, asOf);
+
+  const birthDates = new Map(roster.map((row) => [row.playerId, row.birthDate] as const));
+  const draftYears = new Map(roster.map((row) => [row.playerId, row.draftYear] as const));
+
+  const out = new Map<string, DiscoveryQuantityValues>();
+  for (const playerId of positions.keys()) {
+    const scored = scoring.get(playerId);
+    const ppg = pointsPerGame(scored);
+    if (scored === undefined || ppg === null) continue;
+    const participated = participation.get(playerId);
+    const team = teams.get(playerId);
+    const coach = team === undefined ? undefined : coachFacts.get(team);
+    const usageAgg = usage.get(playerId);
+    const draftYear = draftYears.get(playerId) ?? null;
+    out.set(playerId, {
+      touches: participated === undefined ? null : participated.carries + scored.receptions,
+      age: ageAtSeason(birthDates.get(playerId) ?? null, targetSeason),
+      targetShare: targetShareOf(participated),
+      touchdownPointsShare: scored.points > 0 ? scored.touchdownPoints / scored.points : null,
+      redZoneTouchShare: redZoneTouchShareOf(usageAgg),
+      targetDepth: targetDepthOf(usageAgg),
+      snapShare: snapShareOf(snapCounts.get(playerId)),
+      incomingCoachTenureSeasons: coach?.tenureSeasons ?? null,
+      incomingCoachPriorPassRateOverExpected: coach?.priorPassRateOverExpected ?? null,
+      experienceYear: draftYear === null ? null : targetSeason - draftYear + 1,
+      teamPaceSecondsPerPlay: team === undefined ? null : (pace.get(team) ?? null),
+    });
+  }
+  return out;
+}
+
+/**
+ * `DiscoveryFacts` for every player active in season N, `current` at N's own gate and `prior` from
+ * season N-1 read through the identical helper — see `discoveryQuantitiesForSeason`'s own docblock
+ * for why one shared `asOf` is safe for both halves. Scoped to `LawPosition` (QB/RB/WR/TE) the same
+ * way `factsForSeason`'s own consumers are; a K or DEF row from `positions` is silently excluded
+ * here, the same "not a fact this engine's laws are about" reasoning `SKILL_POSITIONS` encodes.
+ */
+export async function discoveryFactsForSeason(
+  db: ReadonlyDb, season: number, positions: ReadonlyMap<string, Position>, rules: ScoringRules,
+): Promise<Map<string, DiscoveryFacts>> {
+  const asOf = schedulePublishedAsOf(season + 1);
+  const current = await discoveryQuantitiesForSeason(db, season, asOf, positions, rules);
+  const prior = await discoveryQuantitiesForSeason(db, season - 1, asOf, positions, rules);
+
+  const out = new Map<string, DiscoveryFacts>();
+  for (const [playerId, values] of current) {
+    const position = positions.get(playerId);
+    if (position === undefined || !isSkillPosition(position)) continue;
+    out.set(playerId, { position, current: values, prior: prior.get(playerId) ?? null });
   }
   return out;
 }

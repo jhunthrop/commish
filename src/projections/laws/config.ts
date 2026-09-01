@@ -63,3 +63,15 @@ export const MEASURE_SEASONS = { from: 2013, to: 2024 } as const;
 
 /** Bootstrap resampling: how many pair-resamples, and the seed that makes runs reproducible. */
 export const BOOTSTRAP = { resamples: 1000, seed: 20260831 } as const;
+
+/**
+ * THE DISCOVERY TRAIN WINDOW — predictor seasons the candidate generator's quantile thresholds
+ * (`discovery/quantiles.ts`) and Task 7's own BH-controlled testing pass are both fitted/tested on,
+ * and on nothing later. `to: 2021` rather than `REPLICATION_FOLDS`' own range is deliberate: those
+ * folds are for REPLICATING an already-surviving law across seasons a model may or may not have
+ * fit on, while this window is for DISCOVERING candidates in the first place, and letting discovery
+ * see 2022-2024 would let a candidate's very existence be chosen by seasons its own later
+ * measurement is supposed to confirm against — the discovery-time analogue of `factsForSeason`
+ * never reading the outcome season it is predicting.
+ */
+export const DISCOVERY_TRAIN_SEASONS = { from: MEASURE_SEASONS.from, to: 2021 } as const;
