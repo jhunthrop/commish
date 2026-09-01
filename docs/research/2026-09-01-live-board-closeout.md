@@ -251,6 +251,12 @@ display-only caveat: `board-top.ts` prints roster position, which disagrees with
 on 7 of 759 2026 rows, so a printed chip can look cross-position on those specific rows even though
 the underlying gate held.
 
+**Superseded note (2026-09-01, vegas-laws round):** the `commish_board_v6_ppr_12` board and top 50
+recorded above are superseded by `commish_board_v7_ppr_12`, persisted the same day once two win-total
+laws entered the discovery family. See `docs/research/2026-09-01-vegas-laws-closeout.md` for the
+current top 50 and board story; this document's content otherwise remains the record of what the
+live-board round itself shipped.
+
 ## 5. The honest scorecard note
 
 **2026 is unmeasurable until it is played.** `assertGradableMoment` structurally refuses to build a
