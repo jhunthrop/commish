@@ -117,8 +117,28 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * only `blendBoard` does, so v1's own points are byte-identical before and after C1's fix. v4 is NOT
  * kept as a second permanent named constant, for the same reason v2/v3 were not: its own stored rows
  * were wrong (cross-position law contamination) the entire time they existed.
+ *
+ * BUMPED AGAIN TO v6 (live-board plan, final fix round, H1 — the FIFTH occurrence of the identical
+ * unique-key problem, and the first one whose fix is expected to move NOTHING on the archive
+ * seasons). The whole-branch review found that Task 4's derived-2025 admission reached the live
+ * board's LAW facts and not its MODEL arm: `loadPreseason` read the prior season's outcome history
+ * through the published-only `statLinesAsOf` and its opportunity counts through a `usageAsOf` that
+ * synthesized zeros for the metrics the backfill deliberately withheld, so a 2026 live board joined
+ * `predictRates` against an EMPTY 2025 and every one of 759 players silently took the position-prior
+ * efficiency. The fix asks ONE predicate (`preseason/source.ts`'s `admitsDerivedPriorSeason`) for
+ * every prior-season read, and stops the zero synthesis at its source (`usage.ts`).
+ *
+ * WHY A BUMP AT ALL IF THE ARCHIVES DO NOT MOVE: the admission is live-arm-only by construction, so
+ * 2021-2024 SHOULD be byte-identical under v6 — but "should" is exactly the assumption
+ * `(season, source, as_of)` punishes. A re-persist under the unchanged v5 name would `DO NOTHING` on
+ * every archive season (the replay `as_of` is derived and deterministic, so every row already
+ * exists) and the 2026 board would land beside the stale one, leaving no way to tell a verified
+ * no-change from a write that never happened. A fresh source makes the replay invariant a MEASURABLE
+ * claim: v5 and v6 rows sit side by side for 2021-2024 and a read-only comparison either finds them
+ * identical or does not. v5 is not kept as a named constant — unlike v2/v3/v4 its archive rows are
+ * not wrong, they are simply the same numbers under an older name.
  */
-export const BOARD_SOURCE = "commish_board_v5_ppr_12";
+export const BOARD_SOURCE = "commish_board_v6_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {

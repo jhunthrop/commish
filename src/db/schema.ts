@@ -2271,10 +2271,10 @@ export const preseasonProjections = pgTable(
     id: bigserial("id", { mode: "number" }).primaryKey(),
     season: integer("season").notNull(),
     /** Which board said it — model version and league format together, as the benchmark sources
-     *  name market and format together. `commish_board_v5_ppr_12` (Task 4 fix round 2, 2026-09-01 —
-     *  the shipped, market-blended board, bumped a fourth time after a real correctness bug reaching
-     *  back through every archive season (a law reason evaluated against the wrong position); see
-     *  `board-store.ts`'s own `BOARD_SOURCE` docblock for the full v1-through-v5 history).
+     *  name market and format together. `commish_board_v6_ppr_12` (live-board final fix round,
+     *  2026-09-01 — the shipped, market-blended board, bumped a fifth time so the live arm's
+     *  derived-prior-season fix could be re-persisted and its replay rows compared against v5's; see
+     *  `board-store.ts`'s own `BOARD_SOURCE` docblock for the full v1-through-v6 history).
      *  `commish_board_v1_ppr_12` is the raw model's own historical source, kept for provenance. */
     source: text("source").notNull(),
     /** An `nfl_players.id` (a gsis id), the space the whole engine keys on. The product reaches it
