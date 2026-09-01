@@ -1,9 +1,9 @@
 {
   "counts": {
-    "candidates": 1737,
-    "untestable": 488,
-    "bhSurvivors": 10,
-    "replicated": 4
+    "candidates": 2487,
+    "untestable": 687,
+    "bhSurvivors": 12,
+    "replicated": 6
   },
   "laws": {
     "and:WR:threshold:WR:age:q70+threshold:WR:experienceYear:q70": {
@@ -148,6 +148,78 @@
       "expectedSign": -1,
       "primaryQuantityId": "touchdownPointsShare",
       "primaryQuantityNoun": "touchdown-points share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:incomingTeamWinTotal:q70+threshold:WR:snapShare:q70": {
+      "effect": 1.5165573770491805,
+      "trainEffect": 1.2996938775510207,
+      "ci": [
+        0.8626393442622952,
+        2.1890737704918006
+      ],
+      "sample": 244,
+      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 25,
+          "effect": 3.3703999999999996
+        },
+        {
+          "season": 2022,
+          "pairs": 28,
+          "effect": 2.3978571428571436
+        },
+        {
+          "season": 2023,
+          "pairs": 20,
+          "effect": 2.408
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver snap share (69.3%) + incoming team win total (9.0): A wide receiver whose share of his team's offensive snaps that season is 69.3% or more and whose team's Vegas win total for the season ahead is 9.0 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "snapShare",
+      "primaryQuantityNoun": "snap share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:incomingTeamWinTotal:q80+threshold:WR:snapShare:q70": {
+      "effect": 1.817244897959183,
+      "trainEffect": 1.530394736842105,
+      "ci": [
+        1.1038214285714285,
+        2.5610038265306128
+      ],
+      "sample": 196,
+      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 25,
+          "effect": 2.6919999999999997
+        },
+        {
+          "season": 2022,
+          "pairs": 24,
+          "effect": 3.1416666666666675
+        },
+        {
+          "season": 2023,
+          "pairs": 20,
+          "effect": 2.408
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver snap share (69.3%) + incoming team win total (9.5): A wide receiver whose share of his team's offensive snaps that season is 69.3% or more and whose team's Vegas win total for the season ahead is 9.5 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "snapShare",
+      "primaryQuantityNoun": "snap share",
       "primaryQuantityUnit": "percent"
     },
     "threshold:TE:touchdownPointsShare:q70": {
