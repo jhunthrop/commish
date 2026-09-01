@@ -1,4 +1,5 @@
-import type { DiscoveryFacts, LawPosition } from "../populations";
+import type { DiscoveryFacts } from "../discovery-facts";
+import type { LawPosition } from "../populations";
 import type { Law } from "../types";
 import { DISCOVERY_QUANTILES } from "./quantiles";
 import {
@@ -106,6 +107,14 @@ function sortById(candidates: readonly CandidateLaw[]): readonly CandidateLaw[] 
  * TODAY'S STRUCTURAL DESIGN STAYS WELL UNDER THE CAP WITHOUT EVER REACHING THIS TRIM (see the
  * AND-pair restriction in `generateCandidatesFrom`'s own docblock), so this function is exercised by
  * a dedicated unit test with a synthetic oversized list rather than by the real candidate set.
+ *
+ * NOT A NEUTRAL SAMPLE IF IT EVER FIRES: ascending id order is a mechanical property of the
+ * template (family name, then position, then quantity id, then quantile), not a random or
+ * effect-weighted draw, so a real overflow would systematically favor candidates whose ids happen to
+ * sort first (e.g. every "and:" id before any "threshold:" one, alphabetically) rather than sampling
+ * the design space evenly — acceptable only because today's design keeps this trim from ever firing
+ * in production; a future vocabulary expansion that relies on it regularly should reconsider the
+ * trim strategy (e.g. keep-N-per-template-family) rather than assume this bias is harmless at scale.
  */
 export function enforceCap(candidates: readonly CandidateLaw[], cap: number): readonly CandidateLaw[] {
   const ordered = sortById(candidates);

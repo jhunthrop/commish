@@ -13,7 +13,7 @@ import { createDb } from "@/db/client";
 import { allPositions } from "@/projections/backtest";
 import { PPR_SCORING } from "@/domain/scoring";
 import { DISCOVERY_TRAIN_SEASONS } from "@/projections/laws/config";
-import { discoveryFactsForSeason } from "@/projections/laws/populations";
+import { discoveryFactsForSeason } from "@/projections/laws/discovery-facts";
 import { computeQuantileTable, QUANTITY_DEFS, type QuantityRow } from "@/projections/laws/discovery/templates";
 
 const OUTPUT = "src/projections/laws/discovery/quantiles.ts";
@@ -47,7 +47,9 @@ async function main(): Promise<void> {
 
   const rows: QuantityRow[] = [];
   for (let season = DISCOVERY_TRAIN_SEASONS.from; season <= DISCOVERY_TRAIN_SEASONS.to; season++) {
-    const facts = await discoveryFactsForSeason(db, season, positions, PPR_SCORING);
+    // `admitDerived: true` — the laws harness (discovery included) is exactly where a pbp-derived
+    // gap-season stat line belongs, the same choice `buildPopulations` makes for the tribal laws.
+    const facts = await discoveryFactsForSeason(db, season, positions, PPR_SCORING, true);
     for (const { position, current } of facts.values()) {
       rows.push({ season, position, values: current });
     }

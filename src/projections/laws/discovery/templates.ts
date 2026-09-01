@@ -1,4 +1,5 @@
-import type { DiscoveryQuantityValues, LawPosition } from "../populations";
+import type { DiscoveryQuantityValues } from "../discovery-facts";
+import type { LawPosition } from "../populations";
 
 /**
  * THE DISCOVERY VOCABULARY — every quantity a candidate law's condition can threshold or delta on,

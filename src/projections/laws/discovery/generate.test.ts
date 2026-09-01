@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DiscoveryFacts, DiscoveryQuantityValues } from "../populations";
+import type { DiscoveryFacts, DiscoveryQuantityValues } from "../discovery-facts";
 import { renderClaim, type QuantileTable } from "./templates";
 import { CANDIDATE_CAP, enforceCap, generateCandidates, generateCandidatesFrom, type CandidateLaw } from "./generate";
 
@@ -190,14 +190,18 @@ describe("enforceCap", () => {
     expect(first).toHaveLength(7);
   });
 
-  it("never returns more than CANDIDATE_CAP from generateCandidatesFrom, even on an oversized fixture", () => {
-    // A dense fixture across all four positions and every real quantity forces the full AND-pair
-    // cross product, which is the actual production scale check.
-    const dense: QuantileTable = {
+  it("stays under CANDIDATE_CAP on a multi-position fixture (shape check, not a cap-scale replica)", () => {
+    // Two quantities across all four positions -> ~54 candidates (6+4+4+4 threshold, doubled for
+    // delta, plus one RB AND-pair x9 levels) — nowhere near CANDIDATE_CAP. This only proves
+    // `generateCandidatesFrom` still returns a `<= cap` result once more than one position is in
+    // play, not that the trim itself works at cap scale — THAT is `enforceCap`'s own synthetic
+    // oversized-list tests above, and the real committed table's count (`generateCandidates`,
+    // tested below) is the actual production-scale figure (1,737, well under the 2,000 cap).
+    const twoQuantitiesAcrossPositions: QuantileTable = {
       touches: { RB: { 0.7: 100, 0.8: 150, 0.9: 200 } },
       age: { QB: { 0.7: 27, 0.8: 28, 0.9: 30 }, RB: { 0.7: 27, 0.8: 28, 0.9: 30 }, WR: { 0.7: 27, 0.8: 28, 0.9: 30 }, TE: { 0.7: 27, 0.8: 28, 0.9: 30 } },
     };
-    expect(generateCandidatesFrom(dense).length).toBeLessThanOrEqual(CANDIDATE_CAP);
+    expect(generateCandidatesFrom(twoQuantitiesAcrossPositions).length).toBeLessThanOrEqual(CANDIDATE_CAP);
   });
 });
 

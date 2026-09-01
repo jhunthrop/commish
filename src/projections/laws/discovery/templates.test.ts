@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DiscoveryQuantityValues } from "../populations";
+import type { DiscoveryQuantityValues } from "../discovery-facts";
 import {
   computeQuantileTable,
   MIN_QUANTILE_SAMPLE,
