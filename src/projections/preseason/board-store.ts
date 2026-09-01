@@ -30,13 +30,35 @@ import type { BoardEntry, BoardReason } from "./board";
  */
 
 /**
+ * THE HISTORICAL RAW-MODEL SOURCE (C3 fix round, 2026-08-31 — superseded as the SHIPPED board by
+ * `BOARD_SOURCE`, below, which now names the blended one). Kept as its own named constant, never
+ * deleted: every row ever written under it is the raw, pre-blend board's own honest history, and a
+ * reader comparing "what the raw model alone said" against "what shipped" (Task 11's own scorecard,
+ * a backtest) needs a stable name for the first half of that comparison. `scripts/preseason-persist.ts`
+ * writes fresh rows here too, via `shippedPreseasonCandidates`'s own `{ raw: true }` seam, so this
+ * source's own reasons stay CURRENT (never a stale mix of pre-blend projections next to blended-board
+ * reasons — the exact drift a fix round found and this constant's split existence now prevents).
+ */
+export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
+
+/**
  * Which board said it. Model version AND league format in one value, exactly as the benchmark
  * sources name market and format in one (`ffc_adp_ppr_12`), because a projected point total is
  * meaningless without the rules that composed it and a rank is meaningless without the roster
  * shape that valued it. A refit is a new value here, never an overwrite of rows a manager has
  * already been shown.
+ *
+ * BUMPED TO v2 (C3 fix round, 2026-08-31): Task 10 wired `shippedPreseasonCandidates`'s market
+ * blend in as the board `scripts/preseason-persist.ts` writes, but `preseason_projections`' own
+ * unique key (`season, source, as_of`) meant a rerun under the UNCHANGED v1 source name never wrote
+ * a single new projection row — every row already existed from before the blend, so the blend's own
+ * point totals never reached the store a live product surface reads, even though its REASONS did
+ * (a different table, no `as_of`, always overwritten). `commish_board_v2_ppr_12` is a fresh value
+ * with no existing rows, so persisting under it writes the blended board's own projections for
+ * real, for the first time. Every reader of `BOARD_SOURCE` (the drafts-players route, the player
+ * screen) picks up the blended board automatically, with no call-site change.
  */
-export const BOARD_SOURCE = "commish_board_v1_ppr_12";
+export const BOARD_SOURCE = "commish_board_v2_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {

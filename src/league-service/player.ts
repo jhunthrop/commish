@@ -76,8 +76,10 @@ export interface PlayerSeasonTotals {
  *   `player_crosswalk` — the id join that did not exist when this docblock was first written and
  *   was the reason the cell printed a dash. It resolves for a player the crosswalk placed AND the
  *   publisher ranked, which for the current season is 441 of the 518 names on the board.
- * - **Our own board** is `preseason_projections`, source `commish_board_v1_ppr_12`, read through
- *   the same crosswalk. It is EMPTY FOR THE CURRENT SEASON and stated as such rather than
+ * - **Our own board** is `preseason_projections`, source `commish_board_v2_ppr_12` (C3 fix round,
+ *   2026-08-31 — the market-blended board; `commish_board_v1_ppr_12` is the raw model's own
+ *   historical source, kept for provenance but no longer what a live product surface reads), read
+ *   through the same crosswalk. It is EMPTY FOR THE CURRENT SEASON and stated as such rather than
  *   backfilled from a season that has finished: the board needs three prior seasons of ingested
  *   usage and a replay moment derived from games already played, and the store holds 2021 to 2024.
  *   Showing 2024's number beside this year's consensus would be the most plausible-looking lie
