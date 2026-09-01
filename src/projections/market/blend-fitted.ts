@@ -14,7 +14,7 @@ import type { BlendConstants } from "./blend";
  *
  * THE PLATEAU (fix round 2, ruling 4b): 24 of this grid's own cells
  * scored within 1e-4 of the winner — a genuine plateau, not a single sharp peak.
- * At least one of those tied cells sits at this grid's own ceiling (80) on a cap axis — a wider grid might still move the winner.
+ * At least one of those tied cells sits at this grid's own ceiling (80) on a cap axis; a wider grid might still move the winner.
  *
  * THE CHANNEL DECOMPOSITION — pure market (every cap at zero) 0.5892,
  * availability admitted alone (lawCapPoints at zero, the winning availability/total caps otherwise)
