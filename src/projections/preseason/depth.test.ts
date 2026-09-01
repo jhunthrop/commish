@@ -117,6 +117,108 @@ describe("mapDepthChart", () => {
   });
 });
 
+describe("mapDepthChart, the dated schema (2026 onward)", () => {
+  const projected = new Set(["00-0000001", "00-0000002"]);
+  const CUTOFF = new Date("2026-09-10T00:19:59.999Z"); // one millisecond before kickoff
+
+  function datedRow(over: Partial<CsvRow>): CsvRow {
+    return {
+      dt: "2026-08-31T14:44:50Z",
+      team: "ARI",
+      player_name: "Someone",
+      espn_id: "1",
+      gsis_id: "00-0000001",
+      pos_grp_id: "15",
+      pos_grp: "3WR 1TE",
+      pos_id: "9",
+      pos_name: "Quarterback",
+      pos_abb: "QB",
+      pos_slot: "9",
+      pos_rank: "1",
+      ...over,
+    };
+  }
+
+  it("keeps only the offensive personnel group and the latest snapshot at or before the cutoff", () => {
+    const mapped = mapDepthChart(
+      [
+        datedRow({}),
+        datedRow({ dt: "2026-08-30T12:30:54Z", gsis_id: "00-0000002", pos_rank: "9" }), // stale snapshot, dropped
+        datedRow({ pos_grp: "Base 4-3 D", gsis_id: "00-0000002" }), // defence, dropped
+        datedRow({ pos_grp: "Special Teams", gsis_id: "00-0000002" }), // special teams, dropped
+      ],
+      projected,
+      2026,
+      CUTOFF,
+    );
+    expect(mapped.observations).toEqual([
+      { season: 2026, week: 1, playerId: "00-0000001", source: DEPTH_SOURCE, metric: DEPTH_METRIC, value: 1, asOf: CUTOFF },
+    ]);
+  });
+
+  it("ignores a snapshot dated after the cutoff, exactly as the legacy path never sees a future week", () => {
+    const mapped = mapDepthChart(
+      [datedRow({ dt: "2026-09-15T00:00:00Z" })], // after kickoff, must not be readable
+      projected,
+      2026,
+      CUTOFF,
+    );
+    expect(mapped.observations).toEqual([]);
+  });
+
+  it("picks the LATEST snapshot at or before the cutoff, not the earliest", () => {
+    const mapped = mapDepthChart(
+      [
+        datedRow({ dt: "2026-04-01T00:00:00Z", pos_rank: "3" }), // an early-offseason snapshot
+        datedRow({ dt: "2026-08-31T14:44:50Z", pos_rank: "1" }), // the closest one to kickoff
+      ],
+      projected,
+      2026,
+      CUTOFF,
+    );
+    expect(mapped.observations).toHaveLength(1);
+    expect(mapped.observations[0]!.value).toBe(1);
+  });
+
+  it("KEEPS A MAN'S BEST RANK where the offensive group lists him more than once", () => {
+    const mapped = mapDepthChart(
+      [datedRow({ pos_abb: "FB", pos_rank: "3" }), datedRow({ pos_abb: "RB", pos_rank: "1" })],
+      projected,
+      2026,
+      CUTOFF,
+    );
+    expect(mapped.observations).toHaveLength(1);
+    expect(mapped.observations[0]!.value).toBe(1);
+  });
+
+  it("names everyone the universe does not project rather than silently dropping him", () => {
+    const mapped = mapDepthChart([datedRow({ gsis_id: "00-9999999" })], projected, 2026, CUTOFF);
+    expect(mapped.observations).toEqual([]);
+    expect(mapped.unknownPlayers).toEqual(["00-9999999"]);
+  });
+
+  it("THROWS ON A MISSING COLUMN, because a silently empty feed looks like a feed that says nothing", () => {
+    const withoutPosGrp: CsvRow = Object.fromEntries(Object.entries(datedRow({})).filter(([column]) => column !== "pos_grp"));
+    expect(() => mapDepthChart([withoutPosGrp], projected, 2026, CUTOFF)).toThrow(/pos_grp column/);
+  });
+
+  it("ignores a row whose rank is not a positive number", () => {
+    const mapped = mapDepthChart([datedRow({ pos_rank: "not-a-number" })], projected, 2026, CUTOFF);
+    expect(mapped.observations).toEqual([]);
+  });
+});
+
+describe("mapDepthChart, schema dispatch", () => {
+  it("THROWS when a file matches neither the legacy nor the dated schema, rather than silently reading nothing", () => {
+    const alienRow: CsvRow = { season: "2027", team: "ARI", some_new_column: "x" };
+    expect(() => mapDepthChart([alienRow], new Set(), 2027, AS_OF)).toThrow(/matches neither/);
+  });
+
+  it("returns an empty result for an empty file without inspecting columns", () => {
+    expect(mapDepthChart([], new Set(), 2026, AS_OF)).toEqual({ observations: [], unknownPlayers: [] });
+  });
+});
+
 describe("depthMultiplier", () => {
   it("is bounded, so a thin cell cannot make a third-stringer a starter", () => {
     const wild: DepthPriors = { ...PRIORS, bySnapShare: { ...PRIORS.bySnapShare, QB: { first: 40, second: 0.001, third: 1, offChart: 1 } } };

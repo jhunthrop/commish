@@ -143,8 +143,65 @@ export async function firstKickoffFor(db: ReadonlyDb, season: number): Promise<D
  * A player listed in several slots keeps his BEST rank. Charts list a man at both `WR` and `KR`, or
  * at `RB` and `HB`, and the highest place his club gave him anywhere is the claim it is making
  * about him.
+ *
+ * TWO SCHEMAS, because nflverse changed `depth_charts_YYYY.csv` between the 2025 and 2026 releases
+ * without a version marker anywhere but the column list itself. `depth_charts_2019.csv` through
+ * `depth_charts_2025.csv` carry `season`, `week`, `game_type`, `formation`, `depth_team`,
+ * `depth_position`, `gsis_id` — one row per player per week, and week one is the one this board may
+ * read. `depth_charts_2026.csv`, inspected directly against the real nflverse release, carries none
+ * of those: it is `dt`, `team`, `player_name`, `espn_id`, `gsis_id`, `pos_grp_id`, `pos_grp`,
+ * `pos_id`, `pos_name`, `pos_abb`, `pos_slot`, `pos_rank` — an ESPN-sourced feed, snapshotted on a
+ * rolling basis (164 distinct `dt` stamps between March and August of the 2026 file) rather than
+ * published once per week. `mapDepthChart` DISPATCHES on which columns the first row actually
+ * carries and throws if neither marker is present, rather than guessing: a schema this adapter has
+ * never seen is a stop-the-line event, identically to `client.ts`'s `malformed` classification for
+ * every other feed here.
+ *
+ * THE DATED SCHEMA'S MAPPING DECISIONS, each checked against the real 2026 file rather than assumed:
+ *
+ * - NO WEEK COLUMN AT ALL, so "week one" is redefined as "the latest snapshot at or before the
+ *   instant this call is allowed to know about" — the same `asOf` the caller already computes as
+ *   one millisecond before the season's first kickoff (`ingestDepthCharts` derives it via
+ *   `firstKickoffFor` exactly as before). This is the direct dated analogue of the legacy path's
+ *   week-1 filter: both pick the one chart a manager could have read the morning of the opener.
+ *   Snapshots dated after that instant are excluded outright — the identical leak defence the
+ *   legacy path gets for free from `week === "1"` never admitting week 2.
+ * - `pos_grp` IS THE FORMATION EQUIVALENT. The 2026 file carries exactly four distinct values:
+ *   `"3WR 1TE"`, `"Base 3-4 D"`, `"Base 4-3 D"`, `"Special Teams"`. Every offensive position this
+ *   engine ever reads (QB, RB, WR, TE, plus the offensive line and fullback the universe filter
+ *   drops downstream) appears under `"3WR 1TE"` and only there — it is ESPN's one published offence
+ *   grouping, not a personnel-package signal, and the file never varies it by team or by down. That
+ *   makes it the literal counterpart of the legacy file's `formation === "Offense"`.
+ * - `pos_rank` IS THE DEPTH NUMBER, already scoped to one position the way `depth_team` was: an
+ *   arizona sample confirmed QB, RB, WR and TE each restart their own `pos_rank` at 1 for the club's
+ *   top man at that spot, counting the whole depth (a nine-man WR list runs 1 through 9) rather than
+ *   being capped at three the way the legacy `depth_team` column was. `depthRankFor` already buckets
+ *   any number past 2 into `"third"`, so this needs no new bucketing — it is fed the same way
+ *   `depth_team` always was.
+ * - THE OUTPUT STAMP STAYS THE CALLER'S `asOf`, uniformly, on every observation from either schema.
+ *   The dated file's own `dt` is used ONLY to pick which snapshot counts as week one; it is not
+ *   promoted into the written `as_of`. Doing that would give the dated seasons a materially
+ *   different (and more precise) knowability claim than every legacy season carries, which is a
+ *   change to what the point-in-time store means rather than a schema adapter's job to make.
  */
 export function mapDepthChart(
+  rows: readonly CsvRow[],
+  projected: ReadonlySet<string>,
+  season: number,
+  asOf: Date,
+): MapDepthChartResult {
+  if (rows.length === 0) return { observations: [], unknownPlayers: [] };
+  const columns = new Set(Object.keys(rows[0]!));
+  if (columns.has("week")) return mapLegacyDepthChart(rows, projected, season, asOf);
+  if (columns.has("dt")) return mapDatedDepthChart(rows, projected, season, asOf);
+  throw new Error(
+    `depth_charts_${season}.csv matches neither the legacy week/game_type/formation schema nor the ` +
+      `dated dt/pos_grp schema; the published schema changed again. See mapDepthChart's docblock.`,
+  );
+}
+
+/** The 2019-2025 schema: one row per player per week, week and formation named directly. */
+function mapLegacyDepthChart(
   rows: readonly CsvRow[],
   projected: ReadonlySet<string>,
   season: number,
@@ -166,7 +223,62 @@ export function mapDepthChart(
     }
     best.set(playerId, Math.min(best.get(playerId) ?? Number.POSITIVE_INFINITY, depth));
   }
+  return finish(best, unknown, season, asOf);
+}
 
+/** The `"3WR 1TE"` offensive personnel group in the dated schema. See `mapDepthChart`'s docblock. */
+const DATED_OFFENSE_POS_GRP = "3WR 1TE";
+
+/** The 2026-onward schema: rolling `dt`-stamped snapshots, no week column. See `mapDepthChart`. */
+function mapDatedDepthChart(
+  rows: readonly CsvRow[],
+  projected: ReadonlySet<string>,
+  season: number,
+  asOf: Date,
+): MapDepthChartResult {
+  // Compared as parsed instants rather than as raw strings: nflverse's own `dt` values carry no
+  // milliseconds ("...:50Z") while `asOf` almost always does (it is `kickoff - 1ms`), and lexical
+  // comparison of two ISO stamps that differ only in that trailing precision sorts them backwards.
+  const cutoff = asOf.getTime();
+  let snapshot: string | null = null;
+  let snapshotTime = Number.NEGATIVE_INFINITY;
+  for (const row of rows) {
+    const dt = required(row, "dt", season);
+    const time = Date.parse(dt);
+    if (!Number.isFinite(time)) {
+      throw new Error(`depth_charts_${season}.csv has a "dt" value "${dt}" that does not parse as a date.`);
+    }
+    if (time > cutoff) continue;
+    if (time > snapshotTime) {
+      snapshot = dt;
+      snapshotTime = time;
+    }
+  }
+  // No snapshot at or before the cutoff is the dated schema's exact equivalent of the legacy path
+  // finding no `week === "1"` row: an empty chart, not a thrown error. `ingestDepthCharts` still
+  // reports it (`entriesRead` is zero), and a caller that expected rows notices from the count.
+  if (snapshot === null) return { observations: [], unknownPlayers: [] };
+
+  const best = new Map<string, number>();
+  const unknown = new Set<string>();
+  for (const row of rows) {
+    if (required(row, "dt", season) !== snapshot) continue;
+    if (required(row, "pos_grp", season) !== DATED_OFFENSE_POS_GRP) continue;
+    const playerId = (row.gsis_id ?? "").trim();
+    if (playerId === "") continue;
+    const depth = Number(required(row, "pos_rank", season));
+    if (!Number.isFinite(depth) || depth < 1) continue;
+    if (!projected.has(playerId)) {
+      unknown.add(playerId);
+      continue;
+    }
+    best.set(playerId, Math.min(best.get(playerId) ?? Number.POSITIVE_INFINITY, depth));
+  }
+  return finish(best, unknown, season, asOf);
+}
+
+/** Turns the best-rank map both schemas build into the shared result shape. */
+function finish(best: ReadonlyMap<string, number>, unknown: ReadonlySet<string>, season: number, asOf: Date): MapDepthChartResult {
   return {
     observations: [...best.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
