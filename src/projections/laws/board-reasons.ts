@@ -170,6 +170,19 @@ export function lawReasonsFor(
         `lawReasonsFor: "${law.id}" (discovered) has no matching candidate in generateCandidates() — the registry and the candidate generator have drifted.`,
       );
     }
+    // CONSISTENCY GUARD (Task 8 fix round) — `law.primaryQuantityId` was written, once, at discovery
+    // time (`discovery/measure.ts`, from this SAME `primaryQuantityDefOf` rule). Recomputing it here
+    // and asserting the two agree catches the one drift a stale `discovered.json` could otherwise
+    // pass silently to a CLIENT (`ReasonChip`, which reads the persisted field and never recomputes
+    // it — see that component's own docblock for why): a hand-edited entry, or a
+    // `discovery/templates.ts` change (e.g. the AND-pairing rule's own "which half is left" logic)
+    // that moved a candidate's primary quantity without a fresh `npm run laws:discover` run.
+    const primaryDef = primaryQuantityDefOf(candidate.claimParts.clause);
+    if (law.primaryQuantityId !== primaryDef.id) {
+      throw new Error(
+        `lawReasonsFor: "${law.id}"'s persisted primaryQuantityId ("${String(law.primaryQuantityId)}") disagrees with the live template's own primary quantity ("${primaryDef.id}") — discovered.json and discovery/templates.ts have drifted. Re-run \`npm run laws:discover\`.`,
+      );
+    }
     if (candidate.condition(discoveryFacts) !== true) continue;
     const magnitude = magnitudeForDiscoveredLaw(candidate, discoveryFacts);
     if (magnitude === null) {

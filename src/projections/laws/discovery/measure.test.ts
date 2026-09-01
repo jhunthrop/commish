@@ -437,6 +437,11 @@ describe("runDiscoveryPipeline", () => {
     expect(entry!.claim).not.toContain("top 20%");
     expect(entry!.claim).not.toMatch(/—/);
     expect(entry!.claim.startsWith("Running back carries and receptions (182): ")).toBe(true);
+    // The PRESENTATION fields (Task 8 fix round) — written here from `primaryQuantityDefOf`, the
+    // same rule `board-reasons.ts`'s own consistency guard re-derives at board-build time.
+    expect(entry!.primaryQuantityId).toBe("touches");
+    expect(entry!.primaryQuantityNoun).toBe("carries and receptions");
+    expect(entry!.primaryQuantityUnit).toBe("whole");
   });
 
   it("never asserts a candidate for AGE_CANDIDATE in the untestable position (age is a genuine null-effect test, not untestable)", () => {

@@ -30,7 +30,19 @@ function factsFixture(overrides: Partial<LawConditionFacts> = {}): LawConditionF
   };
 }
 
-function lawFixture(id: string, verdict: LawVerdict, effect = -2.5, origin: Law["origin"] = "tribal"): Law {
+/** `primaryQuantityId` defaults to `null` for a tribal fixture and matters ONLY for a discovered one
+ *  reaching `lawReasonsFor`'s own consistency guard (Task 8 fix round) — a test whose discovered
+ *  fixture's candidate has quantity `"touchdownPointsShare"` as its primary must pass that same
+ *  string here, or the guard throws before the condition is ever evaluated. `primaryQuantityNoun`/
+ *  `primaryQuantityUnit` are never read by anything in THIS file (that is `reason-chip.test.tsx`'s
+ *  concern), so they get a fixed placeholder whenever the id is non-null. */
+function lawFixture(
+  id: string,
+  verdict: LawVerdict,
+  effect = -2.5,
+  origin: Law["origin"] = "tribal",
+  primaryQuantityId: string | null = null,
+): Law {
   return {
     id,
     position: "WR",
@@ -40,6 +52,9 @@ function lawFixture(id: string, verdict: LawVerdict, effect = -2.5, origin: Law[
     modelPath: null,
     hasFoldEvidence: true,
     origin,
+    primaryQuantityId,
+    primaryQuantityNoun: primaryQuantityId === null ? null : "fixture noun",
+    primaryQuantityUnit: primaryQuantityId === null ? null : "whole",
   };
 }
 
@@ -267,7 +282,7 @@ describe("lawReasonsFor — tribal laws", () => {
 describe("lawReasonsFor — discovered laws (Task 8)", () => {
   it("produces a reason for a CONFIRMED discovered law whose candidate condition is true, magnitude from the primary quantity", () => {
     const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
-    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered")];
+    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered", "touchdownPointsShare")];
     const discoveryFacts = discoveryFactsFixture({ touchdownPointsShare: 0.35 });
 
     const reasons = lawReasonsFor(null, discoveryFacts, laws, candidatesFixture(candidate));
@@ -277,7 +292,7 @@ describe("lawReasonsFor — discovered laws (Task 8)", () => {
 
   it("never emits for a WEAK discovered law, even when its candidate condition is true", () => {
     const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
-    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "weak", -1.4, "discovered")];
+    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "weak", -1.4, "discovered", "touchdownPointsShare")];
     const discoveryFacts = discoveryFactsFixture({ touchdownPointsShare: 0.35 });
 
     expect(lawReasonsFor(null, discoveryFacts, laws, candidatesFixture(candidate))).toEqual([]);
@@ -285,7 +300,7 @@ describe("lawReasonsFor — discovered laws (Task 8)", () => {
 
   it("never emits for a DEBUNKED discovered law either", () => {
     const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
-    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "debunked", -1.4, "discovered")];
+    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "debunked", -1.4, "discovered", "touchdownPointsShare")];
     const discoveryFacts = discoveryFactsFixture({ touchdownPointsShare: 0.35 });
 
     expect(lawReasonsFor(null, discoveryFacts, laws, candidatesFixture(candidate))).toEqual([]);
@@ -293,14 +308,14 @@ describe("lawReasonsFor — discovered laws (Task 8)", () => {
 
   it("never emits when discoveryFacts is null, even for a confirmed discovered law", () => {
     const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
-    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered")];
+    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered", "touchdownPointsShare")];
 
     expect(lawReasonsFor(null, null, laws, candidatesFixture(candidate))).toEqual([]);
   });
 
   it("never emits when the candidate's own condition is false", () => {
     const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
-    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered")];
+    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered", "touchdownPointsShare")];
     const discoveryFacts = discoveryFactsFixture({ touchdownPointsShare: 0.1 }); // below 0.3
 
     expect(lawReasonsFor(null, discoveryFacts, laws, candidatesFixture(candidate))).toEqual([]);
@@ -308,7 +323,7 @@ describe("lawReasonsFor — discovered laws (Task 8)", () => {
 
   it("never emits when the candidate's own condition is unknown (null) rather than false", () => {
     const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
-    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered")];
+    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered", "touchdownPointsShare")];
     const discoveryFacts = discoveryFactsFixture(); // touchdownPointsShare unknown
 
     expect(lawReasonsFor(null, discoveryFacts, laws, candidatesFixture(candidate))).toEqual([]);
@@ -320,7 +335,7 @@ describe("lawReasonsFor — discovered laws (Task 8)", () => {
       { quantityId: "touchdownPointsShare", threshold: 0.3 },
       { quantityId: "incomingCoachTenureSeasons", threshold: 0 },
     );
-    const laws: readonly Law[] = [lawFixture("wr_td_and_coach", "confirmed", -1.7, "discovered")];
+    const laws: readonly Law[] = [lawFixture("wr_td_and_coach", "confirmed", -1.7, "discovered", "touchdownPointsShare")];
     const discoveryFacts = discoveryFactsFixture({ touchdownPointsShare: 0.41, incomingCoachTenureSeasons: 0 });
 
     const reasons = lawReasonsFor(null, discoveryFacts, laws, candidatesFixture(candidate));
@@ -339,7 +354,7 @@ describe("lawReasonsFor — discovered laws (Task 8)", () => {
     const facts = factsFixture({ targetShare: 0.3 });
     const tribal = lawFixture("target_share_persistence", "confirmed", 1.8);
     const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
-    const discovered = lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered");
+    const discovered = lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered", "touchdownPointsShare");
     const discoveryFacts = discoveryFactsFixture({ touchdownPointsShare: 0.4 });
 
     const reasons = lawReasonsFor(facts, discoveryFacts, [tribal, discovered], candidatesFixture(candidate));
@@ -352,7 +367,40 @@ describe("lawReasonsFor — discovered laws (Task 8)", () => {
     // `discovered.json`) — only that a REAL candidate id (present in every discovery round, since
     // `touches`/RB/q70 is one of the earliest-fitted quantities) resolves without throwing.
     const candidateId = "threshold:RB:touches:q70";
-    const laws: readonly Law[] = [lawFixture(candidateId, "confirmed", -1, "discovered")];
+    const laws: readonly Law[] = [lawFixture(candidateId, "confirmed", -1, "discovered", "touches")];
     expect(() => lawReasonsFor(null, discoveryFactsFixture({ touches: 0 }, null), laws)).not.toThrow();
+  });
+});
+
+/**
+ * THE CONSISTENCY GUARD (Task 8 fix round, IMPORTANT 2 RULING) — `law.primaryQuantityId` (persisted
+ * once at discovery time, `discovery/measure.ts`) must equal what `primaryQuantityDefOf` computes
+ * FRESH from the matched candidate's own `claimParts.clause`. This is the drift check that keeps a
+ * CLIENT bundle (`ReasonChip`, which reads the persisted field and never recomputes it) from ever
+ * silently rendering a headline for the wrong quantity.
+ */
+describe("lawReasonsFor — discovered primaryQuantityId consistency guard (Task 8 fix round)", () => {
+  it("passes silently when the persisted primaryQuantityId agrees with the live template", () => {
+    const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
+    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered", "touchdownPointsShare")];
+    const discoveryFacts = discoveryFactsFixture({ touchdownPointsShare: 0.35 });
+    expect(() => lawReasonsFor(null, discoveryFacts, laws, candidatesFixture(candidate))).not.toThrow();
+  });
+
+  it("throws when the persisted primaryQuantityId disagrees with the live template's own primary quantity", () => {
+    const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
+    // Persisted as "age" — stale relative to the candidate's REAL primary quantity, "touchdownPointsShare".
+    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered", "age")];
+    const discoveryFacts = discoveryFactsFixture({ touchdownPointsShare: 0.35 });
+    expect(() => lawReasonsFor(null, discoveryFacts, laws, candidatesFixture(candidate))).toThrow(
+      /wr_td_share_high.*persisted primaryQuantityId \("age"\) disagrees.*"touchdownPointsShare"/,
+    );
+  });
+
+  it("throws on the SAME disagreement even when the candidate's own condition would be false — drift is checked before condition truth", () => {
+    const candidate = thresholdCandidateFixture("wr_td_share_high", "touchdownPointsShare", 0.3);
+    const laws: readonly Law[] = [lawFixture("wr_td_share_high", "confirmed", -1.4, "discovered", "age")];
+    const discoveryFacts = discoveryFactsFixture({ touchdownPointsShare: 0.1 }); // below 0.3 — condition would be false
+    expect(() => lawReasonsFor(null, discoveryFacts, laws, candidatesFixture(candidate))).toThrow(/disagrees/);
   });
 });

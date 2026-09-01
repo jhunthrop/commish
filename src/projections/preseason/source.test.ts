@@ -318,6 +318,37 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
       modelPath: null,
       hasFoldEvidence: true,
       origin: "tribal",
+      primaryQuantityId: null,
+      primaryQuantityNoun: null,
+      primaryQuantityUnit: null,
+      ...overrides,
+    };
+  }
+
+  /**
+   * A REAL discovered candidate id (Task 8 fix round, IMPORTANT 1) — `preseasonCandidates`'
+   * `lawReasonsFor` call site never overrides `candidates` (`board-reasons.ts`'s own default
+   * parameter), so it always matches a discovered `Law.id` against the REAL
+   * `generateCandidates()`'s own output, never a fixture candidate. `threshold:WR:targetShare:q80`
+   * is real (the committed `DISCOVERY_QUANTILES` table fits a WR `targetShare` quantile at every
+   * level) and its primary quantity is `targetShare` — the SAME quantity `target_share_persistence`
+   * reads, off the SAME `beforeEach` participation rows this describe block already seeds (9
+   * targets / 34 team targets weekly, `9/34 ≈ 0.265`), so no new seeding is needed to trip it: 0.265
+   * clears every one of the real WR `targetShare` quantile marks (0.152/0.188/0.234 at q70/q80/q90).
+   */
+  function fixtureDiscoveredLaw(overrides: Partial<Law> = {}): Law {
+    return {
+      id: "threshold:WR:targetShare:q80",
+      position: "WR",
+      claim: "Fixture claim for a discovered targetShare law, independent of the real discovered.json.",
+      measured: { effect: 2.1, ci: [1.4, 2.8], sample: 250, seasons: "fixture" },
+      verdict: "confirmed",
+      modelPath: null,
+      hasFoldEvidence: true,
+      origin: "discovered",
+      primaryQuantityId: "targetShare",
+      primaryQuantityNoun: "target share",
+      primaryQuantityUnit: "percent",
       ...overrides,
     };
   }
@@ -367,5 +398,54 @@ describe("law reasons — the board-assembly wiring (fix round, IMPORTANT 2)", (
     const inputs = await loadPreseason(db, 2024);
     expect(inputs.laws.length).toBeGreaterThan(0);
     expect(() => preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS)).not.toThrow();
+  });
+
+  /**
+   * THE DISCOVERED-ORIGIN SIBLING OF THIS DESCRIBE BLOCK'S OWN TRIBAL TESTS ABOVE (Task 8 fix round,
+   * IMPORTANT 1) — the SAME wiring seam (`loadPreseason`'s `discoveryFactsForSeason` call ->
+   * `PreseasonInputs.discoveryFacts` -> `preseasonCandidates`'s `emit()` -> `lawReasonsFor`), driven
+   * through the REAL `discoveryFactsForSeason` -> `discoveryQuantitiesForSeason` reader rather than
+   * a hand-built `DiscoveryFacts` object the way `board-reasons.test.ts`'s own fixtures do. This is
+   * the guard against a silent-all-nulls failure the unit fixtures cannot catch: if
+   * `discoveryQuantitiesForSeason`'s own store reads ever drifted from what `PARTICIPATION_METRICS`/
+   * `STAT_LINE_SOURCE` actually publish, every `DiscoveryQuantityValues` field would come back
+   * `null` for every real player and every discovered law would silently stop firing — a unit test
+   * with hand-built facts would never notice, because it never asks the real reader anything.
+   */
+  it("attaches a DISCOVERED \"law\" reason through the REAL discoveryFactsForSeason path, not hand-built facts", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureDiscoveredLaw()]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+
+    const lawReasons = veteran.reasons.filter((reason) => reason.code === "law");
+    expect(lawReasons).toEqual([{ code: "law", lawId: "threshold:WR:targetShare:q80", effect: 2.1, magnitude: 9 / 34 }]);
+  });
+
+  it("attaches no DISCOVERED \"law\" reason when the fixture law is not confirmed, even with real tripping evidence", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureDiscoveredLaw({ verdict: "weak" })]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+
+    expect(veteran.reasons.some((reason) => reason.code === "law")).toBe(false);
+  });
+
+  it("attaches no DISCOVERED \"law\" reason for the rookie, who has no 2023 evidence at all", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureDiscoveredLaw()]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const rookie = candidates.find((candidate) => candidate.playerId === ROOKIE)!;
+
+    expect(rookie.reasons.some((reason) => reason.code === "law")).toBe(false);
+  });
+
+  it("attaches BOTH a tribal and a discovered \"law\" reason for the same player when both fixtures fire", async () => {
+    const inputs = await loadPreseason(db, 2024, [fixtureLaw(), fixtureDiscoveredLaw()]);
+    const candidates = preseasonCandidates(inputs, ALL_PRESEASON_FEATURES, PRIORS);
+    const veteran = candidates.find((candidate) => candidate.playerId === VETERAN)!;
+
+    const lawReasons = veteran.reasons.filter((reason) => reason.code === "law");
+    expect(lawReasons.map((reason) => (reason.code === "law" ? reason.lawId : null)).sort()).toEqual([
+      "target_share_persistence",
+      "threshold:WR:targetShare:q80",
+    ]);
   });
 });

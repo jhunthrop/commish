@@ -1,5 +1,6 @@
 import type { DiscoveryQuantityValues } from "../discovery-facts";
 import type { LawPosition } from "../populations";
+import type { PrimaryQuantityUnit } from "../types";
 
 /**
  * THE DISCOVERY VOCABULARY — every quantity a candidate law's condition can threshold or delta on,
@@ -52,6 +53,13 @@ export interface QuantityDef {
   /** A two-or-three-word label for `renderTitle`'s mechanical heading — never a full sentence, never
    *  hand-authored prose about a specific candidate. */
   readonly shortLabel: string;
+  /** Which of `PrimaryQuantityUnit`'s four plain-rounded shapes a MAGNITUDE (a player's own value)
+   *  of this quantity formats as — persisted onto a discovered `Law` (`registry.ts`'s
+   *  `primaryQuantityUnit`, written by `discovery/measure.ts`) so `ReasonChip` can format a
+   *  magnitude without importing this module. Deliberately independent of `formatValue`'s own
+   *  ceiling rounding, which is for a THRESHOLD's committed number, not a player's fact — see
+   *  `PrimaryQuantityUnit`'s own docblock (`../types.ts`). */
+  readonly magnitudeUnit: PrimaryQuantityUnit;
 }
 
 const ALL_SKILL_POSITIONS: readonly LawPosition[] = ["QB", "RB", "WR", "TE"];
@@ -113,6 +121,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.touches,
     formatValue: formatWhole,
     shortLabel: "carries and receptions",
+    magnitudeUnit: "whole",
   },
   {
     id: "age",
@@ -121,6 +130,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.age,
     formatValue: formatAgeYears,
     shortLabel: "age",
+    magnitudeUnit: "two_decimal",
   },
   {
     id: "targetShare",
@@ -129,6 +139,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.targetShare,
     formatValue: formatPercent,
     shortLabel: "target share",
+    magnitudeUnit: "percent",
   },
   {
     id: "touchdownPointsShare",
@@ -137,6 +148,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.touchdownPointsShare,
     formatValue: formatPercent,
     shortLabel: "touchdown-points share",
+    magnitudeUnit: "percent",
   },
   {
     id: "redZoneTouchShare",
@@ -145,6 +157,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.redZoneTouchShare,
     formatValue: formatPercent,
     shortLabel: "red-zone touch share",
+    magnitudeUnit: "percent",
   },
   {
     id: "targetDepth",
@@ -153,6 +166,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.targetDepth,
     formatValue: formatOneDecimal,
     shortLabel: "target depth",
+    magnitudeUnit: "one_decimal",
   },
   {
     id: "snapShare",
@@ -161,6 +175,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.snapShare,
     formatValue: formatPercent,
     shortLabel: "snap share",
+    magnitudeUnit: "percent",
   },
   {
     id: "incomingCoachTenureSeasons",
@@ -176,6 +191,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.incomingCoachTenureSeasons,
     formatValue: formatWhole,
     shortLabel: "incoming coach's tenure",
+    magnitudeUnit: "whole",
   },
   {
     id: "incomingCoachPriorPassRateOverExpected",
@@ -184,6 +200,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.incomingCoachPriorPassRateOverExpected,
     formatValue: formatOneDecimal,
     shortLabel: "incoming coach's prior pass rate",
+    magnitudeUnit: "one_decimal",
   },
   {
     id: "experienceYear",
@@ -197,6 +214,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.experienceYear,
     formatValue: formatWhole,
     shortLabel: "experience",
+    magnitudeUnit: "whole",
   },
   {
     id: "teamPaceSecondsPerPlay",
@@ -205,6 +223,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     get: (v) => v.teamPaceSecondsPerPlay,
     formatValue: formatOneDecimal,
     shortLabel: "team pace",
+    magnitudeUnit: "one_decimal",
   },
 ];
 

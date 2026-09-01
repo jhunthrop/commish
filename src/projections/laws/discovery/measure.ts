@@ -12,7 +12,7 @@ import type { LawMeasurement, LawVerdict, PlayerSeasonPoint } from "../types";
 import type { DiscoveryFacts } from "../discovery-facts";
 import type { CandidateLaw } from "./generate";
 import { DISCOVERY_QUANTILES } from "./quantiles";
-import { renderSignedClaim } from "./templates";
+import { primaryQuantityDefOf, renderSignedClaim } from "./templates";
 
 /**
  * THE LAW DISCOVERY TRIAL (Task 7, 2026-08-31; fix round 1, same date) — measuring all 1,737 of
@@ -445,6 +445,11 @@ export function runDiscoveryPipeline(
   for (const { candidate, expectedSign } of survivors) {
     const { measurement, foldEffects, verdict } = measureCandidateFullWindow(candidate, rows, expectedSign, seasonsLabel);
     if (verdict === "confirmed") replicated += 1;
+    // The candidate's own PRESENTATION data (Task 8 fix round) — written here, once, so a client
+    // bundle (`ReasonChip`) never needs to import `generateCandidates()` or `templates.ts` itself to
+    // build a discovered law's headline. See `primaryQuantityDefOf`'s own docblock for the "primary
+    // = the AND clause's left half" rule this reads.
+    const primaryQuantityDef = primaryQuantityDefOf(candidate.claimParts.clause);
     laws[candidate.id] = {
       effect: measurement.effect,
       ci: measurement.ci,
@@ -457,6 +462,9 @@ export function runDiscoveryPipeline(
       template: candidate.template,
       claim: renderSignedClaim(candidate.claimParts, expectedSign, DISCOVERY_QUANTILES),
       expectedSign,
+      primaryQuantityId: primaryQuantityDef.id,
+      primaryQuantityNoun: primaryQuantityDef.shortLabel,
+      primaryQuantityUnit: primaryQuantityDef.magnitudeUnit,
     };
   }
 

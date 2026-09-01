@@ -55,7 +55,7 @@ import { DISCOVERY_TRAIN_SEASONS, REPLICATION_FOLDS } from "./config";
 import { LAW_SPECS, type LawSpec } from "./populations";
 import { measureEffect, verdictFor, type MatchedPair } from "./harness";
 import { generateCandidates, type CandidateTemplate } from "./discovery/generate";
-import type { Law, LawMeasurement, LawVerdict, PlayerSeasonPoint } from "./types";
+import type { Law, LawMeasurement, LawVerdict, PlayerSeasonPoint, PrimaryQuantityUnit } from "./types";
 
 /** One replication fold's own effect (`config.ts`'s `REPLICATION_FOLDS`, one entry per predictor
  *  season) — `effect: null` when that fold's predictor season matched zero pairs. `pairs` (fix
@@ -284,13 +284,24 @@ export function verdictForDiscoveredLaw(
 /** One `discovered.json` law entry: everything a `MeasuredEntry` carries, plus what makes it a
  *  DISCOVERED law rather than a tribal one — its origin tag, which position/template it was
  *  generated for, its rendered (sign-committed) claim, and the sign its own train-window effect
- *  determined rather than a person asserting one up front. */
+ *  determined rather than a person asserting one up front.
+ *
+ *  `primaryQuantityId`/`primaryQuantityNoun`/`primaryQuantityUnit` (Task 8 fix round, 2026-08-31):
+ *  the candidate's own PRESENTATION data, written by `discovery/measure.ts`'s
+ *  `runDiscoveryPipeline` from `discovery/templates.ts`'s `primaryQuantityDefOf` at discovery time —
+ *  never derived client-side. See `Law.primaryQuantityId`'s own docblock (`types.ts`) for why this
+ *  is persisted rather than recomputed by every reader: a client bundle (`ReasonChip`) needs a
+ *  discovered law's headline WITHOUT importing the candidate generator or its committed quantile
+ *  table, which is exactly what these three fields let it do. */
 export type DiscoveredEntry = MeasuredEntry & {
   readonly origin: "discovered";
   readonly position: Law["position"];
   readonly template: CandidateTemplate;
   readonly claim: string;
   readonly expectedSign: -1 | 1;
+  readonly primaryQuantityId: string;
+  readonly primaryQuantityNoun: string;
+  readonly primaryQuantityUnit: PrimaryQuantityUnit;
 };
 
 /**
@@ -330,6 +341,7 @@ export interface DiscoveredJson {
 const DISCOVERED_JSON_PREFIX = "malformed discovered.json:";
 const VALID_POSITIONS: ReadonlySet<string> = new Set(["QB", "RB", "WR", "TE", "all"]);
 const VALID_TEMPLATES: ReadonlySet<string> = new Set(["threshold", "delta", "and"]);
+const VALID_PRIMARY_QUANTITY_UNITS: ReadonlySet<string> = new Set(["whole", "one_decimal", "two_decimal", "percent"]);
 
 /**
  * Explicit shape validation for `discovered.json`, mirroring `parseMeasuredJson`'s own discipline
@@ -389,6 +401,15 @@ export function parseDiscoveredJson(raw: string): DiscoveredJson {
     }
     if (record.expectedSign !== -1 && record.expectedSign !== 1) {
       throw new Error(`malformed discovered.json: "${lawId}".expectedSign is not -1 or 1`);
+    }
+    if (typeof record.primaryQuantityId !== "string" || record.primaryQuantityId.length === 0) {
+      throw new Error(`malformed discovered.json: "${lawId}".primaryQuantityId is not a non-empty string`);
+    }
+    if (typeof record.primaryQuantityNoun !== "string" || record.primaryQuantityNoun.length === 0) {
+      throw new Error(`malformed discovered.json: "${lawId}".primaryQuantityNoun is not a non-empty string`);
+    }
+    if (typeof record.primaryQuantityUnit !== "string" || !VALID_PRIMARY_QUANTITY_UNITS.has(record.primaryQuantityUnit)) {
+      throw new Error(`malformed discovered.json: "${lawId}".primaryQuantityUnit is not one of "whole" | "one_decimal" | "two_decimal" | "percent"`);
     }
     if (record.verdict === "confirmed") confirmedCount += 1;
   }
@@ -455,6 +476,9 @@ export function discoveredLawsFrom(
       modelPath: null,
       hasFoldEvidence: entry.foldEffects.some((fold) => fold.effect !== null),
       origin: "discovered" as const,
+      primaryQuantityId: entry.primaryQuantityId,
+      primaryQuantityNoun: entry.primaryQuantityNoun,
+      primaryQuantityUnit: entry.primaryQuantityUnit,
     };
   });
 }
@@ -492,6 +516,11 @@ export function registryFrom(specs: readonly LawSpec[], measuredJson: MeasuredJs
       modelPath: spec.modelPath,
       hasFoldEvidence: entry.foldEffects.some((fold) => fold.effect !== null),
       origin: "tribal" as const,
+      // A tribal law has no generated presentation data — see `Law.primaryQuantityId`'s own
+      // docblock (`types.ts`).
+      primaryQuantityId: null,
+      primaryQuantityNoun: null,
+      primaryQuantityUnit: null,
     };
   });
 }

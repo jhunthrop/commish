@@ -30,6 +30,9 @@ function lawFixture(over: Partial<Law> = {}): Law {
     modelPath: null,
     hasFoldEvidence: true,
     origin: "tribal",
+    primaryQuantityId: null,
+    primaryQuantityNoun: null,
+    primaryQuantityUnit: null,
     ...over,
   };
 }
@@ -52,6 +55,11 @@ function discoveredLawFixture(over: Partial<Law> = {}): Law {
     modelPath: null,
     hasFoldEvidence: true,
     origin: "discovered",
+    // This page never reads these three (they are `ReasonChip`'s concern) — set to match the
+    // default id's own quantity so the fixture stays internally honest either way.
+    primaryQuantityId: "touches",
+    primaryQuantityNoun: "carries and receptions",
+    primaryQuantityUnit: "whole",
     ...over,
   };
 }

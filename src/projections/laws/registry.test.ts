@@ -81,6 +81,9 @@ describe("registryFrom", () => {
       modelPath: null,
       hasFoldEvidence: true,
       origin: "tribal",
+      primaryQuantityId: null,
+      primaryQuantityNoun: null,
+      primaryQuantityUnit: null,
     });
   });
 
@@ -382,6 +385,9 @@ function discoveredEntryFixture(over: Partial<DiscoveredEntry> = {}): Discovered
     template: "threshold",
     claim: "A running back whose combined carries and receptions that season is in the top 20% of running backs loses points per game the following season.",
     expectedSign: -1,
+    primaryQuantityId: "touches",
+    primaryQuantityNoun: "carries and receptions",
+    primaryQuantityUnit: "whole",
   };
   return { ...base, ...over };
 }
@@ -516,6 +522,45 @@ describe("parseDiscoveredJson", () => {
     expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.template is not one of/);
   });
 
+  /** The three PRESENTATION fields (Task 8 fix round, IMPORTANT 2 RULING) — written by
+   *  `discovery/measure.ts` at discovery time, read here for shape only (the cross-check against
+   *  the live template lives in `board-reasons.ts`'s own consistency guard, not in parsing). */
+  describe("the presentation fields (primaryQuantityId/Noun/Unit)", () => {
+    it("throws when primaryQuantityId is missing or empty", () => {
+      const malformed = JSON.stringify({
+        counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+        laws: { fake_candidate: { ...discoveredEntryFixture(), primaryQuantityId: "" } },
+      });
+      expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.primaryQuantityId is not a non-empty string/);
+    });
+
+    it("throws when primaryQuantityNoun is missing or empty", () => {
+      const malformed = JSON.stringify({
+        counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+        laws: { fake_candidate: { ...discoveredEntryFixture(), primaryQuantityNoun: "" } },
+      });
+      expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.primaryQuantityNoun is not a non-empty string/);
+    });
+
+    it("throws when primaryQuantityUnit is not one of the four valid tags", () => {
+      const malformed = JSON.stringify({
+        counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+        laws: { fake_candidate: { ...discoveredEntryFixture(), primaryQuantityUnit: "bogus" } },
+      });
+      expect(() => parseDiscoveredJson(malformed)).toThrow(/"fake_candidate"\.primaryQuantityUnit is not one of/);
+    });
+
+    it("accepts every valid primaryQuantityUnit tag", () => {
+      for (const unit of ["whole", "one_decimal", "two_decimal", "percent"] as const) {
+        const raw = JSON.stringify({
+          counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 },
+          laws: { fake_candidate: { ...discoveredEntryFixture(), primaryQuantityUnit: unit } },
+        });
+        expect(() => parseDiscoveredJson(raw)).not.toThrow();
+      }
+    });
+  });
+
   it("throws when a foldEffects entry's pairs is negative", () => {
     const entry = discoveredEntryFixture({ foldEffects: [{ season: 2021, pairs: -1, effect: -1 }] });
     const malformed = JSON.stringify({ counts: { candidates: 1, untestable: 0, bhSurvivors: 1, replicated: 1 }, laws: { fake_candidate: entry } });
@@ -573,6 +618,9 @@ describe("discoveredLawsFrom", () => {
       modelPath: null,
       hasFoldEvidence: true,
       origin: "discovered",
+      primaryQuantityId: "touches",
+      primaryQuantityNoun: "carries and receptions",
+      primaryQuantityUnit: "whole",
     });
   });
 
@@ -647,6 +695,9 @@ describe("chipEligibleLaws", () => {
       modelPath: null,
       hasFoldEvidence: true,
       origin: "tribal",
+      primaryQuantityId: null,
+      primaryQuantityNoun: null,
+      primaryQuantityUnit: null,
       ...over,
     };
   }

@@ -10,6 +10,19 @@
 /** How the evidence resolved. Never asserted directly — always the output of `verdictFor`. */
 export type LawVerdict = "confirmed" | "weak" | "debunked";
 
+/**
+ * THE FOUR NUMERIC SHAPES A DISCOVERED LAW'S OWN MAGNITUDE CAN TAKE (Task 8 fix round, 2026-08-31) —
+ * one PLAIN-ROUNDED formatter per unit, generic across every discovered id (never a hand entry per
+ * id: a discovered id changes every discovery round). Lives HERE, in the pure shapes file, rather
+ * than in `discovery/templates.ts` (which owns the QUANTITY vocabulary this tag is derived FROM),
+ * because `Law.primaryQuantityUnit` below needs it and a CLIENT bundle (`ReasonChip`) needs to
+ * import `Law`'s own shape without pulling in the candidate generator or its committed quantile
+ * table alongside it — the exact bundle-weight problem this fix round exists to close. See
+ * `discovery/templates.ts`'s `QuantityDef.magnitudeUnit` for where a quantity picks its own tag, and
+ * `ReasonChip`'s own `formatMagnitude` for the plain-rounding formatter keyed by it.
+ */
+export type PrimaryQuantityUnit = "whole" | "one_decimal" | "two_decimal" | "percent";
+
 /** The measured evidence behind one law, independent of what the law claims. */
 export interface LawMeasurement {
   /** Points/game delta, condition minus matched baseline. */
@@ -57,6 +70,27 @@ export interface Law {
    * without learning about folds at all.
    */
   readonly hasFoldEvidence: boolean;
+  /**
+   * THE DISCOVERED HALF OF A LAW'S OWN PRESENTATION DATA (Task 8 fix round, 2026-08-31) — written
+   * ONCE at discovery time (`discovery/measure.ts`'s `runDiscoveryPipeline`, from
+   * `discovery/templates.ts`'s `primaryQuantityDefOf`) rather than derived client-side, so a client
+   * bundle (`ReasonChip`) can build a discovered law's own headline WITHOUT importing the candidate
+   * generator or its committed quantile table — both of which a server-only `board-reasons.ts` is
+   * free to keep importing, since it never ships to the browser. `primaryQuantityId` is the SAME id
+   * `discovery/templates.ts`'s `primaryQuantityIdOf` computes fresh from the candidate's own clause;
+   * `board-reasons.ts`'s `lawReasonsFor` asserts the two agree before ever using either, so this
+   * field can never silently drift from the live template it was generated from. All three are
+   * `null` for a TRIBAL law, which has no generated presentation data — `ReasonChip`'s own
+   * `LAW_HEADLINES` carries a tribal law's headline by hand instead.
+   */
+  readonly primaryQuantityId: string | null;
+  /** The primary quantity's own short label, e.g. "touchdown-points share" — `ReasonChip`'s headline
+   *  reads this verbatim, never re-deriving it. `null` for a tribal law. */
+  readonly primaryQuantityNoun: string | null;
+  /** How to format a MAGNITUDE (a player's own value) of the primary quantity, mechanically, with
+   *  PLAIN rounding — see `PrimaryQuantityUnit`'s own docblock for why this is a separate tag from a
+   *  THRESHOLD's ceiling-rounded `formatValue`. `null` for a tribal law. */
+  readonly primaryQuantityUnit: PrimaryQuantityUnit | null;
 }
 
 /**
