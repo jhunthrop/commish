@@ -40,7 +40,8 @@ function pct(resolved: number, rows: number): string {
 }
 
 async function main(): Promise<void> {
-  const db: ReadonlyDb = createDb(requireEnv("DATABASE_URL"));
+  const client = createDb(requireEnv("DATABASE_URL"));
+  const db: ReadonlyDb = client;
   const positions = await allPositions(db);
 
   const overall = new Map<string, Tally>(QUANTITY_DEFS.map((def) => [def.id, { resolved: 0, rows: 0 }] as const));
@@ -82,7 +83,7 @@ async function main(): Promise<void> {
     console.log(`    ${bySeason}`);
   }
 
-  await db.$client.end();
+  await client.$client.end();
 }
 
 main()
