@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeName, resolveRankings, type RankingCandidate, type RosterIdentity } from "./benchmarks";
-import { parseExpertConsensus } from "./publishers";
+import { parseAverageDraftPosition, parseExpertConsensus, type FfcResponse } from "./publishers";
 
 /**
  * A name join is the thing this codebase otherwise refuses to do, so the tests are about the two
@@ -187,5 +187,62 @@ describe("parseExpertConsensus", () => {
     expect(() => parseExpertConsensus(page(JSON.stringify({ year: "2024", players: [] })), 2024, READ_AT)).toThrow(
       /no ranked players/,
     );
+  });
+});
+
+describe("parseAverageDraftPosition", () => {
+  /** Long after any season this suite names, so the convention stamp wins and these tests are
+   *  about the parser rather than about the clock — the identical fixture `parseExpertConsensus`'s
+   *  own describe block uses, for the identical reason. */
+  const READ_AT = new Date("2030-01-01T00:00:00.000Z");
+
+  const body = (overrides: Partial<FfcResponse> = {}): FfcResponse => ({
+    meta: { end_date: "2024-08-27" },
+    players: [{ name: "CeeDee Lamb", position: "WR", team: "DAL", adp: 1.4 }],
+    ...overrides,
+  });
+
+  it("reads the board out of the feed's own JSON body", () => {
+    const board = parseAverageDraftPosition(body(), 2024, READ_AT);
+    expect(board.candidates).toEqual([{ name: "CeeDee Lamb", position: "WR", team: "DAL", rank: 1.4 }]);
+    expect(board.publisherStamp).toBe("2024-08-27");
+  });
+
+  it("throws on a board with no ranked players at all", () => {
+    expect(() => parseAverageDraftPosition(body({ players: [] }), 2024, READ_AT)).toThrow(
+      /published no 2024 board/,
+    );
+  });
+
+  it("throws on a board with no draft window, rather than treating an undated market price as a benchmark", () => {
+    expect(() => parseAverageDraftPosition(body({ meta: {} }), 2024, READ_AT)).toThrow(/carries no draft window/);
+    expect(() => parseAverageDraftPosition(body({ meta: { end_date: "not-a-date" } }), 2024, READ_AT)).toThrow(
+      /carries no draft window/,
+    );
+  });
+
+  it("leaves an ARCHIVED board on the published convention (the day after its window closed), so no past measurement moves", () => {
+    // READ_AT is 2030 — long after 2024's window closed — so the convention is the earlier of the
+    // two and must win exactly as it always has.
+    const board = parseAverageDraftPosition(body({ meta: { end_date: "2024-08-27" } }), 2024, READ_AT);
+    expect(board.publishedAt).toEqual(new Date(Date.UTC(2024, 7, 28)));
+  });
+
+  /**
+   * THE STAMP CANNOT CLAIM THE FUTURE (live-board plan, Task 4 fix round — the identical defect
+   * `parseExpertConsensus`'s own equivalent test already pins). Fetched WHILE the CURRENT season's
+   * draft window is still open, the day-after convention would date data we are holding right now
+   * to tomorrow, and a live board's `now`-bounded gate would find nothing.
+   */
+  it("stamps a board fetched before its convention date with the moment we fetched it", () => {
+    const fetchedAt = new Date("2026-09-01T15:00:00.000Z");
+    const board = parseAverageDraftPosition(body({ meta: { end_date: "2026-09-01" } }), 2026, fetchedAt);
+    expect(board.publishedAt).toEqual(fetchedAt);
+  });
+
+  it("is exactly the boundary, not past it: a fetch at the instant the convention would stamp still takes the convention", () => {
+    const convention = new Date(Date.UTC(2026, 8, 2)); // 2026-09-01's end_date, +1 day
+    const board = parseAverageDraftPosition(body({ meta: { end_date: "2026-09-01" } }), 2026, convention);
+    expect(board.publishedAt).toEqual(convention);
   });
 });

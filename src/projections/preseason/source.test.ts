@@ -7,7 +7,8 @@ import { week1RosterAsOf } from "../nflverse/rosters";
 import { STAT_LINE_SOURCE, statMetricName } from "../lines";
 import { DERIVED_STAT_LINE_SOURCE } from "../nflverse/derived-stat-lines";
 import { recordObservations, type PlayerWeekObservation } from "../store";
-import { recordPreseasonRosters } from "./store";
+import { BENCHMARK_SOURCES } from "./benchmarks";
+import { recordPreseasonRankings, recordPreseasonRosters } from "./store";
 import { recordTeamObservations } from "../team-store";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { DEPTH_METRIC, DEPTH_SOURCE } from "./depth";
@@ -894,6 +895,62 @@ describe("BoardMoment — the live arm (Task 2 audit)", () => {
       expect(inputs.momentKind).toBe("live");
       expect(inputs.lawFacts.has(VETERAN)).toBe(false);
       expect(inputs.discoveryFacts.has(VETERAN)).toBe(false);
+    });
+  });
+
+  /**
+   * (g) TASK 4 FIX ROUND — THE DEGENERACY GUARD (`market/blend.ts`'s `shippedPreseasonCandidates`).
+   * A LIVE board whose market resolves ZERO listed players must never ship: every candidate would
+   * fall back to the position tail cap and tie an entire position at the identical value, which is
+   * exactly what the real 2026 persist produced before the ADP stamp fix landed.
+   */
+  describe("(g) Task 4 fix round — the degeneracy guard refuses a live board with zero listed market players", () => {
+    it("THROWS naming the season and the moment when a LIVE board's market resolves nobody", async () => {
+      await seedLiveRoster(LIVE_SEASON);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      // No ADP rows recorded for LIVE_SEASON at all — the exact shape the real incident had before
+      // the fix (every row's own stamp fell after the live moment, so nothing was visible).
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      const inputs = await loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment });
+
+      await expect(shippedPreseasonCandidates(db, inputs, PRIORS)).rejects.toThrow(
+        new RegExp(`${LIVE_SEASON}'s LIVE board resolved ZERO listed market players`),
+      );
+      await expect(shippedPreseasonCandidates(db, inputs, PRIORS)).rejects.toThrow(/must not be persisted/);
+    });
+
+    it("does NOT throw when the LIVE board's market resolves at least one listed player, even with no candidates of our own to anchor", async () => {
+      // No usage history is seeded for LIVE_SEASON here (this fixture's `beforeEach` only ever
+      // seeds 2023/2024 history), so `preseasonCandidates` itself has nobody to emit — the
+      // narrowest possible proof that the guard's own predicate is `market.length === 0`, not
+      // `candidates.length === 0`: a market with one real, visible, listed player must not trip it,
+      // whether or not OUR side of the board has anyone to blend that price against.
+      await seedLiveRoster(LIVE_SEASON);
+      await seedFirstKickoff(LIVE_SEASON, FIRST_KICKOFF);
+      await recordPreseasonRankings(db, [
+        {
+          season: LIVE_SEASON,
+          source: BENCHMARK_SOURCES.adp,
+          playerId: VETERAN,
+          rank: 12.6,
+          // Well before the live moment (kickoff minus a day), so it is honestly visible.
+          asOf: new Date(FIRST_KICKOFF.getTime() - 5 * 24 * 60 * 60 * 1000),
+        },
+      ]);
+      const liveMoment = await liveMomentFor(db, LIVE_SEASON, clockBeforeKickoff);
+      const inputs = await loadPreseason(db, LIVE_SEASON, { boardMoment: liveMoment });
+
+      const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS);
+      expect(candidates).toEqual([]);
+    });
+
+    it("does NOT throw for a REPLAY board with zero listed market players — an established, legitimate state", async () => {
+      // 2024's replay fixture never ingests any ADP board at all (the pre-existing "raw: false"
+      // test below pins exactly this: every candidate is market_unlisted, not a thrown error).
+      const inputs = await loadPreseason(db, 2024);
+      const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS);
+      expect(candidates.length).toBeGreaterThan(0);
+      expect(candidates.every((candidate) => candidate.reasons.some((reason) => reason.code === "market_unlisted"))).toBe(true);
     });
   });
 });

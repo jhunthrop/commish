@@ -15,6 +15,12 @@ import type { RankingCandidate } from "./benchmarks";
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/** The earlier of two moments. Named rather than inlined because `Math.min` over `getTime` reads
+ *  as arithmetic, and this is a claim about knowledge. */
+function earlierOf(left: Date, right: Date): Date {
+  return left.getTime() <= right.getTime() ? left : right;
+}
+
 export interface PublishedBoard {
   readonly candidates: readonly RankingCandidate[];
   /** When the publisher says this board was current. Stored as provenance. */
@@ -30,7 +36,9 @@ interface FfcPlayer {
   readonly adp: number;
 }
 
-interface FfcResponse {
+/** Exported so `parseAverageDraftPosition`'s own tests can state the feed's JSON body directly,
+ *  the same reason `PublishedBoard` and `RankingCandidate` are exported. */
+export interface FfcResponse {
   readonly meta?: { readonly end_date?: string };
   readonly players?: readonly FfcPlayer[];
 }
@@ -49,6 +57,21 @@ interface FfcResponse {
  * band a manager wins a league in runs to 400, and beyond 205 there is simply nobody to beat. That
  * is a fact about the market rather than a gap in the ingestion, and the research document says so
  * rather than quietly scoring the deep band on its shallow half.
+ *
+ * BOUNDED BY THE MOMENT WE FETCHED IT (live-board plan, Task 4 fix round) — the IDENTICAL defect
+ * `fetchExpertConsensus`'s own docblock already named and fixed, found here by the first real live
+ * persist this engine ever ran: `publishedAt` used to be "the day after the last draft the feed
+ * averaged," UNCONDITIONALLY, and that convention lands AFTER the fetch instant whenever the
+ * window is still open — which for a CURRENT season's ADP, fetched WHILE the market is still
+ * drafting, is every single time. A live board's own moment is capped at `now`, so a convention
+ * stamped tomorrow gates the ENTIRE board out, silently, exactly the way an un-bounded stamp has
+ * twice already gated a benchmark out of every board this engine built before somebody noticed. The
+ * averaged data was published and knowable the moment we read it, regardless of whether the feed's
+ * own window has formally closed — the rule `parseExpertConsensus` already states applies here
+ * without a single word changed: "a board became knowable no later than the moment we read it." For
+ * an ARCHIVE ingest (a past season, fetched months after its window closed), the convention is
+ * always the earlier of the two and wins unchanged, so every measurement taken under it stays
+ * exactly where it was.
  */
 export async function fetchAverageDraftPosition(
   season: number,
@@ -60,6 +83,18 @@ export async function fetchAverageDraftPosition(
     throw new Error(`Fantasy Football Calculator returned HTTP ${response.status} for ${season}.`);
   }
   const body = (await response.json()) as FfcResponse;
+  // Read AFTER the body, never before the request: the claim is "we had this", and a clock read
+  // before a slow fetch would date the claim to before the bytes existed.
+  return parseAverageDraftPosition(body, season, new Date());
+}
+
+/**
+ * Pulls the ADP board out of the feed's own JSON body.
+ *
+ * `fetchedAt` is passed in rather than read here, mirroring `parseExpertConsensus`'s own reasoning
+ * verbatim: the parser stays pure and a test can state the moment rather than race a clock.
+ */
+export function parseAverageDraftPosition(body: FfcResponse, season: number, fetchedAt: Date): PublishedBoard {
   const players = body.players ?? [];
   if (players.length === 0) {
     throw new Error(`Fantasy Football Calculator published no ${season} board; there is no market price to score against.`);
@@ -75,8 +110,10 @@ export async function fetchAverageDraftPosition(
       team: player.team,
       rank: player.adp,
     })),
-    // The day after the last draft it averaged: the earliest moment the average itself existed.
-    publishedAt: new Date(Date.parse(`${endDate}T00:00:00.000Z`) + MILLISECONDS_PER_DAY),
+    // The day after the last draft it averaged: the earliest moment the average itself existed —
+    // UNLESS we read it even earlier than that convention claims, in which case we read it earlier
+    // than it says it existed, and the moment we actually saw it is the only honest stamp.
+    publishedAt: earlierOf(new Date(Date.parse(`${endDate}T00:00:00.000Z`) + MILLISECONDS_PER_DAY), fetchedAt),
     publisherStamp: endDate,
   };
 }
@@ -149,12 +186,6 @@ export async function fetchExpertConsensus(
  * Throwing by name here is what turns that into an operator's problem rather than a benchmark that
  * quietly has no rows.
  */
-/** The earlier of two moments. Named rather than inlined because `Math.min` over `getTime` reads
- *  as arithmetic, and this is a claim about knowledge. */
-function earlierOf(left: Date, right: Date): Date {
-  return left.getTime() <= right.getTime() ? left : right;
-}
-
 export function parseExpertConsensus(html: string, season: number, fetchedAt: Date): PublishedBoard {
   const match = /ecrData\s*=\s*(\{[\s\S]*?\});\s*\n/.exec(html);
   if (match === null) {

@@ -620,6 +620,27 @@ export async function shippedPreseasonCandidates(
   // `marketBoard` docblock: that function used to derive this itself, unconditionally through the
   // replay-only `preseasonMomentFor`, which throws for a season that has not kicked off yet).
   const { entries: market, droppedCount } = await marketBoard(db, inputs.season, inputs.moment);
+  // THE DEGENERACY GUARD (Task 4 fix round ruling, found by the first real live persist this
+  // engine ever ran). Zero listed players on a LIVE board is not an ordinary "thin benchmark"
+  // outcome the way it can legitimately be on a REPLAY board of a thin historical season: EVERY
+  // candidate falls back to `tailCappedUnlistedPoints`'s position tail, and because that fallback
+  // was built for the few deep-bench stragglers a normal, mostly-listed board leaves unlisted, a
+  // 100%-unlisted class collapses every player at a position to the IDENTICAL tail value (confirmed
+  // live: 26 distinct QBs tied at 172.51, the RAW model underneath NOT tied). A board that ties its
+  // own QB1 through QB26 is not a board; refusing to write it down is the only honest option. Never
+  // an issue for a REPLAY board, scoped to `momentKind === "live"` on purpose: a replay board with
+  // no ADP for its season is an established, tested, legitimate state (thin or unbenchmarked
+  // history), not a leak.
+  if (market.length === 0 && inputs.momentKind === "live") {
+    throw new Error(
+      `${inputs.season}'s LIVE board resolved ZERO listed market players at ${inputs.moment.toISOString()}. ` +
+        "Every candidate would fall back to the position tail cap, degenerately tying every player at a " +
+        "position to the identical value -- this board must not be persisted. The usual cause is the ADP " +
+        "benchmark's own publication stamp sitting after the live moment (publishers.ts's " +
+        "fetchAverageDraftPosition docblock): verify the benchmark is ingested AND visible at this moment " +
+        "before persisting again.",
+    );
+  }
   if (droppedCount > 0) {
     console.warn(`market/blend.ts: marketBoard for ${inputs.season} dropped ${droppedCount} ADP row(s) with an unresolved position.`);
   }
