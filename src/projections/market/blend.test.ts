@@ -213,7 +213,13 @@ describe("blendBoard", () => {
     });
     const [blended] = blendBoard([market({ marketPoints: 999 })], [rookie], { season: SEASON, constants: CONSTANTS, laws: [] });
     const curvePoints = rookieCurve("WR", 5);
-    expect(seasonPointsOf(blended!)).toBeCloseTo(curvePoints, 6);
+    // TWO DECIMALS, NOT SIX (fit-round Task 4). The substituted total does not travel as a number:
+    // it becomes a per-game stat line and is re-scored through `computeFantasyPoints`, whose
+    // `roundPoints` is the product's own two-decimal rule. The round trip is therefore exact only to
+    // the scoring layer's own precision. Six decimals passed before only because the previous
+    // committed curve happened to read a clean 206.5 at this pick; the full-cohort refit reads
+    // 179.4538..., which rounds. The assertion now pins the guarantee that actually exists.
+    expect(seasonPointsOf(blended!)).toBeCloseTo(curvePoints, 2);
     expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 999, delta: curvePoints - 999 });
   });
 

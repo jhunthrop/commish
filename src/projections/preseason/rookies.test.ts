@@ -142,12 +142,20 @@ describe("capitalShares", () => {
   const BUCKETS: RookieFeatures = { landingSpot: false, pickCurve: false };
 
   it("ORDERS A CLASS BY DRAFT CAPITAL, which six flat buckets cannot", () => {
-    // Six cells hand a whole round one number: the fourth pick and the thirtieth are both "round 1"
+    // Six cells hand a whole round one number: the fourth pick and the twentieth are both "round 1"
     // and a bucket table cannot tell them apart. That is the defect the curve exists for.
+    //
+    // THE POSITION AND THE PAIR BOTH MATTER, and pretending otherwise would overclaim (fit-round
+    // Task 4). The full-cohort refit is a step function with wide plateaus, and RB's is flat from
+    // roughly pick 16 to pick 40, so the pair this test used to use (RB 4 against RB 30) now sits
+    // inside one plateau and the curve honestly cannot separate it either. QB has a real step inside
+    // round one, which is what this asserts. The guarantee is that the curve separates picks the
+    // bucket table cannot WHERE THE MEASURED CURVE ACTUALLY MOVES, never everywhere; the monotone
+    // test below is what holds across the whole draft.
     const share = (pick: number, features: RookieFeatures): number =>
-      capitalShares("RB", pick, priors, features).carryShare;
-    expect(share(4, BUCKETS)).toBe(share(30, BUCKETS));
-    expect(share(4, CURVE)).toBeGreaterThan(share(30, CURVE));
+      capitalShares("QB", pick, priors, features).carryShare;
+    expect(share(4, BUCKETS)).toBe(share(20, BUCKETS));
+    expect(share(4, CURVE)).toBeGreaterThan(share(20, CURVE));
   });
 
   it("is monotone in the pick across the whole draft, never rewarding a later pick", () => {

@@ -167,15 +167,28 @@ describe("rookieCurve", () => {
     expect(rookieCurve("QB", 260, negativeTail)).toBe(0);
   });
 
-  it("PIN: clamps the real committed QB tail (picks 250 and 253, both fit to -0.05) at exactly zero", () => {
-    // The exact case the clamp exists for: `rookie-curve-fitted.ts`'s own QB knots at pick 250 and
-    // 253 are both -0.05, the seventh-round/UDFA tail where a rookie season is a mop-up
-    // interception and nothing else. The FITTED constant stays that honest, unfloored measurement
-    // (checked directly below); the ACCESSOR is what floors it.
-    expect(FITTED_ROOKIE_CURVE.QB.find((knot) => knot.pick === 250)?.points).toBe(-0.05);
-    expect(FITTED_ROOKIE_CURVE.QB.find((knot) => knot.pick === 253)?.points).toBe(-0.05);
-    expect(rookieCurve("QB", 250)).toBe(0);
-    expect(rookieCurve("QB", 253)).toBe(0);
+  it("PIN: the committed fit currently carries NO negative knot at any position, so the clamp above is inert on today's constants", () => {
+    // THIS PIN INVERTED IN THE FIT-ROUND (Task 4), and the inversion is the point rather than a
+    // fixture repair. It used to name the real QB knots at picks 250 and 253, both fitted to -0.05:
+    // the seventh-round/UDFA tail where a rookie season was a mop-up interception and nothing else.
+    // Re-fitting on nineteen rookie classes (2003-2021) instead of nine put enough men in every tail
+    // cell that no cell's mean is negative any more, at any position.
+    //
+    // So the clamp's live example is gone. The clamp itself is NOT gone and is not now untested: the
+    // test directly above exercises it against a synthetic negative-tail curve, which is where a
+    // behavioural guarantee belongs. What this test pins is the STATE OF THE COMMITTED FILE, and it
+    // is worth pinning in this direction because a future fit that produces a negative again is a
+    // fact somebody should be told about rather than one the accessor silently absorbs.
+    for (const position of ["QB", "RB", "WR", "TE"] as const) {
+      const negative = FITTED_ROOKIE_CURVE[position].filter((knot) => knot.points < 0);
+      expect(negative).toEqual([]);
+    }
+    // And the accessor still floors, whatever the file says: the deepest knot at every position
+    // reads as a non-negative number.
+    for (const position of ["QB", "RB", "WR", "TE"] as const) {
+      const deepest = FITTED_ROOKIE_CURVE[position][FITTED_ROOKIE_CURVE[position].length - 1]!;
+      expect(rookieCurve(position, deepest.pick)).toBeGreaterThanOrEqual(0);
+    }
   });
 });
 
