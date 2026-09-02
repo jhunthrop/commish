@@ -292,6 +292,204 @@ describe("blendBoard", () => {
   });
 });
 
+/**
+ * FIT-ROUND TASK 3, DELIVERABLE A — the pricing-admission gate. A law Task 2 marked SUSPECT keeps its
+ * confirmed verdict, its board reason and its chip eligibility, and never moves a price.
+ */
+describe("blendBoard — the pricing-admission gate (fit-round Task 3, deliverable A)", () => {
+  /** One of the nine, verbatim: the fullback-driven snap-share law (Task 2, vigilance A). */
+  const SUSPECT_ID = "threshold:RB:snapShare:q20";
+
+  const roomy: BlendConstants = { ...CONSTANTS, lawCapPoints: 100, totalCapPoints: 100 };
+
+  it("a SUSPECT law yields NO pricing delta even though it is confirmed and fires a reason", () => {
+    const withSuspect = candidate({ reasons: [lawReason({ lawId: SUSPECT_ID })] });
+    const laws = [lawFixture({ id: SUSPECT_ID, origin: "discovered", verdict: "confirmed", trainEffect: 50 })];
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withSuspect], { season: SEASON, constants: roomy, laws });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(200, 6);
+    expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 200, delta: 0 });
+  });
+
+  it("the same law with an ordinary id DOES move the price — the gate is the id, not the fixture", () => {
+    const withOrdinary = candidate({ reasons: [lawReason({ lawId: "threshold:RB:snapShare:q70" })] });
+    const laws = [lawFixture({ id: "threshold:RB:snapShare:q70", origin: "discovered", verdict: "confirmed", trainEffect: 50 })];
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withOrdinary], { season: SEASON, constants: roomy, laws });
+    expect(seasonPointsOf(blended!)).toBeGreaterThan(200);
+  });
+
+  it("the suspect law's own board reason SURVIVES on the candidate — the chip surface still sees it", () => {
+    const withSuspect = candidate({ reasons: [lawReason({ lawId: SUSPECT_ID })] });
+    const laws = [lawFixture({ id: SUSPECT_ID, origin: "discovered", verdict: "confirmed", trainEffect: 50 })];
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withSuspect], { season: SEASON, constants: roomy, laws });
+    expect(blended!.reasons).toContainEqual(lawReason({ lawId: SUSPECT_ID }));
+    expect(laws[0]!.verdict).toBe("confirmed");
+  });
+
+  it("still throws for a law reason with NO registry entry — gating is not drift, and drift still fails loudly", () => {
+    const withUnknown = candidate({ reasons: [lawReason({ lawId: "not_in_registry" })] });
+    expect(() => blendBoard([market()], [withUnknown], { season: SEASON, constants: roomy, laws: [] })).toThrow(
+      /"not_in_registry" fired a BoardReason but has no matching entry/,
+    );
+  });
+});
+
+/**
+ * FIT-ROUND TASK 3, DELIVERABLE B — the law-channel grid dimensions. Every one of them has the
+ * incumbent behaviour as its null cell, which is what the first test in each pair pins.
+ */
+describe("blendBoard — law-channel cluster dedup (fit-round Task 3, deliverable B(ii))", () => {
+  /** Three CONFIRMED laws: two in the goal-line cluster, one outside it. */
+  const GOAL_LINE_A = "threshold:RB:touchdownPointsShare:q70";
+  const GOAL_LINE_B = "threshold:RB:insideTenTouchShare:q80";
+  const OTHER = "threshold:RB:draftPick:q80";
+  const roomy: BlendConstants = { ...CONSTANTS, lawCapPoints: 100, availabilityCapPoints: 0, totalCapPoints: 1000 };
+  const exposure = IMPLIED_GAMES / 17;
+
+  const laws = [
+    lawFixture({ id: GOAL_LINE_A, origin: "discovered", trainEffect: 2 }),
+    lawFixture({ id: GOAL_LINE_B, origin: "discovered", trainEffect: 3 }),
+    lawFixture({ id: OTHER, origin: "discovered", trainEffect: 5 }),
+  ];
+  const withThree = candidate({
+    reasons: [lawReason({ lawId: GOAL_LINE_A }), lawReason({ lawId: GOAL_LINE_B }), lawReason({ lawId: OTHER })],
+  });
+
+  it("NULL CELL (absent): sums every fired law, exactly as the blend always has", () => {
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withThree], { season: SEASON, constants: roomy, laws });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(200 + (2 + 3 + 5) * exposure, 2);
+  });
+
+  it("DEDUP ON: the goal-line cluster contributes its STRONGEST law only, the other cluster still adds", () => {
+    const deduped: BlendConstants = { ...roomy, lawClusterDedup: true };
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withThree], { season: SEASON, constants: deduped, laws });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(200 + (3 + 5) * exposure, 2);
+  });
+
+  it("DEDUP ON keeps the strongest law's SIGN, never its absolute value", () => {
+    const negative = [
+      lawFixture({ id: GOAL_LINE_A, origin: "discovered", trainEffect: -1 }),
+      lawFixture({ id: GOAL_LINE_B, origin: "discovered", trainEffect: -4 }),
+    ];
+    const withTwo = candidate({ reasons: [lawReason({ lawId: GOAL_LINE_A }), lawReason({ lawId: GOAL_LINE_B })] });
+    const deduped: BlendConstants = { ...roomy, lawClusterDedup: true };
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withTwo], { season: SEASON, constants: deduped, laws: negative });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(200 - 4 * exposure, 2);
+  });
+
+  it("DEDUP ON is a NO-OP when every fired law sits in a different cluster", () => {
+    const single = candidate({ reasons: [lawReason({ lawId: OTHER })] });
+    const summed = blendBoard([market({ marketPoints: 200 })], [single], { season: SEASON, constants: roomy, laws });
+    const deduped = blendBoard([market({ marketPoints: 200 })], [single], {
+      season: SEASON,
+      constants: { ...roomy, lawClusterDedup: true },
+      laws,
+    });
+    expect(seasonPointsOf(deduped[0]!)).toBe(seasonPointsOf(summed[0]!));
+  });
+});
+
+describe("blendBoard — the per-player law-channel cap (fit-round Task 3, deliverable B(iii))", () => {
+  const MANY = ["threshold:RB:touchdownPointsShare:q70", "threshold:RB:insideTenTouchShare:q80", "threshold:RB:draftPick:q80"];
+  const laws = MANY.map((id) => lawFixture({ id, origin: "discovered", trainEffect: 20 }));
+  const withMany = candidate({ reasons: MANY.map((lawId) => lawReason({ lawId })) });
+  const exposure = IMPLIED_GAMES / 17;
+  /** Per-law cap generous, availability off, total cap enormous — so ONLY the new cap can bind. */
+  const roomy: BlendConstants = { ...CONSTANTS, lawCapPoints: 100, availabilityCapPoints: 0, totalCapPoints: 1000 };
+
+  it("NULL CELL (absent): the law channel is bounded only by the per-law cap and the total cap", () => {
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withMany], { season: SEASON, constants: roomy, laws });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(200 + 3 * 20 * exposure, 2);
+  });
+
+  it("CAPS the summed law channel at playerLawCapPoints", () => {
+    const capped: BlendConstants = { ...roomy, playerLawCapPoints: 7 };
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withMany], { season: SEASON, constants: capped, laws });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(207, 6);
+  });
+
+  it("bounds the LAW channel only — the availability delta still lands on top of it", () => {
+    const capped: BlendConstants = { ...roomy, playerLawCapPoints: 7, availabilityCapPoints: 100 };
+    const moreGames = candidate({
+      ...withMany,
+      games: { expected: IMPLIED_GAMES + 1, rate: 1, distribution: { floor: 0, median: 0, ceiling: 0 }, probabilities: [] },
+    });
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [moreGames], { season: SEASON, constants: capped, laws });
+    // The law channel is pinned at 7; availability adds one game's worth of the market's own rate.
+    // The law deltas themselves rescale with the changed exposure, but the cap binds either way.
+    expect(seasonPointsOf(blended!)).toBeCloseTo(207 + 200 / IMPLIED_GAMES, 2);
+  });
+
+  it("composes with dedup: dedup picks one per cluster, THEN the per-player cap bounds the sum", () => {
+    const both: BlendConstants = { ...roomy, lawClusterDedup: true, playerLawCapPoints: 1000 };
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withMany], { season: SEASON, constants: both, laws });
+    // Two clusters survive dedup (goal-line, draftPick), each at 20; the 1000 cap never binds.
+    expect(seasonPointsOf(blended!)).toBeCloseTo(200 + 2 * 20 * exposure, 2);
+  });
+});
+
+describe("blendBoard — the props anchor (fit-round Task 3, deliverable C)", () => {
+  const roomy: BlendConstants = { ...CONSTANTS, lawCapPoints: 0, availabilityCapPoints: 0, totalCapPoints: 0 };
+  const anchor = new Map([["player-1", 100]]);
+
+  it("NULL CELL (weight absent): the anchor is marketPoints, bit for bit, even with a props map present", () => {
+    const [blended] = blendBoard([market({ marketPoints: 233.47 })], [candidate()], {
+      season: SEASON,
+      constants: roomy,
+      laws: [],
+      propsAnchor: anchor,
+    });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(233.47, 6);
+    expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 233.47, delta: 0 });
+  });
+
+  it("blends ADP toward the props anchor at the fitted weight", () => {
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [candidate()], {
+      season: SEASON,
+      constants: { ...roomy, propsAnchorWeight: 0.25 },
+      laws: [],
+      propsAnchor: anchor,
+    });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(0.75 * 200 + 0.25 * 100, 4);
+    expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 175, delta: 0 });
+  });
+
+  it("falls back to ADP, per player, for a player the archive has no line for — at ANY weight", () => {
+    const [blended] = blendBoard([market({ playerId: "unarchived", marketPoints: 200 })], [candidate({ playerId: "unarchived" })], {
+      season: SEASON,
+      constants: { ...roomy, propsAnchorWeight: 1 },
+      laws: [],
+      propsAnchor: anchor,
+    });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(200, 6);
+  });
+
+  it("falls back to ADP for a season with NO archive at all (an empty map)", () => {
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [candidate()], {
+      season: SEASON,
+      constants: { ...roomy, propsAnchorWeight: 0.5 },
+      laws: [],
+      propsAnchor: new Map(),
+    });
+    expect(seasonPointsOf(blended!)).toBeCloseTo(200, 6);
+  });
+
+  it("REFUSES a weight outside [0, 1] — extrapolating past either anchor is not a blend", () => {
+    expect(() =>
+      blendBoard([market()], [candidate()], { season: SEASON, constants: { ...roomy, propsAnchorWeight: 1.5 }, laws: [], propsAnchor: anchor }),
+    ).toThrow(/propsAnchorWeight must lie in \[0, 1\]/);
+  });
+
+  it("prices the availability gap off the ANCHOR, not off the raw ADP number", () => {
+    const withGap = candidate({
+      games: { expected: IMPLIED_GAMES + 1, rate: 1, distribution: { floor: 0, median: 0, ceiling: 0 }, probabilities: [] },
+    });
+    const constants: BlendConstants = { ...CONSTANTS, lawCapPoints: 0, availabilityCapPoints: 100, totalCapPoints: 100, propsAnchorWeight: 0.5 };
+    const [blended] = blendBoard([market({ marketPoints: 200 })], [withGap], { season: SEASON, constants, laws: [], propsAnchor: anchor });
+    const anchored = 0.5 * 200 + 0.5 * 100;
+    expect(seasonPointsOf(blended!)).toBeCloseTo(anchored + anchored / IMPLIED_GAMES, 2);
+  });
+});
+
 describe("withLawsAblated", () => {
   it("zeroes lawCapPoints and leaves every other field untouched", () => {
     const ablated = withLawsAblated(CONSTANTS);

@@ -2,6 +2,8 @@ import type { ReadonlyDb } from "@/db/client";
 import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring/compute";
+import { clusterKeyFor } from "../laws/clusters";
+import { pricingEligibleLawIds } from "../laws/pricing";
 import { registry } from "../laws/registry";
 import type { Law } from "../laws/types";
 import { spearman, type Observation } from "../metrics";
@@ -165,6 +167,43 @@ export interface BlendConstants {
    * than the number silently looking wrong with no explanation attached.
    */
   readonly marketTailByPosition: MarketTailByPosition;
+  /**
+   * THE LAW-CHANNEL DEDUP AXIS (fit-round Task 3, deliverable B(ii)) — when true, a player takes the
+   * SINGLE STRONGEST applicable law's delta within each correlation cluster (`laws/clusters.ts`)
+   * rather than the sum of every law in that cluster. ABSENT IS THE NULL CELL and is today's
+   * behaviour exactly: every fired law's own capped delta is summed.
+   *
+   * WHY IT IS AN AXIS RATHER THAN A DECISION TAKEN HERE. Task 2's redundancy finding (forty of ninety
+   * confirmations touch one goal-line cluster, thirty-three touch one age/experience cluster) says
+   * summing them admits one fact many times; it does NOT say the deduped board scores better. The fit
+   * answers that, and it can only answer it if both behaviours are reachable cells of one grid.
+   */
+  readonly lawClusterDedup?: boolean;
+  /**
+   * THE PER-PLAYER LAW-CHANNEL CAP (fit-round Task 3, deliverable B(iii)) — a cap, in season points,
+   * on the COMBINED law delta for one player, applied after every per-law cap and after any cluster
+   * dedup, and before the availability delta joins it. ABSENT IS THE NULL CELL: the law channel is
+   * bounded only by `lawCapPoints` per law and by `totalCapPoints` across every channel together.
+   *
+   * DISTINCT FROM `totalCapPoints`, which bounds law PLUS availability. This one bounds what the LAW
+   * CHANNEL alone may ever spend on one player, which is the control the correlated clusters actually
+   * need: forty correlated goal-line laws under a five-point per-law cap can move a player two hundred
+   * points today, and no per-law cap value can stop that without also crushing a lone independent law.
+   */
+  readonly playerLawCapPoints?: number;
+  /**
+   * THE PROPS-ANCHOR WEIGHT (fit-round Task 3, deliverable C) — how far a listed player's anchor moves
+   * off the ADP-derived `marketPoints` toward his archived pre-kickoff props anchor
+   * (`market/props-anchor.ts`), in [0, 1]. ABSENT, OR ZERO, IS THE NULL CELL: ADP only, and
+   * `anchorPointsFor` returns `marketPoints` unchanged, bit for bit, without doing any arithmetic to
+   * it at all.
+   *
+   * A player with no props anchor for the season being blended (no archived pre-kickoff line for him,
+   * or a season the archive does not cover at all) falls back to `marketPoints` at ANY weight — the
+   * fallback is per player, so a partially covered season prices from props exactly where props exist
+   * and from ADP everywhere else.
+   */
+  readonly propsAnchorWeight?: number;
 }
 
 /** The structural tail guard's own committed table — see `BlendConstants.marketTailByPosition`'s
@@ -189,6 +228,18 @@ export interface BlendEvidenceOptions {
    * hand-built `Law[]` instead of the real ~1,700-law registry.
    */
   readonly laws?: readonly Law[];
+  /**
+   * THE SEASON'S PROPS ANCHOR (fit-round Task 3, deliverable C) — player id to that player's archived
+   * pre-kickoff props anchor, ALREADY IN THE MARKET CURVE'S OWN UNITS (`market/props-anchor.ts`'s
+   * `propsAnchorPoints` does the conversion and the rescale, and owns the leakage gate). Defaults to
+   * empty, which is the null cell for every season: an empty map means every player anchors on ADP
+   * alone, whatever `constants.propsAnchorWeight` says.
+   *
+   * Deliberately a plain map rather than a database handle: the anchor is loaded ONCE per season by
+   * whoever is driving the blend (`scripts/blend-fit.ts` for a fit, the persist script for a live
+   * board), never re-read per candidate, and this module stays free of the odds store entirely.
+   */
+  readonly propsAnchor?: ReadonlyMap<string, number>;
 }
 
 /** A full season's worth of games — the fixed reference `FULL_SEASON_GAMES` normalizes a law's
@@ -297,30 +348,125 @@ function tailCappedUnlistedPoints(candidate: BoardCandidate, constants: BlendCon
  * would be inventing a second, unmeasured effect size per player. `lawReasonsFor`
  * (`laws/board-reasons.ts`) already decided which laws fired; this function's only job is turning
  * "fired" into "how many points," off the train-only number.
+ *
+ * CLAUSE (a) GAINED THREE CONTROLS IN THE FIT ROUND (Task 3, deliverables A and B). Each one's OFF
+ * position is the incumbent behaviour exactly, so a grid cell with all of them off reproduces the
+ * board this function shipped before them:
+ *
+ *   1. THE PRICING GATE (`laws/pricing.ts`): a CONFIRMED-BUT-SUSPECT law contributes nothing. Policy
+ *      over admission, never a re-measurement — the law keeps its verdict, its board reason and its
+ *      chip. This one has no off position: a law nobody could separate from an artifact is not
+ *      evidence a price may be spent on, and the nine ids are carried with their reasons.
+ *   2. CLUSTER DEDUP (`constants.lawClusterDedup`, `laws/clusters.ts`): the strongest single delta per
+ *      correlation cluster instead of the sum over it, so forty correlated goal-line laws speak once.
+ *   3. THE PER-PLAYER LAW-CHANNEL CAP (`constants.playerLawCapPoints`): a bound on what the law
+ *      channel as a whole may spend on one player, distinct from the per-law cap under it and from
+ *      `totalCapPoints` over it.
+ *
+ * `anchorPoints`, NOT `marketPoints`, IS WHAT CLAUSE (b) CONVERTS AGAINST (deliverable C). With the
+ * props channel off — the null cell, and every season the archive does not cover — the two are the
+ * identical number and this is a rename. With it on, the availability gap is priced off the anchor
+ * this player is actually blended from, which is still the only rate anchored to his own price.
  */
-function admittedDelta(
-  candidate: BoardCandidate,
-  marketPoints: number,
-  trainEffectByLawId: ReadonlyMap<string, number>,
-  constants: BlendConstants,
-): number {
+function admittedDelta(candidate: BoardCandidate, anchorPoints: number, context: BlendContext): number {
+  const { constants } = context;
   const exposure = candidate.games.expected / FULL_SEASON_GAMES;
+  const dedup = constants.lawClusterDedup === true;
+  /** Cluster key to the strongest signed delta seen in it so far — only used when deduping. */
+  const strongestByCluster = new Map<string, number>();
   let lawTotal = 0;
   for (const reason of candidate.reasons.filter(isLawReason)) {
-    const trainEffect = trainEffectByLawId.get(reason.lawId);
+    const trainEffect = context.trainEffectByLawId.get(reason.lawId);
     if (trainEffect === undefined) {
       throw new Error(
         `market/blend.ts: "${reason.lawId}" fired a BoardReason but has no matching entry in evidence.laws — the model and the law registry have drifted.`,
       );
     }
-    lawTotal += clampAbs(trainEffect * exposure, constants.lawCapPoints);
+    // THE PRICING-ADMISSION GATE (deliverable A). A law the registry CONFIRMS but Task 2's vigilance
+    // record marks SUSPECT still fires its reason, still shows on `/player-laws` and still may be
+    // cited by a chip — it simply never moves a price. The drift check above deliberately runs FIRST
+    // and against every law, suspect or not, so gating a law can never be mistaken for the registry
+    // and the model having drifted apart.
+    if (!context.pricingEligibleIds.has(reason.lawId)) continue;
+    const delta = clampAbs(trainEffect * exposure, constants.lawCapPoints);
+    if (!dedup) {
+      lawTotal += delta;
+      continue;
+    }
+    // STRONGEST = LARGEST ABSOLUTE DELTA, sign kept. A strict `>` means a tie keeps the FIRST law in
+    // the candidate's own reason order, which is `lawReasonsFor`'s registry order — deterministic.
+    const key = context.clusterKeyByLawId.get(reason.lawId) ?? clusterKeyFor(reason.lawId);
+    const held = strongestByCluster.get(key);
+    if (held === undefined || Math.abs(delta) > Math.abs(held)) strongestByCluster.set(key, delta);
   }
+  if (dedup) {
+    for (const delta of strongestByCluster.values()) lawTotal += delta;
+  }
+  if (constants.playerLawCapPoints !== undefined) lawTotal = clampAbs(lawTotal, constants.playerLawCapPoints);
 
   const impliedGames = impliedGamesFor(candidate.position, constants.impliedGamesByPosition);
   const availabilityGap = candidate.games.expected - impliedGames;
-  const availabilityDelta = clampAbs((availabilityGap * marketPoints) / impliedGames, constants.availabilityCapPoints);
+  const availabilityDelta = clampAbs((availabilityGap * anchorPoints) / impliedGames, constants.availabilityCapPoints);
 
   return clampAbs(lawTotal + availabilityDelta, constants.totalCapPoints);
+}
+
+/**
+ * EVERYTHING ONE BLEND NEEDS THAT DOES NOT VARY PER CANDIDATE — built once per (laws, constants,
+ * props anchor) triple and reused across every row.
+ *
+ * WHY THIS EXISTS AS ITS OWN SHAPE (fit-round Task 3). `blendBoard` used to rebuild its
+ * `trainEffectByLawId` map on every call, which is free for a board (one call, one map) and ruinous
+ * for a fit: `scoreBlendConstants` calls the blend once PER ROW, and the fit-round grid multiplies
+ * the cell count by the law-channel, props-anchor and recency axes. Rebuilding a ~180-entry map (plus
+ * a pricing-eligibility set and a cluster lookup) per row per cell is tens of billions of map inserts
+ * for a grid that ought to be seconds of arithmetic. The context is built once and threaded through.
+ */
+interface BlendContext {
+  readonly constants: BlendConstants;
+  /** EVERY law's train effect, suspect or not — the drift check reads this, so gating never looks
+   *  like drift. */
+  readonly trainEffectByLawId: ReadonlyMap<string, number>;
+  /** The ids a delta may actually be spent on — `laws/pricing.ts`'s gate. */
+  readonly pricingEligibleIds: ReadonlySet<string>;
+  /** `laws/clusters.ts`'s key per law, precomputed for the laws this blend was handed. */
+  readonly clusterKeyByLawId: ReadonlyMap<string, string>;
+  /** Player id to props anchor points, in market units. Empty is the null cell. */
+  readonly propsAnchor: ReadonlyMap<string, number>;
+}
+
+const EMPTY_PROPS_ANCHOR: ReadonlyMap<string, number> = new Map();
+
+/** Builds the per-blend context. Validates `propsAnchorWeight` here, once, rather than per candidate:
+ *  a weight outside [0, 1] is a fit-input bug and extrapolating past either anchor is not a blend. */
+function blendContextOf(laws: readonly Law[], constants: BlendConstants, propsAnchor: ReadonlyMap<string, number>): BlendContext {
+  const weight = constants.propsAnchorWeight;
+  if (weight !== undefined && (!Number.isFinite(weight) || weight < 0 || weight > 1)) {
+    throw new Error(`market/blend.ts: propsAnchorWeight must lie in [0, 1]; got ${weight}. A weight outside the two anchors is not a blend.`);
+  }
+  return {
+    constants,
+    trainEffectByLawId: new Map(laws.map((law) => [law.id, law.trainEffect] as const)),
+    pricingEligibleIds: pricingEligibleLawIds(laws),
+    clusterKeyByLawId: new Map(laws.map((law) => [law.id, clusterKeyFor(law.id)] as const)),
+    propsAnchor,
+  };
+}
+
+/**
+ * ONE PLAYER'S ANCHOR — the point the blend starts from before any delta is admitted.
+ *
+ * `marketPoints` EXACTLY, bit for bit, whenever the props channel is switched off (the null cell) or
+ * the archive holds no pre-kickoff line for this player. The explicit early return matters: writing
+ * the general formula with a zero weight would return `marketPoints * 1 + props * 0`, which is the
+ * same number in exact arithmetic and not guaranteed to be the same double.
+ */
+function anchorPointsFor(playerId: string, marketPoints: number, context: BlendContext): number {
+  const weight = context.constants.propsAnchorWeight ?? 0;
+  if (weight === 0) return marketPoints;
+  const props = context.propsAnchor.get(playerId);
+  if (props === undefined) return marketPoints;
+  return marketPoints * (1 - weight) + props * weight;
 }
 
 /**
@@ -353,49 +499,62 @@ function admittedDelta(
  * `reason-chip.test.tsx`'s own pin.
  */
 export function blendBoard(market: readonly MarketPriorEntry[], model: readonly BoardCandidate[], evidence: BlendEvidenceOptions): readonly BoardCandidate[] {
-  const constants = evidence.constants ?? FITTED_BLEND_CONSTANTS;
-  const laws = evidence.laws ?? registry();
-  const trainEffectByLawId = new Map(laws.map((law) => [law.id, law.trainEffect] as const));
+  const context = blendContextOf(
+    evidence.laws ?? registry(),
+    evidence.constants ?? FITTED_BLEND_CONSTANTS,
+    evidence.propsAnchor ?? EMPTY_PROPS_ANCHOR,
+  );
   const marketByPlayer = new Map(market.map((entry) => [entry.playerId, entry] as const));
+  return model.map((candidate) => blendCandidate(candidate, marketByPlayer.get(candidate.playerId), context));
+}
 
-  return model.map((candidate) => {
-    const marketEntry = marketByPlayer.get(candidate.playerId);
-    if (marketEntry === undefined) {
-      return {
-        ...candidate,
-        perGame: pointsOnlyPerGame(candidate, tailCappedUnlistedPoints(candidate, constants)),
-        reasons: [...candidate.reasons, { code: "market_unlisted" }],
-      };
-    }
-
-    // CLAUSE (c) — a rookie WITH a recorded draft pick REPLACES marketPoints outright, ignoring the
-    // market's own number entirely: the market prices rookie hype (name recognition, landing-spot
-    // buzz, summer narrative), `rookieCurve` prices draft capital (what an NFL front office actually
-    // paid for him), and Task 4's whole argument for that curve is that the two answer different
-    // questions. A rookie the draft-pick table has no record of (`overallPick: null` — a UDFA the
-    // model still emits a candidate for) has no curve value to substitute, so he falls through to
-    // the ordinary market-plus-evidence path below like anyone else on the market board.
-    const rookie = rookieReasonOf(candidate);
-    if (rookie !== null && rookie.overallPick !== null) {
-      const rookiePoints = rookieCurve(candidate.position, rookie.overallPick);
-      return {
-        ...candidate,
-        perGame: pointsOnlyPerGame(candidate, rookiePoints),
-        reasons: [
-          ...candidate.reasons,
-          { code: "market_anchor", marketPoints: marketEntry.marketPoints, delta: rookiePoints - marketEntry.marketPoints },
-        ],
-      };
-    }
-
-    const delta = admittedDelta(candidate, marketEntry.marketPoints, trainEffectByLawId, constants);
-    const blendedPoints = Math.max(0, marketEntry.marketPoints + delta);
+/**
+ * ONE CANDIDATE, BLENDED — every branch `blendBoard`'s own docblock describes, for a single player.
+ * Split out of `blendBoard` (fit-round Task 3) so the fit's scoring loop can blend row by row against
+ * ONE prebuilt context instead of rebuilding the law map per row; `blendBoard` itself is now that map
+ * plus this function.
+ */
+function blendCandidate(candidate: BoardCandidate, marketEntry: MarketPriorEntry | undefined, context: BlendContext): BoardCandidate {
+  if (marketEntry === undefined) {
     return {
       ...candidate,
-      perGame: pointsOnlyPerGame(candidate, blendedPoints),
-      reasons: [...candidate.reasons, { code: "market_anchor", marketPoints: marketEntry.marketPoints, delta }],
+      perGame: pointsOnlyPerGame(candidate, tailCappedUnlistedPoints(candidate, context.constants)),
+      reasons: [...candidate.reasons, { code: "market_unlisted" }],
     };
-  });
+  }
+
+  // CLAUSE (c) — a rookie WITH a recorded draft pick REPLACES the anchor outright, ignoring the
+  // market's own number entirely: the market prices rookie hype (name recognition, landing-spot
+  // buzz, summer narrative), `rookieCurve` prices draft capital (what an NFL front office actually
+  // paid for him), and Task 4's whole argument for that curve is that the two answer different
+  // questions. A rookie the draft-pick table has no record of (`overallPick: null` — a UDFA the
+  // model still emits a candidate for) has no curve value to substitute, so he falls through to
+  // the ordinary anchor-plus-evidence path below like anyone else on the market board.
+  const rookie = rookieReasonOf(candidate);
+  if (rookie !== null && rookie.overallPick !== null) {
+    const rookiePoints = rookieCurve(candidate.position, rookie.overallPick);
+    return {
+      ...candidate,
+      perGame: pointsOnlyPerGame(candidate, rookiePoints),
+      reasons: [
+        ...candidate.reasons,
+        { code: "market_anchor", marketPoints: marketEntry.marketPoints, delta: rookiePoints - marketEntry.marketPoints },
+      ],
+    };
+  }
+
+  // `market_anchor.marketPoints` carries THE ANCHOR THIS PLAYER WAS ACTUALLY BLENDED FROM, which is
+  // `marketEntry.marketPoints` itself in every null-cell case (props off, or no archived line for
+  // him) and the ADP/props blend otherwise. The reason's own contract is "where he started and by how
+  // much the blend moved him", and after a props anchor is admitted, where he started is the anchor.
+  const anchorPoints = anchorPointsFor(candidate.playerId, marketEntry.marketPoints, context);
+  const delta = admittedDelta(candidate, anchorPoints, context);
+  const blendedPoints = Math.max(0, anchorPoints + delta);
+  return {
+    ...candidate,
+    perGame: pointsOnlyPerGame(candidate, blendedPoints),
+    reasons: [...candidate.reasons, { code: "market_anchor", marketPoints: anchorPoints, delta }],
+  };
 }
 
 /**
@@ -429,6 +588,16 @@ export interface BlendTrainRow {
   readonly market: MarketPriorEntry;
   readonly candidate: BoardCandidate;
   readonly actualPoints: number;
+  /**
+   * HIS SEASON'S PROPS ANCHOR MAP (fit-round Task 3, deliverable C) — the same per-season map
+   * `BlendEvidenceOptions.propsAnchor` carries, attached to the row because a fit's rows span several
+   * seasons and each season has its own archive (or none). Absent is the null cell: ADP only.
+   *
+   * Carrying the whole season's map on every row rather than that player's own single number keeps
+   * one shape for "the anchor evidence available at this moment" across the board path and the fit
+   * path, so neither can grow a second definition of it.
+   */
+  readonly propsAnchor?: ReadonlyMap<string, number>;
 }
 
 export interface BlendScoreOptions {
@@ -488,9 +657,13 @@ export function scoreBlendConstants(rows: readonly BlendTrainRow[], constants: B
     }
   }
 
+  // ONE context for every row (fit-round Task 3): identical arithmetic to blending each row through
+  // `blendBoard`, minus a per-row rebuild of the law map, the pricing set and the cluster lookup.
+  // `propsAnchor` is per SEASON, so it is carried on each row rather than on the options object.
+  const context = blendContextOf(laws ?? registry(), constants, EMPTY_PROPS_ANCHOR);
   const observations: Observation[] = rows.map((row) => {
-    const [blended] = blendBoard([row.market], [row.candidate], { season: row.season, constants, laws });
-    return { predicted: seasonPointsOf(blended!), actual: row.actualPoints };
+    const rowContext = row.propsAnchor === undefined ? context : { ...context, propsAnchor: row.propsAnchor };
+    return { predicted: seasonPointsOf(blendCandidate(row.candidate, row.market, rowContext)), actual: row.actualPoints };
   });
   return spearman(observations);
 }
