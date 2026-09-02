@@ -155,8 +155,33 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * reach the store while the reasons table, which has no `as_of`, updated underneath it — the exact
  * silent-stale failure v2 through v5 each shipped once. v6 is not kept as a named constant: like v5
  * its rows are not wrong, they are the same board before two laws it could not yet know about.
+ *
+ * BUMPED AGAIN TO v8 (fit-round plan, Task 4, the SEVENTH occurrence of the identical unique-key
+ * problem). This round did not add one quantity, it re-earned the whole evidence base underneath the
+ * board and then re-fit every constant on it. Four things move a stored number:
+ *
+ *   1. THE CROSSWALK CLASS FIX (Task 1). 4,828 skill player-weeks 2003-2024 that the class gate had
+ *      been dropping now resolve, and the weekly stat floor moved from 2013 to 2003. Every population
+ *      this engine measures on grew, so every fitted constant downstream of it moved.
+ *   2. THE ROOKIE CURVE, re-fit on 19 classes instead of 9 (`preseason/rookie-curve-fitted.ts`).
+ *      Every position's top end came down, RB pick 1 hardest (383.8 to 271.1 points), because the old
+ *      decade's rookie classes were not the modern ones.
+ *   3. THE LAW SET (Task 2), re-measured on the completed store: 90 confirmed laws, of which the nine
+ *      Task 2 SELF-MARKED SUSPECT are refused admission to pricing by `laws/pricing.ts` while keeping
+ *      their measured verdicts and their board reasons. The newly confirmed WR collapse law prices
+ *      bad-team receivers down.
+ *   4. THE BLEND'S OWN CONSTANTS (`market/blend-fitted.ts`), re-fit over 18,522 grid cells. Two of
+ *      the fit-round axes moved off their null cells: a per-player law-channel cap of 20 points and an
+ *      availability recency decay of 0.5 (the committed priors' own 0.7 was the null cell). The
+ *      availability cap tightened from 20 to 10.
+ *
+ * WHY A BUMP IS STILL THE POINT: `(season, source, as_of)` would silently refuse every archive row on
+ * a v7 re-persist, because a replay `as_of` is derived and deterministic, so the re-fit pricing would
+ * never reach the store while the reasons table, which has no `as_of`, updated underneath it. v7 is
+ * not kept as a named constant: like v5 and v6 its rows are not wrong, they are the same board fit on
+ * evidence that turned out to be incomplete.
  */
-export const BOARD_SOURCE = "commish_board_v7_ppr_12";
+export const BOARD_SOURCE = "commish_board_v8_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {

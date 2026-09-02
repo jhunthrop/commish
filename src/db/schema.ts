@@ -2272,10 +2272,11 @@ export const preseasonProjections = pgTable(
     id: bigserial("id", { mode: "number" }).primaryKey(),
     season: integer("season").notNull(),
     /** Which board said it — model version and league format together, as the benchmark sources
-     *  name market and format together. `commish_board_v7_ppr_12` (vegas-laws round, 2026-09-01 —
-     *  the shipped, market-blended board, bumped a sixth time so the two newly confirmed win-total
-     *  laws could price every season and their rows be compared against v6's; see
-     *  `board-store.ts`'s own `BOARD_SOURCE` docblock for the full v1-through-v7 history).
+     *  name market and format together. `commish_board_v8_ppr_12` (fit-round, 2026-09-02 —
+     *  the shipped, market-blended board, bumped a seventh time so the re-fit rookie curve, the
+     *  re-measured law set and the re-fit blend constants could price every season and their rows be
+     *  compared against v7's; see `board-store.ts`'s own `BOARD_SOURCE` docblock for the full
+     *  v1-through-v8 history).
      *  `commish_board_v1_ppr_12` is the raw model's own historical source, kept for provenance. */
     source: text("source").notNull(),
     /** An `nfl_players.id` (a gsis id), the space the whole engine keys on. The product reaches it
