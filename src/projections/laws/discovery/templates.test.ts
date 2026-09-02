@@ -208,10 +208,15 @@ describe("quantileCoverageGaps", () => {
     expect(quantileCoverageGaps(highOnly).some((gap) => gap.quantityId === "age")).toBe(false);
   });
 
-  it("finds the real committed table behind the widened grammar, which is what makes the refit visible", () => {
-    const gaps = quantileCoverageGaps(DISCOVERY_QUANTILES);
-    expect(gaps.length).toBeGreaterThan(0);
-    expect(new Set(gaps.map((gap) => gap.level))).toEqual(new Set(LOW_QUANTILE_LEVELS));
+  it("finds NOTHING in the real committed table, because the refit has been run", () => {
+    // Inverted deliberately (2026-09-01, Task 3 stage 3). While the grammar carried a low band and
+    // the committed table did not, this asserted the gap existed and named the three missing levels;
+    // that was the visible half of a KNOWN stale table, and `discover-laws.ts` printed the same fact
+    // above its summary. `npm run laws:discover:quantiles` has since refitted the table on the
+    // extended train window, so every (quantity, position) it covers is covered at all six levels.
+    // A gap reappearing here means the table is behind the grammar again, which is exactly the
+    // silent family-shrink this function exists to make loud.
+    expect(quantileCoverageGaps(DISCOVERY_QUANTILES)).toEqual([]);
   });
 });
 
@@ -564,10 +569,11 @@ describe("formatValue — the band-preserving rounding direction (NEW-3, both ba
     expect(checked).toBeGreaterThan(0);
   });
 
-  it("property test, SYNTHETIC low band: the same guarantee holds at levels the committed table has not been refitted for yet", () => {
-    // The committed table carries the high band only until the regeneration that refits it, so the
-    // low half of the property above would otherwise check zero cases. These are the same quantities
-    // with deliberately awkward values, one per formatter.
+  it("property test, SYNTHETIC low band: the same guarantee holds on deliberately awkward values", () => {
+    // The property above now checks real low-band thresholds too (the committed table was refitted on
+    // 2026-09-01), but a fitted percentile is a tame number and can round cleanly by luck. These are
+    // the same quantities with values chosen to be nasty for each formatter, one per formatter, so
+    // the low band's floor rounding is exercised whatever the committed table happens to hold.
     const awkward: readonly (readonly [string, number])[] = [
       ["touches", 84.7],
       ["age", 23.4449],
