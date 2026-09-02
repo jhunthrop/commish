@@ -16,9 +16,10 @@
 //
 // nflverse is free, so unlike `ingest-once.ts` this spends no upstream request budget.
 //
-// THE PRE-2012 BRANCH (the 2003-2012 history extension). nflverse publishes weekly player stats for
-// every season back to 1999, but its snap-count release only reaches 2012 — audited by hand against
-// the release on 2026-09-01, `snap_counts_2011.csv` and older are deterministic 404s. So for a
+// THE PRE-2013 BRANCH (the 2003-2012 history extension). nflverse publishes weekly player stats for
+// every season back to 1999, but its snap-count release carries no rows before 2013 — audited by
+// hand against the release on 2026-09-01: `snap_counts_2011.csv` and older are deterministic 404s
+// and `snap_counts_2012.csv` is a published, header-only file with zero data rows. So for a
 // season below `SNAP_COUNT_ASSET_FLOOR` this ingests the PUBLISHED stat lines (published beats
 // derived, per season, always) and gets no participation at all, dating each week from the schedule
 // instead of from the snap counts it has none of (`scheduleWeekAsOf`, fetched once for the whole
@@ -237,19 +238,17 @@ async function main(): Promise<void> {
 
   const seasons = Array.from({ length: LAST_SEASON - FIRST_SEASON + 1 }, (_, index) => FIRST_SEASON + index);
 
-  // The schedule is fetched only when the range actually reaches the seasons whose snap counts
-  // cannot date every week, and then exactly once for the whole range. AT or below
-  // `SNAP_COUNT_ASSET_FLOOR`, not merely below it: 2011 and older have no snap-count file at all,
-  // and 2012 has one that is missing its own week 1. An ordinary 2013+ backfill pays for no extra
+  // The schedule is fetched only when the range actually reaches below the snap counts
+  // (`SNAP_COUNT_ASSET_FLOOR`), and then exactly once for the whole range: those seasons' stat
+  // lines have nothing else to take an as-of from. An ordinary 2013+ backfill pays for no extra
   // download at all.
-  const scheduleDatedSeasons = seasons.filter((season) => season <= SNAP_COUNT_ASSET_FLOOR);
+  const scheduleDatedSeasons = seasons.filter((season) => season < SNAP_COUNT_ASSET_FLOOR);
   const scheduleAsOf =
     scheduleDatedSeasons.length === 0 ? new Map<number, ReadonlyMap<number, Date>>() : await scheduleWeekAsOf(scheduleDatedSeasons);
   if (scheduleDatedSeasons.length > 0) {
     console.log(
-      `${scheduleDatedSeasons.length} season(s) at or below SNAP_COUNT_ASSET_FLOOR (${SNAP_COUNT_ASSET_FLOOR}): ` +
-        `weeks their snap counts cannot date are dated from the schedule, and below the floor no participation ` +
-        `exists upstream to ingest at all.\n`,
+      `${scheduleDatedSeasons.length} season(s) below SNAP_COUNT_ASSET_FLOOR (${SNAP_COUNT_ASSET_FLOOR}): ` +
+        `their stat lines are dated from the schedule, and no participation exists upstream to ingest at all.\n`,
     );
   }
 
@@ -277,7 +276,7 @@ async function main(): Promise<void> {
         `${percent(report.statLineResolution)} weekly stats${belowBar ? "  <-- BELOW THE BAR" : ""}`,
     );
     if (report.snapCountsUnavailable) {
-      console.log(`    no participation for ${season}: nflverse publishes no snap counts before ${SNAP_COUNT_ASSET_FLOOR}`);
+      console.log(`    no participation for ${season}: nflverse has no snap-count rows before ${SNAP_COUNT_ASSET_FLOOR}`);
     }
     if (report.playerWeekUnavailable) {
       // M5: without this line, "6218 participation rows" reads as full participation data. It is

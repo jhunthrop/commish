@@ -46,26 +46,38 @@ export const PARTICIPATION_METRICS = {
 } as const;
 
 /**
- * THE SNAP-COUNT ASSET FLOOR — the earliest season nflverse's `snap_counts` release exists for at
- * all, audited by hand against the release on 2026-09-01 (`HEAD` on every asset, 2003 through 2013):
- * `snap_counts_2012.csv` is a 200 and `snap_counts_2011.csv` and everything older is a deterministic
- * 404. The same audit found `stats_player_week_YYYY.csv` and `play_by_play_YYYY.csv` published for
- * EVERY season 2003-2012.
+ * THE SNAP-COUNT ASSET FLOOR — the earliest season nflverse's `snap_counts` release carries any ROWS
+ * for, audited by hand against the live release on 2026-09-01 (every asset, 2003 through 2013):
  *
- * NOT `HISTORICAL_ROSTER_FLOOR` AND NOT `MEASURE_SEASONS.from` (both 2013), which are SCOPE bounds
- * this constant deliberately does not touch. This one is an ASSET bound, the same kind of fact
- * `rosters.ts`'s `ROSTER_ASSET_FLOOR` (2002) records for the weekly-roster release: it answers "does
- * the file exist", not "is this engine willing to read that far back". `laws/config.ts` keeps 2013 as
- * its window floor because the snap-count file for 2012 is missing its own week 1, which is a
- * usability fact about the 2012 asset rather than about its existence, and moving that window is a
- * decision of its own that this constant must never be read as having already made.
+ *   2011 and older  `snap_counts_YYYY.csv` is a deterministic 404, nothing published.
+ *   2012            published, 200, and EMPTY: 154 bytes, a header line and zero data rows.
+ *   2013 onwards    published and full (2013 is two megabytes).
  *
- * ITS ONE READER is `ingest.ts`'s `fetchSnapCounts`, which uses it exactly the way
- * `fetchPlayerWeek` uses `STAT_LINE_GAPS`: a 404 at or above this floor is an ALARM (nflverse
- * dropped a release this engine has always seen), and a 404 below it is the ordinary, expected
- * shape of history.
+ * The same audit found `stats_player_week_YYYY.csv` and `play_by_play_YYYY.csv` published for EVERY
+ * season 2003-2012, which is why the history extension ingests those seasons' PUBLISHED stat lines
+ * and simply has no participation for them.
+ *
+ * ROWS, NOT EXISTENCE, is what this floor measures, and 2012 is why. A 404 and a header-only file
+ * are two upstream shapes of one downstream fact — there are no snap counts for this season — and a
+ * floor drawn at "the file exists" would put 2012 on the wrong side of itself, leaving
+ * `ingestSeason` to derive an empty week map and `mapStatLines` to throw on the first week it could
+ * not date. `laws/config.ts`'s window note says 2012 "is missing its own week 1"; on today's
+ * release it is missing every week, which sharpens that note rather than contradicting it.
+ *
+ * NOT `HISTORICAL_ROSTER_FLOOR` AND NOT `MEASURE_SEASONS.from`, which happen to be the same number
+ * and are SCOPE bounds this constant deliberately does not touch. This one is an ASSET bound, the
+ * same kind of fact `rosters.ts`'s `ROSTER_ASSET_FLOOR` (2002) records for the weekly-roster
+ * release: it answers "is the data upstream", never "is this engine willing to read that far back".
+ * Those two questions agreeing on 2013 today is a coincidence of one upstream limit, and moving
+ * either window is a decision of its own that this constant must never be read as having made.
+ *
+ * ITS READERS are `ingest.ts`'s `fetchSnapCounts` (which treats a missing file at or above this
+ * floor as an ALARM and below it as the ordinary shape of history, exactly the way
+ * `fetchPlayerWeek` reads `STAT_LINE_GAPS`) and `scripts/projection-backfill.ts` (which fetches the
+ * schedule for the seasons below it, since their stat lines have nothing else to take an as-of
+ * from).
  */
-export const SNAP_COUNT_ASSET_FLOOR = 2012;
+export const SNAP_COUNT_ASSET_FLOOR = 2013;
 
 /** One player's opportunity in one week, joined across the two files that describe it. */
 export interface PlayerWeekParticipation {

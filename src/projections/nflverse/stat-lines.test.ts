@@ -106,11 +106,12 @@ describe("the 2003-2012 history extension's branch decisions", () => {
     expect([...STAT_LINE_GAPS]).toEqual([2019, 2025]);
   });
 
-  it("holds the snap-count floor above the extension, which is why those seasons land no participation", () => {
-    // The other half of the audit: weekly stats reach back to 1999, snap counts only to 2012. The
-    // extension's seasons are therefore stat lines only, and this is the constant that says so.
-    expect(SNAP_COUNT_ASSET_FLOOR).toBe(2012);
-    expect(2003).toBeLessThan(SNAP_COUNT_ASSET_FLOOR);
+  it("holds the snap-count floor above the whole extension, which is why those seasons land no participation", () => {
+    // The other half of the audit: weekly stats reach back to 1999, snap-count ROWS only to 2013
+    // (2011 and older 404, 2012 published and header-only). Every season of the extension is
+    // therefore stat lines only, 2012 included, and this is the constant that says so.
+    expect(SNAP_COUNT_ASSET_FLOOR).toBe(2013);
+    expect(2012).toBeLessThan(SNAP_COUNT_ASSET_FLOOR);
   });
 
   it("admits none of the extension to a live board, which still only ever sees the current gap season", () => {

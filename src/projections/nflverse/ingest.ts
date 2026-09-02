@@ -170,35 +170,40 @@ async function fetchPlayerWeek(client: NflverseClient, season: number): Promise<
 }
 
 /**
- * The snap-count file, or an empty release for a season that predates the one nflverse first
- * published — the mirror of `fetchPlayerWeek` above, and it exists for the mirror-image reason.
+ * The snap-count file's rows, or none for a season nflverse has no snap counts for — the mirror of
+ * `fetchPlayerWeek` above, and it exists for the mirror-image reason.
  *
- * `fetchPlayerWeek` catches the 404 for the seasons in the MIDDLE of the range whose weekly stats
- * were never released; this catches the 404 for every season BELOW `SNAP_COUNT_ASSET_FLOOR` (2012),
- * where the snap-count release simply does not reach. Before it existed, a backfill of any season
- * older than 2012 died on its first download and the published weekly stats sitting right there
- * upstream were unreachable.
+ * `fetchPlayerWeek` covers the seasons in the MIDDLE of the range whose weekly stats were never
+ * released; this covers the seasons BELOW `SNAP_COUNT_ASSET_FLOOR`, where the snap counts are what
+ * upstream does not have. Before it existed, a backfill of any season older than 2013 died on its
+ * first download and the published weekly stats sitting right there upstream were unreachable.
  *
- * Only `not_found`, only this asset, and LOUD above the floor: a missing `snap_counts_2018.csv` is
+ * TWO UPSTREAM SHAPES, ONE FACT. 2011 and older 404; 2012 is a published, header-only file with
+ * zero data rows. Both mean "there are no snap counts for this season", so both return `[]` here
+ * and the caller branches once. Only `not_found` is caught — an `upstream` or `malformed` failure
+ * still throws, because those two are alarms.
+ *
+ * LOUD AT OR ABOVE THE FLOOR, either shape: a missing or suddenly empty `snap_counts_2018.csv` is
  * nflverse dropping a release this engine has always read, and treating it like ordinary history
  * would turn that into a quiet season with no participation rather than an alarm.
  */
 async function fetchSnapCounts(client: NflverseClient, season: number): Promise<readonly CsvRow[]> {
-  try {
-    return await client.getCsv(NFLVERSE_CONFIG.releases.snapCounts, `snap_counts_${season}.csv`);
-  } catch (error) {
-    if (error instanceof NflverseError && error.kind === "not_found") {
-      if (season >= SNAP_COUNT_ASSET_FLOOR) {
-        console.warn(
-          `WARNING: nflverse has no snap counts for ${season}, which is at or above SNAP_COUNT_ASSET_FLOOR ` +
-            `(${SNAP_COUNT_ASSET_FLOOR}). This is not the ordinary shape of pre-2012 history; investigate before ` +
-            `trusting this season's participation.`,
-        );
-      }
-      return [];
+  const rows = await (async (): Promise<readonly CsvRow[]> => {
+    try {
+      return await client.getCsv(NFLVERSE_CONFIG.releases.snapCounts, `snap_counts_${season}.csv`);
+    } catch (error) {
+      if (error instanceof NflverseError && error.kind === "not_found") return [];
+      throw error;
     }
-    throw error;
+  })();
+  if (rows.length === 0 && season >= SNAP_COUNT_ASSET_FLOOR) {
+    console.warn(
+      `WARNING: nflverse has no snap counts for ${season}, which is at or above SNAP_COUNT_ASSET_FLOOR ` +
+        `(${SNAP_COUNT_ASSET_FLOOR}). This is not the ordinary shape of pre-2013 history; investigate before ` +
+        `trusting this season's participation.`,
+    );
   }
+  return rows;
 }
 
 /**
@@ -231,13 +236,12 @@ export async function ingestSeason(
    * with no snap-count file, without having thought about the stamp, fails loudly (see the throw
    * below) instead of quietly pulling a second file.
    *
-   * A FALLBACK PER WEEK, NOT PER SEASON. Two different holes need it. Below
-   * `SNAP_COUNT_ASSET_FLOOR` there is no snap-count file at all and every week comes from here. AT
-   * the floor season (2012) the file exists but does not cover its own week 1 — the very fact
-   * `laws/config.ts` cites for keeping `MEASURE_SEASONS.from` at 2013 — and before this, that one
-   * week made `mapStatLines` throw for the whole season. Snap counts still win wherever they reach,
-   * so no stamp that exists today moves; the schedule only fills what they leave undated, on
-   * identical arithmetic (see `weekAsOfFromSchedule`).
+   * A FALLBACK PER WEEK, NOT PER SEASON. Below `SNAP_COUNT_ASSET_FLOOR` every week comes from here,
+   * because there are no snap counts at all (2011 and older 404; 2012 is published and empty). At
+   * or above the floor this stays a per-week backstop for a season whose snap counts reach some
+   * weeks and not others, which is the shape `laws/config.ts` records for 2012 historically.
+   * Snap counts win wherever they reach, so no stamp that exists today moves; the schedule only
+   * fills what they leave undated, on identical arithmetic (see `weekAsOfFromSchedule`).
    */
   scheduleAsOf?: ReadonlyMap<number, Date>,
 ): Promise<SeasonIngestReport> {
