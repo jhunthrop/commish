@@ -36,6 +36,11 @@ const NO_VALUES: DiscoveryQuantityValues = {
   teamPaceSecondsPerPlay: null,
   incomingTeamWinTotal: null,
   incomingTeamWinTotalDelta: null,
+  insideTenTouchShare: null,
+  teamAirYardsShare: null,
+  gamesPlayed: null,
+  draftPick: null,
+  pointsPerGame: null,
 };
 
 function factsWithTouches(touches: number | null): DiscoveryFacts {

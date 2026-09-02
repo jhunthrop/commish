@@ -4,7 +4,8 @@
 //
 // Mirrors `preseason-fit.ts`'s own committed-constant pattern: the candidate generator
 // (`discovery/generate.ts`) is a PURE function of this table, so "what did discovery believe a
-// quantity's 70th/80th/90th percentile was" has to be answerable from the repository alone, with no
+// quantity's quantiles were" (the low band and the high one both, since Task 2 of the
+// discovery-expansion plan) has to be answerable from the repository alone, with no
 // database and no network at generation time. Fitted on
 // `DISCOVERY_TRAIN_SEASONS` (`laws/config.ts`) and nothing later — `computeQuantileTable` itself
 // re-enforces that gate rather than trusting this script to have filtered correctly.
@@ -14,7 +15,13 @@ import { allPositions } from "@/projections/backtest";
 import { PPR_SCORING } from "@/domain/scoring";
 import { DISCOVERY_TRAIN_SEASONS } from "@/projections/laws/config";
 import { discoveryFactsForSeason } from "@/projections/laws/discovery-facts";
-import { computeQuantileTable, QUANTITY_DEFS, type QuantityRow } from "@/projections/laws/discovery/templates";
+import {
+  computeQuantileTable,
+  QUANTILE_LEVELS,
+  QUANTILE_TAG,
+  QUANTITY_DEFS,
+  type QuantityRow,
+} from "@/projections/laws/discovery/templates";
 import { preseasonMomentFor } from "@/projections/preseason/source";
 
 const OUTPUT = "src/projections/laws/discovery/quantiles.ts";
@@ -69,9 +76,14 @@ async function main(): Promise<void> {
         console.log(`  ${def.id.padEnd(40)} ${position}  (too few train-season observations)`);
         continue;
       }
-      console.log(
-        `  ${def.id.padEnd(40)} ${position}  q70=${thresholds[0.7].toFixed(3)}  q80=${thresholds[0.8].toFixed(3)}  q90=${thresholds[0.9].toFixed(3)}`,
-      );
+      // Every level in `QUANTILE_LEVELS`, read off the list rather than named one by one: the low
+      // band joined that list in Task 2 of the discovery-expansion plan, and a hand-listed q70/q80/q90
+      // print would have kept reporting three of six thresholds while writing all six to the file.
+      const printed = QUANTILE_LEVELS.map((level) => {
+        const value = thresholds[level];
+        return `${QUANTILE_TAG[level]}=${value === undefined ? "n/a" : value.toFixed(3)}`;
+      }).join("  ");
+      console.log(`  ${def.id.padEnd(40)} ${position}  ${printed}`);
     }
   }
 

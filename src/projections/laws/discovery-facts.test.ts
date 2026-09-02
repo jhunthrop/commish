@@ -242,6 +242,142 @@ describe("discoveryFactsForSeason — new quantities, tri-state", () => {
  * silently null everywhere. `incomingAsOf` is what makes them readable, and the last test in this
  * block is the one that would have caught the bug.
  */
+/**
+ * TASK 2's VOCABULARY ADDITIONS (the discovery-expansion plan) — four new quantities plus the
+ * production conditional. Every one is computed from a read this module already performed, so these
+ * tests are about the arithmetic and the tri-state rule, never about a new store path.
+ */
+describe("discoveryFactsForSeason — the Task 2 quantities", () => {
+  const players = [["hub", "RB"], ["mate", "WR"], ["quiet", "RB"]] as const;
+
+  /** The eight-member play-by-play touch group, written in full: `usageAsOf` throws on a partial one. */
+  function touchGroup(
+    playerId: string,
+    over: Partial<Record<keyof typeof PBP_PLAYER_METRICS, number>>,
+  ): readonly ObservationRow[] {
+    const counts: Record<string, number> = {
+      carries: 0, targets: 0, redZoneCarries: 0, redZoneTargets: 0,
+      insideTenCarries: 0, insideTenTargets: 0, airYards: 0, airYardTargets: 0,
+      ...over,
+    };
+    return Object.entries(PBP_PLAYER_METRICS).map(([key, metric]) => ({
+      season: N, week: 1, playerId, metric, value: counts[key]!, asOf: BEFORE_GATE,
+    }));
+  }
+
+  beforeEach(async () => {
+    await insertPlayers(players);
+    await storeLines([
+      line(N, 1, "hub", { rushingYards: 800, receivingYards: 100, receptions: 20 }, BEFORE_GATE),
+      line(N, 1, "mate", { receivingYards: 600, receptions: 40 }, BEFORE_GATE),
+      line(N, 1, "quiet", { rushingYards: 300, receivingYards: 50, receptions: 10 }, BEFORE_GATE),
+    ]);
+    await storeSnapCounts([
+      { season: N, week: 1, playerId: "hub", metric: PARTICIPATION_METRICS.offensiveSnaps, value: 50, asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "hub", metric: PARTICIPATION_METRICS.teamOffensiveSnaps, value: 65, asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "mate", metric: PARTICIPATION_METRICS.offensiveSnaps, value: 55, asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "mate", metric: PARTICIPATION_METRICS.teamOffensiveSnaps, value: 65, asOf: BEFORE_GATE },
+    ]);
+  });
+
+  it("insideTenTouchShare divides the tighter band by the SAME denominator redZoneTouchShare uses", async () => {
+    await storePbpPlayerFacts(
+      touchGroup("hub", { carries: 15, targets: 5, redZoneCarries: 4, redZoneTargets: 1, insideTenCarries: 2, insideTenTargets: 1 }),
+    );
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    const current = facts.get("hub")!.current;
+    expect(current.insideTenTouchShare).toBeCloseTo((2 + 1) / (15 + 5), 5);
+    expect(current.redZoneTouchShare).toBeCloseTo((4 + 1) / (15 + 5), 5);
+    // Strictly the tighter band: never larger than the twenty-yard version it sits inside.
+    expect(current.insideTenTouchShare!).toBeLessThanOrEqual(current.redZoneTouchShare!);
+  });
+
+  it("insideTenTouchShare is null with no play-by-play evidence, never a zero share", async () => {
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.insideTenTouchShare).toBeNull();
+  });
+
+  it("insideTenTouchShare is a real ZERO where the play-by-play saw him and he never reached the ten", async () => {
+    await storePbpPlayerFacts(touchGroup("hub", { carries: 12, targets: 3, redZoneCarries: 1, redZoneTargets: 0 }));
+    expect((await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE)).get("hub")!.current.insideTenTouchShare).toBe(0);
+  });
+
+  it("teamAirYardsShare divides one man's air yards by his team's own, summed over the teammates the store can place", async () => {
+    await recordPlayerTeams(db, [
+      { season: N, week: 1, playerId: "hub", team: "KC", asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "mate", team: "KC", asOf: BEFORE_GATE },
+    ]);
+    await storePbpPlayerFacts([
+      ...touchGroup("hub", { carries: 15, targets: 5, airYards: 30, airYardTargets: 5 }),
+      ...touchGroup("mate", { targets: 10, airYards: 90, airYardTargets: 10 }),
+    ]);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.teamAirYardsShare).toBeCloseTo(30 / 120, 5);
+    expect(facts.get("mate")!.current.teamAirYardsShare).toBeCloseTo(90 / 120, 5);
+  });
+
+  it("teamAirYardsShare is null with no team edge, with no play-by-play evidence, and on a non-positive team total", async () => {
+    await storePbpPlayerFacts(touchGroup("hub", { carries: 15, targets: 5, airYards: 30, airYardTargets: 5 }));
+    // "hub" has evidence but no team edge; "quiet" has neither.
+    let facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.teamAirYardsShare).toBeNull();
+    expect(facts.get("quiet")!.current.teamAirYardsShare).toBeNull();
+
+    // A team whose only placeable receiver ran everything behind the line: a share of a non-positive
+    // total is not a share, and reporting one would invert the quantity's meaning.
+    await truncateAll(db);
+    await insertPlayers(players);
+    await storeLines([line(N, 1, "hub", { rushingYards: 800, receptions: 20 }, BEFORE_GATE)]);
+    await storeSnapCounts([
+      { season: N, week: 1, playerId: "hub", metric: PARTICIPATION_METRICS.offensiveSnaps, value: 50, asOf: BEFORE_GATE },
+      { season: N, week: 1, playerId: "hub", metric: PARTICIPATION_METRICS.teamOffensiveSnaps, value: 65, asOf: BEFORE_GATE },
+    ]);
+    await recordPlayerTeams(db, [{ season: N, week: 1, playerId: "hub", team: "KC", asOf: BEFORE_GATE }]);
+    await storePbpPlayerFacts(touchGroup("hub", { carries: 10, targets: 4, airYards: -6, airYardTargets: 4 }));
+    facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.teamAirYardsShare).toBeNull();
+  });
+
+  it("gamesPlayed counts the weeks he was scored in, and pointsPerGame is that same season's points over it", async () => {
+    await storeLines([line(N, 2, "hub", { rushingYards: 100, receptions: 4 }, BEFORE_GATE)]);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.gamesPlayed).toBe(2);
+    expect(facts.get("quiet")!.current.gamesPlayed).toBe(1);
+    // 300 rushing yards + 50 receiving + 10 receptions, PPR, over one game.
+    expect(facts.get("quiet")!.current.pointsPerGame).toBeCloseTo(300 / 10 + 50 / 10 + 10, 5);
+  });
+
+  it("pointsPerGame is never null on a row that exists at all — a row is only built for a scorable season", async () => {
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    for (const entry of facts.values()) {
+      expect(entry.current.pointsPerGame).not.toBeNull();
+      expect(entry.current.gamesPlayed).not.toBeNull();
+    }
+  });
+
+  it("draftPick is the roster row's own overall pick, and null for an undrafted player", async () => {
+    await recordPreseasonRosters(db, [
+      { season: N, team: "KC", playerId: "hub", position: "RB", status: "active", birthDate: null, draftYear: 2020, draftPick: 30, draftClub: "KC", asOf: BEFORE_GATE },
+      { season: N, team: "KC", playerId: "quiet", position: "RB", status: "active", birthDate: null, draftYear: 2021, draftPick: null, draftClub: null, asOf: BEFORE_GATE },
+    ]);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    expect(facts.get("hub")!.current.draftPick).toBe(30);
+    expect(facts.get("quiet")!.current.draftPick).toBeNull();
+    // No roster row at all is the same answer as an undrafted one, for the same reason `age` and
+    // `experienceYear` are null there: the backfill does not reach that season.
+    expect(facts.get("mate")!.current.draftPick).toBeNull();
+  });
+
+  it("carries every new quantity into the PRIOR half too, so the crossing templates have both seasons", async () => {
+    await storeLines([line(N - 1, 1, "hub", { rushingYards: 200, receptions: 5 }, BEFORE_GATE)]);
+    const facts = await discoveryFactsForSeason(db, N, await positionsMap(players), PPR_SCORING, true, INCOMING_GATE);
+    const prior = facts.get("hub")!.prior;
+    expect(prior).not.toBeNull();
+    expect(prior!.gamesPlayed).toBe(1);
+    expect(prior!.pointsPerGame).toBeCloseTo(200 / 10 + 5, 5);
+  });
+});
+
 describe("discoveryFactsForSeason — incoming team win total and its delta", () => {
   const players = [["hub", "RB"], ["quiet", "RB"]] as const;
 

@@ -92,6 +92,57 @@ export interface DiscoveryQuantityValues {
    * `scripts/validate-win-totals.ts`'s `computeSeasonWins` applies against the raw file).
    */
   readonly incomingTeamWinTotalDelta: number | null;
+  /**
+   * Share of the player's OWN carries and targets (the play-by-play's own counts, the same
+   * numerator/denominator discipline `redZoneTouchShare` keeps) that came INSIDE THE TEN — the
+   * goal-line half of the red-zone story, which the twenty-yard line's version cannot separate from
+   * a fifteen-yard-out target. Meaningful for RB/WR/TE.
+   */
+  readonly insideTenTouchShare: number | null;
+  /**
+   * Share of his TEAM's air yards that the player accounted for, both halves from the play-by-play
+   * feed. Distinct from `targetShare` (how many balls came his way) and from `targetDepth` (how far
+   * each one travelled): this is the product of the two, the share of the offence's downfield intent
+   * pointed at one man.
+   *
+   * THE DENOMINATOR IS THE TEAM'S PLAY-BY-PLAY AIR YARDS SUMMED OVER THE PLAYERS THIS MODULE CAN
+   * PLACE ON THAT TEAM — `seasonTeams`' own mapping, the same one `teamPaceSecondsPerPlay` and the
+   * win-total pair are keyed by. A receiver the team map cannot place contributes to no team's
+   * denominator, so a team with an unplaceable target-earner has a slightly small denominator and a
+   * slightly large share for everyone else. Stated rather than worked around: the alternative is a
+   * team air-yard total from a different feed than the numerator, which is the exact mismatch
+   * `usage.ts`'s "both halves from the same file" rule exists to prevent.
+   */
+  readonly teamAirYardsShare: number | null;
+  /** Games he was scored in that season — the availability fact, and the denominator the outcome's
+   *  own points per game is taken over. Never null on a row that exists at all (a row is only built
+   *  for a player with a computable points per game, which needs at least one game). */
+  readonly gamesPlayed: number | null;
+  /**
+   * His OVERALL DRAFT PICK, from the same preseason roster row `experienceYear`'s draft year and
+   * `age`'s birth date come off. `null` for an undrafted player and for any season the roster
+   * backfill does not reach, exactly as those two are.
+   *
+   * RUNS BACKWARDS AGAINST EVERY OTHER QUANTITY HERE: a bigger number is a worse pick. The quantity
+   * itself is stored raw rather than inverted into a "capital" score, because a raw pick number is
+   * the thing a reader already knows about a player; the direction is carried in the noun the claim
+   * renders with (`QUANTITY_DEFS`).
+   */
+  readonly draftPick: number | null;
+  /**
+   * His OWN points per game that season, under the same scoring rules and the same gate every other
+   * quantity here is read at.
+   *
+   * THIS IS THE MATCHED DESIGN'S MATCH KEY, NOT MERELY SOMETHING LIKE IT. `discovery/measure.ts`
+   * builds each population point with `matchKey: row.pointsPerGame`, taken from `factsForSeason`'s
+   * season-N read at `schedulePublishedAsOf(season + 1)`; this field is `pointsPerGame(scored)` over
+   * `seasonContext`'s scoring at the identical gate with the identical rules, so the two are the same
+   * number and not an approximation of each other. That identity is what makes a LEVEL condition on
+   * it unmeasurable under this design and a CROSSING condition perfectly sound — the whole argument
+   * lives on `QuantityDef.isMatchKeyQuantity` (`discovery/templates.ts`), which is where the
+   * generator reads the consequence from.
+   */
+  readonly pointsPerGame: number | null;
 }
 
 /** One player's discovery quantities for one season, plus the SAME quantities one season earlier —
@@ -141,6 +192,8 @@ interface SeasonUsageAggregate {
   readonly pbpCarries: number;
   readonly pbpTargets: number;
   readonly redZoneTouches: number;
+  /** The same shape as `redZoneTouches` one band tighter in: carries plus targets inside the ten. */
+  readonly insideTenTouches: number;
   readonly airYards: number;
   readonly airYardTargets: number;
   /** Whether the play-by-play stream has seen this player at all, any week. `redZoneTouchShare` and
@@ -152,6 +205,7 @@ const EMPTY_USAGE_AGGREGATE: SeasonUsageAggregate = {
   pbpCarries: 0,
   pbpTargets: 0,
   redZoneTouches: 0,
+  insideTenTouches: 0,
   airYards: 0,
   airYardTargets: 0,
   hasPbpEvidence: false,
@@ -163,6 +217,7 @@ function accumulateUsage(existing: SeasonUsageAggregate, row: PlayerWeekUsage): 
     pbpCarries: existing.pbpCarries + (touches === null ? 0 : touches.carries),
     pbpTargets: existing.pbpTargets + (touches === null ? 0 : touches.targets),
     redZoneTouches: existing.redZoneTouches + (touches === null ? 0 : touches.redZoneCarries + touches.redZoneTargets),
+    insideTenTouches: existing.insideTenTouches + (touches === null ? 0 : touches.insideTenCarries + touches.insideTenTargets),
     airYards: existing.airYards + (touches === null ? 0 : touches.airYards),
     airYardTargets: existing.airYardTargets + (touches === null ? 0 : touches.airYardTargets),
     hasPbpEvidence: existing.hasPbpEvidence || touches !== null,
@@ -181,15 +236,45 @@ async function seasonUsageAggregates(db: ReadonlyDb, season: number, asOf: Date)
   return out;
 }
 
-function redZoneTouchShareOf(usage: SeasonUsageAggregate | undefined): number | null {
+/** The share of a player's own play-by-play touches that fell inside a given band, `null` where the
+ *  play-by-play never saw him or where he had no touches to take a share of — the one rule
+ *  `redZoneTouchShare` and `insideTenTouchShare` both read, so the two bands can never drift apart
+ *  on what counts as evidence. */
+function touchBandShareOf(usage: SeasonUsageAggregate | undefined, inBand: (usage: SeasonUsageAggregate) => number): number | null {
   if (usage === undefined || !usage.hasPbpEvidence) return null;
   const denominator = usage.pbpCarries + usage.pbpTargets;
-  return denominator > 0 ? usage.redZoneTouches / denominator : null;
+  return denominator > 0 ? inBand(usage) / denominator : null;
 }
 
 function targetDepthOf(usage: SeasonUsageAggregate | undefined): number | null {
   if (usage === undefined || !usage.hasPbpEvidence) return null;
   return usage.airYardTargets > 0 ? usage.airYards / usage.airYardTargets : null;
+}
+
+/**
+ * Each team's own play-by-play air yards for a season, summed over the players this module can place
+ * on that team — `teamAirYardsShare`'s denominator, and the ONE place that sum is taken, so every
+ * player on a team divides by the identical number. See `DiscoveryQuantityValues.teamAirYardsShare`
+ * for what an unplaceable player does to it.
+ */
+function seasonTeamAirYards(
+  usage: ReadonlyMap<string, SeasonUsageAggregate>, teams: ReadonlyMap<string, string>,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [playerId, aggregate] of usage) {
+    const team = teams.get(playerId);
+    if (team === undefined || !aggregate.hasPbpEvidence) continue;
+    out.set(team, (out.get(team) ?? 0) + aggregate.airYards);
+  }
+  return out;
+}
+
+/** One player's share of his team's air yards, `null` on the same no-evidence rule every other
+ *  play-by-play quantity here applies, and `null` again where the team's own total is not positive
+ *  (a share of nothing, or of a negative total, is not a share). */
+function teamAirYardsShareOf(usage: SeasonUsageAggregate | undefined, teamAirYards: number | undefined): number | null {
+  if (usage === undefined || !usage.hasPbpEvidence || teamAirYards === undefined || teamAirYards <= 0) return null;
+  return usage.airYards / teamAirYards;
 }
 
 /** Each team's mean situation-neutral seconds per play over a season, from the play-by-play's own
@@ -296,7 +381,9 @@ async function discoveryQuantitiesForSeason(
   const pace = await seasonTeamPaceByTeam(db, targetSeason, asOf);
   const winTotals = await incomingWinTotalByTeam(db, targetSeason + 1, incomingAsOf);
   const actualWins = await seasonActualWinsByTeam(db, targetSeason, asOf);
+  const teamAirYards = seasonTeamAirYards(usage, teams);
   const draftYears = new Map(roster.map((row) => [row.playerId, row.draftYear] as const));
+  const draftPicks = new Map(roster.map((row) => [row.playerId, row.draftPick] as const));
 
   const out = new Map<string, DiscoveryQuantityValues>();
   for (const playerId of positions.keys()) {
@@ -315,7 +402,7 @@ async function discoveryQuantitiesForSeason(
       age: ageAtSeason(birthDates.get(playerId) ?? null, targetSeason),
       targetShare: targetShareOf(participated),
       touchdownPointsShare: scored.points > 0 ? scored.touchdownPoints / scored.points : null,
-      redZoneTouchShare: redZoneTouchShareOf(usageAgg),
+      redZoneTouchShare: touchBandShareOf(usageAgg, (u) => u.redZoneTouches),
       targetDepth: targetDepthOf(usageAgg),
       snapShare: snapShareOf(snapCounts.get(playerId)),
       incomingCoachTenureSeasons: coach?.tenureSeasons ?? null,
@@ -325,6 +412,12 @@ async function discoveryQuantitiesForSeason(
       incomingTeamWinTotal: winTotal,
       // Tri-state on BOTH halves: unknown either side makes the gap unknown, never a zero gap.
       incomingTeamWinTotalDelta: winTotal === null || wins === null ? null : winTotal - wins,
+      insideTenTouchShare: touchBandShareOf(usageAgg, (u) => u.insideTenTouches),
+      teamAirYardsShare: teamAirYardsShareOf(usageAgg, team === undefined ? undefined : teamAirYards.get(team)),
+      gamesPlayed: scored.games,
+      draftPick: draftPicks.get(playerId) ?? null,
+      // Already computed above, and non-null by the `continue` this loop opens with.
+      pointsPerGame: ppg,
     });
   }
   return out;

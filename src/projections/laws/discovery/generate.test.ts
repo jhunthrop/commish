@@ -17,6 +17,11 @@ const NO_VALUES: DiscoveryQuantityValues = {
   teamPaceSecondsPerPlay: null,
   incomingTeamWinTotal: null,
   incomingTeamWinTotalDelta: null,
+  insideTenTouchShare: null,
+  teamAirYardsShare: null,
+  gamesPlayed: null,
+  draftPick: null,
+  pointsPerGame: null,
 };
 
 /** A two-quantity, one-position fixture: RB `touches` and RB `age`, both with round thresholds so
@@ -204,6 +209,181 @@ describe("enforceCap", () => {
       age: { QB: { 0.7: 27, 0.8: 28, 0.9: 30 }, RB: { 0.7: 27, 0.8: 28, 0.9: 30 }, WR: { 0.7: 27, 0.8: 28, 0.9: 30 }, TE: { 0.7: 27, 0.8: 28, 0.9: 30 } },
     };
     expect(generateCandidatesFrom(twoQuantitiesAcrossPositions).length).toBeLessThanOrEqual(CANDIDATE_CAP);
+  });
+});
+
+/**
+ * TASK 2 — the low band, the match-key exclusion, the degenerate-level dedupe and the missing-level
+ * skip, all against fixtures that carry BOTH bands (`FIXTURE` above deliberately still carries only
+ * the high three, which is what proves the low band is additive: every count above is unchanged).
+ */
+const BOTH_BANDS: QuantileTable = {
+  touches: { RB: { 0.1: 10, 0.2: 20, 0.3: 40, 0.7: 100, 0.8: 150, 0.9: 200 } },
+  age: { RB: { 0.1: 22, 0.2: 23, 0.3: 24, 0.7: 27, 0.8: 28, 0.9: 30 } },
+  pointsPerGame: { RB: { 0.1: 3, 0.2: 5, 0.3: 7, 0.7: 12, 0.8: 14, 0.9: 17 } },
+};
+
+function bothBands(template: CandidateLaw["template"]): readonly CandidateLaw[] {
+  return generateCandidatesFrom(BOTH_BANDS).filter((candidate) => candidate.template === template);
+}
+
+function bothBandsById(id: string): CandidateLaw {
+  const candidate = generateCandidatesFrom(BOTH_BANDS).find((entry) => entry.id === id);
+  if (candidate === undefined) throw new Error(`No candidate with id "${id}" in the both-bands fixture set`);
+  return candidate;
+}
+
+describe("generateCandidatesFrom — the low band", () => {
+  it("builds the cross product over SIX levels, with the match-key quantity contributing deltas only", () => {
+    // touches + age at 6 levels each = 12 thresholds; pointsPerGame contributes none.
+    expect(bothBands("threshold")).toHaveLength(12);
+    // All three quantities support the crossing template: 3 x 6 x 2 = 36.
+    expect(bothBands("delta")).toHaveLength(36);
+    // AND is HIGH-side only and match-key-free: 3 touches levels x 3 age levels = 9.
+    expect(bothBands("and")).toHaveLength(9);
+  });
+
+  it("tags a low level q10/q20/q30 in an id and leaves every high-side id exactly as it was", () => {
+    const ids = generateCandidatesFrom(BOTH_BANDS).map((candidate) => candidate.id);
+    expect(ids).toContain("threshold:RB:touches:q10");
+    expect(ids).toContain("threshold:RB:touches:q30");
+    expect(ids).toContain("delta:RB:age:q20:fell_out_of");
+    expect(ids).toContain("threshold:RB:touches:q70");
+    expect(ids).toContain("delta:RB:age:q70:fell_out_of");
+  });
+
+  it("is TRUE at or BELOW a low threshold and false above it, the exact mirror of the high band", () => {
+    const low = bothBandsById("threshold:RB:touches:q20"); // threshold 20, low band
+    expect(low.condition(factsWith({ touches: 20 }))).toBe(true);
+    expect(low.condition(factsWith({ touches: 5 }))).toBe(true);
+    expect(low.condition(factsWith({ touches: 21 }))).toBe(false);
+    const high = bothBandsById("threshold:RB:touches:q80"); // threshold 150, high band
+    expect(high.condition(factsWith({ touches: 150 }))).toBe(true);
+    expect(high.condition(factsWith({ touches: 149 }))).toBe(false);
+  });
+
+  it("stays tri-state on the low band: no evidence is unknown, never a low value", () => {
+    expect(bothBandsById("threshold:RB:touches:q10").condition(factsWith({ touches: null }))).toBeNull();
+  });
+
+  it("reads a low-band fell_out_of as falling INTO the bottom band", () => {
+    const fell = bothBandsById("delta:RB:touches:q20:fell_out_of"); // threshold 20, low band
+    expect(fell.condition(factsWith({ touches: 15 }, { touches: 40 }))).toBe(true); // came down across it
+    expect(fell.condition(factsWith({ touches: 15 }, { touches: 18 }))).toBe(false); // was already inside
+    expect(fell.condition(factsWith({ touches: 40 }, { touches: 15 }))).toBe(false); // went the other way
+  });
+
+  it("reads a low-band rose_into as climbing OUT of the bottom band", () => {
+    const rose = bothBandsById("delta:RB:touches:q20:rose_into");
+    expect(rose.condition(factsWith({ touches: 40 }, { touches: 15 }))).toBe(true);
+    expect(rose.condition(factsWith({ touches: 40 }, { touches: 30 }))).toBe(false); // was already outside
+    expect(rose.condition(factsWith({ touches: 20 }, { touches: 15 }))).toBe(false); // exactly on the mark is still IN the band
+  });
+
+  it("leaves the high band's own crossing semantics unchanged", () => {
+    const rose = bothBandsById("delta:RB:touches:q70:rose_into"); // threshold 100, high band
+    expect(rose.condition(factsWith({ touches: 120 }, { touches: 80 }))).toBe(true);
+    expect(rose.condition(factsWith({ touches: 120 }, { touches: 100 }))).toBe(false);
+  });
+});
+
+describe("generateCandidatesFrom — the match-key exclusion (pointsPerGame)", () => {
+  it("builds NO threshold candidate over the quantity the matched design pairs players by", () => {
+    for (const candidate of generateCandidatesFrom(BOTH_BANDS)) {
+      if (candidate.template === "threshold") expect(candidate.id).not.toContain("pointsPerGame");
+    }
+  });
+
+  it("builds NO AND candidate containing it either, on either half", () => {
+    for (const candidate of bothBands("and")) expect(candidate.id).not.toContain("pointsPerGame");
+  });
+
+  it("DOES build its crossing candidates, on both bands and in both directions", () => {
+    const ids = bothBands("delta").map((candidate) => candidate.id);
+    expect(ids).toContain("delta:RB:pointsPerGame:q80:rose_into");
+    expect(ids).toContain("delta:RB:pointsPerGame:q80:fell_out_of");
+    expect(ids).toContain("delta:RB:pointsPerGame:q20:fell_out_of");
+    expect(ids.filter((id) => id.includes("pointsPerGame"))).toHaveLength(12);
+  });
+
+  it("evaluates a production crossing exactly like any other quantity's", () => {
+    const rose = bothBandsById("delta:RB:pointsPerGame:q80:rose_into"); // threshold 14
+    expect(rose.condition(factsWith({ pointsPerGame: 16 }, { pointsPerGame: 9 }))).toBe(true);
+    expect(rose.condition(factsWith({ pointsPerGame: 16 }, { pointsPerGame: 15 }))).toBe(false);
+    expect(rose.condition(factsWith({ pointsPerGame: 16 }, null))).toBeNull();
+  });
+});
+
+describe("generateCandidatesFrom — the AND family stays high-side only", () => {
+  it("names no low level in any AND id", () => {
+    for (const candidate of bothBands("and")) {
+      expect(candidate.id).not.toMatch(/q[123]0/);
+    }
+  });
+
+  it("builds every high x high pair of distinct quantities, and exactly those", () => {
+    const ids = bothBands("and").map((candidate) => candidate.id).sort();
+    expect(ids).toHaveLength(9);
+    expect(ids).toContain("and:RB:threshold:RB:age:q70+threshold:RB:touches:q90");
+    expect(ids).toContain("and:RB:threshold:RB:age:q90+threshold:RB:touches:q70");
+  });
+});
+
+describe("generateCandidatesFrom — degenerate-level dedupe", () => {
+  // q70 and q80 fit the SAME number, exactly as `incomingCoachTenureSeasons` does three times over in
+  // the real committed table. The two candidates would be byte-identical predicates.
+  const TIED: QuantileTable = {
+    touches: { RB: { 0.1: 0, 0.2: 0, 0.3: 5, 0.7: 100, 0.8: 100, 0.9: 200 } },
+    age: { RB: { 0.1: 22, 0.2: 23, 0.3: 24, 0.7: 27, 0.8: 28, 0.9: 30 } },
+  };
+
+  it("keeps the FIRST level in declared order and drops the later duplicate, in every template family", () => {
+    const ids = generateCandidatesFrom(TIED).map((candidate) => candidate.id);
+    expect(ids).toContain("threshold:RB:touches:q70");
+    expect(ids).not.toContain("threshold:RB:touches:q80");
+    expect(ids).toContain("delta:RB:touches:q70:rose_into");
+    expect(ids).not.toContain("delta:RB:touches:q80:rose_into");
+    expect(ids.some((id) => id.includes("and:") && id.includes("touches:q80"))).toBe(false);
+  });
+
+  it("dedupes each band separately, never across them", () => {
+    const ids = generateCandidatesFrom(TIED).map((candidate) => candidate.id);
+    // The low band's own tie (q10 = q20 = 0) drops q20 and keeps q10, independently of the high tie.
+    expect(ids).toContain("threshold:RB:touches:q10");
+    expect(ids).not.toContain("threshold:RB:touches:q20");
+    expect(ids).toContain("threshold:RB:touches:q30");
+  });
+
+  it("leaves an untied quantity's every level intact", () => {
+    const ids = generateCandidatesFrom(TIED).map((candidate) => candidate.id);
+    for (const tag of ["q10", "q20", "q30", "q70", "q80", "q90"]) expect(ids).toContain(`threshold:RB:age:${tag}`);
+  });
+
+  it("is deterministic: the same table always drops the same levels", () => {
+    expect(generateCandidatesFrom(TIED).map((c) => c.id)).toEqual(generateCandidatesFrom(TIED).map((c) => c.id));
+  });
+});
+
+describe("generateCandidatesFrom — a level the table does not carry", () => {
+  const HIGH_ONLY: QuantileTable = { touches: { RB: { 0.7: 100, 0.8: 150, 0.9: 200 } } };
+
+  it("SKIPS the missing levels rather than building a candidate whose threshold is undefined", () => {
+    const ids = generateCandidatesFrom(HIGH_ONLY).map((candidate) => candidate.id);
+    expect(ids.filter((id) => id.startsWith("threshold:"))).toHaveLength(3);
+    for (const tag of ["q10", "q20", "q30"]) expect(ids.some((id) => id.includes(tag))).toBe(false);
+  });
+
+  it("never builds a condition that is false for every player alive — the failure a non-partial type would have hidden", () => {
+    // A candidate built on an `undefined` threshold compares every real number against `undefined`,
+    // which is false for every player and every prior season. Sweeping a grid of both seasons proves
+    // each generated candidate is satisfiable by SOMEBODY, whatever its template and direction.
+    const values = [0, 1, 50, 100, 250, 1000];
+    for (const candidate of generateCandidatesFrom(HIGH_ONLY)) {
+      const satisfiable = values.some((current) =>
+        values.some((prior) => candidate.condition(factsWith({ touches: current }, { touches: prior })) === true),
+      );
+      expect(satisfiable, `${candidate.id} is false for every (current, prior) pair`).toBe(true);
+    }
   });
 });
 

@@ -20,12 +20,90 @@ import type { PrimaryQuantityUnit } from "../types";
  *  that option; the generator always names one concrete position. */
 export type { LawPosition };
 
-export const QUANTILE_LEVELS = [0.7, 0.8, 0.9] as const;
+/**
+ * THE HIGH BAND — a quantity at or ABOVE its position's quantile mark. The original three levels,
+ * unchanged in value and in declared order, so every id and every committed threshold they name
+ * stays byte-stable.
+ */
+export const HIGH_QUANTILE_LEVELS = [0.7, 0.8, 0.9] as const;
+
+/**
+ * THE LOW BAND (Task 2, the discovery-expansion plan) — a quantity at or BELOW its position's
+ * quantile mark, the exact mirror of the high band rather than a second, differently-shaped family.
+ *
+ * WHY THE LOW SIDE EXISTS AT ALL. Every candidate the generator could state until now was a claim
+ * about a STANDOUT: the top 30%, 20% or 10% of a position on some quantity. A whole class of
+ * hypotheses is unsayable in that grammar, and the founder's own collapse case is the plainest of
+ * them: a skill player on a team the market has written off. "His team's Vegas win total is in the
+ * BOTTOM 20% of the league" is not the negation of any high-side candidate (the complement of the
+ * top 20% is the other EIGHTY percent, which is not a band anybody could act on), so the low side is
+ * genuinely new expressive power, not a restatement.
+ *
+ * MIRRORED, NOT INVENTED: 0.1/0.2/0.3 are the same three distances from the extreme that
+ * 0.9/0.8/0.7 are, so a low-side candidate's population is the same SIZE as its high-side twin's,
+ * which is what keeps the two halves of the family comparable under Benjamini-Hochberg rather than
+ * one half being systematically thinner and therefore systematically less testable.
+ */
+export const LOW_QUANTILE_LEVELS = [0.1, 0.2, 0.3] as const;
+
+/**
+ * Every level, LOW FIRST then HIGH, each half ascending. The order is load-bearing twice over:
+ * `computeQuantileTable` and the fit script serialize a quantity's thresholds in this order, and
+ * `generate.ts` walks it when it builds candidates. Low-before-high keeps the whole list ascending,
+ * which is how a reader checks a serialized row at a glance.
+ */
+export const QUANTILE_LEVELS = [...LOW_QUANTILE_LEVELS, ...HIGH_QUANTILE_LEVELS] as const;
 export type QuantileLevel = (typeof QUANTILE_LEVELS)[number];
 
-/** The percentile label a quantile LEVEL reads as in plain words: crossing the 0.8 quantile puts a
- *  player in the top 20% of his position. */
+/**
+ * WHICH BAND A LEVEL NAMES, derived from the level itself rather than stored a second time on every
+ * clause. A `ThresholdClause` carries a level and nothing else, exactly as it did before this task,
+ * so no invalid (level, side) pair is representable and no existing candidate id changes shape.
+ */
+export type QuantileSide = "low" | "high";
+
+const LOW_LEVEL_SET: ReadonlySet<number> = new Set(LOW_QUANTILE_LEVELS);
+
+/** The band a level belongs to. Total over `QuantileLevel` by construction: a level is in
+ *  `LOW_QUANTILE_LEVELS` or it is not, and the two arrays above are the whole of `QUANTILE_LEVELS`. */
+export function sideOf(level: QuantileLevel): QuantileSide {
+  return LOW_LEVEL_SET.has(level) ? "low" : "high";
+}
+
+/**
+ * THE SHORT TAG A LEVEL IS NAMED BY — in a candidate id (`generate.ts`'s `idFor`), in the fit
+ * script's console table, and anywhere else a level needs a filename-safe token. ONE map, here, next
+ * to the levels themselves: the id fragment and the printed label were briefly two hand-maintained
+ * copies of the same fact, which is how a widened level list ends up half-renamed.
+ *
+ * The three high-side tags are byte-identical to what they always were, which is what keeps every
+ * candidate id that existed before the low band stable.
+ */
+export const QUANTILE_TAG: Readonly<Record<QuantileLevel, string>> = {
+  0.1: "q10",
+  0.2: "q20",
+  0.3: "q30",
+  0.7: "q70",
+  0.8: "q80",
+  0.9: "q90",
+};
+
+/**
+ * The percentile label a quantile LEVEL reads as in plain words. On the HIGH side, crossing the 0.8
+ * quantile puts a player in the top 20% of his position; on the LOW side, sitting at or under the
+ * 0.2 quantile puts him in the bottom 20%. The label is the DISTANCE FROM THE NEARER EXTREME either
+ * way, which is why 0.2 and 0.8 share "20%" — the word before it ("top" or "bottom", supplied by
+ * `clauseText` from `sideOf`) is what tells the two apart.
+ *
+ * APPROXIMATE UNDER TIES, on both sides and always has been: an interpolated quantile does not
+ * partition a population with mass at a single value into exactly that percentage. `renderClaim`,
+ * the only renderer that speaks percentages, is the PRE-measurement one; every committed law's claim
+ * goes through `renderSignedClaim`, which states the real fitted number instead.
+ */
 const QUANTILE_PERCENT_LABEL: Readonly<Record<QuantileLevel, string>> = {
+  0.1: "10%",
+  0.2: "20%",
+  0.3: "30%",
   0.7: "30%",
   0.8: "20%",
   0.9: "10%",
@@ -48,8 +126,9 @@ export interface QuantityDef {
   readonly positions: readonly LawPosition[];
   readonly get: (values: DiscoveryQuantityValues) => number | null;
   /** Formats a raw threshold VALUE (not a quantile level) into the plain-words token
-   *  `renderSignedClaim` drops into "... is {formatValue(value)} or more". */
-  readonly formatValue: (value: number) => string;
+   *  `renderSignedClaim` drops into "... is {formatValue(value, rounding)} or more". The rounding
+   *  direction is the CALLER's, never the quantity's: see `ThresholdRounding`. */
+  readonly formatValue: (value: number, rounding: ThresholdRounding) => string;
   /** A two-or-three-word label for `renderTitle`'s mechanical heading — never a full sentence, never
    *  hand-authored prose about a specific candidate. */
   readonly shortLabel: string;
@@ -77,6 +156,46 @@ export interface QuantityDef {
    * perfectly ordinary threshold, and it is the shape the founder's Achane case actually has.
    */
   readonly supportsYearOverYearDelta: boolean;
+  /**
+   * WHETHER THIS QUANTITY *IS* THE MATCHED DESIGN'S OWN MATCH KEY, and therefore cannot carry a
+   * LEVEL template (threshold, and an AND built from thresholds) without the matching itself
+   * manufacturing the effect. `true` for exactly one quantity, `pointsPerGame`, and the flag exists
+   * so the exclusion is a declared property of that quantity rather than an id special-cased inside
+   * `generate.ts`, exactly as `supportsYearOverYearDelta` above already is.
+   *
+   * THE PROOF, not an intuition. `discovery/measure.ts`'s `populationForCandidate` sets
+   * `matchKey: row.pointsPerGame`, and `harness.ts`'s `matchedPairs` pairs each condition row with
+   * the closest UNCLAIMED control whose `matchKey` is within `POINTS_PER_GAME_CALIPER` (2 points).
+   * `DiscoverySeasonRow.pointsPerGame` is `factsForSeason`'s own season-N read at
+   * `schedulePublishedAsOf(season + 1)` and this quantity is `discoveryFactsForSeason`'s season-N
+   * read at the identical gate, so the two are not merely correlated: they are THE SAME NUMBER.
+   * Give a threshold candidate the clause `pointsPerGame >= T` and every condition row has
+   * `matchKey >= T` while every control row has `matchKey < T`, so
+   * `condition.matchKey > control.matchKey` for EVERY pair the matcher can build, with no exception
+   * and in one direction only. The outcome being differenced is
+   * `nextPointsPerGame - pointsPerGame`, which mean-reverts in `pointsPerGame`; a systematically
+   * higher-scoring condition arm therefore carries a systematically more negative difference than
+   * its controls before the candidate's own condition has said anything at all. Every low-side
+   * threshold on the quantity has the same defect with the sign flipped. That is not a weak
+   * candidate, it is a candidate whose measured effect is a function of the matcher.
+   *
+   * A SECOND, INDEPENDENT REASON THE CLAIM WOULD BE FALSE AS WRITTEN. The caliper also DROPS every
+   * condition row with no control within two points, which for a level condition on the match key is
+   * every player more than two points clear of the threshold. The surviving population is a
+   * caliper-wide sliver either side of T, so a rendered claim promising "a running back whose points
+   * per game is 14.0 or more" would be evidenced by running backs scoring 14 to 16 against running
+   * backs scoring 12 to 14. The words and the measurement would not be about the same players.
+   *
+   * WHAT IS KEPT, AND WHY IT IS SOUND. The DELTA template over this quantity is generated normally,
+   * because neither defect applies to it: a delta condition is a CROSSING between seasons N-1 and N,
+   * so the control pool provably holds rows on BOTH sides of T (a player who was already above the
+   * mark last season and still is fails "rose into it" while sitting above T), the one-sided
+   * inequality above does not hold, and the caliper then does exactly the job it was built for —
+   * it pairs a player who arrived at this level of production with a player already at it. That is a
+   * real, sayable, measurable question, and it is the production-conditional shape this task was
+   * asked for.
+   */
+  readonly isMatchKeyQuantity: boolean;
 }
 
 const ALL_SKILL_POSITIONS: readonly LawPosition[] = ["QB", "RB", "WR", "TE"];
@@ -90,45 +209,64 @@ const PASS_CATCHER_POSITIONS: readonly LawPosition[] = ["WR", "TE"];
  * `generateCandidatesFrom` applies before returning).
  */
 /**
- * ROUNDING DIRECTION (fix round 2, NEW-3) — every `formatValue` below rounds AWAY from the
- * threshold, toward larger numbers, never toward nearer ones. The clause this renders is always
- * "value >= threshold"; rounding DOWN (or to nearest) can understate the real threshold — a
- * touches threshold of `237.3` rounded to nearest gives "237 or more", but a player with EXACTLY
- * 237 touches does NOT satisfy `237 >= 237.3`, so the rendered claim would falsely include him. The
- * fix is to round toward the CEILING at whatever precision is displayed, so the displayed number is
- * always itself `>= threshold`, and "displayed value or more" is never a superset of "the real
- * threshold or more" — provably so, per `templates.test.ts`'s own property test, which checks this
- * for every real committed quantile the discovery quantile table carries.
+ * ROUNDING DIRECTION (fix round 2, NEW-3; extended to the low band by Task 2) — every `formatValue`
+ * below rounds AWAY from the population the clause admits, never toward the nearer number, so the
+ * DISPLAYED number is never a looser predicate than the real one.
  *
- * `ceilToDecimals` rounds the scaled value to 6 decimal places BEFORE ceiling, to strip the
- * floating-point representation noise a raw `value * 10**decimals` can carry (e.g. `0.19 * 1000`
- * can compute as `190.00000000000003`, which would otherwise ceiling up to 191 instead of staying
- * at 190 for a threshold that already sits exactly on a displayable boundary) — a purely cosmetic
- * tightness concern, never a correctness one either way, but worth not introducing for free.
+ * HIGH BAND, the original rule. The clause is "value >= threshold"; rounding DOWN (or to nearest)
+ * can understate the real threshold — a touches threshold of `237.3` rounded to nearest gives "237
+ * or more", but a player with EXACTLY 237 touches does NOT satisfy `237 >= 237.3`, so the rendered
+ * claim would falsely include him. Rounding toward the CEILING makes the displayed number itself
+ * `>= threshold`, and "displayed value or more" is never a superset of "the real threshold or more".
+ *
+ * LOW BAND, the mirror. The clause is "value <= threshold", and there the ceiling is the DANGEROUS
+ * direction for exactly the same reason read backwards: a win-total threshold of `6.4` displayed as
+ * "6.5 or less" would admit a team at 6.5 that `6.5 <= 6.4` rejects. The floor is the safe
+ * direction, so a low clause renders `roundAtDecimals(value, decimals, "floor")`.
+ *
+ * WHICH DIRECTION IS THE CALLER'S CALL, never the quantity's — hence the parameter. `sideOf` the
+ * clause's own level picks it (`roundingForSide` below), so a quantity cannot carry a stale opinion
+ * about a band it is being rendered in. `templates.test.ts`'s property test checks BOTH directions
+ * against every real committed quantile the discovery table carries.
+ *
+ * `roundAtDecimals` rounds the scaled value to 6 decimal places BEFORE the ceiling or floor, to
+ * strip the floating-point representation noise a raw `value * 10**decimals` can carry (e.g.
+ * `0.19 * 1000` can compute as `190.00000000000003`, which would otherwise ceiling up to 191
+ * instead of staying at 190 for a threshold that already sits exactly on a displayable boundary) —
+ * a purely cosmetic tightness concern, never a correctness one either way, but worth not
+ * introducing for free.
  */
-function ceilToDecimals(value: number, decimals: number): number {
-  const factor = 10 ** decimals;
-  const scaled = Math.round(value * factor * 1e6) / 1e6;
-  return Math.ceil(scaled) / factor;
+export type ThresholdRounding = "ceil" | "floor";
+
+/** The rounding direction a band's own comparison needs — see the section docblock above. */
+export function roundingForSide(side: QuantileSide): ThresholdRounding {
+  return side === "high" ? "ceil" : "floor";
 }
 
-/** Whole-number formatting, CEILING — touches, tenure seasons, experience years: no fractional
- *  value in the underlying quantity is ever meaningful to a reader, even though a quantile
- *  interpolation can land on one (e.g. `237.29999999999995`, which must display as `238`, never
- *  `237` — see this section's own docblock). */
-const formatWhole = (value: number): string => `${Math.ceil(ceilToDecimals(value, 6))}`;
-/** One-decimal formatting, CEILING — target depth, pace, incoming coach's prior pass rate: genuinely
- *  continuous quantities where one decimal is precise enough that a second would not change what a
- *  reader could act on, unlike age (see `formatAgeYears` below) or a percent share. */
-const formatOneDecimal = (value: number): string => ceilToDecimals(value, 1).toFixed(1);
+function roundAtDecimals(value: number, decimals: number, rounding: ThresholdRounding): number {
+  const factor = 10 ** decimals;
+  const scaled = Math.round(value * factor * 1e6) / 1e6;
+  return (rounding === "ceil" ? Math.ceil(scaled) : Math.floor(scaled)) / factor;
+}
+
+/** Whole-number formatting — touches, tenure seasons, experience years, games, draft pick: no
+ *  fractional value in the underlying quantity is ever meaningful to a reader, even though a
+ *  quantile interpolation can land on one (e.g. `237.29999999999995`, which must display as `238`
+ *  on the high side and `237` on the low side — see this section's own docblock). */
+const formatWhole = (value: number, rounding: ThresholdRounding): string => `${roundAtDecimals(value, 0, rounding)}`;
+/** One-decimal formatting — target depth, pace, incoming coach's prior pass rate, points per game:
+ *  genuinely continuous quantities where one decimal is precise enough that a second would not
+ *  change what a reader could act on, unlike age (see `formatAgeYears` below) or a percent share. */
+const formatOneDecimal = (value: number, rounding: ThresholdRounding): string => roundAtDecimals(value, 1, rounding).toFixed(1);
 /** Age, specifically — TWO decimals (fix round 2: one extra beyond the general one-decimal case),
  *  because age is the single most load-bearing continuous quantity across the confirmed discovered
  *  laws today, and a whole extra digit of precision costs nothing for a reader to skim past. */
-const formatAgeYears = (value: number): string => ceilToDecimals(value, 2).toFixed(2);
+const formatAgeYears = (value: number, rounding: ThresholdRounding): string => roundAtDecimals(value, 2, rounding).toFixed(2);
 /** Percentage formatting for a 0..1 share/rate, ONE decimal (fix round 2: was whole-percent
  *  rounded to nearest, which could understate a threshold like `19.489%` as "19%" — a player at
  *  19.2% would then misread the claim as satisfied when the real predicate needs 19.489%). */
-const formatPercent = (value: number): string => `${ceilToDecimals(value * 100, 1).toFixed(1)}%`;
+const formatPercent = (value: number, rounding: ThresholdRounding): string =>
+  `${roundAtDecimals(value * 100, 1, rounding).toFixed(1)}%`;
 
 export const QUANTITY_DEFS: readonly QuantityDef[] = [
   {
@@ -140,6 +278,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "carries and receptions",
     magnitudeUnit: "whole",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "age",
@@ -150,6 +289,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "age",
     magnitudeUnit: "two_decimal",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "targetShare",
@@ -160,6 +300,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "target share",
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "touchdownPointsShare",
@@ -170,6 +311,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "touchdown-points share",
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "redZoneTouchShare",
@@ -180,6 +322,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "red-zone touch share",
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "targetDepth",
@@ -190,6 +333,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "target depth",
     magnitudeUnit: "one_decimal",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "snapShare",
@@ -200,6 +344,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "snap share",
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "incomingCoachTenureSeasons",
@@ -217,6 +362,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "incoming coach's tenure",
     magnitudeUnit: "whole",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "incomingCoachPriorPassRateOverExpected",
@@ -227,6 +373,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "incoming coach's prior pass rate",
     magnitudeUnit: "one_decimal",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "experienceYear",
@@ -242,6 +389,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "experience",
     magnitudeUnit: "whole",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "teamPaceSecondsPerPlay",
@@ -252,6 +400,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     shortLabel: "team pace",
     magnitudeUnit: "one_decimal",
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   /**
    * THE TWO TEAM-MARKET QUANTITIES (Task 3, the vegas-laws plan) — the market's own preseason
@@ -276,6 +425,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     // A win total genuinely can rise into or fall out of the top band year over year, and a team the
     // market newly believes in is an ordinary, sayable claim. Kept.
     supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
   },
   {
     id: "incomingTeamWinTotalDelta",
@@ -288,6 +438,93 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     // The ONE exclusion in the registry — see `supportsYearOverYearDelta`'s own docblock: this
     // quantity is itself a difference, so a year-over-year template over it is a second difference.
     supportsYearOverYearDelta: false,
+    isMatchKeyQuantity: false,
+  },
+  /**
+   * THE FOUR VOCABULARY ADDITIONS (Task 2, the discovery-expansion plan) plus the one
+   * production-conditional quantity, all appended at the END of the registry for the reason the
+   * team-market pair above states: `computeQuantileTable` walks this array in order and the fit
+   * script serializes the table in that order, so appending keeps a regenerated `quantiles.ts` a
+   * purely additive diff and no existing quantity's committed thresholds move.
+   *
+   * PICKED ON COVERAGE AND DISTINCTNESS, from facts the builder can already reach. Every one is
+   * computed inside `discoveryQuantitiesForSeason` from a read that module ALREADY performs (the
+   * play-by-play touch aggregate, the season scoring entry, the preseason roster row); not one adds
+   * a store round trip, an ingestion, or a metric.
+   */
+  {
+    id: "insideTenTouchShare",
+    noun: "share of his own carries and targets that came inside the ten",
+    positions: RECEIVING_POSITIONS,
+    get: (v) => v.insideTenTouchShare,
+    formatValue: formatPercent,
+    shortLabel: "inside-ten touch share",
+    magnitudeUnit: "percent",
+    supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
+  },
+  {
+    id: "teamAirYardsShare",
+    noun: "share of his team's air yards that season",
+    positions: RECEIVING_POSITIONS,
+    get: (v) => v.teamAirYardsShare,
+    formatValue: formatPercent,
+    shortLabel: "air-yards share",
+    magnitudeUnit: "percent",
+    supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
+  },
+  {
+    id: "gamesPlayed",
+    noun: "number of games he was scored in that season",
+    positions: ALL_SKILL_POSITIONS,
+    get: (v) => v.gamesPlayed,
+    formatValue: formatWhole,
+    shortLabel: "games played",
+    magnitudeUnit: "whole",
+    supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: false,
+  },
+  {
+    id: "draftPick",
+    // The noun carries the direction, because the number runs BACKWARDS against every other quantity
+    // in this registry: a bigger draft pick is a worse one. Without the appositive, "a wide receiver
+    // whose overall draft pick is in the top 10%" reads as a compliment and means the opposite.
+    noun: "overall draft pick, counting a later pick as a larger number,",
+    positions: ALL_SKILL_POSITIONS,
+    get: (v) => v.draftPick,
+    formatValue: formatWhole,
+    shortLabel: "draft pick",
+    magnitudeUnit: "whole",
+    // The SECOND exclusion in the registry, and a different reason from the first: a draft pick is
+    // a career constant, so it cannot cross a quantile mark between season N-1 and season N at all.
+    // Every year-over-year candidate over it would be identically false for every player in every
+    // season, which is not a weak candidate but a non-candidate: six ids per position of pure
+    // multiple-comparisons cost buying a question with no possible affirmative answer.
+    supportsYearOverYearDelta: false,
+    isMatchKeyQuantity: false,
+  },
+  /**
+   * THE PRODUCTION CONDITIONAL — season N's own points per game, as a CONDITION on season N with the
+   * outcome still read at season N+1, the same one-season offset the matched design already applies
+   * to every other quantity here.
+   *
+   * DELTA ONLY. This quantity is the matched design's own match key, which makes a LEVEL template
+   * over it unmeasurable rather than merely weak — the whole argument, with its proof, is
+   * `QuantityDef.isMatchKeyQuantity`'s docblock above, and `generate.ts` reads the flag rather than
+   * this id. What survives is the crossing template, which asks the question worth asking: a player
+   * who ROSE into this level of production, measured against a player already at it.
+   */
+  {
+    id: "pointsPerGame",
+    noun: "points per game that season",
+    positions: ALL_SKILL_POSITIONS,
+    get: (v) => v.pointsPerGame,
+    formatValue: formatOneDecimal,
+    shortLabel: "points per game",
+    magnitudeUnit: "one_decimal",
+    supportsYearOverYearDelta: true,
+    isMatchKeyQuantity: true,
   },
 ];
 
@@ -313,14 +550,26 @@ const POSITION_PLURAL: Readonly<Record<LawPosition, string>> = {
   TE: "tight ends",
 };
 
-/** A single threshold-crossing clause: the quantity is at or above its position's quantile mark. */
+/** A single threshold-crossing clause: the quantity is at or above its position's quantile mark on
+ *  the HIGH band, at or below it on the LOW band. `sideOf(quantileLevel)` is which, always. */
 export interface ThresholdClause {
   readonly kind: "threshold";
   readonly quantityId: QuantityId;
   readonly quantileLevel: QuantileLevel;
 }
 
-/** A year-over-year clause: the quantity crossed the same quantile mark from the season before. */
+/**
+ * A year-over-year clause: the quantity crossed the same quantile mark from the season before.
+ *
+ * `direction` NAMES THE VALUE'S OWN MOTION, never the band's — `rose_into` is always "the value went
+ * up across the mark", `fell_out_of` always "the value went down across it". On the HIGH band those
+ * two happen to read as entering and leaving the band, which is where the names come from and why
+ * they are kept verbatim (every existing candidate id embeds them; renaming would churn the id of
+ * every measured law for no gain). On the LOW band the SAME motion means the opposite membership: a
+ * value that fell across the mark has fallen INTO the bottom band, and one that rose across it has
+ * climbed OUT of it. `clauseText` and `signedClauseText` say which of the two a reader is looking at,
+ * in words, from `sideOf(quantileLevel)`.
+ */
 export interface DeltaClause {
   readonly kind: "delta";
   readonly quantityId: QuantityId;
@@ -347,19 +596,32 @@ export interface ClaimParts {
   readonly clause: Clause;
 }
 
+/** "top 20% of wide receivers" or "bottom 20% of wide receivers" — the band a level names, in the
+ *  words every unmeasured claim states it with. */
+function bandText(level: QuantileLevel, position: LawPosition): string {
+  const edge = sideOf(level) === "high" ? "top" : "bottom";
+  return `${edge} ${QUANTILE_PERCENT_LABEL[level]} of ${POSITION_PLURAL[position]}`;
+}
+
 function clauseText(clause: Clause, position: LawPosition): string {
-  const plural = POSITION_PLURAL[position];
   switch (clause.kind) {
-    case "threshold": {
-      const pct = QUANTILE_PERCENT_LABEL[clause.quantileLevel];
-      return `${quantityDef(clause.quantityId).noun} is in the top ${pct} of ${plural}`;
-    }
+    case "threshold":
+      return `${quantityDef(clause.quantityId).noun} is in the ${bandText(clause.quantileLevel, position)}`;
     case "delta": {
-      const pct = QUANTILE_PERCENT_LABEL[clause.quantileLevel];
       const noun = quantityDef(clause.quantityId).noun;
-      return clause.direction === "rose_into"
-        ? `${noun} climbed into the top ${pct} of ${plural} after being below it the year before`
-        : `${noun} fell out of the top ${pct} of ${plural} after being in it the year before`;
+      const band = bandText(clause.quantileLevel, position);
+      // The VERB follows the value's own motion and the PREPOSITION follows what that motion did to
+      // its band membership — see `DeltaClause`'s own docblock. On the high band a rise enters the
+      // band and a fall leaves it; on the low band a fall enters it and a rise leaves it.
+      const isHigh = sideOf(clause.quantileLevel) === "high";
+      const entersBand = isHigh === (clause.direction === "rose_into");
+      const verb = clause.direction === "rose_into" ? "climbed" : "fell";
+      // Outside the high band is BELOW its mark; outside the low band is ABOVE its mark. The high-side
+      // wording is byte-identical to what it was before the low band existed.
+      const wasOutside = isHigh ? "below" : "above";
+      return entersBand
+        ? `${noun} ${verb} into the ${band} after being ${wasOutside} it the year before`
+        : `${noun} ${verb} out of the ${band} after being in it the year before`;
     }
     case "and":
       return `${clauseText(clause.left, position)} and whose ${clauseText(clause.right, position)}`;
@@ -423,16 +685,28 @@ function signedClauseText(clause: Clause, position: LawPosition, quantiles: Quan
   switch (clause.kind) {
     case "threshold": {
       const def = quantityDef(clause.quantityId);
+      const side = sideOf(clause.quantileLevel);
       const value = thresholdValueFor(quantiles, position, clause.quantityId, clause.quantileLevel);
-      return `${def.noun} is ${def.formatValue(value)} or more`;
+      const formatted = def.formatValue(value, roundingForSide(side));
+      return `${def.noun} is ${formatted} ${side === "high" ? "or more" : "or less"}`;
     }
     case "delta": {
       const def = quantityDef(clause.quantityId);
+      const side = sideOf(clause.quantileLevel);
       const value = thresholdValueFor(quantiles, position, clause.quantityId, clause.quantileLevel);
-      const formatted = def.formatValue(value);
-      return clause.direction === "rose_into"
-        ? `${def.noun} rose to ${formatted} or more after being below that mark the season before`
-        : `${def.noun} fell below ${formatted} after being at or above that mark the season before`;
+      // ONE rounding per clause, taken from the band, so a single fitted threshold never prints as
+      // two different numbers inside one sentence. The band's own membership test is the half that
+      // gets the safe direction ("at or above" on the high band, "at or below" on the low one),
+      // which is the half a reader checks a player against.
+      const formatted = def.formatValue(value, roundingForSide(side));
+      if (side === "high") {
+        return clause.direction === "rose_into"
+          ? `${def.noun} rose to ${formatted} or more after being below that mark the season before`
+          : `${def.noun} fell below ${formatted} after being at or above that mark the season before`;
+      }
+      return clause.direction === "fell_out_of"
+        ? `${def.noun} fell to ${formatted} or less after being above that mark the season before`
+        : `${def.noun} rose above ${formatted} after being at or below that mark the season before`;
     }
     case "and":
       return `${signedClauseText(clause.left, position, quantiles)} and whose ${signedClauseText(clause.right, position, quantiles)}`;
@@ -490,8 +764,13 @@ function clauseShortLabelsWithValue(clause: Clause, position: LawPosition, quant
     case "threshold":
     case "delta": {
       const def = quantityDef(clause.quantityId);
+      const side = sideOf(clause.quantileLevel);
       const value = thresholdValueFor(quantiles, position, clause.quantityId, clause.quantileLevel);
-      return [`${def.shortLabel} (${def.formatValue(value)})`];
+      // The band's own comparison is carried into the heading too, because a bare "(9.0)" cannot tell
+      // a reader whether the law is about teams at nine wins or more or nine wins or fewer, and a
+      // low-side and a high-side candidate on one quantity can otherwise round to the same number.
+      const formatted = def.formatValue(value, roundingForSide(side));
+      return [`${def.shortLabel} (${side === "high" ? formatted : `${formatted} or less`})`];
     }
     case "and":
       return [
@@ -540,8 +819,21 @@ export function renderSignedClaim(parts: ClaimParts, sign: -1 | 1, quantiles: Qu
   return `${renderTitle(parts, quantiles)}: ${sentence}`;
 }
 
-/** One quantity's fitted train-window thresholds, at the three quantile levels this generator uses. */
-export type QuantileThresholds = Readonly<Record<QuantileLevel, number>>;
+/**
+ * One quantity's fitted train-window thresholds, at the quantile levels this generator uses.
+ *
+ * PARTIAL PER LEVEL (Task 2), not merely per position. `computeQuantileTable` fills every level of
+ * `QUANTILE_LEVELS` for any (quantity, position) that clears `MIN_QUANTILE_SAMPLE`, so a freshly
+ * fitted table is never sparse at this depth — but the COMMITTED table is a snapshot of whatever
+ * `QUANTILE_LEVELS` was on the day it was fitted, and this task widened that list without refitting
+ * (the refit belongs to the regeneration event that also extends the measurement window). A
+ * non-partial type here would have let `generate.ts` read `undefined` as a `number` and build
+ * candidates whose threshold is `undefined`, whose condition `value >= undefined` is false for every
+ * player alive, and whose ids would silently join the family as dead weight. `quantileCoverageGaps`
+ * below reports exactly which triples a table is missing, so the gap is a number a script can print
+ * rather than a silence.
+ */
+export type QuantileThresholds = Readonly<Partial<Record<QuantileLevel, number>>>;
 
 /** Committed shape: a quantity may have no entry for a position (too few train-season observations
  *  to trust a quantile), which is why every level of nesting is `Partial`. */
@@ -597,4 +889,35 @@ export function computeQuantileTable(rows: readonly QuantityRow[], trainSeasons:
     }
   }
   return table as QuantileTable;
+}
+
+/** One (quantity, position, level) triple a table does not carry a threshold for. */
+export interface QuantileCoverageGap {
+  readonly quantityId: QuantityId;
+  readonly position: LawPosition;
+  readonly level: QuantileLevel;
+}
+
+/**
+ * EVERY LEVEL A TABLE IS MISSING for a (quantity, position) it otherwise covers — the visible half of
+ * `QuantileThresholds`' partiality, so a widened `QUANTILE_LEVELS` against a table fitted before the
+ * widening is a printable count instead of a family that silently fails to grow.
+ *
+ * A (quantity, position) the table has NO entry for at all is deliberately NOT reported: that is the
+ * ordinary `MIN_QUANTILE_SAMPLE` outcome (a position with too few train-season observations to trust
+ * a quantile), a decision the fit already made on purpose, not a stale-table gap. What this function
+ * finds is the other case: a combination the table DOES cover, at some levels but not all of them.
+ */
+export function quantileCoverageGaps(quantiles: QuantileTable): readonly QuantileCoverageGap[] {
+  const gaps: QuantileCoverageGap[] = [];
+  for (const def of QUANTITY_DEFS) {
+    for (const position of def.positions) {
+      const thresholds = quantiles[def.id]?.[position];
+      if (thresholds === undefined) continue;
+      for (const level of QUANTILE_LEVELS) {
+        if (thresholds[level] === undefined) gaps.push({ quantityId: def.id, position, level });
+      }
+    }
+  }
+  return gaps;
 }

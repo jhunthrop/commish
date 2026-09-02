@@ -73,6 +73,11 @@ const NO_QUANTITIES: DiscoveryQuantityValues = {
   teamPaceSecondsPerPlay: null,
   incomingTeamWinTotal: null,
   incomingTeamWinTotalDelta: null,
+  insideTenTouchShare: null,
+  teamAirYardsShare: null,
+  gamesPlayed: null,
+  draftPick: null,
+  pointsPerGame: null,
 };
 
 function discoveryFactsFixture(

@@ -4,12 +4,15 @@ import type { Law } from "../types";
 import { DISCOVERY_QUANTILES } from "./quantiles";
 import {
   QUANTILE_LEVELS,
+  QUANTILE_TAG,
   QUANTITY_DEFS,
+  sideOf,
   type AndClause,
   type ClaimParts,
   type Clause,
   type DeltaClause,
   type QuantileLevel,
+  type QuantileSide,
   type QuantileTable,
   type QuantityDef,
   type ThresholdClause,
@@ -64,8 +67,17 @@ export interface CandidateLaw {
  * plan asked to be paid in the open. 3,000 leaves the current 2,487 real headroom without inviting
  * an unbounded vocabulary: the next expansion faces this same explicit decision rather than
  * discovering a silent trim in its output.
+ *
+ * RAISED AGAIN, FROM 3,000 TO 6,000 (Task 2, the discovery-expansion plan) — and the paragraph above
+ * is exactly why this number is stated rather than discovered. This round doubled the quantile levels
+ * (a LOW band mirroring the high one) and added five quantities, which the family-size projection in
+ * that task's report puts near 4,800 candidates once the quantile table is refitted at the new
+ * levels. 6,000 clears that with headroom and leaves the trim unfired, which is the only state in
+ * which `enforceCap`'s id-order bias is harmless. It is deliberately NOT the projection plus a
+ * handful: a cap that tracks the family exactly would fire on the first refit that happens to cover
+ * one more position than the last one did.
  */
-export const CANDIDATE_CAP = 3000;
+export const CANDIDATE_CAP = 6000;
 
 /** Three-valued (Kleene) AND: `false` wins over `null` (an antecedent already known to fail makes the
  *  whole AND false regardless of the other half being unknown), but `null` wins over `true` (a known
@@ -76,7 +88,6 @@ function kleeneAnd(a: boolean | null, b: boolean | null): boolean | null {
   return true;
 }
 
-const QUANTILE_TAG: Readonly<Record<QuantileLevel, string>> = { 0.7: "q70", 0.8: "q80", 0.9: "q90" };
 
 /** Deterministic id from a clause's own structure — never a counter, a hash, or a random suffix, so
  *  the same candidate gets the same id on every run and a stable id-sort (`sortById`) is possible. */
@@ -95,19 +106,48 @@ function idFor(position: LawPosition, clause: Clause): string {
   }
 }
 
-function thresholdConditionOf(def: QuantityDef, threshold: number): (facts: DiscoveryFacts) => boolean | null {
+/**
+ * IN-BAND, the one predicate both single templates are built from: at or ABOVE the mark on the high
+ * band, at or BELOW it on the low band. Written once, here, so a threshold candidate and the delta
+ * candidates over the same (quantity, position, level) can never disagree about where the band's
+ * edge is or which side of it a player sits on — the delta templates below are defined purely as
+ * "was he in the band last season, is he in it this season", never as their own inequalities.
+ *
+ * BOTH BANDS ARE CLOSED AT THE MARK (`>=` high, `<=` low). A player exactly ON a threshold is IN the
+ * band either way, which is the reading `renderSignedClaim` states in words ("is 9.0 or more", "is
+ * 6.0 or less") and the one `formatValue`'s rounding direction is chosen to keep honest.
+ */
+function isInBand(value: number, threshold: number, side: QuantileSide): boolean {
+  return side === "high" ? value >= threshold : value <= threshold;
+}
+
+function thresholdConditionOf(def: QuantityDef, threshold: number, side: QuantileSide): (facts: DiscoveryFacts) => boolean | null {
   return (facts) => {
     const value = def.get(facts.current);
-    return value === null ? null : value >= threshold;
+    return value === null ? null : isInBand(value, threshold, side);
   };
 }
 
-function deltaConditionOf(def: QuantityDef, threshold: number, direction: DeltaClause["direction"]): (facts: DiscoveryFacts) => boolean | null {
+/**
+ * A CROSSING, expressed as a change of band membership between season N-1 and season N.
+ *
+ * `direction` names the VALUE's own motion (`DeltaClause`'s docblock), which on the high band means
+ * `rose_into` enters the band and on the low band means `rose_into` LEAVES it. Deriving both from
+ * `isInBand` rather than writing four inequalities keeps that inversion in one place and makes the
+ * high-side behaviour provably unchanged: for `side === "high"`, `rose_into` is still
+ * `prior < threshold && current >= threshold`, and `fell_out_of` still its complement pair.
+ */
+function deltaConditionOf(
+  def: QuantityDef, threshold: number, side: QuantileSide, direction: DeltaClause["direction"],
+): (facts: DiscoveryFacts) => boolean | null {
+  const enters = (side === "high") === (direction === "rose_into");
   return (facts) => {
     const current = def.get(facts.current);
     const prior = facts.prior === null ? null : def.get(facts.prior);
     if (current === null || prior === null) return null;
-    return direction === "rose_into" ? prior < threshold && current >= threshold : prior >= threshold && current < threshold;
+    const wasIn = isInBand(prior, threshold, side);
+    const isIn = isInBand(current, threshold, side);
+    return enters ? !wasIn && isIn : wasIn && !isIn;
   };
 }
 
@@ -151,9 +191,12 @@ interface ThresholdSingle {
  * THE PURE GENERATOR — same `quantiles` in, same candidates out, always. Three template families:
  *
  *   - THRESHOLD: one candidate per (quantity, eligible position, quantile level) the table has data
- *     for — the quantity is at or above its train-window quantile mark.
- *   - DELTA: the same (quantity, position, level) triples, twice each — crossed UP into the top band
- *     from below it the year before, or crossed DOWN out of it — needing `facts.prior`.
+ *     for — the quantity is at or above its train-window quantile mark on the HIGH band, at or below
+ *     it on the LOW one.
+ *   - DELTA: the same (quantity, position, level) triples, twice each — the value crossed the mark
+ *     upward, or downward — needing `facts.prior`. On the high band those read as entering and
+ *     leaving the top band; on the low band the same two motions read as leaving and entering the
+ *     bottom one (`DeltaClause`'s own docblock).
  *   - AND: pairwise ANDs of two THRESHOLD candidates on DISTINCT quantities within the same
  *     position. THIS IS THE DOCUMENTED PRUNING RULE the brief asks for: an AND of every single
  *     condition (threshold and delta both, same-quantity pairs included) would multiply the count by
@@ -164,38 +207,87 @@ interface ThresholdSingle {
  *     and stays under the cap without `enforceCap` ever needing to trim it (see that function's own
  *     docblock, and `generate.test.ts`'s cap test, which exercises the trim directly with synthetic
  *     data rather than waiting for the real vocabulary to grow past the line).
+ *
+ * THE AND FAMILY IS HIGH-SIDE ONLY (Task 2, the discovery-expansion plan), and this is the second
+ * deliberate pruning rule rather than an oversight. AND is the one family that grows QUADRATICALLY
+ * in the single count and MULTIPLICATIVELY in the level count: admitting the low band on both halves
+ * would take its level combinations from nine to thirty-six and, at the vocabulary this round lands,
+ * would add roughly eleven thousand candidates to a family of under five thousand. Benjamini-Hochberg
+ * divides by exactly that number, so the whole family — the twelve laws already discovered included —
+ * would pay three times over for a shape nothing in the plan asked for. What the plan DID ask for is
+ * the founder's collapse hypothesis, and that is a SINGLE low-side threshold ("his team's win total
+ * is in the bottom band"), which the threshold and delta families above state directly.
+ *
+ * REVERSIBLE, AND ORDERED ON PURPOSE: the low side proves itself on singles first, where it costs
+ * about a thousand candidates, and a later round can spend the AND family on it knowing whether the
+ * low band carries signal at all. The report accompanying this task carries the projected counts for
+ * both the same-side and the fully-mixed AND alternatives, so that decision is a number, not a guess.
  */
 export function generateCandidatesFrom(quantiles: QuantileTable): readonly CandidateLaw[] {
   const thresholdCandidates: CandidateLaw[] = [];
   const deltaCandidates: CandidateLaw[] = [];
-  const thresholdSinglesByPosition = new Map<LawPosition, ThresholdSingle[]>();
+  const highSideSinglesByPosition = new Map<LawPosition, ThresholdSingle[]>();
 
   for (const def of QUANTITY_DEFS) {
     for (const position of def.positions) {
       const thresholdsForPosition = quantiles[def.id]?.[position];
       if (thresholdsForPosition === undefined) continue;
 
+      // DEGENERATE-LEVEL DEDUPE, per band. Two levels of the same band can fit the SAME number for a
+      // quantity with mass at a point (the committed table has three today, all
+      // `incomingCoachTenureSeasons` at q70 = q80 = 2, and the low band will have more: a share whose
+      // 10th and 20th percentiles are both zero). Two candidates whose conditions are byte-identical
+      // predicates are not two hypotheses — they are one hypothesis charged twice to the family that
+      // Benjamini-Hochberg divides by, and if it survives they become two `discovered.json` entries
+      // with the same effect and, since `renderTitle` prints the value, the same heading. The first
+      // level in `QUANTILE_LEVELS`' declared order wins, deterministically; the later duplicates
+      // produce no candidates in any template family.
+      const seenThresholdsBySide = new Map<QuantileSide, Set<number>>();
+
       for (const level of QUANTILE_LEVELS) {
+        // A level the table does not carry (see `QuantileThresholds`' own docblock: a committed table
+        // fitted before a level existed). Skipped rather than read as `undefined`, which would build
+        // a candidate whose condition is false for every player who ever lived.
         const threshold = thresholdsForPosition[level];
+        if (threshold === undefined) continue;
+
+        const side = sideOf(level);
+        const seen = seenThresholdsBySide.get(side) ?? new Set<number>();
+        seenThresholdsBySide.set(side, seen);
+        if (seen.has(threshold)) continue;
+        seen.add(threshold);
 
         const thresholdClause: ThresholdClause = { kind: "threshold", quantityId: def.id, quantileLevel: level };
         const thresholdId = idFor(position, thresholdClause);
-        const thresholdConditionFn = thresholdConditionOf(def, threshold);
-        thresholdCandidates.push({
-          id: thresholdId,
-          position,
-          template: "threshold",
-          condition: thresholdConditionFn,
-          claimParts: { position, clause: thresholdClause },
-        });
-        const singles = thresholdSinglesByPosition.get(position) ?? [];
-        singles.push({ def, level, clause: thresholdClause, id: thresholdId, condition: thresholdConditionFn });
-        thresholdSinglesByPosition.set(position, singles);
+        const thresholdConditionFn = thresholdConditionOf(def, threshold, side);
 
-        // A quantity that is ITSELF a difference declares that it has no meaningful year-over-year
-        // template (`QuantityDef.supportsYearOverYearDelta`, `templates.ts`) and produces threshold
-        // and AND candidates only. Read off the quantity rather than branched on an id here, so the
-        // three template families below stay mechanical.
+        // THE MATCH-KEY EXCLUSION (`QuantityDef.isMatchKeyQuantity`, whose docblock carries the
+        // proof): a LEVEL condition on the quantity the matched design pairs players by makes every
+        // condition row outrank every control row on the match key, so the measured effect is a
+        // property of the matcher rather than of the claim. Such a quantity produces DELTA candidates
+        // only. Read off the quantity, never branched on an id, exactly as the year-over-year
+        // exclusion below is.
+        if (!def.isMatchKeyQuantity) {
+          thresholdCandidates.push({
+            id: thresholdId,
+            position,
+            template: "threshold",
+            condition: thresholdConditionFn,
+            claimParts: { position, clause: thresholdClause },
+          });
+          // AND-pairs are built from HIGH-side singles only — see `generateCandidatesFrom`'s own
+          // docblock for the pruning rule and what the low-side AND family would have cost.
+          if (side === "high") {
+            const singles = highSideSinglesByPosition.get(position) ?? [];
+            singles.push({ def, level, clause: thresholdClause, id: thresholdId, condition: thresholdConditionFn });
+            highSideSinglesByPosition.set(position, singles);
+          }
+        }
+
+        // A quantity that is ITSELF a difference, or that is a career constant, declares that it has
+        // no meaningful year-over-year template (`QuantityDef.supportsYearOverYearDelta`,
+        // `templates.ts`) and produces threshold and AND candidates only. Read off the quantity
+        // rather than branched on an id here, so the three template families stay mechanical.
         if (!def.supportsYearOverYearDelta) continue;
         for (const direction of ["rose_into", "fell_out_of"] as const) {
           const deltaClause: DeltaClause = { kind: "delta", quantityId: def.id, quantileLevel: level, direction };
@@ -203,7 +295,7 @@ export function generateCandidatesFrom(quantiles: QuantileTable): readonly Candi
             id: idFor(position, deltaClause),
             position,
             template: "delta",
-            condition: deltaConditionOf(def, threshold, direction),
+            condition: deltaConditionOf(def, threshold, side, direction),
             claimParts: { position, clause: deltaClause },
           });
         }
@@ -212,7 +304,7 @@ export function generateCandidatesFrom(quantiles: QuantileTable): readonly Candi
   }
 
   const andCandidates: CandidateLaw[] = [];
-  for (const [position, singles] of thresholdSinglesByPosition) {
+  for (const [position, singles] of highSideSinglesByPosition) {
     for (let i = 0; i < singles.length; i++) {
       for (let j = i + 1; j < singles.length; j++) {
         const left = singles[i]!;

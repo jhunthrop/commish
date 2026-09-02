@@ -27,6 +27,8 @@ import { discoveryFactsForSeason } from "@/projections/laws/discovery-facts";
 import { actualPointsPerGame, factsForSeason } from "@/projections/laws/populations";
 import { preseasonMomentFor } from "@/projections/preseason/source";
 import { generateCandidates } from "@/projections/laws/discovery/generate";
+import { DISCOVERY_QUANTILES } from "@/projections/laws/discovery/quantiles";
+import { quantileCoverageGaps } from "@/projections/laws/discovery/templates";
 import { MIN_TRAIN_PAIRS, runDiscoveryPipeline, type DiscoverySeasonRow } from "@/projections/laws/discovery/measure";
 import { DISCOVERED_JSON_PATH, MIN_OUT_OF_TRAIN_FOLD_PAIRS, MIN_REPLICATION_PAIRS, type DiscoveredJson } from "@/projections/laws/registry";
 import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
@@ -103,9 +105,30 @@ function renderDiscoveredJson(discoveredJson: DiscoveredJson): string {
   return `${JSON.stringify(discoveredJson, null, 2)}\n`;
 }
 
+/**
+ * THE STALE-TABLE WARNING. A committed quantile table is a snapshot of whatever `QUANTILE_LEVELS`
+ * was on the day it was fitted; a round that WIDENS that list without refitting leaves every new
+ * level missing from every quantity, and `generateCandidatesFrom` skips a missing level silently and
+ * correctly (see `QuantileThresholds`' own docblock for why skipping beats reading `undefined` as a
+ * number). Silently is the problem: the family would simply fail to grow, and the only trace would be
+ * a candidate count nobody diffs. This prints the gap so a regeneration cannot mistake an unfitted
+ * table for a finished one.
+ */
+function printQuantileCoverage(): void {
+  const gaps = quantileCoverageGaps(DISCOVERY_QUANTILES);
+  if (gaps.length === 0) return;
+  const levels = [...new Set(gaps.map((gap) => gap.level))].sort((a, b) => a - b);
+  console.log(
+    `\nQUANTILE TABLE IS BEHIND THE TEMPLATE GRAMMAR: ${gaps.length} (quantity, position, level) thresholds are missing, ` +
+      `at level(s) ${levels.join(", ")}. Every candidate over them was SKIPPED, not generated. ` +
+      "Run `npm run laws:discover:quantiles` to refit before trusting this family's size.",
+  );
+}
+
 function printSummary(candidateCount: number, discoveredJson: DiscoveredJson): void {
   const { counts, laws } = discoveredJson;
   console.log(`\nDISCOVERY TRIAL -- ${candidateCount} candidates`);
+  printQuantileCoverage();
   console.log(`  candidates:   ${counts.candidates}`);
   console.log(
     `  untestable:   ${counts.untestable}  (could not be matched on enough training seasons -- fewer than ${MIN_TRAIN_PAIRS} matched pairs)`,
