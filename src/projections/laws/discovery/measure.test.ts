@@ -436,14 +436,17 @@ describe("runDiscoveryPipeline", () => {
     expect(entry!.verdict).toBe("confirmed");
     expect(entry!.origin).toBe("discovered");
     expect(entry!.expectedSign).toBe(-1);
-    // The real committed DISCOVERY_QUANTILES threshold for touches/RB/0.8 is 182 — a real value, not
-    // a re-stated quantile percentage.
-    expect(entry!.claim).toContain("is 182 or more");
+    // The real committed DISCOVERY_QUANTILES threshold for touches/RB/0.8 is 164.4, which a
+    // threshold's own ceiling rounding states as 165 — a real value, not a re-stated quantile
+    // percentage. The literal moves whenever the table is refitted on a changed population (it read
+    // 182 before the fit round completed the 2003-2012 store), and moving it deliberately is the
+    // point: a claim that stopped naming the committed number would pass a percentage-shaped test.
+    expect(entry!.claim).toContain("is 165 or more");
     expect(entry!.claim).toContain("loses points per game the following season.");
     expect(entry!.claim).not.toContain("scores differently");
     expect(entry!.claim).not.toContain("top 20%");
     expect(entry!.claim).not.toMatch(/—/);
-    expect(entry!.claim.startsWith("Running back carries and receptions (182): ")).toBe(true);
+    expect(entry!.claim.startsWith("Running back carries and receptions (165): ")).toBe(true);
     // The PRESENTATION fields (Task 8 fix round) — written here from `primaryQuantityDefOf`, the
     // same rule `board-reasons.ts`'s own consistency guard re-derives at board-build time.
     expect(entry!.primaryQuantityId).toBe("touches");
