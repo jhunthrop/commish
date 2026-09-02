@@ -1,17 +1,17 @@
 /* GENERATED from src/design/tokens.ts by `npm run tokens:build` — do not edit by hand. */
 :root {
-  --commish-color-surface: #F4F5F7;
-  --commish-color-surface-elevated: #FAFBFC;
+  --commish-color-surface: #EDF4FF;
+  --commish-color-surface-elevated: #F6FAFF;
   --commish-color-surface-raised: #FFFFFF;
-  --commish-color-surface-inset: #E8EBEF;
-  --commish-color-line: #DDE1E8;
-  --commish-color-edge: #767F8E;
-  --commish-color-text-primary: #0A0D12;
-  --commish-color-text-muted: #596576;
-  --commish-color-text-faint: #5C6470;
-  --commish-color-accent: #9D5707;
+  --commish-color-surface-inset: #E5EDF9;
+  --commish-color-line: #C9D9EE;
+  --commish-color-edge: #6C7F9C;
+  --commish-color-text-primary: #0A0F1A;
+  --commish-color-text-muted: #526073;
+  --commish-color-text-faint: #566076;
+  --commish-color-accent: #1350A8;
   --commish-color-accent-text: #FFFFFF;
-  --commish-color-accent-glow: rgba(157, 87, 7, 0.12);
+  --commish-color-accent-glow: rgba(19, 80, 168, 0.12);
   --commish-color-positive: #033020;
   --commish-color-negative: #861B13;
   --commish-color-negative-text: #FFFFFF;
@@ -23,7 +23,7 @@
   --commish-color-scrim: #000000;
   --commish-mag-strong: #044E33;
   --commish-mag-good: #1F5C45;
-  --commish-mag-neutral: #0A0D12;
+  --commish-mag-neutral: #0A0F1A;
   --commish-mag-weak: #9F3C28;
   --commish-mag-bad: #C82C20;
   --commish-pos-qb-sticker: #A78BE0;
