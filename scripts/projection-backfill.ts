@@ -237,15 +237,19 @@ async function main(): Promise<void> {
 
   const seasons = Array.from({ length: LAST_SEASON - FIRST_SEASON + 1 }, (_, index) => FIRST_SEASON + index);
 
-  // The schedule is only fetched when the range actually reaches below the snap-count release
-  // (`SNAP_COUNT_ASSET_FLOOR`), and then exactly once for the whole range: it is where those
-  // seasons' stat lines get their as-of, since they have no snap-count file to take one from.
-  const preSnapSeasons = seasons.filter((season) => season < SNAP_COUNT_ASSET_FLOOR);
-  const scheduleAsOf = preSnapSeasons.length === 0 ? new Map<number, ReadonlyMap<number, Date>>() : await scheduleWeekAsOf(preSnapSeasons);
-  if (preSnapSeasons.length > 0) {
+  // The schedule is fetched only when the range actually reaches the seasons whose snap counts
+  // cannot date every week, and then exactly once for the whole range. AT or below
+  // `SNAP_COUNT_ASSET_FLOOR`, not merely below it: 2011 and older have no snap-count file at all,
+  // and 2012 has one that is missing its own week 1. An ordinary 2013+ backfill pays for no extra
+  // download at all.
+  const scheduleDatedSeasons = seasons.filter((season) => season <= SNAP_COUNT_ASSET_FLOOR);
+  const scheduleAsOf =
+    scheduleDatedSeasons.length === 0 ? new Map<number, ReadonlyMap<number, Date>>() : await scheduleWeekAsOf(scheduleDatedSeasons);
+  if (scheduleDatedSeasons.length > 0) {
     console.log(
-      `${preSnapSeasons.length} season(s) below SNAP_COUNT_ASSET_FLOOR (${SNAP_COUNT_ASSET_FLOOR}): ` +
-        `stat lines will be dated from the schedule, and no participation exists upstream to ingest.\n`,
+      `${scheduleDatedSeasons.length} season(s) at or below SNAP_COUNT_ASSET_FLOOR (${SNAP_COUNT_ASSET_FLOOR}): ` +
+        `weeks their snap counts cannot date are dated from the schedule, and below the floor no participation ` +
+        `exists upstream to ingest at all.\n`,
     );
   }
 

@@ -225,28 +225,33 @@ export async function ingestSeason(
   universe: PlayerUniverse,
   season: number,
   /**
-   * The week as-ofs to use when this season has NO snap-count file to derive them from — built by
-   * `scheduleWeekAsOf` and passed in rather than fetched here, so a ten-season backfill downloads
-   * `games.csv` once. Injected rather than defaulted so a caller that reaches a pre-2012 season
-   * without having thought about the stamp fails loudly (see the throw below) instead of quietly
-   * pulling a second file.
+   * The week as-ofs this season's schedule implies, for the weeks its snap counts cannot date —
+   * built by `scheduleWeekAsOf` and passed in rather than fetched here, so a ten-season backfill
+   * downloads `games.csv` once. Injected rather than defaulted so a caller that reaches a season
+   * with no snap-count file, without having thought about the stamp, fails loudly (see the throw
+   * below) instead of quietly pulling a second file.
+   *
+   * A FALLBACK PER WEEK, NOT PER SEASON. Two different holes need it. Below
+   * `SNAP_COUNT_ASSET_FLOOR` there is no snap-count file at all and every week comes from here. AT
+   * the floor season (2012) the file exists but does not cover its own week 1 — the very fact
+   * `laws/config.ts` cites for keeping `MEASURE_SEASONS.from` at 2013 — and before this, that one
+   * week made `mapStatLines` throw for the whole season. Snap counts still win wherever they reach,
+   * so no stamp that exists today moves; the schedule only fills what they leave undated, on
+   * identical arithmetic (see `weekAsOfFromSchedule`).
    */
   scheduleAsOf?: ReadonlyMap<number, Date>,
 ): Promise<SeasonIngestReport> {
   const snapCounts = await fetchSnapCounts(client, season);
   const playerWeek = await fetchPlayerWeek(client, season);
-  // Snap counts stay the first choice for every season that has them; the schedule is the fallback
-  // for the seasons below `SNAP_COUNT_ASSET_FLOOR`, on identical stamp arithmetic (see
-  // `weekAsOfFromSchedule`). A season with neither has no honest way to date a stat line, and
-  // `mapStatLines` would throw one week at a time; throwing here says why once.
+  // A season with neither snap counts nor a schedule fallback has no honest way to date a stat
+  // line, and `mapStatLines` would throw one week at a time; throwing here says why once.
   if (snapCounts.length === 0 && scheduleAsOf === undefined) {
     throw new Error(
       `nflverse has no snap counts for ${season} and no schedule-derived week as-ofs were supplied, so its stat ` +
-        `lines cannot be dated. Pass scheduleWeekAsOf([...]).get(${season}) for seasons below SNAP_COUNT_ASSET_FLOOR.`,
+        `lines cannot be dated. Pass scheduleWeekAsOf([...]).get(${season}) for seasons at or below SNAP_COUNT_ASSET_FLOOR.`,
     );
   }
-  const weekAsOf =
-    snapCounts.length > 0 ? weekAsOfFromSnapCounts(snapCounts, NFLVERSE_CONFIG.publicationLagHours) : scheduleAsOf!;
+  const weekAsOf = new Map([...(scheduleAsOf ?? []), ...weekAsOfFromSnapCounts(snapCounts, NFLVERSE_CONFIG.publicationLagHours)]);
 
   const participation = mapParticipation({ snapCounts, playerWeek, universe });
   const statLines = mapStatLines({ playerWeek, weekAsOf, universe });
