@@ -10,27 +10,34 @@ import type { BlendConstants } from "./blend";
  * own cheapest drafted man per position (see `market/blend.ts`'s own docblocks). See
  * `scripts/blend-fit.ts` for the grid.
  *
- * THE WINNING SCORE: spearman rho = 0.6055 on the train rows.
+ * THE WINNING SCORE: spearman rho = 0.5980 on the train rows.
  *
- * THE PLATEAU (fix round 2, ruling 4b): 12 of this grid's own cells
+ * THE PLATEAU (fix round 2, ruling 4b): 126 of this grid's own cells
  * scored within 1e-4 of the winner — a genuine plateau, not a single sharp peak.
  * At least one of those tied cells sits at this grid's own ceiling (80) on a cap axis; a wider grid might still move the winner.
  *
- * THE CHANNEL DECOMPOSITION — pure market (every cap at zero) 0.5892,
+ * THE CHANNEL DECOMPOSITION — pure market (every cap at zero) 0.5813,
  * availability admitted alone (lawCapPoints at zero, the winning availability/total caps otherwise)
- * 0.6046, laws admitted too (the winning cell in full)
- * 0.6055 — laws' own share of the total lift over pure market is 5.6%. Written down so
+ * 0.5945, laws admitted too (the winning cell in full)
+ * 0.5980 — laws' own share of the total lift over pure market is 20.8%. Written down so
  * Task 11's own ablation of this board is not a surprise: the availability channel does almost all
  * of the work, laws add a real but small amount on top.
+ *
+ * THE FIT-ROUND AXES (Task 3), all four of which carry the incumbent as their own null cell, and the
+ * winner's position on each: recency=0.5  props=0  dedup=false  playerLawCap=20.
+ * 18522 cells were scored. An axis absent from the object below sits at its null cell.
+ * PROPS-ANCHOR COVERAGE: 0 of 1323 train rows sit in a season the props archive
+ * covers. At zero, the props-weight axis had nothing to move on and its null cell wins by the tie
+ * rule, which is a statement about the archive's own span (2023-2024) rather than about props.
  */
 
 export const FITTED_BLEND_CONSTANTS: BlendConstants = {
   "lawCapPoints": 2,
-  "availabilityCapPoints": 20,
+  "availabilityCapPoints": 10,
   "totalCapPoints": 40,
   "impliedGamesByPosition": {
     "QB": 13.981220657276996,
-    "RB": 12.3271719038817,
+    "RB": 12.414048059149723,
     "WR": 13.404217926186291,
     "TE": 12.934911242603551
   },
@@ -39,5 +46,7 @@ export const FITTED_BLEND_CONSTANTS: BlendConstants = {
     "RB": 45.964999999999996,
     "WR": 85.79333333333332,
     "TE": 85.5624999999996
-  }
+  },
+  "playerLawCapPoints": 20,
+  "availabilityRecencyDecay": 0.5
 };
