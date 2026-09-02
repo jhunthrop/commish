@@ -320,6 +320,25 @@ rank ptsRank   name                     pos  team       points  adp       laws
  50. pts#86    Josh Jacobs              RB   GB      165.3 pts  adp 32.0    td_regression
 ```
 
+**Correction (2026-09-02, roster-refresh hotfix).** Two lines of the table above are superseded, and
+the header count with them. The board that produced it was built on a pre-cutdown roster file, because
+the roster ingest could not refresh itself: a live season's `as_of` does not move between two runs on
+the same day, so every fresh status collided with the landed row and `onConflictDoNothing` threw the
+whole capture away. On the post-cutdown file (2,796 rows, 1,695 actives, one club's 53 apiece) the
+live board holds **546 players**, so the header reads `top 50 of 546` and not `top 50 of 759`. Two rows
+move, both from a roster status and nothing else:
+
+- **50. Josh Jacobs** leaves the top 50, to value#80. His fresh roster row is `GB/reserve`, which cuts
+  his expected games to 2.60 and his points from 165.25 to 142.77 (points rank 86 to 115).
+- **50. D'Andre Swift (RB CHI, 164.09 pts, pts#87)** takes the vacated place. `CHI/active`, points
+  unchanged, moved only by Jacobs falling past him.
+
+The other 48 names, value ranks and point totals stand exactly as printed. Colston Loveland and Tyler
+Warren each move one place in the secondary points-rank column only (pts#89 to pts#88 and pts#90 to
+pts#89), because Jacobs fell below them; their value ranks and points are unchanged. The two new law
+chips and everything section 4 measures are untouched by this, since a win-total law reads the prior
+season.
+
 The two new law ids are abbreviated above for width (`winTotal:qNN+snapShare:q70` stands for
 `and:WR:threshold:WR:incomingTeamWinTotal:qNN+threshold:WR:snapShare:q70`). Against the v6 top 50
 (`docs/research/2026-09-01-live-board-closeout.md`, section 4): the same 50 names, no entries, no
@@ -341,6 +360,10 @@ Read-only SQL against the live store, across all five re-persisted seasons (2021
    2024 |  653 |           16 |              310 |              2.6700
    2026 |  759 |           22 |               39 |              2.6700
 ```
+
+(**Correction (2026-09-02, roster-refresh hotfix):** the 2026 row's 759 is the pre-cutdown count. The
+same board rebuilt on the post-cutdown roster file holds 546 players. The four archive seasons and
+every figure in this table are untouched, and the replay proof it records stands as run.)
 
 **117 rows moved on points across the five seasons, all wide receivers, all gaining one of the two
 new chips.** Zero non-WR rows moved on points. Zero rows moved on points without a chip change.

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, lte } from "drizzle-orm";
-import type { Db, ReadonlyDb } from "@/db/client";
+import type { Db, DbTx, ReadonlyDb } from "@/db/client";
 import { preseasonBoardReasons, preseasonProjections } from "@/db/schema";
 import { changedRowWhere, excludedSetFor } from "@/db/upsert";
 import type { JsonObject } from "@/domain/audit";
@@ -288,8 +288,12 @@ const INSERT_CHUNK_ROWS = 2_000;
  * board taken at a stated moment is immutable. A refit says something different, and it says it
  * under a new `source` or at a new moment, which is a new row. Overwriting would rewrite a number
  * somebody was shown last Tuesday and leave nothing to notice it by.
+ *
+ * IMMUTABLE IS NOT THE SAME AS PERMANENT for a LIVE board — see `writePreseasonBoard` below, which
+ * runs this write behind a delete when the moment is live. This function itself is unchanged and is
+ * still the only write a replay board ever takes.
  */
-export async function recordPreseasonProjections(db: Db, rows: readonly PreseasonProjectionRow[]): Promise<number> {
+export async function recordPreseasonProjections(db: Db | DbTx, rows: readonly PreseasonProjectionRow[]): Promise<number> {
   let written = 0;
   for (let start = 0; start < rows.length; start += INSERT_CHUNK_ROWS) {
     const chunk = rows.slice(start, start + INSERT_CHUNK_ROWS).map((row) => ({ ...row }));
@@ -323,7 +327,7 @@ const REASON_KEYS: readonly string[] = ["source", "season", "playerId", "code", 
  * matches what's stored is neither updated nor returned by `RETURNING` — the write genuinely did
  * not happen, rather than merely being labelled a no-op after the fact.
  */
-export async function recordPreseasonBoardReasons(db: Db, rows: readonly PreseasonBoardReasonRow[]): Promise<number> {
+export async function recordPreseasonBoardReasons(db: Db | DbTx, rows: readonly PreseasonBoardReasonRow[]): Promise<number> {
   let written = 0;
   for (let start = 0; start < rows.length; start += INSERT_CHUNK_ROWS) {
     const chunk = rows.slice(start, start + INSERT_CHUNK_ROWS).map((row) => ({ ...row }));
@@ -345,6 +349,109 @@ export async function recordPreseasonBoardReasons(db: Db, rows: readonly Preseas
     written += inserted.length;
   }
   return written;
+}
+
+/**
+ * Retires one board: every `preseason_projections` row for a `(season, source)` AT ANY STAMP, and
+ * every `preseason_board_reasons` row that explained them.
+ *
+ * FOR A LIVE BOARD ONLY, enforced by its one caller (`writePreseasonBoard` below) and never exposed
+ * to a replay path. An archived board is the primary record every published measurement was scored
+ * against, exactly as an archive season's roster rows are, and nothing in a write path may delete
+ * one.
+ *
+ * BOTH TABLES, ALWAYS, and never one without the other: `preseason_board_reasons` carries no `as_of`
+ * at all (its PK is `(source, season, player_id, code, detail)`), so a reason survives every
+ * re-persist by construction. Retiring the projections alone would leave a reason row explaining a
+ * rank that no longer exists, which `boardReasons` would go on serving to any surface that draws one
+ * man.
+ */
+export async function deletePreseasonBoard(
+  db: Db | DbTx,
+  { season, source }: Omit<BoardStamp, "asOf">,
+): Promise<{ readonly projections: number; readonly reasons: number }> {
+  const projections = await db
+    .delete(preseasonProjections)
+    .where(and(eq(preseasonProjections.season, season), eq(preseasonProjections.source, source)))
+    .returning({ id: preseasonProjections.id });
+  const reasons = await db
+    .delete(preseasonBoardReasons)
+    .where(and(eq(preseasonBoardReasons.season, season), eq(preseasonBoardReasons.source, source)))
+    .returning({ code: preseasonBoardReasons.code });
+  return { projections: projections.length, reasons: reasons.length };
+}
+
+/** Which write path a board took, and what it did. See `writePreseasonBoard`. */
+export interface BoardWriteCounts {
+  readonly mode: "retire_generation" | "append";
+  readonly written: number;
+  readonly reasonsWritten: number;
+  /** Rows of a PRIOR live generation this write retired. Always 0 on the replay path, which retires
+   *  nothing by construction, and 0 on the first live write of a season. */
+  readonly retiredProjections: number;
+  readonly retiredReasons: number;
+}
+
+/**
+ * THE ONE PLACE A BOARD IS WRITTEN — retiring for a LIVE moment, appending for a REPLAY one.
+ *
+ * WHY A LIVE BOARD MUST RETIRE ITS PREDECESSOR. `preseasonProjectionsAsOf` (and
+ * `preseasonProjectionsFor`, which the player page reads) resolve `DISTINCT ON (player_id)` over
+ * `as_of <= bound`, so a player carried by YESTERDAY's live board and absent from today's smaller one
+ * is still returned, with yesterday's points, yesterday's rank and yesterday's reasons. That is not a
+ * point-in-time reconstruction of anything: nobody asked for yesterday's board, and the row is
+ * indistinguishable, at the reader, from a row today's board actually produced. It is how a running
+ * back his club had released stayed at value#118 on the 2026 board after his roster row had already
+ * been corrected — the roster fix cleared the input and the stale OUTPUT went on being drawn. A live
+ * board is a claim about a roster that is still moving; the only honest thing to do with the previous
+ * claim is to retire it.
+ *
+ * WHY A REPLAY BOARD MUST NOT. Every archived board is the record a published measurement was taken
+ * against (`docs/research/2026-08-31-market-edge-closeout.md`'s scorecards read these exact rows),
+ * and a replay moment is derived from a season that has been played, so a second persist of it is a
+ * refit rather than a refresh. That path is byte-identical to the write every archived board landed
+ * under: `recordPreseasonProjections` then `recordPreseasonBoardReasons`, in that order, no
+ * transaction, no delete reachable from here.
+ *
+ * THE SPLIT COMES FROM THE MOMENT, never from a recomputation: `stamp.momentKind` is the kind
+ * `loadPreseason` already resolved from the branded `BoardMoment`, carried on every row this writes.
+ *
+ * REFUSES AN EMPTY LIVE BOARD, the same fail-fast reading `ingestWeek1Rosters` gives an empty roster
+ * capture: "retire the generation and write nothing in its place" is the one outcome that must never
+ * happen quietly. The replay path needs no guard, since writing nothing there deletes nothing.
+ */
+export async function writePreseasonBoard(
+  db: Db,
+  stamp: PreseasonProjectionStamp,
+  board: readonly BoardEntry[],
+): Promise<BoardWriteCounts> {
+  const rows = projectionRows(board, stamp);
+  const reasons = reasonRows(board, stamp);
+
+  if (stamp.momentKind === "replay") {
+    const written = await recordPreseasonProjections(db, rows);
+    const reasonsWritten = await recordPreseasonBoardReasons(db, reasons);
+    return { mode: "append", written, reasonsWritten, retiredProjections: 0, retiredReasons: 0 };
+  }
+
+  if (board.length === 0) {
+    throw new Error(
+      `The live board built for ${stamp.season} under "${stamp.source}" is empty, so there is nothing to replace its stored generation with. Refusing to retire a board on the strength of an empty one.`,
+    );
+  }
+
+  return db.transaction(async (tx) => {
+    const retired = await deletePreseasonBoard(tx, stamp);
+    const written = await recordPreseasonProjections(tx, rows);
+    const reasonsWritten = await recordPreseasonBoardReasons(tx, reasons);
+    return {
+      mode: "retire_generation",
+      written,
+      reasonsWritten,
+      retiredProjections: retired.projections,
+      retiredReasons: retired.reasons,
+    };
+  });
 }
 
 const SELECTED = {

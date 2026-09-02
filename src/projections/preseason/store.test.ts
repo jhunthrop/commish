@@ -4,8 +4,10 @@ import { nflPlayers } from "@/db/schema";
 import { recordNflPlayers } from "../universe";
 import { week1RosterAsOf, type PreseasonRosterEntry } from "../nflverse/rosters";
 import {
+  deletePreseasonRosters,
   firstRosterSeasonsThrough,
   preseasonRankingsAsOf,
+  preseasonRosterStatusesFor,
   preseasonRostersAsOf,
   recordPreseasonRankings,
   recordPreseasonRosters,
@@ -72,6 +74,30 @@ describe("recordPreseasonRosters", () => {
     const asOfLater = await preseasonRostersAsOf(db, { season: 2024, asOf: later });
     expect(asOfCutdown[0]!.status).toBe("active");
     expect(asOfLater[0]!.status).toBe("reserve");
+  });
+});
+
+describe("the superseding write's two halves", () => {
+  it("preseasonRosterStatusesFor reads the LATEST statement per player, unbounded by any moment", async () => {
+    await recordPreseasonRosters(db, [
+      entry({ status: "active" }),
+      entry({ playerId: "00-0036358", status: "practice_squad" }),
+    ]);
+    // A restatement at a later stamp: the map must carry the later belief, not the first one.
+    await recordPreseasonRosters(db, [entry({ status: "reserve", asOf: new Date(CUTDOWN_2024.getTime() + 86_400_000) })]);
+    expect(await preseasonRosterStatusesFor(db, 2024)).toEqual(
+      new Map([
+        ["00-0034857", "reserve"],
+        ["00-0036358", "practice_squad"],
+      ]),
+    );
+  });
+
+  it("deletePreseasonRosters takes one season's rows and NOTHING from any other season", async () => {
+    await recordPreseasonRosters(db, [entry(), entry({ season: 2023, asOf: CUTDOWN_2023 })]);
+    expect(await deletePreseasonRosters(db, 2024)).toBe(1);
+    expect(await preseasonRostersAsOf(db, { season: 2024, asOf: CUTDOWN_2024 })).toHaveLength(0);
+    expect(await preseasonRostersAsOf(db, { season: 2023, asOf: CUTDOWN_2023 })).toHaveLength(1);
   });
 });
 

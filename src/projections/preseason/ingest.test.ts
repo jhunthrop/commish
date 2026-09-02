@@ -8,7 +8,8 @@ import { observationsAsOf } from "../store";
 import { recordTeamObservations, type TeamWeekObservation } from "../team-store";
 import { recordNflPlayers } from "../universe";
 import { DEPTH_SOURCE, firstKickoffFor } from "./depth";
-import { historicalWeek1RosterAsOf, ingestDepthCharts, week1RosterStampFor } from "./ingest";
+import { historicalWeek1RosterAsOf, ingestDepthCharts, ingestWeek1Rosters, week1RosterStampFor } from "./ingest";
+import { preseasonRostersAsOf } from "./store";
 
 /**
  * THE DERIVATION LAYER ITSELF, pinned directly rather than only through what it produces.
@@ -107,6 +108,177 @@ describe("week1RosterStampFor", () => {
     // move the stamp; it must not, because that branch reads the season's own kickoff, never a clock.
     const stamp = await week1RosterStampFor(db, priorSeason, new Date("2000-01-01T00:00:00.000Z"));
     expect(stamp).toEqual(new Date(kickoff.getTime() - 1));
+  });
+});
+
+/**
+ * THE STALE-STATUS DEFECT, PINNED FROM BOTH SIDES.
+ *
+ * A live season's re-ingest lands on the SAME `as_of` its first run computed — `min(the first of
+ * September, the fetch instant)` does not move between two runs on the same day — so every fresh row
+ * collides with the old one on `preseason_rosters_fact_idx` and `onConflictDoNothing` discarded the
+ * lot. The founder found it the ordinary way: the 2026 board ranked a running back his club had
+ * already cut, because our row still said what it said on the morning of the first ingest.
+ *
+ * The archive half of this block is the load-bearing half. Every published measurement in this engine
+ * was taken against rows written insert-if-absent, and a replay season's rows must stay undeletable
+ * through this path whatever the file says today.
+ */
+describe("ingestWeek1Rosters — a LIVE season supersedes itself, an ARCHIVE season never does", () => {
+  const LIVE_SEASON = 2026;
+  const LIVE_KICKOFF = new Date("2026-09-10T00:20:00.000Z");
+  const ARCHIVE_SEASON = 2024;
+  const ARCHIVE_KICKOFF = new Date("2024-09-06T00:20:00.000Z");
+  /** The two runs share one clock on purpose: the identical stamp is the whole defect. */
+  const NOW = new Date("2026-09-01T12:00:00.000Z");
+  const CLOCK: Clock = { now: () => NOW.toISOString() };
+  const FINAL = new Date("9999-12-31T00:00:00.000Z");
+
+  const STARTER = "00-0000101";
+  const CAMP_ARM = "00-0000102";
+  const NEWCOMER = "00-0000103";
+
+  interface RosterFixtureRow {
+    readonly playerId: string;
+    readonly team: string;
+    /** nflverse's own code — ACT, CUT, RES, DEV. Coarsened by `rosterStatusOf`. */
+    readonly status: string;
+    /** Only the poison row overrides this; see the atomicity test. */
+    readonly entryYear?: string;
+  }
+
+  function rosterCsv(season: number, rows: readonly RosterFixtureRow[]): string {
+    const header = "season,week,game_type,team,gsis_id,position,status,birth_date,entry_year,draft_number,draft_club";
+    const body = rows.map(
+      (row) =>
+        `${season},1,REG,${row.team},${row.playerId},RB,${row.status},1999-01-01,${row.entryYear ?? "2023"},,`,
+    );
+    return [header, ...body].join("\n") + "\n";
+  }
+
+  function fakeClient(csv: string): NflverseClient {
+    return createNflverseClient({
+      fetch: (async () => new Response(csv, { status: 200 })) as typeof globalThis.fetch,
+    });
+  }
+
+  function ingest(season: number, rows: readonly RosterFixtureRow[]) {
+    return ingestWeek1Rosters(db, season, fakeClient(rosterCsv(season, rows)), CLOCK);
+  }
+
+  async function storedStatuses(season: number): Promise<ReadonlyMap<string, string>> {
+    const rows = await preseasonRostersAsOf(db, { season, asOf: FINAL });
+    return new Map(rows.map((row) => [row.playerId, row.status]));
+  }
+
+  beforeEach(async () => {
+    await recordNflPlayers(
+      db,
+      [STARTER, CAMP_ARM, NEWCOMER].map((id, index) => ({
+        id,
+        espnId: null,
+        pfrId: `Fixt0${index}`,
+        name: `Fixture ${index}`,
+        position: "RB",
+        latestTeam: "DEN",
+        rookieSeason: 2023,
+        lastSeason: 2025,
+      })),
+    );
+    await recordTeamObservations(db, [kickoffRow(LIVE_SEASON, LIVE_KICKOFF), kickoffRow(ARCHIVE_SEASON, ARCHIVE_KICKOFF)]);
+  });
+
+  it("REPLACES a status that changed upstream, at the identical stamp the re-fetch computes (the McLaughlin shape)", async () => {
+    await ingest(LIVE_SEASON, [{ playerId: STARTER, team: "DEN", status: "ACT" }]);
+    const rerun = await ingest(LIVE_SEASON, [{ playerId: STARTER, team: "DEN", status: "CUT" }]);
+
+    expect(rerun.mode).toBe("supersede");
+    expect(await storedStatuses(LIVE_SEASON)).toEqual(new Map([[STARTER, "off_roster"]]));
+    // One row, not two: the fresh capture REPLACED the stale row rather than sitting beside it, so
+    // there is no older statement left for a differently-bounded read to reach.
+    const rows = await preseasonRostersAsOf(db, { season: LIVE_SEASON, asOf: FINAL });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("counts replaced, added, removed and status changes honestly — the numbers an operator reads", async () => {
+    const first = await ingest(LIVE_SEASON, [
+      { playerId: STARTER, team: "DEN", status: "ACT" },
+      { playerId: CAMP_ARM, team: "DEN", status: "DEV" },
+    ]);
+    expect(first).toMatchObject({ mode: "supersede", written: 2, added: 2, replaced: 0, statusChanged: 0, removed: 0 });
+
+    const second = await ingest(LIVE_SEASON, [
+      { playerId: STARTER, team: "DEN", status: "CUT" },
+      { playerId: NEWCOMER, team: "DEN", status: "ACT" },
+    ]);
+    expect(second).toMatchObject({ mode: "supersede", written: 2, added: 1, replaced: 1, statusChanged: 1, removed: 1 });
+    expect(await storedStatuses(LIVE_SEASON)).toEqual(
+      new Map([
+        [STARTER, "off_roster"],
+        [NEWCOMER, "active"],
+      ]),
+    );
+  });
+
+  it("REFUSES to supersede on an empty capture, rather than emptying the season on an upstream hiccup", async () => {
+    await ingest(LIVE_SEASON, [{ playerId: STARTER, team: "DEN", status: "ACT" }]);
+    await expect(ingest(LIVE_SEASON, [])).rejects.toThrow(/empty/i);
+    expect(await storedStatuses(LIVE_SEASON)).toEqual(new Map([[STARTER, "active"]]));
+  });
+
+  it("is ATOMIC: a write that fails partway leaves the season's existing rows exactly as they were", async () => {
+    await ingest(LIVE_SEASON, [{ playerId: STARTER, team: "DEN", status: "ACT" }]);
+    const before = await preseasonRostersAsOf(db, { season: LIVE_SEASON, asOf: FINAL });
+
+    // `entry_year` past the width of an `integer` column: a real, in-band failure of the INSERT
+    // itself, raised by Postgres after the DELETE in the same transaction has already run. Nothing
+    // is stubbed — the rollback being real is the point.
+    await expect(
+      ingest(LIVE_SEASON, [
+        { playerId: STARTER, team: "DEN", status: "CUT" },
+        { playerId: CAMP_ARM, team: "DEN", status: "ACT", entryYear: "99999999999" },
+      ]),
+      // The failing statement is asserted, not just the rejection: what makes this a test of the
+      // ROLLBACK is that the INSERT is what failed, which places the failure after the DELETE in the
+      // same transaction. A test that passed because the run fell over earlier would prove nothing.
+    ).rejects.toThrow(/insert into "preseason_rosters"/);
+
+    const after = await preseasonRostersAsOf(db, { season: LIVE_SEASON, asOf: FINAL });
+    expect(after).toEqual(before);
+    expect(after.map((row) => row.status)).toEqual(["active"]);
+  });
+
+  it("an ARCHIVE season keeps insert-if-absent: a changed status at the same stamp is DISCARDED, exactly as today", async () => {
+    const first = await ingest(ARCHIVE_SEASON, [{ playerId: STARTER, team: "DEN", status: "ACT" }]);
+    expect(first).toMatchObject({ mode: "insert_if_absent", written: 1 });
+
+    const rerun = await ingest(ARCHIVE_SEASON, [{ playerId: STARTER, team: "DEN", status: "CUT" }]);
+    expect(rerun).toMatchObject({ mode: "insert_if_absent", written: 0, added: 0, replaced: 0, removed: 0 });
+    // The published measurements' own rows: unchanged, and still there.
+    expect(await storedStatuses(ARCHIVE_SEASON)).toEqual(new Map([[STARTER, "active"]]));
+  });
+
+  it("an ARCHIVE season's rows are NOT deletable through this path even when the fresh file drops a player", async () => {
+    await ingest(ARCHIVE_SEASON, [
+      { playerId: STARTER, team: "DEN", status: "ACT" },
+      { playerId: CAMP_ARM, team: "DEN", status: "DEV" },
+    ]);
+    await ingest(ARCHIVE_SEASON, [{ playerId: NEWCOMER, team: "DEN", status: "ACT" }]);
+    expect(await storedStatuses(ARCHIVE_SEASON)).toEqual(
+      new Map([
+        [STARTER, "active"],
+        [CAMP_ARM, "practice_squad"],
+        [NEWCOMER, "active"],
+      ]),
+    );
+  });
+
+  it("takes the ARCHIVE path for a season whose kickoff has passed, whatever the calendar says about the stamp", async () => {
+    // 2024 is above `ROSTER_SOURCE_CONFIG.earliestSeason`, so it stamps by the fixed-date branch
+    // exactly as 2026 does — the live/archive split is the KICKOFF, never the stamping strategy.
+    const report = await ingest(ARCHIVE_SEASON, [{ playerId: STARTER, team: "DEN", status: "ACT" }]);
+    expect(report.mode).toBe("insert_if_absent");
+    expect(NOW.getTime()).toBeGreaterThan(ARCHIVE_KICKOFF.getTime());
   });
 });
 

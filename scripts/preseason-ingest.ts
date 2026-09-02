@@ -18,7 +18,7 @@ import { nflPlayers } from "@/db/schema";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ROSTER_SOURCE_CONFIG } from "@/projections/nflverse/rosters";
 import { BENCHMARK_SOURCES, resolveRankings, type RosterIdentity } from "@/projections/preseason/benchmarks";
-import { ingestDepthCharts, ingestWeek1Rosters } from "@/projections/preseason/ingest";
+import { ingestDepthCharts, ingestWeek1Rosters, type RosterIngestReport } from "@/projections/preseason/ingest";
 import { fetchAverageDraftPosition, fetchExpertConsensus, type PublishedBoard } from "@/projections/preseason/publishers";
 import { preseasonRostersAsOf, recordPreseasonRankings } from "@/projections/preseason/store";
 
@@ -45,6 +45,22 @@ function requireEnv(name: string): string {
 
 function percent(value: number | null): string {
   return value === null ? "  n/a " : `${(value * 100).toFixed(1)}%`;
+}
+
+/**
+ * What the roster write actually did, in its own path's terms.
+ *
+ * The archive path can only ever add, so "N new" says everything there is to say about it. The live
+ * path replaces the season's rows wholesale, and "N new" would print 0 for a run that had just
+ * changed two hundred statuses — the exact reading that hid the stale-roster defect for a day. See
+ * `ingestWeek1Rosters`'s own docblock.
+ */
+function describeRosterWrite(report: RosterIngestReport): string {
+  if (report.mode === "insert_if_absent") return `${report.written} new`;
+  return (
+    `${report.written} written (${report.added} added, ${report.replaced} replaced of which ` +
+    `${report.statusChanged} changed status, ${report.removed} removed)`
+  );
 }
 
 /** The season's own week-one roster, with names joined on, as the benchmark resolver needs it. */
@@ -97,7 +113,7 @@ async function main(): Promise<void> {
   for (let season = FIRST_SEASON; season <= LAST_SEASON; season += 1) {
     const rosters = await ingestWeek1Rosters(db, season, client);
     console.log(
-      `${season}: ${rosters.entriesRead} week-one roster entries, ${rosters.written} new, ` +
+      `${season}: ${rosters.entriesRead} week-one roster entries, ${describeRosterWrite(rosters)}, ` +
         `${rosters.unknownToUniverse} not in the universe`,
     );
     const depth = await ingestDepthCharts(db, season, client);
