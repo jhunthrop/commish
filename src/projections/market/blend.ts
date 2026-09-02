@@ -461,6 +461,12 @@ function blendContextOf(laws: readonly Law[], constants: BlendConstants, propsAn
   if (weight !== undefined && (!Number.isFinite(weight) || weight < 0 || weight > 1)) {
     throw new Error(`market/blend.ts: propsAnchorWeight must lie in [0, 1]; got ${weight}. A weight outside the two anchors is not a blend.`);
   }
+  const playerLawCap = constants.playerLawCapPoints;
+  if (playerLawCap !== undefined && (!Number.isFinite(playerLawCap) || playerLawCap < 0)) {
+    throw new Error(
+      `market/blend.ts: playerLawCapPoints must be a finite, non-negative number of points; got ${playerLawCap}. A negative cap would invert every law delta it bounded rather than bounding it.`,
+    );
+  }
   return {
     constants,
     trainEffectByLawId: new Map(laws.map((law) => [law.id, law.trainEffect] as const)),

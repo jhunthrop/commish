@@ -419,6 +419,12 @@ describe("blendBoard — the per-player law-channel cap (fit-round Task 3, deliv
     expect(seasonPointsOf(blended!)).toBeCloseTo(207 + 200 / IMPLIED_GAMES, 2);
   });
 
+  it("REFUSES a negative cap — a negative bound would invert every delta it touched rather than bounding it", () => {
+    expect(() =>
+      blendBoard([market()], [withMany], { season: SEASON, constants: { ...roomy, playerLawCapPoints: -5 }, laws }),
+    ).toThrow(/playerLawCapPoints must be a finite, non-negative number/);
+  });
+
   it("composes with dedup: dedup picks one per cluster, THEN the per-player cap bounds the sum", () => {
     const both: BlendConstants = { ...roomy, lawClusterDedup: true, playerLawCapPoints: 1000 };
     const [blended] = blendBoard([market({ marketPoints: 200 })], [withMany], { season: SEASON, constants: both, laws });
