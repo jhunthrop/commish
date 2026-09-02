@@ -10,8 +10,8 @@ import type { CsvRow } from "./csv";
  * `preseason/rookie-curve.ts` fits its points curve against.
  *
  * `preseason/rookies.ts`'s bucket prior is fit from `preseason_rosters.draft_pick`, which is honest
- * but shallow: that table's roster backfill floor is 2013 (`rosters.ts`'s `HISTORICAL_ROSTER_FLOOR`),
- * a roster-availability limit rather than a draft-history one. nflverse's `draft_picks` release
+ * but shallow: that table's roster backfill floor is `HISTORICAL_ROSTER_FLOOR` (`rosters.ts`; 2003
+ * since fit-round Task 1, 2013 before it), a roster-availability limit rather than a draft-history one. nflverse's `draft_picks` release
  * carries no such limit — its own release notes say it reaches back to 1980 — and it is keyed on the
  * same `gsis_id` every other table here uses, so a rookie curve fit against it can draw on far more
  * draft classes than the roster table alone would give it. See `schema.ts`'s `nflDraftPicks` for why

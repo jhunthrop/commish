@@ -197,6 +197,20 @@ describe("experienceCohort", () => {
     // longer matters — this is the ordinary "other" case, not a special one.
     expect(experienceCohort(floorSeason + 9, floorSeason)).toBe("other"); // raw year 10
   });
+
+  it("no longer censors a 2013 debut, because the store now holds week-one rosters back to 2003", () => {
+    // THE BEHAVIOUR CHANGE fit-round Task 1's floor raise buys, pinned explicitly rather than left to
+    // follow the constant silently. Before the raise, `HISTORICAL_ROSTER_FLOOR` was 2013 and a player
+    // whose first stamped roster row was 2013 was censored: the table simply began there, so a rookie
+    // and a nine-year veteran were indistinguishable. The rosters now reach 2003, so a first row in
+    // 2013 means he was on nobody's week-one roster for the ten preceding seasons, which is a
+    // measurement. He enters the cohort on his real career year.
+    expect(HISTORICAL_ROSTER_FLOOR).toBe(2003);
+    expect(experienceCohort(2017, 2013)).toBe("year4to6"); // career year 5, previously "other"
+    expect(experienceCohort(2007, 2004)).toBe("year4to6"); // career year 4, previously "other"
+    // The rule itself is untouched: the NEW floor season is still censored, for the original reason.
+    expect(experienceCohort(2007, 2003)).toBe("other");
+  });
 });
 
 describe("predictRates: the years-4-6 experience term", () => {

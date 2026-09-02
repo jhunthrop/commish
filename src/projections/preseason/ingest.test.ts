@@ -63,6 +63,17 @@ describe("historicalWeek1RosterAsOf", () => {
     );
   });
 
+  it("ACCEPTS 2003, the raised floor, and stamps it from that season's own kickoff", async () => {
+    // The floor moved from 2013 to 2003 in fit-round Task 1 and this is the seam that had to open
+    // for the backfill to be possible at all. It is pinned on the literal season rather than only on
+    // `HISTORICAL_ROSTER_FLOOR - 1` above, so a future round that quietly moved the constant back
+    // would fail here rather than silently un-ingesting a decade.
+    expect(HISTORICAL_ROSTER_FLOOR).toBe(2003);
+    const kickoff = new Date("2003-09-04T13:00:00.000Z");
+    await recordTeamObservations(db, [kickoffRow(2003, kickoff)]);
+    expect(await historicalWeek1RosterAsOf(db, 2003)).toEqual(new Date(kickoff.getTime() - 1));
+  });
+
   it("names the context command when the store holds no kickoff instants for the season", async () => {
     // No `recordTeamObservations` call above this line — the store is empty for 2015, so
     // `firstKickoffFor` (which this function reads through, unwrapped) has to refuse rather than

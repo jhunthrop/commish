@@ -53,12 +53,19 @@ export const REPLICATION_FOLDS: readonly number[] = [2021, 2022, 2023];
  * `wr_target_competition` needs the per-week team edge `mapPlayerTeams` builds from the same
  * snap-count file; `rb_age_curve` needs `age` from `preseason_rosters`, not backfilled below
  * `HISTORICAL_ROSTER_FLOOR`; `play_caller_fingerprint` needs coach pace and pass-rate history, which
- * exists only from 2013. A law that cannot see a season simply matches no pair in it, which is the
+ * exists only from 2013. TWO OF THOSE FIVE BLOCKERS WERE LIFTED BY FIT-ROUND TASK 1, which moved
+ * `HISTORICAL_ROSTER_FLOOR` to 2003 (so `rb_age_curve` and every `age`-conditioned discovery
+ * candidate can see the old decade) and backfilled `player_week_teams` for 2003-2012 from the
+ * published weekly stats' own team column (so `wr_target_competition` and `incomingTeamWinTotal` can
+ * resolve a player to a team there). The other three are unchanged: participation and coach history
+ * still begin at 2013. A law that cannot see a season simply matches no pair in it, which is the
  * tri-state "no evidence is not false" rule doing its ordinary job, not a silent degradation.
  *
- * THIS CONSTANT IS NO LONGER EQUAL TO `HISTORICAL_ROSTER_FLOOR` OR `SNAP_COUNT_ASSET_FLOOR`. Those
- * three were all 2013 and were documented as agreeing; they now answer three different questions and
- * two different numbers. Any prose that reads "matches `MEASURE_SEASONS.from`" is about the old
+ * THIS CONSTANT IS NOT DEFINED BY `HISTORICAL_ROSTER_FLOOR` OR `SNAP_COUNT_ASSET_FLOOR`. All three
+ * read 2013 and were once documented as agreeing; they answer three different questions. Two of them
+ * read 2003 again today (this one moved on 2026-09-01, the roster floor on 2026-09-02, each by its
+ * own separate decision) and `SNAP_COUNT_ASSET_FLOOR` is still 2013. Agreement between any two of
+ * them is a coincidence to be re-checked, never an equality to be relied on. Any prose that reads "matches `MEASURE_SEASONS.from`" is about the old
  * coincidence and has been corrected at its own site.
  *
  * WITHIN THE WINDOW, 2019 WAS A HOLE, AND IS NOW FILLED (updated, fix round). nflverse's

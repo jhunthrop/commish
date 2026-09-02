@@ -114,6 +114,19 @@ export interface EfficiencyContext {
  * in the "year 4-6" cohort on that basis would assert a career stage the data cannot support, so a
  * floor-anchored player computing to 6 years or fewer is excluded from the cohort outright rather
  * than guessed into it — he is scored as "other" (no term), never as a false rookie-adjacent player.
+ *
+ * THE CENSORING BOUNDARY MOVED WITH THE FLOOR, 2013 TO 2003 (fit-round Task 1), and this is the
+ * intended direction rather than a side effect. The rule is unchanged; what changed is how many
+ * players it catches. A man whose first stamped roster row is 2013 used to be censored, because the
+ * table simply began there and could not distinguish a rookie from a nine-year veteran. The store now
+ * holds week-one rosters for 2003-2012 as well, so that same 2013 row means something it could not
+ * mean before: he was on nobody's week-one roster for the ten preceding seasons. Every first-roster
+ * season from 2004 to 2013 is therefore a MEASUREMENT now rather than a lower bound, and those
+ * players enter the year-4-to-6 cohort on their real career year instead of being scored as "other".
+ * That is a change to a fitted model input — `scripts/projection-fit.ts` computes the same cohort
+ * when it fits `experienceMultiplier` — so the fit and the prediction move together, in the same
+ * direction, for the same reason. Only 2003 itself, the new floor, is still censored, and for exactly
+ * the original reason.
  */
 export function experienceCohort(season: number, firstRosterSeason: number | null): "year4to6" | "other" {
   if (firstRosterSeason === null || !Number.isInteger(firstRosterSeason)) return "other";

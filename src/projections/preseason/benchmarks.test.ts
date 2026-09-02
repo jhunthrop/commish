@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { normalizeName, resolveRankings, type RankingCandidate, type RosterIdentity } from "./benchmarks";
+import { BENCHMARK_BOARD_FLOOR, normalizeName, resolveRankings, type RankingCandidate, type RosterIdentity } from "./benchmarks";
 import { parseAverageDraftPosition, parseExpertConsensus, type FfcResponse } from "./publishers";
+import { HISTORICAL_ROSTER_FLOOR } from "../nflverse/rosters";
 
 /**
  * A name join is the thing this codebase otherwise refuses to do, so the tests are about the two
@@ -244,5 +245,21 @@ describe("parseAverageDraftPosition", () => {
     const convention = new Date(Date.UTC(2026, 8, 2)); // 2026-09-01's end_date, +1 day
     const board = parseAverageDraftPosition(body({ meta: { end_date: "2026-09-01" } }), 2026, convention);
     expect(board.publishedAt).toEqual(convention);
+  });
+});
+
+/**
+ * THE MARKET FEED'S OWN FLOOR, PINNED SEPARATELY FROM THE ROSTER FLOOR (fit-round Task 1).
+ *
+ * `market-curve-fit.ts` and `blend-fit.ts` used to start their train window at
+ * `HISTORICAL_ROSTER_FLOOR`, which was right only while the two numbers agreed. The roster floor
+ * moved to 2003; the ADP boards did not and cannot. This assertion is what stops the two being
+ * conflated again — if a future round moves the roster floor, nothing here follows it.
+ */
+describe("BENCHMARK_BOARD_FLOOR", () => {
+  it("records the earliest season this store holds a published ADP board for, and is not the roster floor", () => {
+    expect(BENCHMARK_BOARD_FLOOR).toBe(2013);
+    expect(BENCHMARK_BOARD_FLOOR).not.toBe(HISTORICAL_ROSTER_FLOOR);
+    expect(BENCHMARK_BOARD_FLOOR).toBeGreaterThan(HISTORICAL_ROSTER_FLOOR);
   });
 });

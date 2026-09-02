@@ -3,10 +3,14 @@
 // Run: npm run projections:rookie-curve:fit
 //      npm run projections:rookie-curve:fit -- --check   (recomputes, exits 1 on any drift)
 //
-// TRAIN SEASONS: `HISTORICAL_ROSTER_FLOOR` (2013) through `ROOKIE_CURVE_TRAIN_CUTOFF_SEASON` (2021),
-// inclusive. The lower bound is not this script's own choice — it is the floor this repository's
-// weekly stat lines are actually backfilled to (probed directly against the local store below; see
-// `HISTORICAL_ROSTER_FLOOR`'s own docblock for why the roster and stat-line backfills share it). The
+// TRAIN SEASONS: `HISTORICAL_ROSTER_FLOOR` (2003 since fit-round Task 1, 2013 before it) through
+// `ROOKIE_CURVE_TRAIN_CUTOFF_SEASON` (2021), inclusive. The lower bound is not this script's own
+// choice — it is the floor this repository's history is actually backfilled to (probed directly
+// against the local store below; see `HISTORICAL_ROSTER_FLOOR`'s own docblock). This fit KEEPS
+// following that constant, unlike `market-curve-fit.ts` and `blend-fit.ts`, which stopped: those two
+// need an ADP board per train season and the store has none before 2013, while this one needs draft
+// picks (nflverse's release reaches 1980) and stat lines (which now reach 2003) and nothing else.
+// Nineteen rookie classes rather than nine is a real widening of the evidence behind every knot. The
 // upper bound IS this task's own choice, fixed at 2021 by the brief and enforced structurally:
 // `fitRookieCurve` throws if handed a season past it, so a mistake here fails loudly rather than
 // quietly leaking a later class into the fit.
@@ -47,8 +51,8 @@ function header(): string {
  *
  * Fit on rookie classes ${HISTORICAL_ROSTER_FLOOR}-${ROOKIE_CURVE_TRAIN_CUTOFF_SEASON} inclusive and
  * on nothing else. \`fitRookieCurve\` throws if handed a season after
- * \`ROOKIE_CURVE_TRAIN_CUTOFF_SEASON\`. The lower bound is the floor this repository's weekly stat
- * lines are backfilled to (\`HISTORICAL_ROSTER_FLOOR\`), not a choice this fit makes for itself.
+ * \`ROOKIE_CURVE_TRAIN_CUTOFF_SEASON\`. The lower bound is the floor this repository's history is
+ * backfilled to (\`HISTORICAL_ROSTER_FLOOR\`), not a choice this fit makes for itself.
  */
 `;
 }

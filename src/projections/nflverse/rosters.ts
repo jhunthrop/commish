@@ -69,18 +69,34 @@ export const ROSTER_ASSET_FLOOR = 2002;
 /**
  * THE FLOOR THIS ENGINE ACTUALLY BACKFILLS TO — a scope bound, not an asset bound.
  *
- * NO LONGER EQUAL TO `MEASURE_SEASONS.from`, which moved to 2003 on 2026-09-01. This constant did
- * not move with it, deliberately: the measurement window reaches back as far as STAT LINES do, and
- * this floor bounds how far back PRESEASON ROSTERS are backfilled. The consequence is that
- * `rb_age_curve`, which needs `age` from a roster row, still matches no pair before 2013 while the
- * window around it reaches ten years further. Lowering this constant is a scope decision with real
- * behavior attached (`model/efficiency.ts`'s career censoring reads a first-roster season against
- * it, and `scripts/rookie-curve-fit.ts` starts its train window at it), so it is made on its own and
- * never as a side effect of a window move. `ROSTER_ASSET_FLOOR` is kept alongside this constant
- * rather than folded into it, so the next feature that DOES need an earlier season knows the asset
- * is already there and only this scope decision needs to change.
+ * MOVED FROM 2013 TO 2003 ON 2026-09-02 (fit-round Task 1), on its own, deliberately, with every
+ * consumer adjudicated by name rather than allowed to follow the number silently. It now equals
+ * `MEASURE_SEASONS.from` again, which is a coincidence of two decisions agreeing and not a
+ * definition: the previous round moved the measurement window and pointedly left this floor where it
+ * was, precisely so that this move would have to be argued for separately. `ROSTER_ASSET_FLOOR`
+ * (2002) is still one season lower and still says what it always said — the asset reaches further
+ * than the scope, and the difference is a choice.
+ *
+ * WHY 2003 AND NOT 2002. The seasons this floor governs are the ones the rest of the store already
+ * holds: published stat lines and schedule kickoff stamps both reach 2003 and no further (the
+ * discovery-expansion round's history extension). `historicalWeek1RosterAsOf` derives a season's
+ * stamp from that season's own first kickoff, so a 2002 roster could not be honestly stamped even
+ * though its file exists. Moving the floor to 2002 would need a schedule ingest for 2002 first.
+ *
+ * WHAT MOVED WITH IT, each decided on its own merits:
+ *   - `preseason/ingest.ts`'s `historicalWeek1RosterAsOf` refuses one season lower than before; the
+ *     2003-2012 kickoff stamps it needs were ingested by the previous round.
+ *   - `model/efficiency.ts`'s `experienceCohort` right-censors one decade earlier, so a player whose
+ *     first roster row is 2013 is now a genuine debut rather than a possibly-older man the store
+ *     could not see behind. See that function for what changes and why it is the intended direction.
+ *   - `scripts/rookie-curve-fit.ts` trains on rookie classes 2003-2021 rather than 2013-2021; it
+ *     needs draft picks (which reach 1980) and stat lines (which now reach 2003) and nothing else.
+ * WHAT DELIBERATELY DID NOT MOVE WITH IT: `scripts/market-curve-fit.ts` and `scripts/blend-fit.ts`,
+ * which borrowed this constant while the two numbers happened to agree but actually need an ADP
+ * board per train season. They read `BENCHMARK_BOARD_FLOOR` (`preseason/benchmarks.ts`) now, which is
+ * still 2013 because that is where the boards start.
  */
-export const HISTORICAL_ROSTER_FLOOR = 2013;
+export const HISTORICAL_ROSTER_FLOOR = 2003;
 
 /**
  * When a season's week-one roster became knowable: the first of September that year.

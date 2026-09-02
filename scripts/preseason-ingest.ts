@@ -17,7 +17,7 @@ import { createDb, type ReadonlyDb } from "@/db/client";
 import { nflPlayers } from "@/db/schema";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ROSTER_SOURCE_CONFIG } from "@/projections/nflverse/rosters";
-import { BENCHMARK_SOURCES, resolveRankings, type RosterIdentity } from "@/projections/preseason/benchmarks";
+import { BENCHMARK_BOARD_FLOOR, BENCHMARK_SOURCES, resolveRankings, type RosterIdentity } from "@/projections/preseason/benchmarks";
 import { ingestDepthCharts, ingestWeek1Rosters, type RosterIngestReport } from "@/projections/preseason/ingest";
 import { fetchAverageDraftPosition, fetchExpertConsensus, type PublishedBoard } from "@/projections/preseason/publishers";
 import { preseasonRostersAsOf, recordPreseasonRankings } from "@/projections/preseason/store";
@@ -124,6 +124,20 @@ async function main(): Promise<void> {
         // `DepthChartIngestReport.asOf`'s own docblock.
         `${depth.unknownToUniverse} not in the universe, cutoff ${depth.asOf.toISOString()}`,
     );
+
+    // THE BENCHMARKS HAVE THEIR OWN FLOOR, AND IT IS NOT THE ROSTER FLOOR (fit-round Task 1).
+    // `HISTORICAL_ROSTER_FLOOR` moved to 2003 so this script could backfill the old decade's
+    // week-one rosters; neither published board exists that far back (`BENCHMARK_BOARD_FLOOR`).
+    // Skipped explicitly and printed, never attempted-and-failed: a fetch that 404s for a season no
+    // board was ever published for is not a degraded run, and reporting it as one would leave every
+    // archive backfill exiting non-zero and train an operator to ignore the exit code.
+    if (season < BENCHMARK_BOARD_FLOOR) {
+      console.log(
+        `${season}: no published preseason board upstream (BENCHMARK_BOARD_FLOOR is ${BENCHMARK_BOARD_FLOOR}); ` +
+          `rosters and depth charts only for this season.`,
+      );
+      continue;
+    }
 
     const identities = await rosterIdentities(db, season);
 

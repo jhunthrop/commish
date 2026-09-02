@@ -32,10 +32,11 @@ import { FITTED_MARKET_CURVE } from "./curve-fitted";
  * board being built THIS week and carries no season of history to fit a curve against; it is not
  * read here and never will be — see `capture.ts`'s own docblock for why it exists at all.
  *
- * FIT ON TRAIN SEASONS ONLY, `HISTORICAL_ROSTER_FLOOR` (2013) through
- * `MARKET_CURVE_TRAIN_CUTOFF_SEASON` (2021) inclusive — the identical window `rookie-curve.ts` fits
- * on, for the identical reason: `HISTORICAL_ROSTER_FLOOR` is where this repository's weekly stat
- * lines are actually backfilled to, and 2021 is this task's own boundary, enforced structurally
+ * FIT ON TRAIN SEASONS ONLY, `BENCHMARK_BOARD_FLOOR` (2013, `preseason/benchmarks.ts`) through
+ * `MARKET_CURVE_TRAIN_CUTOFF_SEASON` (2021) inclusive. The lower bound is the earliest season this
+ * store holds an `ffc_adp_ppr_12` board for; it used to be spelled `HISTORICAL_ROSTER_FLOOR`, which
+ * was correct only while the two numbers agreed (fit-round Task 1 moved the roster floor to 2003 and
+ * the boards did not move with it). 2021 is this task's own boundary, enforced structurally
  * exactly like the rookie curve's (`fitMarketCurve` throws on a season past it, unconditionally —
  * see the module docblock note on Task 4's inert-gate finding, which is why the throw lives inside
  * the fit rather than behind `heldOutSeasons` alone).

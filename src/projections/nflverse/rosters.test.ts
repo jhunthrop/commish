@@ -156,10 +156,15 @@ describe("ROSTER_ASSET_FLOOR and HISTORICAL_ROSTER_FLOOR", () => {
     // Probed by hand against the live release on 2026-08-31: 2002 returned a real CSV body and 2001
     // a genuine HTTP 404. See the constants' own docblocks for the full account.
     expect(ROSTER_ASSET_FLOOR).toBe(2002);
-    // Matches `SNAP_COUNT_ASSET_FLOOR` (`nflverse/map.ts`), NOT `MEASURE_SEASONS.from`, which moved
-    // to 2003 on 2026-09-01 and left this roster-backfill floor where it was on purpose.
-    expect(HISTORICAL_ROSTER_FLOOR).toBe(2013);
-    expect(ROSTER_ASSET_FLOOR).toBeLessThanOrEqual(HISTORICAL_ROSTER_FLOOR);
+    // MOVED FROM 2013 TO 2003 ON 2026-09-02 (fit-round Task 1), deliberately and on its own: the
+    // previous round moved `MEASURE_SEASONS.from` to 2003 and left this constant alone precisely so
+    // that the roster backfill would have to be argued for separately. It was. It no longer matches
+    // `SNAP_COUNT_ASSET_FLOOR` (still 2013, an upstream fact nothing here can move).
+    expect(HISTORICAL_ROSTER_FLOOR).toBe(2003);
+    // Still ABOVE the asset floor: nflverse publishes `roster_weekly_2002.csv`, but a 2002 roster
+    // could not be honestly stamped, because `historicalWeek1RosterAsOf` derives its stamp from the
+    // season's own first kickoff and the schedule ingest reaches 2003.
+    expect(ROSTER_ASSET_FLOOR).toBeLessThan(HISTORICAL_ROSTER_FLOOR);
   });
 });
 

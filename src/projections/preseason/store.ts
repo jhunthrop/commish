@@ -165,10 +165,12 @@ export async function preseasonRostersAsOf(
  * roster year to prefer, so there is no `asOf` gate here — only the season bound).
  *
  * NOT the player's true NFL debut. `preseason-rosters.ts`'s backfill floor is `HISTORICAL_ROSTER_FLOOR`
- * (2013); a veteran who debuted earlier has no row before it, so his "first" season here is really
- * "first season this table can see him in". Callers that turn this into a career-year band (see
- * `model/efficiency.ts`'s `experienceCohort`) have to treat a first season AT the floor as censored
- * rather than as a literal rookie year.
+ * (2003 since fit-round Task 1, 2013 before it); a veteran who debuted earlier has no row before it,
+ * so his "first" season here is really "first season this table can see him in". Callers that turn
+ * this into a career-year band (see `model/efficiency.ts`'s `experienceCohort`) have to treat a first
+ * season AT the floor as censored rather than as a literal rookie year. The floor moving does not
+ * change that rule; it changes how many players it catches, and every season above the floor becomes
+ * a measurement rather than a lower bound.
  */
 export async function firstRosterSeasonsThrough(db: ReadonlyDb, throughSeason: number): Promise<ReadonlyMap<string, number>> {
   const rows = await db

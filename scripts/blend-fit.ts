@@ -4,12 +4,16 @@
 // Run: npm run projections:blend:fit
 //      npm run projections:blend:fit -- --check   (recomputes, exits 1 on any drift)
 //
-// TRAIN SEASONS: `HISTORICAL_ROSTER_FLOOR` (2013) through `BLEND_TRAIN_CUTOFF_SEASON` (2021),
-// inclusive — the identical window `market-curve-fit.ts` and `rookie-curve-fit.ts` fit on, for the
-// identical reason: the lower bound is the floor this repository's weekly stat lines are actually
-// backfilled to, and the upper bound is this task's own boundary, enforced structurally inside
+// TRAIN SEASONS: `BENCHMARK_BOARD_FLOOR` (2013) through `BLEND_TRAIN_CUTOFF_SEASON` (2021), inclusive —
+// the identical window `market-curve-fit.ts` fits on, for the identical reason: this script blends a
+// MARKET board with a model board, so a train season with no ADP board in the store contributes
+// nothing but a hole. The upper bound is this task's own boundary, enforced structurally inside
 // `scoreBlendConstants` itself so a mistake here fails loudly rather than quietly leaking a later
 // season into the score.
+//
+// THIS WINDOW NO LONGER FOLLOWS `HISTORICAL_ROSTER_FLOOR` (fit-round Task 1), which moved to 2003
+// when the week-one rosters were backfilled to the old decade. The ADP boards did not move with it
+// and could not: the store holds `ffc_adp_ppr_12` for 2013 onward and for nothing earlier.
 //
 // WHAT "NEVER READ" ACTUALLY MEANS HERE (C1(iii)/M1 fix round, correcting an earlier, false claim
 // this header made — "the final-bar seasons, 2023 and 2024, are never read by this script at all").
@@ -76,7 +80,7 @@ import {
 import { fitImpliedGamesByPosition, loadMarketCurveObservations, marketBoard } from "@/projections/market/curve";
 import { registry } from "@/projections/laws/registry";
 import { statLinesAsOfForMeasurement } from "@/projections/nflverse/derived-stat-lines";
-import { HISTORICAL_ROSTER_FLOOR } from "@/projections/nflverse/rosters";
+import { BENCHMARK_BOARD_FLOOR } from "@/projections/preseason/benchmarks";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import { computeFantasyPoints } from "@/scoring/compute";
 import {
@@ -117,7 +121,7 @@ function requireEnv(name: string): string {
 
 function trainSeasons(): readonly number[] {
   const seasons: number[] = [];
-  for (let season = HISTORICAL_ROSTER_FLOOR; season <= BLEND_TRAIN_CUTOFF_SEASON; season += 1) seasons.push(season);
+  for (let season = BENCHMARK_BOARD_FLOOR; season <= BLEND_TRAIN_CUTOFF_SEASON; season += 1) seasons.push(season);
   return seasons;
 }
 

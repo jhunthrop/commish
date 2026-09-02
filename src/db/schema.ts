@@ -2105,11 +2105,12 @@ export const preseasonRankings = pgTable(
  *
  * `preseason_rosters.draft_pick` already carries a pick number for a rookie season, and reusing it
  * was the first option this table's own module docblock considered. It does not reach far enough
- * back: this repository's roster backfill floor is 2013 (`nflverse/rosters.ts`'s
- * `HISTORICAL_ROSTER_FLOOR`), which is a roster-availability limit, not a draft-history one — the
- * `draft_picks` release nflverse publishes carries every pick back to 1980, keyed on the same
- * `gsis_id` every other table here uses. A curve fit on nine draft classes and a curve fit on twenty
- * are different measurements, and the wider one is the one worth having a dedicated table for.
+ * back: this repository's roster backfill floor is `HISTORICAL_ROSTER_FLOOR` (`nflverse/rosters.ts`;
+ * 2003 since fit-round Task 1, 2013 before it), which is a roster-availability limit, not a
+ * draft-history one — the `draft_picks` release nflverse publishes carries every pick back to 1980,
+ * keyed on the same `gsis_id` every other table here uses. A curve fit on nine draft classes and a
+ * curve fit on twenty are different measurements, and the wider one is the one worth having a
+ * dedicated table for.
  *
  * A DEDICATED TABLE RATHER THAN `player_week_observations`, for the exact reason
  * `preseason_rankings`' own docblock gives: a draft pick is a fact about a SEASON, not a WEEK, and

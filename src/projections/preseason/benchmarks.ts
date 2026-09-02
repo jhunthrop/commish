@@ -28,6 +28,26 @@
  * exactly the players both sources found easy.
  */
 
+/**
+ * THE EARLIEST SEASON THIS STORE HOLDS A PUBLISHED PRESEASON BOARD FOR — an ASSET bound on the two
+ * benchmark feeds, the same kind of fact `ROSTER_ASSET_FLOOR` records for the weekly-roster release.
+ *
+ * NAMED HERE IN ITS OWN RIGHT (fit-round Task 1), because until now the two fits that need it
+ * (`scripts/market-curve-fit.ts`, `scripts/blend-fit.ts`) borrowed `HISTORICAL_ROSTER_FLOOR` for it.
+ * That worked only while the two numbers happened to be equal. The roster floor moved to 2003 in
+ * this round and this one did not move with it: both boards are fetched per season by
+ * `preseason-ingest.ts` and the store holds them for 2013 onward and for nothing earlier. A fit whose
+ * train window started at the roster floor would silently pool ten seasons with no market price in
+ * them at all and report the same curve as though it had a decade more evidence.
+ *
+ * ONE CONSTANT FOR BOTH SOURCES, because both start in the same place and the store says so:
+ * `preseason_rankings` was read directly on 2026-09-02 and each of `ffc_adp_ppr_12` and
+ * `fantasypros_ecr_ppr` has rows for every season 2013 through 2026 and for no season before 2013.
+ * Should one feed ever reach further back than the other, this splits into two constants rather than
+ * quietly becoming the minimum of them.
+ */
+export const BENCHMARK_BOARD_FLOOR = 2013;
+
 /** Where a published preseason ranking came from. Free text, matching the store's `source` column. */
 export const BENCHMARK_SOURCES = {
   /** Fantasy Football Calculator's twelve-team PPR average draft position — the MARKET. */
