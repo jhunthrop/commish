@@ -336,7 +336,8 @@ spent-judge ruling exists to prevent, so the earlier three are restored below, f
    search), scored once against 2024. Broke again, at a statistically identical gap to v8, which is
    what bought the constants-exoneration finding above.
 
-**So: five scorecard runs against outcome 2024, across three rounds, and the point estimate has
+**So: six scorecard runs (five distinct reads; the third read executed the scorecard twice, a v6
+reproduction beside v7) against outcome 2024, across three rounds, and the point estimate has
 walked monotonically down through every one of them (+0.1029, +0.1021, +0.1021, +0.1002, +0.0982,
 +0.0979) while the interval's lower bound walked to zero and through it.** No single read selected
 anything, every one was taken after its own round's changes rather than to choose among them, and no
