@@ -33,7 +33,7 @@ import {
   type WeekSnapshotInstant,
 } from "@/projections/odds/backfill-plan";
 import { parseHistoricalEventOddsPage, parseHistoricalEventsPage, type HistoricalEventsPage } from "@/projections/odds/historical";
-import { ODDS_API_BASE, SPORT_KEY, creditStatus, requireEnv, requireOk, type CreditStatus } from "@/projections/odds/http";
+import { ODDS_API_BASE, SPORT_KEY, creditStatus, requireEnv, requireOk, toHistoricalDateParam, type CreditStatus } from "@/projections/odds/http";
 import { archivedEventIds, parseEventOddsResponse, PROP_MARKETS, recordPropObservations } from "@/projections/odds/props-store";
 import { kickoffInstantsByWeek } from "@/projections/team-store";
 
@@ -131,7 +131,7 @@ async function processWeek(
   usedAtStart: { value: number | null },
 ): Promise<{ report: WeekReport; budgetStopped: boolean }> {
   const { week, firstKickoff, snapshotAt } = instant;
-  const { page: eventsPage, credits: eventsCredits } = await fetchHistoricalEvents(apiKey, snapshotAt.toISOString());
+  const { page: eventsPage, credits: eventsCredits } = await fetchHistoricalEvents(apiKey, toHistoricalDateParam(snapshotAt));
   track(tracker, eventsCredits, usedAtStart);
 
   const weekEvents = eventsInWeekWindow(eventsPage.events, firstKickoff);
@@ -147,7 +147,7 @@ async function processWeek(
       budgetStopped = true;
       break;
     }
-    const odds = await fetchHistoricalEventOdds(apiKey, event.id, snapshotAt.toISOString());
+    const odds = await fetchHistoricalEventOdds(apiKey, event.id, toHistoricalDateParam(snapshotAt));
     track(tracker, odds.credits, usedAtStart);
     const { observations: parsed, skippedUnpaired } = parseEventOddsResponse(odds.data, odds.timestamp);
     const written = await recordPropObservations(db, parsed);

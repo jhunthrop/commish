@@ -47,6 +47,18 @@ export function creditStatus(response: Response): CreditStatus {
   };
 }
 
+/**
+ * The historical API's own `date` query param format -- ISO8601 WITHOUT fractional seconds
+ * (`2024-04-30T12:45:00Z`, the API's own docs example). Verified live: `Date#toISOString()`'s
+ * `.000Z` suffix is rejected outright with a 422 `INVALID_HISTORICAL_TIMESTAMP`, even for a
+ * plainly valid instant -- the millisecond component, not the moment, is what the API refuses.
+ * Every historical call (`scripts/odds-props-backfill.ts`) must format its `date` param through
+ * this, never through a bare `toISOString()`.
+ */
+export function toHistoricalDateParam(date: Date): string {
+  return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 /** Throws WITHOUT the URL — see this file's own docblock. `path` is a friendly label the caller
  *  supplies, never the `URL` object the key was set on. */
 export async function requireOk(response: Response, path: string): Promise<void> {
