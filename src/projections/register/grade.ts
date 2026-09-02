@@ -310,17 +310,32 @@ function meanOf(values: readonly number[]): number | null {
  * this opinion order that week correctly. A week no column could be scored on contributes nothing
  * rather than a zero.
  */
-export async function runningScoreboard(db: ReadonlyDb, season: number): Promise<readonly CumulativeScore[]> {
-  const all = await gradeRowsFor(db, season);
+/**
+ * Every grade row belonging to the LATEST `gradedAt` its own week received, grouped by week. The
+ * one dedup rule the register's grade rows ever need: a week's grading may be re-run after a stat
+ * correction, and only the newest run should count toward anything downstream — the scoreboard's
+ * cumulative columns and `scripts/season-week-steps.ts`'s printed per-week population both read
+ * through this, so neither can drift from what the other considers "this week's grading".
+ */
+export function latestGradeRowsByWeek(rows: readonly RegisterGradeRow[]): ReadonlyMap<number, readonly RegisterGradeRow[]> {
   const latestByWeek = new Map<number, number>();
-  for (const row of all) {
+  for (const row of rows) {
     const held = latestByWeek.get(row.week);
     if (held === undefined || row.gradedAt.getTime() > held) latestByWeek.set(row.week, row.gradedAt.getTime());
   }
-  const weeks = [...latestByWeek.keys()].sort((a, b) => a - b);
-  const perWeek = weeks.map((week) =>
-    scoreColumns(all.filter((row) => row.week === week && row.gradedAt.getTime() === latestByWeek.get(week))),
-  );
+  const grouped = new Map<number, RegisterGradeRow[]>();
+  for (const row of rows) {
+    if (row.gradedAt.getTime() !== latestByWeek.get(row.week)) continue;
+    grouped.set(row.week, [...(grouped.get(row.week) ?? []), row]);
+  }
+  return grouped;
+}
+
+export async function runningScoreboard(db: ReadonlyDb, season: number): Promise<readonly CumulativeScore[]> {
+  const all = await gradeRowsFor(db, season);
+  const byWeek = latestGradeRowsByWeek(all);
+  const weeks = [...byWeek.keys()].sort((a, b) => a - b);
+  const perWeek = weeks.map((week) => scoreColumns(byWeek.get(week)!));
 
   return REGISTER_COLUMNS.map((column) => {
     const scores = perWeek.map((week) => week.find((score) => score.column === column)!).filter((score) => score.graded > 0);

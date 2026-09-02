@@ -84,10 +84,15 @@ describe("THE WALL: the sweep covers everything", () => {
     }
   });
 
-  it("exempts the register itself and its own two scripts, and nothing else", () => {
+  it("exempts the register itself and its own four scripts, and nothing else", () => {
     expect(swept.some((file) => file.startsWith(`${REGISTER_DIR}/`))).toBe(false);
     for (const script of WALL_EXEMPT_FILES) expect(swept).not.toContain(script);
-    expect(WALL_EXEMPT_FILES).toEqual(["scripts/register-freeze.ts", "scripts/register-grade.ts"]);
+    expect(WALL_EXEMPT_FILES).toEqual([
+      "scripts/register-freeze.ts",
+      "scripts/register-grade.ts",
+      "scripts/season-week-steps.ts",
+      "scripts/season-week-steps.test.ts",
+    ]);
   });
 });
 

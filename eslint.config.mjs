@@ -331,12 +331,18 @@ const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   { files: ["src/**/*.tsx"], rules: { ...jsxA11y.flatConfigs.strict.rules } },
   {
-    // THE REGISTER QUARANTINE, scoped to everything EXCEPT the register itself and its own two
-    // operator scripts — which necessarily import it, and are the only two files in the tree that
+    // THE REGISTER QUARANTINE, scoped to everything EXCEPT the register itself and its own four
+    // operator files — which necessarily import it, and are the only four files in the tree that
     // may. See REGISTER_QUARANTINE_SELECTORS above for why this owns `no-restricted-syntax` rather
     // than extending `no-restricted-imports`.
     files: ["src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "scripts/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
-    ignores: ["src/projections/register/**", "scripts/register-freeze.ts", "scripts/register-grade.ts"],
+    ignores: [
+      "src/projections/register/**",
+      "scripts/register-freeze.ts",
+      "scripts/register-grade.ts",
+      "scripts/season-week-steps.ts",
+      "scripts/season-week-steps.test.ts",
+    ],
     rules: {
       "no-restricted-syntax": ["error", ...REGISTER_QUARANTINE_SELECTORS],
     },
