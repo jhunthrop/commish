@@ -44,8 +44,33 @@
 // such a cell could never exercise `totalCapPoints`. That reasoning was backwards — a TIGHT total
 // cap is exactly the binding, informative region this search needs to see (it is what makes the
 // blend cautious), and pruning it away meant the search could never discover that a tight total cap
-// was the best-scoring choice. Every one of GRID^3 cells is scored and its own rho logged below,
-// not only the winner.
+// was the best-scoring choice. Every one of GRID^3 cells is scored, and the winner's own axes get
+// the full cap table logged below, exactly as they always did.
+//
+// THE FOUR NEW AXES (fit-round Task 3), crossed with those caps, EVERY ONE OF THEM CARRYING THE
+// INCUMBENT AS ITS OWN NULL CELL — which is the property that makes this grid safe to widen at all:
+// the fit can always choose today's board, so a new dimension can only be admitted by beating it on
+// train.
+//
+//   - LAW-CLUSTER DEDUP (`lawClusterDedup`): the strongest law per correlation cluster instead of
+//     the sum over it. Task 2's redundancy finding is the reason it exists as a choice.
+//   - THE PER-PLAYER LAW-CHANNEL CAP (`playerLawCapPoints`): a bound on what the law channel as a
+//     whole may spend on one player. Forty correlated goal-line laws are what a per-LAW cap cannot
+//     control on its own.
+//   - THE PROPS ANCHOR (`propsAnchorWeight`): how far off ADP toward the archived pre-kickoff props
+//     anchor a listed player is priced. STRUCTURALLY A NO-OP ON TODAY'S TRAIN WINDOW: the props
+//     archive holds 2023 and 2024, this fit trains on 2013-2021, so every train season's anchor map
+//     is empty and every player falls back to ADP per player. The axis is fitted anyway, and its own
+//     coverage number is printed and written into the generated header, because a dimension that
+//     cannot move is a fact worth recording rather than a line of code worth hiding.
+//   - THE AVAILABILITY RECENCY DECAY (`availabilityRecencyDecay`): the exponent
+//     `shrunkAvailabilityRate` already weighs a player's own games history by. This is the one axis
+//     that moves the MODEL rather than the blend, so it rebuilds the candidate rows per value; the
+//     null cell is the committed `FITTED_AVAILABILITY_PRIORS`, used by reference.
+//
+// TIES GO TO THE INCUMBENT. Every axis lists its null cell FIRST and the winner comparison is a
+// strict `>`, so an axis with no evidence to move on (the props one, today) cannot win by sort
+// order, and a null-cell winner renders the identical object shape the committed file already has.
 //
 // THE UNLISTED FALLBACK'S OWN PRICING (C2 fix round 1, TIGHTENED fix round 2, SIMPLIFIED fix round
 // 3, IMPORTANT 1) — an unlisted candidate's raw model season points, capped at
@@ -77,7 +102,15 @@ import {
   type BlendTrainRow,
   type ScoredCell,
 } from "@/projections/market/blend";
-import { fitImpliedGamesByPosition, loadMarketCurveObservations, marketBoard } from "@/projections/market/curve";
+import {
+  fitImpliedGamesByPosition,
+  loadMarketCurveObservations,
+  marketBoard,
+  type ImpliedGamesByPosition,
+} from "@/projections/market/curve";
+import { loadArchivedPropLines, propsAnchorPoints } from "@/projections/market/props-anchor";
+import { withAvailabilityRecency } from "@/projections/preseason/availability";
+import { firstKickoffFor } from "@/projections/team-store";
 import { registry } from "@/projections/laws/registry";
 import { statLinesAsOfForMeasurement } from "@/projections/nflverse/derived-stat-lines";
 import { BENCHMARK_BOARD_FLOOR } from "@/projections/preseason/benchmarks";
@@ -100,6 +133,21 @@ const OUTPUT = "src/projections/market/blend-fitted.ts";
  *  optimum — see the real run's own printed verdict on whether one appeared. */
 const GRID = [0, 2, 5, 10, 20, 40, 80] as const;
 
+/**
+ * THE FOUR FIT-ROUND AXES (Task 3, deliverables B, C and D), and the ONE rule they all obey: THE
+ * NULL CELL COMES FIRST IN EVERY LIST, and the winner comparison below is a STRICT `>`. A tie
+ * therefore keeps the incumbent — which matters more than it sounds, because on the train window
+ * some of these axes are expected to be exact no-ops (the props archive covers 2023 and 2024; this
+ * fit trains on 2013-2021), and an axis that changes nothing must not be able to win by sort order.
+ */
+const LAW_CLUSTER_DEDUP_GRID = [false, true] as const;
+/** `null` is the null cell: no per-player law-channel cap at all. */
+const PLAYER_LAW_CAP_GRID = [null, 10, 20] as const;
+/** `0` is the null cell: ADP only, and `anchorPointsFor` returns `marketPoints` untouched. */
+const PROPS_ANCHOR_WEIGHT_GRID = [0, 0.25, 0.5] as const;
+/** `null` is the null cell: the committed `FITTED_AVAILABILITY_PRIORS`, by reference. */
+const AVAILABILITY_RECENCY_GRID = [null, 0.5, 0.9] as const;
+
 /** Far past any correction: a fit measures completed seasons, never a point-in-time product read. */
 const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");
 
@@ -119,7 +167,13 @@ function requireEnv(name: string): string {
   return value;
 }
 
-function trainSeasons(): readonly number[] {
+/**
+ * THE TRAIN WINDOW — `BENCHMARK_BOARD_FLOOR` through `BLEND_TRAIN_CUTOFF_SEASON`, inclusive, and the
+ * ONE season list this whole script reads data for. Exported so `blend-fit-structure.test.ts` can
+ * assert both halves of the structural pin: that it is disjoint from the seasons the scorecard judges
+ * on, and that no other season list exists in this file for a data read to use.
+ */
+export function blendTrainSeasons(): readonly number[] {
   const seasons: number[] = [];
   for (let season = BENCHMARK_BOARD_FLOOR; season <= BLEND_TRAIN_CUTOFF_SEASON; season += 1) seasons.push(season);
   return seasons;
@@ -142,28 +196,138 @@ async function actualSeasonPoints(db: ReadonlyDb, season: number, positions: Rea
   return totals;
 }
 
-/** One train season's worth of rows: every player who appears on BOTH that season's market board
- *  and its model board, joined to what he actually scored (zero, not dropped, for a listed player
- *  who never recorded a stat line — the identical counting choice `market/curve.ts`'s own train
- *  loader makes). */
-async function rowsForSeason(db: ReadonlyDb, season: number): Promise<{ readonly rows: readonly BlendTrainRow[]; readonly droppedCount: number }> {
+/**
+ * EVERY DATABASE READ ONE TRAIN SEASON NEEDS, made ONCE — the model inputs, the market board, the
+ * outcomes, and the season's own props anchor. Kept separate from row construction (below) because
+ * the availability-recency axis rebuilds the CANDIDATES for each of its values while every one of
+ * these reads is identical across them: reading them once per season instead of once per (season,
+ * recency) is the difference between nine model input loads and twenty-seven.
+ */
+interface SeasonFacts {
+  readonly season: number;
+  readonly inputs: Awaited<ReturnType<typeof gradableInputs>>;
+  readonly marketByPlayer: ReadonlyMap<string, Awaited<ReturnType<typeof marketBoard>>["entries"][number]>;
+  readonly actual: ReadonlyMap<string, number>;
+  readonly droppedCount: number;
+  /** Player id to props-anchor points in market units, EMPTY for a season the archive does not
+   *  cover — which is every train season today, and is the null cell, cleanly. */
+  readonly propsAnchor: ReadonlyMap<string, number>;
+}
+
+async function factsForSeason(db: ReadonlyDb, season: number, impliedGamesByPosition: ImpliedGamesByPosition): Promise<SeasonFacts> {
   // Fix round I3: `gradableInputs` is the convergence point every grading script calls through,
   // immediately after `loadPreseason` — see its own docblock in `preseason/scorecard.ts`. This
   // script's train rows feed the blend's own fitted constants from `actualSeasonPoints` below, so a
   // live board reaching this function would poison a fit with a non-existent outcome.
   const inputs = gradableInputs(await loadPreseason(db, season));
-  const candidates = preseasonCandidates(inputs, SHIPPED_PRESEASON_FEATURES, PRIORS);
   const { entries: market, droppedCount } = await marketBoard(db, season, inputs.moment);
   const marketByPlayer = new Map(market.map((entry) => [entry.playerId, entry] as const));
   const actual = await actualSeasonPoints(db, season, inputs.positions);
 
+  // THE PROPS ANCHOR (deliverable C). `firstKickoffFor` is the leakage boundary AND the week-one
+  // window's origin; a season with no schedule rows at all (never for a completed season) or no
+  // archived pre-kickoff lines yields an empty map, which is exactly the ADP-only null cell.
+  const firstKickoff = await firstKickoffFor(db, season);
+  const propsAnchor =
+    firstKickoff === null
+      ? new Map<string, number>()
+      : propsAnchorPoints(await loadArchivedPropLines(db, season, firstKickoff), {
+          firstKickoff,
+          positionByPlayerId: inputs.positions,
+          marketPointsByPlayerId: new Map([...marketByPlayer].map(([playerId, entry]) => [playerId, entry.marketPoints] as const)),
+          impliedGamesByPosition,
+        });
+
+  return { season, inputs, marketByPlayer, actual, droppedCount, propsAnchor };
+}
+
+/** One train season's worth of rows at ONE availability-recency value: every player who appears on
+ *  BOTH that season's market board and its model board, joined to what he actually scored (zero, not
+ *  dropped, for a listed player who never recorded a stat line — the identical counting choice
+ *  `market/curve.ts`'s own train loader makes). */
+function rowsForSeason(facts: SeasonFacts, recencyDecay: number | null): readonly BlendTrainRow[] {
+  const priors: PreseasonPriors = { ...PRIORS, availability: withAvailabilityRecency(PRIORS.availability, recencyDecay) };
+  const candidates = preseasonCandidates(facts.inputs, SHIPPED_PRESEASON_FEATURES, priors);
   const rows: BlendTrainRow[] = [];
   for (const candidate of candidates) {
-    const marketEntry = marketByPlayer.get(candidate.playerId);
+    const marketEntry = facts.marketByPlayer.get(candidate.playerId);
     if (marketEntry === undefined) continue;
-    rows.push({ season, market: marketEntry, candidate, actualPoints: actual.get(candidate.playerId) ?? 0 });
+    rows.push({
+      season: facts.season,
+      market: marketEntry,
+      candidate,
+      actualPoints: facts.actual.get(candidate.playerId) ?? 0,
+      propsAnchor: facts.propsAnchor,
+    });
   }
-  return { rows, droppedCount };
+  return rows;
+}
+
+/**
+ * ONE POINT ON THE FOUR FIT-ROUND AXES. Held separately from `BlendConstants` while the grid runs
+ * because `availabilityRecencyDecay` picks the ROW SET (it rebuilds candidates) while the other
+ * three are constants, and because `constantsFor` OMITS every axis sitting at its null cell so the
+ * generated file's shape is unchanged whenever the incumbent wins.
+ */
+interface FitAxes {
+  readonly availabilityRecencyDecay: number | null;
+  readonly propsAnchorWeight: number;
+  readonly lawClusterDedup: boolean;
+  readonly playerLawCapPoints: number | null;
+}
+
+interface BestCell {
+  readonly constants: BlendConstants;
+  readonly score: number;
+  /** The row set this cell was scored on — the winner's own recency value picks it. */
+  readonly rows: readonly BlendTrainRow[];
+}
+
+function isNullCell(axes: FitAxes): boolean {
+  return (
+    axes.availabilityRecencyDecay === AVAILABILITY_RECENCY_GRID[0] &&
+    axes.propsAnchorWeight === PROPS_ANCHOR_WEIGHT_GRID[0] &&
+    axes.lawClusterDedup === LAW_CLUSTER_DEDUP_GRID[0] &&
+    axes.playerLawCapPoints === PLAYER_LAW_CAP_GRID[0]
+  );
+}
+
+/** THE INCUMBENT'S OWN FILE SHAPE IS PRESERVED AT THE NULL CELL: an axis sitting at its null value
+ *  contributes NO field, so a null-cell winner renders exactly the object shape the committed
+ *  `blend-fitted.ts` already carries, and `market/blend.ts` reads its absence as the incumbent. */
+function constantsFor(base: BlendConstants, axes: FitAxes): BlendConstants {
+  return {
+    ...base,
+    ...(axes.lawClusterDedup ? { lawClusterDedup: true } : {}),
+    ...(axes.playerLawCapPoints === null ? {} : { playerLawCapPoints: axes.playerLawCapPoints }),
+    ...(axes.propsAnchorWeight === 0 ? {} : { propsAnchorWeight: axes.propsAnchorWeight }),
+    ...(axes.availabilityRecencyDecay === null ? {} : { availabilityRecencyDecay: axes.availabilityRecencyDecay }),
+  };
+}
+
+function axesOf(constants: BlendConstants): FitAxes {
+  return {
+    availabilityRecencyDecay: constants.availabilityRecencyDecay ?? null,
+    propsAnchorWeight: constants.propsAnchorWeight ?? 0,
+    lawClusterDedup: constants.lawClusterDedup ?? false,
+    playerLawCapPoints: constants.playerLawCapPoints ?? null,
+  };
+}
+
+function sameAxes(a: FitAxes, b: FitAxes): boolean {
+  return (
+    a.availabilityRecencyDecay === b.availabilityRecencyDecay &&
+    a.propsAnchorWeight === b.propsAnchorWeight &&
+    a.lawClusterDedup === b.lawClusterDedup &&
+    a.playerLawCapPoints === b.playerLawCapPoints
+  );
+}
+
+function describeAxes(axes: FitAxes): string {
+  return (
+    `recency=${axes.availabilityRecencyDecay ?? "committed"}  props=${axes.propsAnchorWeight}  ` +
+    `dedup=${axes.lawClusterDedup}  playerLawCap=${axes.playerLawCapPoints ?? "none"}`
+  );
 }
 
 /** Everything about the winning cell fix round 2's own review asked to have RECORDED, not just
@@ -175,6 +339,13 @@ interface FitSummary {
   readonly availabilityOnlyScore: number | null;
   readonly plateau: { readonly tiedCellCount: number; readonly anyTiedAtCeiling: boolean };
   readonly ceiling: number;
+  /** The winner's own position on the four fit-round axes, and how many rows carried a props anchor
+   *  at all — both recorded in the generated header so a reader of the committed constants can see
+   *  which axes had evidence to move on and which were structurally no-ops. */
+  readonly axes: FitAxes;
+  readonly propsAnchoredRows: number;
+  readonly totalRows: number;
+  readonly cellCount: number;
 }
 
 function header(summary: FitSummary): string {
@@ -206,6 +377,13 @@ function header(summary: FitSummary): string {
  * ${summary.bestScore.toFixed(4)} — laws' own share of the total lift over pure market is ${lawShare}%. Written down so
  * Task 11's own ablation of this board is not a surprise: the availability channel does almost all
  * of the work, laws add a real but small amount on top.
+ *
+ * THE FIT-ROUND AXES (Task 3), all four of which carry the incumbent as their own null cell, and the
+ * winner's position on each: ${describeAxes(summary.axes)}.
+ * ${summary.cellCount} cells were scored. An axis absent from the object below sits at its null cell.
+ * PROPS-ANCHOR COVERAGE: ${summary.propsAnchoredRows} of ${summary.totalRows} train rows sit in a season the props archive
+ * covers. At zero, the props-weight axis had nothing to move on and its null cell wins by the tie
+ * rule, which is a statement about the archive's own span (2023-2024) rather than about props.
  */
 `;
 }
@@ -220,19 +398,11 @@ async function main(): Promise<void> {
   const check = process.argv.includes("--check");
   const db = createDb(requireEnv("DATABASE_URL"));
 
-  const seasons = trainSeasons();
+  const seasons = blendTrainSeasons();
   console.log(`BLEND FIT, train seasons ${seasons.join(", ")}`);
 
-  const rows: BlendTrainRow[] = [];
-  for (const season of seasons) {
-    const { rows: seasonRows, droppedCount } = await rowsForSeason(db, season);
-    rows.push(...seasonRows);
-    console.log(
-      `  ${season}: ${seasonRows.length} rows (players on both the market and model boards), ` +
-        `${droppedCount} market row(s) dropped (unresolved position)`,
-    );
-  }
-
+  // THE IMPLIED-GAMES TABLE IS FIT FIRST because the props anchor needs it: its own step 4 converts a
+  // per-game props number into a season one through exactly this table (`props-anchor.ts`).
   console.log("\nfitting the market's own implied games-played table (I3+I5)...");
   const marketCurveObservations = await loadMarketCurveObservations(db, seasons);
   const impliedGamesByPosition = fitImpliedGamesByPosition(marketCurveObservations);
@@ -240,9 +410,33 @@ async function main(): Promise<void> {
     console.log(`  ${position}: ${impliedGamesByPosition[position].toFixed(2)} implied games`);
   }
 
+  console.log("");
+  const facts: SeasonFacts[] = [];
+  for (const season of seasons) {
+    const seasonFacts = await factsForSeason(db, season, impliedGamesByPosition);
+    facts.push(seasonFacts);
+    console.log(
+      `  ${season}: ${seasonFacts.marketByPlayer.size} market rows, ${seasonFacts.droppedCount} dropped (unresolved position), ` +
+        `${seasonFacts.propsAnchor.size} players props-anchored`,
+    );
+  }
+
   await db.$client.end();
 
-  console.log(`\nfit on ${rows.length} (player, season) rows across seasons ${seasons.join(", ")}`);
+  // ONE ROW SET PER AVAILABILITY-RECENCY VALUE (deliverable D). The candidates themselves move with
+  // this axis — it changes `games.expected` — so it cannot be a constants-only dimension.
+  const rowsByRecency = new Map<number | null, readonly BlendTrainRow[]>(
+    AVAILABILITY_RECENCY_GRID.map((recency) => [recency, facts.flatMap((seasonFacts) => rowsForSeason(seasonFacts, recency))] as const),
+  );
+  const nullCellRecency = AVAILABILITY_RECENCY_GRID[0];
+  const baselineRows = rowsByRecency.get(nullCellRecency)!;
+  console.log(`\nfit on ${baselineRows.length} (player, season) rows across seasons ${seasons.join(", ")}`);
+  const propsAnchoredRows = baselineRows.filter((row) => (row.propsAnchor?.size ?? 0) > 0).length;
+  console.log(
+    `props anchor coverage: ${propsAnchoredRows} of ${baselineRows.length} rows sit in a season with an archive. ` +
+      "The props archive holds 2023 and 2024; this fit trains on 2013-2021, so a zero here is EXPECTED and the " +
+      "props-weight axis is then an exact no-op whose null cell wins on the tie rule.",
+  );
 
   // `laws` computed ONCE, off the real committed registry, and passed to every grid cell explicitly
   // — `scoreBlendConstants`/`blendBoard` would otherwise default to calling `registry()` (a disk
@@ -251,36 +445,64 @@ async function main(): Promise<void> {
   const laws = registry();
 
   console.log("\nfitting the structural tail guard, per position (fix round 2, ruling 2), the unlisted fallback's only pricing rule (fix round 3, IMPORTANT 1)...");
-  const marketTailByPosition = fitMarketTailByPosition(rows);
+  // Market-side only, and the market board does not move with any of this round's axes, so the
+  // null-cell row set is the right (and the cheapest) population to fit it from.
+  const marketTailByPosition = fitMarketTailByPosition(baselineRows);
   for (const position of ["QB", "RB", "WR", "TE"] as const) {
     console.log(`  ${position}: ${marketTailByPosition[position].toFixed(1)} pts (the market's own cheapest drafted man at this position)`);
   }
 
-  console.log(`\nGRID (${GRID.join(", ")}), every cell scored (I2 fix round, no pruning):\n`);
-  console.log(`${"lawCap".padStart(7)}  ${"availCap".padStart(9)}  ${"totalCap".padStart(9)}  ${"rho".padStart(8)}`);
+  console.log(`\nGRID (${GRID.join(", ")}) on each cap axis, crossed with the fit-round axes:`);
+  console.log(`  law-cluster dedup: ${LAW_CLUSTER_DEDUP_GRID.join(", ")}`);
+  console.log(`  per-player law-channel cap: ${PLAYER_LAW_CAP_GRID.map((value) => value ?? "none").join(", ")}`);
+  console.log(`  props-anchor weight: ${PROPS_ANCHOR_WEIGHT_GRID.join(", ")}`);
+  console.log(`  availability recency decay: ${AVAILABILITY_RECENCY_GRID.map((value) => value ?? "committed").join(", ")}`);
+  console.log("  the FIRST value on every axis is the null cell, and ties go to the incumbent (strict > below).\n");
 
-  let best: { constants: BlendConstants; score: number } | null = null;
+  let best: BestCell | null = null;
   let pureMarketScore: number | null = null;
   const cells: ScoredCell[] = [];
-  for (const lawCapPoints of GRID) {
-    for (const availabilityCapPoints of GRID) {
-      for (const totalCapPoints of GRID) {
-        const constants: BlendConstants = {
-          lawCapPoints,
-          availabilityCapPoints,
-          totalCapPoints,
-          impliedGamesByPosition,
-          marketTailByPosition,
-        };
-        const score = scoreBlendConstants(rows, constants, { heldOutSeasons: [], laws });
-        cells.push({ constants, score });
-        console.log(
-          `${String(lawCapPoints).padStart(7)}  ${String(availabilityCapPoints).padStart(9)}  ${String(totalCapPoints).padStart(9)}  ` +
-            `${score === null ? "n/a".padStart(8) : score.toFixed(4).padStart(8)}`,
-        );
-        if (lawCapPoints === 0 && availabilityCapPoints === 0 && totalCapPoints === 0) pureMarketScore = score;
-        if (score !== null && (best === null || score > best.score)) best = { constants, score };
+  for (const availabilityRecencyDecay of AVAILABILITY_RECENCY_GRID) {
+    const rows = rowsByRecency.get(availabilityRecencyDecay)!;
+    for (const propsAnchorWeight of PROPS_ANCHOR_WEIGHT_GRID) {
+      for (const lawClusterDedup of LAW_CLUSTER_DEDUP_GRID) {
+        for (const playerLawCapPoints of PLAYER_LAW_CAP_GRID) {
+          const axes: FitAxes = { availabilityRecencyDecay, propsAnchorWeight, lawClusterDedup, playerLawCapPoints };
+          let bestInAxes: BestCell | null = null;
+          for (const lawCapPoints of GRID) {
+            for (const availabilityCapPoints of GRID) {
+              for (const totalCapPoints of GRID) {
+                const constants = constantsFor(
+                  { lawCapPoints, availabilityCapPoints, totalCapPoints, impliedGamesByPosition, marketTailByPosition },
+                  axes,
+                );
+                const score = scoreBlendConstants(rows, constants, { heldOutSeasons: [], laws });
+                cells.push({ constants, score });
+                if (isNullCell(axes) && lawCapPoints === 0 && availabilityCapPoints === 0 && totalCapPoints === 0) pureMarketScore = score;
+                if (score === null) continue;
+                if (bestInAxes === null || score > bestInAxes.score) bestInAxes = { constants, score, rows };
+                if (best === null || score > best.score) best = { constants, score, rows };
+              }
+            }
+          }
+          // ONE LINE PER AXES COMBINATION rather than one per cell: the full cross is 18,522 cells and
+          // a per-cell table would bury the run's own verdict in its own log. The cap axes' full table
+          // is still printed below, for the winner's own axes, exactly as it always was.
+          console.log(`${describeAxes(axes).padEnd(74)}  best rho ${bestInAxes === null ? "n/a" : bestInAxes.score.toFixed(4)}`);
+        }
       }
+    }
+  }
+
+  if (best !== null) {
+    console.log(`\nTHE CAP GRID AT THE WINNING AXES (${describeAxes(axesOf(best.constants))}), every cell (I2 fix round, no pruning):\n`);
+    console.log(`${"lawCap".padStart(7)}  ${"availCap".padStart(9)}  ${"totalCap".padStart(9)}  ${"rho".padStart(8)}`);
+    for (const cell of cells) {
+      if (!sameAxes(axesOf(cell.constants), axesOf(best.constants))) continue;
+      console.log(
+        `${String(cell.constants.lawCapPoints).padStart(7)}  ${String(cell.constants.availabilityCapPoints).padStart(9)}  ` +
+          `${String(cell.constants.totalCapPoints).padStart(9)}  ${cell.score === null ? "n/a".padStart(8) : cell.score.toFixed(4).padStart(8)}`,
+      );
     }
   }
 
@@ -297,15 +519,22 @@ async function main(): Promise<void> {
   const beatsPureMarket = pureMarketScore !== null && best.score > pureMarketScore;
   console.log(
     `\nBEST: lawCapPoints=${best.constants.lawCapPoints}  availabilityCapPoints=${best.constants.availabilityCapPoints}  ` +
-      `totalCapPoints=${best.constants.totalCapPoints}  (spearman rho=${best.score.toFixed(4)} on the train rows, ` +
+      `totalCapPoints=${best.constants.totalCapPoints}  ${describeAxes(axesOf(best.constants))}  ` +
+      `(spearman rho=${best.score.toFixed(4)} on the train rows, ` +
       `${beatsPureMarket ? "beats" : "does NOT beat"} the pure-market baseline)`,
+  );
+  console.log(
+    isNullCell(axesOf(best.constants))
+      ? "THE INCUMBENT WON every fit-round axis: the rendered constants carry no new field, and the committed file's own shape is unchanged."
+      : "A fit-round axis moved off its null cell — the rendered constants carry the new field(s), and Task 4 owns whether that ships.",
   );
 
   // THE CHANNEL DECOMPOSITION (fix round 2) — the winning cell with lawCapPoints forced to zero,
   // isolating how much of the winner's own lift over pure market comes from the availability channel
-  // alone versus laws on top of it.
+  // alone versus laws on top of it. Scored on the WINNER'S OWN row set, since the recency axis moves
+  // the rows themselves.
   const availabilityOnlyConstants: BlendConstants = { ...best.constants, lawCapPoints: 0 };
-  const availabilityOnlyScore = scoreBlendConstants(rows, availabilityOnlyConstants, { heldOutSeasons: [], laws });
+  const availabilityOnlyScore = scoreBlendConstants(best.rows, availabilityOnlyConstants, { heldOutSeasons: [], laws });
   console.log(
     `\nCHANNEL DECOMPOSITION: pure market ${pureMarketScore === null ? "n/a" : pureMarketScore.toFixed(4)}  ->  availability admitted alone ` +
       `${availabilityOnlyScore === null ? "n/a" : availabilityOnlyScore.toFixed(4)}  ->  laws admitted too (the winner) ${best.score.toFixed(4)}`,
@@ -328,6 +557,10 @@ async function main(): Promise<void> {
     availabilityOnlyScore,
     plateau,
     ceiling,
+    axes: axesOf(best.constants),
+    propsAnchoredRows,
+    totalRows: baselineRows.length,
+    cellCount: cells.length,
   });
 
   if (check) {
@@ -344,9 +577,13 @@ async function main(): Promise<void> {
   console.log(`\nwrote ${OUTPUT}`);
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error: unknown) => {
-    console.error(error);
-    process.exit(1);
-  });
+// GUARDED, the identical `import.meta.url` discipline `scripts/preseason-persist.ts` uses: importing
+// this module (the structural pin, asking what season list it reads) must not run a fit.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main()
+    .then(() => process.exit(0))
+    .catch((error: unknown) => {
+      console.error(error);
+      process.exit(1);
+    });
+}

@@ -8,6 +8,7 @@ import { registry } from "../laws/registry";
 import type { Law } from "../laws/types";
 import { spearman, type Observation } from "../metrics";
 import { scaleStatLine, type BoardCandidate, type BoardReason } from "../preseason/board";
+import { withAvailabilityRecency } from "../preseason/availability";
 import { rookieCurve } from "../preseason/rookie-curve";
 import {
   preseasonCandidates,
@@ -204,6 +205,22 @@ export interface BlendConstants {
    * and from ADP everywhere else.
    */
   readonly propsAnchorWeight?: number;
+  /**
+   * THE AVAILABILITY RECENCY DECAY (fit-round Task 3, deliverable D) — the ONE MODEL-SIDE parameter
+   * this fit moves, and the reason it lives on the BLEND's constants rather than on the availability
+   * priors: `scripts/blend-fit.ts` is what fits it, against the blend's own objective, and a fitted
+   * number belongs in the file its own fit generates.
+   *
+   * `shippedPreseasonCandidates` applies it through `withAvailabilityRecency` before building
+   * candidates. ABSENT IS THE NULL CELL: the committed `FITTED_AVAILABILITY_PRIORS` object is used by
+   * reference, unchanged, which is what makes today's expected games reproduce bit for bit.
+   *
+   * THE RAW ARM DELIBERATELY DOES NOT GET IT. `shippedPreseasonCandidates({ raw: true })` — Task 11's
+   * pre-blend comparison arm — keeps the committed availability priors exactly. Letting the blend's
+   * own fit move the baseline it is later compared against would flatter the comparison, and the
+   * whole point of the raw arm is that it is the incumbent model.
+   */
+  readonly availabilityRecencyDecay?: number;
 }
 
 /** The structural tail guard's own committed table — see `BlendConstants.marketTailByPosition`'s
@@ -657,14 +674,25 @@ export function scoreBlendConstants(rows: readonly BlendTrainRow[], constants: B
     }
   }
 
-  // ONE context for every row (fit-round Task 3): identical arithmetic to blending each row through
-  // `blendBoard`, minus a per-row rebuild of the law map, the pricing set and the cluster lookup.
-  // `propsAnchor` is per SEASON, so it is carried on each row rather than on the options object.
-  const context = blendContextOf(laws ?? registry(), constants, EMPTY_PROPS_ANCHOR);
-  const observations: Observation[] = rows.map((row) => {
-    const rowContext = row.propsAnchor === undefined ? context : { ...context, propsAnchor: row.propsAnchor };
-    return { predicted: seasonPointsOf(blendCandidate(row.candidate, row.market, rowContext)), actual: row.actualPoints };
-  });
+  // ONE context per DISTINCT PROPS ANCHOR (fit-round Task 3): identical arithmetic to blending each
+  // row through `blendBoard`, minus a per-row rebuild of the law map, the pricing set and the cluster
+  // lookup. A fit's rows span several seasons and each season carries its own anchor map, so the
+  // contexts are keyed by that map's own identity — one per season, not one per row, which at this
+  // grid's cell count is the difference between thousands of map builds and tens of millions.
+  const base = blendContextOf(laws ?? registry(), constants, EMPTY_PROPS_ANCHOR);
+  const contextByAnchor = new Map<ReadonlyMap<string, number>, BlendContext>();
+  const contextFor = (propsAnchor: ReadonlyMap<string, number> | undefined): BlendContext => {
+    if (propsAnchor === undefined) return base;
+    const cached = contextByAnchor.get(propsAnchor);
+    if (cached !== undefined) return cached;
+    const built: BlendContext = { ...base, propsAnchor };
+    contextByAnchor.set(propsAnchor, built);
+    return built;
+  };
+  const observations: Observation[] = rows.map((row) => ({
+    predicted: seasonPointsOf(blendCandidate(row.candidate, row.market, contextFor(row.propsAnchor))),
+    actual: row.actualPoints,
+  }));
   return spearman(observations);
 }
 
@@ -761,6 +789,9 @@ export interface ShippedCandidatesOptions {
   readonly constants?: BlendConstants;
   /** Defaults to the real `registry()`; see `BlendEvidenceOptions.laws`'s own docblock. */
   readonly laws?: readonly Law[];
+  /** This season's props anchor; see `BlendEvidenceOptions.propsAnchor`. Absent is the null cell, and
+   *  a caller that has not loaded an archive simply does not pass one. */
+  readonly propsAnchor?: ReadonlyMap<string, number>;
 }
 
 /** How many LISTED market players a position needs before a LIVE board trusts its own pricing for
@@ -859,10 +890,16 @@ export async function shippedPreseasonCandidates(
   db: ReadonlyDb,
   inputs: PreseasonInputs,
   priors: PreseasonPriors,
-  { raw = false, features = SHIPPED_PRESEASON_FEATURES, constants, laws }: ShippedCandidatesOptions = {},
+  { raw = false, features = SHIPPED_PRESEASON_FEATURES, constants, laws, propsAnchor }: ShippedCandidatesOptions = {},
 ): Promise<readonly BoardCandidate[]> {
-  const candidates = preseasonCandidates(inputs, features, priors);
-  if (raw) return candidates;
+  // THE RAW ARM IS BUILT FROM THE COMMITTED PRIORS, UNTOUCHED (fit-round Task 3, deliverable D): the
+  // blend's own fitted availability recency applies to the BLENDED board only. See
+  // `BlendConstants.availabilityRecencyDecay`'s own docblock for why the comparison arm must not move
+  // with the thing it is comparing against.
+  if (raw) return preseasonCandidates(inputs, features, priors);
+
+  const blendConstants = constants ?? FITTED_BLEND_CONSTANTS;
+  const candidates = preseasonCandidates(inputs, features, withBlendAvailabilityRecency(priors, blendConstants));
   // `inputs.moment` — never a second, internal `preseasonMomentFor` call — so a LIVE board's market
   // prior is taken at the SAME moment the rest of the board was built at (Task 4, `curve.ts`'s own
   // `marketBoard` docblock: that function used to derive this itself, unconditionally through the
@@ -872,5 +909,16 @@ export async function shippedPreseasonCandidates(
   if (droppedCount > 0) {
     console.warn(`market/blend.ts: marketBoard for ${inputs.season} dropped ${droppedCount} ADP row(s) with an unresolved position.`);
   }
-  return blendBoard(market, candidates, { season: inputs.season, constants, laws });
+  return blendBoard(market, candidates, { season: inputs.season, constants, laws, propsAnchor });
+}
+
+/**
+ * THE PRIORS THE BLENDED BOARD IS BUILT FROM — the caller's own, with `availabilityRecencyDecay`
+ * applied if the fit committed one. Returns the caller's object BY REFERENCE at the null cell (no
+ * fitted decay), so the incumbent board is reproduced bit for bit rather than through a copy.
+ */
+function withBlendAvailabilityRecency(priors: PreseasonPriors, constants: BlendConstants): PreseasonPriors {
+  const decay = constants.availabilityRecencyDecay;
+  if (decay === undefined) return priors;
+  return { ...priors, availability: withAvailabilityRecency(priors.availability, decay) };
 }

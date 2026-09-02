@@ -15,15 +15,29 @@
 // `fitRookieCurve` throws if handed a season past it, so a mistake here fails loudly rather than
 // quietly leaking a later class into the fit.
 //
-// nflverse's `draft_picks` release is one file for the whole history (no season parameter), so this
-// script ingests it once, unconditionally, before fitting — idempotent, exactly like every other
-// writer in this engine (`recordDraftPicks`'s `onConflictDoNothing`), so re-running this script never
-// duplicates a pick.
+// nflverse's `draft_picks` release is one file for the whole history (no season parameter), so a
+// WRITE run ingests it once before fitting — idempotent, exactly like every other writer in this
+// engine (`recordDraftPicks`'s `onConflictDoNothing`), so re-running this script never duplicates a
+// pick.
+//
+// A `--check` RUN INGESTS NOTHING (fit-round Task 3, deliverable E). This script used to ingest
+// unconditionally, BEFORE it looked at `--check`, so a drift check — a question about whether the
+// committed file still matches the data — wrote 259 draft picks into the shared store as a side
+// effect. Task 1's adjudication 5 ledgered that as a bug and Task 2 measured what it cost: those
+// writes are part of the residual its own decomposition could not mask away. A check is now
+// READ-ONLY, and `rookie-curve-fit.test.ts` pins it that way.
 import { readFileSync, writeFileSync } from "node:fs";
-import { createDb } from "@/db/client";
-import { ingestDraftPicks } from "@/projections/nflverse/draft-picks";
+import { createDb, type Db, type ReadonlyDb } from "@/db/client";
+import { ingestDraftPicks, type DraftPickIngestReport } from "@/projections/nflverse/draft-picks";
 import { HISTORICAL_ROSTER_FLOOR } from "@/projections/nflverse/rosters";
-import { fitRookieCurve, loadRookieCurveObservations, rookieCurve, ROOKIE_CURVE_TRAIN_CUTOFF_SEASON } from "@/projections/preseason/rookie-curve";
+import {
+  fitRookieCurve,
+  loadRookieCurveObservations,
+  rookieCurve,
+  ROOKIE_CURVE_TRAIN_CUTOFF_SEASON,
+  type RookieCurveObservation,
+  type RookieCurvePriors,
+} from "@/projections/preseason/rookie-curve";
 
 const OUTPUT = "src/projections/preseason/rookie-curve-fitted.ts";
 const POSITIONS = ["QB", "RB", "WR", "TE"] as const;
@@ -37,7 +51,13 @@ function requireEnv(name: string): string {
   return value;
 }
 
-function trainSeasons(): readonly number[] {
+/**
+ * THE FULL-COHORT WINDOW — every rookie class from the floor this repository's history actually
+ * reaches (`HISTORICAL_ROSTER_FLOOR`, 2003 since fit-round Task 1) through the train cutoff, and
+ * NOTHING else. Exported so the structural pin can assert that this is the only season list the fit
+ * ever loads observations for, and that it is disjoint from the seasons the scorecard judges on.
+ */
+export function rookieCurveTrainSeasons(): readonly number[] {
   const seasons: number[] = [];
   for (let season = HISTORICAL_ROSTER_FLOOR; season <= ROOKIE_CURVE_TRAIN_CUTOFF_SEASON; season += 1) seasons.push(season);
   return seasons;
@@ -63,22 +83,61 @@ export const FITTED_ROOKIE_CURVE: RookieCurvePriors = ${JSON.stringify(priors, n
 `;
 }
 
+/**
+ * THE TWO READS THIS FIT MAKES, injectable — the ingest (a WRITE, and the one a check must not make)
+ * and the observation load. Injected rather than imported directly inside the run so
+ * `rookie-curve-fit.test.ts` can prove the check-mode write never happens, without a database and
+ * without a network fetch of nflverse's whole draft-pick release.
+ */
+export interface RookieCurveFitDeps {
+  readonly ingest: (db: Db) => Promise<DraftPickIngestReport>;
+  readonly loadObservations: (db: ReadonlyDb, seasons: readonly number[]) => Promise<readonly RookieCurveObservation[]>;
+}
+
+const LIVE_DEPS: RookieCurveFitDeps = { ingest: ingestDraftPicks, loadObservations: loadRookieCurveObservations };
+
+export interface RookieCurveFitResult {
+  readonly priors: RookieCurvePriors;
+  readonly rendered: string;
+  readonly observationCount: number;
+  readonly observations: readonly RookieCurveObservation[];
+  readonly seasons: readonly number[];
+  /** `null` in check mode, ALWAYS — a check reads, it does not write. */
+  readonly ingestReport: DraftPickIngestReport | null;
+}
+
+/**
+ * THE FIT ITSELF, with the check/write decision taken BEFORE the only write it can make.
+ * Exported (and `main` guarded below) so the read-only guarantee is a tested property rather than a
+ * line somebody has to keep remembering.
+ */
+export async function runRookieCurveFit(
+  db: Db,
+  { check }: { readonly check: boolean },
+  deps: RookieCurveFitDeps = LIVE_DEPS,
+): Promise<RookieCurveFitResult> {
+  const ingestReport = check ? null : await deps.ingest(db);
+  const seasons = rookieCurveTrainSeasons();
+  const observations = await deps.loadObservations(db, seasons);
+  const priors = fitRookieCurve(observations, { heldOutSeasons: [] });
+  return { priors, rendered: render(priors), observationCount: observations.length, observations, seasons, ingestReport };
+}
+
 async function main(): Promise<void> {
   const check = process.argv.includes("--check");
   const db = createDb(requireEnv("DATABASE_URL"));
 
-  const ingestReport = await ingestDraftPicks(db);
-  console.log(
-    `draft_picks: ${ingestReport.entriesRead} picks read, ${ingestReport.written} new, ` +
-      `${ingestReport.unknownToUniverse} unknown to the universe`,
-  );
-
-  const seasons = trainSeasons();
-  const observations = await loadRookieCurveObservations(db, seasons);
+  const { priors, rendered, observations, seasons, ingestReport } = await runRookieCurveFit(db, { check });
   await db.$client.end();
 
+  console.log(
+    ingestReport === null
+      ? "draft_picks: NOT ingested — this is a --check run, and a check is read-only (fit-round Task 3)."
+      : `draft_picks: ${ingestReport.entriesRead} picks read, ${ingestReport.written} new, ` +
+          `${ingestReport.unknownToUniverse} unknown to the universe`,
+  );
+
   console.log(`\nROOKIE CURVE, fit on ${observations.length} rookie-season observations across seasons ${seasons.join(", ")}`);
-  const priors = fitRookieCurve(observations, { heldOutSeasons: [] });
 
   for (const position of POSITIONS) {
     const knots = priors[position];
@@ -88,8 +147,6 @@ async function main(): Promise<void> {
       `    sanity: ${SANITY_PICKS.map((pick) => `pick ${pick} = ${rookieCurve(position, pick, priors).toFixed(1)}pts`).join("   ")}`,
     );
   }
-
-  const rendered = render(priors);
 
   if (check) {
     const committed = readFileSync(OUTPUT, "utf-8");
@@ -105,9 +162,14 @@ async function main(): Promise<void> {
   console.log(`\nwrote ${OUTPUT}`);
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error: unknown) => {
-    console.error(error);
-    process.exit(1);
-  });
+// GUARDED, the identical `import.meta.url` discipline `scripts/preseason-persist.ts` already uses:
+// importing this module (a test asking whether a check writes) must not run the fit against a real
+// database, and running it as a script must behave exactly as it always did.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main()
+    .then(() => process.exit(0))
+    .catch((error: unknown) => {
+      console.error(error);
+      process.exit(1);
+    });
+}
