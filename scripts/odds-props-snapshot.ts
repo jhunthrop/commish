@@ -165,7 +165,17 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+// ENTRY-POINT GUARD. `runOddsSnapshot` above is imported by `scripts/season-week.ts`, and without
+// this guard THAT import alone would trigger a second, real, full snapshot run: ESM executes a
+// module's top-level statements on import, and an unconditional `main().catch(...)` is a top-level
+// statement. Found the hard way in this task's own real run — the props step fired twice, once
+// from this file loading as a side effect of the import and once from `season-week.ts` calling
+// `runOddsSnapshot` itself, doubling the real odds-API spend for nothing. Only run `main` when this
+// file is the process's own entry point, exactly the way it behaves when invoked directly via
+// `npm run projections:odds:snapshot`.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
