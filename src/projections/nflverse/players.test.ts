@@ -3,6 +3,7 @@ import { parseCsv } from "./csv";
 import { readFixture } from "./fixtures";
 import {
   buildPlayerUniverse,
+  isProjectedCandidate,
   mapNflPlayers,
   nflPlayerRows,
   projectedPosition,
@@ -98,6 +99,74 @@ describe("resolveAll", () => {
 
   it("reports null rather than a flattering 1.0 for an empty universe of candidates", () => {
     expect(universe.resolveAll([]).resolutionRate).toBeNull();
+  });
+});
+
+/**
+ * THE CROSSWALK CLASS, PINNED (fit-round Task 1). Each case below is a real shape measured in the
+ * published feeds, not a hypothetical: the fullback (4,704 dropped skill player-weeks across
+ * 2003-2024), the blank `position` column (Trent Richardson's 2012 rookie season), and the
+ * later-career spelling (a receiver a file lists as DL). Before this gate existed, all three were
+ * dropped BEFORE the universe was consulted, so none of them even appeared in the unresolved report
+ * that exists to make a silent drop visible.
+ */
+describe("isProjectedCandidate", () => {
+  function player(overrides: Partial<NflPlayer> & Pick<NflPlayer, "id" | "position">): NflPlayer {
+    return {
+      pfrId: null,
+      espnId: null,
+      name: "Test Player",
+      latestTeam: null,
+      rookieSeason: null,
+      lastSeason: null,
+      ...overrides,
+    };
+  }
+
+  const universe = buildPlayerUniverse([
+    player({ id: "00-0000001", position: "FB", name: "A Fullback", pfrId: "FullBa00" }),
+    player({ id: "00-0000002", position: "RB", name: "A Back", pfrId: "BackAa00" }),
+    player({ id: "00-0000003", position: "WR", name: "A Receiver", pfrId: "RecvAa00" }),
+    player({ id: "00-0000004", position: "C", name: "A Centre", pfrId: "CentAa00" }),
+  ]);
+
+  const gsis = (id: string) => ({ kind: "gsis" as const, id, name: "" });
+  const pfr = (id: string) => ({ kind: "pfr" as const, id, name: "" });
+
+  it("admits a fullback, because projectedPosition calls him a running back and the file does not", () => {
+    expect(isProjectedCandidate(universe, gsis("00-0000001"), "FB")).toBe(true);
+  });
+
+  it("admits a row whose position column is blank, because the universe knows what he plays", () => {
+    // Richardson's 2012: fifteen weeks published with an empty `position`, fifteen weeks dropped.
+    expect(isProjectedCandidate(universe, gsis("00-0000002"), "")).toBe(true);
+    expect(isProjectedCandidate(universe, gsis("00-0000002"), undefined)).toBe(true);
+  });
+
+  it("admits a receiver a file spells with a later-career position, because the universe governs", () => {
+    expect(isProjectedCandidate(universe, gsis("00-0000003"), "DL")).toBe(true);
+  });
+
+  it("refuses a centre however the file spells him, for the same reason", () => {
+    expect(isProjectedCandidate(universe, gsis("00-0000004"), "C")).toBe(false);
+    // The file claiming a projected position does NOT rescue him: the universe is what the backtest
+    // scores through, and a row stored for a man it cannot score is a row nothing reads.
+    expect(isProjectedCandidate(universe, gsis("00-0000004"), "WR")).toBe(false);
+  });
+
+  it("reads the same answer through the pfr id, which is the id the snap-count file carries", () => {
+    expect(isProjectedCandidate(universe, pfr("FullBa00"), "FB")).toBe(true);
+    expect(isProjectedCandidate(universe, pfr("CentAa00"), "WR")).toBe(false);
+  });
+
+  it("falls back to the file's own spelling ONLY for a man the universe cannot place", () => {
+    // He stays a candidate so he lands in the unresolved report, named and counted, rather than
+    // disappearing — and the fallback narrows through `projectedPosition`, so an unplaceable
+    // fullback counts as a missing skill player rather than as no player at all.
+    expect(isProjectedCandidate(universe, gsis("00-0009999"), "FB")).toBe(true);
+    expect(isProjectedCandidate(universe, gsis("00-0009999"), "WR")).toBe(true);
+    expect(isProjectedCandidate(universe, gsis("00-0009999"), "C")).toBe(false);
+    expect(isProjectedCandidate(universe, gsis("00-0009999"), "")).toBe(false);
   });
 });
 

@@ -2,7 +2,7 @@ import type { PlayerWeekTeam, TeamWeekObservation } from "../team-store";
 import { NFLVERSE_CONFIG } from "./config";
 import type { CsvRow } from "./csv";
 import { gameDayAsOf } from "./map";
-import type { PlayerUniverse } from "./players";
+import { isProjectedCandidate, type PlayerRef, type PlayerUniverse } from "./players";
 
 /**
  * TWO THINGS THE SNAP-COUNT FILE ALREADY CARRIES AND NOBODY WAS READING: which offence each player
@@ -61,12 +61,17 @@ export function mapPlayerTeams(
   universe: PlayerUniverse,
   lagHours = NFLVERSE_CONFIG.publicationLagHours,
 ): readonly PlayerWeekTeam[] {
-  const scored = snapCounts.filter(
-    (row) =>
-      row.game_type === NFLVERSE_CONFIG.seasonType &&
-      (NFLVERSE_CONFIG.scoredPositions as readonly string[]).includes(row.position ?? ""),
-  );
-  const refs = scored.map((row) => ({ kind: "pfr" as const, id: row.pfr_player_id ?? "", name: row.player ?? "" }));
+  // Narrowed by `isProjectedCandidate` (`players.ts`), which asks the UNIVERSE rather than the
+  // file's own `position` spelling — the fullback class this used to drop is documented there.
+  const scored: CsvRow[] = [];
+  const refs: PlayerRef[] = [];
+  for (const row of snapCounts) {
+    if (row.game_type !== NFLVERSE_CONFIG.seasonType) continue;
+    const ref: PlayerRef = { kind: "pfr", id: row.pfr_player_id ?? "", name: row.player ?? "" };
+    if (!isProjectedCandidate(universe, ref, row.position)) continue;
+    scored.push(row);
+    refs.push(ref);
+  }
   const { resolved } = universe.resolveAll(refs);
 
   const edges: PlayerWeekTeam[] = [];

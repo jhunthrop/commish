@@ -134,6 +134,30 @@ describe("mapParticipation", () => {
     const corrupt = SNAP_COUNTS.map((row) => (row.pfr_player_id === "AlleJo02" ? { ...row, offense_snaps: "" } : row));
     expect(() => mapParticipation({ snapCounts: corrupt, playerWeek: PLAYER_WEEK, universe })).toThrow(/offense_snaps/);
   });
+
+  it("participates a fullback, whom the snap-count file spells FB and the engine scores as a back", () => {
+    // The class fit-round Task 1 closed. The narrowing is the UNIVERSE's position now, not the
+    // file's: `projectedPosition` maps FB to RB deliberately, so a man the file calls a fullback is
+    // a running back to everything downstream and must not be dropped before resolution.
+    const fullbackUniverse = buildPlayerUniverse([
+      { id: "00-0031235", pfrId: "JuszKy00", espnId: null, name: "Kyle Juszczyk", position: "FB", latestTeam: "SF", rookieSeason: 2013, lastSeason: 2025 },
+    ]);
+    const row: CsvRow = {
+      game_id: "2024_01_SF_SF",
+      pfr_game_id: "202409090sfo",
+      season: "2024",
+      game_type: "REG",
+      week: "1",
+      player: "Kyle Juszczyk",
+      pfr_player_id: "JuszKy00",
+      position: "FB",
+      team: "SF",
+      offense_snaps: "22",
+    };
+    const result = mapParticipation({ snapCounts: [row], playerWeek: [], universe: fullbackUniverse });
+    expect(result.participation).toMatchObject([{ playerId: "00-0031235", week: 1, offensiveSnaps: 22 }]);
+    expect(result.resolutionRate).toBe(1);
+  });
 });
 
 describe("participationObservations", () => {

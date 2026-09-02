@@ -154,6 +154,42 @@ export interface PlayerUniverse {
   resolveAll(refs: readonly PlayerRef[]): UniverseResolution;
 }
 
+/**
+ * WHOSE POSITION DECIDES WHETHER A FILE ROW IS A CANDIDATE: the UNIVERSE's, wherever the universe
+ * knows the man; the file's own spelling ONLY where it does not.
+ *
+ * THE CLASS THIS RETIRES (fit-round Task 1). Every mapper reading an nflverse file used to gate its
+ * rows on `NFLVERSE_CONFIG.scoredPositions`, a four-string list matched against the FILE's own
+ * `position` column, and then narrow the survivors a SECOND time through `projectedPosition` on the
+ * UNIVERSE's position. Two narrowings with two different vocabularies, and the file's one ran FIRST,
+ * so wherever the two disagreed the file silently won and the row never reached the universe at all.
+ * Measured against the published weekly stats for 2003-2024: 4,828 skill player-weeks were dropped
+ * before resolution, and every one of them was a spelling disagreement rather than an identity
+ * problem. The dominant case is the fullback: `projectedPosition` maps FB to RB DELIBERATELY (see its
+ * own docblock, "every fantasy scoring system in existence treats him as one") while
+ * `scoredPositions` never carried FB, so 4,704 of the 4,828 are fullbacks, 110 men across 22 seasons,
+ * absent from the store as skill players entirely. The rest are a blank `position` column (Trent
+ * Richardson's whole 2012 rookie season, 15 weeks of it, sits in this bucket) and a handful of rows
+ * carrying a later-career spelling (a receiver the file lists as DL).
+ *
+ * WHY THE FILE'S SPELLING SURVIVES AT ALL, for the unresolved. A row the universe cannot place has no
+ * other position to read, and admitting every unplaceable row instead would fill the unresolved
+ * report with linemen and turn the resolution rate into a statement about the whole league rather
+ * than about the players this engine projects. `projectedPosition` rather than `scoredPositions` even
+ * there, so a fullback nobody can place is still counted as one missing skill player rather than as
+ * no player at all.
+ *
+ * ONE NARROWING, NOT TWO, is the whole point. `projectedPosition` is now the only function in this
+ * codebase that decides who is projectable, and it is the same one `allPositions` (`backtest.ts`) has
+ * always used to decide who is SCOREABLE. Those two answers must agree, or a player is ingested and
+ * then dropped at scoring time — or, as here, never ingested and quietly missing from every
+ * measurement built on top of the store.
+ */
+export function isProjectedCandidate(universe: PlayerUniverse, ref: PlayerRef, filePosition: string | undefined): boolean {
+  const known = ref.kind === "gsis" ? universe.byGsisId(ref.id) : universe.byPfrId(ref.id);
+  return projectedPosition(known?.position ?? filePosition?.trim() ?? "") !== null;
+}
+
 export function buildPlayerUniverse(universe: readonly NflPlayer[]): PlayerUniverse {
   const byGsis = new Map<string, NflPlayer>();
   const byPfr = new Map<string, NflPlayer>();

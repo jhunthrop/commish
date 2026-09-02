@@ -32,6 +32,28 @@ describe("mapPlayerTeams", () => {
     expect(edges.length).toBeGreaterThan(0);
     expect(new Set(edges.map((edge) => edge.team))).toEqual(new Set(["BUF"]));
   });
+
+  it("builds an edge for a fullback, whom the snap-count file spells FB and the engine scores as a back", () => {
+    // The class fit-round Task 1 closed: the file's own `position` column used to gate these rows
+    // before the universe was consulted, and `NFLVERSE_CONFIG.scoredPositions` never carried FB, so
+    // every fullback in the league was missing from `player_week_teams` and from participation.
+    const fullbackUniverse = buildPlayerUniverse([
+      { id: "00-0031235", pfrId: "JuszKy00", espnId: null, name: "Kyle Juszczyk", position: "FB", latestTeam: "SF", rookieSeason: 2013, lastSeason: 2025 },
+    ]);
+    const row: CsvRow = {
+      game_id: "2024_01_SF_SF",
+      pfr_game_id: "202409090sfo",
+      season: "2024",
+      game_type: "REG",
+      week: "1",
+      player: "Kyle Juszczyk",
+      pfr_player_id: "JuszKy00",
+      position: "FB",
+      team: "SF",
+      offense_snaps: "22",
+    };
+    expect(mapPlayerTeams([row], fullbackUniverse)).toMatchObject([{ playerId: "00-0031235", team: "SF", week: 1 }]);
+  });
 });
 
 describe("lineContinuityObservations", () => {

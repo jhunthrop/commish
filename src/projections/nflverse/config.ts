@@ -75,7 +75,16 @@ export const NFLVERSE_CONFIG = {
    * direction.
    */
   publicationLagHours: 24,
-  /** Only the regular season is scored, and only these positions are projected. */
+  /**
+   * Only the regular season is scored.
+   *
+   * THERE IS NO `scoredPositions` HERE ANY MORE (fit-round Task 1). It used to sit beside this line
+   * as `["QB", "RB", "WR", "TE"]` and was matched against each file's own `position` column — a
+   * second, narrower opinion about who this engine projects, competing with `projectedPosition`
+   * (`players.ts`), which is the real one and which maps FB and HB to RB deliberately. Where the two
+   * disagreed the file's spelling won and the row was dropped before the universe was ever asked,
+   * costing 4,828 skill player-weeks across 2003-2024. `isProjectedCandidate` (`players.ts`) is the
+   * one gate now; deleting the constant is what stops the second opinion coming back.
+   */
   seasonType: "REG",
-  scoredPositions: ["QB", "RB", "WR", "TE"],
 } as const;

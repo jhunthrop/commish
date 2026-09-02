@@ -1,7 +1,7 @@
 import type { PlayerWeekObservation } from "../store";
 import { NFLVERSE_CONFIG } from "./config";
 import type { CsvRow } from "./csv";
-import { projectedPosition, type PlayerRef, type PlayerUniverse, type UnresolvedRef } from "./players";
+import { isProjectedCandidate, type PlayerRef, type PlayerUniverse, type UnresolvedRef } from "./players";
 
 /**
  * SNAP COUNTS AND TARGETS — the participation layer, and the reason this whole module exists.
@@ -264,10 +264,14 @@ function usageByPlayerAndTeam(rows: readonly CsvRow[]): {
  * against it is inflated by roughly a third — a number that looks plausible, which is why it would
  * survive review.
  *
- * Two narrowings, and they are not the same one. The file's own position decides who is a
- * CANDIDATE, because that is all that is knowable before resolving; the UNIVERSE's position decides
- * who is projected, because `nfl_players.position` is what the backtest scores through and the two
- * must agree or a player would be ingested and then silently dropped at scoring time.
+ * ONE NARROWING, AND THE UNIVERSE OWNS IT (fit-round Task 1). This used to be two: the file's own
+ * `position` column decided who was a CANDIDATE and the universe's position decided who was
+ * PROJECTED, on the reasoning that the file's spelling "is all that is knowable before resolving".
+ * That reasoning was wrong — the row carries the id, and the universe is a pure lookup — and the cost
+ * was real: the snap-count file spells a fullback FB, `NFLVERSE_CONFIG.scoredPositions` never carried
+ * FB, and `projectedPosition` maps FB to RB deliberately, so every fullback in the league was dropped
+ * from participation before the universe was consulted. `isProjectedCandidate` (`players.ts`) is now
+ * the single gate; see its docblock for the measured size of the class.
  */
 export function mapParticipation({
   snapCounts,
@@ -278,25 +282,25 @@ export function mapParticipation({
   const teamSnaps = teamSnapsByGame(snapCounts);
   const { byPlayer: playerUsage, byTeam: teamUsage } = usageByPlayerAndTeam(playerWeek);
 
-  const scored = snapCounts.filter(
-    (row) =>
-      row.game_type === NFLVERSE_CONFIG.seasonType &&
-      (NFLVERSE_CONFIG.scoredPositions as readonly string[]).includes(row.position ?? ""),
-  );
-  const refs: readonly PlayerRef[] = scored.map((row) => ({
-    kind: "pfr" as const,
-    id: row.pfr_player_id ?? "",
-    name: row.player ?? "",
-  }));
+  // Row and ref are collected together so their indices cannot drift apart.
+  const scored: CsvRow[] = [];
+  const refs: PlayerRef[] = [];
+  for (const row of snapCounts) {
+    if (row.game_type !== NFLVERSE_CONFIG.seasonType) continue;
+    const ref: PlayerRef = { kind: "pfr", id: row.pfr_player_id ?? "", name: row.player ?? "" };
+    if (!isProjectedCandidate(universe, ref, row.position)) continue;
+    scored.push(row);
+    refs.push(ref);
+  }
   const { resolved, unresolved, resolutionRate } = universe.resolveAll(refs);
 
   const participation: PlayerWeekParticipation[] = [];
   for (const [index, row] of scored.entries()) {
     const playerId = resolved.get(refs[index]!.id);
     // Unresolved players are NOT silently skipped — they are on `unresolved`, named and counted.
-    // They are merely not stored, because there is no id to store them against.
+    // They are merely not stored, because there is no id to store them against. No second position
+    // check follows: `isProjectedCandidate` already asked the universe about everyone it knows.
     if (playerId === undefined) continue;
-    if (projectedPosition(universe.byGsisId(playerId)!.position) === null) continue;
     const week = numeric(row, "week");
     // The player's own team for THIS week comes from the snap row he appears on, not from any
     // roster: a player traded in October has two teams in one season, and his shares belong to

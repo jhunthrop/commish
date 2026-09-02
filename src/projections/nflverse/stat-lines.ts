@@ -4,7 +4,7 @@ import type { PlayerWeekObservation } from "../store";
 import { NFLVERSE_CONFIG } from "./config";
 import type { CsvRow } from "./csv";
 import { NFLVERSE_SOURCE } from "./map";
-import { projectedPosition, type PlayerRef, type PlayerUniverse, type UnresolvedRef } from "./players";
+import { isProjectedCandidate, type PlayerRef, type PlayerUniverse, type UnresolvedRef } from "./players";
 
 /**
  * THE ACTUALS — what a player really did, which is the other half of every measurement the harness
@@ -173,25 +173,28 @@ function statValue(row: CsvRow, columns: readonly string[]): number {
 }
 
 export function mapStatLines({ playerWeek, weekAsOf, universe }: MapStatLinesInput): MapStatLinesResult {
-  const scored = playerWeek.filter(
-    (row) =>
-      row.season_type === NFLVERSE_CONFIG.seasonType &&
-      (NFLVERSE_CONFIG.scoredPositions as readonly string[]).includes(row.position ?? ""),
-  );
-  const refs: readonly PlayerRef[] = scored.map((row) => ({
-    kind: "gsis" as const,
-    id: row.player_id ?? "",
-    name: row.player_display_name ?? "",
-  }));
+  // ONE NARROWING, and the universe owns it — see `isProjectedCandidate` for the 4,828 skill
+  // player-weeks the old file-spelling gate was dropping before the universe was ever consulted.
+  // Row and ref are collected together so their indices cannot drift apart.
+  const scored: CsvRow[] = [];
+  const refs: PlayerRef[] = [];
+  for (const row of playerWeek) {
+    if (row.season_type !== NFLVERSE_CONFIG.seasonType) continue;
+    const ref: PlayerRef = { kind: "gsis", id: row.player_id ?? "", name: row.player_display_name ?? "" };
+    if (!isProjectedCandidate(universe, ref, row.position)) continue;
+    scored.push(row);
+    refs.push(ref);
+  }
   const { resolved, unresolved, resolutionRate } = universe.resolveAll(refs);
 
   const statLines: SeasonStatLine[] = [];
   for (const [index, row] of scored.entries()) {
     const playerId = resolved.get(refs[index]!.id);
+    // Unresolved people are NOT silently skipped — they are on `unresolved`, named and counted.
+    // There is no second position check after this one: `isProjectedCandidate` already asked the
+    // universe about everyone the universe knows, and everyone who resolved is by definition one of
+    // them.
     if (playerId === undefined) continue;
-    // The universe's position governs, exactly as in `mapParticipation`: an outcome stored for a
-    // player the backtest cannot score is a row nothing will ever read.
-    if (projectedPosition(universe.byGsisId(playerId)!.position) === null) continue;
     const week = Number(row.week);
     const asOf = weekAsOf.get(week);
     // Throws rather than defaulting to a stamp of its own: a fact whose as-of we had to invent is

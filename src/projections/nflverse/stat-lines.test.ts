@@ -90,6 +90,55 @@ describe("mapStatLines", () => {
 });
 
 /**
+ * THE CROSSWALK CLASS AT THE STAT-LINE SEAM (fit-round Task 1).
+ *
+ * `mapStatLines` used to gate on the weekly file's own `position` column before the universe was
+ * consulted, so a published stat line whose spelling disagreed with `nfl_players.position` never
+ * became a row. Trent Richardson's whole 2012 rookie season is the loudest instance and the fullback
+ * is the largest class; both are rebuilt here from the shape the real files publish.
+ */
+describe("mapStatLines narrows through the universe, never through the file's position column", () => {
+  const classUniverse = buildPlayerUniverse([
+    { id: "00-0029675", pfrId: "RichTr00", espnId: null, name: "Trent Richardson", position: "RB", latestTeam: "IND", rookieSeason: 2012, lastSeason: 2014 },
+    { id: "00-0020270", pfrId: "NealLo00", espnId: null, name: "Lorenzo Neal", position: "FB", latestTeam: "SD", rookieSeason: 1993, lastSeason: 2008 },
+    { id: "00-0000777", pfrId: "CentAa00", espnId: null, name: "A Centre", position: "C", latestTeam: "BUF", rookieSeason: 2012, lastSeason: 2012 },
+  ]);
+  const weekAsOf = new Map([[1, new Date("2012-09-11T00:00:00.000Z")]]);
+  /** One published weekly row, with only the columns this mapper reads. */
+  function row(playerId: string, position: string, rushingYards: string) {
+    return { player_id: playerId, player_display_name: "n/a", position, season: "2012", week: "1", season_type: "REG", rushing_yards: rushingYards };
+  }
+
+  function idsFrom(rows: readonly ReturnType<typeof row>[]) {
+    return mapStatLines({ playerWeek: rows, weekAsOf, universe: classUniverse }).statLines.map((line) => line.line.playerId);
+  }
+
+  it("keeps a published line whose position column is blank", () => {
+    // The 2012 file publishes Richardson's fifteen weeks with an empty `position`. Fifteen weeks of
+    // a third overall pick's rookie season were silently absent from the store because of it.
+    expect(idsFrom([row("00-0029675", "", "109")])).toEqual(["00-0029675"]);
+  });
+
+  it("keeps a fullback, whom projectedPosition scores as a running back", () => {
+    expect(idsFrom([row("00-0020270", "FB", "41")])).toEqual(["00-0020270"]);
+  });
+
+  it("still drops a centre, whom the universe does not project", () => {
+    expect(idsFrom([row("00-0000777", "C", "0")])).toEqual([]);
+  });
+
+  it("counts only projectable people in the resolution rate, so the number keeps its meaning", () => {
+    const result = mapStatLines({
+      playerWeek: [row("00-0029675", "", "109"), row("00-0020270", "FB", "41"), row("00-0000777", "C", "0")],
+      weekAsOf,
+      universe: classUniverse,
+    });
+    expect(result.resolutionRate).toBe(1);
+    expect(result.unresolved).toEqual([]);
+  });
+});
+
+/**
  * THE PER-SEASON SOURCE DECISION, PINNED (discovery-expansion Task 1). Which seasons are read from
  * the published feed and which are derived from play-by-play is not a preference, it is a per-season
  * fact about what nflverse released, audited by `HEAD` before any of it was ingested. These
