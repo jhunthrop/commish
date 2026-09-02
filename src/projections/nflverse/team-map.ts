@@ -89,6 +89,70 @@ export function mapPlayerTeams(
   return edges;
 }
 
+/**
+ * THE SAME EDGE, FROM THE OTHER FILE — which offence each player was in, read off the PUBLISHED
+ * WEEKLY STATS' own `team` column rather than off a snap-count row.
+ *
+ * WHY A SECOND SOURCE EXISTS AT ALL, and why it is not a preference. `mapPlayerTeams` above is the
+ * better one and stays the default wherever it can run: a snap-count row carries `pfr_game_id`, so
+ * each edge dates itself from the player's OWN game. Below `SNAP_COUNT_ASSET_FLOOR` (2013) there are
+ * no snap-count rows to read — 2011 and older 404, 2012 is published with zero data rows — so for
+ * 2003-2012 the store held a full set of published stat lines and NO team edge at all. That gap was
+ * not cosmetic: `incomingTeamWinTotal` resolves a player to a team through `player_week_teams`, so
+ * the whole collapse-direction question the previous round asked of the extended decade read null for
+ * every player in it and matched exactly the seasons it had matched before the window ever moved
+ * (`docs/research/2026-09-01-discovery-expansion-closeout.md`, section 6). `wr_target_competition`
+ * is blocked on the same edge.
+ *
+ * THE SAME SHAPE, NOT A PARALLEL ONE. It emits `PlayerWeekTeam`, narrows through the identical
+ * `isProjectedCandidate` gate, and resolves identity through the universe the identical way — only
+ * the id space differs (the weekly file carries the gsis id, the snap-count file the pfr id) and only
+ * the stamp is derived differently.
+ *
+ * THE STAMP IS THE WEEK'S, NOT THE GAME'S, and that is the honest direction. With no
+ * `pfr_game_id` there is no per-player game day to read, so this takes `weekAsOf` — the map
+ * `weekAsOfFromSchedule` builds from the week's LAST game, which is exactly what `mapStatLines`
+ * already dates those same seasons' stat lines from. Two consequences, both wanted: the edge and the
+ * stat line that prove the same Sunday share one stamp, and where the two differ this is the LATER
+ * of the two possible answers, so a replay learns a man's team no earlier than it could have, never
+ * sooner.
+ *
+ * A WEEK WITH NO STAMP IS SKIPPED, not stamped with a guess: the same rule `mapStatLines` states, one
+ * degree softer because that function can throw where this one is called for a season whose schedule
+ * is what supplied the map in the first place. A missing week here means the schedule ingest did not
+ * reach it, and an edge invented for it would be a claim about knowledge with nothing behind it.
+ */
+export function mapPlayerTeamsFromWeeklyStats(
+  playerWeek: readonly CsvRow[],
+  season: number,
+  weekAsOf: ReadonlyMap<number, Date>,
+  universe: PlayerUniverse,
+): readonly PlayerWeekTeam[] {
+  const scored: CsvRow[] = [];
+  const refs: PlayerRef[] = [];
+  for (const row of playerWeek) {
+    if (row.season_type !== NFLVERSE_CONFIG.seasonType) continue;
+    const ref: PlayerRef = { kind: "gsis", id: row.player_id ?? "", name: row.player_display_name ?? "" };
+    if (!isProjectedCandidate(universe, ref, row.position)) continue;
+    scored.push(row);
+    refs.push(ref);
+  }
+  const { resolved } = universe.resolveAll(refs);
+
+  const edges: PlayerWeekTeam[] = [];
+  for (const [index, row] of scored.entries()) {
+    const playerId = resolved.get(refs[index]!.id);
+    if (playerId === undefined) continue;
+    const team = row.team ?? "";
+    if (team === "") continue;
+    const week = numeric(row, "week");
+    const asOf = weekAsOf.get(week);
+    if (asOf === undefined) continue;
+    edges.push({ season, week, playerId, team, asOf });
+  }
+  return edges;
+}
+
 /** One team's starting five for one week, and when that became knowable. */
 interface WeeklyLine {
   readonly week: number;

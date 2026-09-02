@@ -41,7 +41,7 @@ import {
   SCHEDULE_SOURCE_CONFIG,
 } from "./schedule";
 import { mapStatLines, statLineObservations, STAT_LINE_GAPS } from "./stat-lines";
-import { lineContinuityObservations, mapPlayerTeams } from "./team-map";
+import { lineContinuityObservations, mapPlayerTeams, mapPlayerTeamsFromWeeklyStats } from "./team-map";
 
 /**
  * ONE SEASON, FROM RELEASE TO STORE — the sequence every script that touches nflverse runs.
@@ -111,6 +111,13 @@ export interface SeasonIngestReport {
    * about the upstream release, not a thin ingestion.
    */
   readonly snapCountsUnavailable: boolean;
+  /**
+   * Player-week team edges ACTUALLY written this run - 0 for a re-run of a landed season, the same
+   * contract every other count here keeps. Reported because the source of these edges depends on the
+   * season (snap counts above `SNAP_COUNT_ASSET_FLOOR`, the published weekly stats' own `team` column
+   * below it) and an operator backfilling the old decade needs to see them land rather than assume it.
+   */
+  readonly playerTeamEdges: number;
 }
 
 /** Fetches and stores the historical player universe. Run once, before any season. */
@@ -296,10 +303,21 @@ export async function ingestSeason(
     (await recordObservations(db, participationRows)) +
     (await recordObservations(db, statLineObservations(statLines.statLines)));
 
-  // Both derived from the snap counts already in hand, so they cost no second download. The
-  // player-to-team edge is what every Phase 3 context feature joins on, and line continuity is the
-  // one part of the offensive line composite that needs no play-by-play at all.
-  await recordPlayerTeams(db, mapPlayerTeams(snapCounts, universe));
+  // THE PLAYER-TO-TEAM EDGE, FROM WHICHEVER FILE CAN PROVE IT (fit-round Task 1). Snap counts are
+  // the better source and win wherever they exist: each row carries `pfr_game_id`, so the edge dates
+  // itself from the player's own game. Below `SNAP_COUNT_ASSET_FLOOR` there are none, and until this
+  // branch existed the 2003-2012 seasons landed a full set of published stat lines and NO team edge
+  // at all — which is what left `incomingTeamWinTotal` and `wr_target_competition` reading null for
+  // the whole extended decade. The published weekly file carries a `team` per player-week and dates
+  // from the same `weekAsOf` its own stat lines do. See `mapPlayerTeamsFromWeeklyStats`.
+  const playerTeams =
+    snapCounts.length > 0
+      ? mapPlayerTeams(snapCounts, universe)
+      : mapPlayerTeamsFromWeeklyStats(playerWeek, season, weekAsOf, universe);
+  const playerTeamEdges = await recordPlayerTeams(db, playerTeams);
+  // Line continuity has no second source and needs none: it is a fact about five OFFENSIVE LINEMEN,
+  // whom the weekly stats file does not carry at all. A season below the snap-count floor simply has
+  // none, exactly as it has no participation.
   await recordTeamObservations(db, lineContinuityObservations(snapCounts, season));
 
   const unresolved = new Map<string, { id: string; name: string; occurrences: number }>();
@@ -322,6 +340,7 @@ export async function ingestSeason(
     weekAsOf,
     playerWeekUnavailable: playerWeek.length === 0,
     snapCountsUnavailable: snapCounts.length === 0,
+    playerTeamEdges,
   };
 }
 

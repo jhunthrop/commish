@@ -275,6 +275,10 @@ async function main(): Promise<void> {
         `${report.observationsWritten} new observations | universe ${percent(report.participationResolution)} participation, ` +
         `${percent(report.statLineResolution)} weekly stats${belowBar ? "  <-- BELOW THE BAR" : ""}`,
     );
+    console.log(
+      `    ${report.playerTeamEdges} new player-week team edges, from ` +
+        `${report.snapCountsUnavailable ? "the published weekly stats' own team column" : "the snap counts"}`,
+    );
     if (report.snapCountsUnavailable) {
       console.log(`    no participation for ${season}: nflverse has no snap-count rows before ${SNAP_COUNT_ASSET_FLOOR}`);
     }

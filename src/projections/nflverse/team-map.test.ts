@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseCsv, type CsvRow } from "./csv";
 import { readFixture } from "./fixtures";
 import { buildPlayerUniverse, mapNflPlayers } from "./players";
-import { CONTINUITY_METRICS, lineContinuityObservations, mapPlayerTeams } from "./team-map";
+import { CONTINUITY_METRICS, lineContinuityObservations, mapPlayerTeams, mapPlayerTeamsFromWeeklyStats } from "./team-map";
 
 const SNAP_COUNTS = parseCsv(readFixture("snap_counts_2024_buf_w1-3.csv"));
 const universe = buildPlayerUniverse(mapNflPlayers(parseCsv(readFixture("players_slice.csv"))));
@@ -53,6 +53,71 @@ describe("mapPlayerTeams", () => {
       offense_snaps: "22",
     };
     expect(mapPlayerTeams([row], fullbackUniverse)).toMatchObject([{ playerId: "00-0031235", team: "SF", week: 1 }]);
+  });
+});
+
+/**
+ * THE PRE-2013 ARM (fit-round Task 1). Below `SNAP_COUNT_ASSET_FLOOR` there is no snap-count file to
+ * read a team off, and the store held a full set of published stat lines for 2003-2012 with no team
+ * edge at all — the measured reason `incomingTeamWinTotal` read null for the whole extended decade.
+ */
+describe("mapPlayerTeamsFromWeeklyStats", () => {
+  const oldDecadeUniverse = buildPlayerUniverse([
+    { id: "00-0029675", pfrId: "RichTr00", espnId: null, name: "Trent Richardson", position: "RB", latestTeam: "IND", rookieSeason: 2012, lastSeason: 2014 },
+    { id: "00-0000777", pfrId: "CentAa00", espnId: null, name: "A Centre", position: "C", latestTeam: "CLE", rookieSeason: 2012, lastSeason: 2012 },
+  ]);
+  const WEEK_AS_OF = new Map([
+    [1, new Date("2012-09-11T00:00:00.000Z")],
+    [2, new Date("2012-09-18T00:00:00.000Z")],
+  ]);
+  function weeklyRow(playerId: string, position: string, week: string, team: string): CsvRow {
+    return { player_id: playerId, player_display_name: "n/a", position, season: "2012", week, season_type: "REG", team };
+  }
+
+  it("reads the offence off the published weekly file's own team column", () => {
+    const edges = mapPlayerTeamsFromWeeklyStats(
+      [weeklyRow("00-0029675", "", "1", "CLE"), weeklyRow("00-0029675", "", "2", "CLE")],
+      2012,
+      WEEK_AS_OF,
+      oldDecadeUniverse,
+    );
+    expect(edges).toEqual([
+      { season: 2012, week: 1, playerId: "00-0029675", team: "CLE", asOf: WEEK_AS_OF.get(1) },
+      { season: 2012, week: 2, playerId: "00-0029675", team: "CLE", asOf: WEEK_AS_OF.get(2) },
+    ]);
+  });
+
+  it("carries a midseason move, because the edge is per week and comes off the row he appears on", () => {
+    const edges = mapPlayerTeamsFromWeeklyStats(
+      [weeklyRow("00-0029675", "RB", "1", "CLE"), weeklyRow("00-0029675", "RB", "2", "IND")],
+      2012,
+      WEEK_AS_OF,
+      oldDecadeUniverse,
+    );
+    expect(edges.map((edge) => [edge.week, edge.team])).toEqual([[1, "CLE"], [2, "IND"]]);
+  });
+
+  it("stamps from the week's own as-of, the same map the season's stat lines are dated from", () => {
+    const [edge] = mapPlayerTeamsFromWeeklyStats([weeklyRow("00-0029675", "RB", "1", "CLE")], 2012, WEEK_AS_OF, oldDecadeUniverse);
+    expect(edge!.asOf).toEqual(WEEK_AS_OF.get(1));
+  });
+
+  it("narrows to the projected positions the same way the snap-count arm does", () => {
+    expect(mapPlayerTeamsFromWeeklyStats([weeklyRow("00-0000777", "C", "1", "CLE")], 2012, WEEK_AS_OF, oldDecadeUniverse)).toEqual([]);
+  });
+
+  it("ignores anything that is not a regular-season row", () => {
+    const post = { ...weeklyRow("00-0029675", "RB", "1", "CLE"), season_type: "POST" };
+    expect(mapPlayerTeamsFromWeeklyStats([post], 2012, WEEK_AS_OF, oldDecadeUniverse)).toEqual([]);
+  });
+
+  it("skips a week the schedule could not date rather than inventing a stamp for it", () => {
+    // A fact whose as-of we had to invent is exactly the fact that later turns out to have leaked.
+    expect(mapPlayerTeamsFromWeeklyStats([weeklyRow("00-0029675", "RB", "9", "CLE")], 2012, WEEK_AS_OF, oldDecadeUniverse)).toEqual([]);
+  });
+
+  it("skips a row with no team rather than writing an empty edge", () => {
+    expect(mapPlayerTeamsFromWeeklyStats([weeklyRow("00-0029675", "RB", "1", "")], 2012, WEEK_AS_OF, oldDecadeUniverse)).toEqual([]);
   });
 });
 
