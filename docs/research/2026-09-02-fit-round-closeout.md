@@ -7,9 +7,9 @@
 This round did five things: it fixed a crosswalk bug that had been silently dropping fullbacks from
 the store since 2003; it raised the roster floor and rebuilt the player-team map back to 2003; it
 re-measured every law on the completed decade; it fit a new blend and a new rookie curve on that
-completed evidence; and it did not ship either fit. THE BAR — beat ADP on 2024, held out, beyond
-noise — broke twice, once on searched constants and once on a corrections-only rebuild. Both breaks
-were honored exactly as the plan requires: no tuning, no third read, `BOARD_SOURCE` reverted to
+completed evidence; and it did not ship either fit. THE BAR (beat ADP on 2024, held out, beyond noise)
+broke twice, once on searched constants and once on a corrections-only rebuild. Both breaks were
+honored exactly as the plan requires: no tuning, no third read, `BOARD_SOURCE` reverted to
 `commish_board_v7_ppr_12` both times. Mid-round, the founder pushed launch to 2027 and reshaped the
 next round from a shipping sprint into a data-year machine. This document is the record of all of it,
 including the part where the system worked by refusing to ship.
@@ -23,7 +23,7 @@ including the part where the system worked by refusing to ship.
 Every nflverse mapper gated its rows on a four-string list (`QB`, `RB`, `WR`, `TE`) matched against
 the published file's OWN `position` column, before ever consulting the universe's `projectedPosition`.
 Wherever a file's spelling disagreed with the universe's, the file won silently, and the row never
-reached the universe — not even into the unresolved report that exists to make a silent drop visible.
+reached the universe, not even into the unresolved report that exists to make a silent drop visible.
 Richardson's 2012 file publishes his fifteen weeks with an EMPTY `position` column; `""` is not in the
 four-string list, so his rookie season vanished at the gate although his gsis id was byte-identical to
 the store's own.
@@ -32,8 +32,8 @@ the store's own.
 position SPELLING disagreement, not an identity problem. The dominant case is the fullback:
 `projectedPosition` maps FB to RB deliberately, but `scoredPositions` never carried FB, so 4,704 of
 the 4,828 are fullbacks and the league's fullbacks were absent from the store as skill players
-entirely, in every season 2003-2024, not only the old decade. The fix — `isProjectedCandidate`, one
-gate read by all three mappers, universe position first and file spelling only as fallback — was
+entirely, in every season 2003-2024, not only the old decade. The fix, `isProjectedCandidate` (one
+gate read by all three mappers, universe position first and file spelling only as fallback), was
 landed across the whole window rather than the old decade alone, because a store with fullbacks in
 one half and not the other would bias every law comparing the halves. 97,322 new observations landed,
 all additive: every pre-existing observation collided on its own fact index and was kept unchanged.
@@ -47,15 +47,15 @@ definition. Every consumer was adjudicated by name rather than swept:
 | consumer | effect of the raise |
 | --- | --- |
 | `preseason/ingest.ts` `historicalWeek1RosterAsOf` | accepts 2003, stamped from that season's own kickoff |
-| `model/efficiency.ts` `experienceCohort` | first-roster seasons 2004-2013 stop being right-censored and become real measurements in the year-4-to-6 cohort — a deliberate fitted-input change |
+| `model/efficiency.ts` `experienceCohort` | first-roster seasons 2004-2013 stop being right-censored and become real measurements in the year-4-to-6 cohort: a deliberate fitted-input change |
 | `preseason/store.ts` `firstRosterSeasonsThrough`, `scripts/projection-fit.ts`, `backtest.ts` | wider cohort membership, fit and prediction moving together |
-| `laws/populations.ts` `seasonContext` | `age`, `experienceYear`, `draftPick` now resolve for 2003-2012 — the point of the exercise |
+| `laws/populations.ts` `seasonContext` | `age`, `experienceYear`, `draftPick` now resolve for 2003-2012: the point of the exercise |
 | `scripts/rookie-curve-fit.ts` | trains on 2003-2021 (nineteen rookie classes) instead of 2013-2021 (nine) |
 | `scripts/market-curve-fit.ts`, `scripts/blend-fit.ts` | deliberately did NOT follow the roster floor; split into a new `BENCHMARK_BOARD_FLOOR` (2013, unchanged in value) because no ADP board exists before 2013 and pooling ten empty seasons would have reported a curve with a decade of evidence it never had |
 
 One incidental ingest was reported rather than buried: the shipped preseason-ingest path also pulls
 week-one depth charts, and nflverse publishes them back to 2002 despite a stale docblock claim of
-"back to 2019," so 2003-2012 depth charts landed too — additive, correctly stamped, accepted as
+"back to 2019," so 2003-2012 depth charts landed too: additive, correctly stamped, accepted as
 shipped-ingest behavior.
 
 ### 1c. The team map: 54,196 edges
@@ -64,7 +64,7 @@ shipped-ingest behavior.
 matching `mapPlayerTeams`'s shape exactly (same gate, same universe resolution), differing only in id
 space (gsis, not pfr) and stamp source (`weekAsOf`, the same map that already dates those seasons'
 stat lines). **54,196 edges** across ten seasons, spot-checked against upstream week by week for five
-players chosen for shape, all five matching exactly — including Randy Moss's 2010 three-club season
+players chosen for shape, all five matching exactly, including Randy Moss's 2010 three-club season
 (NE, MIN, TEN), resolved correctly per week, which is exactly what a season-level roster join would
 have gotten wrong.
 
@@ -83,7 +83,7 @@ completed store:
 | 2012 | 3 | Trent Richardson | 15 | **254.7** | 950 | 11 | 51 |
 
 Six of six. Richardson resolves at 254.7 approximate PPR points, 950 rushing yards, 11 rushing
-touchdowns — the real-world shape the round set out to restore.
+touchdowns: the real-world shape the round set out to restore.
 
 ---
 
@@ -94,8 +94,8 @@ touchdowns — the real-world shape the round set out to restore.
 Six laws in, six laws out, same six verdicts. `rb_age_curve` tripled its sample, 171 to 504 pairs, and
 kept its answer (effect -1.250 to -1.265): **its 95% interval narrowed from 1.75 points wide to
 0.95**, roughly halved, on evidence that is no longer thin. `td_regression` gained pairs in every
-fold, including the modern ones (n 1,480 to 1,616), because the crosswalk fix — not only the roster
-backfill — restored player-seasons across the whole window. `play_caller_fingerprint`'s replication
+fold, including the modern ones (n 1,480 to 1,616), because the crosswalk fix, not only the roster
+backfill, restored player-seasons across the whole window. `play_caller_fingerprint`'s replication
 folds did not move at all while its window-wide n grew 238 to 263; every pair it gained sits in
 2003-2012, and it stays debunked, on more evidence. The other three (`rb_workload_cliff`,
 `target_share_persistence`, `wr_target_competition`) are byte-identical: they need participation, and
@@ -105,14 +105,14 @@ the snap-count asset floor is still 2013.
 
 The quantile table was refit on 10,890 train player-seasons (2003-2021): 222 of 378 thresholds moved,
 all checked mechanically (0 order violations, 0 band overlaps across 315 adjacent pairs). Candidates
-regenerated from the refit table: **4,165 candidates, 177 BH survivors, 90 confirmed** — not the
+regenerated from the refit table: **4,165 candidates, 177 BH survivors, 90 confirmed**, not the
 41/94 figures the Task 1 preview reported, which reproduced to the digit against the STALE
 pre-round quantile table and were formally superseded. The refit is a net restraint: it removes 23
 confirmations the stale thresholds would have granted and adds 19 the stale thresholds would have
 missed.
 
-**The decomposition method.** `runDiscoveryPipeline` is pure — it reads no database once its rows are
-dumped — so the whole trial reruns under a counterfactual store state by masking rows, at about three
+**The decomposition method.** `runDiscoveryPipeline` is pure (it reads no database once its rows are
+dumped), so the whole trial reruns under a counterfactual store state by masking rows, at about three
 seconds a run. Four causes were each undone in turn (crosswalk, roster facts, team map, quantile
 refit) against the identical row dump, and the masks were validated: undoing all four reproduces the
 committed pre-round file to within 5 candidates of 41. The attribution buckets over the 71 new
@@ -128,22 +128,22 @@ confirmations:
 | team map alone | 1 |
 
 Two readings a count of 90 cannot give on its own: **the crosswalk fix, not the decade, is the largest
-single driver, and its work is done in the MODERN half** — removing the 217 restored 2013-2023
+single driver, and its work is done in the MODERN half**: removing the 217 restored 2013-2023
 player-seasons costs 29 confirmations, removing the 348 restored 2003-2012 ones costs 4. And **the
 team map, built specifically to reopen the collapse question, is necessary for exactly 3
 confirmations** (its removal actually raises the confirmed count to 92, because Benjamini-Hochberg is
 a family-wide ranking and a smaller family has a looser line). It bought the one thing it was built
-for — the WR collapse law — and almost nothing else.
+for (the WR collapse law) and almost nothing else.
 
 **Artifact vigilance, the full record.** Four adversarial checks ran over all 90 confirmations:
 
 - **The fullback check.** 84 of 90 keep sign and a CI excluding zero with the 565 restored
   player-seasons removed from the population. One does not: `threshold:RB:snapShare:q20` goes from
-  +1.037 to +0.130 (CI grazing zero) — a fullback law outright, marked SUSPECT.
+  +1.037 to +0.130 (CI grazing zero): a fullback law outright, marked SUSPECT.
 - **The era split.** 40 laws have 40+ pairs in both old-decade and modern halves; 39 agree in sign.
   One disagreement, `and:WR:incomingCoachTenureSeasons:q70+touchdownPointsShare:q70` (old decade
   +0.245 n=44, modern -1.061 n=343), marked SUSPECT for era instability. **49 of 90 confirmations
-  carry fewer than 40 old-decade pairs at all** — more than half the confirmed family has no
+  carry fewer than 40 old-decade pairs at all**: more than half the confirmed family has no
   old-decade evidence whatsoever, because the play-by-play and snap-count quantities still floor at
   2013.
 - **`draftPick`, given its own scrutiny.** The coverage boundary that moved (0% to ~65-70%) is not
@@ -151,11 +151,11 @@ for — the WR collapse law — and almost nothing else.
   eras, five of six carry a modern-era interval excluding zero on their own, and the direction is
   monotone (early picks gain, late picks lose). Not marked suspect.
 - **The match-key trajectory class.** Seven `delta:*:pointsPerGame:*` confirmations are sign-perfect
-  for mean reversion — every riser loses, every faller gains, at every level and every position —
-  which is exactly what a pure regression-to-the-mean process on the match key's own noise would
-  produce with no football content at all. **Marked SUSPECT as a family (7 laws).**
+  for mean reversion (every riser loses, every faller gains, at every level and every position), which
+  is exactly what a pure regression-to-the-mean process on the match key's own noise would produce
+  with no football content at all. **Marked SUSPECT as a family (7 laws).**
 
-**Summary: 9 of 90 marked suspect** — `threshold:RB:snapShare:q20`, the seven-law
+**Summary: 9 of 90 marked suspect**: `threshold:RB:snapShare:q20`, the seven-law
 `delta:*:pointsPerGame:*` family, and the one era-flip AND-law. The other 81 passed every check run
 against them. The pricing-eligible set (Task 3, Task 4) is the confirmed 90 minus these 9, composed by
 subtraction from the existing chip-eligibility seam rather than as a second definition.
@@ -169,7 +169,7 @@ neither. The family got 4.1 times bigger; the number of distinct claims in it di
 
 ## 3. The collapse
 
-The founder's founding hypothesis — a player on a team the market has written off collapses — could
+The founder's founding hypothesis (a player on a team the market has written off collapses) could
 not be tested below 2013 in the previous round because `incomingTeamWinTotal` resolves a player to a
 team through `player_week_teams`, which did not exist there. This round built that map back to 2003,
 and Task 2's review corrected the resulting paragraph twice in place (a TE fold-count error and a
@@ -199,13 +199,13 @@ season-span endpoint error). This is the corrected paragraph verbatim:
 **Two things carried alongside this paragraph, not buried under it.** First, an earlier drift note
 (Task 1) had described this confirmation as pointing "in the direction OPPOSITE to the founder's
 hypothesis." That was wrong and formally corrected: the founder's hypothesis is that a written-off
-player loses points, the measured effect is negative, meaning he loses points — the finding AGREES
+player loses points, the measured effect is negative, meaning he loses points: the finding AGREES
 with the hypothesis. What is opposite is something else: the previous round's two confirmed win-total
 laws were good-team laws (a receiver on a nine-win-or-better team gains); this is their mirror at the
 other end of the line. Both can be true at once and both now are.
 
-Second, and binding on every founder-facing framing: **the WR collapse law is a MARGINAL BH survivor**
-— it sits in the last two ranks of the 177-candidate cut. It survived the fold-agreement gate cleanly
+Second, and binding on every founder-facing framing: **the WR collapse law is a MARGINAL BH survivor**:
+it sits in the last two ranks of the 177-candidate cut. It survived the fold-agreement gate cleanly
 and it is not concentrated where the coverage boundary moved (the modern half is the STRONGER half,
 -0.956 vs -0.614), but its position at the edge of the family-wide cliff means a slightly different
 family size or a slightly different quantile table could have left it out. It is confirmed evidence,
@@ -217,17 +217,17 @@ not settled certainty.
 
 ### 4a. The grid, and the winner's margin
 
-Task 3 widened the blend grid 54x over the incumbent's cell count — 343 cells to 18,522 (7³ cap cells
-× 3 recency × 3 props weights × 2 dedup × 3 per-player caps) — after rebuilding the scoring loop
+Task 3 widened the blend grid 54x over the incumbent's cell count, 343 cells to 18,522 (7³ cap cells
+× 3 recency × 3 props weights × 2 dedup × 3 per-player caps), after rebuilding the scoring loop
 around a single reused context so the grid could run in about two minutes rather than billions of map
 inserts. The winner: `lawCapPoints=2, availabilityCapPoints=10, totalCapPoints=40, recency=0.5,
 props=0, dedup=false, playerLawCap=20`, train rho 0.5980 against the incumbent's 0.5976 on the same
-widened grid — a margin of roughly **4e-4** of train rank correlation, on a search 54 times wider than
+widened grid, a margin of roughly **4e-4** of train rank correlation, on a search 54 times wider than
 the one that produced v7. 126 of 18,522 cells scored within 1e-4 of the winner, but the incumbent
 configuration itself sits outside that plateau by more than three times the tolerance, so the tie rule
 does not save it. Read plainly: the win is real by the letter of the rule and small enough that Task
-3's own multiple-comparisons warning — a wider search finds a higher maximum even when nothing real
-was added — applies to it almost by name.
+3's own multiple-comparisons warning (a wider search finds a higher maximum even when nothing real was
+added) applies to it almost by name.
 
 ### 4b. The bar, all three configurations
 
@@ -244,7 +244,7 @@ broke on exactly the same line: 2024 pooled blend vs ADP, the one the plan names
 
 ### 4c. Constants exonerated
 
-**v8 and v9 differ in exactly one thing — the searched blend constants versus v7's own — and their
+**v8 and v9 differ in exactly one thing, the searched blend constants versus v7's own, and their
 decisive gaps are +0.0982 and +0.0979: statistically the same number.** The searched cell was not the
 cause of the break, and the corrections-only rebuild did not rescue it because there was nothing there
 to rescue. Whatever moved the bar is something v8 and v9 share, and the only things they share are the
@@ -268,13 +268,13 @@ hypothesis, not tested by tuning against the read that surfaced it.
 ### 4e. The store-change confound
 
 **The thing that bounds every sentence above: v7's published verdict was taken on the
-PRE-CORRECTION store.** 653 stored 2024 evaluation rows then, 664 now — a different evaluation
+PRE-CORRECTION store.** 653 stored 2024 evaluation rows then, 664 now: a different evaluation
 population as well as a different board. **v7's own configuration has never been scored on today's
 completed store.** So "v7 clears and v9 does not" is not yet a like-for-like comparison. The honest
 set of live hypotheses is at least three: the enlarged law family costs held-out ordering; or the
 completed store's own 2024 population is slightly harder and v7 would no longer clear on it either; or
 the v7 verdict was always marginal (its own lower bound was +0.0041) and any perturbation tips it.
-Nothing in this round distinguishes them, and distinguishing them costs another look at 2024 — which
+Nothing in this round distinguishes them, and distinguishing them costs another look at 2024, which
 is exactly why it is deferred to the 2027 fit round under the 2026 quarantine (section 5) rather than
 improvised here.
 
@@ -283,7 +283,7 @@ improvised here.
 The plan's rule has no discretion in it: an interval that includes zero on the decisive 2024
 blend-vs-ADP line is a STOP, full stop, whether the break is caused by the point estimate moving or by
 the interval widening. It fired twice. Both times the sequence stopped exactly where the plan says it
-must — no tuning, no third scorecard run chasing the number, no quiet adoption of v8's `+0.0982` on
+must: no tuning, no third scorecard run chasing the number, no quiet adoption of v8's `+0.0982` on
 the reasoning that it is "close enough." `BOARD_SOURCE` reverted to `commish_board_v7_ppr_12` on both
 occasions (`b456ed3` after v8, `bd7888d` after v9); the tree at close-out is `9f73df2`, and the live
 board today serves v7's configuration, the one whose published verdict still stands.
@@ -293,7 +293,7 @@ evidence base by a decade, re-measured every law, quadrupled the confirmed famil
 54 times larger than the incumbent's produced two candidate configurations, and both of them, honestly
 measured on the one held-out season the plan reserves for judgment, failed to clear a bar the
 incumbent cleared. The alternative to stopping was either shipping a configuration that does not
-demonstrably beat the market it competes against, or re-reading 2024 until one did — and the second of
+demonstrably beat the market it competes against, or re-reading 2024 until one did, and the second of
 those is the specific failure mode multiple-comparisons discipline exists to prevent. The system was
 built to be able to say "this round's fit does not ship" and mean it, and this round is the first time
 it had to.
@@ -310,11 +310,53 @@ that selected nothing:
    against 2024. Broke again, at a statistically identical gap to v8, which is what bought the
    constants-exoneration finding above.
 
-Both reads were legitimate under the plan's own discipline — pre-registered, no tuning between them,
-no third read taken after the second came back negative — but 2024 has now been looked at twice with
+Both reads were legitimate under the plan's own discipline (pre-registered, no tuning between them,
+no third read taken after the second came back negative), but 2024 has now been looked at twice with
 different boards, and the second look followed a negative first look. That is not selection, and it is
 not nothing either. **2024 is spent as a judge.** No future configuration reads it again until the
 2027 fit round, under the 2026 quarantine below.
+
+### 4h. The founder rows: what v8 and v9 would have priced
+
+Read-only rows, produced despite both breaks, because they describe what the store already holds and
+change nothing by existing. The 2026 live board, v7 rows beside v8 rows:
+
+| player | v7 points | v8 points | v7 rank | v8 rank | v7 value rank | v8 value rank | chips |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Jeremiyah Love (RB ARI, rookie) | 330.8 | 254.7 | 2 | 14 | 1 | 4 | none either way |
+| Christian McCaffrey | 224.9 | 208.9 | 39 | 43 | 16 | 19 | +26 law chips, 0 lost |
+| Derrick Henry | 231.4 | 203.2 | 32 | 51 | 12 | 22 | +26 law chips, 0 lost |
+| De'Von Achane | 233.2 | 223.2 | 30 | 37 | 11 | 13 | none gained, 0 lost |
+| Jordan Love (QB GB) | 175.3 | 185.3 | 73 | 63 | 174 | 169 | none gained, 0 lost |
+
+Both Loves appear because the brief that requested this table named only "Love": the rookie RB is the
+one the live-board close-out originally flagged (value rank 1 on 330.8 points, the rookie channel
+uncapped), and he is the row the rookie-curve refit was built to move.
+
+**Jeremiyah Love: the founder's own confirmed defect, made visible.** 330.8 to 254.7 points, value
+rank 1 to 4. This is not a hypothetical correction, it is the founder-flagged survivorship defect in
+the previous curve (section 7) resolving on a real 2026 row. He falls off the top of the board without
+being erased from it, and the whole 2026 rookie cohort moves the same way behind him.
+
+**McCaffrey and Henry: what the 4.1x law family and the per-player cap look like on a real row.** Each
+gains 26 law chips, every one of them from the age/experience and goal-line clusters section 2b names
+as redundant, and each loses points on net (McCaffrey -16.0, Henry -28.2). Henry falls 19 places on
+points and 10 on value. Nothing was lost from either man's reason list: v8's reasons are a strict
+superset of v7's for all five founder rows.
+
+**Achane: no new chip, still repriced** (-10.0 points, 7 places), from the availability cap and
+recency decay rather than the law channel. The WR-only collapse law (section 3) has nothing to say
+about a running back; no RB collapse law exists to price him with.
+
+**What this table is, stated exactly.** These are not the live board's rows. They are what v8's
+configuration would have priced, read out of the store where v8's replay was persisted before the bar
+broke. v9's founder rows were never produced as a separate table, because v9's persist changed only the
+blend constants against v8 (recency, the availability cap, the per-player law cap); the rookie curve
+and the priced law set, the two inputs that move Love, McCaffrey, Henry and Achane by these margins,
+are identical between v8 and v9. The shape of this table therefore holds under v9 as well, though the
+exact point totals would differ by the same small margins section 4b's bar table shows between the two
+configurations. **The live board serves v7's rows, unchanged, today.** Nothing in this table is on the
+product a manager sees; it is the record of what the round measured and did not ship.
 
 ---
 
@@ -336,22 +378,22 @@ way (section 4g). After it, 2024 is spent for selection purposes: future configu
 2026 judge.
 
 **Ruling: Round D reshaped.** The in-season loop that would have carried live-shipping pressure
-becomes instead the DATA YEAR machine — no user-facing shipping pressure, all evidence-accumulation.
+becomes instead the DATA YEAR machine: no user-facing shipping pressure, all evidence-accumulation.
 Its design centers on a **prospective register**: weekly pre-kickoff frozen predictions, graded after
 the fact, the launch-evidence spine the 2027 round will need that no retrospective backtest can
 substitute for. Alongside it, the full data-year machine list:
 
 - **Weekly props snapshots** (roughly 100 credits per week, well inside the 20,000-credit monthly
-  budget the props archive already operates under — a single week-1 snapshot this year cost 72
+  budget the props archive already operates under; a single week-1 snapshot this year cost 72
   credits for 967 observations across 16 events).
 - **Weekly stat ingestion**, keeping the store current through the season rather than backfilled after.
 - **The Sep 9 depth ingest**, named explicitly in the founder's own reshaping.
 - **October props backfill**, extending the 2023-2024 archive already captured toward 2025 once the
   October credit refresh lands (the resume command from the vegas-laws round is unchanged).
-- **The participation-floor extension** to the old decade — the pbp/snap-count asset floor still sits
+- **The participation-floor extension** to the old decade: the pbp/snap-count asset floor still sits
   at 2013, which is why 49 of this round's 90 confirmations carry no old-decade evidence at all
   (section 2b); this is the next equivalent unlock to the crosswalk and roster fixes this round made.
-- **The pbp-context correction** — `ingestCoaches` and `ingestOpponentDefence` derive a season's facts
+- **The pbp-context correction**: `ingestCoaches` and `ingestOpponentDefence` derive a season's facts
   from a history window computed off the seasons they're called with, while `recordTeamObservations`
   is insert-if-absent, so a re-run over a widened history silently keeps stale values for seasons
   whose rows already exist. Carried forward again; still needs a correction pass, not an additive
@@ -360,7 +402,7 @@ substitute for. Alongside it, the full data-year machine list:
   619-file run and fails intermittently on `TRUNCATE`; the two-half workaround (`suite-halves.sh`)
   works today but a per-lane database or a larger tmpfs is the real fix.
 - **Committing full scorecard texts**, not only headline rows, to `docs/research/` alongside future
-  close-outs — this round's own v7 arm illustrated the cost: its 404-line scorecard does not survive
+  close-outs. This round's own v7 arm illustrated the cost: its 404-line scorecard does not survive
   anywhere, so this document's flip-list comparisons (section 4b) are complete only over the seven
   headline rows the previous close-out published, not the full run.
 - **Board-clutter cleanup**: the store now holds four boards per archive season (v1 raw, v7, v8, v9)
@@ -371,7 +413,7 @@ substitute for. Alongside it, the full data-year machine list:
 
 ## 6. The frozen state
 
-**The data year runs on v7's configuration exactly as committed — every fitted file as-is.** No
+**The data year runs on v7's configuration exactly as committed: every fitted file as-is.** No
 fitted-file regeneration happens until the 2027 fit round. Regenerating any fitted file now would
 create a curve no stored board uses and would desync the shadow register's own consistency with
 what's actually live.
@@ -392,13 +434,13 @@ through the shipped interpolator, and the committed file restored, tree unchange
 - **It does mean v9 was "corrections minus one."** One fitted file that should move with the store did
   not, so the corrections-only board is not quite complete, and nobody knows whether including it
   would change the bar. Given the size and the RB-only shape, unlikely to move a pooled rank
-  correlation on 176 rows — but that is an argument, not a measurement.
+  correlation on 176 rows, but that is an argument, not a measurement.
 
 Regenerating it now would either desynchronize the committed code from the stored v9 rows and verdict
 this record rests on, or require re-persisting and a THIRD held-out read of 2024 inside a round that
 had already spent two. Neither is this round's to choose after a STOP. It is the first item the next
 round should clear, before anything else is measured, and it clears under the 2027 fit round like
-every other fitted-file regeneration — not sooner.
+every other fitted-file regeneration, not sooner.
 
 ---
 
@@ -415,17 +457,17 @@ observations across nine (2013-2021). Every position's top end came down, RB har
 RB pick 1 383.8 to 271.1 is the headline: the previous curve's top knots rested on a handful of
 post-2013 survivors (this is the founder-flagged survivorship defect the vegas-laws round named), and
 the completed decade's much larger bust cohort (section 1d) pulls the ceiling down hard. QB pick 1
-201.9 to 171.8, WR 206.5 to 179.5, TE unchanged (176.6 to 176.6 — its first knot is still pick 4 and
+201.9 to 171.8, WR 206.5 to 179.5, TE unchanged (176.6 to 176.6, its first knot is still pick 4 and
 the old decade added no earlier TE pick that outscored the incumbent). On the live 2026 board this
-moved Jeremiyah Love from 330.8 points at value rank 1 to 254.7 points at value rank 4 — off the top of
-the board without being erased from it — and the whole 2026 rookie cohort with him.
+moved Jeremiyah Love from 330.8 points at value rank 1 to 254.7 points at value rank 4, off the top of
+the board without being erased from it, and the whole 2026 rookie cohort with him.
 
 **A genuine property of the corrected curve, not a test artifact: the refit is a step function whose
 RB plateau runs from about pick 16 to pick 40.** The full-cohort curve cannot separate two round-one
 running backs across that whole range; three committed test fixtures had to be inverted or updated to
 match (`9f73df2`), including moving the curve-beats-buckets demonstration from RB to QB because the RB
-case no longer demonstrates separation. This is recorded as the 2027 round's own open question — knot
-placement across that plateau — not resolved here, since resolving it means fitting, and no fitted
+case no longer demonstrates separation. This is recorded as the 2027 round's own open question (knot
+placement across that plateau), not resolved here, since resolving it means fitting, and no fitted
 file regenerates before 2027 (section 6).
 
 ---
@@ -453,7 +495,7 @@ file regenerates before 2027 (section 6).
    live; v7, v8, v9 accumulate). Inert, correct under the standing source-bump rule, cleanup rides
    with Round D ops.
 7. **Committing full scorecard texts** to `docs/research/` alongside future close-outs, not only
-   headline rows — this round archived `scorecard-v8.txt` and `scorecard-v9.txt` in-workspace only, so
+   headline rows: this round archived `scorecard-v8.txt` and `scorecard-v9.txt` in-workspace only, so
    the next round that wants a full v8/v9-vs-future comparison has them, but the discipline of
    committing scorecard text alongside the close-out itself starts with the next round, not this one.
 8. **The informational props-anchor comparison: gated correctly, never run.** Stage 6 of the plan
@@ -464,17 +506,17 @@ file regenerates before 2027 (section 6).
 9. **Props-anchor adoption waits for the 2026 judge.** Unchanged from the vegas-laws and Task 3
    rulings: the props archive holds 2023-2024, the blend trains on 2013-2021, and on this train window
    the axis is a structural no-op (every train row's anchor map is empty, coverage prints 0 of 1,323
-   rows). Adoption needs 2023+2024 as train and a fresh held-out season — 2025 under the original
+   rows). Adoption needs 2023+2024 as train and a fresh held-out season, 2025 under the original
    design, now folded into the 2027 round's own held-out discipline under the 2026 quarantine, since
    using 2024 again would burn a season already spent.
 10. **Cluster dedup semantics** (Task 3 concern 4): an AND law joins exactly one cluster, so a player
     firing both an age-plus-goal-line AND and a separate pure goal-line law still gets both. The
-    grid measured that cluster dedup LOSES on train at every axis combination regardless — the fit
-    chose the incumbent semantics — so this is now a settled measurement rather than an open question,
+    grid measured that cluster dedup LOSES on train at every axis combination regardless (the fit
+    chose the incumbent semantics), so this is now a settled measurement rather than an open question,
     but the single-assignment cluster design itself (versus multi-cluster membership with allocation)
     remains unrevisited.
 11. **UX ledger items**: the nine suspect laws fire visible reasons on 14 to 36 moved rows per archive
-    season while spending nothing — the designed policy, working, but a product surface nobody has
+    season while spending nothing: the designed policy, working, but a product surface nobody has
     reviewed the copy for. The `ReasonChip`'s "Market NNN pts" wording is exactly right while the
     props weight is null-celled and needs a persona pass the day a props weight ever ships nonzero.
     Neither addressed this round.
