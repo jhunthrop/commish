@@ -253,3 +253,16 @@ export async function countPropObservations(db: ReadonlyDb, fetchedAt: Date): Pr
   }
   return { byEventMarket, total };
 }
+
+/**
+ * Every event id this store already holds at least one observation for -- `odds-props-backfill.ts`'s
+ * resume/skip check (`backfill-plan.ts`'s `eventsNeedingFetch`). One archived snapshot per event is
+ * this backfill's own invariant (never more than one historical fetch per event, ever), so "has any
+ * row" is a sufficient, and cheap, "already done" test -- no `fetched_at` comparison needed.
+ */
+export async function archivedEventIds(db: ReadonlyDb): Promise<ReadonlySet<string>> {
+  // `ReadonlyDb` exposes no `selectDistinct` (`db/client.ts`'s own narrowing) -- plain `select` plus
+  // a `Set` gives the same distinct result, and this table's own row count keeps that cheap.
+  const rows = await db.select({ eventId: playerPropObservations.eventId }).from(playerPropObservations);
+  return new Set(rows.map((row) => row.eventId));
+}

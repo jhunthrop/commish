@@ -2435,3 +2435,38 @@ export const playerPropObservations = pgTable(
     index("player_prop_observations_fetched_at_idx").on(t.fetchedAt),
   ],
 );
+
+/**
+ * THE NAME RESOLUTION `player_prop_observations` DEFERRED — props-backfill Task 1.
+ *
+ * One row per (raw prop name, season) that a name-matching pass resolved to an `nfl_players.id`.
+ * Season-scoped rather than a single global name -> id map, because the same string can mean two
+ * different people across the archive's own 2023-2025 span (a rookie debuting under a name a
+ * retiree already held), and season-scoping is exactly the spine `preseason/benchmarks.ts`'s
+ * `resolveRankings` already leans on for the identical class of name-join problem.
+ *
+ * A row here means MATCHED — a name the resolver could not place, ambiguously or not at all, is
+ * never written; it is reported instead (`scripts/odds-props-resolve.ts`'s unmatched summary), the
+ * same discipline `player_crosswalk`'s own builder keeps for the id-space join.
+ */
+export const propsPlayerMap = pgTable(
+  "props_player_map",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** The archive's own `player_name`, verbatim — the join key back to `player_prop_observations`. */
+    propName: text("prop_name").notNull(),
+    season: integer("season").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "restrict" }),
+    /** How the match was made — `exact` (normalized full name, unique in the season) or `loose`
+     *  (first-initial + surname, unique in the season). See `player-map.ts`'s own docblock. */
+    method: text("method").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** One resolution per name per season — a re-run of the resolver is idempotent, never a second,
+     *  possibly-different, row for the same fact. */
+    uniqueIndex("props_player_map_name_season_idx").on(t.propName, t.season),
+  ],
+);

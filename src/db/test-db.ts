@@ -37,6 +37,7 @@ export async function truncateAll(db: Db): Promise<void> {
       review_reports, reviews,
       chat_message_reports, chat_reactions, chat_messages,
       player_week_observations, player_week_teams, team_week_observations, player_prop_observations,
+      props_player_map,
       preseason_rosters, preseason_rankings, preseason_projections, preseason_board_reasons, player_crosswalk,
       nfl_draft_picks,
       nfl_players, player_stat_lines, players, stat_weeks, nfl_games, capture_snapshots,

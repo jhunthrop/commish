@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import {
+  archivedEventIds,
   countPropObservations,
   parseEventOddsResponse,
   recordPropObservations,
@@ -207,5 +208,17 @@ describe("recordPropObservations / countPropObservations — the append-only wri
     const counts = await countPropObservations(db, new Date("2020-01-01T00:00:00.000Z"));
     expect(counts.total).toBe(0);
     expect(counts.byEventMarket.size).toBe(0);
+  });
+});
+
+describe("archivedEventIds — the backfill's own resume/skip check", () => {
+  it("returns every distinct event id the store holds any observation for", async () => {
+    const { observations } = parseEventOddsResponse(loadFixture(), FETCHED_AT);
+    await recordPropObservations(db, observations);
+    expect(await archivedEventIds(db)).toEqual(new Set(["e91230456789abcdef0123456789abcd"]));
+  });
+
+  it("returns an empty set when the store holds nothing", async () => {
+    expect(await archivedEventIds(db)).toEqual(new Set());
   });
 });

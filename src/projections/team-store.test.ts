@@ -5,6 +5,7 @@ import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "./nflverse/schedule";
 import { VEGAS_METRICS, VEGAS_SOURCE } from "./vegas/ingest";
 import {
   firstKickoffFor,
+  kickoffInstantsByWeek,
   playerTeamsAsOf,
   recordPlayerTeams,
   recordTeamObservations,
@@ -224,6 +225,39 @@ describe("firstKickoffFor / requireFirstKickoffFor", () => {
 
   it("requireFirstKickoffFor names the context command when the store holds nothing for the season", async () => {
     await expect(requireFirstKickoffFor(db, 2024)).rejects.toThrow(/projections:context/);
+  });
+});
+
+/**
+ * `kickoffInstantsByWeek` — `firstKickoffFor`'s own query generalised across every week
+ * (props-backfill Task 1), one row per week rather than one value pinned to week one.
+ */
+describe("kickoffInstantsByWeek", () => {
+  it("returns the earliest kickoff per week, across multiple weeks, in one map", async () => {
+    await recordTeamObservations(db, [
+      kickoffFact({ week: 1, team: "BUF", asOf: new Date("2024-09-08T17:00:00.000Z") }),
+      kickoffFact({ week: 1, team: "CLE", asOf: new Date("2024-09-08T20:00:00.000Z") }),
+      kickoffFact({ week: 2, team: "BUF", asOf: new Date("2024-09-15T17:00:00.000Z") }),
+    ]);
+    const byWeek = await kickoffInstantsByWeek(db, 2024);
+    expect(byWeek.size).toBe(2);
+    expect(byWeek.get(1)).toEqual(new Date("2024-09-08T17:00:00.000Z"));
+    expect(byWeek.get(2)).toEqual(new Date("2024-09-15T17:00:00.000Z"));
+  });
+
+  it("returns an empty map for a season the store has not ingested at all", async () => {
+    const byWeek = await kickoffInstantsByWeek(db, 2099);
+    expect(byWeek.size).toBe(0);
+  });
+
+  it("ignores a later restatement stamped as the row's own as-of is not the query's concern -- takes the true minimum per week", async () => {
+    await recordTeamObservations(db, [
+      kickoffFact({ week: 3, team: "BUF", asOf: new Date("2024-09-22T17:00:00.000Z") }),
+      // A different team's game in the same week, kicking off earlier -- the true week minimum.
+      kickoffFact({ week: 3, team: "CLE", asOf: new Date("2024-09-19T00:20:00.000Z") }),
+    ]);
+    const byWeek = await kickoffInstantsByWeek(db, 2024);
+    expect(byWeek.get(3)).toEqual(new Date("2024-09-19T00:20:00.000Z"));
   });
 });
 

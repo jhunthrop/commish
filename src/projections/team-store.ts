@@ -238,3 +238,35 @@ export async function requireFirstKickoffFor(db: ReadonlyDb, season: number): Pr
   }
   return kickoff;
 }
+
+/**
+ * `firstKickoffFor`'s own query, generalised across every week rather than pinned to week one —
+ * props-backfill Task 1's own need: one snapshot instant per REGULAR-SEASON week, and the store
+ * already carries only regular-season weeks (`kickoffInstant` is written under
+ * `NFLVERSE_CONFIG.seasonType === "REG"`, `nflverse/schedule.ts`'s own filter), so the weeks this
+ * returns are, by construction, exactly the weeks a props backfill should ever ask the odds API
+ * about — no separate playoff exclusion needed here.
+ *
+ * `GROUP BY week` rather than eighteen calls to `firstKickoffFor` with a week predicate bolted on:
+ * one query, one round trip, and a season the store has not ingested at all returns an empty map
+ * rather than eighteen individual nulls.
+ */
+export async function kickoffInstantsByWeek(db: ReadonlyDb, season: number): Promise<ReadonlyMap<number, Date>> {
+  const rows = await db
+    .select({ week: teamWeekObservations.week, earliest: min(teamWeekObservations.asOf) })
+    .from(teamWeekObservations)
+    .where(
+      and(
+        eq(teamWeekObservations.season, season),
+        eq(teamWeekObservations.source, SCHEDULE_SOURCE.kickoff),
+        eq(teamWeekObservations.metric, SCHEDULE_METRICS.kickoffInstant),
+      ),
+    )
+    .groupBy(teamWeekObservations.week);
+
+  const byWeek = new Map<number, Date>();
+  for (const row of rows) {
+    if (row.earliest !== null) byWeek.set(row.week, row.earliest);
+  }
+  return byWeek;
+}

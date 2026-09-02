@@ -10,11 +10,9 @@
 // Dry run (fetches the event list only, makes no odds requests, writes nothing):
 // npm run projections:odds:snapshot -- --dry-run
 import { createDb } from "@/db/client";
-import { envOrUndefined } from "@/lib/env";
+import { ODDS_API_BASE, SPORT_KEY, creditStatus, parseOddsEvent, requireEnv, requireOk, type CreditStatus, type OddsEvent } from "@/projections/odds/http";
 import { countPropObservations, parseEventOddsResponse, PROP_MARKETS, recordPropObservations } from "@/projections/odds/props-store";
 
-const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
-const SPORT_KEY = "americanfootball_nfl";
 /**
  * How far ahead of now an event may kick off and still be worth a snapshot this run.
  *
@@ -34,57 +32,9 @@ const WINDOW_DAYS = 14;
  *  is refused, with a printed note, rather than silently spending the whole monthly ledger. */
 const MAX_EVENTS_PER_RUN = 20;
 
-interface OddsEvent {
-  readonly id: string;
-  readonly commenceTime: Date;
-  readonly homeTeam: string;
-  readonly awayTeam: string;
-}
-
-interface CreditStatus {
-  readonly remaining: string;
-  readonly used: string;
-}
-
-function requireEnv(name: string): string {
-  const value = envOrUndefined(name);
-  if (value === undefined) {
-    throw new Error(`${name} is not set. Put a The Odds API key in .env.local, then run this through \`npm run projections:odds:snapshot\`.`);
-  }
-  return value;
-}
-
-function creditStatus(response: Response): CreditStatus {
-  return {
-    remaining: response.headers.get("x-requests-remaining") ?? "unknown",
-    used: response.headers.get("x-requests-used") ?? "unknown",
-  };
-}
-
-async function requireOk(response: Response, path: string): Promise<void> {
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`The Odds API returned HTTP ${response.status} for ${path}.${body ? ` Body: ${body}` : ""}`);
-  }
-}
-
 function parseEventsPayload(payload: unknown): readonly OddsEvent[] {
   if (!Array.isArray(payload)) throw new Error("odds-props-snapshot: /events response was not an array.");
-  return payload.map((raw, index) => {
-    if (typeof raw !== "object" || raw === null) throw new Error(`odds-props-snapshot: /events[${index}] was not an object.`);
-    const event = raw as Record<string, unknown>;
-    const { id, commence_time: commenceTimeRaw, home_team: homeTeam, away_team: awayTeam } = event;
-    if (typeof id !== "string" || id === "") throw new Error(`odds-props-snapshot: /events[${index}].id is missing.`);
-    if (typeof commenceTimeRaw !== "string") throw new Error(`odds-props-snapshot: /events[${index}].commence_time is missing.`);
-    const commenceTime = new Date(commenceTimeRaw);
-    if (Number.isNaN(commenceTime.getTime())) {
-      throw new Error(`odds-props-snapshot: /events[${index}].commence_time is unparseable ("${commenceTimeRaw}").`);
-    }
-    if (typeof homeTeam !== "string" || typeof awayTeam !== "string") {
-      throw new Error(`odds-props-snapshot: /events[${index}] is missing home_team or away_team.`);
-    }
-    return { id, commenceTime, homeTeam, awayTeam };
-  });
+  return payload.map((raw, index) => parseOddsEvent(raw, `odds-props-snapshot: /events[${index}]`));
 }
 
 async function fetchEvents(apiKey: string): Promise<{ events: readonly OddsEvent[]; credits: CreditStatus }> {
