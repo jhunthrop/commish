@@ -1,5 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import { registerGradeRows } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { recordNflPlayers } from "@/projections/universe";
 import type { NflPlayerRow } from "@/projections/nflverse/players";
@@ -293,31 +295,161 @@ describe("runSeasonWeek — skip reasons", () => {
   });
 });
 
-describe("runSeasonWeek — failure isolation", () => {
-  it("marks props-snapshot failed without blocking grade, freeze or scoreboard", async () => {
-    await seedThroughFreeze(BEFORE_KICKOFF);
-    const failingProps: SeasonWeekDeps["snapshotProps"] = async () => {
-      throw new Error("ODDS_API_KEY is not set");
-    };
-    const { steps, exitCode } = await runSeasonWeek(depsAt(BEFORE_KICKOFF, { snapshotProps: failingProps }), optionsAt());
-    const props = steps.find((s) => s.step === "props-snapshot")!;
-    const freeze = steps.find((s) => s.step === "freeze")!;
-    const scoreboard = steps.find((s) => s.step === "scoreboard")!;
-    expect(props.status).toBe("failed");
-    expect(props.summary).toContain("ODDS_API_KEY is not set");
-    expect(freeze.status).not.toBe("failed");
-    expect(scoreboard.status).toBe("ok");
-    expect(exitCode).toBe(1);
-  });
+/**
+ * A drizzle SELECT that always rejects, whatever it is chained with next (`.where`, `.groupBy`,
+ * `.orderBy`, `.limit` — every store function this file poisons uses some subset of these before
+ * being awaited). Every chain method returns itself, so the shape is right no matter which
+ * store function's own chain reaches it, and `await`ing it anywhere rejects with `message`.
+ */
+interface ThrowingQueryResult extends PromiseLike<never> {
+  readonly where: () => ThrowingQueryResult;
+  readonly groupBy: () => ThrowingQueryResult;
+  readonly orderBy: () => ThrowingQueryResult;
+  readonly limit: () => ThrowingQueryResult;
+}
 
-  it("marks stats-ingest failed without blocking the other four steps", async () => {
+function throwingQueryResult(message: string): ThrowingQueryResult {
+  const self: ThrowingQueryResult = {
+    where: () => self,
+    groupBy: () => self,
+    orderBy: () => self,
+    limit: () => self,
+    // The rejected promise is created INSIDE `then`, not stored eagerly: every real caller awaits
+    // this immediately (drizzle's own chains always are), so `.then` is attached synchronously and
+    // nothing is ever left an unhandled rejection.
+    then: (onfulfilled, onrejected) => Promise.reject(new Error(message)).then(onfulfilled, onrejected),
+  };
+  return self;
+}
+
+/**
+ * Wraps a real `Db` so that reads of ONE table fail — everything else (every other table, and
+ * every non-`select` method: `.transaction`, `.$client`, …) passes straight through to the real
+ * connection. `allowedCalls` lets the first N reads of the poisoned table through before it starts
+ * throwing, which is what isolates "only THIS step's read of the table fails" from "every step
+ * that happens to read the same table also fails" — see `scoreboardStep` below, which shares
+ * `registerGradeRows` with `gradeStep` and needs its OWN call poisoned without also breaking
+ * grade's.
+ *
+ * This exists because `gradeStep` and `freezeStep` (unlike `statsIngestStep`/`propsSnapshotStep`)
+ * have no injected network-shaped dependency to fail directly — they call the register straight
+ * against `deps.db`, deliberately, the same way `freeze.test.ts`/`grade.test.ts` do. The only way
+ * to make ONE of them throw for real, isolated from the others, is to make ITS OWN read of the
+ * store fail while every other step's own reads (of other tables, or of the same table but not
+ * yet exhausted their `allowedCalls`) keep working against the real test database.
+ */
+function poisonTableReads(realDb: Db, targetTable: unknown, message: string, allowedCalls = 0): Db {
+  let callCount = 0;
+  return new Proxy(realDb, {
+    get(target, prop, receiver) {
+      if (prop !== "select") return Reflect.get(target, prop, receiver);
+      return (...selectArgs: unknown[]) => ({
+        from: (table: unknown) => {
+          if (table !== targetTable) return (target.select as (...args: unknown[]) => { from: (t: unknown) => unknown })(...selectArgs).from(table);
+          callCount += 1;
+          return callCount <= allowedCalls
+            ? (target.select as (...args: unknown[]) => { from: (t: unknown) => unknown })(...selectArgs).from(table)
+            : throwingQueryResult(message);
+        },
+      });
+    },
+  }) as Db;
+}
+
+/** Every step name, in the order `runSeasonWeek` runs them — used to assert the full five-entry
+ *  shape survives any single step's failure, not merely that the failing step reports it. */
+const ALL_STEP_NAMES = ["stats-ingest", "props-snapshot", "grade", "freeze", "scoreboard"] as const;
+
+describe("runSeasonWeek — failure isolation", () => {
+  it("marks stats-ingest failed without blocking the other four steps, which all still ran and succeeded", async () => {
     await seedThroughFreeze(BEFORE_KICKOFF);
     const failingStats: SeasonWeekDeps["ingestStats"] = async () => {
       throw new Error("nflverse returned HTTP 500");
     };
     const { steps, exitCode } = await runSeasonWeek(depsAt(BEFORE_KICKOFF, { ingestStats: failingStats }), optionsAt());
+    expect(steps.map((step) => step.step)).toEqual(ALL_STEP_NAMES);
     expect(steps.find((s) => s.step === "stats-ingest")!.status).toBe("failed");
-    expect(steps.find((s) => s.step === "scoreboard")!.status).toBe("ok");
+    expect(steps.find((s) => s.step === "stats-ingest")!.summary).toContain("nflverse returned HTTP 500");
+    for (const name of ["props-snapshot", "grade", "freeze", "scoreboard"] as const) {
+      expect(steps.find((s) => s.step === name)!.status, `${name} should not be failed`).not.toBe("failed");
+    }
+    expect(exitCode).toBe(1);
+  });
+
+  it("marks props-snapshot failed without blocking the other four steps, which all still ran and succeeded", async () => {
+    await seedThroughFreeze(BEFORE_KICKOFF);
+    const failingProps: SeasonWeekDeps["snapshotProps"] = async () => {
+      throw new Error("ODDS_API_KEY is not set");
+    };
+    const { steps, exitCode } = await runSeasonWeek(depsAt(BEFORE_KICKOFF, { snapshotProps: failingProps }), optionsAt());
+    expect(steps.map((step) => step.step)).toEqual(ALL_STEP_NAMES);
+    expect(steps.find((s) => s.step === "props-snapshot")!.status).toBe("failed");
+    expect(steps.find((s) => s.step === "props-snapshot")!.summary).toContain("ODDS_API_KEY is not set");
+    for (const name of ["stats-ingest", "grade", "freeze", "scoreboard"] as const) {
+      expect(steps.find((s) => s.step === name)!.status, `${name} should not be failed`).not.toBe("failed");
+    }
+    expect(exitCode).toBe(1);
+  });
+
+  it("marks grade failed (the brief's named case) without blocking stats-ingest, props-snapshot or freeze", async () => {
+    // Freeze is seeded, but no outcomes — grade would ordinarily just SKIP, not fail. Poisoning
+    // registerGradeRows makes gradeStep's own read throw for real, before it ever reaches that
+    // per-week skip logic. freezeStep never touches registerGradeRows at all, so it is unaffected;
+    // scoreboardStep DOES read the same table (it reports population from it) and is expected to
+    // fail too — that is an honest consequence of sharing the table, not a broken isolation, and
+    // is asserted separately below as "still ran", not as "succeeded".
+    await seedThroughFreeze(BEFORE_KICKOFF);
+    const poisonedDb = poisonTableReads(db, registerGradeRows, "register_grade_rows is unreachable", 0);
+    const { steps, exitCode } = await runSeasonWeek(depsAt(BEFORE_KICKOFF, { db: poisonedDb }), optionsAt());
+    expect(steps.map((step) => step.step)).toEqual(ALL_STEP_NAMES);
+    const grade = steps.find((s) => s.step === "grade")!;
+    expect(grade.status).toBe("failed");
+    expect(grade.summary).toContain("register_grade_rows is unreachable");
+    for (const name of ["stats-ingest", "props-snapshot", "freeze"] as const) {
+      expect(steps.find((s) => s.step === name)!.status, `${name} should not be failed`).not.toBe("failed");
+    }
+    // scoreboard shares the poisoned table and is expected to fail too — asserted as "still ran"
+    // (present, with its own reported status), not as having succeeded despite the same outage.
+    expect(steps.find((s) => s.step === "scoreboard")).toBeDefined();
+    expect(exitCode).toBe(1);
+  });
+
+  it("marks freeze failed (the brief's named case) without blocking stats-ingest, props-snapshot or grade", async () => {
+    // A real, natural takeFreeze refusal (freeze.ts's own guard): kickoffs exist but the served
+    // board does not, so takeFreeze throws "no rows" before writing anything. No table poisoning
+    // needed here — freeze fails for its own business reason, and nothing else depends on the
+    // board: grade has nothing frozen to grade (a clean skip, not a failure), stats-ingest and
+    // props-snapshot use their own injected outcomes, and scoreboard is a read with nothing to see.
+    await seedKickoffs();
+    const { steps, exitCode } = await runSeasonWeek(depsAt(BEFORE_KICKOFF), optionsAt());
+    expect(steps.map((step) => step.step)).toEqual(ALL_STEP_NAMES);
+    const freeze = steps.find((s) => s.step === "freeze")!;
+    expect(freeze.status).toBe("failed");
+    expect(freeze.summary).toMatch(/served board.*holds no.*rows/i);
+    for (const name of ["stats-ingest", "props-snapshot", "grade", "scoreboard"] as const) {
+      expect(steps.find((s) => s.step === name)!.status, `${name} should not be failed`).not.toBe("failed");
+    }
+    expect(exitCode).toBe(1);
+  });
+
+  it("marks scoreboard failed without blocking (or invalidating) stats-ingest, props-snapshot, grade or freeze", async () => {
+    // grade is allowed exactly its own one real read of registerGradeRows (so it succeeds
+    // normally); scoreboard's own two reads (runningScoreboard + perWeekPopulation) exceed the
+    // allowance and fail — isolating scoreboard's failure from grade's success, not merely
+    // asserting "something downstream also broke" the way the grade test above does.
+    await seedThroughFreeze(BEFORE_KICKOFF);
+    await seedOutcomes();
+    const poisonedDb = poisonTableReads(db, registerGradeRows, "register_grade_rows is unreachable", 1);
+    const { steps, exitCode } = await runSeasonWeek(depsAt(AFTER_STATS_LANDED, { db: poisonedDb }), optionsAt());
+    expect(steps.map((step) => step.step)).toEqual(ALL_STEP_NAMES);
+    const scoreboard = steps.find((s) => s.step === "scoreboard")!;
+    expect(scoreboard.status).toBe("failed");
+    expect(scoreboard.summary).toContain("register_grade_rows is unreachable");
+    const grade = steps.find((s) => s.step === "grade")!;
+    expect(grade.status, "grade should have succeeded on its own allowed read").toBe("ok");
+    for (const name of ["stats-ingest", "props-snapshot", "freeze"] as const) {
+      expect(steps.find((s) => s.step === name)!.status, `${name} should not be failed`).not.toBe("failed");
+    }
     expect(exitCode).toBe(1);
   });
 

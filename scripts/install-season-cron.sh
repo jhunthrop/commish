@@ -85,14 +85,90 @@ EOF
 
 EXISTING="$(crontab -l 2>/dev/null || true)"
 
+# Lines in a string, treating an empty string as ZERO lines (a bare `wc -l` on `printf '%s\n' ""`
+# would otherwise count the one blank line printf itself produces -- this is what lets every count
+# below agree with "the crontab has nothing in it" rather than off-by-one on the empty case).
+line_count() {
+  if [ -z "$1" ]; then
+    printf '0\n'
+  else
+    printf '%s\n' "$1" | wc -l | tr -d ' '
+  fi
+}
+
+refuse() {
+  echo "install-season-cron.sh: REFUSING -- $1" >&2
+  echo "" >&2
+  echo "Found in the existing crontab (via \`crontab -l\`):" >&2
+  echo "  $BEGIN_COUNT occurrence(s) of the BEGIN marker" >&2
+  echo "  $END_COUNT occurrence(s) of the END marker" >&2
+  echo "" >&2
+  echo "The markers are:" >&2
+  echo "  BEGIN: $MARKER_BEGIN" >&2
+  echo "  END:   $MARKER_END" >&2
+  echo "" >&2
+  echo "Nothing was written. Inspect the crontab by hand (\`crontab -l\`), fix or remove the stray" >&2
+  echo "marker line(s) so exactly zero or one balanced BEGIN/END pair remains, then re-run this" >&2
+  echo "script. This refusal exists because an unbalanced marker would otherwise make the strip" >&2
+  echo "logic below silently drop every line after a BEGIN with no matching END -- including any" >&2
+  echo "unrelated cron jobs already installed." >&2
+  exit 1
+}
+
+# THE VALIDATION GATE (fix round 1, HIGH). Before anything below touches $EXISTING, the marker
+# structure it carries must be one of exactly two shapes: no markers at all (a fresh install), or
+# one balanced BEGIN-then-END pair (a prior install of this same script, safe to replace). Every
+# other shape -- a BEGIN with no END, an END with no BEGIN, two BEGINs, or a pair in the wrong
+# order -- refuses LOUDLY and writes NOTHING, rather than feeding an awk strip that has no way to
+# tell "no matching END yet" apart from "matching END never comes" and would skip-and-drop every
+# line for the rest of the file, unrelated cron jobs included.
+BEGIN_COUNT="$(printf '%s\n' "$EXISTING" | grep -c -x -F "$MARKER_BEGIN" || true)"
+END_COUNT="$(printf '%s\n' "$EXISTING" | grep -c -x -F "$MARKER_END" || true)"
+
+if [ "$BEGIN_COUNT" -eq 0 ] && [ "$END_COUNT" -eq 0 ]; then
+  : # no prior install -- nothing to validate further, proceed
+elif [ "$BEGIN_COUNT" -eq 1 ] && [ "$END_COUNT" -eq 1 ]; then
+  BEGIN_LINE="$(printf '%s\n' "$EXISTING" | grep -n -x -F "$MARKER_BEGIN" | head -1 | cut -d: -f1)"
+  END_LINE="$(printf '%s\n' "$EXISTING" | grep -n -x -F "$MARKER_END" | head -1 | cut -d: -f1)"
+  if [ "$BEGIN_LINE" -ge "$END_LINE" ]; then
+    refuse "found one BEGIN and one END marker, but END (line $END_LINE) does not come after BEGIN (line $BEGIN_LINE) -- not a balanced pair."
+  fi
+else
+  refuse "expected zero markers or exactly one balanced BEGIN/END pair, found $BEGIN_COUNT BEGIN marker(s) and $END_COUNT END marker(s)."
+fi
+
+# Original non-marker-block line count, computed from the VALIDATED structure above (so this is
+# exact, not a guess): every line outside the one balanced pair, if there is one, else every line.
+ORIGINAL_TOTAL="$(line_count "$EXISTING")"
+if [ "$BEGIN_COUNT" -eq 1 ] && [ "$END_COUNT" -eq 1 ]; then
+  ORIGINAL_NON_MARKER=$((ORIGINAL_TOTAL - (END_LINE - BEGIN_LINE + 1)))
+else
+  ORIGINAL_NON_MARKER="$ORIGINAL_TOTAL"
+fi
+
 # Strips any prior install of this script's own block (between the markers, inclusive), leaving
-# every other line of the user's crontab exactly as it was.
+# every other line of the user's crontab exactly as it was. Safe now: the gate above guarantees at
+# most one BEGIN and at most one END, in order, so `skip` turns on at most once and off at most
+# once -- it can no longer run to the end of the file stuck on.
 STRIPPED="$(printf '%s\n' "$EXISTING" | awk -v begin="$MARKER_BEGIN" -v end="$MARKER_END" '
   $0 == begin { skip = 1; next }
   $0 == end { skip = 0; next }
   skip { next }
   { print }
 ')"
+
+# THE BELT TO THE GATE'S SUSPENDERS (fix round 1, HIGH, part b). Even though the gate above proves
+# the strip is safe, this checks its actual OUTPUT rather than trusting the proof: the stripped
+# non-marker line count must be at least the original's. It can go up (a fresh install adds
+# nothing here, but nothing stops one that legitimately does), it must never go down -- a drop
+# would mean some non-marker line got eaten, and that is refused rather than installed.
+STRIPPED_NON_MARKER="$(line_count "$STRIPPED")"
+if [ "$STRIPPED_NON_MARKER" -lt "$ORIGINAL_NON_MARKER" ]; then
+  echo "install-season-cron.sh: REFUSING -- the stripped crontab has fewer non-marker lines" >&2
+  echo "($STRIPPED_NON_MARKER) than the original ($ORIGINAL_NON_MARKER). Something ate a line that" >&2
+  echo "was not part of this script's own marker block. Nothing was written." >&2
+  exit 1
+fi
 
 FINAL="$(printf '%s\n\n%s\n' "$STRIPPED" "$NEW_BLOCK" | sed '/./,$!d')"
 
