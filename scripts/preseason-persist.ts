@@ -3,6 +3,14 @@
 // source-bump history behind it), AND the raw model board, under BOARD_SOURCE_V1_RAW (v1), so both
 // halves of Task 11's own scorecard comparison stay addressable and CURRENT.
 // Run: npm run projections:preseason:persist [season ...]   (defaults to every ingested season)
+//      npm run projections:preseason:persist -- --unfreeze   (overrides FROZEN_BOARD_SOURCES, 2027 round)
+//
+// FROZEN WHILE THE FIT ROUND'S RULING STANDS. Both source names this script writes under are in
+// `preseason/board-store.ts`'s `FROZEN_BOARD_SOURCES`, so every write below is REFUSED unless
+// `--unfreeze` is passed. That is not a bug to route around: this tree's fitted files are the v9
+// configuration and the stored rows are v7's, so any write here would either delete the live
+// generation the product serves or rewrite an archive's reasons out from under its own points. See
+// that constant's own docblock for the ruling and the lift condition.
 //
 // THE SCRIPT THAT MAKES THE BOARD ADDRESSABLE. `preseason-report.ts` computes exactly this board
 // and prints it; this one computes exactly this board and stores it. They must not diverge, so the
@@ -55,12 +63,23 @@ import {
   type PreseasonPriors,
 } from "@/projections/preseason/source";
 
-/** Every season the preseason ingestion has ever run for. A board needs three prior seasons of
- *  usage, which is why the floor is not the backfill's floor. 2026 joined this list the day its
- *  week-one rosters, depth charts and ADP landed (live-board plan, Task 4) — it builds through the
- *  LIVE arm below rather than the replay arm every prior season here still uses. */
-const INGESTED_SEASONS = [2021, 2022, 2023, 2024, 2026];
-const SEASONS = process.argv.slice(2).map(Number);
+/**
+ * Every season this script will build WITHOUT being asked for one by name.
+ *
+ * 2026 WAS ON THIS LIST AND IS NOT ANY MORE (fit-round final review). It joined the day its week-one
+ * rosters, depth charts and ADP landed and it builds through the LIVE arm, which retires the stored
+ * generation before writing. While the frozen-state ruling stands (see `FROZEN_BOARD_SOURCES` in
+ * `preseason/board-store.ts`), that generation is the product and this tree can no longer reproduce
+ * it, so a bare `npm run projections:preseason:persist` must not so much as attempt it. Naming 2026
+ * explicitly still works and still meets the guard, which is the layer that actually protects the
+ * rows: this list only decides what a no-argument run reaches for.
+ *
+ * A board needs three prior seasons of usage, which is why the floor is not the backfill's floor.
+ */
+const INGESTED_SEASONS = [2021, 2022, 2023, 2024];
+const ARGUMENTS = process.argv.slice(2);
+const UNFREEZE = ARGUMENTS.includes("--unfreeze");
+const SEASONS = ARGUMENTS.filter((argument) => !argument.startsWith("--")).map(Number);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : INGESTED_SEASONS;
 
 const SYSTEM_CLOCK: Clock = { now: () => new Date().toISOString() };
@@ -128,12 +147,17 @@ function requireEnv(name: string): string {
  * did, and which of those happens is a property of the moment rather than of this script. See that
  * function's docblock for why a live board that only appended left a released player on the board for
  * a day after his roster row had been corrected.
+ *
+ * `unfrozen` is threaded through rather than read from module scope so `persistSeason` stays callable
+ * from a test with either value; the guard it lifts lives in `writePreseasonBoard`, where no caller
+ * can go around it.
  */
 async function persistBoard(
   db: Db,
   inputs: PreseasonInputs,
   source: string,
   raw: boolean,
+  unfrozen: boolean,
 ): Promise<{ readonly board: readonly BoardEntry[]; readonly write: BoardWriteCounts }> {
   const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, { raw });
   const board = preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
@@ -141,6 +165,7 @@ async function persistBoard(
     db,
     { season: inputs.season, source, asOf: inputs.moment, momentKind: inputs.momentKind },
     board,
+    { unfrozen },
   );
   return { board, write };
 }
@@ -173,12 +198,13 @@ export async function persistSeason(
   season: number,
   clock: Clock,
   names: ReadonlyMap<string, string>,
+  unfrozen = false,
 ): Promise<void> {
   const boardMoment = await boardMomentFor(db, season, clock);
   const inputs = await loadPreseason(db, season, { boardMoment });
   console.log(`${season}  moment kind: ${boardMoment.kind}  taken at ${inputs.moment.toISOString()}`);
 
-  const blended = await persistBoard(db, inputs, BOARD_SOURCE, false);
+  const blended = await persistBoard(db, inputs, BOARD_SOURCE, false, unfrozen);
   console.log(
     `${season}  [blend, ${BOARD_SOURCE}]  ${String(blended.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
       `${String(blended.write.written).padStart(4)} new projection rows  ${String(blended.write.reasonsWritten).padStart(4)} reason rows written` +
@@ -191,7 +217,7 @@ export async function persistSeason(
     );
   }
 
-  const v1 = await persistBoard(db, inputs, BOARD_SOURCE_V1_RAW, true);
+  const v1 = await persistBoard(db, inputs, BOARD_SOURCE_V1_RAW, true, unfrozen);
   console.log(
     `${season}  [v1 raw, ${BOARD_SOURCE_V1_RAW}]  ${String(v1.board.length).padStart(4)} players  ` +
       `${String(v1.write.written).padStart(4)} new projection rows  ${String(v1.write.reasonsWritten).padStart(4)} reason rows written` +
@@ -200,13 +226,20 @@ export async function persistSeason(
 }
 
 async function main(): Promise<void> {
+  if (UNFREEZE) {
+    console.warn(
+      "--unfreeze: OVERRIDING FROZEN_BOARD_SOURCES. This run may retire the live generation the product " +
+        "serves and may rewrite an archive's stored reasons. See board-store.ts's FROZEN_BOARD_SOURCES for " +
+        "the ruling this lifts, and be sure BOARD_SOURCE is the name you mean to write under.",
+    );
+  }
   const db = createDb(requireEnv("DATABASE_URL"));
   const names = new Map(
     (await db.select({ id: nflPlayers.id, name: nflPlayers.name }).from(nflPlayers)).map((row) => [row.id, row.name] as const),
   );
 
   for (const season of TARGET_SEASONS) {
-    await persistSeason(db, season, SYSTEM_CLOCK, names);
+    await persistSeason(db, season, SYSTEM_CLOCK, names, UNFREEZE);
   }
 
   await db.$client.end();

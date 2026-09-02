@@ -467,6 +467,67 @@ export async function deletePreseasonBoard(
   return { projections: projections.length, reasons: reasons.length };
 }
 
+/**
+ * THE FROZEN SOURCES (fit-round final review, 2026-09-02) — the board names no write may touch while
+ * the frozen-state ruling stands.
+ *
+ * WHAT THE RULING IS. The fit round ended with two held-out bar breaks, so `BOARD_SOURCE` points
+ * back at v7 (see its own docblock) while every fitted file on this tree is the v9 configuration.
+ * The ledger's adjudication: the 2026 data year runs on the v7 configuration exactly as committed,
+ * and ALL fitted-file regeneration belongs to the 2027 fit round. The store's v7 rows are therefore
+ * the product, and this tree can no longer reproduce them.
+ *
+ * WHY A GUARD RATHER THAN A NOTE. `scripts/preseason-persist.ts` is one command away from destroying
+ * them, and neither of its two paths would say a word:
+ *
+ *   - THE LIVE PATH RETIRES BEFORE IT WRITES. `writePreseasonBoard`'s live arm deletes every row for
+ *     `(season, source)` AT ANY STAMP and writes the fresh board in the same transaction. Run today
+ *     against 2026, it would delete the 546 rows the product serves and replace them with rows this
+ *     tree's constants produce, under v7's name. There is no second copy and no `as_of` to fall back
+ *     to: the previous generation is gone.
+ *   - THE REPLAY PATH REWRITES REASONS WITH NO STAMP TO PROTECT THEM. `preseason_board_reasons`
+ *     carries no `as_of` and is written with `onConflictDoUpdate`, so an archive re-run leaves the
+ *     archived POINTS untouched (their unique key already exists) while silently replacing their
+ *     EXPLANATIONS with the 87-law family's. The result is an archive whose reasons describe numbers
+ *     it is not showing, which is the same silent-stale shape v2 through v5 each shipped once.
+ *
+ * THE GUARD IS WIDER THAN THE LIVE SEASON, deliberately. The live arm deletes by `(season, source)`,
+ * so a live-moment write aimed at an ARCHIVE season under a frozen name would delete that archive
+ * outright. Nothing legitimate needs any write under a served name while the freeze stands, so the
+ * guard does not try to tell the cases apart.
+ *
+ * HOW IT LIFTS. `writePreseasonBoard`'s `unfrozen` option, reachable only through the persist
+ * script's `--unfreeze` flag, which prints what it is overriding. The 2027 fit round will bump
+ * `BOARD_SOURCE` to a fresh name, at which point these two constants name boards nobody serves and
+ * this set should be re-pointed at whatever the new served names are, never simply emptied.
+ */
+export const FROZEN_BOARD_SOURCES: ReadonlySet<string> = new Set([BOARD_SOURCE, BOARD_SOURCE_V1_RAW]);
+
+/** Options every write path shares. Separate from the stamp because this is a property of the RUN,
+ *  never of the board being written. */
+export interface BoardWriteOptions {
+  /** Lifts `FROZEN_BOARD_SOURCES` for this one call. The persist script's `--unfreeze` flag is the
+   *  only caller that sets it, and it prints a warning when it does. */
+  readonly unfrozen?: boolean;
+}
+
+/**
+ * Refuses a write under a frozen source, BEFORE any statement runs, naming the ruling and how to
+ * lift it. Both arms of `writePreseasonBoard` call this first; putting it inside the writer rather
+ * than in the script is what makes it unbypassable by a new caller.
+ */
+function assertNotFrozen(stamp: PreseasonProjectionStamp, { unfrozen = false }: BoardWriteOptions): void {
+  if (unfrozen || !FROZEN_BOARD_SOURCES.has(stamp.source)) return;
+  throw new Error(
+    `"${stamp.source}" is a FROZEN board source and this ${stamp.momentKind} write for ${stamp.season} is refused. ` +
+      "The fit round's frozen-state ruling holds the 2026 data year on the v7 configuration exactly as committed, " +
+      "and this tree's fitted files are the v9 configuration, so a write here would replace the rows the product " +
+      "serves (live) or rewrite an archive's reasons out from under its own points (replay) with numbers no stored " +
+      "board was measured on. The 2027 fit round lifts this by bumping BOARD_SOURCE to a fresh name. " +
+      "To override deliberately, pass --unfreeze to `npm run projections:preseason:persist`.",
+  );
+}
+
 /** Which write path a board took, and what it did. See `writePreseasonBoard`. */
 export interface BoardWriteCounts {
   readonly mode: "retire_generation" | "append";
@@ -510,7 +571,10 @@ export async function writePreseasonBoard(
   db: Db,
   stamp: PreseasonProjectionStamp,
   board: readonly BoardEntry[],
+  options: BoardWriteOptions = {},
 ): Promise<BoardWriteCounts> {
+  // FIRST, before a row is built and long before a statement runs: see `FROZEN_BOARD_SOURCES`.
+  assertNotFrozen(stamp, options);
   const rows = projectionRows(board, stamp);
   const reasons = reasonRows(board, stamp);
 

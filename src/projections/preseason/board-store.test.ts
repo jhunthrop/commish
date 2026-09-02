@@ -7,6 +7,8 @@ import type { NflPlayerRow } from "../nflverse/players";
 import type { BoardEntry, BoardReason } from "./board";
 import {
   BOARD_SOURCE,
+  BOARD_SOURCE_V1_RAW,
+  FROZEN_BOARD_SOURCES,
   boardReasons,
   preseasonProjectionsAsOf,
   preseasonProjectionsFor,
@@ -281,9 +283,18 @@ describe("the preseason board store", () => {
   describe("writePreseasonBoard", () => {
     const LAW: BoardReason = { code: "law", lawId: "target_share_persistence", effect: 1.8, magnitude: 0.31 };
     const UNKNOWN_TO_THE_UNIVERSE = "00-9999999";
+    /**
+     * A source THIS BLOCK OWNS, deliberately not `BOARD_SOURCE` (fit-round final review). Every test
+     * below is about the write path's own mechanics, which are the same whichever board is being
+     * written, and addressing the SHIPPED source from a unit test made these tests hostage to a
+     * product decision they have nothing to do with: `FROZEN_BOARD_SOURCES` now refuses writes under
+     * the served names, so the block that exercises retire-and-write has to name a board nobody
+     * serves. The freeze's own behaviour is tested separately, against the real constants.
+     */
+    const WRITE_SOURCE = "test_board_write_path_ppr_12";
 
     function write(board: readonly BoardEntry[], asOf: Date, momentKind: "live" | "replay") {
-      return writePreseasonBoard(db, { season: 2024, source: BOARD_SOURCE, asOf, momentKind }, board);
+      return writePreseasonBoard(db, { season: 2024, source: WRITE_SOURCE, asOf, momentKind }, board);
     }
 
     /** Every row the table holds for this board, at any stamp — the question `preseasonProjectionsAsOf`
@@ -292,7 +303,7 @@ describe("the preseason board store", () => {
       return db
         .select({ playerId: preseasonProjections.playerId, asOf: preseasonProjections.asOf })
         .from(preseasonProjections)
-        .where(and(eq(preseasonProjections.season, 2024), eq(preseasonProjections.source, BOARD_SOURCE)));
+        .where(and(eq(preseasonProjections.season, 2024), eq(preseasonProjections.source, WRITE_SOURCE)));
     }
 
     it("LIVE: a player absent from the fresh board has NO row afterwards, at any stamp (the McLaughlin shape)", async () => {
@@ -304,7 +315,7 @@ describe("the preseason board store", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]).toEqual({ playerId: CHASE, asOf: A_WEEK_LATER });
       // And through the reader the product actually uses, which is where the stale row surfaced.
-      const board = await preseasonProjectionsAsOf(db, { season: 2024, source: BOARD_SOURCE, asOf: FINAL });
+      const board = await preseasonProjectionsAsOf(db, { season: 2024, source: WRITE_SOURCE, asOf: FINAL });
       expect(board.map((row) => row.playerId)).toEqual([CHASE]);
     });
 
@@ -313,7 +324,7 @@ describe("the preseason board store", () => {
       const second = await write([entry({ reasons: [LAW] })], A_WEEK_LATER, "live");
 
       expect(second.retiredReasons).toBe(2);
-      const byPlayer = await boardReasons(db, BOARD_SOURCE, 2024);
+      const byPlayer = await boardReasons(db, WRITE_SOURCE, 2024);
       expect([...byPlayer.keys()]).toEqual([CHASE]);
     });
 
@@ -353,14 +364,97 @@ describe("the preseason board store", () => {
       // Three rows: both of the first generation's, untouched, plus the second's.
       expect(await everyStoredRow()).toHaveLength(3);
       // The player the newer board dropped is STILL readable, which is exactly what an archive is for.
-      const board = await preseasonProjectionsAsOf(db, { season: 2024, source: BOARD_SOURCE, asOf: FINAL });
+      const board = await preseasonProjectionsAsOf(db, { season: 2024, source: WRITE_SOURCE, asOf: FINAL });
       expect(board.map((row) => row.playerId).sort()).toEqual([LAMB, CHASE].sort());
     });
 
     it("REPLAY: never touches another board's rows either, since it deletes nothing at all", async () => {
       await write([entry({ reasons: [LAW] })], AUGUST, "replay");
       await write([entry({ playerId: LAMB })], A_WEEK_LATER, "replay");
-      expect((await boardReasons(db, BOARD_SOURCE, 2024)).get(CHASE)).toEqual([LAW]);
+      expect((await boardReasons(db, WRITE_SOURCE, 2024)).get(CHASE)).toEqual([LAW]);
+    });
+  });
+
+  /**
+   * THE FREEZE (fit-round final review, the CRITICAL finding).
+   *
+   * The fit round ended with `BOARD_SOURCE` pointing back at v7 after two held-out bar breaks, while
+   * every fitted file on the tree is the v9 configuration. That combination makes the persist script
+   * a loaded gun: a bare `npm run projections:preseason:persist` would take the LIVE 2026 path, and
+   * `writePreseasonBoard`'s live arm retires the stored generation before writing, so the 546 rows
+   * the product actually serves would be deleted and replaced by rows this tree's constants produce,
+   * under v7's name, unrecoverably. The REPLAY arm carries a quieter version of the same defect:
+   * `preseason_board_reasons` has no `as_of` and is written with `onConflictDoUpdate`, so an archive
+   * re-run rewrites archive reasons to the 87-law family's opinions while the archived POINTS stay
+   * v7-era, leaving a board whose explanations describe numbers it is not showing.
+   *
+   * These tests are the guard's contract. They address the REAL constants deliberately: a freeze that
+   * did not cover the actually-served names would be theatre.
+   */
+  describe("FROZEN_BOARD_SOURCES", () => {
+    const LIVE_2026 = new Date("2026-09-02T12:00:00.000Z");
+
+    function writeUnder(source: string, season: number, momentKind: "live" | "replay", options?: { readonly unfrozen?: boolean }) {
+      return writePreseasonBoard(db, { season, source, asOf: LIVE_2026, momentKind }, [entry()], options);
+    }
+
+    it("names exactly the two sources the product serves, and nothing else", () => {
+      expect([...FROZEN_BOARD_SOURCES].sort()).toEqual([BOARD_SOURCE, BOARD_SOURCE_V1_RAW].sort());
+    });
+
+    it("LIVE under the shipped source is REFUSED, so the served 2026 generation cannot be retired", async () => {
+      await expect(writeUnder(BOARD_SOURCE, 2026, "live")).rejects.toThrow(/frozen/i);
+      await expect(writeUnder(BOARD_SOURCE_V1_RAW, 2026, "live")).rejects.toThrow(/frozen/i);
+    });
+
+    it("LIVE under a frozen source is refused for EVERY season, not only 2026", async () => {
+      // Wider than the finding, and deliberately so: the live arm deletes by `(season, source)` at
+      // ANY stamp, so a live-moment write aimed at an ARCHIVE season under a frozen name would
+      // delete that archive outright. Nothing legitimate needs a live write under a served name
+      // while the freeze stands, so the guard does not try to tell the two cases apart.
+      await expect(writeUnder(BOARD_SOURCE, 2024, "live")).rejects.toThrow(/frozen/i);
+    });
+
+    it("REPLAY under a frozen source is REFUSED, because the reason rewrite has no as_of to protect it", async () => {
+      await expect(writeUnder(BOARD_SOURCE, 2021, "replay")).rejects.toThrow(/frozen/i);
+      await expect(writeUnder(BOARD_SOURCE_V1_RAW, 2021, "replay")).rejects.toThrow(/frozen/i);
+    });
+
+    it("REFUSES BEFORE IT WRITES OR DELETES ANYTHING: the store is untouched after a refusal", async () => {
+      await recordPreseasonProjections(
+        db,
+        projectionRows([entry()], { season: 2026, source: BOARD_SOURCE, asOf: LIVE_2026, momentKind: "live" }),
+      );
+      const before = await preseasonProjectionsAsOf(db, { season: 2026, source: BOARD_SOURCE, asOf: FINAL });
+      expect(before).toHaveLength(1);
+
+      await expect(writeUnder(BOARD_SOURCE, 2026, "live")).rejects.toThrow(/frozen/i);
+
+      expect(await preseasonProjectionsAsOf(db, { season: 2026, source: BOARD_SOURCE, asOf: FINAL })).toEqual(before);
+    });
+
+    it("the refusal says WHICH ruling froze it and HOW to lift it, rather than merely failing", async () => {
+      await expect(writeUnder(BOARD_SOURCE, 2026, "live")).rejects.toThrow(/--unfreeze/);
+      await expect(writeUnder(BOARD_SOURCE, 2026, "live")).rejects.toThrow(/2027/);
+    });
+
+    it("UNFREEZE overrides both arms, which is how the 2027 round will bump the source", async () => {
+      const live = await writeUnder(BOARD_SOURCE, 2026, "live", { unfrozen: true });
+      expect(live.mode).toBe("retire_generation");
+      const replay = await writeUnder(BOARD_SOURCE, 2021, "replay", { unfrozen: true });
+      expect(replay.mode).toBe("append");
+    });
+
+    it("LEAVES EVERY OTHER SOURCE ALONE: an unfrozen board still appends and still no-ops on a rerun", async () => {
+      const stamp = { season: 2021, source: "some_other_board_ppr_12", asOf: LIVE_2026, momentKind: "replay" as const };
+      const first = await writePreseasonBoard(db, stamp, [entry({ reasons: [{ code: "scarcity", playersLeftInTier: 4, dropToNextTier: 18.3 }] })]);
+      expect(first).toEqual({ mode: "append", written: 1, reasonsWritten: 1, retiredProjections: 0, retiredReasons: 0 });
+
+      // The archive rerun this freeze exists to prevent, proven harmless where it is allowed: the
+      // projection insert no-ops on its own unique key and the unchanged reason payload no-ops on
+      // `changedRowWhere`, exactly as before the guard existed.
+      const second = await writePreseasonBoard(db, stamp, [entry({ reasons: [{ code: "scarcity", playersLeftInTier: 4, dropToNextTier: 18.3 }] })]);
+      expect(second).toEqual({ mode: "append", written: 0, reasonsWritten: 0, retiredProjections: 0, retiredReasons: 0 });
     });
   });
 });
