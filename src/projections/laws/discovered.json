@@ -1,11 +1,191 @@
 {
   "counts": {
-    "candidates": 2487,
-    "untestable": 687,
-    "bhSurvivors": 12,
-    "replicated": 6
+    "candidates": 4509,
+    "untestable": 1203,
+    "bhSurvivors": 67,
+    "replicated": 41
   },
   "laws": {
+    "and:QB:threshold:QB:gamesPlayed:q80+threshold:QB:snapShare:q70": {
+      "effect": 2.5277343750000005,
+      "trainEffect": 2.288240740740741,
+      "ci": [
+        1.3816621093750006,
+        3.7903144531250006
+      ],
+      "sample": 128,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 12,
+          "effect": 3.0641666666666656
+        },
+        {
+          "season": 2022,
+          "pairs": 9,
+          "effect": 1.0066666666666684
+        },
+        {
+          "season": 2023,
+          "pairs": 11,
+          "effect": 6.123636363636364
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "and",
+      "claim": "Quarterback snap share (96.3%) + games played (15): A quarterback whose share of his team's offensive snaps that season is 96.3% or more and whose number of games he was scored in that season is 15 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "snapShare",
+      "primaryQuantityNoun": "snap share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:QB:threshold:QB:gamesPlayed:q80+threshold:QB:snapShare:q80": {
+      "effect": 2.178494623655913,
+      "trainEffect": 2.3188888888888877,
+      "ci": [
+        0.9777473118279572,
+        3.2959677419354847
+      ],
+      "sample": 93,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 5,
+          "effect": 3.3779999999999992
+        },
+        {
+          "season": 2022,
+          "pairs": 5,
+          "effect": 0.9040000000000014
+        },
+        {
+          "season": 2023,
+          "pairs": 7,
+          "effect": 1.4642857142857149
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "and",
+      "claim": "Quarterback snap share (98.1%) + games played (15): A quarterback whose share of his team's offensive snaps that season is 98.1% or more and whose number of games he was scored in that season is 15 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "snapShare",
+      "primaryQuantityNoun": "snap share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:QB:threshold:QB:gamesPlayed:q90+threshold:QB:snapShare:q80": {
+      "effect": 2.2216666666666653,
+      "trainEffect": 2.4157971014492743,
+      "ci": [
+        0.9550160256410252,
+        3.5241538461538466
+      ],
+      "sample": 78,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 5,
+          "effect": 3.3779999999999992
+        },
+        {
+          "season": 2022,
+          "pairs": 4,
+          "effect": -1.4299999999999984
+        },
+        {
+          "season": 2023,
+          "pairs": 5,
+          "effect": 2.4639999999999995
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "and",
+      "claim": "Quarterback snap share (98.1%) + games played (16): A quarterback whose share of his team's offensive snaps that season is 98.1% or more and whose number of games he was scored in that season is 16 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "snapShare",
+      "primaryQuantityNoun": "snap share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:TE:threshold:TE:gamesPlayed:q80+threshold:TE:incomingCoachTenureSeasons:q70": {
+      "effect": 1.3972448979591843,
+      "trainEffect": 1.7388750000000006,
+      "ci": [
+        0.6144591836734693,
+        2.2076836734693885
+      ],
+      "sample": 98,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 11,
+          "effect": 0.7490909090909089
+        },
+        {
+          "season": 2022,
+          "pairs": 10,
+          "effect": -1.1300000000000003
+        },
+        {
+          "season": 2023,
+          "pairs": 8,
+          "effect": 1.1400000000000001
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "TE",
+      "template": "and",
+      "claim": "Tight end incoming coach's tenure (2) + games played (14): A tight end whose team's incoming play-caller's tenure with that team, in seasons, is 2 or more and whose number of games he was scored in that season is 14 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "incomingCoachTenureSeasons",
+      "primaryQuantityNoun": "incoming coach's tenure",
+      "primaryQuantityUnit": "whole"
+    },
+    "and:TE:threshold:TE:gamesPlayed:q80+threshold:TE:teamAirYardsShare:q70": {
+      "effect": 1.0820312499999998,
+      "trainEffect": 1.0647402597402595,
+      "ci": [
+        0.5519348958333334,
+        1.6236289062500018
+      ],
+      "sample": 192,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 17,
+          "effect": 1.7317647058823529
+        },
+        {
+          "season": 2022,
+          "pairs": 23,
+          "effect": 0.7404347826086952
+        },
+        {
+          "season": 2023,
+          "pairs": 15,
+          "effect": 1.7833333333333337
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "TE",
+      "template": "and",
+      "claim": "Tight end air-yards share (6.5%) + games played (14): A tight end whose share of his team's air yards that season is 6.5% or more and whose number of games he was scored in that season is 14 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "teamAirYardsShare",
+      "primaryQuantityNoun": "air-yards share",
+      "primaryQuantityUnit": "percent"
+    },
     "and:WR:threshold:WR:age:q70+threshold:WR:experienceYear:q70": {
       "effect": -1.1634893617021278,
       "trainEffect": -1.179646739130435,
@@ -14,7 +194,7 @@
         -0.6775249999999996
       ],
       "sample": 470,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
@@ -50,7 +230,7 @@
         -0.5660283132530115
       ],
       "sample": 415,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
@@ -78,15 +258,267 @@
       "primaryQuantityNoun": "age",
       "primaryQuantityUnit": "two_decimal"
     },
-    "and:WR:threshold:WR:incomingCoachTenureSeasons:q70+threshold:WR:touchdownPointsShare:q70": {
-      "effect": -1.0628398791540774,
-      "trainEffect": -1.0795185185185183,
+    "and:WR:threshold:WR:age:q70+threshold:WR:incomingCoachTenureSeasons:q70": {
+      "effect": -1.3258947368421046,
+      "trainEffect": -0.9977092511013215,
       "ci": [
-        -1.603186555891239,
-        -0.5146427492447131
+        -1.9095105263157885,
+        -0.82275350877193
       ],
-      "sample": 331,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "sample": 285,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 24,
+          "effect": 0.0837499999999997
+        },
+        {
+          "season": 2022,
+          "pairs": 30,
+          "effect": -2.339
+        },
+        {
+          "season": 2023,
+          "pairs": 28,
+          "effect": -2.9010714285714276
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver age (26.97) + incoming coach's tenure (1): A wide receiver whose age at that season's opener is 26.97 or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "age",
+      "primaryQuantityNoun": "age",
+      "primaryQuantityUnit": "two_decimal"
+    },
+    "and:WR:threshold:WR:experienceYear:q70+threshold:WR:targetShare:q70": {
+      "effect": -1.1375824175824167,
+      "trainEffect": -1.177741935483871,
+      "ci": [
+        -1.7595970695970693,
+        -0.5386410256410258
+      ],
+      "sample": 273,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 26,
+          "effect": -0.6273076923076922
+        },
+        {
+          "season": 2022,
+          "pairs": 25,
+          "effect": -0.08839999999999965
+        },
+        {
+          "season": 2023,
+          "pairs": 31,
+          "effect": -1.7025806451612904
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver target share (15.3%) + experience (5): A wide receiver whose share of his team's targets that season is 15.3% or more and whose number of seasons in the league (counting that season itself) is 5 or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "targetShare",
+      "primaryQuantityNoun": "target share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:experienceYear:q70+threshold:WR:touchdownPointsShare:q80": {
+      "effect": -1.5648818897637795,
+      "trainEffect": -1.6534020618556704,
+      "ci": [
+        -2.418429133858268,
+        -0.7697736220472441
+      ],
+      "sample": 127,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 9,
+          "effect": 0.058888888888889115
+        },
+        {
+          "season": 2022,
+          "pairs": 11,
+          "effect": -1.9154545454545455
+        },
+        {
+          "season": 2023,
+          "pairs": 19,
+          "effect": -0.9100000000000004
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver touchdown-points share (22.8%) + experience (5): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 22.8% or more and whose number of seasons in the league (counting that season itself) is 5 or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "touchdownPointsShare",
+      "primaryQuantityNoun": "touchdown-points share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:experienceYear:q90+threshold:WR:touchdownPointsShare:q80": {
+      "effect": -2.2538095238095233,
+      "trainEffect": -2.6049999999999995,
+      "ci": [
+        -3.5908511904761884,
+        -0.8085178571428568
+      ],
+      "sample": 42,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 5,
+          "effect": -2.3919999999999995
+        },
+        {
+          "season": 2022,
+          "pairs": 4,
+          "effect": -4.1675
+        },
+        {
+          "season": 2023,
+          "pairs": 6,
+          "effect": 0.8950000000000001
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver touchdown-points share (22.8%) + experience (8): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 22.8% or more and whose number of seasons in the league (counting that season itself) is 8 or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "touchdownPointsShare",
+      "primaryQuantityNoun": "touchdown-points share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:gamesPlayed:q70+threshold:WR:teamAirYardsShare:q70": {
+      "effect": 1.3123848238482392,
+      "trainEffect": 1.0046598639455782,
+      "ci": [
+        0.7934349593495937,
+        1.8652608401084003
+      ],
+      "sample": 369,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 28,
+          "effect": 2.8949999999999996
+        },
+        {
+          "season": 2022,
+          "pairs": 39,
+          "effect": 2.1105128205128203
+        },
+        {
+          "season": 2023,
+          "pairs": 36,
+          "effect": 2.9608333333333334
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver air-yards share (16.8%) + games played (15): A wide receiver whose share of his team's air yards that season is 16.8% or more and whose number of games he was scored in that season is 15 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "teamAirYardsShare",
+      "primaryQuantityNoun": "air-yards share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:gamesPlayed:q70+threshold:WR:teamAirYardsShare:q80": {
+      "effect": 1.3031125827814576,
+      "trainEffect": 1.1364166666666677,
+      "ci": [
+        0.6778402317880795,
+        1.881591059602648
+      ],
+      "sample": 302,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 23,
+          "effect": 2.333043478260869
+        },
+        {
+          "season": 2022,
+          "pairs": 31,
+          "effect": 1.4712903225806448
+        },
+        {
+          "season": 2023,
+          "pairs": 31,
+          "effect": 2.4254838709677413
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver air-yards share (22.4%) + games played (15): A wide receiver whose share of his team's air yards that season is 22.4% or more and whose number of games he was scored in that season is 15 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "teamAirYardsShare",
+      "primaryQuantityNoun": "air-yards share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:incomingCoachTenureSeasons:q70+threshold:WR:snapShare:q70": {
+      "effect": 0.9231192660550459,
+      "trainEffect": 1.1120740740740738,
+      "ci": [
+        0.36665214067278284,
+        1.4786490825688081
+      ],
+      "sample": 327,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 27,
+          "effect": 1.7540740740740735
+        },
+        {
+          "season": 2022,
+          "pairs": 29,
+          "effect": -0.6527586206896554
+        },
+        {
+          "season": 2023,
+          "pairs": 28,
+          "effect": 0.7332142857142857
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver snap share (69.3%) + incoming coach's tenure (1): A wide receiver whose share of his team's offensive snaps that season is 69.3% or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "snapShare",
+      "primaryQuantityNoun": "snap share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:incomingCoachTenureSeasons:q70+threshold:WR:touchdownPointsShare:q70": {
+      "effect": -1.0580116959064314,
+      "trainEffect": -1.0729893238434158,
+      "ci": [
+        -1.56897149122807,
+        -0.5896154970760232
+      ],
+      "sample": 342,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
@@ -108,31 +540,31 @@
       "origin": "discovered",
       "position": "WR",
       "template": "and",
-      "claim": "Wide receiver touchdown-points share (19.5%) + incoming coach's tenure (1): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 19.5% or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more loses points per game the following season.",
+      "claim": "Wide receiver touchdown-points share (19.3%) + incoming coach's tenure (1): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 19.3% or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more loses points per game the following season.",
       "expectedSign": -1,
       "primaryQuantityId": "touchdownPointsShare",
       "primaryQuantityNoun": "touchdown-points share",
       "primaryQuantityUnit": "percent"
     },
     "and:WR:threshold:WR:incomingCoachTenureSeasons:q70+threshold:WR:touchdownPointsShare:q80": {
-      "effect": -1.7326027397260269,
-      "trainEffect": -1.6570949720670394,
+      "effect": -1.7190178571428567,
+      "trainEffect": -1.6488524590163938,
       "ci": [
-        -2.367230593607305,
-        -1.1114977168949762
+        -2.3460926339285715,
+        -1.099147321428571
       ],
-      "sample": 219,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "sample": 224,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
-          "pairs": 24,
-          "effect": -1.3704166666666666
+          "pairs": 25,
+          "effect": -1.3660000000000003
         },
         {
           "season": 2022,
-          "pairs": 17,
-          "effect": -1.4017647058823528
+          "pairs": 18,
+          "effect": -1.3516666666666666
         },
         {
           "season": 2023,
@@ -144,7 +576,7 @@
       "origin": "discovered",
       "position": "WR",
       "template": "and",
-      "claim": "Wide receiver touchdown-points share (23.2%) + incoming coach's tenure (1): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 23.2% or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more loses points per game the following season.",
+      "claim": "Wide receiver touchdown-points share (22.8%) + incoming coach's tenure (1): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 22.8% or more and whose team's incoming play-caller's tenure with that team, in seasons, is 1 or more loses points per game the following season.",
       "expectedSign": -1,
       "primaryQuantityId": "touchdownPointsShare",
       "primaryQuantityNoun": "touchdown-points share",
@@ -158,7 +590,7 @@
         2.1890737704918006
       ],
       "sample": 244,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
@@ -186,6 +618,42 @@
       "primaryQuantityNoun": "snap share",
       "primaryQuantityUnit": "percent"
     },
+    "and:WR:threshold:WR:incomingTeamWinTotal:q70+threshold:WR:targetShare:q80": {
+      "effect": 1.5743999999999998,
+      "trainEffect": 1.4721186440677962,
+      "ci": [
+        0.7776299999999995,
+        2.4311233333333324
+      ],
+      "sample": 150,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 20,
+          "effect": 2.4694999999999996
+        },
+        {
+          "season": 2022,
+          "pairs": 19,
+          "effect": 1.8968421052631586
+        },
+        {
+          "season": 2023,
+          "pairs": 13,
+          "effect": 2.0315384615384615
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver target share (18.8%) + incoming team win total (9.0): A wide receiver whose share of his team's targets that season is 18.8% or more and whose team's Vegas win total for the season ahead is 9.0 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "targetShare",
+      "primaryQuantityNoun": "target share",
+      "primaryQuantityUnit": "percent"
+    },
     "and:WR:threshold:WR:incomingTeamWinTotal:q80+threshold:WR:snapShare:q70": {
       "effect": 1.817244897959183,
       "trainEffect": 1.530394736842105,
@@ -194,7 +662,7 @@
         2.5610038265306128
       ],
       "sample": 196,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
@@ -222,20 +690,1208 @@
       "primaryQuantityNoun": "snap share",
       "primaryQuantityUnit": "percent"
     },
-    "threshold:TE:touchdownPointsShare:q70": {
-      "effect": -0.711010452961672,
-      "trainEffect": -0.8874058577405856,
+    "and:WR:threshold:WR:snapShare:q70+threshold:WR:teamAirYardsShare:q70": {
+      "effect": 1.6524375000000002,
+      "trainEffect": 1.4673228346456697,
       "ci": [
-        -1.152527874564459,
-        -0.2354233449477349
+        1.0554179687499998,
+        2.2547070312500024
       ],
-      "sample": 287,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "sample": 320,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
+          "pairs": 27,
+          "effect": 1.9274074074074077
+        },
+        {
+          "season": 2022,
+          "pairs": 35,
+          "effect": 2.819428571428571
+        },
+        {
+          "season": 2023,
+          "pairs": 31,
+          "effect": 1.8516129032258062
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver snap share (69.3%) + air-yards share (16.8%): A wide receiver whose share of his team's offensive snaps that season is 69.3% or more and whose share of his team's air yards that season is 16.8% or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "snapShare",
+      "primaryQuantityNoun": "snap share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:snapShare:q70+threshold:WR:teamAirYardsShare:q80": {
+      "effect": 1.3189642857142867,
+      "trainEffect": 1.1648000000000005,
+      "ci": [
+        0.6940919642857151,
+        1.9425535714285713
+      ],
+      "sample": 280,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 23,
+          "effect": 2.6439130434782605
+        },
+        {
+          "season": 2022,
+          "pairs": 26,
+          "effect": 2.0269230769230764
+        },
+        {
+          "season": 2023,
+          "pairs": 29,
+          "effect": 1.8803448275862065
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver snap share (69.3%) + air-yards share (22.4%): A wide receiver whose share of his team's offensive snaps that season is 69.3% or more and whose share of his team's air yards that season is 22.4% or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "snapShare",
+      "primaryQuantityNoun": "snap share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:targetShare:q70+threshold:WR:teamAirYardsShare:q70": {
+      "effect": 1.8623694779116469,
+      "trainEffect": 1.589898477157361,
+      "ci": [
+        1.2056295180722887,
+        2.575674698795181
+      ],
+      "sample": 249,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 22,
+          "effect": 1.9127272727272724
+        },
+        {
+          "season": 2022,
           "pairs": 28,
-          "effect": 0.03285714285714285
+          "effect": 3.0500000000000003
+        },
+        {
+          "season": 2023,
+          "pairs": 24,
+          "effect": 2.7133333333333343
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver target share (15.3%) + air-yards share (16.8%): A wide receiver whose share of his team's targets that season is 15.3% or more and whose share of his team's air yards that season is 16.8% or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "targetShare",
+      "primaryQuantityNoun": "target share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:targetShare:q80+threshold:WR:teamAirYardsShare:q70": {
+      "effect": 1.702835820895522,
+      "trainEffect": 1.3879746835443039,
+      "ci": [
+        0.942732587064677,
+        2.4494104477611924
+      ],
+      "sample": 201,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 18,
+          "effect": 2.6877777777777783
+        },
+        {
+          "season": 2022,
+          "pairs": 23,
+          "effect": 2.996521739130435
+        },
+        {
+          "season": 2023,
+          "pairs": 20,
+          "effect": 2.7025
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver target share (18.8%) + air-yards share (16.8%): A wide receiver whose share of his team's targets that season is 18.8% or more and whose share of his team's air yards that season is 16.8% or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "targetShare",
+      "primaryQuantityNoun": "target share",
+      "primaryQuantityUnit": "percent"
+    },
+    "and:WR:threshold:WR:targetShare:q80+threshold:WR:touchdownPointsShare:q80": {
+      "effect": -1.9804615384615378,
+      "trainEffect": -1.999473684210526,
+      "ci": [
+        -3.226715384615384,
+        -0.9392884615384615
+      ],
+      "sample": 65,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 6,
+          "effect": -1.2833333333333334
+        },
+        {
+          "season": 2022,
+          "pairs": 2,
+          "effect": -2.335000000000001
+        },
+        {
+          "season": 2023,
+          "pairs": 6,
+          "effect": -1.6816666666666666
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "and",
+      "claim": "Wide receiver target share (18.8%) + touchdown-points share (22.8%): A wide receiver whose share of his team's targets that season is 18.8% or more and whose share of his own fantasy points that came from touchdowns that season is 22.8% or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "targetShare",
+      "primaryQuantityNoun": "target share",
+      "primaryQuantityUnit": "percent"
+    },
+    "delta:QB:incomingTeamWinTotal:q20:rose_into": {
+      "effect": -2.8866666666666676,
+      "trainEffect": -3.882702702702703,
+      "ci": [
+        -4.79969298245614,
+        -1.0109956140350882
+      ],
+      "sample": 57,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 5,
+          "effect": -0.9660000000000004
+        },
+        {
+          "season": 2022,
+          "pairs": 13,
+          "effect": 0.9553846153846158
+        },
+        {
+          "season": 2023,
+          "pairs": 7,
+          "effect": -4.757142857142857
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "delta",
+      "claim": "Quarterback incoming team win total (6.5 or less): A quarterback whose team's Vegas win total for the season ahead rose above 6.5 after being at or below that mark the season before loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "incomingTeamWinTotal",
+      "primaryQuantityNoun": "incoming team win total",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:QB:pointsPerGame:q80:fell_out_of": {
+      "effect": 2.4940909090909096,
+      "trainEffect": 3.006075949367089,
+      "ci": [
+        0.8169943181818183,
+        4.034951704545455
+      ],
+      "sample": 88,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 8,
+          "effect": 0.7737499999999998
+        },
+        {
+          "season": 2022,
+          "pairs": 5,
+          "effect": -2.959999999999999
+        },
+        {
+          "season": 2023,
+          "pairs": 4,
+          "effect": -0.8000000000000003
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "delta",
+      "claim": "Quarterback points per game (15.3): A quarterback whose points per game that season fell below 15.3 after being at or above that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "pointsPerGame",
+      "primaryQuantityNoun": "points per game",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:QB:pointsPerGame:q90:fell_out_of": {
+      "effect": 2.6454687500000005,
+      "trainEffect": 2.970925925925926,
+      "ci": [
+        1.3270937499999997,
+        3.944226562499999
+      ],
+      "sample": 64,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 5,
+          "effect": 0.826
+        },
+        {
+          "season": 2022,
+          "pairs": 5,
+          "effect": 1.8619999999999988
+        },
+        {
+          "season": 2023,
+          "pairs": 5,
+          "effect": -0.08600000000000066
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "delta",
+      "claim": "Quarterback points per game (17.5): A quarterback whose points per game that season fell below 17.5 after being at or above that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "pointsPerGame",
+      "primaryQuantityNoun": "points per game",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:RB:pointsPerGame:q70:fell_out_of": {
+      "effect": 1.0715263157894734,
+      "trainEffect": 1.3167455621301778,
+      "ci": [
+        0.28883815789473694,
+        1.8776355263157898
+      ],
+      "sample": 190,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 14,
+          "effect": 2.005
+        },
+        {
+          "season": 2022,
+          "pairs": 10,
+          "effect": -0.4249999999999998
+        },
+        {
+          "season": 2023,
+          "pairs": 11,
+          "effect": -1.3354545454545457
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "RB",
+      "template": "delta",
+      "claim": "Running back points per game (8.8): A running back whose points per game that season fell below 8.8 after being at or above that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "pointsPerGame",
+      "primaryQuantityNoun": "points per game",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:RB:teamAirYardsShare:q70:fell_out_of": {
+      "effect": 1.3802419354838713,
+      "trainEffect": 2.2812371134020624,
+      "ci": [
+        0.4105443548387095,
+        2.5235403225806436
+      ],
+      "sample": 124,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 19,
+          "effect": 3.34157894736842
+        },
+        {
+          "season": 2022,
+          "pairs": 13,
+          "effect": -1.9746153846153847
+        },
+        {
+          "season": 2023,
+          "pairs": 14,
+          "effect": -1.7471428571428576
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "RB",
+      "template": "delta",
+      "claim": "Running back air-yards share (0.5%): A running back whose share of his team's air yards that season fell below 0.5% after being at or above that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "teamAirYardsShare",
+      "primaryQuantityNoun": "air-yards share",
+      "primaryQuantityUnit": "percent"
+    },
+    "delta:TE:pointsPerGame:q70:fell_out_of": {
+      "effect": 1.015227272727273,
+      "trainEffect": 0.8989830508474578,
+      "ci": [
+        0.5100265151515152,
+        1.4763465909090907
+      ],
+      "sample": 132,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 10,
+          "effect": 0.7660000000000001
+        },
+        {
+          "season": 2022,
+          "pairs": 3,
+          "effect": 0.38666666666666655
+        },
+        {
+          "season": 2023,
+          "pairs": 11,
+          "effect": 2.4336363636363636
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "TE",
+      "template": "delta",
+      "claim": "Tight end points per game (5.6): A tight end whose points per game that season fell below 5.6 after being at or above that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "pointsPerGame",
+      "primaryQuantityNoun": "points per game",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:WR:age:q30:rose_into": {
+      "effect": 1.373989071038251,
+      "trainEffect": 1.5276158940397349,
+      "ci": [
+        0.6821407103825138,
+        2.0613346994535515
+      ],
+      "sample": 183,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 26,
+          "effect": 1.733846153846154
+        },
+        {
+          "season": 2022,
+          "pairs": 12,
+          "effect": -0.01416666666666655
+        },
+        {
+          "season": 2023,
+          "pairs": 20,
+          "effect": 1.047
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "delta",
+      "claim": "Wide receiver age (23.96 or less): A wide receiver whose age at that season's opener rose above 23.96 after being at or below that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "age",
+      "primaryQuantityNoun": "age",
+      "primaryQuantityUnit": "two_decimal"
+    },
+    "delta:WR:pointsPerGame:q20:fell_out_of": {
+      "effect": 1.2875213675213673,
+      "trainEffect": 1.3971568627450979,
+      "ci": [
+        0.5686132478632484,
+        1.8839615384615391
+      ],
+      "sample": 117,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 10,
+          "effect": 1.8989999999999998
+        },
+        {
+          "season": 2022,
+          "pairs": 8,
+          "effect": 0.5074999999999997
+        },
+        {
+          "season": 2023,
+          "pairs": 7,
+          "effect": 0.5814285714285715
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "delta",
+      "claim": "Wide receiver points per game (1.4 or less): A wide receiver whose points per game that season fell to 1.4 or less after being above that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "pointsPerGame",
+      "primaryQuantityNoun": "points per game",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:WR:pointsPerGame:q70:fell_out_of": {
+      "effect": 1.0519918699186996,
+      "trainEffect": 1.1286877828054298,
+      "ci": [
+        0.44231910569105704,
+        1.6402957317073164
+      ],
+      "sample": 246,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 19,
+          "effect": 0.386842105263158
+        },
+        {
+          "season": 2022,
+          "pairs": 12,
+          "effect": 0.9275000000000002
+        },
+        {
+          "season": 2023,
+          "pairs": 13,
+          "effect": -0.1369230769230766
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "delta",
+      "claim": "Wide receiver points per game (8.9): A wide receiver whose points per game that season fell below 8.9 after being at or above that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "pointsPerGame",
+      "primaryQuantityNoun": "points per game",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:WR:pointsPerGame:q70:rose_into": {
+      "effect": -1.1813147410358575,
+      "trainEffect": -1.1891266375545857,
+      "ci": [
+        -1.8793316733067746,
+        -0.5807221115537856
+      ],
+      "sample": 251,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 10,
+          "effect": -3.651
+        },
+        {
+          "season": 2022,
+          "pairs": 15,
+          "effect": -1.4493333333333334
+        },
+        {
+          "season": 2023,
+          "pairs": 7,
+          "effect": -0.3514285714285714
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "delta",
+      "claim": "Wide receiver points per game (8.9): A wide receiver whose points per game that season rose to 8.9 or more after being below that mark the season before loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "pointsPerGame",
+      "primaryQuantityNoun": "points per game",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:WR:pointsPerGame:q80:rose_into": {
+      "effect": -2.1271090047393386,
+      "trainEffect": -1.984846938775512,
+      "ci": [
+        -2.899821090047394,
+        -1.3900023696682469
+      ],
+      "sample": 211,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 5,
+          "effect": 0.09399999999999942
+        },
+        {
+          "season": 2022,
+          "pairs": 9,
+          "effect": -5.408888888888889
+        },
+        {
+          "season": 2023,
+          "pairs": 6,
+          "effect": -1.8516666666666677
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "delta",
+      "claim": "Wide receiver points per game (11.2): A wide receiver whose points per game that season rose to 11.2 or more after being below that mark the season before loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "pointsPerGame",
+      "primaryQuantityNoun": "points per game",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:WR:pointsPerGame:q90:fell_out_of": {
+      "effect": 2.0983850931677033,
+      "trainEffect": 2.094551724137932,
+      "ci": [
+        1.2494487577639755,
+        2.9576288819875765
+      ],
+      "sample": 161,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 9,
+          "effect": 3.066666666666667
+        },
+        {
+          "season": 2022,
+          "pairs": 9,
+          "effect": 2.486666666666667
+        },
+        {
+          "season": 2023,
+          "pairs": 7,
+          "effect": 1.6785714285714295
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "delta",
+      "claim": "Wide receiver points per game (14.3): A wide receiver whose points per game that season fell below 14.3 after being at or above that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "pointsPerGame",
+      "primaryQuantityNoun": "points per game",
+      "primaryQuantityUnit": "one_decimal"
+    },
+    "delta:WR:touchdownPointsShare:q10:fell_out_of": {
+      "effect": 1.0188979591836733,
+      "trainEffect": 1.1328703703703702,
+      "ci": [
+        0.43844183673469406,
+        1.6374469387755093
+      ],
+      "sample": 245,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 13,
+          "effect": 1.6353846153846154
+        },
+        {
+          "season": 2022,
+          "pairs": 12,
+          "effect": 1.4166666666666667
+        },
+        {
+          "season": 2023,
+          "pairs": 17,
+          "effect": -0.71
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "delta",
+      "claim": "Wide receiver touchdown-points share (0.0% or less): A wide receiver whose share of his own fantasy points that came from touchdowns that season fell to 0.0% or less after being above that mark the season before gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "touchdownPointsShare",
+      "primaryQuantityNoun": "touchdown-points share",
+      "primaryQuantityUnit": "percent"
+    },
+    "threshold:QB:gamesPlayed:q30": {
+      "effect": -2.0169613259668493,
+      "trainEffect": -2.109565217391302,
+      "ci": [
+        -3.163338397790057,
+        -0.8930566298342542
+      ],
+      "sample": 181,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 9,
+          "effect": -1.821111111111112
+        },
+        {
+          "season": 2022,
+          "pairs": 11,
+          "effect": -1.3000000000000007
+        },
+        {
+          "season": 2023,
+          "pairs": 9,
+          "effect": -1.2366666666666672
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "threshold",
+      "claim": "Quarterback games played (3 or less): A quarterback whose number of games he was scored in that season is 3 or less loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "gamesPlayed",
+      "primaryQuantityNoun": "games played",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:QB:gamesPlayed:q70": {
+      "effect": 2.1296874999999993,
+      "trainEffect": 2.292894736842104,
+      "ci": [
+        1.1828603515625002,
+        3.0282499999999986
+      ],
+      "sample": 256,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 15,
+          "effect": 2.052666666666667
+        },
+        {
+          "season": 2022,
+          "pairs": 14,
+          "effect": -2.3564285714285704
+        },
+        {
+          "season": 2023,
+          "pairs": 14,
+          "effect": 3.9578571428571436
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "threshold",
+      "claim": "Quarterback games played (13): A quarterback whose number of games he was scored in that season is 13 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "gamesPlayed",
+      "primaryQuantityNoun": "games played",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:QB:gamesPlayed:q80": {
+      "effect": 2.299734848484849,
+      "trainEffect": 2.314008438818566,
+      "ci": [
+        1.4177026515151514,
+        3.1221571969696957
+      ],
+      "sample": 264,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 12,
+          "effect": 1.899166666666666
+        },
+        {
+          "season": 2022,
+          "pairs": 11,
+          "effect": 0.9609090909090917
+        },
+        {
+          "season": 2023,
+          "pairs": 16,
+          "effect": 3.008750000000001
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "threshold",
+      "claim": "Quarterback games played (15): A quarterback whose number of games he was scored in that season is 15 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "gamesPlayed",
+      "primaryQuantityNoun": "games played",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:QB:gamesPlayed:q90": {
+      "effect": 2.401201550387598,
+      "trainEffect": 2.4453846153846164,
+      "ci": [
+        1.631630813953488,
+        3.166254844961242
+      ],
+      "sample": 258,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 12,
+          "effect": 0.7049999999999995
+        },
+        {
+          "season": 2022,
+          "pairs": 9,
+          "effect": -0.826666666666665
+        },
+        {
+          "season": 2023,
+          "pairs": 15,
+          "effect": 3.648666666666668
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "QB",
+      "template": "threshold",
+      "claim": "Quarterback games played (16): A quarterback whose number of games he was scored in that season is 16 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "gamesPlayed",
+      "primaryQuantityNoun": "games played",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:RB:age:q10": {
+      "effect": 1.8799206349206354,
+      "trainEffect": 2.0007547169811324,
+      "ci": [
+        0.7507559523809527,
+        2.986946428571427
+      ],
+      "sample": 126,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 9,
+          "effect": 3.592222222222221
+        },
+        {
+          "season": 2022,
+          "pairs": 10,
+          "effect": 0.6429999999999996
+        },
+        {
+          "season": 2023,
+          "pairs": 10,
+          "effect": 1.8360000000000007
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "RB",
+      "template": "threshold",
+      "claim": "Running back age (22.50 or less): A running back whose age at that season's opener is 22.50 or less gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "age",
+      "primaryQuantityNoun": "age",
+      "primaryQuantityUnit": "two_decimal"
+    },
+    "threshold:RB:age:q20": {
+      "effect": 1.3967965367965356,
+      "trainEffect": 1.3788442211055265,
+      "ci": [
+        0.612077922077922,
+        2.120285714285714
+      ],
+      "sample": 231,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 22,
+          "effect": 0.648181818181818
+        },
+        {
+          "season": 2022,
+          "pairs": 15,
+          "effect": 1.2566666666666664
+        },
+        {
+          "season": 2023,
+          "pairs": 17,
+          "effect": 1.7305882352941182
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "RB",
+      "template": "threshold",
+      "claim": "Running back age (23.15 or less): A running back whose age at that season's opener is 23.15 or less gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "age",
+      "primaryQuantityNoun": "age",
+      "primaryQuantityUnit": "two_decimal"
+    },
+    "threshold:RB:age:q30": {
+      "effect": 1.4119943019943024,
+      "trainEffect": 1.311911262798635,
+      "ci": [
+        0.7809693732193732,
+        2.055621794871793
+      ],
+      "sample": 351,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 38,
+          "effect": 0.09789473684210509
+        },
+        {
+          "season": 2022,
+          "pairs": 36,
+          "effect": 1.8919444444444444
+        },
+        {
+          "season": 2023,
+          "pairs": 22,
+          "effect": 1.9595454545454556
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "RB",
+      "template": "threshold",
+      "claim": "Running back age (23.77 or less): A running back whose age at that season's opener is 23.77 or less gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "age",
+      "primaryQuantityNoun": "age",
+      "primaryQuantityUnit": "two_decimal"
+    },
+    "threshold:RB:draftPick:q70": {
+      "effect": -1.106975609756097,
+      "trainEffect": -1.37335294117647,
+      "ci": [
+        -1.849276829268294,
+        -0.28968658536585407
+      ],
+      "sample": 205,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 22,
+          "effect": -1.4931818181818182
+        },
+        {
+          "season": 2022,
+          "pairs": 18,
+          "effect": 1.343888888888889
+        },
+        {
+          "season": 2023,
+          "pairs": 17,
+          "effect": -1.0382352941176465
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "RB",
+      "template": "threshold",
+      "claim": "Running back draft pick (149): A running back whose overall draft pick, counting a later pick as a larger number, is 149 or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "draftPick",
+      "primaryQuantityNoun": "draft pick",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:RB:gamesPlayed:q80": {
+      "effect": 0.9979668674698804,
+      "trainEffect": 0.9808149405772506,
+      "ci": [
+        0.5390888554216855,
+        1.418449924698794
+      ],
+      "sample": 664,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 36,
+          "effect": 0.22916666666666682
+        },
+        {
+          "season": 2022,
+          "pairs": 37,
+          "effect": 1.7537837837837835
+        },
+        {
+          "season": 2023,
+          "pairs": 38,
+          "effect": 0.5278947368421053
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "RB",
+      "template": "threshold",
+      "claim": "Running back games played (15): A running back whose number of games he was scored in that season is 15 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "gamesPlayed",
+      "primaryQuantityNoun": "games played",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:RB:gamesPlayed:q90": {
+      "effect": 0.9205720338983059,
+      "trainEffect": 0.9694827586206902,
+      "ci": [
+        0.39872563559322044,
+        1.4859613347457612
+      ],
+      "sample": 472,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 23,
+          "effect": 0.1726086956521739
+        },
+        {
+          "season": 2022,
+          "pairs": 31,
+          "effect": 1.2390322580645163
+        },
+        {
+          "season": 2023,
+          "pairs": 35,
+          "effect": 0.07114285714285755
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "RB",
+      "template": "threshold",
+      "claim": "Running back games played (16): A running back whose number of games he was scored in that season is 16 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "gamesPlayed",
+      "primaryQuantityNoun": "games played",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:RB:touches:q70": {
+      "effect": 1.6624731182795691,
+      "trainEffect": 1.6123225806451607,
+      "ci": [
+        0.7934879032258071,
+        2.594400537634409
+      ],
+      "sample": 186,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 18,
+          "effect": 2.6666666666666674
+        },
+        {
+          "season": 2022,
+          "pairs": 19,
+          "effect": 1.8121052631578947
+        },
+        {
+          "season": 2023,
+          "pairs": 12,
+          "effect": 2.0733333333333337
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "RB",
+      "template": "threshold",
+      "claim": "Running back carries and receptions (129): A running back whose combined carries and receptions that season is 129 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "touches",
+      "primaryQuantityNoun": "carries and receptions",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:TE:draftPick:q90": {
+      "effect": -1.4927419354838711,
+      "trainEffect": -1.57622641509434,
+      "ci": [
+        -2.1685967741935492,
+        -0.7675241935483873
+      ],
+      "sample": 62,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 6,
+          "effect": -1.02
+        },
+        {
+          "season": 2022,
+          "pairs": 4,
+          "effect": -0.5625000000000004
+        },
+        {
+          "season": 2023,
+          "pairs": 5,
+          "effect": -1.3519999999999999
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "TE",
+      "template": "threshold",
+      "claim": "Tight end draft pick (201): A tight end whose overall draft pick, counting a later pick as a larger number, is 201 or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "draftPick",
+      "primaryQuantityNoun": "draft pick",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:TE:gamesPlayed:q30": {
+      "effect": -0.736991869918699,
+      "trainEffect": -0.7318100890207715,
+      "ci": [
+        -1.1096510840108413,
+        -0.38654742547425475
+      ],
+      "sample": 369,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 21,
+          "effect": -1.26952380952381
+        },
+        {
+          "season": 2022,
+          "pairs": 18,
+          "effect": -0.8649999999999998
+        },
+        {
+          "season": 2023,
+          "pairs": 14,
+          "effect": -0.6971428571428572
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "TE",
+      "template": "threshold",
+      "claim": "Tight end games played (6 or less): A tight end whose number of games he was scored in that season is 6 or less loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "gamesPlayed",
+      "primaryQuantityNoun": "games played",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:TE:gamesPlayed:q70": {
+      "effect": 0.6573398058252427,
+      "trainEffect": 0.5828918322295807,
+      "ci": [
+        0.32399660194174734,
+        0.9822868932038837
+      ],
+      "sample": 515,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 32,
+          "effect": 0.5665624999999999
+        },
+        {
+          "season": 2022,
+          "pairs": 33,
+          "effect": 0.9172727272727274
+        },
+        {
+          "season": 2023,
+          "pairs": 29,
+          "effect": 1.5244827586206897
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "TE",
+      "template": "threshold",
+      "claim": "Tight end games played (13): A tight end whose number of games he was scored in that season is 13 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "gamesPlayed",
+      "primaryQuantityNoun": "games played",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:TE:gamesPlayed:q80": {
+      "effect": 0.8074272930648774,
+      "trainEffect": 0.7597964376590337,
+      "ci": [
+        0.4251689038031323,
+        1.193856823266219
+      ],
+      "sample": 447,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 27,
+          "effect": 0.2744444444444446
+        },
+        {
+          "season": 2022,
+          "pairs": 28,
+          "effect": 0.8149999999999998
+        },
+        {
+          "season": 2023,
+          "pairs": 26,
+          "effect": 1.519230769230769
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "TE",
+      "template": "threshold",
+      "claim": "Tight end games played (14): A tight end whose number of games he was scored in that season is 14 or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "gamesPlayed",
+      "primaryQuantityNoun": "games played",
+      "primaryQuantityUnit": "whole"
+    },
+    "threshold:TE:touchdownPointsShare:q70": {
+      "effect": -0.6273773584905664,
+      "trainEffect": -0.7045114345114345,
+      "ci": [
+        -0.9518202830188689,
+        -0.30063018867924507
+      ],
+      "sample": 530,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 29,
+          "effect": -0.006551724137931002
         },
         {
           "season": 2022,
@@ -244,19 +1900,199 @@
         },
         {
           "season": 2023,
-          "pairs": 24,
-          "effect": -0.04625000000000004
+          "pairs": 25,
+          "effect": -0.11120000000000005
         }
       ],
       "verdict": "weak",
       "origin": "discovered",
       "position": "TE",
       "template": "threshold",
-      "claim": "Tight end touchdown-points share (23.3%): A tight end whose share of his own fantasy points that came from touchdowns that season is 23.3% or more loses points per game the following season.",
+      "claim": "Tight end touchdown-points share (22.9%): A tight end whose share of his own fantasy points that came from touchdowns that season is 22.9% or more loses points per game the following season.",
       "expectedSign": -1,
       "primaryQuantityId": "touchdownPointsShare",
       "primaryQuantityNoun": "touchdown-points share",
       "primaryQuantityUnit": "percent"
+    },
+    "threshold:TE:touchdownPointsShare:q80": {
+      "effect": -0.83217008797654,
+      "trainEffect": -0.9130225080385852,
+      "ci": [
+        -1.2063760997067448,
+        -0.47228739002932557
+      ],
+      "sample": 341,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 22,
+          "effect": -0.04227272727272736
+        },
+        {
+          "season": 2022,
+          "pairs": 16,
+          "effect": 0.21000000000000027
+        },
+        {
+          "season": 2023,
+          "pairs": 14,
+          "effect": -0.22714285714285712
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "TE",
+      "template": "threshold",
+      "claim": "Tight end touchdown-points share (28.8%): A tight end whose share of his own fantasy points that came from touchdowns that season is 28.8% or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "touchdownPointsShare",
+      "primaryQuantityNoun": "touchdown-points share",
+      "primaryQuantityUnit": "percent"
+    },
+    "threshold:TE:touchdownPointsShare:q90": {
+      "effect": -1.1297546012269934,
+      "trainEffect": -1.1524324324324324,
+      "ci": [
+        -1.6671365030674854,
+        -0.5893849693251533
+      ],
+      "sample": 163,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 9,
+          "effect": 0.08444444444444422
+        },
+        {
+          "season": 2022,
+          "pairs": 7,
+          "effect": -0.9128571428571421
+        },
+        {
+          "season": 2023,
+          "pairs": 8,
+          "effect": -0.9000000000000001
+        }
+      ],
+      "verdict": "weak",
+      "origin": "discovered",
+      "position": "TE",
+      "template": "threshold",
+      "claim": "Tight end touchdown-points share (37.7%): A tight end whose share of his own fantasy points that came from touchdowns that season is 37.7% or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "touchdownPointsShare",
+      "primaryQuantityNoun": "touchdown-points share",
+      "primaryQuantityUnit": "percent"
+    },
+    "threshold:WR:age:q10": {
+      "effect": 1.4166831683168324,
+      "trainEffect": 1.579024390243903,
+      "ci": [
+        0.7001311881188117,
+        2.142075495049504
+      ],
+      "sample": 202,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 25,
+          "effect": 1.3531999999999997
+        },
+        {
+          "season": 2022,
+          "pairs": 19,
+          "effect": 0.3726315789473686
+        },
+        {
+          "season": 2023,
+          "pairs": 19,
+          "effect": 1.0594736842105261
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "threshold",
+      "claim": "Wide receiver age (22.64 or less): A wide receiver whose age at that season's opener is 22.64 or less gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "age",
+      "primaryQuantityNoun": "age",
+      "primaryQuantityUnit": "two_decimal"
+    },
+    "threshold:WR:age:q20": {
+      "effect": 1.2683244680851062,
+      "trainEffect": 1.314243421052631,
+      "ci": [
+        0.7636768617021277,
+        1.74811170212766
+      ],
+      "sample": 376,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 41,
+          "effect": 1.0248780487804874
+        },
+        {
+          "season": 2022,
+          "pairs": 34,
+          "effect": 0.09941176470588246
+        },
+        {
+          "season": 2023,
+          "pairs": 38,
+          "effect": 1.946842105263158
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "threshold",
+      "claim": "Wide receiver age (23.42 or less): A wide receiver whose age at that season's opener is 23.42 or less gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "age",
+      "primaryQuantityNoun": "age",
+      "primaryQuantityUnit": "two_decimal"
+    },
+    "threshold:WR:age:q30": {
+      "effect": 0.8135593220338982,
+      "trainEffect": 0.7738551401869159,
+      "ci": [
+        0.3997777777777779,
+        1.2553940677966104
+      ],
+      "sample": 531,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 52,
+          "effect": 0.8367307692307688
+        },
+        {
+          "season": 2022,
+          "pairs": 48,
+          "effect": 0.11062500000000003
+        },
+        {
+          "season": 2023,
+          "pairs": 55,
+          "effect": 1.7360000000000004
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "threshold",
+      "claim": "Wide receiver age (23.96 or less): A wide receiver whose age at that season's opener is 23.96 or less gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "age",
+      "primaryQuantityNoun": "age",
+      "primaryQuantityUnit": "two_decimal"
     },
     "threshold:WR:age:q70": {
       "effect": -1.1393995859213255,
@@ -266,7 +2102,7 @@
         -0.6917365424430643
       ],
       "sample": 483,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
@@ -294,6 +2130,42 @@
       "primaryQuantityNoun": "age",
       "primaryQuantityUnit": "two_decimal"
     },
+    "threshold:WR:experienceYear:q10": {
+      "effect": 0.9466237942122193,
+      "trainEffect": 0.9990909090909097,
+      "ci": [
+        0.44550482315112505,
+        1.464860932475883
+      ],
+      "sample": 311,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 29,
+          "effect": 0.12586206896551708
+        },
+        {
+          "season": 2022,
+          "pairs": 27,
+          "effect": 0.36740740740740735
+        },
+        {
+          "season": 2023,
+          "pairs": 31,
+          "effect": 1.0229032258064523
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "threshold",
+      "claim": "Wide receiver experience (1 or less): A wide receiver whose number of seasons in the league (counting that season itself) is 1 or less gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "experienceYear",
+      "primaryQuantityNoun": "experience",
+      "primaryQuantityUnit": "whole"
+    },
     "threshold:WR:experienceYear:q70": {
       "effect": -0.9749105691056912,
       "trainEffect": -0.9400626304801672,
@@ -302,7 +2174,7 @@
         -0.5995252032520324
       ],
       "sample": 615,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
@@ -338,7 +2210,7 @@
         -0.5443738938053094
       ],
       "sample": 452,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
@@ -366,73 +2238,181 @@
       "primaryQuantityNoun": "experience",
       "primaryQuantityUnit": "whole"
     },
-    "threshold:WR:touchdownPointsShare:q70": {
-      "effect": -0.8717009345794389,
-      "trainEffect": -0.9166063348416289,
+    "threshold:WR:targetShare:q30": {
+      "effect": -1.1079577464788737,
+      "trainEffect": -1.4127184466019422,
       "ci": [
-        -1.2841906542056085,
-        -0.4121962616822434
+        -1.732468309859156,
+        -0.45879401408450704
       ],
-      "sample": 535,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "sample": 142,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
-          "pairs": 52,
-          "effect": -1.209423076923077
+          "pairs": 19,
+          "effect": -1.5594736842105263
         },
         {
           "season": 2022,
-          "pairs": 44,
-          "effect": -1.5286363636363638
+          "pairs": 16,
+          "effect": 0.6718750000000002
         },
         {
           "season": 2023,
-          "pairs": 49,
-          "effect": 0.12326530612244896
+          "pairs": 23,
+          "effect": -0.9813043478260873
         }
       ],
       "verdict": "weak",
       "origin": "discovered",
       "position": "WR",
       "template": "threshold",
-      "claim": "Wide receiver touchdown-points share (19.5%): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 19.5% or more loses points per game the following season.",
+      "claim": "Wide receiver target share (4.0% or less): A wide receiver whose share of his team's targets that season is 4.0% or less loses points per game the following season.",
       "expectedSign": -1,
-      "primaryQuantityId": "touchdownPointsShare",
-      "primaryQuantityNoun": "touchdown-points share",
+      "primaryQuantityId": "targetShare",
+      "primaryQuantityNoun": "target share",
       "primaryQuantityUnit": "percent"
     },
-    "threshold:WR:touchdownPointsShare:q80": {
-      "effect": -1.285436046511627,
-      "trainEffect": -1.1967482517482513,
+    "threshold:WR:teamAirYardsShare:q70": {
+      "effect": 1.3457925072046113,
+      "trainEffect": 1.1801459854014604,
       "ci": [
-        -1.7927638081395343,
-        -0.7940501453488377
+        0.7838739193083565,
+        1.9338984149855916
       ],
-      "sample": 344,
-      "seasons": "2013-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "sample": 347,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
       "foldEffects": [
         {
           "season": 2021,
-          "pairs": 34,
-          "effect": -1.6252941176470586
+          "pairs": 32,
+          "effect": 2.2031250000000004
         },
         {
           "season": 2022,
-          "pairs": 23,
-          "effect": -2.0304347826086957
+          "pairs": 40,
+          "effect": 2.1075
         },
         {
           "season": 2023,
-          "pairs": 35,
-          "effect": -1.5205714285714287
+          "pairs": 33,
+          "effect": 1.797878787878788
         }
       ],
       "verdict": "confirmed",
       "origin": "discovered",
       "position": "WR",
       "template": "threshold",
-      "claim": "Wide receiver touchdown-points share (23.2%): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 23.2% or more loses points per game the following season.",
+      "claim": "Wide receiver air-yards share (16.8%): A wide receiver whose share of his team's air yards that season is 16.8% or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "teamAirYardsShare",
+      "primaryQuantityNoun": "air-yards share",
+      "primaryQuantityUnit": "percent"
+    },
+    "threshold:WR:teamAirYardsShare:q80": {
+      "effect": 1.350653594771242,
+      "trainEffect": 1.219839357429719,
+      "ci": [
+        0.7037491830065362,
+        2.0001192810457518
+      ],
+      "sample": 306,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 23,
+          "effect": 2.6439130434782605
+        },
+        {
+          "season": 2022,
+          "pairs": 28,
+          "effect": 1.5389285714285712
+        },
+        {
+          "season": 2023,
+          "pairs": 29,
+          "effect": 2.2920689655172413
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "threshold",
+      "claim": "Wide receiver air-yards share (22.4%): A wide receiver whose share of his team's air yards that season is 22.4% or more gains points per game the following season.",
+      "expectedSign": 1,
+      "primaryQuantityId": "teamAirYardsShare",
+      "primaryQuantityNoun": "air-yards share",
+      "primaryQuantityUnit": "percent"
+    },
+    "threshold:WR:touchdownPointsShare:q80": {
+      "effect": -0.8508978328173372,
+      "trainEffect": -0.7818803418803414,
+      "ci": [
+        -1.2539961300309608,
+        -0.4604373065015478
+      ],
+      "sample": 646,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 35,
+          "effect": -1.6148571428571428
+        },
+        {
+          "season": 2022,
+          "pairs": 25,
+          "effect": -1.8448000000000002
+        },
+        {
+          "season": 2023,
+          "pairs": 36,
+          "effect": -1.2822222222222224
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "threshold",
+      "claim": "Wide receiver touchdown-points share (22.8%): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 22.8% or more loses points per game the following season.",
+      "expectedSign": -1,
+      "primaryQuantityId": "touchdownPointsShare",
+      "primaryQuantityNoun": "touchdown-points share",
+      "primaryQuantityUnit": "percent"
+    },
+    "threshold:WR:touchdownPointsShare:q90": {
+      "effect": -1.09220447284345,
+      "trainEffect": -0.9054285714285708,
+      "ci": [
+        -1.6631214057507988,
+        -0.5335862619808309
+      ],
+      "sample": 313,
+      "seasons": "2003-2023 (2019, 2025 rebuilt from play-by-play), direction discovered on predictor seasons 2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train window; only seasons after it are genuinely out-of-sample for a discovered law)",
+      "foldEffects": [
+        {
+          "season": 2021,
+          "pairs": 16,
+          "effect": -1.455
+        },
+        {
+          "season": 2022,
+          "pairs": 14,
+          "effect": -2.4121428571428574
+        },
+        {
+          "season": 2023,
+          "pairs": 19,
+          "effect": -2.8721052631578945
+        }
+      ],
+      "verdict": "confirmed",
+      "origin": "discovered",
+      "position": "WR",
+      "template": "threshold",
+      "claim": "Wide receiver touchdown-points share (28.0%): A wide receiver whose share of his own fantasy points that came from touchdowns that season is 28.0% or more loses points per game the following season.",
       "expectedSign": -1,
       "primaryQuantityId": "touchdownPointsShare",
       "primaryQuantityNoun": "touchdown-points share",
