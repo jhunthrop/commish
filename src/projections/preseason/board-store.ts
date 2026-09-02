@@ -223,8 +223,26 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * through v5 each shipped once, and it is why every correction round gets a fresh name. v7 and v8
  * both keep their rows: v7 as the configuration whose verdict stood, v8 as the record of the one that
  * did not clear, and neither is read while this constant points at v9.
+ *
+ * REVERTED TO v7 A SECOND TIME (2026-09-02, the same bar-break rule): v9's confirmatory read came in
+ * at +0.0979 [-0.0068, +0.2203] against ADP on decisive 2024, an interval that does not exclude zero,
+ * so v9 did not clear either and this constant points at v7 until the 2025-outcomes round.
+ *
+ * WHAT THE TWO BREAKS TOGETHER SAY, because it is more than either says alone. v8 and v9 differ in
+ * exactly the blend constants (v8's searched cell against v7's pinned one) and their decisive gaps
+ * are +0.0982 and +0.0979: statistically the same number. THE CONSTANTS WERE NEVER THE CAUSE. What
+ * both configurations share is this round's corrections, and the one that touches pricing is the law
+ * family growing from 22 priced laws to 87. On both boards the LAW-ABLATED arm clears the bar
+ * (+0.1056 and +0.1063, intervals excluding zero) while the blended arm does not.
+ *
+ * AND THE ONE THING NOBODY HAS MEASURED, stated here so the next round does not assume it: v7's own
+ * published verdict (+0.1002 [+0.0041, +0.2089]) was taken on the PRE-CORRECTION store, and the 2024
+ * evaluation population itself grew with the crosswalk fix (653 stored rows to 664). v7's board has
+ * never been scored on today's store, so "v7 clears and v9 does not" is not yet a like-for-like
+ * comparison. Establishing that is a measurement the 2025-outcomes round should make FIRST, and it
+ * costs another look at 2024, which is exactly why it needs to be planned rather than improvised.
  */
-export const BOARD_SOURCE = "commish_board_v9_ppr_12";
+export const BOARD_SOURCE = "commish_board_v7_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {
