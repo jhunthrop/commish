@@ -132,7 +132,7 @@ async function main(): Promise<void> {
 
   console.log(
     ingestReport === null
-      ? "draft_picks: NOT ingested — this is a --check run, and a check is read-only (fit-round Task 3)."
+      ? "draft_picks: NOT ingested. This is a --check run, and a check is read-only (fit-round Task 3)."
       : `draft_picks: ${ingestReport.entriesRead} picks read, ${ingestReport.written} new, ` +
           `${ingestReport.unknownToUniverse} unknown to the universe`,
   );
