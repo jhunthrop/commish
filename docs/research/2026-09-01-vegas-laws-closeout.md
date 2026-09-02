@@ -459,3 +459,26 @@ $ npx tsc --noEmit
 43 errors, the documented baseline, matching every task this round's own tsc run, 0 in any file
 this task touched (this task touched no source file, only this document and the live-board
 close-out's superseded-by pointer).
+
+## Addendum (2026-09-01, Round A of the batched roadmap): the props archive extends backward
+
+The historical backfill designed in this document's props section ran the same day. Results, every
+figure from the runs (workspace: `.superpowers/sdd/2026-09-01-props-backfill/`):
+
+- **2023: complete.** Weeks 1-18, 222 events archived, 17,244 observations, one pre-kickoff
+  snapshot per week, `fetched_at` carrying the archive's own timestamps (review-verified: rows
+  cluster about 8 hours before each week's first kickoff in fall 2023; zero wall-clock stamps).
+- **2024: complete.** Weeks 1-18, 302 events, 18,719 observations across two budget-guarded runs.
+- **2025: deferred by ruling to the October credit refresh.** Round C's anchor test needs 2023
+  (in-fit) plus 2024 (held-out), both now complete; spending the remaining 3,825 credits down
+  would pinch September's weekly forward snapshots. The resume command is unchanged.
+- **Credits:** 16,047 spent on the backfill total, 3,825 remaining on the key this month.
+- **Name resolution (`props_player_map`):** by distinct name, 2023 97.3%, 2024 99.7%, 2026 98.6%.
+  Every unmatched name is a genuine same-name ambiguity refused rather than guessed (verified in
+  the map: no row exists for the two-player "Lamar Jackson" seasons) or a bookmaker-disambiguated
+  `Name (TEAM)` variant deferred to the resolver's next pass.
+
+Nothing consumes this data yet; props-as-anchor is measured in Round C's combined fit round,
+alongside the rookie-curve refit (the founder-confirmed survivorship defect: the RB curve's top
+knots rest on three post-2013 survivors while the 2003-2012 top-5 picks sit outside the stat-line
+floor) and the nested-law and recency-availability questions.
