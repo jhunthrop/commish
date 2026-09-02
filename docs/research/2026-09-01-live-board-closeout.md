@@ -107,6 +107,16 @@ Persisted live at `2026-09-01T17:52:51.667Z`, source `commish_board_v6_ppr_12`: 
 reason rows.** (The v6 re-persist is the final fix round's, section 4.1 below. The rows quoted here
 are v6's; the top 50 is point-for-point identical to v5's, for the reason that section explains.)
 
+**Correction (2026-09-02, roster-refresh hotfix).** The 759 figure quoted above, and every other
+"759 players" in this document, is a pre-cutdown count and no longer describes the live board. The
+roster ingest could not refresh itself (a live season's stamp does not move between two runs on the
+same day, so `onConflictDoNothing` discarded every fresh status), so the board was built on a
+mid-camp roster file carrying 3,154 rows and 2,802 actives. The post-cutdown file carries 2,796 rows
+and 1,695 actives, one per club at the 53-man limit, and the live board built from it holds **546
+players**. Nothing about the round this document records is retracted: the count moved because the
+league cut its rosters, not because the board changed its mind. See
+`docs/research/2026-09-01-vegas-laws-closeout.md` for the current top 50 and the corrected counts.
+
 ### The top 50 (value-rank primary, the plan's acceptance deliverable)
 
 ```
