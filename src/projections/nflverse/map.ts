@@ -45,6 +45,28 @@ export const PARTICIPATION_METRICS = {
   teamPassAttempts: "team_pass_attempts",
 } as const;
 
+/**
+ * THE SNAP-COUNT ASSET FLOOR — the earliest season nflverse's `snap_counts` release exists for at
+ * all, audited by hand against the release on 2026-09-01 (`HEAD` on every asset, 2003 through 2013):
+ * `snap_counts_2012.csv` is a 200 and `snap_counts_2011.csv` and everything older is a deterministic
+ * 404. The same audit found `stats_player_week_YYYY.csv` and `play_by_play_YYYY.csv` published for
+ * EVERY season 2003-2012.
+ *
+ * NOT `HISTORICAL_ROSTER_FLOOR` AND NOT `MEASURE_SEASONS.from` (both 2013), which are SCOPE bounds
+ * this constant deliberately does not touch. This one is an ASSET bound, the same kind of fact
+ * `rosters.ts`'s `ROSTER_ASSET_FLOOR` (2002) records for the weekly-roster release: it answers "does
+ * the file exist", not "is this engine willing to read that far back". `laws/config.ts` keeps 2013 as
+ * its window floor because the snap-count file for 2012 is missing its own week 1, which is a
+ * usability fact about the 2012 asset rather than about its existence, and moving that window is a
+ * decision of its own that this constant must never be read as having already made.
+ *
+ * ITS ONE READER is `ingest.ts`'s `fetchSnapCounts`, which uses it exactly the way
+ * `fetchPlayerWeek` uses `STAT_LINE_GAPS`: a 404 at or above this floor is an ALARM (nflverse
+ * dropped a release this engine has always seen), and a 404 below it is the ordinary, expected
+ * shape of history.
+ */
+export const SNAP_COUNT_ASSET_FLOOR = 2012;
+
 /** One player's opportunity in one week, joined across the two files that describe it. */
 export interface PlayerWeekParticipation {
   readonly playerId: string;

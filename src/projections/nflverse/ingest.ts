@@ -19,13 +19,27 @@ import {
   derivedStatLineObservations,
   weekAsOfFromDerivedLines,
 } from "./derived-stat-lines";
-import { mapParticipation, participationObservations, weekAsOfFromSnapCounts, NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "./map";
+import {
+  mapParticipation,
+  participationObservations,
+  weekAsOfFromSnapCounts,
+  NFLVERSE_SOURCE,
+  PARTICIPATION_METRICS,
+  SNAP_COUNT_ASSET_FLOOR,
+} from "./map";
 import { PlayByPlayAggregator, playProfileObservations, PBP_COLUMNS } from "./pbp";
 import { PlayerPlayAggregator, playerTouchObservations, PBP_PLAYER_COLUMNS } from "./pbp-players";
 import { allPositions } from "../backtest";
 import { mapInjuries } from "../news/retrieve";
 import { buildPlayerUniverse, mapNflPlayers, nflPlayerRows, type PlayerUniverse } from "./players";
-import { gameResultObservations, kickoffAsOf, mapSchedule, scheduleObservations, SCHEDULE_SOURCE_CONFIG } from "./schedule";
+import {
+  gameResultObservations,
+  kickoffAsOf,
+  mapSchedule,
+  scheduleObservations,
+  weekAsOfFromSchedule,
+  SCHEDULE_SOURCE_CONFIG,
+} from "./schedule";
 import { mapStatLines, statLineObservations, STAT_LINE_GAPS } from "./stat-lines";
 import { lineContinuityObservations, mapPlayerTeams } from "./team-map";
 
@@ -41,6 +55,14 @@ import { lineContinuityObservations, mapPlayerTeams } from "./team-map";
  * The universe is fetched ONCE and passed in, not fetched per season: it is a single seven-megabyte
  * release covering every year, and re-parsing it per season would be six downloads to answer the
  * same question.
+ *
+ * TWO UPSTREAM HOLES, TWO BRANCHES, AND THEY ARE NOT THE SAME HOLE. `fetchPlayerWeek` handles the
+ * seasons whose PUBLISHED WEEKLY STATS were never released (`STAT_LINE_GAPS`: 2019, 2025), where the
+ * stat lines have to be derived from play-by-play instead. `fetchSnapCounts` handles the seasons
+ * BELOW `SNAP_COUNT_ASSET_FLOOR` (2012), where the weekly stats are published and it is the
+ * PARTICIPATION half that does not exist: the 2003-2012 extension ingests published stat lines for
+ * every one of those seasons and gets no participation at all, which is the opposite shape from a
+ * gap season and is reported as `snapCountsUnavailable` rather than folded into one "thin" flag.
  */
 
 /**
@@ -79,6 +101,16 @@ export interface SeasonIngestReport {
    * participation data landed, when for a gap season only the two snap-count-sourced metrics did.
    */
   readonly playerWeekUnavailable: boolean;
+  /**
+   * TRUE when this season predates nflverse's snap-count release (`SNAP_COUNT_ASSET_FLOOR`), so
+   * NOTHING participation-shaped landed at all — not the two snap-count metrics, and not the six
+   * `playerWeek`-sourced ones either, since `mapParticipation` builds a player-week from a
+   * snap-count row and has nothing to hang a target on without one. The stat lines DID land, dated
+   * from the schedule (`weekAsOfFromSchedule`). Reported for the same reason
+   * `playerWeekUnavailable` is: "0 participation rows" beside a full set of stat lines is a fact
+   * about the upstream release, not a thin ingestion.
+   */
+  readonly snapCountsUnavailable: boolean;
 }
 
 /** Fetches and stores the historical player universe. Run once, before any season. */
@@ -137,15 +169,84 @@ async function fetchPlayerWeek(client: NflverseClient, season: number): Promise<
   }
 }
 
+/**
+ * The snap-count file, or an empty release for a season that predates the one nflverse first
+ * published — the mirror of `fetchPlayerWeek` above, and it exists for the mirror-image reason.
+ *
+ * `fetchPlayerWeek` catches the 404 for the seasons in the MIDDLE of the range whose weekly stats
+ * were never released; this catches the 404 for every season BELOW `SNAP_COUNT_ASSET_FLOOR` (2012),
+ * where the snap-count release simply does not reach. Before it existed, a backfill of any season
+ * older than 2012 died on its first download and the published weekly stats sitting right there
+ * upstream were unreachable.
+ *
+ * Only `not_found`, only this asset, and LOUD above the floor: a missing `snap_counts_2018.csv` is
+ * nflverse dropping a release this engine has always read, and treating it like ordinary history
+ * would turn that into a quiet season with no participation rather than an alarm.
+ */
+async function fetchSnapCounts(client: NflverseClient, season: number): Promise<readonly CsvRow[]> {
+  try {
+    return await client.getCsv(NFLVERSE_CONFIG.releases.snapCounts, `snap_counts_${season}.csv`);
+  } catch (error) {
+    if (error instanceof NflverseError && error.kind === "not_found") {
+      if (season >= SNAP_COUNT_ASSET_FLOOR) {
+        console.warn(
+          `WARNING: nflverse has no snap counts for ${season}, which is at or above SNAP_COUNT_ASSET_FLOOR ` +
+            `(${SNAP_COUNT_ASSET_FLOOR}). This is not the ordinary shape of pre-2012 history; investigate before ` +
+            `trusting this season's participation.`,
+        );
+      }
+      return [];
+    }
+    throw error;
+  }
+}
+
+/**
+ * PER-SEASON WEEK AS-OFS FROM THE SCHEDULE, FETCHED ONCE — what `ingestSeason` needs for a season
+ * with no snap-count file of its own (`SNAP_COUNT_ASSET_FLOOR`).
+ *
+ * One `games.csv` covers every season, so a ten-season backfill pays for one two-megabyte download
+ * here rather than one per season, exactly as `ingestSchedule` and `ingestCoaches` already treat the
+ * same file. Read-only: this writes nothing, and the schedule's own OBSERVATIONS remain
+ * `ingestSchedule`'s job.
+ */
+export async function scheduleWeekAsOf(
+  seasons: readonly number[],
+  client = createScheduleClient(),
+): Promise<ReadonlyMap<number, ReadonlyMap<number, Date>>> {
+  const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  const games = mapSchedule(rows, seasons);
+  return new Map(seasons.map((season) => [season, weekAsOfFromSchedule(games.filter((game) => game.season === season))]));
+}
+
 export async function ingestSeason(
   db: Db,
   client: NflverseClient,
   universe: PlayerUniverse,
   season: number,
+  /**
+   * The week as-ofs to use when this season has NO snap-count file to derive them from — built by
+   * `scheduleWeekAsOf` and passed in rather than fetched here, so a ten-season backfill downloads
+   * `games.csv` once. Injected rather than defaulted so a caller that reaches a pre-2012 season
+   * without having thought about the stamp fails loudly (see the throw below) instead of quietly
+   * pulling a second file.
+   */
+  scheduleAsOf?: ReadonlyMap<number, Date>,
 ): Promise<SeasonIngestReport> {
-  const snapCounts = await client.getCsv(NFLVERSE_CONFIG.releases.snapCounts, `snap_counts_${season}.csv`);
+  const snapCounts = await fetchSnapCounts(client, season);
   const playerWeek = await fetchPlayerWeek(client, season);
-  const weekAsOf = weekAsOfFromSnapCounts(snapCounts, NFLVERSE_CONFIG.publicationLagHours);
+  // Snap counts stay the first choice for every season that has them; the schedule is the fallback
+  // for the seasons below `SNAP_COUNT_ASSET_FLOOR`, on identical stamp arithmetic (see
+  // `weekAsOfFromSchedule`). A season with neither has no honest way to date a stat line, and
+  // `mapStatLines` would throw one week at a time; throwing here says why once.
+  if (snapCounts.length === 0 && scheduleAsOf === undefined) {
+    throw new Error(
+      `nflverse has no snap counts for ${season} and no schedule-derived week as-ofs were supplied, so its stat ` +
+        `lines cannot be dated. Pass scheduleWeekAsOf([...]).get(${season}) for seasons below SNAP_COUNT_ASSET_FLOOR.`,
+    );
+  }
+  const weekAsOf =
+    snapCounts.length > 0 ? weekAsOfFromSnapCounts(snapCounts, NFLVERSE_CONFIG.publicationLagHours) : scheduleAsOf!;
 
   const participation = mapParticipation({ snapCounts, playerWeek, universe });
   const statLines = mapStatLines({ playerWeek, weekAsOf, universe });
@@ -211,6 +312,7 @@ export async function ingestSeason(
     unresolved: [...unresolved.values()],
     weekAsOf,
     playerWeekUnavailable: playerWeek.length === 0,
+    snapCountsUnavailable: snapCounts.length === 0,
   };
 }
 

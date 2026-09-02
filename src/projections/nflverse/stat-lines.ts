@@ -63,6 +63,14 @@ export type { SeasonStatLine };
  * season (2018) — that bar proves the DERIVATION METHOD is trustworthy, not that any one gap season's
  * own numbers are; for a season with no published twin, `derivedSeasonSanityReport`
  * (`derived-stat-lines.ts`) is what the backfill prints instead of a fabricated agreement number.
+ * 2003-2012 AUDITED AND NOT ADDED (discovery-expansion Task 1). The history extension asked whether
+ * those ten seasons needed the derivation the way 2019 and 2025 do. They do not: a per-season `HEAD`
+ * against the release on 2026-09-01 found `stats_player_week_YYYY.csv` published, 200, for every
+ * season 2003 through 2012, with the identical column set 2024 carries. Published beats derived per
+ * season, so all ten are ingested from the published feed and this list does not grow. What those
+ * seasons lack is the OTHER file: `snap_counts_2011.csv` and older are 404s, which is
+ * `SNAP_COUNT_ASSET_FLOOR` (`map.ts`) and a different hole with a different branch — see
+ * `ingest.ts`'s own top-of-file note on why the two are not folded together.
  */
 export const STAT_LINE_GAPS: readonly number[] = [2019, 2025];
 

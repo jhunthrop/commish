@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { CsvRow } from "./csv";
-import { kickoffAsOf, mapSchedule, schedulePublishedAsOf, scheduleObservations, SCHEDULE_METRICS, SCHEDULE_SOURCE } from "./schedule";
+import {
+  kickoffAsOf,
+  mapSchedule,
+  schedulePublishedAsOf,
+  scheduleObservations,
+  weekAsOfFromSchedule,
+  SCHEDULE_METRICS,
+  SCHEDULE_SOURCE,
+} from "./schedule";
 
 function game(over: Partial<Record<string, string>> = {}): CsvRow {
   return {
@@ -115,5 +123,33 @@ describe("scheduleObservations — the two stamps that make the point-in-time cl
     expect(row.source).toBe(SCHEDULE_SOURCE.kickoff);
     // And, unlike `pointSpread`, it is there even though this game carries no line.
     expect(lineless.some((r) => r.team === "BUF" && r.metric === SCHEDULE_METRICS.pointSpread)).toBe(false);
+  });
+});
+
+/**
+ * The stamp a pre-2012 stat line is dated from — the seasons the 2003-2012 extension ingests have
+ * published weekly stats and no snap-count file to borrow a game date from (`SNAP_COUNT_ASSET_FLOOR`).
+ */
+describe("weekAsOfFromSchedule", () => {
+  const week = (over: Partial<Record<string, string>>): CsvRow => game({ season: "2010", ...over });
+
+  it("dates a week from its LAST game, exactly as weekAsOfFromSnapCounts does", () => {
+    const games = mapSchedule(
+      [
+        week({ week: "1", gameday: "2010-09-09" }),
+        week({ week: "1", gameday: "2010-09-13" }),
+        week({ week: "1", gameday: "2010-09-12" }),
+      ],
+      [2010],
+    );
+    expect(weekAsOfFromSchedule(games).get(1)).toEqual(kickoffAsOf("2010-09-13", 24));
+  });
+
+  it("keeps every week separate, and knows nothing about a week that was never played", () => {
+    const games = mapSchedule([week({ week: "1", gameday: "2010-09-12" }), week({ week: "2", gameday: "2010-09-19" })], [2010]);
+    const asOf = weekAsOfFromSchedule(games);
+    expect(asOf.get(1)).toEqual(kickoffAsOf("2010-09-12", 24));
+    expect(asOf.get(2)).toEqual(kickoffAsOf("2010-09-19", 24));
+    expect(asOf.get(3)).toBeUndefined();
   });
 });

@@ -4,9 +4,9 @@ import { computeFantasyPoints } from "@/scoring/compute";
 import type { Position } from "@/domain/player";
 import { parseCsv } from "./csv";
 import { readFixture } from "./fixtures";
-import { weekAsOfFromSnapCounts, NFLVERSE_SOURCE } from "./map";
+import { weekAsOfFromSnapCounts, NFLVERSE_SOURCE, SNAP_COUNT_ASSET_FLOOR } from "./map";
 import { buildPlayerUniverse, mapNflPlayers } from "./players";
-import { mapStatLines, statLineObservations } from "./stat-lines";
+import { mapStatLines, statLineObservations, LIVE_ADMITTED_DERIVED_SEASONS, STAT_LINE_GAPS } from "./stat-lines";
 
 const SNAP_COUNTS = parseCsv(readFixture("snap_counts_2024_buf_w1-3.csv"));
 const PLAYER_WEEK = parseCsv(readFixture("stats_player_week_2024_buf_w1-3.csv"));
@@ -86,6 +86,35 @@ describe("mapStatLines", () => {
     const result = mapStatLines({ playerWeek: PLAYER_WEEK, weekAsOf: WEEK_AS_OF, universe: narrow });
     expect(result.resolutionRate).toBeLessThan(0.2);
     expect(result.unresolved.some((row) => row.name === "Khalil Shakir")).toBe(true);
+  });
+});
+
+/**
+ * THE PER-SEASON SOURCE DECISION, PINNED (discovery-expansion Task 1). Which seasons are read from
+ * the published feed and which are derived from play-by-play is not a preference, it is a per-season
+ * fact about what nflverse released, audited by `HEAD` before any of it was ingested. These
+ * assertions are what stops a later round from "extending the gap list" to a season that has a
+ * published file sitting right there.
+ */
+describe("the 2003-2012 history extension's branch decisions", () => {
+  it("derives none of 2003-2012: every one of those seasons has published weekly stats upstream", () => {
+    const extension = Array.from({ length: 10 }, (_, index) => 2003 + index);
+    expect(extension.filter((season) => STAT_LINE_GAPS.includes(season))).toEqual([]);
+  });
+
+  it("keeps the gap list to the two seasons nflverse genuinely never published", () => {
+    expect([...STAT_LINE_GAPS]).toEqual([2019, 2025]);
+  });
+
+  it("holds the snap-count floor above the extension, which is why those seasons land no participation", () => {
+    // The other half of the audit: weekly stats reach back to 1999, snap counts only to 2012. The
+    // extension's seasons are therefore stat lines only, and this is the constant that says so.
+    expect(SNAP_COUNT_ASSET_FLOOR).toBe(2012);
+    expect(2003).toBeLessThan(SNAP_COUNT_ASSET_FLOOR);
+  });
+
+  it("admits none of the extension to a live board, which still only ever sees the current gap season", () => {
+    expect([...LIVE_ADMITTED_DERIVED_SEASONS]).toEqual([2025]);
   });
 });
 

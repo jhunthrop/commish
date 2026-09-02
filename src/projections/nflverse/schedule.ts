@@ -225,6 +225,31 @@ export function kickoffAsOf(gameday: string, lagHours: number): Date {
   return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day) + 1) + lagHours * MILLISECONDS_PER_HOUR);
 }
 
+/**
+ * WHEN EACH WEEK'S NUMBERS BECAME KNOWABLE, TAKEN FROM THE SCHEDULE — the same quantity
+ * `map.ts`'s `weekAsOfFromSnapCounts` derives, for the seasons that have no snap-count file to
+ * derive it from (`SNAP_COUNT_ASSET_FLOOR`, 2012: nflverse publishes no `snap_counts_2011.csv` or
+ * older, while it publishes weekly stats back to 1999).
+ *
+ * The weekly stats file carries no game date of its own, so it has to borrow one. Snap counts are
+ * the closer source and stay the first choice wherever they exist; the schedule is the same fact
+ * from the file that defines it, and `kickoffAsOf` is deliberately the IDENTICAL arithmetic
+ * `gameDayAsOf` applies to a `pfr_game_id` (end of the game's UTC calendar day plus the publication
+ * lag), so a 2010 stat line and a 2020 one are stamped on one rule rather than two.
+ *
+ * The week's LAST game, exactly as `weekAsOfFromSnapCounts` takes it: a week's stats are not
+ * complete until its Monday night game is over, and dating the week from its opener would make four
+ * days of results visible to a replay before they existed.
+ */
+export function weekAsOfFromSchedule(games: readonly TeamGame[]): ReadonlyMap<number, Date> {
+  const byWeek = new Map<number, Date>();
+  for (const game of games) {
+    const known = byWeek.get(game.week);
+    if (known === undefined || game.kickoffAsOf > known) byWeek.set(game.week, game.kickoffAsOf);
+  }
+  return byWeek;
+}
+
 function required(row: CsvRow, column: string): string {
   const value = row[column];
   if (value === undefined || value.trim() === "") {

@@ -16,6 +16,18 @@
 //
 // nflverse is free, so unlike `ingest-once.ts` this spends no upstream request budget.
 //
+// THE PRE-2012 BRANCH (the 2003-2012 history extension). nflverse publishes weekly player stats for
+// every season back to 1999, but its snap-count release only reaches 2012 — audited by hand against
+// the release on 2026-09-01, `snap_counts_2011.csv` and older are deterministic 404s. So for a
+// season below `SNAP_COUNT_ASSET_FLOOR` this ingests the PUBLISHED stat lines (published beats
+// derived, per season, always) and gets no participation at all, dating each week from the schedule
+// instead of from the snap counts it has none of (`scheduleWeekAsOf`, fetched once for the whole
+// range). Those seasons print "0 participation rows" beside a full set of stat lines and are exempt
+// from the participation half of the resolution bar, exactly as a gap season is exempt from the
+// stat-line half. NOTHING about that widens any measurement window: `MEASURE_SEASONS.from` (2013)
+// and `HISTORICAL_ROSTER_FLOOR` (2013) are untouched, and the seasons this branch lands are
+// therefore visible to nothing that reads through them yet.
+//
 // THE GAP-SEASON BRANCH. `ingestSeason`'s published weekly stats file does not exist for any season
 // named in `STAT_LINE_GAPS` (today, 2019 and 2025 — a deterministic 404, not a transient one). For
 // every such season inside the requested range, this ALSO derives stat lines from that season's own
@@ -51,7 +63,8 @@ import { allPositions } from "@/projections/backtest";
 import { statLinesAsOf } from "@/projections/lines";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { derivedSeasonSanityReport, seasonPointsAgreement, type DerivedSeasonSanityReport } from "@/projections/nflverse/derived-stat-lines";
-import { computeDerivedStatLines, ingestDerivedStatLines, ingestPlayerUniverse, ingestSeason } from "@/projections/nflverse/ingest";
+import { computeDerivedStatLines, ingestDerivedStatLines, ingestPlayerUniverse, ingestSeason, scheduleWeekAsOf } from "@/projections/nflverse/ingest";
+import { SNAP_COUNT_ASSET_FLOOR } from "@/projections/nflverse/map";
 import { STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import type { NflverseClient } from "@/projections/nflverse/client";
@@ -224,20 +237,44 @@ async function main(): Promise<void> {
 
   const seasons = Array.from({ length: LAST_SEASON - FIRST_SEASON + 1 }, (_, index) => FIRST_SEASON + index);
 
+  // The schedule is only fetched when the range actually reaches below the snap-count release
+  // (`SNAP_COUNT_ASSET_FLOOR`), and then exactly once for the whole range: it is where those
+  // seasons' stat lines get their as-of, since they have no snap-count file to take one from.
+  const preSnapSeasons = seasons.filter((season) => season < SNAP_COUNT_ASSET_FLOOR);
+  const scheduleAsOf = preSnapSeasons.length === 0 ? new Map<number, ReadonlyMap<number, Date>>() : await scheduleWeekAsOf(preSnapSeasons);
+  if (preSnapSeasons.length > 0) {
+    console.log(
+      `${preSnapSeasons.length} season(s) below SNAP_COUNT_ASSET_FLOOR (${SNAP_COUNT_ASSET_FLOOR}): ` +
+        `stat lines will be dated from the schedule, and no participation exists upstream to ingest.\n`,
+    );
+  }
+
   let thin = false;
   let observations = 0;
   for (const season of seasons) {
-    const report = await ingestSeason(db, client, universe, season);
+    const report = await ingestSeason(db, client, universe, season, scheduleAsOf.get(season));
     observations += report.observationsWritten;
-    const worst = Math.min(report.participationResolution ?? 0, report.statLineResolution ?? 0);
     // A gap season is EXPECTED to resolve 0% of weekly stats (there is nothing published to
-    // resolve against) — that is not thinness, it is the hole this backfill's next step fills.
-    if (worst < MINIMUM_RESOLUTION && !STAT_LINE_GAPS.includes(season)) thin = true;
+    // resolve against) — that is not thinness, it is the hole this backfill's next step fills. A
+    // pre-2012 season is the mirror image: it resolves 0% of PARTICIPATION because nflverse
+    // published no snap counts that far back, which is equally not thinness. Each exemption drops
+    // exactly the half of the bar its own upstream hole makes unmeasurable, so the other half is
+    // still checked in both cases.
+    const measured: readonly (number | null)[] = [
+      report.snapCountsUnavailable ? null : report.participationResolution,
+      STAT_LINE_GAPS.includes(season) ? null : report.statLineResolution,
+    ];
+    const checked = measured.filter((value): value is number => value !== null);
+    const belowBar = checked.length > 0 && Math.min(...checked) < MINIMUM_RESOLUTION;
+    if (belowBar) thin = true;
     console.log(
       `${season}: ${report.participationRows} participation rows, ${report.statLines} stat lines, ` +
         `${report.observationsWritten} new observations | universe ${percent(report.participationResolution)} participation, ` +
-        `${percent(report.statLineResolution)} weekly stats${worst < MINIMUM_RESOLUTION && !STAT_LINE_GAPS.includes(season) ? "  <-- BELOW THE BAR" : ""}`,
+        `${percent(report.statLineResolution)} weekly stats${belowBar ? "  <-- BELOW THE BAR" : ""}`,
     );
+    if (report.snapCountsUnavailable) {
+      console.log(`    no participation for ${season}: nflverse publishes no snap counts before ${SNAP_COUNT_ASSET_FLOOR}`);
+    }
     if (report.playerWeekUnavailable) {
       // M5: without this line, "6218 participation rows" reads as full participation data. It is
       // not — only the two snap-count-sourced metrics (offensive snaps, team offensive snaps) landed
