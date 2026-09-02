@@ -369,6 +369,33 @@ export function expectedGamesPlayed(
   return outlookFromRate(teamGames, rate, priors.concentration + priors.concentrationPerSeason * history.length);
 }
 
+/**
+ * THE RECENCY AXIS (fit-round Task 3, deliverable D) — one `AvailabilityPriors` set with a different
+ * `recencyDecay`, and NOTHING else changed.
+ *
+ * WHAT THE GAMES-HISTORY AGGREGATION ACTUALLY DOES, traced before parameterising it rather than
+ * assumed: `shrunkAvailabilityRate` sorts a player's history newest first, keeps the most recent
+ * `historySeasons` of it, and weighs season `index` by `recencyDecay ** index` in BOTH the numerator
+ * (games played) and the denominator (team games) of the shrinkage. So the aggregation is already
+ * exponentially decayed, at the committed fitted 0.7 — it was never flat — and the extension this
+ * round needs is not a new mechanism but the ability for the BLEND's own grid to move that one
+ * exponent and see whether the board scores better with a longer or shorter memory of a player's
+ * availability record.
+ *
+ * `null` IS THE NULL CELL, and it returns the caller's own priors object BY REFERENCE. Not a copy
+ * with the same fields: the same object, so "the null cell reproduces today's expected games bit for
+ * bit" is true by construction rather than by floating-point luck. `availability.test.ts` pins it.
+ */
+export function withAvailabilityRecency(priors: AvailabilityPriors, recencyDecay: number | null): AvailabilityPriors {
+  if (recencyDecay === null) return priors;
+  if (!Number.isFinite(recencyDecay) || recencyDecay <= 0 || recencyDecay > 1) {
+    throw new Error(
+      `availability.ts: recencyDecay must lie in (0, 1]; got ${recencyDecay}. At or below zero a season of record would count negatively or not at all, and above one an older season would outweigh a newer one.`,
+    );
+  }
+  return { ...priors, recencyDecay };
+}
+
 /** One rate turned into the distribution every consumer reads. The one place quantiles are taken. */
 export function outlookFromRate(teamGames: number, rate: number, concentration: number): GamesPlayedOutlook {
   const probabilities = gamesPlayedProbabilities(teamGames, rate, concentration);

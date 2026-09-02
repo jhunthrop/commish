@@ -8,6 +8,7 @@ import {
   gamesPlayedProbabilities,
   seventeenGamesForEveryone,
   teamGamesIn,
+  withAvailabilityRecency,
   type AvailabilityInput,
   type AvailabilityPriors,
 } from "./availability";
@@ -293,5 +294,62 @@ describe("the committed fit", () => {
     expect(statusMultiplier.reserve).toBeLessThan(1);
     expect(statusMultiplier.practice_squad).toBeLessThan(1);
     expect(statusMultiplier.off_roster).toBeLessThan(statusMultiplier.practice_squad);
+  });
+});
+
+/**
+ * FIT-ROUND TASK 3, DELIVERABLE D — the recency axis the blend's grid moves. The null cell has to
+ * reproduce today's expected games EXACTLY, or the grid's "incumbent in every dimension" promise is
+ * not true and the fit could pick a "new" cell that is really the old one plus arithmetic noise.
+ */
+describe("withAvailabilityRecency — the fitted recency axis", () => {
+  /** A record with three seasons in it, deliberately UNEVEN, so the weighting has something to do:
+   *  a flat aggregation and a decayed one cannot agree on this player. */
+  const uneven = [
+    { season: 2023, gamesPlayed: 17, teamGames: 17 },
+    { season: 2022, gamesPlayed: 4, teamGames: 17 },
+    { season: 2021, gamesPlayed: 2, teamGames: 17 },
+  ];
+
+  it("NULL CELL: `null` returns the caller's OWN priors object, so today's behaviour is reproduced by construction", () => {
+    expect(withAvailabilityRecency(FITTED_AVAILABILITY_PRIORS, null)).toBe(FITTED_AVAILABILITY_PRIORS);
+  });
+
+  it("NULL CELL: expectedGamesPlayed is bit-for-bit identical at the null value", () => {
+    const input = player({ history: uneven });
+    const today = expectedGamesPlayed(input, at2024);
+    const nulled = expectedGamesPlayed(input, { season: 2024, priors: withAvailabilityRecency(FITTED_AVAILABILITY_PRIORS, null) });
+    expect(nulled).toEqual(today);
+    expect(nulled.expected).toBe(today.expected);
+    expect(nulled.rate).toBe(today.rate);
+    expect(nulled.probabilities).toEqual(today.probabilities);
+  });
+
+  it("the committed value passed EXPLICITLY is also bit-for-bit identical — the axis contains the incumbent", () => {
+    const input = player({ history: uneven });
+    const today = expectedGamesPlayed(input, at2024);
+    const explicit = expectedGamesPlayed(input, {
+      season: 2024,
+      priors: withAvailabilityRecency(FITTED_AVAILABILITY_PRIORS, FITTED_AVAILABILITY_PRIORS.recencyDecay),
+    });
+    expect(explicit.expected).toBe(today.expected);
+  });
+
+  it("a SHORTER memory weighs the most recent season harder — a man whose latest season was clean projects higher", () => {
+    const input = player({ history: uneven });
+    const short = expectedGamesPlayed(input, { season: 2024, priors: withAvailabilityRecency(FITTED_AVAILABILITY_PRIORS, 0.2) });
+    const long = expectedGamesPlayed(input, { season: 2024, priors: withAvailabilityRecency(FITTED_AVAILABILITY_PRIORS, 1) });
+    expect(short.expected).toBeGreaterThan(long.expected);
+  });
+
+  it("changes NOTHING but the decay", () => {
+    const moved = withAvailabilityRecency(FITTED_AVAILABILITY_PRIORS, 0.5);
+    expect(moved.recencyDecay).toBe(0.5);
+    expect({ ...moved, recencyDecay: FITTED_AVAILABILITY_PRIORS.recencyDecay }).toEqual(FITTED_AVAILABILITY_PRIORS);
+  });
+
+  it("REFUSES a decay outside (0, 1] — an older season may never outweigh a newer one", () => {
+    expect(() => withAvailabilityRecency(FITTED_AVAILABILITY_PRIORS, 0)).toThrow(/recencyDecay must lie in \(0, 1\]/);
+    expect(() => withAvailabilityRecency(FITTED_AVAILABILITY_PRIORS, 1.2)).toThrow(/recencyDecay must lie in \(0, 1\]/);
   });
 });
