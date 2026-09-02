@@ -36,10 +36,8 @@ import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
 import {
   BOARD_SOURCE,
   BOARD_SOURCE_V1_RAW,
-  projectionRows,
-  reasonRows,
-  recordPreseasonBoardReasons,
-  recordPreseasonProjections,
+  writePreseasonBoard,
+  type BoardWriteCounts,
 } from "@/projections/preseason/board-store";
 import {
   FITTED_AVAILABILITY_PRIORS,
@@ -121,21 +119,37 @@ function requireEnv(name: string): string {
   return value;
 }
 
-/** Builds one board (raw or blended) and writes both its projection rows and its reason rows under
- *  `source`, returning what actually changed so the caller can print an honest summary. */
+/**
+ * Builds one board (raw or blended) and writes both its projection rows and its reason rows under
+ * `source`, returning what actually changed so the caller can print an honest summary.
+ *
+ * THE WRITE ITSELF IS `writePreseasonBoard`'s (fix round 1), not two calls made here: a LIVE board
+ * retires its own prior generation in one transaction and a REPLAY board appends exactly as it always
+ * did, and which of those happens is a property of the moment rather than of this script. See that
+ * function's docblock for why a live board that only appended left a released player on the board for
+ * a day after his roster row had been corrected.
+ */
 async function persistBoard(
   db: Db,
   inputs: PreseasonInputs,
   source: string,
   raw: boolean,
-): Promise<{ readonly board: readonly BoardEntry[]; readonly written: number; readonly reasonsWritten: number }> {
+): Promise<{ readonly board: readonly BoardEntry[]; readonly write: BoardWriteCounts }> {
   const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, { raw });
   const board = preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
-  const rows = projectionRows(board, { season: inputs.season, source, asOf: inputs.moment, momentKind: inputs.momentKind });
-  const written = await recordPreseasonProjections(db, rows);
-  const reasons = reasonRows(board, { season: inputs.season, source, asOf: inputs.moment });
-  const reasonsWritten = await recordPreseasonBoardReasons(db, reasons);
-  return { board, written, reasonsWritten };
+  const write = await writePreseasonBoard(
+    db,
+    { season: inputs.season, source, asOf: inputs.moment, momentKind: inputs.momentKind },
+    board,
+  );
+  return { board, write };
+}
+
+/** What a board write retired, printed only when it retired something. A replay persist prints
+ *  exactly what it always printed, since it never retires anything. */
+function describeRetirement(write: BoardWriteCounts): string {
+  if (write.mode === "append" || write.retiredProjections + write.retiredReasons === 0) return "";
+  return `  (retired ${write.retiredProjections} prior projection rows, ${write.retiredReasons} prior reasons)`;
 }
 
 /**
@@ -167,7 +181,8 @@ export async function persistSeason(
   const blended = await persistBoard(db, inputs, BOARD_SOURCE, false);
   console.log(
     `${season}  [blend, ${BOARD_SOURCE}]  ${String(blended.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
-      `${String(blended.written).padStart(4)} new projection rows  ${String(blended.reasonsWritten).padStart(4)} reason rows written`,
+      `${String(blended.write.written).padStart(4)} new projection rows  ${String(blended.write.reasonsWritten).padStart(4)} reason rows written` +
+      describeRetirement(blended.write),
   );
   for (const entry of blended.board.slice(0, 5)) {
     console.log(
@@ -179,7 +194,8 @@ export async function persistSeason(
   const v1 = await persistBoard(db, inputs, BOARD_SOURCE_V1_RAW, true);
   console.log(
     `${season}  [v1 raw, ${BOARD_SOURCE_V1_RAW}]  ${String(v1.board.length).padStart(4)} players  ` +
-      `${String(v1.written).padStart(4)} new projection rows  ${String(v1.reasonsWritten).padStart(4)} reason rows written`,
+      `${String(v1.write.written).padStart(4)} new projection rows  ${String(v1.write.reasonsWritten).padStart(4)} reason rows written` +
+      describeRetirement(v1.write),
   );
 }
 
