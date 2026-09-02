@@ -263,9 +263,84 @@ const SRC_ROOT_ESCAPE_PATTERNS = [
   },
 ];
 
+/**
+ * THE REGISTER QUARANTINE (data-year Task 1, fix round 1) — the linter half of THE WALL.
+ *
+ * The prospective register (`src/projections/register`) is a ONE-WAY VALVE. It reads the engine —
+ * the served board, the published benchmarks, the props archive, the weekly stat lines — and
+ * nothing reads it back. The moment a fit, a law measurement or a pricing blend could see a frozen
+ * row, this season's own prospective record would become an input to the thing it exists to judge,
+ * and every number the register later reported would be a measurement of a model that had already
+ * been shown the answer.
+ *
+ * `src/projections/register/wall.source.test.ts` sweeps the tree for the same breach and is the
+ * primary guard. This is the BACKSTOP, and it earns its place by firing at a different moment: in
+ * the editor, on the line, as somebody types the import — rather than when the suite next runs.
+ * The two are deliberately kept in agreement about what a breach is, and that test asserts this
+ * block still exists so a config refactor cannot quietly delete a layer.
+ *
+ * FOUR SYNTAXES, because the first version of the sweep matched only `from "..."` and a review found
+ * two ways past it. A static import and a re-export both carry a `source`; a dynamic `import()` is an
+ * `ImportExpression`; a `require()` is a plain `CallExpression`. All four are named below.
+ *
+ * `no-restricted-syntax` RATHER THAN `no-restricted-imports`, and the choice is load-bearing rather
+ * than stylistic. Flat config merges same-named rules by SHALLOW OVERWRITE (see the client-boundary
+ * blocks at the foot of this file, which pay for that behaviour by merging their patterns into one
+ * invocation). A new `@typescript-eslint/no-restricted-imports` block scoped to `src/**` would
+ * silently REPLACE the boundary patterns for every file it also matched, trading one guard for
+ * another. `no-restricted-syntax` is used nowhere else in this config, so this block owns it
+ * outright and can be scoped freely — and it is the only one of the two rules that can see a
+ * dynamic import or a `require` in the first place.
+ *
+ * THE PATTERN matches the alias form (`@/projections/register/...`) and any relative path whose
+ * final segments enter the directory (`./register/...`, `../register/...`, `../../projections/
+ * register/...`). `registry` and `register-helper` do not match: the directory name is followed by
+ * a slash or the end of the specifier, never by another word character.
+ */
+const REGISTER_QUARANTINE_MESSAGE =
+  "src/projections/register is quarantined: the prospective register reads the engine and nothing reads it back. A module that could see a frozen row would make this season's own prospective record an input to the thing it exists to judge. See THE WALL in src/projections/register/wall.source.test.ts.";
+
+/**
+ * `projections/register` in any spelling, or a bare `./register` / `../register` hop, each ending at
+ * a slash or at the end of the specifier.
+ *
+ * EVERY SLASH IS ESCAPED. esquery reads an attribute regex up to the first UNESCAPED `/`, so a bare
+ * `projections/register` would terminate the literal after `projections` and silently compile to a
+ * pattern matching nothing like what it says. The doubled backslashes here are JS string escaping;
+ * the regex esquery actually receives is `(projections\/register|(\.\.?\/)register)(\/|$)`.
+ */
+const REGISTER_PATH = "(projections\\/register|(\\.\\.?\\/)register)(\\/|$)";
+
+const REGISTER_QUARANTINE_SELECTORS = [
+  // `import ... from "…/register/…"` and `import "…/register/…"`.
+  { selector: `ImportDeclaration[source.value=/${REGISTER_PATH}/]`, message: REGISTER_QUARANTINE_MESSAGE },
+  // `await import("…/register/…")` — no `from` clause, invisible to a static-import rule.
+  { selector: `ImportExpression[source.value=/${REGISTER_PATH}/]`, message: REGISTER_QUARANTINE_MESSAGE },
+  // `export { x } from "…/register/…"` — the re-export proxy.
+  { selector: `ExportNamedDeclaration[source.value=/${REGISTER_PATH}/]`, message: REGISTER_QUARANTINE_MESSAGE },
+  // `export * from "…/register/…"` — the same proxy, wildcard.
+  { selector: `ExportAllDeclaration[source.value=/${REGISTER_PATH}/]`, message: REGISTER_QUARANTINE_MESSAGE },
+  // `require("…/register/…")`.
+  {
+    selector: `CallExpression[callee.name="require"][arguments.0.value=/${REGISTER_PATH}/]`,
+    message: REGISTER_QUARANTINE_MESSAGE,
+  },
+];
+
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   { files: ["src/**/*.tsx"], rules: { ...jsxA11y.flatConfigs.strict.rules } },
+  {
+    // THE REGISTER QUARANTINE, scoped to everything EXCEPT the register itself and its own two
+    // operator scripts — which necessarily import it, and are the only two files in the tree that
+    // may. See REGISTER_QUARANTINE_SELECTORS above for why this owns `no-restricted-syntax` rather
+    // than extending `no-restricted-imports`.
+    files: ["src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "scripts/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+    ignores: ["src/projections/register/**", "scripts/register-freeze.ts", "scripts/register-grade.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...REGISTER_QUARANTINE_SELECTORS],
+    },
+  },
   {
     files: ["src/domain/**/*.ts"],
     plugins: { functional },
