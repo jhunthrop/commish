@@ -36,16 +36,17 @@
 // season range this script itself trains on). Committed alongside the cap constants as one field of
 // the same `BlendConstants` object, with the SAME provenance: both are fit on TRAIN seasons only.
 //
-// THE GRID (I2 fix round, correcting the earlier grid's two mistakes). `lawCapPoints`,
-// `availabilityCapPoints` and `totalCapPoints` each range over GRID — INCLUDING ZERO, so the
-// zero-deviation "pure market, no admitted evidence at all" baseline is itself one of the scored
-// cells rather than an unreachable edge case — with EVERY combination scored: the earlier version
-// skipped any cell where `totalCapPoints` sat below the larger of the other two, on the theory that
-// such a cell could never exercise `totalCapPoints`. That reasoning was backwards — a TIGHT total
-// cap is exactly the binding, informative region this search needs to see (it is what makes the
-// blend cautious), and pruning it away meant the search could never discover that a tight total cap
-// was the best-scoring choice. Every one of GRID^3 cells is scored, and the winner's own axes get
-// the full cap table logged below, exactly as they always did.
+// THE GRID IS PINNED TO ONE CELL (fit-round Task 4, the corrections-only ruling). Every cap axis and
+// every fit-round axis carries a single value, the v7 configuration's own, so this script performs a
+// PRE-REGISTERED EVALUATION rather than a search. The full history of what the grid was and why it
+// was restricted lives on the axis lists themselves, below; the short version is that a widened
+// search chose a cell whose board then lost the decisive held-out bar, and selecting a replacement
+// cell after that look would have burned the held-out season.
+//
+// WHAT THIS RUN STILL COMPUTES rather than carries: the two market-side TABLES,
+// `impliedGamesByPosition` and `marketTailByPosition`, both of which are derived from the train
+// population directly (never from a grid) and both of which MUST move with the completed store, and
+// the pinned cell's own train rho plus its channel decomposition, reported for the record.
 //
 // THE FOUR NEW AXES (fit-round Task 3), crossed with those caps, EVERY ONE OF THEM CARRYING THE
 // INCUMBENT AS ITS OWN NULL CELL — which is the property that makes this grid safe to widen at all:
@@ -128,10 +129,38 @@ import { gradableInputs } from "@/projections/preseason/scorecard";
 import type { ReadonlyDb } from "@/db/client";
 
 const OUTPUT = "src/projections/market/blend-fitted.ts";
-/** I2/I3+I5 fix round: zero included (the pure-market baseline), extended upward from the earlier
- *  [2,5,10,20,40] ladder toward 80 to give the availability/total axes real room for an interior
- *  optimum — see the real run's own printed verdict on whether one appeared. */
-const GRID = [0, 2, 5, 10, 20, 40, 80] as const;
+
+/**
+ * THE CORRECTIONS-ONLY RESTRICTION (fit-round Task 4, founder ruling of 2026-09-02, after the v8
+ * configuration's held-out bar break).
+ *
+ * THIS SCRIPT NO LONGER SEARCHES. Every axis below carries exactly ONE value, and that value is the
+ * v7 configuration's own cell: the constants the board has been shipping and whose held-out verdict
+ * (2024 blend vs ADP +0.1002 [+0.0041, +0.2089] BEYOND NOISE) is the one that stands. The run is a
+ * PRE-REGISTERED EVALUATION, not a selection: it re-derives the two fitted TABLES that must move with
+ * the completed store (`impliedGamesByPosition` and `marketTailByPosition`, both market-side and both
+ * computed outside the grid), reports the train rho of the pinned cell for the record, and renders.
+ * Nothing about the cell is chosen by anything this run measures.
+ *
+ * WHY, in one line, because a reader a year from now will otherwise assume a search happened: the
+ * widened grid of the same task chose a different cell, that cell's board lost the decisive 2024 bar,
+ * and the founder's ruling was to keep the round's genuine CORRECTIONS (the full-cohort rookie curve,
+ * the re-measured law family, the pricing gate) while returning the blend's own semantics to the
+ * configuration that had already earned its verdict. Selecting a NEW cell after a held-out look would
+ * have burned the held-out season, which is exactly what the plan's STOP rule exists to prevent.
+ *
+ * THE GRID IS RESTORED BY WIDENING THESE FOUR LISTS AND THE THREE CAP LISTS BACK OUT, and the next
+ * round that means to search should do so deliberately, with the multiple-comparisons cost the 54x
+ * widening carried stated up front.
+ */
+const LAW_CAP_GRID = [2] as const;
+const AVAILABILITY_CAP_GRID = [20] as const;
+const TOTAL_CAP_GRID = [40] as const;
+
+/** The cap ceiling the plateau report is read against. With the grid pinned to one cell there is no
+ *  plateau to detect, and this is only what the generated header names as the edge of what the run
+ *  was allowed to try — which, this round, is the pinned cell itself. */
+const CAP_CEILING = TOTAL_CAP_GRID[TOTAL_CAP_GRID.length - 1];
 
 /**
  * THE FOUR FIT-ROUND AXES (Task 3, deliverables B, C and D), and the ONE rule they all obey: THE
@@ -140,13 +169,13 @@ const GRID = [0, 2, 5, 10, 20, 40, 80] as const;
  * some of these axes are expected to be exact no-ops (the props archive covers 2023 and 2024; this
  * fit trains on 2013-2021), and an axis that changes nothing must not be able to win by sort order.
  */
-const LAW_CLUSTER_DEDUP_GRID = [false, true] as const;
+const LAW_CLUSTER_DEDUP_GRID = [false] as const;
 /** `null` is the null cell: no per-player law-channel cap at all. */
-const PLAYER_LAW_CAP_GRID = [null, 10, 20] as const;
+const PLAYER_LAW_CAP_GRID = [null] as const;
 /** `0` is the null cell: ADP only, and `anchorPointsFor` returns `marketPoints` untouched. */
-const PROPS_ANCHOR_WEIGHT_GRID = [0, 0.25, 0.5] as const;
+const PROPS_ANCHOR_WEIGHT_GRID = [0] as const;
 /** `null` is the null cell: the committed `FITTED_AVAILABILITY_PRIORS`, by reference. */
-const AVAILABILITY_RECENCY_GRID = [null, 0.5, 0.9] as const;
+const AVAILABILITY_RECENCY_GRID = [null] as const;
 
 /** Far past any correction: a fit measures completed seasons, never a point-in-time product read. */
 const FINAL_OUTCOME = new Date("9999-12-31T00:00:00.000Z");
@@ -358,32 +387,34 @@ function header(summary: FitSummary): string {
 /**
  * GENERATED by \`npm run projections:blend:fit\`. Do not edit by hand.
  *
- * Fit by a grid search over predictor seasons up to and including \`BLEND_TRAIN_CUTOFF_SEASON\`
- * (2021), scored by rank correlation against those seasons' own outcomes. \`impliedGamesByPosition\`
- * is the market curve's own train population's mean games played, per position
- * (\`fitImpliedGamesByPosition\`); \`marketTailByPosition\` caps the unlisted fallback at the market's
- * own cheapest drafted man per position (see \`market/blend.ts\`'s own docblocks). See
- * \`scripts/blend-fit.ts\` for the grid.
+ * SINGLE-CELL REGENERATION PER THE CORRECTIONS-ONLY RULING (fit-round Task 4, 2026-09-02). CONSTANTS
+ * CARRIED FROM THE v7 CONFIGURATION, TRAIN RHO REPORTED FOR THE RECORD, NOTHING SELECTED. This file
+ * was not produced by a search: \`scripts/blend-fit.ts\`'s cap axes and fit-round axes each carry
+ * exactly one value, the v7 cell, and the run below evaluated that one cell. The two market-side
+ * tables ARE re-derived from the train population, because they must move with the store:
+ * \`impliedGamesByPosition\` is the market curve's own train population's mean games played per
+ * position (\`fitImpliedGamesByPosition\`) and \`marketTailByPosition\` caps the unlisted fallback at
+ * the market's own cheapest drafted man per position (see \`market/blend.ts\`'s own docblocks).
  *
- * THE WINNING SCORE: spearman rho = ${summary.bestScore.toFixed(4)} on the train rows.
+ * THE PINNED CELL'S SCORE: spearman rho = ${summary.bestScore.toFixed(4)} on ${summary.totalRows} train rows, over
+ * predictor seasons up to and including \`BLEND_TRAIN_CUTOFF_SEASON\` (2021). This number is a
+ * DESCRIPTION of the shipped configuration on this store, not a comparison and not a selection
+ * criterion, and it is not comparable to any previous round's rho: the store's own population changed
+ * underneath it when the crosswalk class fix landed.
  *
- * THE PLATEAU (fix round 2, ruling 4b): ${summary.plateau.tiedCellCount} of this grid's own cells
- * scored within 1e-4 of the winner — a genuine plateau, not a single sharp peak.
- * ${summary.plateau.anyTiedAtCeiling ? `At least one of those tied cells sits at this grid's own ceiling (${summary.ceiling}) on a cap axis; a wider grid might still move the winner.` : `None of the tied cells sits at this grid's own ceiling (${summary.ceiling}); the search found a genuine interior optimum, not one pinned to the edge of what it was allowed to try.`}
+ * THE PLATEAU: ${summary.plateau.tiedCellCount} of ${summary.cellCount} cells scored within 1e-4 of the reported cell, which is
+ * arithmetic rather than evidence when the grid holds one cell. No plateau claim is made this round.
  *
- * THE CHANNEL DECOMPOSITION — pure market (every cap at zero) ${summary.pureMarketScore === null ? "n/a" : summary.pureMarketScore.toFixed(4)},
- * availability admitted alone (lawCapPoints at zero, the winning availability/total caps otherwise)
- * ${summary.availabilityOnlyScore === null ? "n/a" : summary.availabilityOnlyScore.toFixed(4)}, laws admitted too (the winning cell in full)
- * ${summary.bestScore.toFixed(4)} — laws' own share of the total lift over pure market is ${lawShare}%. Written down so
- * Task 11's own ablation of this board is not a surprise: the availability channel does almost all
- * of the work, laws add a real but small amount on top.
+ * THE CHANNEL DECOMPOSITION, computed OUTSIDE the pinned cell purely to describe it: pure market
+ * (every cap at zero) ${summary.pureMarketScore === null ? "n/a" : summary.pureMarketScore.toFixed(4)}, availability admitted alone (lawCapPoints at zero, the
+ * pinned availability/total caps otherwise) ${summary.availabilityOnlyScore === null ? "n/a" : summary.availabilityOnlyScore.toFixed(4)}, laws admitted too (the pinned cell in full)
+ * ${summary.bestScore.toFixed(4)}. Laws' own share of the total lift over pure market is ${lawShare}%.
  *
- * THE FIT-ROUND AXES (Task 3), all four of which carry the incumbent as their own null cell, and the
- * winner's position on each: ${describeAxes(summary.axes)}.
- * ${summary.cellCount} cells were scored. An axis absent from the object below sits at its null cell.
+ * THE FIT-ROUND AXES (Task 3) all sit at their null cells, which is the v7 semantics exactly:
+ * ${describeAxes(summary.axes)}. An axis absent from the object below sits at its null cell.
  * PROPS-ANCHOR COVERAGE: ${summary.propsAnchoredRows} of ${summary.totalRows} train rows sit in a season the props archive
- * covers. At zero, the props-weight axis had nothing to move on and its null cell wins by the tie
- * rule, which is a statement about the archive's own span (2023-2024) rather than about props.
+ * covers. Zero is expected and is a statement about the archive's own span (2023-2024) against this
+ * train window (2013-2021), never about props.
  */
 `;
 }
@@ -452,15 +483,17 @@ async function main(): Promise<void> {
     console.log(`  ${position}: ${marketTailByPosition[position].toFixed(1)} pts (the market's own cheapest drafted man at this position)`);
   }
 
-  console.log(`\nGRID (${GRID.join(", ")}) on each cap axis, crossed with the fit-round axes:`);
+  console.log("\nTHE PINNED CELL (corrections-only ruling: a pre-registered evaluation, not a search):");
+  console.log(`  lawCapPoints: ${LAW_CAP_GRID.join(", ")}`);
+  console.log(`  availabilityCapPoints: ${AVAILABILITY_CAP_GRID.join(", ")}`);
+  console.log(`  totalCapPoints: ${TOTAL_CAP_GRID.join(", ")}`);
   console.log(`  law-cluster dedup: ${LAW_CLUSTER_DEDUP_GRID.join(", ")}`);
   console.log(`  per-player law-channel cap: ${PLAYER_LAW_CAP_GRID.map((value) => value ?? "none").join(", ")}`);
   console.log(`  props-anchor weight: ${PROPS_ANCHOR_WEIGHT_GRID.join(", ")}`);
   console.log(`  availability recency decay: ${AVAILABILITY_RECENCY_GRID.map((value) => value ?? "committed").join(", ")}`);
-  console.log("  the FIRST value on every axis is the null cell, and ties go to the incumbent (strict > below).\n");
+  console.log("  every axis carries one value, the v7 configuration's own. NOTHING IS SELECTED BY THIS RUN.\n");
 
   let best: BestCell | null = null;
-  let pureMarketScore: number | null = null;
   const cells: ScoredCell[] = [];
   for (const availabilityRecencyDecay of AVAILABILITY_RECENCY_GRID) {
     const rows = rowsByRecency.get(availabilityRecencyDecay)!;
@@ -469,16 +502,15 @@ async function main(): Promise<void> {
         for (const playerLawCapPoints of PLAYER_LAW_CAP_GRID) {
           const axes: FitAxes = { availabilityRecencyDecay, propsAnchorWeight, lawClusterDedup, playerLawCapPoints };
           let bestInAxes: BestCell | null = null;
-          for (const lawCapPoints of GRID) {
-            for (const availabilityCapPoints of GRID) {
-              for (const totalCapPoints of GRID) {
+          for (const lawCapPoints of LAW_CAP_GRID) {
+            for (const availabilityCapPoints of AVAILABILITY_CAP_GRID) {
+              for (const totalCapPoints of TOTAL_CAP_GRID) {
                 const constants = constantsFor(
                   { lawCapPoints, availabilityCapPoints, totalCapPoints, impliedGamesByPosition, marketTailByPosition },
                   axes,
                 );
                 const score = scoreBlendConstants(rows, constants, { heldOutSeasons: [], laws });
                 cells.push({ constants, score });
-                if (isNullCell(axes) && lawCapPoints === 0 && availabilityCapPoints === 0 && totalCapPoints === 0) pureMarketScore = score;
                 if (score === null) continue;
                 if (bestInAxes === null || score > bestInAxes.score) bestInAxes = { constants, score, rows };
                 if (best === null || score > best.score) best = { constants, score, rows };
@@ -495,7 +527,7 @@ async function main(): Promise<void> {
   }
 
   if (best !== null) {
-    console.log(`\nTHE CAP GRID AT THE WINNING AXES (${describeAxes(axesOf(best.constants))}), every cell (I2 fix round, no pruning):\n`);
+    console.log(`\nTHE CAP TABLE AT THE PINNED AXES (${describeAxes(axesOf(best.constants))}), every cell:\n`);
     console.log(`${"lawCap".padStart(7)}  ${"availCap".padStart(9)}  ${"totalCap".padStart(9)}  ${"rho".padStart(8)}`);
     for (const cell of cells) {
       if (!sameAxes(axesOf(cell.constants), axesOf(best.constants))) continue;
@@ -506,30 +538,40 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(`\nscored ${cells.length} grid cells (every combination; the I2 fix round removed the earlier pruning rule)`);
+  console.log(`\nscored ${cells.length} grid cell(s)`);
+
+  if (best === null) {
+    throw new Error("The blend fit found no scoreable combination; every cell returned null from `spearman`.");
+  }
+
+  // THE PURE-MARKET BASELINE, computed OUTSIDE the grid (corrections-only ruling). It used to be one
+  // of the searched cells; with the grid pinned to the v7 cell it is a separate, deliberate scoring
+  // of the same rows at zero deviation, kept because the channel decomposition below is the only
+  // thing that makes the reported rho readable. It cannot influence what is rendered.
+  const pureMarketScore = scoreBlendConstants(
+    best.rows,
+    { ...best.constants, lawCapPoints: 0, availabilityCapPoints: 0, totalCapPoints: 0 },
+    { heldOutSeasons: [], laws },
+  );
   console.log(
     `\nPURE MARKET BASELINE (lawCapPoints=0, availabilityCapPoints=0, totalCapPoints=0, zero deviation from marketPoints for every ` +
       `listed player): rho=${pureMarketScore === null ? "n/a" : pureMarketScore.toFixed(4)}`,
   );
 
-  if (best === null) {
-    throw new Error("The blend grid search found no scoreable combination; every cell returned null from `spearman`.");
-  }
-
   const beatsPureMarket = pureMarketScore !== null && best.score > pureMarketScore;
   console.log(
-    `\nBEST: lawCapPoints=${best.constants.lawCapPoints}  availabilityCapPoints=${best.constants.availabilityCapPoints}  ` +
+    `\nTHE PINNED CELL: lawCapPoints=${best.constants.lawCapPoints}  availabilityCapPoints=${best.constants.availabilityCapPoints}  ` +
       `totalCapPoints=${best.constants.totalCapPoints}  ${describeAxes(axesOf(best.constants))}  ` +
       `(spearman rho=${best.score.toFixed(4)} on the train rows, ` +
       `${beatsPureMarket ? "beats" : "does NOT beat"} the pure-market baseline)`,
   );
   console.log(
     isNullCell(axesOf(best.constants))
-      ? "THE INCUMBENT WON every fit-round axis: the rendered constants carry no new field, and the committed file's own shape is unchanged."
-      : "A fit-round axis moved off its null cell — the rendered constants carry the new field(s), and Task 4 owns whether that ships.",
+      ? "Every fit-round axis sits at its null cell, which is the v7 semantics exactly: the rendered constants carry no new field."
+      : "A fit-round axis is off its null cell, which the corrections-only ruling does not allow. Check the axis lists.",
   );
 
-  // THE CHANNEL DECOMPOSITION (fix round 2) — the winning cell with lawCapPoints forced to zero,
+  // THE CHANNEL DECOMPOSITION (fix round 2) — the pinned cell with lawCapPoints forced to zero,
   // isolating how much of the winner's own lift over pure market comes from the availability channel
   // alone versus laws on top of it. Scored on the WINNER'S OWN row set, since the recency axis moves
   // the rows themselves.
@@ -537,18 +579,16 @@ async function main(): Promise<void> {
   const availabilityOnlyScore = scoreBlendConstants(best.rows, availabilityOnlyConstants, { heldOutSeasons: [], laws });
   console.log(
     `\nCHANNEL DECOMPOSITION: pure market ${pureMarketScore === null ? "n/a" : pureMarketScore.toFixed(4)}  ->  availability admitted alone ` +
-      `${availabilityOnlyScore === null ? "n/a" : availabilityOnlyScore.toFixed(4)}  ->  laws admitted too (the winner) ${best.score.toFixed(4)}`,
+      `${availabilityOnlyScore === null ? "n/a" : availabilityOnlyScore.toFixed(4)}  ->  laws admitted too (the pinned cell) ${best.score.toFixed(4)}`,
   );
 
-  // THE PLATEAU GUARD (fix round 2, ruling 4b) — every cell within 1e-4 of the winner, not just the
-  // winner itself; see `detectPlateau`'s own docblock for why that distinction matters.
-  const ceiling = GRID[GRID.length - 1];
+  // THE PLATEAU GUARD (fix round 2, ruling 4b) — every cell within 1e-4 of the reported one. With a
+  // one-cell grid this is arithmetic rather than evidence, and the generated header says so.
+  const ceiling = CAP_CEILING;
   const plateau = detectPlateau(cells, best.score, ceiling);
   console.log(
-    `\nPLATEAU: ${plateau.tiedCellCount} of ${cells.length} cells scored within 1e-4 of the winner. ` +
-      (plateau.anyTiedAtCeiling
-        ? `At least one tied cell sits at this grid's own ceiling (${ceiling}) on a cap axis; a wider grid might still move the winner.`
-        : `None of the tied cells sits at this grid's own ceiling (${ceiling}); a genuine interior optimum.`),
+    `\nPLATEAU: ${plateau.tiedCellCount} of ${cells.length} cell(s) scored within 1e-4 of the reported cell, ` +
+      "which with a pinned grid is a statement about the grid rather than about the objective's shape.",
   );
 
   const rendered = render(best.constants, {
