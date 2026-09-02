@@ -8,11 +8,15 @@ import {
   mapWeek1Rosters,
   ROSTER_SOURCE_CONFIG,
   week1RosterAsOfBoundedBy,
+  type PreseasonRosterEntry,
 } from "../nflverse/rosters";
 import { allPositions } from "../backtest";
 import { recordObservations } from "../store";
+// The NULLABLE reading of the same consolidated definition `firstKickoffFor` (below) throws through:
+// a season with no ingested schedule is a season this module declines to call live, never a refusal.
+import { firstKickoffFor as scheduledFirstKickoff } from "../team-store";
 import { firstKickoffFor, mapDepthChart } from "./depth";
-import { recordPreseasonRosters } from "./store";
+import { deletePreseasonRosters, preseasonRosterStatusesFor, recordPreseasonRosters } from "./store";
 
 /**
  * BRINGING THE OFFSEASON INTO THE STORE — one season's week-one rosters, stamped at cutdown.
@@ -24,13 +28,38 @@ import { recordPreseasonRosters } from "./store";
  * column is that a reader can tell which kind of claim a row is making.
  */
 
+/**
+ * Which write path a season's roster ingestion took, and what it did.
+ *
+ * `insert_if_absent` is the archive path, unchanged since this module was written: rows land once and
+ * a re-run adds nothing. `supersede` is the LIVE path — see `ingestWeek1Rosters`'s own docblock for
+ * why a season that has not kicked off cannot be written the archive way.
+ */
+export type RosterWriteMode = "supersede" | "insert_if_absent";
+
+/** What a roster write changed, in the terms an operator reads it in. */
+export interface RosterWriteCounts {
+  readonly mode: RosterWriteMode;
+  /** Rows this run actually put in the table. */
+  readonly written: number;
+  /** Players the season had no row for at all before this run. */
+  readonly added: number;
+  /** Players whose existing row this run replaced. Always 0 on the archive path, which replaces
+   *  nothing by construction. */
+  readonly replaced: number;
+  /** The replaced rows whose STATUS the fresh capture states differently — the count that would have
+   *  been silently zero for every re-ingest before the live path existed. */
+  readonly statusChanged: number;
+  /** Players the season held a row for that the fresh capture does not carry at all. Always 0 on the
+   *  archive path, which deletes nothing. */
+  readonly removed: number;
+}
+
 /** What one season's roster ingestion reports about itself. */
-export interface RosterIngestReport {
+export interface RosterIngestReport extends RosterWriteCounts {
   readonly season: number;
   /** Week-one entries the release carried, before the universe was consulted. */
   readonly entriesRead: number;
-  /** How many were written. A re-run of a landed ingestion reports 0. */
-  readonly written: number;
   /**
    * Entries dropped because the gsis id is not in `nfl_players`.
    *
@@ -96,6 +125,31 @@ const REAL_CLOCK: Clock = { now: () => new Date().toISOString() };
  * foreign key and a camp arm the NFL never issued a gsis id to would fail the whole insert. The
  * drop is counted and returned rather than logged, so a caller can refuse a season whose resolution
  * collapsed instead of quietly building a board on half a league.
+ *
+ * SELF-SUPERSEDING FOR A LIVE SEASON, insert-if-absent for an archive one, and the split is the
+ * whole of this function's care. A season's stamp is `min(the first of September, the fetch
+ * instant)` and DOES NOT MOVE between two runs on the same day, so a re-ingest's rows collide with
+ * the landed ones on `preseason_rosters_fact_idx` and `onConflictDoNothing` throws every fresh status
+ * away — a re-run reports "0 new" and the store keeps saying what it said this morning. That is
+ * harmless for a season whose rosters were settled years ago and actively wrong for one whose clubs
+ * are still cutting players: the defect that produced this function's live arm was a back the Broncos
+ * had already released sitting 118th on the 2026 board, because our row still read DEN/active from
+ * the day's first capture. The live arm deletes the season's rows and writes the fresh capture in ONE
+ * transaction, exactly as `nflverse/ingest.ts`'s `ingestDerivedStatLines` does for a recomputed
+ * derivation, and for the same reason: a row that is a current best statement rather than a primary
+ * record is safe to replace, and dangerous not to.
+ *
+ * AN ARCHIVE SEASON IS BYTE-IDENTICAL to before, deliberately and load-bearingly. Every published
+ * measurement in this engine was fitted and scored against rows written insert-if-absent, and a replay
+ * season's rows are the primary record of what was knowable before a season that has now been played.
+ * Nothing in this path may delete one.
+ *
+ * LIVE IS THE KICKOFF, NEVER THE CALENDAR — `season`'s own first scheduled kickoff read from the
+ * store, compared against the fetch instant, which is `preseason/source.ts`'s `liveMomentFor` guard
+ * verbatim ("`now >= kickoff` means the season has already started"). A season the store holds no
+ * schedule for is treated as an ARCHIVE: an ingestion cannot claim a season is still ahead of us on
+ * the strength of a schedule it has never seen, and the conservative reading costs a refresh rather
+ * than a row.
  */
 export async function ingestWeek1Rosters(
   db: Db,
@@ -115,13 +169,71 @@ export async function ingestWeek1Rosters(
   const entries = mapWeek1Rosters(rows, season, asOf);
   const known = await knownPlayerIds(db);
   const insertable = entries.filter((entry) => known.has(entry.playerId));
-  const written = await recordPreseasonRosters(db, insertable);
+  const write = (await isLiveSeason(db, season, fetchedAt))
+    ? await supersedeSeasonRosters(db, season, insertable)
+    : await appendSeasonRosters(db, insertable);
   return {
     season,
     entriesRead: entries.length,
-    written,
     unknownToUniverse: entries.length - insertable.length,
+    ...write,
   };
+}
+
+/** Whether `season` has still not kicked off as of `at` — `liveMomentFor`'s own guard, and `false`
+ *  whenever the store holds no schedule to check against. See `ingestWeek1Rosters`'s docblock. */
+async function isLiveSeason(db: ReadonlyDb, season: number, at: Date): Promise<boolean> {
+  const kickoff = await scheduledFirstKickoff(db, season);
+  return kickoff !== null && at.getTime() < kickoff.getTime();
+}
+
+/**
+ * The LIVE write: delete the season's rows, write the fresh capture, in one transaction.
+ *
+ * REFUSES AN EMPTY CAPTURE rather than emptying the season. A file that mapped to nothing is a broken
+ * release or a fetch that returned a stub, and "delete every row and write none" is the one outcome
+ * this path must never produce silently — the same fail-fast reading `ingestCoaches` gives a missing
+ * play-caller file. The archive path needs no such guard: writing nothing there deletes nothing.
+ */
+async function supersedeSeasonRosters(
+  db: Db,
+  season: number,
+  entries: readonly PreseasonRosterEntry[],
+): Promise<RosterWriteCounts> {
+  if (entries.length === 0) {
+    throw new Error(
+      `${season}'s week-one roster file mapped to an empty capture, so there is nothing to supersede its stored rows with. Refusing to delete the season's rosters on the strength of an empty file.`,
+    );
+  }
+  return db.transaction(async (tx) => {
+    const before = await preseasonRosterStatusesFor(tx, season);
+    await deletePreseasonRosters(tx, season);
+    const written = await recordPreseasonRosters(tx, entries);
+    const fresh = new Set(entries.map((entry) => entry.playerId));
+    let replaced = 0;
+    let statusChanged = 0;
+    for (const entry of entries) {
+      const previous = before.get(entry.playerId);
+      if (previous === undefined) continue;
+      replaced += 1;
+      if (previous !== entry.status) statusChanged += 1;
+    }
+    return {
+      mode: "supersede",
+      written,
+      added: entries.length - replaced,
+      replaced,
+      statusChanged,
+      removed: [...before.keys()].filter((playerId) => !fresh.has(playerId)).length,
+    };
+  });
+}
+
+/** The ARCHIVE write: `recordPreseasonRosters` alone, untouched. Everything it cannot do — replace,
+ *  remove, restate a status — reports zero, because it never does any of them. */
+async function appendSeasonRosters(db: Db, entries: readonly PreseasonRosterEntry[]): Promise<RosterWriteCounts> {
+  const written = await recordPreseasonRosters(db, entries);
+  return { mode: "insert_if_absent", written, added: written, replaced: 0, statusChanged: 0, removed: 0 };
 }
 
 /** Every id `nfl_players` holds. Read once per season rather than per row. */
