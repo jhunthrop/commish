@@ -3,6 +3,7 @@ import type { DiscoveryQuantityValues } from "../discovery-facts";
 import { DISCOVERY_QUANTILES } from "./quantiles";
 import {
   computeQuantileTable,
+  emitsLevelConditions,
   HIGH_QUANTILE_LEVELS,
   LOW_QUANTILE_LEVELS,
   MIN_QUANTILE_SAMPLE,
@@ -170,6 +171,23 @@ describe("QUANTITY_DEFS — the Task 2 additions", () => {
   it("marks pointsPerGame, and ONLY pointsPerGame, as the matched design's own match key", () => {
     const flagged = QUANTITY_DEFS.filter((def) => def.isMatchKeyQuantity).map((def) => def.id);
     expect(flagged).toEqual(["pointsPerGame"]);
+  });
+
+  it("marks gamesPlayed, and ONLY gamesPlayed, as the match key's own reliability", () => {
+    // The second exclusion, and a DIFFERENT defect from the first: points per game IS the match key,
+    // games played is the denominator it is measured over. Kept as its own flag so the registry says
+    // which reason each excluded quantity is excluded for.
+    const flagged = QUANTITY_DEFS.filter((def) => def.isMatchKeyReliabilityQuantity).map((def) => def.id);
+    expect(flagged).toEqual(["gamesPlayed"]);
+  });
+
+  it("bars level conditions for exactly the two quantities the matcher would answer for, and no others", () => {
+    const barred = QUANTITY_DEFS.filter((def) => !emitsLevelConditions(def)).map((def) => def.id);
+    expect(barred).toEqual(["gamesPlayed", "pointsPerGame"]);
+  });
+
+  it("keeps the year-over-year template ON the reliability quantity, which is the whole point of the split", () => {
+    expect(defFor("gamesPlayed").supportsYearOverYearDelta).toBe(true);
   });
 
   it("keeps the year-over-year template off the two quantities it cannot mean anything for", () => {

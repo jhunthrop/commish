@@ -196,6 +196,68 @@ export interface QuantityDef {
    * asked for.
    */
   readonly isMatchKeyQuantity: boolean;
+
+  /**
+   * WHETHER THIS QUANTITY IS THE MATCH KEY'S OWN RELIABILITY — the sample size the match key is
+   * measured over — and therefore cannot carry a LEVEL template for a SECOND, INDEPENDENT reason
+   * from the one above. `true` for exactly one quantity, `gamesPlayed`.
+   *
+   * ADDED 2026-09-01 BY ULTRACODE REVIEW RULING, after twelve `gamesPlayed`-conditioned laws (seven
+   * thresholds, five conjunctions) came back confirmed in a regeneration and could not be
+   * distinguished from this artifact. The flag is separate from `isMatchKeyQuantity` rather than
+   * folded into it because the two defects are genuinely different and a reader deserves to know
+   * WHICH one a quantity is excluded for: `pointsPerGame` IS the match key, `gamesPlayed` is the
+   * DENOMINATOR the match key is divided by.
+   *
+   * THE ARGUMENT. The match key is points per game, i.e. season points over `gamesPlayed`, and the
+   * outcome being differenced is `nextPointsPerGame - pointsPerGame`. The caliper equalises the
+   * OBSERVED value of that ratio between the two arms to within two points. It cannot equalise the
+   * PRECISION of the two observations, because precision is a function of the denominator and the
+   * denominator is exactly what the candidate is conditioning on. At equal observed points per game,
+   * a player scored in 3 games carries a far noisier estimate of his own true rate than a player
+   * scored in 15, so his observed value sits further from his true value in expectation, and his
+   * next season regresses toward that true value harder and more often. The measured effect is
+   * regression to the mean sorted by measurement error, and it appears whether or not the claim is
+   * true.
+   *
+   * WHY MATCHING DOES NOT CURE IT, WHICH IS THE PART THAT LOOKS WRONG UNTIL IT IS TRACED. Equal
+   * observed points per game is the artifact's PRECONDITION, not its cure. Two players at 9.0 points
+   * per game, one over 3 games and one over 15, are not two draws from the same distribution that
+   * happen to agree; they are one precise observation and one imprecise one that agree BY SELECTION.
+   * The caliper is what puts them in the same pair, so tightening it strengthens the artifact rather
+   * than weakening it.
+   *
+   * WHY FOLD REPLICATION DOES NOT RESCUE IT EITHER, which is why these twelve were confirmed rather
+   * than weak. `verdictForDiscoveredLaw` requires every replication fold to agree in direction with
+   * the full-window effect. An artifact of the estimator is STABLE across seasons in exactly the way
+   * a real effect is: the noisier arm regresses harder in 2021, 2022 and 2023 alike, because the
+   * arithmetic that produces it does not vary by season. Unanimous fold agreement is evidence
+   * against a fluke and is no evidence at all against a mechanism.
+   *
+   * THE PROBE THAT SETTLED IT, rather than the argument alone: within the confirmed
+   * `gamesPlayed` candidates the effect concentrates in pairs with a LARGE games gap between the
+   * arms, flips sign in pairs with a small one, and scales with distance above the population mean.
+   * A claim about durability would not have that shape; a reliability artifact has exactly it.
+   *
+   * WHAT IS KEPT. The DELTA template, for the same reason `isMatchKeyQuantity` keeps it: a crossing
+   * condition places rows on BOTH sides of the mark in the control pool, so the condition arm is not
+   * systematically the low-precision arm, and the question the crossing asks (a player whose
+   * availability collapsed or recovered between seasons, against a player already there) is a real
+   * one the arithmetic does not answer for free.
+   */
+  readonly isMatchKeyReliabilityQuantity: boolean;
+}
+
+/**
+ * THE ONE GATE `generate.ts` READS before emitting a threshold candidate or admitting a single into
+ * the AND family. Two separately-named, separately-argued exclusions, one predicate, so the generator
+ * never branches on an id and a future third reason has an obvious place to go.
+ *
+ * DELTA candidates are deliberately NOT gated by this: both exclusions are arguments about LEVEL
+ * conditions specifically, and both docblocks above set out why the crossing template survives each.
+ */
+export function emitsLevelConditions(def: QuantityDef): boolean {
+  return !def.isMatchKeyQuantity && !def.isMatchKeyReliabilityQuantity;
 }
 
 const ALL_SKILL_POSITIONS: readonly LawPosition[] = ["QB", "RB", "WR", "TE"];
@@ -279,6 +341,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "whole",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "age",
@@ -290,6 +353,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "two_decimal",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "targetShare",
@@ -301,6 +365,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "touchdownPointsShare",
@@ -312,6 +377,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "redZoneTouchShare",
@@ -323,6 +389,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "targetDepth",
@@ -334,6 +401,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "one_decimal",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "snapShare",
@@ -345,6 +413,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "incomingCoachTenureSeasons",
@@ -363,6 +432,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "whole",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "incomingCoachPriorPassRateOverExpected",
@@ -374,6 +444,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "one_decimal",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "experienceYear",
@@ -390,6 +461,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "whole",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "teamPaceSecondsPerPlay",
@@ -401,6 +473,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "one_decimal",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   /**
    * THE TWO TEAM-MARKET QUANTITIES (Task 3, the vegas-laws plan) — the market's own preseason
@@ -426,6 +499,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     // market newly believes in is an ordinary, sayable claim. Kept.
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "incomingTeamWinTotalDelta",
@@ -439,6 +513,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     // quantity is itself a difference, so a year-over-year template over it is a second difference.
     supportsYearOverYearDelta: false,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   /**
    * THE FOUR VOCABULARY ADDITIONS (Task 2, the discovery-expansion plan) plus the one
@@ -462,6 +537,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   {
     id: "teamAirYardsShare",
@@ -473,7 +549,23 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "percent",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
+  /**
+   * AVAILABILITY — how many games this season actually scored him.
+   *
+   * DELTA ONLY, and NOT for the reason `pointsPerGame` below is. This quantity is not the match key;
+   * it is the match key's DENOMINATOR, which makes it the reliability of the number the matcher pairs
+   * on. A level condition over it therefore sorts pairs by measurement precision and reads regression
+   * to the mean as an effect, whatever the claim says. The full argument, the reason the caliper
+   * cannot cure it, the reason unanimous fold agreement is not evidence against it, and the probe
+   * that settled it are all in `QuantityDef.isMatchKeyReliabilityQuantity`'s docblock above;
+   * `generate.ts` reads the flag through `emitsLevelConditions`, never this id.
+   *
+   * The crossing template survives and is the honest version of the availability question: a player
+   * whose availability collapsed or recovered BETWEEN seasons, measured against a player already
+   * there.
+   */
   {
     id: "gamesPlayed",
     noun: "number of games he was scored in that season",
@@ -484,6 +576,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "whole",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: true,
   },
   {
     id: "draftPick",
@@ -503,6 +596,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     // multiple-comparisons cost buying a question with no possible affirmative answer.
     supportsYearOverYearDelta: false,
     isMatchKeyQuantity: false,
+    isMatchKeyReliabilityQuantity: false,
   },
   /**
    * THE PRODUCTION CONDITIONAL — season N's own points per game, as a CONDITION on season N with the
@@ -525,6 +619,7 @@ export const QUANTITY_DEFS: readonly QuantityDef[] = [
     magnitudeUnit: "one_decimal",
     supportsYearOverYearDelta: true,
     isMatchKeyQuantity: true,
+    isMatchKeyReliabilityQuantity: false,
   },
 ];
 

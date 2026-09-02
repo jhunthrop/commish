@@ -221,6 +221,10 @@ const BOTH_BANDS: QuantileTable = {
   touches: { RB: { 0.1: 10, 0.2: 20, 0.3: 40, 0.7: 100, 0.8: 150, 0.9: 200 } },
   age: { RB: { 0.1: 22, 0.2: 23, 0.3: 24, 0.7: 27, 0.8: 28, 0.9: 30 } },
   pointsPerGame: { RB: { 0.1: 3, 0.2: 5, 0.3: 7, 0.7: 12, 0.8: 14, 0.9: 17 } },
+  // Carried since fix round 1: the SECOND level-condition exclusion needs a quantity in the fixture
+  // to be excluded, and it has to sit alongside others so the AND family has something to pair it
+  // with and therefore something to refuse.
+  gamesPlayed: { RB: { 0.1: 2, 0.2: 4, 0.3: 7, 0.7: 14, 0.8: 15, 0.9: 16 } },
 };
 
 function bothBands(template: CandidateLaw["template"]): readonly CandidateLaw[] {
@@ -234,12 +238,13 @@ function bothBandsById(id: string): CandidateLaw {
 }
 
 describe("generateCandidatesFrom — the low band", () => {
-  it("builds the cross product over SIX levels, with the match-key quantity contributing deltas only", () => {
-    // touches + age at 6 levels each = 12 thresholds; pointsPerGame contributes none.
+  it("builds the cross product over SIX levels, with BOTH excluded quantities contributing deltas only", () => {
+    // touches + age at 6 levels each = 12 thresholds; pointsPerGame and gamesPlayed contribute none.
     expect(bothBands("threshold")).toHaveLength(12);
-    // All three quantities support the crossing template: 3 x 6 x 2 = 36.
-    expect(bothBands("delta")).toHaveLength(36);
-    // AND is HIGH-side only and match-key-free: 3 touches levels x 3 age levels = 9.
+    // All four quantities support the crossing template: 4 x 6 x 2 = 48.
+    expect(bothBands("delta")).toHaveLength(48);
+    // AND is HIGH-side only and built from level-condition-eligible singles only, so neither excluded
+    // quantity can enter either half: 3 touches levels x 3 age levels = 9, unchanged by their presence.
     expect(bothBands("and")).toHaveLength(9);
   });
 
@@ -311,6 +316,51 @@ describe("generateCandidatesFrom — the match-key exclusion (pointsPerGame)", (
     expect(rose.condition(factsWith({ pointsPerGame: 16 }, { pointsPerGame: 9 }))).toBe(true);
     expect(rose.condition(factsWith({ pointsPerGame: 16 }, { pointsPerGame: 15 }))).toBe(false);
     expect(rose.condition(factsWith({ pointsPerGame: 16 }, null))).toBeNull();
+  });
+});
+
+/**
+ * FIX ROUND 1, the ultracode review's confirmed HIGH. `gamesPlayed` is the match key's DENOMINATOR,
+ * so a level condition over it sorts pairs by how precisely the match key was measured and reads
+ * regression to the mean as an effect. Structurally excluded from the level templates, exactly as
+ * `pointsPerGame` is and by the same `emitsLevelConditions` gate, so the twelve confirmations it
+ * produced in the first regeneration cannot be re-emitted by any future run. These tests are the
+ * mirror of the block above, deliberately: two defects, one enforcement, one shape of proof.
+ */
+describe("generateCandidatesFrom — the reliability exclusion (gamesPlayed)", () => {
+  it("builds NO threshold candidate over the match key's own denominator", () => {
+    for (const candidate of generateCandidatesFrom(BOTH_BANDS)) {
+      if (candidate.template === "threshold") expect(candidate.id).not.toContain("gamesPlayed");
+    }
+  });
+
+  it("builds NO AND candidate containing it either, on either half", () => {
+    // This is the half that matters most in practice: five of the twelve withdrawn confirmations were
+    // conjunctions in which gamesPlayed supplied the artifact and the OTHER half took the credit.
+    for (const candidate of bothBands("and")) expect(candidate.id).not.toContain("gamesPlayed");
+  });
+
+  it("DOES build its crossing candidates, on both bands and in both directions", () => {
+    const ids = bothBands("delta").map((candidate) => candidate.id);
+    expect(ids).toContain("delta:RB:gamesPlayed:q80:rose_into");
+    expect(ids).toContain("delta:RB:gamesPlayed:q80:fell_out_of");
+    expect(ids).toContain("delta:RB:gamesPlayed:q20:fell_out_of");
+    expect(ids.filter((id) => id.includes("gamesPlayed"))).toHaveLength(12);
+  });
+
+  it("evaluates an availability crossing exactly like any other quantity's", () => {
+    const fell = bothBandsById("delta:RB:gamesPlayed:q70:fell_out_of"); // threshold 14, high band
+    expect(fell.condition(factsWith({ gamesPlayed: 6 }, { gamesPlayed: 16 }))).toBe(true);
+    expect(fell.condition(factsWith({ gamesPlayed: 6 }, { gamesPlayed: 9 }))).toBe(false);
+    expect(fell.condition(factsWith({ gamesPlayed: 6 }, null))).toBeNull();
+  });
+
+  it("excludes it from the REAL committed family too, not only from the fixture", () => {
+    // The fixture proves the gate; this proves the gate is wired to the table the engine ships with.
+    for (const candidate of generateCandidates()) {
+      if (candidate.template !== "delta") expect(candidate.id).not.toContain("gamesPlayed");
+    }
+    expect(generateCandidates().some((candidate) => candidate.id.includes("gamesPlayed"))).toBe(true);
   });
 });
 

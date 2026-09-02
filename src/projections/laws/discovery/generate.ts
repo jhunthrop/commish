@@ -3,6 +3,7 @@ import type { LawPosition } from "../populations";
 import type { Law } from "../types";
 import { DISCOVERY_QUANTILES } from "./quantiles";
 import {
+  emitsLevelConditions,
   QUANTILE_LEVELS,
   QUANTILE_TAG,
   QUANTITY_DEFS,
@@ -261,13 +262,16 @@ export function generateCandidatesFrom(quantiles: QuantileTable): readonly Candi
         const thresholdId = idFor(position, thresholdClause);
         const thresholdConditionFn = thresholdConditionOf(def, threshold, side);
 
-        // THE MATCH-KEY EXCLUSION (`QuantityDef.isMatchKeyQuantity`, whose docblock carries the
-        // proof): a LEVEL condition on the quantity the matched design pairs players by makes every
-        // condition row outrank every control row on the match key, so the measured effect is a
-        // property of the matcher rather than of the claim. Such a quantity produces DELTA candidates
-        // only. Read off the quantity, never branched on an id, exactly as the year-over-year
-        // exclusion below is.
-        if (!def.isMatchKeyQuantity) {
+        // THE LEVEL-CONDITION EXCLUSIONS (`emitsLevelConditions`, `templates.ts`, and the two flag
+        // docblocks it reads). A quantity is barred from the threshold and AND families when a level
+        // condition over it would measure the MATCHER rather than the claim, and there are two
+        // separately-argued ways that happens: the quantity IS the match key (`pointsPerGame`, whose
+        // condition arm then outranks every control row on the key by construction), or the quantity
+        // is the match key's own RELIABILITY (`gamesPlayed`, the denominator, whose low arm carries a
+        // noisier estimate at equal observed value and mean-reverts mechanically). Both produce DELTA
+        // candidates normally. Read off the quantity, never branched on an id, exactly as the
+        // year-over-year exclusion below is.
+        if (emitsLevelConditions(def)) {
           thresholdCandidates.push({
             id: thresholdId,
             position,
