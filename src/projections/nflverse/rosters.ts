@@ -69,12 +69,16 @@ export const ROSTER_ASSET_FLOOR = 2002;
 /**
  * THE FLOOR THIS ENGINE ACTUALLY BACKFILLS TO — a scope bound, not an asset bound.
  *
- * Matches `MEASURE_SEASONS.from` (`laws/config.ts`): snap counts are unusable before 2013, so no
- * law's population and no `rb_age_curve` measurement can reach earlier than that regardless of
- * whether a roster exists for it. Ingesting 2002-2012 rosters would be real rows nothing in the
- * engine reads yet. `ROSTER_ASSET_FLOOR` is kept alongside this constant rather than folded into it,
- * so the next feature that DOES need an earlier season knows the asset is already there and only
- * this scope decision needs to change.
+ * NO LONGER EQUAL TO `MEASURE_SEASONS.from`, which moved to 2003 on 2026-09-01. This constant did
+ * not move with it, deliberately: the measurement window reaches back as far as STAT LINES do, and
+ * this floor bounds how far back PRESEASON ROSTERS are backfilled. The consequence is that
+ * `rb_age_curve`, which needs `age` from a roster row, still matches no pair before 2013 while the
+ * window around it reaches ten years further. Lowering this constant is a scope decision with real
+ * behavior attached (`model/efficiency.ts`'s career censoring reads a first-roster season against
+ * it, and `scripts/rookie-curve-fit.ts` starts its train window at it), so it is made on its own and
+ * never as a side effect of a window move. `ROSTER_ASSET_FLOOR` is kept alongside this constant
+ * rather than folded into it, so the next feature that DOES need an earlier season knows the asset
+ * is already there and only this scope decision needs to change.
  */
 export const HISTORICAL_ROSTER_FLOOR = 2013;
 

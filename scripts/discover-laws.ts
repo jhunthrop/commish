@@ -51,8 +51,8 @@ function fullWindowSeasons(): readonly number[] {
   return seasons;
 }
 
-/** e.g. "2013-2023 (2019 rebuilt from play-by-play), direction discovered on predictor seasons
- *  2013-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train
+/** e.g. "2003-2023 (2019 rebuilt from play-by-play), direction discovered on predictor seasons
+ *  2003-2021, replicated on predictor seasons 2021-2023 (2021 sits inside the discovery train
  *  window; only 2022 and 2023 are genuinely out-of-sample for a discovered law)" — `discovered.json`'s
  *  own `seasons` label, the discovery analogue of `measure-laws.ts`'s `seasonsLabel`. The
  *  parenthetical (fix round, IMPORTANT 1 RULING) is the one place a reader of the committed file

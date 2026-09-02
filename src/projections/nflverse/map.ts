@@ -64,12 +64,13 @@ export const PARTICIPATION_METRICS = {
  * not date. `laws/config.ts`'s window note says 2012 "is missing its own week 1"; on today's
  * release it is missing every week, which sharpens that note rather than contradicting it.
  *
- * NOT `HISTORICAL_ROSTER_FLOOR` AND NOT `MEASURE_SEASONS.from`, which happen to be the same number
- * and are SCOPE bounds this constant deliberately does not touch. This one is an ASSET bound, the
- * same kind of fact `rosters.ts`'s `ROSTER_ASSET_FLOOR` (2002) records for the weekly-roster
- * release: it answers "is the data upstream", never "is this engine willing to read that far back".
- * Those two questions agreeing on 2013 today is a coincidence of one upstream limit, and moving
- * either window is a decision of its own that this constant must never be read as having made.
+ * NOT `HISTORICAL_ROSTER_FLOOR` AND NOT `MEASURE_SEASONS.from`, which are SCOPE bounds this constant
+ * deliberately does not touch. This one is an ASSET bound, the same kind of fact `rosters.ts`'s
+ * `ROSTER_ASSET_FLOOR` (2002) records for the weekly-roster release: it answers "is the data
+ * upstream", never "is this engine willing to read that far back". All three read 2013 until
+ * 2026-09-01, when `MEASURE_SEASONS.from` moved to 2003 and the other two did not — which is the
+ * separation this docblock predicted, arriving exactly as described: a window move is a decision of
+ * its own that this constant must never be read as having made, in either direction.
  *
  * ITS READERS are `ingest.ts`'s `fetchSnapCounts` (which treats a missing file at or above this
  * floor as an ALARM and below it as the ordinary shape of history, exactly the way

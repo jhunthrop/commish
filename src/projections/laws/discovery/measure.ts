@@ -27,7 +27,7 @@ import { primaryQuantityDefOf, renderSignedClaim } from "./templates";
  * THE PIPELINE, IN ORDER:
  *
  *   1. TRAIN SCREEN, WITH A MINIMUM SAMPLE FLOOR. Every candidate's train-window population
- *      (`DISCOVERY_TRAIN_SEASONS`, 2013-2021 — see `config.ts`'s own docblock for why discovery's
+ *      (`DISCOVERY_TRAIN_SEASONS`, 2003-2021 since the 2026-09-01 window extension — see `config.ts`'s own docblock for why discovery's
  *      window stops short of `MEASURE_SEASONS`) is matched the identical stratified way a tribal law
  *      is (`matchedPairsStratified`, keyed by `stratumKeyFor` — a discovered candidate is always a
  *      single concrete position, never `"all"`, so this reduces to season-only stratification).
@@ -89,7 +89,7 @@ import { primaryQuantityDefOf, renderSignedClaim } from "./templates";
  *      known-PRDS structure does not require paying.
  *
  *   4. FULL-WINDOW REPLICATION. Every BH survivor is re-measured on the FULL window (predictor
- *      seasons `MEASURE_SEASONS.from`-`MEASURE_SEASONS.to - 1`, 2013-2023 — the same window the six
+ *      seasons `MEASURE_SEASONS.from`-`MEASURE_SEASONS.to - 1`, 2003-2023 — the same window the six
  *      tribal laws use), matched the identical stratified way. `measureEffect` is left UNCAUGHT here
  *      (unlike the train stage): the full window's per-season strata for every train season are the
  *      identical rows train measurement already matched successfully, so a survivor that cleared

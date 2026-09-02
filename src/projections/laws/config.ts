@@ -36,10 +36,30 @@ export const REPLICATION_FOLDS: readonly number[] = [2021, 2022, 2023];
 /**
  * The full window a law's evidence is drawn from, held-out seasons included in the range.
  *
- * `from: 2013` is the earlier of two floors nflverse itself imposes, not a choice: snap counts (what
- * `touches`/`targetShare` are built from) are unusable before 2013 — 2012 is missing its own week 1
- * and 2011 has no snap-count file at all, so a population that reached back to 2011 would be reading
- * rows nflverse never published rather than measuring anything.
+ * `from: 2003` AS OF THE 2026-09-01 DISCOVERY-EXPANSION ROUND. It was 2013 for as long as the store
+ * reached no further back, and the reason given was the snap counts: `touches`/`targetShare` are
+ * built from participation rows, and nflverse publishes no snap-count file before 2013 (2012's is
+ * header-only, 2011 and older are 404s — now recorded as `SNAP_COUNT_ASSET_FLOOR`, `nflverse/map.ts`).
+ * That upstream fact has NOT changed. What changed is that stat lines now reach back to 2003
+ * (51,108 lines / 715,512 observations, 100% player resolution every season, plus schedules for
+ * 2003-2010 so every older line can be dated), so the seasons below 2013 are no longer empty of
+ * evidence — they are empty of PARTICIPATION evidence only.
+ *
+ * WHAT THAT ASYMMETRY MEANS, MEASURED RATHER THAN ASSUMED (`window-probe.ts`, Task 1 of the round):
+ * of the six tribal laws, exactly ONE gains anything from the extension — `td_regression`, which is
+ * built from stat lines alone, gains roughly 82% more population. The other five gain exactly zero
+ * pairs, each blocked by a NAMED missing input rather than by a vague one: `rb_workload_cliff` and
+ * `target_share_persistence` need snap-count-derived touches and target share;
+ * `wr_target_competition` needs the per-week team edge `mapPlayerTeams` builds from the same
+ * snap-count file; `rb_age_curve` needs `age` from `preseason_rosters`, not backfilled below
+ * `HISTORICAL_ROSTER_FLOOR`; `play_caller_fingerprint` needs coach pace and pass-rate history, which
+ * exists only from 2013. A law that cannot see a season simply matches no pair in it, which is the
+ * tri-state "no evidence is not false" rule doing its ordinary job, not a silent degradation.
+ *
+ * THIS CONSTANT IS NO LONGER EQUAL TO `HISTORICAL_ROSTER_FLOOR` OR `SNAP_COUNT_ASSET_FLOOR`. Those
+ * three were all 2013 and were documented as agreeing; they now answer three different questions and
+ * two different numbers. Any prose that reads "matches `MEASURE_SEASONS.from`" is about the old
+ * coincidence and has been corrected at its own site.
  *
  * WITHIN THE WINDOW, 2019 WAS A HOLE, AND IS NOW FILLED (updated, fix round). nflverse's
  * `stats_player_week_2019.csv` release does not exist (a deterministic 404) — that upstream fact has
@@ -59,7 +79,7 @@ export const REPLICATION_FOLDS: readonly number[] = [2021, 2022, 2023];
  * `loadPreseason` (a live board), which passes `admitDerived: false` and reads published history
  * only, forever.
  */
-export const MEASURE_SEASONS = { from: 2013, to: 2024 } as const;
+export const MEASURE_SEASONS = { from: 2003, to: 2024 } as const;
 
 /** Bootstrap resampling: how many pair-resamples, and the seed that makes runs reproducible. */
 export const BOOTSTRAP = { resamples: 1000, seed: 20260831 } as const;
@@ -73,6 +93,16 @@ export const BOOTSTRAP = { resamples: 1000, seed: 20260831 } as const;
  * see 2022-2024 would let a candidate's very existence be chosen by seasons its own later
  * measurement is supposed to confirm against — the discovery-time analogue of `factsForSeason`
  * never reading the outcome season it is predicting.
+ *
+ * `from` IS DEFINED AS `MEASURE_SEASONS.from` AND THEREFORE MOVED WITH IT, to 2003 (2026-09-01
+ * round). This window is what `scripts/discovery-quantile-fit.ts` fits every threshold in
+ * `discovery/quantiles.ts` on, so widening it re-fits the whole table: a quantity the older seasons
+ * CAN see (points per game, games played, touchdowns) now has a decade more of observations behind
+ * its percentiles, and one they cannot (age, snap share, draft pick, anything roster- or
+ * participation-derived) keeps exactly the same threshold it had, because `computeQuantileTable`
+ * ignores a null value rather than counting it as a zero. Refitting the table is a mandatory step of
+ * any change to this constant: the generator SKIPS a (quantity, position, level) the table does not
+ * carry, so a stale table silently shrinks the candidate family instead of failing.
  */
 export const DISCOVERY_TRAIN_SEASONS = { from: MEASURE_SEASONS.from, to: 2021 } as const;
 

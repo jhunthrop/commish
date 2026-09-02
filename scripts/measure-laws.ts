@@ -21,8 +21,13 @@
 // filtering matched pairs down to one predictor season at a time gives exactly the pairs a
 // per-season match would have produced anyway, for free.
 //
-// ONE FLOOR SETS `MEASURE_SEASONS.from`, AND A ONCE-MID-WINDOW HOLE IS NOW FILLED — both are
-// upstream nflverse facts, not choices: `config.ts` documents the snap-count floor (2013) in full,
+// `MEASURE_SEASONS.from` IS 2003 AS OF 2026-09-01, AND A ONCE-MID-WINDOW HOLE IS FILLED. The floor
+// used to be the snap-count floor (2013) and is not any more: stat lines now reach 2003, so the
+// window reaches with them, and the seasons below 2013 carry stat-line evidence and NO
+// participation, roster or coach evidence. A law built on inputs those seasons cannot see matches
+// no pair there and is measured on exactly the window it always was — see `config.ts`'s own
+// `MEASURE_SEASONS` docblock for the per-law enumeration of which gains and which cannot.
+// `config.ts` documents the snap-count floor (`SNAP_COUNT_ASSET_FLOOR`, 2013) in full,
 // and `STAT_LINE_GAPS` (`nflverse/stat-lines.ts`) names the seasons whose published weekly stats
 // file nflverse never released — `stats_player_week_2019.csv` is a deterministic 404. THAT USED TO
 // mean no 2019 stat-line season was ever built and a player-season whose outcome fell there dropped
@@ -92,7 +97,7 @@ function measurementSeasons(): readonly number[] {
 }
 
 /**
- * e.g. "2013-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons
+ * e.g. "2003-2023 (2019 rebuilt from play-by-play), direction replicated on predictor seasons
  * 2021-2023".
  *
  * This string renders verbatim on `/player-laws` (`measuredFigures`'s "Seasons" figure) — a reader

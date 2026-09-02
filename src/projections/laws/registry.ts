@@ -103,8 +103,10 @@ export function foldEffectsFor(pairs: readonly MatchedPair[]): readonly FoldEffe
  * the blend is later scored on. `measureEffect` throws on zero matched pairs (see its own docblock);
  * left uncaught here for the identical reason `discovery/measure.ts`'s FULL-WINDOW step leaves it
  * uncaught rather than pre-checking a floor: every one of today's six tribal laws' full-window
- * populations spans `MEASURE_SEASONS.from`-2023 (2013-2023), and `LAW_TRAIN_CUTOFF_SEASON` (2021)
- * leaves nine of those eleven years inside the train partition — a law with real full-window
+ * populations spans `MEASURE_SEASONS.from`-2023 (2003-2023 since the 2026-09-01 window extension;
+ * five of the six laws still match pairs only from 2013 on, because the older seasons carry no
+ * participation, roster or coach evidence for them to condition on), and `LAW_TRAIN_CUTOFF_SEASON`
+ * (2021) leaves all but the last two of those years inside the train partition — a law with real full-window
  * evidence having ZERO train pairs would be a population-builder bug, not an expected shortfall.
  */
 export function trainEffectFor(pairs: readonly MatchedPair[]): number {
