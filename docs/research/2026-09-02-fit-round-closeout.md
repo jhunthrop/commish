@@ -106,8 +106,13 @@ the snap-count asset floor is still 2013.
 The quantile table was refit on 10,890 train player-seasons (2003-2021): 222 of 378 thresholds moved,
 all checked mechanically (0 order violations, 0 band overlaps across 315 adjacent pairs). Candidates
 regenerated from the refit table: **4,165 candidates, 177 BH survivors, 90 confirmed**, not the
-41/94 figures the Task 1 preview reported, which reproduced to the digit against the STALE
-pre-round quantile table and were formally superseded. The refit is a net restraint: it removes 23
+**206 survivors / 94 confirmed** the Task 1 preview reported, which reproduced to the digit against
+the STALE pre-round quantile table and were formally superseded. [CORRECTED 2026-09-02, final
+review: this sentence previously read "the 41/94 figures", which paired the PRE-ROUND survivor count
+with the PREVIEW's confirmed count and so named a pair that never existed. The three states, said
+plainly: the committed pre-round file held **41 survivors / 22 confirmed**; the Task 1 preview, on
+the stale quantile table, jumped to **206 / 94**; the refit landed at **177 / 90**.] The refit is a
+net restraint: it removes 23
 confirmations the stale thresholds would have granted and adds 19 the stale thresholds would have
 missed.
 
@@ -300,21 +305,45 @@ it had to.
 
 ### 4g. The complete 2024 read history
 
-2024 has now been read exactly twice this round, both as pre-registered, corrections-following reads
-that selected nothing:
+[CORRECTED 2026-09-02, final review: this section previously began "2024 has now been read exactly
+twice this round" and listed only this round's two reads, which is true of THIS ROUND and false of
+the season. Outcome 2024 had already been scored three times before this round opened. A "complete
+read history" that starts at this round's own first read is exactly the accounting error the
+spent-judge ruling exists to prevent, so the earlier three are restored below, from
+`docs/research/2026-08-31-market-edge-closeout.md` and its two addenda.]
 
-1. **v8, the searched-grid read.** The full 54x grid was scored on train (2013-2021); the winning
+**Before this round, three reads:**
+
+1. **The original market-edge scorecard** (2026-08-31 close-out, section 1). The bar's first
+   statement: 2024 blend vs ADP **+0.1029 [+0.0081, +0.2099] BEYOND NOISE**, blend rho 0.5301. This
+   is the read that established the bar and the discipline every later one inherited.
+2. **The gate-fix re-measure** (2026-09-01, live-board plan Task 4 fix round 2 addendum), after the
+   cross-position law-reason defect was closed and the board bumped to v5: **+0.1021 [+0.0070,
+   +0.2102] BEYOND NOISE**, blend rho 0.5293. Every classification identical to the read before it.
+3. **The win-total re-measure** (2026-09-01, vegas-laws Task 4 addendum), after two new
+   `incomingTeamWinTotal` laws entered pricing. This one ran the full 404-line scorecard TWICE, since
+   the v6 arm was reproduced on the same store to make the comparison a measurement rather than a
+   memory: v6 **+0.1021 [+0.0070, +0.2102]** reproducing read 2 exactly, and v7 **+0.1002 [+0.0041,
+   +0.2089] BEYOND NOISE**. The v7 figure is the published verdict this round's two breaks are
+   measured against, and it is the last time the bar was cleared.
+
+**This round, two more:**
+
+4. **v8, the searched-grid read.** The full 54x grid was scored on train (2013-2021); the winning
    cell's board was persisted and scored once against 2024, held out. Broke.
-2. **v9, the corrections-only confirmatory read.** Dispatched under the founder's own corrections-only
-   choice, built with a single-cell "grid" carrying v7's exact constants (no search), scored once
-   against 2024. Broke again, at a statistically identical gap to v8, which is what bought the
-   constants-exoneration finding above.
+5. **v9, the corrections-only confirmatory read.** Dispatched under the founder's own
+   corrections-only choice, built with a single-cell "grid" carrying v7's exact constants (no
+   search), scored once against 2024. Broke again, at a statistically identical gap to v8, which is
+   what bought the constants-exoneration finding above.
 
-Both reads were legitimate under the plan's own discipline (pre-registered, no tuning between them,
-no third read taken after the second came back negative), but 2024 has now been looked at twice with
-different boards, and the second look followed a negative first look. That is not selection, and it is
-not nothing either. **2024 is spent as a judge.** No future configuration reads it again until the
-2027 fit round, under the 2026 quarantine below.
+**So: five scorecard runs against outcome 2024, across three rounds, and the point estimate has
+walked monotonically down through every one of them (+0.1029, +0.1021, +0.1021, +0.1002, +0.0982,
++0.0979) while the interval's lower bound walked to zero and through it.** No single read selected
+anything, every one was taken after its own round's changes rather than to choose among them, and no
+sixth was taken after the fifth came back negative. But a season read five times is not a fresh judge
+in any meaningful sense, and the last two reads also changed the evaluation population underneath the
+comparison (section 4e). **2024 is spent as a judge.** No future configuration reads it again until
+the 2027 fit round, under the 2026 quarantine below.
 
 ### 4h. The founder rows: what v8 and v9 would have priced
 
@@ -405,9 +434,16 @@ substitute for. Alongside it, the full data-year machine list:
   close-outs. This round's own v7 arm illustrated the cost: its 404-line scorecard does not survive
   anywhere, so this document's flip-list comparisons (section 4b) are complete only over the seven
   headline rows the previous close-out published, not the full run.
-- **Board-clutter cleanup**: the store now holds four boards per archive season (v1 raw, v7, v8, v9)
-  and three of them are read by nothing. Inert clutter, not a correctness problem; cleanup rides with
-  Round D ops.
+- **Board-clutter cleanup**: the store holds **nine sources per archive season** (`commish_board_v1`
+  raw through `commish_board_v9`, all `_ppr_12`), of which one is read. 2026 holds **seven** (v1, v4,
+  v5, v6, v7, v8, v9), and v4 there is the odd one: **2,277 rows across three stamps**, a live board
+  from before the retire-on-live rule existed, so it appended three generations instead of replacing
+  them. v5 and v6 hold 759 rows each, the pre-cutdown universe. Inert clutter, not a correctness
+  problem, but Round D's cleanup brief needs the real shape rather than the round's own most recent
+  four. [CORRECTED 2026-09-02, final review: this bullet previously said "four boards per archive
+  season (v1 raw, v7, v8, v9)", which counted only the boards THIS round touched and would have
+  scoped the cleanup brief to less than half the rows. Counts above are read directly from
+  `preseason_projections`.]
 
 ---
 
@@ -417,6 +453,34 @@ substitute for. Alongside it, the full data-year machine list:
 fitted-file regeneration happens until the 2027 fit round. Regenerating any fitted file now would
 create a curve no stored board uses and would desync the shadow register's own consistency with
 what's actually live.
+
+### 6a. The freeze is now a guard, not a note
+
+[ADDED 2026-09-02, final review, the CRITICAL finding.] The paragraph above described an intention
+that one bare command could have destroyed. `BOARD_SOURCE` points at v7 while every fitted file on
+the tree is the v9 configuration, so `npm run projections:preseason:persist` with no arguments would
+have taken the LIVE 2026 path, and that path RETIRES THE STORED GENERATION BEFORE IT WRITES: the 546
+rows the product serves would have been deleted and replaced by rows this tree's constants produce,
+under v7's name, with no second copy and no `as_of` to recover from. The replay path carried the
+quieter version of the same defect, since `preseason_board_reasons` has no `as_of` and is written
+with `onConflictDoUpdate`: an archive re-run would leave the archived POINTS alone, their unique key
+already existing, while silently replacing their EXPLANATIONS with the 87-law family's, producing an
+archive whose reasons describe numbers it is not showing.
+
+`FROZEN_BOARD_SOURCES` (`src/projections/preseason/board-store.ts`) names both served boards, and
+`writePreseasonBoard` refuses before it builds a single row, on both paths, so no script can route
+around it. The refusal names the ruling, says why the write is unsafe, and points at the `--unfreeze`
+flag that lifts it, which prints what it is overriding. The live refusal covers EVERY season rather
+than only 2026, deliberately: the live arm deletes by `(season, source)`, so a live-moment write
+aimed at an archive season under a served name would delete that archive outright. 2026 also comes
+off the persist script's default season list, so a no-argument run does not reach for it at all.
+
+The lift condition is the same one everything else in this section waits for: **the 2027 fit round
+bumps `BOARD_SOURCE` to a fresh name**, at which point these two constants name boards nobody serves
+and the set should be re-pointed at the new served names rather than emptied.
+
+Proven end to end rather than asserted: `npm run projections:preseason:persist 2026` exits non-zero
+with the refusal, and the 2026 v7 row count reads 546 before and 546 after.
 
 One check remains deliberately unresolved rather than silently drifted: `npm run
 projections:market:fit -- --check` still exits 1. It has been drifted since Task 1 completed the
@@ -491,9 +555,12 @@ file regenerates before 2027 (section 6).
 5. **The test-database tmpfs**: undersized for a single serial 619-file run, intermittently failing on
    `TRUNCATE`. Two-half workaround in place; the real fix (per-lane database or larger tmpfs) is Round
    D ops.
-6. **Board-clutter cleanup**: four boards per archive season, three read by nothing (v1 raw stays
-   live; v7, v8, v9 accumulate). Inert, correct under the standing source-bump rule, cleanup rides
-   with Round D ops.
+6. **Board-clutter cleanup**: **nine sources per archive season** (v1 raw through v9), one of them
+   read; **seven for 2026** (v1, v4, v5, v6, v7, v8, v9), where v4 alone holds 2,277 rows across
+   three stamps because it predates the retire-on-live rule, and v5 and v6 hold 759 each from the
+   pre-cutdown universe. Inert, correct under the standing source-bump rule, cleanup rides with Round
+   D ops. [CORRECTED 2026-09-02, final review: previously "four boards per archive season", which was
+   the count of the boards this round touched, not the count in the store.]
 7. **Committing full scorecard texts** to `docs/research/` alongside future close-outs, not only
    headline rows: this round archived `scorecard-v8.txt` and `scorecard-v9.txt` in-workspace only, so
    the next round that wants a full v8/v9-vs-future comparison has them, but the discipline of
@@ -501,8 +568,8 @@ file regenerates before 2027 (section 6).
 8. **The informational props-anchor comparison: gated correctly, never run.** Stage 6 of the plan
    (constructing a props-anchored 2024 board variant and scoring it, loudly labeled non-selective) was
    gated on the bar holding, and the bar broke twice. Running it anyway would have added a third read
-   of 2024 to a round that had already spent two, in service of a comparison that could not have
-   changed the STOP either way. Correctly not run.
+   of 2024 to a round that had already spent two, and a sixth to the season overall (section 4g), in
+   service of a comparison that could not have changed the STOP either way. Correctly not run.
 9. **Props-anchor adoption waits for the 2026 judge.** Unchanged from the vegas-laws and Task 3
    rulings: the props archive holds 2023-2024, the blend trains on 2013-2021, and on this train window
    the axis is a structural no-op (every train row's anchor map is empty, coverage prints 0 of 1,323

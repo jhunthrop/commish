@@ -468,7 +468,7 @@ export async function deletePreseasonBoard(
 }
 
 /**
- * THE FROZEN SOURCES (fit-round final review, 2026-09-02) — the board names no write may touch while
+ * THE FROZEN SOURCES (fit-round final review, 2026-09-02): the board names no write may touch while
  * the frozen-state ruling stands.
  *
  * WHAT THE RULING IS. The fit round ended with two held-out bar breaks, so `BOARD_SOURCE` points

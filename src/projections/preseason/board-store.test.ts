@@ -447,13 +447,13 @@ describe("the preseason board store", () => {
 
     it("LEAVES EVERY OTHER SOURCE ALONE: an unfrozen board still appends and still no-ops on a rerun", async () => {
       const stamp = { season: 2021, source: "some_other_board_ppr_12", asOf: LIVE_2026, momentKind: "replay" as const };
-      const first = await writePreseasonBoard(db, stamp, [entry({ reasons: [{ code: "scarcity", playersLeftInTier: 4, dropToNextTier: 18.3 }] })]);
+      const first = await writePreseasonBoard(db, stamp, [entry({ reasons: [{ code: "scarcity", positionRank: 2, replacementLevel: 185.2 }] })]);
       expect(first).toEqual({ mode: "append", written: 1, reasonsWritten: 1, retiredProjections: 0, retiredReasons: 0 });
 
       // The archive rerun this freeze exists to prevent, proven harmless where it is allowed: the
       // projection insert no-ops on its own unique key and the unchanged reason payload no-ops on
       // `changedRowWhere`, exactly as before the guard existed.
-      const second = await writePreseasonBoard(db, stamp, [entry({ reasons: [{ code: "scarcity", playersLeftInTier: 4, dropToNextTier: 18.3 }] })]);
+      const second = await writePreseasonBoard(db, stamp, [entry({ reasons: [{ code: "scarcity", positionRank: 2, replacementLevel: 185.2 }] })]);
       expect(second).toEqual({ mode: "append", written: 0, reasonsWritten: 0, retiredProjections: 0, retiredReasons: 0 });
     });
   });
