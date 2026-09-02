@@ -20,7 +20,7 @@ import type { Db, ReadonlyDb } from "@/db/client";
 import type { Clock } from "@/domain/timing";
 import { formatCoverage, takeFreeze } from "@/projections/register/freeze";
 import { formatScoreboard, gradableWeeksFor, gradeWeek, latestGradeRowsByWeek, runningScoreboard, type CumulativeScore } from "@/projections/register/grade";
-import { gradeRowsFor, latestFreezeFor, REGISTER_COLUMNS } from "@/projections/register/store";
+import { freezeRowsAt, gradeRowsFor, latestFreezeFor, REGISTER_COLUMNS } from "@/projections/register/store";
 import { kickoffInstantsByWeek } from "@/projections/team-store";
 
 export type StepStatus = "ok" | "skipped" | "failed";
@@ -238,10 +238,15 @@ export async function freezeStep(deps: SeasonWeekDeps, options: SeasonWeekOption
   const { week, kickoff } = candidate;
   const existing = await latestFreezeFor(deps.db, options.season, week);
   if (existing !== null && !options.refreeze) {
+    // Row count, not just the instant: an operator reading a skip line wants to know what is
+    // already sitting there, not only that something is.
+    const existingRows = await freezeRowsAt(deps.db, { season: options.season, week, frozenAt: existing });
     return {
       step: "freeze",
       status: "skipped",
-      summary: `week ${week} already frozen at ${existing.toISOString()}; pass --refreeze to supersede`,
+      summary:
+        `week ${week} already frozen at ${existing.toISOString()} (${existingRows.length} rows); ` +
+        "pass --refreeze to supersede",
       detail: [],
     };
   }
