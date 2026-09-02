@@ -180,8 +180,15 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * never reach the store while the reasons table, which has no `as_of`, updated underneath it. v7 is
  * not kept as a named constant: like v5 and v6 its rows are not wrong, they are the same board fit on
  * evidence that turned out to be incomplete.
+ *
+ * REVERTED TO v7 (2026-09-02, the bar-break rule): the v8 configuration's held-out verdict came in
+ * at +0.0982 [-0.0065, +0.2201] against ADP on decisive 2024, an interval that no longer excludes
+ * zero, so per the fit-round plan's own STOP rule the current source is v7, whose published verdict
+ * (+0.1002 [+0.0041, +0.2089] BEYOND NOISE) still stands. The v8 rows remain in the store as the
+ * measured record of the configuration that did not clear; nothing reads them while this constant
+ * points at v7. The full verdict and adjudication live in the fit-round ledger and close-out.
  */
-export const BOARD_SOURCE = "commish_board_v8_ppr_12";
+export const BOARD_SOURCE = "commish_board_v7_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {
