@@ -174,7 +174,27 @@ New (src/league-room/components unless noted, each file well under 800 lines):
   pill)
 - roster-spine.tsx (44px position rail: projections, BYE, OUT, live ticks; links /team)
 - stage-attention.tsx (resting: NEEDS YOU cards + claim notice + THE LEAGUE THIS WEEK
-  pulse row: standings pulse, next matchup, since you left)
+  pulse. AMENDED 2026-09-03 (founder defect: "the league home landing page feels empty" —
+  three shallow teaser cards over a black void, week 17, viewer out of the playoffs):
+  THE PULSE FILLS THE STAGE. When no attention cards are dealt, the pulse IS the room:
+  the full standings table the /standings surface renders (RoomSurfaceStandings, amber
+  rail on the viewer's row) as the main column, with the week story and the league's
+  recent history (first ~8 activity rows, All activity door) beside it. A league with no
+  activity at all gets no activity card — null is absent, never a box saying "nothing
+  new" — and standings plus the week story share the width. When cards ARE dealt, the
+  compact three-seat pulse row rides beneath them as before, its activity seat now also
+  omitted when empty.
+  THE WEEK STORY (room-week-story.tsx + lib/week-story.ts, pure and unit-tested) replaces
+  the "No matchup this week." dead-end, every figure from reads the page already loads:
+  matchup -> the next-matchup card unchanged; playoffs running without the viewer ->
+  "Your season is in the books: 6-8, 9th of 12." plus this week's real pairings, round
+  named by the bracket's own week arithmetic, each tappable to the week's matchup route;
+  season fully settled -> the arrival card's bookend ("The season is in the books"): the
+  championship game's winner when the final week is a single settled playoff game, else
+  the standings leader with "finished first" language, plus the viewer's finish; anything
+  unprovable collapses to this week's pairings list, then to the plain sentence.
+  regularSeasonWeeks threads from the page as a prop, playoffTeams-style — stage priority
+  untouched, all of this is inside the pulse/attention rendering)
 - stage-live.tsx (score block with margin protagonist, head-to-head starters with live
   points, the swing line, around-the-league ticker)
 - room-drawer.tsx (chip row, half/full container, mobile bottom tab bar projection)

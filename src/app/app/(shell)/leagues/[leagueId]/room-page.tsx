@@ -35,6 +35,7 @@ export async function RoomPage({ surface, leagueId, holdExpired = false, activit
       data={data}
       initialSurface={surface}
       playoffTeams={LEAGUE_CONFIG.playoffTeams}
+      regularSeasonWeeks={LEAGUE_CONFIG.regularSeasonWeeks}
       holdExpired={holdExpired}
     />
   );

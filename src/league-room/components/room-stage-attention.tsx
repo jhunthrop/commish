@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Button, Card, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { Position } from "@/domain/player";
@@ -6,16 +5,27 @@ import type { PendingWaiverClaim } from "@/league-service/claims";
 import type { ActivityRow } from "@/integrity/activity-view";
 import type { TradeProposalView } from "@/trades/contract";
 import { assetPlayerIds } from "@/trades/assets";
-import type { LeagueHomeBody, LineupBody, MatchupDetail, TradeRoomContext, TradeRosterPlayer } from "../contract";
+import type { LeagueHomeBody, LineupBody, MatchupDetail, MatchupWeekBody, TradeRoomContext, TradeRosterPlayer } from "../contract";
 import { RoomArrivalCard } from "./room-arrival-card";
+import { RoomSurfaceStandings } from "./room-surface-standings";
+import { RoomWeekStory } from "./room-week-story";
 import type { DrawerSurface } from "../lib/drawer-state";
 import { formatPoints, formatRecord, formatWeekdayClock, ordinal } from "../lib/format";
 import { slotLabelFor, type LineupFixPlan } from "../lib/lineup-problems";
+import { weekStoryFor } from "../lib/week-story";
 
 export interface RoomStageAttentionProps {
   readonly home: LeagueHomeBody;
   /** The viewer's own lineup — the arrival card's roster on a week-1 visit. */
   readonly lineup: LineupBody | null;
+  /** The whole current-week slate the room already loaded — the week story's picture of the
+   *  league when the viewer has no matchup of their own. */
+  readonly week: MatchupWeekBody | null;
+  /** `LEAGUE_CONFIG.regularSeasonWeeks`, threaded from the page (`standings-table.tsx`'s own
+   *  playoffTeams reasoning: a plain constant as a prop, because `@/league` is value-banned here). */
+  readonly regularSeasonWeeks: number | null;
+  /** `LEAGUE_CONFIG.playoffTeams`, for the full standings table's cut line. */
+  readonly playoffTeams: number | null;
   readonly plans: readonly LineupFixPlan[];
   readonly inboxTrades: readonly TradeProposalView[];
   readonly tradeContext: TradeRoomContext | null;
@@ -121,14 +131,48 @@ function sideTotals(
   };
 }
 
+/** The league's recent history as a pulse card — the same rows the activity surface serves,
+ *  first `limit` of them. Rendered ONLY when there are rows: null is absent, so a league with
+ *  nothing to report gets no box saying "nothing new". */
+function ActivityGlanceCard({
+  rows,
+  limit,
+  onOpen,
+}: {
+  readonly rows: readonly ActivityRow[];
+  readonly limit: number;
+  readonly onOpen: () => void;
+}) {
+  return (
+    <Card padding="compact" className="flex flex-col gap-1.5">
+      <p className={`${MICRO_LABEL} text-text-faint`}>Since you left</p>
+      {rows.slice(0, limit).map((row) => (
+        <p key={row.eventId} className="text-sm text-text-muted">
+          {row.headline}
+        </p>
+      ))}
+      <button type="button" onClick={onOpen} className="mt-auto self-start text-xs text-text-faint hover:text-accent">
+        All activity
+      </button>
+    </Card>
+  );
+}
+
 /**
  * THE RESTING ROOM'S STAGE — law 1's third and fourth rungs on one surface. The cards the room
  * deals (each a finished diagnosis whose verb opens a decision sheet), the filed-claim notices
- * that need nothing, and the league's pulse in one glance: standings, the next matchup, what
- * happened since the viewer left.
+ * that need nothing, and the league's pulse.
+ *
+ * THE PULSE FILLS THE STAGE (founder defect, 2026-09-03: "the league home landing page feels
+ * empty"). One stage that owns the room means spending the space: when no attention cards are
+ * dealt, the pulse stops being three teaser cards over a void and becomes the room — the full
+ * standings table the /standings surface renders as the main column, the week story beside it,
+ * and the league's recent history under that. When cards ARE dealt, the compact three-seat pulse
+ * row stays beneath them exactly as before — the cards are the story then, and the pulse is
+ * the glance.
  */
 export function RoomStageAttention(props: RoomStageAttentionProps) {
-  const { home, lineup, plans, inboxTrades, tradeContext, pendingClaims, myMatchupDetail, projectionsByPlayerId, activityRows } = props;
+  const { home, lineup, week, plans, inboxTrades, tradeContext, pendingClaims, myMatchupDetail, projectionsByPlayerId, activityRows } = props;
   const hasCards = plans.length > 0 || inboxTrades.length > 0;
   const totals = myMatchupDetail === null ? null : sideTotals(myMatchupDetail, home.myTeamId, projectionsByPlayerId);
   const opponentName =
@@ -143,6 +187,13 @@ export function RoomStageAttention(props: RoomStageAttentionProps) {
 
   const projectedLine =
     totals === null ? null : `projected ${formatPoints(totals.mine)} to ${formatPoints(totals.theirs)}, ${totals.mine >= totals.theirs ? "your favor" : "their favor"}`;
+
+  const story = weekStoryFor({
+    week,
+    hasMyMatchup: myMatchupDetail !== null,
+    standings: home.standings,
+    regularSeasonWeeks: props.regularSeasonWeeks,
+  });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
@@ -204,82 +255,66 @@ export function RoomStageAttention(props: RoomStageAttentionProps) {
       ))}
 
       <p className={`${MICRO_LABEL} mt-2 text-text-faint`}>The league this week</p>
-      <div className="grid flex-1 content-start gap-3 lg:grid-cols-3">
-        <Card padding="compact" className="flex flex-col gap-1.5">
-          <p className={`${MICRO_LABEL} text-text-faint`}>Standings pulse</p>
-          {pulseRows.map((row) => (
-            <p
-              key={row.teamId}
-              className={`flex items-baseline gap-2 text-sm ${row.teamId === home.myTeamId ? "accent-wash rounded-sm text-accent" : ""}`}
-            >
-              <span className="w-4 font-mono text-text-faint">{row.rank}</span>
-              <span className="font-display font-semibold">{row.teamName}</span>
-              <span className="ml-auto font-mono text-text-muted">
-                {formatRecord(row)} · {formatPoints(row.pointsFor)}
-              </span>
-            </p>
-          ))}
-          {myRowOutsideTop && myRow !== null ? (
-            <p className="accent-wash flex items-baseline gap-2 rounded-sm text-sm text-accent">
-              <span className="w-4 font-mono">{myRow.rank}</span>
-              <span className="font-display font-semibold">{myRow.teamName}</span>
-              <span className="ml-auto font-mono">
-                {formatRecord(myRow)} · {formatPoints(myRow.pointsFor)}
-              </span>
-            </p>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => props.onOpenSurface("standings")}
-            className="mt-auto self-start text-xs text-text-faint hover:text-accent"
-          >
-            Full standings live in the drawer
-          </button>
-        </Card>
-
-        <Card padding="compact" className="flex flex-col gap-1.5">
-          <p className={`${MICRO_LABEL} text-text-faint`}>Your next matchup</p>
-          {opponentName === null ? (
-            <p className="text-sm text-text-muted">No matchup this week.</p>
-          ) : (
-            <>
-              <p className="font-display text-md font-semibold text-text-primary">vs {opponentName}</p>
-              {totals === null ? null : (
-                <p className="font-mono text-sm text-text-muted">
-                  projected {formatPoints(totals.mine)} to {formatPoints(totals.theirs)},{" "}
-                  {totals.mine >= totals.theirs ? "your favor" : "their favor"}
-                </p>
-              )}
-              <Link
-                href={`/app/leagues/${home.leagueId}/matchups/${home.currentWeek}`}
-                className="mt-auto text-xs text-accent"
+      {hasCards ? (
+        // THE COMPACT PULSE ROW — unchanged beneath the dealt cards: the cards are the stage's
+        // story, and the pulse is a glance.
+        <div className="grid flex-1 content-start gap-3 lg:grid-cols-3">
+          <Card padding="compact" className="flex flex-col gap-1.5">
+            <p className={`${MICRO_LABEL} text-text-faint`}>Standings pulse</p>
+            {pulseRows.map((row) => (
+              <p
+                key={row.teamId}
+                className={`flex items-baseline gap-2 text-sm ${row.teamId === home.myTeamId ? "accent-wash rounded-sm text-accent" : ""}`}
               >
-                Full matchup
-              </Link>
-            </>
-          )}
-        </Card>
-
-        <Card padding="compact" className="flex flex-col gap-1.5">
-          <p className={`${MICRO_LABEL} text-text-faint`}>Since you left</p>
-          {activityRows.length === 0 ? (
-            <p className="text-sm text-text-muted">Nothing new since your last visit.</p>
-          ) : (
-            activityRows.slice(0, 3).map((row) => (
-              <p key={row.eventId} className="text-sm text-text-muted">
-                {row.headline}
+                <span className="w-4 font-mono text-text-faint">{row.rank}</span>
+                <span className="font-display font-semibold">{row.teamName}</span>
+                <span className="ml-auto font-mono text-text-muted">
+                  {formatRecord(row)} · {formatPoints(row.pointsFor)}
+                </span>
               </p>
-            ))
+            ))}
+            {myRowOutsideTop && myRow !== null ? (
+              <p className="accent-wash flex items-baseline gap-2 rounded-sm text-sm text-accent">
+                <span className="w-4 font-mono">{myRow.rank}</span>
+                <span className="font-display font-semibold">{myRow.teamName}</span>
+                <span className="ml-auto font-mono">
+                  {formatRecord(myRow)} · {formatPoints(myRow.pointsFor)}
+                </span>
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => props.onOpenSurface("standings")}
+              className="mt-auto self-start text-xs text-text-faint hover:text-accent"
+            >
+              Full standings live in the drawer
+            </button>
+          </Card>
+
+          <RoomWeekStory home={home} story={story} opponentName={opponentName} projectedLine={projectedLine} />
+
+          {activityRows.length === 0 ? null : (
+            <ActivityGlanceCard rows={activityRows} limit={3} onOpen={() => props.onOpenSurface("activity")} />
           )}
-          <button
-            type="button"
-            onClick={() => props.onOpenSurface("activity")}
-            className="mt-auto self-start text-xs text-text-faint hover:text-accent"
-          >
-            All activity
-          </button>
-        </Card>
-      </div>
+        </div>
+      ) : (
+        // THE PULSE AS THE ROOM — no cards dealt, so the pulse spends the stage: the full
+        // standings table (the /standings surface's own component, amber rail on the viewer's
+        // row) as the main column, the week story and the league's recent history beside it.
+        // A league with no activity at all omits that card entirely (null is absent) and
+        // standings plus the week story share the width.
+        <div className="grid flex-1 content-start gap-3 lg:grid-cols-3">
+          <Card padding="compact" className="min-w-0 lg:col-span-2">
+            <RoomSurfaceStandings home={home} playoffTeams={props.playoffTeams} />
+          </Card>
+          <div className="flex min-w-0 flex-col gap-3">
+            <RoomWeekStory home={home} story={story} opponentName={opponentName} projectedLine={projectedLine} />
+            {activityRows.length === 0 ? null : (
+              <ActivityGlanceCard rows={activityRows} limit={8} onOpen={() => props.onOpenSurface("activity")} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1112,7 +1112,7 @@ describe("RoomShell says nothing that breaks the house copy rules, including eve
       const { container, unmount } = render(
         <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
           <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
-            <RoomShell data={{ ...ROOM_DATA, home }} initialSurface={null} playoffTeams={6} holdExpired={false} />
+            <RoomShell data={{ ...ROOM_DATA, home }} initialSurface={null} playoffTeams={6} regularSeasonWeeks={14} holdExpired={false} />
           </LeagueRoomDepsProvider>
         </ChatRoomDepsProvider>,
       );

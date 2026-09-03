@@ -43,6 +43,10 @@ export interface RoomShellProps {
   /** Which surface the URL opened at full height — null for the room itself. */
   readonly initialSurface: DrawerSurface | null;
   readonly playoffTeams: number | null;
+  /** `LEAGUE_CONFIG.regularSeasonWeeks`, threaded like `playoffTeams` (a plain constant as a
+   *  prop — `@/league` is value-banned in `src/league-room/**`). The week story's playoff
+   *  boundary; `null` makes no playoff claim at all. */
+  readonly regularSeasonWeeks: number | null;
   readonly holdExpired: boolean;
 }
 
@@ -73,7 +77,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * `history.pushState` integration so the drawer animates in place) and the keyboard (space, /,
  * esc). Everything it decides, it decides by calling `stage-priority` and `drawer-state`.
  */
-export function RoomShell({ data, initialSurface, playoffTeams, holdExpired }: RoomShellProps) {
+export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWeeks, holdExpired }: RoomShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { home } = data;
@@ -259,6 +263,9 @@ export function RoomShell({ data, initialSurface, playoffTeams, holdExpired }: R
               <RoomStageAttention
                 home={home}
                 lineup={data.lineup}
+                week={data.week}
+                regularSeasonWeeks={regularSeasonWeeks}
+                playoffTeams={playoffTeams}
                 plans={plans}
                 inboxTrades={inbox}
                 tradeContext={data.tradeContext}

@@ -20,7 +20,7 @@ beforeEach(() => {
 const wrap = (data: RoomData, initialSurface: Parameters<typeof RoomShell>[0]["initialSurface"] = null) => (
   <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
     <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
-      <RoomShell data={data} initialSurface={initialSurface} playoffTeams={6} holdExpired={false} />
+      <RoomShell data={data} initialSurface={initialSurface} playoffTeams={6} regularSeasonWeeks={14} holdExpired={false} />
     </LeagueRoomDepsProvider>
   </ChatRoomDepsProvider>
 );
@@ -102,10 +102,13 @@ describe("RoomShell", () => {
     expect(screen.getByText("Yours")).toBeTruthy();
   });
 
-  it("rests at the pulse when nothing needs the viewer", () => {
+  it("rests at the pulse when nothing needs the viewer — and the pulse spends the stage on the full standings", () => {
     render(wrap(ROOM_DATA));
     expect(screen.getByText("The league this week")).toBeTruthy();
-    expect(screen.getByText("Standings pulse")).toBeTruthy();
+    // No cards dealt, so the pulse is the room: the full standings table, not the compact teaser
+    // (founder defect 2026-09-03, "the league home landing page feels empty").
+    expect(screen.getByRole("heading", { name: "Standings" })).toBeTruthy();
+    expect(screen.queryByText("Standings pulse")).toBeNull();
     expect(screen.queryByText(/needs you/i)).toBeNull();
   });
 
