@@ -12,7 +12,7 @@ import {
   formatClockLength,
   formatGap,
   formatPausedUntil,
-  formatPickFact,
+  formatPickFactClause,
   formatTightening,
   formatYourTurn,
   picksUntilYours,
@@ -183,33 +183,31 @@ describe("formatYourTurn", () => {
 // consumers.
 
 const PICK_FACT_COPY: PickFactCopy = {
-  took: "You took {name} at pick {pickNumber}.",
   bestAvailable: "The board's best player available.",
   positionBestAvailable: "The board's best {position} available.",
   rankedHigherAvailable: "{count} ranked higher were available.",
-  positionRank: "{position}{rank} on the board.",
 };
 
 function review(overrides: Partial<PickReview>): PickReview {
   return { pickNumber: 1, playerId: "p1", bestAvailableDelta: 0, positionRank: 1, positionBestDelta: 0, ...overrides };
 }
 
-describe("formatPickFact", () => {
+describe("formatPickFactClause", () => {
   it("states the board's own best player available when the delta is 0", () => {
-    expect(formatPickFact(PICK_FACT_COPY, review({ pickNumber: 12, positionRank: 2 }), "Bijan Robinson", "RB")).toBe(
-      "You took Bijan Robinson at pick 12. The board's best player available. RB2 on the board.",
+    expect(formatPickFactClause(PICK_FACT_COPY, review({ pickNumber: 12, positionRank: 2 }), "RB")).toBe(
+      "The board's best player available.",
     );
   });
 
   it("states the board's own best player AT THE POSITION when only the position delta is 0 (the round-15-kicker case)", () => {
     expect(
-      formatPickFact(PICK_FACT_COPY, review({ pickNumber: 180, bestAvailableDelta: 550, positionRank: 12, positionBestDelta: 0 }), "Xavier Walker", "K"),
-    ).toBe("You took Xavier Walker at pick 180. The board's best K available. K12 on the board.");
+      formatPickFactClause(PICK_FACT_COPY, review({ pickNumber: 180, bestAvailableDelta: 550, positionRank: 12, positionBestDelta: 0 }), "K"),
+    ).toBe("The board's best K available.");
   });
 
   it("states the honest reach when neither delta is 0", () => {
-    expect(formatPickFact(PICK_FACT_COPY, review({ pickNumber: 13, bestAvailableDelta: 1, positionRank: 9, positionBestDelta: 1 }), "Nico Collins", "WR")).toBe(
-      "You took Nico Collins at pick 13. 1 ranked higher were available. WR9 on the board.",
+    expect(formatPickFactClause(PICK_FACT_COPY, review({ pickNumber: 13, bestAvailableDelta: 1, positionRank: 9, positionBestDelta: 1 }), "WR")).toBe(
+      "1 ranked higher were available.",
     );
   });
 });

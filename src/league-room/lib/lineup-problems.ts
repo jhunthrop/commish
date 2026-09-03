@@ -182,6 +182,13 @@ export function lineupFixPlans(input: LineupProblemsInput): readonly LineupFixPl
   });
 }
 
+/** "WR2" when the league carries more than one of the slot, bare "TE" otherwise — the one
+ *  spelling of a broken slot's name, shared by the attention card and the fix sheet. */
+export function slotLabelFor(problem: LineupProblem, rosterSlots: readonly RosterSlotConfig[]): string {
+  const config = rosterSlots.find((slot) => slot.slot === problem.slot);
+  return config !== undefined && config.count > 1 ? `${problem.slot}${problem.slotIndex + 1}` : problem.slot;
+}
+
 /**
  * The PUT payload for committing a fix: the starting slots with the chosen player in the
  * broken slot. Starters only — the bench is derived server-side (`setLineup`'s own rule).

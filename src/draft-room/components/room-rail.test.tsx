@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
-import { GLOSSARY } from "@/help/glossary";
 import { describeStartTiming } from "@/matchmaking/roll";
 import { renderSurface } from "@/components/ui/test-utils";
 import { AUCTION_VIEW, LEAGUE_NAME, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
@@ -43,6 +42,15 @@ function pick(over: Partial<CompletedPick> = {}): CompletedPick {
   };
 }
 
+/**
+ * Sunday v5 (`feat(room): the dock becomes the lower third, and the room gets its clock back`):
+ * the pick clock, the on-clock subject/sentence and the picks-until-yours figure all moved out of
+ * this rail and down into `RoomDock`'s lower third (see that component's own test file). What
+ * stays here is the standing MASTHEAD — league identity, the format badge, where the board is
+ * (round/pick or lot number), the pending-picks count, the scheduled/complete/tightening/paused
+ * lines, the team chip, the connection banner and the way home — plus the one piece of "the moment"
+ * this rail still morphs with: `data-mode` and the on-clock pulse beside the turn label.
+ */
 describe("RoomRail", () => {
   it("names the league, the format, the turn and your team — both themes, axe-clean", async () => {
     await renderSurface(<RoomRail {...props} view={liveView()} myTeamId="t2" />, async ({ container }) => {
@@ -54,39 +62,34 @@ describe("RoomRail", () => {
     });
   });
 
-  it("names who is on the clock, counts down, and says when the clock tightens", () => {
+  it("says when the clock tightens", () => {
     render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
-    expect(screen.getByText("On the clock")).toBeInTheDocument();
-    expect(screen.getByTestId("countdown")).toHaveTextContent("2:05");
     expect(screen.getByText("Picks shorten to 10 minutes in 2h 14m")).toBeInTheDocument();
   });
 
-  it("shows the paused state honestly in place of the countdown, and drops it once picks resume — both themes, axe-clean", async () => {
+  it("shows the paused state honestly, and drops it once picks resume — both themes, axe-clean", async () => {
     // 3 hours out: well within the freeze right now (real time, not a fake timer — see this
     // file's own top-of-file note on why).
     const resumeAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
     await renderSurface(<RoomRail {...props} view={liveView({ pausedUntil: resumeAt })} myTeamId="t2" />, async ({ container }) => {
-      expect(screen.queryByTestId("countdown")).toBeNull();
       const message = screen.getByTestId("paused-message");
       expect(message).toHaveTextContent(/^Picks are paused until \d{1,2}:\d{2} (AM|PM) Eastern\. You can still make yours\.$/);
       expect(await axe(container)).toHaveNoViolations();
     });
   });
 
-  it("keeps ticking the countdown once pausedUntil is already in the past", () => {
+  it("shows no paused message once pausedUntil is already in the past", () => {
     // The stale-payload case: an event set `pausedUntil` for a freeze that has since lifted, and
     // no later event has refreshed it (nothing happened overnight). `now` having already passed
     // it is what the live room reads, never the field alone.
     const resumeAt = new Date(Date.now() - 60_000).toISOString();
     render(<RoomRail {...props} view={liveView({ pausedUntil: resumeAt })} myTeamId="t2" />);
     expect(screen.queryByTestId("paused-message")).toBeNull();
-    expect(screen.getByTestId("countdown")).toBeInTheDocument();
   });
 
   it("never shows the paused message when the view carries no pausedUntil at all", () => {
     render(<RoomRail {...props} view={liveView({ pausedUntil: null })} myTeamId="t2" />);
     expect(screen.queryByTestId("paused-message")).toBeNull();
-    expect(screen.getByTestId("countdown")).toBeInTheDocument();
   });
 
   // Task 5, Phase 3.5: a plain count, no name — the board's own pending cells and each owing
@@ -102,87 +105,25 @@ describe("RoomRail", () => {
     expect(screen.queryByTestId("pending-picks")).toBeNull();
   });
 
-  it("carries an InfoTip on the format name and on the on-the-clock label", () => {
-    render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
-    expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is on the clock?" })).toBeInTheDocument();
-  });
-
-  // FIX 1 (HIGH): helpLevel must actually reach a wired InfoTip, not just be accepted and
-  // dropped — a guided caller sees the short line without clicking; a standard caller (or the
-  // default, when it's omitted) only gets the click-to-reveal trigger.
-  it("threads helpLevel into its InfoTips: guided shows the short line inline, standard doesn't", () => {
-    const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
-    expect(screen.queryByText(GLOSSARY["on-the-clock"].short)).not.toBeInTheDocument();
-    rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" helpLevel="standard" />);
-    expect(screen.queryByText(GLOSSARY["on-the-clock"].short)).not.toBeInTheDocument();
-    rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" helpLevel="guided" />);
-    expect(screen.getByText(GLOSSARY["on-the-clock"].short)).toBeInTheDocument();
-    expect(screen.getByText(GLOSSARY["snake-draft"].short)).toBeInTheDocument();
-  });
-
-  // NEW-3 (gauntlet fix wave, "reported, not fixed"): the masthead's own instance of
-  // `open-league-card.tsx`'s guided-`InfoTip` layout break. Neither `axe`-checked test above
-  // renders `helpLevel="guided"`, so neither ever exercised the layout this fix targets — the
-  // format-name `InfoTip`'s caption growing its own row past one line, inside a header that used
-  // to be a hard `h-20` (now `min-h-20`, so it can grow instead of clipping or spilling out of
-  // its own box).
-  it("stays a fixed-height-floor band and axe-clean with both guided captions showing, in both themes", async () => {
-    await renderSurface(<RoomRail {...props} view={liveView()} myTeamId="t2" helpLevel="guided" />, async ({ container }) => {
-      expect(screen.getByText(GLOSSARY["snake-draft"].short)).toBeInTheDocument();
-      expect(screen.getByText(GLOSSARY["on-the-clock"].short)).toBeInTheDocument();
+  // Sunday v5 (founder ruling 2026-08-28, "the UX should explain itself — we shouldn't need
+  // tips"): the format-name and on-the-clock `InfoTip`s are gone outright, not merely re-gated by
+  // `helpLevel` — "Snake draft"/"Auction draft" are plain `Badge` text, and the full definition
+  // lives at `/league-rules` instead of a click-to-reveal trigger on the rail itself.
+  it("stays a fixed-height-floor band and axe-clean, with no clickable tips at all, in both themes", async () => {
+    await renderSurface(<RoomRail {...props} view={liveView()} myTeamId="t2" />, async ({ container }) => {
+      expect(screen.getByText("Snake draft")).toBeInTheDocument();
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
       expect(screen.getByTestId("room-rail").className).toContain("lg:min-h-20");
       expect(await axe(container)).toHaveNoViolations();
     });
   });
 
-  it("drops the on-the-clock InfoTip during a live auction lot — that state isn't the rule the term defines", () => {
-    const lotView: DraftStateView = {
-      ...AUCTION_VIEW,
-      onClockTeamId: null,
-      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
-      auction: { minBid: 1, nominatingTeamId: null, lot: { playerId: "qb1", highBid: 12, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
-    };
-    render(<RoomRail {...props} view={lotView} myTeamId="t1" />);
-    expect(screen.getByRole("button", { name: "What is an auction draft?" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "What is on the clock?" })).not.toBeInTheDocument();
-  });
-
-  // Step 15's audit: the rail named whose turn it was but never showed a face. `Avatar` falls
-  // back to initials with no `ownerAvatarUrl` on the fixture team, so Bay Bandits' owner (Dana
-  // Whitfield) shows as "DW" beside the name while she is on the clock.
-  it("puts a face beside the on-clock team's name", () => {
-    render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
-    expect(screen.getByText("DW")).toBeInTheDocument();
-  });
-
-  it("puts no face beside a live bid — the subject there is the player, not a team", async () => {
-    const lotView: DraftStateView = {
-      ...AUCTION_VIEW,
-      onClockTeamId: null,
-      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
-      auction: { minBid: 1, nominatingTeamId: null, lot: { playerId: "qb1", highBid: 12, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
-    };
-    render(<RoomRail {...props} view={lotView} myTeamId="t1" />);
-    expect(screen.queryByText("DW")).toBeNull();
-    expect(screen.queryByText("RO")).toBeNull();
-  });
-
-  it("hides the ticking digits from assistive tech and states the clock in words instead", () => {
-    render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
-    expect(screen.getByTestId("countdown")).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByText("Bay Bandits is on the clock. This round's pick clock is 8 hours.")).toBeInTheDocument();
-  });
-
   it("goes hot when the turn is mine, and stays calm when it is not", () => {
     const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "hot");
-    expect(screen.getByText("You're on the clock")).toBeInTheDocument();
-    expect(screen.getByTestId("countdown").className).toContain("text-negative");
 
     rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "watching");
-    expect(screen.getByTestId("countdown").className).toContain("text-text-primary");
   });
 
   it("counts the round off the board rather than off a turn-order rule", () => {
@@ -228,15 +169,19 @@ describe("RoomRail", () => {
     });
   });
 
-  it("explains a draft that has not started and one that has finished, and drops the turn label", () => {
+  // Sunday v5: the standalone "Not started"/"Draft complete" headline is gone from this rail —
+  // the lower third's own phase cell already shouts those two words, and this rail restating them
+  // in an eyebrow was the "same fact stated twice, differently" pattern the room keeps finding in
+  // itself. A finished draft still gets its one honest sentence here.
+  it("drops the turn label once the draft is not in progress, and states the finished room plainly", () => {
     const { rerender } = render(<RoomRail {...props} view={{ ...SNAKE_VIEW, phase: "scheduled", ...finished }} myTeamId="t1" />);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "scheduled");
-    expect(screen.getByText("Not started")).toBeInTheDocument();
     expect(screen.queryByTestId("turn-label")).toBeNull();
 
     rerender(<RoomRail {...props} view={{ ...SNAKE_VIEW, phase: "complete", ...finished }} myTeamId="t1" />);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "complete");
     expect(screen.getByText("Every roster is final.")).toBeInTheDocument();
+    expect(screen.queryByTestId("turn-label")).toBeNull();
   });
 
   // R2 (the draft-room design review, carried into this lane by Task 10): the scheduled rail
@@ -253,7 +198,6 @@ describe("RoomRail", () => {
         detail: describeStartTiming({ startTrigger: "scheduled", authority: "member" }),
       };
       await renderSurface(<RoomRail {...props} view={scheduledView} myTeamId="t1" waiting={waiting} />, async ({ container }) => {
-        expect(screen.getByText("Not started")).toBeInTheDocument();
         expect(screen.getByText(waiting.detail)).toBeInTheDocument();
         expect(screen.getByText("Starts in")).toBeInTheDocument();
         expect(screen.getByTestId("kickoff-countdown")).toHaveTextContent("2:05");
@@ -281,9 +225,8 @@ describe("RoomRail", () => {
       expect(screen.getByTestId("kickoff-countdown")).toHaveTextContent("2:05");
     });
 
-    it("never guesses a commissioner into a room that has none — with no waiting info, the headline stands alone", () => {
+    it("never guesses a commissioner into a room that has none — with no waiting info, nothing invented shows", () => {
       render(<RoomRail {...props} view={scheduledView} myTeamId="t1" />);
-      expect(screen.getByText("Not started")).toBeInTheDocument();
       expect(screen.queryByText(/commissioner/)).toBeNull();
       expect(screen.queryByTestId("kickoff-countdown")).toBeNull();
     });
@@ -301,16 +244,16 @@ describe("RoomRail", () => {
       expect(screen.getByText("Starts in").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
     });
 
-    it("ignores waiting info entirely once the draft is live — the pick clock owns the rail", () => {
+    it("ignores waiting info entirely once the draft is live — the tightening line owns the rail instead", () => {
       const waiting = { kickoffAt: new Date(Date.now() + 9_000_000).toISOString(), detail: "Stale sentence." };
       render(<RoomRail {...props} view={liveView()} myTeamId="t2" waiting={waiting} />);
       expect(screen.queryByTestId("kickoff-countdown")).toBeNull();
       expect(screen.queryByText("Stale sentence.")).toBeNull();
-      expect(screen.getByTestId("countdown")).toHaveTextContent("2:05");
+      expect(screen.getByText("Picks shorten to 10 minutes in 2h 14m")).toBeInTheDocument();
     });
   });
 
-  it("never claims a team is on the clock during a live auction lot — it becomes the lot instead", async () => {
+  it("names the lot rather than a round, and never claims a team is on the clock, during a live auction lot", async () => {
     const lotView: DraftStateView = {
       ...AUCTION_VIEW,
       onClockTeamId: null,
@@ -318,28 +261,21 @@ describe("RoomRail", () => {
       auction: { minBid: 1, nominatingTeamId: null, lot: { playerId: "qb1", highBid: 12, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
     };
     await renderSurface(<RoomRail {...props} view={lotView} myTeamId="t1" />, async ({ container }) => {
-      expect(screen.getByText("Live bid")).toBeInTheDocument();
-      expect(screen.getByText("Jalen Croft · $12")).toBeInTheDocument();
-      expect(screen.getByText("Bidding is open on Jalen Croft. High bid $12 by Iron Owls.")).toBeInTheDocument();
-      expect(screen.queryByText(/on the clock/i)).toBeNull();
       expect(screen.getByText("Auction draft")).toBeInTheDocument();
       expect(screen.getByTestId("turn-label")).toHaveTextContent("Lot 1");
+      expect(screen.queryByText(/on the clock/i)).toBeNull();
       expect(await axe(container)).toHaveNoViolations();
     });
   });
 
-  it("says who is nominating when the auction has no lot open yet", () => {
-    const nominateView: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t2", lot: null, minBid: 1 } };
-    render(<RoomRail {...props} view={nominateView} myTeamId="t1" />);
-    expect(screen.getByText("Iron Owls is nominating.")).toBeInTheDocument();
-    expect(screen.queryByText(/on the clock/i)).toBeNull();
-  });
-
-  it("says it is your turn to nominate when it is", () => {
-    const nominateView: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t1", lot: null, minBid: 1 } };
-    render(<RoomRail {...props} view={nominateView} myTeamId="t1" />);
-    expect(screen.getByText("You're nominating")).toBeInTheDocument();
+  it("goes hot while it's my turn to nominate, and stays calm when it's somebody else's", () => {
+    const mineNominating: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t1", lot: null, minBid: 1 } };
+    const { rerender } = render(<RoomRail {...props} view={mineNominating} myTeamId="t1" />);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "hot");
+
+    const theirsNominating: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t2", lot: null, minBid: 1 } };
+    rerender(<RoomRail {...props} view={theirsNominating} myTeamId="t1" />);
+    expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "watching");
   });
 
   // E9 (2026-08-26 design review): hot-state redundancy — "Your team: Bay Bandits" sat beside
@@ -371,101 +307,31 @@ describe("RoomRail", () => {
     expect(screen.getByRole("heading", { level: 1, name: LEAGUE_NAME }).className).toContain("text-display-xl");
     // Nobody is "you" on a TV in the corner of a room: no team chip, and no my-turn heat.
     expect(screen.queryByText(/Your team/)).toBeNull();
-    expect(screen.getByText("On the clock")).toBeInTheDocument();
-    // A shared, unattended display has no clickable control at all, InfoTip included.
+    // A shared, unattended display has no clickable control at all.
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "watching");
   });
 
-  /**
-   * TASK 6, THE ON-CLOCK BAND (the fun pass, 2026-08-27). This test used to assert `text-3xl`
-   * unconditionally — "keeps its lg countdown in the room". That assertion is gone because the
-   * behaviour it pinned is the behaviour the fun pass changes: a room where your own sixty
-   * seconds render at exactly the size somebody else's do is the "almost no typographic dynamic
-   * range" the spec names as its third cause of "it feels like a legal website". Watching still
-   * gets `lg`; the turn that is yours gets a full display size.
-   */
-  describe("the on-clock band (Task 6)", () => {
-    it("keeps the calm clock at lg and steps yours up to the display scale", () => {
-      const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
-      expect(screen.getByTestId("countdown").className).toContain("text-3xl");
+  /** Rule 6, spent rather than merely obeyed: the clock genuinely is running out, and the dot
+   *  is the product's existing "live" vocabulary (`animate-pulse-live`). It is decorative and
+   *  `aria-hidden` — the turn label right beside it already says the same thing in words. */
+  it("pulses a live dot beside the turn label only while the clock is yours", () => {
+    const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
+    const dot = screen.getByTestId("on-clock-pulse");
+    expect(dot.className).toContain("animate-pulse-live");
+    expect(dot).toHaveAttribute("aria-hidden", "true");
 
-      rerender(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
-      expect(screen.getByTestId("countdown").className).toContain("text-display-xl");
-    });
-
-    it("grows the manager's name with the moment, and shrinks it back when the turn moves on", () => {
-      // Bay Bandits (t1) holds the clock in the fixture; only the caller's own seat changes.
-      const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
-      expect(screen.getByText("Bay Bandits").className).toContain("text-display-md");
-
-      rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
-      expect(screen.getByText("Bay Bandits").className).toContain("text-display-sm");
-    });
-
-    /** Rule 6, spent rather than merely obeyed: the clock genuinely is running out, and the dot
-     *  is the product's existing "live" vocabulary (`animate-pulse-live`). It is decorative and
-     *  `aria-hidden` — the label beside it already says the same thing in words. */
-    it("pulses a live dot only while the clock is yours", () => {
-      const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t1" />);
-      const dot = screen.getByTestId("on-clock-pulse");
-      expect(dot.className).toContain("animate-pulse-live");
-      expect(dot).toHaveAttribute("aria-hidden", "true");
-
-      rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
-      expect(screen.queryByTestId("on-clock-pulse")).toBeNull();
-    });
-
-    /** The anxiety-killer as a NUMBER (`picksUntilYours`), not a sentence: the dock still says it
-     *  in words, the band says it at a glance. Absent the moment the turn is yours, because zero
-     *  picks until yours is not a fact anybody needs while the clock is already ticking. */
-    it("counts the picks until yours while somebody else is on the clock", async () => {
-      const view = liveView({ onClockTeamId: "t2", upcoming: ["t2", "t3", "t1"] });
-      await renderSurface(<RoomRail {...props} view={view} myTeamId="t1" />, async ({ container }) => {
-        const until = screen.getByTestId("picks-until-yours");
-        expect(until).toHaveTextContent("2");
-        expect(until).toHaveTextContent("Picks until yours");
-        expect(await axe(container)).toHaveNoViolations();
-      });
-    });
-
-    it("says one pick in the singular, and nothing at all once the turn is yours", () => {
-      const { rerender } = render(<RoomRail {...props} view={liveView({ onClockTeamId: "t2", upcoming: ["t2", "t1"] })} myTeamId="t1" />);
-      expect(screen.getByTestId("picks-until-yours")).toHaveTextContent("Pick until yours");
-
-      rerender(<RoomRail {...props} view={liveView({ onClockTeamId: "t1", upcoming: ["t1", "t2"] })} myTeamId="t1" />);
-      expect(screen.queryByTestId("picks-until-yours")).toBeNull();
-    });
-
-    it("counts nothing for a spectator, and nothing on the TV — neither of them is anybody's turn", () => {
-      const { rerender } = render(<RoomRail {...props} view={liveView({ onClockTeamId: "t2", upcoming: ["t2", "t1"] })} myTeamId={null} />);
-      expect(screen.queryByTestId("picks-until-yours")).toBeNull();
-
-      rerender(<RoomRail {...props} view={liveView({ onClockTeamId: "t2", upcoming: ["t2", "t1"] })} myTeamId="t1" variant="tv" />);
-      expect(screen.queryByTestId("picks-until-yours")).toBeNull();
-      expect(screen.queryByTestId("on-clock-pulse")).toBeNull();
-    });
-  });
-
-  // Task 2 (review E5/E6): the TV spotlight band now owns the party's one clock — folding in
-  // the countdown AND the last pick landed (E6) is what made the old band worth looking at.
-  // With that clock living in the band, the rail must never print a second one on the same
-  // screen (E5's "one clock per screen, in the band where eyes are"), so `variant="tv"` drops
-  // its own `Countdown` entirely rather than rendering a redundant `xl` one in the corner. This
-  // replaces the old "xl on the TV" assertion this same test used to make — that was the exact
-  // TV-variant behavior this task deliberately removes.
-  it("renders no countdown of its own on the TV — the spotlight band owns that clock", () => {
-    render(<RoomRail {...props} view={liveView()} myTeamId="t2" variant="tv" />);
-    expect(screen.queryByTestId("countdown")).toBeNull();
+    rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+    expect(screen.queryByTestId("on-clock-pulse")).toBeNull();
   });
 
   // Task 12 Step 3: "the one surface where `xs` never appears", scoped to this rail's OWN
-  // authored labels (the turn label, the waiting/complete headline, the tightening line) — not
-  // the shared `Badge`/`Avatar` chrome beside them, which stays fixed-size everywhere in the
-  // product (see `RAIL_EYEBROW`'s own docblock for the stated carve-out).
+  // authored labels (the turn label and the tightening line) — not the shared `Badge`/`Avatar`
+  // chrome beside them, which stays fixed-size everywhere in the product (see `RAIL_EYEBROW`'s
+  // own docblock for the stated carve-out).
   it("never drops its own labels to text-xs on the TV, across every mode", () => {
     const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId={null} variant="tv" />);
-    expect(screen.getByText("On the clock").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+    expect(screen.getByTestId("turn-label").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
 
     rerender(
       <RoomRail
@@ -476,11 +342,5 @@ describe("RoomRail", () => {
       />,
     );
     expect(screen.getByText("Picks shorten to 10 minutes in 2h 14m").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
-
-    rerender(<RoomRail {...props} view={{ ...SNAKE_VIEW, phase: "scheduled", ...finished }} myTeamId={null} variant="tv" />);
-    expect(screen.getByText("Not started").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
-
-    rerender(<RoomRail {...props} view={{ ...SNAKE_VIEW, phase: "complete", ...finished }} myTeamId={null} variant="tv" />);
-    expect(screen.getByText("Draft complete").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
   });
 });

@@ -98,3 +98,23 @@ export function formatDraftAbsolute(iso: string): string {
   if (Number.isNaN(instant.getTime())) return "";
   return `${WEEKDAY_FORMAT.format(instant)} ${DAY_FORMAT.format(instant)} ${MONTH_FORMAT.format(instant)}, ${CLOCK_FORMAT.format(instant)} UTC`;
 }
+
+/** "1st", "2nd", "3rd", "4th" … with the 11th-13th exception — the week strip's standings seat. */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  const ones = n % 10;
+  if (ones === 1) return `${n}st`;
+  if (ones === 2) return `${n}nd`;
+  if (ones === 3) return `${n}rd`;
+  return `${n}th`;
+}
+
+/** "Friday, 9:00 PM UTC" — a deadline inside the current week (a trade expiry, a waiver clear),
+ *  in the product's one timezone convention (`formatDraftAbsolute`'s own reasoning: UTC and
+ *  labelled, because no per-visitor timezone signal exists to read). */
+export function formatWeekdayClock(iso: string): string {
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return "";
+  return `${WEEKDAY_FORMAT.format(instant)}, ${CLOCK_FORMAT.format(instant)} UTC`;
+}

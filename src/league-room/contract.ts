@@ -3,7 +3,12 @@ import type { DraftFormat, TeamCard } from "@/domain/league";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/trades/fairness";
+import type { TradesPageBody } from "@/trades/contract";
 import type { FirstRunPlan } from "@/identity";
+import type { HelpLevel } from "@/identity/preferences";
+import type { FixtureLabel } from "@/league-service/nfl-schedule";
+import type { PendingWaiverClaim } from "@/league-service/claims";
+import type { ActivityRow } from "@/integrity/activity-view";
 import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
 import type { LeagueAuthority } from "@/league-service/authority";
 import type { CompositionCategory } from "@/participation/composition";
@@ -615,4 +620,50 @@ export interface TradeRoomContext {
    *  (`@/integrity/notices`), and a room component may never import that module as a value (the
    *  client boundary, `eslint.config.mjs`), so the page hands the name down as plain data. */
   readonly leagueName: string;
+}
+
+/**
+ * EVERYTHING THE LEAGUE ROOM RENDERS FROM, assembled once, server side, by `room-data.ts`
+ * beside the pages and handed to `RoomShell` whole. One object rather than a dozen props
+ * because the room's five routes (the room itself plus the four full-height drawer surfaces)
+ * all load the identical set — the route only decides which surface starts expanded.
+ *
+ * Every field is a read the services already answer; the maps ride the RSC boundary as
+ * `Map`s (React 19 serializes them, the same way `LineupEditor` already receives
+ * `projectionsByPlayerId`). Nothing here is a forecast the platform does not compute: no
+ * rest-of-season splits, no projected finals, no win probability.
+ */
+export interface RoomData {
+  readonly home: LeagueHomeBody;
+  readonly lineup: LineupBody | null;
+  /** The whole current-week slate (rosters, per-player points) — null pre-draft or pre-schedule. */
+  readonly week: MatchupWeekBody | null;
+  /** This week's per-player projections. Legitimately empty on a stale snapshot. */
+  readonly projectionsByPlayerId: ReadonlyMap<string, number>;
+  /** This week's fixture per NFL team; an absent team is on bye. */
+  readonly fixturesByNflTeam: ReadonlyMap<string, FixtureLabel>;
+  /** Each NFL team's bye week, derived from the real schedule. */
+  readonly byeWeeksByNflTeam: ReadonlyMap<string, number>;
+  /** The viewer's trade bands — null for a commissioner with no team. */
+  readonly trades: TradesPageBody | null;
+  /** The viewer's filed waiver claims with their true place in line. */
+  readonly pendingClaims: readonly PendingWaiverClaim[];
+  /** First page of league activity, for the pulse's "since you left" and the activity surface. */
+  readonly activityRows: readonly ActivityRow[];
+  readonly activityNextBefore: number | null;
+  /** The viewer's own platform notices for this league — the activity surface's "what the
+   *  platform did" band. Loaded only when the activity route asked for it; empty elsewhere. */
+  readonly activityNotices: readonly PlatformNoticeView[];
+  /** The trade surface's composer context — null for a viewer with no team. */
+  readonly tradeContext: TradeRoomContext | null;
+  readonly helpLevel: HelpLevel;
+}
+
+/** One platform notice as the activity surface renders it: pre-resolved server-side (the quote
+ *  comes from `quoteFor`, a server-only read), so the client band is plain data. */
+export interface PlatformNoticeView {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  readonly quote: string | null;
 }

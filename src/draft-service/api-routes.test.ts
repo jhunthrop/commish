@@ -286,11 +286,9 @@ describe("GET /api/drafts/[draftId] — Task 8's mock room info", () => {
       openSlotLabel: MOCK_COPY.resultsOpenSlotLabel,
       noPicksMessage: MOCK_COPY.resultsNoPicksMessage,
       pickFact: {
-        took: MOCK_COPY.resultsPickTook,
         bestAvailable: MOCK_COPY.resultsPickBestAvailable,
         positionBestAvailable: MOCK_COPY.resultsPickPositionBestAvailable,
         rankedHigherAvailable: MOCK_COPY.resultsPickRankedHigherAvailable,
-        positionRank: MOCK_COPY.resultsPickPositionRank,
       },
       runAgainLabel: MOCK_COPY.resultsRunAgainLabel,
       openLobbyLabel: MOCK_COPY.resultsOpenLobbyLabel,

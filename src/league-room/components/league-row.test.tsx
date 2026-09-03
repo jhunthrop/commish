@@ -53,7 +53,7 @@ const soonIso = () => new Date(Date.now() + UI_CONFIG.openLeagueCard.clockWithin
 const farIso = () => new Date(Date.now() + UI_CONFIG.openLeagueCard.clockWithinMs * 4).toISOString();
 
 const row = (league: PublicLeagueSummary, extra: Partial<Parameters<typeof LeagueRow>[0]> = {}) => (
-  <LeagueRow league={league} signedIn={false} {...extra} />
+  <LeagueRow league={league} signedIn={false} position={1} {...extra} />
 );
 
 /**
@@ -90,31 +90,22 @@ describe("LeagueRow", () => {
     expect(screen.queryByText(GLOSSARY["snake-draft"].short)).not.toBeInTheDocument();
   });
 
-  it("prices the Entry column in ink, semibold, with an sr-only key for screen readers", () => {
-    // v5 law 1: a price is a FACT and wears ink. Money green is gone, and cyan is the verdict
-    // channel a price has no claim on.
-    render(row(BASE));
-    const entry = screen.getAllByText("Free").find((element) => element.className.includes("text-text-primary"));
-    expect(entry).toBeDefined();
-    expect(entry!.className).toContain("font-semibold");
-    expect(entry!.className).not.toContain("text-positive");
-    expect(screen.getByText("Entry")).toHaveClass("sr-only");
+  // Sunday v5 (founder, 2026-08-28: "this table is boring... feels stagnant"): the Entry column
+  // is deleted outright — every league is free this season, and a column with zero variance
+  // carries no information. Position (`#`) took its place; the stake fact still says itself
+  // once, in the name row's own badge (`the badge carries only what the title does not` below).
+  it("leads the row with the board position, hero-numeral and tabular", () => {
+    render(row(BASE, { position: 4 }));
+    const numeral = screen.getByText("4");
+    expect(numeral.className).toContain("tabular-nums");
+    expect(numeral).toHaveAttribute("aria-hidden", "true");
   });
 
-  // Phase 4, Task 13: the live branch, proven through injection — no league that exists today
-  // carries `entryFeeCents > 0` (`moneyIsLive()` gates paid creation dark), so this fixture is
-  // the only way to exercise the column's real-money reading ahead of that day.
-  it("prices the Entry column from the real entry fee, once a league carries one", () => {
-    render(row({ ...BASE, entryFeeCents: 5000 }));
-    const entry = screen.getByText("$50.00");
-    expect(entry.className).toContain("text-text-primary");
-    expect(entry.className).toContain("font-semibold");
-  });
-
-  it("counts the Seats column as '{n} of {t} open', tabular, with the segment meter beside it", () => {
+  it("states the seats-left hero number beside the segment meter, tabular", () => {
     const { container } = render(row(BASE));
-    const seats = screen.getByText("3 of 12 open");
-    expect(seats.className).toContain("tabular-nums");
+    const microLabel = screen.getByText(/left of 12/);
+    expect(microLabel.parentElement!.className).toContain("tabular-nums");
+    expect(microLabel.parentElement!.textContent).toContain("3");
     expect(container.querySelector('[data-testid="seat-segments"]')).not.toBeNull();
   });
 
@@ -136,7 +127,10 @@ describe("LeagueRow", () => {
     it("keeps the absolute sentence when the draft is scheduled but not yet close", () => {
       render(row({ ...BASE, draftAtIso: farIso() }));
       expect(screen.queryByTestId("draft-clock")).not.toBeInTheDocument();
-      expect(screen.getByText(BASE.draftAt)).toBeInTheDocument();
+      // Law 1 (relativeFirst): the relative fact leads, and the absolute date drops to the
+      // faint second line — split into its own element, never restated as one combined string.
+      expect(screen.getByText("in 3 days")).toBeInTheDocument();
+      expect(screen.getByText("Thursday 10 September, 8:00 PM UTC")).toBeInTheDocument();
     });
 
     it("prints a compact 'Drafts when full' value with the full commitment one press away, never a placeholder date (storefront review E1)", () => {
@@ -192,13 +186,13 @@ describe("LeagueRow", () => {
       // inspecting the title text, so a fun name proves the same invariant just as well: exactly
       // one "Free" text renders (the Entry value), never a second one for a stake badge.
       render(row({ ...BASE, id: "house3", name: "The Longshot League", houseRung: "open_12" }));
-      expect(screen.getAllByText("Free")).toHaveLength(1);
+      expect(screen.queryAllByText("Free")).toHaveLength(0);
     });
 
     it("badges a member row with its stake tier, whatever the member named the league", () => {
       render(row({ ...BASE, id: "member2", name: "Free For All League", houseRung: null }));
-      // Exactly two exact "Free" texts: the stake badge and the Entry value.
-      expect(screen.getAllByText("Free")).toHaveLength(2);
+      // Exactly one exact "Free" text: the stake badge (the Entry column is gone, v5).
+      expect(screen.getAllByText("Free")).toHaveLength(1);
     });
   });
 
@@ -236,15 +230,18 @@ describe("LeagueRow", () => {
 });
 
 describe("LeagueRowsHeader", () => {
-  it("names the five columns once, eyebrow register, sentence case, hidden from assistive tech (each cell carries its own key)", () => {
+  it("names the columns once, eyebrow register, sentence case, hidden from assistive tech (each cell carries its own key)", () => {
     const { container } = render(<LeagueRowsHeader />);
     const header = container.firstElementChild as HTMLElement;
     expect(header.getAttribute("aria-hidden")).toBe("true");
     expect(header.className).toContain("font-mono");
     expect(header.className).toContain(LEAGUE_ROW_GRID);
-    for (const label of ["League", "Format", "Drafts", "Entry", "Seats"]) {
+    // Sunday v5: the Entry column is gone (every league is free this season), and `#` leads —
+    // the board is ranked by seats remaining, so the room that fires next reads as P1.
+    for (const label of ["#", "League", "Format", "Drafts", "Seats"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByText("Entry")).not.toBeInTheDocument();
     expect(screen.queryByText("LEAGUE")).not.toBeInTheDocument();
   });
 });

@@ -55,7 +55,7 @@ describe("LeagueRow SSR hydration (scheduled league inside the clock window)", (
     const league = soonLeague();
 
     await hydrateSurface(
-      () => <LeagueRow league={league} signedIn={false} />,
+      () => <LeagueRow league={league} signedIn={false} position={1} />,
       ({ recoverableErrors, consoleErrors }) => {
         expect(recoverableErrors).toEqual([]);
         expect(consoleErrors).toEqual([]);
@@ -70,9 +70,12 @@ describe("LeagueRow SSR hydration (scheduled league inside the clock window)", (
     const league = soonLeague();
 
     await hydrateSurface(
-      () => <LeagueRow league={league} signedIn={false} />,
+      () => <LeagueRow league={league} signedIn={false} position={1} />,
       ({ serverHtml }) => {
-        expect(serverHtml).toContain(BASE.draftAt);
+        // Law 1 (relativeFirst): the relative fact leads and the absolute date drops to its own
+        // faint second line, never restated as one combined string.
+        expect(serverHtml).toContain("in 3 days");
+        expect(serverHtml).toContain("Thursday 10 September, 8:00 PM UTC");
         expect(serverHtml).not.toContain('data-testid="draft-clock"');
       },
       { beforeHydrate: () => vi.setSystemTime(new Date(Date.now() + HYDRATION_SKEW_MS)) },
@@ -85,7 +88,7 @@ describe("LeagueRow SSR hydration (scheduled league inside the clock window)", (
     const league = soonLeague();
 
     await hydrateSurface(
-      () => <LeagueRow league={league} signedIn={false} />,
+      () => <LeagueRow league={league} signedIn={false} position={1} />,
       async ({ container }) => {
         // Post-hydration effects have flushed: the clock has snapped and the digits render.
         const clock = container.querySelector('[data-testid="draft-clock"]');
