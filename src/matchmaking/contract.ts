@@ -1,6 +1,7 @@
 import type { DraftFormat } from "@/domain/league";
 import type { ExperienceTier } from "@/domain/user";
 import type { HouseRungName } from "@/matchmaking/house-catalog";
+import type { PrizeTable } from "@/money/prize-table";
 import type { CompositionCategory } from "@/participation/composition";
 import type { ParticipationTier } from "@/participation/tier";
 
@@ -163,6 +164,21 @@ export interface PublicLeagueSummary {
    * honestly rather than silently showing a different date than the one a visitor wrote down.
    */
   readonly kickoffRolls: number;
+  /**
+   * Front door blueprint (2026-09-02), the eighteenth field: `leagues.payout_table`, straight
+   * through — the published prize table a PAID league advertises, `null` for every free league,
+   * which is every league that can exist while `moneyIsLive()` gates paid creation dark
+   * (`leagueMoneyOrRefuse`, `@/league-service/creation`). The SAME disclosure reasoning
+   * `entryFeeCents` (Phase 4, Task 13) already carries, and the same fact `LeagueTerms.prizeTable`
+   * already shows a prospect on the invite preview: what a league pays its podium is a fact
+   * about the LEAGUE being advertised, never about a person in it, and a stranger deciding on a
+   * paid seat cannot decide without it. Rendered only behind `moneyIsLive()` — a free-season
+   * shelf shows no money column at all — and the pot a row advertises is `prizePotCents` of
+   * THIS stored table (`@/money/prize-table`), never `entryFeeCents * seats` recomputed at a
+   * render site. Optional in TYPE (a fixture may omit it, `draftAtIso`'s own precedent);
+   * `summarizeRow` always writes it, so the wire's key set stays exact.
+   */
+  readonly payoutTable?: PrizeTable | null;
 }
 
 /** A normalized browse filter: every field is a concrete value or the "any" sentinel. */

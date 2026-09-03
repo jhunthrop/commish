@@ -280,6 +280,9 @@ describe("listPublicLeagues", () => {
         medianGame: false, startTrigger: "scheduled",
         houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17],
         kickoffRolls: 0,
+        // Front door blueprint (2026-09-02), the eighteenth field: `null` stated, never absent —
+        // a free league publishes no prize table, and the wire says so explicitly.
+        payoutTable: null,
       },
     ]);
   });
@@ -299,6 +302,22 @@ describe("listPublicLeagues", () => {
     const byId = new Map(rows.map((row) => [row.id, row.medianGame]));
     expect(byId.get("standard")).toBe(false);
     expect(byId.get("median")).toBe(true);
+  });
+
+  // Front door blueprint (2026-09-02): the eighteenth field — the STORED table, straight through.
+  it("discloses a stored payout table straight through, and null for a league without one", async () => {
+    await seed({
+      id: "paid_shape", name: "Paid Shape Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    const table = [
+      { place: 1, amountCents: 30000 },
+      { place: 2, amountCents: 20000 },
+      { place: 3, amountCents: 10000 },
+    ];
+    await db.update(leagues).set({ payoutTable: table }).where(eq(leagues.id, "paid_shape"));
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(rows.find((row) => row.id === "paid_shape")?.payoutTable).toEqual(table);
   });
 
   // Phase 3.5, Task 8, Step 3: the twelfth field.

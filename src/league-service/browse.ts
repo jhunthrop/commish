@@ -15,6 +15,7 @@ import { FIXTURE_LEAGUE_NAME_PREFIXES } from "@/matchmaking/fixtures";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseBody, BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
 import type { HouseRungName } from "@/matchmaking/house-catalog";
+import type { PrizeTable } from "@/money/prize-table";
 import { compositionCategoryFor, tierCompositionFor } from "@/participation/composition";
 import { describeScoring, type ScoringRules } from "@/scoring";
 
@@ -87,6 +88,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "rosterSummary",
   "playoffWeeks",
   "kickoffRolls",
+  "payoutTable",
 ];
 
 /**
@@ -294,6 +296,9 @@ export function browseQuery(db: Db, filter: BrowseFilter, options: BrowseQueryOp
       experienceTier: leagues.experienceTier,
       stakeTier: leagues.stakeTier,
       entryFeeCents: leagues.entryFeeCents,
+      // Front door blueprint (2026-09-02): the published prize table, straight through — the
+      // same ungrouped-plain-column reasoning `entryFeeCents` above already rides on.
+      payoutTable: leagues.payoutTable,
       teamCount: leagues.teamCount,
       medianGame: leagues.medianGame,
       // Ungrouped, on the identical functional-dependency proof `kickoffAt`/`startTrigger`
@@ -420,6 +425,7 @@ export function houseShelfQuery(db: Db, nowIso: string) {
       experienceTier: leagues.experienceTier,
       stakeTier: leagues.stakeTier,
       entryFeeCents: leagues.entryFeeCents,
+      payoutTable: leagues.payoutTable,
       teamCount: leagues.teamCount,
       medianGame: leagues.medianGame,
       houseRung: leagues.houseRung,
@@ -529,6 +535,7 @@ interface SummarizableRow {
   readonly experienceTier: ExperienceTier;
   readonly stakeTier: number;
   readonly entryFeeCents: number;
+  readonly payoutTable: PrizeTable | null;
   readonly teamCount: number;
   readonly medianGame: boolean;
   readonly rosterSlots: readonly RosterSlotConfig[];
@@ -576,6 +583,9 @@ function summarizeRow(
     experienceTier: row.experienceTier,
     stakeTier: row.stakeTier,
     entryFeeCents: row.entryFeeCents,
+    // `null`, never absent: the disclosure test pins the wire's exact key set, and a free
+    // league's "no table" is a stated fact, not a missing one.
+    payoutTable: row.payoutTable ?? null,
     teamCount: row.teamCount,
     filledTeams: row.filledTeams,
     scoringLabel: weights === undefined ? "Custom" : describeScoring(weights),
