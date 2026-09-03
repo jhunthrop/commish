@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen, waitFor, act } from "@testing-library/react";
+import { screen, waitFor, act, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { DraftRoomDepsProvider } from "../hooks/deps";
@@ -137,13 +137,23 @@ describe("TvBoard", () => {
   // Task 2 (review E5/E6): the spotlight band folds in the one clock the party sees — the
   // rail's own countdown is gone on this variant (see room-rail.test.tsx), so this band is now
   // the TV's only ticking clock.
+  //
+  // SUNDAY v5 REWIRED THE BAND ONTO `LowerThird` (law 6): the old bordered "spotlight card" with
+  // its own `spotlight-countdown`/`spotlight-last-pick` testids became a lower-third strip of
+  // cells, `data-testid="spotlight"` now naming the whole strip rather than a card. It also
+  // changed what urgency SPENDS (this file's own docblock on `spotlightClockTone`): the clock is
+  // drawn in the live channel unconditionally, since a running draft clock already IS "happening
+  // right now" — there is no redder color left for "hot" to step to, so hot renames the cell's
+  // micro-label ("Final seconds") instead of recoloring the digits.
   describe("the spotlight band's own clock (E5/E6)", () => {
-    it("shows the shared countdown in the band, calm above the hot threshold", async () => {
+    it("shows the shared countdown in the band, always in the live channel, never recolored by urgency", async () => {
       stubMatchMedia();
       const fixture = fixtureDeps({ ...SNAKE_VIEW, deadlineAt: new Date(Date.now() + 45_000).toISOString() });
       renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
-      await waitFor(() => expect(screen.getByTestId("spotlight-countdown")).toBeInTheDocument());
-      expect(screen.getByTestId("spotlight-countdown").className).not.toContain("text-negative");
+      await waitFor(() => expect(screen.getByText("Pick clock")).toBeInTheDocument());
+      const clockCell = screen.getByText("Pick clock").nextElementSibling as HTMLElement;
+      expect(clockCell.className).toContain("text-live");
+      expect(clockCell.className).not.toContain("text-negative");
       // One clock per screen (E5): the rail beside it prints none of its own.
       expect(screen.queryByTestId("countdown")).toBeNull();
     });
@@ -157,12 +167,14 @@ describe("TvBoard", () => {
       expect(spotlightClockTone(null)).toBe("default");
     });
 
-    it("goes hot inside the final 30 seconds, and not a moment before", async () => {
+    it("goes hot inside the final 30 seconds by renaming the clock's own label, not by recoloring it", async () => {
       stubMatchMedia();
       const fixture = fixtureDeps({ ...SNAKE_VIEW, deadlineAt: new Date(Date.now() + 20_000).toISOString() });
       renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
-      await waitFor(() => expect(screen.getByTestId("spotlight-countdown")).toBeInTheDocument());
-      expect(screen.getByTestId("spotlight-countdown").className).toContain("text-negative");
+      await waitFor(() => expect(screen.getByText("Final seconds")).toBeInTheDocument());
+      expect(screen.queryByText("Pick clock")).toBeNull();
+      const clockCell = screen.getByText("Final seconds").nextElementSibling as HTMLElement;
+      expect(clockCell.className).toContain("text-live");
     });
 
     /**
@@ -175,8 +187,9 @@ describe("TvBoard", () => {
       stubMatchMedia();
       const fixture = fixtureDeps({ ...SNAKE_VIEW, deadlineAt: new Date(Date.now() + 45_000).toISOString() });
       renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
-      await waitFor(() => expect(screen.getByTestId("spotlight-countdown")).toBeInTheDocument());
-      expect(screen.getByTestId("spotlight-countdown").className).toContain("text-display-xl");
+      await waitFor(() => expect(screen.getByText("Pick clock")).toBeInTheDocument());
+      const digits = screen.getByText("Pick clock").nextElementSibling!.querySelector("span")!;
+      expect(digits.className).toContain("text-display-2xl");
     });
   });
 
@@ -189,15 +202,19 @@ describe("TvBoard", () => {
     stubMatchMedia();
     const fixture = fixtureDeps();
     renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
-    await waitFor(() => expect(screen.getByTestId("tv-progress")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Picks in")).toBeInTheDocument());
     const total = SNAKE_VIEW.draftOrder.length * SNAKE_VIEW.slotConfig.reduce((sum, slot) => sum + slot.count, 0);
-    expect(screen.getByTestId("tv-progress")).toHaveTextContent(`${SNAKE_VIEW.picks.length} of ${total}`);
+    expect(screen.getByText("Picks in").nextElementSibling).toHaveTextContent(`${SNAKE_VIEW.picks.length} of ${total}`);
   });
 
-  // Task 2 (review E6): the last pick landed, restated quietly at glance scale beside the
-  // band's own clock — the wire underneath already carries the newest pick's ink; this is a
-  // restatement, so the player's name stays muted rather than repeating that emphasis.
-  it("restates the last pick landed, quietly, beside the spotlight clock", async () => {
+  // Task 2 (review E6) put the newest pick's own restatement here, at glance scale beside the
+  // spotlight clock. Sunday v5 cut the cell outright rather than reconciling it — this file's
+  // own `TvBoard` docblock: "this line already names the newest pick, in ink, one row up" — so
+  // `PickWire`, directly above the board, is now the room's one telling of "what just happened"
+  // (its own suite owns the formatting; `spotlight-last-pick` no longer exists to test).  This
+  // keeps only the integration fact that belongs to `TvBoard`: the live event still reaches the
+  // wire, and the strip genuinely carries no per-player fact of its own any more.
+  it("routes a live pick to the wire rather than restating it in the spotlight, now that the strip states none", async () => {
     stubMatchMedia();
     const fixture = fixtureDeps();
     renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
@@ -219,24 +236,7 @@ describe("TvBoard", () => {
       }),
     );
 
-    await waitFor(() => expect(screen.getByTestId("spotlight-last-pick")).toHaveTextContent("#1"));
-    const lastPick = screen.getByTestId("spotlight-last-pick");
-    expect(lastPick).toHaveTextContent("Jalen Croft");
-    expect(lastPick.className).toContain("text-text-muted");
-    // The face beside the line (T1 review MEDIUM): qb1's fixture carries a real headshot URL,
-    // so the restatement renders the image branch — the pool's own test carries the initials
-    // branch with the same fixture set.
-    // The Avatar renders BESIDE the testid'd line, inside the same spotlight band — scope the
-    // query there, keyed by qb1's own URL so the on-clock owner's avatar can never satisfy it.
-    const faces = Array.from(screen.getByTestId("spotlight").querySelectorAll("img"));
-    expect(faces.some((img) => (img.getAttribute("src") ?? "").includes("qb1.png"))).toBe(true);
-  });
-
-  it("shows no last-pick restatement before anything has been drafted", async () => {
-    stubMatchMedia();
-    const fixture = fixtureDeps();
-    renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
-    await waitFor(() => expect(screen.getByTestId("spotlight")).toBeInTheDocument());
-    expect(screen.queryByTestId("spotlight-last-pick")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("pick-wire")).toHaveTextContent("Jalen Croft"));
+    expect(within(screen.getByTestId("spotlight")).queryByText("Jalen Croft")).toBeNull();
   });
 });
