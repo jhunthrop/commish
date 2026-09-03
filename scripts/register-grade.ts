@@ -16,7 +16,6 @@ import { createDb } from "@/db/client";
 import type { Clock } from "@/domain/timing";
 import { requireEnv } from "@/projections/odds/http";
 import { formatScoreboard, gradableWeeksFor, gradeWeek, runningScoreboard } from "@/projections/register/grade";
-import { REGISTER_COLUMNS } from "@/projections/register/store";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };
 
@@ -54,17 +53,21 @@ async function main(): Promise<void> {
     for (const week of weeks) {
       try {
         const grade = await gradeWeek(db, { season, week }, systemClock);
-        const summary = grade.scores
-          .map((score) => `${score.column} ${show(score.spearman, 4)} (n=${score.graded})`)
-          .join("  ");
-        console.log(`week ${String(week).padStart(2)}  graded ${String(grade.population).padStart(4)} of the ${grade.frozenAt.toISOString()} freeze  ${summary}`);
+        console.log(`week ${String(week).padStart(2)}  graded the ${grade.frozenAt.toISOString()} freeze at ${grade.gradedAt.toISOString()}`);
+        for (const board of grade.boards) {
+          const summary = board.scores.map((score) => `${score.column} ${show(score.spearman, 4)} (n=${score.graded})`).join("  ");
+          console.log(`          ${board.boardSource.padEnd(26)} ${String(board.population).padStart(4)} players  ${summary}`);
+        }
+        for (const board of grade.skipped) {
+          console.log(`          ${board.boardSource.padEnd(26)} SKIPPED: ${board.reason}`);
+        }
       } catch (error: unknown) {
         console.log(`week ${String(week).padStart(2)}  SKIPPED: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
     console.log("");
-    console.log(`register-grade: ${season} running scoreboard, ${REGISTER_COLUMNS.length} columns, cumulative by column`);
+    console.log(`register-grade: ${season} running scoreboard, cumulative by board and column`);
     console.log(formatScoreboard(await runningScoreboard(db, season)));
   } finally {
     await db.$client.end();

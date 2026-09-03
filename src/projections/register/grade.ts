@@ -7,7 +7,9 @@ import { computeFantasyPoints } from "@/scoring/compute";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import { statLinesAsOf } from "../lines";
 import { spearman } from "../metrics";
+import { roleOf, SERVED_BOARD_SOURCE } from "./sources";
 import {
+  freezeBoardSourcesAt,
   freezeRowsAt,
   frozenWeeksFor,
   gradeRowsFor,
@@ -25,8 +27,13 @@ import {
  *
  * This is the half that reads outcomes, and it is deliberately the smaller half. It takes the last
  * claim standing before kickoff, takes what the week actually produced, and appends one row per
- * player saying where each of the four columns had placed him. It writes nothing but graded rows,
- * and it reads nothing it did not need for that.
+ * player PER BOARD saying where each of the four columns had placed him. It writes nothing but
+ * graded rows, and it reads nothing it did not need for that.
+ *
+ * EVERY BOARD THE FREEZE RECORDED (the dual-track ruling, Round D), scored independently and stored
+ * under its own `boardSource`. One grading run, one `gradedAt`, one outcome read, N boards: the
+ * whole point is that the served board and its shadow are answered by the SAME week, so anything
+ * that could differ between them other than the boards themselves has to be shared.
  *
  * IT RUNS ONLY FOR A WEEK WITH OUTCOMES. A week the stats pipeline has not reached yet has no
  * observations at all, and grading it would score every column against an empty population — which
@@ -71,20 +78,41 @@ export interface ColumnScore {
   readonly meanAbsoluteRankError: number | null;
 }
 
+/** One BOARD's verdict on one week: its own graded rows and its own four column scores. */
+export interface BoardGrade {
+  readonly boardSource: string;
+  /** Frozen players on THIS board who have an outcome for the week. */
+  readonly population: number;
+  readonly rows: readonly RegisterGradeRow[];
+  readonly scores: readonly ColumnScore[];
+}
+
+/** A board the freeze recorded that this grading could not score, and why. Never silent: a shadow
+ *  vanishing from a scoreboard reads as a shadow that agreed with everything. */
+export interface SkippedBoard {
+  readonly boardSource: string;
+  readonly reason: string;
+}
+
 export interface WeekGrade {
   readonly season: number;
   readonly week: number;
   /** The exact freeze graded — the last claim standing before kickoff. */
   readonly frozenAt: Date;
   readonly gradedAt: Date;
-  /** Frozen players who have an outcome for the week. */
+  /** Every board the freeze recorded that could be scored, served first. */
+  readonly boards: readonly BoardGrade[];
+  readonly skipped: readonly SkippedBoard[];
+  /** The SERVED board's population — "how many players did this week grade", in the sense every
+   *  earlier caller of this field meant. A shadow's own population is on its `BoardGrade`. */
   readonly population: number;
+  /** Every row written, across every board. */
   readonly rows: readonly RegisterGradeRow[];
-  readonly scores: readonly ColumnScore[];
 }
 
-/** One column across every week graded so far. */
+/** One column of one board across every week graded so far. */
 export interface CumulativeScore {
+  readonly boardSource: string;
   readonly column: RegisterColumn;
   /** How many graded weeks this column could be scored on at all. */
   readonly weeks: number;
@@ -226,7 +254,8 @@ export async function gradeWeek(db: Db, { season, week }: GradeRequest, clock: C
   if (frozenAt === null) {
     throw new Error(`The register holds no freeze for ${season} week ${week}, so there is nothing to grade.`);
   }
-  const frozen = await freezeRowsAt(db, { season, week, frozenAt });
+  const key = { season, week, frozenAt };
+  const frozen = await freezeRowsAt(db, key);
   const gradedAt = new Date(clock.now());
 
   const lines = await statLinesAsOf(db, { season, week, asOf: gradedAt });
@@ -239,13 +268,68 @@ export async function gradeWeek(db: Db, { season, week }: GradeRequest, clock: C
   const positions = await positionsFor(db, frozen.map((row) => row.playerId));
   const lineByPlayer = new Map(lines.map((line) => [line.line.playerId, line.line]));
 
-  const graded = frozen.filter((row) => lineByPlayer.has(row.playerId));
-  if (graded.length === 0) {
-    throw new Error(
-      `${season} week ${week} has outcomes, but none of them belong to a player the ${frozenAt.toISOString()} freeze carried. Refusing to grade an empty intersection.`,
-    );
+  // EVERY BOARD THE FREEZE ACTUALLY RECORDED, read from the rows rather than from the current source
+  // list, and ordered served-first so a report can print them in the order that means something.
+  const boardSources = [...(await freezeBoardSourcesAt(db, key))].sort(
+    (a, b) => servedFirst(a) - servedFirst(b) || a.localeCompare(b),
+  );
+
+  const boards: BoardGrade[] = [];
+  const skipped: SkippedBoard[] = [];
+  for (const boardSource of boardSources) {
+    const claim = frozen.filter((row) => row.boardSource === boardSource);
+    const graded = claim.filter((row) => lineByPlayer.has(row.playerId));
+    if (graded.length === 0) {
+      const reason =
+        `${season} week ${week} has outcomes, but none of them belong to a player the ${frozenAt.toISOString()} freeze carried under "${boardSource}". ` +
+        "Refusing to grade an empty intersection.";
+      // The SERVED board is load-bearing: an empty intersection there means the week cannot be
+      // graded at all, and calling that a skipped board would leave a scoreboard quietly missing the
+      // one column it exists to report. A shadow's empty intersection is a fact about a diagnostic
+      // track and is recorded as one.
+      if (boardSource === SERVED_BOARD_SOURCE) throw new Error(reason);
+      skipped.push({ boardSource, reason });
+      continue;
+    }
+    boards.push(gradeOneBoard({ season, week, frozenAt, gradedAt, boardSource, graded, positions, lineByPlayer }));
   }
 
+  const rows = boards.flatMap((board) => board.rows);
+  await db.transaction(async (tx) => {
+    await recordGradeRows(tx, rows);
+  });
+
+  const servedBoard = boards.find((board) => board.boardSource === SERVED_BOARD_SOURCE);
+  return { season, week, frozenAt, gradedAt, boards, skipped, population: servedBoard?.population ?? 0, rows };
+}
+
+/** Sort key that puts the currently served source first and leaves every other source alone. */
+function servedFirst(source: string): number {
+  return source === SERVED_BOARD_SOURCE ? 0 : 1;
+}
+
+interface OneBoardInput {
+  readonly season: number;
+  readonly week: number;
+  readonly frozenAt: Date;
+  readonly gradedAt: Date;
+  readonly boardSource: string;
+  /** This board's frozen rows that have an outcome. Non-empty — the caller checked. */
+  readonly graded: readonly RegisterFreezeRow[];
+  readonly positions: ReadonlyMap<string, string>;
+  readonly lineByPlayer: ReadonlyMap<string, Parameters<typeof computeFantasyPoints>[0]>;
+}
+
+/**
+ * One board's graded rows and scores.
+ *
+ * EACH BOARD IS SCORED OVER ITS OWN POPULATION, and the outcome is re-ranked inside it. Two boards
+ * with different universes (a shadow persisted before a cutdown, say) must not be scored against
+ * ranks taken over a field one of them never spoke about — that is the same rule this module already
+ * applies per COLUMN, applied one level up, and it is what makes the shadow's number comparable to
+ * the served board's rather than merely printed beside it.
+ */
+function gradeOneBoard({ season, week, frozenAt, gradedAt, boardSource, graded, positions, lineByPlayer }: OneBoardInput): BoardGrade {
   const actualPoints = new Map(
     graded.map((row) => {
       // `register_freeze_rows.player_id` is a foreign key into `nfl_players`, whose `position` is
@@ -275,6 +359,7 @@ export async function gradeWeek(db: Db, { season, week }: GradeRequest, clock: C
     week,
     frozenAt,
     gradedAt,
+    boardSource,
     playerId: row.playerId,
     actualPoints: actualPoints.get(row.playerId)!,
     actualRank: actualRanks.get(row.playerId)!,
@@ -285,11 +370,7 @@ export async function gradeWeek(db: Db, { season, week }: GradeRequest, clock: C
     propsRank: rankFor("props", row.playerId),
   }));
 
-  await db.transaction(async (tx) => {
-    await recordGradeRows(tx, rows);
-  });
-
-  return { season, week, frozenAt, gradedAt, population: rows.length, rows, scores: scoreColumns(rows) };
+  return { boardSource, population: rows.length, rows, scores: scoreColumns(rows) };
 }
 
 function meanOf(values: readonly number[]): number | null {
@@ -331,22 +412,49 @@ export function latestGradeRowsByWeek(rows: readonly RegisterGradeRow[]): Readon
   return grouped;
 }
 
+/**
+ * WHICH COLUMNS A BOARD CONTRIBUTES TO THE SCOREBOARD.
+ *
+ * The served board contributes all four: it is the product, and adp/ecr/props are the benchmarks the
+ * product is being measured against. A SHADOW contributes only its `board` column. Its benchmark
+ * columns are not wrong, they are REDUNDANT — the same three market opinions, scored over a
+ * near-identical population — and printing them would put five near-duplicate benchmark rows on a
+ * scoreboard whose whole job is to make two board columns comparable at a glance. The dual track is
+ * a comparison of BOARDS; the benchmarks are the fixed backdrop both are compared against.
+ */
+function columnsFor(boardSource: string): readonly RegisterColumn[] {
+  return boardSource === SERVED_BOARD_SOURCE ? REGISTER_COLUMNS : ["board"];
+}
+
 export async function runningScoreboard(db: ReadonlyDb, season: number): Promise<readonly CumulativeScore[]> {
   const all = await gradeRowsFor(db, season);
   const byWeek = latestGradeRowsByWeek(all);
   const weeks = [...byWeek.keys()].sort((a, b) => a - b);
-  const perWeek = weeks.map((week) => scoreColumns(byWeek.get(week)!));
 
-  return REGISTER_COLUMNS.map((column) => {
-    const scores = perWeek.map((week) => week.find((score) => score.column === column)!).filter((score) => score.graded > 0);
-    return {
-      column,
-      weeks: scores.length,
-      spearman: meanOf(scores.map((score) => score.spearman).filter((value): value is number => value !== null)),
-      meanAbsoluteRankError: meanOf(
-        scores.map((score) => score.meanAbsoluteRankError).filter((value): value is number => value !== null),
-      ),
-    };
+  // Every board any graded week holds, served first — read from the ROWS, so a board that stopped
+  // being tracked mid-season still reports the weeks it was graded on rather than vanishing.
+  const boardSources = [...new Set(all.map((row) => row.boardSource))].sort(
+    (a, b) => servedFirst(a) - servedFirst(b) || a.localeCompare(b),
+  );
+
+  return boardSources.flatMap((boardSource) => {
+    const perWeek = weeks
+      .map((week) => byWeek.get(week)!.filter((row) => row.boardSource === boardSource))
+      .filter((rows) => rows.length > 0)
+      .map((rows) => scoreColumns(rows));
+
+    return columnsFor(boardSource).map((column) => {
+      const scores = perWeek.map((week) => week.find((score) => score.column === column)!).filter((score) => score.graded > 0);
+      return {
+        boardSource,
+        column,
+        weeks: scores.length,
+        spearman: meanOf(scores.map((score) => score.spearman).filter((value): value is number => value !== null)),
+        meanAbsoluteRankError: meanOf(
+          scores.map((score) => score.meanAbsoluteRankError).filter((value): value is number => value !== null),
+        ),
+      };
+    });
   });
 }
 
@@ -354,13 +462,22 @@ function show(value: number | null, digits: number): string {
   return value === null ? "n/a" : value.toFixed(digits);
 }
 
-/** The scoreboard as one printable block, naming EVERY column even where it has nothing to say —
- *  a column missing from a report reads as a column nobody thought to check. */
+/**
+ * The scoreboard as one printable block, naming EVERY row even where it has nothing to say — a
+ * column missing from a report reads as a column nobody thought to check.
+ *
+ * The board source leads each line, and a shadow is marked as one, because two lines both saying
+ * "board" with different numbers is exactly the ambiguity the dual track must not print.
+ */
 export function formatScoreboard(scores: readonly CumulativeScore[]): string {
-  const header = `${"column".padEnd(8)}${"weeks".padStart(7)}${"spearman".padStart(11)}${"rank err".padStart(11)}`;
+  const label = (score: CumulativeScore): string =>
+    `${score.boardSource}${roleOf(score.boardSource) === "shadow" ? " (shadow)" : ""}`;
+  const width = Math.max(12, ...scores.map((score) => label(score).length));
+  const header = `${"board source".padEnd(width)}  ${"column".padEnd(8)}${"weeks".padStart(7)}${"spearman".padStart(11)}${"rank err".padStart(11)}`;
   const lines = scores.map(
     (score) =>
-      `${score.column.padEnd(8)}${String(score.weeks).padStart(7)}${show(score.spearman, 4).padStart(11)}${show(score.meanAbsoluteRankError, 2).padStart(11)}`,
+      `${label(score).padEnd(width)}  ${score.column.padEnd(8)}${String(score.weeks).padStart(7)}` +
+      `${show(score.spearman, 4).padStart(11)}${show(score.meanAbsoluteRankError, 2).padStart(11)}`,
   );
   return [header, ...lines].join("\n");
 }

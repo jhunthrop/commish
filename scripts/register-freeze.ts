@@ -1,5 +1,6 @@
-// Takes one prospective-register freeze: writes down what the SERVED board and the three
-// benchmarks said about a week, before that week's first kickoff.
+// Takes one prospective-register freeze: writes down what EVERY tracked board (the served one and
+// each shadow, `register/sources.ts`) and the three benchmarks said about a week, before that week's
+// first kickoff.
 //
 // Run: npm run projections:register:freeze -- --season=2026 --week=1
 //
@@ -66,14 +67,27 @@ async function main(): Promise<void> {
     console.log(`register-freeze: ${season} week ${week}`);
     console.log(`  frozen at   ${result.frozenAt.toISOString()}`);
     console.log(`  kickoff     ${result.kickoff.toISOString()} (${((result.kickoff.getTime() - result.frozenAt.getTime()) / 3_600_000).toFixed(1)}h away)`);
-    console.log(`  board as-of ${result.boardAsOf.toISOString()}`);
-    console.log(`  rows        ${result.rows.length}`);
-    console.log(`  coverage    ${formatCoverage(result.coverage)}`);
-    console.log("");
-    const top = [...result.rows].sort((a, b) => a.boardRank - b.boardRank).slice(0, SHOWN_ROWS);
-    const names = await namesFor(db, top.map((row) => row.playerId));
-    console.log(`${"rank".padStart(6)}${"  player".padEnd(26)}${"points".padStart(9)}${"adp".padStart(8)}${"ecr".padStart(8)}${"props".padStart(9)}`);
-    for (const row of top) console.log(line(row, names.get(row.playerId) ?? row.playerId));
+    console.log(`  rows        ${result.rows.length} across ${result.boards.length} board(s)`);
+
+    // EVERY BOARD, PRINTED IN FULL. A shadow whose stance is never shown is a shadow nobody checks,
+    // and the top-ten block is the check an operator can make with their own eyes.
+    const names = await namesFor(
+      db,
+      result.boards.flatMap((board) => [...board.rows].sort((a, b) => a.boardRank - b.boardRank).slice(0, SHOWN_ROWS)).map((row) => row.playerId),
+    );
+    for (const board of result.boards) {
+      console.log("");
+      console.log(`  ${board.source} [${board.role}]`);
+      console.log(`    board as-of ${board.boardAsOf === null ? "(no rows)" : board.boardAsOf.toISOString()}`);
+      console.log(`    rows        ${board.rows.length}`);
+      console.log(`    coverage    ${formatCoverage(board.coverage)}`);
+      if (board.rows.length === 0) continue;
+      console.log("");
+      console.log(`${"rank".padStart(6)}${"  player".padEnd(26)}${"points".padStart(9)}${"adp".padStart(8)}${"ecr".padStart(8)}${"props".padStart(9)}`);
+      for (const row of [...board.rows].sort((a, b) => a.boardRank - b.boardRank).slice(0, SHOWN_ROWS)) {
+        console.log(line(row, names.get(row.playerId) ?? row.playerId));
+      }
+    }
   } finally {
     await db.$client.end();
   }

@@ -2,15 +2,16 @@ import type { Db } from "@/db/client";
 import type { Clock } from "@/domain/timing";
 import type { JsonObject } from "@/domain/audit";
 import { kickoffInstantsByWeek } from "../team-store";
-import { BOARD_SOURCE, preseasonProjectionsAsOf } from "../preseason/board-store";
+import { preseasonProjectionsAsOf } from "../preseason/board-store";
 import { BENCHMARK_SOURCES } from "../preseason/benchmarks";
 import { preseasonRankingsAsOf } from "../preseason/store";
 import { weekPropsConsensus, type WeekWindow } from "./props";
+import { REGISTER_BOARD_SOURCES, SERVED_BOARD_SOURCE, type RegisterBoardRole } from "./sources";
 import { recordFreezeRows, REGISTER_COLUMNS, type RegisterColumn, type RegisterFreezeRow } from "./store";
 
 /**
- * TAKING A FREEZE — writing down what four opinions said about a week, before the week could say
- * anything back.
+ * TAKING A FREEZE — writing down what every tracked board and the three benchmarks said about a
+ * week, before the week could say anything back.
  *
  * THE REFUSAL IS THE FEATURE. A freeze taken at or after this week's first kickoff is not a
  * prospective claim; it is a claim made by somebody who could already see a scoreboard, and the
@@ -24,16 +25,26 @@ import { recordFreezeRows, REGISTER_COLUMNS, type RegisterColumn, type RegisterF
  * freeze after the season's opening night. `kickoffInstantsByWeek` is that same query generalised
  * across weeks, and this reads THIS week's own instant out of it.
  *
- * THE BOARD COLUMN IS A READ OF THE PRODUCT, NEVER A RECOMPUTE. `preseasonProjectionsAsOf` under
- * `BOARD_SOURCE` is exactly the call the drafts-players route and the player screen make, so the
+ * THE BOARD COLUMN IS A READ OF THE PRODUCT, NEVER A RECOMPUTE. `preseasonProjectionsAsOf` under a
+ * board's own source is exactly the call the drafts-players route and the player screen make, so the
  * points and ranks this freezes are the ones a manager could actually have been shown. Rebuilding
- * the board here would freeze a number nobody was served — and on this tree it would freeze a
- * DIFFERENT number, because the fit round's frozen-state ruling holds the served rows at the v7
- * configuration while every fitted file here is v9. The register must record the claim, not
- * reproduce the claimant.
+ * the board here would freeze a number nobody was served, and for the SHADOW board it would freeze a
+ * number nobody could serve: v7's stored rows are the last artefact of a configuration this tree
+ * cannot reproduce. The register must record the claim, not reproduce the claimant.
+ *
+ * EVERY TRACKED BOARD, ONE INSTANT (the dual-track ruling, Round D). `register/sources.ts` names the
+ * served board and each shadow; this freezes all of them at the same moment, off the same read path,
+ * against the same three benchmarks. Taking them at DIFFERENT instants would make the comparison the
+ * dual track exists for unfalsifiable — the later board would have seen a day more of injury news —
+ * so the loop is inside one clock read and one transaction, never one call per board.
+ *
+ * THE SERVED BOARD IS LOAD-BEARING AND A SHADOW IS NOT. An empty served board is a refusal: there is
+ * no claim to freeze and the product is broken. An empty shadow is REPORTED and the freeze proceeds,
+ * because a shadow going quiet is a fact about a diagnostic track and must not cost the season its
+ * week-1 claim.
  *
  * THE FREEZE INSTANT IS THE INJECTED CLOCK, and it is also the `as_of` bound every read below is
- * taken at. One instant, used for the refusal, for the board read, for both ranking reads, for the
+ * taken at. One instant, used for the refusal, for every board read, for both ranking reads, for the
  * props window and as the row's own identity: a freeze that read its benchmarks at a different
  * moment from its board would be a claim nobody ever actually held.
  */
@@ -47,6 +58,17 @@ export interface FreezeRequest {
  *  benchmark whose feed went quiet looks exactly like a benchmark nobody had an opinion in. */
 export type FreezeCoverage = Readonly<Record<RegisterColumn, number>>;
 
+/** What one tracked board contributed to one freeze. */
+export interface FreezeBoard {
+  readonly source: string;
+  readonly role: RegisterBoardRole;
+  /** The stamp THIS board carried, which is NOT the freeze instant and differs between boards: a
+   *  shadow's stamp is however old its last persist was. `null` only when the board is empty. */
+  readonly boardAsOf: Date | null;
+  readonly rows: readonly RegisterFreezeRow[];
+  readonly coverage: FreezeCoverage;
+}
+
 export interface FreezeResult {
   readonly season: number;
   readonly week: number;
@@ -54,10 +76,13 @@ export interface FreezeResult {
   readonly frozenAt: Date;
   /** This week's own first kickoff, the bound the freeze had to beat. */
   readonly kickoff: Date;
-  /** The stamp the served board carried, which is NOT the freeze instant. */
-  readonly boardAsOf: Date;
+  /** Every tracked board's contribution, served first, in `REGISTER_BOARD_SOURCES` order. */
+  readonly boards: readonly FreezeBoard[];
+  /** The served board's own entry, the one the product actually showed. Always present and always
+   *  non-empty — `takeFreeze` refuses otherwise. */
+  readonly served: FreezeBoard;
+  /** Every row this freeze wrote, across every board. */
   readonly rows: readonly RegisterFreezeRow[];
-  readonly coverage: FreezeCoverage;
 }
 
 /**
@@ -107,13 +132,9 @@ export async function takeFreeze(db: Db, { season, week }: FreezeRequest, clock:
     );
   }
 
-  const board = await preseasonProjectionsAsOf(db, { season, source: BOARD_SOURCE, asOf: frozenAt });
-  if (board.length === 0) {
-    throw new Error(
-      `The served board ("${BOARD_SOURCE}") holds no ${season} rows at or before ${frozenAt.toISOString()}, so there is no claim to freeze. Run \`npm run projections:preseason:persist\` first.`,
-    );
-  }
-
+  // The three benchmarks are read ONCE and shared by every board. They are the same three opinions
+  // whichever board is being compared against them, and reading them per board would be three
+  // identical queries whose results could not differ.
   const [adp, ecr, props] = await Promise.all([
     preseasonRankingsAsOf(db, { season, source: BENCHMARK_SOURCES.adp, asOf: frozenAt }),
     preseasonRankingsAsOf(db, { season, source: BENCHMARK_SOURCES.ecr, asOf: frozenAt }),
@@ -122,40 +143,51 @@ export async function takeFreeze(db: Db, { season, week }: FreezeRequest, clock:
   const adpByPlayer = rankMapFor(adp);
   const ecrByPlayer = rankMapFor(ecr);
 
-  const rows: readonly RegisterFreezeRow[] = board.map((entry) => {
-    const stance = props.get(entry.playerId);
-    return {
-      season,
-      week,
-      frozenAt,
-      playerId: entry.playerId,
-      boardSource: entry.source,
-      boardAsOf: entry.asOf,
-      boardPoints: entry.projectedPoints,
-      boardRank: entry.rank,
-      boardValueRank: entry.valueRank,
-      adpRank: adpByPlayer.get(entry.playerId) ?? null,
-      ecrRank: ecrByPlayer.get(entry.playerId) ?? null,
-      propsPoints: stance?.points ?? null,
-      propsMarkets: stance === undefined ? null : ({ ...stance.markets } as JsonObject),
-    };
-  });
+  const boards: readonly FreezeBoard[] = await Promise.all(
+    REGISTER_BOARD_SOURCES.map(async ({ source, role }): Promise<FreezeBoard> => {
+      const board = await preseasonProjectionsAsOf(db, { season, source, asOf: frozenAt });
+      const rows: readonly RegisterFreezeRow[] = board.map((entry) => {
+        const stance = props.get(entry.playerId);
+        return {
+          season,
+          week,
+          frozenAt,
+          playerId: entry.playerId,
+          boardSource: entry.source,
+          boardAsOf: entry.asOf,
+          boardPoints: entry.projectedPoints,
+          boardRank: entry.rank,
+          boardValueRank: entry.valueRank,
+          adpRank: adpByPlayer.get(entry.playerId) ?? null,
+          ecrRank: ecrByPlayer.get(entry.playerId) ?? null,
+          propsPoints: stance?.points ?? null,
+          propsMarkets: stance === undefined ? null : ({ ...stance.markets } as JsonObject),
+        };
+      });
+      // Every row of one `preseasonProjectionsAsOf` read carries the same board stamp.
+      return { source, role, boardAsOf: rows[0]?.boardAsOf ?? null, rows, coverage: coverageOf(rows) };
+    }),
+  );
 
+  const served = boards.find((board) => board.role === "served");
+  if (served === undefined) {
+    throw new Error(
+      "register/sources.ts lists no board with the `served` role, so this freeze has no claim about the product to record. " +
+        "A shadow-only register is a comparison of two boards nobody was shown.",
+    );
+  }
+  if (served.rows.length === 0) {
+    throw new Error(
+      `The served board ("${SERVED_BOARD_SOURCE}") holds no ${season} rows at or before ${frozenAt.toISOString()}, so there is no claim to freeze. Run \`npm run projections:preseason:persist\` first.`,
+    );
+  }
+
+  const rows = boards.flatMap((board) => board.rows);
   await db.transaction(async (tx) => {
     await recordFreezeRows(tx, rows);
   });
 
-  return {
-    season,
-    week,
-    frozenAt,
-    kickoff,
-    // Every row of one `preseasonProjectionsAsOf` read carries the same board stamp; the board is
-    // non-empty by the guard above, so this is always a real value.
-    boardAsOf: rows[0]!.boardAsOf,
-    rows,
-    coverage: coverageOf(rows),
-  };
+  return { season, week, frozenAt, kickoff, boards, served, rows };
 }
 
 /** The coverage report, one line, in `REGISTER_COLUMNS` order. Shared by the operator script and

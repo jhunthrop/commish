@@ -20,7 +20,8 @@ import type { Db, ReadonlyDb } from "@/db/client";
 import type { Clock } from "@/domain/timing";
 import { formatCoverage, takeFreeze } from "@/projections/register/freeze";
 import { formatScoreboard, gradableWeeksFor, gradeWeek, latestGradeRowsByWeek, runningScoreboard, type CumulativeScore } from "@/projections/register/grade";
-import { freezeRowsAt, gradeRowsFor, latestFreezeFor, REGISTER_COLUMNS } from "@/projections/register/store";
+import { freezeRowsAt, gradeRowsFor, latestFreezeFor } from "@/projections/register/store";
+import { SERVED_BOARD_SOURCE } from "@/projections/register/sources";
 import { kickoffInstantsByWeek } from "@/projections/team-store";
 
 export type StepStatus = "ok" | "skipped" | "failed";
@@ -190,7 +191,11 @@ export async function gradeStep(deps: SeasonWeekDeps, options: SeasonWeekOptions
     try {
       const grade = await gradeWeek(deps.db, { season: options.season, week }, deps.clock);
       gradedCount += 1;
-      detail.push(`week ${week}: graded ${grade.population} player(s)`);
+      // Per BOARD, not one number: "graded 546 player(s)" over a dual-track freeze hides which of
+      // the two boards that was, and a shadow that silently stopped grading would look like nothing.
+      const boards = grade.boards.map((board) => `${board.boardSource}=${board.population}`).join(" ");
+      const skipped = grade.skipped.map((board) => ` SKIPPED ${board.boardSource}`).join("");
+      detail.push(`week ${week}: graded ${boards}${skipped}`);
     } catch (error: unknown) {
       detail.push(`week ${week}: SKIPPED (${error instanceof Error ? error.message : String(error)})`);
     }
@@ -266,17 +271,28 @@ export async function freezeStep(deps: SeasonWeekDeps, options: SeasonWeekOption
     status: "ok",
     summary:
       `${existing === null ? "froze" : "superseded"} week ${week} at ${result.frozenAt.toISOString()} ` +
-      `(${result.rows.length} rows, coverage ${formatCoverage(result.coverage)})`,
-    detail: [],
+      `(${result.rows.length} rows across ${result.boards.length} board(s))`,
+    // One line per board, coverage and all: the summary carries the total because that is what an
+    // operator scanning five step lines needs, and the detail carries which board said what.
+    detail: result.boards.map(
+      (board) => `${board.source} [${board.role}]: ${board.rows.length} rows, coverage ${formatCoverage(board.coverage)}`,
+    ),
   };
 }
 
 /** Distinct players graded in each week's LATEST grading — the population line the brief asks the
  *  scoreboard step to print, read through `latestGradeRowsByWeek` so it can never disagree with the
- *  cumulative scoreboard about which grading of a week counts. */
+ *  cumulative scoreboard about which grading of a week counts.
+ *
+ *  SCOPED TO THE SERVED BOARD. A dual-track grading writes one row set per board, so counting rows
+ *  outright would report roughly double the players a week actually graded. "Population" here has
+ *  always meant the product's own graded universe, and the shadow's own count is on the scoreboard
+ *  beside its score. */
 async function perWeekPopulation(db: ReadonlyDb, season: number): Promise<ReadonlyMap<number, number>> {
   const byWeek = latestGradeRowsByWeek(await gradeRowsFor(db, season));
-  return new Map([...byWeek.entries()].map(([week, rows]) => [week, rows.length]));
+  return new Map(
+    [...byWeek.entries()].map(([week, rows]) => [week, rows.filter((row) => row.boardSource === SERVED_BOARD_SOURCE).length]),
+  );
 }
 
 /** STEP 5 — the running scoreboard, read fresh (never mutates anything), so it reflects whatever
@@ -295,7 +311,7 @@ export async function scoreboardStep(deps: SeasonWeekDeps, options: SeasonWeekOp
   return {
     step: "scoreboard",
     status: "ok",
-    summary: `season ${options.season} running scoreboard (${REGISTER_COLUMNS.length} columns)`,
+    summary: `season ${options.season} running scoreboard`,
     detail: [`per-week population: ${populationLine}`, "", ...formatScoreboard(scores).split("\n")],
   };
 }

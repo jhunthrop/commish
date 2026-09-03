@@ -2522,8 +2522,15 @@ export const registerFreezeRows = pgTable(
     playerId: text("player_id")
       .notNull()
       .references(() => nflPlayers.id, { onDelete: "restrict" }),
-    /** Which board was being SERVED at the freeze — `BOARD_SOURCE`'s value, stored rather than
-     *  assumed, so a row taken under v7 stays readable after the 2027 round bumps the constant. */
+    /** WHICH BOARD THIS ROW IS THE CLAIM OF — a value from `register/sources.ts`'s
+     *  `REGISTER_BOARD_SOURCES`, stored rather than assumed, so a row stays readable after a round
+     *  bumps whichever constant produced it.
+     *
+     *  PART OF THE ROW'S IDENTITY SINCE THE DUAL-TRACK RULING (Round D). One freeze instant now
+     *  records EVERY tracked board's claim — the served one and each shadow — so `(season, week,
+     *  frozen_at, player_id)` names a player twice at one instant and only this column tells the two
+     *  apart. It is in the unique index below for that reason, and the register's no-update rule
+     *  means a collision on it is still two different answers claimed for one board at one instant. */
     boardSource: text("board_source").notNull(),
     /** The stamp the served board row itself carried — the board's own moment, not the freeze's. */
     boardAsOf: timestamp("board_as_of", { withTimezone: true }).notNull(),
@@ -2544,8 +2551,9 @@ export const registerFreezeRows = pgTable(
     propsMarkets: jsonb("props_markets").$type<JsonObject>(),
   },
   (t) => [
-    /** One row per player per freeze — see the table doc: this index IS the immutability rule. */
-    uniqueIndex("register_freeze_rows_fact_idx").on(t.season, t.week, t.frozenAt, t.playerId),
+    /** One row per player per BOARD per freeze — see the table doc: this index IS the immutability
+     *  rule, and `board_source` is in it because one instant carries every tracked board's claim. */
+    uniqueIndex("register_freeze_rows_fact_idx").on(t.season, t.week, t.frozenAt, t.boardSource, t.playerId),
     /** The read grading performs: one week's freezes, latest first. */
     index("register_freeze_rows_week_idx").on(t.season, t.week, t.frozenAt),
   ],
@@ -2581,6 +2589,10 @@ export const registerGradeRows = pgTable(
     frozenAt: timestamp("frozen_at", { withTimezone: true }).notNull(),
     /** When this grading ran, and the point-in-time bound its outcome read was taken at. */
     gradedAt: timestamp("graded_at", { withTimezone: true }).notNull(),
+    /** Which board's claim was graded — the matching `register_freeze_rows.board_source`. One
+     *  grading run scores every board the freeze recorded, so this is part of the identity for the
+     *  same reason it is over there: without it, two boards' verdicts on one player collide. */
+    boardSource: text("board_source").notNull(),
     playerId: text("player_id")
       .notNull()
       .references(() => nflPlayers.id, { onDelete: "restrict" }),
@@ -2598,7 +2610,7 @@ export const registerGradeRows = pgTable(
     propsRank: integer("props_rank"),
   },
   (t) => [
-    uniqueIndex("register_grade_rows_fact_idx").on(t.season, t.week, t.frozenAt, t.gradedAt, t.playerId),
+    uniqueIndex("register_grade_rows_fact_idx").on(t.season, t.week, t.frozenAt, t.gradedAt, t.boardSource, t.playerId),
     /** The read the running scoreboard performs: a whole season's gradings. */
     index("register_grade_rows_season_idx").on(t.season, t.week, t.gradedAt),
   ],

@@ -5,14 +5,15 @@ import { recordNflPlayers } from "../universe";
 import type { NflPlayerRow } from "../nflverse/players";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { recordTeamObservations } from "../team-store";
-import { BOARD_SOURCE, projectionRows, recordPreseasonProjections } from "../preseason/board-store";
+import { BOARD_SOURCE, BOARD_SOURCE_V7_SHADOW, projectionRows, recordPreseasonProjections } from "../preseason/board-store";
 import type { BoardEntry } from "../preseason/board";
 import { BENCHMARK_SOURCES } from "../preseason/benchmarks";
 import { recordPreseasonRankings } from "../preseason/store";
 import { recordPropObservations, type PlayerPropObservation } from "../odds/props-store";
 import { recordPropPlayerMap } from "../odds/player-map";
 import { takeFreeze } from "./freeze";
-import { freezeInstantsFor, freezeRowsAt, latestFreezeFor } from "./store";
+import { REGISTER_BOARD_SOURCES } from "./sources";
+import { freezeBoardSourcesAt, freezeInstantsFor, freezeRowsAt, latestFreezeFor } from "./store";
 
 /**
  * THE FREEZE IS THE WHOLE POINT OF THE REGISTER, so these tests are about the two properties that
@@ -26,6 +27,7 @@ const SEASON = 2026;
 const WEEK_1_KICKOFF = new Date("2026-09-10T00:20:00.000Z");
 const WEEK_2_KICKOFF = new Date("2026-09-18T00:15:00.000Z");
 const BOARD_AS_OF = new Date("2026-09-02T03:20:39.210Z");
+const SHADOW_AS_OF = new Date("2026-09-01T11:00:00.000Z");
 
 const CHASE = "00-0036900";
 const LAMB = "00-0036322";
@@ -107,6 +109,20 @@ async function seedBoard(): Promise<void> {
       season: SEASON,
       source: BOARD_SOURCE,
       asOf: BOARD_AS_OF,
+      momentKind: "live",
+    }),
+  );
+}
+
+/** The shadow board: the same three players, priced DIFFERENTLY and stamped EARLIER, because those
+ *  are the two ways a shadow actually differs from the served board in the store. */
+async function seedShadowBoard(): Promise<void> {
+  await recordPreseasonProjections(
+    db,
+    projectionRows([entry(CHASE, 300.1, 2), entry(LAMB, 310.9, 1), entry(HURTS, 250.0, 3)], {
+      season: SEASON,
+      source: BOARD_SOURCE_V7_SHADOW,
+      asOf: SHADOW_AS_OF,
       momentKind: "live",
     }),
   );
@@ -223,8 +239,8 @@ describe("takeFreeze — the kickoff refusal", () => {
 describe("takeFreeze — the board column reads what the product serves", () => {
   it("carries the served board's own points, ranks, source and stamp onto every row", async () => {
     await seedAll();
-    const { rows, boardAsOf } = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
-    expect(boardAsOf.toISOString()).toBe(BOARD_AS_OF.toISOString());
+    const { rows, served } = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
+    expect(served.boardAsOf?.toISOString()).toBe(BOARD_AS_OF.toISOString());
     const chase = rows.find((row) => row.playerId === CHASE);
     expect(chase?.boardSource).toBe(BOARD_SOURCE);
     expect(chase?.boardPoints).toBeCloseTo(326.4, 6);
@@ -232,9 +248,15 @@ describe("takeFreeze — the board column reads what the product serves", () => 
     expect(chase?.boardAsOf.toISOString()).toBe(BOARD_AS_OF.toISOString());
   });
 
-  it("writes no row under any board source but the served one", async () => {
+  it("writes no row under a board source the register does not track", async () => {
     await seedAll();
+    await recordPreseasonProjections(
+      db,
+      projectionRows([entry(CHASE, 1.0, 1)], { season: SEASON, source: "some_untracked_board_ppr_12", asOf: BOARD_AS_OF, momentKind: "live" }),
+    );
     const { rows } = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
+    // Only the served board has rows in this fixture; the shadow is empty, and the untracked board
+    // is not consulted at all.
     expect(new Set(rows.map((row) => row.boardSource))).toEqual(new Set([BOARD_SOURCE]));
   });
 });
@@ -289,8 +311,8 @@ describe("takeFreeze — the tri-state benchmark columns", () => {
 
   it("reports coverage counts per column so a freeze with a dead feed is visible, not silent", async () => {
     await seedAll();
-    const { coverage } = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
-    expect(coverage).toEqual({ board: 3, adp: 2, ecr: 2, props: 1 });
+    const { served } = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
+    expect(served.coverage).toEqual({ board: 3, adp: 2, ecr: 2, props: 1 });
   });
 });
 
@@ -350,5 +372,112 @@ describe("takeFreeze — the archive is immutable and append-only", () => {
     await expect(takeFreeze(db, { season: SEASON, week: 1 }, at)).rejects.toThrow();
     const rows = await freezeRowsAt(db, { season: SEASON, week: 1, frozenAt: new Date("2026-09-08T12:00:00.000Z") });
     expect(rows).toHaveLength(3);
+  });
+});
+
+/**
+ * THE DUAL TRACK (Round D). The register records the SERVED board and every SHADOW at one instant,
+ * so 2026 answers head-to-head a comparison the fit round could not make without spending its
+ * held-out season. These tests are about the three properties that make the comparison mean
+ * anything: both boards are read at the SAME moment, each keeps its OWN stamp and numbers, and the
+ * served board is load-bearing in a way a shadow is not.
+ */
+describe("takeFreeze — the dual track", () => {
+  it("records EVERY tracked board at one instant, the served one and the shadow alike", async () => {
+    await seedAll();
+    await seedShadowBoard();
+    const result = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
+
+    expect(result.boards.map((board) => board.source)).toEqual(REGISTER_BOARD_SOURCES.map((tracked) => tracked.source));
+    expect(result.boards.map((board) => board.role)).toEqual(["served", "shadow"]);
+    expect(result.rows).toHaveLength(6);
+    expect(new Set(result.rows.map((row) => row.frozenAt.toISOString()))).toEqual(
+      new Set(["2026-09-08T12:00:00.000Z"]),
+    );
+    expect(await freezeBoardSourcesAt(db, { season: SEASON, week: 1, frozenAt: result.frozenAt })).toEqual(
+      [BOARD_SOURCE_V7_SHADOW, BOARD_SOURCE].sort(),
+    );
+  });
+
+  it("keeps each board's OWN points, ranks and stamp — a shadow is read, never recomputed", async () => {
+    await seedAll();
+    await seedShadowBoard();
+    const { boards } = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
+    const [servedBoard, shadow] = boards;
+
+    expect(servedBoard!.boardAsOf?.toISOString()).toBe(BOARD_AS_OF.toISOString());
+    expect(shadow!.boardAsOf?.toISOString()).toBe(SHADOW_AS_OF.toISOString());
+
+    const servedChase = servedBoard!.rows.find((row) => row.playerId === CHASE);
+    const shadowChase = shadow!.rows.find((row) => row.playerId === CHASE);
+    expect(servedChase?.boardPoints).toBeCloseTo(326.4, 6);
+    expect(servedChase?.boardRank).toBe(1);
+    expect(shadowChase?.boardPoints).toBeCloseTo(300.1, 6);
+    expect(shadowChase?.boardRank).toBe(2);
+  });
+
+  it("gives both boards the SAME three benchmarks, because they are the same three opinions", async () => {
+    await seedAll();
+    await seedShadowBoard();
+    const { boards } = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
+    for (const board of boards) {
+      const chase = board.rows.find((row) => row.playerId === CHASE);
+      expect(chase?.adpRank).toBeCloseTo(1.4, 6);
+      expect(chase?.ecrRank).toBe(2);
+      expect(chase?.propsPoints).toBeCloseTo(12.55, 6);
+      expect(board.coverage).toEqual({ board: 3, adp: 2, ecr: 2, props: 1 });
+    }
+  });
+
+  it("stores one player TWICE at one instant, which only board_source tells apart", async () => {
+    await seedAll();
+    await seedShadowBoard();
+    const result = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
+    const key = { season: SEASON, week: 1, frozenAt: result.frozenAt };
+
+    const chaseRows = (await freezeRowsAt(db, key)).filter((row) => row.playerId === CHASE);
+    expect(chaseRows).toHaveLength(2);
+    expect(chaseRows.map((row) => row.boardSource).sort()).toEqual([BOARD_SOURCE_V7_SHADOW, BOARD_SOURCE].sort());
+
+    // And a reader that means ONE board says so, rather than getting both and hoping.
+    expect(await freezeRowsAt(db, key, BOARD_SOURCE)).toHaveLength(3);
+    expect(await freezeRowsAt(db, key, BOARD_SOURCE_V7_SHADOW)).toHaveLength(3);
+  });
+
+  it("an EMPTY SHADOW is reported and the freeze proceeds — a diagnostic track cannot cost the week", async () => {
+    await seedAll();
+    const result = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
+    const shadow = result.boards.find((board) => board.role === "shadow");
+    expect(shadow?.rows).toHaveLength(0);
+    expect(shadow?.boardAsOf).toBeNull();
+    expect(shadow?.coverage).toEqual({ board: 0, adp: 0, ecr: 0, props: 0 });
+    expect(result.rows).toHaveLength(3);
+  });
+
+  it("an EMPTY SERVED BOARD still refuses, even when the shadow is full", async () => {
+    await seedUniverse();
+    await seedKickoffs();
+    await seedBenchmarks();
+    await seedShadowBoard();
+    await expect(takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"))).rejects.toThrow(
+      /served board/i,
+    );
+    // And it refuses BEFORE writing: the shadow's rows must not survive a refused freeze.
+    expect(await freezeInstantsFor(db, SEASON, 1)).toEqual([]);
+  });
+
+  it("cannot see a shadow generation persisted AFTER the freeze instant", async () => {
+    await seedAll();
+    await recordPreseasonProjections(
+      db,
+      projectionRows([entry(CHASE, 999.9, 1)], {
+        season: SEASON,
+        source: BOARD_SOURCE_V7_SHADOW,
+        asOf: new Date("2026-09-09T00:00:00.000Z"),
+        momentKind: "live",
+      }),
+    );
+    const { boards } = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
+    expect(boards.find((board) => board.role === "shadow")?.rows).toHaveLength(0);
   });
 });

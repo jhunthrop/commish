@@ -470,6 +470,13 @@
       "when": 1788376806890,
       "tag": "0066_rainy_human_torch",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1788396795016,
+      "tag": "0067_opposite_blacklash",
+      "breakpoints": true
     }
   ]
 }

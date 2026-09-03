@@ -126,10 +126,13 @@ STEPS, IN ORDER
                      carrying a grade is skipped, not re-graded -- see \`--week\` on
                      \`projections:register:grade\` for an explicit re-grade after a correction).
   4. freeze          freezes the current week (the soonest week whose kickoff has not happened yet)
-                     if it is still strictly before that kickoff. A week already frozen this run
-                     SKIPS, citing the existing freeze's instant, unless --refreeze is passed, in
-                     which case a new freeze is taken (a supersede, never an overwrite).
-  5. scoreboard      prints the season's running scoreboard, plus each graded week's population.
+                     if it is still strictly before that kickoff. EVERY tracked board is recorded at
+                     the one instant -- the served one and each shadow -- and the step prints a line
+                     per board. A week already frozen this run SKIPS, citing the existing freeze's
+                     instant, unless --refreeze is passed, in which case a new freeze is taken (a
+                     supersede, never an overwrite).
+  5. scoreboard      prints the season's running scoreboard, one line per board and column, plus
+                     each graded week's population.
 
 FLAGS
   --dry-run          walks all five steps and prints what WOULD happen; makes no network calls and
@@ -177,7 +180,8 @@ WHEN A STEP REPORTS "failed"
   freeze         "already frozen at <instant>" is the expected skip on every pass after the first
                  that reaches a given week -- not a failure. A "failed" status here means the
                  refusal fired for cause: either the week's kickoff has already passed (nothing to
-                 do until next week) or the served board is empty (check
+                 do until next week) or the SERVED board is empty -- an empty shadow is reported in
+                 the step's detail lines and never a failure (check
                  \`npm run projections:preseason:persist\` has been run for this season).
   scoreboard     A read-only step; a failure here means the database connection itself dropped
                  mid-run. Re-run once it is back.

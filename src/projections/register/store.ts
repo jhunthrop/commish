@@ -22,8 +22,8 @@ import type { ScoringRules } from "@/scoring/compute";
  */
 
 /**
- * THE REGISTER'S OWN SCORING RULES — twelve-team PPR, matching the format `BOARD_SOURCE` names in
- * its own value (`commish_board_v7_ppr_12`).
+ * THE REGISTER'S OWN SCORING RULES — twelve-team PPR, matching the format every source in
+ * `register/sources.ts` names in its own value (`..._ppr_12`), served and shadow alike.
  *
  * Named here rather than passed in by each caller, because the four columns are only comparable to
  * each other if all four are priced by the SAME rules: the board's points were composed under PPR,
@@ -58,12 +58,15 @@ export interface RegisterFreezeRow {
   readonly propsMarkets: JsonObject | null;
 }
 
-/** One player's outcome for one week, and where each column had placed him. */
+/** One player's outcome for one week, and where each column had placed him — for ONE of the boards
+ *  the freeze recorded. */
 export interface RegisterGradeRow {
   readonly season: number;
   readonly week: number;
   readonly frozenAt: Date;
   readonly gradedAt: Date;
+  /** The `RegisterFreezeRow.boardSource` these ranks were computed from. */
+  readonly boardSource: string;
   readonly playerId: string;
   readonly actualPoints: number;
   readonly actualRank: number;
@@ -105,6 +108,7 @@ const GRADE_COLUMNS = {
   week: registerGradeRows.week,
   frozenAt: registerGradeRows.frozenAt,
   gradedAt: registerGradeRows.gradedAt,
+  boardSource: registerGradeRows.boardSource,
   playerId: registerGradeRows.playerId,
   actualPoints: registerGradeRows.actualPoints,
   actualRank: registerGradeRows.actualRank,
@@ -143,8 +147,21 @@ export async function recordGradeRows(db: Db | DbTx, rows: readonly RegisterGrad
   return rows.length;
 }
 
-/** One exact freeze, in player-id order so anything computed from it is reproducible run to run. */
-export async function freezeRowsAt(db: ReadonlyDb, { season, week, frozenAt }: FreezeKey): Promise<readonly RegisterFreezeRow[]> {
+/**
+ * One exact freeze, in (board source, player id) order so anything computed from it is reproducible
+ * run to run.
+ *
+ * `boardSource` narrows to ONE board's claim; omitting it returns every board the instant recorded,
+ * which is what a caller counting "how big was this freeze" wants and what a caller GRADING a board
+ * must not have. Deliberately not defaulted to the served source: a reader that means one board has
+ * to say which, because "the served board" is a moving target across seasons and a stored freeze
+ * belongs to whichever board was served when it was taken.
+ */
+export async function freezeRowsAt(
+  db: ReadonlyDb,
+  { season, week, frozenAt }: FreezeKey,
+  boardSource?: string,
+): Promise<readonly RegisterFreezeRow[]> {
   return db
     .select(FREEZE_COLUMNS)
     .from(registerFreezeRows)
@@ -153,9 +170,33 @@ export async function freezeRowsAt(db: ReadonlyDb, { season, week, frozenAt }: F
         eq(registerFreezeRows.season, season),
         eq(registerFreezeRows.week, week),
         eq(registerFreezeRows.frozenAt, frozenAt),
+        ...(boardSource === undefined ? [] : [eq(registerFreezeRows.boardSource, boardSource)]),
       ),
     )
-    .orderBy(asc(registerFreezeRows.playerId));
+    .orderBy(asc(registerFreezeRows.boardSource), asc(registerFreezeRows.playerId));
+}
+
+/**
+ * Which boards one exact freeze recorded, in the order they were written.
+ *
+ * Read from the ROWS rather than assumed from `register/sources.ts`: grading has to score what a
+ * freeze actually holds, and a freeze taken before a source list changed holds what the list said
+ * then. A tracked board missing from this is a real fact about that week, not a lookup miss.
+ */
+export async function freezeBoardSourcesAt(db: ReadonlyDb, { season, week, frozenAt }: FreezeKey): Promise<readonly string[]> {
+  const rows = await db
+    .select({ boardSource: registerFreezeRows.boardSource })
+    .from(registerFreezeRows)
+    .where(
+      and(
+        eq(registerFreezeRows.season, season),
+        eq(registerFreezeRows.week, week),
+        eq(registerFreezeRows.frozenAt, frozenAt),
+      ),
+    )
+    .groupBy(registerFreezeRows.boardSource)
+    .orderBy(asc(registerFreezeRows.boardSource));
+  return rows.map((row) => row.boardSource);
 }
 
 /**
@@ -216,5 +257,10 @@ export async function gradeRowsFor(db: ReadonlyDb, season: number): Promise<read
     .select(GRADE_COLUMNS)
     .from(registerGradeRows)
     .where(eq(registerGradeRows.season, season))
-    .orderBy(asc(registerGradeRows.week), asc(registerGradeRows.gradedAt), asc(registerGradeRows.playerId));
+    .orderBy(
+      asc(registerGradeRows.week),
+      asc(registerGradeRows.gradedAt),
+      asc(registerGradeRows.boardSource),
+      asc(registerGradeRows.playerId),
+    );
 }

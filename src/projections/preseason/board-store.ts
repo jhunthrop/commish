@@ -241,8 +241,52 @@ export const BOARD_SOURCE_V1_RAW = "commish_board_v1_ppr_12";
  * never been scored on today's store, so "v7 clears and v9 does not" is not yet a like-for-like
  * comparison. Establishing that is a measurement the 2025-outcomes round should make FIRST, and it
  * costs another look at 2024, which is exactly why it needs to be planned rather than improvised.
+ *
+ * BUMPED TO v9 AND STAYING THERE (2026-09-02, the founder's SERVE-v9 ruling, Round D). The two
+ * reverts above left the tree in a state that could not be defended for a data year: the served rows
+ * were v7's and every fitted file was v9's, so the product served a board this tree could not
+ * reproduce, and the thing that surfaced it was a founder reading the board and finding an unsigned
+ * rookie still at value rank 1 — a number v9's corrected rookie curve had already fixed and the
+ * revert had put back.
+ *
+ * THE RULING, and what it is NOT. It is not a claim that v9 cleared the bar: it did not
+ * (+0.0979 [-0.0068, +0.2203]), that break stands on the record above, and the held-out ship gate
+ * returns intact for the 2027 launch. It is a ruling about which of two boards a USER-LESS 2026 data
+ * year should run on, which is a different question with a different answer. v9 carries three ruled
+ * corrections v7 does not — the crosswalk class fix, the 19-class rookie curve, the 90-law
+ * re-measurement with the suspects gated — and the year's whole product is a register of prospective
+ * claims. Serving the board with the known defects still in it, in order to honour a gate whose
+ * purpose is protecting users who do not exist yet, would spend the season measuring a board nobody
+ * intends to ship.
+ *
+ * AND IT MAKES THE TREE HONEST AGAIN: the code IS the v9 configuration, so a persist under this name
+ * reproduces what is stored, `assertSingleGeneration` reads one generation, and the freeze below can
+ * stop protecting rows the tree cannot rebuild.
+ *
+ * v7 IS NOT DISCARDED. It becomes the SHADOW the register dual-tracks (`BOARD_SOURCE_V7_SHADOW`
+ * below): every weekly freeze records both boards' claims from the same read path at the same
+ * instant, and grading scores both. The comparison the fit round could not make on 2024 without
+ * spending the held-out season gets made prospectively on 2026 instead, at no cost to any gate.
  */
-export const BOARD_SOURCE = "commish_board_v7_ppr_12";
+export const BOARD_SOURCE = "commish_board_v9_ppr_12";
+
+/**
+ * THE PROTECTED PRIOR CHAMPION (Round D, the serve-v9 ruling).
+ *
+ * v7 is the configuration whose held-out verdict actually cleared, and its 546 stored 2026 rows are
+ * what the product served from the fit round's close until this ruling. Two things make it worth its
+ * own permanent named constant rather than a string in a list:
+ *
+ *   IT IS THE REGISTER'S SHADOW TRACK. `register/sources.ts` names it beside `BOARD_SOURCE`, and the
+ *   weekly freeze records BOTH from the same read path at the same instant, so 2026 grades the two
+ *   configurations head-to-head week by week.
+ *
+ *   THIS TREE CANNOT REBUILD IT. Every fitted file here is v9's. v7's rows are the last thing left
+ *   of that configuration, they are the shadow track's entire input, and a single live-arm write
+ *   under this name would delete them with nothing to fall back on. That is why it — and now only it
+ *   — is what `FROZEN_BOARD_SOURCES` protects.
+ */
+export const BOARD_SOURCE_V7_SHADOW = "commish_board_v7_ppr_12";
 
 /** One player's place on one board, as it was taken at one moment. */
 export interface PreseasonProjectionRow {
@@ -468,40 +512,55 @@ export async function deletePreseasonBoard(
 }
 
 /**
- * THE FROZEN SOURCES (fit-round final review, 2026-09-02): the board names no write may touch while
- * the frozen-state ruling stands.
+ * THE FROZEN SOURCES: the board names no write may touch.
  *
- * WHAT THE RULING IS. The fit round ended with two held-out bar breaks, so `BOARD_SOURCE` points
- * back at v7 (see its own docblock) while every fitted file on this tree is the v9 configuration.
- * The ledger's adjudication: the 2026 data year runs on the v7 configuration exactly as committed,
- * and ALL fitted-file regeneration belongs to the 2027 fit round. The store's v7 rows are therefore
- * the product, and this tree can no longer reproduce them.
- *
- * WHY A GUARD RATHER THAN A NOTE. `scripts/preseason-persist.ts` is one command away from destroying
- * them, and neither of its two paths would say a word:
+ * WHY A GUARD RATHER THAN A NOTE, unchanged since the fit round put one here.
+ * `scripts/preseason-persist.ts` is one command away from destroying a board it cannot rebuild, and
+ * neither of its two paths would say a word:
  *
  *   - THE LIVE PATH RETIRES BEFORE IT WRITES. `writePreseasonBoard`'s live arm deletes every row for
- *     `(season, source)` AT ANY STAMP and writes the fresh board in the same transaction. Run today
- *     against 2026, it would delete the 546 rows the product serves and replace them with rows this
- *     tree's constants produce, under v7's name. There is no second copy and no `as_of` to fall back
- *     to: the previous generation is gone.
+ *     `(season, source)` AT ANY STAMP and writes the fresh board in the same transaction. There is
+ *     no second copy and no `as_of` to fall back to: the previous generation is gone.
  *   - THE REPLAY PATH REWRITES REASONS WITH NO STAMP TO PROTECT THEM. `preseason_board_reasons`
  *     carries no `as_of` and is written with `onConflictDoUpdate`, so an archive re-run leaves the
  *     archived POINTS untouched (their unique key already exists) while silently replacing their
- *     EXPLANATIONS with the 87-law family's. The result is an archive whose reasons describe numbers
- *     it is not showing, which is the same silent-stale shape v2 through v5 each shipped once.
+ *     EXPLANATIONS. The result is an archive whose reasons describe numbers it is not showing, which
+ *     is the same silent-stale shape v2 through v5 each shipped once.
  *
- * THE GUARD IS WIDER THAN THE LIVE SEASON, deliberately. The live arm deletes by `(season, source)`,
- * so a live-moment write aimed at an ARCHIVE season under a frozen name would delete that archive
- * outright. Nothing legitimate needs any write under a served name while the freeze stands, so the
- * guard does not try to tell the cases apart.
+ * RE-ADJUDICATED (Round D, the serve-v9 ruling). The set was `{ BOARD_SOURCE, BOARD_SOURCE_V1_RAW }`
+ * under a premise that no longer holds: that the served rows and this tree's fitted files were
+ * DIFFERENT configurations, so any write would replace measured rows with numbers no stored board
+ * was measured on. Serving v9 removes that premise, and the set is re-derived from the one test that
+ * ever justified it — CAN THIS TREE REBUILD WHAT IS STORED? — asked of each name in turn rather than
+ * carried over by habit:
+ *
+ *   - `BOARD_SOURCE` (v9): NOT FROZEN, and this is the substantive change. The code IS the v9
+ *     configuration, so a persist under this name reproduces the rows it replaces. The two dangers
+ *     above both reduce to "a write puts something else there", and here there is no something else.
+ *     It also has to be writable for the year to function at all: 2026 is a LIVE season whose board
+ *     legitimately moves as depth charts and ADP move, and a frozen served source would mean the
+ *     data year could never re-take its own board.
+ *
+ *   - `BOARD_SOURCE_V7_SHADOW` (v7): FROZEN, and now the only entry. Its rows are the last remaining
+ *     artefact of a configuration this tree cannot reproduce, and the register's shadow track reads
+ *     them every week. This is exactly the case the guard was built for, and it is the reason the
+ *     set must never simply be emptied when a served name changes.
+ *
+ *   - `BOARD_SOURCE_V1_RAW` (v1 raw): NOT FROZEN, on the same evidence rather than on convenience.
+ *     Its stored rows on EVERY season are already this tree's own output — the fit round's last
+ *     persist wrote them from the v9-era fitted files (2026 live at 2026-09-02T17:56:09Z; the
+ *     archives at the post-crosswalk-fix universe, 675/706/666/664, which the pre-fix v2-v7 boards
+ *     do not share). So the rebuild test passes, and freezing it would protect nothing while
+ *     breaking something real: `persistSeason` writes v1 raw in the SAME call as `BOARD_SOURCE`, so
+ *     a frozen v1 would refuse every legitimate v9 persist on its second leg. Verified rather than
+ *     asserted: re-persisting 2026 reproduced all 546 v1 rows value-for-value.
  *
  * HOW IT LIFTS. `writePreseasonBoard`'s `unfrozen` option, reachable only through the persist
- * script's `--unfreeze` flag, which prints what it is overriding. The 2027 fit round will bump
- * `BOARD_SOURCE` to a fresh name, at which point these two constants name boards nobody serves and
- * this set should be re-pointed at whatever the new served names are, never simply emptied.
+ * script's `--unfreeze` flag, which prints what it is overriding. When the 2027 fit round bumps
+ * `BOARD_SOURCE` to a fresh name, the name it bumps AWAY from joins this set — a board that was
+ * served and can no longer be rebuilt is precisely what belongs here.
  */
-export const FROZEN_BOARD_SOURCES: ReadonlySet<string> = new Set([BOARD_SOURCE, BOARD_SOURCE_V1_RAW]);
+export const FROZEN_BOARD_SOURCES: ReadonlySet<string> = new Set([BOARD_SOURCE_V7_SHADOW]);
 
 /** Options every write path shares. Separate from the stamp because this is a property of the RUN,
  *  never of the board being written. */
@@ -520,10 +579,10 @@ function assertNotFrozen(stamp: PreseasonProjectionStamp, { unfrozen = false }: 
   if (unfrozen || !FROZEN_BOARD_SOURCES.has(stamp.source)) return;
   throw new Error(
     `"${stamp.source}" is a FROZEN board source and this ${stamp.momentKind} write for ${stamp.season} is refused. ` +
-      "The fit round's frozen-state ruling holds the 2026 data year on the v7 configuration exactly as committed, " +
-      "and this tree's fitted files are the v9 configuration, so a write here would replace the rows the product " +
-      "serves (live) or rewrite an archive's reasons out from under its own points (replay) with numbers no stored " +
-      "board was measured on. The 2027 fit round lifts this by bumping BOARD_SOURCE to a fresh name. " +
+      "It is the prior champion the register dual-tracks as its SHADOW, and this tree's fitted files are a later " +
+      "configuration, so it cannot rebuild these rows: a write here would delete the shadow track's entire input " +
+      "(live) or rewrite an archive's reasons out from under its own points (replay), with nothing to fall back on. " +
+      "Serving a board is what makes a source writable, and this one is not served. " +
       "To override deliberately, pass --unfreeze to `npm run projections:preseason:persist`.",
   );
 }
