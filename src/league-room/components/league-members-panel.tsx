@@ -67,7 +67,7 @@ export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, comp
         // to one, at roughly two thirds of the height, with the same twelve facts on it. The
         // two-column split (owner over team name) collapses to one line at `sm` and up for the
         // same reason: they are two short facts about one person, not a stacked pairing.
-        <ul aria-label="Managers" className="flex flex-col rounded-lg border border-line bg-surface-elevated">
+        <ul aria-label="Managers" className="flex flex-col rounded-lg bg-surface-elevated shadow-card">
           {teams.map((team) => (
             <li
               key={team.id}

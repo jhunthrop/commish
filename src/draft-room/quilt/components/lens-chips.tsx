@@ -25,7 +25,7 @@ export function LensChips({ lens, onChange, hasByes }: LensChipsProps) {
           aria-pressed={lens === candidate}
           onClick={() => onChange(candidate)}
           className={`rounded-sm px-2 py-0.5 font-display text-xs font-semibold tracking-wide focus-visible:outline-2 focus-visible:outline-accent ${
-            lens === candidate ? "bg-accent text-accent-text" : "border border-line bg-surface-inset text-text-muted"
+            lens === candidate ? "bg-accent text-accent-text" : "bg-surface-elevated text-text-muted"
           }`}
         >
           {LENS_LABEL[candidate]}

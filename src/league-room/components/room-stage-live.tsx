@@ -78,7 +78,7 @@ function PlayerRow({
   return (
     <div className={`flex items-center gap-2 rounded-sm px-2 py-1 ${waiting ? "opacity-70" : ""}`}>
       {entry.position === null ? (
-        <span className="h-6 w-7 rounded-sm border border-line" aria-hidden />
+        <span className="h-6 w-7 rounded-sm bg-surface-inset" aria-hidden />
       ) : (
         <span
           className={`flex h-6 w-7 items-center justify-center rounded-sm font-display text-[10px] font-semibold ${positionStickerClass(entry.position)}`}

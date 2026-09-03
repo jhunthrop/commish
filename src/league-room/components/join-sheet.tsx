@@ -173,7 +173,7 @@ export function JoinSheetBody({ facts, action }: JoinSheetBodyProps) {
           </div>
         ))}
       </div>
-      <div className="flex flex-col gap-1.5 rounded-md border border-line bg-surface-inset p-3.5">
+      <div className="flex flex-col gap-1.5 rounded-md bg-surface-inset p-3.5">
         <p className={`${MICRO_LABEL} text-text-faint`}>What happens when you sit</p>
         <ol className="flex list-none flex-col gap-1.5">
           {facts.contract.map((line, index) => (

@@ -71,7 +71,7 @@ export function StartOrJoinDisclosure({ experienceTier }: { readonly experienceT
     <details
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
-      className="rounded-lg border border-line"
+      className="rounded-lg bg-surface-elevated shadow-card"
     >
       <summary className="cursor-pointer select-none p-4 text-sm font-medium text-text-primary">
         Start or join another league

@@ -102,7 +102,7 @@ export function LineupFixSheet({ leagueId, weekNumber, lineup, rosterSlots, plan
           No bench player fits this slot right now. The players drawer has free agents who do.
         </p>
       ) : (
-        <div className="accent-wash flex items-center gap-3 rounded-md border border-accent p-3">
+        <div className="accent-wash flex items-center gap-3 rounded-md p-3 ring-2 ring-accent/40">
           <PositionBadge position={recommended.position} size="md" />
           <div className="flex min-w-0 flex-col">
             <p className="font-display text-md font-semibold text-text-primary">Start {recommended.playerName}</p>
@@ -125,7 +125,7 @@ export function LineupFixSheet({ leagueId, weekNumber, lineup, rosterSlots, plan
         <div className="flex flex-col gap-1.5">
           <p className="text-xs text-text-faint">Or from your bench</p>
           {alternatives.map((candidate) => (
-            <div key={candidate.playerId} className="flex items-center gap-3 rounded-md border border-line bg-surface-raised px-3 py-2">
+            <div key={candidate.playerId} className="flex items-center gap-3 rounded-md bg-surface-raised px-3 py-2 shadow-raised">
               <PositionBadge position={candidate.position} size="sm" />
               <p className="min-w-0 truncate font-display text-sm font-semibold text-text-primary">{candidate.playerName}</p>
               <p className="min-w-0 truncate text-xs text-text-muted">{evidence(candidate)}</p>

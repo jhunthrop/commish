@@ -34,7 +34,7 @@ export function CrewDoor({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <section className="flex w-full flex-wrap items-center gap-x-6 gap-y-3 rounded-md border border-line bg-surface-elevated px-4 py-3.5">
+    <section className="flex w-full flex-wrap items-center gap-x-6 gap-y-3 rounded-md bg-surface-elevated px-4 py-3.5 shadow-card">
       <h2 className="shrink-0 font-display text-md font-bold leading-display text-text-primary">Bringing your own crew?</h2>
       <p className="min-w-0 flex-1 basis-64 text-sm text-text-muted">{live ? LIVE_PITCH : FREE_PITCH}</p>
       <Button variant="secondary" onClick={() => setOpen(true)} aria-haspopup="dialog" className="shrink-0">

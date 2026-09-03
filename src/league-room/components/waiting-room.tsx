@@ -391,7 +391,7 @@ export function WaitingRoom({
   if (justSeated) {
     const next = items[0]!;
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-surface-elevated p-6 text-center">
+      <div className="flex flex-col items-center gap-2 rounded-lg bg-surface-elevated p-6 text-center shadow-card">
         <Crest id={league.leagueId} name={leagueName} size={64} />
         {/* The one place a contraction is deliberate, per C1's own named exception
             (`docs/design-system.md`): the mock's own approved wordmark-adjacent line. */}

@@ -124,7 +124,7 @@ export function NoticeInbox() {
           id={panelId}
           role="region"
           aria-label="Notices"
-          className="fixed inset-x-4 top-16 z-20 flex max-h-96 flex-col gap-3 overflow-y-auto rounded-lg border border-line bg-surface-elevated p-4 shadow-card sm:inset-x-auto sm:right-4 sm:w-96"
+          className="fixed inset-x-4 top-16 z-20 flex max-h-96 flex-col gap-3 overflow-y-auto rounded-lg bg-surface-elevated p-4 shadow-overlay sm:inset-x-auto sm:right-4 sm:w-96"
         >
           {status === "error" ? (
             <ErrorState

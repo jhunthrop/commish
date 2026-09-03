@@ -66,7 +66,7 @@ export function MatchupStrip({ matchups, children }: {
 }) {
   if (matchups.length === 0) return null;
   return (
-    <ul className="flex flex-col rounded-lg border border-line bg-surface-elevated">
+    <ul className="flex flex-col rounded-lg bg-surface-elevated shadow-card">
       {matchups.map((matchup) => {
         const { home, away } = matchup;
         const decided = home.score !== null && away.score !== null;

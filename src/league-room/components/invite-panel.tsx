@@ -60,7 +60,7 @@ function LiveInvite({
   const openSeatsRemaining = invite.maxUses - invite.uses;
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-line p-3">
+    <div className="flex flex-col gap-2 rounded-md bg-surface-elevated p-3">
       <Input label="Invite link" value={invite.url} readOnly />
       {copyFailed ? (
         <p role="alert" className="text-sm text-negative">

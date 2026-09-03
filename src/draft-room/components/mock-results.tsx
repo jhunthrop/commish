@@ -79,7 +79,7 @@ function judgedPicks(view: DraftStateView, players: readonly Player[], playersBy
 
 function StatCard({ value, caption }: { readonly value: string; readonly caption: string }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-md border border-line bg-surface-elevated px-3.5 py-2.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-md bg-surface-elevated px-3.5 py-2.5">
       <span className="font-display text-2xl font-bold tabular-nums text-text-primary">{value}</span>
       <span className="text-xs text-text-faint">{caption}</span>
     </div>
@@ -197,7 +197,7 @@ function TeamCardSection({
     sentences.push(fillCopyTemplate(copy.byeStackSentence, { week: String(stacked.week), count: String(stacked.count) }));
   }
   return (
-    <section aria-label={copy.teamHeading} className="flex flex-col gap-2 rounded-lg border border-line p-3.5">
+    <section aria-label={copy.teamHeading} className="flex flex-col gap-2 rounded-lg bg-surface-elevated p-3.5 shadow-card">
       <h2 className={`${MICRO_LABEL} text-text-faint`}>{copy.teamHeading}</h2>
       <div className="flex flex-wrap gap-1">
         {filled.map((row) => {
@@ -218,7 +218,7 @@ function HabitsSection({ results }: { readonly results: MockResultsInfo }) {
   const { copy } = results;
   const heading = fillCopyTemplate(copy.habitsHeading, { count: String(habits.mockCount) });
   return (
-    <section aria-label={heading} className="flex flex-col gap-2 rounded-lg border border-line p-3.5">
+    <section aria-label={heading} className="flex flex-col gap-2 rounded-lg bg-surface-elevated p-3.5 shadow-card">
       <h2 className={`${MICRO_LABEL} text-text-faint`}>{heading}</h2>
       {habits.firstTeRounds === null ? null : (
         <p className="text-sm text-text-muted">
@@ -345,7 +345,7 @@ export function MockResults({ view, teams, board, players, byeWeeks, myTeamId, r
               <TeamCardSection view={view} playersById={playersById} positionOf={positionOf} byeWeeks={byeWeeks} myTeamId={myTeamId} copy={copy} />
               {/* TAKE IT WITH YOU — the loop back to the real room. Outline verbs, never the
                   solid: the page's one act is the rematch in the headline. */}
-              <section aria-label={copy.takeItHeading} className="flex flex-col gap-2 rounded-lg border border-accent p-3.5">
+              <section aria-label={copy.takeItHeading} className="flex flex-col gap-2 rounded-lg bg-surface-elevated p-3.5 shadow-card ring-2 ring-accent/40">
                 <h2 className={`${MICRO_LABEL} text-accent`}>{copy.takeItHeading}</h2>
                 <p className="text-sm text-text-muted">{copy.seedDetail}</p>
                 <div className="flex flex-wrap items-center gap-2">

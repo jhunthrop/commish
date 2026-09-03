@@ -155,7 +155,7 @@ function QueueRail({ queue, playersById, draftedIds, busy, onChange }: QueueRail
                 // and the chip's width never changes — the D1 containment above stays honest.
                 <li
                   key={playerId}
-                  className="group/chip flex shrink-0 items-center gap-1 rounded-pill border border-line bg-surface-raised py-0.5 pl-2 pr-1"
+                  className="group/chip flex shrink-0 items-center gap-1 rounded-pill bg-surface-raised py-0.5 pl-2 pr-1"
                 >
                   <span className="font-mono text-xs tabular-nums text-text-faint">{index + 1}</span>
                   {player === undefined ? null : <PositionBadge position={player.position} size="sm" />}

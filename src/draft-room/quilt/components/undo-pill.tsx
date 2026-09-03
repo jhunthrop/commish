@@ -40,7 +40,7 @@ export function UndoPill({ pending, player, swappedFrom, onUndo }: UndoPillProps
     <div
       data-testid="undo-pill"
       role="status"
-      className="pointer-events-auto flex items-center gap-3 rounded-md border border-accent bg-surface-raised px-4 py-2 shadow-card"
+      className="pointer-events-auto flex items-center gap-3 rounded-md bg-surface-raised px-4 py-2 shadow-overlay ring-2 ring-accent/40"
     >
       {player === null ? null : <PositionBadge position={player.position} size="sm" />}
       <div className="flex flex-col">

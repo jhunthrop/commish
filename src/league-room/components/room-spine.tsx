@@ -58,7 +58,7 @@ export function RoomSpine({ leagueId, lineup, fixturesByNflTeam, projectionsByPl
             <span
               className={`relative flex h-7 w-8 items-center justify-center rounded-sm font-display text-xs font-semibold ${
                 slot.position === null
-                  ? "border border-line text-text-faint"
+                  ? "border border-dashed border-line text-text-faint"
                   : positionStickerClass(slot.position)
               }`}
             >
@@ -83,7 +83,7 @@ export function RoomSpine({ leagueId, lineup, fixturesByNflTeam, projectionsByPl
       {lineup.bench.map((slot) => (
         <span
           key={`bench-${slot.slotIndex}`}
-          className="flex h-6 w-8 items-center justify-center rounded-sm border border-line font-display text-[10px] font-semibold text-text-faint"
+          className="flex h-6 w-8 items-center justify-center rounded-sm border border-dashed border-line font-display text-[10px] font-semibold text-text-faint"
           aria-hidden
         >
           B

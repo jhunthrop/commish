@@ -41,7 +41,7 @@ export interface PaidJoinConfirmationProps {
  */
 export function PaidJoinConfirmation({ entryFeeUsd, balanceAfterUsd, stateOfEntry, onStateOfEntryChange }: PaidJoinConfirmationProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-line bg-surface-elevated p-3">
+    <div className="flex flex-col gap-3 rounded-md bg-surface-elevated p-3">
       <p className="text-sm text-text-primary">{`This league charges ${entryFeeUsd} to join.`}</p>
       <p className="text-sm text-text-primary">
         {"Your balance after: "}

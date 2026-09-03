@@ -44,7 +44,7 @@ export function proofPhrases(stats: ProofStats): readonly string[] {
 
 function FactCard({ label, fact, children }: { readonly label: string; readonly fact: string; readonly children?: React.ReactNode }) {
   return (
-    <div className="flex flex-1 basis-64 flex-col gap-1.5 rounded-md border border-line bg-surface-inset px-3.5 py-3">
+    <div className="flex flex-1 basis-64 flex-col gap-1.5 rounded-md bg-surface-inset px-3.5 py-3">
       <h3 className={`${MICRO_LABEL} text-text-faint`}>{label}</h3>
       <p className="text-sm text-text-muted">{fact}</p>
       {children}

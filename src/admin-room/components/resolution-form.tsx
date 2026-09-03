@@ -226,7 +226,7 @@ export function ResolutionForm({ flagId, decisions, noteMaxLength, previews, isC
         hint={decision === "content_removed" ? "Your own words. The member reads a general reason instead. The preview below shows it." : "Your own words. Kept on the record either way."}
       />
 
-      <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface-elevated p-3" aria-label="What the member will see">
+      <div className="flex flex-col gap-2 rounded-lg bg-surface-elevated p-3" aria-label="What the member will see">
         <p className={`${EYEBROW} text-text-muted`}>What the member sees</p>
         {decision === "no_action" ? (
           <NoActionPreview />

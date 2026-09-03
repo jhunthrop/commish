@@ -80,7 +80,7 @@ export function MockTableChips({ table, options, hint, onChange }: MockTableChip
 
   const editor =
     openChip === null ? null : (
-      <div className="flex flex-wrap items-end gap-3 rounded-md border border-line bg-surface-elevated p-3">
+      <div className="flex flex-wrap items-end gap-3 rounded-md bg-surface-elevated p-3">
         {openChip === "teams" ? (
           <SegmentGroup
             label={CHIP_EDITOR_LABEL.teams}

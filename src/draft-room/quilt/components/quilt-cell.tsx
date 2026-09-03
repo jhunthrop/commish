@@ -82,7 +82,7 @@ export function QuiltCellView({ cell, player, teamCount, lens, verdict, byeWeek,
       </div>
     );
   }
-  return <div aria-hidden="true" className="min-h-11 rounded-sm border border-line bg-surface-inset" />;
+  return <div aria-hidden="true" className="min-h-11 rounded-sm bg-surface-inset" />;
 }
 
 /** "Jahmyr Gibbs" → "J. Gibbs" — the mock's cell grammar; a one-word name stays itself. */

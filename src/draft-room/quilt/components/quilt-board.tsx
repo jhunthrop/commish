@@ -75,7 +75,7 @@ export function QuiltBoard({ view, teams, playersById, myTeamId, lens, byeWeeks,
         <div className={GRID} style={columns} data-testid="quilt-needs-row">
           <div className={`self-center text-right ${MICRO_LABEL} text-text-faint`}>needs</div>
           {view.draftOrder.map((teamId) => (
-            <div key={teamId} className="flex min-h-8 items-center justify-center gap-1 rounded-sm border border-line bg-surface-inset">
+            <div key={teamId} className="flex min-h-8 items-center justify-center gap-1 rounded-sm bg-surface-inset">
               {(needs.get(teamId) ?? []).map((position, index) => (
                 <span key={`${position}-${index}`} title={`needs ${position}`} className={`h-2 w-2 rounded-full ${positionStickerClass(position)}`}>
                   <span className="sr-only">needs {position}</span>
@@ -131,7 +131,7 @@ function QuiltRowView({ row, view, playersById, myTeamId, lens, byeWeeks, boardR
           if (cell.pick === null || player === null) {
             // My own far-future cell keeps its amber promise even at micro height.
             const mine = cell.yourPickLabel !== null;
-            return <div key={cell.teamId} aria-hidden="true" className={`h-3.5 rounded-xs ${mine ? "border border-dashed border-accent bg-surface-raised" : "border border-line bg-surface-inset"} ${cell.onClock ? "outline-2 outline-live" : ""}`} />;
+            return <div key={cell.teamId} aria-hidden="true" className={`h-3.5 rounded-xs ${mine ? "border border-dashed border-accent bg-surface-raised" : "bg-surface-inset"} ${cell.onClock ? "outline-2 outline-live" : ""}`} />;
           }
           const mine = cell.teamId === myTeamId;
           return (

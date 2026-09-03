@@ -32,7 +32,7 @@ export function WaitingChecklist({ items }: { readonly items: readonly WaitingCh
   return (
     <ol aria-label="Get ready" className="flex flex-col gap-3">
       {items.map((item) => (
-        <li key={item.key} className="flex flex-col gap-2 rounded-lg border border-line bg-surface-elevated p-3">
+        <li key={item.key} className="flex flex-col gap-2 rounded-lg bg-surface-elevated p-3">
           <div className="flex flex-col gap-1">
             <h3 className={EYEBROW}>{item.heading}</h3>
             <p className="text-sm text-text-muted">{item.body}</p>

@@ -180,7 +180,7 @@ export function CoachMarks({ stops, onDismiss }: CoachMarksProps) {
         ref={popoverRef}
         role="dialog"
         aria-label={stop.heading}
-        className="fixed z-50 max-w-80 rounded-sm border border-line bg-surface-elevated p-4 shadow-card"
+        className="fixed z-50 max-w-80 rounded-lg bg-surface-elevated p-4 shadow-overlay"
         style={popoverStyle}
       >
         <h3 className="font-semibold text-text-primary">{stop.heading}</h3>

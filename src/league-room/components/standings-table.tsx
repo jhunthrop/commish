@@ -229,7 +229,7 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
             <span className="text-sm text-text-faint">if the season ended today</span>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="flex flex-col gap-1.5 rounded-md border border-line bg-surface-elevated px-3 py-2.5">
+            <div className="flex flex-col gap-1.5 rounded-md bg-surface-elevated px-3 py-2.5">
               <span className={`${MICRO_LABEL} text-text-faint`}>First-round byes</span>
               {[rows[0], rows[1]].map((row, index) =>
                 row === undefined ? null : (
@@ -244,7 +244,7 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
               { label: "3 vs 6", pair: [rows[2], rows[5]] as const, seeds: [3, 6] as const },
               { label: "4 vs 5", pair: [rows[3], rows[4]] as const, seeds: [4, 5] as const },
             ].map((game) => (
-              <div key={game.label} className="flex flex-col gap-1.5 rounded-md border border-line bg-surface-elevated px-3 py-2.5">
+              <div key={game.label} className="flex flex-col gap-1.5 rounded-md bg-surface-elevated px-3 py-2.5">
                 <span className={`${MICRO_LABEL} text-text-faint`}>{game.label}</span>
                 {game.pair.map((row, index) =>
                   row === undefined ? null : (

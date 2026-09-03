@@ -51,7 +51,7 @@ function AssetCard({
   readonly value: number | null;
 }) {
   return (
-    <div className="flex flex-1 flex-col gap-2 rounded-md border border-line bg-surface-raised p-3">
+    <div className="flex flex-1 flex-col gap-2 rounded-md bg-surface-raised p-3 shadow-raised">
       <p className={`${MICRO_LABEL} ${tone === "positive" ? "text-positive" : "text-negative"}`}>{label}</p>
       {assets.map((asset) => (
         <div key={asset.playerId} className="flex items-center gap-2.5">
@@ -240,7 +240,7 @@ export function TradeSheet({ leagueId, trade, context, math, onClose, onCounter,
         <p className="text-xs text-text-faint">Pricing both sides…</p>
       ) : null}
 
-      <div className="flex flex-col gap-2 rounded-md border border-line bg-surface-inset p-3">
+      <div className="flex flex-col gap-2 rounded-md bg-surface-inset p-3">
         <p className={`${MICRO_LABEL} text-text-faint`}>Your roster, before and after</p>
         {depthPositions.map((position) => (
           <DepthRow

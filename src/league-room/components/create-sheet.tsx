@@ -246,14 +246,14 @@ export function CreateSheet({
         />
 
         <div className="grid gap-2.5 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5 rounded-md border border-line bg-surface-inset p-3.5">
+          <div className="flex flex-col gap-1.5 rounded-md bg-surface-inset p-3.5">
             <p className={`${MICRO_LABEL} text-text-faint`}>What you never do again</p>
             {live ? <p className="text-sm text-text-muted">Chase money: buy-ins land before the draft, nobody drafts unpaid.</p> : null}
             <p className="text-sm text-text-muted">Play referee: trade reviews run on deadlines, votes counted by the house.</p>
             <p className="text-sm text-text-muted">Run the machinery: the draft room, the schedule and the scoring are the house&apos;s job.</p>
             {live ? <p className="text-sm text-text-muted">Do payout math: the pot pays the podium when the season settles.</p> : null}
           </div>
-          <div className="flex flex-col gap-1.5 rounded-md border border-line bg-surface-inset p-3.5">
+          <div className="flex flex-col gap-1.5 rounded-md bg-surface-inset p-3.5">
             <p className={`${MICRO_LABEL} text-text-faint`}>What your crew sees</p>
             <p className="text-sm text-text-muted">
               One link, opening the same join sheet the lobby uses: your league&apos;s terms, the draft night, a seat to take. The
