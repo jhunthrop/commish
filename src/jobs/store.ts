@@ -143,19 +143,27 @@ export async function recordAttemptFailure(db: Db, clock: Clock, claimed: Claime
 }
 
 /**
- * THE RECLAIM RACE'S SIGNATURE (fix round, MEDIUM-2). A worker whose attempt was reclaimed
- * mid-flight (a long GC pause, a laptop lid) is a zombie the moment `reclaimStaleJobs` closes its
- * run row as `abandoned` — and when it later tries to finish, the append-only trigger rejects the
- * UPDATE with its "a finished run ... may not be rewritten" refusal and the whole finish
- * transaction rolls back. That rejection is CORRECT (a newer attempt owns the job now; the
- * zombie's late result must not overwrite the record), but it must not kill the caller's tick:
- * the executor asks this predicate and reports the attempt `superseded` instead of throwing. The
- * trigger text is ours (migration 0068), matched via the same cause-chain walk
- * `expectRejectionMatching` uses, because drizzle wraps the driver's error one level down.
+ * The SQLSTATE migration 0069's history-rewrite triggers raise — one custom code, matched by
+ * `.code` alone (fix round 2, MEDIUM-B: the first fix matched the trigger's English, a sentence
+ * edit away from silent desync). Exported so the migration and this predicate name one constant;
+ * a future trigger edit that drops the code fails the staged-race tests, not production.
+ */
+export const JOB_HISTORY_REWRITE_SQLSTATE = "JB001";
+
+/**
+ * THE RECLAIM RACE'S SIGNATURE. A worker whose attempt was reclaimed mid-flight (a long GC
+ * pause, a laptop lid) is a zombie the moment `reclaimStaleJobs` closes its run row as
+ * `abandoned` — and when it later tries to finish, the append-only trigger rejects the rewrite
+ * with SQLSTATE `JB001` and the whole finish transaction rolls back. That rejection is CORRECT
+ * (a newer attempt owns the job now; the zombie's late result must not overwrite the record),
+ * but it must not kill the caller's tick: the executor asks this predicate and reports the
+ * attempt `superseded` instead of throwing. Matched via the same cause-chain walk
+ * `expectRejectionMatching` uses, because drizzle wraps the driver's error one level down; the
+ * message is not consulted.
  */
 export function isSupersededAttempt(error: unknown): boolean {
   return unwrapCauseChain(error).some(
-    (link) => link instanceof Error && link.message.includes("job_runs is append-only history: a finished run"),
+    (link) => (link as { readonly code?: unknown }).code === JOB_HISTORY_REWRITE_SQLSTATE,
   );
 }
 

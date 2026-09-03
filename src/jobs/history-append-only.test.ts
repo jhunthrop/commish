@@ -1,7 +1,22 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { jobRuns, jobRunSteps, jobs } from "@/db/schema";
+import { unwrapCauseChain } from "@/db/errors";
 import { createTestDb, expectRejectionMatching, truncateAll, truncateJobTables } from "@/db/test-db";
+import { JOB_HISTORY_REWRITE_SQLSTATE } from "./store";
+
+/** The rejection's SQLSTATE, dug out of drizzle's wrapper — 0069's contract with
+ *  `isSupersededAttempt`, pinned here at the trigger itself. */
+async function sqlstateOf(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise;
+    return "promise unexpectedly resolved";
+  } catch (error: unknown) {
+    return unwrapCauseChain(error)
+      .map((link) => (link as { readonly code?: unknown }).code)
+      .find((code) => code !== undefined);
+  }
+}
 
 /**
  * THE APPEND-ONLY GUARANTEE, asserted against the real triggers (migration 0068, the 0019
@@ -53,7 +68,7 @@ describe("job_runs is append-only history", () => {
     expect(after[0]!.status).toBe("succeeded");
   });
 
-  it("refuses to rewrite a finished run", async () => {
+  it("refuses to rewrite a finished run, carrying the dedicated rewrite SQLSTATE", async () => {
     const jobId = await insertJob();
     const runId = await insertRun(jobId, "failed");
 
@@ -61,6 +76,15 @@ describe("job_runs is append-only history", () => {
       db.update(jobRuns).set({ status: "succeeded" }).where(eq(jobRuns.id, runId)),
       /finished run \(status failed\) may not be rewritten/,
     );
+    expect(await sqlstateOf(db.update(jobRuns).set({ status: "succeeded" }).where(eq(jobRuns.id, runId)))).toBe(
+      JOB_HISTORY_REWRITE_SQLSTATE,
+    );
+  });
+
+  it("keeps check_violation, not the rewrite code, on a refused DELETE (not a supersede signal)", async () => {
+    const jobId = await insertJob();
+    const runId = await insertRun(jobId, "failed");
+    expect(await sqlstateOf(db.delete(jobRuns).where(eq(jobRuns.id, runId)))).toBe("23514");
   });
 
   it("never permits DELETE, running or finished", async () => {
@@ -91,6 +115,9 @@ describe("job_run_steps is an append-only checkpoint log", () => {
       /UPDATE is not permitted/,
     );
     await expectRejectionMatching(db.delete(jobRunSteps).where(eq(jobRunSteps.id, stepId)), /DELETE is not permitted/);
+    expect(await sqlstateOf(db.update(jobRunSteps).set({ step: "renamed" }).where(eq(jobRunSteps.id, stepId)))).toBe(
+      JOB_HISTORY_REWRITE_SQLSTATE,
+    );
   });
 
   it("records a step once per job, across attempts", async () => {
