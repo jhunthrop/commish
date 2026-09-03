@@ -69,10 +69,19 @@ function errorText(error: unknown): string {
  * injected clock: it exists to prove this process is alive to `reclaimStaleJobs`, and a fake
  * clock proving fake liveness would defeat it.
  */
+export interface ExecuteOptions {
+  /** The runner's remaining tick budget: the attempt's timeout race runs at
+   *  `min(definition.timeoutMs, timeoutCapMs)`, so a job started near the end of a bounded
+   *  (Vercel) tick fails as an honest, retryable timeout instead of being killed mid-write by
+   *  the platform. Checkpoints mean the next tick resumes where this one stopped. */
+  readonly timeoutCapMs?: number;
+}
+
 export async function executeClaimedJob(
   deps: ExecutorDeps,
   definitions: ReadonlyMap<string, AnyJobDefinition>,
   claimed: ClaimedJob,
+  options: ExecuteOptions = {},
 ): Promise<ExecutionReport> {
   const definition = definitions.get(claimed.name);
   if (definition === undefined) {
@@ -91,6 +100,7 @@ export async function executeClaimedJob(
     });
   }, deps.heartbeatIntervalMs ?? JOBS_CONFIG.heartbeatIntervalMs);
 
+  const timeoutMs = Math.max(1, Math.min(definition.timeoutMs, options.timeoutCapMs ?? Number.POSITIVE_INFINITY));
   try {
     const completed = await completedStepsFor(deps.db, claimed.jobId);
     await raceTimeout(
@@ -100,7 +110,7 @@ export async function executeClaimedJob(
           detail: outcome.detail.map(scrubSecrets),
         });
       }),
-      definition.timeoutMs,
+      timeoutMs,
     );
     await succeedJob(deps.db, deps.clock, claimed);
     return { jobId: claimed.jobId, name: claimed.name, attempt: claimed.attempt, outcome: "succeeded" };

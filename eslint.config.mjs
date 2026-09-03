@@ -340,8 +340,8 @@ const eslintConfig = [
       "src/projections/register/**",
       "scripts/register-freeze.ts",
       "scripts/register-grade.ts",
-      "scripts/season-week-steps.ts",
-      "scripts/season-week-steps.test.ts",
+      "src/jobs/season-week/steps.ts",
+      "src/jobs/season-week/steps.test.ts",
     ],
     rules: {
       "no-restricted-syntax": ["error", ...REGISTER_QUARANTINE_SELECTORS],

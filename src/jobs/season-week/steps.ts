@@ -1,7 +1,9 @@
-// THE WEEKLY CADENCE'S ORCHESTRATION LOGIC — everything `scripts/season-week.ts` (the thin CLI) and
-// `scripts/season-week.test.ts` (the fixtures) both need, and the ONLY place besides the register's
-// own two scripts that may import `src/projections/register` (`WALL_EXEMPT_FILES`,
-// `src/projections/register/test-support.ts`).
+// THE WEEKLY CADENCE'S ORCHESTRATION LOGIC — everything `scripts/season-week.ts` (the thin CLI)
+// and `src/jobs/defs/season-week-job.ts` (the durable job) both need, and the ONLY place besides
+// the register's own two scripts that may import `src/projections/register` (`WALL_EXEMPT_FILES`,
+// `src/projections/register/test-support.ts`). Moved here from `scripts/season-week-steps.ts` in
+// the job-system round: the Vercel tick route has to reach these steps and `src/**` may not
+// import `scripts/**` — the exemption moved with the file, same one file, new path.
 //
 // FIVE STEPS, EACH ISOLATED. `runSeasonWeek` wraps every step in `safely`, so a step that throws is
 // reported as `status: "failed"` and the run continues to the next step rather than crashing the

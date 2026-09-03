@@ -8,81 +8,20 @@
 //      npm run season:week -- --season=2026      (overrides the season; defaults from today's date)
 //      npm run season:week -- --help
 //
-// THIN ON PURPOSE. Every step's actual logic lives in `scripts/season-week-steps.ts` — the one
+// THIN ON PURPOSE. Every step's actual logic lives in `src/jobs/season-week/steps.ts` — the one
 // other file besides `register-freeze.ts` and `register-grade.ts` the register's own quarantine
 // wall (`src/projections/register/wall.source.test.ts`) allows to import it, and the file
-// `scripts/season-week.test.ts` exercises directly against a real test database with a fake
-// network. This script's only jobs are: wire real dependencies (a real db connection, a real
-// nflverse client, the real odds snapshot), parse argv, print the report, and set the exit code.
-import { createDb, type Db } from "@/db/client";
+// `src/jobs/season-week/steps.test.ts` exercises directly against a real test database with a
+// fake network. This script's only jobs are: wire real dependencies, parse argv, print the
+// report, and set the exit code. The durable job system (`src/jobs/defs/season-week-job.ts`) runs
+// the same steps on the same deps; this CLI stays for operator-initiated runs.
+import { createDb } from "@/db/client";
 import { requireEnv } from "@/projections/odds/http";
-import { createNflverseClient } from "@/projections/nflverse/client";
-import { ingestPlayerUniverse, ingestSeason, scheduleWeekAsOf } from "@/projections/nflverse/ingest";
-import { runOddsSnapshot } from "./odds-props-snapshot";
-import {
-  defaultSeason,
-  runSeasonWeek,
-  type PropsSnapshotOutcome,
-  type SeasonWeekDeps,
-  type SeasonWeekOptions,
-  type StatsIngestOutcome,
-  type StepResult,
-} from "./season-week-steps";
+import { realIngestStats, realSnapshotProps } from "@/jobs/season-week/deps";
+import { defaultSeason, runSeasonWeek, type SeasonWeekDeps, type SeasonWeekOptions, type StepResult } from "@/jobs/season-week/steps";
 
-/**
- * THE STATS-INGEST CHOICE (Task 2 brief: "pick the one that ingests a completed week's published
- * stats and document the choice").
- *
- * NOT `npm run stats:ingest` (`scripts/ingest-once.ts`, `getIngestionWorker().tick()`). That is
- * the Tank01-backed LIVE SCORING pipeline: it settles real leagues' real matchups from a paid,
- * metered API, and writes to `player_stat_lines`, a table `src/projections/lines.ts` explicitly
- * refuses to read FROM (see its own top-of-file comment: no season, no `as_of`, final-and-corrected
- * numbers a backtest reading them would leak). The register's `gradeWeek` reads outcomes through
- * `statLinesAsOf`, whose default source is nflverse's own published weekly file
- * (`STAT_LINE_SOURCE`) — a completely different pipe than Tank01's live scoring.
- *
- * NOT `npm run projections:backfill` (`scripts/projection-backfill.ts`) run for one season either,
- * even though it is built on the exact same primitive this step uses (`ingestSeason`). That script
- * is sized for an ANNUAL history walk: it validates gap-season derivation against a fixed 2018
- * control season, enforces a 95% resolution bar across the WHOLE requested range and exits
- * non-zero below it, and derives play-by-play stat lines for `STAT_LINE_GAPS` seasons — all of
- * which is the right behaviour once a year, when the season list changes, and the wrong behaviour
- * weekly: a resolution bar tuned for a multi-season backfill has no business gating a Tuesday
- * morning run over whether last week's stats happened to resolve to 94.8%, and the gap-season
- * derivation only ever needs running once per gap season, not every week of it.
- *
- * This step therefore calls the same underlying primitive both of those scripts share directly —
- * `ingestPlayerUniverse` + `scheduleWeekAsOf` + `ingestSeason` (`@/projections/nflverse/ingest`) —
- * for exactly the ONE season the cadence cares about, with none of the annual-backfill machinery
- * wrapped around it. It is idempotent (`ingestSeason`'s writes are `onConflictDoNothing`), so a run
- * that finds nothing new published costs one small CSV fetch and reports zero new observations
- * rather than failing.
- */
-async function realIngestStats(db: Db, season: number): Promise<StatsIngestOutcome> {
-  const client = createNflverseClient();
-  const universe = await ingestPlayerUniverse(db, client);
-  const scheduleAsOf = (await scheduleWeekAsOf([season])).get(season);
-  const report = await ingestSeason(db, client, universe, season, scheduleAsOf);
-  return {
-    observationsWritten: report.observationsWritten,
-    statLines: report.statLines,
-    participationRows: report.participationRows,
-    playerWeekUnavailable: report.playerWeekUnavailable,
-  };
-}
-
-async function realSnapshotProps(db: Db): Promise<PropsSnapshotOutcome> {
-  const apiKey = requireEnv("ODDS_API_KEY");
-  const summary = await runOddsSnapshot(db, apiKey);
-  return {
-    totalEvents: summary.totalEvents,
-    selectedEvents: summary.selectedEvents,
-    totalWritten: summary.totalWritten,
-    totalSkipped: summary.totalSkipped,
-    creditsRemaining: summary.credits.remaining,
-    creditsUsed: summary.credits.used,
-  };
-}
+// THE STATS-INGEST CHOICE and both real network deps live in `src/jobs/season-week/deps.ts` —
+// one implementation, two entry points (this CLI and the durable job).
 
 interface Args {
   readonly season: number;

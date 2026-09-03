@@ -25,7 +25,7 @@ import {
   type SeasonWeekDeps,
   type SeasonWeekOptions,
   type StatsIngestOutcome,
-} from "./season-week-steps";
+} from "./steps";
 
 /**
  * THE CADENCE'S OWN ORCHESTRATION, tested the way `freeze.test.ts` and `grade.test.ts` test their
