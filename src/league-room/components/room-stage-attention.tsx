@@ -33,6 +33,10 @@ export interface RoomStageAttentionProps {
   readonly myMatchupDetail: MatchupDetail | null;
   readonly projectionsByPlayerId: ReadonlyMap<string, number>;
   readonly activityRows: readonly ActivityRow[];
+  /** True while any drawer surface is open over the stage. The expanded pulse yields to the
+   *  compact row then — the collapse law's own rule (a surface borrows space and the stage
+   *  gives it back), and it keeps the drawer's standings from doubling the stage's. */
+  readonly drawerOpen: boolean;
   readonly onFixLineup: (plan: LineupFixPlan) => void;
   readonly onViewTrade: (trade: TradeProposalView) => void;
   readonly onOpenSurface: (surface: DrawerSurface) => void;
@@ -174,6 +178,10 @@ function ActivityGlanceCard({
 export function RoomStageAttention(props: RoomStageAttentionProps) {
   const { home, lineup, week, plans, inboxTrades, tradeContext, pendingClaims, myMatchupDetail, projectionsByPlayerId, activityRows } = props;
   const hasCards = plans.length > 0 || inboxTrades.length > 0;
+  // The expanded pulse and an open drawer never share the room: while a surface borrows the
+  // stage's space, the pulse falls back to its compact row (and the drawer's own standings
+  // table is the only one in the DOM).
+  const compactPulse = hasCards || props.drawerOpen;
   const totals = myMatchupDetail === null ? null : sideTotals(myMatchupDetail, home.myTeamId, projectionsByPlayerId);
   const opponentName =
     myMatchupDetail === null || home.myTeamId === null
@@ -255,7 +263,7 @@ export function RoomStageAttention(props: RoomStageAttentionProps) {
       ))}
 
       <p className={`${MICRO_LABEL} mt-2 text-text-faint`}>The league this week</p>
-      {hasCards ? (
+      {compactPulse ? (
         // THE COMPACT PULSE ROW — unchanged beneath the dealt cards: the cards are the stage's
         // story, and the pulse is a glance.
         <div className="grid flex-1 content-start gap-3 lg:grid-cols-3">

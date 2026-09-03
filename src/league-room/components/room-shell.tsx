@@ -273,6 +273,7 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
                 myMatchupDetail={myMatchupDetail}
                 projectionsByPlayerId={data.projectionsByPlayerId}
                 activityRows={data.activityRows}
+                drawerOpen={drawer.surface !== null}
                 onFixLineup={(plan) => setSheet({ kind: "lineup", plan })}
                 onViewTrade={(trade) => setSheet({ kind: "trade", trade })}
                 onOpenSurface={(surface) => send({ kind: "chipTap", surface })}

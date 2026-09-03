@@ -53,6 +53,7 @@ function renderStage(overrides: Partial<RoomStageAttentionProps>) {
     myMatchupDetail: null,
     projectionsByPlayerId: new Map(),
     activityRows: [],
+    drawerOpen: false,
     onFixLineup: noop,
     onViewTrade: noop,
     onOpenSurface: noop,
@@ -75,6 +76,14 @@ describe("RoomStageAttention", () => {
     renderStage({ home: OUTSIDER_HOME, plans: [PLAN] });
     expect(screen.getByText("Your RB1 slot is empty")).toBeInTheDocument();
     expect(screen.getByText("Full standings live in the drawer")).toBeInTheDocument();
+    expect(screen.queryByText("Points against")).not.toBeInTheDocument();
+  });
+
+  it("yields the expanded pulse to the compact row while a drawer surface is open — one standings table in the room, never two", () => {
+    renderStage({ home: OUTSIDER_HOME, drawerOpen: true });
+    // The drawer's own surface will carry the full table; the stage falls back to the glance.
+    expect(screen.getByText("Full standings live in the drawer")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Standings" })).not.toBeInTheDocument();
     expect(screen.queryByText("Points against")).not.toBeInTheDocument();
   });
 
