@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertEnableable, MONEY_STATES, moneyIsLive, US_STATE_CODES } from "./states";
+import { assertEnableable, MONEY_STATES, moneyIsLive, stateEligibilityLine, US_STATE_CODES } from "./states";
 
 describe("MONEY_STATES", () => {
   it("ships with no state enabled, so money is dark until the founder names a list with counsel", () => {
@@ -34,5 +34,27 @@ describe("US_STATE_CODES", () => {
     expect(US_STATE_CODES).toHaveLength(51);
     expect(new Set(US_STATE_CODES).size).toBe(51);
     expect(US_STATE_CODES).toContain("DC");
+  });
+});
+
+describe("stateEligibilityLine", () => {
+  it("is absent, never filler, while money is dark — the shipped config renders no line", () => {
+    expect(stateEligibilityLine()).toBeNull();
+    expect(stateEligibilityLine(MONEY_STATES)).toBeNull();
+  });
+
+  it("derives the live sentence from the enabled list itself — count and the real minimum ages", () => {
+    expect(stateEligibilityLine({ enabled: [{ state: "TN", minAge: 18 }], neverEligible: MONEY_STATES.neverEligible })).toBe(
+      "Real money is open in 1 state · 18+ · state list under How it works",
+    );
+    expect(
+      stateEligibilityLine({
+        enabled: [
+          { state: "TN", minAge: 18 },
+          { state: "MA", minAge: 21 },
+        ],
+        neverEligible: MONEY_STATES.neverEligible,
+      }),
+    ).toBe("Real money is open in 2 states · 18+ (21+ in some states) · state list under How it works");
   });
 });

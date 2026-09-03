@@ -12,6 +12,42 @@ export type PrizeTable = readonly PrizeTableEntry[];
 
 export type PrizeTableInvariantResult = { readonly ok: true } | { readonly ok: false; readonly reason: string };
 
+/**
+ * The pot a published table actually pays — the sum of its prizes, which is `pot - rake` by the
+ * invariant below. THE one place a "The pot" figure is derived (front door blueprint, 2026-09-02):
+ * a shelf row and a join sheet advertising a paid league both read this sum of the STORED table,
+ * never `entryFeeCents * seats` recomputed at a render site, so what the card promises is
+ * exactly what settlement pays.
+ */
+export function prizePotCents(table: PrizeTable): number {
+  return table.reduce((sum, entry) => sum + entry.amountCents, 0);
+}
+
+/**
+ * How the pot splits across the podium when a table is derived rather than hand-published: the
+ * create sheet's default (front door blueprint, 2026-09-02) — ZERO RAKE, the whole pot paid,
+ * 50/30/20 across places 1..3 with rounding remainders to 1st. Zero rake on purpose: a default
+ * may not invent platform economics, and "the pot pays the podium" is the crew pitch's own
+ * sentence. Places whose floored share rounds to zero cents drop off the tail (shares decrease
+ * monotonically, so contiguity from 1st survives), and their cents fold into 1st — the result
+ * satisfies `prizeTableInvariant(entryFeeCents, 0, seats, table)` by construction, which the
+ * tests assert rather than assume.
+ *
+ * `[]` for a non-positive fee or seat count: a free league publishes no table at all
+ * (`leagues.payout_table` is `null`), never a zero-amount one.
+ */
+export function defaultPodiumPrizeTable(entryFeeCents: number, seats: number): PrizeTable {
+  if (!isPositiveInt(entryFeeCents) || !isPositiveInt(seats)) return [];
+  const pot = entryFeeCents * seats;
+  if (!Number.isSafeInteger(pot)) return [];
+  const shares = [0.5, 0.3, 0.2];
+  const floored = shares.map((share) => Math.floor(pot * share));
+  const paid = floored.filter((amount) => amount > 0);
+  if (paid.length === 0) return [{ place: 1, amountCents: pot }];
+  const remainder = pot - paid.reduce((sum, amount) => sum + amount, 0);
+  return paid.map((amount, index) => ({ place: index + 1, amountCents: index === 0 ? amount + remainder : amount }));
+}
+
 function isNonNegativeInt(n: number): boolean {
   return Number.isInteger(n) && n >= 0;
 }

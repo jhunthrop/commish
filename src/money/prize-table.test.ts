@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MONEY_REFUSALS } from "./config";
-import { prizeTableInvariant, type PrizeTable } from "./prize-table";
+import { defaultPodiumPrizeTable, prizePotCents, prizeTableInvariant, type PrizeTable } from "./prize-table";
 
 describe("prizeTableInvariant", () => {
   it("accepts only a table where prizes plus rake equal the pot exactly, never approximately", () => {
@@ -103,5 +103,44 @@ describe("prizeTableInvariant", () => {
       { place: 2, amountCents: Number.MAX_SAFE_INTEGER },
     ]);
     expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
+});
+
+describe("prizePotCents", () => {
+  it("sums the published prizes — the one figure a shelf may call the pot", () => {
+    expect(prizePotCents([{ place: 1, amountCents: 30000 }, { place: 2, amountCents: 20000 }, { place: 3, amountCents: 10000 }])).toBe(60000);
+    expect(prizePotCents([])).toBe(0);
+  });
+});
+
+describe("defaultPodiumPrizeTable", () => {
+  it("splits the whole pot 50/30/20 with zero rake, and the invariant accepts it by construction", () => {
+    const table = defaultPodiumPrizeTable(5000, 12);
+    expect(table).toEqual([
+      { place: 1, amountCents: 30000 },
+      { place: 2, amountCents: 18000 },
+      { place: 3, amountCents: 12000 },
+    ]);
+    expect(prizeTableInvariant(5000, 0, 12, table)).toEqual({ ok: true });
+    expect(prizePotCents(table)).toBe(5000 * 12);
+  });
+
+  it("folds rounding remainders into 1st so the table still balances exactly", () => {
+    const table = defaultPodiumPrizeTable(333, 7); // pot 2331, not divisible cleanly
+    expect(prizeTableInvariant(333, 0, 7, table)).toEqual({ ok: true });
+    expect(prizePotCents(table)).toBe(333 * 7);
+    expect(table[0]!.place).toBe(1);
+  });
+
+  it("drops podium places whose share rounds to zero, keeping contiguity from 1st", () => {
+    const table = defaultPodiumPrizeTable(1, 3); // pot 3 cents: 1/0/0
+    expect(table.every((entry) => entry.amountCents > 0)).toBe(true);
+    expect(table.map((entry) => entry.place)).toEqual(table.map((_, index) => index + 1));
+    expect(prizeTableInvariant(1, 0, 3, table)).toEqual({ ok: true });
+  });
+
+  it("publishes no table at all for a free league — null in storage, never a zero-amount row", () => {
+    expect(defaultPodiumPrizeTable(0, 12)).toEqual([]);
+    expect(defaultPodiumPrizeTable(5000, 0)).toEqual([]);
   });
 });

@@ -64,6 +64,25 @@ export function moneyIsLive(): boolean {
 }
 
 /**
+ * The front door's state-eligibility line (front door blueprint, 2026-09-02): `null` while money
+ * is dark — the line renders ONLY when money is live, and a null is an absent line, never filler
+ * — and, once a list is named, a sentence derived entirely from the config itself: the count of
+ * enabled states and the real minimum ages they carry, with the pointer at the state list's own
+ * page. Takes the config as a parameter (the `moneyGates` seam's identical reasoning) so a test
+ * can exercise the live sentence with a test-only entry while the shipped list stays empty; the
+ * production caller passes `MONEY_STATES`.
+ */
+export function stateEligibilityLine(config: MoneyStatesConfig = MONEY_STATES): string | null {
+  if (config.enabled.length === 0) return null;
+  const ages = config.enabled.map((entry) => entry.minAge);
+  const minAge = Math.min(...ages);
+  const maxAge = Math.max(...ages);
+  const agePhrase = minAge === maxAge ? `${minAge}+` : `${minAge}+ (${maxAge}+ in some states)`;
+  const stateCount = `${config.enabled.length} ${config.enabled.length === 1 ? "state" : "states"}`;
+  return `Real money is open in ${stateCount} · ${agePhrase} · state list under How it works`;
+}
+
+/**
  * The runtime guard a future writer to `MONEY_STATES.enabled` (Phase 8 item 1) must call before
  * adding a state: throws for any of the five states that have never permitted paid fantasy sports,
  * regardless of what minimum age it was typed in with. Every other state — including CA, which
