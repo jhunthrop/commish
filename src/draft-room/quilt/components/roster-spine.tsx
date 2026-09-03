@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
+import { Icon } from "@/components/ui/icon";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { positionStickerClass } from "@/components/ui/position-badge";
 import { SLOT_POSITION } from "../../components/room-dock";
@@ -35,9 +36,41 @@ export interface RosterSpineProps {
 }
 
 /**
+ * The head's chevron plate — founder addition 3 (WarmQuilt mock, the 40x30 rounded button):
+ * an EXPLICIT toggle in the spine's head, chevron flipping while open, inside the motion
+ * budget with a reduced-motion branch. The rotated vertical micro-text is retired.
+ */
+function RosterToggle({ expanded, filled, total, onToggle }: { readonly expanded: boolean; readonly filled: number; readonly total: number; readonly onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      data-testid="roster-toggle"
+      aria-expanded={expanded}
+      aria-label={`Your roster, ${filled} of ${total} slots filled. ${expanded ? "Collapse" : "Expand"}`}
+      onClick={onToggle}
+      className="flex flex-col items-center gap-1 focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      <span className="flex h-[30px] w-10 items-center justify-center rounded-md bg-surface-raised">
+        <span
+          data-testid="roster-chevron"
+          aria-hidden="true"
+          className={`inline-flex text-accent transition-transform duration-200 motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+        >
+          <Icon name="chevron-right" size={16} />
+        </span>
+      </span>
+      <span aria-hidden="true" className={`${MICRO_LABEL} text-text-faint`}>
+        roster
+      </span>
+    </button>
+  );
+}
+
+/**
  * THE ROSTER SPINE (law 5): a 44px rail of slot dots down the quilt's left edge — filled dots
  * wear the position's sticker color, open ones stay dashed — expanding in place to name every
- * slot on tap. One toggle button owns the whole rail, so the keyboard reaches it in one stop.
+ * slot on tap. The head is now an explicit ROSTER chevron button (founder addition 3); the
+ * dots below are furniture the button speaks for.
  */
 export function RosterSpine({ view, myTeamId, playersById, expanded, onToggle }: RosterSpineProps) {
   const slots = useMemo(() => spineSlots(view, myTeamId, playersById), [view, myTeamId, playersById]);
@@ -45,17 +78,8 @@ export function RosterSpine({ view, myTeamId, playersById, expanded, onToggle }:
 
   if (!expanded) {
     return (
-      <button
-        type="button"
-        data-testid="roster-spine"
-        aria-expanded={false}
-        aria-label={`Your roster, ${filled} of ${slots.length} slots filled. Expand`}
-        onClick={onToggle}
-        className="flex w-11 shrink-0 flex-col items-center gap-1.5 border-r border-line bg-surface-elevated py-3 focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        <span aria-hidden="true" className={`mb-1 ${MICRO_LABEL} text-text-faint [writing-mode:vertical-rl] rotate-180`}>
-          roster
-        </span>
+      <div data-testid="roster-spine" className="flex w-11 shrink-0 flex-col items-center gap-1.5 border-r border-line bg-surface-elevated py-2">
+        <RosterToggle expanded={false} filled={filled} total={slots.length} onToggle={onToggle} />
         {slots.map((slot) => {
           const position = slot.player?.position ?? SLOT_POSITION[slot.slot as keyof typeof SLOT_POSITION];
           return slot.player === null ? (
@@ -66,23 +90,18 @@ export function RosterSpine({ view, myTeamId, playersById, expanded, onToggle }:
             </span>
           );
         })}
-      </button>
+      </div>
     );
   }
 
   return (
     <div data-testid="roster-spine" className="flex w-60 shrink-0 flex-col border-r border-line bg-surface-elevated">
-      <button
-        type="button"
-        aria-expanded
-        onClick={onToggle}
-        className="flex items-center justify-between border-b border-line px-3 py-2 focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        <span className={`${MICRO_LABEL} text-text-faint`}>My roster</span>
+      <div className="flex items-center justify-between border-b border-line px-3 py-2">
+        <RosterToggle expanded filled={filled} total={slots.length} onToggle={onToggle} />
         <span className="font-display text-xs font-bold text-text-muted tabular-nums">
           {filled}/{slots.length}
         </span>
-      </button>
+      </div>
       <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
         {slots.map((slot) => (
           <li key={slot.key} className="flex items-center gap-2 rounded-sm bg-surface-raised px-2 py-1.5">

@@ -179,6 +179,7 @@ function QuiltRowView({ row, view, playersById, myTeamId, lens, byeWeeks, boardR
           clockLabel={clockLabel}
           onPeek={onPeek}
           peeked={cell.pick !== null && peekedPlayerId === cell.pick.playerId}
+          withFace={row.kind === "full"}
         />
       ))}
     </div>

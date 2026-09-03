@@ -1,6 +1,7 @@
 "use client";
 
 import type { Player } from "@/domain/player";
+import { PlayerFace } from "@/components/ui/player-face";
 import { positionOnFillTextClass, positionStickerClass } from "@/components/ui/position-badge";
 import { pickPlace, type QuiltCell as QuiltCellModel } from "../state/board";
 import type { Lens, ValueVerdict } from "../state/lens";
@@ -20,6 +21,9 @@ export interface QuiltCellProps {
   readonly onPeek: (playerId: string) => void;
   /** True while the peek sheet is open on this cell's player. */
   readonly peeked: boolean;
+  /** True only for the ACTIVE round's cells (founder addition 4): a landed pick renders the
+   *  player's face beside the condensed name. Track and micro geometry never carries one. */
+  readonly withFace: boolean;
 }
 
 /** The VALUE lens's tint per verdict — the verdict pair plus quiet for even (law 4 channel two). */
@@ -35,7 +39,7 @@ const VERDICT_CELL: Readonly<Record<ValueVerdict, { readonly box: string; readon
  * dashed amber promise; an empty cell is an inset track. Lenses only change pigment and the
  * micro-line's fact — geometry is shared, so switching lenses moves nothing.
  */
-export function QuiltCellView({ cell, player, teamCount, lens, verdict, byeWeek, clockLabel, onPeek, peeked }: QuiltCellProps) {
+export function QuiltCellView({ cell, player, teamCount, lens, verdict, byeWeek, clockLabel, onPeek, peeked, withFace }: QuiltCellProps) {
   if (cell.onClock) {
     return (
       <div data-testid="quilt-onclock" className="flex min-h-11 flex-col items-center justify-center overflow-hidden rounded-sm bg-surface-inset outline-2 outline-live">
@@ -67,10 +71,13 @@ export function QuiltCellView({ cell, player, teamCount, lens, verdict, byeWeek,
         aria-pressed={peeked}
         aria-label={`${player.name}, pick ${pickPlace(cell.pick, teamCount)}`}
         onClick={() => onPeek(player.id)}
-        className={`flex min-h-11 flex-col justify-center overflow-hidden rounded-sm px-2 py-1 text-left focus-visible:outline-2 focus-visible:outline-accent ${box} ${peeked ? "ring-2 ring-accent" : ""}`}
+        className={`flex min-h-11 items-center gap-2 overflow-hidden rounded-sm px-2 py-1 text-left focus-visible:outline-2 focus-visible:outline-accent ${box} ${peeked ? "ring-2 ring-accent" : ""}`}
       >
-        <span className={`font-display text-sm font-bold leading-tight ${text}`}>{shortName(player.name)}</span>
-        <span className={`text-[10px] leading-tight opacity-85 ${text}`}>{fact}</span>
+        {withFace ? <PlayerFace player={player} size="sm" /> : null}
+        <span className="flex min-w-0 flex-col justify-center">
+          <span className={`truncate font-display text-sm font-bold leading-tight ${text}`}>{shortName(player.name)}</span>
+          <span className={`truncate text-[10px] leading-tight opacity-85 ${text}`}>{fact}</span>
+        </span>
       </button>
     );
   }
