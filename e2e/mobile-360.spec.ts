@@ -382,8 +382,9 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // accumulation the reuse-if-exists discipline exists to avoid, and this section only READS
     // what that spec already made real. -------------------------------------------------------
     await page.goto(`/app/leagues/${E2E_HELD_TRADE_LEAGUE_ID}/trades`);
-    // `exact`: same reason as the seeded season league's trades visit above.
-    await expect(page.getByRole("heading", { name: "Trades", exact: true })).toBeVisible();
+    // The room's trades route: the week strip's h1 is the league name; the inbox's own
+    // heading is "Your trades" (trade-inbox.tsx), same structure the seeded visit asserts above.
+    await expect(page.getByRole("heading", { name: "Your trades" })).toBeVisible();
     await expect(page.getByText("Your trade is waiting on a fairness review").first()).toBeVisible();
     await expectNoHorizontalScroll(page, "the trades page with a held trade's own banner");
 
