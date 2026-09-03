@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
 import { renderSurface } from "@/components/ui/test-utils";
@@ -7,6 +7,7 @@ import { buttonClassName } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { GLOSSARY } from "@/help/glossary";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { potFacts } from "./open-league-shared";
 import { OpenLeagueCard } from "./open-league-card";
 
 vi.mock("next/navigation", () => ({
@@ -65,6 +66,21 @@ const BEGINNERS_ONLY_LAST_SEAT: PublicLeagueSummary = {
   name: "Median #13",
   experienceTier: "beginner",
   filledTeams: 11,
+};
+
+// The pot ledger row's own fixture (front door blueprint, 2026-09-02): a real entry fee plus a
+// stored payout table — the only way to exercise the row ahead of `moneyIsLive()` going true,
+// same idiom the Entry-row fixture above already established.
+const PAID_LEAGUE: PublicLeagueSummary = {
+  ...BASE,
+  id: "paid77",
+  name: "High Stakes #77",
+  entryFeeCents: 5000,
+  payoutTable: [
+    { place: 1, amountCents: 30000 },
+    { place: 2, amountCents: 20000 },
+    { place: 3, amountCents: 10000 },
+  ],
 };
 
 /** A scheduled draft comfortably INSIDE `UI_CONFIG.openLeagueCard.clockWithinMs` (6h). */
@@ -304,6 +320,50 @@ describe("OpenLeagueCard", () => {
       const surface = container.querySelector(".shadow-card")!;
       expect(surface.getAttribute("role")).toBeNull();
       expect(surface.getAttribute("tabindex")).toBeNull();
+    });
+  });
+
+  /**
+   * The pot ledger row (front door blueprint, 2026-09-02): `potFacts` from `@/money/prize-table`
+   * via `open-league-shared.tsx`, gated by the injectable `live` prop. Code review note: this
+   * card gained the row and the `onOpen` prop with no dedicated coverage — added here.
+   */
+  describe("the pot ledger row (live-gated)", () => {
+    it("renders the pot row with the exact potFacts output for a paid league, live", () => {
+      render(card(PAID_LEAGUE, { live: true }));
+      const facts = potFacts(PAID_LEAGUE)!;
+      expect(screen.getByText("The pot")).toBeInTheDocument();
+      expect(screen.getByText(`${facts.potUsd} · ${facts.placesLabel}`)).toBeInTheDocument();
+      // Exact potFacts output, not a recomputation at the render site: $50 entry * 12 teams
+      // would be $600.00 too, but the row must read the STORED table's sum, never the fee.
+      expect(facts.potUsd).toBe("$600.00");
+      expect(facts.placesLabel).toBe("top 3 paid");
+    });
+
+    it("renders no pot row for the same paid league once live is false", () => {
+      render(card(PAID_LEAGUE, { live: false }));
+      expect(screen.queryByText("The pot")).not.toBeInTheDocument();
+      const facts = potFacts(PAID_LEAGUE)!;
+      expect(screen.queryByText(`${facts.potUsd} · ${facts.placesLabel}`)).not.toBeInTheDocument();
+    });
+
+    it("renders no pot row for a free league even when live — FREE badge and copy render instead", () => {
+      render(card({ ...BASE, entryFeeCents: 0, payoutTable: null }, { live: true }));
+      expect(screen.queryByText("The pot")).not.toBeInTheDocument();
+      // The stake badge and the Entry ledger value both read "Free" (E3's badge plus S7's row).
+      expect(screen.getAllByText("Free").length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("the join-sheet opener (front door blueprint, 2026-09-02)", () => {
+    it("turns the CTA into the sheet opener when onOpen is provided — same accessible name, dialog announced", () => {
+      const onOpen = vi.fn();
+      render(card(BASE, { onOpen }));
+      const opener = screen.getByRole("button", { name: "Take a seat in Half-PPR #241." });
+      expect(opener).toHaveAttribute("aria-haspopup", "dialog");
+      expect(screen.queryByRole("link", { name: /Take/ })).not.toBeInTheDocument();
+      fireEvent.click(opener);
+      expect(onOpen).toHaveBeenCalledTimes(1);
     });
   });
 });
