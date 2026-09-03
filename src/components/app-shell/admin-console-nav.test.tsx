@@ -14,7 +14,7 @@ function mockPathname(next: string): void {
 }
 
 describe("AdminConsoleNav", () => {
-  it("lists all six operator surfaces for an admin standing on the admin console, axe-clean", async () => {
+  it("lists all seven operator surfaces for an admin standing on the admin console, axe-clean", async () => {
     mockPathname("/app/admin/queue");
     await renderSurface(<AdminConsoleNav isAdmin={true} />, async ({ container }) => {
       expect(screen.getByRole("link", { name: "Dispute queue" })).toHaveAttribute("href", "/app/admin/queue");
@@ -23,6 +23,7 @@ describe("AdminConsoleNav", () => {
       expect(screen.getByRole("link", { name: "Settle league" })).toHaveAttribute("href", "/app/admin/leagues/settle");
       expect(screen.getByRole("link", { name: "Dissolve league" })).toHaveAttribute("href", "/app/admin/leagues/dissolve");
       expect(screen.getByRole("link", { name: "Money reconciliation" })).toHaveAttribute("href", "/app/admin/money/reconcile");
+      expect(screen.getByRole("link", { name: "Jobs" })).toHaveAttribute("href", "/app/admin/jobs");
       expect(await axe(container)).toHaveNoViolations();
     });
   });
