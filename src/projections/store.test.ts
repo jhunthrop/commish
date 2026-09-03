@@ -133,6 +133,14 @@ describe("observationsAsOf — the leakage defence", () => {
     expect(known).toHaveLength(1);
   });
 
+  it("narrows to the named players when given, and every player when not", async () => {
+    await recordObservations(db, [observation({ playerId: "p1", value: 41 }), observation({ playerId: "p2", value: 33 })]);
+    const narrowed = await observationsAsOf(db, { season: 2024, week: 2, asOf: SUNDAY, playerIds: ["p2"] });
+    expect(narrowed).toEqual([expect.objectContaining({ playerId: "p2", value: 33 })]);
+    const everyone = await observationsAsOf(db, { season: 2024, week: 2, asOf: SUNDAY });
+    expect(everyone).toHaveLength(2);
+  });
+
   it("takes the latest restatement at or before the as-of — a stat correction supersedes", async () => {
     await recordObservations(db, [
       observation({ metric: "receiving_yards", value: 55, asOf: SUNDAY }),

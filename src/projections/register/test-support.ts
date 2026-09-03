@@ -39,19 +39,20 @@ export const REGISTER_DIR = "src/projections/register";
 /** The register's own operator scripts, which necessarily import it. Everything else under
  *  `scripts/` is swept, because a fit script that read a frozen row would leak this season's
  *  prospective record into next season's constants just as surely as a module would.
- *  `season-week-steps.ts` (Task 2, the weekly cadence) is the third: it orchestrates `takeFreeze`
- *  and `gradeWeek` on a schedule and has to read `latestFreezeFor` to decide skip-vs-supersede,
- *  which is exactly the same "necessarily imports it" shape the first two scripts already have.
- *  `season-week-steps.test.ts` is the fourth, for the same reason `register/*.test.ts` never needed
- *  a separate exemption: it seeds and asserts against the register directly, the way `freeze.test.ts`
- *  and `grade.test.ts` do — it just cannot inherit the directory-wide exemption those two get,
- *  because it lives beside its script under `scripts/`, a swept root, rather than inside
- *  `src/projections/register/` itself. */
+ *  `src/jobs/season-week/steps.ts` (Task 2's weekly cadence, moved out of `scripts/` in the
+ *  job-system round so the Vercel tick route could reach it — `src/**` may not import
+ *  `scripts/**`) is the third: it orchestrates `takeFreeze` and `gradeWeek` on a schedule and has
+ *  to read `latestFreezeFor` to decide skip-vs-supersede, which is exactly the same "necessarily
+ *  imports it" shape the first two scripts already have. Its test file is the fourth, for the same
+ *  reason `register/*.test.ts` never needed a separate exemption: it seeds and asserts against the
+ *  register directly, the way `freeze.test.ts` and `grade.test.ts` do — it just cannot inherit the
+ *  directory-wide exemption those two get, because it lives beside its module under `src/jobs/`,
+ *  a swept location, rather than inside `src/projections/register/` itself. */
 export const WALL_EXEMPT_FILES: readonly string[] = [
   "scripts/register-freeze.ts",
   "scripts/register-grade.ts",
-  "scripts/season-week-steps.ts",
-  "scripts/season-week-steps.test.ts",
+  "src/jobs/season-week/steps.ts",
+  "src/jobs/season-week/steps.test.ts",
 ];
 
 /** Everything that ships or runs. Not `e2e/` — it is the browser harness, cannot reach a database,

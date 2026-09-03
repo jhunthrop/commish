@@ -26,34 +26,45 @@ Flags:
 Exit code is nonzero if any step's status is `failed`. A `skipped` step is not a failure — it is
 the expected outcome for a week that has not been played, graded, or reached kickoff yet.
 
-## The cron entries
+## The runner (was: the cron entries)
 
-Installed by `scripts/install-season-cron.sh` (run it with `--print-only` to preview without
-touching crontab; re-running it is idempotent — it replaces only its own marker block, leaving
-every other crontab entry untouched):
+The weekly cadence now runs on the durable job system (`src/jobs/`, spec:
+`docs/superpowers/specs/2026-09-02-job-system-design.md`). The three cron fires became three
+code-defined schedules — same hours, same semantics, `America/New_York`:
+
+| Schedule | Cron | Purpose |
+|---|---|---|
+| `season-week-tue-data` | `0 8 * * 2` | data pass: Monday night stats settled, grade the played week |
+| `season-week-wed-data` | `0 18 * * 3` | data pass: mid-week props refresh |
+| `season-week-thu-freeze` | `0 14 * * 4` | freeze pass: hours of margin before Thursday kickoff |
+
+Each fire enqueues one idempotent `season-week` job (unique on schedule name + fire instant, so
+double ticks are harmless), and the schedule tick computes due-and-missed fires since its cursor
+— a laptop that slept through Tuesday 08:00 runs Tuesday's cadence when it wakes, which the old
+crontab never could.
+
+Installed by `scripts/install-season-runner.sh` (run with `--print-only` to preview without
+writing): it puts `npm run jobs:runner` under launchd (`com.commish.jobs-runner`, KeepAlive +
+RunAtLoad, logs under `~/.commish/job-logs/`) and removes the OLD installer's crontab marker
+block with the same validation gate that installer had — a crontab whose markers are anything but
+zero or one balanced pair is refused untouched. The runner runs against the **main checkout**
+(`/Users/jh/code/fantasy`), not a worktree; **do not install until the job-system branch merges
+to main** (`npm run jobs:runner` does not exist there before that).
+
+Operations:
 
 ```
-# BEGIN commish season-week cron (managed by scripts/install-season-cron.sh -- do not edit by hand)
-0 8 * * 2 cd /Users/jh/code/fantasy && npm run season:week >> /Users/jh/.commish/season-logs/$(date +\%Y-\%m-\%d)-tue-data.log 2>&1
-0 18 * * 3 cd /Users/jh/code/fantasy && npm run season:week >> /Users/jh/.commish/season-logs/$(date +\%Y-\%m-\%d)-wed-data.log 2>&1
-0 14 * * 4 cd /Users/jh/code/fantasy && npm run season:week >> /Users/jh/.commish/season-logs/$(date +\%Y-\%m-\%d)-thu-freeze.log 2>&1
-# END commish season-week cron
+launchctl print gui/$(id -u)/com.commish.jobs-runner | head -20   # status
+tail -f ~/.commish/job-logs/runner.log                             # logs
+launchctl bootout gui/$(id -u)/com.commish.jobs-runner             # stop
 ```
 
-(The `\%` is not a typo — crontab treats a bare `%` as a newline inside a command, so `date`'s
-format string has to escape it. `--print-only` on the install script prints this exact block.)
+Observability lives at `/app/admin/jobs`: dead-lettered jobs first (a terminal failure is loud
+by design), schedules with cursors and last fires, recent runs, and a Run again action. On a
+Vercel deployment the same jobs run through the authenticated tick route (`/api/jobs/tick`,
+CRON_SECRET bearer, one bounded tick per minute) with no code changes.
 
-All three entries run the identical `npm run season:week`, cd'd into the **main checkout**
-(`/Users/jh/code/fantasy`), not this worktree — crontab has no notion of a git worktree, and a job
-pointed at a worktree would break the moment the worktree is removed after this branch merges.
-**Until this branch merges to main, these entries will fail** (exit 127, `missing script:
-season:week`) every time they fire; that is expected and self-correcting the moment `season:week`
-lands on main. Every step the command runs is idempotent-or-skip, so firing it three times a week
-costs nothing extra beyond the one real freeze it eventually takes.
-
-Why these three passes, and these times (assumes the crontab runs in `America/New_York` — Vixie
-cron, what ships on macOS and most Linux distributions, has no per-line timezone, so the whole
-crontab runs in one; adjust the hours by hand if the host's system timezone differs):
+Why these three passes, and these hours: unchanged from the crontab era —
 
 1. **Tuesday 08:00 ET — data pass.** By Tuesday morning, Sunday's late corrections and Monday
    Night Football's own final stats have both settled, so this is the first pass each week that
@@ -71,7 +82,8 @@ crontab runs in one; adjust the hours by hand if the host's system timezone diff
 
 Full reasoning, including the stats-ingest entrypoint choice (why this is `ingestSeason`
 directly, not `npm run stats:ingest` or a full `npm run projections:backfill` run), lives in
-`scripts/season-week.ts`'s and `scripts/install-season-cron.sh`'s own header comments.
+`src/jobs/season-week/deps.ts`'s and `src/jobs/schedules.ts`'s own header comments. The manual
+`npm run season:week` CLI still exists for operator-initiated runs and behaves exactly as before.
 
 ## Two one-off commands the weekly cadence does not cover
 

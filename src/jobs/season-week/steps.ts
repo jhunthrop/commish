@@ -1,7 +1,9 @@
-// THE WEEKLY CADENCE'S ORCHESTRATION LOGIC — everything `scripts/season-week.ts` (the thin CLI) and
-// `scripts/season-week.test.ts` (the fixtures) both need, and the ONLY place besides the register's
-// own two scripts that may import `src/projections/register` (`WALL_EXEMPT_FILES`,
-// `src/projections/register/test-support.ts`).
+// THE WEEKLY CADENCE'S ORCHESTRATION LOGIC — everything `scripts/season-week.ts` (the thin CLI)
+// and `src/jobs/defs/season-week-job.ts` (the durable job) both need, and the ONLY place besides
+// the register's own two scripts that may import `src/projections/register` (`WALL_EXEMPT_FILES`,
+// `src/projections/register/test-support.ts`). Moved here from `scripts/season-week-steps.ts` in
+// the job-system round: the Vercel tick route has to reach these steps and `src/**` may not
+// import `scripts/**` — the exemption moved with the file, same one file, new path.
 //
 // FIVE STEPS, EACH ISOLATED. `runSeasonWeek` wraps every step in `safely`, so a step that throws is
 // reported as `status: "failed"` and the run continues to the next step rather than crashing the
@@ -23,6 +25,15 @@ import { formatScoreboard, gradableWeeksFor, gradeWeek, latestGradeRowsByWeek, r
 import { freezeRowsAt, gradeRowsFor, latestFreezeFor } from "@/projections/register/store";
 import { SERVED_BOARD_SOURCE } from "@/projections/register/sources";
 import { kickoffInstantsByWeek } from "@/projections/team-store";
+
+/**
+ * THE SANCTIONED PASS-THROUGH of the register's refusal type (job-system fix round, HIGH-1). The
+ * job definition (`src/jobs/defs/season-week-job.ts`) must classify a register refusal terminal
+ * by `instanceof`, and it may not import `src/projections/register` itself — this file is the
+ * wall-exempt orchestrator, so the CLASS crosses here, exactly one name, no register data. A
+ * second wall exemption for the job def would widen the quarantine for what one re-export solves.
+ */
+export { RegisterRefusalError } from "@/projections/register/errors";
 
 export type StepStatus = "ok" | "skipped" | "failed";
 

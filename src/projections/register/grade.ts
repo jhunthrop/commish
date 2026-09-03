@@ -395,7 +395,7 @@ function meanOf(values: readonly number[]): number | null {
  * Every grade row belonging to the LATEST `gradedAt` its own week received, grouped by week. The
  * one dedup rule the register's grade rows ever need: a week's grading may be re-run after a stat
  * correction, and only the newest run should count toward anything downstream — the scoreboard's
- * cumulative columns and `scripts/season-week-steps.ts`'s printed per-week population both read
+ * cumulative columns and `src/jobs/season-week/steps.ts`'s printed per-week population both read
  * through this, so neither can drift from what the other considers "this week's grading".
  */
 export function latestGradeRowsByWeek(rows: readonly RegisterGradeRow[]): ReadonlyMap<number, readonly RegisterGradeRow[]> {

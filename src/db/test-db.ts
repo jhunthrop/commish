@@ -81,6 +81,22 @@ export async function truncateMoneyTables(db: Db): Promise<void> {
 }
 
 /**
+ * The job system's own truncation (job-system round, migration 0068), SEPARATE from `truncateAll`
+ * for the exact reason `truncateMoneyTables` was: these tables do not exist on main's
+ * `commish_test` until this lane merges, and folding them into `truncateAll`'s list now would
+ * fail every OTHER suite against a database that has not seen 0068 yet. Every job-system suite
+ * calls this beside `truncateAll`. THE MERGE CLEANUP: once this lane lands and `db:migrate:test`
+ * carries every lane past 0068, fold these four names into `truncateAll` and delete this helper.
+ *
+ * The append-only triggers on `job_runs`/`job_run_steps` do not block TRUNCATE, by 0019/0068's
+ * own ruling (26): table ownership can already DROP or DISABLE TRIGGER, and this is how every
+ * job-system integration test starts clean.
+ */
+export async function truncateJobTables(db: Db): Promise<void> {
+  await db.execute(sql`TRUNCATE TABLE job_run_steps, job_runs, jobs, schedule_cursors RESTART IDENTITY CASCADE`);
+}
+
+/**
  * `db.execute` throws drizzle-orm's `DrizzleQueryError`, whose own `.message` is just the SQL
  * text it was trying to run — the driver's real error (a trigger's `RAISE EXCEPTION` text, or
  * the violated constraint's name) sits one level down on `.cause`. `unwrapCauseChain`
