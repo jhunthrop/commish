@@ -30,7 +30,7 @@ const cannedSeasonWeek: AnyJobDefinition = defineJob({
   steps: [{ name: "only", run: async () => ({ summary: "canned", detail: [] }) }],
 });
 
-function deps(env: NodeJS.ProcessEnv = { CRON_SECRET: SECRET }): TickHandlerDeps {
+function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET: SECRET }): TickHandlerDeps {
   return {
     db,
     definitions: new Map([

@@ -7,12 +7,12 @@ import { fail, ok } from "@/lib/api/respond";
 import { JOBS_CONFIG } from "./config";
 import type { AnyJobDefinition } from "./contract";
 import { runTick } from "./runner";
-import { cronSecretFromEnv, isAuthorizedTick } from "./tick-auth";
+import { cronSecretFromEnv, isAuthorizedTick, type EnvRecord } from "./tick-auth";
 
 export interface TickHandlerDeps {
   readonly db: Db;
   readonly definitions: ReadonlyMap<string, AnyJobDefinition>;
-  readonly env: NodeJS.ProcessEnv;
+  readonly env: EnvRecord;
   readonly workerId: string;
 }
 
@@ -21,7 +21,7 @@ export interface TickHandlerDeps {
 const BUDGET_FLOOR_MS = 5_000;
 const BUDGET_CEILING_MS = 280_000;
 
-export function tickBudgetMs(env: NodeJS.ProcessEnv): number {
+export function tickBudgetMs(env: EnvRecord): number {
   const raw = env.JOBS_TICK_BUDGET_MS;
   if (raw === undefined || raw === "") return JOBS_CONFIG.vercelTickBudgetMsDefault;
   const parsed = Number(raw);
@@ -53,7 +53,7 @@ export async function handleTick(request: Request, deps: TickHandlerDeps): Promi
   }
 }
 
-function readSecret(env: NodeJS.ProcessEnv): string | null {
+function readSecret(env: EnvRecord): string | null {
   try {
     return cronSecretFromEnv(env);
   } catch {
