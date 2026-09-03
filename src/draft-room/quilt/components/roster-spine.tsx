@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { positionStickerClass } from "@/components/ui/position-badge";
 import { SLOT_POSITION } from "../../components/room-dock";
 
@@ -52,7 +53,7 @@ export function RosterSpine({ view, myTeamId, playersById, expanded, onToggle }:
         onClick={onToggle}
         className="flex w-11 shrink-0 flex-col items-center gap-1.5 border-r border-line bg-surface-elevated py-3 focus-visible:outline-2 focus-visible:outline-accent"
       >
-        <span aria-hidden="true" className="mb-1 font-mono text-[9px] uppercase tracking-wide text-text-faint [writing-mode:vertical-rl] rotate-180">
+        <span aria-hidden="true" className={`mb-1 ${MICRO_LABEL} text-text-faint [writing-mode:vertical-rl] rotate-180`}>
           roster
         </span>
         {slots.map((slot) => {
@@ -77,7 +78,7 @@ export function RosterSpine({ view, myTeamId, playersById, expanded, onToggle }:
         onClick={onToggle}
         className="flex items-center justify-between border-b border-line px-3 py-2 focus-visible:outline-2 focus-visible:outline-accent"
       >
-        <span className="font-mono text-xs uppercase tracking-wide text-text-faint">My roster</span>
+        <span className={`${MICRO_LABEL} text-text-faint`}>My roster</span>
         <span className="font-display text-xs font-bold text-text-muted tabular-nums">
           {filled}/{slots.length}
         </span>

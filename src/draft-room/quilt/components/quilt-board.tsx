@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { positionStickerClass } from "@/components/ui/position-badge";
 import { buildQuiltRows, pickPlace, type QuiltRow } from "../state/board";
 import { needsByTeam, pickValueVerdict, type Lens } from "../state/lens";
@@ -72,7 +73,7 @@ export function QuiltBoard({ view, teams, playersById, myTeamId, lens, byeWeeks,
           facts, and the rounds grid stays beneath untouched (the lens law). */}
       {needs !== null ? (
         <div className={GRID} style={columns} data-testid="quilt-needs-row">
-          <div className="self-center text-right font-mono text-[10px] uppercase tracking-wide text-text-faint">needs</div>
+          <div className={`self-center text-right ${MICRO_LABEL} text-text-faint`}>needs</div>
           {view.draftOrder.map((teamId) => (
             <div key={teamId} className="flex min-h-8 items-center justify-center gap-1 rounded-sm border border-line bg-surface-inset">
               {(needs.get(teamId) ?? []).map((position, index) => (

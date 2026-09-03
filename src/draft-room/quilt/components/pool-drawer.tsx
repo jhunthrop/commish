@@ -6,6 +6,7 @@ import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
 import { Button, PositionBadge } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import type { CheatSheet } from "../state/sheet";
 import { DRAWER_TABS, type CollapseEvent, type DrawerTab, type ExpandedSurface } from "../state/collapse";
 import { QUILT_CONFIG } from "../state/config";
@@ -58,7 +59,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
     return (
       <div id="dock-queue" data-testid="pool-drawer" data-drawer-height="collapsed" className="flex flex-col gap-2 border-t border-line bg-surface-elevated px-4 py-2.5">
         <div id="player-pool" className="flex items-center gap-3">
-          <span className="font-mono text-xs uppercase tracking-wide text-text-muted">Best available</span>
+          <span className={`${MICRO_LABEL} text-text-muted`}>Best available</span>
           <span className="h-px flex-1 bg-line" aria-hidden="true" />
           <Button size="sm" variant="ghost" onClick={() => dispatch({ type: "TOGGLE_DRAWER" })}>
             Expand pool
@@ -124,7 +125,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
             </button>
           ))}
         </div>
-        <span className="ml-auto hidden font-mono text-xs uppercase tracking-wide text-text-faint lg:inline">space toggles · esc collapses</span>
+        <span className={`ml-auto hidden ${MICRO_LABEL} text-text-faint lg:inline`}>space toggles · esc collapses</span>
         <Button size="sm" variant="ghost" onClick={() => dispatch({ type: "COLLAPSE_ALL" })}>
           Collapse
         </Button>

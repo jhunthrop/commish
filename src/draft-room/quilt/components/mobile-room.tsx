@@ -93,7 +93,7 @@ export function MobileRoom(props: MobileRoomProps) {
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Header: amber takeover on your turn, slim red ribbon otherwise. */}
       {myTurn ? (
-        <div data-testid="mobile-your-turn" className="flex flex-col gap-2 border-b-2 border-accent bg-accent-glow px-4 py-3">
+        <div data-testid="mobile-your-turn" className="accent-wash flex flex-col gap-2 border-b-2 border-accent px-4 py-3">
           <div className="flex items-center gap-3">
             <span className="font-display text-3xl font-bold text-accent tabular-nums">{clockLabel ?? "…"}</span>
             <span className="font-display text-md font-bold text-accent">YOUR PICK</span>

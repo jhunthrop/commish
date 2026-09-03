@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { Player } from "@/domain/player";
 import { Button } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { formatAdp } from "../../lib/tiers";
 import { DrawerRow } from "./drawer-row";
 import type { RoomActs } from "./room-acts";
@@ -39,7 +40,7 @@ export function DrawerByesTab({ players, available, byeWeeks, canDraft, submitti
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
       {bands.map((band) => (
         <section key={band.week ?? "none"} aria-label={band.week === null ? "No bye on record" : `Bye week ${band.week}`} className="flex flex-col gap-1">
-          <h3 className="font-mono text-xs uppercase tracking-wide text-text-faint">
+          <h3 className={`${MICRO_LABEL} text-text-faint`}>
             {band.week === null ? "No bye on record" : `Bye ${band.week}`}
             <span className="ml-2 tabular-nums">{band.players.length}</span>
           </h3>

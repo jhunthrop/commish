@@ -5,6 +5,7 @@ import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
 import { Button } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { pickLabel } from "../state/board";
 import { QUILT_CONFIG } from "../state/config";
@@ -73,7 +74,7 @@ export function ClockStrip({ view, teams, playersById, myTeamId, queue, myTurn, 
       <div
         data-testid="clock-strip"
         data-strip-state="your-turn"
-        className={`flex items-center gap-3 border-b-2 border-accent bg-accent-glow px-4 py-2 ${reducedMotion ? "" : "animate-strip-grow"}`}
+        className={`accent-wash flex items-center gap-3 border-b-2 border-accent px-4 py-2 ${reducedMotion ? "" : "animate-strip-grow"}`}
       >
         <div id="room-clock" className="flex items-center gap-2 rounded-sm bg-accent px-3 py-1.5">
           <span className="font-display text-2xl font-bold text-accent-text tabular-nums">{clockLabel ?? "…"}</span>
@@ -93,7 +94,7 @@ export function ClockStrip({ view, teams, playersById, myTeamId, queue, myTurn, 
               </div>
             );
           })}
-          <span className="hidden font-mono text-xs uppercase tracking-wide text-text-faint xl:inline">{fromBoard ? "board" : "your queue"}</span>
+          <span className={`hidden ${MICRO_LABEL} text-text-faint xl:inline`}>{fromBoard ? "board" : "your queue"}</span>
         </div>
         <LensChips {...lensChips} />
       </div>

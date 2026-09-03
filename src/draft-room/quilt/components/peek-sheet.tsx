@@ -5,6 +5,7 @@ import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
 import { Button, PositionBadge } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { formatAdp } from "../../lib/tiers";
 
 export interface PeekFacts {
@@ -115,7 +116,7 @@ export function PeekSheet({ facts, view, myTeamId, canDraft, submitting, onDraft
 
         {availability !== null ? (
           <div className="flex flex-col gap-1">
-            <p className="font-mono text-xs uppercase tracking-wide text-text-faint">Availability</p>
+            <p className={`${MICRO_LABEL} text-text-faint`}>Availability</p>
             <p className="rounded-sm bg-surface-raised px-3 py-2 text-xs text-text-muted">
               Expected <span className="font-semibold text-text-primary tabular-nums">{availability.expectedGames.toFixed(1)}</span> games · range{" "}
               <span className="tabular-nums">{availability.floorGames}</span> to <span className="tabular-nums">{availability.ceilingGames}</span>
@@ -124,7 +125,7 @@ export function PeekSheet({ facts, view, myTeamId, canDraft, submitting, onDraft
         ) : null}
 
         <div className="flex flex-col gap-1">
-          <p className="font-mono text-xs uppercase tracking-wide text-text-faint">Measured edges</p>
+          <p className={`${MICRO_LABEL} text-text-faint`}>Measured edges</p>
           <p data-testid="peek-edges" className="rounded-sm bg-surface-raised px-3 py-2 text-xs text-text-muted">
             {edges ?? "No measured edge on him"}
             {edges !== null ? <span className="text-text-faint"> · detail withheld in room</span> : null}
@@ -133,13 +134,13 @@ export function PeekSheet({ facts, view, myTeamId, canDraft, submitting, onDraft
 
         {slot !== null && !facts.drafted ? (
           <div className="flex flex-col gap-1">
-            <p className="font-mono text-xs uppercase tracking-wide text-text-faint">Roster fit</p>
+            <p className={`${MICRO_LABEL} text-text-faint`}>Roster fit</p>
             <p className="rounded-sm bg-surface-raised px-3 py-2 text-xs text-positive">Fills your open {slot} slot</p>
           </div>
         ) : null}
 
         <div className="flex flex-col gap-1">
-          <p className="font-mono text-xs uppercase tracking-wide text-text-faint">Your note</p>
+          <p className={`${MICRO_LABEL} text-text-faint`}>Your note</p>
           {editingNote ? (
             <div className="flex flex-col gap-2">
               <textarea
@@ -197,7 +198,7 @@ function Figure({ label, value, accent }: { readonly label: string; readonly val
   return (
     <div className="flex flex-col gap-0.5 rounded-sm bg-surface-raised px-3 py-2">
       <span className={`font-display text-lg font-bold tabular-nums ${accent ? "text-accent" : "text-text-primary"}`}>{value}</span>
-      <span className="font-mono text-[10px] uppercase tracking-wide text-text-faint">{label}</span>
+      <span className={`${MICRO_LABEL} text-text-faint`}>{label}</span>
     </div>
   );
 }
