@@ -98,6 +98,9 @@ export function CreateSheet({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name,
+          // Only what this sheet actually asks the founder: teamCount and scoringPreset. Every
+          // other league setting is deliberately omitted, not forgotten — the LEAGUE_CONFIG
+          // schema's own defaults govern whatever this sheet never asked about.
           teamCount: Number(teamCount),
           scoringPreset,
           // The zero-rake podium split, published with the fee it balances against — only a
