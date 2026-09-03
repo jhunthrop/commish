@@ -143,38 +143,77 @@ const dark: Palette = {
 /**
  * Light — the same room in daylight, designed to the same roles and the same contrast
  * thresholds, never derived from `dark` by inversion (founder ruling, 2026-08-23). `surface`
- * is the mock's paper (`#FBFBFA`); depth moves the OTHER direction from dark's monotonic climb,
- * because a light UI's brightest surface is the card, not the page — `surfaceElevated` is the
- * peak (white, the mock's `--card`), and `surfaceRaised`/`surfaceInset` step down from the page
- * toward gray as a field or a well recedes. `accent`/`positive`/`negative`/`warning`/`info`
- * keep dark's hue families, darkened and saturated until they clear 4.5:1 as text directly on
- * `surface` — a naive inversion (dark's bright mint literally on white) fails that badly.
+ * is the day game's paper; depth moves the OTHER direction from dark's monotonic climb,
+ * because a light UI's brightest surface is the card, not the page — `surfaceRaised` is the
+ * peak (white), and `surface`/`surfaceInset` step down as a field or a well recedes.
+ * `positive`/`negative`/`live`/`warning`/`info` keep dark's hue families, darkened and
+ * saturated until they clear 4.5:1 as text directly on `surface` — a naive inversion (dark's
+ * bright mint literally on white) fails that badly.
+ *
+ * THE BLUE RE-DERIVATION (founder direction, 2026-09-02: *"I don't like the light mode colour
+ * scheme. Can we make it blue themed?"*). This is a HUE move inside v5, not a new system: the
+ * role set, the four-step ladder, the binding ground and every contrast threshold are the ones
+ * the spec already solved. Two things changed and nothing else:
+ *
+ * - **The neutrals stopped being neutral.** The old ladder was near-achromatic (an 8-point
+ *   spread between the red and blue channels on the ground). Every surface, the hairline, the
+ *   control boundary and all three ink roles are now solved on ONE hue — 213-221°, a daylight
+ *   blue — with the channel spread widened to 18-25 points so the tint is a decision a person
+ *   can see rather than a rounding error. Newsprint became blueprint.
+ * - **`accent` moved from amber to the brand blue.** Law 4 channel one is *furniture, you, and
+ *   the verb* — the network's own graphics, which is exactly the channel a brand hue belongs to.
+ *   Amber was never a verdict and nothing semantic moved with it.
+ *
+ * WHAT DID NOT MOVE, and the reason each one did not:
+ *
+ * - `positive` (green), `negative` (red), `live`/`warning` (red) and the whole magnitude ramp
+ *   are LAW 4's semantic channels. A verdict that stops being green or red stops being a
+ *   verdict, so the blue never reaches them.
+ * - The position stickers are a LEGEND — six categories held apart by a pairwise gate whose
+ *   tightest pair (`wr`/`def`) is already carried by contrast rather than hue. Re-hueing a
+ *   category set toward one hue is the one move that gate cannot survive.
+ * - The tier ladder is an ORDER, and `tokens.test.ts` holds its ends ≥30° apart in hue so `S`
+ *   can never read as `C`. It is a warm-to-cool ramp by construction: pull `S` into the blue
+ *   family and the ladder's own range gate fails. `A`/`B`/`C` are already blue-greys.
+ *
+ * THE ONE COST, STATED RATHER THAN HIDDEN: `accent` (#1350A8, 215°) and `info` (#105C93, 205°)
+ * now sit in the same hue family in daylight, where dark keeps them a full colour wheel apart
+ * (amber against blue). No gate binds the pair — `DISTINGUISHABLE_PAIRS` does not list it,
+ * because the two never appear in the same role: `accent` is a FILL and the product's furniture,
+ * `info` is only ever ink on a surface. Separating them by luminance instead would need `info`
+ * inside a 0.006-wide band of relative luminance to keep its own 4.5:1 on `surface`, which is a
+ * margin the next surface tune would silently eat. Recorded here so it is a decision.
  */
 const light: Palette = {
-  surface: "#F4F5F7", // newsprint — the ground
-  surfaceElevated: "#FAFBFC", // a card lifted off the paper
+  surface: "#EDF4FF", // daylight blue paper — the ground. 217°
+  surfaceElevated: "#F6FAFF", // a card lifted off the paper. 213°
   surfaceRaised: "#FFFFFF", // a row lifted off its card — the brightest surface in daylight
   /**
    * The well, and THE BINDING GROUND for every light value below: the dimmest of the four,
    * because a well recedes in daylight while a raised row climbs. This is the mirror of dark,
    * where the binding ground is the brightest surface, and getting it backwards is the single
    * most repeated mistake in this file's history.
+   *
+   * Re-solved for the blue pass at relative luminance 0.8407, deliberately a shade ABOVE the
+   * achromatic ladder's 0.8280: the first blue candidate at 0.7925 read better on its own and
+   * dropped the magnitude ramp's `bad` step to 4.39:1 in every table's own track. The spec says
+   * this happens every time a surface moves, and it happened again.
    */
-  surfaceInset: "#E8EBEF",
-  line: "#DDE1E8", // the decorative hairline between two surfaces
-  edge: "#767F8E", // WCAG 1.4.11's 3:1 for a control boundary. 3.38:1
-  textPrimary: "#0A0D12", // ink. 16.27:1
+  surfaceInset: "#E5EDF9",
+  line: "#C9D9EE", // the decorative hairline between two surfaces. 1.30:1 on the ground — a hairline, not a boundary
+  edge: "#6C7F9C", // WCAG 1.4.11's 3:1 for a control boundary. 3.46:1 on the binding ground
+  textPrimary: "#0A0F1A", // blue-black ink. 16.25:1 across all four surfaces
   /**
    * Re-solved twice. The plain-surface check passes at a lighter value, but this role also sits
    * on the 10%-of-negative and 10%-of-live tint composites the product paints, and against those
    * a plain-surface-only solve measured 4.27:1 and 4.22:1. Solved against all six grounds.
    */
-  textMuted: "#596576", // 4.56:1 across four surfaces AND both tint composites
-  textFaint: "#5C6470", // 4.60:1 — held to the full text bar, and to both tint composites
-  accent: "#9D5707", // law 4 channel one: furniture, you, the verb. 4.62:1
-  accentText: "#FFFFFF", // 5.53:1 on the amber fill
-  accentGlow: "rgba(157, 87, 7, 0.12)",
-  positive: "#033020", // law 4 channel two: deep green, the loud end (founder ruling 2026-08-30). 12.13:1
+  textMuted: "#526073", // 5.43:1 across four surfaces, 4.84:1 on the tightest tint composite
+  textFaint: "#566076", // 5.35:1 — held to the full text bar, and to both tint composites
+  accent: "#1350A8", // law 4 channel one: furniture, you, the verb. 6.50:1 across four surfaces
+  accentText: "#FFFFFF", // 7.66:1 on the blue fill
+  accentGlow: "rgba(19, 80, 168, 0.12)",
+  positive: "#033020", // law 4 channel two: deep green, the loud end (founder ruling 2026-08-30). 12.91:1 on the blue ground
   /**
    * The quiet end of the verdict pair, and a FIXED POINT: this value is both the text colour and
    * the source of the 10%-of-itself tint it then sits on, so it must clear 4.5:1 against a
@@ -185,14 +224,16 @@ const light: Palette = {
    * ground the loud end of the verdict pair has to go DARKER, not brighter, or `positive` and
    * `negative` cannot both clear the floor and stay 1.5 apart in luminance.
    */
-  negative: "#861B13", // 8.06:1 plain, clears its own tint, 1.64x from live, 1.51x under positive
+  negative: "#861B13", // 8.57:1 plain on the blue ground, clears its own tint, 1.64x from live, 1.51x under positive
   negativeText: "#FFFFFF", // 5.71:1 on the warm-red fill
-  live: "#C20A0A", // law 4 channel three. Re-solved for the red negative's 10% tint composite (was 4.49 on it): 4.82, chain to negative 1.53
+  live: "#C20A0A", // law 4 channel three. Re-solved for the red negative's 10% tint composite (was 4.49 on it): 4.75, chain to negative 1.53
   liveText: "#FFFFFF", // 5.77:1 on the live fill
   // A tightening clock. A separate hue from `accent`, never a shade of it — see dark's docblock.
   warning: "#C20A0A", // the live channel; see dark's docblock
   warningGlow: "rgba(194, 10, 10, 0.12)",
-  info: "#105C93", // 5.90:1
+  // Unchanged by the blue pass, and the one place daylight is now poorer than night: see the
+  // palette docblock's "one cost". 205°, one hue-family neighbour of `accent`, never in its role.
+  info: "#105C93", // 6.28:1 on the blue ground
   scrim: "#000000",
 };
 
@@ -278,11 +319,13 @@ const lightPositions: PositionPalette = {
  *
  * - **Dark's binding ground is `surfaceRaised`** (#2F2F39, the BRIGHTEST of the four), so every
  *   dark step needs relative luminance ≥ 0.307 to clear 4.5:1.
- * - **Light's binding ground is `surfaceInset`** (#F3F3F1, the DIMMEST of the four — a well
- *   recedes in daylight), so every light step needs luminance ≤ 0.160. Solving against white
+ * - **Light's binding ground is `surfaceInset`** (#E5EDF9, the DIMMEST of the four — a well
+ *   recedes in daylight), so every light step needs luminance ≤ 0.148. Solving against white
  *   instead would have allowed 0.183 and shipped a `bad` red that failed in every table's own
  *   track. The 2026-08-27 solve caught that on the first pass; it is written down here so the
- *   next person tuning this ramp does not rediscover it in an axe report.
+ *   next person tuning this ramp does not rediscover it in an axe report. The 2026-09-02 blue
+ *   pass caught it a SECOND time from the other direction: a blue inset one step too dark put
+ *   `bad` at 4.39:1, and the inset was lifted rather than the ramp re-hued.
  *
  * **The ramp is ordered by luminance, not by hue, and that ordering is the point.** Green versus
  * red is the worst available pair for deuteranopia (roughly one man in twelve) and this
@@ -312,12 +355,15 @@ const darkMagnitude: MagnitudePalette = {
   bad: "#F05549", // 5.21:1
 };
 
+// Unmoved by the 2026-09-02 blue pass — a verdict that stops being green or red stops being a
+// verdict. Ratios below are re-measured against the new blue ground, and still strictly
+// decreasing, which is the only property this ramp actually promises.
 const lightMagnitude: MagnitudePalette = {
-  strong: "#044E33", // 8.20:1
-  good: "#1F5C45", // 6.56:1
+  strong: "#044E33", // 8.86:1
+  good: "#1F5C45", // 7.10:1
   neutral: light.textPrimary,
-  weak: "#9F3C28", // 5.57:1
-  bad: "#C82C20", // 4.58:1
+  weak: "#9F3C28", // 6.02:1
+  bad: "#C82C20", // 4.95:1 on the ground, 4.64:1 on the binding inset
 };
 
 /**
@@ -457,12 +503,20 @@ const darkTiers: TierPalette = {
 
 /** The same four hues (6°, 30°, 48°, 217° against dark's 5°, 31°, 49°, 209°) taken down in
  *  lightness until each clears 4.5:1 against white — which is what puts white ink on them and,
- *  in one step, satisfies the 3:1 findability floor on every light surface with margin. */
+ *  in one step, satisfies the 3:1 findability floor on every light surface with margin.
+ *
+ *  UNMOVED BY THE BLUE PASS (2026-09-02), and `S` is the reason. A grade badge is an ORDER, and
+ *  the gate below holds the ladder's ends ≥30° apart in hue so `S` can never read as `C`. The
+ *  ramp is warm-to-cool by construction: pull `S` into the blue family and `S`, `A`, `B` and `C`
+ *  collapse onto one hue and the range gate fails. So `S` keeps amber even though `accent` — the
+ *  role it used to share a pigment with — is now blue. That doubling was never load-bearing:
+ *  a tier plate is a legend and `accent` is the verb, and nothing asserted they were equal.
+ *  Every ratio below is re-measured against the new blue ground, not carried over. */
 const lightTiers: TierPalette = {
-  S: { fill: "#9D5707", label: "#FFFFFF" }, // 5.07:1 on ground, 5.53:1 label
-  A: { fill: "#495465", label: "#FFFFFF" }, // 7.03:1 on ground, 7.67:1 label
-  B: { fill: "#6E7D91", label: "#0A0D12" }, // 3.85:1 on ground, 4.64:1 label
-  C: { fill: "#7F8C9F", label: "#0A0D12" }, // 3.13:1 on ground, 5.70:1 label
+  S: { fill: "#9D5707", label: "#FFFFFF" }, // 5.00:1 on ground, 5.53:1 label
+  A: { fill: "#495465", label: "#FFFFFF" }, // 6.93:1 on ground, 7.67:1 label
+  B: { fill: "#6E7D91", label: "#0A0D12" }, // 3.79:1 on ground, 4.64:1 label
+  C: { fill: "#7F8C9F", label: "#0A0D12" }, // 3.08:1 on ground, 5.70:1 label — the tightest value in the light palette
 };
 
 export const TOKENS = {

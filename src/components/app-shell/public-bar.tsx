@@ -19,15 +19,12 @@ export interface NavLink {
  *
  * "How it works" points at `/league-rules`, whose own `<h1>` reads "How it works" — a signed-in
  * manager and a stranger see one name for one page (N15's rule, applied to the second surface it
- * was always about). "Player laws" points at `/player-laws` the same way, matching that route's
- * own `<h1>` (Task 9) — the product's second public reference page, registered alongside the
- * first rather than reachable only from a board's reason chip. The front door appends its
- * conditional "Reviews" entry to THIS list rather than keeping a third copy of the base.
+ * was always about). The front door appends its conditional "Reviews" entry to THIS list rather
+ * than keeping a third copy of the base.
  */
 export const STOREFRONT_NAV: readonly NavLink[] = [
   { href: "/browse", label: "Open leagues" },
   { href: "/league-rules", label: "How it works" },
-  { href: "/player-laws", label: "Player laws" },
 ];
 
 export interface PublicBarProps {
