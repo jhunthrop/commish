@@ -3,6 +3,7 @@
 // admin surface (`admin-view.ts`) — this file is the one place a `jobs` row's status ever moves.
 import { and, asc, eq, lt, lte } from "drizzle-orm";
 import type { Db } from "@/db/client";
+import { unwrapCauseChain } from "@/db/errors";
 import { jobRunSteps, jobRuns, jobs } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
@@ -139,6 +140,23 @@ export async function recordAttemptFailure(db: Db, clock: Clock, claimed: Claime
         .where(eq(jobs.id, claimed.jobId));
     }
   });
+}
+
+/**
+ * THE RECLAIM RACE'S SIGNATURE (fix round, MEDIUM-2). A worker whose attempt was reclaimed
+ * mid-flight (a long GC pause, a laptop lid) is a zombie the moment `reclaimStaleJobs` closes its
+ * run row as `abandoned` — and when it later tries to finish, the append-only trigger rejects the
+ * UPDATE with its "a finished run ... may not be rewritten" refusal and the whole finish
+ * transaction rolls back. That rejection is CORRECT (a newer attempt owns the job now; the
+ * zombie's late result must not overwrite the record), but it must not kill the caller's tick:
+ * the executor asks this predicate and reports the attempt `superseded` instead of throwing. The
+ * trigger text is ours (migration 0068), matched via the same cause-chain walk
+ * `expectRejectionMatching` uses, because drizzle wraps the driver's error one level down.
+ */
+export function isSupersededAttempt(error: unknown): boolean {
+  return unwrapCauseChain(error).some(
+    (link) => link instanceof Error && link.message.includes("job_runs is append-only history: a finished run"),
+  );
 }
 
 export interface ReclaimedJob {

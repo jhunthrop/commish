@@ -8,6 +8,7 @@ import { JOBS_CONFIG } from "./config";
 import { TerminalJobError, type AnyJobDefinition } from "./contract";
 import {
   completedStepsFor,
+  isSupersededAttempt,
   recordAttemptFailure,
   recordHeartbeat,
   recordStepCompletion,
@@ -29,7 +30,10 @@ export interface ExecutionReport {
   readonly jobId: number;
   readonly name: string;
   readonly attempt: number;
-  readonly outcome: "succeeded" | "retry-scheduled" | "dead-lettered";
+  /** `superseded`: this attempt was reclaimed mid-flight and a newer attempt owns the job; the
+   *  zombie's late finish was rejected by the append-only trigger and discarded. Nothing to do —
+   *  the reclaimed job is already pending (or dead-lettered) under its own bookkeeping. */
+  readonly outcome: "succeeded" | "retry-scheduled" | "dead-lettered" | "superseded";
   readonly error?: string;
   readonly errorKind?: "retryable" | "terminal" | "timeout";
   readonly nextRunAt?: string;
@@ -115,6 +119,7 @@ export async function executeClaimedJob(
     await succeedJob(deps.db, deps.clock, claimed);
     return { jobId: claimed.jobId, name: claimed.name, attempt: claimed.attempt, outcome: "succeeded" };
   } catch (error: unknown) {
+    if (isSupersededAttempt(error)) return supersededReport(claimed);
     const kind = error instanceof TerminalJobError ? "terminal" : error instanceof AttemptTimeoutError ? "timeout" : "retryable";
     return finishFailed(deps, claimed, {
       error: errorText(error),
@@ -125,6 +130,15 @@ export async function executeClaimedJob(
   } finally {
     clearInterval(heartbeat);
   }
+}
+
+/** The reclaim race, resolved in the loser's favor quietly: log it, report it, change nothing —
+ *  the reclaim already closed this attempt's run row and requeued (or dead-lettered) the job. */
+function supersededReport(claimed: ClaimedJob): ExecutionReport {
+  console.warn(
+    `[jobs] attempt ${claimed.attempt} of job ${claimed.jobId} "${claimed.name}" was reclaimed mid-flight; its late result was discarded (a newer attempt owns the job).`,
+  );
+  return { jobId: claimed.jobId, name: claimed.name, attempt: claimed.attempt, outcome: "superseded" };
 }
 
 interface FailureInput {
@@ -138,11 +152,16 @@ async function finishFailed(deps: ExecutorDeps, claimed: ClaimedJob, failure: Fa
   const retryable = failure.kind !== "terminal" && claimed.attempt < failure.maxAttempts;
   if (retryable) {
     const runAt = new Date(new Date(deps.clock.now()).getTime() + backoffDelayMs(failure.backoff, claimed.attempt, deps.random));
-    await recordAttemptFailure(deps.db, deps.clock, claimed, {
-      error: failure.error,
-      errorKind: failure.kind,
-      disposition: { kind: "retry", runAt },
-    });
+    try {
+      await recordAttemptFailure(deps.db, deps.clock, claimed, {
+        error: failure.error,
+        errorKind: failure.kind,
+        disposition: { kind: "retry", runAt },
+      });
+    } catch (error: unknown) {
+      if (isSupersededAttempt(error)) return supersededReport(claimed);
+      throw error;
+    }
     return {
       jobId: claimed.jobId,
       name: claimed.name,
@@ -154,11 +173,16 @@ async function finishFailed(deps: ExecutorDeps, claimed: ClaimedJob, failure: Fa
     };
   }
 
-  await recordAttemptFailure(deps.db, deps.clock, claimed, {
-    error: failure.error,
-    errorKind: failure.kind,
-    disposition: { kind: "dead-letter" },
-  });
+  try {
+    await recordAttemptFailure(deps.db, deps.clock, claimed, {
+      error: failure.error,
+      errorKind: failure.kind,
+      disposition: { kind: "dead-letter" },
+    });
+  } catch (error: unknown) {
+    if (isSupersededAttempt(error)) return supersededReport(claimed);
+    throw error;
+  }
   return {
     jobId: claimed.jobId,
     name: claimed.name,

@@ -5,7 +5,8 @@ import { createTestDb, truncateAll, truncateJobTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
 import { TerminalJobError, defineJob, type AnyJobDefinition, type StepOutcome } from "./contract";
 import { executeClaimedJob, scrubSecrets, type ExecutorDeps } from "./execute";
-import { claimNextJob, completedStepsFor, enqueueJob } from "./store";
+import { JOBS_CONFIG } from "./config";
+import { claimNextJob, completedStepsFor, enqueueJob, reclaimStaleJobs } from "./store";
 
 const db = createTestDb();
 
@@ -223,6 +224,66 @@ describe("executeClaimedJob", () => {
     expect(report.outcome).toBe("dead-lettered");
     expect(report.errorKind).toBe("terminal");
     expect(report.error).toContain("season must be an integer");
+  });
+});
+
+describe("the reclaim race (fix round, MEDIUM-2)", () => {
+  /** A clock far enough past the claim that the claimed attempt's heartbeat reads stale. */
+  const wellPastStale = clockAt(new Date(new Date(T0).getTime() + JOBS_CONFIG.staleAfterMs + 60_000).toISOString());
+
+  /** A step that stages the race deterministically: mid-attempt, a reclaim pass (another tick,
+   *  later wall clock) takes the job back — then the step finishes as the zombie. */
+  function selfReclaimingDefinition(name: string, thenThrow: boolean) {
+    return defineJob({
+      name,
+      maxAttempts: 3,
+      timeoutMs: 5_000,
+      backoff: { baseMs: 60_000, maxMs: 600_000 },
+      parsePayload: () => ({}),
+      steps: [
+        {
+          name: "raced",
+          run: async (ctx) => {
+            const reclaimed = await reclaimStaleJobs(ctx.db, wellPastStale);
+            expect(reclaimed).toHaveLength(1);
+            if (thenThrow) throw new Error("zombie's own failure, after losing the job");
+            return ok("zombie finished late");
+          },
+        },
+      ],
+    });
+  }
+
+  it("reports a reclaimed attempt superseded on the success path, tick intact, history consistent", async () => {
+    const definition = selfReclaimingDefinition("raced-success", false);
+    const clock = clockAt(T0);
+    const claimed = await enqueueAndClaim("raced-success", clock);
+
+    const report = await executeClaimedJob(deps(clock), registryOf(definition), claimed);
+    expect(report.outcome).toBe("superseded");
+
+    // History: the zombie's run row stays exactly as the reclaim closed it, and the job belongs
+    // to the reclaim's requeue — pending, claimable, and able to finish for real.
+    const runRow = (await db.select().from(jobRuns).where(eq(jobRuns.id, claimed.runId)))[0]!;
+    expect(runRow.status).toBe("abandoned");
+    expect(runRow.errorKind).toBe("crash");
+    expect((await jobRow(claimed.jobId)).status).toBe("pending");
+
+    const second = await claimNextJob(db, wellPastStale, "test-worker-2");
+    expect(second?.jobId).toBe(claimed.jobId);
+    expect(second?.attempt).toBe(2);
+  });
+
+  it("reports superseded on the failure path too, instead of letting the trigger rejection escape", async () => {
+    const definition = selfReclaimingDefinition("raced-failure", true);
+    const clock = clockAt(T0);
+    const claimed = await enqueueAndClaim("raced-failure", clock);
+
+    const report = await executeClaimedJob(deps(clock), registryOf(definition), claimed);
+    expect(report.outcome).toBe("superseded");
+    expect((await jobRow(claimed.jobId)).status).toBe("pending");
+    const runRow = (await db.select().from(jobRuns).where(eq(jobRuns.id, claimed.runId)))[0]!;
+    expect(runRow.status).toBe("abandoned"); // the reclaim's record, not the zombie's rewrite
   });
 });
 
