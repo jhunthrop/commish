@@ -99,12 +99,10 @@ export function SeasonBars({ weeks, label, className = "" }: SeasonBarsProps) {
               </span>
             ) : (
               // Plain figures, no per-week caret (the founder's "why does everything have an
-              // uptick?"). The season high alone speaks in full ink and weight.
-              <span
-                className={`font-display text-sm tabular-nums ${
-                  week.week === highWeek ? "font-bold text-text-primary" : "font-medium text-text-muted"
-                }`}
-              >
+              // uptick?"). The season high alone speaks in full ink and weight. The className
+              // stays on one line on purpose: the weight sweep reads lines, and the heavy
+              // weight must sit beside the `font-display` that earns it.
+              <span className={`font-display text-sm tabular-nums ${week.week === highWeek ? "font-bold text-text-primary" : "font-medium text-text-muted"}`}>
                 <span className="sr-only">{`Week ${week.week}: `}</span>
                 {points.toFixed(1)}
               </span>
