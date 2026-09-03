@@ -74,10 +74,13 @@ describe("MockResults", () => {
     render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
     const picks = screen.getByRole("list", { name: "Your picks" });
     // rb1 (Marcus Reed) is the board's own best available RB at pick 1 — the D3 case exactly.
-    // Tabular now (E1): number, face, name and the fact clause live in their own cells; the
-    // prose lead-in that named every player twice is gone.
+    // Tabular now (E1): number, face, name, the position rank (its own sticker) and the fact
+    // clause live in their own cells; the prose lead-in that named every player twice, and the
+    // raw rank the clause used to repeat in prose ("RB1 on the board."), are both gone — the
+    // rank rides the sticker the pool has always drawn (`PositionBadge`'s own `rank` prop).
     expect(within(picks).getByText("Marcus Reed")).toBeInTheDocument();
-    expect(within(picks).getByText(/The board's best RB available\. RB1 on the board\./)).toBeInTheDocument();
+    expect(within(picks).getByText("RB1")).toBeInTheDocument();
+    expect(within(picks).getByText("Best RB available")).toBeInTheDocument();
     expect(within(picks).queryByText(/You took/)).not.toBeInTheDocument();
     // Never a letter grade (ruling 5) — no A/B/C/D/F verdict anywhere on the panel.
     expect(screen.queryByText(/grade/i)).not.toBeInTheDocument();
@@ -96,18 +99,28 @@ describe("MockResults", () => {
    * FOUNDER 2026-08-27: "there's no navigation at the top of a finished mock draft." The actions
    * were rendering — the test above proves that, and proved it while the defect was live — but on
    * a desktop they sat below the roster AND a fifteen-round pick list, a full screen of scrolling
-   * away from the headline. PRESENT is not the same as REACHABLE, so this pins the thing that was
-   * actually broken: the way out precedes the log in document order, which is what puts it beside
-   * the headline at every width.
+   * away from the headline. PRESENT is not the same as REACHABLE, so this originally pinned the
+   * thing that was actually broken: the way out precedes the log in document order.
+   *
+   * SUNDAY v5 LAW 6 split "the way out" in two. The two ways OUT (open the lobby, browse real
+   * leagues) still ride the headline, ahead of the log — the founder's original fix, unchanged.
+   * The one ACT ("Run another mock draft") moved into the debrief's own lower third at the foot
+   * of the page (this component's own docblock: "law 6 gives the verb a place... it goes last in
+   * the strip") — deliberately AFTER the log now, since the debrief that names it is itself built
+   * from the log's own verdicts.
    */
-  it("puts the way out at the TOP, before the pick log a manager would otherwise scroll past", () => {
+  it("keeps the two ways out at the TOP before the pick log, while the one verb waits in the debrief strip below it (law 6)", () => {
     render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
 
+    const openLobby = screen.getByRole("link", { name: COPY.openLobbyLabel });
+    const browseLeagues = screen.getByRole("link", { name: COPY.browseLeaguesLabel });
     const runAgain = screen.getByRole("link", { name: COPY.runAgainLabel });
     const pickLog = screen.getByRole("list", { name: "Your picks" });
 
-    // Node.compareDocumentPosition: FOLLOWING means the log comes after the action in the DOM.
-    expect(runAgain.compareDocumentPosition(pickLog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Node.compareDocumentPosition: FOLLOWING means the log comes after the node in the DOM.
+    expect(openLobby.compareDocumentPosition(pickLog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(browseLeagues.compareDocumentPosition(pickLog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pickLog.compareDocumentPosition(runAgain) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   /**
@@ -154,8 +167,11 @@ describe("MockResults", () => {
       expect(within(picks).getByText("+7")).toBeInTheDocument();
       expect(within(picks).getByText("+9")).toBeInTheDocument();
       // The honest board fact is still there on every row — the chip is a second reading of it,
-      // not a replacement for it.
-      expect(within(picks).getAllByText(/on the board\./)).toHaveLength(2);
+      // not a replacement for it. rb1 (pick 9) is the board's own best RB still there; qb1
+      // (pick 10) is the board's own best player overall — the position rank both facts used to
+      // restate in prose ("RB1 on the board.") now rides each row's own sticker instead.
+      expect(within(picks).getByText("Best RB available")).toBeInTheDocument();
+      expect(within(picks).getByText("Best available")).toBeInTheDocument();
     });
 
     /** An honest silence. A manager who never beat the board gets no "best pick" rather than a
@@ -187,9 +203,18 @@ describe("MockResults", () => {
       expect(within(debrief).getByText("Reach")).toBeInTheDocument();
     });
 
-    it("tells a commissioner with no seat no story at all — there are no picks to have one about", () => {
+    // A commissioner with no seat has no picks to judge, so `judgedPicks` is empty and the two
+    // counts are honestly zero rather than fabricated — the strip itself still renders (it also
+    // carries the room's one act, "Run another mock draft", which nothing else on the page owns
+    // for this caller) but names no "Best pick", since nothing was there to beat the board.
+    it("shows honest zero counts and no best pick for a commissioner with no seat — there are no picks to judge", () => {
       render(<MockResults teams={TEAMS} board={null} view={judgedView} players={PLAYERS} myTeamId={null} copy={COPY} actions={ACTIONS} />);
-      expect(screen.queryByTestId("mock-debrief")).not.toBeInTheDocument();
+      const debrief = screen.getByTestId("mock-debrief");
+      expect(within(debrief).getByText("Steals")).toBeInTheDocument();
+      expect(within(debrief).getByText("Reaches")).toBeInTheDocument();
+      expect(within(debrief).getAllByText("0")).toHaveLength(2);
+      expect(within(debrief).queryByText("Best pick")).not.toBeInTheDocument();
+      expect(within(debrief).getByRole("link", { name: COPY.runAgainLabel })).toBeInTheDocument();
     });
   });
 
