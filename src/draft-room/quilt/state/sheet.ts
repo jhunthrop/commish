@@ -1,3 +1,5 @@
+import { QUILT_CONFIG } from "./config";
+
 /**
  * MY SHEET — the manager's editable copy of our board (the `SheetAndLens` mock's bottom half).
  *
@@ -58,7 +60,7 @@ export function moveInSheet(sheet: CheatSheet, playerId: string, delta: number):
 
 /** Set (or, with an empty string, clear) the manager's note for a player. */
 export function setSheetNote(sheet: CheatSheet, playerId: string, note: string): CheatSheet {
-  const trimmed = note.trim();
+  const trimmed = note.trim().slice(0, QUILT_CONFIG.sheetNoteMaxChars);
   if (trimmed === "") {
     const rest = Object.fromEntries(Object.entries(sheet.notes).filter(([id]) => id !== playerId));
     return { ...sheet, notes: rest };
@@ -76,7 +78,10 @@ export function sheetRanks(sheet: CheatSheet): ReadonlyMap<string, number> {
   return new Map(sheet.order.map((id, index) => [id, index + 1]));
 }
 
-/** The storage codec. `decodeSheet` trusts nothing: any malformed shape reads as "no sheet". */
+/** The storage codec. `decodeSheet` trusts nothing: any malformed shape reads as "no sheet",
+ *  a duplicated order entry keeps its first occurrence only, and an over-long note truncates
+ *  to `QUILT_CONFIG.sheetNoteMaxChars` — localStorage is external data and is validated like
+ *  any other (review LOW 5). */
 export function encodeSheet(sheet: CheatSheet): string {
   return JSON.stringify(sheet);
 }
@@ -90,7 +95,11 @@ export function decodeSheet(raw: string | null): CheatSheet | null {
     if (!Array.isArray(order) || !order.every((id): id is string => typeof id === "string")) return null;
     if (typeof notes !== "object" || notes === null) return null;
     if (!Object.values(notes).every((note) => typeof note === "string")) return null;
-    return { order, notes: notes as Readonly<Record<string, string>> };
+    const deduped = [...new Set(order)];
+    const capped = Object.fromEntries(
+      Object.entries(notes as Record<string, string>).map(([id, note]) => [id, note.slice(0, QUILT_CONFIG.sheetNoteMaxChars)]),
+    );
+    return { order: deduped, notes: capped };
   } catch {
     return null;
   }

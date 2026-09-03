@@ -31,4 +31,8 @@ export const QUILT_CONFIG = {
   fullRoundsAhead: 1,
   /** localStorage key prefix for the cheat sheet, suffixed with the draft id. */
   sheetStorageKeyPrefix: "commish.draft-sheet.",
+  /** A sheet note's ceiling, in characters — prep is a margin scribble, not an essay, and the
+   *  codec truncates anything longer on decode so a tampered or ancient store can never bloat
+   *  the room. */
+  sheetNoteMaxChars: 280,
 } as const;

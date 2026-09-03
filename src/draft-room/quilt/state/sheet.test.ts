@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { QUILT_CONFIG } from "./config";
 import { decodeSheet, encodeSheet, moveInSheet, reconcileSheet, seedSheet, setSheetNote, sheetQueueSeed, sheetRanks } from "./sheet";
 
 const BOARD = ["a", "b", "c", "d"] as const;
@@ -40,6 +41,19 @@ describe("cheat sheet model", () => {
 
   it("ranks 1-based by sheet order", () => {
     expect(sheetRanks(seedSheet(BOARD)).get("c")).toBe(3);
+  });
+
+  it("de-duplicates a stored order (first occurrence wins) and caps over-long notes", () => {
+    const long = "x".repeat(QUILT_CONFIG.sheetNoteMaxChars + 40);
+    const decoded = decodeSheet(JSON.stringify({ order: ["a", "b", "a", "c", "b"], notes: { a: long } }));
+    expect(decoded?.order).toEqual(["a", "b", "c"]);
+    expect(decoded?.notes["a"]).toHaveLength(QUILT_CONFIG.sheetNoteMaxChars);
+  });
+
+  it("caps a note at write time too, so the ceiling is one number in one place", () => {
+    const long = "y".repeat(QUILT_CONFIG.sheetNoteMaxChars + 5);
+    const noted = setSheetNote(seedSheet(BOARD), "b", long);
+    expect(noted.notes["b"]).toHaveLength(QUILT_CONFIG.sheetNoteMaxChars);
   });
 
   it("round-trips through the codec and rejects every malformed shape", () => {
