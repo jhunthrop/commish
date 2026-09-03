@@ -8,7 +8,9 @@ import { leagueNameFor, listTeamCards } from "@/draft-service/teams";
 import { describeStartTiming } from "@/matchmaking/roll";
 import { expectedBotThinkDelaySeconds } from "@/mock-draft/bots";
 import { MOCK_COPY } from "@/mock-draft/config";
-import type { DraftSnapshotBody, MockResultsCopy, MockRoomInfo, MockShareInfo, WaitingInfo } from "@/draft-room/contract";
+import type { DraftSnapshotBody, MockResultsCopy, MockResultsInfo, MockRoomInfo, MockShareInfo, WaitingInfo } from "@/draft-room/contract";
+import { mockHabits } from "@/draft-room/state/debrief";
+import { completedMockDebriefs, habitFactsOf, tableForMockRoom } from "@/mock-draft-service/debrief";
 import { withLeagueMember, type RouteContext } from "./_shared";
 
 export const runtime = "nodejs";
@@ -67,23 +69,55 @@ async function waitingInfoFor(db: Db, leagueId: string, draftId: string, isMock:
   };
 }
 
-/** `MockResults`' own copy (Task 8, Step 2) — present only once the draft has finished. */
+/** The debrief's words (the workflow pass, law 4) — present only once the draft has finished. */
 function mockResultsCopy(): MockResultsCopy {
   return {
     heading: MOCK_COPY.resultsHeading,
     retentionSentence: MOCK_COPY.resultsRetentionSentence,
-    rosterHeading: MOCK_COPY.resultsRosterHeading,
     picksHeading: MOCK_COPY.resultsPicksHeading,
-    openSlotLabel: MOCK_COPY.resultsOpenSlotLabel,
     noPicksMessage: MOCK_COPY.resultsNoPicksMessage,
     pickFact: {
       bestAvailable: MOCK_COPY.resultsPickBestAvailable,
       positionBestAvailable: MOCK_COPY.resultsPickPositionBestAvailable,
       rankedHigherAvailable: MOCK_COPY.resultsPickRankedHigherAvailable,
     },
-    runAgainLabel: MOCK_COPY.resultsRunAgainLabel,
+    runBackVerb: MOCK_COPY.resultsRunBackVerb,
     openLobbyLabel: MOCK_COPY.resultsOpenLobbyLabel,
-    browseLeaguesLabel: MOCK_COPY.resultsBrowseLeaguesLabel,
+    statBestAvailableCaption: MOCK_COPY.resultsStatBestAvailableCaption,
+    statReachCaption: MOCK_COPY.resultsStatReachCaption,
+    statFirstTeCaption: MOCK_COPY.resultsStatFirstTeCaption,
+    statNoTeCaption: MOCK_COPY.resultsStatNoTeCaption,
+    roomAverageClause: MOCK_COPY.resultsRoomAverageClause,
+    teamHeading: MOCK_COPY.resultsTeamHeading,
+    shapeSentence: MOCK_COPY.resultsShapeSentence,
+    byeStackSentence: MOCK_COPY.resultsByeStackSentence,
+    takeItHeading: MOCK_COPY.resultsTakeItHeading,
+    seedDetail: MOCK_COPY.resultsSeedDetail,
+    seedVerb: MOCK_COPY.resultsSeedVerb,
+    seededConfirmation: MOCK_COPY.resultsSeededConfirmation,
+    trySeatVerb: MOCK_COPY.resultsTrySeatVerb,
+    habitsHeading: MOCK_COPY.resultsHabitsHeading,
+    habitsTeSentence: MOCK_COPY.resultsHabitsTeSentence,
+    habitsEarlySentence: MOCK_COPY.resultsHabitsEarlySentence,
+  };
+}
+
+/**
+ * The finished debrief's own extras (the workflow pass, law 4): the room's table for RUN IT
+ * BACK, and the caller's across-mocks habits — server-computed from stored completed mocks
+ * through the SAME derivations the page renders (`completedMockDebriefs`), gated to 2+ by
+ * `mockHabits` itself. A commissioner with no seat gets no habits card: the card is about the
+ * caller's own picks.
+ */
+async function mockResultsInfo(db: Db, leagueId: string, userId: string, hasSeat: boolean): Promise<MockResultsInfo> {
+  const [table, summaries] = await Promise.all([
+    tableForMockRoom(db, leagueId),
+    hasSeat ? completedMockDebriefs(db, userId) : Promise.resolve([]),
+  ]);
+  return {
+    copy: mockResultsCopy(),
+    table,
+    habits: mockHabits(summaries.map(habitFactsOf)),
   };
 }
 
@@ -124,7 +158,10 @@ export async function GET(request: Request, context: RouteContext) {
                 ? 0
                 : expectedBotThinkDelaySeconds(state.config.clockSchedule[state.config.clockSchedule.length - 1]!.pickSeconds),
             share: view.phase === "scheduled" ? await mockShareInfoFor(getDb(), actor.leagueId) : null,
-            results: view.phase === "complete" ? mockResultsCopy() : null,
+            results:
+              view.phase === "complete"
+                ? await mockResultsInfo(getDb(), actor.leagueId, actor.userId, actor.teamId !== null)
+                : null,
           };
 
     const body: DraftSnapshotBody = {

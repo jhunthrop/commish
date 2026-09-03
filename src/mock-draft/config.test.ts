@@ -208,9 +208,16 @@ describe("MOCK_COPY", () => {
     expect(MOCK_COPY.botBadge).toBe("Bot");
   });
 
-  it("never leaves an empty lobby without an honest one-tap sentence to pair it with", () => {
-    expect(MOCK_COPY.lobbyEmptyMessage.length).toBeGreaterThan(0);
-    expect(MOCK_COPY.lobbyHistoryEmptyMessage.length).toBeGreaterThan(0);
+  /** The workflow pass, law 2: an empty lobby renders NOTHING — so no empty-lobby sentence may
+   *  exist to drift back in. The page's own sentences replaced the pair. */
+  it("keeps the page's own sentences present and carries no empty-lobby sentence at all", () => {
+    expect(MOCK_COPY.soloDetail.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.tableHint.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.openLobbyDetail.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.crewDetail.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.pageFootnote.length).toBeGreaterThan(0);
+    expect(Object.keys(MOCK_COPY)).not.toContain("lobbyEmptyMessage");
+    expect(Object.keys(MOCK_COPY)).not.toContain("lobbyHistoryEmptyMessage");
   });
 
   it("leads with the promise before any settings form (R2)", () => {
@@ -218,13 +225,25 @@ describe("MOCK_COPY", () => {
     expect(MOCK_COPY.lobbyPromise.toLowerCase()).toContain("nothing counts");
   });
 
-  /** Task 8: the results page's own three actions, and its retention line kept honest against
-   *  the config number it describes — the same "state the config, then pin the sentence
-   *  against it" idiom the `MOCK_CONFIG.retention` test above already uses. */
-  it("never leaves a finished results page without its three next actions", () => {
-    expect(MOCK_COPY.resultsRunAgainLabel.length).toBeGreaterThan(0);
+  /** Task 8's "never a dead end" rule, carried by the workflow pass: the debrief's one solid
+   *  verb (the rematch) plus the quiet lobby way out. */
+  it("never leaves a finished debrief without its rematch and a way out", () => {
+    expect(MOCK_COPY.resultsRunBackVerb.length).toBeGreaterThan(0);
     expect(MOCK_COPY.resultsOpenLobbyLabel.length).toBeGreaterThan(0);
-    expect(MOCK_COPY.resultsBrowseLeaguesLabel.length).toBeGreaterThan(0);
+  });
+
+  /** Law 4's templates: every token a debrief sentence carries is one the stored draft can
+   *  actually fill — no template smuggles in a fact the honesty gates never derive. */
+  it("keeps the debrief templates on their stated tokens", () => {
+    expect(MOCK_COPY.resultsStatReachCaption).toContain("{threshold}");
+    expect(MOCK_COPY.resultsRoomAverageClause).toContain("{round}");
+    expect(MOCK_COPY.resultsShapeSentence).toContain("{count}");
+    expect(MOCK_COPY.resultsByeStackSentence).toContain("{week}");
+    expect(MOCK_COPY.resultsTrySeatVerb).toContain("{seat}");
+    expect(MOCK_COPY.resultsHabitsTeSentence).toContain("{rounds}");
+    expect(MOCK_COPY.resultsHabitsEarlySentence).toContain("{count}");
+    expect(MOCK_COPY.learningFootnote).toContain("{count}");
+    expect(MOCK_COPY.bestFractionRow).toContain("{fraction}");
   });
 
   it("states the same retention window in its results sentence that MOCK_CONFIG actually enforces", () => {
@@ -232,13 +251,12 @@ describe("MOCK_COPY", () => {
     expect(MOCK_COPY.resultsRetentionSentence).toContain("24 hours");
   });
 
-  /** The mock-results design review's E6: these four used to be bare literals in
-   *  `mock-results.tsx`, never passed through this file's own copy sweep above. */
-  it("never leaves the results roster or pick list without its own labels", () => {
-    expect(MOCK_COPY.resultsRosterHeading.length).toBeGreaterThan(0);
+  /** The mock-results design review's E6, carried: the verdict lane's label and empty sentence
+   *  still pass through this file's own copy sweep above. */
+  it("never leaves the verdict lane without its own labels", () => {
     expect(MOCK_COPY.resultsPicksHeading.length).toBeGreaterThan(0);
-    expect(MOCK_COPY.resultsOpenSlotLabel.length).toBeGreaterThan(0);
     expect(MOCK_COPY.resultsNoPicksMessage.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.resultsTeamHeading.length).toBeGreaterThan(0);
   });
 
   /** D3 + R2: the pick-fact templates never carry a raw, un-normalized rank number — only the

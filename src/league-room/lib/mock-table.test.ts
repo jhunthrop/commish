@@ -86,17 +86,18 @@ describe("createRequestFor", () => {
 });
 
 describe("tableChips", () => {
-  it("renders the blueprint's sentence in order, seat random by default", () => {
+  it("renders the blueprint's sentence in order, seat random and name auto by default", () => {
     expect(tableChips(defaultMockTable(OPTIONS), LABELS).map((chip) => chip.label)).toEqual([
       "12 teams",
       "60s clock",
       "Half PPR",
       "Standard",
       "Seat: random",
+      "Name: auto",
     ]);
   });
 
-  it("adds the name chip only when a name is set, and names a chosen seat", () => {
+  it("names a chosen seat and shows a set name as itself", () => {
     const table = { ...defaultMockTable(OPTIONS), draftSlot: 8, teamName: "The Herd" };
     const labels = tableChips(table, LABELS).map((chip) => chip.label);
     expect(labels).toContain("Seat: 8");

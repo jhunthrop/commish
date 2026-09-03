@@ -1,21 +1,23 @@
-import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import Link from "next/link";
+import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { renderSurface } from "@/components/ui/test-utils";
-import { MOCK_RESULTS_COPY, PLAYERS, SNAKE_VIEW, TEAMS } from "../test-fixtures";
-import { MockResults } from "./mock-results";
+import type { MockResultsInfo } from "../contract";
+import { DraftRoomDepsProvider, type DraftRoomDeps } from "../hooks/deps";
+import { SHEET_SEED_STORAGE_KEY } from "../quilt/state/sheet-seed";
+import { MOCK_RESULTS_COPY, MOCK_RESULTS_INFO, PLAYERS, SNAKE_VIEW, TEAMS } from "../test-fixtures";
+import { MockResults, spokenRounds } from "./mock-results";
+
+const pushed: string[] = [];
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: (href: string) => pushed.push(href) }),
+}));
 
 const COPY = MOCK_RESULTS_COPY;
 
-const ACTIONS = {
-  runAgain: <Link href="/app/mock-drafts?create=solo">{COPY.runAgainLabel}</Link>,
-  openLobby: <Link href="/app/mock-drafts">{COPY.openLobbyLabel}</Link>,
-  browseLeagues: <Link href="/browse">{COPY.browseLeaguesLabel}</Link>,
-};
-
-// PLAYERS (test-fixtures) is [qb1, rb1, rb2, wr1] — pool rank order 1..4.
+// PLAYERS (test-fixtures) is [qb1, rb1, rb2, wr1] — pool rank order 1..4, no tight end.
 const COMPLETE_VIEW: DraftStateView = {
   ...SNAKE_VIEW,
   phase: "complete",
@@ -23,8 +25,6 @@ const COMPLETE_VIEW: DraftStateView = {
   picks: [
     { pickNumber: 1, round: 1, teamId: "t1", playerId: "rb1", slot: "RB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false },
     { pickNumber: 2, round: 1, teamId: "t2", playerId: "wr1", slot: "RB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:01:00.000Z", auto: false },
-    // qb1 carries the fixture set's ONE real headshot URL — on t1's roster it is what lets the
-    // D1 face assertion below see an <img> rather than the initials fallback.
     { pickNumber: 3, round: 2, teamId: "t1", playerId: "qb1", slot: "QB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:02:00.000Z", auto: false },
   ],
   rosters: {
@@ -41,191 +41,204 @@ const COMPLETE_VIEW: DraftStateView = {
   },
 };
 
-describe("MockResults", () => {
-  it("states the heading and meta line, restates NO retention (the banner owns it), axe-clean in both themes", async () => {
+const BYES = new Map<string, number>();
+
+interface Mounted {
+  readonly requests: { url: string; body: unknown }[];
+}
+
+function mount(
+  overrides: {
+    view?: DraftStateView;
+    players?: readonly Player[];
+    myTeamId?: string | null;
+    results?: MockResultsInfo;
+    byeWeeks?: ReadonlyMap<string, number>;
+    board?: React.ReactNode;
+  } = {},
+): Mounted {
+  const requests: { url: string; body: unknown }[] = [];
+  const deps: DraftRoomDeps = {
+    fetchJson: (url, init) => {
+      requests.push({ url, body: init?.body === undefined ? null : JSON.parse(String(init.body)) });
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, data: { draftId: "d9" } })));
+    },
+    openEventSource: () => ({ addEventListener: () => {}, close: () => {} }),
+  };
+  render(
+    <DraftRoomDepsProvider deps={deps}>
+      <MockResults
+        view={overrides.view ?? COMPLETE_VIEW}
+        teams={TEAMS}
+        board={overrides.board ?? null}
+        players={overrides.players ?? PLAYERS}
+        byeWeeks={overrides.byeWeeks ?? BYES}
+        myTeamId={overrides.myTeamId === undefined ? "t1" : overrides.myTeamId}
+        results={overrides.results ?? MOCK_RESULTS_INFO}
+      />
+    </DraftRoomDepsProvider>,
+  );
+  return { requests };
+}
+
+beforeEach(() => {
+  pushed.length = 0;
+  window.localStorage.clear();
+});
+
+describe("MockResults — the debrief", () => {
+  it("states the heading, the meta line, and the summary counts, axe-clean in both themes", async () => {
     await renderSurface(
-      <MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />,
+      <DraftRoomDepsProvider deps={{ fetchJson: () => Promise.reject(new Error("no")), openEventSource: () => ({ addEventListener: () => {}, close: () => {} }) }}>
+        <MockResults view={COMPLETE_VIEW} teams={TEAMS} board={null} players={PLAYERS} byeWeeks={BYES} myTeamId="t1" results={MOCK_RESULTS_INFO} />
+      </DraftRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByRole("heading", { name: COPY.heading, level: 1 })).toBeInTheDocument();
-        // E3 (results review): the practice banner directly above this panel already says the
-        // room clears itself — one retention fact per view, so the panel says it zero times.
-        expect(screen.queryByText(COPY.retentionSentence)).not.toBeInTheDocument();
-        // E5: the debrief's meta line — seat, shape, opponents — from data the props held.
         expect(screen.getByText(/seat \d+ of \d+/)).toBeInTheDocument();
-        expect(screen.getByText(/practice opponents/)).toBeInTheDocument();
+        // Pick 1.01 (rb1) left qb1 on the board — one ranked higher, so only pick 2.01 (qb1,
+        // the board's own top player) counts best available: 1 of 2, stated exactly.
+        expect(screen.getByText("1 of 2")).toBeInTheDocument();
+        expect(screen.getByText(COPY.statBestAvailableCaption)).toBeInTheDocument();
+        // The reach caption states its threshold — the number never judges silently.
+        expect(screen.getByText(/reaches, 5 or more ranked higher/)).toBeInTheDocument();
+        // No tight end all draft: the honest zero, never an invented round.
+        expect(screen.getByText(COPY.statNoTeCaption)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
   });
 
-  it("draws the roster with the rail's own row — the player's face and true position, dashed placeholders for open spots (D1/D2)", () => {
-    render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
-    const roster = screen.getByRole("list", { name: "Your roster" });
-    expect(within(roster).getByText("Marcus Reed")).toBeInTheDocument();
-    // The shared RosterRow (roster-row.tsx): open spots read as the slot's own chip, exactly
-    // as the rail draws them — the word "Open" was this panel's private idiom and is gone.
-    expect(within(roster).queryByText("Open")).not.toBeInTheDocument();
-    // Faces: qb1's fixture headshot renders when qb1 is on the roster.
-    const rosterImgs = Array.from(roster.querySelectorAll("img"));
-    expect(rosterImgs.length).toBeGreaterThan(0);
-  });
-
-  it("states each pick's honest board facts — the board's own best available at that position, never a raw rank", () => {
-    render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
-    const picks = screen.getByRole("list", { name: "Your picks" });
-    // rb1 (Marcus Reed) is the board's own best available RB at pick 1 — the D3 case exactly.
-    // Tabular now (E1): number, face, name, the position rank (its own sticker) and the fact
-    // clause live in their own cells; the prose lead-in that named every player twice, and the
-    // raw rank the clause used to repeat in prose ("RB1 on the board."), are both gone — the
-    // rank rides the sticker the pool has always drawn (`PositionBadge`'s own `rank` prop).
+  it("renders the verdict lane: board slot, sticker rank, the honest fact clause — never a letter grade", () => {
+    mount();
+    const picks = screen.getByRole("list", { name: COPY.picksHeading });
+    // Two-team room: pick 1 is 1.01, pick 3 is 2.01.
+    expect(within(picks).getByText("1.01")).toBeInTheDocument();
+    expect(within(picks).getByText("2.01")).toBeInTheDocument();
     expect(within(picks).getByText("Marcus Reed")).toBeInTheDocument();
     expect(within(picks).getByText("RB1")).toBeInTheDocument();
     expect(within(picks).getByText("Best RB available")).toBeInTheDocument();
-    expect(within(picks).queryByText(/You took/)).not.toBeInTheDocument();
-    // Never a letter grade (ruling 5) — no A/B/C/D/F verdict anywhere on the panel.
+    expect(within(picks).getByText("Best available")).toBeInTheDocument();
     expect(screen.queryByText(/grade/i)).not.toBeInTheDocument();
-    // Never a bare, un-normalized overall rank either (D3) — the defect this replaces.
-    expect(screen.queryByText(/ranked \d/)).not.toBeInTheDocument();
   });
 
-  it("never leaves the room a dead end — the three next actions always render", () => {
-    render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
-    expect(screen.getByRole("link", { name: COPY.runAgainLabel })).toBeInTheDocument();
+  it("runs it back at the SAME table — this room's own re-derived settings and the seat just played", async () => {
+    const { requests } = mount();
+    fireEvent.click(screen.getByRole("button", { name: COPY.runBackVerb }));
+    await waitFor(() => expect(pushed).toEqual(["/app/drafts/d9"]));
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.url).toBe("/api/mock-drafts");
+    expect(requests[0]!.body).toEqual({
+      mode: "solo",
+      teamCount: 2,
+      pickSeconds: 60,
+      scoringPreset: "half_ppr",
+      rosterShape: "standard",
+      draftSlot: 1,
+    });
+  });
+
+  it("offers another seat — the same table, a different chair", async () => {
+    const { requests } = mount();
+    fireEvent.click(screen.getByRole("button", { name: "Try seat 2 instead" }));
+    await waitFor(() => expect(pushed).toEqual(["/app/drafts/d9"]));
+    expect(requests[0]!.body).toMatchObject({ mode: "solo", draftSlot: 2 });
+  });
+
+  it("self-omits both rematch buttons when the room's table could not be re-derived, rather than posting a guess", () => {
+    mount({ results: { ...MOCK_RESULTS_INFO, table: null } });
+    expect(screen.queryByRole("button", { name: COPY.runBackVerb })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Try seat/ })).not.toBeInTheDocument();
+    // Still never a dead end: the quiet way out remains.
     expect(screen.getByRole("link", { name: COPY.openLobbyLabel })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: COPY.browseLeaguesLabel })).toBeInTheDocument();
   });
 
-  /**
-   * FOUNDER 2026-08-27: "there's no navigation at the top of a finished mock draft." The actions
-   * were rendering — the test above proves that, and proved it while the defect was live — but on
-   * a desktop they sat below the roster AND a fifteen-round pick list, a full screen of scrolling
-   * away from the headline. PRESENT is not the same as REACHABLE, so this originally pinned the
-   * thing that was actually broken: the way out precedes the log in document order.
-   *
-   * SUNDAY v5 LAW 6 split "the way out" in two. The two ways OUT (open the lobby, browse real
-   * leagues) still ride the headline, ahead of the log — the founder's original fix, unchanged.
-   * The one ACT ("Run another mock draft") moved into the debrief's own lower third at the foot
-   * of the page (this component's own docblock: "law 6 gives the verb a place... it goes last in
-   * the strip") — deliberately AFTER the log now, since the debrief that names it is itself built
-   * from the log's own verdicts.
-   */
-  it("keeps the two ways out at the TOP before the pick log, while the one verb waits in the debrief strip below it (law 6)", () => {
-    render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
-
-    const openLobby = screen.getByRole("link", { name: COPY.openLobbyLabel });
-    const browseLeagues = screen.getByRole("link", { name: COPY.browseLeaguesLabel });
-    const runAgain = screen.getByRole("link", { name: COPY.runAgainLabel });
-    const pickLog = screen.getByRole("list", { name: "Your picks" });
-
-    // Node.compareDocumentPosition: FOLLOWING means the log comes after the node in the DOM.
-    expect(openLobby.compareDocumentPosition(pickLog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(browseLeagues.compareDocumentPosition(pickLog) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(pickLog.compareDocumentPosition(runAgain) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  it("seeds the sheet: the mock picks in pick order, then the rest of the board — and says so once", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: COPY.seedVerb }));
+    expect(screen.getByText(COPY.seededConfirmation)).toBeInTheDocument();
+    const stored = JSON.parse(window.localStorage.getItem(SHEET_SEED_STORAGE_KEY)!) as { order: string[] };
+    // t1's picks (rb1 then qb1) lead; the rest of the snapshot follows in board order.
+    expect(stored.order).toEqual(["rb1", "qb1", "rb2", "wr1"]);
+    expect(screen.getByRole("button", { name: COPY.seedVerb })).toBeDisabled();
   });
 
-  /**
-   * TASKS 7 AND 13. The page already recorded what you did; this is where it says whether it was
-   * any good. The chips are the verdict on each pick, and the debrief above the log is what the
-   * plan calls the story they accumulate into.
-   *
-   * Deliberately still NO letter grade (ruling 5, unchanged): a grade manufactures authority this
-   * platform has not earned. A steal is arithmetic over this draft's own log.
-   */
-  describe("the debrief (Task 13)", () => {
-    // qb1 is the board's first player and t1 took him at pick 10: nine picks past his rank. wr1
-    // (rank 4) went to t2 at pick 2, two picks early. Both far enough out to clear the even band.
-    const judgedView: DraftStateView = {
-      ...COMPLETE_VIEW,
-      picks: [
-        { pickNumber: 2, round: 1, teamId: "t2", playerId: "wr1", slot: "RB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:01:00.000Z", auto: false },
-        { pickNumber: 9, round: 1, teamId: "t1", playerId: "rb1", slot: "RB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false },
-        { pickNumber: 10, round: 2, teamId: "t1", playerId: "qb1", slot: "QB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:02:00.000Z", auto: false },
-      ],
-    };
+  it("keeps the amber budget: RUN IT BACK is the page's only solid verb", () => {
+    mount();
+    const solids = screen.getAllByRole("button").filter((button) => button.className.includes("bg-accent"));
+    expect(solids).toHaveLength(1);
+    expect(solids[0]).toHaveTextContent(COPY.runBackVerb);
+  });
 
-    it("counts the steals and the reaches, and names the single best pick — axe-clean in both themes", async () => {
-      await renderSurface(
-        <MockResults teams={TEAMS} board={null} view={judgedView} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />,
-        async ({ container }) => {
-          const debrief = screen.getByTestId("mock-debrief");
-          expect(within(debrief).getByText("Steals")).toBeInTheDocument();
-          expect(within(debrief).getByText("2")).toBeInTheDocument();
-          expect(within(debrief).getByText("Reaches")).toBeInTheDocument();
-          expect(within(debrief).getByText("0")).toBeInTheDocument();
-          // rb1 at pick 9 slipped seven; qb1 at pick 10 slipped nine, so qb1 is the best.
-          expect(within(debrief).getByText("Best pick")).toBeInTheDocument();
-          expect(within(debrief).getByText("Jalen Croft")).toBeInTheDocument();
-          expect(within(debrief).getByText("+9")).toBeInTheDocument();
-          expect(await axe(container)).toHaveNoViolations();
-        },
-      );
+  describe("the team you built", () => {
+    it("names the bye stack only from the real schedule read, and only past the threshold", () => {
+      // All three rostered players' NFL teams share week 8 — KC (qb1), SF (rb1) plus a third
+      // teammate would be needed; t1 rosters qb1 (KC) and rb1 (SF) only, so even a shared week
+      // stays under the threshold and the clause drops.
+      mount({ byeWeeks: new Map([["KC", 8], ["SF", 8]]) });
+      expect(screen.queryByText(/Byes stack/)).not.toBeInTheDocument();
     });
 
-    it("puts the verdict on each pick in the log, beside the fact it came from", () => {
-      render(<MockResults teams={TEAMS} board={null} view={judgedView} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
-      const picks = screen.getByRole("list", { name: "Your picks" });
-      expect(within(picks).getByText("+7")).toBeInTheDocument();
-      expect(within(picks).getByText("+9")).toBeInTheDocument();
-      // The honest board fact is still there on every row — the chip is a second reading of it,
-      // not a replacement for it. rb1 (pick 9) is the board's own best RB still there; qb1
-      // (pick 10) is the board's own best player overall — the position rank both facts used to
-      // restate in prose ("RB1 on the board.") now rides each row's own sticker instead.
-      expect(within(picks).getByText("Best RB available")).toBeInTheDocument();
-      expect(within(picks).getByText("Best available")).toBeInTheDocument();
-    });
-
-    /** An honest silence. A manager who never beat the board gets no "best pick" rather than a
-     *  best that was merely least bad. */
-    it("names no best pick when nothing beat the board", () => {
-      render(<MockResults teams={TEAMS} board={null} view={COMPLETE_VIEW} players={PLAYERS} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
-      const debrief = screen.getByTestId("mock-debrief");
-      expect(within(debrief).queryByText("Best pick")).not.toBeInTheDocument();
-      expect(within(debrief).getByText("Steals")).toBeInTheDocument();
-    });
-
-    it("says the count in the singular when there is exactly one", () => {
-      // A reach needs a board rank further down than the four-player fixture reaches, so this
-      // case gets a deeper pool: `deep11` sits at rank 12 and goes first overall.
-      const deepPool = [
-        ...PLAYERS,
-        ...Array.from({ length: 8 }, (_, index) => ({ id: `deep${index + 4}`, name: `Deep Player ${index + 4}`, position: "WR" as const, nflTeam: "DAL", headshotUrl: null, adp: index + 12 })),
-      ];
-      const oneEach: DraftStateView = {
+    it("states the stack when three rostered players sit out the same week", () => {
+      const view: DraftStateView = {
         ...COMPLETE_VIEW,
-        picks: [
-          { pickNumber: 1, round: 1, teamId: "t1", playerId: "deep11", slot: "RB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false },
-          { pickNumber: 10, round: 2, teamId: "t1", playerId: "qb1", slot: "QB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:02:00.000Z", auto: false },
-        ],
+        rosters: {
+          ...COMPLETE_VIEW.rosters,
+          t1: [
+            { slot: "QB", slotIndex: 0, playerId: "qb1" },
+            { slot: "RB", slotIndex: 0, playerId: "rb1" },
+            { slot: "RB", slotIndex: 1, playerId: "rb2" },
+          ],
+        },
       };
-      render(<MockResults teams={TEAMS} board={null} view={oneEach} players={deepPool} myTeamId="t1" copy={COPY} actions={ACTIONS} />);
-      const debrief = screen.getByTestId("mock-debrief");
-      expect(within(debrief).getByText("Steal")).toBeInTheDocument();
-      expect(within(debrief).getByText("Reach")).toBeInTheDocument();
-    });
-
-    // A commissioner with no seat has no picks to judge, so `judgedPicks` is empty and the two
-    // counts are honestly zero rather than fabricated — the strip itself still renders (it also
-    // carries the room's one act, "Run another mock draft", which nothing else on the page owns
-    // for this caller) but names no "Best pick", since nothing was there to beat the board.
-    it("shows honest zero counts and no best pick for a commissioner with no seat — there are no picks to judge", () => {
-      render(<MockResults teams={TEAMS} board={null} view={judgedView} players={PLAYERS} myTeamId={null} copy={COPY} actions={ACTIONS} />);
-      const debrief = screen.getByTestId("mock-debrief");
-      expect(within(debrief).getByText("Steals")).toBeInTheDocument();
-      expect(within(debrief).getByText("Reaches")).toBeInTheDocument();
-      expect(within(debrief).getAllByText("0")).toHaveLength(2);
-      expect(within(debrief).queryByText("Best pick")).not.toBeInTheDocument();
-      expect(within(debrief).getByRole("link", { name: COPY.runAgainLabel })).toBeInTheDocument();
+      mount({ view, byeWeeks: new Map([["KC", 8], ["SF", 8], ["NYJ", 8]]) });
+      // The clause rides the team card's observation sentence (joined with the shape clause).
+      expect(screen.getByText(/Byes stack in week 8: 3 of your players sit out together\./)).toBeInTheDocument();
     });
   });
 
-  it("gives a commissioner with no team the heading, the actions, and the room's own finished board (E7)", () => {
-    render(
-      <MockResults teams={TEAMS} board={<p>the finished board</p>} view={COMPLETE_VIEW} players={PLAYERS} myTeamId={null} copy={COPY} actions={ACTIONS} />,
-    );
-    expect(screen.queryByRole("list", { name: "Your roster" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "Your picks" })).not.toBeInTheDocument();
+  describe("across your last mocks", () => {
+    it("renders nothing at all under two completed mocks", () => {
+      mount();
+      expect(screen.queryByText(/Across your last/)).not.toBeInTheDocument();
+    });
+
+    it("states only the stored patterns, dropping the TE clause when a mock never drafted one", () => {
+      mount({
+        results: {
+          ...MOCK_RESULTS_INFO,
+          habits: { mockCount: 3, firstTeRounds: null, earlyBestAvailableCount: 2 },
+        },
+      });
+      expect(screen.getByText("Across your last 3 mocks")).toBeInTheDocument();
+      expect(screen.queryByText(/first tight end went/)).not.toBeInTheDocument();
+      expect(screen.getByText("Your first two rounds were all best available in 2 of 3 mocks.")).toBeInTheDocument();
+    });
+
+    it("speaks the TE rounds as a list when every mock has one", () => {
+      mount({
+        results: {
+          ...MOCK_RESULTS_INFO,
+          habits: { mockCount: 3, firstTeRounds: [6, 7, 5], earlyBestAvailableCount: 3 },
+        },
+      });
+      expect(screen.getByText("Your first tight end went in rounds 6, 7 and 5.")).toBeInTheDocument();
+    });
+  });
+
+  it("gives a commissioner with no team the heading, the way out, and the finished board — no lane, no habits", () => {
+    mount({ myTeamId: null, board: <p>the finished board</p> });
+    expect(screen.queryByRole("list", { name: COPY.picksHeading })).not.toBeInTheDocument();
+    expect(screen.queryByText(COPY.takeItHeading)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: COPY.heading })).toBeInTheDocument();
     expect(screen.getByText("the finished board")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: COPY.browseLeaguesLabel })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: COPY.openLobbyLabel })).toBeInTheDocument();
+  });
+});
+
+describe("spokenRounds", () => {
+  it("joins rounds the way a sentence says them", () => {
+    expect(spokenRounds([6])).toBe("6");
+    expect(spokenRounds([6, 7])).toBe("6 and 7");
+    expect(spokenRounds([6, 7, 5])).toBe("6, 7 and 5");
   });
 });

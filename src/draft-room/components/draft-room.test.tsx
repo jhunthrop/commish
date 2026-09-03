@@ -7,9 +7,16 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
-import { fixtureDeps, MOCK_RESULTS_COPY, MOCK_ROOM, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
+import { fixtureDeps, MOCK_RESULTS_INFO, MOCK_ROOM, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
 import { DraftRoomDepsProvider } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
+
+// The debrief (`MockResults`) owns its own rematch navigation now, so mounting a finished mock
+// pulls `useRouter` into the tree — mocked the same way every page test mocks it.
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 /** Already dismissed, so `RoomTour` stays out of the way of every case that isn't testing it. */
 const TOUR_DISMISSED = "2026-01-01T00:00:00.000Z";
@@ -192,13 +199,13 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     const fixture = fixtureDeps({ ...SNAKE_VIEW, phase: "complete", onClockTeamId: null });
     fixture.mock = {
       ...MOCK_ROOM,
-      results: MOCK_RESULTS_COPY,
+      results: MOCK_RESULTS_INFO,
     };
     mount(fixture);
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Your mock draft is complete." })).toBeInTheDocument());
-    // The board and dock are gone — the results panel is what the room shows now.
+    await waitFor(() => expect(screen.getByRole("heading", { name: "The debrief" })).toBeInTheDocument());
+    // The board and dock are gone — the debrief is what the room shows now.
     expect(screen.queryByRole("list", { name: /available players/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Browse real leagues" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open the mock draft lobby" })).toBeInTheDocument();
   });
 
   it("is axe-clean with every one of its own additions mounted at once, in both themes", async () => {

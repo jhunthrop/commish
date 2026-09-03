@@ -7,10 +7,9 @@ import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import type { WireItem } from "@/matchmaking/contract";
 
 /**
- * The mock's `.wire b`: the one fact in an otherwise quiet sentence, in ink at 600. Exported for
- * `MockWire` (`./mock-wire`) — the practice lobby's own sibling ticker shares this exact visual
- * idiom for its own quiet items rather than respelling it (DRY on the visuals, per R3's ruling),
- * even though the two components speak entirely separate item vocabularies.
+ * The mock's `.wire b`: the one fact in an otherwise quiet sentence, in ink at 600. (The
+ * practice lobby's own sibling ticker, `MockWire`, shared this idiom until the mock-drafts
+ * workflow pass retired that surface, 2026-09-03.)
  */
 export function Ink({ children }: { readonly children: ReactNode }) {
   return <b className="font-semibold text-text-primary">{children}</b>;
@@ -36,9 +35,6 @@ function toneOf(item: WireItem): "quiet" | "money" | "live" {
   return "quiet";
 }
 
-/** Exported for `MockWire` (./mock-wire): its own `toneOf` only ever answers `"quiet"` or
- *  `"live"` (a mock room carries no money moment, R3's ruling), both drawn from this SAME map
- *  rather than a second copy of the two colors. */
 /**
  * SUNDAY v5: the ticker is furniture, so it does not wear the furniture colour — amber on every
  * second item was the loudest thing on the storefront. A filled room is a FACT now (money green
@@ -52,10 +48,8 @@ export const TONE_CLASS: Readonly<Record<ReturnType<typeof toneOf>, string>> = {
 };
 
 /**
- * The band's own shell classes, shared verbatim with `MockWire` (R3's DRY-on-the-visuals
- * ruling): a hairline-bottomed, inset strip in the wire's own mono/xs register. `overflow-hidden`
- * + `whitespace-nowrap` serve two different callers' needs — this component's own scrolling
- * marquee, and `MockWire`'s static truncating line — with the identical two utilities.
+ * The band's own shell classes: a hairline-bottomed, inset strip in the wire's own mono/xs
+ * register. `overflow-hidden` + `whitespace-nowrap` carry this component's scrolling marquee.
  */
 export const WIRE_BAND_CLASSNAME =
   "overflow-hidden whitespace-nowrap border-b border-line bg-surface-inset py-1.5 font-mono text-xs";

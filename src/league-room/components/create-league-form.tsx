@@ -21,8 +21,8 @@ export const TEAM_COUNTS = [8, 10, 12, 14, 16].map((n) => ({ value: String(n), l
  * TE-premium / superflex toggles") — full PPR stays one tap away, not removed or demoted past
  * reach, only no longer preselected.
  *
- * Exported (Task 9): `MockSetupForm` (`./mock-setup-form.tsx`) reuses this SAME table for the
- * practice lobby's own scoring control — "reuse the create-league form's existing option
+ * Exported (Task 9; carried by the workflow pass): `MockTableChips` (`./mock-table-chips.tsx`)
+ * reuses this SAME table for the mock table's scoring chip — "reuse the create-league form's existing option
  * vocabulary, never a parallel picker" (the brief's own words). A mock room shares this whole
  * vocabulary with a real league (`createMockRoomSchema`'s `scoringPreset` is the identical
  * `ScoringPresetName` enum), so the labels a commissioner already knows are the labels a

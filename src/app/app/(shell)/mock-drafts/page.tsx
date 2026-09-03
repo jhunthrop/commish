@@ -3,18 +3,22 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { ButtonLink, ErrorState, PageTitle } from "@/components/ui";
+import { SCORING_PRESETS } from "@/domain/scoring";
 import { LEAGUE_CONFIG } from "@/league";
+import { ROSTER_SHAPES } from "@/league/roster-shape";
 import { MOCK_CONFIG, MOCK_COPY } from "@/mock-draft/config";
 import { createMockRoom } from "@/mock-draft-service/creation";
+import { completedMockDebriefs } from "@/mock-draft-service/debrief";
 import { listOpenMockRooms, myMockRooms } from "@/mock-draft-service/lobby";
 import { createMockRoomSchema } from "@/mock-draft-service/schemas";
-import { listMockWireItems } from "@/mock-draft-service/wire";
 import {
   createMockRateLimited,
   mockLifecycleDeps,
 } from "@/app/api/mock-drafts/_shared";
-import { MockLobby } from "@/league-room/components/mock-lobby";
+import { MockDraftsPage } from "@/league-room/components/mock-drafts-page";
+import type { MockTableOptions } from "@/league-room/lib/mock-table";
 import { pageTitle } from "@/components/app-shell/page-metadata";
+import { LearningColumn } from "./learning-column";
 
 export const dynamic = "force-dynamic";
 // A5: matches this page's own <h1>.
@@ -31,23 +35,21 @@ const RETRY_ACTION = (
 );
 
 /**
- * The practice lobby (Task 9, Step 2) — the setup form, the open lobby a stranger can join, and
- * the caller's own rooms, ALL in `(shell)` (signed-in only, the founder's sign-in-first ruling —
- * no anonymous rooms). `?create=solo` is `DraftRoom`'s own contract with this page (its own
- * `MOCK_LOBBY_PATH` docblock, `@/draft-room/components/draft-room.tsx`, and `MockLobby`'s own
- * empty-lobby action): "Run it again" and a swept-room's own restart both hand this page that
- * query, asking for an immediate solo room rather than the form. Honored here, once, rather than
- * duplicated at every caller that wants a solo room in one click — `createMockRoom` is exactly
- * the same call `POST /api/mock-drafts` makes, run server-side so the click is one navigation,
- * not a navigation plus a fetch.
+ * THE MOCK DRAFTS PAGE (the workflow pass, 2026-09-03 — the canvas laws). One verb and a chip
+ * sentence (`MockDraftsPage`, law 1), people as a door (law 2), and the learning as the page's
+ * second half (`LearningColumn`, law 3) — a caller with no completed mocks gets no column at
+ * all, and the doors take the width.
  *
- * `MOCK_CONFIG`/`MOCK_COPY` cross into `MockLobby`/`MockSetupForm` as PLAIN PROPS (ruling 8):
- * both client components live under `src/league-room/**`, which may not value-import
- * `@/mock-draft` (the client boundary, `eslint.config.mjs`) — this page is the one place server
- * and client meet, so it reads the real config once and hands down only the values those two
- * components actually render.
+ * `?create=solo` is `DraftRoom`'s own contract with this page (its `MOCK_LOBBY_PATH` docblock):
+ * a swept room's restart hands this page that query for an immediate solo room with the schema
+ * defaults, honored here once rather than duplicated at every caller. (The page's own DRAFT NOW
+ * posts the remembered table client-side — this server path is the default-table fallback.)
+ *
+ * `MOCK_CONFIG`/`MOCK_COPY` cross into the client component as PLAIN PROPS (ruling 8): the
+ * client half lives under `src/league-room/**`, which may not value-import `@/mock-draft` (the
+ * client boundary, `eslint.config.mjs`) — this page is where server and client meet.
  */
-export default async function MockDraftsPage({ searchParams }: PageProps) {
+export default async function MockDraftsLobbyPage({ searchParams }: PageProps) {
   const user = await requireCurrentUser();
   const params = await searchParams;
   const create = params.create;
@@ -90,36 +92,54 @@ export default async function MockDraftsPage({ searchParams }: PageProps) {
   }
 
   const db = getDb();
-  const [open, mine, wire] = await Promise.all([
+  const [open, mine, summaries] = await Promise.all([
     listOpenMockRooms(db),
     myMockRooms(db, user.id),
-    listMockWireItems(db),
+    completedMockDebriefs(db, user.id),
   ]);
+
+  const options: MockTableOptions = {
+    teamCounts: MOCK_CONFIG.teamCountOptions,
+    pickSeconds: MOCK_CONFIG.pickClockSecondsOptions,
+    scoringPresets: Object.keys(SCORING_PRESETS),
+    rosterShapes: Object.keys(ROSTER_SHAPES),
+    defaultTeamCount: LEAGUE_CONFIG.defaults.teamCount,
+    defaultPickSeconds: MOCK_CONFIG.defaultPickClockSeconds,
+    defaultScoringPreset: LEAGUE_CONFIG.defaults.scoringPreset,
+    defaultRosterShape: LEAGUE_CONFIG.defaults.rosterShape,
+    maxTeamNameLength: LEAGUE_CONFIG.maxNameLength,
+  };
 
   return (
     <>
       <PageTitle>Mock drafts</PageTitle>
-      {/* R2 (the lobby design review's ruling): the page leads with the promise before it asks
-          anything — read directly from MOCK_COPY here, since the page's own h1 lives in this
-          server component, not in MockLobby below it. */}
+      {/* R2's ruling, kept: the page leads with the promise before it asks anything. */}
       <p className="max-w-2xl text-base text-text-muted">
         {MOCK_COPY.lobbyPromise}
       </p>
-      {/* R3: the practice wire renders inside MockLobby (below), positioned first in its own
-          markup, so the same 30s poll that refreshes the lists also keeps the wire current —
-          it still reads as sitting directly under this h1/promise line. */}
-      <MockLobby
-        initialOpen={open}
-        initialMine={mine}
-        initialWireItems={wire}
-        modes={MOCK_CONFIG.modes}
-        teamCountOptions={MOCK_CONFIG.teamCountOptions}
-        pickSecondsOptions={MOCK_CONFIG.pickClockSecondsOptions}
-        defaultTeamCount={LEAGUE_CONFIG.defaults.teamCount}
-        defaultPickSeconds={MOCK_CONFIG.defaultPickClockSeconds}
-        emptyMessage={MOCK_COPY.lobbyEmptyMessage}
-        historyEmptyMessage={MOCK_COPY.lobbyHistoryEmptyMessage}
-      />
+      <div
+        className={
+          summaries.length === 0
+            ? "flex flex-col gap-6"
+            : "flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-start lg:gap-8"
+        }
+      >
+        <MockDraftsPage
+          initialOpen={open}
+          initialMine={mine}
+          options={options}
+          copy={{
+            soloDetail: MOCK_COPY.soloDetail,
+            tableHint: MOCK_COPY.tableHint,
+            openLobbyDetail: MOCK_COPY.openLobbyDetail,
+            crewDetail: MOCK_COPY.crewDetail,
+            sheetTieIn: MOCK_COPY.sheetTieIn,
+          }}
+        />
+        {/* LAW 3's empty state: no completed mocks, no column — absence, not an empty panel. */}
+        {summaries.length === 0 ? null : <LearningColumn summaries={summaries} />}
+      </div>
+      <p className="text-xs text-text-faint">{MOCK_COPY.pageFootnote}</p>
     </>
   );
 }

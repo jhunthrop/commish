@@ -8,10 +8,6 @@ import {
   type MyMockRoomSummary,
 } from "@/mock-draft-service/lobby";
 import { createMockRoomSchema } from "@/mock-draft-service/schemas";
-import {
-  listMockWireItems,
-  type MockWireItem,
-} from "@/mock-draft-service/wire";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
 import {
   createMockRateLimited,
@@ -22,15 +18,14 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** `GET /api/mock-drafts`'s whole answer: the open lobby (join a stranger), the caller's own
- *  rooms (re-entry), and the practice wire (R3) — three different promises, the identical
- *  member-list/shelf split `BrowseBody` (`@/matchmaking/contract`) already keeps for a real
- *  league, never one merged array. `wire` rides this SAME read rather than a second endpoint so
- *  `MockLobby`'s own 30s poll refreshes the band with the lists in one fetch, not two. */
+/** `GET /api/mock-drafts`'s whole answer: the open lobby (join a stranger) and the caller's own
+ *  rooms (re-entry) — two different promises, the identical member-list/shelf split `BrowseBody`
+ *  (`@/matchmaking/contract`) already keeps for a real league, never one merged array. The
+ *  practice wire left with the workflow pass (law 2: an empty lobby renders nothing, and the
+ *  page has no wire band at all). */
 export interface MockLobbyBody {
   readonly open: readonly MockLobbyRoomSummary[];
   readonly mine: readonly MyMockRoomSummary[];
-  readonly wire: readonly MockWireItem[];
 }
 
 export interface CreateMockRoomBody {
@@ -54,12 +49,11 @@ export async function GET(request: Request) {
     if (limited !== null) return limited;
 
     const db = getDb();
-    const [open, mine, wire] = await Promise.all([
+    const [open, mine] = await Promise.all([
       listOpenMockRooms(db),
       myMockRooms(db, userId),
-      listMockWireItems(db),
     ]);
-    return ok<MockLobbyBody>({ open, mine, wire });
+    return ok<MockLobbyBody>({ open, mine });
   });
 }
 

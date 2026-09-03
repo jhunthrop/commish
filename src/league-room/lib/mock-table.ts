@@ -122,21 +122,21 @@ export interface MockTableChip {
 }
 
 /**
- * The sentence itself: one chip per setting, in the blueprint's own order. The NAME chip rides
- * only when a name is set — an unset name is the server's own silent fallback, and a chip that
- * says "name: none" would be the settings form creeping back in.
+ * The sentence itself: one chip per setting, in the blueprint's own order. An unset name reads
+ * "Name: auto" — the server's own fallback (the profile display name) stated as a fact rather
+ * than a blank that would need a form to explain itself.
  */
 export function tableChips(
   table: MockTable,
   labels: { readonly scoring: ReadonlyMap<string, string>; readonly roster: ReadonlyMap<string, string> },
 ): readonly MockTableChip[] {
-  const chips: MockTableChip[] = [
+  const name = table.teamName.trim();
+  return [
     { id: "teams", label: `${table.teamCount} teams` },
     { id: "clock", label: `${table.pickSeconds}s clock` },
     { id: "scoring", label: labels.scoring.get(table.scoringPreset) ?? table.scoringPreset },
     { id: "roster", label: labels.roster.get(table.rosterShape) ?? table.rosterShape },
     { id: "seat", label: table.draftSlot === null ? "Seat: random" : `Seat: ${table.draftSlot}` },
+    { id: "name", label: name.length > 0 ? name : "Name: auto" },
   ];
-  if (table.teamName.trim().length > 0) chips.push({ id: "name", label: table.teamName.trim() });
-  return chips;
 }

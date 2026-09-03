@@ -32,10 +32,9 @@ interface TourStop {
  * phrase, verbatim, the ONE sanctioned way this product reassures anyone about missing a draft
  * (`docs/design-system.md`'s "Copy" section, `copy-rules.ts`'s `FORBIDDEN_VOCABULARY` family).
  * The second half used to be copied word-for-word from `MOCK_COPY.lobbyEmptyActionLabel`
- * (`@/mock-draft/config`); the lobby design review (2026-08-26) replaced that bare "Start a mock
- * draft" link with a labeled, defaults-stating one-tap (`soloQuickStartLabel`,
- * `@/league-room/components/mock-lobby.tsx`), so there is no longer a single static MOCK_COPY
- * phrase to mirror here. This sentence is now its OWN standalone copy, still swept by
+ * (`@/mock-draft/config`); the lobby design review (2026-08-26) retired that bare "Start a mock
+ * draft" phrase (and the workflow pass later replaced the lobby surface entirely), so there is
+ * no longer a single static MOCK_COPY phrase to mirror here. This sentence is now its OWN standalone copy, still swept by
  * `src/integrity/rendered-copy.test.tsx` for the house copy rules, just no longer pinned against
  * a value in `@/mock-draft/config` — `src/draft-room/**` may not value-import that module anyway
  * (the client boundary), the identical reason `PracticeBanner`/`MockResults` receive its words as

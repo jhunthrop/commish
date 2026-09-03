@@ -278,22 +278,25 @@ describe("GET /api/drafts/[draftId] — Task 8's mock room info", () => {
     const body = await (await getDraft(new Request(`http://test/api/drafts/${MOCK_DRAFT_ID}`), { params: mockParams })).json();
 
     expect(body.data.draft.phase).toBe("complete");
-    expect(body.data.mock.results).toEqual({
+    // The debrief's wire shape (the workflow pass): the copy in full, the room's own
+    // re-derived table for RUN IT BACK, and no habits under two completed mocks.
+    expect(body.data.mock.results.copy).toMatchObject({
       heading: MOCK_COPY.resultsHeading,
       retentionSentence: MOCK_COPY.resultsRetentionSentence,
-      rosterHeading: MOCK_COPY.resultsRosterHeading,
       picksHeading: MOCK_COPY.resultsPicksHeading,
-      openSlotLabel: MOCK_COPY.resultsOpenSlotLabel,
       noPicksMessage: MOCK_COPY.resultsNoPicksMessage,
       pickFact: {
         bestAvailable: MOCK_COPY.resultsPickBestAvailable,
         positionBestAvailable: MOCK_COPY.resultsPickPositionBestAvailable,
         rankedHigherAvailable: MOCK_COPY.resultsPickRankedHigherAvailable,
       },
-      runAgainLabel: MOCK_COPY.resultsRunAgainLabel,
+      runBackVerb: MOCK_COPY.resultsRunBackVerb,
       openLobbyLabel: MOCK_COPY.resultsOpenLobbyLabel,
-      browseLeaguesLabel: MOCK_COPY.resultsBrowseLeaguesLabel,
+      teamHeading: MOCK_COPY.resultsTeamHeading,
+      habitsHeading: MOCK_COPY.resultsHabitsHeading,
     });
+    expect(body.data.mock.results.table).toMatchObject({ pickSeconds: 60 });
+    expect(body.data.mock.results.habits).toBeNull();
     expect(body.data.mock.share).toBeNull();
   });
 });

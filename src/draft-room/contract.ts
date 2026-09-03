@@ -27,22 +27,72 @@ export interface MockShareInfo {
   readonly startsAt: string;
 }
 
-/** `MockResults`' own copy (Task 8, Step 2), present on `DraftSnapshotBody.mock.results` only
- *  once `phase === "complete"` — a live or scheduled mock never renders `MockResults` at all.
- *  `rosterHeading`/`picksHeading`/`openSlotLabel`/`noPicksMessage`/`pickFact` are the mock-results
- *  design review's own finding (E6, 2026-08-26): the surface's remaining bare literals, moved
- *  beside their siblings here rather than hardcoded in the client component or `state/format.ts`. */
+/** The debrief's words (the workflow pass, law 4), present on `DraftSnapshotBody.mock.results
+ *  .copy` only once `phase === "complete"` — a live or scheduled mock never renders
+ *  `MockResults` at all. Every string is `MOCK_COPY`'s, pre-rendered by the route (E6's "no
+ *  surface's own words skip the gate" rule); `{token}`s are filled client-side by
+ *  `fillCopyTemplate` from facts of the stored draft alone. */
 export interface MockResultsCopy {
   readonly heading: string;
   readonly retentionSentence: string;
-  readonly rosterHeading: string;
   readonly picksHeading: string;
-  readonly openSlotLabel: string;
   readonly noPicksMessage: string;
   readonly pickFact: PickFactCopy;
-  readonly runAgainLabel: string;
+  readonly runBackVerb: string;
   readonly openLobbyLabel: string;
-  readonly browseLeaguesLabel: string;
+  readonly statBestAvailableCaption: string;
+  /** Takes `{threshold}` — the debrief's own stated reach definition. */
+  readonly statReachCaption: string;
+  readonly statFirstTeCaption: string;
+  readonly statNoTeCaption: string;
+  /** Takes `{round}`. Renders ONLY when every other seat drafted the position (the honesty
+   *  gate, `roomAverageFirstRound`) — otherwise the clause drops silently. */
+  readonly roomAverageClause: string;
+  readonly teamHeading: string;
+  /** Takes `{count}`, `{position}`, `{rounds}`. */
+  readonly shapeSentence: string;
+  /** Takes `{week}`, `{count}` — rendered only past the bye-stack threshold, from the real
+   *  schedule read (`DraftPlayersBody.byeWeeks`). */
+  readonly byeStackSentence: string;
+  readonly takeItHeading: string;
+  readonly seedDetail: string;
+  readonly seedVerb: string;
+  readonly seededConfirmation: string;
+  /** Takes `{seat}`. */
+  readonly trySeatVerb: string;
+  /** Takes `{count}`. */
+  readonly habitsHeading: string;
+  /** Takes `{rounds}` — a spoken list ("6, 7 and 5"). */
+  readonly habitsTeSentence: string;
+  /** Takes `{count}`, `{total}`. */
+  readonly habitsEarlySentence: string;
+}
+
+/** The table this room was set with, spoken in the create schema's own vocabulary — what RUN
+ *  IT BACK, SAME TABLE and TRY ANOTHER SEAT post back to `POST /api/mock-drafts`. */
+export interface MockResultsTable {
+  readonly teamCount: number;
+  readonly pickSeconds: number;
+  readonly scoringPreset: string;
+  readonly rosterShape: string;
+}
+
+/** ACROSS YOUR LAST MOCKS — computed server-side from the caller's stored completed mocks
+ *  (`mockHabits`, `@/draft-room/state/debrief`), null under two of them. */
+export interface MockResultsHabits {
+  readonly mockCount: number;
+  /** Null when any summarized mock never drafted a tight end — the clause drops, the card stays. */
+  readonly firstTeRounds: readonly number[] | null;
+  readonly earlyBestAvailableCount: number;
+}
+
+/** Everything the finished mock's debrief needs beyond the draft state itself. */
+export interface MockResultsInfo {
+  readonly copy: MockResultsCopy;
+  /** Null when the room row is somehow gone — the rematch buttons self-omit rather than post a
+   *  guessed table. */
+  readonly table: MockResultsTable | null;
+  readonly habits: MockResultsHabits | null;
 }
 
 /**
@@ -72,7 +122,7 @@ export interface MockRoomInfo {
   /** Present only for an unstarted `link`-mode room. */
   readonly share: MockShareInfo | null;
   /** Present only once the draft has actually finished. */
-  readonly results: MockResultsCopy | null;
+  readonly results: MockResultsInfo | null;
 }
 
 /**

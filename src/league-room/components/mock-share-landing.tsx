@@ -16,11 +16,10 @@ export interface MockShareLandingProps {
   readonly summary: MockRoomSummary;
 }
 
-/** Short mode words for this landing's meta line — this component's own, not `MockSetupForm`'s
- *  longer descriptive labels ("Solo, play against bots"): the create form is asking a question,
- *  this landing is stating a fact in passing. `src/league-room/**` may not value-import
- *  `@/mock-draft` (the client boundary), so the words are typed fresh here the same way
- *  `MockSetupForm`'s own `MODE_LABEL` already is. */
+/** Short mode words for this landing's meta line — this component's own: a landing states a
+ *  fact in passing. `src/league-room/**` may not value-import `@/mock-draft` (the client
+ *  boundary), so the words are typed fresh here, the same split every mock client surface keeps
+ *  for its own control labels. */
 const MODE_LABEL: Readonly<Record<MockMode, string>> = {
   solo: "Solo practice",
   lobby: "Open lobby",
@@ -30,12 +29,9 @@ const MODE_LABEL: Readonly<Record<MockMode, string>> = {
 /**
  * E10 (lobby review, 2026-08-26): the one practice-promise sentence this landing owes a
  * forwarded stranger, who has committed to nothing yet and has no way to know this is not a
- * real league. Kept as a LOCAL exported constant rather than a new `MOCK_COPY` entry: `E12`'s
- * fix (the mock lobby's own empty-history sentence, `mock-lobby.tsx`) is landing a different new
- * `MOCK_COPY` key in this same fix pass, and two implementers adding two keys to one object in
- * the same window is exactly the collision this sidesteps. Deferred, not skipped — this belongs
- * beside `MOCK_COPY.practiceBanner` once both land, threaded as a prop the same way
- * `MOCK_COPY.lobbyEmptyMessage` already reaches `MockLobby` (ruling 8). It passes `copyViolations`
+ * real league. Kept as a LOCAL exported constant rather than a new `MOCK_COPY` entry
+ * (a decision recorded at the lobby review, still standing after the workflow pass — this
+ * landing is the one surface that says it, and it is threaded nowhere). It passes `copyViolations`
  * (`@/integrity/copy-rules`) today the same as it would sitting in that object already: no dash,
  * no contraction, no accusatory or passive construction, nothing from the forbidden vocabulary.
  */

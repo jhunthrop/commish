@@ -3,7 +3,7 @@ import { render, type RenderResult } from "@testing-library/react";
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftClockView, DraftStateView } from "@/draft-engine";
-import type { MockResultsCopy, MockRoomInfo, WaitingInfo } from "./contract";
+import type { MockResultsCopy, MockResultsInfo, MockRoomInfo, WaitingInfo } from "./contract";
 import { DraftRoomDepsProvider, type DraftRoomDeps, type EventSourceLike } from "./hooks/deps";
 
 export const PLAYERS: readonly Player[] = [
@@ -49,20 +49,42 @@ export const MOCK_ROOM: MockRoomInfo = {
  *  rather than every test file re-declaring the same literal, so a future MOCK_COPY addition
  *  needs one update here, not three. */
 export const MOCK_RESULTS_COPY: MockResultsCopy = {
-  heading: "Your mock draft is complete.",
+  heading: "The debrief",
   retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
-  rosterHeading: "Your roster",
   picksHeading: "Your picks",
-  openSlotLabel: "Open",
   noPicksMessage: "You did not draft anyone in this room.",
   pickFact: {
     bestAvailable: "Best available",
     positionBestAvailable: "Best {position} available",
     rankedHigherAvailable: "{count} ranked higher",
   },
-  runAgainLabel: "Run another mock draft",
+  runBackVerb: "Run it back, same table",
   openLobbyLabel: "Open the mock draft lobby",
-  browseLeaguesLabel: "Browse real leagues",
+  statBestAvailableCaption: "picks were the board's best available at your turn",
+  statReachCaption: "reaches, {threshold} or more ranked higher when you picked",
+  statFirstTeCaption: "your first tight end",
+  statNoTeCaption: "tight ends taken all draft",
+  roomAverageClause: "the room's average was round {round}",
+  teamHeading: "The team you built",
+  shapeSentence: "{count} {position} inside your first {rounds} rounds.",
+  byeStackSentence: "Byes stack in week {week}: {count} of your players sit out together.",
+  takeItHeading: "Take it with you",
+  seedDetail: "Your mock picks can seed your cheat sheet, so the real room already knows who you want.",
+  seedVerb: "Seed my sheet",
+  seededConfirmation: "Your sheet is seeded. The next room you open without a sheet starts from these picks.",
+  trySeatVerb: "Try seat {seat} instead",
+  habitsHeading: "Across your last {count} mocks",
+  habitsTeSentence: "Your first tight end went in rounds {rounds}.",
+  habitsEarlySentence: "Your first two rounds were all best available in {count} of {total} mocks.",
+};
+
+/** The full wire shape a finished mock's snapshot carries (`MockRoomInfo.results`) — the copy
+ *  above plus a rematchable table and no habits (the under-two-mocks default; tests that want
+ *  the card override `habits`). */
+export const MOCK_RESULTS_INFO: MockResultsInfo = {
+  copy: MOCK_RESULTS_COPY,
+  table: { teamCount: 2, pickSeconds: 60, scoringPreset: "half_ppr", rosterShape: "standard" },
+  habits: null,
 };
 
 export const SNAKE_VIEW: DraftStateView = {

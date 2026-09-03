@@ -102,34 +102,6 @@ export const MOCK_CONFIG = {
    */
   debriefHistoryLimit: 6,
   /**
-   * R3 (the lobby design review's carry): the practice wire's own tunables —
-   * `listMockWireItems` (`@/mock-draft-service/wire`), rendered by `MockWire`
-   * (`@/league-room/components/mock-wire`). Deliberately its own object, never a value read off
-   * `MATCHMAKING_CONFIG.wire`: a mock lifecycle write appends NO audit event, ever (ruling 2),
-   * so this domain shares none of the front door's audit-backed window and needs no anonymous-
-   * surface concern at all — the vocabulary and the numbers describing it belong together.
-   */
-  wire: {
-    /**
-     * How far back a `mock_filled` item looks. A mock's `drafts.kickoff_at` IS its
-     * `mock_rooms.starts_at` (`createMockRoom`'s own docblock: "the draft's own kickoff is the
-     * same instant", never rewritten after creation), so `status = 'in_progress' AND
-     * kickoff_at` inside this window is the honest, cheap proxy for "went in_progress this
-     * recently" — no audit event exists to read instead (ruling 2's carve-out), and the ticker's
-     * own due-scan cadence (`sweepIntervalMs`, 60s, above) keeps that proxy accurate to within
-     * one tick.
-     */
-    filledWindowMs: 30 * 60 * 1000,
-    /**
-     * The most items one render of the practice wire carries. Small on purpose: unlike the
-     * front-door wire (`MATCHMAKING_CONFIG.wire.maxItems`, 12) this band never scrolls (RULED —
-     * no `animate-wire` here, "a lobby is not a marquee"), so the cap is exactly how many facts
-     * a single truncating line can honestly hold before the newest ones crowd the rest off the
-     * end anyway.
-     */
-    maxItems: 4,
-  },
-  /**
    * Task 7's per-user ceilings on the mock-drafts surface — every route behind it requires a
    * signed-in caller (no anonymous rooms), so each is keyed on the caller's own id, the identical
    * shape `ADVISOR_CONFIG.maxRequestsPerWindow`/`rateLimitWindowMs` and
@@ -271,10 +243,10 @@ export const MOCK_COPY = {
    */
   waitingDetail:
     "Practice opponents fill any open seats.",
-  /** The results page heading. Deliberately not a grade or a score against the room: this
-   *  product invents no draft-grade authority (founder self-ruling), only confirms the practice
-   *  round is over. */
-  resultsHeading: "Your mock draft is complete.",
+  /** The results page heading (the workflow pass: the blueprint's own word for the surface).
+   *  Deliberately not a grade or a score against the room: this product invents no draft-grade
+   *  authority (founder self-ruling) — a debrief states facts, it never scores them. */
+  resultsHeading: "The debrief",
   /**
    * R2 (the lobby design review's ruling): the page's own lead sentence, read directly by the
    * server page (`src/app/app/(shell)/mock-drafts/page.tsx`) beside its `<h1>` — never threaded
@@ -287,18 +259,26 @@ export const MOCK_COPY = {
    */
   lobbyPromise:
     "A mock draft is the real room against practice opponents. Free, nothing counts, done in minutes.",
-  /** Shown in the mock lobby when no open room is waiting to be joined. Pairs with the honest
-   *  one-tap `MockLobby` builds from `defaultTeamCount`/`defaultPickSeconds` (D3's ruling: a
-   *  labeled quick start, never a bare "Start a mock draft" link that could be mistaken for the
-   *  form's own submit button) so an empty lobby is an invitation, never a dead end. */
-  lobbyEmptyMessage: "No mock drafts are open right now.",
   /**
-   * E12 (the same review): the caller's own empty-history sentence, moved here beside its
-   * sibling above rather than a bare string literal `MockLobby` used to hold — no copy gate had
-   * ever seen it. Pairs with the identical honest one-tap `lobbyEmptyMessage` does, for the same
-   * "never a dead end" reason.
+   * THE WORKFLOW PASS (2026-09-03, the canvas laws): the page's own sentences. Law 1 leads with
+   * one verb and a chip sentence; law 2 makes people a door (an EMPTY lobby renders NOTHING, so
+   * the old `lobbyEmptyMessage`/`lobbyHistoryEmptyMessage` pair left with the surfaces that said
+   * them); law 3 gives the learning the page's second half. Every sentence crosses to the client
+   * page component as props (ruling 8, the client boundary) and passes `copyViolations` like the
+   * rest of this object.
    */
-  lobbyHistoryEmptyMessage: "You have no mock drafts yet.",
+  soloDetail: "In the room in five seconds. The bots pick the way real rooms do.",
+  tableHint: "Tap any chip to change it. Your last table is remembered.",
+  openLobbyDetail: "Anyone can take a seat; bots fill whoever does not show.",
+  crewDetail: "A private link seats your league mates; practice the real draft together.",
+  sheetTieIn:
+    "Drafting for real soon? Your mock picks can seed your cheat sheet, so practice walks into the real room with you.",
+  pageFootnote: "Practice rooms clear themselves after a day. Nothing here touches a real league.",
+  /** Law 3: the learning column's own sentences. `{count}`/`{fraction}` are the only tokens. */
+  learningHeading: "What your last mock says",
+  earlierHeading: "Earlier mocks",
+  learningFootnote: "The debrief shows all {count}, judged against the board at the moment you picked.",
+  bestFractionRow: "{fraction} best available",
   /**
    * Task 8's own results-page line, beside `resultsHeading`. The number is a literal, not a
    * computed `MOCK_CONFIG.retention.completedMs` string, for the same "no reader should do
@@ -308,14 +288,11 @@ export const MOCK_COPY = {
   resultsRetentionSentence:
     "Your results stay here for 24 hours, then this room clears itself.",
   /**
-   * The results-page roster and pick-list labels (mock-results design review, 2026-08-26,
-   * finding E6): moved here beside their siblings rather than left as bare literals in
-   * `mock-results.tsx` and `state/format.ts` — the same "no surface's own words skip the gate"
-   * fix `lobbyHistoryEmptyMessage` already got for the lobby's own review.
+   * The verdict lane's label and its empty sentence (E6's "no surface's own words skip the
+   * gate" rule carried into the workflow pass; the roster-list labels this block used to hold
+   * left with the roster list itself — the debrief's team card replaced it).
    */
-  resultsRosterHeading: "Your roster",
   resultsPicksHeading: "Your picks",
-  resultsOpenSlotLabel: "Open",
   resultsNoPicksMessage: "You did not draft anyone in this room.",
   /**
    * The pick-fact sentence (finding D3 + ruling R2): the honest replacement for the old,
@@ -333,11 +310,30 @@ export const MOCK_COPY = {
   resultsPickBestAvailable: "Best available",
   resultsPickPositionBestAvailable: "Best {position} available",
   resultsPickRankedHigherAvailable: "{count} ranked higher",
-  /** The results page's three next actions (Task 8, Step 2 — "never a dead end"): a quick
-   *  rematch, the lobby, and the real thing. `MockResults` (`@/draft-room/components/
-   *  mock-results`) renders all three, every time — a finished mock draft never leaves a
-   *  member with nowhere to go. */
-  resultsRunAgainLabel: "Run another mock draft",
+  /**
+   * THE DEBRIEF'S OWN SECTIONS (the workflow pass, law 4). The one solid verb is the rematch;
+   * the lobby link stays as the quiet way out ("never a dead end", Task 8's rule, kept). Every
+   * `{token}` is filled by `fillCopyTemplate` (`@/draft-room/state/format`) from facts the
+   * stored draft actually supports — a clause whose fact is not derivable drops silently, per
+   * the canvas laws.
+   */
+  resultsRunBackVerb: "Run it back, same table",
   resultsOpenLobbyLabel: "Open the mock draft lobby",
-  resultsBrowseLeaguesLabel: "Browse real leagues",
+  resultsStatBestAvailableCaption: "picks were the board's best available at your turn",
+  resultsStatReachCaption: "reaches, {threshold} or more ranked higher when you picked",
+  resultsStatFirstTeCaption: "your first tight end",
+  resultsStatNoTeCaption: "tight ends taken all draft",
+  resultsRoomAverageClause: "the room's average was round {round}",
+  resultsTeamHeading: "The team you built",
+  resultsShapeSentence: "{count} {position} inside your first {rounds} rounds.",
+  resultsByeStackSentence: "Byes stack in week {week}: {count} of your players sit out together.",
+  resultsTakeItHeading: "Take it with you",
+  resultsSeedDetail:
+    "Your mock picks can seed your cheat sheet, so the real room already knows who you want.",
+  resultsSeedVerb: "Seed my sheet",
+  resultsSeededConfirmation: "Your sheet is seeded. The next room you open without a sheet starts from these picks.",
+  resultsTrySeatVerb: "Try seat {seat} instead",
+  resultsHabitsHeading: "Across your last {count} mocks",
+  resultsHabitsTeSentence: "Your first tight end went in rounds {rounds}.",
+  resultsHabitsEarlySentence: "Your first two rounds were all best available in {count} of {total} mocks.",
 } as const;

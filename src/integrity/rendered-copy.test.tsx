@@ -62,13 +62,14 @@ import { MockResults } from "@/draft-room/components/mock-results";
 import { PracticeBanner } from "@/draft-room/components/practice-banner";
 import { RoomTour } from "@/draft-room/components/room-tour";
 import { ShareLinkPanel } from "@/draft-room/components/share-link-panel";
-import { MOCK_RESULTS_COPY, PLAYERS, SNAKE_VIEW, TEAMS } from "@/draft-room/test-fixtures";
+import { MOCK_RESULTS_INFO, PLAYERS, SNAKE_VIEW, TEAMS } from "@/draft-room/test-fixtures";
 import { formatAbsoluteTime } from "@/league/terms";
 import { formatDraftAbsolute } from "@/league-room/lib/format";
 import { MOCK_COPY } from "@/mock-draft/config";
 import type { MockRoomSummary } from "@/mock-draft-service/lobby";
-import { MockLobby } from "@/league-room/components/mock-lobby";
-import { MockSetupForm } from "@/league-room/components/mock-setup-form";
+import { MockDraftsPage } from "@/league-room/components/mock-drafts-page";
+import { MockTableChips } from "@/league-room/components/mock-table-chips";
+import { defaultMockTable, type MockTableOptions } from "@/league-room/lib/mock-table";
 import { MockShareLanding } from "@/league-room/components/mock-share-landing";
 import { PracticeEntryLink } from "@/league-room/components/practice-entry-link";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
@@ -1719,14 +1720,17 @@ const MOCK_RESULTS_VIEW = {
 
 describe("MockResults says nothing that breaks the house copy rules, with and without a team of your own", () => {
   it("is clean for a team with a roster and picks, and for a commissioner with neither", () => {
-    const actions = {
-      runAgain: <Link href="/app/mock-drafts?create=solo">{MOCK_RESULTS_COPY.runAgainLabel}</Link>,
-      openLobby: <Link href="/app/mock-drafts">{MOCK_RESULTS_COPY.openLobbyLabel}</Link>,
-      browseLeagues: <Link href="/browse">{MOCK_RESULTS_COPY.browseLeaguesLabel}</Link>,
-    };
     for (const myTeamId of ["t1", null]) {
       const { container, unmount } = render(
-        <MockResults teams={TEAMS} board={null} view={MOCK_RESULTS_VIEW} players={PLAYERS} myTeamId={myTeamId} copy={MOCK_RESULTS_COPY} actions={actions} />,
+        <MockResults
+          teams={TEAMS}
+          board={null}
+          view={MOCK_RESULTS_VIEW}
+          players={PLAYERS}
+          byeWeeks={new Map()}
+          myTeamId={myTeamId}
+          results={{ ...MOCK_RESULTS_INFO, habits: { mockCount: 2, firstTeRounds: [6, 5], earlyBestAvailableCount: 1 } }}
+        />,
       );
       expectClean(container, "Marcus Reed");
       unmount();
@@ -1735,10 +1739,10 @@ describe("MockResults says nothing that breaks the house copy rules, with and wi
 });
 
 /**
- * Task 9's own three new client components — `PracticeEntryLink`, `MockSetupForm` and `MockLobby`
- * (`src/league-room/**`) plus `MockShareLanding` (also `src/league-room/**`) — none of which may
- * value-import `@/mock-draft` either, the identical client-boundary reason `PracticeBanner`/
- * `MockResults`/`ShareLinkPanel` above are swept here rather than trusted.
+ * The workflow pass's client components — `PracticeEntryLink`, `MockDraftsPage` and
+ * `MockTableChips` (`src/league-room/**`) plus `MockShareLanding` (also `src/league-room/**`) —
+ * none of which may value-import `@/mock-draft` either, the identical client-boundary reason
+ * `PracticeBanner`/`MockResults`/`ShareLinkPanel` above are swept here rather than trusted.
  */
 describe("PracticeEntryLink says nothing that breaks the house copy rules", () => {
   it("is clean signed in and signed out", () => {
@@ -1747,22 +1751,6 @@ describe("PracticeEntryLink says nothing that breaks the house copy rules", () =
       expectClean(container);
       unmount();
     }
-  });
-});
-
-describe("MockSetupForm says nothing that breaks the house copy rules", () => {
-  it("is clean with the real MOCK_CONFIG options threaded down as props", () => {
-    const { container } = render(
-      <MockSetupForm
-        modes={["solo", "lobby", "link"]}
-        teamCountOptions={[8, 10, 12]}
-        pickSecondsOptions={[30, 60, 90]}
-        defaultTeamCount={12}
-        defaultPickSeconds={60}
-        onCreated={() => {}}
-      />,
-    );
-    expectClean(container);
   });
 });
 
@@ -1779,29 +1767,51 @@ const MOCK_LOBBY_MINE_ROOM = {
   status: "in_progress" as const,
   teamName: "Mock Squad",
 };
-const MOCK_LOBBY_WIRE_ITEMS = [
-  { kind: "mocks_running" as const, count: 3 },
-  { kind: "mock_filled" as const, teamCount: 12, agoMs: 4 * 60_000 },
-];
 
-describe("MockLobby says nothing that breaks the house copy rules, empty and populated", () => {
-  it("is clean with nothing open and nothing of the caller's own, and with both populated", () => {
+const MOCK_TABLE_OPTIONS: MockTableOptions = {
+  teamCounts: [8, 10, 12],
+  pickSeconds: [30, 60, 90],
+  scoringPresets: ["half_ppr", "ppr", "standard", "te_premium"],
+  rosterShapes: ["standard", "superflex"],
+  defaultTeamCount: 12,
+  defaultPickSeconds: 60,
+  defaultScoringPreset: "half_ppr",
+  defaultRosterShape: "standard",
+  maxTeamNameLength: 30,
+};
+
+const MOCK_PAGE_COPY = {
+  soloDetail: MOCK_COPY.soloDetail,
+  tableHint: MOCK_COPY.tableHint,
+  openLobbyDetail: MOCK_COPY.openLobbyDetail,
+  crewDetail: MOCK_COPY.crewDetail,
+  sheetTieIn: MOCK_COPY.sheetTieIn,
+};
+
+describe("MockDraftsPage says nothing that breaks the house copy rules, empty and populated", () => {
+  it("is clean with an empty lobby, and with an open room plus a re-entry row", () => {
     for (const props of [
-      { initialOpen: [], initialMine: [], initialWireItems: [] },
-      { initialOpen: [MOCK_LOBBY_OPEN_ROOM], initialMine: [MOCK_LOBBY_MINE_ROOM], initialWireItems: MOCK_LOBBY_WIRE_ITEMS },
+      { initialOpen: [], initialMine: [] },
+      { initialOpen: [MOCK_LOBBY_OPEN_ROOM], initialMine: [MOCK_LOBBY_MINE_ROOM] },
     ]) {
       const { container, unmount } = render(
-        <MockLobby
-          {...props}
-          modes={["solo", "lobby", "link"]}
-          teamCountOptions={[8, 10, 12]}
-          pickSecondsOptions={[30, 60, 90]}
-          defaultTeamCount={12}
-          defaultPickSeconds={60}
-          emptyMessage={MOCK_COPY.lobbyEmptyMessage}
-          historyEmptyMessage={MOCK_COPY.lobbyHistoryEmptyMessage}
-        />,
+        <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
+          <MockDraftsPage {...props} options={MOCK_TABLE_OPTIONS} copy={MOCK_PAGE_COPY} />
+        </LeagueRoomDepsProvider>,
       );
+      expectClean(container, "Mock Squad");
+      unmount();
+    }
+  });
+});
+
+describe("MockTableChips says nothing that breaks the house copy rules, with every editor open", () => {
+  it("is clean for each chip's own borrowed editor row", () => {
+    for (const chip of ["teams", "clock", "scoring", "roster", "seat", "name"]) {
+      const { container, unmount } = render(
+        <MockTableChips table={defaultMockTable(MOCK_TABLE_OPTIONS)} options={MOCK_TABLE_OPTIONS} hint={MOCK_COPY.tableHint} onChange={() => {}} />,
+      );
+      fireEvent.click(within(container as HTMLElement).getByTestId(`table-chip-${chip}`));
       expectClean(container);
       unmount();
     }

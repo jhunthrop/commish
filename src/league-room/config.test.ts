@@ -9,7 +9,6 @@ describe("LEAGUE_ROOM_CONFIG", () => {
       "expiryTickMs",
       "attentionQueueCap",
       "mockLobbyPollIntervalMs",
-      "mockHistoryVisibleCount",
       // `heatMinPopulation` LEFT THIS CONFIG on 2026-08-28 and is now `UI_CONFIG.stat
       // .minPopulation` (`@/components/ui/config`), moved with the arithmetic it governs when
       // `Table` learned to judge a column. A draft-room table asking a league-room config how

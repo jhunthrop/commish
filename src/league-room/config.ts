@@ -25,8 +25,8 @@ export const LEAGUE_ROOM_CONFIG = {
    */
   attentionQueueCap: 3,
   /**
-   * R5 (the mock lobby design review's ruling): how often `MockLobby` (`./components/mock-
-   * lobby.tsx`) re-fetches `GET /api/mock-drafts` in the background, ms. A lobby's whole
+   * R5 (the mock lobby design review's ruling): how often `MockDraftsPage`
+   * (`./components/mock-drafts-page.tsx`) re-fetches `GET /api/mock-drafts` in the background, ms. A lobby's whole
    * question is "is anyone here right now" — bounded, no gating condition (unlike
    * `homeRefreshIntervalMs` above, this list is cheap and always worth a glance while the page
    * is open), and no socket: ruling 10 (no anonymous or pre-seat SSE for a mock room) stays
@@ -36,14 +36,6 @@ export const LEAGUE_ROOM_CONFIG = {
    * independently.
    */
   mockLobbyPollIntervalMs: 30_000,
-  /**
-   * E7 (the same review): how many of the caller's own mock rooms `MockLobby` shows before
-   * folding the rest behind a quiet "Show all N" disclosure. Eight is a Sunday-glance number —
-   * enough to show a full week of daily mocks without the wall of rows the review's D2/E7
-   * findings flagged (`MOCK_CONFIG.maxLobbyListing`'s own 20-row cap is what the LIST can hold;
-   * this is what the FOLD shows before asking).
-   */
-  mockHistoryVisibleCount: 8,
   /**
    * The remembered mock table's localStorage key (law 1 of the mock-drafts workflow pass:
    * "your last table is remembered"). Browser persistence by the cheat sheet's own precedent

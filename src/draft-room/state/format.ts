@@ -67,7 +67,7 @@ export function formatPausedUntil(resumeAt: string): string {
  * the token set is small and fixed per template, so no template can accidentally match part of
  * another token.
  */
-function fillTemplate(template: string, values: Readonly<Record<string, string>>): string {
+export function fillCopyTemplate(template: string, values: Readonly<Record<string, string>>): string {
   return Object.entries(values).reduce((text, [token, value]) => text.split(`{${token}}`).join(value), template);
 }
 
@@ -108,8 +108,8 @@ export function formatPickFactClause(copy: PickFactCopy, review: PickReview, pos
   return review.bestAvailableDelta === 0
     ? copy.bestAvailable
     : review.positionBestDelta === 0
-      ? fillTemplate(copy.positionBestAvailable, { position })
-      : fillTemplate(copy.rankedHigherAvailable, { count: String(review.bestAvailableDelta) });
+      ? fillCopyTemplate(copy.positionBestAvailable, { position })
+      : fillCopyTemplate(copy.rankedHigherAvailable, { count: String(review.bestAvailableDelta) });
 }
 
 /**

@@ -58,6 +58,24 @@ const BOT_COUNT = TEAM_COUNT - 1;
  */
 const PICK_SECONDS = 90;
 
+/**
+ * The workflow pass (law 1): a setting is changed by tapping its chip and choosing inside the
+ * borrowed editor row. Click-and-verify, retried, because the chips are server-rendered before
+ * the editors hydrate (the pre-hydration hazard `design-v2.spec.ts` documents); the chosen
+ * option closes the row, so the group's own disappearance is the confirmation.
+ */
+async function setTableChip(page: import("@playwright/test").Page, chip: string, groupLabel: string, optionName: string): Promise<void> {
+  await expect(async () => {
+    const group = page.getByRole("group", { name: groupLabel });
+    if ((await group.count()) === 0) {
+      await page.getByTestId(`table-chip-${chip}`).click();
+      await expect(group).toBeVisible({ timeout: 2_000 });
+    }
+    await group.getByRole("button", { name: optionName, exact: true }).click();
+    await expect(group).toHaveCount(0, { timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+}
+
 /** `MOCK_CONFIG.botDelay.maxSeconds` (9) times the widest gap a solo room's own shuffled draft
  *  order (`drawSequenceFor`, `@/draft-service/order.ts` — seeded from the draft id, never
  *  predictable ahead of creation) could ever put between the host's own seat and pick 1: every
@@ -204,22 +222,21 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   await expect(managerA).toHaveURL(/\/app\/mock-drafts$/);
   await expect(managerA.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
 
-  // --- Setup: solo (the default mode), the widest room, a fast clock (see `PICK_SECONDS`'s own
-  // docblock for why this is the 90s tier, not the 30s one) --------------------------------
-  await managerA.getByLabel("Teams").selectOption(String(TEAM_COUNT));
-  await managerA.getByLabel("Pick clock").selectOption(String(PICK_SECONDS));
+  // --- Setup (the workflow pass, law 1): the chip sentence edited in place — the widest room,
+  // a fast clock (see `PICK_SECONDS`'s own docblock for why this is the 90s tier, not the 30s
+  // one). Each chip open is click-and-verify, retried: chips are server-rendered before the
+  // editors hydrate, the identical pre-hydration hazard `design-v2.spec.ts` documents.
+  await setTableChip(managerA, "teams", "Teams", String(TEAM_COUNT));
+  await setTableChip(managerA, "clock", "Pick clock", `${PICK_SECONDS}s`);
   // Founder directive 2026-08-26: "users should be able to select their draft position." The
   // LAST slot is the one choice `assignDraftSlots` (`@/draft-service/order`) honors under EVERY
   // possible shuffle (see `creation.test.ts`'s own note on this) — the one deterministic pick
   // available to a real-UUID room this spec cannot seed. Choosing it here also means the host
   // now ALWAYS lands in the exact worst case `ON_CLOCK_TIMEOUT_MS` was already sized for (the
   // host drafting last), so this changes nothing about that bound's own margin.
-  await managerA.getByLabel("Draft position").selectOption(String(TEAM_COUNT));
-  // Click-and-verify, retried: this is a React form's submit button on a page freshly navigated
-  // to a moment ago, the identical pre-hydration hazard `design-v2.spec.ts`'s own keyboard walk
-  // documents for a button in the same position in its own journey.
+  await setTableChip(managerA, "seat", "Your seat", String(TEAM_COUNT));
   await expect(async () => {
-    await managerA.getByRole("button", { name: "Start mock draft" }).click();
+    await managerA.getByRole("button", { name: "Draft now" }).click();
     await expect(managerA).toHaveURL(/\/app\/drafts\//, { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
   const draftId = new URL(managerA.url()).pathname.split("/").pop()!;
@@ -322,18 +339,18 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
   // E3 (results review): the panel restates NO retention — the practice banner above it owns
   // the one clearing fact per view.
   await expect(managerA.getByText(MOCK_COPY.resultsRetentionSentence)).toHaveCount(0);
-  await expect(managerA.getByRole("list", { name: "Your roster" })).toBeVisible();
-  // At least the one pick this test's own human made lands in the pick list — a fact of this
+  // The debrief's team card replaced the roster list (the workflow pass, law 4).
+  await expect(managerA.getByText(MOCK_COPY.resultsTeamHeading)).toBeVisible();
+  // At least the one pick this test's own human made lands in the verdict lane — a fact of this
   // draft's own log, not a live ranking (`MockResults`'s own docblock).
   await expect(managerA.getByRole("list", { name: "Your picks" }).getByRole("listitem")).not.toHaveCount(0);
 
-  // --- "Run it again" honors its own contract: a NEW solo room, not the same one reopened ----
+  // --- RUN IT BACK, SAME TABLE honors its own contract: a NEW solo room, not this one reopened.
   // `waitForURL` with a predicate, not a bare `toHaveURL(/\/app\/drafts\//)`: this page was
   // ALREADY on such a URL before the click (the reload above never left it), so a pattern-only
   // wait would pass the instant it started polling, proving nothing about whether the click's
-  // own navigation (through the intermediate `/app/mock-drafts?create=solo` redirect) ever
-  // actually landed anywhere.
-  await managerA.getByRole("link", { name: MOCK_COPY.resultsRunAgainLabel }).click();
+  // own POST-and-navigate ever actually landed anywhere.
+  await managerA.getByRole("button", { name: MOCK_COPY.resultsRunBackVerb }).click();
   await managerA.waitForURL((url) => url.pathname !== `/app/drafts/${draftId}`, { timeout: 20_000 });
   await expect(managerA).toHaveURL(/\/app\/drafts\//, { timeout: 20_000 });
   const secondDraftId = new URL(managerA.url()).pathname.split("/").pop()!;
@@ -359,7 +376,7 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
  * (`use-draft-room.ts`'s own docblock: refetch on mount, on an SSE reconnect, or on a genuine
  * event gap — never on a timer, never on an unrelated write). Reloading is the honest way to
  * observe a fact this surface only ever reads at request time, the identical "request-time
- * truth, manual refresh" rule `MockLobby`'s own listing already keeps (ruling 10).
+ * truth" rule the mock lobby listing itself keeps (ruling 10).
  * -------------------------------------------------------------------------------------------
  */
 test("a link room's share code, claimed by a second seeded identity, moves the seat count live", async ({ managerA, managerB }) => {
@@ -368,10 +385,10 @@ test("a link room's share code, claimed by a second seeded identity, moves the s
   // --- managerB hosts a private link room -----------------------------------------------------
   await managerB.goto("/app/mock-drafts");
   await expect(managerB.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
-  await managerB.getByLabel("Mode").selectOption("link");
-  await managerB.getByLabel("Teams").selectOption(String(teamCount));
+  // Law 2: people are a door — the crew room is minted from the same chip sentence.
+  await setTableChip(managerB, "teams", "Teams", String(teamCount));
   await expect(async () => {
-    await managerB.getByRole("button", { name: "Start mock draft" }).click();
+    await managerB.getByRole("button", { name: "Mint a link" }).click();
     await expect(managerB).toHaveURL(/\/app\/drafts\//, { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
 
