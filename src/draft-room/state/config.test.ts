@@ -15,7 +15,7 @@ import { DRAFT_ROOM_CONFIG } from "./config";
 describe("DRAFT_ROOM_CONFIG", () => {
   it("defines every numeric tunable as a positive number", () => {
     const numericKeys: readonly (keyof typeof DRAFT_ROOM_CONFIG)[] = ["poolPageSize", "celebrationMs"];
-    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire", "tv", "verdict", "tiers", "boardFutureRoundsShown", "dock"] as const;
+    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire", "tv", "verdict", "tiers", "boardFutureRoundsShown", "dock", "debrief"] as const;
     expect(Object.keys(DRAFT_ROOM_CONFIG).sort()).toEqual([...allKeys].sort());
     for (const key of numericKeys) {
       expect(Number.isFinite(DRAFT_ROOM_CONFIG[key])).toBe(true);
@@ -69,6 +69,15 @@ describe("DRAFT_ROOM_CONFIG", () => {
   it("keeps the verdict's even band a positive number of picks", () => {
     expect(Number.isFinite(DRAFT_ROOM_CONFIG.verdict.evenBandPicks)).toBe(true);
     expect(DRAFT_ROOM_CONFIG.verdict.evenBandPicks).toBeGreaterThan(0);
+  });
+
+  // The debrief's thresholds (the mock-drafts workflow pass): a reach definition of zero would
+  // brand every non-perfect pick a reach; a shape window under a round reads no build at all;
+  // a bye-stack floor under three names the two-teammate coincidence every roster has.
+  it("keeps the debrief's thresholds meaningful", () => {
+    expect(DRAFT_ROOM_CONFIG.debrief.reachRankedHigher).toBeGreaterThan(0);
+    expect(DRAFT_ROOM_CONFIG.debrief.shapeRounds).toBeGreaterThanOrEqual(1);
+    expect(DRAFT_ROOM_CONFIG.debrief.byeStackMin).toBeGreaterThanOrEqual(3);
   });
 
   // `DraftBoard`'s empty-cell recede: a future round's border may shrink, never dim past

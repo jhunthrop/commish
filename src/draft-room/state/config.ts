@@ -46,6 +46,25 @@ export const DRAFT_ROOM_CONFIG = {
     evenBandPicks: 6,
   },
   /**
+   * THE DEBRIEF'S OWN THRESHOLDS (the mock-drafts workflow pass, 2026-09-03 — `./debrief`
+   * reads these and nothing else does).
+   *
+   * - `reachRankedHigher`: how many players ranked higher must still be on the board at the
+   *   moment of a pick before the debrief counts it a reach. Five is the blueprint's own stated
+   *   definition ("reaches, five or more ranked higher when you picked"), and the sentence that
+   *   renders beside the count always states it — the number never judges silently.
+   * - `shapeRounds`: how deep the positional-shape read looks ("4 RB by round 6"). Six rounds
+   *   is where a build's identity is set; past it every roster converges on filling out.
+   * - `byeStackMin`: how many rostered players must share a bye week before the team card names
+   *   it. Two sharing a bye is every roster ever; three or more sitting together is the fact
+   *   worth a sentence.
+   */
+  debrief: {
+    reachRankedHigher: 5,
+    shapeRounds: 6,
+    byeStackMin: 3,
+  },
+  /**
    * `PickWire`'s own tunable (2026-08-26 design review, R1): how many of the draft's most
    * recent picks the band shows, newest first. One number, read by both the room's `text-xs`
    * band and the TV's `text-base` one, so a future retune never drifts between the two.
