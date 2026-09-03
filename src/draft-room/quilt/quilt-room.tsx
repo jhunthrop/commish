@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useReducer, useState } from "react";
+import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import type { Player } from "@/domain/player";
 import { useToast } from "@/components/ui";
 import { formatCountdown, useCountdown } from "@/components/ui/countdown";
@@ -11,6 +11,7 @@ import { RESTING, reduceCollapse } from "./state/collapse";
 import type { Lens } from "./state/lens";
 import { sheetRanks as sheetRanksOf } from "./state/sheet";
 import { usePendingPick } from "./hooks/use-pending-pick";
+import { usePlayerHistory, type PlayerHistoryCache } from "./hooks/use-player-history";
 import { useRoomKeys } from "./hooks/use-room-keys";
 import { useSheet } from "./hooks/use-sheet";
 import { peekFactsFor } from "./lib/peek-facts";
@@ -76,6 +77,11 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
   const byeWeeks = room.byeWeeks ?? new Map<string, number>();
   const reasons = room.reasons ?? new Map();
+
+  // The season-history cache lives for the room, shared by both trees — a player peeked on the
+  // phone is already warm on the desktop and vice versa.
+  const historyCacheRef = useRef<PlayerHistoryCache>(new Map());
+  const peekHistory = usePlayerHistory(view.draftId, surface.kind === "peek" ? surface.playerId : null, historyCacheRef.current);
 
   const { remainingMs } = useCountdown(view.deadlineAt);
   const clockLabel = remainingMs === null ? null : formatCountdown(remainingMs);
@@ -163,6 +169,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           {peekFacts === null ? null : (
             <PeekSheet
               facts={peekFacts}
+              history={peekHistory}
               view={view}
               myTeamId={room.myTeamId}
               canDraft={canDraft}
@@ -208,6 +215,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
         <MobileRoom
           room={room}
           view={view}
+          historyCache={historyCacheRef.current}
           playersById={playersById}
           myTurn={myTurn}
           acts={acts}

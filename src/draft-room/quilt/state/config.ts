@@ -31,6 +31,10 @@ export const QUILT_CONFIG = {
   fullRoundsAhead: 1,
   /** localStorage key prefix for the cheat sheet, suffixed with the draft id. */
   sheetStorageKeyPrefix: "commish.draft-sheet.",
+  /** The consistency strip's own bar: a week at or over this many fantasy points counts as a
+   *  hit and wears the position's color; under it stays quiet. One constant, stated beside the
+   *  caption that quotes it. */
+  weeklyGoodPoints: 12,
   /** A sheet note's ceiling, in characters — prep is a margin scribble, not an essay, and the
    *  codec truncates anything longer on decode so a tampered or ancient store can never bloat
    *  the room. */

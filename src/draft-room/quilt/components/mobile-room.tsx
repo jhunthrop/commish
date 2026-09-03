@@ -9,6 +9,7 @@ import type { DraftRoom as DraftRoomState } from "../../hooks/use-draft-room";
 import type { CheatSheet } from "../state/sheet";
 import type { Lens } from "../state/lens";
 import type { PendingPick } from "../state/pending-pick";
+import { usePlayerHistory, type PlayerHistoryCache } from "../hooks/use-player-history";
 import { peekFactsFor } from "../lib/peek-facts";
 import { teamCode } from "../lib/team-code";
 import { shortName } from "./quilt-cell";
@@ -50,6 +51,8 @@ export interface MobileRoomProps {
   readonly onSheetReset: () => void;
   readonly onSeedQueue: (playerIds: readonly string[]) => void;
   readonly available: ReadonlySet<string>;
+  /** The room-lifetime season-history cache, shared with the desktop tree. */
+  readonly historyCache: PlayerHistoryCache;
 }
 
 /**
@@ -71,6 +74,7 @@ export function MobileRoom(props: MobileRoomProps) {
     [acts],
   );
 
+  const peekHistory = usePlayerHistory(view.draftId, peekId, props.historyCache);
   const onClockTeam = room.teams.find((team) => team.id === view.onClockTeamId) ?? null;
   const confirmPlayer = confirmId === null ? null : (playersById.get(confirmId) ?? null);
   const peekFacts =
@@ -225,6 +229,7 @@ export function MobileRoom(props: MobileRoomProps) {
       {peekFacts === null ? null : (
         <PeekSheet
           facts={peekFacts}
+          history={peekHistory}
           view={view}
           myTeamId={room.myTeamId}
           canDraft={acts.canDraft}

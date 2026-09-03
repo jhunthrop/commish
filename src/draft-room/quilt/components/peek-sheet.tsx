@@ -7,6 +7,8 @@ import type { BoardReason } from "@/projections/preseason/board";
 import { Button, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { formatAdp } from "../../lib/tiers";
+import type { PlayerHistoryState } from "../hooks/use-player-history";
+import { PeekHistory } from "./peek-history";
 
 export interface PeekFacts {
   readonly player: Player;
@@ -25,6 +27,8 @@ export interface PeekFacts {
 
 export interface PeekSheetProps {
   readonly facts: PeekFacts;
+  /** The lazy season-history fetch's state — see `usePlayerHistory`. */
+  readonly history: PlayerHistoryState;
   readonly view: DraftStateView;
   readonly myTeamId: string | null;
   /** True while the caller may act right now (their turn, or an owed pick). */
@@ -68,7 +72,7 @@ function fillsSlot(view: DraftStateView, myTeamId: string | null, player: Player
  * GENERIC edge line, roster fit, and the manager's own note. Click-away dismisses (the backdrop
  * is the click target); ✕ and Esc do the same job for keyboards.
  */
-export function PeekSheet({ facts, view, myTeamId, canDraft, submitting, onDraft, onQueueToggle, onNote, onClose }: PeekSheetProps) {
+export function PeekSheet({ facts, history, view, myTeamId, canDraft, submitting, onDraft, onQueueToggle, onNote, onClose }: PeekSheetProps) {
   const { player } = facts;
   const [editingNote, setEditingNote] = useState(false);
   const [draftNote, setDraftNote] = useState(facts.note ?? "");
@@ -118,6 +122,8 @@ export function PeekSheet({ facts, view, myTeamId, canDraft, submitting, onDraft
             {marketGap > 0 ? `We rank him ${marketGap} ${marketGap === 1 ? "place" : "places"} higher than the room's consensus.` : `The room's consensus ranks him ${-marketGap} ${marketGap === -1 ? "place" : "places"} higher than we do.`}
           </p>
         ) : null}
+
+        <PeekHistory state={history} position={player.position} />
 
         {availability !== null ? (
           <div className="flex flex-col gap-1">
