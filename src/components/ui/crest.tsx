@@ -62,6 +62,15 @@ export interface CrestProps {
    *  40px tile. */
   readonly size?: number;
   readonly className?: string;
+  /**
+   * A COLLISION-RESOLVED mark from `monogramsFor` (`./monogram.ts`) and NOTHING else — never a
+   * caller's own abbreviation, which is exactly the sixth rule `shortNameFor`'s docblock exists
+   * to forbid. Only a surface that can see the user's WHOLE league list (the rail, its full-page
+   * form) can know two leagues collide; `monogramsFor` still builds on `shortNameFor`, so a
+   * league without a collision renders the identical mark either way. Omitted, the tile derives
+   * its own mark from `name` as always.
+   */
+  readonly mark?: string;
 }
 
 /**
@@ -72,9 +81,9 @@ export interface CrestProps {
  * markup until this landed, and was refactored onto this component in the same commit. The mark
  * itself became this component's job on 2026-08-27 — see `shortNameFor` above for why.
  */
-export function Crest({ id, name, size = UI_CONFIG.shell.crestSizePx, className = "" }: CrestProps) {
+export function Crest({ id, name, size = UI_CONFIG.shell.crestSizePx, className = "", mark }: CrestProps) {
   const tone = crestTone(id);
-  const label = shortNameFor(name);
+  const label = mark ?? shortNameFor(name);
   return (
     <span
       aria-hidden="true"
