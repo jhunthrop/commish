@@ -90,6 +90,11 @@ Deep links and reloads hit the real sub-route pages, which server-render the sam
 with the drawer already full. Back button fires popstate -> usePathname change ->
 `routeSync`. Esc from full does `history.pushState(room)` + `esc`.
 
+MOBILE EXCEPTION (explicit, ruled in the branch review): the phone's bottom tab bar
+navigates with real Links, not pushState — each tab is deep-linkable and remounts the
+shell, re-reading fresh data, which is the right pattern for a phone returning from a
+pocket. The half height and the keyboard belong to the desktop drawer only.
+
 ## Decision sheets (contracts)
 
 Rendered by a NEW shared primitive `src/components/ui/decision-sheet.tsx` (dialog, focus

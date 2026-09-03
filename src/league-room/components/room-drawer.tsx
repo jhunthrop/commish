@@ -82,7 +82,10 @@ export function RoomDrawer({ leagueId, state, onChipTap, onExpand, onEsc, childr
         </span>
       </div>
 
-      {/* Phone projection: the same surfaces as a bottom tab bar, the room first. */}
+      {/* Phone projection: the same surfaces as a bottom tab bar, the room first. LAW 2's ONE
+          MOBILE EXCEPTION, deliberate: these are real Links (a remount), not the desktop's
+          pushState — deep-linkable tabs are the right phone pattern, and each tab remount
+          re-reads fresh data, which a phone that sat in a pocket wants. */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface-elevated md:hidden" aria-label="League room">
         <Link
           href={base}
