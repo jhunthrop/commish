@@ -9,10 +9,11 @@ interface AdminConsoleLink {
 }
 
 /**
- * The six operator surfaces, one name per route — each label matches that route's own
+ * The seven operator surfaces, one name per route — each label matches that route's own
  * `PageTitle` exactly (`/app/admin/queue/page.tsx`, `holds/page.tsx`, `exclusions/page.tsx`,
- * `leagues/settle/page.tsx`, `leagues/dissolve/page.tsx`, `money/reconcile/page.tsx`), so the
- * nav, the browser tab (A5's per-page `metadata`) and the page heading never disagree.
+ * `leagues/settle/page.tsx`, `leagues/dissolve/page.tsx`, `money/reconcile/page.tsx`,
+ * `jobs/page.tsx`), so the nav, the browser tab (A5's per-page `metadata`) and the page heading
+ * never disagree.
  */
 const ADMIN_CONSOLE_LINKS: readonly AdminConsoleLink[] = [
   { href: "/app/admin/queue", label: "Dispute queue" },
@@ -21,6 +22,7 @@ const ADMIN_CONSOLE_LINKS: readonly AdminConsoleLink[] = [
   { href: "/app/admin/leagues/settle", label: "Settle league" },
   { href: "/app/admin/leagues/dissolve", label: "Dissolve league" },
   { href: "/app/admin/money/reconcile", label: "Money reconciliation" },
+  { href: "/app/admin/jobs", label: "Jobs" },
 ];
 
 export interface AdminConsoleNavProps {

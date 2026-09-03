@@ -2615,3 +2615,132 @@ export const registerGradeRows = pgTable(
     index("register_grade_rows_season_idx").on(t.season, t.week, t.gradedAt),
   ],
 );
+
+/**
+ * THE DURABLE JOB SYSTEM (job-system round, 2026-09-02). Postgres-backed queue we own, worked by
+ * a thin runner seam: the local always-on runner during the data year, Vercel Cron tick endpoints
+ * when deployed. See docs/superpowers/specs/2026-09-02-job-system-design.md.
+ *
+ * `failed` and `abandoned` are TERMINAL dead-letter states, loud by construction: the admin jobs
+ * page lists them first and the runner prints a DEAD-LETTER banner when one is reached. `failed`
+ * means the job itself said no (a terminal refusal, or retryable errors exhausting max_attempts);
+ * `abandoned` means the process working it died (stale heartbeat) with no attempts left.
+ */
+export const jobStatusEnum = pgEnum("job_status", ["pending", "running", "succeeded", "failed", "abandoned"]);
+
+/**
+ * THE QUEUE ROW — the one MUTABLE row per job. Every transition here is a claim about "now"
+ * (pending -> running -> back to pending with backoff, or a terminal state); history lives in
+ * `job_runs`/`job_run_steps`, which are append-only and trigger-enforced (migration 0068).
+ */
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** Registry key (`src/jobs/registry.ts`). The definition — steps, timeout, backoff — lives in
+     *  code; the row carries only what the queue needs to schedule and report it. */
+    name: text("name").notNull(),
+    /** What makes a double enqueue harmless. Schedule-born jobs use `<schedule>@<fireInstant>`,
+     *  so a double tick (two runners, a retried Vercel cron) inserts once; operator re-runs mint
+     *  a fresh key on purpose. */
+    idempotencyKey: text("idempotency_key").notNull(),
+    payload: jsonb("payload").$type<JsonObject>().notNull(),
+    status: jobStatusEnum("status").notNull().default("pending"),
+    /** STARTED attempts (incremented by the claim itself, so a crash mid-run still counts). */
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull(),
+    /** When this job is next eligible: enqueue instant at first, then `now + backoff(attempt)`
+     *  after each retryable failure. The claim scan's leading filter. */
+    runAt: timestamp("run_at", { withTimezone: true }).notNull(),
+    /** Which worker holds the current claim, null when not running. */
+    claimedBy: text("claimed_by"),
+    /** Refreshed by the executor while running; a reclaim pass returns any running job whose
+     *  heartbeat has gone stale to `pending` (attempts remaining) or `abandoned` (exhausted). */
+    heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+    /** For schedule-born jobs: which code-defined schedule fired, and the fire instant it fired
+     *  for. Nullable — an operator enqueue has neither. This IS the fire history (the spec's
+     *  cursor-over-history call): no second table to disagree with. */
+    scheduleName: text("schedule_name"),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    /** The most recent attempt's error, denormalized for the admin list. The authoritative record
+     *  is the run row's own `error`; this is a pointer-sized convenience, overwritten per attempt,
+     *  never the history itself. Stored pre-scrubbed: nothing writes env values into it. */
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("jobs_idempotency_key_idx").on(t.idempotencyKey),
+    /** The claim scan: `status = 'pending' AND run_at <= now ORDER BY run_at, id`. */
+    index("jobs_status_run_at_idx").on(t.status, t.runAt),
+  ],
+);
+
+/**
+ * APPEND-ONLY ATTEMPT HISTORY — one row per attempt at a job. The current attempt's row may
+ * finish itself exactly once (`running` -> a terminal status); a finished row is immutable and
+ * DELETE is never permitted, both enforced by trigger (0068, the 0019 audit-spine precedent).
+ */
+export const jobRuns = pgTable(
+  "job_runs",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    jobId: bigint("job_id", { mode: "number" })
+      .notNull()
+      .references(() => jobs.id, { onDelete: "restrict" }),
+    /** Which attempt this was, 1-based — matches `jobs.attempts` at claim time. */
+    attempt: integer("attempt").notNull(),
+    status: jobStatusEnum("status").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    /** What went wrong, in stored-scrubbed text (never raw env, never a secret). */
+    error: text("error"),
+    /** `retryable | terminal | timeout | crash` — how the failure was classified, so the admin
+     *  page can say WHY a job died without re-parsing error prose. */
+    errorKind: text("error_kind"),
+    claimedBy: text("claimed_by").notNull(),
+  },
+  (t) => [
+    uniqueIndex("job_runs_attempt_idx").on(t.jobId, t.attempt),
+    /** The admin read: recent runs, newest first. */
+    index("job_runs_started_idx").on(t.startedAt),
+  ],
+);
+
+/**
+ * THE CHECKPOINT LOG — one row per COMPLETED step of a job, appended the moment the step
+ * finishes. Unique per `(job_id, step)`: a completed step is completed for the JOB, across
+ * attempts and across bounded Vercel ticks, which is what lets a retry or a resume skip straight
+ * to the first unrecorded step. Append-only by trigger, like `job_runs`.
+ */
+export const jobRunSteps = pgTable(
+  "job_run_steps",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    jobId: bigint("job_id", { mode: "number" })
+      .notNull()
+      .references(() => jobs.id, { onDelete: "restrict" }),
+    /** The run that actually completed the step — attribution, not identity. */
+    runId: bigint("run_id", { mode: "number" })
+      .notNull()
+      .references(() => jobRuns.id, { onDelete: "restrict" }),
+    step: text("step").notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull(),
+    /** What the step reported (a season-week step's summary and detail lines). Display data for
+     *  the admin page, never re-read by the executor's skip logic. */
+    detail: jsonb("detail").$type<JsonObject>(),
+  },
+  (t) => [uniqueIndex("job_run_steps_job_step_idx").on(t.jobId, t.step)],
+);
+
+/**
+ * SCHEDULE CURSORS — one bookmark per code-defined schedule (`src/jobs/schedules.ts`): the
+ * instant up to which its cron expression has been evaluated. The catch-up walk enqueues every
+ * fire in `(last_evaluated_at, now]` (bounded by the config's catch-up window) and moves the
+ * bookmark forward — which is how a laptop that slept through Tuesday 08:00 still runs Tuesday's
+ * cadence when it wakes. A cursor is a bookmark, not history; the fire history is on `jobs`.
+ */
+export const scheduleCursors = pgTable("schedule_cursors", {
+  scheduleName: text("schedule_name").primaryKey(),
+  lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }).notNull(),
+});

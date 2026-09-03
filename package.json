@@ -71,7 +71,8 @@
     "projections:odds:snapshot": "dotenv -e .env.local -- tsx scripts/odds-props-snapshot.ts",
     "projections:odds:backfill": "dotenv -e .env.local -- tsx scripts/odds-props-backfill.ts",
     "projections:odds:resolve": "dotenv -e .env.local -- tsx scripts/odds-props-resolve.ts",
-    "season:week": "dotenv -e .env.local -- tsx scripts/season-week.ts"
+    "season:week": "dotenv -e .env.local -- tsx scripts/season-week.ts",
+    "jobs:runner": "dotenv -e .env.local -- tsx scripts/jobs-runner.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

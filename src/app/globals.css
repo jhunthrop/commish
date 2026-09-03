@@ -239,6 +239,23 @@ body {
   animation: commish-rise var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
 }
 
+/* The quilt's clock strip swelling amber on YOUR turn (draft room, 2026-09-02) — a grow from
+   the slim ribbon's own height, eased out inside the 250ms ceiling. Amber is yours in color AND
+   motion: this is the one entrance the your-turn state makes, and nothing ever flashes red. */
+@keyframes commish-strip-grow {
+  from { opacity: 0.4; transform: scaleY(0.6); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+
+.animate-strip-grow {
+  transform-origin: top;
+  animation: commish-strip-grow var(--commish-motion-duration-slow) var(--commish-motion-easing-standard) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-strip-grow { animation: none; }
+}
+
 .rise-1 { animation-delay: var(--commish-motion-duration-fast); }
 .rise-2 { animation-delay: calc(var(--commish-motion-duration-fast) * 2); }
 .rise-3 { animation-delay: calc(var(--commish-motion-duration-fast) * 3); }

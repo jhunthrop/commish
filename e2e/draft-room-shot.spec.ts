@@ -59,7 +59,9 @@ test("photograph the live draft room", async ({ managerA }) => {
   const gotIt = managerA.getByRole("button", { name: "Got it" });
   if ((await gotIt.count()) > 0) await gotIt.click();
 
-  await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
+  // The quilt (2026-09-02): the your-turn signal is the clock strip swelling amber — the old
+  // rail's "You're on the clock" band no longer exists in a snake room.
+  await expect(managerA.getByTestId("clock-strip")).toHaveAttribute("data-strip-state", "your-turn", { timeout: ON_CLOCK_TIMEOUT_MS });
   // One second of settle: the pick that just landed is mid-celebration, and the countdown has
   // just re-based. Photographing between those two leaves a half-drawn band in the shot.
   await managerA.waitForTimeout(1_500);

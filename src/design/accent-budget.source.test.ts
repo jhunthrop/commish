@@ -67,6 +67,16 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   // narrows the same list. One file draws it, and a call site that hand-rolls the class still
   // fails, which is the property the budget actually protects.
   "src/league-room/components/browse-filters.tsx",
+  // THE QUILT (2026-09-02), law 4, earning both entries the way this docblock asks — in review,
+  // with a reason. The clock strip's your-turn plate is the mock's own amber clock chip: it is
+  // "furniture and you" in one surface — the network's clock graphic, filled amber precisely
+  // because the turn is YOURS (the room's turns wear `live`, a role with no budget here). The
+  // lens switcher is the same case `browse-filters.tsx` already earned: a segmented filter rail
+  // is the network's own graphics over the board, carrying no act — every chip recolors the same
+  // quilt in place. Each fill is drawn in exactly one file, and a call site that hand-rolls the
+  // class string still fails, which is the property the budget actually protects.
+  "src/draft-room/quilt/components/clock-strip.tsx",
+  "src/draft-room/quilt/components/lens-chips.tsx",
 ];
 
 /**

@@ -752,6 +752,23 @@ export async function preseasonProjectionsFor(
  * shares the SAME derived, deterministic `as_of` (see `writePreseasonBoard`'s own docblock), so as
  * of any single bound this still resolves to exactly one and passes without change.
  */
+/**
+ * THE INTEGRITY VIOLATION ITSELF, distinguishable from the weather around it (job-system fix
+ * round 2, HIGH-A). `assertSingleGeneration` can fail two ways: the board really is stitched
+ * (this class — a data-integrity fact no retry will change), or the one query it runs hit a
+ * transient error (a plain driver error — retry away). A caller that catch-wrapped everything
+ * from this function into a terminal refusal was dead-lettering the week's freeze over a dropped
+ * connection; `instanceof StitchedGenerationsError` is what lets `takeFreeze` wrap ONLY the
+ * violation and rethrow the weather untouched. Thrown from the integrity site only; the message
+ * is unchanged from when it was a plain Error.
+ */
+export class StitchedGenerationsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StitchedGenerationsError";
+  }
+}
+
 export async function assertSingleGeneration(db: ReadonlyDb, { season, source, asOf }: BoardStamp): Promise<void> {
   // `selectDistinct` is not part of `ReadonlyDb` (`@/db/client` picks only `select`/`selectDistinctOn`
   // for a read-only surface), so this uses `selectDistinctOn` on the one column it needs, the same
@@ -767,7 +784,7 @@ export async function assertSingleGeneration(db: ReadonlyDb, { season, source, a
       .map((row) => row.asOf.toISOString())
       .sort()
       .join(", ");
-    throw new Error(
+    throw new StitchedGenerationsError(
       `${source} for season ${season} carries ${stamps.length} distinct as_of generations as of ${asOf.toISOString()} (${asOfList}), not one. ` +
         "A live board must retire its predecessor before writing (writePreseasonBoard); this board is stitched together from more than one generation.",
     );
