@@ -129,18 +129,11 @@ export function entryFeeLabel(league: PublicLeagueSummary): string {
 }
 
 /**
- * The two money sentences the storefront's one money line can render — moved here from
- * `front-door-hero.tsx` (front door blueprint, 2026-09-02) because the join sheet now needs the
- * SAME derived sentence, and two hand-typed copies of "free this season" is exactly how one goes
- * stale the week money goes live. Same `moneyIsLive()` switch, read by every caller through
- * `moneySentence(live)`.
+ * The money sentences live in `@/money/copy` — a PURE module, because the SERVER-rendered hero
+ * reads the same words these client sheets do. Re-exported here for the client callers that
+ * already import their shared vocabulary from this file.
  */
-export const FREE_SEASON_SENTENCE = "Every league is free this season.";
-export const LIVE_MONEY_SENTENCE = "Play free everywhere, or play for real money where your state allows.";
-
-export function moneySentence(live: boolean): string {
-  return live ? LIVE_MONEY_SENTENCE : FREE_SEASON_SENTENCE;
-}
+export { FREE_SEASON_SENTENCE, LIVE_MONEY_SENTENCE, moneySentence } from "@/money/copy";
 
 /** What a paid league's pot cell says, derived once from the STORED table for every reader. */
 export interface PotFacts {

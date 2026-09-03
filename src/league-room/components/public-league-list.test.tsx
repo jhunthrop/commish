@@ -322,6 +322,25 @@ describe("OpenLeagueShelf", () => {
     }
   });
 
+  // Blueprint law 2 (2026-09-02): when nothing GENUINELY fills — every room untouched, or the
+  // fullest one already rolled (E4) — NO row wears the solid; the page-level nav pill stays
+  // loud instead, and two solids on one surface (the dev-render defect) cannot recur.
+  it("marks NOTHING ink when nothing genuinely fills — the fallback tightest-seats pick never wears the solid", () => {
+    const untouched = PUBLIC_LEAGUES.map((league) => ({ ...league, filledTeams: 0 }));
+    render(<OpenLeagueShelf house={[]} leagues={untouched} signedIn={false} asOfTime={AS_OF} />);
+    for (const rendering of [rows(), cards()]) {
+      expect(inkPillCount(rendering)).toBe(0);
+    }
+  });
+
+  it("marks NOTHING ink when the fullest filling room has rolled (E4) — rolled rooms are not featured", () => {
+    const rolled = { ...PUBLIC_LEAGUES[0]!, id: "rolled", filledTeams: 11, kickoffRolls: 2 };
+    render(<OpenLeagueShelf house={[]} leagues={[rolled, { ...PUBLIC_LEAGUES[1]!, filledTeams: 0 }]} signedIn={false} asOfTime={AS_OF} />);
+    for (const rendering of [rows(), cards()]) {
+      expect(inkPillCount(rendering)).toBe(0);
+    }
+  });
+
   // 2026-08-25 founder finding: the hero's own "Next draft" module carries this league's ink
   // instead, so the shelf goes all-quiet rather than double-inking the same league.
   it("marks NOTHING ink, in either rendering, once the hero module carries the featured league (featuredInHero)", () => {

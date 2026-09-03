@@ -10,11 +10,13 @@ import { proofStats } from "@/league-service/proof";
 import { getProofCache } from "@/league-service/proof-cache-instance";
 import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
+// The PURE module, not the client shelf: a server render may not CALL a client module's export.
+import { featuredFillingLeague } from "@/matchmaking/shelf-order";
 import { listReviews } from "@/review-service/reviews";
 import { excludeFixtureReviews } from "./reviews/fixture-filter";
 import { CrewDoor } from "@/league-room/components/crew-door";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
-import { OpenLeagueShelf, featuredFillingLeague } from "@/league-room/components/public-league-list";
+import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
 import { TrustFacts } from "@/league-room/components/trust-facts";
 import { Wire } from "@/league-room/components/wire";
 

@@ -6,98 +6,36 @@ import { EmptyState } from "@/components/ui";
 import { ChapterBand } from "@/components/ui/chapter-band";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import { sortBySoonestJoinableDraft } from "@/matchmaking/shelf-order";
+import { featuredFillingLeague, sortBySoonestJoinableDraft } from "@/matchmaking/shelf-order";
 import { moneyIsLive } from "@/money/states";
 import { JoinSheet } from "./join-sheet";
 import { LeagueRow, LeagueRowsHeader } from "./league-row";
 import { OpenLeagueCard } from "./open-league-card";
 
 /**
- * THE house sentence — Task 6's two-constant explainer row (`HOUSE_SHELF_EXPLAINER` +
- * `HOUSE_SHELF_PROMISE`) collapsed to ONE muted sentence, FOUNDER-ORDERED (2026-08-24, the same
- * live-page feedback that ordered the rows): the shelf head stacked three explainer lines and
- * the eye had nowhere to land. The factory's user-visible contract (Phase 3.5 addendum,
- * Task 14 — "a new league opens as soon as one fills, so there is always a seat") survives
- * inside it verbatim as the sentence's second half, still allowed to be printed only because
- * the reconciler makes it true by construction (`ensureHouseCatalog`,
- * `@/league-service/house-factory.ts`). The dropped "everyone joins the same way and plays the
- * same rules" clause lives one press away in the house-league glossary entry beside it. Still
- * written WITHOUT pointing at a badge: a rung badge would be redundant on a house row regardless
- * of what its title says — `stakeBadge` (`./open-league-shared.tsx`) decides by AUTHORITY
- * (`houseRung === null`), never by inspecting the name, so neither form renders one (E3). Before
- * the founder's 2026-08-26 fun-name pass, a factory-named house league's title also happened to
- * spell its rung out literally ("Open 12-team League 3"); `houseLeagueName` now draws from a
- * curated pool instead, and the badge decision needed no change at all because it was never
- * keyed off the title text to begin with.
+ * The house sentence and the featured-league selectors MOVED to `@/matchmaking/shelf-order`
+ * (front door blueprint, 2026-09-02): this module is a client component now (it owns the join
+ * sheet's state), and the server pages (`src/app/page.tsx`, `/browse`) CALL those functions
+ * during their own renders — a value imported from a "use client" module is a client reference
+ * a server component cannot call. Re-exported here so every existing client/test importer keeps
+ * its path; SERVER callers import from `@/matchmaking/shelf-order` directly.
  */
-export const HOUSE_SHELF_SENTENCE =
-  "Commish runs some of these leagues itself, and a new league opens as soon as one fills, so there is always a seat.";
+export { featuredFillingLeague, featuredLeagueId, HOUSE_SHELF_SENTENCE } from "@/matchmaking/shelf-order";
 
 /**
  * The shelf header's own freshness disclosure (Phase 3.6, Task 5, F20 and the honest half of
  * deferral D4) — VERBATIM: "Seat counts as of {time}. A seat being claimed is counted." Takes
  * the time already formatted (`formatAbsoluteTime`, `@/league`) rather than an instant itself,
- * because the page rendering this (`src/app/page.tsx`, `src/app/browse/page.tsx`) is the one
- * place that owns a server clock and this component may not value-import `@/league` at all (the
- * client boundary, `eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`).
+ * because the page rendering this is the one place that owns a server clock and this component
+ * may not value-import `@/league` at all (the client boundary).
  *
- * The mock's "Live seat counts · updated just now" is REFUSED: there is no anonymous SSE fan-out
- * for signed-out visitors (deferral D4), "live" would be a claim about a mechanism this product
- * does not have, and "just now" is a claim that ages badly on a cached page. The second sentence
- * here — "A seat being claimed is counted" — is what makes the first one true: `heldSeats`
- * (Task 6) is folded into every count this page renders, so a seat mid-claim never reads as open.
+ * The mock's "Live seat counts · updated just now" is REFUSED: there is no anonymous SSE
+ * fan-out for signed-out visitors (deferral D4), and "just now" ages badly on a cached page.
+ * "A seat being claimed is counted" is what makes the first sentence true: `heldSeats` is
+ * folded into every count this page renders.
  */
 export function seatCountsAsOfSentence(asOfTime: string): string {
   return `Seat counts as of ${asOfTime}. A seat being claimed is counted.`;
-}
-
-/**
- * THE FULLEST FILLING LEAGUE (storefront review R1) — house or member, at least one seat taken,
- * and, for a `scheduled` league, one that has never rolled (E4: a room the shelf already
- * confirmed short of its own promised time is not the one to feature). `null` when nothing
- * qualifies. Pure and clock-free: "fullest" only ever compares two already-known seat counts,
- * never `now`.
- *
- * Repoints `featuredLeagueId`'s and `featuredFillingLeague`'s shared first pass from "the
- * nearest SCHEDULED kickoff" — a fact the sit-and-go shelf no longer produces
- * (`docs/decisions/formats-and-lobby.md`, "The whole shelf is sit-and-go") — onto "the room
- * closest to full": a filling room is this world's own version of "next draft", since the fewer
- * seats it has left, the sooner `fireWhenFullInTx` fires it.
- */
-function fullestFillingLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
-  const filling = leagues.filter((league) => league.filledTeams > 0 && (league.startTrigger !== "scheduled" || league.kickoffRolls === 0));
-  if (filling.length === 0) return null;
-  const seatsRemaining = (league: PublicLeagueSummary): number => league.teamCount - league.filledTeams;
-  return filling.reduce((tightest, league) => (seatsRemaining(league) < seatsRemaining(tightest) ? league : tightest));
-}
-
-/**
- * D2 (rule 5, one ink action per view): which card, if any, is the shelf's single featured one —
- * the fullest filling league (`fullestFillingLeague`), else the fewest seats remaining across the
- * WHOLE shelf (the only fallback left once nothing is genuinely filling — an empty shelf, or one
- * where every room still sits at zero). Ties keep list order, so the answer is deterministic for
- * one rendered shelf.
- */
-export function featuredLeagueId(leagues: readonly PublicLeagueSummary[]): string | null {
-  if (leagues.length === 0) return null;
-  const fullest = fullestFillingLeague(leagues);
-  if (fullest !== null) return fullest.id;
-  const seatsRemaining = (league: PublicLeagueSummary): number => league.teamCount - league.filledTeams;
-  return leagues.reduce((tightest, league) => (seatsRemaining(league) < seatsRemaining(tightest) ? league : tightest)).id;
-}
-
-/**
- * The front door hero's own "Next draft" module (2026-08-25 founder finding, controller-ruled;
- * repointed by storefront review R1): the SAME league `featuredLeagueId` marks `emphasis="ink"`
- * on the shelf, but ONLY the genuinely filling case — never the fallback tightest-seats pick a
- * shelf where nothing has a single seat taken falls back to (E4: never feature an empty room).
- * `fullestFillingLeague` is exactly that qualifying subset already; this is its public name for a
- * caller outside this module (`page.tsx`), which needs the league OBJECT, not its id, to render
- * the module from. `null` (empty shelf, or every room still at zero) tells the hero band to
- * render nothing at all — rule 6, real or absent, never dressed up.
- */
-export function featuredFillingLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
-  return fullestFillingLeague(leagues);
 }
 
 export interface OpenLeagueShelfProps {
@@ -204,7 +142,12 @@ export function OpenLeagueShelf({
   const merged: readonly PublicLeagueSummary[] = [...house, ...leagues].filter(
     (league, index, all) => all.findIndex((other) => other.id === league.id) === index,
   );
-  const featuredId = featuredInHero ? null : featuredLeagueId(merged);
+  // Blueprint law 2 (2026-09-02): ONLY the fullest GENUINELY-FILLING room gets the solid verb
+  // and the leader wash — never `featuredLeagueId`'s tightest-seats fallback, which on a shelf
+  // where nothing has a claim (or the fullest room has rolled, E4) put a solid on a row while
+  // the page-level nav pill, deciding off `featuredFillingLeague`, stayed loud too: two solids,
+  // one surface, seen live on the dev render. The shelf and the page now read the SAME selector.
+  const featuredId = featuredInHero ? null : (featuredFillingLeague(merged)?.id ?? null);
   const Heading = headingLevel === 1 ? "h1" : "h2";
   // Front door blueprint (2026-09-02): sorted by soonest draft you can still join —
   // `sortBySoonestJoinableDraft` (seats remaining, then a CHOSEN kickoff as the tiebreak; see
@@ -260,7 +203,9 @@ export function OpenLeagueShelf({
                     league={league}
                     signedIn={signedIn}
                     position={index + 1}
-                    leader={index === 0}
+                    // The wash rides the FEATURED row (blueprint law 2), not bare P1: a board
+                    // whose fullest room has rolled, or holds no claims, washes nothing.
+                    leader={league.id === featuredId}
                     emphasis={league.id === featuredId ? "ink" : "quiet"}
                     headingLevel={headingLevel === 1 ? 2 : 3}
                     live={live}

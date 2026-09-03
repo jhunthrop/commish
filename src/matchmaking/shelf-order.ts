@@ -47,3 +47,52 @@ export function soonestJoinableOrder(a: PublicLeagueSummary, b: PublicLeagueSumm
 export function sortBySoonestJoinableDraft(leagues: readonly PublicLeagueSummary[]): readonly PublicLeagueSummary[] {
   return [...leagues].sort(soonestJoinableOrder);
 }
+
+/**
+ * THE house sentence — moved here from `public-league-list.tsx` (front door blueprint,
+ * 2026-09-02) when that module became a client component: `/browse`'s SERVER render interpolates
+ * this string into its own JSX, and a value imported from a "use client" module is a client
+ * reference a server component cannot read. The words are FOUNDER-ORDERED (2026-08-24) and
+ * unchanged; only the module moved. The factory's user-visible contract survives inside it
+ * verbatim, printable only because the reconciler makes it true by construction
+ * (`ensureHouseCatalog`, `@/league-service/house-factory.ts`).
+ */
+export const HOUSE_SHELF_SENTENCE =
+  "Commish runs some of these leagues itself, and a new league opens as soon as one fills, so there is always a seat.";
+
+/**
+ * THE FULLEST FILLING LEAGUE (storefront review R1) — house or member, at least one seat taken,
+ * and, for a `scheduled` league, one that has never rolled (E4: a room the shelf already
+ * confirmed short of its own promised time is not the one to feature). `null` when nothing
+ * qualifies. Pure and clock-free — moved here from `public-league-list.tsx` with
+ * `HOUSE_SHELF_SENTENCE` above, for the same client-boundary reason: `src/app/page.tsx` and
+ * `/browse` CALL these from server renders.
+ */
+function fullestFillingLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
+  const filling = leagues.filter((league) => league.filledTeams > 0 && (league.startTrigger !== "scheduled" || league.kickoffRolls === 0));
+  if (filling.length === 0) return null;
+  return filling.reduce((tightest, league) => (seatsRemaining(league) < seatsRemaining(tightest) ? league : tightest));
+}
+
+/**
+ * Which league, if any, is the shelf's single featured one — the fullest filling league, else
+ * the fewest seats remaining across the WHOLE shelf (the only fallback left once nothing is
+ * genuinely filling). Ties keep list order, so the answer is deterministic for one rendered
+ * shelf.
+ */
+export function featuredLeagueId(leagues: readonly PublicLeagueSummary[]): string | null {
+  if (leagues.length === 0) return null;
+  const fullest = fullestFillingLeague(leagues);
+  if (fullest !== null) return fullest.id;
+  return leagues.reduce((tightest, league) => (seatsRemaining(league) < seatsRemaining(tightest) ? league : tightest)).id;
+}
+
+/**
+ * The SAME league `featuredLeagueId` marks featured, but ONLY the genuinely filling case —
+ * never the fallback tightest-seats pick (E4: never feature an empty room). The page-level
+ * caller (`page.tsx`'s nav-pill arithmetic, `/browse`'s lower third) needs the league OBJECT;
+ * `null` says feature nothing at all — real or absent, never dressed up.
+ */
+export function featuredFillingLeague(leagues: readonly PublicLeagueSummary[]): PublicLeagueSummary | null {
+  return fullestFillingLeague(leagues);
+}

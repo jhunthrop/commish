@@ -11,8 +11,11 @@ import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
+// The PURE module, not the client shelf: a server render may not CALL or interpolate a client
+// module's exports (front door blueprint, 2026-09-02 — the shelf owns the join sheet now).
+import { featuredFillingLeague, HOUSE_SHELF_SENTENCE } from "@/matchmaking/shelf-order";
 import { BrowseFilters, type BrowseFilterOption } from "@/league-room/components/browse-filters";
-import { HOUSE_SHELF_SENTENCE, OpenLeagueShelf, featuredFillingLeague } from "@/league-room/components/public-league-list";
+import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
 import { PracticeEntryLink } from "@/league-room/components/practice-entry-link";
 import { Wire } from "@/league-room/components/wire";
 import { BrowseLowerThird } from "./lower-third";

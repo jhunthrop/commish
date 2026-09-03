@@ -1,5 +1,5 @@
+import { moneySentence } from "@/money/copy";
 import { moneyIsLive, stateEligibilityLine, MONEY_STATES, type MoneyStatesConfig } from "@/money/states";
-import { moneySentence } from "./open-league-shared";
 
 export interface FrontDoorHeroProps {
   /** Defaults to the real `moneyIsLive()` — injectable so a test can exercise the live sentence
