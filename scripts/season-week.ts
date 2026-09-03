@@ -85,16 +85,15 @@ EXIT CODE
   Nonzero if any step's status is "failed". A "skipped" step is not a failure -- it is the honest,
   expected outcome for a week that has not been played, graded or reached kickoff yet.
 
-THE CRON SCHEDULE (installed by scripts/install-season-cron.sh)
+THE SCHEDULE (the durable job system, installed by scripts/install-season-runner.sh)
   Tuesday   08:00 ET   data pass    -- catches the week just played (stats + grading).
   Wednesday 18:00 ET   data pass    -- a mid-week props refresh, lines firmer than at week-open.
   Thursday  14:00 ET   freeze pass  -- hours of margin before this season's Thursday-evening
                                        kickoffs; whichever of the three passes gets there first
                                        takes the week's freeze, the other two skip citing it.
-  All three run the identical \`npm run season:week\` -- every step is idempotent-or-skip, so
-  running it three times a week costs nothing extra beyond the one real freeze it eventually takes.
-  See scripts/install-season-cron.sh's own header for the full reasoning and the DST/timezone
-  caveat, and docs/ops/season-runbook.md for the installed entries themselves.
+  The three fires are code-defined schedules (src/jobs/schedules.ts) running the season-week JOB,
+  which walks these same five steps with checkpoints and retries; this CLI stays for
+  operator-initiated runs. See docs/ops/season-runbook.md for runner operations.
 
 OTHER ONE-LINERS THIS CADENCE DOES NOT COVER
   Kickoff-eve depth ingest (run once, the evening before week 1's own kickoff):
