@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HomeLeagueCard, MatchupSummary } from "../contract";
-import { orderByUrgency, railStateFor, railStateLine, needsYouKindFor } from "./rail-line";
+import { orderByUrgency, railPageLine, railStateFor, railStateLine, needsYouKindFor } from "./rail-line";
 
 const BASE: HomeLeagueCard = {
   id: "l1",
@@ -162,6 +162,23 @@ describe("railStateLine", () => {
     expect(railStateLine(invite, "shell")).toBe("Invite managers");
     const bare: HomeLeagueCard = { ...BASE, record: null, myRank: null, filledTeams: 8, nextAction: null };
     expect(railStateLine(bare, "shell")).toBe("8 of 12 seats filled");
+  });
+
+  it("the page line trades a needs-you row's verb words for its facts — the button beside it already says the act", () => {
+    const fix: HomeLeagueCard = {
+      ...BASE,
+      matchup: matchup(),
+      nextAction: { kind: "fix-lineup", label: "Fix your lineup" },
+      lineupSet: false,
+    };
+    expect(railPageLine(fix)).toBe("4th of 12 · next: vs Mudville Nine");
+    // A pre-draft join-draft league has no honest standing (a 0-0 rank says nothing), so the
+    // action words stand — the same sentence twice beats an invented one.
+    const drafting: HomeLeagueCard = { ...BASE, draftStatus: "in_progress", record: null, myRank: null, nextAction: { kind: "join-draft", label: "Join the draft" } };
+    expect(railPageLine(drafting)).toBe("Join the draft");
+    // Everything not needs-you reads exactly the rich tier.
+    const live: HomeLeagueCard = { ...BASE, weekStatus: "in_progress", matchup: matchup({ homeScore: 84.2, awayScore: 71.6, weekStatus: "in_progress" }) };
+    expect(railPageLine(live)).toBe("Live · you lead 84.20 to 71.60");
   });
 
   it("never emits an em-dash in any line", () => {

@@ -7,7 +7,6 @@ describe("LEAGUE_ROOM_CONFIG", () => {
       "celebrationMs",
       "homeRefreshIntervalMs",
       "expiryTickMs",
-      "attentionQueueCap",
       "mockLobbyPollIntervalMs",
       // `heatMinPopulation` LEFT THIS CONFIG on 2026-08-28 and is now `UI_CONFIG.stat
       // .minPopulation` (`@/components/ui/config`), moved with the arithmetic it governs when
@@ -30,6 +29,5 @@ describe("LEAGUE_ROOM_CONFIG", () => {
     // LED-1 (founder delegated-decision directive, 2026-08-24): three chips is the RULED value,
     // not a tunable — the veteran's under-a-second glance was the deciding persona. Changing it
     // is relitigating a ruling, and this assertion is what makes that a decision, not a drift.
-    expect(LEAGUE_ROOM_CONFIG.attentionQueueCap).toBe(3);
   });
 });

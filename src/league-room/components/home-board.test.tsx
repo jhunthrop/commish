@@ -87,7 +87,8 @@ function setVisibility(state: DocumentVisibilityState): void {
 describe("HomeBoard", () => {
   it("renders the server's payload immediately, in both themes", async () => {
     await renderSurface(<HomeBoard initial={ONE_SCHEDULED} />, async ({ container }) => {
-      expect(screen.getByRole("link", { name: "Sunday Money" })).toBeInTheDocument();
+      // The row's accessible name is the league plus its one state line (the rail's own rule).
+      expect(screen.getByRole("link", { name: /Sunday Money\./ })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
   });
@@ -151,7 +152,7 @@ describe("HomeBoard", () => {
       await vi.advanceTimersByTimeAsync(LEAGUE_ROOM_CONFIG.homeRefreshIntervalMs);
     });
     expect(fixture.calls).toEqual(["GET /api/home"]);
-    expect(screen.getByRole("link", { name: "Auction Night Refreshed" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Auction Night Refreshed/ }).length).toBeGreaterThan(0);
   });
 
   it("stops polling on its own once a refreshed payload says every week is done", async () => {
@@ -192,31 +193,26 @@ describe("HomeBoard", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(LEAGUE_ROOM_CONFIG.homeRefreshIntervalMs);
     });
-    expect(screen.getByRole("link", { name: "Auction Night" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Auction Night/ }).length).toBeGreaterThan(0);
   });
 
-  // Step 1's own n=1 test (locker-room-panel.md, HIGH — the casual in ONE league): every hero
-  // element on this screen is a cross-league aggregation, and n=1 turned the house shelf into
-  // the loudest thing on the page. At n=1 the board IS the league, and no sort is named.
+  // The n=1 shape (the rail redesign): the board IS the rail's full-page row model at every
+  // count — one league renders one row, no sort language, no table.
   it("degrades to one league without announcing a sort over a list of one", async () => {
-    await renderSurface(<HomeBoard initial={ONE_LEAGUE} />, async ({ queryByText, getByRole }) => {
+    await renderSurface(<HomeBoard initial={ONE_LEAGUE} />, async ({ queryByText, queryByRole, getByRole }) => {
       expect(queryByText(/closest first/i)).toBeNull();
-      expect(getByRole("heading", { name: "Bay Bandits" })).toBeInTheDocument();
+      expect(getByRole("link", { name: /Bay Bandits\./ })).toBeInTheDocument();
+      expect(queryByRole("table")).toBeNull();
     });
   });
 
-  // Rule 5 / S10 (Task 9): the single-league home has no board and no attention queue to share
-  // ink with, so the one card's own action IS the view's one ink action.
-  it("keeps the single league's card quiet and puts the verb in the lower third (law 6)", () => {
-    render(<HomeBoard initial={ONE_LEAGUE} />);
-    // Two controls name the same act: the card's quiet secondary pill, and the lower third's
-    // amber verb. Neither is the old ink pill — law 6 moved the loud action to the strip.
-    const links = screen.getAllByRole("link", { name: "Set your lineup for Bay Bandits" });
-    expect(links).toHaveLength(2);
-    const [cardLink, verbLink] = links;
-    expect(cardLink?.className).toContain("bg-transparent");
-    expect(cardLink?.className).not.toContain("bg-text-primary");
-    expect(verbLink?.className).toContain("bg-accent");
+  // The amber budget, at n=1: a quiet league (set-lineup is not the needs-you set) gets the
+  // plain Open affordance and NOTHING solid — the page's one solid amber verb exists only when
+  // a league genuinely needs its manager.
+  it("gives a quiet single league a plain Open affordance and spends no solid amber", () => {
+    const { container } = render(<HomeBoard initial={ONE_LEAGUE} />);
+    expect(screen.getByRole("link", { name: "Open Bay Bandits" })).toBeInTheDocument();
+    expect(container.querySelector(".bg-accent")).toBeNull();
   });
 
   // Step 2b (F18c): a manager whose leagues have all not drafted yet has no games at all — the

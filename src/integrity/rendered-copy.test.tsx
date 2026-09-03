@@ -16,13 +16,12 @@ import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 import { DRAFT_SCHEDULE, PUBLIC_LEAGUES, ROOM_DATA, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
-import { AttentionQueue, attentionQueueItemsFrom } from "@/league-room/components/attention-queue";
 import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
 import { FirstRunPanel } from "@/league-room/components/first-run-panel";
 import { firstRunPlan } from "@/identity";
 import { WaitingRoom, type WaitingRoomLeague } from "@/league-room/components/waiting-room";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
-import { LeagueBoard } from "@/league-room/components/league-board";
+import { LeagueRows } from "@/league-room/components/league-rows";
 import { RoomShell } from "@/league-room/components/room-shell";
 import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
 import { LiveStatePill } from "@/league-room/components/live-state-pill";
@@ -1445,12 +1444,19 @@ const SWEEP_LEAGUE: HomeLeagueCard = {
   myRank: null,
 };
 
-describe("LeagueBoard says nothing that breaks the house copy rules", () => {
-  it("is clean with a mix of leagues, including a median league's second result", () => {
+describe("LeagueRows says nothing that breaks the house copy rules", () => {
+  it("is clean with a mix of leagues, urgent, live and quiet at once", () => {
     const { container } = render(
-      <LeagueBoard
+      <LeagueRows
         leagues={[
           SWEEP_LEAGUE,
+          {
+            ...SWEEP_LEAGUE,
+            id: "l_sweep_fix",
+            name: "Backyard Bandits",
+            nextAction: { kind: "fix-lineup", label: "Fix your lineup" },
+            lineupSet: false,
+          },
           {
             ...SWEEP_LEAGUE,
             id: "l_sweep_live",
@@ -1473,20 +1479,7 @@ describe("LeagueBoard says nothing that breaks the house copy rules", () => {
         ]}
       />,
     );
-    expectClean(container, "Sunday Money", "Auction Night", "Bay Bandits", "Iron Owls");
-  });
-});
-
-describe("AttentionQueue says nothing that breaks the house copy rules", () => {
-  it("is clean populated and empty", () => {
-    for (const element of [
-      <AttentionQueue key="populated" items={attentionQueueItemsFrom([SWEEP_LEAGUE])} />,
-      <AttentionQueue key="empty" items={[]} />,
-    ]) {
-      const { container, unmount } = render(element);
-      expectClean(container, SWEEP_LEAGUE.name);
-      unmount();
-    }
+    expectClean(container, "Sunday Money", "Backyard Bandits", "Auction Night", "Bay Bandits", "Iron Owls");
   });
 });
 

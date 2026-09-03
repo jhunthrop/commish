@@ -57,8 +57,11 @@ const ACCENT_FILL_ALLOWLIST: readonly string[] = [
   // not a caution, it is an act, and money is this product's pigment for an act (the same clause
   // that makes `Button`'s `verb` variant legal). This is the "seat dot" case the list above
   // already names as a place where green MEANS something, in the one file that draws it. The
-  // dot's live sibling is `bg-negative` and needs no exemption.
-  "src/components/app-shell/league-rail.tsx",
+  // dot's live sibling is `bg-negative` and needs no exemption. THE RAIL REDESIGN (2026-09-03)
+  // moved the dot from `league-rail.tsx` into the extracted row model (`RailDot`) — same dot,
+  // same reason, still exactly one file drawing it; `league-rail.tsx` itself no longer spells
+  // the fill at all.
+  "src/components/app-shell/rail-row.tsx",
   // SUNDAY v5 (2026-08-28), law 4. The lobby's segmented filter rail, earning its entry the way
   // this docblock asks — in review, with a reason. Law 4 spends amber on "furniture and you and
   // the verb", and a filter strip is furniture: the network's own graphics over the board, not a

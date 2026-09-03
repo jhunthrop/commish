@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
 
-export type ButtonVariant = "primary" | "verb" | "secondary" | "destructive" | "ghost";
+export type ButtonVariant = "primary" | "verb" | "secondary" | "destructive" | "live" | "ghost";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -63,11 +63,19 @@ const BASE =
 // This is why `button.tsx` is on `accent-budget.source.test.ts`'s fill allowlist: green as a
 // control fill is now sanctioned in exactly one primitive, and still banned everywhere a call
 // site might hand-roll it.
+// THE RAIL REDESIGN ADDS `live` (2026-09-03, the founder-approved blueprint's WATCH LIVE):
+// an OUTLINE in the red channel — red is the live family (law 1: a clock tightening, the live
+// dot, `WeekStatusBadge`'s in_progress tone), and an outline rather than a fill because
+// watching is not the page's one act, it is a doorway into a game already running. `verb`'s
+// amber fill stays reserved for the single most-urgent act on the page (the amber budget:
+// one solid), and `destructive` keeps the red FILL for the destructive family alone — the
+// two red variants can never read as the same weight of act.
 const VARIANT: Readonly<Record<ButtonVariant, string>> = {
   primary: "rounded-pill bg-text-primary text-surface hover:opacity-90",
   verb: "rounded-md bg-accent text-accent-text hover:opacity-90",
   secondary: "rounded-pill border border-edge bg-transparent text-text-primary hover:bg-surface-elevated",
   destructive: "rounded-pill bg-negative text-negative-text hover:brightness-110",
+  live: "rounded-md border border-negative bg-transparent text-negative hover:bg-surface-elevated",
   ghost: "rounded-md text-text-primary hover:bg-surface-elevated",
 };
 

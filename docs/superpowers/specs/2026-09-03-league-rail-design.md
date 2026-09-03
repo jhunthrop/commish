@@ -118,7 +118,15 @@ The current `/app` matchup table (`LeagueBoard`: League / Your score / Opponent 
   would be a second solid amber on a page whose budget is one.
 - `AttentionQueue`/`LeagueBoard`/`BoardLowerThird` leave `/app`; `attentionQueueItemsFrom`'s
   needs-you derivation lives on as the comparator's needs-you set (same two kinds, same
-  precedence).
+  precedence). `HomeLeagueCard` (the card component) and `MatchupScoreboard` had no consumer
+  left after the rebuild and are deleted with their tests (dead-code rule); the contract type
+  `HomeLeagueCard` stays. `LEAGUE_ROOM_CONFIG.attentionQueueCap` retires with the queue.
+- A quiet row's NON-urgent action (`set-lineup`, `review-week`, `invite-managers`,
+  `open-draft-room`) no longer gets a button on `/app` — the mission's own row grammar gives
+  quiet rows a plain Open. The action's words survive in the row's state line where the fact
+  ladder reaches them ("Invite managers", "Drafts Thursday…"), and the room the row opens
+  carries the actual control. `fix-lineup`/`join-draft` — the two acts that genuinely stall a
+  league — keep real verbs, which is the honest line between "needs you" and "could be done".
 
 ## Hard gates
 

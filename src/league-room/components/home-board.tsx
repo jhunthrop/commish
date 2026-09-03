@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import { ButtonLink, Crest, EmptyState, LowerThird, Meter, SeatMeter } from "@/components/ui";
+import { ButtonLink, Crest, EmptyState, Meter, SeatMeter } from "@/components/ui";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { RoomTour } from "@/draft-room/components/room-tour";
 import { actionLabelFor } from "@/draft-room/lib/lookups";
@@ -12,12 +12,9 @@ import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import type { HomeBody, HomeLeagueCard as HomeLeagueCardData } from "../contract";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useLeagueRoomDeps } from "../hooks/deps";
-import { AttentionQueue, attentionQueueItemsFrom } from "./attention-queue";
-import { actionHref } from "../lib/action-href";
 import { isHomeBody } from "../lib/home-body";
 import { FirstRunPanel } from "./first-run-panel";
-import { HomeLeagueCard } from "./home-league-card";
-import { LeagueBoard } from "./league-board";
+import { LeagueRows } from "./league-rows";
 import { OpenSeatsPanel } from "./open-seats-panel";
 import { WaitingChecklist } from "./waiting-checklist";
 import { checklistItems } from "./waiting-room";
@@ -242,86 +239,18 @@ export function HomeBoard({
     );
   }
 
-  // n=1 (Step 1's own test): the board IS the league — a heading and the ordinary card, no
-  // sort language ("closest first") announced over a list of one, and no multi-league table.
-  if (body.leagues.length === 1) {
-    const only = body.leagues[0]!;
-    return (
-      <div className="flex flex-col gap-6">
-        <CreateLeagueCta />
-        <div className="flex flex-col gap-3">
-          {/* n=1 (Step 1's own test): the board IS the league — a real heading naming it, never
-              a sort ("closest first") announced over a list of one. `HomeLeagueCard` below still
-              carries its own link to the league; this heading names the page, it does not
-              duplicate that control. */}
-          <h2 className="font-display text-2xl font-semibold leading-display text-text-primary">{only.name}</h2>
-          {/* QUIET, since law 6 (Sunday v5). This card used to carry the view's one ink action on
-              the reasoning that a single-league home has no board and no queue to share ink with.
-              It has a lower third now, and law 6 says that is WHERE the verb lives — two controls
-              naming the same act, one white pill and one amber verb, is the duplication this pass
-              exists to remove. */}
-          <HomeLeagueCard league={only} emphasis="quiet" />
-        </div>
-        {openSeats}
-        <BoardLowerThird leagues={body.leagues} />
-      </div>
-    );
-  }
-
+  // THE RAIL AT FULL PAGE (the rail redesign, 2026-09-03): one branch for one league or ten —
+  // `LeagueRows` is the same row model the rail's flyout renders, with per-row verbs, and its
+  // urgency order IS the page's answer to "which of my leagues needs me right now". The old
+  // board's three tellings of that answer (`AttentionQueue`'s chips, `LeagueBoard`'s sort,
+  // `BoardLowerThird`'s counts-and-verb) collapsed into it — the spec's law-4 accounting names
+  // what each column became, and the amber budget holds by construction: the rows' one solid
+  // verb is the page's only solid.
   return (
     <div className="flex flex-col gap-6">
       <CreateLeagueCta />
-      <AttentionQueue items={attentionQueueItemsFrom(body.leagues)} />
-      <LeagueBoard leagues={body.leagues} />
+      <LeagueRows leagues={body.leagues} />
       {openSeats}
-      <BoardLowerThird leagues={body.leagues} />
     </div>
-  );
-}
-
-/**
- * LAW 6 — the leagues board's lower third.
- *
- * This page is the daily landing, and its whole question is "which of my leagues needs me right
- * now". The board answers it by SORTING, which is a real answer a reader has to read the whole
- * table to receive; the strip states it as a figure, and puts the one act at the end of it.
- *
- * The verb is the attention queue's own top item — the same derivation, never a second opinion
- * about what is most urgent — so the chip at the top of the page and the verb at the foot always
- * name the same league and the same act. Nothing pending renders no verb.
- *
- * "Live now" is law 4's third channel, and it is a count rather than a chip because the board
- * above already paints each live week's own marker: this is the total, and the total is the fact
- * that decides whether a manager stays on this page or opens one.
- */
-function BoardLowerThird({ leagues }: { readonly leagues: readonly HomeLeagueCardData[] }) {
-  const queue = attentionQueueItemsFrom(leagues);
-  const live = leagues.filter((league) => league.weekStatus === "in_progress").length;
-  const pending = leagues.filter((league) => league.nextAction !== null);
-  // THE QUEUE'S TOP ITEM FIRST, then the board's own order. The queue is the URGENT set — a live
-  // draft or an unset lineup — and it is deliberately narrower than "has an act at all"
-  // (`attentionQueueItemsFrom`, which the rail also reads). A board where nothing is urgent still
-  // has something to do, and a strip that showed no verb in that case would be hiding the
-  // decision rather than reporting there is none.
-  const first = pending[0];
-  const top =
-    queue[0] ??
-    (first === undefined ? undefined : { leagueId: first.id, leagueName: first.name, label: first.nextAction!.label, href: actionHref(first) });
-  return (
-    <LowerThird
-      live={live > 0}
-      cells={[
-        { label: "Leagues", value: leagues.length },
-        { label: "Waiting on you", value: pending.length },
-        { label: "Live now", value: live, clock: live > 0 },
-      ]}
-      action={
-        top === undefined ? undefined : (
-          <ButtonLink href={top.href} variant="verb" size="sm" aria-label={`${top.label} for ${top.leagueName}`}>
-            {top.label}
-          </ButtonLink>
-        )
-      }
-    />
   );
 }

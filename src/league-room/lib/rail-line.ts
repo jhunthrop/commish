@@ -109,6 +109,14 @@ function standingLine(league: HomeLeagueCard, rank: number): string {
   return base;
 }
 
+/** "Drafts Thursday 10 September, 8:30 PM UTC", or the fill trigger — a league whose season
+ *  has not started names the one clock it actually has. */
+function draftLine(league: HomeLeagueCard): string {
+  if (league.startTrigger === "when_full") return "Drafts when the room fills";
+  if (league.kickoffAt !== null) return `Drafts ${formatDraftAbsolute(league.kickoffAt)}`;
+  return "Draft scheduled";
+}
+
 /**
  * The one line of words under a league's name — every rung a real read (law 4), top to bottom:
  *  1. A needs-you league speaks its action's own words (`nextAction.label` — `NEXT_ACTION_COPY`,
@@ -124,12 +132,23 @@ export function railStateLine(league: HomeLeagueCard, tier: RailLineTier): strin
   const state = railStateFor(league.nextAction?.kind, league.weekStatus);
   if (state === "needs-you") return league.nextAction!.label;
   if (state === "live") return liveLine(league, tier);
-  if (league.draftStatus === "scheduled") {
-    if (league.startTrigger === "when_full") return "Drafts when the room fills";
-    if (league.kickoffAt !== null) return `Drafts ${formatDraftAbsolute(league.kickoffAt)}`;
-    return "Draft scheduled";
-  }
+  if (league.draftStatus === "scheduled") return draftLine(league);
   if (league.myRank !== null) return standingLine(league, league.myRank);
   if (league.nextAction !== null) return league.nextAction.label;
   return `${league.filledTeams} of ${league.teamCount} seats filled`;
+}
+
+/**
+ * The FULL-PAGE row's line (law 3's third size): identical to the rich tier, except that a
+ * needs-you row does not repeat its verb — on the page the action already stands beside the row
+ * as a real button, so the line carries the league's facts instead (its draft clock, or its
+ * standing and fixture — the standing only once the draft is complete, because a 0-0 rank in an
+ * undrafted league is a number with nothing behind it). A needs-you league with no other true
+ * fact keeps the action words: better the same sentence twice than an invented one (law 4).
+ */
+export function railPageLine(league: HomeLeagueCard): string {
+  if (railStateFor(league.nextAction?.kind, league.weekStatus) !== "needs-you") return railStateLine(league, "rich");
+  if (league.draftStatus === "scheduled") return draftLine(league);
+  if (league.draftStatus === "complete" && league.myRank !== null) return standingLine(league, league.myRank);
+  return league.nextAction!.label;
 }
