@@ -219,3 +219,20 @@ loaded faces). No em-dashes in user-facing copy. No tooltips — words instead. 
 verb per surface (page: the featured row or the loud nav pill, never both; sheet: its own verb).
 Immutable patterns; files under 800 lines; strict tsc (zero errors in touched files against the
 43-error baseline) and eslint clean. The signed-in page variant keeps working.
+
+## Implementation amendments (2026-09-02, recorded at close)
+
+1. **Pure modules for server-called vocabulary.** `public-league-list.tsx` becoming a client
+   component (it owns the join sheet's state) made every export a client reference, and both
+   server pages CALL `featuredFillingLeague`/interpolate `HOUSE_SHELF_SENTENCE` — a live RSC
+   error the jsdom suites cannot see. The featured selectors and the house sentence moved to
+   `src/matchmaking/shelf-order.ts` (re-exported from the shelf for client/test importers), and
+   the money sentences to `src/money/copy.ts` (the SERVER hero reads them too).
+2. **The solid and the wash ride only a genuinely filling room.** Seen on the live dev render:
+   with every filling room rolled, the shelf's old `featuredLeagueId` fallback inked the
+   tightest row while the nav pill, deciding off `featuredFillingLeague`, stayed loud — two
+   solids on one surface. The shelf's ink AND the leader wash now key off
+   `featuredFillingLeague` alone; when nothing genuinely fills, every row outlines and the nav
+   pill is the page's one loud verb.
+3. **Sub-lg cards keep house-first order** (the founder-approved mobile form); the ranked
+   soonest-joinable order governs the lg+ board, where the column comparison lives.
