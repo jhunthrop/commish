@@ -9,6 +9,7 @@ import { nflPlayerIdsFor } from "@/projections/crosswalk";
 import { BOARD_SOURCE, boardReasons } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
+import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import { withLeagueMember, type RouteContext } from "../_shared";
 
 export const runtime = "nodejs";
@@ -51,12 +52,16 @@ export async function GET(request: Request, context: RouteContext) {
   return withLeagueMember(request, context, async (actor) => {
     const db = getDb();
     const players = await rankedPlayers(db, actor.leagueId);
+    const [reasons, byes] = await Promise.all([reasonsByLeaguePlayerId(db, players), byeWeeksByTeam(db)]);
     const body: DraftPlayersBody = {
       players,
-      reasons: await reasonsByLeaguePlayerId(db, players),
+      reasons,
       // Chip-eligible only (IMPORTANT 3 RULING, fix round; widened Task 8) — every tribal law plus
       // every CONFIRMED discovered one; see `chipEligibleLaws`'s own docblock.
       laws: chipEligibleLaws(registry()),
+      // The Quilt's BYES tab and lens (2026-09-02): a real-schedule fact, same one-per-draft
+      // cadence as `players` — a bye week does not change during a draft.
+      byeWeeks: Object.fromEntries(byes),
     };
     return ok(body);
   });

@@ -132,6 +132,14 @@ export interface DraftPlayersBody {
   /** The law registry (`registry()`, read server-side), for `ReasonChip`'s own claim lookup.
    *  Optional for the same reason `reasons` is. */
   readonly laws?: readonly Law[];
+  /**
+   * NFL team code → that team's bye week, from `byeWeeksByTeam` (`@/league-service/nfl-schedule`,
+   * the Quilt's BYES tab and lens, 2026-09-02) — a fact the real ingested schedule states, never
+   * an invention. A team absent from this record has no claimable bye (schedule not ingested, or
+   * incomplete), and every bye surface renders nothing for it. Optional for the same
+   * fixture-compatibility reason `reasons` is; `undefined` reads as an empty record everywhere.
+   */
+  readonly byeWeeks?: Readonly<Record<string, number>>;
 }
 
 export interface DraftQueueBody {
