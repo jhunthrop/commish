@@ -38,7 +38,7 @@ const VERDICT_CELL: Readonly<Record<ValueVerdict, { readonly box: string; readon
 export function QuiltCellView({ cell, player, teamCount, lens, verdict, byeWeek, clockLabel, onPeek, peeked }: QuiltCellProps) {
   if (cell.onClock) {
     return (
-      <div data-testid="quilt-onclock" className="flex min-h-11 flex-col items-center justify-center rounded-sm bg-surface-inset outline-2 outline-live">
+      <div data-testid="quilt-onclock" className="flex min-h-11 flex-col items-center justify-center overflow-hidden rounded-sm bg-surface-inset outline-2 outline-live">
         <span className="font-display text-sm font-bold text-live tabular-nums">{clockLabel ?? "…"}</span>
         <span className="text-[10px] leading-tight text-live">ON CLOCK</span>
       </div>
@@ -67,7 +67,7 @@ export function QuiltCellView({ cell, player, teamCount, lens, verdict, byeWeek,
         aria-pressed={peeked}
         aria-label={`${player.name}, pick ${pickPlace(cell.pick, teamCount)}`}
         onClick={() => onPeek(player.id)}
-        className={`flex min-h-11 flex-col justify-center rounded-sm px-2 py-1 text-left focus-visible:outline-2 focus-visible:outline-accent ${box} ${peeked ? "ring-2 ring-accent" : ""}`}
+        className={`flex min-h-11 flex-col justify-center overflow-hidden rounded-sm px-2 py-1 text-left focus-visible:outline-2 focus-visible:outline-accent ${box} ${peeked ? "ring-2 ring-accent" : ""}`}
       >
         <span className={`font-display text-sm font-bold leading-tight ${text}`}>{shortName(player.name)}</span>
         <span className={`text-[10px] leading-tight opacity-85 ${text}`}>{fact}</span>
@@ -76,7 +76,7 @@ export function QuiltCellView({ cell, player, teamCount, lens, verdict, byeWeek,
   }
   if (cell.yourPickLabel !== null) {
     return (
-      <div data-testid="quilt-your-cell" className="flex min-h-11 flex-col items-center justify-center rounded-sm border border-dashed border-accent bg-surface-raised">
+      <div data-testid="quilt-your-cell" className="flex min-h-11 flex-col items-center justify-center overflow-hidden rounded-sm border border-dashed border-accent bg-surface-raised">
         <span className="font-display text-sm font-bold text-accent tabular-nums">{cell.yourPickLabel}</span>
         <span className="text-[10px] leading-tight text-accent">YOURS</span>
       </div>
