@@ -1,6 +1,9 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
+// Relative, not "@/db/test-lanes": this file loads before the `tsconfigPaths()` plugin below is
+// wired into anything, so the "@/" alias is not resolvable here yet.
+import { TEST_DB_LANE_COUNT } from "./src/db/test-lanes";
 
 /**
  * Directories with a 100% coverage gate (mirrored in `coverage.thresholds` below).
@@ -124,9 +127,17 @@ export default defineConfig({
     environment: "happy-dom",
     // Harness worktrees are nested checkouts — never collect their tests from the parent.
     exclude: ["**/node_modules/**", "**/.claude/**", "**/.next/**", "e2e/**"],
-    // Integration tests share one real Postgres/Redis and truncate between tests, so
-    // test FILES must not interleave. Tests within a file already run sequentially.
-    fileParallelism: false,
+    // Integration tests share a real Postgres/Redis and truncate between tests, so test FILES
+    // running in the SAME worker must not interleave — Vitest already guarantees that (a worker
+    // runs its assigned files one at a time; tests within a file already run sequentially).
+    // FOUR lane databases (`src/db/test-lanes.ts`, `scripts/migrate-test-lanes.ts`) mean cross-
+    // WORKER interleaving is also safe now: each worker gets its own database via
+    // `vitest.setup.mts`'s lane rewrite, so `fileParallelism` no longer needs to be pinned to
+    // `false` — Vitest's own default (`true`) shards files across up to `maxWorkers` below.
+    // `--no-file-parallelism` on the CLI still overrides this to exactly one worker (Vitest's own
+    // behavior: that flag forces `maxWorkers` to 1), which resolves to lane 1 — the SAME
+    // `commish_test` database this suite has always used serially, unchanged.
+    maxWorkers: TEST_DB_LANE_COUNT,
     // DB-backed files open a real Postgres pool in beforeEach/afterAll; under CPU pressure
     // (CI, capped Docker) the default 10s hook budget has flaked three times. Vitest's
     // defaults are 5s test / 10s hook — these are ceilings, not targets: a healthy run is

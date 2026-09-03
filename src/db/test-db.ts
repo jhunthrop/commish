@@ -11,7 +11,9 @@ import * as schema from "./schema";
 export const TEST_DATABASE_URL = envOr("TEST_DATABASE_URL", "postgres://commish:commish@localhost:5433/commish_test");
 
 /**
- * Connects to the dedicated test database (docker-compose `postgres-test`, tmpfs-backed).
+ * Connects to the dedicated test database (docker-compose `postgres-test`, one of the four lanes
+ * `src/db/test-lanes.ts` names — lane 1, `commish_test`, unless a Vitest worker's own
+ * `VITEST_POOL_ID` sent this process to another).
  * Every table is truncated between tests so each test starts from a clean state.
  *
  * Test-only module (it imports `vitest`): registers its own `afterAll` to close the

@@ -94,6 +94,26 @@ skipped, so re-running the identical command is always safe:
 npm run projections:odds:backfill -- --seasons=2025 --budget=9000
 ```
 
+## Testing: lanes vs. serial
+
+The whole-repo suite defaults to PARALLEL now (`npx vitest run`, no flags): Vitest shards test
+files across up to four workers, and each worker reads its own test-Postgres database (lane 1 is
+`commish_test`, unchanged; lanes 2-4 are `commish_test_2`/`_3`/`_4` on the same `postgres-test`
+container). A worker picks its lane from its own `VITEST_POOL_ID`, rewritten into
+`TEST_DATABASE_URL` once per test file by `vitest.setup.mts`, before `test-db.ts`'s
+`createTestDb()` or any route-handler test's own `process.env.DATABASE_URL` setup reads it — see
+`src/db/test-lanes.ts` for the naming contract.
+
+`npm run db:migrate:test` creates whichever lane databases are missing and migrates all four in one
+call (`TEST_DB_LANE=<n>` or `-- --lane=<n>` does one). It is idempotent, so run it after any
+migration and after any `docker compose down -v`.
+
+Reach for **`npx vitest run --no-file-parallelism`** (exactly lane 1, `commish_test`, the way this
+suite always ran) when debugging a single DB-backed suite step by step, or when narrowing down
+whether a failure is a real regression versus a lane-routing bug — serial mode removes lanes from
+the picture entirely. Measured on the whole repo (631 files), the two modes report the identical
+failure set, and parallel costs 118s against serial's 410s.
+
 ## What to check when a step reports "failed"
 
 | Step | A `failed` status means | Check |
