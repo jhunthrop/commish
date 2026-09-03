@@ -93,6 +93,15 @@ export const MOCK_CONFIG = {
    */
   maxLobbyListing: 20,
   /**
+   * The learning column's own cap (the workflow pass, law 3): how many completed mocks
+   * `completedMockDebriefs` (`@/mock-draft-service/debrief`) summarizes per read. Each summary
+   * loads a whole stored draft state, so this is the costliest read the lobby page makes —
+   * retention (`retention.completedMs`, above) already keeps the population under a day deep,
+   * and this bounds the walk regardless: one featured mock plus a short run of earlier rows is
+   * everything the page renders.
+   */
+  debriefHistoryLimit: 6,
+  /**
    * R3 (the lobby design review's carry): the practice wire's own tunables —
    * `listMockWireItems` (`@/mock-draft-service/wire`), rendered by `MockWire`
    * (`@/league-room/components/mock-wire`). Deliberately its own object, never a value read off
