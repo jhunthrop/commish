@@ -15,6 +15,11 @@ import { decodeSheet, encodeSheet, seedSheet, type CheatSheet } from "./sheet";
  * already edited always wins; the seed never overwrites prep. Same-browser only, lost with
  * cleared storage — exactly the sheet's own recorded posture ("prep words, never money or
  * picks").
+ *
+ * EXACTLY ONCE (fix round ruling): the seed is CONSUMED by its first successful import
+ * (`takeSeedSheet` deletes as it reads). Seeding is a deliberate act aimed at the NEXT room
+ * the manager opens — a standing seed would silently become the starting order of every
+ * future sheet-less room, real leagues included, from a mock played arbitrarily long ago.
  */
 
 /** "seed" can never collide with a draft id — every draft id is a UUID-shaped `deps.newId()`. */
@@ -38,9 +43,15 @@ export function writeSeedSheet(order: readonly string[]): boolean {
   }
 }
 
-export function readSeedSheet(): CheatSheet | null {
+/** Read AND consume: the seed serves exactly one room. Removal rides the same read so a
+ *  successful import can never leave a stale seed behind; a decode failure also clears it
+ *  (a corrupt seed is not worth keeping for a second try). */
+export function takeSeedSheet(): CheatSheet | null {
   try {
-    return decodeSheet(window.localStorage.getItem(SHEET_SEED_STORAGE_KEY));
+    const raw = window.localStorage.getItem(SHEET_SEED_STORAGE_KEY);
+    if (raw === null) return null;
+    window.localStorage.removeItem(SHEET_SEED_STORAGE_KEY);
+    return decodeSheet(raw);
   } catch {
     return null;
   }

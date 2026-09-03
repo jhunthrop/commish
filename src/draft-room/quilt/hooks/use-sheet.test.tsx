@@ -22,6 +22,16 @@ describe("useSheet — the seed import (the workflow pass)", () => {
     expect(result.current.sheet.order).toEqual(["p3", "p2", "p1"]);
   });
 
+  it("consumes the seed on import: a second sheet-less draft starts from its own board, not the mock", async () => {
+    writeSeedSheet(["p3", "p1"]);
+    const first = renderHook(() => useSheet("draft_first", BOARD));
+    await waitFor(() => expect(first.result.current.sheet.order).toEqual(["p3", "p1", "p2"]));
+    const second = renderHook(() => useSheet("draft_second", BOARD));
+    await waitFor(() => expect(second.result.current.sheet.order.length).toBeGreaterThan(0));
+    // The seed served exactly one room; this one gets the board's own order.
+    expect(second.result.current.sheet.order).toEqual(["p1", "p2", "p3"]);
+  });
+
   it("never lets the seed overwrite a sheet the manager already has for this draft", async () => {
     writeSeedSheet(["p3", "p2", "p1"]);
     window.localStorage.setItem(

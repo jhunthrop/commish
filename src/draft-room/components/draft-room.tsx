@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
-import { Button, ButtonLink, ErrorState, Skeleton, useToast } from "@/components/ui";
+import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { useDraftRoomDeps } from "../hooks/deps";
@@ -24,7 +24,6 @@ import { AuctionRoom } from "./auction-room";
  * to open straight into creating another one rather than browsing first — "Run it again" below
  * hands the lobby that query param; "Open the lobby" hands it none.
  */
-const MOCK_LOBBY_PATH = "/app/mock-drafts";
 
 export interface DraftRoomProps {
   readonly draftId: string;

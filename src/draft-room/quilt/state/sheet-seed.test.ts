@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { QUILT_CONFIG } from "./config";
-import { readSeedSheet, seedOrderFrom, SHEET_SEED_STORAGE_KEY, writeSeedSheet } from "./sheet-seed";
+import { seedOrderFrom, SHEET_SEED_STORAGE_KEY, takeSeedSheet, writeSeedSheet } from "./sheet-seed";
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -21,12 +21,15 @@ describe("the seed store", () => {
   it("round-trips through the sheet codec under the well-known key", () => {
     expect(writeSeedSheet(["p2", "p1"])).toBe(true);
     expect(SHEET_SEED_STORAGE_KEY).toBe(`${QUILT_CONFIG.sheetStorageKeyPrefix}seed`);
-    expect(readSeedSheet()).toEqual({ order: ["p2", "p1"], notes: {} });
+    expect(takeSeedSheet()).toEqual({ order: ["p2", "p1"], notes: {} });
+    // Consumed by the take: the seed serves exactly one room.
+    expect(window.localStorage.getItem(SHEET_SEED_STORAGE_KEY)).toBeNull();
+    expect(takeSeedSheet()).toBeNull();
   });
 
   it("reads a missing or malformed store as no seed at all", () => {
-    expect(readSeedSheet()).toBeNull();
+    expect(takeSeedSheet()).toBeNull();
     window.localStorage.setItem(SHEET_SEED_STORAGE_KEY, "{broken");
-    expect(readSeedSheet()).toBeNull();
+    expect(takeSeedSheet()).toBeNull();
   });
 });

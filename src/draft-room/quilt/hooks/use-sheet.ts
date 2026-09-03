@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QUILT_CONFIG } from "../state/config";
 import { decodeSheet, encodeSheet, moveInSheet, reconcileSheet, seedSheet, setSheetNote, type CheatSheet } from "../state/sheet";
-import { readSeedSheet } from "../state/sheet-seed";
+import { takeSeedSheet } from "../state/sheet-seed";
 
 export interface SheetControls {
   readonly sheet: CheatSheet;
@@ -51,11 +51,12 @@ export function useSheet(draftId: string, boardIds: readonly string[]): SheetCon
       setSheet(reconcileSheet(stored, boardIds));
       return;
     }
-    // No sheet of this draft's own yet: import the standing seed sheet if one exists (the
-    // finished-mock debrief's SEED MY SHEET, `../state/sheet-seed`) — reconciled against THIS
-    // room's board, so ids the board does not serve drop and new arrivals slot in at board
-    // position. A sheet the manager has edited is never touched by this branch at all.
-    const seed = readSeedSheet();
+    // No sheet of this draft's own yet: import the seed sheet if one exists (the finished-mock
+    // debrief's SEED MY SHEET, `../state/sheet-seed`) — reconciled against THIS room's board,
+    // so ids the board does not serve drop and new arrivals slot in at board position. The
+    // take CONSUMES the seed: it serves exactly this one room, never a later one. A sheet the
+    // manager has edited is never touched by this branch at all.
+    const seed = takeSeedSheet();
     setSheet(seed === null ? seedSheet(boardIds) : reconcileSheet(seed, boardIds));
   }, [draftId, boardIds]);
 
