@@ -325,6 +325,11 @@ export function useDraftRoom(draftId: string): DraftRoom {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(action),
+          // A tapped DRAFT is an affirmative choice (pick-safety review, HIGH): the quilt's
+          // undo window flushes a held pick on `pagehide`, and `keepalive` is what lets that
+          // in-flight POST outlive the page. Every action body is a few dozen bytes, far under
+          // the keepalive budget, so this costs nothing on the ordinary path.
+          keepalive: true,
         });
         const body = (await response.json()) as ApiEnvelope<{ readonly draft: DraftStateView }>;
         if (!body.ok) {

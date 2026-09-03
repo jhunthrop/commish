@@ -10,6 +10,12 @@ export interface PendingPick {
   readonly playerId: string;
   /** Epoch ms the window closes and the pick actually submits. */
   readonly commitsAt: number;
+  /**
+   * The player this window REPLACED, when a second DRAFT landed while one pended — last word
+   * wins, and the pill says so ("swapped from …") for the remainder of the window so a swap is
+   * never silent (whole-branch review, MEDIUM). Null for a first, unswapped pick.
+   */
+  readonly swappedFromPlayerId: string | null;
 }
 
 /**
@@ -26,7 +32,7 @@ export function undoWindowMs(now: number, deadlineAt: string | null): number {
 }
 
 /** The pending pick a DRAFT press begins, or null when the squeeze rule says submit now. */
-export function beginPendingPick(playerId: string, now: number, deadlineAt: string | null): PendingPick | null {
+export function beginPendingPick(playerId: string, now: number, deadlineAt: string | null, swappedFromPlayerId: string | null = null): PendingPick | null {
   const windowMs = undoWindowMs(now, deadlineAt);
-  return windowMs === 0 ? null : { playerId, commitsAt: now + windowMs };
+  return windowMs === 0 ? null : { playerId, commitsAt: now + windowMs, swappedFromPlayerId };
 }

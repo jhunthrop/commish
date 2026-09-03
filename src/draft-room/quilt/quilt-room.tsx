@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useReducer, useState } from "react";
 import type { Player } from "@/domain/player";
-import type { ClientDraftAction } from "@/draft-engine";
+import { useToast } from "@/components/ui";
 import { formatCountdown, useCountdown } from "@/components/ui/countdown";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
@@ -27,7 +27,6 @@ import type { RoomActs } from "./components/room-acts";
 export interface QuiltRoomProps {
   readonly room: DraftRoomState;
   readonly playersById: ReadonlyMap<string, Player>;
-  readonly onAct: (action: ClientDraftAction) => void;
 }
 
 /**
@@ -37,7 +36,7 @@ export interface QuiltRoomProps {
  * compositions over the same state: at phone widths the room INVERTS — pool first, the quilt
  * demoted to the BOARD tab — because a 390pt screen drafts from a list, not a grid.
  */
-export function QuiltRoom({ room, playersById, onAct }: QuiltRoomProps) {
+export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const view = room.view!;
   const [surface, dispatch] = useReducer(reduceCollapse, RESTING);
   const [lens, setLens] = useState<Lens>("picks");
@@ -48,7 +47,25 @@ export function QuiltRoom({ room, playersById, onAct }: QuiltRoomProps) {
   const owesPick = room.myTeamId !== null && (view.owedPicks?.[room.myTeamId]?.length ?? 0) > 0;
   const canDraft = myTurn || owesPick;
 
-  const submitPick = useCallback((playerId: string) => onAct({ type: "MAKE_PICK", playerId }), [onAct]);
+  /**
+   * The window's own submit, with the window's own rejection words (whole-branch review,
+   * MEDIUM 3): a pick that fails AFTER its undo window closed rejects out of nowhere — seconds
+   * after the tap, from a surface that may already be gone — so the generic act toast ("It's
+   * not your turn") is not enough story. This names the player, quotes the reducer's reason,
+   * and says the turn is still live. Wired HERE, at the submit the flush/expiry path fires,
+   * never in the generic act wrapper.
+   */
+  const { show } = useToast();
+  const submitPick = useCallback(
+    (playerId: string): void => {
+      void room.submit({ type: "MAKE_PICK", playerId }).then((outcome) => {
+        if (outcome.ok) return;
+        const name = playersById.get(playerId)?.name ?? "Your pick";
+        show({ message: `${name} did not land. ${outcome.reason} You are still on the clock.`, tone: "error" });
+      });
+    },
+    [room, playersById, show],
+  );
   const { pending, begin, undo } = usePendingPick(submitPick, view.deadlineAt);
   const queueHandlers = useQueueHandlers(room);
 
@@ -158,7 +175,12 @@ export function QuiltRoom({ room, playersById, onAct }: QuiltRoomProps) {
           )}
           {pending === null ? null : (
             <div className="pointer-events-none absolute bottom-4 left-1/2 z-40 -translate-x-1/2">
-              <UndoPill pending={pending} player={playersById.get(pending.playerId) ?? null} onUndo={undo} />
+              <UndoPill
+                pending={pending}
+                player={playersById.get(pending.playerId) ?? null}
+                swappedFrom={pending.swappedFromPlayerId === null ? null : (playersById.get(pending.swappedFromPlayerId) ?? null)}
+                onUndo={undo}
+              />
             </div>
           )}
         </div>

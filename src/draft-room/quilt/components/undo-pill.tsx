@@ -11,6 +11,11 @@ import type { PendingPick } from "../state/pending-pick";
 export interface UndoPillProps {
   readonly pending: PendingPick;
   readonly player: Player | null;
+  /** The player this window replaced (`PendingPick.swappedFromPlayerId`, resolved), or null.
+   *  When set, the pill's sub-line announces the swap for the remainder of the window — the
+   *  last-word-wins gesture is fast on purpose, and this line is what keeps it from being
+   *  silent. */
+  readonly swappedFrom: Player | null;
   readonly onUndo: () => void;
 }
 
@@ -23,7 +28,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
  * one red-adjacent verb in the room, worded and bounded so a slipped finger costs nothing.
  * Reduced motion swaps the draining ring for the same number as plain text.
  */
-export function UndoPill({ pending, player, onUndo }: UndoPillProps) {
+export function UndoPill({ pending, player, swappedFrom, onUndo }: UndoPillProps) {
   const commitsAtIso = useMemo(() => new Date(pending.commitsAt).toISOString(), [pending.commitsAt]);
   const { remainingMs } = useCountdown(commitsAtIso);
   const reducedMotion = usePrefersReducedMotion();
@@ -40,7 +45,7 @@ export function UndoPill({ pending, player, onUndo }: UndoPillProps) {
       {player === null ? null : <PositionBadge position={player.position} size="sm" />}
       <div className="flex flex-col">
         <span className="font-display text-md font-semibold text-text-primary">{player?.name ?? "Your pick"}</span>
-        <span className="text-xs text-text-faint">locking in…</span>
+        <span className="text-xs text-text-faint">{swappedFrom === null ? "locking in…" : `swapped from ${swappedFrom.name}`}</span>
       </div>
       {reducedMotion ? (
         <span className="font-display text-sm font-bold text-accent tabular-nums">{seconds}s</span>

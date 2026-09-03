@@ -9,7 +9,13 @@ import { QuiltRoom } from "../quilt/quilt-room";
 export interface SnakeRoomProps {
   readonly room: DraftRoomState;
   readonly playersById: ReadonlyMap<string, Player>;
-  readonly onAct: (action: ClientDraftAction) => void;
+  /**
+   * The shell-era act path. Accepted for `DraftRoom`'s call-site compatibility and unused
+   * here: the quilt submits picks through `room.submit` itself, so the pick-safety window can
+   * own its OWN rejection words (see `QuiltRoom.submitPick`). The auction room still acts
+   * through this.
+   */
+  readonly onAct?: (action: ClientDraftAction) => void;
   /**
    * The old shell's social band. Accepted for `DraftRoom`'s call-site compatibility and
    * DELIBERATELY unrendered: the Quilt's design law gives the stage to the board and the right
@@ -24,6 +30,6 @@ export interface SnakeRoomProps {
  * `.superpowers/mocks/`). The old `RoomShell` composition still serves the auction format;
  * snake drafts get the board-owns-the-stage rebuild.
  */
-export function SnakeRoom({ room, playersById, onAct }: SnakeRoomProps) {
-  return <QuiltRoom room={room} playersById={playersById} onAct={onAct} />;
+export function SnakeRoom({ room, playersById }: SnakeRoomProps) {
+  return <QuiltRoom room={room} playersById={playersById} />;
 }

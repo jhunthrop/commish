@@ -182,7 +182,12 @@ export function MobileRoom(props: MobileRoomProps) {
 
       {pending === null ? null : (
         <div className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2">
-          <UndoPill pending={pending} player={playersById.get(pending.playerId) ?? null} onUndo={onUndo} />
+          <UndoPill
+            pending={pending}
+            player={playersById.get(pending.playerId) ?? null}
+            swappedFrom={pending.swappedFromPlayerId === null ? null : (playersById.get(pending.swappedFromPlayerId) ?? null)}
+            onUndo={onUndo}
+          />
         </div>
       )}
 

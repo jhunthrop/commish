@@ -43,23 +43,61 @@ describe("usePendingPick", () => {
     expect(result.current.pending).toBeNull();
   });
 
-  it("a second begin replaces the first — only the last pick submits", () => {
+  it("a second begin replaces the first — only the last pick submits, and the window says what it swapped", () => {
     const submit = vi.fn();
     const { result } = renderHook(() => usePendingPick(submit, farDeadline()));
     act(() => result.current.begin("p1"));
     act(() => vi.advanceTimersByTime(1_000));
     act(() => result.current.begin("p2"));
+    expect(result.current.pending?.swappedFromPlayerId).toBe("p1");
     act(() => vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs));
     expect(submit).toHaveBeenCalledTimes(1);
     expect(submit).toHaveBeenCalledWith("p2");
+    // Re-tapping the SAME player is not a swap — there is nothing to announce.
+    act(() => result.current.begin("p2"));
+    act(() => result.current.begin("p2"));
+    expect(result.current.pending?.swappedFromPlayerId).toBeNull();
   });
 
-  it("unmount abandons the window without submitting", () => {
+  it("unmount FLUSHES a held pick — a tapped DRAFT is never silently dropped", () => {
     const submit = vi.fn();
     const { result, unmount } = renderHook(() => usePendingPick(submit, farDeadline()));
     act(() => result.current.begin("p1"));
     unmount();
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(submit).toHaveBeenCalledWith("p1");
+    // The flush already submitted; the dead timer must not fire a second copy.
     act(() => vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs * 2));
+    expect(submit).toHaveBeenCalledTimes(1);
+  });
+
+  it("unmount after an undo submits nothing — the discard was said out loud", () => {
+    const submit = vi.fn();
+    const { result, unmount } = renderHook(() => usePendingPick(submit, farDeadline()));
+    act(() => result.current.begin("p1"));
+    act(() => result.current.undo());
+    unmount();
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("guards the tab while a pick pends: beforeunload registered, pagehide flushes, both released", () => {
+    const submit = vi.fn();
+    const addSpy = vi.spyOn(window, "addEventListener");
+    const removeSpy = vi.spyOn(window, "removeEventListener");
+    const { result } = renderHook(() => usePendingPick(submit, farDeadline()));
+    expect(addSpy).not.toHaveBeenCalledWith("beforeunload", expect.any(Function));
+    act(() => result.current.begin("p1"));
+    expect(addSpy).toHaveBeenCalledWith("beforeunload", expect.any(Function));
+    expect(addSpy).toHaveBeenCalledWith("pagehide", expect.any(Function));
+
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    expect(submit).toHaveBeenCalledWith("p1");
+    expect(result.current.pending).toBeNull();
+    expect(removeSpy).toHaveBeenCalledWith("beforeunload", expect.any(Function));
+    expect(removeSpy).toHaveBeenCalledWith("pagehide", expect.any(Function));
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
   });
 });

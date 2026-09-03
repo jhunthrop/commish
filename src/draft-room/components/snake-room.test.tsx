@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { renderSurface } from "@/components/ui/test-utils";
@@ -34,10 +34,10 @@ const room: DraftRoomState = {
   setQueue: async () => ({ ok: true }),
 };
 
-function renderRoom(over: Partial<DraftRoomState> = {}, onAct: (action: unknown) => void = () => {}) {
+function renderRoom(over: Partial<DraftRoomState> = {}) {
   return render(
     <ToastProvider>
-      <SnakeRoom room={{ ...room, ...over }} playersById={playersById(PLAYERS)} onAct={onAct} />
+      <SnakeRoom room={{ ...room, ...over }} playersById={playersById(PLAYERS)} />
     </ToastProvider>,
   );
 }
@@ -89,25 +89,54 @@ describe("SnakeRoom (the quilt)", () => {
     });
 
     it("holds a DRAFT in the undo window and submits only on expiry", () => {
-      const onAct = vi.fn();
-      renderRoom({}, onAct);
+      const submit = vi.fn(async () => ({ ok: true as const }));
+      renderRoom({ submit });
       const strip = desktop().getByTestId("clock-strip");
       fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
-      expect(onAct).not.toHaveBeenCalled();
+      expect(submit).not.toHaveBeenCalled();
       expect(desktop().getByTestId("undo-pill")).toBeInTheDocument();
       vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs);
-      expect(onAct).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "rb1" });
+      expect(submit).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "rb1" });
     });
 
     it("UNDO inside the window means nothing was ever sent", () => {
-      const onAct = vi.fn();
-      renderRoom({}, onAct);
+      const submit = vi.fn(async () => ({ ok: true as const }));
+      renderRoom({ submit });
       const strip = desktop().getByTestId("clock-strip");
       fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
       fireEvent.click(desktop().getByRole("button", { name: "Undo" }));
       vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs * 2);
-      expect(onAct).not.toHaveBeenCalled();
+      expect(submit).not.toHaveBeenCalled();
       expect(desktop().queryByTestId("undo-pill")).toBeNull();
+    });
+
+    it("a rejected expiry submit gets the window's own words, not the generic act toast", async () => {
+      const submit = vi.fn(async () => ({ ok: false as const, reason: "It's not your turn to pick." }));
+      renderRoom({ submit });
+      const strip = desktop().getByTestId("clock-strip");
+      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(QUILT_CONFIG.undoWindowMs);
+      });
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent("Marcus Reed did not land.");
+      expect(alert).toHaveTextContent("It's not your turn to pick.");
+      expect(alert).toHaveTextContent("You are still on the clock.");
+    });
+
+    it("a swap relabels the pill and says what it replaced", () => {
+      const submit = vi.fn(async () => ({ ok: true as const }));
+      renderRoom({ submit, queue: ["rb1", "qb1"] });
+      const strip = desktop().getByTestId("clock-strip");
+      // rb1 (Marcus Reed) leads the queued strip; qb1 (Jalen Croft) rides second.
+      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
+      expect(desktop().getByTestId("undo-pill")).toHaveTextContent("locking in…");
+      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[1]!);
+      const pill = desktop().getByTestId("undo-pill");
+      expect(pill).toHaveTextContent("swapped from Marcus Reed");
+      // Last word wins, said out loud — and only the last pick ever submits.
+      vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs);
+      expect(submit).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -175,13 +204,13 @@ describe("SnakeRoom (the quilt)", () => {
   });
 
   it("inverts on the phone tree: bottom tabs, pool first, two-step picking", () => {
-    const onAct = vi.fn();
-    renderRoom({}, onAct);
+    const submit = vi.fn(async () => ({ ok: true as const }));
+    renderRoom({ submit });
     const phone = screen.getByRole("navigation", { name: "Draft room tabs" }).parentElement!;
     expect(within(phone).getByTestId("mobile-your-turn")).toBeInTheDocument();
     // A phone DRAFT opens the confirm sheet rather than picking.
     fireEvent.click(within(phone).getAllByRole("button", { name: "Draft" })[0]!);
-    expect(onAct).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
   });
 });

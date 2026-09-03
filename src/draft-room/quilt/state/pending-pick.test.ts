@@ -28,7 +28,12 @@ describe("undoWindowMs", () => {
 describe("beginPendingPick", () => {
   it("holds the pick for the window against a roomy deadline", () => {
     const held = beginPendingPick("p1", NOW, iso(60_000));
-    expect(held).toEqual({ playerId: "p1", commitsAt: NOW + QUILT_CONFIG.undoWindowMs });
+    expect(held).toEqual({ playerId: "p1", commitsAt: NOW + QUILT_CONFIG.undoWindowMs, swappedFromPlayerId: null });
+  });
+
+  it("remembers the player a swap replaced", () => {
+    const held = beginPendingPick("p2", NOW, iso(60_000), "p1");
+    expect(held?.swappedFromPlayerId).toBe("p1");
   });
 
   it("returns null — submit now — under the squeeze rule", () => {
