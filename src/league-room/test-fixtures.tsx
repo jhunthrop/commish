@@ -137,7 +137,7 @@ export const DRAFT_SCHEDULE: DraftScheduleBody = {
   missedDraft: false,
 };
 
-/** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
+/** Everything the room reads off one league: a commissioner, mid-season, drafted, `t1` up this week. */
 export const HOME: LeagueHomeBody = {
   leagueId: "l1",
   name: "Sunday Money",

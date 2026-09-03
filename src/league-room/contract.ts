@@ -80,8 +80,9 @@ export interface DraftScheduleBody {
   /**
    * Phase 3.5, Task 8: which of the two ways this draft's `kickoffAt` comes to be set — the
    * SAME union `setDraftKickoff`'s own refusal already keys on (`KICKOFF_REFUSALS.whenFull`).
-   * `LeagueHome` reads this to decide which of `WaitingRoom`/`DraftSchedulePanel` renders: the
-   * two never render at once.
+   * The room's waiting stage (`WaitingRoom`, mounted by `room-shell.tsx` when `stage-priority`
+   * says `waiting`) reads this to decide which of `WaitingRoom`'s two heroes renders: the two
+   * never render at once.
    */
   readonly startTrigger: "scheduled" | "when_full";
   /** How many seats are taken right now — the same `count(teams.id)` `filledTeams` means
