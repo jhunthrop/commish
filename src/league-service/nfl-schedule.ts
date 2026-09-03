@@ -69,6 +69,12 @@ export async function fixtureLabelsByTeam(db: Db, week: number): Promise<Readonl
  * does not contain. A team playing all fourteen weeks (possible while byes land in weeks the
  * regular season doesn't reach) is likewise absent — it has no bye to report. One query, filtered
  * to the window in the database, grouped here.
+ *
+ * Serves BOTH consumers: the room's bye problems (room-data.ts) and the Quilt draft room's BYES
+ * tab and lens (the players route). Two parallel builds wrote this derivation independently;
+ * the merge kept this window-pinned version, whose honesty guard subsumes the other's — a
+ * partially ingested schedule names no byes, and a game outside the regular-season window can
+ * neither fill nor invent one.
  */
 export async function byeWeeksByTeam(db: Db): Promise<ReadonlyMap<string, number>> {
   const rows = await db
@@ -121,41 +127,4 @@ export async function startedTeamsForWeek(db: Db, week: number, now: Date): Prom
     }
   }
   return started;
-}
-
-/**
- * EVERY TEAM'S BYE WEEK, from the schedule itself (the Quilt draft room's BYES tab and lens,
- * 2026-09-02): a team's bye is the one regular-season week it plays no game in. Derived, never
- * declared — the same "a team absent from the week is on bye" fact `fixtureLabelsByTeam`'s
- * docblock already states, aggregated across the season.
- *
- * HONESTY GUARD: a team earns an entry only when the ingested schedule leaves it EXACTLY ONE
- * week short of the season's own week span. A partially ingested schedule (or an empty table)
- * would otherwise "discover" byes that are really just missing rows, and the draft room's law
- * for missing data is silence, not invention — a team absent from this map renders no bye
- * anywhere.
- */
-export async function byeWeeksByTeam(db: Db): Promise<ReadonlyMap<string, number>> {
-  const rows = await db.select({ week: nflGames.week, home: nflGames.homeNflTeam, away: nflGames.awayNflTeam }).from(nflGames);
-  const weeksPlayed = new Map<string, Set<number>>();
-  let finalWeek = 0;
-  for (const game of rows) {
-    finalWeek = Math.max(finalWeek, game.week);
-    for (const team of [game.home, game.away]) {
-      const played = weeksPlayed.get(team) ?? new Set<number>();
-      played.add(game.week);
-      weeksPlayed.set(team, played);
-    }
-  }
-  const byes = new Map<string, number>();
-  for (const [team, played] of weeksPlayed) {
-    if (played.size !== finalWeek - 1) continue;
-    for (let week = 1; week <= finalWeek; week += 1) {
-      if (!played.has(week)) {
-        byes.set(team, week);
-        break;
-      }
-    }
-  }
-  return byes;
 }
