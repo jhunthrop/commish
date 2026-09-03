@@ -130,8 +130,11 @@ export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
       // The grid track reads `--rail-width` off this element and never changes with `open`:
       // the flyout below is an absolutely-positioned OVERLAY, so nothing to the right moves.
       // `sticky` is itself a positioned box, so the flyout's `absolute` resolves against this
-      // element — no extra `relative` needed (the two would conflict).
-      className={`border-b border-line bg-surface lg:sticky lg:top-0 lg:w-[var(--rail-width)] lg:self-start lg:border-b-0 lg:border-r ${className}`}
+      // element — no extra `relative` needed (the two would conflict). `lg:z-40` while open:
+      // the sticky nav is a stacking context whose default order loses to later siblings (the
+      // room's own spine chips painted over the flyout without it — seen in the first
+      // screenshot pass, 2026-09-03).
+      className={`border-b border-line bg-surface lg:sticky lg:top-0 lg:w-[var(--rail-width)] lg:self-start lg:border-b-0 lg:border-r ${open ? "lg:z-40" : ""} ${className}`}
     >
       <div
         className={`flex flex-row items-center gap-2 overflow-x-auto px-3 py-2 lg:max-h-dvh lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-y-auto lg:px-2 lg:py-3 ${
