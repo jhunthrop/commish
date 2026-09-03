@@ -36,9 +36,7 @@ function PointsCell({ points, playerId, loud = false }: { readonly points: Reado
   const value = playerId === null ? null : (points.get(playerId) ?? null);
   return (
     <span
-      className={`text-right font-display tabular-nums ${
-        value === null ? "text-base font-semibold text-text-faint/60" : loud ? "text-2xl font-bold text-text-primary" : "text-lg font-bold text-text-muted"
-      }`}
+      className={`text-right font-display tabular-nums ${value === null ? "text-base font-semibold text-text-faint/60" : loud ? "text-2xl font-bold text-text-primary" : "text-lg font-bold text-text-muted"}`}
     >
       {playerId === null ? "" : value === null ? NOT_STARTED_DASH : formatPoints(value)}
     </span>

@@ -173,7 +173,7 @@ export function DraftSchedulePanel({
    * Task 7's own short-room warning needs the league's own seat ceiling, and — the same reasoning
    * `WaitingRoomLeague`'s own docblock already states for the identical field — `DraftScheduleBody`
    * itself deliberately does not carry it (a third copy of a league's own seat count on the wire).
-   * `LeagueHome` (`./league-home.tsx`) already holds `home.teamCount` for its own header line, so
+   * The room (`./room-shell.tsx`, which mounts `WaitingRoom`) already holds `home.teamCount`, so
    * this rides in as a second prop rather than widening the wire body.
    */
   readonly teamCount: number;

@@ -43,8 +43,8 @@ export function LeagueTermsPanel({
    * is the real, primary heading for that page's content — the invite page's own `PageTitle`
    * reads "Join a league", so `terms.name` here is the only heading naming the actual league.
    *
-   * `"p"` is what `LeagueHome` (Task 8) passes: that page already has an `h1` (`PageTitle`)
-   * carrying `terms.name` verbatim, so a SECOND element exposed with `role="heading"` and the
+   * `"p"` is what the room's rail (`room-shell.tsx`) passes: the week strip already has an `h1`
+   * carrying the league's name verbatim, so a SECOND element exposed with `role="heading"` and the
    * identical accessible name gives a screen reader's headings list two entries for one fact and
    * fails any accessible-name-scoped query with a strict-mode ambiguity — exactly the Task 9 e2e
    * regression (`league-lifecycle.spec.ts`) this fixes. `terms.name` still renders, still reads

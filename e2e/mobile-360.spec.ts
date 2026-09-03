@@ -314,22 +314,22 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // so this reuses that league rather than minting a third — the trades page fits at 360px
     // whichever league it renders for, and this is the one already on hand.
     await page.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/trades`);
-    // `exact`: the empty state's own `h2` "No trades yet." substring-matches a bare "Trades",
-    // and the page `h1` is the heading this walk has always meant — the same `exact` precedent
-    // the "Save" button above and the 3.6 waiting-room heading below already set.
-    await expect(page.getByRole("heading", { name: "Trades", exact: true })).toBeVisible();
+    // The room's week strip carries the league name as the page `h1`; the trades surface at
+    // full height (law 2) names itself with the inbox's own `h2`.
+    await expect(page.getByRole("heading", { name: "Your trades" })).toBeVisible();
     await expectNoHorizontalScroll(page, "the trades page");
 
-    // --- Phase 3.6, Task 13: league home (post-draft, standings included) and standings -----
+    // --- Phase 3.6, Task 13: the room (post-draft) and the standings route -------------------
     // The seeded season league is already fully drafted and played (`global-setup.ts`), so its
-    // own `/app/leagues/[leagueId]` renders the real `LeagueHome` — `StandingsTable` and all —
-    // rather than `WaitingRoom`. Standings has no route of its own (it renders inline on this
-    // same page, `league-home.tsx`'s own `<StandingsTable>`), so this reuses the one navigation
-    // for both surfaces rather than a second, identical page load.
+    // own `/app/leagues/[leagueId]` renders the room's stage rather than `WaitingRoom`. The
+    // collapsed room draws no table any more — standings is a route of its own (law 2, the
+    // drawer at full height) — so the table walk navigates there separately.
     await page.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the room");
+    await page.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/standings`);
     await expect(page.getByRole("table")).toBeVisible();
-    await expectNoHorizontalScroll(page, "league home (standings included)");
+    await expectNoHorizontalScroll(page, "standings at full height");
 
     // --- Phase 3.6, Task 13: a matchup week ------------------------------------------------
     await page.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/matchups/${SEEDED_SEASON_CURRENT_WEEK}`);
@@ -382,8 +382,9 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // accumulation the reuse-if-exists discipline exists to avoid, and this section only READS
     // what that spec already made real. -------------------------------------------------------
     await page.goto(`/app/leagues/${E2E_HELD_TRADE_LEAGUE_ID}/trades`);
-    // `exact`: same reason as the seeded season league's trades visit above.
-    await expect(page.getByRole("heading", { name: "Trades", exact: true })).toBeVisible();
+    // The room's trades route: the week strip's h1 is the league name; the inbox's own
+    // heading is "Your trades" (trade-inbox.tsx), same structure the seeded visit asserts above.
+    await expect(page.getByRole("heading", { name: "Your trades" })).toBeVisible();
     await expect(page.getByText("Your trade is waiting on a fairness review").first()).toBeVisible();
     await expectNoHorizontalScroll(page, "the trades page with a held trade's own banner");
 

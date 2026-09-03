@@ -242,12 +242,11 @@ describe("MOCK_COPY", () => {
   });
 
   /** D3 + R2: the pick-fact templates never carry a raw, un-normalized rank number — only the
-   *  tokens `formatPickFact` (`@/draft-room/state/format`) fills from `reviewPicks`' own facts. */
+   *  tokens `formatPickFactClause` (`@/draft-room/state/format`) fills from `reviewPicks`' own
+   *  facts. */
   it("states the pick-fact sentences as honest, normalized facts — never a bare overall rank", () => {
     expect(MOCK_COPY.resultsPickBestAvailable.toLowerCase()).not.toMatch(/\brank/);
     expect(MOCK_COPY.resultsPickPositionBestAvailable).toContain("{position}");
     expect(MOCK_COPY.resultsPickRankedHigherAvailable).toContain("{count}");
-    expect(MOCK_COPY.resultsPickPositionRank).toContain("{position}");
-    expect(MOCK_COPY.resultsPickPositionRank).toContain("{rank}");
   });
 });

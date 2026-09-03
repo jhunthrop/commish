@@ -76,12 +76,12 @@ describe("HomeLeagueCard", () => {
   // fragment land.
   it("sends a lineup action straight to the editor's own anchor", () => {
     render(<HomeLeagueCard league={{ ...BASE, nextAction: { kind: "set-lineup", label: "Set your lineup" } }} />);
-    expect(screen.getByRole("link", { name: "Set your lineup for Sunday Money" })).toHaveAttribute("href", "/app/leagues/l1#lineup");
+    expect(screen.getByRole("link", { name: "Set your lineup for Sunday Money" })).toHaveAttribute("href", "/app/leagues/l1/team#lineup");
   });
 
   it("sends a fix-lineup action straight to the editor's own anchor too", () => {
     render(<HomeLeagueCard league={{ ...BASE, nextAction: { kind: "fix-lineup", label: "Fix your lineup" } }} />);
-    expect(screen.getByRole("link", { name: "Fix your lineup for Sunday Money" })).toHaveAttribute("href", "/app/leagues/l1#lineup");
+    expect(screen.getByRole("link", { name: "Fix your lineup for Sunday Money" })).toHaveAttribute("href", "/app/leagues/l1/team#lineup");
   });
 
   it("gives a live draft the same loud ring treatment LeagueList (the card this replaced) gave it", () => {

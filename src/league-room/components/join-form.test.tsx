@@ -4,6 +4,7 @@ import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { LeagueTerms } from "@/league";
+import type { LowerThirdCell } from "@/components/ui";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { JoinForm } from "./join-form";
 
@@ -32,6 +33,13 @@ const TERMS: LeagueTerms = {
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
   formatNotes: [],
 };
+
+/** `InviteLanding`'s own strip facts — built once so the signed-in and signed-out renderings
+ *  can never disagree about how many seats are left. */
+const CELLS: readonly LowerThirdCell[] = [
+  { label: "Seats", value: "4 open of 12" },
+  { label: "Drafts", value: TERMS.draftAt },
+];
 
 // Phase 4, Task 13: the live branch, proven through injection — no invite can carry a paid
 // league's terms while `moneyIsLive()` stays false, so this fixture is the only way to exercise
@@ -65,7 +73,7 @@ describe("JoinForm", () => {
   // once regardless of session) — this component's whole surface is the button and the action
   // that follows pressing it.
   it("offers the one real action, named after the league, axe-clean in both themes", async () => {
-    await renderSurface(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} />, async ({ container, getByRole }) => {
+    await renderSurface(<JoinForm code="SUNDAY12" cells={CELLS} terms={TERMS} {...NOOP} />, async ({ container, getByRole }) => {
       expect(getByRole("button", { name: "Join Sunday Money" })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -73,7 +81,7 @@ describe("JoinForm", () => {
 
   it("accepts the invite and sends the new member into the league they just joined", async () => {
     const fixture = fixtureLeagueDeps(undefined, { deferred: true });
-    renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} />, fixture.deps);
+    renderInLeague(<JoinForm code="SUNDAY12" cells={CELLS} terms={TERMS} {...NOOP} />, fixture.deps);
 
     const button = screen.getByRole("button", { name: "Join Sunday Money" });
     fireEvent.click(button);
@@ -89,7 +97,7 @@ describe("JoinForm", () => {
   it("reports already-member upward instead of navigating there itself", async () => {
     const onAlreadyMember = vi.fn();
     const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l1", teamId: "t2", alreadyMember: true } });
-    renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} onAlreadyMember={onAlreadyMember} />, fixture.deps);
+    renderInLeague(<JoinForm code="SUNDAY12" cells={CELLS} terms={TERMS} {...NOOP} onAlreadyMember={onAlreadyMember} />, fixture.deps);
 
     fireEvent.click(screen.getByRole("button", { name: "Join Sunday Money" }));
     await waitFor(() => expect(onAlreadyMember).toHaveBeenCalledWith("l1"));
@@ -99,7 +107,7 @@ describe("JoinForm", () => {
   it("reports league-full upward instead of showing an inline alert for that one refusal", async () => {
     const onLeagueFull = vi.fn();
     const fixture = fixtureLeagueDeps({ ok: false, error: "That league is already full." });
-    renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} onLeagueFull={onLeagueFull} />, fixture.deps);
+    renderInLeague(<JoinForm code="SUNDAY12" cells={CELLS} terms={TERMS} {...NOOP} onLeagueFull={onLeagueFull} />, fixture.deps);
 
     fireEvent.click(screen.getByRole("button", { name: "Join Sunday Money" }));
     await waitFor(() => expect(onLeagueFull).toHaveBeenCalled());
@@ -109,7 +117,7 @@ describe("JoinForm", () => {
   it("reports draft-started upward instead of showing an inline alert for that one refusal", async () => {
     const onDraftStarted = vi.fn();
     const fixture = fixtureLeagueDeps({ ok: false, error: "That league's draft has already started. Try another open league." });
-    renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} onDraftStarted={onDraftStarted} />, fixture.deps);
+    renderInLeague(<JoinForm code="SUNDAY12" cells={CELLS} terms={TERMS} {...NOOP} onDraftStarted={onDraftStarted} />, fixture.deps);
 
     fireEvent.click(screen.getByRole("button", { name: "Join Sunday Money" }));
     await waitFor(() => expect(onDraftStarted).toHaveBeenCalled());
@@ -122,7 +130,7 @@ describe("JoinForm", () => {
       ok: false,
       error: "This league is reserved for newer players so everyone starts on a level footing. Browse the open leagues to find one you can join.",
     });
-    renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} onTierRefused={onTierRefused} />, fixture.deps);
+    renderInLeague(<JoinForm code="SUNDAY12" cells={CELLS} terms={TERMS} {...NOOP} onTierRefused={onTierRefused} />, fixture.deps);
 
     fireEvent.click(screen.getByRole("button", { name: "Join Sunday Money" }));
     await waitFor(() => expect(onTierRefused).toHaveBeenCalled());
@@ -131,7 +139,7 @@ describe("JoinForm", () => {
 
   it("shows an actionable reason for a dead link at accept time, unmatched by any of the four terminal outcomes", async () => {
     const fixture = fixtureLeagueDeps(undefined, { deferred: true });
-    renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} />, fixture.deps);
+    renderInLeague(<JoinForm code="SUNDAY12" cells={CELLS} terms={TERMS} {...NOOP} />, fixture.deps);
 
     const button = screen.getByRole("button", { name: "Join Sunday Money" });
     fireEvent.click(button);
@@ -152,7 +160,7 @@ describe("JoinForm", () => {
       },
       openEventSource: fixtureLeagueDeps().deps.openEventSource,
     };
-    renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} />, deps);
+    renderInLeague(<JoinForm code="SUNDAY12" cells={CELLS} terms={TERMS} {...NOOP} />, deps);
     fireEvent.click(screen.getByRole("button", { name: "Join Sunday Money" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("We could not reach the server."));
   });
@@ -162,14 +170,14 @@ describe("JoinForm", () => {
   // league's terms while `moneyIsLive()` stays false.
   describe("a paid league's join", () => {
     it("renders no confirmation, and never gates the button, for a free join", () => {
-      renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} />, fixtureLeagueDeps().deps);
+      renderInLeague(<JoinForm code="SUNDAY12" cells={CELLS} terms={TERMS} {...NOOP} />, fixtureLeagueDeps().deps);
       expect(screen.queryByLabelText("State of entry")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Join Sunday Money" })).not.toBeDisabled();
     });
 
     it("states the fee, the balance after and the refund rule, and gates Join on a chosen state", () => {
       renderInLeague(
-        <JoinForm code="SUNDAY12" terms={PAID_TERMS} balanceAfterUsd="$70.00" {...NOOP} />,
+        <JoinForm code="SUNDAY12" cells={CELLS} terms={PAID_TERMS} balanceAfterUsd="$70.00" {...NOOP} />,
         fixtureLeagueDeps().deps,
       );
       expect(screen.getByText("This league charges $50.00 to join.")).toBeInTheDocument();
@@ -189,7 +197,7 @@ describe("JoinForm", () => {
         },
         openEventSource: fixtureLeagueDeps().deps.openEventSource,
       };
-      renderInLeague(<JoinForm code="SUNDAY12" terms={PAID_TERMS} balanceAfterUsd="$70.00" {...NOOP} />, deps);
+      renderInLeague(<JoinForm code="SUNDAY12" cells={CELLS} terms={PAID_TERMS} balanceAfterUsd="$70.00" {...NOOP} />, deps);
 
       const button = screen.getByRole("button", { name: "Join Sunday Money" });
       expect(button).toBeDisabled();

@@ -102,7 +102,9 @@ describe("Wire", () => {
     try {
       const { container, getByRole } = render(<Wire items={ITEMS} />);
       expect(container.querySelector(".animate-wire")).toBeNull();
-      expect(container.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
+      // No duplicated hidden LIST under reduced motion. The band's two decorative edge-fade
+      // spans are still aria-hidden chrome, so the assertion targets the list, not every node.
+      expect(container.querySelectorAll('ul[aria-hidden="true"]')).toHaveLength(0);
       const list = getByRole("list", { name: "Recent activity" });
       expect(within(list).getAllByRole("listitem")).toHaveLength(UI_CONFIG.wire.minItems);
       expect(list.textContent).toContain("A seat was claimed in Sunday Money");

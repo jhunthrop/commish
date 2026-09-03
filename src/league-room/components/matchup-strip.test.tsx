@@ -46,8 +46,12 @@ describe("MatchupStrip", () => {
   // The one fact that decides whether a manager cares about somebody else's game at all — a five
   // point lead with three still to play is a different afternoon from the same lead with none.
   it("prints the number of starters still to play across both sides of a row", () => {
+    // Mid-week, not final: `remainingToPlay` reports 0 for a final week on purpose (nobody is
+    // still to play once the week is over), so the marker only exists while games remain.
     const pending = {
       ...MATCHUP,
+      final: false,
+      weekStatus: "in_progress" as const,
       home: { ...MATCHUP.home, starters: MATCHUP.home.starters.map((row) => ({ ...row, points: null })) },
     };
     return renderSurface(<MatchupStrip matchups={[pending]}>{() => null}</MatchupStrip>, async () => {

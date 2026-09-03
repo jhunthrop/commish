@@ -86,43 +86,44 @@ describe("MockLobby", () => {
     calls.length = 0;
   });
 
-  it("shows the empty-lobby invitation when nothing is open, pointing at an honest one-tap stating the defaults", () => {
+  it("shows the quiet one-line empty state when nothing is open, with the honest one-tap in the lower third", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
-    expect(screen.getByText("No mock drafts are open right now.")).toBeInTheDocument();
-    const quickStart = screen.getByTestId("quick-start-open-empty");
+    // The two bordered announcing-an-absence panels died (founder, 2026-08-28, the stadium
+    // pass): one faint line says the one true thing, and the strip at the foot carries the act.
+    expect(screen.getByText("Nothing is drafting right now. Start one and a room opens in seconds.")).toBeInTheDocument();
+    const quickStart = screen.getByTestId("quick-start-primary");
     expect(quickStart).toHaveTextContent("Start a solo mock now, 12 teams, 60s clock");
     expect(quickStart).toHaveAttribute("href", "/app/mock-drafts?create=solo");
   });
 
-  it("always offers the same honest one-tap beside the form, whether or not the lobby is empty", () => {
+  it("swaps the strip's verb for the open room closest to firing, never a second solo one-tap beside it", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} initialOpen={[OPEN_ROOM]} />, fixture.deps);
-    expect(screen.getByTestId("quick-start-primary")).toHaveTextContent("Start a solo mock now, 12 teams, 60s clock");
+    // Law 6: only one of the strip's three acts ever renders. With a joinable room open, the
+    // verb is Take a seat, and the solo quick-start does not render anywhere.
+    expect(screen.getByRole("button", { name: "Take a seat" })).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-start-primary")).not.toBeInTheDocument();
+    expect(screen.queryByText("Start a solo mock now, 12 teams, 60s clock")).not.toBeInTheDocument();
   });
 
   /**
-   * TASK 13'S LOBBY HALF (the fun pass). The room list was hairline-separated rows, which is the
-   * shape for a column you READ down. A lobby is the other thing: a manager compares three rooms'
-   * sizes, clocks and countdowns against each other and then joins one — exactly what rule 4's
-   * amended test permits a card for (*act on or compare = card; read down a column = row*).
-   *
-   * `interactive` is the half that answers the founder's complaint rather than the rule. A shelf
-   * you are meant to compare and then act on, which never acknowledges the pointer, is part of
-   * why the product read as a page of terms.
+   * SUNDAY v5 undid the fun pass's card here: a ranked list of near-identical rooms is a thing
+   * you read DOWN (the founder's own storefront ruling), so an open room is a timing-tower row
+   * again — hairline-topped, position numeral, hover response on the row surface.
    */
-  it("draws an open room as a card that answers the pointer, not a row you read down", () => {
+  it("draws an open room as a hairline timing-tower row that still answers the pointer", () => {
     const fixture = fixtureLeagueDeps();
     const { container } = renderInLeague(<MockLobby {...baseProps()} initialOpen={[OPEN_ROOM]} />, fixture.deps);
 
     const row = container.querySelector("li");
     expect(row).not.toBeNull();
-    // A card, not a hairline row: the old idiom's top border is gone and a real surface is under it.
-    expect(row!.className).not.toContain("border-t");
-    expect(row!.className).toContain("bg-surface-elevated");
-    // The depth response rule 4's amendment actually buys.
-    expect(row!.className).toMatch(/hover:/);
-    // The card never becomes the control — Join is still its own button (rule 5 holds here; the
+    // A hairline row, not a bordered card.
+    expect(row!.className).toContain("border-t");
+    expect(row!.className).toContain("border-line");
+    // The pointer response lives on the row's own surface.
+    expect(row!.firstElementChild?.className).toMatch(/hover:bg-surface-elevated/);
+    // The row never becomes the control — Join is still its own button (rule 5 holds here; the
     // lobby is audited by e2e/page-audit.spec.ts and is not the draft room's named exception).
     expect(row!.getAttribute("role")).toBeNull();
     expect(row!.getAttribute("tabindex")).toBeNull();
@@ -147,11 +148,14 @@ describe("MockLobby", () => {
     expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
   });
 
-  it("caps the one-tap at two placements when both lists are empty — the brand-new account never sees three (review MEDIUM)", () => {
+  it("shows exactly one one-tap when both lists are empty — the lower third's, never a second copy (law 6)", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
+    // The per-panel one-taps (quick-start-open-empty / quick-start-history-empty) died with the
+    // empty panels themselves; the strip at the foot carries the page's single loud action.
     expect(screen.getByTestId("quick-start-primary")).toBeInTheDocument();
-    expect(screen.getByTestId("quick-start-open-empty")).toBeInTheDocument();
+    expect(screen.getAllByText("Start a solo mock now, 12 teams, 60s clock")).toHaveLength(1);
+    expect(screen.queryByTestId("quick-start-open-empty")).not.toBeInTheDocument();
     expect(screen.queryByTestId("quick-start-history-empty")).not.toBeInTheDocument();
   });
 
@@ -160,7 +164,6 @@ describe("MockLobby", () => {
     renderInLeague(<MockLobby {...baseProps()} initialOpen={[OPEN_ROOM]} />, fixture.deps);
     expect(screen.getByText("10 teams · 60s clock")).toBeInTheDocument();
     expect(screen.getByText("7 of 10 seated")).toBeInTheDocument();
-    expect(screen.getByTestId("quick-start-history-empty")).toHaveTextContent("Start a solo mock now, 12 teams, 60s clock");
     expect(screen.getByText("You have no mock drafts yet.")).toBeInTheDocument();
   });
 
@@ -168,11 +171,14 @@ describe("MockLobby", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} initialMine={[MINE_ROOM]} />, fixture.deps);
     // Gameday split the row's one sentence in two: the team NAME on its own baseline, and the
-    // data clauses under it in mono, where a history's columns line up as the eye runs down.
-    expect(screen.getByText("Mock Squad")).toBeInTheDocument();
+    // data clauses under it in mono. The name and "Drafting now" each appear TWICE — once in
+    // the history row, once in the lower third's drafting-now cell, which points back into the
+    // same room with its own verb.
+    expect(screen.getAllByText("Mock Squad")).toHaveLength(2);
     expect(screen.getByText("Solo · 8 teams · 30s · under a minute ago")).toBeInTheDocument();
-    expect(screen.getByText("Drafting now")).toBeInTheDocument();
+    expect(screen.getAllByText("Drafting now").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Continue" })).toHaveAttribute("href", "/app/drafts/d2");
+    expect(screen.getByRole("link", { name: "Back to your draft" })).toHaveAttribute("href", "/app/drafts/d2");
     expect(screen.getByText("1 mock draft")).toBeInTheDocument();
   });
 

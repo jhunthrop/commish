@@ -9,12 +9,13 @@ import type { NoticeView } from "@/account-room/contract";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
+import { RoomSurfaceActivity } from "@/league-room/components/room-surface-activity";
 import type { ActivityRow } from "@/integrity/activity-view";
 import { noLongerHeldExplanationFor } from "@/integrity/queue-view";
 import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
-import { DRAFT_SCHEDULE, HOME, LINEUP, PUBLIC_LEAGUES, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { DRAFT_SCHEDULE, PUBLIC_LEAGUES, ROOM_DATA, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
 import { AttentionQueue, attentionQueueItemsFrom } from "@/league-room/components/attention-queue";
 import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
 import { FirstRunPanel } from "@/league-room/components/first-run-panel";
@@ -22,7 +23,7 @@ import { firstRunPlan } from "@/identity";
 import { WaitingRoom, type WaitingRoomLeague } from "@/league-room/components/waiting-room";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
 import { LeagueBoard } from "@/league-room/components/league-board";
-import { LeagueHome } from "@/league-room/components/league-home";
+import { RoomShell } from "@/league-room/components/room-shell";
 import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
 import { LiveStatePill } from "@/league-room/components/live-state-pill";
 import { ModerationSummary } from "@/league-room/components/moderation-summary";
@@ -190,6 +191,10 @@ describe("NoticeInbox says nothing that breaks the house copy rules", () => {
  * the persona panel's FIX-5 privacy statement, which is the single most carefully worded string on
  * the surface and was covered by no sweep at all.
  */
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/app/leagues/l1",
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
+}));
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn(), requireAdmin: vi.fn() }));
 vi.mock("@/lib/leagues/membership", () => ({ resolveLeagueMembership: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
@@ -214,43 +219,15 @@ vi.mock("next/navigation", async (importOriginal) => {
   return { ...actual, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/app/leagues/league_1" };
 });
 
-describe("the league activity page says nothing that breaks the house copy rules", () => {
-  it("is clean with and without a platform-action band", async () => {
-    const { requireCurrentUser } = await import("@/lib/auth/current-user");
-    const { resolveLeagueMembership } = await import("@/lib/leagues/membership");
-    const { leagueNameFor } = await import("@/draft-service/teams");
-    const { listLeagueActivity } = await import("@/integrity-service/activity");
-    const { listNotices } = await import("@/integrity-service/notify");
-    const { default: LeagueActivityPage } = await import("@/app/app/(shell)/leagues/[leagueId]/activity/page");
-
-    vi.mocked(requireCurrentUser).mockResolvedValue({
-      id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner", avatarUrl: null,
-      createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false,
-    });
-    vi.mocked(resolveLeagueMembership).mockResolvedValue({
-      ok: true,
-      membership: { leagueId: "league_1", teamId: "team_1", isCommissioner: false, authority: { kind: "member", userId: "someone_else" } },
-    });
-    vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
-    vi.mocked(listLeagueActivity).mockResolvedValue({ rows: [ROW], nextBefore: null });
-
+describe("the activity surface says nothing that breaks the house copy rules", () => {
+  it("is clean with and without a platform-action band", () => {
     for (const notices of [
       [],
-      [{
-        id: "n1", userId: "u1", leagueId: "league_1", noticeType: "draft_auto_picked" as const,
-        title: NOTICE.title, body: NOTICE.body, context: {}, auditEventId: "evt_1",
-        createdAt: NOTICE.createdAt, readAt: null,
-      }],
+      [{ id: "n1", title: NOTICE.title, body: NOTICE.body, quote: null }],
     ]) {
-      vi.mocked(listNotices).mockResolvedValue({ notices, unreadCount: notices.length });
-      const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
-      const page = await LeagueActivityPage({ params: Promise.resolve({ leagueId: "league_1" }), searchParams: Promise.resolve({}) });
       const { container, unmount } = render(
-        <AccountRoomDepsProvider deps={fixture.deps}>
-          <NoticesProvider>{page}</NoticesProvider>
-        </AccountRoomDepsProvider>,
+        <RoomSurfaceActivity leagueId="league_1" rows={[ROW]} nextBefore={null} notices={notices} />,
       );
-      await screen.findByText("League activity");
       expectClean(container, NOTICE.title, NOTICE.body, ROW.headline, ROW.detail ?? "");
       unmount();
     }
@@ -1129,13 +1106,13 @@ describe("WaitingRoom says nothing that breaks the house copy rules, across its 
   });
 });
 
-describe("LeagueHome says nothing that breaks the house copy rules, including every composed date it renders", () => {
+describe("RoomShell says nothing that breaks the house copy rules, including every composed line it renders", () => {
   it("is clean for the commissioner and for an ordinary member", async () => {
-    for (const home of [HOME, { ...HOME, isCommissioner: false }]) {
+    for (const home of [ROOM_DATA.home, { ...ROOM_DATA.home, isCommissioner: false }]) {
       const { container, unmount } = render(
         <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
           <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
-            <LeagueHome home={home} lineup={LINEUP} />
+            <RoomShell data={{ ...ROOM_DATA, home }} initialSurface={null} playoffTeams={6} holdExpired={false} />
           </LeagueRoomDepsProvider>
         </ChatRoomDepsProvider>,
       );
@@ -1146,15 +1123,8 @@ describe("LeagueHome says nothing that breaks the house copy rules, including ev
         home.terms.commissionerName,
         ...home.teams.map((team) => team.name),
         ...home.teams.map((team) => team.ownerDisplayName),
-        // NOT_STARTED_DASH, subtracted for the same reason a league's own name is: it is DATA
-        // handed to the surface, not copy the surface wrote. Gameday's week band renders the
-        // shared `Scoreboard`, whose projected-final slot has no number to print — no weekly
-        // per-player projection reaches the league layer — so it prints the product's one glyph
-        // for "there is no number yet". `game-state-chip.tsx`'s own docblock is where that ruling
-        // lives: *"the em-dash here is DATA, not copy — the product's no-em-dashes-in-prose rule
-        // is about sentences a manager reads, and this is the absence of a number in a numeric
-        // column."* The rule engine is untouched and every SENTENCE on this page is still swept;
-        // what is excluded is two characters standing where two numbers will stand.
+        // The absence-of-a-number glyphs data columns print (`game-state-chip.tsx`'s ruling):
+        // data, not copy, exactly as the old LeagueHome sweep subtracted them.
         NOT_STARTED_DASH,
         NOT_STARTED_DASH,
       );
@@ -1227,7 +1197,8 @@ describe("ReviewFeed says nothing that breaks the house copy rules, verified bad
         <ReviewFeed initialPage={verifiedPage} emptyAction={<span>Write the first review</span>} />
       </AccountRoomDepsProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "What is a verified reviewer?" }));
+    // The badge's InfoTip left with the UX-explains-itself purge; the badge itself remains and
+    // its copy is swept below.
     expectClean(container, VERIFIED_REVIEW.body, VERIFIED_REVIEW.authorName);
   });
 });

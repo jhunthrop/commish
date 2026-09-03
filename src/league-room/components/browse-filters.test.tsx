@@ -47,14 +47,16 @@ describe("BrowseFilters", () => {
     });
   });
 
-  it("dresses the active control as an ink-bordered quiet pill — never a filled one (Task 6 restyle)", async () => {
+  it("dresses the active control as the rail's one amber-filled segment — the quiet ones stay muted (Sunday v5)", async () => {
     await renderSurface(<BrowseFilters active="soonest" />, () => {
+      // The row is a segmented rail now: one joined strip, selected segment filled with the
+      // accent (law 4 — a filter row is furniture), the others muted text with no fill.
       const active = screen.getByRole("link", { name: "Drafting soonest" });
-      expect(active.className).toContain("border-text-primary");
-      expect(active.className).not.toContain("bg-surface-elevated");
+      expect(active.className).toContain("bg-accent");
+      expect(active.className).toContain("text-accent-text");
       const quiet = screen.getByRole("link", { name: "All" });
-      expect(quiet.className).toContain("border-line");
-      expect(quiet.className).not.toContain("bg-surface-elevated");
+      expect(quiet.className).toContain("text-text-muted");
+      expect(quiet.className).not.toContain("bg-accent");
     });
   });
 

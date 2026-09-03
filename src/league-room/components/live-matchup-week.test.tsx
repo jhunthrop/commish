@@ -40,17 +40,21 @@ describe("LiveMatchupWeek", () => {
     renderInLeague(<LiveMatchupWeek leagueId="l1" body={WEEK_BODY} />, fixture.deps);
     expect(screen.getByText("10.50")).toBeInTheDocument();
     expect(screen.getByText("8.75")).toBeInTheDocument();
-    expect(screen.getByText("Live")).toBeInTheDocument();
+    // "Live" appears both as the hero's status marker and in the lower third's Week cell —
+    // the point here is that the live state is on screen at all before any frame arrives.
+    expect(screen.getAllByText("Live").length).toBeGreaterThan(0);
   });
 
-  // E1(a)+(c), as Gameday splits them: the margin belongs to the caller's own matchup (`t1`,
-  // home, "You", leading 10.50 to 8.75) and the games-final count is a WEEK-WIDE fact stated once
-  // in the week band above every panel, never appended to six identical sentences.
-  it("prints the margin on the caller's own matchup and the games-final count once for the week", () => {
+  // E1(a)+(c), as law 6 rehomed them: the margin is a signed delta in the lower third's "Your
+  // margin" cell (the prose sentence "You are up 1.75." is gone), and the games-final count is a
+  // WEEK-WIDE fact stated once in the strip's "Games final" cell, never per panel.
+  it("prints the margin as a delta and the games-final count once, in the lower third", () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: WEEK_BODY });
     renderInLeague(<LiveMatchupWeek leagueId="l1" body={WEEK_BODY} />, fixture.deps);
-    expect(screen.getByText("You are up 1.75.")).toBeInTheDocument();
-    expect(screen.getAllByText("3 of 8 games final")).toHaveLength(1);
+    expect(screen.getByText("Your margin")).toBeInTheDocument();
+    expect(screen.getByText("+1.75")).toBeInTheDocument();
+    expect(screen.getAllByText("Games final")).toHaveLength(1);
+    expect(screen.getAllByText("3/8")).toHaveLength(1);
   });
 
   // E3: one honest sentence for the whole page while the week is still mid-games, never repeated
@@ -71,7 +75,7 @@ describe("LiveMatchupWeek", () => {
         scores: [{ teamId: "t1", points: 30 }, { teamId: "t2", points: 22 }],
       }),
     );
-    await waitFor(() => expect(screen.getByText("Final")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Final").length).toBeGreaterThan(0));
     expect(screen.queryByText(/They are not final/)).not.toBeInTheDocument();
   });
 
@@ -93,7 +97,7 @@ describe("LiveMatchupWeek", () => {
   it("updates the badge when a frame moves the week to final", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: WEEK_BODY });
     renderInLeague(<LiveMatchupWeek leagueId="l1" body={WEEK_BODY} />, fixture.deps);
-    expect(screen.getByText("Live")).toBeInTheDocument();
+    expect(screen.getAllByText("Live").length).toBeGreaterThan(0);
 
     act(() =>
       fixture.emit("score.update", {
@@ -101,7 +105,7 @@ describe("LiveMatchupWeek", () => {
         scores: [{ teamId: "t1", points: 30 }, { teamId: "t2", points: 22 }],
       }),
     );
-    await waitFor(() => expect(screen.getByText("Final")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Final").length).toBeGreaterThan(0));
     expect(screen.queryByText("Live")).not.toBeInTheDocument();
   });
 });

@@ -300,9 +300,11 @@ test("every v2 surface clears axe's color-contrast rule, in both themes", async 
   await managerA.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`);
   await expect(managerA.getByRole("heading", { level: 1 })).toBeVisible();
   await assertContrastClean(managerA, "league home");
-  // Standings has no route of its own — it renders inline on league home (`league-home.tsx`'s
-  // own `<StandingsTable>`) — so this scopes the SAME page's axe scan to its `<table>` rather
-  // than re-navigating to re-scan the whole page under a second name.
+  // Standings is a route of its own now (law 2: the drawer at full height IS the route), so
+  // the table's scan navigates there and scopes to the `<table>` the surface really renders —
+  // the collapsed room itself no longer draws one.
+  await managerA.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/standings`);
+  await expect(managerA.getByRole("table")).toBeVisible();
   await assertContrastClean(managerA, "standings", "table");
 
   await managerA.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/matchups/${SEEDED_SEASON_CURRENT_WEEK}`);

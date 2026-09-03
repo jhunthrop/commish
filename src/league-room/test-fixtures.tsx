@@ -4,7 +4,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import type { LeagueTerms } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import type { DraftScheduleBody, LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
+import type { DraftScheduleBody, LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, RoomData, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
 
 /** Server rank order (wins, then points for, then team id) — never re-derived in a test. */
@@ -137,7 +137,7 @@ export const DRAFT_SCHEDULE: DraftScheduleBody = {
   missedDraft: false,
 };
 
-/** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
+/** Everything the room reads off one league: a commissioner, mid-season, drafted, `t1` up this week. */
 export const HOME: LeagueHomeBody = {
   leagueId: "l1",
   name: "Sunday Money",
@@ -160,6 +160,44 @@ export const HOME: LeagueHomeBody = {
   draftSchedule: DRAFT_SCHEDULE,
   justSeated: false,
   compositionCategory: "open",
+};
+
+/** Everything `RoomShell` needs, built from the fixtures above: mid-season, drafted, the week
+ *  final (the resting room), one bench quarterback, no open trades and no filed claims. A test
+ *  that wants another stage overrides `home.weekStatus`/`trades`/the lineup. */
+export const ROOM_DATA: RoomData = {
+  home: HOME,
+  lineup: LINEUP,
+  week: {
+    leagueId: "l1",
+    weekNumber: 3,
+    totalWeeks: 14,
+    myTeamId: "t1",
+    matchups: [MATCHUP],
+    weekStatus: "final",
+    gamesFinal: 16,
+    gamesTotal: 16,
+  },
+  projectionsByPlayerId: new Map([
+    ["qb1", 21.4],
+    ["rb1", 15.8],
+    ["qb2", 9.1],
+  ]),
+  fixturesByNflTeam: new Map([["BUF", { opp: "vs MIA", when: "Sun 1:00p", status: "scheduled" }]]),
+  byeWeeksByNflTeam: new Map([["BUF", 12]]),
+  trades: null,
+  pendingClaims: [],
+  activityRows: [],
+  activityNextBefore: null,
+  activityNotices: [],
+  tradeContext: {
+    weekNumber: 3,
+    myTeamId: "t1",
+    counterparties: [{ teamId: "t2", teamName: "Iron Owls" }],
+    rostersByTeamId: {},
+    leagueName: "Sunday Money",
+  },
+  helpLevel: "standard",
 };
 
 /** Three managers, an open seat implied by `teamCount`, and `t1`'s owner running the league —

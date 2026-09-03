@@ -26,7 +26,7 @@ describe("LeagueTermsPanel", () => {
   it("names the league, its format, size, scoring, roster, stake, draft time and commissioner, in both themes, axe-clean", async () => {
     await renderSurface(<LeagueTermsPanel terms={TERMS} />, async ({ container }) => {
       expect(screen.getByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
-      expect(screen.getByText("Snake")).toBeInTheDocument();
+      expect(screen.getByText("Snake draft")).toBeInTheDocument();
       // F17: converged onto SeatMeter's own sentence, not this panel's own "N of N managers".
       expect(screen.getByText("8 of 12 seated")).toBeInTheDocument();
       expect(screen.getByText("PPR")).toBeInTheDocument();
@@ -39,33 +39,27 @@ describe("LeagueTermsPanel", () => {
     });
   });
 
-  it("gives format and scoring their own InfoTip", () => {
+  // Sunday v5 (founder ruling 2026-08-28, "the UX should explain itself — we shouldn't need
+  // tips"): format used to read "Snake" beside a trigger defining "snake draft" — the noun is
+  // now the whole word, and it carries no InfoTip at all.
+  it("carries no InfoTip on format, scoring or stake — the words explain themselves", () => {
     render(<LeagueTermsPanel terms={TERMS} />);
-    expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is PPR?" })).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByText("Snake draft")).toBeInTheDocument();
   });
 
-  // A15: the "stake-tier" glossary term's InfoTip caller.
-  it("gives Stake its own InfoTip", () => {
-    render(<LeagueTermsPanel terms={TERMS} />);
-    expect(screen.getByRole("button", { name: "What is a stake tier?" })).toBeInTheDocument();
-  });
-
-  it("leaves Standard scoring untipped — it is already plain English", () => {
+  // Scoring: "change the word", not "delete the definition" — a rule sentence prints beside
+  // every label this map has ever produced, "Standard" included, rather than the old InfoTip.
+  it("prints the scoring rule itself as a plain sentence, Standard included", () => {
     render(<LeagueTermsPanel terms={{ ...TERMS, scoringLabel: "Standard" }} />);
     expect(screen.getByText("Standard")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "What is Standard?" })).not.toBeInTheDocument();
+    expect(screen.getByText("no points for catches")).toBeInTheDocument();
   });
 
-  it("renders the auction format with its own InfoTip too", () => {
+  it("renders the auction format as its own whole word, with no InfoTip either", () => {
     render(<LeagueTermsPanel terms={{ ...TERMS, format: "auction" }} />);
-    expect(screen.getByText("Auction")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is an auction draft?" })).toBeInTheDocument();
-  });
-
-  it("opens an InfoTip's definition inline for a guided reader", () => {
-    render(<LeagueTermsPanel terms={TERMS} helpLevel="guided" />);
-    expect(screen.getAllByText(/snake back and forth/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Auction draft")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   // Veteran persona review, fix round 1: this is a real-money decision, so the money fact
