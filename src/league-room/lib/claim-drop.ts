@@ -42,7 +42,10 @@ export function rankDropCandidates(
       const aProjection = a.projection ?? 0;
       const bProjection = b.projection ?? 0;
       if (aProjection !== bProjection) return aProjection - bProjection;
-      // Later (or missing) ADP is the lesser player, dropped first.
-      return (b.adp ?? Number.POSITIVE_INFINITY) - (a.adp ?? Number.POSITIVE_INFINITY);
+      // Later (or missing) ADP is the lesser player, dropped first. Presence compared before
+      // arithmetic: Infinity - Infinity is NaN, and NaN in a comparator makes the sort order
+      // engine-defined — two undrafted players tie honestly instead.
+      if (a.adp === null || b.adp === null) return (a.adp === null ? 0 : 1) - (b.adp === null ? 0 : 1);
+      return b.adp - a.adp;
     });
 }

@@ -57,6 +57,15 @@ describe("rankDropCandidates", () => {
     expect(ranked[0]?.playerId).toBe("p4");
   });
 
+  it("orders two undrafted players ahead of a drafted one on a projection tie, never NaN-shuffled", () => {
+    const mixed = [bench("p1", "Drafted Guy", 90, 0), bench("p2", "Undrafted A", null, 1), bench("p3", "Undrafted B", null, 2)];
+    const ranked = rankDropCandidates(mixed, new Map());
+    // Both undrafted players lead (dropped first); the drafted player is last. A NaN in the
+    // comparator would make this order engine-defined rather than stable.
+    expect(ranked.map((candidate) => candidate.playerId).slice(0, 2).sort()).toEqual(["p2", "p3"]);
+    expect(ranked[2]?.playerId).toBe("p1");
+  });
+
   it("skips empty bench slots", () => {
     const withEmpty: readonly LineupSlotView[] = [
       ...BENCH,
