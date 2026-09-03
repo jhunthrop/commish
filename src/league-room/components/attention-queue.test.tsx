@@ -28,6 +28,7 @@ const BASE_LEAGUE: HomeLeagueCard = {
   startTrigger: null,
   kickoffRolls: 0,
   myTeamName: "Bay Bandits Team",
+  myRank: null,
 };
 
 const lineupUnset: readonly HomeLeagueCard[] = [BASE_LEAGUE];

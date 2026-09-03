@@ -140,6 +140,7 @@ export async function crossLeagueHome(
     readonly nameById: ReadonlyMap<string, string>;
     readonly mine: (typeof allMatchups)[number] | undefined;
     readonly record: { readonly wins: number; readonly losses: number; readonly ties: number } | null;
+    readonly myRank: number | null;
   }
 
   const phaseByLeague = new Map<string, LeaguePhase>();
@@ -157,9 +158,13 @@ export async function crossLeagueHome(
       matchups: leagueMatchups,
       medianByWeek: medianByWeekByLeague.get(league.id),
     });
-    const myStanding = myTeamId === null ? undefined : standings.find((row) => row.teamId === myTeamId);
+    // The INDEX, not just the row: `computeStandings` returns rows sorted by record, so the
+    // caller's place in the league is the same lookup as their record — the rail's "3rd of 12"
+    // state line (2026-09-03) reads it at zero extra cost.
+    const myStandingIndex = myTeamId === null ? -1 : standings.findIndex((row) => row.teamId === myTeamId);
+    const myStanding = myStandingIndex === -1 ? undefined : standings[myStandingIndex];
     const record = myStanding === undefined ? null : { wins: myStanding.wins, losses: myStanding.losses, ties: myStanding.ties };
-    phaseByLeague.set(league.id, { currentWeek, myTeamId, nameById, mine, record });
+    phaseByLeague.set(league.id, { currentWeek, myTeamId, nameById, mine, record, myRank: myStanding === undefined ? null : myStandingIndex + 1 });
   }
 
   // Always non-empty: `leagueRows.length === 0` already returned above, and the loop just above
@@ -245,6 +250,7 @@ export async function crossLeagueHome(
       startTrigger: draft?.startTrigger ?? null,
       kickoffRolls: draft?.kickoffRolls ?? 0,
       myTeamName: phase.myTeamId === null ? null : (phase.nameById.get(phase.myTeamId) ?? null),
+      myRank: phase.myRank,
       nextAction: nextAction({
         isCommissioner: isCommissionerOf(league, userId),
         filledTeams,

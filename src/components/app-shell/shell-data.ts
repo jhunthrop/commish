@@ -1,42 +1,49 @@
 import type { Db } from "@/db/client";
 import type { Clock } from "@/domain/timing";
-import type { NextActionKind, WeekStatus } from "@/league";
 import { crossLeagueHome } from "@/league-service";
 import type { LiveState as HomeLiveState } from "@/league-room/contract";
+import { monogramsFor } from "@/components/ui/monogram";
+import {
+  needsYouKindFor,
+  orderByUrgency,
+  railStateFor,
+  railStateLine,
+  type RailLeagueState,
+} from "@/league-room/lib/rail-line";
 
 /**
- * The rail's own three-way read of a league, derived from `nextAction.kind` and the current
- * week's status — nothing else (Step 3). `"needs-you"` is exactly `"fix-lineup"` or
- * `"join-draft"` (Task 10, Step 1b, F1): the two kinds that mean "you are the reason this league
- * is stalled, and the platform can say so honestly" — before `fix-lineup` existed, the rail had
- * no truthful way to say "your lineup" beyond "join-draft", so it claimed only that one kind. A
- * `needs-you` dot with no honest sentence behind it is worse than no dot at all. `"live"` is a
- * league whose current week is `in_progress`, independent of `nextAction` entirely. Everything
- * else, including "no action at all", is `"quiet"`.
+ * The rail's three-way read of a league (needs-you / live / quiet) lives in
+ * `@/league-room/lib/rail-line` now (the rail redesign, 2026-09-03) — one pure module the shell
+ * read, the flyout's live upgrade and the `/app` full-page rows all share, so the three sizes of
+ * one component can never disagree. Re-exported here so `AppShellProps`/`LeagueRail` callers
+ * that only know this module keep working.
  */
-export type RailLeagueState = "needs-you" | "live" | "quiet";
+export type { RailLeagueState };
 
 /**
- * One league as the rail renders it: 40px tiles, never more data than a tile needs. The tile's
- * MARK is not carried here: `Crest` derives it from the name it is handed (`shortNameFor`,
- * `@/components/ui/crest`), because five separate rules for one small mark is how the same league
- * came to read "O1" in the rail and "OP" beside its own heading (founder, 2026-08-27). Nothing is
- * stored either way, so a renamed league can never carry a stale initial and there is no column to
- * migrate (ruling 10). The tile's tone is not carried here at all: `Crest` (`@/components/ui/crest`) derives it deterministically from `id` itself
- * (`crestTone`, Phase 3.6, Task 3), so there is no second value that could ever disagree with it.
+ * One league as the rail renders it, in every size (2026-09-03): the chip needs `monogram` and
+ * `state`; the flyout row adds `name` and `stateLine`. Ordered by urgency already — needs-you
+ * first, live second, quiet after the divider — so no renderer re-sorts.
  *
- * `needsYouKind` is `state`'s own kind-aware sibling: `state === "needs-you"` collapses TWO
- * distinct facts (`"fix-lineup"` and `"join-draft"`) into one bucket for the dot's color, and a
- * dot alone cannot say which — `league-rail.tsx`'s accessible name reads this field to pick the
- * right sentence (`NEXT_ACTION_COPY["fix-lineup"]` vs `["join-draft"]`), never a hardcoded map
- * that can only ever mean one of the two (fix round 1, H1). `null` whenever `state !== "needs-
- * you"` — there is nothing to disambiguate outside that one state.
+ * `monogram` is LAW 1's collision-resolved mark (`monogramsFor`, `@/components/ui/monogram`),
+ * assigned over the leagues in the read's own stable order (`myLeaguesOverview`: `createdAt`
+ * asc) BEFORE the urgency sort, so a league's mark never changes just because its urgency did.
+ * The chip's ground color stays `Crest`'s own `crestTone(id)` — nothing here carries a tone.
+ *
+ * `stateLine` is the SHELL TIER of `railStateLine` (`@/league-room/lib/rail-line`): every rung a
+ * real read, and a live league degrades to "Live now" because this read deliberately skips the
+ * score cache — the flyout upgrades live rows itself, from `/api/home`, only when it is open.
+ *
+ * `needsYouKind` keeps its original job (fix round 1, H1): `state === "needs-you"` collapses two
+ * distinct facts and the accessible name has to say which.
  */
 export interface RailLeague {
   readonly id: string;
   readonly name: string;
   readonly state: RailLeagueState;
   readonly needsYouKind: "fix-lineup" | "join-draft" | null;
+  readonly monogram: string;
+  readonly stateLine: string;
 }
 
 /**
@@ -53,36 +60,28 @@ export interface ShellData {
   readonly liveState: HomeLiveState | null;
 }
 
-function stateFor(kind: NextActionKind | undefined, weekStatus: WeekStatus): RailLeagueState {
-  if (kind === "join-draft" || kind === "fix-lineup") return "needs-you";
-  if (weekStatus === "in_progress") return "live";
-  return "quiet";
-}
-
-/** Which of the two needs-you kinds `kind` is, or `null` — `RailLeague.needsYouKind`'s own
- *  derivation, kept as a named function so `stateFor` and this can never independently disagree
- *  about which kinds count as needs-you (fix round 1, H1). */
-function needsYouKindFor(kind: NextActionKind | undefined): "fix-lineup" | "join-draft" | null {
-  return kind === "fix-lineup" || kind === "join-draft" ? kind : null;
-}
-
 /**
  * The rail's data, once: `{ rail, liveState }` in one round trip, built on the reads
- * `crossLeagueHome` already performs (Step 3) — this function issues no query of its own.
- * Called exactly once per navigation, by `src/app/app/(shell)/layout.tsx` (ruling 8, as
- * amended); nothing else reads the rail twice. `liveState` (Task 10, Step 3) is `home.liveState`
- * verbatim — `crossLeagueHome` is the one place that computes it, from the `stat_weeks` rows it
- * already reads, so this never derives a second, potentially-disagreeing answer. `clock` rides
- * straight through to `crossLeagueHome`'s own `CrossLeagueHomeDeps.clock` — optional, defaulting
- * to the real one, injectable only so a test can pin the weekday `liveStateFor` reads.
+ * `crossLeagueHome` already performs — this function issues no query of its own, and it passes
+ * NO score cache on purpose (the rail redesign's own scope rule: the shell renders on every
+ * signed-in page, so its read stays the 8 grouped queries, and live margins are the flyout's
+ * lazy fetch, never the shell's). Called exactly once per navigation, by
+ * `src/app/app/(shell)/layout.tsx` (ruling 8, as amended); nothing else reads the rail twice.
+ * `liveState` is `home.liveState` verbatim. `clock` rides straight through to
+ * `crossLeagueHome`'s own `CrossLeagueHomeDeps.clock` — optional, defaulting to the real one,
+ * injectable only so a test can pin the weekday `liveStateFor` reads.
  */
 export async function shellData(db: Db, user: { readonly id: string }, clock?: Clock): Promise<ShellData> {
   const home = await crossLeagueHome(db, user.id, { clock });
-  const rail: readonly RailLeague[] = home.leagues.map((league) => ({
+  // Marks first, over the stable createdAt order the read returns — then the urgency sort.
+  const monogramByLeague = new Map(monogramsFor(home.leagues.map((league) => league.name)).map((mark, index) => [home.leagues[index]!.id, mark]));
+  const rail: readonly RailLeague[] = orderByUrgency(home.leagues).map((league) => ({
     id: league.id,
     name: league.name,
-    state: stateFor(league.nextAction?.kind, league.weekStatus),
+    state: railStateFor(league.nextAction?.kind, league.weekStatus),
     needsYouKind: needsYouKindFor(league.nextAction?.kind),
+    monogram: monogramByLeague.get(league.id)!,
+    stateLine: railStateLine(league, "shell"),
   }));
   return { rail, liveState: home.liveState };
 }

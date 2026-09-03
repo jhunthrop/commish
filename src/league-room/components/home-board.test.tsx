@@ -37,6 +37,7 @@ const SCHEDULED_CARD: HomeBody["leagues"][number] = {
   startTrigger: null,
   kickoffRolls: 0,
   myTeamName: "Sunday Money Team",
+  myRank: null,
 };
 
 const LIVE_CARD: HomeBody["leagues"][number] = {

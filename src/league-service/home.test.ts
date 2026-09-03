@@ -225,6 +225,26 @@ describe("crossLeagueHome", () => {
     });
   });
 
+  // The rail redesign (2026-09-03): a quiet league's state line reads "2nd of 2", so the rank
+  // rides the SAME standings pass `record` already comes from — never a second derivation.
+  it("myRank is this manager's place in the standings the record already reads", async () => {
+    await seedLeague({
+      leagueId: "lgRank",
+      commissionerUserId: "u1",
+      teamCount: 2,
+      teams: [{ teamId: "r_t1", userId: "u1", name: "Bay Bandits" }, { teamId: "r_t2", userId: "u2", name: "Iron Owls" }],
+    });
+    // My team loses both settled weeks: unambiguously last.
+    await seedMatchup("lgRank", 1, "r_t1", "r_t2", 10, 30);
+    await seedMatchup("lgRank", 2, "r_t2", "r_t1", 40, 20);
+
+    const mine = await crossLeagueHome(db, "u1");
+    expect(mine.leagues.find((league) => league.id === "lgRank")?.myRank).toBe(2);
+    // The other manager, same read, opposite seat: first of two.
+    const theirs = await crossLeagueHome(db, "u2");
+    expect(theirs.leagues.find((league) => league.id === "lgRank")?.myRank).toBe(1);
+  });
+
   it("a live week's score comes from the cache", async () => {
     await seedLeague({
       leagueId: "lgLive",
@@ -397,7 +417,7 @@ describe("crossLeagueHome", () => {
 
     const result = await crossLeagueHome(stubDb, "u1");
     const phantom = result.leagues.find((league) => league.id === "lg_phantom");
-    expect(phantom).toMatchObject({ myTeamId: null, filledTeams: 0, draftId: null, draftStatus: null, record: null });
+    expect(phantom).toMatchObject({ myTeamId: null, filledTeams: 0, draftId: null, draftStatus: null, record: null, myRank: null });
   });
 
   // Phase 3.6, Task 10, Step 1b (F1).

@@ -286,6 +286,15 @@ export interface HomeLeagueCard extends LeagueSummary {
    *  pre-draft hero's inlined `checklistItems` (`./waiting-room.tsx`) reads this for its "Name
    *  your team" row, the same fact `WaitingRoom` itself reads from its own `teams` prop. */
   readonly myTeamName: string | null;
+  /**
+   * This manager's place in the league right now, 1-based, out of the SAME `computeStandings`
+   * pass `crossLeagueHome` already runs per league for `record` — zero new queries (the rail
+   * redesign, 2026-09-03: a quiet league's state line reads "3rd of 12", and law 4 forbids
+   * inventing it). The "of 12" half is `filledTeams`: standings rows and team rows are the same
+   * set by construction. `null` exactly when `record` is `null` — a caller with no team here
+   * has no place to report.
+   */
+  readonly myRank: number | null;
 }
 
 /**

@@ -64,6 +64,7 @@ const ONE_LEAGUE = {
       startTrigger: null,
       kickoffRolls: 0,
       myTeamName: "Bay Bandits Team",
+      myRank: null,
     },
   ],
   liveState: null,

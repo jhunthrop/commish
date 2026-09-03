@@ -28,6 +28,7 @@ const BASE: HomeLeagueCardData = {
   startTrigger: null,
   kickoffRolls: 0,
   myTeamName: "Bay Bandits Team",
+  myRank: null,
 };
 
 describe("HomeLeagueCard", () => {

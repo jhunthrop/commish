@@ -19,10 +19,10 @@ function mockPathname(next: string): void {
 }
 
 const RAIL: readonly RailLeague[] = [
-  { id: "lg_bandits", name: "Bay Bandits", state: "quiet", needsYouKind: null },
+  { id: "lg_bandits", name: "Bay Bandits", state: "quiet", needsYouKind: null, monogram: "XX", stateLine: "A line" },
   // "needs-you" can be either "join-draft" or "fix-lineup" (Task 10 Step 1b, F1) —
   // `needsYouKind` is what tells `LeagueRail` which sentence to say.
-  { id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "join-draft" },
+  { id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "join-draft", monogram: "XX", stateLine: "A line" },
 ];
 
 function baseProps(): AppShellProps {
@@ -128,7 +128,7 @@ describe("AppShell", () => {
     mockPathname("/app");
     const props: AppShellProps = {
       ...baseProps(),
-      rail: [{ id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "fix-lineup" }],
+      rail: [{ id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "fix-lineup", monogram: "XX", stateLine: "A line" }],
     };
     const { getByRole, queryByRole } = renderShell(props);
     expect(getByRole("link", { name: "Volt Kings. Fix your lineup." })).toBeInTheDocument();

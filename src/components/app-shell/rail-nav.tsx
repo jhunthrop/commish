@@ -34,6 +34,10 @@ export function RailNav({ className = "" }: { readonly className?: string }) {
   const pathname = usePathname();
 
   const activeOf = (destination: RailDestination): boolean => {
+    // `usePathname()` is typed non-null but genuinely returns null outside a route context
+    // (jsdom tests render this bar directly) — the same `?.` guard `LeagueRail` has always
+    // carried; a bar with no pathname simply marks nothing as here.
+    if (pathname === null) return false;
     if (destination.href === "/app") {
       return pathname === "/app" || (destination.also ?? []).some((prefix) => pathname.startsWith(prefix));
     }

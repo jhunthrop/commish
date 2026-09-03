@@ -27,6 +27,7 @@ const BASE: HomeLeagueCard = {
   startTrigger: null,
   kickoffRolls: 0,
   myTeamName: "Bay Bandits Team",
+  myRank: null,
 };
 
 const NEEDS_FIX: HomeLeagueCard = {

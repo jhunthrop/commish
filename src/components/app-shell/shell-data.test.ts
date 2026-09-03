@@ -25,10 +25,10 @@ afterAll(async () => {
  *  `teamCount` defaults to 8 (an ordinary open league); a test that needs `invite-managers`'
  *  unfilled-seat check to never outrank the fact under test passes `1` — a solo, already-full
  *  room — rather than seeding seven more teams it has no other use for. */
-async function seedLeague(name: string, userId: string, teamCount = 8): Promise<string> {
+async function seedLeague(name: string, userId: string, teamCount = 8, at?: string): Promise<string> {
   await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: name }).onConflictDoNothing();
   const created = await createLeague(
-    { db, clock, newId },
+    { db, clock: at === undefined ? clock : { now: () => at }, newId },
     {
       name,
       format: "snake",
@@ -129,5 +129,76 @@ describe("shellData", () => {
     expect(rail).toHaveLength(1);
     expect(rail[0]!.state).toBe("needs-you");
     expect(rail[0]!.needsYouKind).toBe("fix-lineup");
+  });
+
+  // ——— The rail redesign (2026-09-03): order, marks, and one line of words per league. ———
+
+  it("orders the rail by urgency — needs-you first, live second, quiet after — not by join order", async () => {
+    // Seeded quiet FIRST (earliest createdAt), then live, then needs-you: join order is the
+    // exact opposite of urgency order, so this can only pass on the comparator's own merits.
+    // The quiet league's draft is still scheduled, and the LIVE league is put on week 2 —
+    // `stat_weeks` is a SHARED calendar, so a live week 1 would read every league as live.
+    const quietId = await seedLeague("Quiet Harbor", "u_order", 8, "2026-08-20T12:00:00.000Z");
+
+    const liveId = await seedLeague("Golden Hawks", "u_order", 8, "2026-08-21T12:00:00.000Z");
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, liveId));
+    const [liveTeam] = await db.select().from(teams).where(eq(teams.leagueId, liveId));
+    await db.insert(users).values({ id: "u_order_rival", email: "u_order_rival@test.local", displayName: "Rival" }).onConflictDoNothing();
+    await db.insert(teams).values({ id: "u_order_rival_team", leagueId: liveId, userId: "u_order_rival", name: "Rival" });
+    await db
+      .insert(matchups)
+      .values({ leagueId: liveId, weekNumber: 1, homeTeamId: liveTeam!.id, awayTeamId: "u_order_rival_team", homeScore: 30, awayScore: 20 });
+    await db.insert(matchups).values({ leagueId: liveId, weekNumber: 2, homeTeamId: liveTeam!.id, awayTeamId: "u_order_rival_team" });
+    await db.insert(statWeeks).values({ week: 2, status: "in_progress" }).onConflictDoNothing();
+
+    const draftingId = await seedLeague("Bay Bandits", "u_order", 8, "2026-08-22T12:00:00.000Z");
+    await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.leagueId, draftingId));
+
+    const { rail } = await shellData(db, { id: "u_order" });
+    expect(rail.map((league) => league.id)).toEqual([draftingId, liveId, quietId]);
+  });
+
+  it("hands colliding leagues unique monograms, assigned in join order — never two identical chips", async () => {
+    await seedLeague("Dire Straits", "u_marks", 8, "2026-08-20T12:00:00.000Z");
+    await seedLeague("Dark Skies", "u_marks", 8, "2026-08-21T12:00:00.000Z");
+
+    const { rail } = await shellData(db, { id: "u_marks" });
+    const byName = new Map(rail.map((league) => [league.name, league.monogram]));
+    // Law 1's stability half: the EARLIER league keeps the preferred form whatever the urgency
+    // order says, because marks are assigned over createdAt order before the sort.
+    expect(byName.get("Dire Straits")).toBe("DS");
+    expect(byName.get("Dark Skies")).toBe("DS2");
+  });
+
+  it("carries one honest state line per league, and degrades a live league to 'Live now' (no score cache in the shell read)", async () => {
+    // needs-you via join-draft: `fix-lineup` needs a scheduled week, and the shared `stat_weeks`
+    // calendar below puts week 1 in progress for every league at once.
+    const draftingId = await seedLeague("Bay Bandits", "u_lines", 8, "2026-08-20T12:00:00.000Z");
+    await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.leagueId, draftingId));
+
+    // The live league sits on week 2 (week 1 settled) so the shared live calendar week cannot
+    // leak into the other two leagues' own week-1 status.
+    const liveId = await seedLeague("Golden Hawks", "u_lines", 8, "2026-08-21T12:00:00.000Z");
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, liveId));
+    const [liveTeam] = await db.select().from(teams).where(eq(teams.leagueId, liveId));
+    await db.insert(users).values({ id: "u_lines_rival", email: "u_lines_rival@test.local", displayName: "Rival" }).onConflictDoNothing();
+    await db.insert(teams).values({ id: "u_lines_rival_team", leagueId: liveId, userId: "u_lines_rival", name: "Rival" });
+    await db
+      .insert(matchups)
+      .values({ leagueId: liveId, weekNumber: 1, homeTeamId: liveTeam!.id, awayTeamId: "u_lines_rival_team", homeScore: 30, awayScore: 20 });
+    await db
+      .insert(matchups)
+      .values({ leagueId: liveId, weekNumber: 2, homeTeamId: liveTeam!.id, awayTeamId: "u_lines_rival_team", homeScore: 84.2, awayScore: 71.6 });
+    await db.insert(statWeeks).values({ week: 2, status: "in_progress" }).onConflictDoNothing();
+
+    const scheduledId = await seedLeague("Thunder Squad", "u_lines", 8, "2026-08-22T12:00:00.000Z");
+
+    const { rail } = await shellData(db, { id: "u_lines" });
+    const byId = new Map(rail.map((league) => [league.id, league.stateLine]));
+    expect(byId.get(draftingId)).toBe("Join the draft");
+    // Degraded honestly: Postgres holds scores, but this read never asked the score cache, so
+    // the shell line refuses the margin rather than quoting a number it cannot vouch for.
+    expect(byId.get(liveId)).toBe("Live now");
+    expect(byId.get(scheduledId)).toMatch(/^Drafts /);
   });
 });

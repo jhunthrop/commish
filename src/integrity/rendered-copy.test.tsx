@@ -1442,6 +1442,7 @@ const SWEEP_LEAGUE: HomeLeagueCard = {
   startTrigger: null,
   kickoffRolls: 0,
   myTeamName: "Sunday Money Team",
+  myRank: null,
 };
 
 describe("LeagueBoard says nothing that breaks the house copy rules", () => {
