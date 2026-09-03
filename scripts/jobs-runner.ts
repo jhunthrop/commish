@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { createDb } from "@/db/client";
 import { JOBS_CONFIG } from "@/jobs/config";
+import { formatErrorForLog } from "@/jobs/execute";
 import { JOB_DEFINITIONS } from "@/jobs/registry";
 import { runTick, type TickReport } from "@/jobs/runner";
 
@@ -55,7 +56,8 @@ async function main(): Promise<void> {
       } catch (error: unknown) {
         // A tick that failed whole (db unreachable mid-restart) is a log line, not a crash: the
         // next tick retries, and launchd's KeepAlive covers the crashes this catch cannot.
-        console.error("[jobs] tick failed", error);
+        // Scrubbed text, never the raw object (its stack and causes bypass a message-only scrub).
+        console.error(`[jobs] tick failed: ${formatErrorForLog(error)}`);
       }
       if (once || state.stopping) break;
       await new Promise((resolve) => setTimeout(resolve, JOBS_CONFIG.localTickIntervalMs));
@@ -67,6 +69,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(error);
+  console.error(formatErrorForLog(error));
   process.exitCode = 1;
 });

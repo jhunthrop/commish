@@ -48,18 +48,60 @@ class AttemptTimeoutError extends Error {
 }
 
 /**
- * Stored error text must never carry a secret. Handlers should already keep env values out of
- * their messages (the odds module's own discipline), but the executor scrubs regardless: any
- * present secret env value is replaced before the text touches a row or a log line. Cheap, and it
- * turns "we believe nothing interpolates the key" into "the store cannot receive it".
+ * Stored and logged error text must never carry a secret. Handlers should already keep env
+ * values out of their messages (the odds module's own discipline), but the executor scrubs
+ * regardless — and by CONVENTION, not by a hand-kept list (fix round, MEDIUM-3: the hand list
+ * had already missed ANTHROPIC_API_KEY): every env var whose NAME matches the secret-shaped
+ * pattern contributes its value, unioned with the five explicit names, so the next secret added
+ * to .env.local is scrubbed the day it exists. Derived per call, so tests plant fakes and
+ * long-lived runners see rotated values.
  */
-const SECRET_ENV_KEYS = ["ODDS_API_KEY", "CRON_SECRET", "DATABASE_URL", "TANK01_API_KEY", "WORKOS_API_KEY"] as const;
+const EXPLICIT_SECRET_KEYS = ["ODDS_API_KEY", "CRON_SECRET", "DATABASE_URL", "TANK01_API_KEY", "WORKOS_API_KEY"] as const;
+const SECRET_NAME_PATTERN = /KEY|SECRET|TOKEN|PASSWORD|DATABASE_URL/;
+/** A matching NAME with a tiny value ("1", "on") would scrub that substring out of every error in
+ *  the system; real credentials are never this short, so short values are left alone. */
+const MIN_SECRET_VALUE_LENGTH = 6;
 
-export function scrubSecrets(text: string): string {
-  return SECRET_ENV_KEYS.reduce((scrubbed, key) => {
-    const value = process.env[key];
-    return value !== undefined && value.length > 0 ? scrubbed.replaceAll(value, `[${key}]`) : scrubbed;
-  }, text);
+type ScrubEnv = Readonly<Record<string, string | undefined>>;
+
+function secretValuesByKey(env: ScrubEnv): readonly (readonly [string, string])[] {
+  const explicit = new Set<string>(EXPLICIT_SECRET_KEYS);
+  return Object.entries(env)
+    .filter((entry): entry is [string, string] => {
+      const [key, value] = entry;
+      if (value === undefined || value.length < MIN_SECRET_VALUE_LENGTH) return false;
+      return explicit.has(key) || SECRET_NAME_PATTERN.test(key);
+    })
+    // Longest value first, so a secret that contains another (DATABASE_URL carrying a password
+    // that is also its own var) is scrubbed whole before its fragment is.
+    .sort((a, b) => b[1].length - a[1].length);
+}
+
+export function scrubSecrets(text: string, env: ScrubEnv = process.env): string {
+  return secretValuesByKey(env).reduce((scrubbed, [key, value]) => scrubbed.replaceAll(value, `[${key}]`), text);
+}
+
+/**
+ * Everything worth logging about an error — message, stack, and the whole cause chain,
+ * recursively — with every secret scrubbed. EVERY console line in the job system that prints an
+ * error goes through this rather than handing the raw object to console.error, because a raw
+ * object's stack and nested causes bypass a message-only scrub.
+ */
+export function formatErrorForLog(error: unknown, env: ScrubEnv = process.env): string {
+  const parts: string[] = [];
+  const seen = new Set<unknown>();
+  const walk = (current: unknown): void => {
+    if (current === undefined || current === null || seen.has(current) || parts.length >= 8) return;
+    seen.add(current);
+    if (current instanceof Error) {
+      parts.push(current.stack ?? `${current.name}: ${current.message}`);
+      walk(current.cause);
+    } else {
+      parts.push(String(current));
+    }
+  };
+  walk(error);
+  return scrubSecrets(parts.join("\ncaused by: "), env);
 }
 
 function errorText(error: unknown): string {
@@ -100,7 +142,7 @@ export async function executeClaimedJob(
 
   const heartbeat = setInterval(() => {
     void recordHeartbeat(deps.db, deps.clock, claimed.jobId).catch((error: unknown) => {
-      console.error(`[jobs] heartbeat failed for job ${claimed.jobId}`, error);
+      console.error(`[jobs] heartbeat failed for job ${claimed.jobId}: ${formatErrorForLog(error)}`);
     });
   }, deps.heartbeatIntervalMs ?? JOBS_CONFIG.heartbeatIntervalMs);
 
@@ -111,7 +153,7 @@ export async function executeClaimedJob(
       definition.runRemainingSteps({ db: deps.db, clock: deps.clock }, claimed.payload, completed, async (step, outcome) => {
         await recordStepCompletion(deps.db, deps.clock, claimed, step, {
           summary: scrubSecrets(outcome.summary),
-          detail: outcome.detail.map(scrubSecrets),
+          detail: outcome.detail.map((line) => scrubSecrets(line)),
         });
       }),
       timeoutMs,

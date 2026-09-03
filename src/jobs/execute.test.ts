@@ -4,7 +4,7 @@ import { jobRuns, jobs } from "@/db/schema";
 import { createTestDb, truncateAll, truncateJobTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
 import { TerminalJobError, defineJob, type AnyJobDefinition, type StepOutcome } from "./contract";
-import { executeClaimedJob, scrubSecrets, type ExecutorDeps } from "./execute";
+import { executeClaimedJob, formatErrorForLog, scrubSecrets, type ExecutorDeps } from "./execute";
 import { JOBS_CONFIG } from "./config";
 import { claimNextJob, completedStepsFor, enqueueJob, reclaimStaleJobs } from "./store";
 
@@ -288,14 +288,46 @@ describe("the reclaim race (fix round, MEDIUM-2)", () => {
 });
 
 describe("scrubSecrets", () => {
-  it("replaces a present secret env value in stored text", () => {
-    const previous = process.env.ODDS_API_KEY;
-    process.env.ODDS_API_KEY = "sk-live-e2e-scrub-test";
-    try {
-      expect(scrubSecrets("GET /odds?apiKey=sk-live-e2e-scrub-test failed")).toBe("GET /odds?apiKey=[ODDS_API_KEY] failed");
-    } finally {
-      if (previous === undefined) delete process.env.ODDS_API_KEY;
-      else process.env.ODDS_API_KEY = previous;
-    }
+  it("replaces an explicit secret env value in stored text", () => {
+    const env = { ODDS_API_KEY: "sk-live-e2e-scrub-test" };
+    expect(scrubSecrets("GET /odds?apiKey=sk-live-e2e-scrub-test failed", env)).toBe("GET /odds?apiKey=[ODDS_API_KEY] failed");
+  });
+
+  it("catches secrets by NAME convention, not only the hand list (the ANTHROPIC_API_KEY lesson)", () => {
+    const env = {
+      ANTHROPIC_API_KEY: "sk-ant-planted-value",
+      SOME_SERVICE_TOKEN: "tok-planted-value",
+      DB_PASSWORD: "hunter2-planted",
+      NODE_ENV: "production", // matching nothing secret-shaped: untouched
+      FEATURE_KEY_ROTATION: "on", // secret-shaped NAME, trivial value: left alone by the length floor
+    };
+    const text = "auth sk-ant-planted-value then tok-planted-value then hunter2-planted while production stayed on";
+    expect(scrubSecrets(text, env)).toBe("auth [ANTHROPIC_API_KEY] then [SOME_SERVICE_TOKEN] then [DB_PASSWORD] while production stayed on");
+  });
+});
+
+describe("formatErrorForLog (fix round, MEDIUM-3)", () => {
+  it("scrubs a planted secret out of the message, the stack, and a nested cause", () => {
+    const env = { PLANTED_TEST_SECRET: "planted-secret-value-123" };
+
+    const root = new Error("connect failed for token planted-secret-value-123");
+    root.stack = `Error: connect failed for token planted-secret-value-123\n    at fetchOdds (planted-secret-value-123/http.ts:1:1)`;
+    const middle = new Error("snapshot aborted", { cause: root });
+    const top = new Error("props step failed", { cause: middle });
+
+    const formatted = formatErrorForLog(top, env);
+    expect(formatted).not.toContain("planted-secret-value-123");
+    expect(formatted).toContain("[PLANTED_TEST_SECRET]");
+    // The whole chain is present: top, middle, and the root's own stack line.
+    expect(formatted).toContain("props step failed");
+    expect(formatted).toContain("snapshot aborted");
+    expect(formatted).toContain("at fetchOdds");
+  });
+
+  it("survives a cause cycle without recursing forever", () => {
+    const a = new Error("a");
+    const b = new Error("b", { cause: a });
+    (a as { cause?: unknown }).cause = b;
+    expect(formatErrorForLog(a, {})).toContain("Error: a");
   });
 });

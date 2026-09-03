@@ -6,6 +6,7 @@ import type { Db } from "@/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import { JOBS_CONFIG } from "./config";
 import type { AnyJobDefinition } from "./contract";
+import { formatErrorForLog } from "./execute";
 import { runTick } from "./runner";
 import { cronSecretFromEnv, isAuthorizedTick, type EnvRecord } from "./tick-auth";
 
@@ -48,7 +49,9 @@ export async function handleTick(request: Request, deps: TickHandlerDeps): Promi
     );
     return ok(report);
   } catch (error: unknown) {
-    console.error("[jobs] tick failed", error);
+    // Scrubbed text, never the raw object: a stack or a nested cause can carry what a message
+    // does not (the same rule the executor's own logging follows).
+    console.error(`[jobs] tick failed: ${formatErrorForLog(error)}`);
     return fail("Tick failed. See the server log.", 500);
   }
 }
