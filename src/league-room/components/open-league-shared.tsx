@@ -10,6 +10,7 @@ import { rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { formatUsd } from "@/money/config";
+import { prizePotCents } from "@/money/prize-table";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 
 /**
@@ -125,6 +126,47 @@ export function stakeBadge(league: PublicLeagueSummary): ReactElement | null {
  */
 export function entryFeeLabel(league: PublicLeagueSummary): string {
   return league.entryFeeCents > 0 ? formatUsd(league.entryFeeCents) : "Free";
+}
+
+/**
+ * The two money sentences the storefront's one money line can render — moved here from
+ * `front-door-hero.tsx` (front door blueprint, 2026-09-02) because the join sheet now needs the
+ * SAME derived sentence, and two hand-typed copies of "free this season" is exactly how one goes
+ * stale the week money goes live. Same `moneyIsLive()` switch, read by every caller through
+ * `moneySentence(live)`.
+ */
+export const FREE_SEASON_SENTENCE = "Every league is free this season.";
+export const LIVE_MONEY_SENTENCE = "Play free everywhere, or play for real money where your state allows.";
+
+export function moneySentence(live: boolean): string {
+  return live ? LIVE_MONEY_SENTENCE : FREE_SEASON_SENTENCE;
+}
+
+/** What a paid league's pot cell says, derived once from the STORED table for every reader. */
+export interface PotFacts {
+  /** The pot the table actually pays — `prizePotCents` of the stored table, `formatUsd`'d. */
+  readonly potUsd: string;
+  /** "pays $300.00 / $200.00 / $100.00" — the split, place order, the join sheet's register. */
+  readonly splitLabel: string;
+  /** "top 3 paid" / "winner takes all" — the row column's compact register. */
+  readonly placesLabel: string;
+}
+
+/**
+ * The pot a league advertises, or `null` when it publishes no prize table — which is every
+ * league while `moneyIsLive()` is dark, and any free league after. Derived from
+ * `PublicLeagueSummary.payoutTable` (the stored `leagues.payout_table`, straight through) and
+ * NEVER from `entryFeeCents * teamCount` recomputed here: what the card promises must be exactly
+ * what settlement pays (`prizePotCents`'s own docblock).
+ */
+export function potFacts(league: PublicLeagueSummary): PotFacts | null {
+  const table = league.payoutTable ?? null;
+  if (table === null || table.length === 0) return null;
+  return {
+    potUsd: formatUsd(prizePotCents(table)),
+    splitLabel: `pays ${table.map((entry) => formatUsd(entry.amountCents)).join(" / ")}`,
+    placesLabel: table.length === 1 ? "winner takes all" : `top ${table.length} paid`,
+  };
 }
 
 /**

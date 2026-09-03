@@ -143,7 +143,7 @@ export default async function Home() {
         <section className="floodlight w-full overflow-hidden">
           <div aria-hidden="true" className="yard-lines" />
           <div className="relative px-4 py-10 sm:px-10 sm:py-14">
-            <FrontDoorHero signedIn={user !== null} featuredLeague={featuredLeague} />
+            <FrontDoorHero />
           </div>
         </section>
 
