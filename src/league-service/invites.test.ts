@@ -594,6 +594,10 @@ describe("invitePreview", () => {
         // `league()` creates with `clock` (`nowIso`, "2026-08-17T12:00:00.000Z"), so the draft
         // is scheduled 7 days out — `LEAGUE_CONFIG.defaults.draftDaysFromCreation`.
         draftAt: "Monday 24 August, 12:00 PM UTC (in 7 days)",
+        // The machine-readable twin of `draftAt` (front-door join sheet, 2026-09-02): present
+        // exactly when the draft time is genuinely chosen, so the viewer's own timezone can be
+        // rendered client-side from the same instant the prose names.
+        draftAtIso: "2026-08-24T12:00:00.000Z",
         // `league()` seeds a plain, standard-shape league — no median game, no superflex.
         formatNotes: [],
       },
