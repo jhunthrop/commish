@@ -5,31 +5,55 @@ Branch: `worktree-draft-room`. Verification cadence per the founder's UX-campaig
 ruling: `tsc` + `eslint` + targeted vitest per task; screenshots and the broader
 suite reconciled at the end. Conventional commits per task.
 
-- [ ] 1. **Byes on the wire.** `byeWeeksByTeam` in
+- [x] 1. **Byes on the wire.** `byeWeeksByTeam` in
       `src/league-service/nfl-schedule.ts` (a team with no `nfl_games` fixture
       in a week 1..18 is on bye), `DraftPlayersBody.byeWeeks?`, set it in
       `GET /api/drafts/[draftId]/players`, thread through `useDraftRoom`.
-- [ ] 2. **Collapse machine.** `quilt/state/collapse.ts` pure reducer + tests
+- [x] 2. **Collapse machine.** `quilt/state/collapse.ts` pure reducer + tests
       (one expanded surface at a time; space/slash/esc transitions).
-- [ ] 3. **Pending pick.** `quilt/state/pending-pick.ts` (window model, clock
+- [x] 3. **Pending pick.** `quilt/state/pending-pick.ts` (window model, clock
       squeeze rule) + `quilt/hooks/use-pending-pick.ts` + tests.
-- [ ] 4. **Cheat sheet.** `quilt/state/sheet.ts` (immutable ops, localStorage
+- [x] 4. **Cheat sheet.** `quilt/state/sheet.ts` (immutable ops, localStorage
       codec, board reconciliation) + `quilt/hooks/use-sheet.ts` + tests.
-- [ ] 5. **Lenses.** `quilt/state/lens.ts` (needs per team, value verdicts,
+- [x] 5. **Lenses.** `quilt/state/lens.ts` (needs per team, value verdicts,
       bye coloring) + tests.
-- [ ] 6. **Quilt board.** `quilt-board.tsx` + `quilt-cell.tsx` + `lens-chips.tsx`;
+- [x] 6. **Quilt board.** `quilt-board.tsx` + `quilt-cell.tsx` + `lens-chips.tsx`;
       compaction rule; cell click opens peek. Component test for compaction +
       lens recolor-not-move.
-- [ ] 7. **Clock strip.** `clock-strip.tsx` slim/expanded states, queue top 3,
+- [x] 7. **Clock strip.** `clock-strip.tsx` slim/expanded states, queue top 3,
       one-tap draft, amber grow motion. Component test for the two states.
-- [ ] 8. **Drawer.** `pool-drawer.tsx` + four tab components; heights; search
+- [x] 8. **Drawer.** `pool-drawer.tsx` + four tab components; heights; search
       and position filters; DRAFT verbs through the pending-pick path.
-- [ ] 9. **Peek, spine, undo pill.** `peek-sheet.tsx`, `roster-spine.tsx`,
+- [x] 9. **Peek, spine, undo pill.** `peek-sheet.tsx`, `roster-spine.tsx`,
       `undo-pill.tsx`.
-- [ ] 10. **Composition.** `quilt-room.tsx` + `use-room-keys.ts`; `SnakeRoom`
+- [x] 10. **Composition.** `quilt-room.tsx` + `use-room-keys.ts`; `SnakeRoom`
       renders it; keep auction on `RoomShell`. Fix `snake-room` tests.
-- [ ] 11. **Mobile.** `mobile-room.tsx` + `mobile-confirm-sheet.tsx`, bottom
+- [x] 11. **Mobile.** `mobile-room.tsx` + `mobile-confirm-sheet.tsx`, bottom
       tabs, two-step pick.
-- [ ] 12. **Reconcile.** Full `tsc` + `eslint` + `vitest run` over
+- [x] 12. **Reconcile.** Full `tsc` + `eslint` + `vitest run` over
       `src/draft-room`; screenshots of resting / your-turn / drawer / peek /
       mobile states into `.superpowers/mocks/screenshots/` if the app can boot.
+
+## Close-out (2026-09-02)
+
+All twelve tasks done. Verification state at close:
+
+- `tsc`: 43 errors, ALL pre-existing stale test files on the deferred UX ledger
+  (`helpLevel`, `formatPickFact`, join/league-room fixtures) — none in production
+  code, none introduced by this branch. Count identical before and after.
+- `eslint`: clean over every touched file.
+- `vitest src/draft-room`: 414 passing. The 8 still-failing files
+  (auction-room, draft-board, mock-results, room-dock, room-rail, tv-board,
+  tiers, format) are the SAME pre-existing stale suites — they assert v4-era
+  DOM (`ring-negative`, `dock-your-turn`) and copy against components this
+  branch never modified, per the founder's tests-deferred ruling.
+- Design source sweeps: the quilt is clean under the accent budget (two earned
+  allowlist entries, reasons recorded in the test), the caps charter
+  (`MICRO_LABEL` throughout) and the weight cap. The 10 remaining sweep
+  failures are pre-existing, in league-room/ui files untouched here.
+- Screenshots: `.superpowers/mocks/screenshots/` (untracked — `.superpowers/`
+  is gitignored, like the mocks themselves): your-turn, drawer-half, peek,
+  undo-pill, mobile-pool, mobile-board. The RESTING desktop state could not be
+  photographed in a solo mock — the bots chain their picks in under a second,
+  so the room is effectively always on the human's clock; the state is covered
+  by component tests (`snake-room.test.tsx`) instead.
