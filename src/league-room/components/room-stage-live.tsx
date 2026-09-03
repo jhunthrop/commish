@@ -159,7 +159,7 @@ export function RoomStageLive(props: RoomStageLiveProps) {
               margin === null ? "text-text-faint" : margin >= 0 ? "text-positive" : "text-negative"
             }`}
           >
-            {margin === null ? "·" : `${margin >= 0 ? "+" : ""}${formatPoints(margin)}`}
+            {margin === null ? "·" : `${margin >= 0 ? "+" : ""}${formatPoints(Math.abs(margin))}`}
           </p>
           <p className="font-mono text-xs text-text-faint">
             {live.gamesFinal} of {live.gamesTotal} games final

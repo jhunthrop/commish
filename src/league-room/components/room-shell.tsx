@@ -211,7 +211,9 @@ export function RoomShell({ data, initialSurface, playoffTeams, holdExpired }: R
       <PlayerPeekHost />
       <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
 
-      <div className="flex min-h-[75vh] flex-col overflow-hidden rounded-lg border border-line bg-surface pb-12 shadow-card md:pb-0">
+      {/* The room is one framed stage: the week strip pins to its top, the chip row to its
+          bottom, and the stage scrolls between them (the mock's own geometry). */}
+      <div className="flex min-h-[75vh] flex-col overflow-hidden rounded-lg border border-line bg-surface pb-12 shadow-card md:pb-0 lg:h-[calc(100vh-7rem)] lg:min-h-0">
         <RoomWeekStrip home={home} attentionCount={attentionCount} gamesLive={gamesLive} />
 
         <div className="flex min-h-0 flex-1">
