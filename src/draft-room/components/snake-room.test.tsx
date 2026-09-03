@@ -65,7 +65,10 @@ describe("SnakeRoom (the quilt)", () => {
         expect(surface.getByTestId("your-next")).toHaveTextContent("YOU PICK 1.02 · NEXT");
         expect(surface.getByTestId("quilt-board")).toBeInTheDocument();
         expect(surface.getByTestId("pool-drawer")).toHaveAttribute("data-drawer-height", "collapsed");
-        expect(surface.getByText("Best available")).toBeInTheDocument();
+        // The tab handles ride the collapsed edge (founder addition 2) — opening is never a
+        // mystery gesture, so the handles and the grabber are visible even at rest.
+        expect(surface.getByTestId("drawer-handles")).toBeInTheDocument();
+        expect(surface.getByTestId("drawer-grabber")).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
@@ -199,7 +202,7 @@ describe("SnakeRoom (the quilt)", () => {
     renderRoom();
     const surface = desktop();
     fireEvent.keyDown(window, { key: " " });
-    fireEvent.click(within(surface.getByTestId("pool-drawer")).getByRole("tab", { name: "MY SHEET" }));
+    fireEvent.click(within(surface.getByTestId("pool-drawer")).getByRole("tab", { name: "My sheet" }));
     const rows = within(surface.getByTestId("pool-drawer")).getAllByTestId("sheet-vs-board");
     expect(rows[0]).toHaveTextContent("you 1 · board 1");
   });

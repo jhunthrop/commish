@@ -23,6 +23,9 @@ export const QUILT_CONFIG = {
   sheetQueueSeedCount: 5,
   /** The half drawer's own height as a fraction of the room, and the full drawer's. */
   drawerHeight: { half: "45dvh", full: "100dvh" },
+  /** The grabber's drag threshold: a pointer that travels less than this is a tap (space's own
+   *  toggle), anything longer is one honest step up or down the heights. */
+  drawerDragThresholdPx: 12,
   /**
    * The quilt's compaction (law 4): the active round renders full cells; this many rounds
    * after it render full-height EMPTY tracks so the eye can see what is coming; everything

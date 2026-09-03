@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@/domain/roster";
-import { needsByTeam, pickValueVerdict, positionNeeds } from "./lens";
+import { needFractions, needsByTeam, pickValueVerdict, positionNeeds } from "./lens";
 
 const filled = (slot: RosterSlot["slot"], slotIndex: number): RosterSlot => ({ slot, slotIndex, playerId: `p-${slot}-${slotIndex}` });
 
@@ -25,6 +25,36 @@ describe("needsByTeam", () => {
     const needs = needsByTeam(STANDARD_ROSTER_SLOTS, { t1: [filled("QB", 0)] }, ["t1", "t2"]);
     expect(needs.get("t1")).toEqual(["RB", "RB", "WR", "WR", "TE"]);
     expect(needs.get("t2")).toEqual(["QB", "RB", "RB", "WR", "WR", "TE"]);
+  });
+});
+
+describe("needFractions", () => {
+  it("states filled over total per dedicated position, in config order, from an empty roster", () => {
+    expect(needFractions(STANDARD_ROSTER_SLOTS, [])).toEqual([
+      { position: "QB", filled: 0, total: 1, satisfied: false },
+      { position: "RB", filled: 0, total: 2, satisfied: false },
+      { position: "WR", filled: 0, total: 2, satisfied: false },
+      { position: "TE", filled: 0, total: 1, satisfied: false },
+    ]);
+  });
+
+  it("counts fills toward the fraction and marks a filled position satisfied", () => {
+    const roster = [filled("QB", 0), filled("RB", 0), filled("FLEX", 0), filled("K", 0)];
+    const fractions = needFractions(STANDARD_ROSTER_SLOTS, roster);
+    expect(fractions.find((fraction) => fraction.position === "QB")).toEqual({ position: "QB", filled: 1, total: 1, satisfied: true });
+    expect(fractions.find((fraction) => fraction.position === "RB")).toEqual({ position: "RB", filled: 1, total: 2, satisfied: false });
+    // FLEX and K never appear — the same scope the NEEDS lens keeps.
+    expect(fractions.map((fraction) => fraction.position)).toEqual(["QB", "RB", "WR", "TE"]);
+  });
+
+  it("caps filled at the starting total: a third RB never reads 3/2", () => {
+    const roster = [filled("RB", 0), filled("RB", 1), filled("RB", 2)];
+    expect(needFractions(STANDARD_ROSTER_SLOTS, roster).find((fraction) => fraction.position === "RB")).toEqual({
+      position: "RB",
+      filled: 2,
+      total: 2,
+      satisfied: true,
+    });
   });
 });
 

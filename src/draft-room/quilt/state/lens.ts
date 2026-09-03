@@ -39,6 +39,36 @@ export function positionNeeds(slotConfig: readonly RosterSlotConfig[], roster: r
   return needs;
 }
 
+/**
+ * One position's Sleeper-grammar fraction for the drawer's filter row: "RB 1/2", "QB 1/1 ✓"
+ * (WarmQuilt mock, the "stolen honestly" ruling). Same scope as `positionNeeds` — the four
+ * dedicated positions a draft is planned around — and derived from the identical roster facts,
+ * so the chips and the NEEDS lens can never disagree.
+ */
+export interface NeedFraction {
+  readonly position: Position;
+  /** Starting-slot copies filled, capped at `total` — a flex-bound third RB never reads 3/2. */
+  readonly filled: number;
+  /** The slot config's starting copies for this position. */
+  readonly total: number;
+  /** True when every starting copy is filled — the chip goes quiet and wears the check. */
+  readonly satisfied: boolean;
+}
+
+/** The filter row's fractions, in the slot config's own order. */
+export function needFractions(slotConfig: readonly RosterSlotConfig[], roster: readonly RosterSlot[]): readonly NeedFraction[] {
+  const filled = new Map<string, number>();
+  for (const slot of roster) filled.set(slot.slot, (filled.get(slot.slot) ?? 0) + 1);
+  const fractions: NeedFraction[] = [];
+  for (const config of slotConfig) {
+    const position = NEED_POSITIONS.find((candidate) => candidate === config.slot);
+    if (position === undefined) continue;
+    const count = Math.min(filled.get(config.slot) ?? 0, config.count);
+    fractions.push({ position, filled: count, total: config.count, satisfied: count >= config.count });
+  }
+  return fractions;
+}
+
 /** teamId → its open position needs, for the whole room in one pass. */
 export function needsByTeam(
   slotConfig: readonly RosterSlotConfig[],

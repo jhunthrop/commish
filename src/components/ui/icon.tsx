@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Anchor,
   Check,
+  ChevronDown,
   ChevronRight,
   Clock,
   Clover,
@@ -32,6 +33,9 @@ export const ICONS = {
   check: Check,
   x: X,
   "chevron-right": ChevronRight,
+  // The quilt's drawer handles and roster toggle (v6 quilt pass) flip a chevron with open
+  // state; `chevron-right` covers the horizontal pair via rotate, this one the vertical pair.
+  "chevron-down": ChevronDown,
   search: Search,
   // `InfoTip`'s trigger glyph — the one place a definition is one click away.
   info: Info,
