@@ -20,9 +20,9 @@ export function POST(request: Request): Promise<Response> {
 
     const result = await rerunJob(getDb(), { now: () => new Date().toISOString() }, parsed.value.jobId);
     if (!result.ok) {
-      return result.reason === "not-found"
-        ? fail("No job with that id.", 404)
-        : fail("That job is still pending or running. Let it finish.", 409);
+      if (result.reason === "not-found") return fail("No job with that id.", 404);
+      if (result.reason === "duplicate-request") return fail("That re-run was already queued a moment ago.", 409);
+      return fail("That job is still pending or running. Let it finish.", 409);
     }
     console.log(`[admin] operator ${operatorUserId} re-ran job ${parsed.value.jobId} as job ${result.newJobId}`);
     return ok({ newJobId: result.newJobId });

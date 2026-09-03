@@ -9,7 +9,7 @@ import { enqueueJob } from "./store";
 
 export type RerunResult =
   | { readonly ok: true; readonly newJobId: number }
-  | { readonly ok: false; readonly reason: "not-found" | "still-active" };
+  | { readonly ok: false; readonly reason: "not-found" | "still-active" | "duplicate-request" };
 
 /**
  * A `pending` or `running` job is refused (`still-active`): it does not need a second copy, it
@@ -30,7 +30,8 @@ export async function rerunJob(db: Db, clock: Clock, jobId: number): Promise<Rer
     maxAttempts: row.maxAttempts,
     runAt: now,
   });
-  // The key carries the instant, so a conflict means the same operator double-clicked within one
-  // clock reading — treat the existing enqueue as the answer either way.
-  return result.jobId === null ? { ok: false, reason: "still-active" } : { ok: true, newJobId: result.jobId };
+  // The key carries the instant, so a conflict here can only mean this exact re-run was already
+  // requested within one clock reading (a double click, a double-submitted form) — named as what
+  // it is rather than folded into "still-active", which described a different situation entirely.
+  return result.jobId === null ? { ok: false, reason: "duplicate-request" } : { ok: true, newJobId: result.jobId };
 }

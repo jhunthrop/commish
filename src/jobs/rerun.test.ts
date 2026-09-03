@@ -54,6 +54,14 @@ describe("rerunJob", () => {
     expect(await rerunJob(db, clock, pending.id)).toEqual({ ok: false, reason: "still-active" });
   });
 
+  it("names a same-instant duplicate re-run for what it is", async () => {
+    const originalId = await deadLetteredJobId();
+    const first = await rerunJob(db, clock, originalId);
+    expect(first.ok).toBe(true);
+    // Same frozen clock reading = same idempotency key: the double click, not "still active".
+    expect(await rerunJob(db, clock, originalId)).toEqual({ ok: false, reason: "duplicate-request" });
+  });
+
   it("reports a missing job as not-found", async () => {
     expect(await rerunJob(db, clock, 999_999)).toEqual({ ok: false, reason: "not-found" });
   });
