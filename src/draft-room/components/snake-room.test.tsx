@@ -166,6 +166,25 @@ describe("SnakeRoom (the quilt)", () => {
     expect(surface.queryByTestId("peek-sheet")).toBeNull();
   });
 
+  it("Esc mid-note saves the words and keeps the peek; the next Esc collapses as always", () => {
+    const picks = [{ pickNumber: 1, round: 1, teamId: "t2", playerId: "qb1", slot: "QB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false }];
+    renderRoom({ view: { ...room.view!, picks, pickNumber: 2, availablePlayerIds: ["rb1", "rb2", "wr1"] } });
+    const surface = desktop();
+    fireEvent.click(surface.getByRole("button", { name: "Jalen Croft, pick 1.01" }));
+    fireEvent.click(within(surface.getByTestId("peek-sheet")).getByRole("button", { name: "Add a note" }));
+    const noteField = surface.getByRole("textbox", { name: "Your note on Jalen Croft" });
+    fireEvent.change(noteField, { target: { value: "late-round stack" } });
+    fireEvent.keyDown(noteField, { key: "Escape" });
+    // Saved and closed the EDITOR, not the peek: the note now reads back on its own button.
+    const peek = surface.getByTestId("peek-sheet");
+    expect(peek).toBeInTheDocument();
+    expect(surface.queryByRole("textbox", { name: "Your note on Jalen Croft" })).toBeNull();
+    expect(within(peek).getByText("late-round stack")).toBeInTheDocument();
+    // With the note closed, Esc means what it always means.
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(surface.queryByTestId("peek-sheet")).toBeNull();
+  });
+
   it("recolors in place under the NEEDS lens: the needs row appears, the rounds stay", () => {
     renderRoom();
     const surface = desktop();

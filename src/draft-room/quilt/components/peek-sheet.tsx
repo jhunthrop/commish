@@ -72,6 +72,11 @@ export function PeekSheet({ facts, view, myTeamId, canDraft, submitting, onDraft
   const { player } = facts;
   const [editingNote, setEditingNote] = useState(false);
   const [draftNote, setDraftNote] = useState(facts.note ?? "");
+
+  const saveNote = (): void => {
+    onNote(player.id, draftNote);
+    setEditingNote(false);
+  };
   const availability = useMemo(() => availabilityOf(facts.reasons), [facts.reasons]);
   const edges = useMemo(() => edgeSummary(facts.reasons), [facts.reasons]);
   const slot = useMemo(() => fillsSlot(view, myTeamId, player), [view, myTeamId, player]);
@@ -147,18 +152,20 @@ export function PeekSheet({ facts, view, myTeamId, canDraft, submitting, onDraft
                 aria-label={`Your note on ${player.name}`}
                 value={draftNote}
                 onChange={(event) => setDraftNote(event.target.value)}
+                // Esc mid-note SAVES and leaves editing — never discards the words, never
+                // collapses the peek (review MEDIUM 4). Stopping propagation is what keeps the
+                // room's own Esc (collapse everything, `use-room-keys`) out of this keystroke;
+                // the next Esc, with the note closed, collapses as always.
+                onKeyDown={(event) => {
+                  if (event.key !== "Escape") return;
+                  event.stopPropagation();
+                  saveNote();
+                }}
                 rows={3}
                 className="rounded-sm border border-edge bg-surface-raised px-3 py-2 text-sm text-text-primary focus-visible:outline-2 focus-visible:outline-accent"
               />
               <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    onNote(player.id, draftNote);
-                    setEditingNote(false);
-                  }}
-                >
+                <Button size="sm" variant="secondary" onClick={saveNote}>
                   Save note
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setEditingNote(false)}>
