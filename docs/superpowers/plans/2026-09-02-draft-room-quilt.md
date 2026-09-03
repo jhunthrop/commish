@@ -57,3 +57,39 @@ All twelve tasks done. Verification state at close:
   photographed in a solo mock — the bots chain their picks in under a second,
   so the room is effectively always on the human's clock; the state is covered
   by component tests (`snake-room.test.tsx`) instead.
+
+## Fix round (2026-09-02, whole-branch review APPROVE-WITH-NOTES)
+
+- [x] HIGH 1 — pick loss on navigation: unmount FLUSHES the pending pick,
+      `beforeunload` earns the native prompt while one pends, `pagehide`
+      flushes with `keepalive: true` on the actions POST (cheap: the option
+      rides the existing fetch init; bodies are tiny). Tests flipped to the
+      flush contract plus beforeunload/pagehide coverage.
+- [x] MEDIUM 2 — swap feedback: `PendingPick.swappedFromPlayerId`; the pill's
+      sub-line reads "swapped from <name>" for the window's remainder. Other
+      DRAFT buttons stay enabled; last word wins.
+- [x] MEDIUM 3 — rejection words: the quilt submits picks through
+      `room.submit` itself and toasts "<name> did not land. <reason> You are
+      still on the clock." at the window's own submit, never the generic act
+      wrapper.
+- [x] MEDIUM 4 — Esc mid-note saves the draft note and exits editing
+      (stopPropagation keeps the room's collapse out of that keystroke); the
+      next Esc collapses as always.
+- [x] LOW 5 — sheet codec dedupes order on decode (first wins) and caps notes
+      at `QUILT_CONFIG.sheetNoteMaxChars`, on decode and on write.
+- [x] DESIGN 6 — the dense card returns from the REAL stores:
+      `GET /api/drafts/[draftId]/players/[playerId]/history`
+      (`playerHistory` in draft-service) reads `player_week_observations`
+      through the league's own scoring, ranks the positional finish over the
+      stored population, respects the derived-season live-admission seam, and
+      the store's `observationsAsOf` gained an additive `playerIds` filter so
+      one card never pays for a league-season. Client: `usePlayerHistory`
+      (lazy, room-lifetime cache shared by both trees) + `PeekHistory`
+      (seasons table + consistency strip; skeleton loading; absence renders
+      nothing). Probed against the dev store: Gibbs answers 2025 RB3, 17
+      weekly bars, 311ms cold.
+
+Test deltas this round: +14 (pending-pick hook/model rewrites and additions,
+swap pill, rejection toast, Esc-saves-note, codec dedupe/cap, store player
+filter, 3 real-store route tests, 5 PeekHistory rendering tests). All targeted
+suites green; the pre-existing stale-ledger failures are unchanged.
