@@ -228,7 +228,10 @@ export function ScheduledDraftValue({
       const [, absolute, relative] = match;
       return (
         <span className={`flex min-w-0 flex-col ${className}`}>
-          <span className="font-medium text-text-primary first-letter:uppercase">{relative}</span>
+          {/* The relative clause renders as the formatter wrote it ("in 2 days") — no styled
+              capitalisation: the caps charter routes every shout through MICRO_LABEL, and this
+              is body prose, not a micro-label. */}
+          <span className="font-medium text-text-primary">{relative}</span>
           <span className="text-xs text-text-faint">{absolute}</span>
         </span>
       );

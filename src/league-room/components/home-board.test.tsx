@@ -206,9 +206,16 @@ describe("HomeBoard", () => {
 
   // Rule 5 / S10 (Task 9): the single-league home has no board and no attention queue to share
   // ink with, so the one card's own action IS the view's one ink action.
-  it("gives the single league's own action the ink pill, since it is the view's only one", () => {
+  it("keeps the single league's card quiet and puts the verb in the lower third (law 6)", () => {
     render(<HomeBoard initial={ONE_LEAGUE} />);
-    expect(screen.getByRole("link", { name: "Set your lineup for Bay Bandits" }).className).toContain("bg-text-primary");
+    // Two controls name the same act: the card's quiet secondary pill, and the lower third's
+    // amber verb. Neither is the old ink pill — law 6 moved the loud action to the strip.
+    const links = screen.getAllByRole("link", { name: "Set your lineup for Bay Bandits" });
+    expect(links).toHaveLength(2);
+    const [cardLink, verbLink] = links;
+    expect(cardLink?.className).toContain("bg-transparent");
+    expect(cardLink?.className).not.toContain("bg-text-primary");
+    expect(verbLink?.className).toContain("bg-accent");
   });
 
   // Step 2b (F18c): a manager whose leagues have all not drafted yet has no games at all — the

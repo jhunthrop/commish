@@ -42,13 +42,13 @@ describe("MatchupPanel", () => {
     expect(screen.queryByText("0.00")).not.toBeInTheDocument();
   });
 
-  // E1(a) (D2/E3, competition review), as Gameday re-sites it: the margin is the hero's own
-  // middle-column line. The games-final clause it used to carry moved up to the week band
-  // (`LiveMatchupWeek`), which states it ONCE — it is a week-wide fact, and six panels printing
-  // "13 of 13 games final" on one screen was six copies of one truth.
-  it("prints the margin from the reader's own seat", () => {
+  // Sunday v5, subtraction: the margin SENTENCE is gone from the hero — the two 84px figures
+  // already say who is ahead, and the delta form ("+14.25") lives in the page's lower third
+  // (`LiveMatchupWeek`), not in this panel. The panel must never grow the sentence back.
+  it("prints no margin sentence — the delta lives in the lower third, not the hero", () => {
     render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
-    expect(screen.getByText("You are up 14.25.")).toBeInTheDocument();
+    expect(screen.queryByText(/You are up/)).not.toBeInTheDocument();
+    expect(screen.getByText("112.50")).toBeInTheDocument();
   });
 
   // Phase 2 Plan B: live scoring EXISTS. This case used to assert the opposite, and it was
@@ -115,10 +115,13 @@ describe("MatchupPanel", () => {
     expect(screen.getByText(/Iron Owls scored 98.25/)).toBeInTheDocument();
   });
 
-  // A15: the "matchup" glossary term's InfoTip caller.
-  it("carries an InfoTip on its own Matchup eyebrow", () => {
+  // NO TIPS (founder ruling, 2026-08-28): the eyebrow used to carry the "matchup" glossary
+  // InfoTip. Two crests, two records and two 84px scores under the word "Matchup" define the
+  // term better than a tip paragraph did, so the eyebrow is plain text and no tip button exists.
+  it("renders a plain Matchup eyebrow with no glossary tip button", () => {
     render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
-    expect(screen.getByRole("button", { name: "What is a matchup?" })).toBeInTheDocument();
+    expect(screen.getByText("Matchup")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "What is a matchup?" })).not.toBeInTheDocument();
   });
 
   // Step 3c: the last two `Table` consumers to converge dense (the other is `budget-table.tsx`,

@@ -173,8 +173,8 @@ describe("SlotPreferencePanel", () => {
     };
     renderInLeague(<SlotPreferencePanel leagueId="league_1" initialPreference={{ slotCount: 2, ranking: [1], assignedSlot: null, canEdit: true }} />, fixture.deps);
 
-    await user.tab();
-    expect(screen.getByRole("button", { name: "What is a draft slot?" })).toHaveFocus();
+    // NO TIPS (founder ruling, 2026-08-28): the "What is a draft slot?" glossary trigger is
+    // gone, so the first tab stop is the first real control.
     await user.tab();
     expect(screen.getByRole("button", { name: "Move slot 1 up" })).toHaveFocus();
     await user.tab();

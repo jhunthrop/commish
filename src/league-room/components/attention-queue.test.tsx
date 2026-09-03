@@ -69,7 +69,7 @@ describe("AttentionQueue", () => {
 
   it("sends a fix-lineup chip to the lineup editor's own anchor", () => {
     render(<AttentionQueue items={itemsFor(lineupUnset)} />);
-    expect(screen.getByRole("link", { name: "Fix your lineup for Bay Bandits" })).toHaveAttribute("href", "/app/leagues/l1#lineup");
+    expect(screen.getByRole("link", { name: "Fix your lineup for Bay Bandits" })).toHaveAttribute("href", "/app/leagues/l1/team#lineup");
   });
 
   it("is axe-clean with items, in both themes", async () => {

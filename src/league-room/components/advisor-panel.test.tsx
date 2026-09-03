@@ -22,7 +22,9 @@ describe("AdvisorPanel", () => {
         <AdvisorPanel leagueId="l1" weekNumber={4} />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
-        expect(screen.getByText("Advice only. You make the move.")).toBeInTheDocument();
+        // The aside ("Advice only. You make the move.") died in the 2026-08-30 scan pass; the
+        // eyebrow heading and the single quiet button carry the whole identity now.
+        expect(screen.getByRole("heading", { name: "Lineup advisor" })).toBeInTheDocument();
         expect(screen.getByLabelText("Ask about your lineup")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Get advice" })).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();

@@ -32,9 +32,10 @@ describe("ActivityFeed", () => {
       const times = document.querySelectorAll("time");
       expect(times).toHaveLength(2);
       expect(times[0]).toHaveAttribute("dateTime", NEWEST.occurredAt);
-      // "Readable" means a locale-formatted date and time, not the raw ISO string a screen
-      // reader would have to spell out digit by digit.
-      expect(times[0]?.textContent).toBe(new Date(NEWEST.occurredAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }));
+      // "Readable" means a locale-formatted clock, not the raw ISO string a screen reader would
+      // have to spell out digit by digit. The DATE lives in the day band above the rows now
+      // (law 5), so the row keeps only the time of day.
+      expect(times[0]?.textContent).toBe(new Date(NEWEST.occurredAt).toLocaleTimeString(undefined, { timeStyle: "short" }));
 
       expect(screen.getByText(NEWEST.detail!)).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
@@ -73,13 +74,13 @@ describe("ActivityFeed", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(rows.length);
   });
 
-  // Fix round 1, FIX 4: the first-timer's question — "clock" is the icon ONLY the
-  // clock-ran-out-so-we-drafted-from-your-queue branch uses (`renderDraftPick`,
-  // `src/integrity/activity-view.ts`), so it is the one reliable signal for wiring the glossary
-  // term in without re-parsing the headline string.
-  it("offers the queue glossary term beside a clock-icon row, and not beside a human pick", () => {
+  // NO TIPS (founder ruling, 2026-08-28): the clock-icon row used to carry a "queue" glossary
+  // trigger. The headline sentence itself ("…from their queue") now carries the definition, so
+  // the feed must render that sentence plainly and offer NO tip button at all.
+  it("renders the clock-icon auto-pick as plain prose with no glossary tip button", () => {
     const auto: ActivityRow = { ...NEWEST, eventId: "e3", icon: "clock", headline: "The clock ran out, so Bay Bandits drafted Bijan Robinson from their queue." };
     render(<ActivityFeed rows={[auto, NEWEST]} leagueId="league_1" nextBefore={null} />);
-    expect(screen.getAllByRole("button", { name: "What is your draft queue?" })).toHaveLength(1);
+    expect(screen.getByText(auto.headline)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

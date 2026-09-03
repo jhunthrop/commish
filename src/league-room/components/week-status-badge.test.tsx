@@ -19,13 +19,14 @@ describe("WeekStatusBadge", () => {
     });
   });
 
-  it("says an in-progress week is in progress, with the live pill's tinted ring, in both themes, axe-clean", async () => {
+  it("says an in-progress week is live, in the live channel's own ink, in both themes, axe-clean", async () => {
     await renderSurface(<WeekStatusBadge status="in_progress" />, async ({ container }) => {
       expect(screen.getByText("Live")).toBeInTheDocument();
-      // Live wears the red family now (competition review D1): rule 1's own color for the
-      // one genuinely live fact a league week has.
-      expect(screen.getByText("Live").className).toMatch(/ring-negative/);
-      expect(screen.getByText("Live").className).toMatch(/text-negative/);
+      // Sunday v5's channel split: `live` is its own ink now, never the negative red, and the
+      // live state is a LiveMarker (dot beside the word) rather than a ringed pill.
+      expect(screen.getByText("Live").className).toMatch(/text-live/);
+      expect(screen.getByText("Live").className).not.toMatch(/ring-/);
+      expect(screen.getByText("Live").className).not.toMatch(/negative/);
       expect(await axe(container)).toHaveNoViolations();
     });
   });

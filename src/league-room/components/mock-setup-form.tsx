@@ -213,7 +213,11 @@ export function MockSetupForm({
                 onClick={() => setDraftSlot(option.value)}
                 className={`min-w-9 rounded-md border px-2 py-1.5 font-display text-sm font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                   draftSlot === option.value
-                    ? "border-accent bg-accent text-accent-text"
+                    ? // Accent BORDER and INK, never the fill: the amber fill belongs to the
+                      // sanctioned primitives alone (`accent-budget.source.test.ts`), and a
+                      // hand-rolled pill does not earn it — the outlined accent still separates
+                      // the pressed pill in both themes.
+                      "border-accent text-accent"
                     : "border-line text-text-muted hover:text-text-primary"
                 }`}
               >

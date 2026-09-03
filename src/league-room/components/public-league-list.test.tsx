@@ -148,17 +148,24 @@ const rows = () => screen.getByTestId("league-rows");
 const cards = () => screen.getByTestId("league-cards");
 
 describe("OpenLeagueShelf", () => {
-  it("renders the merged shelf twice, house first in both: rows for lg+ viewports, cards below lg (E3 + Task 13)", async () => {
+  it("renders the merged shelf twice: rows ranked by seats remaining for lg+, house-first cards below lg (E3 + Task 13)", async () => {
     await renderSurface(
       <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />,
       async ({ container }) => {
         for (const rendering of [rows(), cards()]) {
           const items = within(rendering).getAllByRole("listitem");
           expect(items).toHaveLength(1 + PUBLIC_LEAGUES.length);
-          expect(items[0]!.textContent).toContain(HOUSE_LEAGUE.name);
           expect(within(rendering).getByText("Rookie Snake Room")).toBeInTheDocument();
           expect(within(rendering).getByText("Sharks Only Auction")).toBeInTheDocument();
         }
+        // The rows board is RANKED — one axis, seats remaining ascending (house-first ordering
+        // died with the ranking): Sharks Only Auction has 1 seat left, the house league 7,
+        // Rookie Snake Room 9.
+        const rowItems = within(rows()).getAllByRole("listitem");
+        expect(rowItems[0]!.textContent).toContain("Sharks Only Auction");
+        expect(rowItems[1]!.textContent).toContain(HOUSE_LEAGUE.name);
+        // The card grid keeps house first — it is the form with no rank column to say otherwise.
+        expect(within(cards()).getAllByRole("listitem")[0]!.textContent).toContain(HOUSE_LEAGUE.name);
         expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
@@ -198,12 +205,14 @@ describe("OpenLeagueShelf", () => {
     render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />);
     for (const item of within(rows()).getAllByRole("listitem")) {
       expect(item.className).toContain("border-t");
-      expect(item.className).toContain("border-line");
+      // Filling rows spell the hairline as `border-hair border-t-line`, fresh rows as
+      // `border-line` — both are the same line-colored top hairline, and neither is a box.
+      expect(item.className).toMatch(/border-t-line|border-line/);
     }
-    // The header is the rows rendering's first element; "Entry" also exists per row as each
-    // cell's own sr-only key, so the column names are asserted inside the header alone.
+    // The header is the rows rendering's first element. The ranked board added a "#" rank
+    // column and dropped the "Entry" column (the stake lives on each row's own badge now).
     const header = rows().firstElementChild as HTMLElement;
-    for (const label of ["League", "Format", "Drafts", "Entry", "Seats"]) {
+    for (const label of ["#", "League", "Format", "Drafts", "Seats"]) {
       expect(within(header).getByText(label)).toBeInTheDocument();
     }
   });

@@ -103,9 +103,11 @@ describe("TradeInbox", () => {
     renderInLeague(<TradeInbox leagueId="l1" context={CONTEXT} />, fixture.deps);
     await fixture.settle(0, { ok: true, data: page });
 
-    expect(await screen.findByRole("region", { name: "Offers to answer" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Offers you have out" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Trade history" })).toBeInTheDocument();
+    // The bands wear their consequence markers now (ChapterBand restyle): who is expected to
+    // act, not a filing-cabinet noun.
+    expect(await screen.findByRole("region", { name: "Needs your answer" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Waiting on them" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Settled" })).toBeInTheDocument();
   });
 
   // Fix round 1, F4: the verdict is asked for, never fetched on mount — a mount fires exactly

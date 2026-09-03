@@ -4,5 +4,5 @@
  *  tab loop, 2026-08-30). */
 export function DesignationChip({ designation }: { readonly designation: string | null | undefined }) {
   if (designation === null || designation === undefined) return null;
-  return <span className="rounded-sm bg-negative px-1 py-0.5 font-mono text-xs font-bold leading-none text-negative-text">{designation}</span>;
+  return <span className="rounded-sm bg-negative px-1 py-0.5 font-mono text-xs font-semibold leading-none text-negative-text">{designation}</span>;
 }

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { TeamStandingsRow } from "../contract";
 import { Avatar, Button, EmptyState, Movement, Table, type TableColumn } from "@/components/ui";
+import { MICRO_LABEL } from "@/components/ui/config";
 import { formatPoints, formatRecord } from "../lib/format";
 
 
@@ -229,7 +230,7 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="flex flex-col gap-1.5 rounded-md border border-line bg-surface-elevated px-3 py-2.5">
-              <span className="text-xs uppercase tracking-wide text-text-faint">First-round byes</span>
+              <span className={`${MICRO_LABEL} text-text-faint`}>First-round byes</span>
               {[rows[0], rows[1]].map((row, index) =>
                 row === undefined ? null : (
                   <span key={row.teamId} className="flex items-baseline gap-2 text-base text-text-primary">
@@ -244,7 +245,7 @@ export function StandingsTable({ rows, myTeamId, medianGame = false, playoffTeam
               { label: "4 vs 5", pair: [rows[3], rows[4]] as const, seeds: [4, 5] as const },
             ].map((game) => (
               <div key={game.label} className="flex flex-col gap-1.5 rounded-md border border-line bg-surface-elevated px-3 py-2.5">
-                <span className="text-xs uppercase tracking-wide text-text-faint">{game.label}</span>
+                <span className={`${MICRO_LABEL} text-text-faint`}>{game.label}</span>
                 {game.pair.map((row, index) =>
                   row === undefined ? null : (
                     <span key={row.teamId} className="flex items-baseline gap-2 text-base text-text-primary">

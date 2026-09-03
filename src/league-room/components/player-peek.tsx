@@ -117,7 +117,7 @@ export function PlayerPeekHost() {
                       is the one fact a manager checks before anything else. Absent = the feed
                       does not name him, and nothing prints. */}
                   {body.injuryDesignation === null ? null : (
-                    <span className="rounded-sm bg-negative px-1.5 py-0.5 font-mono text-sm font-bold text-negative-text">{body.injuryDesignation}</span>
+                    <span className="rounded-sm bg-negative px-1.5 py-0.5 font-mono text-sm font-semibold text-negative-text">{body.injuryDesignation}</span>
                   )}
                 </div>
                 <p className="text-sm text-text-muted">{body.ownedBy === null ? "Free agent in this league" : `On ${body.ownedBy}`}</p>

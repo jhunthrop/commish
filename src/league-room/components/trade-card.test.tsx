@@ -108,8 +108,10 @@ describe("TradeCard", () => {
     vi.setSystemTime(new Date("2026-08-20T23:59:59.000Z")); // one second left
 
     render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} />);
-    expect(screen.getByText("Needs your answer")).toBeInTheDocument();
+    // The "Needs your answer" badge left the card (Sunday v5 subtraction — the inbox band above
+    // says it once); the answer controls themselves are what must survive to the last second.
     expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Decline" })).toBeInTheDocument();
   });
 });
 
