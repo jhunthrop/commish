@@ -119,8 +119,10 @@ describe("AuctionRoom", () => {
         minBid: 6,
       }),
     );
-    // The lot has exactly one home now: the rail. The dock becomes the bid console.
-    await waitFor(() => expect(screen.getByTestId("room-rail")).toHaveTextContent("Jalen Croft · $5"));
+    // Sunday v5 law 6: the turn moved off the rail into the dock's lower third — the rail keeps
+    // only "Lot N"; the live bid's player and price are the dock's "Live bid" cell now.
+    await waitFor(() => expect(screen.getByTestId("room-dock")).toHaveTextContent("Jalen Croft"));
+    expect(screen.getByTestId("room-dock")).toHaveTextContent("$5");
     expect(screen.getByTestId("room-dock")).toHaveAttribute("data-mode", "bidding");
     expect(screen.getByTestId("bid-console")).toBeInTheDocument();
 
@@ -134,7 +136,8 @@ describe("AuctionRoom", () => {
         minBid: 13,
       }),
     );
-    await waitFor(() => expect(screen.getByTestId("room-rail")).toHaveTextContent("Jalen Croft · $12"));
+    await waitFor(() => expect(screen.getByTestId("room-dock")).toHaveTextContent("$12"));
+    // The sr-only sentence lives in the dock now too, alongside the visible cell.
     expect(screen.getByText("Bidding is open on Jalen Croft. High bid $12 by Iron Owls.")).toBeInTheDocument();
   });
 
@@ -162,7 +165,7 @@ describe("AuctionRoom", () => {
       }),
     );
 
-    await waitFor(() => expect(screen.getByTestId("room-rail")).toHaveTextContent("Jalen Croft · $31"));
+    await waitFor(() => expect(screen.getByTestId("room-dock")).toHaveTextContent("$31"));
     expect(fixture.calls.filter((call) => call === "GET /api/drafts/d1")).toHaveLength(before + 1);
   });
 
