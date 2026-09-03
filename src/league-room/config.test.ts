@@ -17,11 +17,14 @@ describe("LEAGUE_ROOM_CONFIG", () => {
       // have been worse. Named here so this list reads as a deletion with a destination rather
       // than as a tunable somebody dropped.
     ];
-    expect(Object.keys(LEAGUE_ROOM_CONFIG).sort()).toEqual([...keys].sort());
+    // `mockTableStorageKey` is the one non-numeric tunable (a storage address, not a quantity)
+    // — listed by name so the exact-keys assertion still catches an unreviewed addition.
+    expect(Object.keys(LEAGUE_ROOM_CONFIG).sort()).toEqual([...keys, "mockTableStorageKey"].sort());
     for (const key of keys) {
       expect(Number.isFinite(LEAGUE_ROOM_CONFIG[key])).toBe(true);
       expect(LEAGUE_ROOM_CONFIG[key]).toBeGreaterThan(0);
     }
+    expect(LEAGUE_ROOM_CONFIG.mockTableStorageKey.length).toBeGreaterThan(0);
   });
 
   it("pins the attention queue's cap at the founder-ruled three", () => {

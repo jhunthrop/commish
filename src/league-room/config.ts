@@ -44,4 +44,11 @@ export const LEAGUE_ROOM_CONFIG = {
    * this is what the FOLD shows before asking).
    */
   mockHistoryVisibleCount: 8,
+  /**
+   * The remembered mock table's localStorage key (law 1 of the mock-drafts workflow pass:
+   * "your last table is remembered"). Browser persistence by the cheat sheet's own precedent
+   * (`QUILT_CONFIG.sheetStorageKeyPrefix`) — see `./lib/mock-table.ts` for the codec that
+   * validates whatever this key holds before trusting it.
+   */
+  mockTableStorageKey: "commish.mock-table",
 } as const;
