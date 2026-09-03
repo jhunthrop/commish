@@ -58,8 +58,10 @@ class AttemptTimeoutError extends Error {
  */
 const EXPLICIT_SECRET_KEYS = ["ODDS_API_KEY", "CRON_SECRET", "DATABASE_URL", "TANK01_API_KEY", "WORKOS_API_KEY"] as const;
 const SECRET_NAME_PATTERN = /KEY|SECRET|TOKEN|PASSWORD|DATABASE_URL/;
-/** A matching NAME with a tiny value ("1", "on") would scrub that substring out of every error in
- *  the system; real credentials are never this short, so short values are left alone. */
+/** A pattern-matched NAME with a tiny value ("1", "on") would scrub that substring out of every
+ *  error in the system, so the heuristic keeps a length floor. The EXPLICIT keys take no floor
+ *  (fix round 2, MEDIUM-C): a short CRON_SECRET is still the real secret, and a var we named by
+ *  hand is never a false positive — any non-empty value scrubs. */
 const MIN_SECRET_VALUE_LENGTH = 6;
 
 type ScrubEnv = Readonly<Record<string, string | undefined>>;
@@ -69,8 +71,9 @@ function secretValuesByKey(env: ScrubEnv): readonly (readonly [string, string])[
   return Object.entries(env)
     .filter((entry): entry is [string, string] => {
       const [key, value] = entry;
-      if (value === undefined || value.length < MIN_SECRET_VALUE_LENGTH) return false;
-      return explicit.has(key) || SECRET_NAME_PATTERN.test(key);
+      if (value === undefined || value.length === 0) return false;
+      if (explicit.has(key)) return true;
+      return SECRET_NAME_PATTERN.test(key) && value.length >= MIN_SECRET_VALUE_LENGTH;
     })
     // Longest value first, so a secret that contains another (DATABASE_URL carrying a password
     // that is also its own var) is scrubbed whole before its fragment is.

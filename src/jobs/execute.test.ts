@@ -293,6 +293,14 @@ describe("scrubSecrets", () => {
     expect(scrubSecrets("GET /odds?apiKey=sk-live-e2e-scrub-test failed", env)).toBe("GET /odds?apiKey=[ODDS_API_KEY] failed");
   });
 
+  it("scrubs a SHORT explicit secret, where the heuristic's length floor does not apply", () => {
+    // The floor exists to keep trivial pattern-matched values ("on") from shredding logs; an
+    // explicitly named secret is real at any length, and CRON_SECRET is exactly the kind an
+    // operator might set short.
+    const env = { CRON_SECRET: "abc12" };
+    expect(scrubSecrets("Authorization: Bearer abc12 rejected", env)).toBe("Authorization: Bearer [CRON_SECRET] rejected");
+  });
+
   it("catches secrets by NAME convention, not only the hand list (the ANTHROPIC_API_KEY lesson)", () => {
     const env = {
       ANTHROPIC_API_KEY: "sk-ant-planted-value",
