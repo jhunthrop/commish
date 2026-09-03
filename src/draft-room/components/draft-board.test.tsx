@@ -113,24 +113,30 @@ describe("DraftBoard", () => {
     stubMatchMedia(true);
     const view: DraftStateView = { ...SNAKE_VIEW, picks: SERPENTINE, onClockTeamId: "t1" };
     const { container } = render(<DraftBoard {...props} view={view} />);
-    expect(container.querySelector(".ring-negative")).not.toBeNull();
+    expect(container.querySelector(".ring-live")).not.toBeNull();
     expect(container.querySelector(".animate-spotlight")).toBeNull();
   });
 
   // E1 (2026-08-26 design review): one fact, one color family. The rail says "You're on the
   // clock" in live-red while this cell answered in money-green — rule 1 assigns clocks and
   // live to red, and the split was loudest at the emotional peak. The cell (ring + label +
-  // spotlight breath) joins the negative family. The decision the review asked for, made
+  // spotlight breath) joins the live family. The decision the review asked for, made
   // once: the "You" COLUMN marker stays money — it names identity (your own column, the same
   // meaning as the my-row tint), never the clock.
-  it("speaks the on-clock fact in the clock's own red family, never money-green (E1)", () => {
+  //
+  // Sunday v5 (tokens.ts, law 4 channel three): `live` split off `negative` as its own hue so
+  // "happening now" and "a bad outcome" stop sharing one pigment. The on-clock cell moved with
+  // it — it was never actually a "bad outcome," so `live` is the more honest home E1 was
+  // reaching for.
+  it("speaks the on-clock fact in the clock's own live channel, never money-green or negative (E1)", () => {
     stubMatchMedia(false);
     const view: DraftStateView = { ...SNAKE_VIEW, picks: SERPENTINE, onClockTeamId: "t1", pickNumber: 5 };
     const { container } = render(<DraftBoard {...props} view={view} />);
     const cell = container.querySelector('[data-onclock-cell="true"]')!;
-    expect(cell.querySelector(".ring-negative")).not.toBeNull();
+    expect(cell.querySelector(".ring-live")).not.toBeNull();
     expect(cell.querySelector(".ring-accent")).toBeNull();
-    expect(within(cell as HTMLElement).getByText("On the clock").className).toContain("text-negative");
+    expect(cell.querySelector(".ring-negative")).toBeNull();
+    expect(within(cell as HTMLElement).getByText("On the clock").className).toContain("text-live");
     // Identity stays money: my own column header keeps its accent marker.
     const myHeader = within(grid()).getByRole("columnheader", { name: /Bay Bandits/ });
     expect(myHeader.className).toContain("ring-accent");

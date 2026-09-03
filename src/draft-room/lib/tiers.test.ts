@@ -53,14 +53,28 @@ describe("poolTiers", () => {
     expect(poolTiers(players, 4).get("b0")!.grade).toBe("C");
   });
 
-  it("labels a band with its own consensus span", () => {
+  it("labels a band with the consensus round its players go in", () => {
     const tiers = poolTiers(run("a", 13, 7), TEAMS);
-    expect(tiers.get("a0")!.label).toBe("ADP 13 to 19");
+    expect(tiers.get("a0")!.label).toBe("usually drafted in round 2");
   });
 
-  it("labels a one-player band with a single value rather than a range of itself", () => {
+  it("labels a one-player band with a single round rather than a range of itself", () => {
     const tiers = poolTiers([player("only", 4.2)], TEAMS);
-    expect(tiers.get("only")!.label).toBe("ADP 4");
+    expect(tiers.get("only")!.label).toBe("usually drafted in round 1");
+  });
+
+  it("names the step down for a band a cliff actually sealed", () => {
+    // Every adjacent pair here is a cliff; the sparse tail rule (minBandSize) is what makes only
+    // the FIRST band eligible to seal here, so it is the one whose label gets the drop clause.
+    // p0..p3 (ADP 1, 7, 13, 19) seal as one band once it reaches minBandSize: round 1 to round 2.
+    const players = Array.from({ length: 6 }, (_, index) => player(`p${index}`, 1 + index * DRAFT_ROOM_CONFIG.tiers.cliffAdp * 2));
+    const tiers = poolTiers(players, TEAMS);
+    expect(tiers.get("p0")!.label).toBe("usually drafted in rounds 1 to 2 · next tier is a big step down");
+  });
+
+  it("never claims a drop for the ladder's last band, since nothing was measured after it", () => {
+    const tiers = poolTiers(run("a", 13, 7), TEAMS);
+    expect(tiers.get("a0")!.label).not.toContain("step down");
   });
 
   it("gives an unranked player no band at all", () => {
