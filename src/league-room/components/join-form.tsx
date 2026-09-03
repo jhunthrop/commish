@@ -37,9 +37,10 @@ const TIER_REFUSED =
 
 export interface JoinFormProps {
   readonly code: string;
-  /** The strip's own facts, built ONCE by `InviteLanding` so the signed-in and signed-out
-   *  renderings of this decision can never disagree about how many seats are left. */
-  readonly cells: readonly LowerThirdCell[];
+  /** The verb strip's cells. Empty by default (front door blueprint, 2026-09-02): the invite
+   *  landing's facts moved into the shared `JoinSheetBody` cards above this form, so the strip
+   *  carries only the act — law 6's place for it. */
+  readonly cells?: readonly LowerThirdCell[];
   /** Already known — `InviteLanding` fetched it once, server-side, before this ever mounts. This
    *  form reads only `terms.name` for its own button label; the rest of the terms are
    *  `LeagueTermsPanel`'s job, rendered once by `InviteLanding` regardless of session. */
@@ -73,7 +74,7 @@ export interface JoinFormProps {
  */
 export function JoinForm({
   code,
-  cells,
+  cells = [],
   terms,
   balanceAfterUsd,
   onAlreadyMember,

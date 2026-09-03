@@ -3,7 +3,7 @@ import { BENCH_SLOT, ROSTER_SHAPE_LABEL, type RosterSlotConfig } from "@/domain/
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { hasOpenSeat, stakeTierLabel } from "@/matchmaking/filter";
 import { formatUsd } from "@/money/config";
-import type { PrizeTable } from "@/money/prize-table";
+import { prizePotCents, type PrizeTable } from "@/money/prize-table";
 import { describeScoring, type ScoringRules } from "@/scoring";
 import { describeRosterShape } from "./roster-shape";
 
@@ -54,6 +54,14 @@ export interface LeagueTerms {
    *  first, the same order `payoutTable` itself is written in (`prizeTableInvariant`'s own
    *  contiguous-from-1 rule). */
   readonly prizeTable?: readonly { readonly place: number; readonly amountUsd: string }[];
+  /**
+   * Front door blueprint (2026-09-02): the pot the published table actually pays —
+   * `prizePotCents` of the STORED table, `formatUsd`'d, present under the identical condition
+   * `prizeTable` is and absent for the identical reason. Derived here, server-side, so the join
+   * sheet's pot card and settlement can only ever agree; never `entryFeeCents * seats`
+   * recomputed at a render site.
+   */
+  readonly prizePotUsd?: string;
   readonly commissionerName: string;
   /** The commissioner's STORED avatar ref, not a URL — same contract as `Avatar`'s `avatar` prop. */
   readonly commissionerAvatar: string | null;
@@ -74,6 +82,15 @@ export interface LeagueTerms {
    * only ever a placeholder while a seat is still open.
    */
   readonly draftAt: string;
+  /**
+   * Front door blueprint (2026-09-02): the SAME instant `draftAt` is formatted from, as a raw
+   * ISO string — present ONLY when that instant is a real, chosen time (never the `when_full`
+   * placeholder `draftAt` itself refuses to format, and gated by the same
+   * `stillFillingWhenFull` branch). The join sheet's viewer-timezone upgrade
+   * (`LocalDraftTime`) needs the instant itself, the identical reasoning
+   * `PublicLeagueSummary.draftAtIso` records.
+   */
+  readonly draftAtIso?: string;
   /**
    * Facts about how this league plays that a stakes/scoring/roster line alone doesn't say —
    * every note derived from a STORED column, never a remembered preset name, mirroring
@@ -249,7 +266,7 @@ export function formatDraftTime(kickoffAtIso: string, nowIso: string): string {
  */
 function moneyTermsFor(
   input: Pick<LeagueTermsInput, "entryFeeCents" | "platformFeeCents" | "payoutTable">,
-): Pick<LeagueTerms, "entryFeeUsd" | "platformFeeUsd" | "prizeTable"> {
+): Pick<LeagueTerms, "entryFeeUsd" | "platformFeeUsd" | "prizeTable" | "prizePotUsd"> {
   // `!(> 0)` rather than `<= 0`: a stub `leagues` row that omits the column entirely reads
   // `undefined` here (`league-read-routes.test.ts`'s own defensive-fallback stub, never a real
   // Postgres row — that NOT NULL column always answers `0` at worst), and `undefined <= 0` is
@@ -260,6 +277,7 @@ function moneyTermsFor(
     entryFeeUsd: formatUsd(input.entryFeeCents),
     platformFeeUsd: formatUsd(input.platformFeeCents),
     prizeTable: (input.payoutTable ?? []).map((entry) => ({ place: entry.place, amountUsd: formatUsd(entry.amountCents) })),
+    prizePotUsd: formatUsd(prizePotCents(input.payoutTable ?? [])),
   };
 }
 
@@ -298,6 +316,8 @@ export function leagueTerms(input: LeagueTermsInput): LeagueTerms {
     commissionerName: input.commissioner.displayName,
     commissionerAvatar: input.commissioner.avatarUrl,
     draftAt: stillFillingWhenFull ? WHEN_FULL_FILLING_NOTE : formatDraftTime(input.kickoffAt, input.now),
+    // The raw instant beside its prose sibling, only when the prose names a real chosen time.
+    ...(stillFillingWhenFull ? {} : { draftAtIso: input.kickoffAt }),
     formatNotes: formatNotesFor(input.medianGame, input.rosterSlots),
   };
 }

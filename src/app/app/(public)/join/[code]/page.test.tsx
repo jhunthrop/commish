@@ -116,7 +116,7 @@ describe("/app/join/[code] — signed out", () => {
 });
 
 describe("/app/join/[code] — signed in", () => {
-  it("still renders the join button and reads the caller's own help level", async () => {
+  it("still renders the join button, and never reads preferences (the retired helpLevel read stays retired)", async () => {
     vi.mocked(getCurrentUser).mockResolvedValue({
       id: "u1",
       email: "u1@test.local",
@@ -133,7 +133,8 @@ describe("/app/join/[code] — signed in", () => {
 
     expect(screen.getByRole("button", { name: "Join Sunday Money" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
-    expect(vi.mocked(readPreferences)).toHaveBeenCalledWith({}, expect.objectContaining({ id: "u1" }));
+    // Sunday v5, the no-tips ruling: the `readPreferences` read is GONE from this page.
+    expect(vi.mocked(readPreferences)).not.toHaveBeenCalled();
   });
 
   // Phase 4, Task 13: the free-season reality check — this is every signed-in join that exists

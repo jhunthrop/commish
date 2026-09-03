@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
@@ -141,5 +141,43 @@ describe("InviteLanding", () => {
         expect(await axe(container)).toHaveNoViolations();
       });
     }
+  });
+});
+
+describe("the invite convergence (front door blueprint, 2026-09-02)", () => {
+  it("renders the SAME join-sheet body the lobby uses — fact cards and the contract — with this door's own truths", () => {
+    render(<InviteLanding state={{ kind: "open", terms: TERMS }} signedIn={false} code="CODE1234" />);
+    expect(screen.getByText("What happens when you sit")).toBeInTheDocument();
+    expect(screen.getByText("The draft")).toBeInTheDocument();
+    expect(screen.getByText("Seats")).toBeInTheDocument();
+    // F15: the invite path takes no seat hold, so the sheet's lines never claim one here.
+    expect(screen.queryByText(/held for 10 minutes/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Sign in first\. This page brings you straight back here to join\./)).toBeInTheDocument();
+  });
+
+  it("shows no money card at all for a free league — every league today", () => {
+    render(<InviteLanding state={{ kind: "open", terms: TERMS }} signedIn={false} code="CODE1234" />);
+    expect(screen.queryByText("Buy-in")).not.toBeInTheDocument();
+    expect(screen.queryByText("The pot")).not.toBeInTheDocument();
+  });
+
+  it("carries the buy-in and the stored pot for a paid league's terms (live money, by fixture)", () => {
+    const paidTerms = {
+      ...TERMS,
+      entryFeeCents: 5000,
+      entryFeeUsd: "$50.00",
+      platformFeeUsd: "$0.00",
+      prizeTable: [
+        { place: 1, amountUsd: "$300.00" },
+        { place: 2, amountUsd: "$200.00" },
+        { place: 3, amountUsd: "$100.00" },
+      ],
+      prizePotUsd: "$600.00",
+    };
+    render(<InviteLanding state={{ kind: "open", terms: paidTerms }} signedIn={false} code="CODE1234" />);
+    expect(screen.getByText("Buy-in")).toBeInTheDocument();
+    expect(screen.getByText("$600.00")).toBeInTheDocument();
+    expect(screen.getByText("pays $300.00 / $200.00 / $100.00")).toBeInTheDocument();
+    expect(screen.getByText(/The pot pays the podium when the season settles\./)).toBeInTheDocument();
   });
 });

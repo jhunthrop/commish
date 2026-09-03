@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { LeagueTerms } from "@/league";
 import { Badge, BottomSheet, SeatMeter } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { SEAT_HOLD } from "@/matchmaking/seat-hold";
@@ -102,10 +103,58 @@ export function lobbyJoinFacts(league: PublicLeagueSummary, signedIn: boolean, l
   };
 }
 
+/**
+ * The INVITE door's own facts, from `LeagueTerms` and nothing else — the same body, that door's
+ * truths: the invite path takes NO seat hold (F15, controller-ruled), so its lines never claim
+ * one, and its money cells read the terms' own server-derived figures (`prizePotUsd` is the
+ * stored table's sum, the identical one-source rule the lobby's `potFacts` holds).
+ */
+export function inviteJoinFacts(terms: LeagueTerms, signedIn: boolean): JoinDecisionFacts {
+  const open = Math.max(0, terms.teamCount - terms.filledTeams);
+  const paid = terms.entryFeeUsd !== undefined;
+  const cells: JoinFactCell[] = [];
+  if (paid) {
+    cells.push({ label: "Buy-in", value: terms.entryFeeUsd, note: "one payment, before the draft" });
+    cells.push({
+      label: "The pot",
+      value: terms.prizePotUsd ?? "Published in the league",
+      note: terms.prizeTable === undefined ? undefined : `pays ${terms.prizeTable.map((entry) => entry.amountUsd).join(" / ")}`,
+    });
+  }
+  cells.push({
+    label: "The draft",
+    value: <LocalDraftTime iso={terms.draftAtIso} fallback={terms.draftAt} />,
+  });
+  cells.push({
+    label: "Seats",
+    value: `${open} of ${terms.teamCount}`,
+    note: open === 1 ? "yours would be the last" : "open right now",
+    accent: open === 1,
+  });
+
+  const startClause =
+    terms.draftAtIso === undefined
+      ? `The draft starts on its own about ${SIT_AND_GO_GRACE_MINUTES} minutes after the last seat fills.`
+      : "The draft starts at the listed time.";
+  return {
+    cells,
+    contract: [
+      signedIn
+        ? "Press Join and the seat is yours on the spot. This invite came to you; no seat is held for anyone."
+        : "Sign in first. This page brings you straight back here to join.",
+      `${startClause} Miss the start and the room drafts for you from the best available.`,
+      `The season runs itself: lineups, waivers, scoring and standings, week 1 through the playoffs.${
+        paid ? " The pot pays the podium when the season settles." : ""
+      }`,
+    ],
+  };
+}
+
 export interface JoinSheetBodyProps {
   readonly facts: JoinDecisionFacts;
-  /** The door's own verb row — the lobby's hold-riding CTA, the invite door's join form. */
-  readonly action: ReactNode;
+  /** The door's own verb row — the lobby's hold-riding CTA, the invite door's join form. A door
+   *  whose verb lives in its own strip below the body passes nothing. */
+  readonly action?: ReactNode;
 }
 
 /** The presentational core both doors render — fact cards, then the contract, then the verb. */

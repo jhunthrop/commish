@@ -214,3 +214,28 @@ describe("formatDraftTime", () => {
     );
   });
 });
+
+describe("the join sheet's own terms fields (front door blueprint, 2026-09-02)", () => {
+  it("derives prizePotUsd from the STORED table's sum, present only alongside the other money fields", () => {
+    const paid = leagueTerms({
+      ...BASE,
+      entryFeeCents: 5000,
+      platformFeeCents: 0,
+      payoutTable: [
+        { place: 1, amountCents: 30000 },
+        { place: 2, amountCents: 20000 },
+        { place: 3, amountCents: 10000 },
+      ],
+    });
+    expect(paid.prizePotUsd).toBe("$600.00");
+    const free = leagueTerms(BASE);
+    expect(Object.keys(free)).not.toContain("prizePotUsd");
+  });
+
+  it("carries draftAtIso only when draftAt names a real chosen time, never the when_full placeholder", () => {
+    const scheduled = leagueTerms(BASE);
+    expect(scheduled.draftAtIso).toBe(BASE.kickoffAt);
+    const filling = leagueTerms({ ...BASE, startTrigger: "when_full", filledTeams: 3 });
+    expect(Object.keys(filling)).not.toContain("draftAtIso");
+  });
+});

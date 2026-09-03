@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { LeagueTerms } from "@/league";
-import { ButtonLink, LowerThird, Panel, Crest, buttonClassName, type LowerThirdCell } from "@/components/ui";
-import { MICRO_LABEL } from "@/components/ui/config";
+import { ButtonLink, LowerThird, Panel, Crest, buttonClassName } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
+import { inviteJoinFacts, JoinSheetBody } from "./join-sheet";
 import { LeagueTermsPanel } from "./league-terms-panel";
 import { SeatTakenPanel } from "./seat-taken-panel";
 import { JoinForm } from "./join-form";
@@ -165,32 +165,15 @@ export function InviteLanding({ state: initialState, signedIn = true, code, bala
   }
 
   // `state.kind === "open"` — the only branch left.
-  const seatsOpen = Math.max(0, state.terms.teamCount - state.terms.filledTeams);
-  /**
-   * THE FACTS THE DECISION RESTS ON (Sunday v5, law 6), built once here so the signed-in strip
-   * and the signed-out one can never disagree about them.
-   *
-   * The seat figure used to sit at the top of this page in its own bordered row — law 2's "the
-   * one number a stranger decides on, at size" — and the strip is simply where that number
-   * belongs now: beside the act it decides. The FIGURE only, deliberately: `LeagueTermsPanel`
-   * below already carries the league's own name as its heading.
-   *
-   * No tint and no `Stat`: a count of open seats sits inside no stated population.
-   */
-  const cells: readonly LowerThirdCell[] = [
-    {
-      label: "Seats",
-      value: (
-        <>
-          <span data-testid="invite-seats-open">{seatsOpen}</span>
-          <span className={`${MICRO_LABEL} ml-1.5 align-middle font-sans text-text-faint`}>
-            {seatsOpen === 1 ? "seat open" : "open"} of {state.terms.teamCount}
-          </span>
-        </>
-      ),
-    },
-    { label: "Drafts", value: state.terms.draftAt },
-  ];
+  //
+  // THE INVITE CONVERGENCE (front door blueprint, 2026-09-02): the open state renders the SAME
+  // `JoinSheetBody` the lobby's join sheet uses — the fact cards (seats, the draft, and a paid
+  // league's buy-in and pot) and the three-line contract — built from `LeagueTerms` by
+  // `inviteJoinFacts`, whose lines say THIS door's truths: no seat hold is ever taken here
+  // (F15, controller-ruled), so none is ever claimed. The old two-cell strip retires: its seat
+  // and draft facts moved into the body's cards, and the strip below keeps only the verb (law
+  // 6's place for it). `LeagueTermsPanel` stays as the deep terms under the decision.
+  const facts = inviteJoinFacts(state.terms, signedIn);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex max-w-2xl flex-col gap-3">
@@ -203,12 +186,12 @@ export function InviteLanding({ state: initialState, signedIn = true, code, bala
       <p className="text-sm text-text-muted">
         {"You are in the draft, then the season. Set a lineup every week."}
       </p>
+      <JoinSheetBody facts={facts} />
       <LeagueTermsPanel terms={state.terms} />
       </div>
       {signedIn ? (
         <JoinForm
           code={code ?? ""}
-          cells={cells}
           terms={state.terms}
           balanceAfterUsd={balanceAfterUsd}
           onAlreadyMember={(leagueId) => setState({ kind: "already-member", leagueId, name: state.terms.name })}
@@ -217,13 +200,11 @@ export function InviteLanding({ state: initialState, signedIn = true, code, bala
           onTierRefused={() => setState({ kind: "tier-refused" })}
         />
       ) : (
-        // The same strip, signed out, with the same facts — the only thing that changes is which
-        // act it is waiting on. This page's own path (Task 16, F6) rides the intent, so signing
-        // in returns here, to the same invite, rather than dropping the visitor at a generic
-        // `/app`.
+        // The verb strip, signed out. This page's own path (Task 16, F6) rides the intent, so
+        // signing in returns here, to the same invite, rather than a generic `/app`.
         <div className="-mx-4">
           <LowerThird
-            cells={cells}
+            cells={[]}
             action={<SignInLink intent={`/app/join/${code ?? ""}`} className={buttonClassName("verb", "lg")} />}
           />
         </div>
