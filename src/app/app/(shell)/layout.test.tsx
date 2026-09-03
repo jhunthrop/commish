@@ -56,6 +56,7 @@ describe("the (shell) route group's layout", () => {
     const rail = getByRole("navigation", { name: "Your leagues" });
     const railLinks = getAllByRole("link").filter((link) => rail.contains(link));
     expect(railLinks).toHaveLength(1);
-    expect(railLinks[0]).toHaveAccessibleName("Join or create another league");
+    // The rail redesign (2026-09-03): the + row's words are the blueprint's own.
+    expect(railLinks[0]).toHaveAccessibleName("Find or start a league");
   });
 });
