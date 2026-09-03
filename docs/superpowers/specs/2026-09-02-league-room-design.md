@@ -53,11 +53,12 @@ Ordering, first match wins, flat early returns:
 A filed waiver claim is a notice, never an attention card: it needs nothing from the user,
 so it can never lift the stage (it rides below the cards and in the week strip).
 
-Attention cards rank by the clock: soonest deadline first (a lineup problem's deadline is
-its player's kickoff instant when known, else the week; a trade's deadline is expiresAt);
-at equal deadline lineup problems outrank trades; lineup problems tie-break by severity
-(empty slot > bye > OUT designation). Pure, in `lineup-problems.ts` / `stage-priority.ts`,
-with `now` injected.
+Attention cards extend the stage's own precedence: lineup problems always lead (they decay
+to zero points at kickoff; a trade can wait until its own deadline), ranked by severity
+(empty slot > bye > OUT designation, ties by slot order); trades follow, soonest expiresAt
+first, no deadline last. This is the mocks' own dealing order (the amber-bordered lineup
+card above the Friday-expiring trade). Pure, in `stage-priority.ts`
+(`compareAttentionCards`) and `lineup-problems.ts`.
 
 ## The drawer state machine (exact)
 
