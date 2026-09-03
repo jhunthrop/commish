@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { PositionBadge, StatPill } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { formatCoarseDuration } from "@/components/ui/countdown";
 import { DRAFT_ROOM_CONFIG } from "@/draft-room/state/config";
 import { bestAvailableFraction, formatPickSlot } from "@/draft-room/state/debrief";
-import { fillCopyTemplate } from "@/draft-room/state/format";
+import { fillCopyTemplate, formatGap } from "@/draft-room/state/format";
 import { MOCK_COPY, type MockMode } from "@/mock-draft/config";
 import type { MockDebriefHighlight, MockDebriefSummary } from "@/mock-draft-service/debrief";
 
@@ -78,7 +77,7 @@ export function LearningColumn({ summaries }: { readonly summaries: readonly Moc
       <section aria-label={MOCK_COPY.learningHeading} className="flex flex-col gap-3 rounded-lg border border-line p-4">
         <div className="flex flex-wrap items-baseline gap-3">
           <span className="text-sm font-semibold text-text-primary">{metaLine(latest)}</span>
-          <span className="font-mono text-xs tabular-nums text-text-faint">{formatCoarseDuration(latest.startedAgoMs)} ago</span>
+          <span className="font-mono text-xs tabular-nums text-text-faint">{formatGap(latest.startedAgoMs)} ago</span>
           <Link href={`/app/drafts/${latest.draftId}`} className={`${MICRO_LABEL} ml-auto font-semibold text-accent hover:opacity-80`}>
             Full debrief
           </Link>
@@ -124,7 +123,7 @@ export function LearningColumn({ summaries }: { readonly summaries: readonly Moc
             {earlier.map((summary) => (
               <li key={summary.draftId} className="flex flex-wrap items-center gap-3 rounded-md border border-line px-3 py-2">
                 <span className="text-sm font-semibold text-text-primary">{metaLine(summary)}</span>
-                <span className="font-mono text-xs tabular-nums text-text-faint">{formatCoarseDuration(summary.startedAgoMs)} ago</span>
+                <span className="font-mono text-xs tabular-nums text-text-faint">{formatGap(summary.startedAgoMs)} ago</span>
                 <span className="ml-auto font-mono text-xs tabular-nums text-text-muted">
                   {fillCopyTemplate(MOCK_COPY.bestFractionRow, { fraction: bestAvailableFraction(summary.counts) })}
                 </span>
