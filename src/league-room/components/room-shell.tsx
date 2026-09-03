@@ -258,6 +258,7 @@ export function RoomShell({ data, initialSurface, playoffTeams, holdExpired }: R
             ) : (
               <RoomStageAttention
                 home={home}
+                lineup={data.lineup}
                 plans={plans}
                 inboxTrades={inbox}
                 tradeContext={data.tradeContext}

@@ -199,6 +199,13 @@ initialSurface set); membership 404 predicate unchanged on every page.
 
 ## Kept vs deleted
 
+Restored after review (HIGH 1): the post-draft ARRIVAL MOMENT. The old league-home's
+DraftCompleteArrival was silently dropped in the first cut; it returns as
+`room-arrival-card.tsx`, the top card of the stage when `draftStatus === "complete" &&
+currentWeek === 1` (not a stage kind — a live Sunday still outranks it, and the ordinary
+cards ride beneath it): the drafted roster by face and name, the week-1 opponent with the
+projected line the stage already computes, verbs to the matchup and the draft board.
+
 Kept working as today: WaitingRoom + DraftSchedulePanel (waiting stage state), /team
 (LineupEditor + AdvisorPanel), /matchups/[week] (LiveMatchupWeek), players/[playerId],
 LeagueChat + terms/members/invite/moderation rail (judgment call: the mocks omit the rail

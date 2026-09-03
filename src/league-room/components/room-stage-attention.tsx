@@ -6,13 +6,16 @@ import type { PendingWaiverClaim } from "@/league-service/claims";
 import type { ActivityRow } from "@/integrity/activity-view";
 import type { TradeProposalView } from "@/trades/contract";
 import { assetPlayerIds } from "@/trades/assets";
-import type { LeagueHomeBody, MatchupDetail, TradeRoomContext, TradeRosterPlayer } from "../contract";
+import type { LeagueHomeBody, LineupBody, MatchupDetail, TradeRoomContext, TradeRosterPlayer } from "../contract";
+import { RoomArrivalCard } from "./room-arrival-card";
 import type { DrawerSurface } from "../lib/drawer-state";
 import { formatPoints, formatRecord, formatWeekdayClock, ordinal } from "../lib/format";
 import { slotLabelFor, type LineupFixPlan } from "../lib/lineup-problems";
 
 export interface RoomStageAttentionProps {
   readonly home: LeagueHomeBody;
+  /** The viewer's own lineup — the arrival card's roster on a week-1 visit. */
+  readonly lineup: LineupBody | null;
   readonly plans: readonly LineupFixPlan[];
   readonly inboxTrades: readonly TradeProposalView[];
   readonly tradeContext: TradeRoomContext | null;
@@ -125,7 +128,7 @@ function sideTotals(
  * happened since the viewer left.
  */
 export function RoomStageAttention(props: RoomStageAttentionProps) {
-  const { home, plans, inboxTrades, tradeContext, pendingClaims, myMatchupDetail, projectionsByPlayerId, activityRows } = props;
+  const { home, lineup, plans, inboxTrades, tradeContext, pendingClaims, myMatchupDetail, projectionsByPlayerId, activityRows } = props;
   const hasCards = plans.length > 0 || inboxTrades.length > 0;
   const totals = myMatchupDetail === null ? null : sideTotals(myMatchupDetail, home.myTeamId, projectionsByPlayerId);
   const opponentName =
@@ -138,8 +141,22 @@ export function RoomStageAttention(props: RoomStageAttentionProps) {
   const pulseRows = home.standings.slice(0, 4);
   const myRowOutsideTop = myRow !== null && !pulseRows.some((row) => row.teamId === myRow.teamId);
 
+  const projectedLine =
+    totals === null ? null : `projected ${formatPoints(totals.mine)} to ${formatPoints(totals.theirs)}, ${totals.mine >= totals.theirs ? "your favor" : "their favor"}`;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+      {/* THE ARRIVAL MOMENT (review HIGH 1): week 1 only, the top card, everything else beneath. */}
+      {home.draftStatus === "complete" && home.currentWeek === 1 && lineup !== null ? (
+        <RoomArrivalCard
+          leagueId={home.leagueId}
+          draftId={home.draftId}
+          lineup={lineup}
+          matchup={home.myMatchup}
+          projectedLine={projectedLine}
+        />
+      ) : null}
+
       {hasCards ? <p className={`${MICRO_LABEL} text-text-faint`}>Needs you before Sunday</p> : null}
 
       {plans.map((plan) => (

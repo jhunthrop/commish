@@ -69,6 +69,39 @@ const INBOX_TRADE: TradesPageBody = {
 };
 
 describe("RoomShell", () => {
+  it("deals the arrival moment as the top card on a week-1 visit, ordinary cards beneath", () => {
+    const weekOne = {
+      ...ATTENTION_DATA,
+      home: { ...ATTENTION_DATA.home, currentWeek: 1 },
+    };
+    render(wrap(weekOne));
+    const arrival = screen.getByTestId("draft-complete-arrival");
+    expect(arrival.textContent).toContain("Your draft is in the books");
+    expect(screen.getByRole("link", { name: "View the draft board" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "See the matchup" }).getAttribute("href")).toBe(
+      "/app/leagues/l1/matchups/3",
+    );
+    // The stage still deals the lineup card, beneath the arrival.
+    const fix = screen.getByRole("button", { name: "Fix lineup" });
+    expect(arrival.compareDocumentPosition(fix) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("keeps the arrival moment off every later week", () => {
+    render(wrap(ROOM_DATA));
+    expect(screen.queryByTestId("draft-complete-arrival")).toBeNull();
+  });
+
+  it("a live Sunday still outranks the arrival moment (law 1)", () => {
+    const liveWeekOne = {
+      ...ROOM_DATA,
+      home: { ...ROOM_DATA.home, currentWeek: 1, weekStatus: "in_progress" as const },
+      week: { ...ROOM_DATA.week!, weekStatus: "in_progress" as const },
+    };
+    render(wrap(liveWeekOne));
+    expect(screen.queryByTestId("draft-complete-arrival")).toBeNull();
+    expect(screen.getByText("Yours")).toBeTruthy();
+  });
+
   it("rests at the pulse when nothing needs the viewer", () => {
     render(wrap(ROOM_DATA));
     expect(screen.getByText("The league this week")).toBeTruthy();
