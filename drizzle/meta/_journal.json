@@ -477,6 +477,13 @@
       "when": 1788396795016,
       "tag": "0067_opposite_blacklash",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1788399363129,
+      "tag": "0068_worried_clea",
+      "breakpoints": true
     }
   ]
 }
