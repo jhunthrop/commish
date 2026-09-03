@@ -2,63 +2,32 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { Icon } from "@/components/ui/icon";
 import { Crest } from "@/components/ui/crest";
 import { UI_CONFIG } from "@/components/ui/config";
-import { NEXT_ACTION_COPY } from "@/league";
-import type { RailLeague, RailLeagueState } from "./shell-data";
+import type { ApiEnvelope } from "@/lib/api/respond";
+import { isHomeBody } from "@/league-room/lib/home-body";
+import { railStateLine } from "@/league-room/lib/rail-line";
+import type { RailLeague } from "./shell-data";
+import { RailDot, RailWords } from "./rail-row";
 
 /**
- * `"live"`'s accessible-name fragment, reusing `NEXT_ACTION_COPY` (`@/league/next-action.ts`)
- * rather than typing a second copy of the same words — C2's "one string COPY owns" rule applies
- * here exactly as it does to the board cell. `"needs-you"` is NOT in this map: it can mean either
- * of two kinds (`"fix-lineup"` or `"join-draft"`, Task 10 Step 1b, F1) and a fixed one-sentence
- * map cannot tell them apart — `labelFor`, below, reads `league.needsYouKind` for that state
- * instead (fix round 1, H1: this map used to hardcode `"needs-you"` to `NEXT_ACTION_COPY["join-
- * draft"]`, so a manager whose lineup was unset heard "Join the draft" — false).
+ * LAW 3's "the rail never renders beside its own page": `/app` IS the rail's full-page form
+ * (`/app/leagues` is its standing redirect), so the rail yields the whole edge there rather
+ * than repeating itself beside the same rows. Exported for the component test.
  */
-const STATE_LABEL: Readonly<Partial<Record<RailLeagueState, string>>> = {
-  live: NEXT_ACTION_COPY["watch-scores"],
-};
-
-/**
- * The dot's own color — `aria-hidden` always, per Step 3: a colored dot with no sentence behind it
- * is never rendered, and the sentence lives in the link's accessible name instead.
- *
- * LAW 1, COLOUR IS A LEGEND (Gameday, 2026-08-28). Both values were wrong, and wrong in a way that
- * made the product's most persistent navigation teach the WRONG legend on every signed-in page:
- *
- * - `live` was `positive` — money-green. Green means money in this product and red is the whole
- *   live family (a clock tightening, a live chip's dot, `WeekStatusBadge`'s own in_progress tone,
- *   `GameStateChip`'s live state). A live game wearing the money pigment is the one colour rule
- *   this product cannot afford to break, because it is the pair a manager reads fastest.
- * - `needs-you` was `warning` — amber, whose usage law 1 demotes to "a clock genuinely tightening"
- *   and nothing else. A league waiting on your lineup is not a caution, it is an ACT, and money is
- *   the pigment of an action here (the same clause that makes `Button`'s `verb` variant legal).
- */
-const DOT_CLASS: Readonly<Partial<Record<RailLeagueState, string>>> = {
-  "needs-you": "bg-accent",
-  live: "bg-negative",
-};
-
-/** `"needs-you"`'s own accessible-name fragment: `league.needsYouKind` names WHICH of the two
- *  facts is true for this league, and `NEXT_ACTION_COPY` owns both sentences (C2) — never a
- *  second, narrower copy of either typed here. */
-function labelFor(league: RailLeague): string | undefined {
-  if (league.state === "needs-you") {
-    return league.needsYouKind === null ? undefined : NEXT_ACTION_COPY[league.needsYouKind];
-  }
-  return STATE_LABEL[league.state];
+export function railHiddenOn(pathname: string | null): boolean {
+  return pathname === "/app" || pathname === "/app/leagues";
 }
 
-/** "Bay Bandits" (quiet) → "Bay Bandits". "Volt Kings" (needs-you, fix-lineup) → "Volt Kings.
- *  Fix your lineup." — the accessible name is the league's real name, never its initials (Step
- *  1's own test): the crest tile's two-letter text is `aria-hidden`, so only this string is
- *  announced. */
-function accessibleNameFor(league: RailLeague): string {
-  const label = labelFor(league);
-  return label === undefined ? league.name : `${league.name}. ${label}.`;
+/** "Bay Bandits. 4th of 12 · next: vs Mudville Nine." — the row's accessible name is the
+ *  league's REAL name plus its one state line, never its monogram (the crest's text is
+ *  `aria-hidden`), so the collapsed rail loses nothing to a screen reader when the words are
+ *  visually hidden. */
+function accessibleNameFor(league: RailLeague, stateLine: string): string {
+  return `${league.name}. ${stateLine}.`;
 }
 
 export interface LeagueRailProps {
@@ -67,76 +36,154 @@ export interface LeagueRailProps {
 }
 
 /**
- * The league rail: one `<nav>`, one tile per league plus a trailing "join or create another
- * league" control (Step 6's `plus` icon). A client component because `aria-current` is read off
- * `usePathname()` (ruling 8, as amended) — the fact a layout cannot otherwise have without a
- * per-page `currentLeagueId` prop, and the reason the shell can live in a layout at all.
+ * THE LEAGUE RAIL, one component in its first two sizes (the rail redesign, 2026-09-03; the
+ * founder-approved blueprint in `.superpowers/mocks/`):
  *
- * Always `overflow-x-auto` and never `hidden` at any breakpoint (Step 1's 360px test): below
- * `lg` this is a horizontal scrolling strip; at `lg` it becomes the vertical rail, the same
- * markup re-flowed rather than a second, narrower copy of it.
+ * - COLLAPSED (56px, `lg`+): a vertical strip of monogram chips (`monogramsFor` marks, law 1)
+ *   with typed dots (amber = yours to act on, red = live now, law 2), ordered by urgency with a
+ *   divider before the quiet leagues — `shellData` already ordered them; this renders, it never
+ *   re-sorts. Below `lg` it stays the horizontal scrolling strip.
+ * - FLYOUT (268px, `lg`+): hover or focus anywhere on the rail expands the WHOLE rail as an
+ *   absolutely-positioned overlay — no layout shift, the grid column keeps the collapsed width.
+ *   Each row is the same link as its chip, now with its words visible (`RailWords`): full name
+ *   and one state line. Esc and mouse-out close; Esc leaves focus where it stood, which is the
+ *   row the reader was on. Rows are the tap targets — the flyout renders no verbs at all.
+ *
+ * SUNDAY FORM (law 4 of the canvas brief): the shell read's live lines are deliberately
+ * degraded ("Live now" — `shellData` skips the score cache on purpose). When the flyout OPENS
+ * with a live league on it, ONE `fetch("/api/home")` — the same lazy-on-open idiom as the peek
+ * card's history fetch, and the same cache-backed read `HomeBoard` polls — upgrades live rows
+ * to real margins ("Live · you lead 84.20 to 71.60", the rich tier of `railStateLine`). Until
+ * it lands, or if it fails, the degraded line stands: honest, never wrong. Nothing is fetched
+ * while the flyout is closed, and nothing at all on a Tuesday rail with no live league.
+ *
+ * A client component because `aria-current` reads `usePathname()` (ruling 8, as amended) and
+ * because open/close is interaction state. Still one `<nav>` whose links are the chips
+ * themselves — opening the flyout adds no second set of focus targets, the words simply appear
+ * beside the chip a keyboard user is already on.
  */
 export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
   const pathname = usePathname();
   const reducedMotion = usePrefersReducedMotion();
-  const crestSize = UI_CONFIG.shell.crestSizePx;
-  const tileStyle = { width: crestSize, height: crestSize };
+  const [open, setOpen] = useState(false);
+  const [richLines, setRichLines] = useState<ReadonlyMap<string, string> | null>(null);
+  const navRef = useRef<HTMLElement | null>(null);
 
+  const anyLive = leagues.some((league) => league.state === "live");
+
+  useEffect(() => {
+    if (!open || !anyLive) return;
+    let cancelled = false;
+
+    async function upgradeLiveLines(): Promise<void> {
+      try {
+        const response = await fetch("/api/home");
+        const envelope = (await response.json()) as ApiEnvelope<unknown>;
+        if (cancelled || !envelope.ok || !isHomeBody(envelope.data)) return;
+        setRichLines(new Map(envelope.data.leagues.map((league) => [league.id, railStateLine(league, "rich")])));
+      } catch {
+        // The degraded shell line ("Live now") stays on screen — this fetch exists to sharpen
+        // the flyout, never to be the thing that can break the rail.
+      }
+    }
+
+    void upgradeLiveLines();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, anyLive]);
+
+  // LAW 3: `/app` is this component's own full-page size — nothing renders beside it.
+  if (railHiddenOn(pathname)) return null;
+
+  const crestSize = UI_CONFIG.shell.crestSizePx;
+  const widthVars = {
+    "--rail-width": `${UI_CONFIG.shell.railWidthPx}px`,
+    "--rail-flyout": `${UI_CONFIG.shell.railFlyoutWidthPx}px`,
+  } as CSSProperties;
+  const firstQuietIndex = leagues.findIndex((league) => league.state === "quiet");
+  const wordsClassName = `hidden ${open ? "lg:flex" : ""}`;
+
+  // The a11y disable below: the nav's listeners are the flyout's open/close ENHANCEMENT, not
+  // the interaction itself — every action in the rail is a real link (keyboard reachable, with
+  // full accessible names carrying the same words the flyout shows); hover/focus merely reveal
+  // the words visually and Escape re-hides them. No functionality exists only behind these
+  // handlers, which is exactly the case the rule's own docs carve out for visual disclosure on
+  // a container.
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <nav
+      ref={navRef}
       aria-label="Your leagues"
       data-testid="league-rail"
-      // lg: the rail scrolls INSIDE itself, capped at the viewport and stuck to it (lobby
-      // review E11): unbounded, a long account's rail dragged the whole document thousands of
-      // px past the page's own content — the void below every short page. Sticky keeps the
-      // rail in reach while the main column scrolls, the same scroll-inside rule every other
-      // outgrowing region already keeps.
-      className={`flex flex-row items-center gap-2 overflow-x-auto border-b border-line bg-surface px-3 py-2 lg:sticky lg:top-0 lg:max-h-dvh lg:flex-col lg:items-stretch lg:self-start lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-2 lg:py-4 ${className}`}
+      data-expanded={open}
+      style={widthVars}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocusCapture={() => setOpen(true)}
+      onBlurCapture={(event) => {
+        if (!navRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") setOpen(false);
+      }}
+      // The grid track reads `--rail-width` off this element and never changes with `open`:
+      // the flyout below is an absolutely-positioned OVERLAY, so nothing to the right moves.
+      // `sticky` is itself a positioned box, so the flyout's `absolute` resolves against this
+      // element — no extra `relative` needed (the two would conflict).
+      className={`border-b border-line bg-surface lg:sticky lg:top-0 lg:w-[var(--rail-width)] lg:self-start lg:border-b-0 lg:border-r ${className}`}
     >
-      {leagues.map((league) => {
-        const isCurrent = pathname?.startsWith(`/app/leagues/${league.id}`) ?? false;
-        return (
-          <Link
-            key={league.id}
-            href={`/app/leagues/${league.id}`}
-            aria-current={isCurrent ? "page" : undefined}
-            aria-label={accessibleNameFor(league)}
-            // D4: the one persistent navigation in the product had no visual "you are here" —
-            // `aria-current="page"` was set but every tile shared one class string. The current
-            // tile now carries the product's own selected idiom (`ThemeSwitcher`'s checked chip,
-            // `src/account-room/components/theme-switcher.tsx`: `ring-1 ring-edge` plus a surface
-            // step the tile itself cannot swallow), an `<Crest>`-sized ring rather than a change
-            // to `Crest`'s own tone fill, which stays the league's deterministic color either way.
-            className={`relative flex shrink-0 items-center justify-center self-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-              isCurrent ? "ring-2 ring-edge ring-offset-2 ring-offset-surface" : ""
-            }`}
-            style={tileStyle}
-          >
-            <Crest id={league.id} name={league.name} size={crestSize} />
-            {league.state === "quiet" ? null : (
-              // LAW 6, MOTION REPORTS: the live dot breathes because a game is genuinely running
-              // right now, which is the live chip's own sanctioned use of `animate-pulse-live`.
-              // A needs-you dot does not move — nothing about it is changing, it is a standing
-              // fact waiting on the manager. Reduced motion is a real branch, not a faster
-              // animation: the dot still renders, in the same pigment, and simply stops breathing.
-              <span
-                aria-hidden="true"
-                className={`absolute -right-0.5 -top-0.5 size-2.5 rounded-pill border border-surface ${DOT_CLASS[league.state]} ${
-                  league.state === "live" && !reducedMotion ? "animate-pulse-live" : ""
-                }`}
-              />
-            )}
-          </Link>
-        );
-      })}
-      <Link
-        href="/app#create-league"
-        aria-label="Join or create another league"
-        className="flex shrink-0 items-center justify-center self-center rounded-md border border-dashed border-line text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        style={tileStyle}
+      <div
+        className={`flex flex-row items-center gap-2 overflow-x-auto px-3 py-2 lg:max-h-dvh lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-y-auto lg:px-2 lg:py-3 ${
+          open ? "lg:absolute lg:left-0 lg:top-0 lg:z-40 lg:w-[var(--rail-flyout)] lg:border lg:border-line lg:bg-surface lg:shadow-lg" : ""
+        }`}
       >
-        <Icon name="plus" size={18} />
-      </Link>
+        {leagues.map((league, index) => {
+          const isCurrent = pathname?.startsWith(`/app/leagues/${league.id}`) ?? false;
+          const stateLine = (league.state === "live" ? richLines?.get(league.id) : undefined) ?? league.stateLine;
+          return (
+            <Fragment key={league.id}>
+              {index === firstQuietIndex && index > 0 ? (
+                // The divider between what needs the manager (or is live) and what is quiet —
+                // decoration only, the order itself already said it.
+                <span aria-hidden="true" className="hidden border-line lg:mx-2 lg:my-0.5 lg:block lg:border-t" />
+              ) : null}
+              <Link
+                href={`/app/leagues/${league.id}`}
+                aria-current={isCurrent ? "page" : undefined}
+                aria-label={accessibleNameFor(league, stateLine)}
+                // D4's "you are here" ring, unchanged from the pre-flyout rail (`ThemeSwitcher`'s
+                // checked-chip idiom): the current tile keeps its ring in both sizes.
+                className={`relative flex shrink-0 items-center gap-2.5 rounded-md lg:p-1 ${open ? "lg:hover:bg-surface-elevated" : ""} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  isCurrent ? "ring-2 ring-edge ring-offset-2 ring-offset-surface" : ""
+                }`}
+              >
+                <span className="relative shrink-0" style={{ width: crestSize, height: crestSize }}>
+                  <Crest id={league.id} name={league.name} mark={league.monogram} size={crestSize} />
+                  <RailDot state={league.state} reducedMotion={reducedMotion} />
+                </span>
+                <RailWords name={league.name} stateLine={stateLine} state={league.state} className={wordsClassName} />
+              </Link>
+            </Fragment>
+          );
+        })}
+        <Link
+          href="/app#create-league"
+          aria-label="Find or start a league"
+          className="flex shrink-0 items-center gap-2.5 rounded-md text-text-muted transition-colors hover:text-text-primary lg:mt-auto lg:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <span
+            className="flex shrink-0 items-center justify-center rounded-md border border-dashed border-line"
+            style={{ width: crestSize, height: crestSize }}
+          >
+            <Icon name="plus" size={18} />
+          </span>
+          {/* LAW 1's last clause: the + gets words in the flyout. */}
+          <span aria-hidden="true" className={`${wordsClassName} font-display text-sm font-semibold`}>
+            Find or start a league
+          </span>
+        </Link>
+      </div>
     </nav>
   );
 }

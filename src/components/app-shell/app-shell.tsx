@@ -1,5 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
-import { UI_CONFIG } from "@/components/ui/config";
+import type { ReactNode } from "react";
 import { AdminConsoleNav } from "./admin-console-nav";
 import { LeagueRail } from "./league-rail";
 import { ShellFooter } from "./shell-footer";
@@ -23,20 +22,20 @@ export interface AppShellProps {
  * needs no per-page argument, which is what makes it renderable from a layout in the first
  * place.
  *
- * The grid is `grid-cols-[var(--rail)_1fr]` at `lg`, a single column below it — `UI_CONFIG.shell
- * .railWidthPx` reaches the DOM as the `--rail` custom property in an inline style, the same
- * "a dynamic value has to reach the DOM as a style, not a class" idiom `InfoTip`'s own
- * `minTargetPx` already uses, since a Tailwind arbitrary value cannot read a JS constant.
+ * The grid is `grid-cols-[auto_1fr]` at `lg`, a single column below it (the rail redesign,
+ * 2026-09-03): the rail column takes whatever the rail renders — `UI_CONFIG.shell.railWidthPx`
+ * when the collapsed rail is there, ZERO on `/app`, where the rail is `null` because that page
+ * IS the rail's own full-page form (law 3: the rail never renders beside its own page). The
+ * flyout is an absolutely-positioned overlay inside the rail, so opening it never changes this
+ * track either — no layout shift, ever.
  *
  * A third row (`ShellFooter`, flow analysis A3) sits under the content column only — never
  * under the rail — so the grid grows by one row (`auto`) rather than being restructured. Below
  * `lg` the grid collapses to a single column and the footer simply falls in flow after `<main>`.
  */
 export function AppShell({ user, rail, liveState, children }: AppShellProps) {
-  const shellStyle = { "--rail": `${UI_CONFIG.shell.railWidthPx}px` } as CSSProperties;
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[var(--rail)_1fr] lg:grid-rows-[auto_1fr_auto]" style={shellStyle}>
+    <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] lg:grid-rows-[auto_1fr_auto]">
       <TopBar
         className="lg:col-span-2 lg:row-start-1"
         displayName={user.displayName}

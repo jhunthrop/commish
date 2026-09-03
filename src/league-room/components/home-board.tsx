@@ -14,6 +14,7 @@ import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { AttentionQueue, attentionQueueItemsFrom } from "./attention-queue";
 import { actionHref } from "../lib/action-href";
+import { isHomeBody } from "../lib/home-body";
 import { FirstRunPanel } from "./first-run-panel";
 import { HomeLeagueCard } from "./home-league-card";
 import { LeagueBoard } from "./league-board";
@@ -45,9 +46,6 @@ function someWeekInProgress(body: HomeBody): boolean {
   return body.leagues.some((league) => league.weekStatus === "in_progress");
 }
 
-function isHomeBody(value: unknown): value is HomeBody {
-  return typeof value === "object" && value !== null && Array.isArray((value as { leagues?: unknown }).leagues);
-}
 
 /** Every league on the board is still pre-draft — the manager has no games at all, only a
  *  future draft (F18c). */

@@ -9,11 +9,15 @@ export const UI_CONFIG = {
      * (Task 2), so density and layout change together rather than at two different widths.
      */
     denseFromPx: 1024,
-    /** `AppShell`'s `grid-cols-[var(--rail)_1fr]` column width, px, at `lg` and above — read
-     *  into a `--rail` custom property (`AppShell`'s own inline style, the same "a dynamic
-     *  value has to reach the DOM as a style, not a class" idiom `UI_CONFIG.infoTip.minTargetPx`
-     *  already uses) rather than a Tailwind arbitrary value hardcoded at the call site. */
-    railWidthPx: 64,
+    /** The COLLAPSED rail's own width, px, at `lg` and above (the rail redesign, 2026-09-03:
+     *  the blueprint's 44-56px chip rail). `LeagueRail` reads it into a `--rail-width` custom
+     *  property (the same "a dynamic value has to reach the DOM as a style, not a class" idiom
+     *  `UI_CONFIG.infoTip.minTargetPx` already uses); `AppShell`'s grid column is `auto` and
+     *  simply takes this width — or zero on `/app`, where the rail renders nothing at all. */
+    railWidthPx: 56,
+    /** The OPEN rail — the flyout overlay's width, px (the blueprint's 268px panel). An
+     *  overlay by law 3: opening never moves the grid column above. */
+    railFlyoutWidthPx: 268,
     /** `LeagueRail`'s crest tile, px — the mocks' own 40px tiles reading "BB", "TS", "GH". */
     crestSizePx: 40,
   },

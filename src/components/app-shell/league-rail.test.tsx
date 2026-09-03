@@ -1,13 +1,14 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { renderSurface } from "@/components/ui/test-utils";
+import type { HomeLeagueCard } from "@/league-room/contract";
 import type { RailLeague } from "./shell-data";
-import { LeagueRail } from "./league-rail";
+import { LeagueRail, railHiddenOn } from "./league-rail";
 
 // `LeagueRail` reads `usePathname()` directly (ruling 8, as amended) — mocked the same way
 // `help-level-form.test.tsx` mocks `next/navigation`'s `useRouter`, one module-level mock whose
 // return value a test can move before rendering.
-let pathname = "/app";
+let pathname = "/app/leagues/lg_somewhere";
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
 }));
@@ -18,131 +19,187 @@ function mockPathname(next: string): void {
   pathname = next;
 }
 
+// A quiet default stub so a test that merely OPENS the flyout (with a live league in the
+// fixture) never lets happy-dom fire a real network fetch at teardown; the fetch-specific
+// tests below stub their own.
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ json: async () => ({ ok: false }) }));
+});
+
+afterEach(() => {
+  mockPathname("/app/leagues/lg_somewhere");
+  vi.unstubAllGlobals();
+});
+
 const LEAGUES: readonly RailLeague[] = [
-  { id: "lg_bandits", name: "Bay Bandits", state: "quiet", needsYouKind: null, monogram: "XX", stateLine: "A line" },
-  { id: "lg_thunder", name: "Thunder Squad", state: "needs-you", needsYouKind: "join-draft", monogram: "XX", stateLine: "A line" },
-  { id: "lg_hawks", name: "Golden Hawks", state: "live", needsYouKind: null, monogram: "XX", stateLine: "A line" },
+  // Already in urgency order — `shellData` sorts, the rail renders.
+  { id: "lg_thunder", name: "Thunder Squad", state: "needs-you", needsYouKind: "join-draft", monogram: "TS", stateLine: "Join the draft" },
+  { id: "lg_hawks", name: "Golden Hawks", state: "live", needsYouKind: null, monogram: "GH", stateLine: "Live now" },
+  { id: "lg_bandits", name: "Bay Bandits", state: "quiet", needsYouKind: null, monogram: "BB", stateLine: "4th of 12 · next: vs Mudville Nine" },
 ];
 
+function rail(): HTMLElement {
+  return screen.getByTestId("league-rail");
+}
+
+describe("railHiddenOn", () => {
+  it("hides the rail on its own full page and the standing redirect, nowhere else", () => {
+    expect(railHiddenOn("/app")).toBe(true);
+    expect(railHiddenOn("/app/leagues")).toBe(true);
+    expect(railHiddenOn("/app/leagues/lg_x")).toBe(false);
+    expect(railHiddenOn("/app/wallet")).toBe(false);
+    expect(railHiddenOn(null)).toBe(false);
+  });
+});
+
 describe("LeagueRail", () => {
-  it("names every crest by the league's real name, never its initials", async () => {
+  it("renders nothing at all on /app — the page IS the rail's full form (law 3)", () => {
     mockPathname("/app");
+    render(<LeagueRail leagues={LEAGUES} />);
+    expect(screen.queryByTestId("league-rail")).not.toBeInTheDocument();
+  });
+
+  it("names every chip by the league's real name AND its state line — never its monogram", async () => {
     await renderSurface(<LeagueRail leagues={LEAGUES} />, () => {
-      expect(screen.getByRole("link", { name: "Bay Bandits" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Thunder Squad. Join the draft." })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Golden Hawks. Watch the scores." })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Golden Hawks. Live now." })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Bay Bandits. 4th of 12 · next: vs Mudville Nine." })).toBeInTheDocument();
     });
   });
 
-  // Fix round 1, H1: the missing combination — a needs-you league whose kind is `fix-lineup`
-  // must say so, not fall back to the (unrelated) `join-draft` sentence.
-  it("says 'Fix your lineup', not 'Join the draft', when needsYouKind is fix-lineup", async () => {
-    mockPathname("/app");
-    const leagues: readonly RailLeague[] = [
-      { id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "fix-lineup", monogram: "XX", stateLine: "A line" },
+  it("renders the collision-resolved monogram on the chip, aria-hidden", async () => {
+    const twins: readonly RailLeague[] = [
+      { id: "lg_dire", name: "Dire Straits", state: "quiet", needsYouKind: null, monogram: "DS", stateLine: "3rd of 12" },
+      { id: "lg_dark", name: "Dark Skies", state: "quiet", needsYouKind: null, monogram: "DS2", stateLine: "9th of 12" },
     ];
-    await renderSurface(<LeagueRail leagues={leagues} />, () => {
-      expect(screen.getByRole("link", { name: "Volt Kings. Fix your lineup." })).toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: /Join the draft/ })).not.toBeInTheDocument();
+    await renderSurface(<LeagueRail leagues={twins} />, ({ container }) => {
+      const marks = Array.from(container.querySelectorAll("span[aria-hidden]"))
+        .map((span) => span.textContent)
+        .filter((text) => text === "DS" || text === "DS2");
+      expect(marks).toContain("DS");
+      expect(marks).toContain("DS2");
     });
+  });
+
+  it("gives the + row words and a full accessible name", () => {
+    render(<LeagueRail leagues={LEAGUES} />);
+    const plus = screen.getByRole("link", { name: "Find or start a league" });
+    expect(plus).toHaveAttribute("href", "/app#create-league");
+    expect(plus.textContent).toContain("Find or start a league");
+  });
+
+  it("draws the divider exactly once, before the first quiet league", () => {
+    const { container } = render(<LeagueRail leagues={LEAGUES} />);
+    expect(container.querySelectorAll("span.lg\\:border-t")).toHaveLength(1);
+  });
+
+  it("draws no divider when every league is quiet — there is no boundary to mark", () => {
+    const quiet: readonly RailLeague[] = [
+      { id: "lg_a", name: "Alpha", state: "quiet", needsYouKind: null, monogram: "AL", stateLine: "1st of 8" },
+    ];
+    const { container } = render(<LeagueRail leagues={quiet} />);
+    expect(container.querySelectorAll("span.lg\\:border-t")).toHaveLength(0);
+  });
+
+  it("opens on focus, closes on Escape, and never moves the rail's own track (overlay only)", () => {
+    render(<LeagueRail leagues={LEAGUES} />);
+    expect(rail()).toHaveAttribute("data-expanded", "false");
+    fireEvent.focus(screen.getByRole("link", { name: /Thunder Squad/ }));
+    expect(rail()).toHaveAttribute("data-expanded", "true");
+    // The overlay: the inner panel takes absolute positioning; the nav's own width class —
+    // the grid track — is untouched by opening.
+    expect(rail().className).toContain("lg:w-[var(--rail-width)]");
+    expect(rail().querySelector(".lg\\:absolute")).not.toBeNull();
+    fireEvent.keyDown(rail(), { key: "Escape" });
+    expect(rail()).toHaveAttribute("data-expanded", "false");
+    expect(rail().querySelector(".lg\\:absolute")).toBeNull();
+  });
+
+  it("opens on mouse-enter and closes on mouse-out", () => {
+    render(<LeagueRail leagues={LEAGUES} />);
+    fireEvent.mouseEnter(rail());
+    expect(rail()).toHaveAttribute("data-expanded", "true");
+    fireEvent.mouseLeave(rail());
+    expect(rail()).toHaveAttribute("data-expanded", "false");
+  });
+
+  it("fetches /api/home once on open when a league is live, and upgrades the live line", async () => {
+    const liveCard: Partial<HomeLeagueCard> = {
+      id: "lg_hawks",
+      myTeamId: "t1",
+      weekStatus: "in_progress",
+      nextAction: { kind: "watch-scores", label: "Watch the scores" },
+      matchup: {
+        weekNumber: 4,
+        homeTeamId: "t1",
+        awayTeamId: "t2",
+        homeTeamName: "Mine",
+        awayTeamName: "Theirs",
+        homeScore: 84.2,
+        awayScore: 71.6,
+        final: false,
+        weekStatus: "in_progress",
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: async () => ({ ok: true, data: { leagues: [liveCard], liveState: null, firstRun: null } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<LeagueRail leagues={LEAGUES} />);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.mouseEnter(rail());
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/home");
+    expect(screen.getByRole("link", { name: "Golden Hawks. Live · you lead 84.20 to 71.60." })).toBeInTheDocument();
+    // The other rows keep their shell lines — the upgrade only ever touches live rows.
+    expect(screen.getByRole("link", { name: "Thunder Squad. Join the draft." })).toBeInTheDocument();
+  });
+
+  it("never fetches while closed, and never fetches at all with no live league", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const noLive: readonly RailLeague[] = [
+      { id: "lg_thunder", name: "Thunder Squad", state: "needs-you", needsYouKind: "join-draft", monogram: "TS", stateLine: "Join the draft" },
+      { id: "lg_bandits", name: "Bay Bandits", state: "quiet", needsYouKind: null, monogram: "BB", stateLine: "4th of 12" },
+    ];
+    render(<LeagueRail leagues={noLive} />);
+    await act(async () => {
+      fireEvent.mouseEnter(rail());
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the degraded 'Live now' line when the upgrade fetch fails", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("offline"));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<LeagueRail leagues={LEAGUES} />);
+    await act(async () => {
+      fireEvent.mouseEnter(rail());
+    });
+    expect(screen.getByRole("link", { name: "Golden Hawks. Live now." })).toBeInTheDocument();
   });
 
   it("marks the league the current URL belongs to with aria-current, and no other", () => {
     mockPathname("/app/leagues/lg_bandits/matchups/3");
     render(<LeagueRail leagues={LEAGUES} />);
-    expect(screen.getByRole("link", { name: "Bay Bandits" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Thunder Squad. Join the draft." })).not.toHaveAttribute("aria-current");
-    expect(screen.getByRole("link", { name: "Golden Hawks. Watch the scores." })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: /Bay Bandits/ })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /Thunder Squad/ })).not.toHaveAttribute("aria-current");
+    // D4's visual "you are here" survives the rebuild: the current tile's class differs.
+    expect(screen.getByRole("link", { name: /Bay Bandits/ }).className).toMatch(/ring-edge/);
+    expect(screen.getByRole("link", { name: /Thunder Squad/ }).className).not.toMatch(/ring-edge/);
   });
 
-  // D4: `aria-current="page"` was already set, but every tile shared one class string — the
-  // one persistent navigation in the product had no visual "you are here". The current tile now
-  // carries a real visual state, not just an accessibility attribute.
-  it("gives the current tile a class string that differs from every sibling's", () => {
-    mockPathname("/app/leagues/lg_bandits/matchups/3");
-    render(<LeagueRail leagues={LEAGUES} />);
-    const current = screen.getByRole("link", { name: "Bay Bandits" });
-    const siblingOne = screen.getByRole("link", { name: "Thunder Squad. Join the draft." });
-    const siblingTwo = screen.getByRole("link", { name: "Golden Hawks. Watch the scores." });
-    expect(current.className).not.toBe(siblingOne.className);
-    expect(current.className).not.toBe(siblingTwo.className);
-    // The idiom itself: `ThemeSwitcher`'s own checked-chip treatment (ring-1 ring-edge).
-    expect(current.className).toMatch(/ring-edge/);
-    expect(siblingOne.className).not.toMatch(/ring-edge/);
-  });
-
-  it("hides every state dot from the accessibility tree — the state lives in the accessible name only", async () => {
-    mockPathname("/app");
+  it("hides every state dot and every word span from the accessibility tree", async () => {
     await renderSurface(<LeagueRail leagues={LEAGUES} />, ({ container }) => {
-      const dots = container.querySelectorAll("[data-testid], span");
-      // Every visual dot/crest span is aria-hidden — none is exposed as its own accessible node.
       for (const span of Array.from(container.querySelectorAll("span[aria-hidden]"))) {
         expect(span).toHaveAttribute("aria-hidden", "true");
       }
-      expect(dots.length).toBeGreaterThan(0);
+      // The dots exist, colored by the channel law: amber = yours, red = live.
+      expect(container.querySelector(".bg-accent")).not.toBeNull();
+      expect(container.querySelector(".bg-negative")).not.toBeNull();
     });
-  });
-
-  /**
-   * LAW 1, COLOUR IS A LEGEND. The rail is the product's most persistent navigation, so whatever
-   * legend it teaches is the legend a manager learns. It taught the wrong one twice over: a live
-   * game wore money-green (`positive`), which is the pigment of seats filling and of an action,
-   * and a league waiting on the manager wore amber (`warning`), whose usage law 1 demotes to a
-   * clock that is genuinely tightening. Live is the red family everywhere else in this product
-   * (`WeekStatusBadge`, `GameStateChip`, `Countdown`'s hot tone); an act is money.
-   */
-  it("paints a live game in the live family and a needs-you league in money, never amber", () => {
-    mockPathname("/app");
-    const { container } = render(<LeagueRail leagues={LEAGUES} />);
-    const dots = Array.from(container.querySelectorAll("span[aria-hidden='true'].rounded-pill")).map((n) => n.className);
-    expect(dots.some((c) => c.includes("bg-negative"))).toBe(true);
-    expect(dots.some((c) => c.includes("bg-accent"))).toBe(true);
-    expect(dots.some((c) => c.includes("bg-warning"))).toBe(false);
-    expect(dots.some((c) => c.includes("bg-positive"))).toBe(false);
-  });
-
-  /**
-   * LAW 6, MOTION REPORTS, NEVER PERFORMS. Only the live dot moves, because only it has something
-   * genuinely happening behind it; a needs-you dot is a standing fact and stays still. The
-   * reduced-motion branch is asserted in `use-reduced-motion`'s own suite — here the point is that
-   * the two states differ at all, so a future change cannot quietly make every dot breathe.
-   */
-  it("breathes only on the dot with a live game behind it", () => {
-    mockPathname("/app");
-    const { container } = render(<LeagueRail leagues={LEAGUES} />);
-    const breathing = Array.from(container.querySelectorAll("span.animate-pulse-live")).map((n) => n.className);
-    expect(breathing.length).toBe(1);
-    expect(breathing[0]).toContain("bg-negative");
-  });
-
-  it("stays reachable at 360px as a horizontal strip — overflow-x-auto, never hidden", async () => {
-    mockPathname("/app");
-    await renderSurface(<LeagueRail leagues={LEAGUES} />, ({ getByTestId }) => {
-      expect(getByTestId("league-rail").className).toMatch(/overflow-x-auto/);
-      expect(getByTestId("league-rail").className).not.toMatch(/hidden/);
-    });
-  });
-
-  it("carries a trailing join-or-create control, named for what it does", async () => {
-    mockPathname("/app");
-    await renderSurface(<LeagueRail leagues={LEAGUES} />, () => {
-      expect(screen.getByRole("link", { name: "Join or create another league" })).toHaveAttribute("href", "/app#create-league");
-    });
-  });
-
-  it("renders the rail with no leagues at all — just the trailing control", async () => {
-    mockPathname("/app");
-    await renderSurface(<LeagueRail leagues={[]} />, () => {
-      expect(screen.getByRole("link", { name: "Join or create another league" })).toBeInTheDocument();
-    });
-  });
-
-  it("scrolls inside itself at lg — capped at the viewport, stuck to it, never dragging the page (E11)", () => {
-    render(<LeagueRail leagues={LEAGUES} />);
-    const rail = screen.getByTestId("league-rail");
-    expect(rail.className).toContain("lg:max-h-dvh");
-    expect(rail.className).toContain("lg:overflow-y-auto");
-    expect(rail.className).toContain("lg:sticky");
-    expect(rail.className).not.toContain("lg:overflow-visible");
   });
 });

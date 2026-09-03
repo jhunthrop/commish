@@ -19,10 +19,11 @@ function mockPathname(next: string): void {
 }
 
 const RAIL: readonly RailLeague[] = [
-  { id: "lg_bandits", name: "Bay Bandits", state: "quiet", needsYouKind: null, monogram: "XX", stateLine: "A line" },
-  // "needs-you" can be either "join-draft" or "fix-lineup" (Task 10 Step 1b, F1) —
-  // `needsYouKind` is what tells `LeagueRail` which sentence to say.
-  { id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "join-draft", monogram: "XX", stateLine: "A line" },
+  // Already in urgency order — `shellData` sorts before the shell ever renders.
+  // "needs-you" can be either "join-draft" or "fix-lineup" (Task 10 Step 1b, F1); the state
+  // line carries the sentence (`railStateLine` built it from `nextAction.label`).
+  { id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "join-draft", monogram: "VK", stateLine: "Join the draft" },
+  { id: "lg_bandits", name: "Bay Bandits", state: "quiet", needsYouKind: null, monogram: "BB", stateLine: "3rd of 12" },
 ];
 
 function baseProps(): AppShellProps {
@@ -47,7 +48,8 @@ function renderShell(props: AppShellProps) {
 
 describe("AppShell", () => {
   it("renders one banner, one league rail, one footer nav and one main, so a screen reader hears a place", async () => {
-    mockPathname("/app");
+    // Not "/app": that page is the rail's own full form, where the rail correctly renders null.
+    mockPathname("/app/wallet");
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
@@ -117,7 +119,7 @@ describe("AppShell", () => {
     // The rail is 40px tiles reading two-letter initials. Initials are a VISUAL compression and
     // are meaningless read aloud; the accessible name is the league, and the state dot is
     // words. The action half of the name is the one string COPY owns in `next-action.ts` (C2).
-    mockPathname("/app");
+    mockPathname("/app/wallet");
     const { getByRole } = renderShell(baseProps());
     expect(getByRole("link", { name: "Volt Kings. Join the draft." })).toBeInTheDocument();
   });
@@ -125,10 +127,10 @@ describe("AppShell", () => {
   // Fix round 1, H1: the missing combination that let a hardcoded "needs-you" -> "join-draft"
   // map ship — a manager whose LINEUP is unset must never hear "Join the draft."
   it("says 'Fix your lineup', not 'Join the draft', for a needs-you league whose kind is fix-lineup", () => {
-    mockPathname("/app");
+    mockPathname("/app/wallet");
     const props: AppShellProps = {
       ...baseProps(),
-      rail: [{ id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "fix-lineup", monogram: "XX", stateLine: "A line" }],
+      rail: [{ id: "lg_volt", name: "Volt Kings", state: "needs-you", needsYouKind: "fix-lineup", monogram: "VK", stateLine: "Fix your lineup" }],
     };
     const { getByRole, queryByRole } = renderShell(props);
     expect(getByRole("link", { name: "Volt Kings. Fix your lineup." })).toBeInTheDocument();
@@ -136,10 +138,17 @@ describe("AppShell", () => {
   });
 
   it("keeps the rail reachable at 360px by becoming a horizontal strip, not by disappearing", () => {
-    mockPathname("/app");
+    mockPathname("/app/wallet");
     const { getByTestId } = renderShell(baseProps());
-    expect(getByTestId("league-rail").className).toMatch(/overflow-x-auto/);
+    // The strip's scroll lives on the row container inside the nav now (the flyout rebuild).
+    expect(getByTestId("league-rail").querySelector(".overflow-x-auto")).not.toBeNull();
     expect(getByTestId("league-rail").className).not.toMatch(/hidden/);
+  });
+
+  it("renders no league rail at all on /app — the page is the rail's own full form (law 3)", () => {
+    mockPathname("/app");
+    const { queryByRole } = renderShell(baseProps());
+    expect(queryByRole("navigation", { name: "Your leagues" })).not.toBeInTheDocument();
   });
 
   it("renders no max-w-* on <main> — full-bleed frames, measured paragraphs (Step 2)", () => {
