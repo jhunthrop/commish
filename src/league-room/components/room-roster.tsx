@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Avatar, Badge } from "@/components/ui";
+import { Avatar, Badge, Card } from "@/components/ui";
 import { TIER_COMPOSITION_LABEL, type CompositionCategory } from "@/participation/composition";
 import type { LeagueMemberCard } from "../contract";
 
@@ -34,7 +34,7 @@ export interface RoomRosterProps {
 export function RoomRoster({ leagueId, teams, teamCount, myTeamId, compositionCategory, canInvite }: RoomRosterProps) {
   const openSeats = Math.max(0, teamCount - teams.length);
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-line bg-surface-elevated p-4" aria-label="The room">
+    <Card as="section" className="flex flex-col gap-3" aria-label="The room">
       {/* Gauntlet fix wave, NEW-9: `SeatMeter` used to render here too — `WaitingRoom`'s own hero,
           immediately above this panel, already owns the "N of 12 seated" sentence (F17); a second
           meter within 200px said the same fact twice. `Badge` alone stays: composition is a fact
@@ -61,6 +61,6 @@ export function RoomRoster({ leagueId, teams, teamCount, myTeamId, compositionCa
           Invite someone
         </Link>
       ) : null}
-    </section>
+    </Card>
   );
 }

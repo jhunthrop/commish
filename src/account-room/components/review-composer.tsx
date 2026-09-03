@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import { Button, Textarea } from "@/components/ui";
+import { Button, Card, Textarea } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { REVIEW_CONFIG, removalSentenceFor } from "@/reviews/config";
 import { validateReviewDraft } from "@/reviews/validate";
@@ -29,7 +29,7 @@ export interface ReviewComposerProps {
  */
 function RemovedNotice({ reason }: { readonly reason: string | null }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface-elevated p-4">
+    <Card className="flex flex-col gap-2">
       <p className="text-sm font-medium text-text-primary">{removalSentenceFor(reason)}</p>
       <p className="text-sm text-text-muted">
         Everything you wrote is kept on record, and it no longer appears in public.{" "}
@@ -38,7 +38,7 @@ function RemovedNotice({ reason }: { readonly reason: string | null }) {
         </Link>
         .
       </p>
-    </div>
+    </Card>
   );
 }
 

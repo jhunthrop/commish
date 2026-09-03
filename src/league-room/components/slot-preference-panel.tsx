@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { SlotPreferenceView } from "../contract";
-import { Button, EYEBROW } from "@/components/ui";
+import { Button, Card, EYEBROW } from "@/components/ui";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 /**
@@ -56,7 +56,7 @@ function resultSentence(ranking: readonly number[], assignedSlot: number): strin
 // shipped with. Still a `<li>` holding real, named `<button>`s: the restyle changes the shape,
 // never the affordance — dragging was never the only way to move a slot here, but it was the
 // mock's own HIGH accessibility finding, so this stays explicit rather than implied.
-const TILE = "flex shrink-0 items-center gap-1 rounded-md border border-line bg-surface px-2 py-1.5";
+const TILE = "flex shrink-0 items-center gap-1 rounded-md bg-surface px-2 py-1.5";
 
 export interface SlotPreferencePanelProps {
   readonly leagueId: string;
@@ -117,10 +117,10 @@ export function SlotPreferencePanel({ leagueId, initialPreference }: SlotPrefere
     // half-true sentence.
     if (preference.assignedSlot === null) return null;
     return (
-      <div className="flex flex-col gap-1 rounded-lg border border-line bg-surface-elevated p-4">
+      <Card className="flex flex-col gap-1">
         <h2 className={`${EYEBROW} text-text-muted`}>Draft slot</h2>
         <p className="text-sm text-text-primary">{resultSentence(preference.ranking, preference.assignedSlot)}</p>
-      </div>
+      </Card>
     );
   }
 
@@ -128,7 +128,7 @@ export function SlotPreferencePanel({ leagueId, initialPreference }: SlotPrefere
   const unranked = allSlots.filter((slot) => !ranking.includes(slot));
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-elevated p-4">
+    <Card className="flex flex-col gap-3">
       <h2 className={`${EYEBROW} text-text-muted`}>Draft slot</h2>
       <p className="text-sm text-text-muted">{SLOT_PREFERENCE_EXPLAINER}</p>
 
@@ -189,6 +189,6 @@ export function SlotPreferencePanel({ leagueId, initialPreference }: SlotPrefere
           {error}
         </p>
       )}
-    </div>
+    </Card>
   );
 }

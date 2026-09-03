@@ -37,7 +37,7 @@ function metaLine(summary: MockDebriefSummary): string {
 function HighlightRow({ highlight, teamCount }: { readonly highlight: MockDebriefHighlight; readonly teamCount: number }) {
   const reach = highlight.bestAvailableDelta >= DRAFT_ROOM_CONFIG.debrief.reachRankedHigher;
   return (
-    <li className="flex items-center gap-2.5 rounded-md border border-line px-3 py-2">
+    <li className="flex items-center gap-2.5 rounded-md bg-surface-raised px-3 py-2">
       <span className="w-10 shrink-0 font-mono text-xs tabular-nums text-text-muted">
         {formatPickSlot(highlight.pickNumber, teamCount)}
       </span>
@@ -57,7 +57,7 @@ function HighlightRow({ highlight, teamCount }: { readonly highlight: MockDebrie
 
 function StatTile({ value, caption }: { readonly value: string; readonly caption: string }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-md border border-line bg-surface-elevated px-3 py-2.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-md bg-surface-raised px-3 py-2.5">
       <span className="font-display text-xl font-bold tabular-nums text-text-primary">{value}</span>
       <span className="text-xs text-text-faint">{caption}</span>
     </div>
@@ -74,7 +74,7 @@ export function LearningColumn({ summaries }: { readonly summaries: readonly Moc
     <div className="flex min-w-0 flex-col gap-3">
       <h2 className={`${MICRO_LABEL} text-text-faint`}>{MOCK_COPY.learningHeading}</h2>
 
-      <section aria-label={MOCK_COPY.learningHeading} className="flex flex-col gap-3 rounded-lg border border-line p-4">
+      <section aria-label={MOCK_COPY.learningHeading} className="flex flex-col gap-3 rounded-lg bg-surface-elevated p-4 shadow-card">
         <div className="flex flex-wrap items-baseline gap-3">
           <span className="text-sm font-semibold text-text-primary">{metaLine(latest)}</span>
           <span className="font-mono text-xs tabular-nums text-text-faint">{formatGap(latest.startedAgoMs)} ago</span>
@@ -121,7 +121,7 @@ export function LearningColumn({ summaries }: { readonly summaries: readonly Moc
           <h2 className={`${MICRO_LABEL} text-text-faint`}>{MOCK_COPY.earlierHeading}</h2>
           <ul aria-label={MOCK_COPY.earlierHeading} className="flex flex-col gap-1.5">
             {earlier.map((summary) => (
-              <li key={summary.draftId} className="flex flex-wrap items-center gap-3 rounded-md border border-line px-3 py-2">
+              <li key={summary.draftId} className="flex flex-wrap items-center gap-3 rounded-md bg-surface-elevated px-3 py-2">
                 <span className="text-sm font-semibold text-text-primary">{metaLine(summary)}</span>
                 <span className="font-mono text-xs tabular-nums text-text-faint">{formatGap(summary.startedAgoMs)} ago</span>
                 <span className="ml-auto font-mono text-xs tabular-nums text-text-muted">

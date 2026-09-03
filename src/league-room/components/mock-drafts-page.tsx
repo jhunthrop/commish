@@ -67,7 +67,7 @@ export interface MockDraftsPageProps {
  *  blueprint simply had no live room to show. Quiet, and never the amber solid. */
 function ReentryRow({ room }: { readonly room: MyMockRoomSummary }) {
   return (
-    <li className="flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface-elevated px-3 py-2">
+    <li className="flex flex-wrap items-center gap-3 rounded-md bg-surface-elevated px-3 py-2">
       {room.status === "in_progress" ? (
         <span className={`${MICRO_LABEL} rounded-sm bg-live px-2 py-0.5 font-semibold text-live-text`}>
           {STATUS_ROW_LABEL.in_progress}
@@ -201,7 +201,7 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
           budget reserves for the button primitive); the ONE solid is the button. */}
       <section
         aria-label="Draft against the bots"
-        className="flex flex-col gap-3 rounded-lg border border-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent p-4"
+        className="flex flex-col gap-3 rounded-lg bg-surface-elevated bg-gradient-to-r from-accent-glow via-transparent to-transparent p-4 shadow-card ring-2 ring-accent/40"
       >
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex min-w-0 flex-col gap-0.5">
@@ -218,9 +218,9 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
       </section>
 
       {/* LAW 2: people are a door. Outline verbs, and the lobby list only when it has rows. */}
-      <section aria-label="Draft with people" className="flex flex-col gap-2 rounded-lg border border-line p-4">
+      <section aria-label="Draft with people" className="flex flex-col gap-2 rounded-lg bg-surface-elevated p-4 shadow-card">
         <h2 className={`${MICRO_LABEL} text-text-faint`}>Draft with people</h2>
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface-elevated px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-3 rounded-md bg-surface-raised px-3 py-2.5">
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-sm font-semibold text-text-primary">Open a lobby room</span>
             <span className="text-xs text-text-muted">{copy.openLobbyDetail}</span>
@@ -231,7 +231,7 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
             </Button>
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface-elevated px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-3 rounded-md bg-surface-raised px-3 py-2.5">
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-sm font-semibold text-text-primary">Mock with your crew</span>
             <span className="text-xs text-text-muted">{copy.crewDetail}</span>
@@ -248,7 +248,7 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
             {[...open]
               .sort((a, b) => a.seatsOpen - b.seatsOpen)
               .map((room) => (
-                <li key={room.shareCode} className="flex flex-wrap items-center gap-3 rounded-md border border-line px-3 py-2">
+                <li key={room.shareCode} className="flex flex-wrap items-center gap-3 rounded-md bg-surface-raised px-3 py-2">
                   <span className="font-mono text-xs tabular-nums text-text-muted" data-testid="lobby-seats">
                     {room.teamCount - room.seatsOpen} of {room.teamCount} seated · fires when full
                   </span>
@@ -273,7 +273,7 @@ export function MockDraftsPage({ initialOpen, initialMine, options, copy }: Mock
       </section>
 
       {/* The practice loop's tie-in to the real room — a sentence, not a control. */}
-      <p className="rounded-lg border border-line px-4 py-3 text-xs text-text-muted">{copy.sheetTieIn}</p>
+      <p className="rounded-lg bg-surface-elevated px-4 py-3 text-xs text-text-muted">{copy.sheetTieIn}</p>
     </div>
   );
 }
