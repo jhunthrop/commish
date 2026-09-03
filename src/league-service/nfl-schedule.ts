@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { kickoffInstant } from "./kickoff";
 import type { getDb } from "@/db/client";
 import { nflGames } from "@/db/schema";
+import { LEAGUE_CONFIG } from "@/league";
 
 type Db = ReturnType<typeof getDb>;
 
@@ -54,6 +55,43 @@ export async function fixtureLabelsByTeam(db: Db, week: number): Promise<Readonl
     labels.set(game.away, { opp: `@ ${game.home}`, when, status: game.status });
   }
   return labels;
+}
+
+/**
+ * EACH TEAM'S BYE WEEK, derived from the real ingested schedule rather than declared by a feed:
+ * the one regular-season week (1..{@link LEAGUE_CONFIG.regularSeasonWeeks}) in which a team that
+ * otherwise plays every week has no fixture. Derivation keeps it honest the same way
+ * `fixtureLabelsByTeam`'s bye story is honest — an absence in `nfl_games` is a fact about the
+ * schedule, not an invention.
+ *
+ * A team missing MORE than one week inside the range is omitted, deliberately: that is a
+ * partially ingested schedule, and naming its first hole "the bye" would state a fact the data
+ * does not contain. A team playing all fourteen weeks (possible while byes land in weeks the
+ * regular season doesn't reach) is likewise absent — it has no bye to report. One query, filtered
+ * to the window in the database, grouped here.
+ */
+export async function byeWeeksByTeam(db: Db): Promise<ReadonlyMap<string, number>> {
+  const rows = await db
+    .select({ week: nflGames.week, home: nflGames.homeNflTeam, away: nflGames.awayNflTeam })
+    .from(nflGames)
+    .where(and(gte(nflGames.week, 1), lte(nflGames.week, LEAGUE_CONFIG.regularSeasonWeeks)));
+  const playedWeeks = new Map<string, Set<number>>();
+  for (const game of rows) {
+    for (const team of [game.home, game.away]) {
+      const played = playedWeeks.get(team) ?? new Set<number>();
+      played.add(game.week);
+      playedWeeks.set(team, played);
+    }
+  }
+  const byes = new Map<string, number>();
+  for (const [team, played] of playedWeeks) {
+    const missing: number[] = [];
+    for (let week = 1; week <= LEAGUE_CONFIG.regularSeasonWeeks; week += 1) {
+      if (!played.has(week)) missing.push(week);
+    }
+    if (missing.length === 1) byes.set(team, missing[0]!);
+  }
+  return byes;
 }
 
 /**

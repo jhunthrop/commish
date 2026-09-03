@@ -124,6 +124,79 @@ export async function freeAgents(db: Db, input: FreeAgentsInput): Promise<{ read
   };
 }
 
+export interface PendingWaiverClaim {
+  readonly claimId: string;
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly position: Position;
+  /** ISO instant the window closes — `league_waivers.until`, or filed-at plus the standard
+   *  window when the row is already gone (see `pendingWaiverClaims`). */
+  readonly clearsAt: string;
+  /** 1-based rank among ALL pending claims on the same player, in exact award order. */
+  readonly queuePosition: number;
+}
+
+/**
+ * THE CALLER TEAM'S PENDING WAIVER CLAIMS, each with where it sits in line. `queuePosition`
+ * ranks every pending claim on the same player by the EXACT order `processWaivers` awards in —
+ * `teams.waiver_priority` ascending, then filed-at ascending — so "1" means "his to lose", and
+ * anything higher names how many teams stand ahead. Telling a manager his true place is the
+ * disclosure half of the waiver system: the award order is deterministic, so it can be shown
+ * before it runs rather than discovered after.
+ *
+ * `clearsAt` reads the player's `league_waivers.until` row. A pending claim whose window row is
+ * already gone (processing is lazy — the row dies on the touch that resolves the claims, so this
+ * is a between-ticks read, not steady state) falls back to filed-at plus the standard
+ * {@link WAIVER_PERIOD_HOURS} window rather than inventing a null. Two queries total, however
+ * many claims the team has filed.
+ */
+export async function pendingWaiverClaims(db: Db, leagueId: string, teamId: string): Promise<readonly PendingWaiverClaim[]> {
+  const mine = await db
+    .select({
+      claimId: waiverClaims.id,
+      playerId: waiverClaims.addPlayerId,
+      playerName: players.name,
+      position: players.position,
+      until: leagueWaivers.until,
+      createdAt: waiverClaims.createdAt,
+    })
+    .from(waiverClaims)
+    .innerJoin(players, eq(players.id, waiverClaims.addPlayerId))
+    .leftJoin(leagueWaivers, and(eq(leagueWaivers.leagueId, waiverClaims.leagueId), eq(leagueWaivers.playerId, waiverClaims.addPlayerId)))
+    .where(and(eq(waiverClaims.leagueId, leagueId), eq(waiverClaims.teamId, teamId), eq(waiverClaims.status, "pending")));
+  if (mine.length === 0) return [];
+
+  // Every pending claim in the league, in `processWaivers`' own award order; ranked per player
+  // here. One query regardless of how many players the team has bid on.
+  const queue = await db
+    .select({ id: waiverClaims.id, playerId: waiverClaims.addPlayerId })
+    .from(waiverClaims)
+    .innerJoin(teams, eq(teams.id, waiverClaims.teamId))
+    .where(and(eq(waiverClaims.leagueId, leagueId), eq(waiverClaims.status, "pending")))
+    .orderBy(asc(teams.waiverPriority), asc(waiverClaims.createdAt));
+  const rankByClaimId = new Map<string, number>();
+  const bidsSeenForPlayer = new Map<string, number>();
+  for (const bid of queue) {
+    const rank = (bidsSeenForPlayer.get(bid.playerId) ?? 0) + 1;
+    bidsSeenForPlayer.set(bid.playerId, rank);
+    rankByClaimId.set(bid.id, rank);
+  }
+
+  return mine
+    .map((row) => ({
+      claimId: row.claimId,
+      playerId: row.playerId,
+      playerName: row.playerName,
+      position: row.position,
+      clearsAt: (row.until ?? new Date(row.createdAt.getTime() + WAIVER_PERIOD_HOURS * 3_600_000)).toISOString(),
+      // Every row in `mine` is a pending claim in this league, so the full-league queue above
+      // necessarily ranked it — asserted, not branch-guarded (the test-support convention: a
+      // runtime check for a case the filters make impossible would be an uncoverable branch).
+      queuePosition: rankByClaimId.get(row.claimId)!,
+    }))
+    .sort((a, b) => a.clearsAt.localeCompare(b.clearsAt) || a.playerName.localeCompare(b.playerName));
+}
+
 export interface ClaimInput {
   readonly leagueId: string;
   readonly userId: string;
