@@ -117,7 +117,13 @@ export function DrawerPoolTab({ players, available, byeWeeks, reasons, focusSear
                 }
                 verdict={
                   <>
-                    {edges === null ? null : <Badge tone="neutral">{edges.split(" · ")[0]}</Badge>}
+                    {/* The edge count is a desktop luxury: a 390pt row spends its width on the
+                        name, the meta and the verb, and the peek carries the edges. */}
+                    {edges === null ? null : (
+                      <span className="hidden md:inline">
+                        <Badge tone="neutral">{edges.split(" · ")[0]}</Badge>
+                      </span>
+                    )}
                     {gap === 0 ? null : <Movement places={gap} against="the market" />}
                   </>
                 }

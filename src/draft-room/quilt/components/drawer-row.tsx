@@ -41,14 +41,16 @@ export function DrawerRow({ player, positionRank, rank, rankAccent = false, meta
         <span className={`w-6 shrink-0 text-right font-display text-sm font-bold tabular-nums ${rankAccent ? "text-accent" : "text-text-faint"}`}>{rank}</span>
       )}
       <PositionBadge position={player.position} rank={positionRank} size="sm" />
-      <button
-        type="button"
-        onClick={() => onPeek(player.id)}
-        className={`min-w-0 truncate text-left font-display text-md font-semibold focus-visible:outline-2 focus-visible:outline-accent ${drafted ? "text-text-faint line-through" : "text-text-primary"}`}
-      >
-        {player.name}
-      </button>
-      {meta === undefined ? null : <span className="min-w-0 truncate text-xs text-text-faint">{meta}</span>}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <button
+          type="button"
+          onClick={() => onPeek(player.id)}
+          className={`w-full truncate text-left font-display text-md font-semibold focus-visible:outline-2 focus-visible:outline-accent ${drafted ? "text-text-faint line-through" : "text-text-primary"}`}
+        >
+          {player.name}
+        </button>
+        {meta === undefined ? null : <span className="min-w-0 truncate text-xs text-text-faint">{meta}</span>}
+      </span>
       <span className="ml-auto flex shrink-0 items-center gap-2">
         {verdict}
         {actions}

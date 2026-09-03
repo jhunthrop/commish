@@ -25,9 +25,10 @@ test("photograph the quilt's key states", async ({ managerA }) => {
   await managerA.goto("/");
   await managerA.getByRole("link", { name: "Try a mock draft" }).click();
   await expect(managerA).toHaveURL(/\/app\/mock-drafts$/);
-  await managerA.getByLabel("Teams").selectOption(String(TEAM_COUNT));
-  await managerA.getByLabel("Pick clock").selectOption(String(PICK_SECONDS));
-  await managerA.getByLabel("Draft position").selectOption(String(TEAM_COUNT));
+  // The lobby's config is segment groups now, not selects — click the option's own button.
+  await managerA.getByRole("group", { name: "Teams" }).getByRole("button", { name: String(TEAM_COUNT), exact: true }).click();
+  await managerA.getByRole("group", { name: "Pick clock" }).getByRole("button", { name: `${PICK_SECONDS}s`, exact: true }).click();
+  await managerA.getByRole("group", { name: "Draft position" }).getByRole("button", { name: String(TEAM_COUNT), exact: true }).click();
   await expect(async () => {
     await managerA.getByRole("button", { name: "Start mock draft" }).click();
     await expect(managerA).toHaveURL(/\/app\/drafts\//, { timeout: 5_000 });
@@ -39,10 +40,13 @@ test("photograph the quilt's key states", async ({ managerA }) => {
 
   const strip = managerA.getByTestId("clock-strip");
 
-  // 1 — RESTING: bots are picking, the quilt owns the stage, the drawer is the chip row.
-  await expect(strip).toHaveAttribute("data-strip-state", "resting", { timeout: 30_000 });
-  await managerA.waitForTimeout(1_500);
-  await managerA.screenshot({ path: `${OUT_DIR}/quilt-resting.png` });
+  // A 12-team solo room on the last slot reaches the host's turn fast (bot picks are seconds),
+  // so the states are photographed in the order the room actually produces them.
+
+  // 1 — YOUR TURN: the strip swells amber; eleven bot picks are already on the quilt.
+  await expect(strip).toHaveAttribute("data-strip-state", "your-turn", { timeout: ON_CLOCK_TIMEOUT_MS });
+  await managerA.waitForTimeout(1_000);
+  await managerA.screenshot({ path: `${OUT_DIR}/quilt-your-turn.png` });
 
   // 2 — DRAWER AT HALF: space borrows the stage's lower edge.
   await managerA.keyboard.press(" ");
@@ -50,27 +54,45 @@ test("photograph the quilt's key states", async ({ managerA }) => {
   await managerA.screenshot({ path: `${OUT_DIR}/quilt-drawer-half.png` });
   await managerA.keyboard.press("Escape");
 
-  // 3 — PEEK: the first landed pick's cell opens the dense card over the right edge.
-  const firstCell = managerA.getByTestId("quilt-pick-cell").first();
-  await expect(firstCell).toBeVisible({ timeout: 60_000 });
-  await firstCell.click();
+  // 3 — PEEK: a landed pick's cell opens the dense card over the right edge.
+  await managerA.getByTestId("quilt-pick-cell").first().click();
   await expect(managerA.getByTestId("peek-sheet")).toBeVisible();
   await managerA.screenshot({ path: `${OUT_DIR}/quilt-peek.png` });
   await managerA.keyboard.press("Escape");
 
-  // 4 — YOUR TURN: the strip swells amber. Last slot, so eleven bot picks precede it.
-  await expect(strip).toHaveAttribute("data-strip-state", "your-turn", { timeout: ON_CLOCK_TIMEOUT_MS });
-  await managerA.waitForTimeout(1_000);
-  await managerA.screenshot({ path: `${OUT_DIR}/quilt-your-turn.png` });
+  // 4 — THE PICK MOMENT: DRAFT opens the undo window; the pick leaves only when it expires.
+  await strip.getByRole("button", { name: "Draft" }).first().click();
+  await expect(managerA.getByTestId("quilt-room").getByTestId("undo-pill")).toBeVisible();
+  await managerA.screenshot({ path: `${OUT_DIR}/quilt-undo-pill.png` });
+  await expect(managerA.getByTestId("quilt-room").getByTestId("undo-pill")).toBeHidden({ timeout: 10_000 });
 
-  // 5 — PHONE, YOUR TURN + POOL: the inversion, big verbs, amber takeover header.
+  // 5 — RESTING: the room's clock is somebody else's. A solo mock's bots pick in seconds, so
+  // the resting state is a short window — keep making our own picks (the snake's last seat
+  // picks twice back to back) and photograph the first resting frame that shows itself. If the
+  // bots chain too fast to ever catch one, say so and move on: the shot is a design tool.
+  let restingShot = false;
+  for (let attempt = 0; attempt < 4 && !restingShot; attempt += 1) {
+    try {
+      await expect(strip).toHaveAttribute("data-strip-state", "resting", { timeout: 20_000 });
+      await managerA.screenshot({ path: `${OUT_DIR}/quilt-resting.png` });
+      restingShot = true;
+    } catch {
+      const drafts = strip.getByRole("button", { name: "Draft" });
+      if ((await drafts.count()) === 0) break;
+      await drafts.first().click();
+      await expect(managerA.getByTestId("quilt-room").getByTestId("undo-pill")).toBeHidden({ timeout: 10_000 });
+    }
+  }
+  if (!restingShot) console.log("[shot] resting state never held long enough to photograph");
+
+  // 6 — PHONE: the inversion, pool first with big verbs.
   await managerA.setViewportSize({ width: 390, height: 844 });
   await managerA.waitForTimeout(500);
-  await managerA.screenshot({ path: `${OUT_DIR}/quilt-mobile-your-turn.png` });
+  await managerA.screenshot({ path: `${OUT_DIR}/quilt-mobile-pool.png` });
 
-  // 6 — PHONE, THE BOARD TAB: the quilt as micro tiles.
+  // 7 — PHONE, THE BOARD TAB: the quilt as micro tiles.
   await managerA.getByRole("button", { name: "BOARD" }).click();
   await managerA.waitForTimeout(300);
   await managerA.screenshot({ path: `${OUT_DIR}/quilt-mobile-board.png` });
-  console.log(`[shot] wrote 6 states into ${OUT_DIR}`);
+  console.log(`[shot] wrote 7 states into ${OUT_DIR}`);
 });

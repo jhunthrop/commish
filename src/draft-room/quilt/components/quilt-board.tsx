@@ -121,7 +121,9 @@ function QuiltRowView({ row, view, playersById, myTeamId, lens, byeWeeks, boardR
 
   if (isMicro) {
     return (
-      <div className={GRID} style={columns} data-testid={`quilt-round-${row.round}`} data-round-kind="micro">
+      // Micro rows share a sliver of the slack too, capped low — the compacted past keeps its
+      // shape while the stage never ends in a dead band under R15.
+      <div className={`${GRID} min-h-0 max-h-7 grow basis-4`} style={columns} data-testid={`quilt-round-${row.round}`} data-round-kind="micro">
         {label}
         {row.cells.map((cell) => {
           const player = cell.pick === null ? null : (playersById.get(cell.pick.playerId) ?? null);
@@ -147,7 +149,15 @@ function QuiltRowView({ row, view, playersById, myTeamId, lens, byeWeeks, boardR
   }
 
   return (
-    <div className={GRID} style={columns} data-testid={`quilt-round-${row.round}`} data-round-kind={row.kind}>
+    // The present deserves the space: the active round grows hardest, the track round takes a
+    // smaller share, and the micro rows above stay compact — 15 rounds, zero scroll, no dead
+    // stage under the last one.
+    <div
+      className={`${GRID} ${row.kind === "full" ? "min-h-0 max-h-24 grow-[3] basis-0" : "min-h-0 max-h-20 grow-[2] basis-0"}`}
+      style={columns}
+      data-testid={`quilt-round-${row.round}`}
+      data-round-kind={row.kind}
+    >
       {label}
       {row.cells.map((cell) => (
         <QuiltCellView
