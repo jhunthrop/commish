@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { preseasonProjections } from "@/db/schema";
+import type { Db } from "@/db/client";
 import { createTestDb, truncateAll, truncateJobTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
@@ -163,10 +165,45 @@ describe("the freeze step refuses terminally, end-to-end", () => {
     ]);
   }
 
-  async function runFreezeStep(stepClock: Clock): Promise<void> {
+  async function runFreezeStep(stepClock: Clock, stepDb: Db = db): Promise<void> {
     const definition = seasonWeekJobWith(cannedNetwork);
-    await definition.runRemainingSteps({ db, clock: stepClock }, { season: SEASON }, COMPLETED_BEFORE_FREEZE, async () => {});
+    await definition.runRemainingSteps({ db: stepDb, clock: stepClock }, { season: SEASON }, COMPLETED_BEFORE_FREEZE, async () => {});
   }
+
+  /**
+   * A db whose ONE generation-check query fails like a dropped connection (fix round 2, HIGH-A).
+   * `assertSingleGeneration` is the only freeze-path caller of `selectDistinctOn` over the
+   * `as_of` column — kickoffs, benchmarks and the board read either use `select` or distinct on
+   * other columns — so matching on that exact column poisons precisely the query the finding
+   * names and nothing before it.
+   */
+  function poisonGenerationCheck(realDb: Db): Db {
+    return new Proxy(realDb, {
+      get(target, prop, receiver) {
+        if (prop !== "selectDistinctOn") return Reflect.get(target, prop, receiver);
+        return (...args: unknown[]) => {
+          const columns = args[0] as readonly unknown[] | undefined;
+          if (Array.isArray(columns) && columns[0] === preseasonProjections.asOf) {
+            throw new Error("connection terminated unexpectedly");
+          }
+          return (target.selectDistinctOn as (...a: unknown[]) => unknown)(...args);
+        };
+      },
+    }) as Db;
+  }
+
+  it("classifies a transient error DURING the generation check retryable, never stitched-terminal", async () => {
+    await seedKickoff();
+    // Healthy store, sick connection: the exact case the first fix got wrong by wrapping
+    // everything assertSingleGeneration threw into a terminal refusal.
+    const failure = await runFreezeStep({ now: () => "2026-09-08T12:00:00.000Z" }, poisonGenerationCheck(db)).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(TerminalJobError);
+    expect((failure as Error).message).toContain("connection terminated unexpectedly");
+  });
 
   it("classifies past-kickoff terminal when kickoff passes between the pick and the freeze", async () => {
     await seedKickoff();

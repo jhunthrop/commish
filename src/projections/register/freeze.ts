@@ -2,7 +2,7 @@ import type { Db } from "@/db/client";
 import type { Clock } from "@/domain/timing";
 import type { JsonObject } from "@/domain/audit";
 import { kickoffInstantsByWeek } from "../team-store";
-import { assertSingleGeneration, preseasonProjectionsAsOf } from "../preseason/board-store";
+import { StitchedGenerationsError, assertSingleGeneration, preseasonProjectionsAsOf } from "../preseason/board-store";
 import { RegisterRefusalError } from "./errors";
 import { BENCHMARK_SOURCES } from "../preseason/benchmarks";
 import { preseasonRankingsAsOf } from "../preseason/store";
@@ -149,15 +149,18 @@ export async function takeFreeze(db: Db, { season, week }: FreezeRequest, clock:
   const boards: readonly FreezeBoard[] = await Promise.all(
     REGISTER_BOARD_SOURCES.map(async ({ source, role }): Promise<FreezeBoard> => {
       // A stitched two-generation read anywhere else is a bad page render; here it becomes an
-      // immutable weekly claim the whole season grades against. Fail loud before recording,
-      // wrapped into the register's own typed refusal (board-store's error untouched) so the job
-      // system classifies this terminal the same way it does every other refusal here.
+      // immutable weekly claim the whole season grades against. Fail loud before recording. ONLY
+      // the integrity violation itself becomes a typed refusal (fix round 2, HIGH-A): board-store
+      // now names it `StitchedGenerationsError`, and anything else this call throws — a dropped
+      // connection, a restarting database — rethrows untouched, because wrapping the weather too
+      // was dead-lettering a retryable freeze.
       try {
         await assertSingleGeneration(db, { season, source, asOf: frozenAt });
       } catch (error: unknown) {
-        throw new RegisterRefusalError("stitched_generations", error instanceof Error ? error.message : String(error), {
-          cause: error,
-        });
+        if (error instanceof StitchedGenerationsError) {
+          throw new RegisterRefusalError("stitched_generations", error.message, { cause: error });
+        }
+        throw error;
       }
       const board = await preseasonProjectionsAsOf(db, { season, source, asOf: frozenAt });
       const rows: readonly RegisterFreezeRow[] = board.map((entry) => {
