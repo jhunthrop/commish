@@ -13,7 +13,9 @@ const FORMATS = [
   { value: "snake", label: "Snake" },
   { value: "auction", label: "Auction" },
 ];
-const TEAM_COUNTS = [8, 10, 12, 14, 16].map((n) => ({ value: String(n), label: `${n} teams` }));
+/** Exported (front door blueprint, 2026-09-02): the CREATE SHEET reuses this SAME table for its
+ *  teams chips — one option vocabulary, never a parallel picker (the `PRESETS` precedent). */
+export const TEAM_COUNTS = [8, 10, 12, 14, 16].map((n) => ({ value: String(n), label: `${n} teams` }));
 /**
  * Half-PPR leads (founder decision, §4.2's launch canon: "half-PPR default with PPR /
  * TE-premium / superflex toggles") — full PPR stays one tap away, not removed or demoted past

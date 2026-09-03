@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
-import { GLOSSARY } from "@/help/glossary";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
@@ -308,7 +307,8 @@ describe("CreateLeagueForm", () => {
       expect(select.value).toBe("scheduled");
       expect([...select.options].map((option) => option.value)).toEqual(START_TRIGGERS.map((option) => option.value));
       expect(screen.getByText(START_TRIGGER_HINT)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "What is a sit-and-go league?" })).toBeInTheDocument();
+      // NO TIPS (founder ruling, 2026-08-28): the hint sentence IS the explanation now.
+      expect(screen.queryByRole("button", { name: "What is a sit-and-go league?" })).not.toBeInTheDocument();
     });
 
     it("resets to scheduled, invisibly, if a commissioner picks it then backs out of public", () => {
@@ -424,21 +424,10 @@ describe("CreateLeagueForm", () => {
       expect(bodies[0]).toMatchObject({ rosterShape: "superflex" });
     });
 
-    it("carries an InfoTip beside the roster shape select", () => {
+    it("explains superflex in the field's own hint — no tip trigger, no glossary popover (founder ruling, 2026-08-28)", () => {
       renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
-      expect(screen.getByRole("button", { name: "What is a superflex spot?" })).toBeInTheDocument();
-    });
-
-    it("threads helpLevel into the roster-shape InfoTip: guided shows the short line inline", () => {
-      const fixture = fixtureLeagueDeps();
-      const { rerender } = renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
-      expect(screen.queryByText(GLOSSARY.superflex.short)).not.toBeInTheDocument();
-      rerender(
-        <LeagueRoomDepsProvider deps={fixture.deps}>
-          <CreateLeagueForm onCreated={vi.fn()} helpLevel="guided" />
-        </LeagueRoomDepsProvider>,
-      );
-      expect(screen.getByText(GLOSSARY.superflex.short)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "What is a superflex spot?" })).not.toBeInTheDocument();
+      expect(screen.getByText(/Superflex lets a second quarterback start in the flex/)).toBeInTheDocument();
     });
 
     it("renders keyboard-reachable and axe-clean in both themes, at 360px", async () => {
