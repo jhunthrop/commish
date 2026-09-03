@@ -30,7 +30,7 @@ import { OpenLeagueCard } from "@/league-room/components/open-league-card";
 import { OpenSeatsPanel } from "@/league-room/components/open-seats-panel";
 import { Wire } from "@/league-room/components/wire";
 import type { PublicLeagueSummary, WireItem } from "@/matchmaking/contract";
-import { FrontDoorLowerThird } from "@/league-room/components/front-door-lower-third";
+import { TrustFacts } from "@/league-room/components/trust-facts";
 import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
 import { SeatHoldPanel } from "@/league-room/components/seat-hold-panel";
 import { SeatTakenPanel } from "@/league-room/components/seat-taken-panel";
@@ -900,31 +900,33 @@ describe("OpenLeagueCard says nothing that breaks the house copy rules, in every
 });
 
 describe("FrontDoorHero says nothing that breaks the house copy rules", () => {
-  it("is clean signed in and signed out", () => {
-    for (const signedIn of [true, false]) {
-      const { container, unmount } = render(<FrontDoorHero signedIn={signedIn} />);
+  it("is clean in both money states", () => {
+    for (const live of [true, false]) {
+      const { container, unmount } = render(
+        <FrontDoorHero live={live} states={{ enabled: live ? [{ state: "TN", minAge: 18 }] : [], neverEligible: [] }} />,
+      );
       expectClean(container);
       unmount();
     }
   });
 });
 
-describe("FrontDoorLowerThird says nothing that breaks the house copy rules, full and empty", () => {
-  // Sunday v5: `ProofStrip` and `SeatClaimSteps` retired with the Direction A front door —
-  // the proof numbers live in the lower third now, and this sweep moved with them.
+describe("TrustFacts says nothing that breaks the house copy rules, full and empty, both money states", () => {
+  // Front door blueprint (2026-09-02): `FrontDoorLowerThird` is retired — the earned proof
+  // numbers render as TrustFacts' quiet line now, and this sweep moved with them.
   it("is clean with every stat present and with none of them", () => {
     for (const element of [
-      <FrontDoorLowerThird
+      <TrustFacts
         key="full"
         stats={{ leaguesFilled: 247, roomsFillingNow: 12, rating: { average: 4.8, count: 63 }, tightestRoomSeatsRemaining: 5, any: true }}
-        featuredLeague={null}
         signedIn={false}
+        live
       />,
-      <FrontDoorLowerThird
+      <TrustFacts
         key="empty"
         stats={{ leaguesFilled: null, roomsFillingNow: null, rating: null, tightestRoomSeatsRemaining: null, any: false }}
-        featuredLeague={null}
         signedIn={false}
+        live={false}
       />,
     ]) {
       const { container, unmount } = render(element);

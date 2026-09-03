@@ -19,6 +19,7 @@ import { getProofCache } from "@/league-service/proof-cache-instance";
 import { listWireItems } from "@/league-service/wire";
 import { listReviews } from "@/review-service/reviews";
 import { UI_CONFIG } from "@/components/ui/config";
+import { LEAGUE_CONFIG } from "@/league";
 import { featuredLeagueId, featuredFillingLeague } from "@/league-room/components/public-league-list";
 import { PUBLIC_LEAGUES } from "@/league-room/test-fixtures";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
@@ -41,23 +42,7 @@ async function renderHome() {
   return render(page);
 }
 
-/** How many ink pills (rule 5's `bg-text-primary` fill) the WHOLE rendered page holds — the same
- *  convention `public-league-list.test.tsx`'s own `inkPillCount` uses. Before E2, the nav's "Take
- *  a seat" CTA was always one of them; since E2, the nav's own pill steps back to quiet the
- *  instant a league is genuinely filling and the HERO band's own seat action carries the page's
- *  one ink action instead — see the "Next Draft module" describe block below for both shapes. */
-function inkPillCount(container: HTMLElement): number {
-  return container.querySelectorAll('[class*="bg-text-primary"]').length;
-}
-
-/**
- * Review HIGH (2951353's pair), repointed by storefront review R1: `page.tsx`'s derive-once-
- * thread-twice wiring (`featuredLeague` to both `NextDraftModule` and `OpenLeagueShelf`'s
- * `featuredInHero`) needs a genuinely FILLING league to exercise — `FULLEST_FILLING` extends
- * `PUBLIC_LEAGUES[0]` with one field (`filledTeams`, tight enough to beat every other league in
- * these tests) at the call site, the same minimal-spread idiom `public-league-list.test.tsx`'s
- * own fixtures already use, rather than forking a parallel fixture set.
- */
+/** The fullest genuinely-filling league — tight enough to beat every other fixture. */
 const FULLEST_FILLING: PublicLeagueSummary = {
   ...PUBLIC_LEAGUES[0]!,
   id: "front_door_fullest_filling",
@@ -65,9 +50,7 @@ const FULLEST_FILLING: PublicLeagueSummary = {
   filledTeams: 11,
 };
 
-/** Every league at zero seats — the shape under which nothing on the shelf is genuinely
- *  "filling" (storefront review R1), so `featuredFillingLeague` answers `null` and the hero's
- *  module stays absent. */
+/** Every league at zero seats — nothing on the shelf is genuinely "filling". */
 const NOTHING_FILLING: readonly PublicLeagueSummary[] = PUBLIC_LEAGUES.map((league) => ({ ...league, filledTeams: 0 }));
 
 beforeEach(() => {
@@ -76,66 +59,52 @@ beforeEach(() => {
   vi.mocked(getProofCache)
     .mockReset()
     .mockReturnValue({ stats: vi.fn(async () => EMPTY_STATS) } as never);
-  // Quiet by default — the wire's own component tests own its rendering; the page tests below
-  // only assert where it mounts and that a quiet product mounts nothing.
   vi.mocked(listWireItems).mockReset().mockResolvedValue([]);
-  // Empty by default — D3's own tests below override this to prove the nav link's own honesty.
   vi.mocked(listReviews).mockReset().mockResolvedValue(EMPTY_REVIEWS);
 });
 
-describe("the front door (Task 5)", () => {
+describe("the front door (the 2026-09-02 blueprint: two doors, one page)", () => {
   it("says what a seat costs, because a visitor who searched for money deserves an answer", async () => {
     await renderHome();
     expect(screen.getByText("Every league is free this season.")).toBeInTheDocument();
   });
 
-  it("renders the mock's three nav links and the Take a seat CTA, both pointing where the plan says", async () => {
-    // D3: a real review, so the "Reviews" nav link has something honest to advertise — this
-    // test's own purpose is the three links' hrefs, not the nav's own D3 visibility rule (its
-    // own describe block below).
+  it("renders the nav links and the Take a seat doorway, pointing where the plan says", async () => {
     vi.mocked(listReviews).mockResolvedValue({
       reviews: [{ id: "r1", rating: 5, body: "Great season.", createdAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:00.000Z", authorName: "A manager", authorAvatar: null, verified: false }],
       hasMore: false,
       nextBefore: null,
     });
     await renderHome();
-    expect(screen.getByRole("link", { name: "Open leagues" })).toHaveAttribute("href", "/browse");
-    expect(screen.getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/league-rules");
-    expect(screen.getByRole("link", { name: "Reviews" })).toHaveAttribute("href", "/reviews");
     const header = screen.getByRole("banner");
-    const { getByRole } = within(header);
-    expect(getByRole("link", { name: "Take a seat" })).toHaveAttribute("href", "/browse");
+    expect(within(header).getByRole("link", { name: "Open leagues" })).toHaveAttribute("href", "/browse");
+    expect(within(header).getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/league-rules");
+    expect(within(header).getByRole("link", { name: "Reviews" })).toHaveAttribute("href", "/reviews");
+    expect(within(header).getByRole("link", { name: "Take a seat" })).toHaveAttribute("href", "/browse");
   });
 
-  it("renders no proof strip at all when the numbers have not earned it", async () => {
-    await renderHome();
-    expect(screen.queryByText(/leagues filled this season/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/member rating/)).not.toBeInTheDocument();
+  it("keeps the hero band's ground and its compressed register: headline, sub, money fact, nothing that acts (Task 7 carry)", async () => {
+    const { container } = await renderHome();
+    const band = container.querySelector(".floodlight");
+    expect(band).not.toBeNull();
+    expect(band?.className).toContain("overflow-hidden");
+    expect(band?.querySelector(".yard-lines")).toHaveAttribute("aria-hidden", "true");
+    expect(within(band as HTMLElement).getByRole("heading", { level: 1, name: "There is always a seat." })).toBeInTheDocument();
+    expect(within(band as HTMLElement).queryAllByRole("link")).toHaveLength(0);
   });
 
-  it("renders the earned proof numbers in the lower third once proofStats clears every floor", async () => {
-    vi.mocked(getProofCache).mockReturnValue({ stats: vi.fn(async () => FULL_STATS) } as never);
-    await renderHome();
-    expect(screen.getByText("247")).toBeInTheDocument();
-    expect(screen.getByText("Leagues filled this season")).toBeInTheDocument();
-    // v5: the rating cell is retired — the nav's own Reviews entry is the room's one honest door.
-    expect(screen.queryByRole("link", { name: /member reviews/ })).not.toBeInTheDocument();
-  });
-
-  it("names the shelf header's freshness sentence verbatim, never the mock's refused 'live' phrasing (F20)", async () => {
-    await renderHome();
-    expect(screen.getByText(/^Seat counts as of .+\. A seat being claimed is counted\.$/)).toBeInTheDocument();
-    expect(screen.queryByText(/Live seat counts/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/updated just now/)).not.toBeInTheDocument();
-  });
-
-  it("renders the one shelf head, and NO filter row — the front door is the capped teaser, /browse is the lobby (D3)", async () => {
+  it("renders the one shelf head and NO filter row — the front door is the capped teaser, /browse is the lobby (D3)", async () => {
     await renderHome();
     expect(screen.getByRole("heading", { level: 2, name: "Open leagues" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Filter open leagues" })).not.toBeInTheDocument();
   });
 
-  it("caps the member list at UI_CONFIG.frontDoor.shelfCap and offers the one quiet way to the rest (D3)", async () => {
+  it("names the shelf header's freshness sentence verbatim, never the mock's refused 'live' phrasing (F20)", async () => {
+    await renderHome();
+    expect(screen.getByText(/^Seat counts as of .+\. A seat being claimed is counted\.$/)).toBeInTheDocument();
+  });
+
+  it("caps the member list at shelfCap and counts the remainder honestly in the sorting sentence (D3)", async () => {
     const cap = UI_CONFIG.frontDoor.shelfCap;
     const many = Array.from({ length: cap + 2 }, (_, index) => ({
       ...PUBLIC_LEAGUES[0]!,
@@ -144,37 +113,20 @@ describe("the front door (Task 5)", () => {
     }));
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: many, house: [] });
     await renderHome();
-    // Two headings per league within the cap: the shelf renders rows for lg+ AND cards below lg
-    // (Task 13's responsive pair — jsdom applies no stylesheet, so both are queryable here).
     expect(screen.getAllByRole("heading", { name: `Capped League ${cap}` })).toHaveLength(2);
     expect(screen.queryAllByRole("heading", { name: `Capped League ${cap + 1}` })).toHaveLength(0);
-    expect(screen.queryAllByRole("heading", { name: `Capped League ${cap + 2}` })).toHaveLength(0);
+    expect(screen.getByText("Sorted by soonest draft you can still join · 2 more rooms in the full lobby")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "See every open league" })).toHaveAttribute("href", "/browse");
   });
 
-  it("keeps 'See every open league' a quiet pill — the shelf's featured card holds the view's card ink (D2/rule 5)", async () => {
+  it("drops the remainder clause when the cap held nothing back — no fabricated count", async () => {
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [...PUBLIC_LEAGUES], house: [] });
     await renderHome();
-    const seeEvery = screen.getByRole("link", { name: "See every open league" });
-    expect(seeEvery.className).not.toContain("bg-text-primary");
-    expect(seeEvery.className).toContain("border-edge");
+    expect(screen.getByText("Sorted by soonest draft you can still join")).toBeInTheDocument();
+    expect(screen.queryByText(/more rooms in the full lobby/)).not.toBeInTheDocument();
   });
 
-  it("gives 'Start your own league' its own row, framed apart from the league cards", async () => {
-    await renderHome();
-    expect(screen.getByRole("heading", { name: "Start your own league" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Create a league" })).toHaveAttribute("href", "/app#create-league");
-  });
-
-  it("renders the footer's four trust links", async () => {
-    await renderHome();
-    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/legal/terms");
-    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/legal/privacy");
-    expect(screen.getByRole("link", { name: "Support" })).toHaveAttribute("href", "/support");
-    expect(screen.getByRole("link", { name: "League rules" })).toHaveAttribute("href", "/league-rules");
-  });
-
-  it("always asks for the default, unfiltered shelf — the front door reads no params, /browse owns filtering (D3)", async () => {
+  it("always asks for the default, unfiltered shelf — the front door reads no params (D3)", async () => {
     await renderHome();
     expect(vi.mocked(listPublicLeagues)).toHaveBeenCalledWith(
       {},
@@ -184,103 +136,105 @@ describe("the front door (Task 5)", () => {
     );
   });
 
-  // Task 7: the hero band is the page's one floodlit, yard-lined ground — the wrapper owns
-  // overflow-hidden (Task 2's carry) so the full-bleed overlays clip at the band's own edge.
-  it("grounds the hero band under the floodlight and yard lines, clipped at the band edge (Task 7)", async () => {
-    const { container } = await renderHome();
-    const band = container.querySelector(".floodlight");
-    expect(band).not.toBeNull();
-    expect(band?.className).toContain("overflow-hidden");
-    expect(band?.querySelector(".yard-lines")).not.toBeNull();
-    expect(band?.querySelector(".yard-lines")).toHaveAttribute("aria-hidden", "true");
-    // v5: the band holds the hero alone — the steps strip is retired (the board's own Join
-    // column is the instruction), and the proof numbers moved to the lower third.
-    expect(within(band as HTMLElement).getByRole("heading", { level: 1 })).toBeInTheDocument();
-    expect(screen.queryByText("Pick a seat")).not.toBeInTheDocument();
+  it("threads the create sheet's defaults from the service's own LEAGUE_CONFIG — never a second copy", async () => {
+    await renderHome();
+    // Open the crew door's sheet: the defaults must arrive selected, straight from the constant.
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.click(screen.getByRole("button", { name: "Start a league" }));
+    expect(screen.getByRole("button", { name: `${LEAGUE_CONFIG.defaults.teamCount} teams` })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Half PPR" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(new RegExp(`${LEAGUE_CONFIG.defaults.draftDaysFromCreation} days out`))).toBeInTheDocument();
   });
 
-  // Task 8: the wire mounts under the nav — real events or nothing at all.
-  it("runs the wire under the nav when the product has earned it, on the page's own clock (Task 8)", async () => {
+  it("keeps the crew door under the shelf with an outline verb — the second door, never hidden (law 1)", async () => {
+    await renderHome();
+    expect(screen.getByRole("heading", { name: "Bringing your own crew?" })).toBeInTheDocument();
+    const verb = screen.getByRole("button", { name: "Start a league" });
+    expect(verb.className).not.toContain("bg-accent");
+  });
+
+  it("answers the stranger's three questions in facts, with the practice door in the third card (law 4)", async () => {
+    await renderHome();
+    expect(screen.getByText("Who runs it")).toBeInTheDocument();
+    expect(screen.getByText("What it costs")).toBeInTheDocument();
+    expect(screen.getByText("Never played?")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sign up and try a mock draft" })).toBeInTheDocument();
+  });
+
+  it("renders no proof line at all when the numbers have not earned it (law 7)", async () => {
+    await renderHome();
+    expect(screen.queryByTestId("proof-line")).not.toBeInTheDocument();
+  });
+
+  it("renders the earned proof numbers once proofStats clears its floors", async () => {
+    vi.mocked(getProofCache).mockReturnValue({ stats: vi.fn(async () => FULL_STATS) } as never);
+    await renderHome();
+    expect(screen.getByTestId("proof-line").textContent).toBe("247 leagues filled this season · 12 rooms filling right now");
+  });
+
+  it("runs the wire at the page's foot when the product has earned it, on the page's own clock", async () => {
     const items: readonly WireItem[] = [
       { kind: "seat_claimed", leagueName: "Sunday Money", agoMs: 5 * 60_000, seatsOpen: 6 },
       { kind: "league_filled", leagueName: "Iron Bowl", draftStatus: "in_progress" },
       { kind: "season_count", count: 76 },
     ];
     vi.mocked(listWireItems).mockResolvedValue(items);
-    await renderHome();
+    const { container } = await renderHome();
     const list = screen.getByRole("list", { name: "Recent activity" });
-    // Under the nav: the band sits immediately between the banner and the page's main content.
-    expect(screen.getByRole("banner").nextElementSibling).toBe(list.closest(".bg-surface-inset"));
+    // The blueprint's "lobby pulse" position: the wire is the LAST band inside main, above the footer.
+    const main = container.querySelector("main");
+    expect(main?.lastElementChild).toBe(list.closest(".bg-surface-inset"));
     expect(vi.mocked(listWireItems)).toHaveBeenCalledWith({}, expect.objectContaining({ now: expect.any(Function) }));
   });
 
-  it("mounts no wire at all on a quiet product — a clean hairline, never filler (Task 8)", async () => {
+  it("mounts no wire at all on a quiet product — a clean hairline, never filler", async () => {
     await renderHome();
     expect(screen.queryByRole("list", { name: "Recent activity" })).not.toBeInTheDocument();
   });
 
-  /**
-   * The gauntlet's MEDIUM said "a hairline-topped row, never a box", and that stays true: the
-   * closing block is still bounded by a rule rather than wearing a card. GAMEDAY (2026-08-28)
-   * moved the rule from a nested `<div>` inside the shelf section onto the block's own `<section>`
-   * band — two hairlines a few pixels apart read as a rendering accident — and gave the heading a
-   * display size, because the last thing a stranger reads on the storefront was the quietest thing
-   * on the page. Copy is unchanged, and the way in is still QUIET: this page's one ink action
-   * belongs to the seat (E2).
-   */
-  it("closes on a hairline-topped band, never a box, and never a second ink action (rule 4, law 5)", async () => {
+  it("renders the footer's four trust links", async () => {
     await renderHome();
-    const heading = screen.getByRole("heading", { name: "Start your own league" });
-    const band = heading.closest("section");
-    expect(band?.className).toContain("border-t");
-    expect(band?.className).not.toContain("rounded");
-    const create = screen.getByRole("link", { name: "Create a league" });
-    expect(create.className).not.toContain("bg-text-primary");
-    expect(create.className).not.toContain("bg-accent");
+    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/legal/terms");
+    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/legal/privacy");
+    expect(screen.getByRole("link", { name: "Support" })).toHaveAttribute("href", "/support");
+    const footer = screen.getByRole("navigation", { name: "Legal and support" });
+    expect(within(footer).getByRole("link", { name: "How it works" })).toHaveAttribute("href", "/league-rules");
   });
 });
 
-describe("the front door's lower third — page-level wiring (Sunday v5, law 6)", () => {
-  it("names the shelf's own featured (fullest filling) league in the strip, repeats its verb, and quiets the nav pill", async () => {
+describe("the one solid amber verb (blueprint law 2 + E2's nav arithmetic)", () => {
+  it("gives the solid to the fullest genuinely-filling ROW and quiets the nav pill", async () => {
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [FULLEST_FILLING, PUBLIC_LEAGUES[1]!], house: [] });
-    const { container } = await renderHome();
+    await renderHome();
 
-    // (1) the strip names the subject with its own seat count.
-    expect(screen.getByText("Filling now")).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(`${FULLEST_FILLING.name} · 1 seat left`))).toBeInTheDocument();
-
-    // (2) the nav's own "Take a seat" pill steps back to quiet — the hero's verb carries the act.
+    // The nav pill steps back to quiet the moment a room genuinely fills.
     const header = screen.getByRole("banner");
-    expect(within(header).getByRole("link", { name: "Take a seat" }).className).not.toContain("bg-text-primary");
+    expect(within(header).getByRole("link", { name: "Take a seat" }).className).not.toContain("bg-accent");
 
-    // (3) law 6: the verb REPEATS — hero and lower third both render the featured room's seat in
-    // the amber verb, and repetition of one act is correct where two different loud acts are not.
-    const sameNameCtas = screen.getAllByRole("link", { name: `Take the last seat in ${FULLEST_FILLING.name}. Newer players only.` });
-    expect(sameNameCtas.filter((el) => el.className.includes("bg-accent")).length).toBeGreaterThanOrEqual(2);
+    // The featured row's opener wears the verb fill, in BOTH renderings (rows and cards — only
+    // one is on screen past the lg boundary); everything else outlines.
+    const solid = screen
+      .getAllByRole("button", { name: /^Take (a seat|the last seat) in / })
+      .filter((el) => el.className.includes("bg-accent"));
+    expect(solid).toHaveLength(2);
+    for (const verb of solid) {
+      expect(verb.getAttribute("aria-label")).toContain(FULLEST_FILLING.name);
+    }
 
-    // (4) the v3 ink pill is extinct on this page: the verb wears amber, never bg-text-primary.
-    expect(inkPillCount(container)).toBe(0);
-
-    // (5) the strip names the SAME league the shelf's own featured-selection logic would pick,
-    // proving page.tsx derives ONE feature and threads it, rather than two children computing two.
+    // The selection is the shelf's own featured logic — one function, one answer.
     const merged = [FULLEST_FILLING, PUBLIC_LEAGUES[1]!];
     expect(featuredFillingLeague(merged)?.id).toBe(FULLEST_FILLING.id);
     expect(featuredLeagueId(merged)).toBe(FULLEST_FILLING.id);
   });
 
-  it("renders no subject cell and keeps the nav pill loud when nothing on the shelf is filling", async () => {
+  it("keeps the nav pill loud when nothing on the shelf is filling — the page still has one verb", async () => {
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [...NOTHING_FILLING], house: [] });
     await renderHome();
-    expect(screen.queryByText("Filling now")).not.toBeInTheDocument();
     const header = screen.getByRole("banner");
-    expect(within(header).getByRole("link", { name: "Take a seat" }).className).toContain("bg-text-primary");
+    expect(within(header).getByRole("link", { name: "Take a seat" }).className).toContain("bg-accent");
   });
 });
 
-/**
- * D3 (flow analysis; storefront review) — the nav's own "Reviews" link never advertises a room
- * this page already knows is empty.
- */
 describe("the front door's Reviews nav entry (D3)", () => {
   it("hides the Reviews nav entry when the feed has nothing real to show", async () => {
     vi.mocked(listReviews).mockResolvedValue(EMPTY_REVIEWS);
