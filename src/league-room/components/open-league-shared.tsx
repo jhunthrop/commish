@@ -40,12 +40,12 @@ function isLastSeat(league: PublicLeagueSummary): boolean {
  * out `SignInLink`'s `aria-label` and (via the visible half alone) a signed-in `Button`'s own
  * label — see `ctaVisibleText` below for the shorter half a sighted visitor actually reads.
  */
-function ctaAccessibleName(league: PublicLeagueSummary): string {
+export function ctaAccessibleName(league: PublicLeagueSummary): string {
   const who = league.experienceTier === "beginner" ? " Newer players only." : "";
   return `Take ${isLastSeat(league) ? "the last seat" : "a seat"} in ${league.name}.${who}`;
 }
 
-function ctaVisibleText(league: PublicLeagueSummary): string {
+export function ctaVisibleText(league: PublicLeagueSummary): string {
   return isLastSeat(league) ? "Take the last seat" : "Take a seat";
 }
 
@@ -310,17 +310,22 @@ export function OpenLeagueCta({
   league,
   signedIn,
   emphasis,
+  suffix,
 }: {
   readonly league: PublicLeagueSummary;
   readonly signedIn: boolean;
   readonly emphasis: "ink" | "quiet";
+  /** A visible tail on the label ("· $50.00", the join sheet's live-money price) — appended to
+   *  the signed-out link's text only; the accessible name and the signed-in join button keep
+   *  their own established sentences. */
+  readonly suffix?: string;
 }) {
   const variant = emphasis === "ink" ? ("verb" as const) : ("secondary" as const);
   return signedIn ? (
     <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} variant={variant} />
   ) : (
     <SignInLink intent={`/join/${league.id}/hold`} aria-label={ctaAccessibleName(league)} className={buttonClassName(variant, "md")}>
-      {ctaVisibleText(league)}
+      {suffix === undefined ? ctaVisibleText(league) : `${ctaVisibleText(league)} ${suffix}`}
     </SignInLink>
   );
 }
