@@ -23,15 +23,42 @@ services:
       POSTGRES_USER: commish
       POSTGRES_PASSWORD: commish
       POSTGRES_DB: commish_test
-    # The data dir is a 1.4 GB tmpfs, and Postgres recycles WAL up to max_wal_size (default
-    # 1 GB) without ever shrinking it, so a long test session fills the tmpfs with pg_wal and
-    # the suite starts failing 53100 "No space left on device" while the host has plenty.
-    # Capping WAL keeps the throwaway test DB inside its own memory budget.
-    command: ["postgres", "-c", "max_wal_size=256MB"]
+    # THE DATA DIR IS A DISK VOLUME, NOT A tmpfs (Round D, Task 3 — the season-long debt).
+    #
+    # It was a 1.4 GB tmpfs, and the whole-repo suite kept failing 53100 "No space left on device"
+    # on TRUNCATE while the host had hundreds of gigabytes free. The standing diagnosis was that
+    # the tmpfs was too small (WAL recycling up to max_wal_size and never shrinking), and the
+    # standing fix was to cap WAL, then to make the tmpfs bigger. MEASURED, the diagnosis is wrong:
+    # sampling the data dir every 2s across a whole-repo run (serial AND four-way parallel) peaks
+    # at 448 MB. It never approached 1.4 GB, let alone the 4 GB a bump had grown it to.
+    #
+    # WHAT ACTUALLY RAN OUT WAS THE DOCKER VM'S MEMORY. A tmpfs is paged out of the VM's own RAM,
+    # and this VM has 2.9 GB total for every container here (Redis alone holds ~590 MB). The
+    # sampler bottoms out at 91 MB free with a gigabyte already swapped, and a tmpfs page
+    # allocation that cannot find memory reports ENOSPC — "no space" for a filesystem that is 89%
+    # empty. A SIZE cap can never fix that, in either direction: raising it only lets the test
+    # database compete harder for the memory the failure is made of.
+    #
+    # So the throwaway test database moves onto the container's own disk, which has ~950 GB free
+    # and cannot run out, and hands the ~450 MB it was holding back to the VM. Durability is
+    # turned off to pay for the move: fsync, full page writes and synchronous commit exist to
+    # survive a crash, and a database whose entire contents are re-created by `db:migrate:test`
+    # has nothing to survive for. max_wal_size stays capped so the volume does not grow without
+    # bound across long sessions.
+    command:
+      - postgres
+      - -c
+      - max_wal_size=256MB
+      - -c
+      - fsync=off
+      - -c
+      - full_page_writes=off
+      - -c
+      - synchronous_commit=off
     ports:
       - "5433:5432"
-    tmpfs:
-      - /var/lib/postgresql/data
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U commish -d commish_test"]
       interval: 5s
@@ -122,4 +149,8 @@ services:
 
 volumes:
   postgres-data:
+  # The test database's lanes live here now instead of in the VM's RAM. Wiping it (`docker compose
+  # down -v`) costs nothing but a `npm run db:migrate:test`, which re-creates every lane database
+  # and migrates it.
+  postgres-test-data:
   redis-data:

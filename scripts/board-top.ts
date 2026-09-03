@@ -11,7 +11,7 @@
 import { createDb } from "@/db/client";
 import { nflPlayers } from "@/db/schema";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
-import { BOARD_SOURCE, boardReasons, preseasonProjectionsAsOf } from "@/projections/preseason/board-store";
+import { BOARD_SOURCE, assertSingleGeneration, boardReasons, preseasonProjectionsAsOf } from "@/projections/preseason/board-store";
 import { preseasonRankingsAsOf, preseasonRostersAsOf } from "@/projections/preseason/store";
 
 /** Far past any correction: this script reads the CURRENT state of the store, never a point-in-time
@@ -129,6 +129,10 @@ class BoardRosterMismatchError extends Error {
 async function main(): Promise<void> {
   const { season, n } = parseArgs(process.argv.slice(2));
   const db = createDb(requireEnv("DATABASE_URL"));
+
+  // THE LOUD READ: refuses a board stitched together from more than one live generation, the same
+  // way the writer's own retire discipline promises there never is one. See `assertSingleGeneration`.
+  await assertSingleGeneration(db, { season, source: BOARD_SOURCE, asOf: FAR_FUTURE });
 
   const projections = await preseasonProjectionsAsOf(db, { season, source: BOARD_SOURCE, asOf: FAR_FUTURE });
   if (projections.length === 0) {

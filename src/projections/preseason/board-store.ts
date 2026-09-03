@@ -673,6 +673,48 @@ export async function preseasonProjectionsFor(
     .orderBy(asc(preseasonProjections.playerId), desc(preseasonProjections.asOf));
 }
 
+/**
+ * THE LOUD READ (Round D, Task 3): a board `preseasonProjectionsAsOf`/`preseasonProjectionsFor`
+ * serve is supposed to be ONE generation — `writePreseasonBoard`'s live arm retires every row of
+ * the prior `as_of` inside the same transaction it writes the new one under, so a live source
+ * should never carry more than one distinct `as_of` value as of any bound. Neither reader above can
+ * see that promise break: `selectDistinctOn(playerId)` picks the newest `as_of` PER PLAYER, so a
+ * retire that failed partway — one generation's rows surviving next to another's — would still
+ * return a row for every player, silently stitched together out of two different moments, with
+ * nothing in the shape of the result to say so.
+ *
+ * This queries the table directly for every distinct `as_of` under `(season, source)` as of the
+ * given bound and throws the moment there is more than one. Call it once, wherever a caller is
+ * about to serve a board built from `preseasonProjectionsAsOf`/`preseasonProjectionsFor`, so a
+ * regression in the retire discipline is loud at the read path instead of silently blended.
+ *
+ * A REPLAY source (an archived season) legitimately holds many `as_of` values across its full
+ * history — that is the whole point of an append-only archive — but every row under one moment
+ * shares the SAME derived, deterministic `as_of` (see `writePreseasonBoard`'s own docblock), so as
+ * of any single bound this still resolves to exactly one and passes without change.
+ */
+export async function assertSingleGeneration(db: ReadonlyDb, { season, source, asOf }: BoardStamp): Promise<void> {
+  // `selectDistinct` is not part of `ReadonlyDb` (`@/db/client` picks only `select`/`selectDistinctOn`
+  // for a read-only surface), so this uses `selectDistinctOn` on the one column it needs, the same
+  // shape `preseasonProjectionsAsOf`/`preseasonProjectionsFor` already use for `playerId`.
+  const stamps = await db
+    .selectDistinctOn([preseasonProjections.asOf], { asOf: preseasonProjections.asOf })
+    .from(preseasonProjections)
+    .where(and(eq(preseasonProjections.season, season), eq(preseasonProjections.source, source), lte(preseasonProjections.asOf, asOf)))
+    .orderBy(asc(preseasonProjections.asOf));
+
+  if (stamps.length > 1) {
+    const asOfList = stamps
+      .map((row) => row.asOf.toISOString())
+      .sort()
+      .join(", ");
+    throw new Error(
+      `${source} for season ${season} carries ${stamps.length} distinct as_of generations as of ${asOf.toISOString()} (${asOfList}), not one. ` +
+        "A live board must retire its predecessor before writing (writePreseasonBoard); this board is stitched together from more than one generation.",
+    );
+  }
+}
+
 /** Every `BoardReason` tag this reader knows how to reconstruct — hand-paired with the union in
  *  `board.ts`, the same literal-and-type pairing this engine keeps everywhere a runtime list stands
  *  in for a type TypeScript itself erases (`populations.ts`'s `SKILL_POSITIONS`, for one). */

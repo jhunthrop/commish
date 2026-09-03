@@ -48,7 +48,7 @@ export const DB_POOL_CONFIG = {
   /**
    * The test pool: small and short-lived. Every test file calls `createTestDb()` and opens
    * its own `postgres-js` pool that nothing previously closed; at ~40 files that's enough
-   * simultaneous connections against the tmpfs-backed `postgres-test` container to cause
+   * simultaneous connections against the shared `postgres-test` container to cause
    * contention and transient timeouts under a full-suite run. A small max plus a short idle
    * timeout keeps each file's footprint bounded even before `createTestDb`'s own
    * `afterAll(() => db.$client.end())` releases it for good.

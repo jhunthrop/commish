@@ -232,4 +232,24 @@ describe("playerSeason's preseason readings", () => {
     ]);
     expect((await playerSeason(db, leagueId, "rb1", clock))!.expertRank).toBeNull();
   });
+
+  /**
+   * THE LOUD READ (Round D, Task 3). `preseasonProjectionsFor` resolves one row PER PLAYER, so a
+   * BOARD_SOURCE live retire that failed partway — two generations coexisting under the same
+   * (season, source) — would still hand this player a number, silently possibly from the stale
+   * generation. Seeded directly (bypassing `writePreseasonBoard`, which the freeze on `BOARD_SOURCE`
+   * would refuse anyway): the throw must be loud rather than a quietly wrong rank.
+   */
+  it("throws rather than serve a player page whose board carries more than one live generation", async () => {
+    const leagueId = await crossOver(await league());
+    await recordPreseasonProjections(db, [
+      { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: CHASE, rank: 9, positionRank: 4, projectedPoints: 288.1,
+        valueOverReplacement: 96.4, valueRank: 12, expectedGames: 16.1, floorPoints: 230.5, medianPoints: 288.1,
+        ceilingPoints: 316.9, tier: 1, asOf: LAST_WEEK, momentKind: "live" },
+      { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: CHASE, rank: 8, positionRank: 3, projectedPoints: 292.0,
+        valueOverReplacement: 100.0, valueRank: 10, expectedGames: 16.1, floorPoints: 233.0, medianPoints: 292.0,
+        ceilingPoints: 320.0, tier: 1, asOf: NOW, momentKind: "live" },
+    ]);
+    await expect(playerSeason(db, leagueId, "rb1", clock)).rejects.toThrow(/distinct as_of generations/);
+  });
 });

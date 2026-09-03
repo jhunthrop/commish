@@ -9,6 +9,7 @@ import {
   BOARD_SOURCE,
   BOARD_SOURCE_V1_RAW,
   FROZEN_BOARD_SOURCES,
+  assertSingleGeneration,
   boardReasons,
   preseasonProjectionsAsOf,
   preseasonProjectionsFor,
@@ -455,6 +456,61 @@ describe("the preseason board store", () => {
       // `changedRowWhere`, exactly as before the guard existed.
       const second = await writePreseasonBoard(db, stamp, [entry({ reasons: [{ code: "scarcity", positionRank: 2, replacementLevel: 185.2 }] })]);
       expect(second).toEqual({ mode: "append", written: 0, reasonsWritten: 0, retiredProjections: 0, retiredReasons: 0 });
+    });
+  });
+
+  /**
+   * THE LOUD READ (Round D, Task 3). `writePreseasonBoard`'s live arm retires a prior generation
+   * before writing a new one, so a well-behaved live source never carries more than one `as_of`.
+   * These tests seed the broken invariant DIRECTLY — bypassing `writePreseasonBoard` entirely, the
+   * same way a retire that failed partway (a crash between the DELETE and the INSERT reaching every
+   * replica, a hand-run script) would leave the table — because the point of this guard is to catch
+   * that shape however it happened, not only the one path this engine's own writer takes.
+   */
+  describe("assertSingleGeneration", () => {
+    const LIVE_SOURCE = "test_single_generation_live_ppr_12";
+    const REPLAY_SOURCE = "test_single_generation_replay_ppr_12";
+
+    async function seed(source: string, season: number, asOf: Date, momentKind: "live" | "replay") {
+      await recordPreseasonProjections(db, projectionRows([entry()], { season, source, asOf, momentKind }));
+    }
+
+    it("passes for a single live generation", async () => {
+      await seed(LIVE_SOURCE, 2026, AUGUST, "live");
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: FINAL })).resolves.toBeUndefined();
+    });
+
+    it("THROWS when two live generations coexist under one source — the retire that did not run", async () => {
+      await seed(LIVE_SOURCE, 2026, AUGUST, "live");
+      await seed(LIVE_SOURCE, 2026, A_WEEK_LATER, "live");
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: FINAL })).rejects.toThrow(
+        /2 distinct as_of generations/,
+      );
+    });
+
+    it("names the source and season in the thrown message, so an operator sees which board broke", async () => {
+      await seed(LIVE_SOURCE, 2026, AUGUST, "live");
+      await seed(LIVE_SOURCE, 2026, A_WEEK_LATER, "live");
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: FINAL })).rejects.toThrow(
+        new RegExp(`${LIVE_SOURCE} for season 2026`),
+      );
+    });
+
+    it("passes a REPLAY season with its one deterministic as_of per source", async () => {
+      // Every row an archived board's single persist writes shares one derived `as_of`, exactly as
+      // `store()`'s own helper above writes archive fixtures throughout this file.
+      await seed(REPLAY_SOURCE, 2024, AUGUST, "replay");
+      await expect(assertSingleGeneration(db, { season: 2024, source: REPLAY_SOURCE, asOf: FINAL })).resolves.toBeUndefined();
+    });
+
+    it("a bound BEFORE the second generation still sees only the first, and passes", async () => {
+      await seed(LIVE_SOURCE, 2026, AUGUST, "live");
+      await seed(LIVE_SOURCE, 2026, A_WEEK_LATER, "live");
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: AUGUST })).resolves.toBeUndefined();
+    });
+
+    it("is silent when the source has no rows at all — an unpersisted board is a caller's own concern", async () => {
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: FINAL })).resolves.toBeUndefined();
     });
   });
 });

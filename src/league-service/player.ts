@@ -10,7 +10,7 @@ import type { Law } from "@/projections/laws/types";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import type { BoardReason } from "@/projections/preseason/board";
-import { BOARD_SOURCE, boardReasons, preseasonProjectionsFor } from "@/projections/preseason/board-store";
+import { BOARD_SOURCE, assertSingleGeneration, boardReasons, preseasonProjectionsFor } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { preseasonRankingsFor } from "@/projections/preseason/store";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
@@ -217,6 +217,9 @@ async function preseasonReadings(
   if (nflPlayerId === null) return { expertRank: null, modelRank: null, reasons: [] };
 
   const season = PRODUCT_SEASON;
+  // THE LOUD READ: refuses a board stitched together from more than one live generation, the same
+  // way the writer's own retire discipline promises there never is one. See `assertSingleGeneration`.
+  await assertSingleGeneration(db, { season, source: BOARD_SOURCE, asOf });
   const [consensus] = await preseasonRankingsFor(db, { season, source: BENCHMARK_SOURCES.ecr, asOf }, [nflPlayerId]);
   const [ours] = await preseasonProjectionsFor(db, { season, source: BOARD_SOURCE, asOf }, [nflPlayerId]);
   // Task 8's own Outlook section. `boardReasons` reads every reason the CURRENT season's board

@@ -114,6 +114,12 @@ interface WeekReport {
   readonly fetched: number;
   readonly alreadyArchived: number;
   readonly observations: number;
+  /** Player+points dropped rather than archived this week -- unpaired (one side only) and
+   *  duplicate (a book contradicting itself, `props-store.ts`'s own skip case) alike. */
+  readonly skipped: number;
+  /** The `duplicate` subset of `skipped` -- broken out because it is the count that answers "how
+   *  many books contradicted themselves this run", which the combined total does not. */
+  readonly skippedDuplicate: number;
 }
 
 /** Processes one week: discover its events (one `/historical/events` call), skip what is already
@@ -140,6 +146,8 @@ async function processWeek(
 
   let fetched = 0;
   let observations = 0;
+  let skipped = 0;
+  let skippedDuplicate = 0;
   let budgetStopped = false;
 
   for (const event of toFetch) {
@@ -154,15 +162,18 @@ async function processWeek(
     archived.add(event.id);
     fetched += 1;
     observations += written;
+    skipped += skippedUnpaired.length;
+    const duplicateCount = skippedUnpaired.filter((skip) => skip.reason === "duplicate").length;
+    skippedDuplicate += duplicateCount;
     console.log(
       `  season ${season} week ${week} ${event.awayTeam} @ ${event.homeTeam} [${event.id}]: ${written} rows` +
-        `${skippedUnpaired.length > 0 ? `, ${skippedUnpaired.length} single-sided skipped` : ""}` +
+        `${skippedUnpaired.length > 0 ? `, ${skippedUnpaired.length} skipped (${duplicateCount} duplicate)` : ""}` +
         ` (credits remaining=${tracker.lastRemaining}, used this run=${tracker.usedThisRun})`,
     );
   }
 
   return {
-    report: { week, events: weekEvents.length, fetched, alreadyArchived: alreadyArchivedCount, observations },
+    report: { week, events: weekEvents.length, fetched, alreadyArchived: alreadyArchivedCount, observations, skipped, skippedDuplicate },
     budgetStopped,
   };
 }
@@ -180,6 +191,8 @@ async function main(): Promise<void> {
 
   let budgetStopped = false;
   let resumePoint: { season: number; week: number } | null = null;
+  let runSkipped = 0;
+  let runSkippedDuplicate = 0;
 
   for (const season of seasons) {
     if (budgetStopped) break;
@@ -216,12 +229,18 @@ async function main(): Promise<void> {
 
     const seasonEvents = weekReports.reduce((sum, w) => sum + w.events, 0);
     const seasonObservations = weekReports.reduce((sum, w) => sum + w.observations, 0);
+    const seasonSkipped = weekReports.reduce((sum, w) => sum + w.skipped, 0);
+    const seasonSkippedDuplicate = weekReports.reduce((sum, w) => sum + w.skippedDuplicate, 0);
+    runSkipped += seasonSkipped;
+    runSkippedDuplicate += seasonSkippedDuplicate;
     console.log(
       `SEASON ${season} SUMMARY: weeks covered ${weekReports.map((w) => w.week).join(",") || "none"}, events ${seasonEvents}, ` +
-        `observations ${seasonObservations}${gaps.length > 0 ? `, gaps: ${gaps.join("; ")}` : ""}`,
+        `observations ${seasonObservations}, skipped ${seasonSkipped} (${seasonSkippedDuplicate} duplicate)` +
+        `${gaps.length > 0 ? `, gaps: ${gaps.join("; ")}` : ""}`,
     );
   }
 
+  console.log(`Total skipped this run: ${runSkipped} (${runSkippedDuplicate} duplicate, ${runSkipped - runSkippedDuplicate} single-sided).`);
   console.log(`Credits used this run: ${tracker.usedThisRun} of ${budget} budgeted. Remaining on the key: ${tracker.lastRemaining}.`);
   if (budgetStopped && resumePoint !== null) {
     console.log(
