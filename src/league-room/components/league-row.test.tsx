@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
 import { renderSurface } from "@/components/ui/test-utils";
@@ -7,7 +7,7 @@ import { buttonClassName } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { GLOSSARY } from "@/help/glossary";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import { LEAGUE_ROW_GRID, LeagueRow, LeagueRowsHeader } from "./league-row";
+import { LEAGUE_ROW_GRID, LEAGUE_ROW_GRID_LIVE, LeagueRow, LeagueRowsHeader } from "./league-row";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -47,23 +47,37 @@ const BASE: PublicLeagueSummary = {
   kickoffRolls: 0,
 };
 
+/** A paid league as only a live-money world could store one — real fee, real stored table. */
+const PAID: PublicLeagueSummary = {
+  ...BASE,
+  id: "paid1",
+  name: "Paid League",
+  entryFeeCents: 5000,
+  payoutTable: [
+    { place: 1, amountCents: 30000 },
+    { place: 2, amountCents: 20000 },
+    { place: 3, amountCents: 10000 },
+  ],
+};
+
 /** A scheduled draft comfortably INSIDE `UI_CONFIG.openLeagueCard.clockWithinMs` (6h). */
 const soonIso = () => new Date(Date.now() + UI_CONFIG.openLeagueCard.clockWithinMs / 2).toISOString();
 /** A scheduled draft comfortably OUTSIDE the window. */
 const farIso = () => new Date(Date.now() + UI_CONFIG.openLeagueCard.clockWithinMs * 4).toISOString();
 
 const row = (league: PublicLeagueSummary, extra: Partial<Parameters<typeof LeagueRow>[0]> = {}) => (
-  <LeagueRow league={league} signedIn={false} {...extra} />
+  <LeagueRow league={league} signedIn={false} position={1} {...extra} />
 );
 
 /**
  * FOUNDER-ORDERED (2026-08-24, screenshot review): the shelf renders horizontal rows on lg+
- * viewports — "my eyes don't know where to focus" — one league per hairline-separated row,
- * six columns, sharing every derived fact (clock, chip, badge authority, CTA names) with
- * `OpenLeagueCard` through `open-league-shared.tsx` so the two forms can never drift apart.
+ * viewports — one league per hairline-separated row, position-led (the tower), sharing every
+ * derived fact with `OpenLeagueCard` through `open-league-shared.tsx`. Reconciled to the v5
+ * tower row (2026-09-02, the deferred-tests campaign's own settle-up) and extended with the
+ * front door blueprint's money columns and join-sheet opener.
  */
 describe("LeagueRow", () => {
-  it("lays the six columns on the one shared grid template the header row also uses", () => {
+  it("lays the free-season columns on the one shared grid template the header row also uses", () => {
     const { container } = render(row(BASE));
     expect((container.firstElementChild as HTMLElement).className).toContain(LEAGUE_ROW_GRID);
   });
@@ -90,31 +104,42 @@ describe("LeagueRow", () => {
     expect(screen.queryByText(GLOSSARY["snake-draft"].short)).not.toBeInTheDocument();
   });
 
-  it("prices the Entry column in ink, semibold, with an sr-only key for screen readers", () => {
-    // v5 law 1: a price is a FACT and wears ink. Money green is gone, and cyan is the verdict
-    // channel a price has no claim on.
-    render(row(BASE));
-    const entry = screen.getAllByText("Free").find((element) => element.className.includes("text-text-primary"));
-    expect(entry).toBeDefined();
-    expect(entry!.className).toContain("font-semibold");
-    expect(entry!.className).not.toContain("text-positive");
-    expect(screen.getByText("Entry")).toHaveClass("sr-only");
+  it("leads with the board position, hidden from assistive tech (the verb carries the spoken name)", () => {
+    const { container } = render(row(BASE, { position: 3 }));
+    const position = container.querySelector('[aria-hidden="true"]');
+    expect(position?.textContent).toBe("3");
   });
 
-  // Phase 4, Task 13: the live branch, proven through injection — no league that exists today
-  // carries `entryFeeCents > 0` (`moneyIsLive()` gates paid creation dark), so this fixture is
-  // the only way to exercise the column's real-money reading ahead of that day.
-  it("prices the Entry column from the real entry fee, once a league carries one", () => {
-    render(row({ ...BASE, entryFeeCents: 5000 }));
-    const entry = screen.getByText("$50.00");
-    expect(entry.className).toContain("text-text-primary");
-    expect(entry.className).toContain("font-semibold");
+  describe("the money columns (front door blueprint, both states by injection)", () => {
+    it("renders NO money column at all while money is dark — zero variance is zero information", () => {
+      render(row(BASE, { live: false }));
+      // Exactly ONE "Free": the member row's stake badge. No buy-in cell, no dollar anywhere.
+      expect(screen.getAllByText("Free")).toHaveLength(1);
+      expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
+      expect(screen.queryByText("Bragging rights")).not.toBeInTheDocument();
+    });
+
+    it("prices the buy-in column from the real entry fee and pots the STORED table, once live", () => {
+      const { container } = render(row(PAID, { live: true }));
+      expect((container.firstElementChild as HTMLElement).className).toContain(LEAGUE_ROW_GRID_LIVE);
+      expect(screen.getByText("$50.00")).toBeInTheDocument();
+      // The pot is prizePotCents of the stored table with its places note, never fee × seats.
+      expect(screen.getByText("$600.00")).toBeInTheDocument();
+      expect(screen.getByText("top 3 paid")).toBeInTheDocument();
+    });
+
+    it("says 'Free' and 'Bragging rights' for a free league on a live shelf — real cells, no fabricated dollar", () => {
+      render(row(BASE, { live: true }));
+      // Two "Free" texts now: the stake badge and the buy-in cell.
+      expect(screen.getAllByText("Free")).toHaveLength(2);
+      expect(screen.getByText("Bragging rights")).toBeInTheDocument();
+    });
   });
 
-  it("counts the Seats column as '{n} of {t} open', tabular, with the segment meter beside it", () => {
+  it("makes seats-left the row's hero number, tabular, with the segment meter under it", () => {
     const { container } = render(row(BASE));
-    const seats = screen.getByText("3 of 12 open");
-    expect(seats.className).toContain("tabular-nums");
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText(/left of/)).toBeInTheDocument();
     expect(container.querySelector('[data-testid="seat-segments"]')).not.toBeNull();
   });
 
@@ -133,18 +158,17 @@ describe("LeagueRow", () => {
       expect(screen.queryByText(BASE.draftAt)).not.toBeInTheDocument();
     });
 
-    it("keeps the absolute sentence when the draft is scheduled but not yet close", () => {
+    it("leads with the relative fact outside the window, the absolute date on the faint line (v5 law 1)", () => {
       render(row({ ...BASE, draftAtIso: farIso() }));
       expect(screen.queryByTestId("draft-clock")).not.toBeInTheDocument();
-      expect(screen.getByText(BASE.draftAt)).toBeInTheDocument();
+      expect(screen.getByText("in 3 days")).toBeInTheDocument();
+      expect(screen.getByText("Thursday 10 September, 8:00 PM UTC")).toBeInTheDocument();
     });
 
-    it("prints a compact 'Drafts when full' value with the full commitment one press away, never a placeholder date (storefront review E1)", () => {
+    it("prints a compact 'Drafts when full' value, never a placeholder date (storefront review E1)", () => {
       render(row({ ...BASE, startTrigger: "when_full" }));
       expect(screen.getByText("Drafts when full")).toBeInTheDocument();
-      // No tip: "Drafts when full" is the self-explaining register the no-tips ruling asks for.
       expect(screen.queryByRole("button", { name: "What is a sit-and-go league?" })).not.toBeInTheDocument();
-      expect(screen.queryByText(/This one drafts the moment the last seat is taken/)).not.toBeInTheDocument();
       expect(screen.queryByText(BASE.draftAt)).not.toBeInTheDocument();
     });
 
@@ -186,19 +210,13 @@ describe("LeagueRow", () => {
 
   describe("the badge carries only what the title does not (E3), by authority", () => {
     it("renders no rung badge on a house row — the factory title carries the rung by construction", () => {
-      // "The Longshot League" — a real `houseLeagueName("open_12", 3)` output (founder directive
-      // 2026-08-26), not the retired "Open 12-team League 3" shape. The badge itself is decided
-      // by authority (`stakeBadge`, `@/league-room/components/open-league-shared.tsx`), never by
-      // inspecting the title text, so a fun name proves the same invariant just as well: exactly
-      // one "Free" text renders (the Entry value), never a second one for a stake badge.
       render(row({ ...BASE, id: "house3", name: "The Longshot League", houseRung: "open_12" }));
-      expect(screen.getAllByText("Free")).toHaveLength(1);
+      expect(screen.queryByText("Free")).not.toBeInTheDocument();
     });
 
     it("badges a member row with its stake tier, whatever the member named the league", () => {
       render(row({ ...BASE, id: "member2", name: "Free For All League", houseRung: null }));
-      // Exactly two exact "Free" texts: the stake badge and the Entry value.
-      expect(screen.getAllByText("Free")).toHaveLength(2);
+      expect(screen.getAllByText("Free")).toHaveLength(1);
     });
   });
 
@@ -228,6 +246,26 @@ describe("LeagueRow", () => {
     });
   });
 
+  describe("the join-sheet opener (front door blueprint, 2026-09-02)", () => {
+    it("turns the verb into the sheet opener when onOpen is provided — same name, dialog announced", () => {
+      const onOpen = vi.fn();
+      render(row(BASE, { onOpen }));
+      const verb = screen.getByRole("button", { name: "Take a seat in Half-PPR #241." });
+      expect(verb).toHaveAttribute("aria-haspopup", "dialog");
+      fireEvent.click(verb);
+      expect(onOpen).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("link", { name: /Take/ })).not.toBeInTheDocument();
+    });
+
+    it("opens the same sheet from a tap anywhere on the row — a pointer convenience onto the one act", () => {
+      const onOpen = vi.fn();
+      const { container } = render(row(BASE, { onOpen }));
+      fireEvent.click(container.firstElementChild as HTMLElement);
+      expect(onOpen).toHaveBeenCalled();
+      expect((container.firstElementChild as HTMLElement).className).toContain("cursor-pointer");
+    });
+  });
+
   it("is axe-clean in both themes", async () => {
     await renderSurface(row(BASE), async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();
@@ -236,15 +274,23 @@ describe("LeagueRow", () => {
 });
 
 describe("LeagueRowsHeader", () => {
-  it("names the five columns once, eyebrow register, sentence case, hidden from assistive tech (each cell carries its own key)", () => {
-    const { container } = render(<LeagueRowsHeader />);
+  it("names the free-season columns once, eyebrow register, hidden from assistive tech", () => {
+    const { container } = render(<LeagueRowsHeader live={false} />);
     const header = container.firstElementChild as HTMLElement;
     expect(header.getAttribute("aria-hidden")).toBe("true");
     expect(header.className).toContain("font-mono");
     expect(header.className).toContain(LEAGUE_ROW_GRID);
-    for (const label of ["League", "Format", "Drafts", "Entry", "Seats"]) {
+    for (const label of ["League", "Format", "Drafts", "Seats"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByText("Buy-in")).not.toBeInTheDocument();
     expect(screen.queryByText("LEAGUE")).not.toBeInTheDocument();
+  });
+
+  it("adds Buy-in and The pot on the live template, and only then", () => {
+    const { container } = render(<LeagueRowsHeader live />);
+    expect((container.firstElementChild as HTMLElement).className).toContain(LEAGUE_ROW_GRID_LIVE);
+    expect(screen.getByText("Buy-in")).toBeInTheDocument();
+    expect(screen.getByText("The pot")).toBeInTheDocument();
   });
 });

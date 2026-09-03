@@ -1,10 +1,14 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { EmptyState } from "@/components/ui";
 import { ChapterBand } from "@/components/ui/chapter-band";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { sortBySoonestJoinableDraft } from "@/matchmaking/shelf-order";
 import { moneyIsLive } from "@/money/states";
+import { JoinSheet } from "./join-sheet";
 import { LeagueRow, LeagueRowsHeader } from "./league-row";
 import { OpenLeagueCard } from "./open-league-card";
 
@@ -202,12 +206,19 @@ export function OpenLeagueShelf({
   );
   const featuredId = featuredInHero ? null : featuredLeagueId(merged);
   const Heading = headingLevel === 1 ? "h1" : "h2";
-  // The tower's one axis: seats remaining, ascending. Rooms with claims rank above untouched
-  // rooms whatever their size, because a claim is the fact that starts a room's clock.
-  const seatsRemaining = (league: PublicLeagueSummary): number => league.teamCount - league.filledTeams;
-  const filling = merged.filter((league) => league.filledTeams > 0).sort((a, b) => seatsRemaining(a) - seatsRemaining(b));
-  const fresh = merged.filter((league) => league.filledTeams === 0);
+  // Front door blueprint (2026-09-02): sorted by soonest draft you can still join —
+  // `sortBySoonestJoinableDraft` (seats remaining, then a CHOSEN kickoff as the tiebreak; see
+  // that module's own account of why proximity-to-full is the honest axis for both triggers).
+  // The founder's Filling/Fresh chapters survive; the comparator orders within each, because a
+  // claim is still the fact that starts a room's clock.
+  const filling = sortBySoonestJoinableDraft(merged.filter((league) => league.filledTeams > 0));
+  const fresh = sortBySoonestJoinableDraft(merged.filter((league) => league.filledTeams === 0));
   const houseIds = new Set(house.map((league) => league.id));
+  // The JOIN SHEET's one owner: tapping any row or card opens the whole contract for that
+  // league. Stored as the ID and re-resolved so a re-render with fresher props never shows a
+  // stale summary inside the sheet.
+  const [openLeagueId, setOpenLeagueId] = useState<string | null>(null);
+  const openLeague = openLeagueId === null ? null : (merged.find((league) => league.id === openLeagueId) ?? null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -238,7 +249,7 @@ export function OpenLeagueShelf({
               are FILLING, untouched rooms wait below. House-first ordering died with the
               ranking; a leaderboard has one axis. */}
           <div data-testid="league-rows" className="hidden lg:block">
-            <LeagueRowsHeader />
+            <LeagueRowsHeader live={live} />
             {filling.length > 0 ? (
               <ChapterBand name="Filling" consequence="Claimed seats · first to fill is first to draft" tone="live" />
             ) : null}
@@ -252,6 +263,8 @@ export function OpenLeagueShelf({
                     leader={index === 0}
                     emphasis={league.id === featuredId ? "ink" : "quiet"}
                     headingLevel={headingLevel === 1 ? 2 : 3}
+                    live={live}
+                    onOpen={() => setOpenLeagueId(league.id)}
                   />
                 </li>
               ))}
@@ -268,6 +281,8 @@ export function OpenLeagueShelf({
                     position={filling.length + index + 1}
                     emphasis={league.id === featuredId ? "ink" : "quiet"}
                     headingLevel={headingLevel === 1 ? 2 : 3}
+                    live={live}
+                    onOpen={() => setOpenLeagueId(league.id)}
                   />
                 </li>
               ))}
@@ -280,12 +295,12 @@ export function OpenLeagueShelf({
           <ul data-testid="league-cards" className="grid gap-3 sm:grid-cols-2 lg:hidden">
             {house.map((league) => (
               <li key={league.id} className="min-w-0">
-                <OpenLeagueCard league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} />
+                <OpenLeagueCard league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} live={live} onOpen={() => setOpenLeagueId(league.id)} />
               </li>
             ))}
             {leagues.map((league) => (
               <li key={league.id} className="min-w-0" data-testid="member-league">
-                <OpenLeagueCard league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} />
+                <OpenLeagueCard league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} live={live} onOpen={() => setOpenLeagueId(league.id)} />
               </li>
             ))}
           </ul>
@@ -297,6 +312,10 @@ export function OpenLeagueShelf({
           <p className="text-sm text-text-muted">{live ? MATCHMAKING_CONFIG.liveShelfStakeDisclosure : MATCHMAKING_CONFIG.stakeDisclosure}</p>
         </>
       ) : null}
+
+      {openLeague === null ? null : (
+        <JoinSheet league={openLeague} signedIn={signedIn} live={live} onClose={() => setOpenLeagueId(null)} />
+      )}
 
       {leagues.length === 0 ? (
         <EmptyState

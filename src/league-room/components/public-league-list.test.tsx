@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
 import { renderSurface } from "@/components/ui/test-utils";
@@ -148,21 +148,43 @@ const rows = () => screen.getByTestId("league-rows");
 const cards = () => screen.getByTestId("league-cards");
 
 describe("OpenLeagueShelf", () => {
-  it("renders the merged shelf twice, house first in both: rows for lg+ viewports, cards below lg (E3 + Task 13)", async () => {
+  it("renders the merged shelf twice: RANKED rows for lg+ viewports (soonest joinable first), house-first cards below lg", async () => {
     await renderSurface(
       <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />,
       async ({ container }) => {
         for (const rendering of [rows(), cards()]) {
           const items = within(rendering).getAllByRole("listitem");
           expect(items).toHaveLength(1 + PUBLIC_LEAGUES.length);
-          expect(items[0]!.textContent).toContain(HOUSE_LEAGUE.name);
+          expect(within(rendering).getByText(HOUSE_LEAGUE.name)).toBeInTheDocument();
           expect(within(rendering).getByText("Rookie Snake Room")).toBeInTheDocument();
           expect(within(rendering).getByText("Sharks Only Auction")).toBeInTheDocument();
         }
+        // The board is ranked by soonest joinable draft (v5's tower + the blueprint's sort):
+        // "Sharks Only Auction" sits at 9 of 10 — one seat left — so it is P1, house or not.
+        // House-first ordering died with the ranking; the CARD grid below lg keeps house first.
+        expect(within(rows()).getAllByRole("listitem")[0]!.textContent).toContain("Sharks Only Auction");
+        expect(within(cards()).getAllByRole("listitem")[0]!.textContent).toContain(HOUSE_LEAGUE.name);
         expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+  });
+
+  // Front door blueprint (2026-09-02): sorted by soonest draft you can still join — within the
+  // filling chapter, a CHOSEN kickoff breaks a seats tie, sooner first.
+  it("breaks a seats tie inside a chapter by the sooner chosen kickoff", () => {
+    const later: PublicLeagueSummary = {
+      ...HOUSE_LEAGUE, id: "later", name: "Later Twin", houseRung: null, filledTeams: 6,
+      draftAtIso: "2026-09-08T20:00:00.000Z",
+    };
+    const sooner: PublicLeagueSummary = {
+      ...HOUSE_LEAGUE, id: "sooner", name: "Sooner Twin", houseRung: null, filledTeams: 6,
+      draftAtIso: "2026-09-05T20:00:00.000Z",
+    };
+    render(<OpenLeagueShelf house={[]} leagues={[later, sooner]} signedIn={false} asOfTime={AS_OF} />);
+    const items = within(rows()).getAllByRole("listitem");
+    expect(items[0]!.textContent).toContain("Sooner Twin");
+    expect(items[1]!.textContent).toContain("Later Twin");
   });
 
   // 2026-08-25, the absolutism sweep's carried finding: the shelf-wide disclosure defers to the
@@ -198,14 +220,18 @@ describe("OpenLeagueShelf", () => {
     render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />);
     for (const item of within(rows()).getAllByRole("listitem")) {
       expect(item.className).toContain("border-t");
-      expect(item.className).toContain("border-line");
+      // Filling rows spell the hairline as `border-hair border-t-line`; fresh rows as
+      // `border-line` — either way the line token draws it, and no row wears a box.
+      expect(item.className).toMatch(/border(-t)?-line/);
+      expect(item.className).not.toContain("rounded");
     }
-    // The header is the rows rendering's first element; "Entry" also exists per row as each
-    // cell's own sr-only key, so the column names are asserted inside the header alone.
+    // The header is the rows rendering's first element. Free season: no money column at all —
+    // the blueprint's money columns exist only behind `moneyIsLive()` (their own tests).
     const header = rows().firstElementChild as HTMLElement;
-    for (const label of ["League", "Format", "Drafts", "Entry", "Seats"]) {
+    for (const label of ["League", "Format", "Drafts", "Seats"]) {
       expect(within(header).getByText(label)).toBeInTheDocument();
     }
+    expect(within(header).queryByText("Buy-in")).not.toBeInTheDocument();
   });
 
   /**
@@ -326,24 +352,41 @@ describe("OpenLeagueShelf", () => {
     }
   });
 
-  it("gives a signed-in visitor a join button per league in both renderings, house and member alike", () => {
+  // Front door blueprint (2026-09-02): every row and card verb opens the JOIN SHEET — the
+  // sheet's own verb is what joins (signed in) or rides the hold interstitial (signed out).
+  it("opens the join sheet from a verb, and the sheet carries the real join button signed in", () => {
     renderInLeague(
       <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn asOfTime={AS_OF} />,
       fixtureLeagueDeps().deps,
     );
     for (const rendering of [rows(), cards()]) {
-      expect(within(rendering).getByRole("button", { name: `Join ${HOUSE_LEAGUE.name}` })).toBeInTheDocument();
-      expect(within(rendering).getByRole("button", { name: "Join Rookie Snake Room" })).toBeInTheDocument();
-      expect(within(rendering).getByRole("button", { name: "Join Sharks Only Auction" })).toBeInTheDocument();
+      // One opener per league in each rendering, each announcing the dialog it opens.
+      const openers = within(rendering).getAllByRole("button", { name: /^Take (a seat|the last seat) in / });
+      expect(openers).toHaveLength(1 + PUBLIC_LEAGUES.length);
+      for (const opener of openers) expect(opener).toHaveAttribute("aria-haspopup", "dialog");
     }
+    fireEvent.click(within(rows()).getByRole("button", { name: `Take a seat in ${HOUSE_LEAGUE.name}.` }));
+    const sheet = screen.getByRole("dialog", { name: `Join ${HOUSE_LEAGUE.name}` });
+    expect(within(sheet).getByRole("button", { name: `Join ${HOUSE_LEAGUE.name}` })).toBeInTheDocument();
   });
 
-  it("sends a signed-out visitor to the hold interstitial, one link per league in each rendering", () => {
+  it("opens the join sheet signed out too, whose verb rides the hold interstitial for THAT league", () => {
     render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn={false} asOfTime={AS_OF} />);
     expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
-    for (const rendering of [rows(), cards()]) {
-      expect(within(rendering).getAllByRole("link", { name: /^Take (a seat|the last seat) in / })).toHaveLength(1 + PUBLIC_LEAGUES.length);
-    }
+    fireEvent.click(within(rows()).getByRole("button", { name: "Take the last seat in Sharks Only Auction." }));
+    const sheet = screen.getByRole("dialog", { name: "Join Sharks Only Auction" });
+    const verb = within(sheet).getByRole("link", { name: "Take the last seat in Sharks Only Auction." });
+    expect(verb.getAttribute("href")).toContain(encodeURIComponent("/join/p2/hold"));
+    // And the whole contract is on the sheet: the real hold duration, never a made-up one.
+    expect(within(sheet).getByText(/Your seat is held for 10 minutes while you sign in\./)).toBeInTheDocument();
+  });
+
+  it("closes the sheet and returns to the board", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn={false} asOfTime={AS_OF} />);
+    fireEvent.click(within(rows()).getByRole("button", { name: `Take a seat in ${HOUSE_LEAGUE.name}.` }));
+    expect(screen.getByRole("dialog", { name: `Join ${HOUSE_LEAGUE.name}` })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("offers a next action when no member league matches, rather than a dead end", async () => {

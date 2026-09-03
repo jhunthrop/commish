@@ -4,11 +4,17 @@ import { SeatMeter } from "@/components/ui";
 import { MICRO_LABEL, UI_CONFIG } from "@/components/ui/config";
 import { useValueChangeHighlight } from "@/design/use-value-change-highlight";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { Button } from "@/components/ui";
+import { moneyIsLive } from "@/money/states";
 import {
+  ctaAccessibleName,
+  ctaVisibleText,
   DraftTimingNotes,
+  entryFeeLabel,
   FormatLine,
   LiveChip,
   OpenLeagueCta,
+  potFacts,
   ScheduledDraftValue,
   stakeBadge,
   useOpenLeagueLive,
@@ -35,18 +41,40 @@ export const LEAGUE_ROW_GRID =
   "grid grid-cols-[44px_minmax(0,2.2fr)_minmax(0,1.7fr)_minmax(0,1.7fr)_minmax(0,2fr)_176px] items-center gap-x-4";
 
 /**
+ * The LIVE-MONEY template (front door blueprint, 2026-09-02): BUY-IN and THE POT ride between
+ * seats and the verb, and they exist AT ALL only while `moneyIsLive()` — the free season's
+ * zero-variance money columns stay deleted (the ruling that removed the Entry column stands;
+ * the derived free-season sentence under the board says the money fact once). Buy-in is a
+ * fixed right-aligned track (a price is short and comparison wants a shared right edge); the
+ * pot takes a fr share for its split note.
+ */
+export const LEAGUE_ROW_GRID_LIVE =
+  "grid grid-cols-[44px_minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1.5fr)_minmax(0,1.7fr)_88px_minmax(0,1.5fr)_176px] items-center gap-x-4";
+
+/** The one place the live/free template fork happens, for the header and every row alike. */
+export function leagueRowGrid(live: boolean): string {
+  return live ? LEAGUE_ROW_GRID_LIVE : LEAGUE_ROW_GRID;
+}
+
+/**
  * The column names, once, above the stack — the shouted micro-label register (the one register
  * a scoreboard has always shouted quietly). `aria-hidden`: every cell that needs a spoken key
  * carries its own, so this line is layout for eyes. The verb column names itself.
  */
-export function LeagueRowsHeader() {
+export function LeagueRowsHeader({ live = moneyIsLive() }: { readonly live?: boolean }) {
   return (
-    <div aria-hidden="true" className={`${LEAGUE_ROW_GRID} pb-2 pl-2 ${MICRO_LABEL} text-text-faint`}>
+    <div aria-hidden="true" className={`${leagueRowGrid(live)} pb-2 pl-2 ${MICRO_LABEL} text-text-faint`}>
       <span>#</span>
       <span>League</span>
       <span>Format</span>
       <span>Drafts</span>
       <span>Seats</span>
+      {live ? (
+        <>
+          <span className="text-right">Buy-in</span>
+          <span>The pot</span>
+        </>
+      ) : null}
       <span />
     </div>
   );
@@ -65,6 +93,17 @@ export interface LeagueRowProps {
   /** The heading level this row's league name renders at — the PARENT's call (page-audit
    *  harness, 2026-08-27). Defaults to the front door's shape. */
   readonly headingLevel?: 2 | 3;
+  /** Defaults to the real `moneyIsLive()` — injectable so a test can exercise the live columns
+   *  without editing shipped state, the `FrontDoorHero` idiom. */
+  readonly live?: boolean;
+  /**
+   * Front door blueprint (2026-09-02): tapping the row opens the JOIN SHEET, where the whole
+   * contract is read and the sheet's own verb rides the holds machinery. When provided, the
+   * row's verb becomes the sheet opener (same visible text, same accessible name) and the row
+   * surface itself is a pointer convenience onto the same act; when absent the row keeps the
+   * direct `OpenLeagueCta`.
+   */
+  readonly onOpen?: () => void;
 }
 
 /**
@@ -84,18 +123,34 @@ export interface LeagueRowProps {
  *   countdown) and drops the absolute date to the faint line — the delta is the story, the
  *   date is the record.
  */
-export function LeagueRow({ league, signedIn, position, leader = false, emphasis = "quiet", headingLevel = 3 }: LeagueRowProps) {
+export function LeagueRow({
+  league,
+  signedIn,
+  position,
+  leader = false,
+  emphasis = "quiet",
+  headingLevel = 3,
+  live = moneyIsLive(),
+  onOpen,
+}: LeagueRowProps) {
   const { remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
   const claimFlash = useValueChangeHighlight(remainingSeats);
   const NameHeading = headingLevel === 2 ? "h2" : "h3";
 
   const urgent = league.filledTeams > 0 && remainingSeats > 0 && remainingSeats < UI_CONFIG.seatMeter.lowSeatsThreshold;
+  const pot = live ? potFacts(league) : null;
 
   return (
+    // The row surface is a POINTER CONVENIENCE onto the same act the verb button carries: the
+    // button is the accessible, focusable control (same name, same handler), so keyboard and AT
+    // users lose nothing — the `Modal` primitive documents the identical pattern for its own
+    // container.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
-      className={`${LEAGUE_ROW_GRID} border-l-[3px] py-3 pl-2 transition-colors hover:bg-surface-elevated ${
-        leader ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent" : "border-l-transparent"
-      }`}
+      onClick={onOpen}
+      className={`${leagueRowGrid(live)} border-l-[3px] py-3 pl-2 transition-colors hover:bg-surface-elevated ${
+        onOpen === undefined ? "" : "cursor-pointer "
+      }${leader ? "border-l-accent bg-gradient-to-r from-accent-glow via-transparent to-transparent" : "border-l-transparent"}`}
     >
       <span
         aria-hidden="true"
@@ -135,8 +190,38 @@ export function LeagueRow({ league, signedIn, position, leader = false, emphasis
         <SeatMeter filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} srOnlySentence />
       </div>
 
+      {live ? (
+        <>
+          {/* A price is a fact and wears ink (v5 law 1) — `entryFeeLabel` reads the REAL fee. */}
+          <span className="text-right font-display text-lg font-bold tabular-nums text-text-primary">{entryFeeLabel(league)}</span>
+          <span className="min-w-0 text-sm tabular-nums text-text-muted">
+            {pot === null ? "Bragging rights" : (
+              <>
+                <span className="font-medium text-text-primary">{pot.potUsd}</span>
+                <span className="block text-xs text-text-faint">{pot.placesLabel}</span>
+              </>
+            )}
+          </span>
+        </>
+      ) : null}
+
       <div className="justify-self-end">
-        <OpenLeagueCta league={league} signedIn={signedIn} emphasis={emphasis} />
+        {onOpen === undefined ? (
+          <OpenLeagueCta league={league} signedIn={signedIn} emphasis={emphasis} />
+        ) : (
+          <Button
+            variant={emphasis === "ink" ? "verb" : "secondary"}
+            onClick={(event) => {
+              // The row surface shares this handler; stop the bubble so one tap is one open.
+              event.stopPropagation();
+              onOpen();
+            }}
+            aria-label={ctaAccessibleName(league)}
+            aria-haspopup="dialog"
+          >
+            {ctaVisibleText(league)}
+          </Button>
+        )}
       </div>
     </div>
   );

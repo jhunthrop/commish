@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { Card, LedgerRow, SeatMeter } from "@/components/ui";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { Button } from "@/components/ui";
+import { moneyIsLive } from "@/money/states";
 import {
+  ctaAccessibleName,
+  ctaVisibleText,
   DraftTimingNotes,
   FormatLine,
   LiveChip,
   OpenLeagueCta,
+  potFacts,
   ScheduledDraftValue,
   entryFeeLabel,
   stakeBadge,
@@ -35,6 +40,13 @@ export interface OpenLeagueCardProps {
    * twenty is never the view's one ink action on its own authority.
    */
   readonly emphasis?: "ink" | "quiet";
+  /** Defaults to the real `moneyIsLive()` — injectable, the `FrontDoorHero` idiom. Adds the
+   *  pot ledger row (front door blueprint, 2026-09-02) only when live: the free season's Entry
+   *  row already says "Free" and a second money row with zero variance would say nothing. */
+  readonly live?: boolean;
+  /** Same contract as `LeagueRow.onOpen`: the card's verb opens the join sheet instead of
+   *  acting directly. */
+  readonly onOpen?: () => void;
 }
 
 /**
@@ -53,10 +65,11 @@ export interface OpenLeagueCardProps {
  * retired the 30-word paragraph this row used to print inline, in place of the Drafts value,
  * on every `when_full` card).
  */
-export function OpenLeagueCard({ league, signedIn, emphasis = "quiet" }: OpenLeagueCardProps) {
+export function OpenLeagueCard({ league, signedIn, emphasis = "quiet", live = moneyIsLive(), onOpen }: OpenLeagueCardProps) {
   const { remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
   const isBeginnerOnly = league.experienceTier === "beginner";
   const badge = stakeBadge(league);
+  const pot = live ? potFacts(league) : null;
 
   return (
     // `interactive` (the fun pass, Task 12): rule 4's amended test names this exact surface — "a
@@ -105,6 +118,11 @@ export function OpenLeagueCard({ league, signedIn, emphasis = "quiet" }: OpenLea
             {remainingSeats} of {league.teamCount} open
           </span>
         </LedgerRow>
+        {pot === null ? null : (
+          <LedgerRow label="The pot">
+            <span className="font-medium tabular-nums text-text-primary">{`${pot.potUsd} · ${pot.placesLabel}`}</span>
+          </LedgerRow>
+        )}
         <LedgerRow label="Roster">
           <span className="font-medium text-text-primary">{league.rosterSummary}</span>
         </LedgerRow>
@@ -130,7 +148,18 @@ export function OpenLeagueCard({ league, signedIn, emphasis = "quiet" }: OpenLea
       ) : null}
 
       <div className="mt-auto">
-        <OpenLeagueCta league={league} signedIn={signedIn} emphasis={emphasis} />
+        {onOpen === undefined ? (
+          <OpenLeagueCta league={league} signedIn={signedIn} emphasis={emphasis} />
+        ) : (
+          <Button
+            variant={emphasis === "ink" ? "verb" : "secondary"}
+            onClick={onOpen}
+            aria-label={ctaAccessibleName(league)}
+            aria-haspopup="dialog"
+          >
+            {ctaVisibleText(league)}
+          </Button>
+        )}
       </div>
     </Card>
   );
