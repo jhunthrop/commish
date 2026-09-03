@@ -3,6 +3,7 @@ import type { Clock } from "@/domain/timing";
 import type { JsonObject } from "@/domain/audit";
 import { kickoffInstantsByWeek } from "../team-store";
 import { assertSingleGeneration, preseasonProjectionsAsOf } from "../preseason/board-store";
+import { RegisterRefusalError } from "./errors";
 import { BENCHMARK_SOURCES } from "../preseason/benchmarks";
 import { preseasonRankingsAsOf } from "../preseason/store";
 import { weekPropsConsensus, type WeekWindow } from "./props";
@@ -119,14 +120,16 @@ export async function takeFreeze(db: Db, { season, week }: FreezeRequest, clock:
   const kickoffs = await kickoffInstantsByWeek(db, season);
   const kickoff = kickoffs.get(week);
   if (kickoff === undefined) {
-    throw new Error(
+    throw new RegisterRefusalError(
+      "no_kickoff",
       `The store holds no ingested kickoff for ${season} week ${week}, so there is nothing to check a freeze against. Run \`npm run projections:context\` first.`,
     );
   }
 
   const frozenAt = new Date(clock.now());
   if (frozenAt.getTime() >= kickoff.getTime()) {
-    throw new Error(
+    throw new RegisterRefusalError(
+      "past_kickoff",
       `${season} week ${week}'s first kickoff (${kickoff.toISOString()}) is not after ${frozenAt.toISOString()}. ` +
         "The week has already begun, so a freeze taken now would not be a prospective claim. Refusing.",
     );
@@ -146,8 +149,16 @@ export async function takeFreeze(db: Db, { season, week }: FreezeRequest, clock:
   const boards: readonly FreezeBoard[] = await Promise.all(
     REGISTER_BOARD_SOURCES.map(async ({ source, role }): Promise<FreezeBoard> => {
       // A stitched two-generation read anywhere else is a bad page render; here it becomes an
-      // immutable weekly claim the whole season grades against. Fail loud before recording.
-      await assertSingleGeneration(db, { season, source, asOf: frozenAt });
+      // immutable weekly claim the whole season grades against. Fail loud before recording,
+      // wrapped into the register's own typed refusal (board-store's error untouched) so the job
+      // system classifies this terminal the same way it does every other refusal here.
+      try {
+        await assertSingleGeneration(db, { season, source, asOf: frozenAt });
+      } catch (error: unknown) {
+        throw new RegisterRefusalError("stitched_generations", error instanceof Error ? error.message : String(error), {
+          cause: error,
+        });
+      }
       const board = await preseasonProjectionsAsOf(db, { season, source, asOf: frozenAt });
       const rows: readonly RegisterFreezeRow[] = board.map((entry) => {
         const stance = props.get(entry.playerId);
@@ -174,13 +185,15 @@ export async function takeFreeze(db: Db, { season, week }: FreezeRequest, clock:
 
   const served = boards.find((board) => board.role === "served");
   if (served === undefined) {
-    throw new Error(
+    throw new RegisterRefusalError(
+      "no_served_role",
       "register/sources.ts lists no board with the `served` role, so this freeze has no claim about the product to record. " +
         "A shadow-only register is a comparison of two boards nobody was shown.",
     );
   }
   if (served.rows.length === 0) {
-    throw new Error(
+    throw new RegisterRefusalError(
+      "empty_served_board",
       `The served board ("${SERVED_BOARD_SOURCE}") holds no ${season} rows at or before ${frozenAt.toISOString()}, so there is no claim to freeze. Run \`npm run projections:preseason:persist\` first.`,
     );
   }

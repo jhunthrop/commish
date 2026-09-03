@@ -15,6 +15,7 @@
 //   - Every step is idempotent-or-skip already, which is what makes checkpoint resume and
 //     at-least-once delivery safe here without new step logic.
 import {
+  RegisterRefusalError,
   freezeStep,
   gradeStep,
   defaultSeason,
@@ -56,23 +57,18 @@ export function parseSeasonWeekPayload(raw: JsonObject): SeasonWeekPayload {
 }
 
 /**
- * `takeFreeze` refuses with plain `Error`s; these are the refusals that are the REGISTER
- * SPEAKING — each one needs an operator or the calendar, never a retry. Matched on the stable
- * clause of each message (`freeze.ts` is the one author of all three).
+ * A refusal is the REGISTER SPEAKING — each one needs an operator or the calendar, never a
+ * retry. Recognised by TYPE (`RegisterRefusalError`, thrown by every `takeFreeze` refusal site
+ * and by its wrap of `assertSingleGeneration`), never by message-matching: a regex over prose
+ * desyncs silently the day someone edits a sentence, which is how the fix round found the
+ * stitched-generations refusal uncovered. Anything else thrown through the freeze path is
+ * weather (a dropped connection, a restarting database) and stays retryable.
  */
-const TERMINAL_FREEZE_PATTERNS: readonly RegExp[] = [
-  /week has already begun/i,
-  /no claim to freeze/i,
-  /no board with the `served` role/i,
-  /no ingested kickoff/i,
-];
-
 export function classifyFreezeError(error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error);
-  if (TERMINAL_FREEZE_PATTERNS.some((pattern) => pattern.test(message))) {
-    return new TerminalJobError(`freeze refused by the register: ${message}`, { cause: error });
+  if (error instanceof RegisterRefusalError) {
+    return new TerminalJobError(`freeze refused by the register [${error.code}]: ${error.message}`, { cause: error });
   }
-  return error instanceof Error ? error : new Error(message);
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 function toOutcome(result: StepResult): StepOutcome {

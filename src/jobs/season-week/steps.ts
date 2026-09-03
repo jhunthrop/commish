@@ -26,6 +26,15 @@ import { freezeRowsAt, gradeRowsFor, latestFreezeFor } from "@/projections/regis
 import { SERVED_BOARD_SOURCE } from "@/projections/register/sources";
 import { kickoffInstantsByWeek } from "@/projections/team-store";
 
+/**
+ * THE SANCTIONED PASS-THROUGH of the register's refusal type (job-system fix round, HIGH-1). The
+ * job definition (`src/jobs/defs/season-week-job.ts`) must classify a register refusal terminal
+ * by `instanceof`, and it may not import `src/projections/register` itself — this file is the
+ * wall-exempt orchestrator, so the CLASS crosses here, exactly one name, no register data. A
+ * second wall exemption for the job def would widen the quarantine for what one re-export solves.
+ */
+export { RegisterRefusalError } from "@/projections/register/errors";
+
 export type StepStatus = "ok" | "skipped" | "failed";
 
 export interface StepResult {

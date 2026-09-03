@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll, truncateJobTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
+import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
+import type { BoardEntry } from "@/projections/preseason/board";
+import { BOARD_SOURCE, projectionRows, recordPreseasonProjections } from "@/projections/preseason/board-store";
+import { recordTeamObservations } from "@/projections/team-store";
+import { recordNflPlayers } from "@/projections/universe";
 import { TerminalJobError } from "../contract";
 import { executeClaimedJob, type ExecutorDeps } from "../execute";
+import { RegisterRefusalError } from "../season-week/steps";
 import { claimNextJob, completedStepsFor, enqueueJob } from "../store";
 import { classifyFreezeError, parseSeasonWeekPayload, seasonWeekJobWith, SEASON_WEEK_JOB_NAME } from "./season-week-job";
 
@@ -91,18 +97,122 @@ describe("the season-week job", () => {
 });
 
 describe("classifyFreezeError", () => {
-  it.each([
-    "2026 week 1's first kickoff (2026-09-11T00:20:00.000Z) is not after 2026-09-11T01:00:00.000Z. The week has already begun, so a freeze taken now would not be a prospective claim. Refusing.",
-    'The served board ("preseason-v9") holds no 2026 rows at or before 2026-09-08T12:00:00.000Z, so there is no claim to freeze. Run `npm run projections:preseason:persist` first.',
-    "register/sources.ts lists no board with the `served` role, so this freeze has no claim about the product to record.",
-    "The store holds no ingested kickoff for 2026 week 1, so there is nothing to check a freeze against.",
-  ])("marks the register's own refusals terminal: %s", (message) => {
-    expect(classifyFreezeError(new Error(message))).toBeInstanceOf(TerminalJobError);
+  it.each(["past_kickoff", "empty_served_board", "no_served_role", "no_kickoff", "stitched_generations"] as const)(
+    "marks the register's own %s refusal terminal, by type, and names the code",
+    (code) => {
+      const classified = classifyFreezeError(new RegisterRefusalError(code, "the register said no"));
+      expect(classified).toBeInstanceOf(TerminalJobError);
+      expect(classified.message).toContain(`[${code}]`);
+    },
+  );
+
+  it("leaves a transient error retryable, even one whose prose sounds like a refusal", () => {
+    // The old classifier matched message text; this is the desync it invited, pinned as a
+    // negative: a plain Error is weather no matter what its sentence happens to say.
+    for (const message of ["connection terminated unexpectedly", "The week has already begun, so a freeze taken now would not be a prospective claim."]) {
+      expect(classifyFreezeError(new Error(message))).not.toBeInstanceOf(TerminalJobError);
+    }
+  });
+});
+
+/**
+ * THE TWO REFUSAL PATHS, DRIVEN END-TO-END through the definition's own freeze step (via
+ * `runRemainingSteps` with everything before it checkpointed): the register refuses for real
+ * against a seeded store, and what escapes the job step must be a `TerminalJobError`. Fixture
+ * shapes mirror `../season-week/steps.test.ts`'s seeding, minus everything these two paths never
+ * reach. No `src/projections/register` import anywhere here — the refusal crosses as a type
+ * through the wall-exempt steps module, and the seeds go through team-store and board-store.
+ */
+describe("the freeze step refuses terminally, end-to-end", () => {
+  const SEASON = 2026;
+  const KICKOFF = new Date("2026-09-10T00:20:00.000Z");
+  const COMPLETED_BEFORE_FREEZE: ReadonlySet<string> = new Set(["stats-ingest", "props-snapshot", "grade"]);
+
+  function boardEntry(playerId: string, points: number, rank: number): BoardEntry {
+    return {
+      playerId,
+      position: "WR",
+      projectedPoints: points,
+      valueOverReplacement: points - 100,
+      positionRank: rank,
+      replacementLevel: 100,
+      rank,
+      valueRank: rank,
+      team: "CIN",
+      expectedGames: 16.2,
+      seasonLine: { playerId, week: 0 } as BoardEntry["seasonLine"],
+      outlook: { floor: points - 40, median: points, ceiling: points + 40 },
+      tier: 0,
+      playersLeftInTier: 4,
+      dropToNextTier: 18.3,
+      reasons: [],
+    };
+  }
+
+  async function seedKickoff(): Promise<void> {
+    await recordTeamObservations(db, [
+      {
+        season: SEASON,
+        week: 1,
+        team: "CIN",
+        source: SCHEDULE_SOURCE.kickoff,
+        metric: SCHEDULE_METRICS.kickoffInstant,
+        value: KICKOFF.getTime(),
+        asOf: KICKOFF,
+      },
+    ]);
+  }
+
+  async function runFreezeStep(stepClock: Clock): Promise<void> {
+    const definition = seasonWeekJobWith(cannedNetwork);
+    await definition.runRemainingSteps({ db, clock: stepClock }, { season: SEASON }, COMPLETED_BEFORE_FREEZE, async () => {});
+  }
+
+  it("classifies past-kickoff terminal when kickoff passes between the pick and the freeze", async () => {
+    await seedKickoff();
+    // A stateful clock stages the real race: the step's own read (first call) still sees the
+    // kickoff ahead, so it picks week 1; `takeFreeze`'s read (every later call) lands after
+    // kickoff, and the register refuses. Payload carries the season, so no other clock read
+    // precedes these two.
+    const calls = { count: 0 };
+    const racingClock: Clock = {
+      now: () => (calls.count++ === 0 ? "2026-09-10T00:19:00.000Z" : "2026-09-10T00:21:00.000Z"),
+    };
+
+    const failure = await runFreezeStep(racingClock).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(TerminalJobError);
+    expect((failure as TerminalJobError).message).toContain("[past_kickoff]");
   });
 
-  it("leaves a transient error retryable", () => {
-    const classified = classifyFreezeError(new Error("connection terminated unexpectedly"));
-    expect(classified).not.toBeInstanceOf(TerminalJobError);
+  it("classifies a stitched two-generation board terminal", async () => {
+    await seedKickoff();
+    await recordNflPlayers(db, [
+      { id: "00-0036900", pfrId: null, espnId: null, name: "Ja'Marr Chase", position: "WR", latestTeam: "CIN", rookieSeason: 2020, lastSeason: 2026 },
+    ]);
+    // Two generations of the served board, both at or before the freeze instant — the exact
+    // stitched state `assertSingleGeneration` exists to refuse.
+    for (const asOf of ["2026-09-01T00:00:00.000Z", "2026-09-02T00:00:00.000Z"]) {
+      await recordPreseasonProjections(
+        db,
+        projectionRows([boardEntry("00-0036900", 326.4, 1)], {
+          season: SEASON,
+          source: BOARD_SOURCE,
+          asOf: new Date(asOf),
+          momentKind: "live",
+        }),
+      );
+    }
+
+    const failure = await runFreezeStep({ now: () => "2026-09-08T12:00:00.000Z" }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(TerminalJobError);
+    expect((failure as TerminalJobError).message).toContain("[stitched_generations]");
+    expect((failure as TerminalJobError).message).toContain("distinct as_of generations");
   });
 });
 
