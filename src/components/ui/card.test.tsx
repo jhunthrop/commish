@@ -57,15 +57,33 @@ describe("Card", () => {
   it("earns its place with depth, never with a heavier line — rule 4 did not move", async () => {
     // The whole point of the amendment is that a card is still not a box. Depth is the four-step
     // surface model doing its job; `edge` is a CONTROL boundary and a card is not a control.
+    // V6 goes one further: the default card carries NO hairline at all — the soft fill plus its
+    // own shadow token is the whole material (the warmth pass, founder 2026-09-03).
     await renderSurface(
       <Card interactive aria-label="Open league">
         <p>Row</p>
       </Card>,
       ({ container }) => {
         const card = container.querySelector("[aria-label='Open league']")!;
-        expect(card.className).toContain("border-line");
+        expect(card.className).not.toContain("border-line");
+        expect(card.className).toContain("shadow-card");
         expect(card.className).not.toContain("border-edge");
         expect(card.className).not.toContain("border-2");
+      },
+    );
+  });
+
+  it("keeps a hairline available where a border is semantic — the outline variant, opt-in", async () => {
+    // The warmth pass retires the DEFAULT hairline, not the idea of a visible boundary: a
+    // dashed placeholder or a line a reader must notice still spells `variant="outline"`.
+    await renderSurface(
+      <Card variant="outline" aria-label="Bounded">
+        <p>Row</p>
+      </Card>,
+      ({ container }) => {
+        const card = container.querySelector("[aria-label='Bounded']")!;
+        expect(card.className).toContain("border-line");
+        expect(card.className).toContain("shadow-card");
       },
     );
   });

@@ -48,6 +48,29 @@ describe("EmptyState", () => {
     const { container } = render(<EmptyState title="No leagues yet" action={<Button>Create a league</Button>} />);
     expect(container.querySelector("svg.lucide-inbox")).toBeInTheDocument();
   });
+
+  it("v6: the mascot slot swaps the practice bot in for the icon, decorative and static", async () => {
+    // The bot is aria-hidden (the words carry the meaning) and has no animation classes —
+    // reduced-motion safe by construction, not by a media-query branch (law 6).
+    await renderSurface(
+      <EmptyState mascot title="Your queue is empty." description="Tap a player and he'll wait right here." action={<Button>Open the pool</Button>} />,
+      async ({ container }) => {
+        expect(container.querySelector("svg.lucide-inbox")).toBeNull();
+        const bot = container.querySelector('svg[viewBox="0 0 40 40"]')!;
+        expect(bot).toBeInTheDocument();
+        expect(bot.getAttribute("aria-hidden")).toBe("true");
+        expect(bot.outerHTML).not.toContain("animate");
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
+  it("v6: the empty lot lost its dashed fence — soft resting fill, no hairline", () => {
+    const { container } = render(<EmptyState title="No leagues yet" action={<Button>Create a league</Button>} />);
+    const panel = container.firstElementChild!;
+    expect(panel.className).toContain("bg-surface-elevated");
+    expect(panel.className).not.toContain("border-dashed");
+  });
 });
 
 describe("ErrorState", () => {

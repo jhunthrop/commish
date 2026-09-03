@@ -36,7 +36,10 @@ export interface LowerThirdProps {
 export function LowerThird({ cells, action, live = false }: LowerThirdProps): ReactElement {
   return (
     <div
-      className={`flex flex-wrap items-stretch border-t-[3px] bg-surface-elevated ${
+      // V6: the channel top-bar stays (it is the strip's semantic color, not decoration) and the
+      // cell hairlines stay (data separation); the strip itself takes the raised top-light so it
+      // reads as the same soft material every card became.
+      className={`flex flex-wrap items-stretch border-t-[3px] bg-surface-elevated shadow-raised ${
         live ? "border-live" : "border-accent"
       }`}
       data-live={live ? "true" : undefined}

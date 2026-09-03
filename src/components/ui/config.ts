@@ -237,7 +237,10 @@ export const EYEBROW = "font-mono text-xs tracking-wide";
  * micro-label is a shouted key beside data. Both are mono and small; only one is capitals, and
  * collapsing them would put capitals back on the prose labels the charter cleared.
  */
-export const MICRO_LABEL = "font-mono text-xs uppercase tracking-[0.11em]";
+// V6 (the warmth pass, 2026-09-03): the register survives — a scoreboard still shouts Q3
+// quietly — but the tracking softens from 0.11em to the mocks' own 0.5px-at-micro-size
+// (~0.06em). Mono, xs and the capitals stay; the charter's guard assertions still hold.
+export const MICRO_LABEL = "font-mono text-xs uppercase tracking-[0.06em]";
 
 /**
  * THE RAIL REGISTER — the caps charter's second sanctioned address (Sunday v5, 2026-08-28).

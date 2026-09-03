@@ -39,15 +39,19 @@ export function SegmentGroup({ label, options, value, onChange, labelled = true,
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
       {labelled ? <span className="text-sm font-medium text-text-primary">{label}</span> : null}
-      <div className={`flex w-fit flex-wrap overflow-hidden rounded-md border border-line ${RAIL_LABEL_LG}`} role="group" aria-label={label}>
+      {/* V6 (the warmth pass): the bordered strip becomes a row of PILLS — the mocks' tabs.
+          Inactive segments rest on the elevated fill; the active one keeps the solid amber
+          (furniture channel, verified ink), now pill-shaped. Same options, same one-glance
+          readability, no hairline. */}
+      <div className={`flex w-fit flex-wrap gap-1.5 ${RAIL_LABEL_LG}`} role="group" aria-label={label}>
         {options.map((option) => (
           <button
             key={option.value}
             type="button"
             aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
-            className={`px-4 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-              value === option.value ? "bg-accent text-accent-text" : "text-text-muted hover:text-text-primary"
+            className={`rounded-pill px-4 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+              value === option.value ? "bg-accent text-accent-text" : "bg-surface-elevated text-text-muted hover:text-text-primary"
             }`}
           >
             {option.label}

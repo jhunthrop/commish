@@ -39,7 +39,9 @@ export function BottomSheet({ label, onClose, children }: BottomSheetProps) {
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="absolute inset-x-0 bottom-0 mx-auto max-h-[85vh] w-full max-w-5xl animate-sheet-up overflow-y-auto rounded-t-xl border border-b-0 border-line bg-surface-raised p-6 shadow-2xl focus-visible:outline-none"
+        // V6: soft raised fill under the overlay shadow token — the hairline went with the
+        // warmth pass; `rounded-t-xl` now rides the 20px sheet step the radius scale added.
+        className="absolute inset-x-0 bottom-0 mx-auto max-h-[85vh] w-full max-w-5xl animate-sheet-up overflow-y-auto rounded-t-xl bg-surface-raised p-6 shadow-overlay focus-visible:outline-none"
       >
         {children}
       </div>

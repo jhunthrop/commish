@@ -23,7 +23,7 @@ export interface DecisionSheetProps {
 /**
  * A DECISION SHEET — law 3 of the league room. Not a page and not a form: a finished diagnosis
  * with its evidence, and one amber verb that commits. Distinct from `Modal` on purpose: the
- * accent border marks "the room is asking you to decide", the title sits in the display face
+ * accent attention ring marks "the room is asking you to decide", the title sits in the display face
  * with its context beside it, and the footer is a verbs row rather than a Close button.
  *
  * Mechanics follow `Modal`'s APG dialog pattern exactly: renders nothing while closed, takes
@@ -91,7 +91,10 @@ export function DecisionSheet({ open, title, meta, onClose, children, footer, si
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className={`w-full ${size === "lg" ? "max-w-3xl" : "max-w-2xl"} rounded-lg border border-accent bg-surface-elevated p-5 shadow-card focus-visible:outline-none`}
+        // V6: the solid amber border becomes the attention treatment the warmth pass names —
+        // a soft ring in the accent's own family over the soft fill, with the overlay shadow.
+        // "The room is asking you to decide" still reads amber; it just stopped being a wire.
+        className={`w-full ${size === "lg" ? "max-w-3xl" : "max-w-2xl"} rounded-xl bg-surface-elevated p-5 shadow-overlay ring-2 ring-accent/40 focus-visible:outline-none`}
       >
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 id={titleId} className="font-display text-lg font-semibold text-text-primary">

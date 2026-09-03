@@ -30,11 +30,14 @@ describe("DecisionSheet", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("is a labelled modal dialog with the accent border", () => {
+  it("is a labelled modal dialog wearing the accent attention ring", () => {
+    // V6 (the warmth pass): "the room is asking you to decide" is a soft ring in the accent's
+    // own family, not a solid border wire — the amber signal survives, the hairline does not.
     render(sheet(true));
     const dialog = screen.getByRole("dialog", { name: "Fix your WR2" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(dialog.className).toContain("border-accent");
+    expect(dialog.className).toContain("ring-accent/40");
+    expect(dialog.className).not.toContain("border-accent");
   });
 
   it("states the context and the way out beside the headline", () => {

@@ -88,7 +88,9 @@ export function Crest({ id, name, size = UI_CONFIG.shell.crestSizePx, className 
     <span
       aria-hidden="true"
       style={{ width: size, height: size }}
-      className={`flex shrink-0 items-center justify-center rounded-md border border-line font-display text-xs font-semibold uppercase ${AVATAR_TONE_CLASS[tone]} ${className}`}
+      // V6: the tile is a soft fill on the moved 12px radius (the squircle feel on a 40px
+      // square); the hairline went with the warmth pass — the tone fill IS the boundary.
+      className={`flex shrink-0 items-center justify-center rounded-md font-display text-xs font-semibold uppercase ${AVATAR_TONE_CLASS[tone]} ${className}`}
     >
       {label}
     </span>

@@ -72,7 +72,9 @@ const BASE =
 // two red variants can never read as the same weight of act.
 const VARIANT: Readonly<Record<ButtonVariant, string>> = {
   primary: "rounded-pill bg-text-primary text-surface hover:opacity-90",
-  verb: "rounded-md bg-accent text-accent-text hover:opacity-90",
+  // V6: the verb keeps its solid (the one solid per surface) and gains the soft glow token —
+  // the mocks' halo under DRAFT, riding each theme's own accent via `--shadow-verb-glow`.
+  verb: "rounded-md bg-accent text-accent-text shadow-verb-glow hover:opacity-90",
   secondary: "rounded-pill border border-edge bg-transparent text-text-primary hover:bg-surface-elevated",
   destructive: "rounded-pill bg-negative text-negative-text hover:brightness-110",
   live: "rounded-md border border-negative bg-transparent text-negative hover:bg-surface-elevated",

@@ -13,6 +13,16 @@ import type { HTMLAttributes } from "react";
  */
 export type CardPadding = "comfortable" | "compact";
 
+/**
+ * V6, THE WARMTH PASS (founder 2026-09-03): the default card is a SOFT FILL — no hairline, the
+ * elevated surface carrying its own light (`shadow-card` is dark's inset top-light plus a real
+ * drop shadow, light's designed equivalent). `outline` keeps the hairline for the few places a
+ * border is SEMANTIC rather than material — a dashed placeholder, a boundary a reader is meant
+ * to notice as a line. An attention card (the old amber border) is neither of these: it reads as
+ * a wash + ring at its call site, never a heavier card variant here.
+ */
+export type CardVariant = "soft" | "outline";
+
 export interface CardProps extends HTMLAttributes<HTMLElement> {
   /**
    * Both `header` and `li` joined the union during the fun pass, from opposite ends of the
@@ -41,6 +51,8 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
   readonly interactive?: boolean;
   /** @default "comfortable" */
   readonly padding?: CardPadding;
+  /** @default "soft" */
+  readonly variant?: CardVariant;
 }
 
 /**
@@ -58,17 +70,22 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
  */
 const INTERACTIVE = "transition-colors hover:bg-surface-raised focus-within:bg-surface-raised";
 
-const BASE = "rounded-lg border border-line bg-surface-elevated shadow-card";
+const BASE = "rounded-lg bg-surface-elevated shadow-card";
+
+const VARIANT: Readonly<Record<CardVariant, string>> = {
+  soft: "",
+  outline: "border border-line",
+};
 
 const PADDING: Readonly<Record<CardPadding, string>> = {
   comfortable: "p-4",
   compact: "px-2 py-1.5",
 };
 
-export function Card({ as: Tag = "div", interactive = false, padding = "comfortable", className = "", children, ...rest }: CardProps) {
+export function Card({ as: Tag = "div", interactive = false, padding = "comfortable", variant = "soft", className = "", children, ...rest }: CardProps) {
   // Joined from the non-empty fragments rather than interpolated: a `${cond ? x : ""}` slot
   // leaves a double space in the rendered `class` attribute on every quiet card in the product.
-  const classes = [BASE, PADDING[padding], interactive ? INTERACTIVE : "", className].filter((part) => part !== "").join(" ");
+  const classes = [BASE, VARIANT[variant], PADDING[padding], interactive ? INTERACTIVE : "", className].filter((part) => part !== "").join(" ");
   return (
     <Tag className={classes} {...rest}>
       {children}

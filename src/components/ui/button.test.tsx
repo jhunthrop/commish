@@ -51,6 +51,16 @@ describe("Button", () => {
     expect(className).not.toContain("border-line");
   });
 
+  // V6 (the warmth pass): the verb keeps its solid amber — still the one solid per surface —
+  // and gains the soft glow token, the mocks' halo under DRAFT, riding each theme's own accent.
+  it("verb is the glowing solid: accent fill, verb radius, the shadow-verb-glow token", () => {
+    const { getByRole } = render(<Button variant="verb">Draft</Button>);
+    const className = getByRole("button").className;
+    expect(className).toContain("bg-accent");
+    expect(className).toContain("rounded-md");
+    expect(className).toContain("shadow-verb-glow");
+  });
+
   it("destructive keeps its negative fill and joins the pill; ghost keeps rounded-md and no pill", () => {
     const destructive = render(<Button variant="destructive">Delete</Button>);
     expect(destructive.getByRole("button").className).toContain("rounded-pill");
