@@ -57,13 +57,26 @@ describe("renderTokensCss", () => {
     }
   });
 
-  it("emits radius, font-size, display-size, shadow and motion vars, namespaced with the token var prefix", () => {
-    expect(css).toContain("--commish-radius-md: 8px;");
+  it("emits radius, font-size, display-size and motion vars, namespaced with the token var prefix", () => {
+    // V6 pins: the warmth pass's verb radius (md 12) and the new sheet step (xl 20).
+    expect(css).toContain("--commish-radius-md: 12px;");
+    expect(css).toContain("--commish-radius-xl: 20px;");
     expect(css).toContain(`--commish-font-size-md: ${TOKENS.font.size.md}px;`);
     expect(css).toContain(`--commish-display-size-xl: ${TOKENS.font.display.xl}px;`);
     expect(css).toContain(`--commish-line-height-display: ${TOKENS.font.lineHeight.display};`);
-    expect(css).toContain(`--commish-shadow-card: ${TOKENS.shadow.card};`);
     expect(css).toContain("--commish-motion-duration-base: 200ms;");
+  });
+
+  it("emits the shadow set PER THEME — light values on :root, dark values under the dark selectors — because v6's materials are theme-dependent", () => {
+    // Dark's card carries the inset top-light; on :root (light) the same variable holds light's
+    // own designed value. Same emission contract the colors keep.
+    expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-shadow-card:\s*${TOKENS.shadow.light.card.replace(/[().]/g, (m) => `\\${m}`)}`, "i"));
+    expect(css).toMatch(
+      new RegExp(String.raw`:root\[data-theme="dark"\]\s*\{[^}]*--commish-shadow-card:\s*${TOKENS.shadow.dark.card.replace(/[().]/g, (m) => `\\${m}`)}`, "i"),
+    );
+    for (const key of ["raised", "overlay", "verb-glow", "sticker"]) {
+      expect(css).toContain(`--commish-shadow-${key}:`);
+    }
   });
 
   it("emits the dense type scale inside a min-width media query at UI_CONFIG.shell.denseFromPx", () => {

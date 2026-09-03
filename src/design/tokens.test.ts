@@ -418,6 +418,45 @@ describe("TOKENS scales", () => {
     expect(base).toBeLessThanOrEqual(1.45);
   });
 
+  /**
+   * V6, THE WARMTH PASS (founder 2026-09-03): the straightedge's 3-5px corners are the ruling's
+   * named rigidity source, so the scale is pinned VALUE BY VALUE — judged against the approved
+   * mocks (a card reads ~14-16, a verb ~12, chips full pill), not merely "bigger than before".
+   * A drift back toward the straightedge should fail here by name.
+   */
+  it("carries the v6 radius scale the mocks were judged at — sm 8, md 12, lg 16, xl 20, pill", () => {
+    expect(TOKENS.radius).toEqual({ sm: 8, md: 12, lg: 16, xl: 20, pill: 999 });
+  });
+
+  it("keeps the radius scale strictly increasing below pill", () => {
+    const { sm, md, lg, xl, pill } = TOKENS.radius;
+    expect(sm).toBeLessThan(md);
+    expect(md).toBeLessThan(lg);
+    expect(lg).toBeLessThan(xl);
+    expect(xl).toBeLessThan(pill);
+  });
+
+  /**
+   * V6's material depth: two designed shadow sets over ONE key set, the same parity contract
+   * `TOKENS.color` keeps — a depth key present in one theme and missing from the other is a
+   * surface whose material silently stops responding to the theme switch.
+   */
+  it("carries the same shadow keys in both themes", () => {
+    expect(Object.keys(TOKENS.shadow.light).sort()).toEqual(Object.keys(TOKENS.shadow.dark).sort());
+  });
+
+  it("keeps dark's card material carrying the inset top-light, and only dark's — a white inner hairline vanishes on paper", () => {
+    expect(TOKENS.shadow.dark.card).toContain("inset");
+    expect(TOKENS.shadow.light.card).not.toContain("inset");
+  });
+
+  it("derives each theme's verb glow from its own accent family, never the other theme's", () => {
+    // Amber at night, the brand blue in daylight: the glow is a tint of the accent that is
+    // actually under it (dark accent #FFB627 → 255,182,39; light accent #1350A8 → 19,80,168).
+    expect(TOKENS.shadow.dark.verbGlow).toContain("255, 182, 39");
+    expect(TOKENS.shadow.light.verbGlow).toContain("19, 80, 168");
+  });
+
   it("motion durations are strictly increasing", () => {
     const { fast, base, slow } = TOKENS.motion.duration;
     expect(fast).toBeLessThan(base);

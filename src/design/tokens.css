@@ -52,9 +52,15 @@
   --commish-tier-b-label: #0A0D12;
   --commish-tier-c-fill: #7F8C9F;
   --commish-tier-c-label: #0A0D12;
-  --commish-radius-sm: 4px;
-  --commish-radius-md: 8px;
-  --commish-radius-lg: 12px;
+  --commish-shadow-card: 0 1px 2px rgb(22 24 29 / 0.06), 0 4px 16px rgb(22 24 29 / 0.08);
+  --commish-shadow-raised: 0 1px 2px rgb(22 24 29 / 0.05);
+  --commish-shadow-overlay: 0 12px 40px rgb(22 24 29 / 0.18);
+  --commish-shadow-verb-glow: 0 4px 14px rgba(19, 80, 168, 0.25);
+  --commish-shadow-sticker: 0 2px 0 rgb(22 24 29 / 0.14);
+  --commish-radius-sm: 8px;
+  --commish-radius-md: 12px;
+  --commish-radius-lg: 16px;
+  --commish-radius-xl: 20px;
   --commish-radius-pill: 999px;
   --commish-font-size-xs: 11px;
   --commish-font-size-sm: 13px;
@@ -72,8 +78,6 @@
   --commish-line-height-display: 0.95;
   --commish-line-height-tight: 1.15;
   --commish-line-height-base: 1.45;
-  --commish-shadow-card: 0 1px 2px rgb(22 24 29 / 0.06), 0 1px 3px rgb(22 24 29 / 0.05);
-  --commish-shadow-sticker: 0 2px 0 rgb(22 24 29 / 0.14);
   --commish-motion-duration-fast: 120ms;
   --commish-motion-duration-base: 200ms;
   --commish-motion-duration-slow: 250ms;
@@ -85,14 +89,14 @@
 
 :root[data-theme="dark"] {
   --commish-color-surface: #05070C;
-  --commish-color-surface-elevated: #0B1019;
-  --commish-color-surface-raised: #101724;
+  --commish-color-surface-elevated: #0F1522;
+  --commish-color-surface-raised: #131B2A;
   --commish-color-surface-inset: #0A0F17;
   --commish-color-line: #1B2331;
   --commish-color-edge: #5A6C87;
   --commish-color-text-primary: #FFFFFF;
   --commish-color-text-muted: #8794A8;
-  --commish-color-text-faint: #738195;
+  --commish-color-text-faint: #76849B;
   --commish-color-accent: #FFB627;
   --commish-color-accent-text: #1A1200;
   --commish-color-accent-glow: rgba(255, 182, 39, 0.14);
@@ -136,19 +140,24 @@
   --commish-tier-b-label: #0A0D12;
   --commish-tier-c-fill: #5E6773;
   --commish-tier-c-label: #FFFFFF;
+  --commish-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --commish-shadow-raised: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --commish-shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --commish-shadow-verb-glow: 0 4px 14px rgba(255, 182, 39, 0.25);
+  --commish-shadow-sticker: 0 2px 0 rgb(22 24 29 / 0.14);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --commish-color-surface: #05070C;
-    --commish-color-surface-elevated: #0B1019;
-    --commish-color-surface-raised: #101724;
+    --commish-color-surface-elevated: #0F1522;
+    --commish-color-surface-raised: #131B2A;
     --commish-color-surface-inset: #0A0F17;
     --commish-color-line: #1B2331;
     --commish-color-edge: #5A6C87;
     --commish-color-text-primary: #FFFFFF;
     --commish-color-text-muted: #8794A8;
-    --commish-color-text-faint: #738195;
+    --commish-color-text-faint: #76849B;
     --commish-color-accent: #FFB627;
     --commish-color-accent-text: #1A1200;
     --commish-color-accent-glow: rgba(255, 182, 39, 0.14);
@@ -192,6 +201,11 @@
     --commish-tier-b-label: #0A0D12;
     --commish-tier-c-fill: #5E6773;
     --commish-tier-c-label: #FFFFFF;
+    --commish-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --commish-shadow-raised: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --commish-shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.45);
+    --commish-shadow-verb-glow: 0 4px 14px rgba(255, 182, 39, 0.25);
+    --commish-shadow-sticker: 0 2px 0 rgb(22 24 29 / 0.14);
   }
 }
 

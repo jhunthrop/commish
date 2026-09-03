@@ -75,8 +75,16 @@ type MagnitudePalette = Readonly<Record<MagnitudeStep, string>>;
  */
 const dark: Palette = {
   surface: "#05070C", // the ground, blue-biased black. A stadium is never neutral grey.
-  surfaceElevated: "#0B1019", // a card, a panel, a row's container
-  surfaceRaised: "#101724", // a row lifted off its card. THE BINDING GROUND for every value below.
+  /**
+   * V6, THE WARMTH PASS (founder 2026-09-03, `.superpowers/mocks/` canvas): the elevation ladder
+   * widens so a card can read as a SOFT FILL with no hairline around it — the mocks' resting
+   * `#0F1522` and raised `#131B2A`, evolved onto the existing roles rather than forked beside
+   * them. The ground and the inset do not move: the mocks keep the same ground, and the well
+   * stays below it. Every chroma value below was re-measured against the new binding ground;
+   * `textFaint` is the one that had to move (see its own comment).
+   */
+  surfaceElevated: "#0F1522", // a card, a panel, a row's container — the mocks' resting fill
+  surfaceRaised: "#131B2A", // a row lifted off its card. THE BINDING GROUND for every value below.
   surfaceInset: "#0A0F17", // the well: an unfilled meter, a track. Below the ground, not above it.
   line: "#1B2331", // the decorative hairline between two surfaces
   /**
@@ -88,9 +96,15 @@ const dark: Palette = {
    * until the dimmest margin cleared: 3.36:1.
    */
   edge: "#5A6C87",
-  textPrimary: "#FFFFFF", // floodlit. 17.95:1
-  textMuted: "#8794A8", // 5.84:1
-  textFaint: "#738195", // 4.53:1 — held to the full text bar, not 3:1
+  textPrimary: "#FFFFFF", // floodlit. 17.24:1
+  textMuted: "#8794A8", // 5.61:1
+  /**
+   * Re-solved for v6's brighter binding ground: the v5 value #738195 measured 4.35:1 on the new
+   * raised surface — the spec's own warning ("change a surface and every chroma value against it
+   * is unverified until re-measured") firing for the fourth time across three design systems.
+   * Walked up its own hue until the dimmest margin cleared the full text bar: 4.55:1.
+   */
+  textFaint: "#76849B", // 4.55:1 — held to the full text bar, not 3:1
   /**
    * LAW 4, channel one: furniture, you, and the verb. Amber is the network's own graphics — the
    * segmented rail, a tier plate, your own row's marker — and it is the single verb in a lower
@@ -525,7 +539,14 @@ export const TOKENS = {
   tier: { light: lightTiers, dark: darkTiers },
   magnitude: { light: lightMagnitude, dark: darkMagnitude },
   position: { light: lightPositions, dark: darkPositions },
-  radius: { sm: 4, md: 8, lg: 12, pill: 999 },
+  /**
+   * V6, THE WARMTH PASS (founder 2026-09-03): the 3-5px straightedge becomes 8-20px, judged
+   * against the approved mocks — a card reads ~14-16 (`lg`), a verb ~12 (`md`), chips and tabs
+   * go full pill. `xl` is new: the sheet/modal step the mocks draw at 20. The scale stays
+   * strictly increasing below `pill`, which `tokens.test.ts` pins along with the mock-judged
+   * values themselves.
+   */
+  radius: { sm: 8, md: 12, lg: 16, xl: 20, pill: 999 },
   font: {
     /**
      * Base scale, px — what a phone gets.
@@ -577,12 +598,37 @@ export const TOKENS = {
     lineHeight: { display: 0.95, tight: 1.15, base: 1.45 },
   },
   /**
-   * Paper depth. Theme-independent on purpose: a shadow is cast light, and on the dark surface
-   * the border/edge roles do the separating instead — a lightened "shadow" would read as a glow.
+   * V6 MATERIAL DEPTH — per-theme now, and the theme-dependence is the point (this reverses
+   * v5's "theme-independent on purpose" note, deliberately). The warmth pass replaces hairline
+   * borders with soft fills that carry their own light: dark's card wears an INSET TOP-LIGHT
+   * (the mocks' `0 1px 0 rgba(255,255,255,0.04) inset`) plus a real drop shadow, and a white
+   * inner hairline is a material that only exists at night — on daylight paper it vanishes, so
+   * light gets its own designed set at equal perceived depth rather than dark's values inverted.
+   * Same shape `TOKENS.color` keeps: two designed palettes over one key set, emitted inside the
+   * theme blocks (`generate-css.ts`) so a surface repaints its depth when the theme changes.
+   *
+   * `verbGlow` is the mocks' soft halo under the one solid verb. It derives from each theme's
+   * OWN accent — amber at night, the brand blue in daylight — because a glow is a tint of its
+   * family, never a fifth pigment (the same rule `Badge`'s glow rings follow).
+   *
+   * `sticker` is unchanged and identical in both themes: a 2px hard offset under an opaque
+   * plate reads the same on any ground.
    */
   shadow: {
-    card: "0 1px 2px rgb(22 24 29 / 0.06), 0 1px 3px rgb(22 24 29 / 0.05)",
-    sticker: "0 2px 0 rgb(22 24 29 / 0.14)",
+    light: {
+      card: "0 1px 2px rgb(22 24 29 / 0.06), 0 4px 16px rgb(22 24 29 / 0.08)",
+      raised: "0 1px 2px rgb(22 24 29 / 0.05)",
+      overlay: "0 12px 40px rgb(22 24 29 / 0.18)",
+      verbGlow: "0 4px 14px rgba(19, 80, 168, 0.25)",
+      sticker: "0 2px 0 rgb(22 24 29 / 0.14)",
+    },
+    dark: {
+      card: "inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35)",
+      raised: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+      overlay: "0 12px 40px rgba(0, 0, 0, 0.45)",
+      verbGlow: "0 4px 14px rgba(255, 182, 39, 0.25)",
+      sticker: "0 2px 0 rgb(22 24 29 / 0.14)",
+    },
   },
   /**
    * LAW 6, MOTION REPORTS AND NEVER PERFORMS. Nothing here animates a mount, a scroll or a

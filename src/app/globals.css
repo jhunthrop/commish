@@ -83,6 +83,7 @@
   --radius-sm: var(--commish-radius-sm);
   --radius-md: var(--commish-radius-md);
   --radius-lg: var(--commish-radius-lg);
+  --radius-xl: var(--commish-radius-xl);
   --radius-pill: var(--commish-radius-pill);
   --text-xs: var(--commish-font-size-xs);
   --text-sm: var(--commish-font-size-sm);
@@ -102,6 +103,11 @@
   --leading-display: var(--commish-line-height-display);
   --shadow-card: var(--commish-shadow-card);
   --shadow-sticker: var(--commish-shadow-sticker);
+  /* V6 material depth (the warmth pass): the raised row's inset top-light, the sheet/modal
+     overlay shadow, and the verb's soft glow — per-theme values, aliased like the colors. */
+  --shadow-raised: var(--commish-shadow-raised);
+  --shadow-overlay: var(--commish-shadow-overlay);
+  --shadow-verb-glow: var(--commish-shadow-verb-glow);
 }
 
 /* Both themes are first-class (founder ruling, 2026-08-23). This is what tells the browser to

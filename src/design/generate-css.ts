@@ -67,9 +67,23 @@ function tierVars(theme: ThemeName, indent: string): string {
   ]).join("\n");
 }
 
+/**
+ * V6's material depth, per theme (the warmth pass, 2026-09-03): dark's card shadow carries an
+ * inset top-light that would vanish on daylight paper, and the verb's glow is a tint of each
+ * theme's own accent — so shadows moved from the theme-independent block into the theme blocks,
+ * the same emission shape every other theme-varying palette here takes.
+ */
+function shadowVars(theme: ThemeName, indent: string): string {
+  return Object.entries(TOKENS.shadow[theme])
+    .map(([key, value]) => `${indent}${tokenVar(`shadow-${kebab(key)}`)}: ${value};`)
+    .join("\n");
+}
+
 /** Everything that changes with the theme, in the order every theme block emits it. */
 function themeVars(theme: ThemeName, indent: string): string {
-  return [colorVars(theme, indent), magnitudeVars(theme, indent), positionVars(theme, indent), tierVars(theme, indent)].join("\n");
+  return [colorVars(theme, indent), magnitudeVars(theme, indent), positionVars(theme, indent), tierVars(theme, indent), shadowVars(theme, indent)].join(
+    "\n",
+  );
 }
 
 function scaleVars(prefix: string, obj: Readonly<Record<string, number | string>>, unit: string, indent: string): string {
@@ -99,7 +113,6 @@ export function renderTokensCss(): string {
     scaleVars("font-size", TOKENS.font.size, "px", i),
     scaleVars("display-size", TOKENS.font.display, "px", i),
     scaleVars("line-height", TOKENS.font.lineHeight, "", i),
-    scaleVars("shadow", TOKENS.shadow, "", i),
     scaleVars("motion-duration", TOKENS.motion.duration, "ms", i),
     scaleVars("motion-easing", TOKENS.motion.easing, "", i),
     "}",
