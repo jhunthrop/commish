@@ -132,8 +132,56 @@ export interface DraftPlayersBody {
   /** The law registry (`registry()`, read server-side), for `ReasonChip`'s own claim lookup.
    *  Optional for the same reason `reasons` is. */
   readonly laws?: readonly Law[];
+  /**
+   * NFL team code → that team's bye week, from `byeWeeksByTeam` (`@/league-service/nfl-schedule`,
+   * the Quilt's BYES tab and lens, 2026-09-02) — a fact the real ingested schedule states, never
+   * an invention. A team absent from this record has no claimable bye (schedule not ingested, or
+   * incomplete), and every bye surface renders nothing for it. Optional for the same
+   * fixture-compatibility reason `reasons` is; `undefined` reads as an empty record everywhere.
+   */
+  readonly byeWeeks?: Readonly<Record<string, number>>;
 }
 
 export interface DraftQueueBody {
   readonly queue: readonly string[];
+}
+
+/**
+ * One real season a player actually played, summarized for the peek card's LAST THREE SEASONS
+ * table (design ruling, 2026-09-02: the dense card comes back, from the real stat stores).
+ * Every number is derived from stored `player_week_observations` weeks — a season with no
+ * stored weeks produces NO row here, never a placeholder.
+ */
+export interface PlayerSeasonSummary {
+  readonly season: number;
+  readonly gamesPlayed: number;
+  /** Fantasy points per game under THIS league's own scoring rules, 1dp. */
+  readonly pointsPerGame: number;
+  /** Passing + rushing + receiving yards, whole. */
+  readonly totalYards: number;
+  /** Passing + rushing + receiving touchdowns, whole. */
+  readonly totalTouchdowns: number;
+  /** "RB3": rank among every player at his position with a stored week that season, by season
+   *  fantasy points under the same rules. */
+  readonly positionFinish: string;
+}
+
+/** One week's fantasy points, for the consistency strip. */
+export interface PlayerWeekPoints {
+  readonly week: number;
+  readonly points: number;
+}
+
+/**
+ * `GET /api/drafts/[draftId]/players/[playerId]/history` — fetched lazily when the peek opens,
+ * cached client-side per player for the room's lifetime, and deliberately NOT widened onto the
+ * players payload (it is per-player, historical, and most players are never peeked).
+ * `seasons` is latest first, capped at three; `latestWeekly` is the most recent listed season's
+ * weeks ascending, `latestWeeklySeason` naming which. A player the stores know nothing about
+ * (a rookie, an unplaced crosswalk) answers with both empty — absence, never invention.
+ */
+export interface PlayerHistoryBody {
+  readonly seasons: readonly PlayerSeasonSummary[];
+  readonly latestWeeklySeason: number | null;
+  readonly latestWeekly: readonly PlayerWeekPoints[];
 }

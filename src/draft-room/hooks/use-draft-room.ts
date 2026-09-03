@@ -51,6 +51,10 @@ interface RoomState {
   /** The law registry, cached alongside `players`/`reasons` for the same reason: it does not
    *  change during a draft. Optional for the same reason `reasons` is. */
   readonly laws?: readonly Law[];
+  /** NFL team code → bye week (`DraftPlayersBody.byeWeeks`), cached alongside `players` for the
+   *  same one-per-draft reason. Optional for the same fixture reason `reasons` is; `undefined`
+   *  reads exactly like an empty map. */
+  readonly byeWeeks?: ReadonlyMap<string, number>;
   readonly teams: readonly TeamCard[];
   /** The league's display name, straight off the snapshot. */
   readonly leagueName: string;
@@ -83,6 +87,7 @@ const INITIAL: RoomState = {
   players: [],
   reasons: new Map(),
   laws: [],
+  byeWeeks: new Map(),
   teams: [],
   leagueName: "",
   myTeamId: null,
@@ -163,6 +168,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
         let fetchedPlayers: readonly Player[] | null = null;
         let fetchedReasons: ReadonlyMap<string, readonly BoardReason[]> | null = null;
         let fetchedLaws: readonly Law[] | null = null;
+        let fetchedByeWeeks: ReadonlyMap<string, number> | null = null;
         if (needsPlayers && playersResponse !== null) {
           const players = (await playersResponse.json()) as ApiEnvelope<DraftPlayersBody>;
           if (generation !== generationRef.current) return;
@@ -177,6 +183,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
           // response with no `reasons`/`laws` at all (both optional on the wire type).
           fetchedReasons = new Map(Object.entries(players.data.reasons ?? {}));
           fetchedLaws = players.data.laws ?? [];
+          fetchedByeWeeks = new Map(Object.entries(players.data.byeWeeks ?? {}));
           playersLoadedForRef.current = draftId;
         }
 
@@ -192,6 +199,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
           players: fetchedPlayers ?? prev.players,
           reasons: fetchedReasons ?? prev.reasons,
           laws: fetchedLaws ?? prev.laws,
+          byeWeeks: fetchedByeWeeks ?? prev.byeWeeks,
           teams: snapshot.data.teams,
           leagueName: snapshot.data.leagueName,
           myTeamId: snapshot.data.teamId,
@@ -317,6 +325,11 @@ export function useDraftRoom(draftId: string): DraftRoom {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(action),
+          // A tapped DRAFT is an affirmative choice (pick-safety review, HIGH): the quilt's
+          // undo window flushes a held pick on `pagehide`, and `keepalive` is what lets that
+          // in-flight POST outlive the page. Every action body is a few dozen bytes, far under
+          // the keepalive budget, so this costs nothing on the ordinary path.
+          keepalive: true,
         });
         const body = (await response.json()) as ApiEnvelope<{ readonly draft: DraftStateView }>;
         if (!body.ok) {
