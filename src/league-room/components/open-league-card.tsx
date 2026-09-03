@@ -81,7 +81,7 @@ export function OpenLeagueCard({ league, signedIn, emphasis = "quiet", live = mo
     // and rule 5's one-ink-action accounting is untouched.
     <Card as="article" interactive className="flex h-full flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
-        {/* `min-w-0 break-words`: see `HomeLeagueCard`'s identical heading — a grid item's
+        {/* `min-w-0 break-words`: the same guard the rail's `league-rows.tsx` name line carries — a grid item's
             default `min-width: auto` otherwise lets a long league name widen the item past its
             column at 360px. `text-lg`: the mock's card register (16.5/600), never the old
             display-2xl shout. */}

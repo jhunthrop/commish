@@ -7,10 +7,11 @@ export interface LedgerRowProps extends HTMLAttributes<HTMLDivElement> {
 /**
  * One hairline-topped ledger row: quiet key left, value right (rule 4 — structure from thin
  * rules and space, never boxes). `OpenLeagueCard` (Phase 3.7, Task 5) established the shape for
- * the public browse card; extracted here at its second caller, `HomeLeagueCard` (Task 9), so the
+ * the public browse card; extracted at what was then its second caller (the old home league card,
+ * since retired by the rail's row model, `league-rows.tsx`), so the
  * public shelf and the signed-in home read as one product rather than two hand-rolled copies of
  * the same row that could drift apart. `...rest` (role, aria-label, etc.) passes straight to the
- * outer `div` — `HomeLeagueCard`'s Record row needs `role="group"` for its own accessible name.
+ * outer `div` — callers whose rows need `role="group"` carry their own accessible names.
  */
 export function LedgerRow({ label, children, className = "", ...rest }: LedgerRowProps) {
   return (
