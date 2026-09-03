@@ -8,7 +8,10 @@ import { teamCodesById } from "../lib/team-code";
 /** Who a column head is, in the channel law's grammar (amber = yours, red = live). */
 type HeadState = "live" | "you" | "quiet";
 
-/** The ring around each face: live wins (the room's clock outranks identity), then yours. */
+/** The ring around each face. Precedence keeps the channel law the clock strip states
+ * ("amber is yours, red is the room's; nothing here ever flashes red at you"): YOUR head is
+ * amber even while you are the one on the clock — the moment the room turns toward you is
+ * exactly the moment the row must not flash red at you. */
 const RING: Readonly<Record<HeadState, string>> = {
   live: "ring-live",
   you: "ring-accent shadow-verb-glow",
@@ -53,7 +56,7 @@ export function ManagerRow({ draftOrder, teams, myTeamId, onClockTeamId, columns
       <div />
       {draftOrder.map((teamId) => {
         const team = byId.get(teamId) ?? null;
-        const state: HeadState = teamId === onClockTeamId ? "live" : teamId === myTeamId ? "you" : "quiet";
+        const state: HeadState = teamId === myTeamId ? "you" : teamId === onClockTeamId ? "live" : "quiet";
         return (
           <div key={teamId} data-testid="manager-head" data-state={state} className="flex min-w-0 flex-col items-center gap-0.5">
             <span aria-hidden="true" className={`inline-flex shrink-0 overflow-hidden rounded-pill ring-2 ${RING[state]}`}>

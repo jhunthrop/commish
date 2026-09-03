@@ -77,6 +77,33 @@ describe("DrawerHandles", () => {
     expect(fromCollapsed).toHaveBeenCalledWith({ type: "SET_HEIGHT", height: "half" });
   });
 
+  it("captures the pointer on down so a drag that leaves the button still lands its release", () => {
+    // jsdom fires same-target events regardless, so the capture call itself is the pin: without
+    // setPointerCapture a real browser routes pointerup to whatever the finger ends over and
+    // the drag is dead code (the review's green-that-was-never-green finding).
+    renderHandles(COLLAPSED);
+    const grabber = screen.getByTestId("drawer-grabber");
+    const capture = vi.fn();
+    const release = vi.fn();
+    grabber.setPointerCapture = capture;
+    grabber.releasePointerCapture = release;
+    fireEvent.pointerDown(grabber, { clientY: 500, pointerId: 7 });
+    expect(capture).toHaveBeenCalledWith(7);
+    fireEvent.pointerUp(grabber, { clientY: 420, pointerId: 7 });
+    expect(release).toHaveBeenCalledWith(7);
+    // The vertical gesture must not scroll the page out from under itself.
+    expect(grabber.style.touchAction).toBe("none");
+  });
+
+  it("pointer cancel clears the drag start so an abandoned gesture cannot fire later", () => {
+    const fromCollapsed = renderHandles(COLLAPSED);
+    const grabber = screen.getByTestId("drawer-grabber");
+    fireEvent.pointerDown(grabber, { clientY: 500, pointerId: 3 });
+    fireEvent.pointerCancel(grabber, { pointerId: 3 });
+    fireEvent.pointerUp(grabber, { clientY: 300, pointerId: 3 });
+    expect(fromCollapsed).not.toHaveBeenCalledWith({ type: "SET_HEIGHT", height: "half" });
+  });
+
   it("dragging up at half fills the stage; dragging down at full gives half back", () => {
     const atHalf = renderHandles(HALF);
     const grabber = screen.getByTestId("drawer-grabber");

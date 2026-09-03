@@ -62,13 +62,16 @@ describe("ManagerRow", () => {
     expect(quiet!).toHaveTextContent("TB");
   });
 
-  it("your own turn is live AND yours: the live ring wins the ring, the label stays YOU", () => {
+  it("your own turn stays AMBER: the channel law never flashes red at you, even on the clock", () => {
+    // The clock strip's own law ("amber is yours, red is the room's") governs the row too:
+    // the moment the room turns toward you is exactly the moment your head must not go red.
     renderRow({ onClockTeamId: "t2" });
     const heads = screen.getAllByTestId("manager-head");
     const mine = heads.find((head) => head.textContent?.includes("YOU"));
     expect(mine).toBeDefined();
-    expect(mine!.dataset.state).toBe("live");
-    expect(mine!.innerHTML).toContain("ring-live");
+    expect(mine!.dataset.state).toBe("you");
+    expect(mine!.innerHTML).toContain("ring-accent");
+    expect(mine!.innerHTML).not.toContain("ring-live");
   });
 
   it("a manager with no avatar gets the team's crest monogram; a stored ref renders the avatar", () => {

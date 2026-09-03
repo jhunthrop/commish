@@ -90,8 +90,13 @@ export function DrawerHandles({ surface, dispatch, hasByes }: DrawerHandlesProps
         aria-label={open ? "Drag or tap to close the pool. Space toggles it." : "Drag or tap to open the pool. Space toggles it."}
         onPointerDown={(event) => {
           dragStartY.current = event.clientY;
+          // A real drag leaves this small button before release. Capture routes the pointerup
+          // back here regardless of what the pointer ends up over; without it the gesture is
+          // dead in a browser even though jsdom tests (same-target dispatch) stay green.
+          event.currentTarget.setPointerCapture?.(event.pointerId);
         }}
         onPointerUp={(event) => {
+          event.currentTarget.releasePointerCapture?.(event.pointerId);
           const start = dragStartY.current;
           dragStartY.current = null;
           if (start === null) return;
@@ -101,6 +106,11 @@ export function DrawerHandles({ surface, dispatch, hasByes }: DrawerHandlesProps
           if (delta < 0) raise();
           else lower();
         }}
+        onPointerCancel={(event) => {
+          event.currentTarget.releasePointerCapture?.(event.pointerId);
+          dragStartY.current = null;
+        }}
+        style={{ touchAction: "none" }}
         onClick={() => {
           if (dragHandled.current) {
             dragHandled.current = false;
