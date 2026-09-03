@@ -81,3 +81,8 @@ export function buildQuiltRows(view: DraftStateView, myTeamId: string | null): r
     return { round, kind, cells };
   });
 }
+
+/** A landed pick's place in the sport's grammar: global pick number → "2.05" for this room. */
+export function pickPlace(pick: CompletedPick, teamCount: number): string {
+  return pickLabel(pick.round, pick.pickNumber - (pick.round - 1) * teamCount);
+}

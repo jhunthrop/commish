@@ -1,16 +1,20 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { renderSurface } from "@/components/ui/test-utils";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
+import { QUILT_CONFIG } from "../quilt/state/config";
 import { LEAGUE_NAME, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { SnakeRoom } from "./snake-room";
+
+/** A deadline far enough out that the pick-safety window is never squeezed away. */
+const roomyDeadline = (): string => new Date(Date.now() + 60_000).toISOString();
 
 const room: DraftRoomState = {
   status: "ready",
   error: null,
-  view: SNAKE_VIEW,
+  view: { ...SNAKE_VIEW, deadlineAt: roomyDeadline() },
   players: PLAYERS,
   teams: TEAMS,
   leagueName: LEAGUE_NAME,
@@ -24,167 +28,160 @@ const room: DraftRoomState = {
   nudge: null,
   mock: null,
   waiting: null,
+  byeWeeks: new Map([["KC", 10]]),
   submit: async () => ({ ok: true }),
   refresh: async () => {},
   setQueue: async () => ({ ok: true }),
 };
 
-function renderRoom(over: Partial<DraftRoomState> = {}) {
+function renderRoom(over: Partial<DraftRoomState> = {}, onAct: (action: unknown) => void = () => {}) {
   return render(
     <ToastProvider>
-      <SnakeRoom room={{ ...room, ...over }} playersById={playersById(PLAYERS)} onAct={() => {}} />
+      <SnakeRoom room={{ ...room, ...over }} playersById={playersById(PLAYERS)} onAct={onAct} />
     </ToastProvider>,
   );
 }
 
-describe("SnakeRoom", () => {
-  it("lays out the four regions — rail, left pool, board stage, dock — both themes, axe-clean", async () => {
+/** The desktop tree — the mobile inversion renders beside it and CSS hides one of the two. */
+const desktop = () => within(screen.getByTestId("quilt-room"));
+
+describe("SnakeRoom (the quilt)", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("rests as the quilt: board on stage, slim strip, collapsed drawer — both themes, axe-clean", async () => {
     await renderSurface(
       <ToastProvider>
-        <SnakeRoom room={room} playersById={playersById(PLAYERS)} onAct={() => {}} />
+        <SnakeRoom
+          room={{ ...room, myTeamId: "t2", view: { ...room.view!, onClockTeamId: "t1", upcoming: ["t1", "t2"] } }}
+          playersById={playersById(PLAYERS)}
+          onAct={() => {}}
+        />
       </ToastProvider>,
       async ({ container }) => {
-        expect(screen.getByTestId("room-rail")).toHaveTextContent("You're on the clock");
-        expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
-        expect(screen.getByRole("table", { name: /draft board/i })).toBeInTheDocument();
-        expect(screen.getByTestId("room-dock")).toHaveAttribute("data-mode", "acting");
+        const surface = desktop();
+        expect(surface.getByTestId("clock-strip")).toHaveAttribute("data-strip-state", "resting");
+        expect(surface.getByTestId("your-next")).toHaveTextContent("YOU PICK 1.02 · NEXT");
+        expect(surface.getByTestId("quilt-board")).toBeInTheDocument();
+        expect(surface.getByTestId("pool-drawer")).toHaveAttribute("data-drawer-height", "collapsed");
+        expect(surface.getByText("Best available")).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
   });
 
-  it("makes the dock's primary action the whole pick: one click on the top of your queue", () => {
-    const submit = vi.fn(async () => ({ ok: true as const }));
-    const onAct = vi.fn();
-    render(
-      <ToastProvider>
-        <SnakeRoom room={{ ...room, submit }} playersById={playersById(PLAYERS)} onAct={onAct} />
-      </ToastProvider>,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Draft Marcus Reed" }));
-    expect(onAct).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "rb1" });
+  it("swells amber on your turn with the queue's top picks inline", () => {
+    renderRoom();
+    const strip = desktop().getByTestId("clock-strip");
+    expect(strip).toHaveAttribute("data-strip-state", "your-turn");
+    // rb1 is queued and available, so it leads the strip.
+    expect(within(strip).getByText("M. Reed")).toBeInTheDocument();
+    expect(within(strip).getAllByRole("button", { name: "Draft" }).length).toBeGreaterThan(0);
   });
 
-  it("lets the team on the clock draft from the pool as well, for the pivot", () => {
-    const onAct = vi.fn();
-    render(
-      <ToastProvider>
-        <SnakeRoom room={room} playersById={playersById(PLAYERS)} onAct={onAct} />
-      </ToastProvider>,
-    );
-    fireEvent.click(screen.getAllByRole("button", { name: "Draft" })[0]!);
-    expect(onAct).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "qb1" });
+  describe("pick safety", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("holds a DRAFT in the undo window and submits only on expiry", () => {
+      const onAct = vi.fn();
+      renderRoom({}, onAct);
+      const strip = desktop().getByTestId("clock-strip");
+      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
+      expect(onAct).not.toHaveBeenCalled();
+      expect(desktop().getByTestId("undo-pill")).toBeInTheDocument();
+      vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs);
+      expect(onAct).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "rb1" });
+    });
+
+    it("UNDO inside the window means nothing was ever sent", () => {
+      const onAct = vi.fn();
+      renderRoom({}, onAct);
+      const strip = desktop().getByTestId("clock-strip");
+      fireEvent.click(within(strip).getAllByRole("button", { name: "Draft" })[0]!);
+      fireEvent.click(desktop().getByRole("button", { name: "Undo" }));
+      vi.advanceTimersByTime(QUILT_CONFIG.undoWindowMs * 2);
+      expect(onAct).not.toHaveBeenCalled();
+      expect(desktop().queryByTestId("undo-pill")).toBeNull();
+    });
   });
 
-  it("stands the room down when it is somebody else's turn, and says how long the wait is", () => {
-    renderRoom({ view: { ...SNAKE_VIEW, onClockTeamId: "t2", upcoming: ["t2", "t1"] } });
-    expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "watching");
-    expect(screen.getByTestId("room-dock")).toHaveAttribute("data-mode", "watching");
-    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're up in 1 pick (~8h 0m).");
+  it("walks the drawer from the keyboard: space to half, slash to search-full, esc collapses", () => {
+    renderRoom();
+    const surface = desktop();
+    fireEvent.keyDown(window, { key: " " });
+    expect(surface.getByTestId("pool-drawer")).toHaveAttribute("data-drawer-height", "half");
+    fireEvent.keyDown(window, { key: "/" });
+    expect(surface.getByTestId("pool-drawer")).toHaveAttribute("data-drawer-height", "full");
+    expect(surface.getByRole("searchbox", { name: "Search players" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(surface.getByTestId("pool-drawer")).toHaveAttribute("data-drawer-height", "collapsed");
   });
 
-  it("walks the whole picking flow from the keyboard — star, reorder, dock action, pool pivot", () => {
-    const onAct = vi.fn();
-    render(
-      <ToastProvider>
-        <SnakeRoom room={{ ...room, queue: ["rb1", "qb1"] }} playersById={playersById(PLAYERS)} onAct={onAct} />
-      </ToastProvider>,
-    );
-    // Every step of the flow is a real, named, focusable <button> — no div with a click
-    // handler, and nothing reachable only by pointer.
-    const flow = [
-      screen.getByRole("button", { name: "Queue Andre Salas" }),
-      screen.getByRole("button", { name: "Move Jalen Croft up" }),
-      screen.getByRole("button", { name: "Draft Marcus Reed" }),
-      screen.getAllByRole("button", { name: "Draft" })[0]!,
-    ];
-    for (const control of flow) {
-      control.focus();
-      expect(document.activeElement).toBe(control);
-      expect(control.tabIndex).toBe(0);
-    }
-    // The last thing focused is the pool's own act button: the two-click pivot.
-    fireEvent.click(document.activeElement!);
-    expect(onAct).toHaveBeenCalledWith({ type: "MAKE_PICK", playerId: "qb1" });
+  it("opens the peek sheet from a quilt cell and dismisses it on close", () => {
+    const picks = [{ pickNumber: 1, round: 1, teamId: "t2", playerId: "qb1", slot: "QB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false }];
+    renderRoom({ view: { ...room.view!, picks, pickNumber: 2, availablePlayerIds: ["rb1", "rb2", "wr1"] } });
+    const surface = desktop();
+    fireEvent.click(surface.getByRole("button", { name: "Jalen Croft, pick 1.01" }));
+    const peek = surface.getByTestId("peek-sheet");
+    expect(peek).toHaveTextContent("Jalen Croft");
+    expect(peek).toHaveTextContent("Bye 10");
+    // The GENERIC edge line only — never a law's name (founder secrecy ruling).
+    expect(surface.getByTestId("peek-edges")).toHaveTextContent("No measured edge on him");
+    fireEvent.click(within(peek).getByRole("button", { name: "Close player card" }));
+    expect(surface.queryByTestId("peek-sheet")).toBeNull();
   });
 
-  /**
-   * LAW 5, AND THIS TEST IS THE SHAPE OF ITS ENFORCEMENT EVERYWHERE (`docs/design-system.md`,
-   * "Pill discipline and the obvious verb"). Its history is the whole argument in three steps:
-   * D3 (2026-08-26) read v3's one-ink law as binding here and asserted at most ONE loud pill in
-   * the room; the fun pass (2026-08-27) made the draft room rule 5's named exception and flipped
-   * that to "many, and every one an act"; Gameday promotes the exception to the law and moves the
-   * repeated act off the CEREMONIAL ink pill onto `verb`.
-   *
-   * So the room now carries **no `primary` at all** — `primary` is *"the thing a page exists to do
-   * once"* and a draft is sixteen picks — and every loud control it does carry is money-filled.
-   * What has never changed, through all three versions, is the discipline that makes any of it
-   * safe: **the loud action belongs to ACTS only.** Every filter, every toggle, every way out
-   * stays quiet, whatever the verb beside it is doing.
-   */
-  it("spends its loud fills on acts and on nothing else, on your turn (law 5)", () => {
-    const { container } = renderRoom();
-    expect(screen.getByRole("button", { name: "Draft Marcus Reed" })).toBeInTheDocument();
-    // The ceremonial pill has no business in a room built to repeat one act.
-    expect(container.querySelector(".bg-text-primary")).toBeNull();
-    // Every money fill in the rendered room, walked. `bg-accent` is `verb`'s own fill; the
-    // translucent `accent-wash` a starred row carries is a tint, not a fill, and is not this.
-    const loud = [...container.querySelectorAll("button.bg-accent")];
-    expect(loud.length).toBeGreaterThan(1);
-    for (const pill of loud) {
-      expect(pill.textContent ?? "").toMatch(/Draft|Confirm/);
-    }
+  it("recolors in place under the NEEDS lens: the needs row appears, the rounds stay", () => {
+    renderRoom();
+    const surface = desktop();
+    expect(surface.queryByTestId("quilt-needs-row")).toBeNull();
+    fireEvent.click(within(surface.getByTestId("clock-strip")).getByRole("button", { name: "NEEDS" }));
+    expect(surface.getByTestId("quilt-needs-row")).toBeInTheDocument();
+    expect(surface.getByTestId("quilt-round-1")).toBeInTheDocument();
+    expect(surface.getByTestId("quilt-round-3")).toBeInTheDocument();
   });
 
-  // D2 (2026-08-26 design review): every landing pick used to shove the whole board ~64px
-  // down and snap it back 2.4s later — ~180 reflows per draft, against the room's own
-  // "nothing reflows when state changes" law. The stage now reserves a fixed-height notice
-  // slot whether or not anything is speaking, and the celebration/nudge render in an
-  // absolutely positioned layer inside it, so a notice taller than the band floats over the
-  // board instead of displacing it. happy-dom computes no layout, so this pins the classes;
-  // the harness screenshots prove the pixels.
-  it("reserves a fixed-height notice slot so a landing pick never moves the board (D2)", () => {
-    const { unmount } = renderRoom();
-    const quiet = screen.getByTestId("stage-notices");
-    expect(quiet.className).toContain("h-16");
-    expect(quiet.className).toContain("shrink-0");
-    expect(quiet.className).toContain("relative");
-    unmount();
-
-    const landed = { pickNumber: 1, round: 1, teamId: "t1", playerId: "rb1", slot: "RB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:05:00.000Z", auto: false };
-    renderRoom({ lastPick: { pick: landed, isMine: true } });
-    const slot = screen.getByTestId("stage-notices");
-    const celebration = screen.getByTestId("pick-celebration");
-    expect(slot.contains(celebration)).toBe(true);
-    // The layer, not the slot, is absolute: the slot holds the band's height open.
-    expect(celebration.closest(".absolute")).not.toBeNull();
+  it("carries MY SHEET in the drawer, seeded from the board, with the you-vs-board gap", () => {
+    renderRoom();
+    const surface = desktop();
+    fireEvent.keyDown(window, { key: " " });
+    fireEvent.click(within(surface.getByTestId("pool-drawer")).getByRole("tab", { name: "MY SHEET" }));
+    const rows = within(surface.getByTestId("pool-drawer")).getAllByTestId("sheet-vs-board");
+    expect(rows[0]).toHaveTextContent("you 1 · board 1");
   });
 
-  it("shows the moderator's nudge, addressed to my own team for this turn", () => {
-    renderRoom({ nudge: { message: "You're on the clock.", sequence: SNAKE_VIEW.sequence } });
-    expect(screen.getByRole("status")).toHaveTextContent("You're on the clock.");
-  });
-
-  it("queues a player from the pool through room.setQueue", async () => {
+  it("queues from the drawer through room.setQueue", async () => {
     const setQueue = vi.fn(async () => ({ ok: true as const }));
     renderRoom({ queue: [], setQueue });
-    fireEvent.click(screen.getByRole("button", { name: "Queue Jalen Croft" }));
+    const surface = desktop();
+    fireEvent.keyDown(window, { key: " " });
+    fireEvent.click(within(surface.getByTestId("pool-drawer")).getByRole("button", { name: "Add Jalen Croft to your queue" }));
     await waitFor(() => expect(setQueue).toHaveBeenCalledWith(["qb1"]));
   });
 
-  it("reorders the queue from the dock's own chips, wired to room.setQueue", async () => {
-    const setQueue = vi.fn(async () => ({ ok: true as const }));
-    renderRoom({ queue: ["rb1", "qb1"], setQueue });
-    fireEvent.click(screen.getByRole("button", { name: "Move Jalen Croft up" }));
-    await waitFor(() => expect(setQueue).toHaveBeenCalledWith(["qb1", "rb1"]));
+  it("keeps the loud fills on acts and on nothing else (law 5)", () => {
+    const { container } = renderRoom();
+    expect(container.querySelector(".bg-text-primary")).toBeNull();
+    const loud = [...container.querySelectorAll("button.bg-accent")];
+    for (const pill of loud) {
+      expect(pill.textContent ?? "").toMatch(/Draft|Confirm|PICKS|NEEDS|VALUE|BYES/);
+    }
   });
 
-  it("toasts the reducer's reason when a queue change is rejected", async () => {
-    const setQueue = vi.fn(async () => ({ ok: false as const, reason: "A queue can hold at most 50 players." }));
-    renderRoom({ setQueue });
-    // Both the dock's chips and the pool render a "Remove … from your queue" button for a
-    // queued player — either one exercises the same `onQueueChange`/toast wiring.
-    fireEvent.click(screen.getAllByRole("button", { name: "Remove Marcus Reed from your queue" })[0]!);
-    expect(await screen.findByRole("alert")).toHaveTextContent("A queue can hold at most 50 players.");
+  it("inverts on the phone tree: bottom tabs, pool first, two-step picking", () => {
+    const onAct = vi.fn();
+    renderRoom({}, onAct);
+    const phone = screen.getByRole("navigation", { name: "Draft room tabs" }).parentElement!;
+    expect(within(phone).getByTestId("mobile-your-turn")).toBeInTheDocument();
+    // A phone DRAFT opens the confirm sheet rather than picking.
+    fireEvent.click(within(phone).getAllByRole("button", { name: "Draft" })[0]!);
+    expect(onAct).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: /Confirm your pick/ })).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen, waitFor, fireEvent, act, within } from "@testing-library/react";
+import { screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { hydrateSurface, renderSurface } from "@/components/ui/test-utils";
@@ -43,59 +43,31 @@ describe("DraftRoom", () => {
       </DraftRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText("Loading…")).toBeInTheDocument();
-        // "Bay Bandits" appears in the rail AND on the board's column head — presence, not uniqueness.
-        await waitFor(() => expect(screen.getAllByText("Bay Bandits").length).toBeGreaterThan(0));
+        // The quilt's column heads carry the full team name as each code's <abbr> title.
+        await waitFor(() => expect(screen.getAllByTitle("Bay Bandits").length).toBeGreaterThan(0));
         expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
-        expect(screen.getByTestId("room-layout")).toBeInTheDocument();
+        expect(screen.getByTestId("quilt-room")).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
   });
 
-  it("gives the room a chat band", async () => {
+  // THE QUILT (2026-09-02, the blueprint mocks): the snake room's right-edge aside is GONE by
+  // design law — the quilt owns the stage, the roster becomes the 44px spine on the left, and
+  // the mocks carry no chat column. League chat stays reachable from the league room, and the
+  // auction room still renders the old shell's band (`auction-room.test.tsx` covers it).
+  it("gives a manager the roster spine instead of the old aside — the quilt owns the stage", async () => {
     mount();
-    await waitFor(() => expect(screen.getByTestId("room-aside")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("roster-spine")).toBeInTheDocument());
+    expect(screen.queryByTestId("room-aside")).not.toBeInTheDocument();
   });
 
-  // FOUNDER DIRECTIVE 2026-08-26 (room-product pass): "the right hand side should be your
-  // roster and what positions you have filled" — this supersedes E4's own xl-open default
-  // (2026-08-26 design review) outright. The aside shows the roster by default at EVERY width,
-  // never chat, and there is no `matchMedia` read left to stub — a plain `useState(false)`.
-  // `within(room-aside)` throughout: `RoomDock`'s own `RosterFill` band (`room-dock.tsx`) also
-  // carries a "Your roster" heading (the phone's answer, always mounted, merely `hidden` above
-  // `lg`) — scoping to the aside is what tells the two apart.
-  it("shows the roster rail by default at every width, with no window.matchMedia dependency", async () => {
-    mount();
-    const aside = await screen.findByTestId("room-aside");
-    expect(within(aside).getByRole("heading", { name: "Your roster" })).toBeInTheDocument();
-    expect(within(aside).getByRole("button", { name: "League chat" })).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "League chat" })).not.toBeInTheDocument();
-  });
-
-  it("swaps the aside to chat on toggle, and back to the roster — one panel at a time, the same fixed-width band throughout", async () => {
-    mount();
-    const aside = await screen.findByTestId("room-aside");
-    expect(within(aside).getByRole("heading", { name: "Your roster" })).toBeInTheDocument();
-
-    fireEvent.click(within(aside).getByRole("button", { name: "League chat" }));
-    expect(await screen.findByRole("region", { name: "League chat" })).toBeInTheDocument();
-    expect(within(aside).queryByRole("heading", { name: "Your roster" })).not.toBeInTheDocument();
-    // The band itself never moves — the aside is still there, just showing the other panel.
-    expect(screen.getByTestId("room-aside")).toBeInTheDocument();
-
-    fireEvent.click(within(aside).getByRole("button", { name: "Back to your roster" }));
-    await waitFor(() => expect(within(aside).getByRole("heading", { name: "Your roster" })).toBeInTheDocument());
-    expect(screen.queryByRole("region", { name: "League chat" })).not.toBeInTheDocument();
-  });
-
-  it("shows the chat panel directly for a commissioner with no team of their own — no roster, no strip", async () => {
+  it("renders no spine for a commissioner with no team of their own", async () => {
     const fixture = fixtureDeps();
     fixture.teamId = null;
     mount(fixture);
-    await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
-    expect(screen.queryByRole("heading", { name: "Your roster" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "League chat" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Back to your roster" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("quilt-room")).toBeInTheDocument());
+    expect(screen.queryByTestId("roster-spine")).not.toBeInTheDocument();
   });
 
   it("offers a retry when the draft cannot be loaded", async () => {
@@ -130,13 +102,13 @@ describe("DraftRoom", () => {
     const fixture = fixtureDeps();
     fixture.queueResponse = { ok: false, error: "A queue can hold at most 50 players." };
     mount(fixture);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add Jalen Croft to your queue" })).toBeInTheDocument());
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Queue Jalen Croft" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add Jalen Croft to your queue" }));
     });
     expect(await screen.findByRole("alert")).toHaveTextContent("A queue can hold at most 50 players.");
     // Rolled back: the pool still offers to queue the player, not to remove them.
-    expect(screen.getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Jalen Croft to your queue" })).toBeInTheDocument();
   });
 
   it("tells the user when the connection drops", async () => {
@@ -292,6 +264,6 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     expect(viewport.className).toContain("lg:h-dvh");
     expect(viewport.className).toContain("lg:overflow-hidden");
     expect(viewport.contains(screen.getByTestId("practice-banner"))).toBe(true);
-    expect(viewport.contains(screen.getByTestId("room-layout"))).toBe(true);
+    expect(viewport.contains(screen.getByTestId("quilt-room"))).toBe(true);
   });
 });
