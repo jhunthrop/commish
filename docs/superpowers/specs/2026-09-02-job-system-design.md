@@ -183,9 +183,14 @@ worker id, and a `random` for jitter — all injected.
 
 ## 7. The season-week job (`src/jobs/defs/season-week-job.ts`)
 
-Five job steps mapping one-to-one onto `scripts/season-week-steps.ts`'s exported step functions
-(the shape preserved deliberately — that file stays the wall-exempt home of the register logic;
-the job def imports the STEP functions, which is a call-through, not a re-export of the register):
+Five job steps mapping one-to-one onto the cadence's exported step functions (the shape
+preserved deliberately). The cadence module moved: `scripts/season-week-steps.ts` is now
+`src/jobs/season-week/steps.ts` (its test beside it), because the tick route lives in `src/` and
+the repo's eslint boundary forbids `src/**` importing `scripts/**`. It remains the ONE wall-exempt
+home of the register orchestration — the exemption moved with the file (`WALL_EXEMPT_FILES`, the
+wall test's pinned list, and the eslint quarantine ignores updated in lockstep). The odds
+snapshot core moved to `src/projections/odds/snapshot.ts` for the same reason; both CLI scripts
+stay as thin wires. The job def imports the STEP functions, a call-through, never the register:
 
 1. `stats-ingest` — `statsIngestStep` with the real nflverse deps. Throws = retryable.
 2. `props-snapshot` — `propsSnapshotStep`; its OWN failure is caught and recorded in the step
@@ -201,9 +206,9 @@ Payload: `{ season?: number }`, defaulting via `defaultSeason(clock.now())` at e
 Checkpointing means a Vercel tick that dies after `grade` resumes at `freeze`, not at another
 paid props snapshot.
 
-Wall compliance: `src/jobs/**` never imports `src/projections/register`; it imports
-`scripts/season-week-steps.ts` (exempt) exactly as `scripts/season-week.ts` does. The wall test
-(`wall.source.test.ts`) sweeps `src/jobs` like everything else and is run as a gate.
+Wall compliance: nothing under `src/jobs/**` imports `src/projections/register` except the
+relocated `season-week/steps.ts` (exempt by exact path, as it was under `scripts/`). The wall
+test (`wall.source.test.ts`) sweeps `src/jobs` like everything else and is run as a gate.
 
 ## 8. Installer (`scripts/install-season-runner.sh`, replaces `install-season-cron.sh`)
 
@@ -265,3 +270,8 @@ only.
 - **Draft ticker and stats worker stay in-process** (§1): a minute-granularity durable queue is
   the wrong contract for second-level countdowns and live scoring; both already have injected
   clocks and tests, and their Vercel story belongs to their features' own deployment plan.
+- **The cadence relocated into `src/` mid-implementation** (§7): the original plan kept
+  `scripts/season-week-steps.ts` in place, but the eslint boundary (`src/**` must not import
+  `scripts/**` — "source may not depend on build tooling") is the codebase's own law, and the
+  Vercel route is source. The wall's guarantees are unchanged: same single exempt module plus
+  test, new path, all three guard layers updated together and asserted green.
