@@ -8,7 +8,9 @@ import type { BoardEntry, BoardReason } from "./board";
 import {
   BOARD_SOURCE,
   BOARD_SOURCE_V1_RAW,
+  BOARD_SOURCE_V7_SHADOW,
   FROZEN_BOARD_SOURCES,
+  assertSingleGeneration,
   boardReasons,
   preseasonProjectionsAsOf,
   preseasonProjectionsFor,
@@ -398,50 +400,70 @@ describe("the preseason board store", () => {
       return writePreseasonBoard(db, { season, source, asOf: LIVE_2026, momentKind }, [entry()], options);
     }
 
-    it("names exactly the two sources the product serves, and nothing else", () => {
-      expect([...FROZEN_BOARD_SOURCES].sort()).toEqual([BOARD_SOURCE, BOARD_SOURCE_V1_RAW].sort());
+    /**
+     * RE-ADJUDICATED (Round D, the serve-v9 ruling). The set used to be the two names the persist
+     * script writes; it is now the one name this tree cannot rebuild. These tests assert the new
+     * membership from BOTH sides on purpose — what is frozen, and what is deliberately no longer
+     * frozen — because a guard nobody checks the negative half of is a guard that quietly grows
+     * back.
+     */
+    it("names exactly the prior champion the tree cannot rebuild, and nothing else", () => {
+      expect([...FROZEN_BOARD_SOURCES]).toEqual([BOARD_SOURCE_V7_SHADOW]);
     });
 
-    it("LIVE under the shipped source is REFUSED, so the served 2026 generation cannot be retired", async () => {
-      await expect(writeUnder(BOARD_SOURCE, 2026, "live")).rejects.toThrow(/frozen/i);
-      await expect(writeUnder(BOARD_SOURCE_V1_RAW, 2026, "live")).rejects.toThrow(/frozen/i);
+    it("LIVE under v7 is REFUSED, so the register's shadow track cannot be retired out from under it", async () => {
+      await expect(writeUnder(BOARD_SOURCE_V7_SHADOW, 2026, "live")).rejects.toThrow(/frozen/i);
     });
 
     it("LIVE under a frozen source is refused for EVERY season, not only 2026", async () => {
       // Wider than the finding, and deliberately so: the live arm deletes by `(season, source)` at
       // ANY stamp, so a live-moment write aimed at an ARCHIVE season under a frozen name would
-      // delete that archive outright. Nothing legitimate needs a live write under a served name
-      // while the freeze stands, so the guard does not try to tell the two cases apart.
-      await expect(writeUnder(BOARD_SOURCE, 2024, "live")).rejects.toThrow(/frozen/i);
+      // delete that archive outright. Nothing legitimate needs a live write under v7 at all, so the
+      // guard does not try to tell the two cases apart.
+      await expect(writeUnder(BOARD_SOURCE_V7_SHADOW, 2024, "live")).rejects.toThrow(/frozen/i);
     });
 
     it("REPLAY under a frozen source is REFUSED, because the reason rewrite has no as_of to protect it", async () => {
-      await expect(writeUnder(BOARD_SOURCE, 2021, "replay")).rejects.toThrow(/frozen/i);
-      await expect(writeUnder(BOARD_SOURCE_V1_RAW, 2021, "replay")).rejects.toThrow(/frozen/i);
+      await expect(writeUnder(BOARD_SOURCE_V7_SHADOW, 2021, "replay")).rejects.toThrow(/frozen/i);
+    });
+
+    it("THE SERVED BOARD IS WRITABLE AGAIN: v9 is what this tree builds, so a persist reproduces it", async () => {
+      // The substantive half of the re-adjudication. A live re-take of the served 2026 board is the
+      // normal weekly act of a live season, and it was refused while the tree and the store held
+      // different configurations. They hold the same one now.
+      const live = await writeUnder(BOARD_SOURCE, 2026, "live");
+      expect(live.mode).toBe("retire_generation");
+    });
+
+    it("v1 RAW IS WRITABLE AGAIN, which is what lets a v9 persist finish its second leg", async () => {
+      // `persistSeason` writes v1 raw in the same call as BOARD_SOURCE. A frozen v1 would refuse
+      // every legitimate persist halfway through, having already written the blended board.
+      const live = await writeUnder(BOARD_SOURCE_V1_RAW, 2026, "live");
+      expect(live.mode).toBe("retire_generation");
     });
 
     it("REFUSES BEFORE IT WRITES OR DELETES ANYTHING: the store is untouched after a refusal", async () => {
       await recordPreseasonProjections(
         db,
-        projectionRows([entry()], { season: 2026, source: BOARD_SOURCE, asOf: LIVE_2026, momentKind: "live" }),
+        projectionRows([entry()], { season: 2026, source: BOARD_SOURCE_V7_SHADOW, asOf: LIVE_2026, momentKind: "live" }),
       );
-      const before = await preseasonProjectionsAsOf(db, { season: 2026, source: BOARD_SOURCE, asOf: FINAL });
+      const before = await preseasonProjectionsAsOf(db, { season: 2026, source: BOARD_SOURCE_V7_SHADOW, asOf: FINAL });
       expect(before).toHaveLength(1);
 
-      await expect(writeUnder(BOARD_SOURCE, 2026, "live")).rejects.toThrow(/frozen/i);
+      await expect(writeUnder(BOARD_SOURCE_V7_SHADOW, 2026, "live")).rejects.toThrow(/frozen/i);
 
-      expect(await preseasonProjectionsAsOf(db, { season: 2026, source: BOARD_SOURCE, asOf: FINAL })).toEqual(before);
+      expect(await preseasonProjectionsAsOf(db, { season: 2026, source: BOARD_SOURCE_V7_SHADOW, asOf: FINAL })).toEqual(before);
     });
 
     it("the refusal says WHICH ruling froze it and HOW to lift it, rather than merely failing", async () => {
-      await expect(writeUnder(BOARD_SOURCE, 2026, "live")).rejects.toThrow(/--unfreeze/);
-      await expect(writeUnder(BOARD_SOURCE, 2026, "live")).rejects.toThrow(/2027/);
+      await expect(writeUnder(BOARD_SOURCE_V7_SHADOW, 2026, "live")).rejects.toThrow(/--unfreeze/);
+      await expect(writeUnder(BOARD_SOURCE_V7_SHADOW, 2026, "live")).rejects.toThrow(/shadow/i);
     });
 
-    it("UNFREEZE overrides both arms, which is how the 2027 round will bump the source", async () => {
-      const live = await writeUnder(BOARD_SOURCE, 2026, "live", { unfrozen: true });
+    it("UNFREEZE overrides both arms, which is the only way v7's rows can ever be touched", async () => {
+      const live = await writeUnder(BOARD_SOURCE_V7_SHADOW, 2026, "live", { unfrozen: true });
       expect(live.mode).toBe("retire_generation");
-      const replay = await writeUnder(BOARD_SOURCE, 2021, "replay", { unfrozen: true });
+      const replay = await writeUnder(BOARD_SOURCE_V7_SHADOW, 2021, "replay", { unfrozen: true });
       expect(replay.mode).toBe("append");
     });
 
@@ -455,6 +477,61 @@ describe("the preseason board store", () => {
       // `changedRowWhere`, exactly as before the guard existed.
       const second = await writePreseasonBoard(db, stamp, [entry({ reasons: [{ code: "scarcity", positionRank: 2, replacementLevel: 185.2 }] })]);
       expect(second).toEqual({ mode: "append", written: 0, reasonsWritten: 0, retiredProjections: 0, retiredReasons: 0 });
+    });
+  });
+
+  /**
+   * THE LOUD READ (Round D, Task 3). `writePreseasonBoard`'s live arm retires a prior generation
+   * before writing a new one, so a well-behaved live source never carries more than one `as_of`.
+   * These tests seed the broken invariant DIRECTLY — bypassing `writePreseasonBoard` entirely, the
+   * same way a retire that failed partway (a crash between the DELETE and the INSERT reaching every
+   * replica, a hand-run script) would leave the table — because the point of this guard is to catch
+   * that shape however it happened, not only the one path this engine's own writer takes.
+   */
+  describe("assertSingleGeneration", () => {
+    const LIVE_SOURCE = "test_single_generation_live_ppr_12";
+    const REPLAY_SOURCE = "test_single_generation_replay_ppr_12";
+
+    async function seed(source: string, season: number, asOf: Date, momentKind: "live" | "replay") {
+      await recordPreseasonProjections(db, projectionRows([entry()], { season, source, asOf, momentKind }));
+    }
+
+    it("passes for a single live generation", async () => {
+      await seed(LIVE_SOURCE, 2026, AUGUST, "live");
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: FINAL })).resolves.toBeUndefined();
+    });
+
+    it("THROWS when two live generations coexist under one source — the retire that did not run", async () => {
+      await seed(LIVE_SOURCE, 2026, AUGUST, "live");
+      await seed(LIVE_SOURCE, 2026, A_WEEK_LATER, "live");
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: FINAL })).rejects.toThrow(
+        /2 distinct as_of generations/,
+      );
+    });
+
+    it("names the source and season in the thrown message, so an operator sees which board broke", async () => {
+      await seed(LIVE_SOURCE, 2026, AUGUST, "live");
+      await seed(LIVE_SOURCE, 2026, A_WEEK_LATER, "live");
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: FINAL })).rejects.toThrow(
+        new RegExp(`${LIVE_SOURCE} for season 2026`),
+      );
+    });
+
+    it("passes a REPLAY season with its one deterministic as_of per source", async () => {
+      // Every row an archived board's single persist writes shares one derived `as_of`, exactly as
+      // `store()`'s own helper above writes archive fixtures throughout this file.
+      await seed(REPLAY_SOURCE, 2024, AUGUST, "replay");
+      await expect(assertSingleGeneration(db, { season: 2024, source: REPLAY_SOURCE, asOf: FINAL })).resolves.toBeUndefined();
+    });
+
+    it("a bound BEFORE the second generation still sees only the first, and passes", async () => {
+      await seed(LIVE_SOURCE, 2026, AUGUST, "live");
+      await seed(LIVE_SOURCE, 2026, A_WEEK_LATER, "live");
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: AUGUST })).resolves.toBeUndefined();
+    });
+
+    it("is silent when the source has no rows at all — an unpersisted board is a caller's own concern", async () => {
+      await expect(assertSingleGeneration(db, { season: 2026, source: LIVE_SOURCE, asOf: FINAL })).resolves.toBeUndefined();
     });
   });
 });

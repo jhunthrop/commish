@@ -11,7 +11,9 @@ import * as schema from "./schema";
 export const TEST_DATABASE_URL = envOr("TEST_DATABASE_URL", "postgres://commish:commish@localhost:5433/commish_test");
 
 /**
- * Connects to the dedicated test database (docker-compose `postgres-test`, tmpfs-backed).
+ * Connects to the dedicated test database (docker-compose `postgres-test`, one of the four lanes
+ * `src/db/test-lanes.ts` names — lane 1, `commish_test`, unless a Vitest worker's own
+ * `VITEST_POOL_ID` sent this process to another).
  * Every table is truncated between tests so each test starts from a clean state.
  *
  * Test-only module (it imports `vitest`): registers its own `afterAll` to close the
@@ -39,6 +41,7 @@ export async function truncateAll(db: Db): Promise<void> {
       player_week_observations, player_week_teams, team_week_observations, player_prop_observations,
       props_player_map,
       preseason_rosters, preseason_rankings, preseason_projections, preseason_board_reasons, player_crosswalk,
+      register_freeze_rows, register_grade_rows,
       nfl_draft_picks,
       nfl_players, player_stat_lines, players, stat_weeks, nfl_games, capture_snapshots,
       matchups, weeks, draft_picks, draft_nudges, draft_slot_preferences, draft_actions, drafts,

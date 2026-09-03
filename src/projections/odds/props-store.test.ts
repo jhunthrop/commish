@@ -126,6 +126,7 @@ describe("parseEventOddsResponse — the pure event-odds-to-observations mapping
         market: "player_pass_yds",
         playerName: "Patrick Mahomes",
         point: 275.5,
+        reason: "unpaired",
         presentSide: "Over",
       },
     ]);
@@ -134,13 +135,80 @@ describe("parseEventOddsResponse — the pure event-odds-to-observations mapping
     expect(observations.some((o) => o.bookmaker === "draftkings" && o.market === "player_pass_yds")).toBe(false);
   });
 
-  it("rejects a duplicate Over for the same player and point loudly", () => {
+  it("skips a duplicate Over for the same player and point rather than throwing, and reports it", () => {
+    // A real archive payload (2025 historical backfill, week 2-ish) hit exactly this shape:
+    // `duplicate Over outcome for "Jahmyr Gibbs" at point 2.5` -- a book's snapshot preserving a
+    // stale price beside its own update, not a malformed response. Ambiguous prices; refuse to
+    // guess which is live, drop the WHOLE pair (both sides, even though Under arrived cleanly),
+    // and report it instead of killing the whole run over one book's mess.
     const payload = clonePayload((p) => {
       const bookmakers = p.bookmakers as Array<{ markets: Array<{ outcomes: Array<Record<string, unknown>> }> }>;
       const outcomes = bookmakers[0].markets[0].outcomes;
-      outcomes.push({ ...outcomes[0] });
+      outcomes.push({ ...outcomes[0] }); // a second "Over" for Mahomes at 275.5
     });
-    expect(() => parseEventOddsResponse(payload, FETCHED_AT)).toThrow(/duplicate Over outcome/);
+    const { observations, skippedUnpaired } = parseEventOddsResponse(payload, FETCHED_AT);
+    expect(skippedUnpaired).toEqual([
+      {
+        bookmaker: "draftkings",
+        market: "player_pass_yds",
+        playerName: "Patrick Mahomes",
+        point: 275.5,
+        reason: "duplicate",
+        presentSide: "Over",
+      },
+    ]);
+    // The whole pair is dropped, including the Under that arrived cleanly before the duplicate.
+    expect(observations.some((o) => o.bookmaker === "draftkings" && o.market === "player_pass_yds")).toBe(false);
+    // Everything else in the payload -- other markets, other players, the other bookmaker -- lands.
+    expect(observations).toHaveLength(5);
+  });
+
+  it("skips a duplicate Under symmetrically, and reports it", () => {
+    const payload = clonePayload((p) => {
+      const bookmakers = p.bookmakers as Array<{ markets: Array<{ outcomes: Array<Record<string, unknown>> }> }>;
+      const outcomes = bookmakers[0].markets[0].outcomes;
+      outcomes.push({ ...outcomes[1] }); // a second "Under" for Mahomes at 275.5
+    });
+    const { observations, skippedUnpaired } = parseEventOddsResponse(payload, FETCHED_AT);
+    expect(skippedUnpaired).toEqual([
+      {
+        bookmaker: "draftkings",
+        market: "player_pass_yds",
+        playerName: "Patrick Mahomes",
+        point: 275.5,
+        reason: "duplicate",
+        presentSide: "Under",
+      },
+    ]);
+    expect(observations).toHaveLength(5);
+  });
+
+  it("reports one skip for a player+point duplicated three times, not two", () => {
+    const payload = clonePayload((p) => {
+      const bookmakers = p.bookmakers as Array<{ markets: Array<{ outcomes: Array<Record<string, unknown>> }> }>;
+      const outcomes = bookmakers[0].markets[0].outcomes;
+      outcomes.push({ ...outcomes[0] }, { ...outcomes[0] }); // Over listed three times total
+    });
+    const { skippedUnpaired } = parseEventOddsResponse(payload, FETCHED_AT);
+    expect(skippedUnpaired).toHaveLength(1);
+    expect(skippedUnpaired[0]).toMatchObject({ playerName: "Patrick Mahomes", reason: "duplicate" });
+  });
+
+  it("drops only the duplicated pair, not other players in the same market or other books", () => {
+    const payload = clonePayload((p) => {
+      const bookmakers = p.bookmakers as Array<{ markets: Array<{ outcomes: Array<Record<string, unknown>> }> }>;
+      // player_rush_yds carries two players (Pacheco, Herbert); duplicate only Pacheco's Over.
+      const rushOutcomes = bookmakers[0].markets[1].outcomes;
+      rushOutcomes.push({ ...rushOutcomes[0] });
+    });
+    const { observations, skippedUnpaired } = parseEventOddsResponse(payload, FETCHED_AT);
+    expect(skippedUnpaired).toEqual([
+      { bookmaker: "draftkings", market: "player_rush_yds", playerName: "Isiah Pacheco", point: 55.5, reason: "duplicate", presentSide: "Over" },
+    ]);
+    expect(observations.some((o) => o.playerName === "Isiah Pacheco")).toBe(false);
+    expect(observations.some((o) => o.playerName === "Justin Herbert" && o.market === "player_rush_yds")).toBe(true);
+    expect(observations.some((o) => o.bookmaker === "fanduel" && o.playerName === "Patrick Mahomes")).toBe(true);
+    expect(observations).toHaveLength(5);
   });
 
   it("rejects an outcome name that is neither Over nor Under loudly", () => {

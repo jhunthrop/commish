@@ -9,6 +9,12 @@
 //
 // Dry run (fetches the event list only, makes no odds requests, writes nothing):
 // npm run projections:odds:snapshot -- --dry-run
+//
+// `runOddsSnapshot` below is exported for `scripts/season-week-steps.ts` (the weekly cadence, Task
+// 2), which calls it directly rather than shelling out to this script a second time — one process,
+// one set of printed lines, and a structured `SnapshotSummary` the cadence's own step report reads
+// its credits line from instead of re-parsing this script's stdout.
+import type { Db } from "@/db/client";
 import { createDb } from "@/db/client";
 import { ODDS_API_BASE, SPORT_KEY, creditStatus, parseOddsEvent, requireEnv, requireOk, type CreditStatus, type OddsEvent } from "@/projections/odds/http";
 import { countPropObservations, parseEventOddsResponse, PROP_MARKETS, recordPropObservations } from "@/projections/odds/props-store";
@@ -60,11 +66,23 @@ async function fetchEventOdds(apiKey: string, eventId: string): Promise<{ payloa
   return { payload, credits };
 }
 
-async function main(): Promise<void> {
-  const dryRun = process.argv.includes("--dry-run");
-  const apiKey = requireEnv("ODDS_API_KEY");
+/** What one snapshot run actually did — the shape `season-week-steps.ts`'s props step reports from,
+ *  so its printed credits line reads the same numbers a standalone run of this script would print. */
+export interface SnapshotSummary {
+  readonly totalEvents: number;
+  readonly upcomingEvents: number;
+  readonly selectedEvents: number;
+  readonly totalWritten: number;
+  readonly totalSkipped: number;
+  readonly credits: CreditStatus;
+}
 
-  const { events, credits: eventsCredits } = await fetchEvents(apiKey);
+/** The event fetch, window filter and budget cap — identical for the dry run and the real one, so
+ *  a dry run reports the exact selection a real run would have fetched odds for. */
+async function selectUpcomingEvents(
+  apiKey: string,
+): Promise<{ events: readonly OddsEvent[]; upcoming: readonly OddsEvent[]; selected: readonly OddsEvent[]; credits: CreditStatus }> {
+  const { events, credits } = await fetchEvents(apiKey);
   const now = new Date();
   const windowEnd = new Date(now.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const upcoming = events
@@ -78,15 +96,16 @@ async function main(): Promise<void> {
         `only the first ${MAX_EVENTS_PER_RUN} (earliest kickoff first) will be fetched.`,
     );
   }
-  const selected = upcoming.slice(0, MAX_EVENTS_PER_RUN);
+  return { events, upcoming, selected: upcoming.slice(0, MAX_EVENTS_PER_RUN), credits };
+}
 
-  if (dryRun) {
-    console.log("Dry run: event list fetched only, no odds requests made, nothing written.");
-    console.log(`Credits after /events: remaining=${eventsCredits.remaining} used=${eventsCredits.used}`);
-    return;
-  }
-
-  const db = createDb(requireEnv("DATABASE_URL"));
+/**
+ * THE REAL SNAPSHOT — fetches, writes, prints, and returns what it did. Never closes `db`: it is
+ * handed one, not asked to make one, so a caller running this beside other steps against the same
+ * connection (`season-week-steps.ts`) controls that lifecycle itself.
+ */
+export async function runOddsSnapshot(db: Db, apiKey: string): Promise<SnapshotSummary> {
+  const { events, upcoming, selected, credits: eventsCredits } = await selectUpcomingEvents(apiKey);
   const fetchedAt = new Date();
   let totalWritten = 0;
   let totalSkipped = 0;
@@ -117,10 +136,46 @@ async function main(): Promise<void> {
   console.log(`Total single-sided lines skipped: ${totalSkipped}`);
   console.log(`Credits: remaining=${lastCredits.remaining} used=${lastCredits.used}`);
 
-  await db.$client.end();
+  return {
+    totalEvents: events.length,
+    upcomingEvents: upcoming.length,
+    selectedEvents: selected.length,
+    totalWritten,
+    totalSkipped,
+    credits: lastCredits,
+  };
 }
 
-main().catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+async function main(): Promise<void> {
+  const dryRun = process.argv.includes("--dry-run");
+  const apiKey = requireEnv("ODDS_API_KEY");
+
+  if (dryRun) {
+    const { credits } = await selectUpcomingEvents(apiKey);
+    console.log("Dry run: event list fetched only, no odds requests made, nothing written.");
+    console.log(`Credits after /events: remaining=${credits.remaining} used=${credits.used}`);
+    return;
+  }
+
+  const db = createDb(requireEnv("DATABASE_URL"));
+  try {
+    await runOddsSnapshot(db, apiKey);
+  } finally {
+    await db.$client.end();
+  }
+}
+
+// ENTRY-POINT GUARD. `runOddsSnapshot` above is imported by `scripts/season-week.ts`, and without
+// this guard THAT import alone would trigger a second, real, full snapshot run: ESM executes a
+// module's top-level statements on import, and an unconditional `main().catch(...)` is a top-level
+// statement. Found the hard way in this task's own real run — the props step fired twice, once
+// from this file loading as a side effect of the import and once from `season-week.ts` calling
+// `runOddsSnapshot` itself, doubling the real odds-API spend for nothing. Only run `main` when this
+// file is the process's own entry point, exactly the way it behaves when invoked directly via
+// `npm run projections:odds:snapshot`.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

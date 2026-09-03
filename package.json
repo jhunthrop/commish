@@ -18,7 +18,7 @@
     "stats:tank01:record": "dotenv -e .env.local -- tsx scripts/record-tank01-fixtures.ts",
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
     "db:migrate": "dotenv -e .env.local -v DATABASE_URL=postgres://commish:commish@localhost:5432/commish -- drizzle-kit migrate",
-    "db:migrate:test": "dotenv -e .env.local -- sh -c 'DATABASE_URL=\"${TEST_DATABASE_URL:-postgres://commish:commish@localhost:5433/commish_test}\" drizzle-kit migrate'",
+    "db:migrate:test": "dotenv -e .env.local -- tsx scripts/migrate-test-lanes.ts",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
     "seed": "dotenv -e .env.local -- tsx src/data/seed/index.ts",
     "stats:ingest": "dotenv -e .env.local -- tsx scripts/ingest-once.ts",
@@ -58,6 +58,8 @@
     "projections:ecr:current": "dotenv -e .env.local -- tsx scripts/ingest-current-ecr.ts",
     "projections:preseason:persist": "dotenv -e .env.local -- tsx scripts/preseason-persist.ts",
     "projections:board:top": "dotenv -e .env.local -- tsx scripts/board-top.ts",
+    "projections:register:freeze": "dotenv -e .env.local -- tsx scripts/register-freeze.ts",
+    "projections:register:grade": "dotenv -e .env.local -- tsx scripts/register-grade.ts",
     "projections:market-edge:scorecard": "dotenv -e .env.local -- tsx scripts/market-edge-scorecard.ts",
     "laws:measure": "dotenv -e .env.local -- tsx scripts/measure-laws.ts",
     "laws:discover:quantiles": "dotenv -e .env.local -- tsx scripts/discovery-quantile-fit.ts",
@@ -68,7 +70,8 @@
     "projections:schedule:results": "dotenv -e .env.local -- tsx scripts/schedule-results-ingest.ts",
     "projections:odds:snapshot": "dotenv -e .env.local -- tsx scripts/odds-props-snapshot.ts",
     "projections:odds:backfill": "dotenv -e .env.local -- tsx scripts/odds-props-backfill.ts",
-    "projections:odds:resolve": "dotenv -e .env.local -- tsx scripts/odds-props-resolve.ts"
+    "projections:odds:resolve": "dotenv -e .env.local -- tsx scripts/odds-props-resolve.ts",
+    "season:week": "dotenv -e .env.local -- tsx scripts/season-week.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

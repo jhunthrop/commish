@@ -5,12 +5,12 @@
 // Run: npm run projections:preseason:persist [season ...]   (defaults to every ingested season)
 //      npm run projections:preseason:persist -- --unfreeze   (overrides FROZEN_BOARD_SOURCES, 2027 round)
 //
-// FROZEN WHILE THE FIT ROUND'S RULING STANDS. Both source names this script writes under are in
-// `preseason/board-store.ts`'s `FROZEN_BOARD_SOURCES`, so every write below is REFUSED unless
-// `--unfreeze` is passed. That is not a bug to route around: this tree's fitted files are the v9
-// configuration and the stored rows are v7's, so any write here would either delete the live
-// generation the product serves or rewrite an archive's reasons out from under its own points. See
-// that constant's own docblock for the ruling and the lift condition.
+// NEITHER SOURCE THIS SCRIPT WRITES IS FROZEN ANY MORE (Round D, the serve-v9 ruling). Both were,
+// while the served rows were v7's and this tree's fitted files were v9's — a write then would have
+// replaced measured rows with numbers no stored board was measured on. Serving v9 makes the tree
+// reproduce what it stores, so both legs below run without `--unfreeze`. What `FROZEN_BOARD_SOURCES`
+// still protects is v7, which this script never writes under and which the register reads every
+// week as its shadow track. See that constant's own docblock for the re-adjudication.
 //
 // THE SCRIPT THAT MAKES THE BOARD ADDRESSABLE. `preseason-report.ts` computes exactly this board
 // and prints it; this one computes exactly this board and stores it. They must not diverge, so the
@@ -66,13 +66,14 @@ import {
 /**
  * Every season this script will build WITHOUT being asked for one by name.
  *
- * 2026 WAS ON THIS LIST AND IS NOT ANY MORE (fit-round final review). It joined the day its week-one
- * rosters, depth charts and ADP landed and it builds through the LIVE arm, which retires the stored
- * generation before writing. While the frozen-state ruling stands (see `FROZEN_BOARD_SOURCES` in
- * `preseason/board-store.ts`), that generation is the product and this tree can no longer reproduce
- * it, so a bare `npm run projections:preseason:persist` must not so much as attempt it. Naming 2026
- * explicitly still works and still meets the guard, which is the layer that actually protects the
- * rows: this list only decides what a no-argument run reaches for.
+ * 2026 WAS ON THIS LIST AND IS NOT ANY MORE (fit-round final review), and it STAYS OFF for a
+ * different reason than the one that removed it. It joined the day its week-one rosters, depth
+ * charts and ADP landed and it builds through the LIVE arm, which retires the stored generation
+ * before writing. It came off because the frozen-state ruling meant this tree could not reproduce
+ * that generation; the serve-v9 ruling ended that, and 2026 still does not belong here. A live
+ * re-take replaces the board the product is serving and the board next week's register freeze will
+ * record, which is a deliberate act with a visible consequence, not something a no-argument
+ * archive-refresh run should do as a side effect. Naming 2026 explicitly is how it is taken.
  *
  * A board needs three prior seasons of usage, which is why the floor is not the backfill's floor.
  */

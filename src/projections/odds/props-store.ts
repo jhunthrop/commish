@@ -80,6 +80,17 @@ interface OutcomePair {
   underPrice?: number;
 }
 
+/** One player+point a market listed the SAME side of twice -- a real archive payload (2025
+ *  backfill, week 2-ish: `duplicate Over outcome for "Jahmyr Gibbs" at point 2.5`) turned out to
+ *  be a book leaving a stale price beside its own update in one snapshot, not a shape violation.
+ *  Reported alongside `side`, the side that was ambiguous -- see `parseMarketOutcomes`'s own
+ *  docblock for why the whole pair is dropped rather than picking one of the two prices. */
+interface DuplicateOutcome {
+  readonly playerName: string;
+  readonly point: number;
+  readonly side: "Over" | "Under";
+}
+
 /**
  * One market's outcomes, validated and paired into Over/Under by player name + point.
  *
@@ -87,9 +98,28 @@ interface OutcomePair {
  * `point` never does -- it is always a finite number's own string form -- so the text after the
  * LAST space in the key is always exactly `point`, and everything before it is always exactly
  * `playerName`. Two different (name, point) pairs can therefore never produce the same key.
+ *
+ * A SAME-SIDE DUPLICATE (two Overs, or two Unders, for one player+point) is AMBIGUOUS, not
+ * malformed: a book's snapshot occasionally preserves a stale price beside its own update rather
+ * than replacing it, and this store has no way to tell which of the two numbers is the live one.
+ * Refusing to guess, the WHOLE pair for that player+point is dropped -- both sides, even a side
+ * that arrived cleanly before the duplicate did -- and reported via the returned `duplicated` map
+ * rather than either thrown (killing the whole response, and every OTHER book's honest prices in
+ * it, over one book's mess) or silently resolved by picking a price arbitrarily. Once a key is
+ * marked duplicated, any further entries for it (a book that lists the same side three times, not
+ * two) are ignored rather than re-flagged, so one ambiguous player+point is reported exactly once.
+ *
+ * Every OTHER shape violation still throws: an unknown outcome `name`, a missing/non-finite
+ * `point` or `price`, an empty player name -- these mean the response does not match the shape
+ * this store was built against, which is a different failure than one book contradicting itself
+ * about a price.
  */
-function parseMarketOutcomes(outcomes: readonly unknown[], path: string): ReadonlyMap<string, OutcomePair> {
+function parseMarketOutcomes(
+  outcomes: readonly unknown[],
+  path: string,
+): { readonly pairs: ReadonlyMap<string, OutcomePair>; readonly duplicated: ReadonlyMap<string, DuplicateOutcome> } {
   const pairs = new Map<string, OutcomePair>();
+  const duplicated = new Map<string, DuplicateOutcome>();
   outcomes.forEach((raw, index) => {
     const outcomePath = `${path}[${index}]`;
     const outcome = requireObject(raw, outcomePath);
@@ -101,38 +131,50 @@ function parseMarketOutcomes(outcomes: readonly unknown[], path: string): Readon
     const point = requireFiniteNumber(outcome.point, `${outcomePath}.point`);
     const price = requireFiniteNumber(outcome.price, `${outcomePath}.price`);
     const key = `${playerName} ${point}`;
+    if (duplicated.has(key)) return; // already ambiguous for this pair -- further entries change nothing
     const pair = pairs.get(key) ?? { playerName, point };
     if (name === "Over") {
       if (pair.overPrice !== undefined) {
-        fail(outcomePath, `duplicate Over outcome for "${playerName}" at point ${point} -- malformed outcome pair`);
+        duplicated.set(key, { playerName, point, side: "Over" });
+        pairs.delete(key);
+        return;
       }
       pair.overPrice = price;
     } else {
       if (pair.underPrice !== undefined) {
-        fail(outcomePath, `duplicate Under outcome for "${playerName}" at point ${point} -- malformed outcome pair`);
+        duplicated.set(key, { playerName, point, side: "Under" });
+        pairs.delete(key);
+        return;
       }
       pair.underPrice = price;
     }
     pairs.set(key, pair);
   });
-  return pairs;
+  return { pairs, duplicated };
 }
 
-/** One player+point left with only one side priced, dropped rather than stored (see
- *  `parseEventOddsResponse`'s own docblock for why this is a skip, not a throw). */
+/** One player+point dropped rather than stored — either it priced only one side, or a book
+ *  contradicted itself about one (see `parseMarketOutcomes`'s own docblock for the second case).
+ *  Both land here, under the SAME reported tally, because both are the identical operator
+ *  question — "which lines couldn't this run archive" — with two different reasons. */
 export interface SkippedUnpairedOutcome {
   readonly bookmaker: string;
   readonly market: PropMarket;
   readonly playerName: string;
   readonly point: number;
-  /** Which side the response DID carry — the missing side is whichever this is not. */
+  /** `"unpaired"`: the response priced only one side. `"duplicate"`: the response priced one side
+   *  twice (ambiguously), so the whole pair was dropped even if the other side WAS present. */
+  readonly reason: "unpaired" | "duplicate";
+  /** `"unpaired"`: the side the response DID carry — the missing side is whichever this is not.
+   *  `"duplicate"`: the side that was ambiguous. Always present either way. */
   readonly presentSide: "Over" | "Under";
 }
 
 export interface ParsedEventOdds {
   readonly observations: readonly PlayerPropObservation[];
-  /** Every player+point this response priced on only one side. Reported rather than silently
-   *  dropped, and rather than failing the whole response over it — see this function's docblock. */
+  /** Every player+point this response could not archive, unpaired or ambiguous alike. Reported
+   *  rather than silently dropped, and rather than failing the whole response over it — see
+   *  `parseMarketOutcomes` and this function's own docblocks. */
   readonly skippedUnpaired: readonly SkippedUnpairedOutcome[];
 }
 
@@ -141,18 +183,27 @@ export interface ParsedEventOdds {
  * flat observation rows, pairing every market's Over and Under outcomes by player name and point.
  *
  * Rejects loudly, naming the offending path, on: an unknown market key, an outcome whose `name`
- * is neither "Over" nor "Under", a missing/non-finite `point` or `price`, an empty player name, and
- * a DUPLICATE Over or Under (two prices for the same side of the same player+point) -- every one
- * of these means the response does not match the shape this store was built against.
+ * is neither "Over" nor "Under", a missing/non-finite `point` or `price`, and an empty player name
+ * -- every one of these means the response does not match the shape this store was built against.
  *
- * A player+point priced on only ONE side is different: verified against a real live response
- * (`betrivers`, event `8c94552d022acec4a0458d70c19d3da9`, `player_receptions`, Cooper Kupp at
- * 2.5 -- an Over with no Under anywhere in that book's block), some books genuinely post a
- * single-sided line. That is a normal fact about the market, not a broken payload, and this
- * table's schema has no row shape for a price with no opposite number regardless. Storing an
- * observation always needs both prices, so an unpaired side is dropped rather than stored -- but
- * "dropped" is reported back in `skippedUnpaired`, never silent, so an operator can see exactly
- * which lines this run could not archive.
+ * TWO THINGS ARE NOT SHAPE VIOLATIONS, and both are dropped-and-reported instead of thrown:
+ *
+ * A player+point priced on only ONE side: verified against a real live response (`betrivers`,
+ * event `8c94552d022acec4a0458d70c19d3da9`, `player_receptions`, Cooper Kupp at 2.5 -- an Over
+ * with no Under anywhere in that book's block), some books genuinely post a single-sided line.
+ *
+ * A player+point priced on the SAME side TWICE (`parseMarketOutcomes`'s own `duplicated`):
+ * verified against a real archive payload (the 2025 historical backfill, week 2-ish --
+ * `duplicate Over outcome for "Jahmyr Gibbs" at point 2.5`), a book's snapshot occasionally
+ * preserves a stale price beside its own update rather than replacing it. This USED to throw --
+ * which is what killed that whole backfill run over one book's mess -- and now skips instead,
+ * exactly like the single-sided case.
+ *
+ * Neither is a broken payload, and this table's schema has no row shape for either (a price with
+ * no opposite number, or two conflicting prices for one side) regardless. Storing an observation
+ * always needs exactly one unambiguous price per side, so both are dropped rather than stored --
+ * but "dropped" is reported back in `skippedUnpaired`, never silent, so an operator can see
+ * exactly which lines this run could not archive, and why.
  *
  * ALL bookmakers the response carries are parsed, not one preferred book. A response with no
  * `bookmakers` at all (no book has posted this event's props yet) is valid and yields zero
@@ -182,7 +233,18 @@ export function parseEventOddsResponse(payload: unknown, fetchedAt: Date): Parse
         fail(`${marketPath}.key`, `unknown market "${marketKey}" -- expected one of ${PROP_MARKETS.join(", ")}`);
       }
       const outcomes = requireArray(marketObj.outcomes, `${marketPath}.outcomes`);
-      const pairs = parseMarketOutcomes(outcomes, `${marketPath}.outcomes`);
+      const { pairs, duplicated } = parseMarketOutcomes(outcomes, `${marketPath}.outcomes`);
+
+      for (const duplicate of duplicated.values()) {
+        skippedUnpaired.push({
+          bookmaker: bookmakerKey,
+          market: marketKey,
+          playerName: duplicate.playerName,
+          point: duplicate.point,
+          reason: "duplicate",
+          presentSide: duplicate.side,
+        });
+      }
 
       for (const pair of pairs.values()) {
         if (pair.overPrice === undefined || pair.underPrice === undefined) {
@@ -191,6 +253,7 @@ export function parseEventOddsResponse(payload: unknown, fetchedAt: Date): Parse
             market: marketKey,
             playerName: pair.playerName,
             point: pair.point,
+            reason: "unpaired",
             presentSide: pair.overPrice !== undefined ? "Over" : "Under",
           });
           continue;

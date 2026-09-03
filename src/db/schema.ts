@@ -2471,3 +2471,147 @@ export const propsPlayerMap = pgTable(
     uniqueIndex("props_player_map_name_season_idx").on(t.propName, t.season),
   ],
 );
+
+/**
+ * THE PROSPECTIVE REGISTER, HALF ONE: WHAT WAS CLAIMED, BEFORE THE WEEK COULD ANSWER (data-year
+ * Task 1).
+ *
+ * Every measurement this engine has published is RETROSPECTIVE — a board rebuilt for a season that
+ * has already been played, scored against outcomes that were sitting in the store the whole time.
+ * The discipline around that is real (`BoardMoment`'s two arms, the `as_of` gate on every read,
+ * `assertNothingFromTheSeasonIsVisible`), and it is still, structurally, a claim made after the
+ * fact by a process that could in principle have seen the answer. 2026 is the first season this
+ * repository can do the other thing: write down what four different opinions said about a week
+ * BEFORE that week existed, and come back afterwards.
+ *
+ * AN ARCHIVE BY CONSTRUCTION. There is no `UPDATE` and no `ON CONFLICT DO UPDATE` anywhere in
+ * `src/projections/register`, and no `DELETE` at all. A freeze taken again before kickoff is a NEW
+ * `frozen_at` and a fresh set of rows; the earlier freeze's rows are not touched, not superseded
+ * and not marked stale, because "what we said on Tuesday" does not stop being true when Wednesday
+ * disagrees. That is the opposite of `preseason_projections`' live arm, which RETIRES its previous
+ * generation on purpose (a board is a current claim about a moving roster, and yesterday's is a
+ * stale answer to a question nobody asked). The register is not a current claim; it is a record of
+ * claims, and the whole value of it is that the record cannot be edited afterwards.
+ *
+ * THE UNIQUE KEY IS THE IMMUTABILITY GUARANTEE, not a de-duplication convenience: two rows for one
+ * player at one freeze instant would mean the register held two different answers to "what did the
+ * board say at 12:00:00.000Z", and the writer inserts plainly so Postgres REFUSES that rather than
+ * quietly keeping whichever landed first.
+ *
+ * THE FOUR COLUMNS, and why three of them are nullable. `board_*` is what the PRODUCT served,
+ * read through `preseasonProjectionsAsOf` under `BOARD_SOURCE` rather than recomputed, so the row
+ * records the claim a manager could actually have seen. `adp_rank`, `ecr_rank` and
+ * `props_points` are the three benchmarks, and every one of them is genuinely absent for some
+ * players in some weeks: a rookie nobody drafted has no average draft position, a panel does not
+ * rank everybody, and a bookmaker posts props on a few hundred people a week. NULL IS NOT ZERO here
+ * for the same reason it is not zero anywhere else in this store — a player with no line did not
+ * have a line of zero, and scoring him as though he did would drag every benchmark's own agreement
+ * number toward whatever the unlisted population happened to do.
+ */
+export const registerFreezeRows = pgTable(
+  "register_freeze_rows",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season: integer("season").notNull(),
+    /** The REGULAR-SEASON week this freeze is a claim about. */
+    week: integer("week").notNull(),
+    /** THE FREEZE INSTANT — when the claim was written down, always strictly before this week's own
+     *  first kickoff (`freeze.ts` refuses otherwise). Part of the row's identity, never a
+     *  bookkeeping timestamp. */
+    frozenAt: timestamp("frozen_at", { withTimezone: true }).notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "restrict" }),
+    /** WHICH BOARD THIS ROW IS THE CLAIM OF — a value from `register/sources.ts`'s
+     *  `REGISTER_BOARD_SOURCES`, stored rather than assumed, so a row stays readable after a round
+     *  bumps whichever constant produced it.
+     *
+     *  PART OF THE ROW'S IDENTITY SINCE THE DUAL-TRACK RULING (Round D). One freeze instant now
+     *  records EVERY tracked board's claim — the served one and each shadow — so `(season, week,
+     *  frozen_at, player_id)` names a player twice at one instant and only this column tells the two
+     *  apart. It is in the unique index below for that reason, and the register's no-update rule
+     *  means a collision on it is still two different answers claimed for one board at one instant. */
+    boardSource: text("board_source").notNull(),
+    /** The stamp the served board row itself carried — the board's own moment, not the freeze's. */
+    boardAsOf: timestamp("board_as_of", { withTimezone: true }).notNull(),
+    boardPoints: doublePrecision("board_points").notNull(),
+    boardRank: integer("board_rank").notNull(),
+    boardValueRank: integer("board_value_rank").notNull(),
+    /** Average draft position, fractional as the market publishes it. NULL where the market never
+     *  priced this player. */
+    adpRank: doublePrecision("adp_rank"),
+    /** Expert consensus rank. NULL where the panel never ranked this player. */
+    ecrRank: doublePrecision("ecr_rank"),
+    /** The week's props consensus, priced into fantasy points under the register's own scoring
+     *  rules. NULL where no book posted a line on this player for this week. */
+    propsPoints: doublePrecision("props_points"),
+    /** The median line per market behind `props_points` (`player_reception_yds` -> 70.5), kept so
+     *  the derived number can always be checked against what the books actually posted. NULL
+     *  exactly when `props_points` is. */
+    propsMarkets: jsonb("props_markets").$type<JsonObject>(),
+  },
+  (t) => [
+    /** One row per player per BOARD per freeze — see the table doc: this index IS the immutability
+     *  rule, and `board_source` is in it because one instant carries every tracked board's claim. */
+    uniqueIndex("register_freeze_rows_fact_idx").on(t.season, t.week, t.frozenAt, t.boardSource, t.playerId),
+    /** The read grading performs: one week's freezes, latest first. */
+    index("register_freeze_rows_week_idx").on(t.season, t.week, t.frozenAt),
+  ],
+);
+
+/**
+ * THE PROSPECTIVE REGISTER, HALF TWO: WHAT THE WEEK ANSWERED (data-year Task 1).
+ *
+ * One row per player per grading of one freeze. `frozen_at` is not decoration — it names the EXACT
+ * freeze these ranks were computed from, so a week that was frozen twice can be graded against
+ * either one and the two gradings can never be confused. `graded_at` is part of the identity for
+ * the same reason `frozen_at` is on the other table: re-grading a week after a stat correction is a
+ * SECOND, later statement, appended beside the first rather than overwriting it, so the record
+ * shows both what we scored on Monday and what the corrected file said on Thursday.
+ *
+ * THE RANKS ARE PER-COLUMN AND SCOPED TO THAT COLUMN'S OWN COVERED POPULATION. A column that had no
+ * opinion about a player (no ADP, no ECR, no props line) stores NULL rather than a rank invented for
+ * him, and its own agreement number is computed over the players it actually spoke about. Mixing
+ * those populations would let a benchmark look better simply by being quiet about hard players.
+ *
+ * `actual_points` and `actual_rank` are stored raw so every metric in `grade.ts` is DERIVABLE from
+ * these rows alone. Nothing here stores a correlation or an error: a metric is a summary, summaries
+ * change as the season lengthens, and a table that stored last week's summary would be a second
+ * source of truth for a number the rows already contain.
+ */
+export const registerGradeRows = pgTable(
+  "register_grade_rows",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season: integer("season").notNull(),
+    week: integer("week").notNull(),
+    /** The exact `register_freeze_rows.frozen_at` these ranks came from. */
+    frozenAt: timestamp("frozen_at", { withTimezone: true }).notNull(),
+    /** When this grading ran, and the point-in-time bound its outcome read was taken at. */
+    gradedAt: timestamp("graded_at", { withTimezone: true }).notNull(),
+    /** Which board's claim was graded — the matching `register_freeze_rows.board_source`. One
+     *  grading run scores every board the freeze recorded, so this is part of the identity for the
+     *  same reason it is over there: without it, two boards' verdicts on one player collide. */
+    boardSource: text("board_source").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "restrict" }),
+    /** What the player actually scored that week, under the register's own scoring rules. */
+    actualPoints: doublePrecision("actual_points").notNull(),
+    /** His place in the graded population by actual points, 1 = best. */
+    actualRank: integer("actual_rank").notNull(),
+    /** The board's own ordering of the graded population. Never null: the board is what defines
+     *  the population. */
+    boardRank: integer("board_rank").notNull(),
+    /** Each benchmark's ordering of the players IT covered, or NULL where it covered nobody by
+     *  that name. */
+    adpRank: integer("adp_rank"),
+    ecrRank: integer("ecr_rank"),
+    propsRank: integer("props_rank"),
+  },
+  (t) => [
+    uniqueIndex("register_grade_rows_fact_idx").on(t.season, t.week, t.frozenAt, t.gradedAt, t.boardSource, t.playerId),
+    /** The read the running scoreboard performs: a whole season's gradings. */
+    index("register_grade_rows_season_idx").on(t.season, t.week, t.gradedAt),
+  ],
+);

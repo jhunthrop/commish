@@ -3,6 +3,7 @@ import { afterEach, expect } from "vitest";
 import { cleanup } from "@testing-library/react";
 import * as axeMatchers from "vitest-axe/matchers";
 import type { AxeMatchers } from "vitest-axe/matchers";
+import { currentTestDbLane, testDatabaseUrlForLane } from "@/db/test-lanes";
 
 // vitest.config.mts sets `globals: false`, so @testing-library/react's automatic
 // afterEach(cleanup) (which relies on global test hooks) never registers. Register
@@ -10,6 +11,29 @@ import type { AxeMatchers } from "vitest-axe/matchers";
 afterEach(() => {
   cleanup();
 });
+
+// THE LANE REWRITE (Round D, Task 3 scope extension — the one-runner era ends). `setupFiles` run
+// before EVERY test file loads, which is earlier than any test file's own module-scope code (its
+// `vi.hoisted` blocks included) — so this is the ONE place the lane rewrite needs to happen for
+// the whole suite to pick it up. Roughly 35 route-handler test files read
+// `process.env.TEST_DATABASE_URL` directly (to point the code UNDER TEST, which builds its own
+// `DATABASE_URL`-driven connection, at the same physical database their own `createTestDb()`
+// call reads) rather than importing `test-db.ts`'s exported constant — rewriting the env var
+// itself, once, here, means every one of those files gets lane-correct routing for free, with no
+// per-file change and no chance of the rule drifting between whichever files remembered to apply
+// it. `test-db.ts`'s own `TEST_DATABASE_URL` export reads through `envOr` at import time, which
+// happens after this file has already run, so it resolves to the SAME rewritten value.
+//
+// CACHED THROUGH A SENTINEL ENV VAR, DELIBERATELY: `isolate: true` (the default) re-imports this
+// setup file's module graph fresh for every test file in the worker, but `process.env` itself is
+// the SAME process-wide object across every file a worker runs — so a naive
+// `testDatabaseUrlForLane(process.env.TEST_DATABASE_URL, lane)` on file 2 would rewrite the
+// ALREADY-rewritten value from file 1 a second time (`commish_test_2` growing an extra `_2`
+// suffix into `commish_test_2_2`). The sentinel remembers the pristine base URL the first time
+// this file runs in a given worker so every later run in that same worker rewrites from the same
+// origin rather than from its own prior output.
+process.env.__TEST_DATABASE_BASE_URL__ ??= process.env.TEST_DATABASE_URL ?? "postgres://commish:commish@localhost:5433/commish_test";
+process.env.TEST_DATABASE_URL = testDatabaseUrlForLane(process.env.__TEST_DATABASE_BASE_URL__, currentTestDbLane());
 
 // `npm test` is plain `vitest run` — nothing here loads `.env.local` the way `next dev`/`next
 // build` do or `dotenv -e .env.local --` does for the scripts that need it. `TEST_DATABASE_URL`
