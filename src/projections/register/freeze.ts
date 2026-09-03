@@ -2,7 +2,7 @@ import type { Db } from "@/db/client";
 import type { Clock } from "@/domain/timing";
 import type { JsonObject } from "@/domain/audit";
 import { kickoffInstantsByWeek } from "../team-store";
-import { preseasonProjectionsAsOf } from "../preseason/board-store";
+import { assertSingleGeneration, preseasonProjectionsAsOf } from "../preseason/board-store";
 import { BENCHMARK_SOURCES } from "../preseason/benchmarks";
 import { preseasonRankingsAsOf } from "../preseason/store";
 import { weekPropsConsensus, type WeekWindow } from "./props";
@@ -145,6 +145,9 @@ export async function takeFreeze(db: Db, { season, week }: FreezeRequest, clock:
 
   const boards: readonly FreezeBoard[] = await Promise.all(
     REGISTER_BOARD_SOURCES.map(async ({ source, role }): Promise<FreezeBoard> => {
+      // A stitched two-generation read anywhere else is a bad page render; here it becomes an
+      // immutable weekly claim the whole season grades against. Fail loud before recording.
+      await assertSingleGeneration(db, { season, source, asOf: frozenAt });
       const board = await preseasonProjectionsAsOf(db, { season, source, asOf: frozenAt });
       const rows: readonly RegisterFreezeRow[] = board.map((entry) => {
         const stance = props.get(entry.playerId);

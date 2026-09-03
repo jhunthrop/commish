@@ -5,7 +5,7 @@ import { recordNflPlayers } from "../universe";
 import type { NflPlayerRow } from "../nflverse/players";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { recordTeamObservations } from "../team-store";
-import { BOARD_SOURCE, BOARD_SOURCE_V7_SHADOW, projectionRows, recordPreseasonProjections } from "../preseason/board-store";
+import { BOARD_SOURCE, BOARD_SOURCE_V7_SHADOW, projectionRows, recordPreseasonProjections, writePreseasonBoard } from "../preseason/board-store";
 import type { BoardEntry } from "../preseason/board";
 import { BENCHMARK_SOURCES } from "../preseason/benchmarks";
 import { recordPreseasonRankings } from "../preseason/store";
@@ -338,16 +338,15 @@ describe("takeFreeze — the archive is immutable and append-only", () => {
     await seedAll();
     const first = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-08T12:00:00.000Z"));
 
-    // The served board is re-persisted at a later stamp with different points.
+    // The served board moves the way it does in production: `writePreseasonBoard`'s live arm
+    // retires the stored generation and writes the new one in one transaction. (A raw
+    // `recordPreseasonProjections` here would leave two live generations, which the freeze's
+    // `assertSingleGeneration` loud read now refuses by design.)
     const later = new Date("2026-09-08T18:00:00.000Z");
-    await recordPreseasonProjections(
+    await writePreseasonBoard(
       db,
-      projectionRows([entry(CHASE, 111.1, 3), entry(LAMB, 222.2, 1), entry(HURTS, 200.0, 2)], {
-        season: SEASON,
-        source: BOARD_SOURCE,
-        asOf: later,
-        momentKind: "live",
-      }),
+      { season: SEASON, source: BOARD_SOURCE, asOf: later, momentKind: "live" },
+      [entry(CHASE, 111.1, 3), entry(LAMB, 222.2, 1), entry(HURTS, 200.0, 2)],
     );
 
     const second = await takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-09T12:00:00.000Z"));
@@ -355,6 +354,25 @@ describe("takeFreeze — the archive is immutable and append-only", () => {
 
     const firstRows = await freezeRowsAt(db, { season: SEASON, week: 1, frozenAt: first.frozenAt });
     expect(firstRows.find((row) => row.playerId === CHASE)?.boardPoints).toBeCloseTo(326.4, 6);
+  });
+
+  it("refuses to freeze a stitched board: two live generations under one source fail loud", async () => {
+    await seedAll();
+    // A raw append that never retired its predecessor: the shape a partial-retire regression
+    // would leave behind. The freeze must refuse to bake it into immutable history.
+    await recordPreseasonProjections(
+      db,
+      projectionRows([entry(CHASE, 111.1, 3)], {
+        season: SEASON,
+        source: BOARD_SOURCE,
+        asOf: new Date("2026-09-08T18:00:00.000Z"),
+        momentKind: "live",
+      }),
+    );
+    await expect(takeFreeze(db, { season: SEASON, week: 1 }, clockAt("2026-09-09T12:00:00.000Z"))).rejects.toThrow(
+      /distinct as_of generations/,
+    );
+    expect(await freezeInstantsFor(db, SEASON, 1)).toEqual([]);
   });
 
   it("names the latest freeze for a week, which is what grading reaches for", async () => {
