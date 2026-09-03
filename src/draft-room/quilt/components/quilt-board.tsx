@@ -9,6 +9,7 @@ import { positionStickerClass } from "@/components/ui/position-badge";
 import { buildQuiltRows, pickPlace, type QuiltRow } from "../state/board";
 import { needsByTeam, pickValueVerdict, type Lens } from "../state/lens";
 import { teamCodesById } from "../lib/team-code";
+import { ManagerRow } from "./manager-row";
 import { QuiltCellView } from "./quilt-cell";
 
 export interface QuiltBoardProps {
@@ -53,21 +54,27 @@ export function QuiltBoard({ view, teams, playersById, myTeamId, lens, byeWeeks,
 
   return (
     <div data-testid="quilt-board" className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
-      {/* Team header row. The caller's own column says YOU in amber; every code still carries
-          the full team name for a screen reader. */}
-      <div className={GRID} style={columns}>
-        <div />
-        {view.draftOrder.map((teamId) => (
-          <div
-            key={teamId}
-            className={`text-center font-display text-xs font-bold tracking-wide ${teamId === myTeamId ? "text-accent" : teamId === view.onClockTeamId ? "text-text-primary" : "text-text-faint"}`}
-          >
-            <abbr title={names.get(teamId) ?? teamId} className="no-underline">
-              {teamId === myTeamId ? "YOU" : (codes.get(teamId) ?? "")}
-            </abbr>
-          </div>
-        ))}
-      </div>
+      {/* THE MANAGER ROW (founder addition 1): every swimlane's manager as the column head.
+          The phone's micro-quilt keeps the text initials instead — 12 columns at 390px leave
+          ~22px per column, which cannot carry a readable face honestly (spec, mobile
+          judgment). */}
+      {microOnly ? (
+        <div className={GRID} style={columns}>
+          <div />
+          {view.draftOrder.map((teamId) => (
+            <div
+              key={teamId}
+              className={`text-center font-display text-xs font-bold tracking-wide ${teamId === myTeamId ? "text-accent" : teamId === view.onClockTeamId ? "text-text-primary" : "text-text-faint"}`}
+            >
+              <abbr title={names.get(teamId) ?? teamId} className="no-underline">
+                {teamId === myTeamId ? "YOU" : (codes.get(teamId) ?? "")}
+              </abbr>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ManagerRow draftOrder={view.draftOrder} teams={teams} myTeamId={myTeamId} onClockTeamId={view.onClockTeamId} columns={columns} />
+      )}
 
       {/* NEEDS lens: what every team still needs, as position dots — an added row, recolored
           facts, and the rounds grid stays beneath untouched (the lens law). */}
