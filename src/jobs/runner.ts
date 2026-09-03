@@ -82,7 +82,10 @@ async function drain(
     const claimed = await claimNextJob(deps.db, deps.clock, deps.workerId);
     if (claimed === null) return "queue-drained";
 
-    executed.push(await executeClaimedJob(deps, definitions, claimed, { timeoutCapMs: remaining }));
+    // Re-read the clock AFTER the claim (fix round, LOW-5): the claim's own round trip spends
+    // budget, and a cap computed before it would promise the job time the tick no longer has.
+    const remainingAfterClaim = Math.max(1, deadline - monotonicNow());
+    executed.push(await executeClaimedJob(deps, definitions, claimed, { timeoutCapMs: remainingAfterClaim }));
   }
   return "max-jobs";
 }
