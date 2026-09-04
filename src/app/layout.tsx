@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Saira, Saira_Condensed } from "next/font/google";
 import { ThemeProvider } from "@/design/theme-provider";
 import { NoticesProvider } from "@/components/app-shell/notices-provider";
-import { TITLE_TEMPLATE } from "@/components/app-shell/page-metadata";
+import { TITLE_TEMPLATE, TAGLINE } from "@/components/app-shell/page-metadata";
 import "./globals.css";
 
 /**
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   // page that sets none (the front door itself) falls back to `default` below, unchanged from
   // before this task.
   title: { default: "Commish", template: TITLE_TEMPLATE },
-  description: "Season-long fantasy football, done right.",
+  description: TAGLINE,
 };
 
 export default function RootLayout({

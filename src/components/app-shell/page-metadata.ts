@@ -15,6 +15,15 @@ import type { Metadata } from "next";
 export const TITLE_TEMPLATE = "%s · Commish";
 
 /**
+ * The one line the product uses to introduce itself outside its own chrome — the root layout's
+ * `metadata.description` and `opengraph-image.tsx`'s own tagline (Task 3, brand adoption pass).
+ * A single constant rather than two copies of the same sentence: a link unfurl and a search
+ * result are two renderings of the same claim, and letting them drift is how a tagline stops
+ * matching what a stranger reads on the page it points at.
+ */
+export const TAGLINE = "Season-long fantasy football, done right.";
+
+/**
  * Builds a page's `metadata` export from its own short, page-specific title — "Your leagues",
  * never "Your leagues · Commish". Next's `title.template` (`src/app/layout.tsx`) appends the
  * product name, so every page that calls this agrees on the suffix by construction; there is no
