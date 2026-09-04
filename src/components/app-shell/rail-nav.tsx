@@ -21,10 +21,18 @@ interface RailDestination {
  * absent: a broadcast rail lists destinations, not settings, and the avatar beside this nav is
  * the door to who you are.
  *
+ * THE BOARD JOINED THIS LIST (Draft HQ phase 1, 2026-09-04): `DRAFT` sits between Leagues and
+ * Rooms — prepare in Draft, perform in Rooms — and the day named above has come. It is not an
+ * empty room: HQ, The Board and My Sheet are real, league-aware surfaces from the day this
+ * lands (`docs/superpowers/specs/2026-09-04-draft-hq-design.md`); the Simulator/Assistant/
+ * Market/Playbook links behind it render an honest "arriving soon" state rather than fabricated
+ * content, which is what keeps this addition inside the D3 rule rather than breaking it.
+ *
  * ROOMS names where drafting happens — the practice lobby now, live rooms when you are in one.
  */
 const DESTINATIONS: readonly RailDestination[] = [
   { href: "/app", label: "Leagues", also: ["/app/leagues"] },
+  { href: "/app/draft", label: "Draft" },
   { href: "/app/mock-drafts", label: "Rooms", also: ["/app/drafts"] },
   { href: "/app/wallet", label: "Wallet" },
 ];

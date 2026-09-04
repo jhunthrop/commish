@@ -2744,3 +2744,71 @@ export const scheduleCursors = pgTable("schedule_cursors", {
   scheduleName: text("schedule_name").primaryKey(),
   lastEvaluatedAt: timestamp("last_evaluated_at", { withTimezone: true }).notNull(),
 });
+
+/**
+ * DRAFT HQ'S SHEET STORE (spec §10, phase 1) — the persistent cheat sheet, server-side, so it can
+ * follow a manager into every room rather than living only in one browser's `localStorage` the
+ * way `src/draft-room/quilt/state/sheet.ts`'s `CheatSheet` does today.
+ *
+ * ONE ROW PER SHEET, not per (user, league): the spec's own "one per (user, league) plus a
+ * default sheet" plus My Sheet's multi-sheet picker (duplicate/rename/delete) both need more than
+ * one sheet per user to exist at once, so a sheet is its own row with an owner and an OPTIONAL
+ * league, never a singleton keyed by the pair. `leagueId` null is the format-default sheet (spec
+ * §4: "a format-default sheet"); non-null scopes a sheet to one league's own rules.
+ *
+ * `draftSheetTagEnum` — TARGET / AVOID-EARLY / NEVER-DRAFT, spec §4's three tags, worded as
+ * `avoid`/`never` in the enum (the UI's own hyphenated labels are a presentation choice, not a
+ * stored fact) so a future fourth tag is one enum value, not a schema migration plus a rename.
+ */
+export const draftSheetTagEnum = pgEnum("draft_sheet_tag", ["target", "avoid", "never"]);
+
+export const draftSheets = pgTable(
+  "draft_sheets",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Null is the format-default sheet; non-null scopes this sheet to one league's own rules
+     *  and gates every read/write on that league's membership (`@/lib/leagues/membership.ts`). */
+    leagueId: text("league_id").references(() => leagues.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** The sheet picker's own read: every sheet a user owns, newest first — bounded to one
+     *  person's own sheets, never scanned across the table. */
+    index("draft_sheets_user_idx").on(t.userId, t.createdAt),
+  ],
+);
+
+export const draftSheetEntries = pgTable(
+  "draft_sheet_entries",
+  {
+    id: text("id").primaryKey(),
+    sheetId: text("sheet_id")
+      .notNull()
+      .references(() => draftSheets.id, { onDelete: "cascade" }),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** The manager's own 1-based order within this sheet — the sheet's whole reason to exist
+     *  (spec §4: "manual order always beats the board's"). Reassigned in full on every reorder
+     *  write rather than stored as a float/gap sequence: a sheet tops out at a few hundred rows,
+     *  so a full rewrite costs one small transaction and never accumulates float-precision drift. */
+    rank: integer("rank").notNull(),
+    /** A user-named tier header ("My tier 1"), or null for an entry with no tier band of its
+     *  own — spec §4's "custom tiers with user-named headers." */
+    tierLabel: text("tier_label"),
+    note: text("note"),
+    tag: draftSheetTagEnum("tag"),
+  },
+  (t) => [
+    /** One row per player per sheet — re-ranking a player already on the sheet is an UPDATE,
+     *  never a second row for the same man. */
+    uniqueIndex("draft_sheet_entries_sheet_player_idx").on(t.sheetId, t.playerId),
+    /** The sheet's own read: every entry in rank order, bounded to one sheet. */
+    index("draft_sheet_entries_sheet_rank_idx").on(t.sheetId, t.rank),
+  ],
+);
