@@ -523,3 +523,38 @@ describe("POST /api/drafts/[draftId]/start", () => {
     expect(await again.json()).toEqual({ ok: false, error: "This draft has already started." });
   });
 });
+
+describe("advance-on-read (driver 1 of the draft-driver design)", () => {
+  it("GET fast-forwards a stalled draft to the true present — expiries chained at their deadlines, never at read time", async () => {
+    // A 2-team all-human mock on 30s clocks whose whole life happened "in the past": started by
+    // a store whose clock sits an hour before the real wall clock the route reads. Every one of
+    // its six turns has long since run out by the time the GET arrives.
+    const startedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const f = await seedDraftFixture(db, {
+      draftId: MOCK_DRAFT_ID, leagueId: "league_api_mock", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+      isMock: true, botTeams: 0, mockPickSeconds: 30,
+    });
+    await seedMockPlayers();
+    const { createDraftStore } = await import("./store");
+    const pastStore = createDraftStore({ db, publish: async () => "0-0", clock: { now: () => startedAt } });
+    await pastStore.startDraft(MOCK_DRAFT_ID);
+
+    signedInAs(f.userIds[0]!);
+    const response = await getDraft(new Request(`http://test/api/drafts/${MOCK_DRAFT_ID}`), { params: mockParams });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.draft.phase).toBe("complete");
+
+    // The catch-up's decided timestamp semantics, proved through the real route: the six
+    // expiries are stamped 30 seconds apart from the recorded start, not at the read instant.
+    const log = await db.select().from(draftActions).where(eq(draftActions.draftId, MOCK_DRAFT_ID)).orderBy(draftActions.sequence);
+    expect(log).toHaveLength(7);
+    const startedAtMs = Date.parse(startedAt);
+    log.slice(1).forEach((row, i) => {
+      const action = row.action as { readonly type: string; readonly timestamp: string };
+      expect(action.type).toBe("TIMER_EXPIRE");
+      expect(Date.parse(action.timestamp)).toBe(startedAtMs + (i + 1) * 30_000);
+    });
+  });
+});
