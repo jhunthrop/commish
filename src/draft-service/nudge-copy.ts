@@ -30,7 +30,7 @@ const VERB: Readonly<Record<NudgeAction, string>> = {
  * — who, how long, what to do, and what happens if they don't — in one plain sentence.
  */
 export function staticNudge({ teamName, secondsRemaining, action }: NudgeCopyInput): string {
-  return `${teamName}, you're on the clock with about ${formatClockLength(secondsRemaining)} left. ${VERB[action]}, or we'll auto-pick the top player from your queue.`;
+  return `${teamName}, you're on the clock with about ${formatClockLength(secondsRemaining)} left. ${VERB[action]}, or we'll pick for you: your queue first, then the best player your roster needs.`;
 }
 
 const SYSTEM = [

@@ -423,7 +423,7 @@ type NoticeTemplate<T extends NoticeType> = (context: NoticeContexts[T]) => Rend
 export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> } = {
   draft_auto_picked: ({ leagueName, pickNumber, playerName, position }) => ({
     title: "We made your pick for you",
-    body: `The clock ran out on pick ${pickNumber} in ${leagueName}, so we used your queue and drafted ${playerName} (${position}). Set your queue before your next draft so this does not happen again.`,
+    body: `The clock ran out on pick ${pickNumber} in ${leagueName}, so we picked for you: your queue first, then the best player your roster needs. You drafted ${playerName} (${position}). Set your queue before your next draft so this does not happen again.`,
   }),
   // `reason` is stored on the row (`context.reason`) but deliberately unused HERE: its
   // author-facing phrase travels as its own field on the wire (`NoticeView.quote`, `GET

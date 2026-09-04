@@ -629,7 +629,7 @@ describe("draft store — notices", () => {
       readAt: null,
     });
     expect(notice!.body).toBe(
-      `The clock ran out on pick ${payload.pickNumber} in league_1, so we used your queue and drafted ${PLAYER_NAMES[payload.playerId]} (${payload.playerId.startsWith("qb") ? "QB" : payload.playerId.startsWith("rb") ? "RB" : "WR"}). Set your queue before your next draft so this does not happen again.`,
+      `The clock ran out on pick ${payload.pickNumber} in league_1, so we picked for you: your queue first, then the best player your roster needs. You drafted ${PLAYER_NAMES[payload.playerId]} (${payload.playerId.startsWith("qb") ? "QB" : payload.playerId.startsWith("rb") ? "RB" : "WR"}). Set your queue before your next draft so this does not happen again.`,
     );
 
     // Ruling 13's guard: a private notice may not ride the league broadcast (every subscriber in

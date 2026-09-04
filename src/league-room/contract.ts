@@ -109,7 +109,8 @@ export interface DraftScheduleBody {
    * drafted, so every pick on it came from the queue, not a shrug at a live clock nobody was
    * behind. `false` for a caller with no team here (`slotPreference`'s own null case) and for
    * every draft that has not finished yet. `WaitingRoom` reads this to show "The draft ran on
-   * {day} and the room picked for you from your queue" (C3) instead of the ordinary complete
+   * {day} and the room picked for you: your queue first, then the best player your roster
+   * needed" (C3, tense-adapted) instead of the ordinary complete
    * state's "View the draft board".
    */
   readonly missedDraft: boolean;

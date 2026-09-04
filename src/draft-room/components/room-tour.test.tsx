@@ -84,7 +84,7 @@ describe("RoomTour", () => {
     expect(screen.getByText("The queue")).toBeInTheDocument();
     expect(screen.getByText("Taking your turn")).toBeInTheDocument();
     expect(
-      screen.getByText("Draft the player you want before the clock runs out. Miss it and the room picks for you from your queue."),
+      screen.getByText("Draft the player you want before the clock runs out. Miss it and the room picks for you: your queue first, then the best player your roster needs."),
     ).toBeInTheDocument();
   });
 
@@ -93,7 +93,7 @@ describe("RoomTour", () => {
     // renders is "Nominate" in an auction room, never "Draft", so the copy has to say so too.
     render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Nominate" />);
     expect(
-      screen.getByText("Nominate the player you want before the clock runs out. Miss it and the room picks for you from your queue."),
+      screen.getByText("Nominate the player you want before the clock runs out. Miss it and the room picks for you: your queue first, then the best player your roster needs."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/click Draft/)).not.toBeInTheDocument();
   });
@@ -152,7 +152,7 @@ describe("RoomTour — anchored mode (Task 4, R3)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(
-      screen.getByText("Nominate the player you want before the clock runs out. Miss it and the room picks for you from your queue."),
+      screen.getByText("Nominate the player you want before the clock runs out. Miss it and the room picks for you: your queue first, then the best player your roster needs."),
     ).toBeInTheDocument();
   });
 

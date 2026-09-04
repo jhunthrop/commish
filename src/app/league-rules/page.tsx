@@ -72,8 +72,9 @@ export default async function LeagueRulesPage() {
           want before the room opens, and the draw gives each manager their highest-ranked slot
           still free. When it is your turn you are{" "}
           <TermLink term="on-the-clock">on the clock</TermLink>, with a countdown running. Rank
-          players into <TermLink term="queue">your queue</TermLink> beforehand and the room picks
-          for you from your queue if that clock runs out, so a draft never stalls on one manager.
+          players into <TermLink term="queue">your queue</TermLink> beforehand; if that clock runs
+          out the room picks for you: your queue first, then the best player your roster needs. A
+          draft never stalls on one manager.
         </p>
       </ReadingSection>
 

@@ -94,7 +94,7 @@ describe("WaitingRoom", () => {
 
   it("tells a member who missed the draft what happened to their team", () => {
     render(<WaitingRoom league={draftedWithoutYou} />);
-    expect(screen.getByText("The draft ran on Thursday and the room picked for you from your queue.")).toBeInTheDocument();
+    expect(screen.getByText("The draft ran on Thursday and the room picked for you: your queue first, then the best player your roster needed.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "See your roster" })).toBeInTheDocument();
   });
 

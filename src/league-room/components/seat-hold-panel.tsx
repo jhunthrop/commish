@@ -98,7 +98,7 @@ export function SeatHoldPanel({ leagueId, leagueName }: SeatHoldPanelProps) {
             the join flow's own first screen — the hold page is where a first-timer first asks
             "what if I miss it", and until now the sentence rendered nowhere earlier than a
             full sit-and-go room or a missed draft, both well past this point. */}
-        <p className="text-sm text-text-muted">The room picks for you from your queue if your clock runs out.</p>
+        <p className="text-sm text-text-muted">If your clock runs out the room picks for you: your queue first, then the best player your roster needs.</p>
       </div>
       {/* The hold page's ONE action (rule 5), so it is the view's ink pill. */}
       <SignInLink

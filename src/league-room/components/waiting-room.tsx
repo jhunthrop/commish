@@ -335,7 +335,7 @@ export function WaitingRoom({
             </p>
             {/* First-timer persona question, Step 5/6: "what happens if I'm not there?" —
                 answered honestly, in C3's own phrasing, once the clock is actually running. */}
-            <p className="text-sm text-text-muted">Away when it starts? The room picks for you from your queue.</p>
+            <p className="text-sm text-text-muted">Away when it starts? The room picks for you: your queue first, then the best player your roster needs.</p>
           </div>
         ) : null}
       </div>
@@ -364,7 +364,8 @@ export function WaitingRoom({
     );
   }
 
-  // C3: the safety net has one phrasing, "the room picks for you from your queue", quoted here
+  // C3: the safety net has one phrasing, "the room picks for you: your queue first, then the
+  // best player your roster needs", quoted here (tense-adapted)
   // verbatim (`docs/design-system.md`, Task 14 Step 2) rather than composed a second way.
   if (league.missedDraft) {
     return (
@@ -373,7 +374,7 @@ export function WaitingRoom({
           tone="neutral"
           icon="check"
           title="Draft complete"
-          description={`The draft ran on ${weekdayOf(league.kickoffAt)} and the room picked for you from your queue.`}
+          description={`The draft ran on ${weekdayOf(league.kickoffAt)} and the room picked for you: your queue first, then the best player your roster needed.`}
           action={
             <Link href={`/app/drafts/${league.draftId}`} className="text-sm font-medium text-accent underline">
               See your roster

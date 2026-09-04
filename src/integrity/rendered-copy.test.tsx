@@ -1677,7 +1677,7 @@ describe("RoomTour says nothing that breaks the house copy rules, and never drif
     const { container, getByText, getAllByText } = render(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Draft" />);
     expectClean(container);
     expect(getByText(/Run a mock draft first\./)).toBeInTheDocument();
-    expect(getAllByText(/the room picks for you from your queue/).length).toBeGreaterThan(0);
+    expect(getAllByText(/the room picks for you: your queue first, then the best player your roster needs/).length).toBeGreaterThan(0);
   });
 });
 

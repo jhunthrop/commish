@@ -27,8 +27,9 @@ function NoticeRow({ notice }: { readonly notice: NoticeView }) {
       <p className="break-words font-medium text-text-primary">{notice.title}</p>
       {/* NO TIPS (founder, 2026-08-28: "the UX should explain itself, we shouldn't need tips").
           A `draft_auto_picked` notice used to carry an ⓘ defining "queue" beside its body; the
-          stored notice already says "the room picks for you from your queue" (C3's sanctioned
-          safety-net phrase) in the sentence itself, so the tip was fantasy vocabulary restated
+          stored notice already quotes C3's sanctioned safety-net phrase (today "the room picks
+          for you: your queue first, then the best player your roster needs") in the sentence
+          itself, so the tip was fantasy vocabulary restated
           next to the sentence that had just used it correctly. */}
       <p className="break-words text-sm text-text-muted">{notice.body}</p>
       {/* `quote` is the ONE wire field split out of a notice's stored `context`: the

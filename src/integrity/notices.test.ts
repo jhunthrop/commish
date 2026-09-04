@@ -34,7 +34,7 @@ describe("NOTICE_TEMPLATES", () => {
     const autoPick = renderNotice("draft_auto_picked", NOTICE_SAMPLES.draft_auto_picked);
     expect(autoPick.title).toBe("We made your pick for you");
     expect(autoPick.body).toBe(
-      "The clock ran out on pick 24 in Sunday Money, so we used your queue and drafted Bijan Robinson (RB). Set your queue before your next draft so this does not happen again.",
+      "The clock ran out on pick 24 in Sunday Money, so we picked for you: your queue first, then the best player your roster needs. You drafted Bijan Robinson (RB). Set your queue before your next draft so this does not happen again.",
     );
 
     const removed = renderNotice("review_removed", NOTICE_SAMPLES.review_removed);

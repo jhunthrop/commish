@@ -12,7 +12,7 @@ const llmReturning = (text: string): LlmClient => ({
 describe("staticNudge", () => {
   it("names the team, the time left and what to do next", () => {
     expect(staticNudge(INPUT)).toBe(
-      "Bay Bandits, you're on the clock with about 45 seconds left. Make your pick, or we'll auto-pick the top player from your queue.",
+      "Bay Bandits, you're on the clock with about 45 seconds left. Make your pick, or we'll pick for you: your queue first, then the best player your roster needs.",
     );
   });
 

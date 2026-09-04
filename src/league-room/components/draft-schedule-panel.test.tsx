@@ -58,7 +58,7 @@ describe("DraftSchedulePanel", () => {
       <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={SCHEDULED} />,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.getByText("The room picks for you from your queue if your clock runs out.")).toBeInTheDocument();
+    expect(screen.getByText("If your clock runs out the room picks for you: your queue first, then the best player your roster needs.")).toBeInTheDocument();
   });
 
   it("offers no controls to a member who is not the commissioner", () => {

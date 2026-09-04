@@ -31,8 +31,10 @@ import { INTEGRITY_CONFIG } from "./config";
  *    the rule.
  *  - NOTHING FROM THE FORBIDDEN VOCABULARY (C3, ruled; extended Phase 4.5). No surface invents
  *    "autopick," "auto-draft," or "we will draft for you" — the one sanctioned phrase for the
- *    safety net is "the room picks for you from your queue," and every surface that reassures a
- *    member about missing a draft quotes it exactly. Phase 4.5 adds the mock draft's own honesty
+ *    safety net is "the room picks for you: your queue first, then the best player your roster
+ *    needs" (amended 2026-09-03 with the need-aware autopick upgrade — the old queue-only
+ *    phrasing stopped being the whole truth), and every surface that reassures a member about
+ *    missing a draft quotes it exactly. Phase 4.5 adds the mock draft's own honesty
  *    floor beside it: no surface calls a bot an "AI opponent," "smart AI," or claims it "learns
  *    from" anything or uses "machine learning" — a mock bot is a named, seeded sampler, and no
  *    claim of intelligence is true until Phase 6 actually ships one.
@@ -68,7 +70,8 @@ const CONTRACTION_ALLOWLIST: readonly string[] = ["You're in"];
 
 /**
  * C3's forbidden vocabulary family — the words this product's copy never invents for the
- * safety-net idea, because "the room picks for you from your queue" is the one sanctioned phrase
+ * safety-net idea, because "the room picks for you: your queue first, then the best player
+ * your roster needs" is the one sanctioned phrase
  * and a second name for the same idea is exactly the "two names for one idea" confusion the
  * first-timer persona flagged.
  *

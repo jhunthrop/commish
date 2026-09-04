@@ -95,7 +95,7 @@ export function lobbyJoinFacts(league: PublicLeagueSummary, signedIn: boolean, l
       signedIn
         ? "Press the button and the seat is yours on the spot."
         : `Your seat is held for ${SEAT_HOLD.minutes} minutes while you sign in.`,
-      `${startClause} Miss the start and the room drafts for you from the best available.`,
+      `${startClause} Miss the start and the room picks for you: your queue first, then the best player your roster needs.`,
       `The season runs itself: lineups, waivers, scoring and standings, week 1 through the playoffs.${
         live && pot !== null ? " The pot pays the podium when the season settles." : ""
       }`,
@@ -142,7 +142,7 @@ export function inviteJoinFacts(terms: LeagueTerms, signedIn: boolean): JoinDeci
       signedIn
         ? "Press Join and the seat is yours on the spot. This invite came to you; no seat is held for anyone."
         : "Sign in first. This page brings you straight back here to join.",
-      `${startClause} Miss the start and the room drafts for you from the best available.`,
+      `${startClause} Miss the start and the room picks for you: your queue first, then the best player your roster needs.`,
       `The season runs itself: lineups, waivers, scoring and standings, week 1 through the playoffs.${
         paid ? " The pot pays the podium when the season settles." : ""
       }`,

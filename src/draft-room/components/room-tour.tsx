@@ -61,12 +61,12 @@ function tourStops(actionLabel: string): readonly TourStop[] {
   return [
     {
       heading: "The clock",
-      body: "When it hits zero, the room picks for you from your queue.",
+      body: "When it hits zero, the room picks for you: your queue first, then the best player your roster needs.",
     },
-    { heading: "The queue", body: "Stack the players you want. The room picks for you from your queue whenever you miss your turn." },
+    { heading: "The queue", body: "Stack the players you want. When you miss a turn the room picks for you: your queue first, then the best player your roster needs." },
     {
       heading: "Taking your turn",
-      body: `${actionLabel} the player you want before the clock runs out. Miss it and the room picks for you from your queue.`,
+      body: `${actionLabel} the player you want before the clock runs out. Miss it and the room picks for you: your queue first, then the best player your roster needs.`,
     },
     CLOSING_STOP,
   ];

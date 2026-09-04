@@ -132,7 +132,7 @@ function QueueRail({ queue, playersById, draftedIds, busy, onChange }: QueueRail
         // the target must exist whether or not a manager has queued anyone yet, so opening the
         // tour with an empty queue still anchors instead of falling back to the modal.
         <p id="dock-queue" className="min-w-0 py-1.5 text-xs text-text-muted lg:truncate lg:py-0">
-          Star players in the pool. The room picks for you from your queue if your clock runs out.
+          Star players in the pool. If your clock runs out the room picks for you: your queue first, then the best player your roster needs.
         </p>
       ) : (
         <div id="dock-queue" className="flex min-w-0 items-center gap-2">

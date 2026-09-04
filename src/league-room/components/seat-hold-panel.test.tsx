@@ -31,7 +31,7 @@ describe("SeatHoldPanel", () => {
   it("answers the first-timer's own question, verbatim, once the hold lands", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: { expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() } });
     renderInLeague(<SeatHoldPanel leagueId="lg1" leagueName="Rookie Snake Room" />, fixture.deps);
-    expect(await screen.findByText("The room picks for you from your queue if your clock runs out.")).toBeInTheDocument();
+    expect(await screen.findByText("If your clock runs out the room picks for you: your queue first, then the best player your roster needs.")).toBeInTheDocument();
   });
 
   it("shows a loading skeleton before the claim resolves", () => {

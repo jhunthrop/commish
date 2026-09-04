@@ -913,8 +913,9 @@ before Task 4 swept them:
 load-bearing and stay long if long is what makes them true — `seatCountsAsOfSentence`'s second
 sentence is the thing that makes its first one honest. Screen-reader sentences are never trimmed:
 the visible digits of a clock are `aria-hidden` and the `sr-only` sentence beside them is the only
-spoken form there is. And C3's sanctioned safety-net phrase, **"the room picks for you from your
-queue"**, is still quoted verbatim by every surface that reassures a member about missing a draft.
+spoken form there is. And C3's sanctioned safety-net phrase, **"the room picks for you: your queue
+first, then the best player your roster needs"**, is still quoted verbatim by every surface that
+reassures a member about missing a draft.
 Cutting a sentence is only an improvement when nothing true leaves with it.
 
 Everything above this line still binds: expanded register (no contractions, C1), no em-dashes or
@@ -927,7 +928,9 @@ register is what keeps those sentences from reading as chat. **One named excepti
 just-seated heading, `` `${leagueName} · You're in` `` (`waiting-room.tsx`, D1) — recorded as a
 decision somebody made once, not a precedent the next writer generalizes from.
 
-**The safety net is named once: "the room picks for you from your queue"** (C3). Every surface
+**The safety net is named once: "the room picks for you: your queue first, then the best player
+your roster needs"** (C3; amended 2026-09-03 when the clock-expiry autopick became need-aware —
+the old queue-only phrasing stopped being the whole truth). Every surface
 that reassures a member about missing a draft quotes that exact phrase (`waiting-room.tsx`,
 `src/help/glossary.ts`, `room-tour.tsx` — Phase 4.5, Task 9, whose first-ever rendered sweep
 caught the tour's own pre-existing "autopick" wording, unswept since before that phase); no

@@ -342,7 +342,7 @@ export function DraftSchedulePanel({
           a SCHEDULED league's waiting room — this product's most common waiting state, and the
           one the gauntlet's first-timer persona actually asked "what if I miss it" from. Only
           `full && startTrigger === "when_full"` said this before; a scheduled room never did. */}
-      <p className="text-sm text-text-muted">The room picks for you from your queue if your clock runs out.</p>
+      <p className="text-sm text-text-muted">If your clock runs out the room picks for you: your queue first, then the best player your roster needs.</p>
     </div>
   );
 
