@@ -1,10 +1,9 @@
-import { and, asc, eq, gte } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues, teams } from "@/db/schema";
 import type { Position } from "@/domain/player";
 import { plural } from "@/domain/duration";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { boardRows } from "@/draft-hq/board/service";
+import { nextDraftingLeague as nextDraftingLeagueRow } from "@/draft-hq/league-context";
 import { defaultSheetFor } from "@/draft-hq/sheet/service";
 
 /**
@@ -80,34 +79,23 @@ export function rosterShapeNote(rosterSlots: readonly RosterSlotConfig[]): strin
   return `Your league starts ${qbSlots} quarterbacks. That moves quarterbacks up your board — every surface here is computed under your league's exact rules, not a generic list.`;
 }
 
-/** The caller's soonest SCHEDULED real draft — never a mock (`leagues.isMock`), which is its own
- *  practice lobby with its own countdown. `null` for a caller with none scheduled. */
-async function nextDraftingLeague(db: Db, userId: string): Promise<DraftHqLeagueContext | null> {
-  const [row] = await db
-    .select({
-      leagueId: leagues.id,
-      leagueName: leagues.name,
-      rosterSlots: leagues.rosterSlots,
-      kickoffAt: drafts.kickoffAt,
-    })
-    .from(teams)
-    .innerJoin(leagues, and(eq(leagues.id, teams.leagueId), eq(leagues.isMock, false)))
-    .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
-    .where(and(eq(teams.userId, userId), eq(drafts.status, "scheduled"), gte(drafts.kickoffAt, new Date())))
-    .orderBy(asc(drafts.kickoffAt))
-    .limit(1);
-  if (row === undefined) return null;
+/** The HQ banner's own shaping of the shared league-context read (`@/draft-hq/league-context`):
+ *  a plain-language roster note derived from the league's own stored shape. `null` for a caller
+ *  with none scheduled. */
+async function nextDraftingLeagueContext(db: Db, userId: string): Promise<DraftHqLeagueContext | null> {
+  const row = await nextDraftingLeagueRow(db, userId);
+  if (row === null) return null;
   return {
     leagueId: row.leagueId,
     leagueName: row.leagueName,
-    kickoffAt: row.kickoffAt.toISOString(),
+    kickoffAt: row.kickoffAt,
     rosterNote: rosterShapeNote(row.rosterSlots),
   };
 }
 
 export async function draftHqBody(db: Db, userId: string): Promise<DraftHqBody> {
   const [nextDraft, board, sheet] = await Promise.all([
-    nextDraftingLeague(db, userId),
+    nextDraftingLeagueContext(db, userId),
     boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } }).catch(() => []),
     defaultSheetFor(db, userId, null),
   ]);
