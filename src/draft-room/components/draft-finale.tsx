@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Button, ButtonLink, Celebration, PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
+import { Button, ButtonLink, Celebration, Modal, PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { rosterFillRows } from "../state/roster-fill";
 import type { FinaleStage } from "../hooks/use-draft-finale";
@@ -86,6 +86,7 @@ export function DraftFinaleOverlay({ stage, view, playersById, myTeamId, onDismi
       <div className="absolute inset-x-0 top-0 z-50 flex flex-col items-center gap-4">
         <div
           data-testid="finale-banner"
+          role="status"
           className={`w-full border-b border-line bg-surface-elevated px-4 py-2.5 text-center font-display text-md font-semibold text-text-primary ${reducedMotion ? "" : "animate-strip-grow"}`}
         >
           {BANNER_SENTENCE}
@@ -104,7 +105,7 @@ export function DraftFinaleOverlay({ stage, view, playersById, myTeamId, onDismi
   if (stage === "preparing") {
     return (
       <div className="absolute inset-x-0 top-0 z-50 flex justify-center p-3">
-        <p data-testid="finale-preparing" role="status" className="rounded-md border border-line bg-surface-elevated px-3 py-1.5 text-sm text-text-muted">
+        <p data-testid="finale-preparing" role="status" className="rounded-md bg-surface-elevated shadow-card px-3 py-1.5 text-sm text-text-muted">
           Preparing your debrief
         </p>
       </div>
@@ -114,7 +115,7 @@ export function DraftFinaleOverlay({ stage, view, playersById, myTeamId, onDismi
   if (stage === "manual") {
     return (
       <div className="absolute inset-x-0 top-0 z-50 flex justify-center p-3">
-        <div className="flex items-center gap-3 rounded-md border border-line bg-surface-elevated px-3 py-2">
+        <div className="flex items-center gap-3 rounded-md bg-surface-elevated shadow-card px-3 py-2">
           <span className="text-sm text-text-muted">Your debrief is ready when the room is.</span>
           <Button size="sm" variant="secondary" onClick={onSeeDebrief}>
             See your debrief
@@ -126,21 +127,25 @@ export function DraftFinaleOverlay({ stage, view, playersById, myTeamId, onDismi
 
   if (stage === "panel") {
     return (
-      <div className="absolute inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim/50 p-4 pt-12 lg:items-center lg:pt-4">
-        <section
-          aria-label="Draft complete"
-          data-testid="finale-panel"
-          className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-line bg-surface-elevated p-5"
+      // The shared `Modal` primitive, never a hand-rolled scrim (fix round 1, HIGH 2): it
+      // brings the dialog role, the focus trap, Escape and focus restoration — and Escape
+      // dismisses exactly the way "Stay on the board" does, back to the browsable board.
+      <div data-testid="finale-panel">
+        <Modal
+          open
+          title={BANNER_SENTENCE}
+          onClose={onDismiss}
+          footer={
+            <>
+              <ButtonLink href={`/app/leagues/${view.leagueId}`}>Open your league room</ButtonLink>
+              <Button variant="ghost" onClick={onDismiss}>
+                Stay on the board
+              </Button>
+            </>
+          }
         >
-          <h2 className="font-display text-display-md font-semibold leading-display text-text-primary">{BANNER_SENTENCE}</h2>
           <PanelRoster view={view} playersById={playersById} myTeamId={myTeamId} />
-          <div className="flex items-center gap-3">
-            <ButtonLink href={`/app/leagues/${view.leagueId}`}>Open your league room</ButtonLink>
-            <Button variant="ghost" onClick={onDismiss}>
-              Stay on the board
-            </Button>
-          </div>
-        </section>
+        </Modal>
       </div>
     );
   }

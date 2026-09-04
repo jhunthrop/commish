@@ -338,6 +338,34 @@ describe("DraftRoom — the finale", () => {
     expect(screen.queryByRole("list", { name: /available players/i })).not.toBeInTheDocument();
   });
 
+  // Fix round 1, HIGH 1: one combined resync (the stream's onOpen refetch after a dropped
+  // connection) can deliver the phase flip and `mock.results` in a single state update. This
+  // test guards the WIRING of that path — combined update in, beat showing and debrief absent
+  // once settled, then the in-place swap after the beat. It cannot observe the single-frame
+  // debrief flash the bug produced (act() flushes effects before any assertion runs in jsdom),
+  // so the frame-level no-flash guarantee is pinned ONLY by the hook's commit-logging probe
+  // test in use-draft-finale.test.tsx.
+  it("wears the beat, not the debrief, when one resync carries the flip and the results together", async () => {
+    const fixture = fixtureDeps();
+    fixture.mock = MOCK_ROOM;
+    await mountLive(fixture);
+
+    fixture.view = COMPLETE_VIEW;
+    fixture.mock = { ...MOCK_ROOM, results: MOCK_RESULTS_INFO };
+    vi.useFakeTimers();
+    await act(async () => {
+      fixture.sources[0]!.emit("open");
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId("finale-banner")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "The debrief" })).not.toBeInTheDocument();
+
+    // After the beat the debrief takes the room with no further fetch needed.
+    await advance(momentMs);
+    await advance(0);
+    expect(screen.getByRole("heading", { name: "The debrief" })).toBeInTheDocument();
+  });
+
   it("retries when the refetch races settlement, says so quietly, then offers the manual door — which opens the debrief", async () => {
     const fixture = fixtureDeps();
     fixture.mock = MOCK_ROOM;
