@@ -54,6 +54,17 @@ fresh state and continues; two consecutive refusals end the call (never a spin).
 never throws — every failure is caught, logged, and reported in the outcome, the ticker's own
 "one draft's failure must not stop the scan" discipline.
 
+Fix round (2026-09-03): the outcome is a tri-state — `ok` / `not_found` / `error` — so a
+transient failure is never confused with a missing draft (the SSE loop ticks through `error`,
+logging once per streak, and stops only on `complete`/`not_found`). A DISSOLVED draft
+classifies with `not_found`: its log still replays as in_progress, but nothing may ever advance
+it, and `draftLoopTarget` refuses to start a loop for it at all. When the two-refusal breaker
+trips WITH due work still pending the call is flagged `wedged: true` and emits one
+distinguishing structured line (`[draft] advance wedged` + draftId, refusal reason, due-work
+summary — greppable for alerting), and the sweep job counts wedged drafts in its step detail so
+the admin jobs page shows them. FULL DEAD-LETTERING OF WEDGED DRAFTS IS DELIBERATELY OUT OF
+SCOPE for this round: the wedge line and the sweep detail are the minimum visibility ruling.
+
 ### Timestamp semantics: chained due instants (decided)
 
 The live ticker stamps `TIMER_EXPIRE` with the tick's `now` — at a 1s tick that lags the true

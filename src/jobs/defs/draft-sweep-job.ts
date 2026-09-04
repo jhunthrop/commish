@@ -57,6 +57,7 @@ export async function sweepDrafts(ctx: DraftSweepContext): Promise<StepOutcome> 
   let actions = 0;
   let advanced = 0;
   let exhausted = false;
+  const wedged: string[] = [];
   for (const row of rows) {
     const remaining = budget - actions;
     if (remaining <= 0) {
@@ -67,13 +68,17 @@ export async function sweepDrafts(ctx: DraftSweepContext): Promise<StepOutcome> 
     actions += outcome.applied;
     if (outcome.applied > 0) advanced += 1;
     if (outcome.exhausted) exhausted = true;
+    if (outcome.wedged) wedged.push(row.id);
   }
 
   return {
-    summary: `sweep: ${started.filter((s) => s.started).length} auto-starts, ${mocks.filter((m) => m.started).length} mock starts, ${actions} actions across ${advanced} of ${rows.length} live drafts${exhausted ? " (budget hit — the next fire resumes)" : ""}`,
+    summary: `sweep: ${started.filter((s) => s.started).length} auto-starts, ${mocks.filter((m) => m.started).length} mock starts, ${actions} actions across ${advanced} of ${rows.length} live drafts${wedged.length > 0 ? `, ${wedged.length} WEDGED` : ""}${exhausted ? " (budget hit — the next fire resumes)" : ""}`,
     detail: [
       ...started.filter((s) => !s.started && s.rolled !== true && s.reason !== undefined).map((s) => `auto-start ${s.draftId}: ${s.reason}`),
       ...mocks.flatMap((m) => (!m.started && !m.benignRace ? [`mock ${m.leagueId}: ${m.reason}`] : [])),
+      // Fix round MEDIUM 3: the admin jobs page shows a stuck draft instead of it being
+      // invisible; the per-draft "[draft] advance wedged" log carries the refusal reason.
+      ...wedged.map((draftId) => `wedged: ${draftId} cannot advance (see "[draft] advance wedged" logs)`),
     ],
   };
 }

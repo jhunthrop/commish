@@ -335,6 +335,57 @@ describe("transient errors vs a missing draft (fix round HIGH 1: the tri-state o
   });
 });
 
+describe("a wedged draft is visible (fix round MEDIUM 3)", () => {
+  it("the refusal breaker with due work still pending logs one distinguishing structured line and flags the outcome", async () => {
+    // A board that can genuinely wedge: only QBs — enough to pass reduceStart's COUNT guard
+    // (6 players for 6 slots), but once every QB slot is filled the next expiry's autopick
+    // finds no eligible player and the store refuses — forever.
+    const fixture = await seedDraftFixture(db, {
+      draftId: "draft_wedge",
+      leagueId: "league_wedge",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + 24 * 60 * 60 * 1000),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 0,
+      mockPickSeconds: 60,
+    });
+    // Distinct ids from `seedSprintPlayers` — the benign half of this test seeds those too.
+    await db.insert(players).values(
+      Array.from({ length: 6 }, (_, i) => ({ id: `wqb${i + 1}`, name: `Wedge QB ${i + 1}`, position: "QB" as const, nflTeam: "KC" })),
+    );
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      now = atMs(10 * 60_000);
+      const outcome = await testAdvancer(store).advance(fixture.draftId, now);
+      // Both QB slots autopicked, then the wedge: due work remains, refused twice.
+      expect(outcome.applied).toBe(2);
+      expect(outcome.wedged).toBe(true);
+      expect(outcome.outcome).toBe("ok");
+      const wedgedLines = errorLog.mock.calls.filter((call) => String(call[0]).includes("advance wedged"));
+      expect(wedgedLines).toHaveLength(1);
+      const detail = wedgedLines[0]![1] as { draftId: string; reason: string; dueWork: string };
+      expect(detail.draftId).toBe(fixture.draftId);
+      expect(detail.reason).toContain("No eligible player");
+      expect(detail.dueWork).toContain("expire");
+    } finally {
+      errorLog.mockRestore();
+    }
+
+    // The benign nothing-due path never wears the wedged label.
+    const idle = await seedAbandonedMock("notwedged");
+    const idleStore = testStore();
+    await idleStore.startDraft(idle.draftId);
+    const quiet = await testAdvancer(idleStore).advance(idle.draftId, now);
+    expect(quiet.wedged).toBe(false);
+  });
+});
+
 describe("dissolved drafts are terminal (fix round MEDIUM 2)", () => {
   it("advance treats a dissolved draft as not_found and applies nothing, even with an in_progress log behind it", async () => {
     const fixture = await seedAbandonedMock("dissolved");
@@ -372,8 +423,8 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
       const phases: ("in_progress" | "complete")[] = ["in_progress", "complete"];
       const advance = vi.fn(async (draftId: string) => {
         const kind = script.shift() ?? "ok";
-        if (kind === "error") return { draftId, applied: 0, exhausted: false, phase: null, outcome: "error" as const };
-        return { draftId, applied: 1, exhausted: false, phase: phases.shift() ?? ("complete" as const), outcome: "ok" as const };
+        if (kind === "error") return { draftId, applied: 0, exhausted: false, phase: null, outcome: "error" as const, wedged: false };
+        return { draftId, applied: 1, exhausted: false, phase: phases.shift() ?? ("complete" as const), outcome: "ok" as const, wedged: false };
       });
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_flaky_loop", controller.signal, { advance, clock, intervalMs: 1_000 });
@@ -399,6 +450,7 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
         exhausted: false,
         phase: null,
         outcome: "not_found" as const,
+        wedged: false,
       }));
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_vanished", controller.signal, { advance, clock, intervalMs: 1_000 });
@@ -418,7 +470,7 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
         calls.push(draftId);
         // The first call blocks until released — interval fires during it must be skipped.
         if (calls.length === 1) await new Promise<void>((resolve) => (release = resolve));
-        return { draftId, applied: 0, exhausted: false, phase: "in_progress" as const, outcome: "ok" as const };
+        return { draftId, applied: 0, exhausted: false, phase: "in_progress" as const, outcome: "ok" as const, wedged: false };
       });
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_loop", controller.signal, { advance, clock, intervalMs: 1_000 });
@@ -448,6 +500,7 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
         exhausted: false,
         phase: phases.shift() ?? "complete",
         outcome: "ok" as const,
+        wedged: false,
       }));
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_done", controller.signal, { advance, clock, intervalMs: 1_000 });

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, players } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
@@ -107,6 +107,43 @@ describe("the draft-sweep job (driver 3 — the backstop for rooms nobody is wat
 
     const [deferredRow] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, deferred.draftId));
     expect(deferredRow?.status).toBe("in_progress");
+  });
+
+  it("surfaces a wedged draft in the step detail so the admin jobs page shows it (fix round MEDIUM 3)", async () => {
+    // Only QBs (six, passing reduceStart's count guard): after both QB slots fill, every
+    // further expiry's autopick is refused and the advance breaker trips wedged.
+    const fixture = await seedDraftFixture(db, {
+      draftId: "draft_sw_wedge",
+      leagueId: "league_sw_wedge",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + 24 * 60 * 60 * 1000),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 0,
+      mockPickSeconds: 60,
+    });
+    await db.insert(players).values([
+      { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
+      { id: "qb2", name: "QB Two", position: "QB", nflTeam: "KC" },
+      { id: "qb3", name: "QB Three", position: "QB", nflTeam: "KC" },
+      { id: "qb4", name: "QB Four", position: "QB", nflTeam: "KC" },
+      { id: "qb5", name: "QB Five", position: "QB", nflTeam: "KC" },
+      { id: "qb6", name: "QB Six", position: "QB", nflTeam: "KC" },
+    ]);
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+
+    now = new Date(Date.parse(BASE_NOW) + 10 * 60_000).toISOString();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const outcome = await sweepDrafts(sweepContext(store));
+      expect(outcome.summary).toContain("WEDGED");
+      expect(outcome.detail.some((line) => line.includes(`wedged: ${fixture.draftId}`))).toBe(true);
+    } finally {
+      errorLog.mockRestore();
+    }
   });
 
   it("bounds its work per tick: the action budget stops the sweep, and the next sweep resumes from the log", async () => {

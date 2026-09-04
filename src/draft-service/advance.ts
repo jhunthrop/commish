@@ -9,7 +9,7 @@ import { startMockDraft } from "@/mock-draft-service/start";
 import { dueDraftsQuery } from "./auto-start";
 import { DRAFT_ADVANCE_CONFIG } from "./config";
 import { NO_OP_NUDGE_SCHEDULER, type NudgeScheduler } from "./nudge";
-import type { DraftStore } from "./store";
+import type { ApplyResult, DraftStore } from "./store";
 
 /**
  * THE SERVERLESS ADVANCE FUNNEL (draft-driver design, 2026-09-03). On Vercel no process lives
@@ -60,6 +60,11 @@ export interface AdvanceOutcome {
   /** The draft's phase after this call, or null when it has none to report (`not_found`/`error`). */
   readonly phase: DraftState["phase"] | null;
   readonly outcome: AdvanceResultKind;
+  /** True when the refusal breaker tripped WITH due work still pending (fix round MEDIUM 3) —
+   *  a draft that cannot advance and will not on its own. The call also emits one structured
+   *  `[draft] advance wedged` line, distinct from every benign path, for alerting to grep; the
+   *  sweep job counts these in its step detail. Full dead-lettering is out of scope (spec). */
+  readonly wedged: boolean;
 }
 
 export interface DraftAdvancer {
@@ -130,26 +135,30 @@ export function createDraftAdvancer({
 
   /** One due action: the bot's pick when a bot holds a due clock (its think-delay always
    *  elapses inside the turn's clock — the T1 guarantee, the same ordering `tickOne` keeps),
-   *  otherwise the clock's own expiry. Null when nothing is due yet. */
-  async function applyNextDue(state: DraftState, nowMs: number) {
+   *  otherwise the clock's own expiry. Null when nothing is due yet; `dueWork` names what was
+   *  attempted so a wedged trip can say what the draft is stuck on (fix round MEDIUM 3). */
+  async function applyNextDue(state: DraftState, nowMs: number): Promise<{ readonly dueWork: string; readonly result: ApplyResult } | null> {
     if (state.config.isMock === true) {
       const due = await mockDriver.dueBotPick(state);
       if (due !== null && due.dueAtMs <= nowMs) {
-        return store.applyAction(state.config.draftId, {
+        // `Math.ceil`: the seeded delay is fractional-millisecond arithmetic; the stamp is
+        // the first whole millisecond at-or-after it, so the recorded instant never precedes
+        // the true due instant and two advancers stamp identically.
+        const timestamp = new Date(Math.ceil(due.dueAtMs)).toISOString();
+        const result = await store.applyAction(state.config.draftId, {
           v: DRAFT_ACTION_VERSION,
           type: "MAKE_PICK",
-          // `Math.ceil`: the seeded delay is fractional-millisecond arithmetic; the stamp is
-          // the first whole millisecond at-or-after it, so the recorded instant never precedes
-          // the true due instant and two advancers stamp identically.
-          timestamp: new Date(Math.ceil(due.dueAtMs)).toISOString(),
+          timestamp,
           teamId: due.teamId,
           playerId: due.playerId,
         });
+        return { dueWork: `bot-pick due ${timestamp}`, result };
       }
     }
     const deadline = currentDeadline(state);
     if (deadline === null || Date.parse(deadline) > nowMs) return null;
-    return store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: deadline });
+    const result = await store.applyAction(state.config.draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: deadline });
+    return { dueWork: `expire due ${deadline}`, result };
   }
 
   return {
@@ -163,34 +172,35 @@ export function createDraftAdvancer({
         // primary-key read; the row's absence is the same answer the state load would give.
         const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
         if (row === undefined || row.status === "dissolved") {
-          return { draftId, applied, exhausted: false, phase: null, outcome: "not_found" };
+          return { draftId, applied, exhausted: false, phase: null, outcome: "not_found", wedged: false };
         }
         let state = await store.getDraftState(draftId);
-        if (state === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found" };
+        if (state === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found", wedged: false };
 
         if (state.phase === "scheduled") {
           const start = await startIfDue(state, now);
           if (start === "started") applied += 1;
-          if (start === "not-due") return { draftId, applied, exhausted: false, phase: state.phase, outcome: "ok" };
+          if (start === "not-due") return { draftId, applied, exhausted: false, phase: state.phase, outcome: "ok", wedged: false };
           const fresh = await store.getDraftState(draftId);
-          if (fresh === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found" };
+          if (fresh === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found", wedged: false };
           state = fresh;
         }
 
         const nowMs = Date.parse(now);
         let refusals = 0;
+        let wedged = false;
         while (state.phase === "in_progress") {
-          if (applied >= maxActions) return { draftId, applied, exhausted: true, phase: state.phase, outcome: "ok" };
-          const result = await applyNextDue(state, nowMs);
-          if (result === null) {
+          if (applied >= maxActions) return { draftId, applied, exhausted: true, phase: state.phase, outcome: "ok", wedged };
+          const attempt = await applyNextDue(state, nowMs);
+          if (attempt === null) {
             // Nothing due — the clock is still running: the moderator's window, exactly where
             // `tickOne` gives it. It never applies an action, so it can never change what this
             // call would otherwise have done.
             await nudger.nudge(state, now);
             break;
           }
-          if (result.ok) {
-            state = result.state;
+          if (attempt.result.ok) {
+            state = attempt.result.state;
             applied += 1;
             refusals = 0;
             continue;
@@ -199,9 +209,17 @@ export function createDraftAdvancer({
           // advance — e.g. no eligible autopick). Reload once and re-derive; two consecutive
           // refusals end the call rather than spin.
           refusals += 1;
-          if (refusals >= 2) break;
+          if (refusals >= 2) {
+            // THE WEDGED LINE (fix round MEDIUM 3): due work is still pending and the store
+            // refused it twice against fresh state — this draft will not advance on its own.
+            // Deliberately distinct text from every benign path so an alert can grep it; full
+            // dead-lettering stays out of scope (spec).
+            wedged = true;
+            console.error("[draft] advance wedged", { draftId, reason: attempt.result.reason, dueWork: attempt.dueWork });
+            break;
+          }
           const fresh = await store.getDraftState(draftId);
-          if (fresh === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found" };
+          if (fresh === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found", wedged: false };
           state = fresh;
         }
 
@@ -211,12 +229,12 @@ export function createDraftAdvancer({
         if (state.phase === "complete" && state.config.isMock === true) {
           await settleMockDraftCompletion(db, draftId);
         }
-        return { draftId, applied, exhausted: false, phase: state.phase, outcome: "ok" };
+        return { draftId, applied, exhausted: false, phase: state.phase, outcome: "ok", wedged };
       } catch (error: unknown) {
         // The ticker's own discipline, held per call: one draft's DB error must not fail the
         // read (or stream, or sweep) that triggered the advance.
         console.error("[draft] advance failed", { draftId }, error);
-        return { draftId, applied, exhausted: false, phase: null, outcome: "error" };
+        return { draftId, applied, exhausted: false, phase: null, outcome: "error", wedged: false };
       }
     },
   };
