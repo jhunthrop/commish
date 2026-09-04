@@ -174,9 +174,11 @@ function matchesServedRoute(segments: readonly string[]): boolean {
       route.length === segments.length &&
       route.every((routeSegment, index) => {
         const linkSegment = segments[index] ?? "";
-        // A dynamic route segment takes anything; a wildcard link segment could be anything, so
-        // it is allowed to satisfy a literal route segment too (`${tab}` may well be "players").
-        return routeSegment.startsWith("[") || linkSegment === WILDCARD || routeSegment === linkSegment;
+        // A dynamic route segment takes anything — including a wildcard link segment. A LITERAL
+        // route segment takes only its own literal: letting a wildcard satisfy it too (the first
+        // draft's rule) meant `/app/${x}/edit` could "match" `/app/leagues/[leagueId]` purely by
+        // length, hiding stale templated hrefs (review finding, 2026-09-04).
+        return routeSegment.startsWith("[") ? true : linkSegment !== WILDCARD && routeSegment === linkSegment;
       }),
   );
 }
@@ -246,6 +248,11 @@ describe("link integrity: every internal link lands on a served route", () => {
     expect(matchesServedRoute([])).toBe(true); // "/" — src/app/page.tsx
     expect(matchesServedRoute(["app", "join", WILDCARD])).toBe(true);
     expect(matchesServedRoute(["no", "such", "route"])).toBe(false);
+    // The review's own probes (2026-09-04): a wildcard must never satisfy a LITERAL route
+    // segment, or a stale templated href hides behind any same-length route.
+    expect(matchesServedRoute(["app", WILDCARD, "edit"])).toBe(false); // no /app/*/edit exists
+    expect(matchesServedRoute(["app", WILDCARD])).toBe(false); // no /app/[x] route exists
+    expect(matchesServedRoute(["app", "leagues", WILDCARD, "players"])).toBe(true); // real dynamic
   });
 
   it("routes every internal href/push/redirect target to a served route or public file", () => {
