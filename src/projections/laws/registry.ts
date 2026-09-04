@@ -50,7 +50,13 @@
  * not a separate match).
  */
 
-import { readFileSync } from "node:fs";
+// The committed evidence artifacts, bundled at build time. A runtime `readFileSync` of a
+// repo-relative path worked in dev and returned ENOENT in a serverless function, whose bundle
+// carries only traced files (production incident, 2026-09-03: the draft room's players route
+// 500'd on every request). Static imports compile the same committed JSON into the chunk, so
+// serving needs no filesystem; the writer scripts keep the path constants below.
+import measuredJsonData from "./measured.json";
+import discoveredJsonData from "./discovered.json";
 import { DISCOVERY_TRAIN_SEASONS, LAW_TRAIN_CUTOFF_SEASON, REPLICATION_FOLDS } from "./config";
 import { LAW_SPECS, type LawSpec } from "./populations";
 import { measureEffect, verdictFor, type MatchedPair } from "./harness";
@@ -196,7 +202,12 @@ const MEASURED_JSON_PREFIX = "malformed measured.json:";
  * untyped JSON becomes a typed `MeasuredJson`, naming the exact law and field.
  */
 export function parseMeasuredJson(raw: string): MeasuredJson {
-  const parsed: unknown = JSON.parse(raw);
+  return measuredJsonFromData(JSON.parse(raw));
+}
+
+/** The same validation over already-parsed data: what `registry()` runs against the statically
+ *  imported artifact, and what `parseMeasuredJson` runs after its own `JSON.parse`. */
+export function measuredJsonFromData(parsed: unknown): MeasuredJson {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error("malformed measured.json: root is not an object");
   }
@@ -390,7 +401,12 @@ const VALID_PRIMARY_QUANTITY_UNITS: ReadonlySet<string> = new Set(["whole", "one
  * file's own `laws` object actually holds.
  */
 export function parseDiscoveredJson(raw: string): DiscoveredJson {
-  const parsed: unknown = JSON.parse(raw);
+  return discoveredJsonFromData(JSON.parse(raw));
+}
+
+/** `parseDiscoveredJson`'s validation over already-parsed data, for the statically imported
+ *  artifact. */
+export function discoveredJsonFromData(parsed: unknown): DiscoveredJson {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error("malformed discovered.json: root is not an object");
   }
@@ -574,18 +590,17 @@ export const MEASURED_JSON_PATH = "src/projections/laws/measured.json";
 export const DISCOVERED_JSON_PATH = "src/projections/laws/discovered.json";
 
 /** The thin file-reading wrapper every real caller uses: the committed `LAW_SPECS` against the
- *  committed `measured.json` (shape-validated by `parseMeasuredJson`, drift-checked by
+ *  committed `measured.json` (shape-validated by `measuredJsonFromData`, drift-checked by
  *  `registryFrom`), merged with `discovered.json`'s own BH survivors (shape-validated by
- *  `parseDiscoveredJson`, drift-checked by `discoveredLawsFrom`) — both read fresh off disk on
- *  every call. Tribal laws come first, in `LAW_SPECS`' own order, exactly as before Task 7; discovered
+ *  `discoveredJsonFromData`, drift-checked by `discoveredLawsFrom`) — both statically imported,
+ *  so the evidence ships inside the build itself (dev hot-reloads the modules on a pipeline
+ *  rewrite; a deployed build serves the artifact it compiled). Tribal laws come first, in `LAW_SPECS`' own order, exactly as before Task 7; discovered
  *  laws follow, in `discovered.json`'s own key order (BH-survivor id order, itself deterministic —
  *  see `discovery/measure.ts`'s docblock). */
 export function registry(): readonly Law[] {
-  const measuredRaw = readFileSync(MEASURED_JSON_PATH, "utf-8");
-  const discoveredRaw = readFileSync(DISCOVERED_JSON_PATH, "utf-8");
   return [
-    ...registryFrom(LAW_SPECS, parseMeasuredJson(measuredRaw)),
-    ...discoveredLawsFrom(parseDiscoveredJson(discoveredRaw)),
+    ...registryFrom(LAW_SPECS, measuredJsonFromData(measuredJsonData)),
+    ...discoveredLawsFrom(discoveredJsonFromData(discoveredJsonData)),
   ];
 }
 
@@ -609,11 +624,9 @@ export function chipEligibleLaws(laws: readonly Law[]): readonly Law[] {
 }
 
 /** The discovery pipeline's own top-level accounting (`discovery/measure.ts`'s `runDiscoveryPipeline`
- *  is what computes it), read fresh off `discovered.json` — `/player-laws`'s discovered section uses
- *  this for its one methodology sentence (tested/untestable/bhSurvivors/replicated), never a number
- *  typed into that page's own copy. The same "read through registry.ts, never parse the file a second
- *  place" discipline `registry()` itself keeps. */
+ *  is what computes it), from the same bundled artifact `registry()` serves — a consumer reads it
+ *  here, never by parsing the file a second place. (Its one page consumer, /player-laws, was
+ *  retired 2026-09-02; internal reporting keeps it alive.) */
 export function discoveredPipelineCounts(): PipelineCounts {
-  const raw = readFileSync(DISCOVERED_JSON_PATH, "utf-8");
-  return parseDiscoveredJson(raw).counts;
+  return discoveredJsonFromData(discoveredJsonData).counts;
 }
