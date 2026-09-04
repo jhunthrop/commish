@@ -8,37 +8,24 @@
 import type { DraftPoolEntry } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
-import { assignSlot, availablePool, queuedEntriesFor, rosterFor, type DraftState } from "@/draft-engine";
+import { assignSlot, availablePool, needMultiplier, queuedEntriesFor, rankWeight, rosterFor, type DraftState } from "@/draft-engine";
 import type { BotArchetype } from "./archetypes";
 import { MOCK_CONFIG } from "./config";
 import type { Rng } from "./rng";
 
-/** `exp(-index / temperature)`: rank 0 weighs 1, each step down the board decays smoothly. */
-function rankWeight(index: number): number {
-  return Math.exp(-index / MOCK_CONFIG.strategy.temperature);
-}
-
 /**
- * Open DEDICATED starting slots for a position — the slot type that shares the position's own
- * name (QB/RB/WR/TE/K/DEF), FLEX and bench excluded on purpose: a bot whose RB starters are
- * rostered still CAN flex a third RB, it just stops wanting one.
+ * The need term, parameterized by this bot's own brain: each open dedicated starting slot
+ * warms the position by `needPerOpenStartingSlot` scaled by the archetype's `needWeight`; a
+ * position with no open starter left cools to `startersFilledDamp` — under 1, so surplus at a
+ * position reads as disinterest, not neutrality. The rank-and-need SHAPE itself
+ * (`rankWeight`/`needMultiplier`) is the engine's own (`@/draft-engine`'s `scoring.ts`, shared
+ * with the money rooms' autopick); only the dials here are `MOCK_CONFIG.strategy`'s.
  */
-function openStartingSlots(position: Position, roster: readonly RosterSlot[], slotConfig: readonly RosterSlotConfig[]): number {
-  const configured = slotConfig.filter((s) => s.slot === position).reduce((sum, s) => sum + s.count, 0);
-  const filled = roster.filter((s) => s.slot === position).length;
-  return configured - filled;
-}
-
-/**
- * The need term: derived from the roster the caller passed in, never stored. Each open starting
- * slot warms the position by `needPerOpenStartingSlot`, scaled by the archetype's `needWeight`;
- * a position with no open starter left cools to `startersFilledDamp` — under 1, so surplus at a
- * position reads as disinterest, not neutrality.
- */
-function needMultiplier(position: Position, roster: readonly RosterSlot[], slotConfig: readonly RosterSlotConfig[], archetype: BotArchetype): number {
-  const open = openStartingSlots(position, roster, slotConfig);
-  if (open === 0) return MOCK_CONFIG.strategy.startersFilledDamp;
-  return 1 + archetype.needWeight * MOCK_CONFIG.strategy.needPerOpenStartingSlot * open;
+function botNeedMultiplier(position: Position, roster: readonly RosterSlot[], slotConfig: readonly RosterSlotConfig[], archetype: BotArchetype): number {
+  return needMultiplier(position, roster, slotConfig, {
+    openSlotBoost: archetype.needWeight * MOCK_CONFIG.strategy.needPerOpenStartingSlot,
+    filledDamp: MOCK_CONFIG.strategy.startersFilledDamp,
+  });
 }
 
 /**
@@ -118,9 +105,9 @@ export function chooseBotPick(state: DraftState, teamId: string, archetype: BotA
   const recentCounts = recentPositionCounts(state);
   const weights = candidates.map(
     (entry, index) =>
-      rankWeight(index) *
+      rankWeight(index, MOCK_CONFIG.strategy.temperature) *
       (archetype.posBias[entry.position] ?? 1) *
-      needMultiplier(entry.position, roster, slotConfig, archetype) *
+      botNeedMultiplier(entry.position, roster, slotConfig, archetype) *
       runMultiplier(entry.position, recentCounts, archetype),
   );
   return candidates[weightedIndex(weights, rng)]!.playerId;
