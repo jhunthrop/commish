@@ -1,6 +1,6 @@
 import { and, eq, lte } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { mockRooms } from "@/db/schema";
+import { drafts, mockRooms } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import { currentDeadline, type DraftState } from "@/draft-engine";
@@ -157,6 +157,14 @@ export function createDraftAdvancer({
       const maxActions = Math.min(maxActionsPerAdvance, opts?.maxActions ?? maxActionsPerAdvance);
       let applied = 0;
       try {
+        // Terminal statuses first (fix round MEDIUM 2): a DISSOLVED draft still carries an
+        // action log — replaying it looks in_progress — but nothing may ever advance it again,
+        // so it classifies with not_found (a loop stops, a read just renders what it has). One
+        // primary-key read; the row's absence is the same answer the state load would give.
+        const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
+        if (row === undefined || row.status === "dissolved") {
+          return { draftId, applied, exhausted: false, phase: null, outcome: "not_found" };
+        }
         let state = await store.getDraftState(draftId);
         if (state === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found" };
 
@@ -212,6 +220,17 @@ export function createDraftAdvancer({
       }
     },
   };
+}
+
+/**
+ * Which draft a league's SSE connection should tick, or null when there is nothing to ever tick
+ * (no draft, or a terminal status — `complete` AND `dissolved`, fix round MEDIUM 2: a reopened
+ * dissolved house league must not run a fruitless advance loop for every reconnect forever).
+ */
+export async function draftLoopTarget(db: Db, leagueId: string): Promise<string | null> {
+  const [row] = await db.select({ id: drafts.id, status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
+  if (row === undefined || row.status === "complete" || row.status === "dissolved") return null;
+  return row.id;
 }
 
 export interface AdvanceLoopDeps {

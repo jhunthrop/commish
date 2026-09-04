@@ -5,7 +5,7 @@ import { draftActions, drafts, players } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { DraftAction } from "@/domain/draft";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
-import { createDraftAdvancer, runDraftAdvanceLoop, type DraftAdvancer } from "./advance";
+import { createDraftAdvancer, draftLoopTarget, runDraftAdvanceLoop, type DraftAdvancer } from "./advance";
 import { createDraftStore, type DraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -332,6 +332,34 @@ describe("transient errors vs a missing draft (fix round HIGH 1: the tri-state o
     const outcome = await testAdvancer(testStore()).advance("draft_never_was", now);
     expect(outcome.outcome).toBe("not_found");
     expect(outcome.phase).toBeNull();
+  });
+});
+
+describe("dissolved drafts are terminal (fix round MEDIUM 2)", () => {
+  it("advance treats a dissolved draft as not_found and applies nothing, even with an in_progress log behind it", async () => {
+    const fixture = await seedAbandonedMock("dissolved");
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    await db.update(drafts).set({ status: "dissolved" }).where(eq(drafts.id, fixture.draftId));
+
+    now = atMs(10 * 60_000);
+    const outcome = await testAdvancer(store).advance(fixture.draftId, now);
+    expect(outcome.outcome).toBe("not_found");
+    expect(outcome.applied).toBe(0);
+    expect(await actionLog(fixture.draftId)).toHaveLength(1); // the START_DRAFT only — no expiry ever landed
+  });
+
+  it("draftLoopTarget gates the SSE loop: live drafts watched, complete and dissolved never", async () => {
+    const live = await seedAbandonedMock("looklive");
+    expect(await draftLoopTarget(db, live.leagueId)).toBe(live.draftId);
+
+    await db.update(drafts).set({ status: "dissolved" }).where(eq(drafts.id, live.draftId));
+    expect(await draftLoopTarget(db, live.leagueId)).toBeNull();
+
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.id, live.draftId));
+    expect(await draftLoopTarget(db, live.leagueId)).toBeNull();
+
+    expect(await draftLoopTarget(db, "league_without_draft")).toBeNull();
   });
 });
 

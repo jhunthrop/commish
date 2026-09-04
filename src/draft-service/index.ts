@@ -1,11 +1,9 @@
-import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { drafts } from "@/db/schema";
 import { isLLMEnabled, getLlmClient } from "@/lib/llm/client";
 import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "./store";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
-import { createDraftAdvancer, runDraftAdvanceLoop, type DraftAdvancer } from "./advance";
+import { createDraftAdvancer, draftLoopTarget, runDraftAdvanceLoop, type DraftAdvancer } from "./advance";
 import { createNudgeScheduler, type NudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
 import { createDraftStore, type DraftStore } from "./store";
@@ -163,12 +161,11 @@ export async function advanceDraftNow(draftId: string): Promise<void> {
  */
 export async function startDraftAdvanceLoopForLeague(leagueId: string, signal: AbortSignal): Promise<void> {
   try {
-    const [row] = await getDb()
-      .select({ id: drafts.id, status: drafts.status })
-      .from(drafts)
-      .where(eq(drafts.leagueId, leagueId));
-    if (row === undefined || row.status === "complete") return;
-    runDraftAdvanceLoop(row.id, signal, { advance: getDraftAdvancer().advance, clock: systemClock });
+    // `draftLoopTarget` owns the terminal-status gate (complete AND dissolved — fix round
+    // MEDIUM 2), so this wrapper stays pure wiring.
+    const draftId = await draftLoopTarget(getDb(), leagueId);
+    if (draftId === null) return;
+    runDraftAdvanceLoop(draftId, signal, { advance: getDraftAdvancer().advance, clock: systemClock });
   } catch (error: unknown) {
     console.error("[draft] could not start the stream's advance loop", { leagueId }, error);
   }
