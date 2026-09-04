@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { DraftStateView } from "@/draft-engine";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 
@@ -54,19 +54,28 @@ export interface DraftFinale {
  * cycle and one behind the "Preparing your debrief" line, then a manual button. A real league
  * goes straight to the completion panel. Pick machinery, the engine and the SSE plumbing are
  * untouched: this hook reads `phase` and calls the existing `refresh`, nothing else.
+ *
+ * Finale state is component-local and assumes `DraftRoom` is never remounted mid-cycle —
+ * true of today's mount lifecycle, which keys no remount of the room.
  */
 export function useDraftFinale({ phase, isMock, hasResults, refresh }: DraftFinaleArgs): DraftFinale {
   const [stage, setStage] = useState<FinaleStage>("idle");
   const [attempt, setAttempt] = useState(0);
-  const previousPhaseRef = useRef<DraftStateView["phase"] | null>(null);
 
-  // The detector. A ref, not state: the previous phase is a fact about the render that
-  // already happened, and writing it must never itself cause one.
-  useEffect(() => {
-    const previous = previousPhaseRef.current;
-    previousPhaseRef.current = phase;
-    if (previous === "in_progress" && phase === "complete") setStage("moment");
-  }, [phase]);
+  // THE DETECTOR — run during render, not in an effect (React's sanctioned
+  // adjust-state-during-render pattern; previous phase is STATE, not a ref, so StrictMode's
+  // double render stays idempotent). It must be synchronous with the render that carries the
+  // flip: one combined refetch can deliver `phase: "complete"` AND `mock.results` in a single
+  // setState (the onOpen resync after a dropped connection), and an effect-based detector
+  // would let that render commit with stage still "idle" — the parent's debrief guard reads
+  // "idle", the debrief flashes for a frame, THEN the beat plays. Detected here, React
+  // discards the in-progress render and re-renders before committing, so the first painted
+  // frame of the combined update already wears the beat.
+  const [previousPhase, setPreviousPhase] = useState(phase);
+  if (previousPhase !== phase) {
+    setPreviousPhase(phase);
+    if (previousPhase === "in_progress" && phase === "complete") setStage("moment");
+  }
 
   // The beat. One timer, cleaned up on unmount; where it hands off is decided by what kind
   // of room this is, not by anything that could change mid-beat.

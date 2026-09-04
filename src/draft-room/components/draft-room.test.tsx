@@ -338,6 +338,32 @@ describe("DraftRoom — the finale", () => {
     expect(screen.queryByRole("list", { name: /available players/i })).not.toBeInTheDocument();
   });
 
+  // Fix round 1, HIGH 1: one combined resync (the stream's onOpen refetch after a dropped
+  // connection) can deliver the phase flip and `mock.results` in a single state update. The
+  // detector runs during render, so the first paint of that update already wears the beat —
+  // never a debrief flash before the celebration (the hook's own probe test pins the
+  // commit-by-commit mechanics; this pins the room's composition of it).
+  it("wears the beat, not the debrief, when one resync carries the flip and the results together", async () => {
+    const fixture = fixtureDeps();
+    fixture.mock = MOCK_ROOM;
+    await mountLive(fixture);
+
+    fixture.view = COMPLETE_VIEW;
+    fixture.mock = { ...MOCK_ROOM, results: MOCK_RESULTS_INFO };
+    vi.useFakeTimers();
+    await act(async () => {
+      fixture.sources[0]!.emit("open");
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId("finale-banner")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "The debrief" })).not.toBeInTheDocument();
+
+    // After the beat the debrief takes the room with no further fetch needed.
+    await advance(momentMs);
+    await advance(0);
+    expect(screen.getByRole("heading", { name: "The debrief" })).toBeInTheDocument();
+  });
+
   it("retries when the refetch races settlement, says so quietly, then offers the manual door — which opens the debrief", async () => {
     const fixture = fixtureDeps();
     fixture.mock = MOCK_ROOM;

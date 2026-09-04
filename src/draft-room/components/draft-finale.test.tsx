@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { DraftStateView } from "@/draft-engine";
 import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
@@ -62,6 +62,8 @@ describe("DraftFinaleOverlay", () => {
     stubMatchMedia(false);
     render(overlay("moment"));
     expect(screen.getByTestId("finale-banner")).toHaveTextContent("The draft is in the books.");
+    // Announced, not just painted — the same polite register its celebration sibling uses.
+    expect(screen.getByTestId("finale-banner")).toHaveAttribute("role", "status");
     expect(screen.getByTestId("finale-banner").className).toContain("animate-strip-grow");
     const celebration = screen.getByTestId("finale-celebration");
     expect(celebration).toHaveTextContent("Every pick is in.");
@@ -95,7 +97,8 @@ describe("DraftFinaleOverlay", () => {
     stubMatchMedia(false);
     const onDismiss = vi.fn();
     await renderSurface(overlay("panel", { onDismiss }), async ({ container }) => {
-      expect(screen.getByTestId("finale-panel")).toHaveTextContent("The draft is in the books.");
+      // The shared Modal primitive, not a hand-rolled scrim: a real dialog, named by the sentence.
+      expect(screen.getByRole("dialog", { name: "The draft is in the books." })).toBeInTheDocument();
       // Two picks made, one RB spot still open: exactly two rows, never a dashed empty one.
       const rows = screen.getAllByTestId("finale-roster-row");
       expect(rows).toHaveLength(2);
@@ -106,6 +109,17 @@ describe("DraftFinaleOverlay", () => {
       expect(await axe(container)).toHaveNoViolations();
     });
     expect(onDismiss).toHaveBeenCalled();
+  });
+
+  it("takes focus into the panel on open and dismisses on Escape, exactly like Stay on the board", () => {
+    stubMatchMedia(false);
+    const onDismiss = vi.fn();
+    render(overlay("panel", { onDismiss }));
+    const dialog = screen.getByRole("dialog", { name: "The draft is in the books." });
+    // The Modal contract: focus lands inside the panel the moment it opens.
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it("gives a commissioner the panel without inventing a roster block", () => {

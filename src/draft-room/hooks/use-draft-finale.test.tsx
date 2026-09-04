@@ -1,4 +1,5 @@
-import { act, renderHook } from "@testing-library/react";
+import { useEffect } from "react";
+import { act, render, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { useDraftFinale, type DraftFinaleArgs } from "./use-draft-finale";
@@ -42,6 +43,27 @@ describe("useDraftFinale", () => {
     expect(result.current.stage).toBe("panel");
     rerender({ ...initial, phase: "complete" });
     expect(result.current.stage).toBe("panel");
+  });
+
+  // Fix round 1, HIGH 1: one combined refetch can deliver the phase flip AND `mock.results`
+  // in a single state update (the onOpen resync). The detector runs during render, so no
+  // COMMITTED frame may ever pair results with an idle stage — that frame is the parent
+  // mounting the debrief for a flash before the beat. The probe logs each committed frame
+  // (effects run per commit, never for a render React discarded).
+  it("detects the flip during render — a combined update never commits a frame with results and an idle stage", () => {
+    const commits: string[] = [];
+    function Probe(props: DraftFinaleArgs) {
+      const { stage } = useDraftFinale(props);
+      useEffect(() => {
+        commits.push(`${stage}|${props.hasResults ? "results" : "none"}`);
+      });
+      return null;
+    }
+    const initial = args({ isMock: true });
+    const { rerender } = render(<Probe {...initial} />);
+    rerender(<Probe {...initial} phase="complete" hasResults={true} />);
+    expect(commits).not.toContain("idle|results");
+    expect(commits[commits.length - 1]).toBe("moment|results");
   });
 
   it("never fires for a draft that was already complete at load", async () => {
