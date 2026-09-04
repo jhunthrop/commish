@@ -10,6 +10,7 @@ import { DrawerRow } from "./drawer-row";
 import type { RoomActs } from "./room-acts";
 
 export interface DrawerSheetTabProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft" | "onPeek"> {
+  readonly leagueId: string;
   readonly sheet: CheatSheet;
   readonly playersById: ReadonlyMap<string, Player>;
   /** playerId → 1-based rank on OUR board, for the "you N · board M" comparison. */
@@ -26,7 +27,7 @@ export interface DrawerSheetTabProps extends Pick<RoomActs, "canDraft" | "submit
  * where the manager and the board disagree, and the sheet's one bridge to the server is the
  * queue seed: the top five undrafted names become the autopick queue in one tap.
  */
-export function DrawerSheetTab({ sheet, playersById, boardRanks, available, onMove, onSeedQueue, onReset, canDraft, submitting, onDraft, onPeek }: DrawerSheetTabProps) {
+export function DrawerSheetTab({ leagueId, sheet, playersById, boardRanks, available, onMove, onSeedQueue, onReset, canDraft, submitting, onDraft, onPeek }: DrawerSheetTabProps) {
   const seed = useMemo(() => sheetQueueSeed(sheet, available, QUILT_CONFIG.sheetQueueSeedCount), [sheet, available]);
   let firstAvailableSeen = false;
 
@@ -56,6 +57,7 @@ export function DrawerSheetTab({ sheet, playersById, boardRanks, available, onMo
           return (
             <DrawerRow
               key={playerId}
+              leagueId={leagueId}
               player={player}
               rank={you}
               rankAccent={highlight}

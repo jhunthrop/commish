@@ -15,6 +15,7 @@ const ALL = "ALL";
 const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
 export interface DrawerPoolTabProps extends RoomActs {
+  readonly leagueId: string;
   /** Server-ranked, best first — never re-ranked here. */
   readonly players: readonly Player[];
   readonly available: ReadonlySet<string>;
@@ -31,9 +32,10 @@ export interface DrawerPoolTabProps extends RoomActs {
 /**
  * THE POOL TAB — the drawer's default: search, the six position stickers, and the ranked list of
  * who is left. Each row carries the market gap (the one figure with a real comparison behind it)
- * and a GENERIC edge count; the name opens the peek for everything deeper.
+ * and a GENERIC edge count; the name opens the season peek (`PlayerName`), and the row's own
+ * "Card" button opens this room's own draft-context card for everything deeper.
  */
-export function DrawerPoolTab({ players, available, byeWeeks, reasons, focusSearch, needs, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle, onPeek }: DrawerPoolTabProps) {
+export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons, focusSearch, needs, canDraft, submitting, queuedPlayerIds, onDraft, onQueueToggle, onPeek }: DrawerPoolTabProps) {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState<string>(ALL);
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -127,6 +129,7 @@ export function DrawerPoolTab({ players, available, byeWeeks, reasons, focusSear
             return (
               <DrawerRow
                 key={player.id}
+                leagueId={leagueId}
                 player={player}
                 rank={rank}
                 positionRank={ranks.get(player.id)}
