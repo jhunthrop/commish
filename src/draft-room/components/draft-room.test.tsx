@@ -339,10 +339,12 @@ describe("DraftRoom — the finale", () => {
   });
 
   // Fix round 1, HIGH 1: one combined resync (the stream's onOpen refetch after a dropped
-  // connection) can deliver the phase flip and `mock.results` in a single state update. The
-  // detector runs during render, so the first paint of that update already wears the beat —
-  // never a debrief flash before the celebration (the hook's own probe test pins the
-  // commit-by-commit mechanics; this pins the room's composition of it).
+  // connection) can deliver the phase flip and `mock.results` in a single state update. This
+  // test guards the WIRING of that path — combined update in, beat showing and debrief absent
+  // once settled, then the in-place swap after the beat. It cannot observe the single-frame
+  // debrief flash the bug produced (act() flushes effects before any assertion runs in jsdom),
+  // so the frame-level no-flash guarantee is pinned ONLY by the hook's commit-logging probe
+  // test in use-draft-finale.test.tsx.
   it("wears the beat, not the debrief, when one resync carries the flip and the results together", async () => {
     const fixture = fixtureDeps();
     fixture.mock = MOCK_ROOM;
