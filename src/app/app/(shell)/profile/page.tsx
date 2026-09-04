@@ -134,7 +134,15 @@ export default async function ProfilePage() {
               </ButtonLink>
             </div>
           </Panel>
-          <NotificationSummary />
+          {/* Link audit, 2026-09-04: the waiting room's "See what you will hear about" checklist
+              item targets `/app/profile#notifications-heading`. The anchor's original home was
+              `NotificationSummary`'s own hand-rolled section heading, and the Task 18 retone onto
+              `Panel` dropped the id without moving it — so the link opened this page at the top
+              and pointed at nothing. The id lives on a wrapper here, the `#invite-managers`
+              idiom (`RoomShell`), so the panel keeps owning its own markup. */}
+          <div id="notifications-heading">
+            <NotificationSummary />
+          </div>
         </section>
 
         <section className="flex flex-col gap-4" aria-label="What you told the world">
