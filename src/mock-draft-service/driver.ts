@@ -132,6 +132,22 @@ export type BotDriveOutcome = { readonly picked: true; readonly picks: number } 
 
 export type MockBotDriveFn = (state: DraftState, now: string) => Promise<BotDriveOutcome | null>;
 
+/**
+ * The one due computation every bot-driving caller reads (draft-driver design, 2026-09-03):
+ * which bot is on the clock, WHEN its pick falls due, and WHAT it picks. `dueAtMs` is the exact
+ * (fractional-millisecond) instant `turnStartedAt + botThinkDelaySeconds(...)` — kept as a
+ * number, not an ISO string, so the paced lane's strict `now < dueAtMs` boundary stays the
+ * arithmetic the delay-boundary test pins rather than a rounded copy of it. A sim room
+ * (`simToNextPick`) prices every bot turn at the turn's own start: zero delay is the directive.
+ * The catch-up driver (`@/draft-service/advance`) stamps the applied action at this instant,
+ * which is what chains an abandoned room's deadlines from due instant to due instant.
+ */
+export interface DueBotPick {
+  readonly teamId: string;
+  readonly playerId: string;
+  readonly dueAtMs: number;
+}
+
 export interface MockBotDriverDeps {
   readonly db: Db;
   readonly store: DraftStore;
@@ -213,6 +229,13 @@ function pickStreamFor(botSeed: number, teamId: string, state: DraftState): Rng 
  */
 export interface MockBotDriver {
   readonly driveBotPick: MockBotDriveFn;
+  /**
+   * The shared due computation (see `DueBotPick`): null unless a BOT holds a running clock in a
+   * room whose sidecar still exists and whose roster can take something. Pure over the handed-in
+   * state, the stored seed and the cached meta — it draws from the same delay stream and the
+   * same pick stream the drive itself consumes, so pricing a turn never moves either cursor.
+   */
+  readonly dueBotPick: (state: DraftState) => Promise<DueBotPick | null>;
   /** Drops one draft's cached meta — the sweep's seam, called per swept room. */
   readonly invalidateDraft: (draftId: string) => void;
 }
@@ -254,6 +277,31 @@ export function createMockBotDriver({ db, store }: MockBotDriverDeps): MockBotDr
   }
 
   /**
+   * See `MockBotDriver.dueBotPick`. The delay draw and the pick draw ride their own separate
+   * seeded streams (`:delay:` vs the pick stream), so computing both here — even on a tick where
+   * the delay has not elapsed — consumes nothing and changes nothing: `pickStreamFor` rebuilds
+   * its cursor from the log on every call.
+   */
+  async function dueBotPick(state: DraftState): Promise<DueBotPick | null> {
+    const onClockTeamId = teamOnClock(state);
+    if (onClockTeamId === null) return null;
+    const meta = await metaFor(state);
+    if (meta === null) return null;
+    if (!meta.botTeamIds.has(onClockTeamId)) return null;
+    const clockSeconds = currentClockSeconds(state);
+    if (clockSeconds === null) return null; // no turn is running, so there is no delay to measure
+    // Non-null exactly when a clock is running: `currentTier` (which `currentClockSeconds` just
+    // answered through) is null whenever `turnStartedAt` is — one fact, checked once above.
+    const startedAtMs = Date.parse(state.turnStartedAt!);
+    const dueAtMs = meta.simToNextPick
+      ? startedAtMs
+      : startedAtMs + botThinkDelaySeconds(clockSeconds, rngFor(meta.botSeed, `${onClockTeamId}:delay:${state.pickNumber}`)) * 1000;
+    const playerId = chooseBotPick(state, onClockTeamId, meta.archetypes[onClockTeamId]!, pickStreamFor(meta.botSeed, onClockTeamId, state));
+    if (playerId === null) return null; // a roster that can take nothing (the T3 carry: not an error)
+    return { teamId: onClockTeamId, playerId, dueAtMs };
+  }
+
+  /**
    * The sim lane (the founder's sim-to-next-pick directive — see `MockDraftMeta.simToNextPick`):
    * every consecutive bot pick in ONE call, zero think-delay, until the human is back on the
    * clock or the draft is complete. Each pick is still the identical plain `MAKE_PICK` through
@@ -279,15 +327,17 @@ export function createMockBotDriver({ db, store }: MockBotDriverDeps): MockBotDr
         break;
       }
       if (!meta.botTeamIds.has(onClockTeamId)) break; // the human is back on the clock
-      if (currentClockSeconds(current) === null) break; // no turn is running — nothing to drive
-      const playerId = chooseBotPick(current, onClockTeamId, meta.archetypes[onClockTeamId]!, pickStreamFor(meta.botSeed, onClockTeamId, current));
-      if (playerId === null) break; // a roster that can take nothing (the T3 carry: not an error)
+      // The shared due computation (no-turn-running and nothing-to-take both answer null here,
+      // the same breaks this loop always took). A sim room's dueAtMs is the turn's own start,
+      // which by construction has already passed — no due check needed on this lane.
+      const due = await dueBotPick(current);
+      if (due === null) break;
       const result = await store.applyAction(current.config.draftId, {
         v: DRAFT_ACTION_VERSION,
         type: "MAKE_PICK",
         timestamp: now,
-        teamId: onClockTeamId,
-        playerId,
+        teamId: due.teamId,
+        playerId: due.playerId,
       });
       // A refusal mid-stretch (a sequence conflict with the ticker's own concurrent drive is
       // the live case) ends the loop; the picks that DID land are still this call's honest
@@ -315,29 +365,25 @@ export function createMockBotDriver({ db, store }: MockBotDriverDeps): MockBotDr
 
     if (meta.simToNextPick) return simToHumanTurn(state, now, meta);
 
-    const clockSeconds = currentClockSeconds(state);
-    if (clockSeconds === null) return null; // no turn is running, so there is no delay to measure
-    // Non-null exactly when a clock is running: `currentTier` (which `currentClockSeconds` just
-    // answered through) is null whenever `turnStartedAt` is — one fact, checked once above.
-    const startedAt = state.turnStartedAt!;
-    const delaySeconds = botThinkDelaySeconds(clockSeconds, rngFor(meta.botSeed, `${onClockTeamId}:delay:${state.pickNumber}`));
-    if (Date.parse(now) < Date.parse(startedAt) + delaySeconds * 1000) return null;
-
-    const playerId = chooseBotPick(state, onClockTeamId, meta.archetypes[onClockTeamId]!, pickStreamFor(meta.botSeed, onClockTeamId, state));
-    if (playerId === null) return null;
+    // The paced lane, on the shared due computation: not yet due means nothing to drive this
+    // tick, and the pick applied at the due boundary is the exact one `dueBotPick` priced.
+    const due = await dueBotPick(state);
+    if (due === null) return null;
+    if (Date.parse(now) < due.dueAtMs) return null;
 
     const result = await store.applyAction(state.config.draftId, {
       v: DRAFT_ACTION_VERSION,
       type: "MAKE_PICK",
       timestamp: now,
-      teamId: onClockTeamId,
-      playerId,
+      teamId: due.teamId,
+      playerId: due.playerId,
     });
     return result.ok ? { picked: true, picks: 1 } : { picked: false, reason: result.reason };
   }
 
   return {
     driveBotPick,
+    dueBotPick,
     invalidateDraft(draftId: string): void {
       metaCache.delete(draftId);
     },

@@ -646,3 +646,90 @@ describe("the whole practice round, through the real writers", () => {
     expect((await liveDraftsQuery(db)).map((row) => row.id)).not.toContain(room.draftId);
   });
 });
+
+describe("dueBotPick (the drivers' one due computation — paced ticker, sim lane and catch-up all read it)", () => {
+  it("prices a paced bot turn at turnStartedAt + the seeded think-delay, naming the exact pick the live drive lands", async () => {
+    const fixture = await seedAllBotMock("duecalc");
+    const store = testStore();
+    const driver = createMockBotDriver({ db, store });
+    await store.startDraft(fixture.draftId);
+    const state = (await store.getDraftState(fixture.draftId))!;
+    const onClock = state.draftOrder[0]!;
+
+    const due = await driver.dueBotPick(state);
+    expect(due).not.toBeNull();
+    expect(due!.teamId).toBe(onClock);
+    // The identical stream the live driver derives: the room's stored seed, this pick's own key.
+    const delaySeconds = botThinkDelaySeconds(30, rngFor(FIXTURE_BOT_SEED, `${onClock}:delay:1`));
+    expect(due!.dueAtMs).toBe(Date.parse(state.turnStartedAt!) + delaySeconds * 1000);
+
+    // One computation, two callers: the live drive at the due instant lands THIS pick.
+    now = new Date(Math.ceil(due!.dueAtMs)).toISOString();
+    const driven = await driver.driveBotPick(state, now);
+    expect(driven).toEqual({ picked: true, picks: 1 });
+    const after = (await store.getDraftState(fixture.draftId))!;
+    expect(after.picks[0]!.playerId).toBe(due!.playerId);
+  });
+
+  it("prices a sim room's bot turn at the turn's own start (zero delay) and answers null while the human holds the clock", async () => {
+    const fixture = await seedAllBotMock("duesim", { botTeams: 1 });
+    const store = testStore();
+    const driver = createMockBotDriver({ db, store });
+    await store.startDraft(fixture.draftId);
+    const humanTeamId = fixture.teamIds[0]!;
+
+    let state = (await store.getDraftState(fixture.draftId))!;
+    let botTurnsPriced = 0;
+    let humanTurnsRefused = 0;
+    for (let i = 0; i < 12 && state.phase !== "complete"; i += 1) {
+      const onClock = teamOnClock(state)!;
+      const due = await driver.dueBotPick(state);
+      if (onClock === humanTeamId) {
+        expect(due).toBeNull();
+        humanTurnsRefused += 1;
+        const taken = new Set(state.picks.map((pick) => pick.playerId));
+        const filled = new Set(state.picks.filter((pick) => pick.teamId === humanTeamId).map((pick) => pick.playerId.slice(0, 2)));
+        const playerId = ["qb1", "qb2", "rb1", "rb2", "wr1", "wr2"].find((id) => !taken.has(id) && !filled.has(id.slice(0, 2)))!;
+        const picked = await store.applyAction(fixture.draftId, {
+          v: DRAFT_ACTION_VERSION,
+          type: "MAKE_PICK",
+          timestamp: now,
+          teamId: humanTeamId,
+          playerId,
+        });
+        if (!picked.ok) throw new Error(picked.reason);
+        state = picked.state;
+        continue;
+      }
+      // A sim room's bot pick is due the instant its turn starts — no think-delay at all.
+      expect(due).not.toBeNull();
+      expect(due!.dueAtMs).toBe(Date.parse(state.turnStartedAt!));
+      botTurnsPriced += 1;
+      const applied = await store.applyAction(fixture.draftId, {
+        v: DRAFT_ACTION_VERSION,
+        type: "MAKE_PICK",
+        timestamp: now,
+        teamId: due!.teamId,
+        playerId: due!.playerId,
+      });
+      if (!applied.ok) throw new Error(applied.reason);
+      state = applied.state;
+    }
+    expect(state.phase).toBe("complete");
+    expect(botTurnsPriced).toBeGreaterThan(0);
+    expect(humanTurnsRefused).toBeGreaterThan(0);
+  });
+
+  it("answers null with no turn running and null once the room's sidecar is gone", async () => {
+    const fixture = await seedAllBotMock("duenone");
+    const store = testStore();
+    const driver = createMockBotDriver({ db, store });
+    const scheduled = (await store.getDraftState(fixture.draftId))!;
+    expect(await driver.dueBotPick(scheduled)).toBeNull();
+
+    await store.startDraft(fixture.draftId);
+    const started = (await store.getDraftState(fixture.draftId))!;
+    await db.delete(mockRooms).where(eq(mockRooms.leagueId, fixture.leagueId));
+    expect(await driver.dueBotPick(started)).toBeNull();
+  });
+});
