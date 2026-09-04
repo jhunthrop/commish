@@ -1,0 +1,16 @@
+# Build inputs are src/, drizzle/, public/, and the config files. Everything below is local
+# tooling output or session state that the Vercel CLI would otherwise upload with `vercel --prod`.
+.next
+.next-e2e
+coverage
+test-results
+playwright-report
+.superpowers
+.claude
+.lab
+e2e/.auth
+*.tsbuildinfo
+
+# Never ship local secrets in a CLI upload; the project env is the only source of runtime config.
+.env*
+!.env.example
