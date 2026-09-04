@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { renderSurface } from "@/components/ui/test-utils";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import type { MockResultsInfo } from "../contract";
 import { DraftRoomDepsProvider, type DraftRoomDeps } from "../hooks/deps";
 import { SHEET_SEED_STORAGE_KEY } from "../quilt/state/sheet-seed";
@@ -119,6 +121,26 @@ describe("MockResults — the debrief", () => {
     expect(within(picks).getByText("Best RB available")).toBeInTheDocument();
     expect(within(picks).getByText("Best available")).toBeInTheDocument();
     expect(screen.queryByText(/grade/i)).not.toBeInTheDocument();
+  });
+
+  // Task 2 (player-name adoption sweep): "Your picks" rows go through `PlayerName` — a real
+  // button with the player's own name as its accessible name, wired to the product's one
+  // pressable-name primitive (never a second local peek).
+  it("makes every pick-log name a pressable button that opens the season peek", async () => {
+    const deps: DraftRoomDeps = { fetchJson: () => Promise.reject(new Error("no")), openEventSource: () => ({ addEventListener: () => {}, close: () => {} }) };
+    render(
+      <DraftRoomDepsProvider deps={deps}>
+        <LeagueRoomDepsProvider deps={{ fetchJson: () => new Promise(() => {}), openEventSource: () => ({ addEventListener: () => {}, close: () => {} }) }}>
+          <PlayerPeekHost />
+          <MockResults view={COMPLETE_VIEW} teams={TEAMS} board={null} players={PLAYERS} byeWeeks={BYES} myTeamId="t1" results={MOCK_RESULTS_INFO} />
+        </LeagueRoomDepsProvider>
+      </DraftRoomDepsProvider>,
+    );
+    const name = screen.getByRole("button", { name: "Marcus Reed" });
+    await act(async () => {
+      fireEvent.click(name);
+    });
+    expect(screen.getByRole("dialog", { name: "Marcus Reed" })).toBeInTheDocument();
   });
 
   it("runs it back at the SAME table — this room's own re-derived settings and the seat just played", async () => {

@@ -8,6 +8,7 @@ import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Button, ButtonLink, EYEBROW, PlayerFace, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import { PlayerName } from "@/league-room/components/player-peek";
 import type { MockResultsCopy, MockResultsInfo } from "../contract";
 import { useDraftRoomDeps } from "../hooks/deps";
 import { playersById as buildPlayersById } from "../lib/lookups";
@@ -126,7 +127,17 @@ function SummaryCards({
 }
 
 /** The verdict lane: every pick — slot, sticker, name, the honest fact clause, the chip. */
-function VerdictLane({ judged, teamCount, copy }: { readonly judged: readonly JudgedPick[]; readonly teamCount: number; readonly copy: MockResultsCopy }) {
+function VerdictLane({
+  leagueId,
+  judged,
+  teamCount,
+  copy,
+}: {
+  readonly leagueId: string;
+  readonly judged: readonly JudgedPick[];
+  readonly teamCount: number;
+  readonly copy: MockResultsCopy;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <h2 className={`${EYEBROW} text-text-muted`}>{copy.picksHeading}</h2>
@@ -138,7 +149,12 @@ function VerdictLane({ judged, teamCount, copy }: { readonly judged: readonly Ju
             <li key={review.pickNumber} className="flex items-center gap-3 border-t border-line py-2 first:border-t-0">
               <span className="w-10 shrink-0 font-mono text-xs tabular-nums text-text-muted">{formatPickSlot(review.pickNumber, teamCount)}</span>
               <PlayerFace player={player} size="sm" />
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">{player.name}</span>
+              <PlayerName
+                leagueId={leagueId}
+                playerId={player.id}
+                name={player.name}
+                className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary"
+              />
               <PositionBadge position={player.position} rank={review.positionRank} size="sm" />
               <VerdictChip verdict={verdict} />
               <span
@@ -339,7 +355,7 @@ export function MockResults({ view, teams, board, players, byeWeeks, myTeamId, r
           <>
             <div className="order-1 flex min-w-0 flex-col gap-4">
               <SummaryCards view={view} positionOf={positionOf} myTeamId={myTeamId} reviews={reviews} copy={copy} />
-              <VerdictLane judged={judged} teamCount={view.draftOrder.length} copy={copy} />
+              <VerdictLane leagueId={view.leagueId} judged={judged} teamCount={view.draftOrder.length} copy={copy} />
             </div>
             <div className="order-2 flex min-w-0 flex-col gap-3">
               <TeamCardSection view={view} playersById={playersById} positionOf={positionOf} byeWeeks={byeWeeks} myTeamId={myTeamId} copy={copy} />
