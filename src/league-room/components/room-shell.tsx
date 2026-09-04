@@ -17,6 +17,7 @@ import {
 import { rankDropCandidates } from "../lib/claim-drop";
 import { lineupFixPlans, type LineupFixPlan } from "../lib/lineup-problems";
 import { stageFor } from "../lib/stage-priority";
+import { useRailVisible } from "../hooks/use-rail-visible";
 import { tradeSheetMath } from "../lib/trade-math";
 import { ClaimSheet } from "./claim-sheet";
 import { InvitePanel } from "./invite-panel";
@@ -88,6 +89,7 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
   );
   const [sheet, setSheet] = useState<SheetState>(null);
   const [searchFocusToken, setSearchFocusToken] = useState(0);
+  const railVisible = useRailVisible();
   const drawerRef = useRef(drawer);
   drawerRef.current = drawer;
 
@@ -116,6 +118,16 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
     const surface = surfaceFromPathname(pathname, home.leagueId);
     setDrawer((state) => drawerReduce(state, { kind: "routeSync", surface }));
   }, [pathname, home.leagueId]);
+
+  // The `#invite-managers` anchor moves between the rail and the waiting stage with the
+  // breakpoint (see `useRailVisible`'s docblock), so a load that arrives WITH the fragment can
+  // find the element mounted only after the media query resolves — after the browser's own
+  // anchor jump already came up empty. Walk the viewport to it once the right instance exists;
+  // instant, not smooth, because it is an anchor jump (`StartOrJoinDisclosure`'s idiom).
+  useEffect(() => {
+    if (window.location.hash !== "#invite-managers") return;
+    requestAnimationFrame(() => document.getElementById("invite-managers")?.scrollIntoView());
+  }, [railVisible]);
 
   const sheetOpen = sheet !== null;
   useEffect(() => {
@@ -249,6 +261,17 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
                   compositionCategory={home.compositionCategory}
                   helpLevel={data.helpLevel}
                 />
+                {/* Link audit, 2026-09-04: `WaitingRoom`'s "Invite someone" links target
+                    `#invite-managers`, which lived only in the rail — an aside that is `hidden`
+                    below `xl`, so below 1280px the click did nothing and a commissioner had no
+                    way to mint an invite at all. The ONE invite block mounts here instead when
+                    the rail is off screen — never in both places, so the id stays unique and the
+                    browser's own anchor jump always lands on a visible element. */}
+                {home.isCommissioner && !railVisible ? (
+                  <div id="invite-managers" className="mt-4">
+                    <InvitePanel leagueId={home.leagueId} leagueName={home.name} />
+                  </div>
+                ) : null}
               </div>
             ) : stage === "live" && data.week !== null && myMatchupDetail !== null && home.myTeamId !== null ? (
               <RoomStageLive
@@ -306,7 +329,10 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
               myTeamId={home.myTeamId}
               compositionCategory={home.compositionCategory}
             />
-            {home.isCommissioner ? (
+            {/* Gated on `railVisible`, not rendered-and-hidden: the `#invite-managers` anchor
+                must exist exactly once, on the visible instance — see the waiting stage's own
+                copy of this block and `useRailVisible`'s docblock. */}
+            {home.isCommissioner && railVisible ? (
               <div id="invite-managers">
                 <InvitePanel leagueId={home.leagueId} leagueName={home.name} />
               </div>

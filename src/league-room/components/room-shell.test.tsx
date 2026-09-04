@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
@@ -6,6 +6,7 @@ import type { TradesPageBody } from "@/trades/contract";
 import type { RoomData } from "../contract";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { HOME, LINEUP, ROOM_DATA, fixtureLeagueDeps } from "../test-fixtures";
+import { RAIL_QUERY } from "../hooks/use-rail-visible";
 import { RoomShell } from "./room-shell";
 
 let mockPathname = "/app/leagues/l1";
@@ -181,5 +182,63 @@ describe("RoomShell", () => {
     mockPathname = "/app/leagues/l1/standings";
     render(wrap(ROOM_DATA, "standings"));
     expect(screen.getByRole("button", { name: "Back to room" })).toBeTruthy();
+  });
+});
+
+/**
+ * Link audit, 2026-09-04 (the founder's "the invite link doesn't work from a created league
+ * page"): `WaitingRoom`'s "Invite someone" links target `#invite-managers`, and the block lived
+ * only in the rail — an aside that is `hidden` below `xl`, so below 1280px the click changed the
+ * hash and nothing else. The anchor now mounts exactly once, where it is visible: in the rail at
+ * `xl`, inline under the waiting stage below it.
+ */
+describe("RoomShell — the #invite-managers anchor follows the rail breakpoint", () => {
+  const WAITING: RoomData = {
+    ...ROOM_DATA,
+    home: {
+      ...HOME,
+      draftStatus: "scheduled",
+      draftSchedule: { ...HOME.draftSchedule!, status: "scheduled" },
+    },
+    lineup: null,
+    week: null,
+  };
+
+  /** `use-reduced-motion.test.tsx`'s stub idiom, answering the rail query specifically —
+   *  every other query (reduced motion included) reads as unmatched. */
+  function stubRailQuery(matches: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === RAIL_QUERY ? matches : false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("below xl, the anchor and invite panel live inline in the waiting stage, not in the hidden rail", async () => {
+    stubRailQuery(false);
+    render(wrap(WAITING));
+    const anchors = document.querySelectorAll("#invite-managers");
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0]!.closest("aside")).toBeNull();
+    expect(await screen.findByRole("button", { name: "Create invite link" })).toBeInTheDocument();
+  });
+
+  it("at xl, the anchor keeps its place in the rail, still exactly once", () => {
+    stubRailQuery(true);
+    render(wrap(WAITING));
+    const anchors = document.querySelectorAll("#invite-managers");
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0]!.closest("aside")).not.toBeNull();
+  });
+
+  it("renders no anchor at all for a non-commissioner, at either width", () => {
+    stubRailQuery(false);
+    render(wrap({ ...WAITING, home: { ...WAITING.home, isCommissioner: false } }));
+    expect(document.querySelector("#invite-managers")).toBeNull();
   });
 });
