@@ -21,7 +21,10 @@ autopick(team) =
 - Legality is the engine's own `assignSlot`, unchanged. The endgame forcing (bench full means
   only unfilled starters are legal) is therefore inherited, not reimplemented.
 - Everything is a pure function of `DraftState`. No clock, no RNG: the same action log always
-  reproduces the same autopick, which is non-negotiable in money rooms.
+  reproduces the same autopick, which is non-negotiable in money rooms. That determinism claim
+  is scoped to a single JavaScript engine build — `Math.exp` is specified as a good-faith
+  approximation, not bit-exact across engines — which is one more reason the scoring values
+  ride the action log (below) instead of being read live.
 
 ## rankWeight
 
@@ -75,6 +78,19 @@ The furthest need can pull a player up the board is
 `temperature × ln(maxBoost / minDamp)` ranks. At the shipped values the worst case
 (2 open RB slots vs a fully cooled position) is `3 × ln(1.8 / 0.6) ≈ 3.3` ranks — an autopick
 can never "reach" absurdly, by construction, with no reachDepth cap needed.
+
+## The snapshot (fix round, 2026-09-03): history replays under its own policy
+
+`bestAvailableFor` is a reducer-path read — `replayDraft` re-derives every TIMER_EXPIRE
+autopick on every cold load — so the four tunables are SNAPSHOTTED onto the `START_DRAFT`
+action (`StartDraftAction.autopick`, the `minBid`/`skipPolicy` discipline), copied into
+`DraftConfig.autopick` by `reduceStart`, and the selector reads ONLY that snapshot. A later
+retune of `AUTOPICK_CONFIG` changes future drafts, never what an already-persisted autopick
+WAS. An ABSENT snapshot (a log persisted before this upgrade) replays under the pre-upgrade
+policy — plain queue-then-board-order, need weight permanently zero — never today's tunables,
+so reconstructed rosters keep agreeing with the picks (and notices) the live draft actually
+produced. `DRAFT_ACTION_VERSION` stays at 1: an optional additive field whose absence means
+the old behavior never reinterprets a v1 row, the same reasoning that kept `skipPolicy` at v1.
 
 ## Tunables (all in `AUTOPICK_CONFIG`, src/draft-engine/config.ts)
 
