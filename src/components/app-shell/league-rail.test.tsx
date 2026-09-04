@@ -187,9 +187,13 @@ describe("LeagueRail", () => {
     render(<LeagueRail leagues={LEAGUES} />);
     expect(screen.getByRole("link", { name: /Bay Bandits/ })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /Thunder Squad/ })).not.toHaveAttribute("aria-current");
-    // D4's visual "you are here" survives the rebuild: the current tile's class differs.
-    expect(screen.getByRole("link", { name: /Bay Bandits/ }).className).toMatch(/ring-edge/);
-    expect(screen.getByRole("link", { name: /Thunder Squad/ }).className).not.toMatch(/ring-edge/);
+    // The visual "you are here" sits snug ON the crest tile (accent ring, crest's own radius),
+    // never the old offset halo on the link that read as a glitch (founder, 2026-09-03).
+    const currentChip = screen.getByRole("link", { name: /Bay Bandits/ }).querySelector("span");
+    const quietChip = screen.getByRole("link", { name: /Thunder Squad/ }).querySelector("span");
+    expect(currentChip?.className).toMatch(/ring-accent/);
+    expect(screen.getByRole("link", { name: /Bay Bandits/ }).className).not.toMatch(/ring-edge/);
+    expect(quietChip?.className).not.toMatch(/ring-accent/);
   });
 
   it("hides every state dot and every word span from the accessibility tree", async () => {

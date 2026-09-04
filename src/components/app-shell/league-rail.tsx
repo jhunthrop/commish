@@ -155,13 +155,18 @@ export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
                 href={`/app/leagues/${league.id}`}
                 aria-current={isCurrent ? "page" : undefined}
                 aria-label={accessibleNameFor(league, stateLine)}
-                // D4's "you are here" ring, unchanged from the pre-flyout rail (`ThemeSwitcher`'s
-                // checked-chip idiom): the current tile keeps its ring in both sizes.
-                className={`relative flex shrink-0 items-center gap-2.5 rounded-md lg:p-1 ${open ? "lg:hover:bg-surface-elevated" : ""} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                  isCurrent ? "ring-2 ring-edge ring-offset-2 ring-offset-surface" : ""
-                }`}
+                // D4's "you are here" mark, reworked with the founder's own read of it in prod
+                // (2026-09-03): the old offset `ring-edge` on the LINK floated a grey halo away
+                // from the tile with corners that matched the link, not the crest, and it read
+                // as a rendering glitch. The ring now sits ON the crest tile itself, snug and
+                // accent-tinted, radius matched to the crest's own `rounded-md` — the manager
+                // row's ring grammar, applied to the rail.
+                className={`relative flex shrink-0 items-center gap-2.5 rounded-md lg:p-1 ${open ? "lg:hover:bg-surface-elevated" : ""} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
               >
-                <span className="relative shrink-0" style={{ width: crestSize, height: crestSize }}>
+                <span
+                  className={`relative shrink-0 rounded-md ${isCurrent ? "ring-2 ring-accent" : ""}`}
+                  style={{ width: crestSize, height: crestSize }}
+                >
                   <Crest id={league.id} name={league.name} mark={league.monogram} size={crestSize} />
                   <RailDot state={league.state} reducedMotion={reducedMotion} />
                 </span>
