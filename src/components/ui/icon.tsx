@@ -19,8 +19,31 @@ import {
   Users,
   X,
   Zap,
-  type LucideIcon,
 } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
+import {
+  AuctionGlyph,
+  ByeWeekGlyph,
+  DraftPickGlyph,
+  LineupGlyph,
+  MatchupGlyph,
+  PayoutGlyph,
+  PlayoffsGlyph,
+  SnakeOrderGlyph,
+  TradeGlyph,
+  WaiverGlyph,
+} from "./glyphs";
+
+/**
+ * The shared shape every entry in `ICONS` satisfies — a component that renders an `<svg>` from
+ * the props `Icon` passes it (`role`, `aria-label` or `aria-hidden`, `width`, `height`,
+ * `className`). Lucide's own `LucideIcon` type is a `LucideProps`-typed component, and
+ * `LucideProps` is `SVGProps<SVGSVGElement>` plus a few extra optional fields — a strict superset
+ * — so every lucide icon already satisfies this narrower type structurally; `glyphs.tsx`'s ten
+ * components are typed directly against it. Widened from `LucideIcon` alone (Task 4, brand
+ * adoption pass) the day the map's first non-lucide entry joined it.
+ */
+export type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 /** `src/identity/avatars.ts` and other pure modules import `IconName` (type-only) from here. */
 export const ICONS = {
@@ -54,7 +77,20 @@ export const ICONS = {
   // means "another one of these", and a page-local `+` glyph in a `<span>` is exactly the
   // page-local visual mapping the founder rule forbids.
   plus: Plus,
-} as const satisfies Readonly<Record<string, LucideIcon>>;
+  // THE TEN FANTASY-NATIVE GLYPHS (Task 4, brand adoption pass) — `glyphs.tsx`. Our own
+  // vocabulary, drawn for this product rather than borrowed from a generic icon set, for the
+  // domain concepts a generic glyph was standing in for (or that had no icon at all).
+  "draft-pick": DraftPickGlyph,
+  "snake-order": SnakeOrderGlyph,
+  auction: AuctionGlyph,
+  waiver: WaiverGlyph,
+  trade: TradeGlyph,
+  "bye-week": ByeWeekGlyph,
+  lineup: LineupGlyph,
+  matchup: MatchupGlyph,
+  playoffs: PlayoffsGlyph,
+  payout: PayoutGlyph,
+} as const satisfies Readonly<Record<string, IconComponent>>;
 
 export type IconName = keyof typeof ICONS;
 

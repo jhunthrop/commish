@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { Icon, ICONS, type IconName } from "./icon";
 
 describe("Icon", () => {
@@ -16,5 +16,16 @@ describe("Icon", () => {
       const { container } = render(<Icon name={name} />);
       expect(container.querySelector("svg")).not.toBeNull();
     }
+  });
+
+  // Task 4, brand adoption pass: `ICONS` now holds ten of our own glyphs (`glyphs.tsx`) beside
+  // lucide's, so this exercises the same decorative/labeled contract against a non-lucide entry
+  // rather than trusting the widened `IconComponent` type alone.
+  it("renders a custom glyph decoratively by default and as an accessible image when labeled", () => {
+    const decorative = render(<Icon name="trade" />);
+    expect(decorative.container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+
+    render(<Icon name="trade" label="Trade" />);
+    expect(screen.getByRole("img", { name: "Trade" })).toBeInTheDocument();
   });
 });
