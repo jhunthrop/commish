@@ -105,7 +105,7 @@ export function DraftFinaleOverlay({ stage, view, playersById, myTeamId, onDismi
   if (stage === "preparing") {
     return (
       <div className="absolute inset-x-0 top-0 z-50 flex justify-center p-3">
-        <p data-testid="finale-preparing" role="status" className="rounded-md border border-line bg-surface-elevated px-3 py-1.5 text-sm text-text-muted">
+        <p data-testid="finale-preparing" role="status" className="rounded-md bg-surface-elevated shadow-card px-3 py-1.5 text-sm text-text-muted">
           Preparing your debrief
         </p>
       </div>
@@ -115,7 +115,7 @@ export function DraftFinaleOverlay({ stage, view, playersById, myTeamId, onDismi
   if (stage === "manual") {
     return (
       <div className="absolute inset-x-0 top-0 z-50 flex justify-center p-3">
-        <div className="flex items-center gap-3 rounded-md border border-line bg-surface-elevated px-3 py-2">
+        <div className="flex items-center gap-3 rounded-md bg-surface-elevated shadow-card px-3 py-2">
           <span className="text-sm text-text-muted">Your debrief is ready when the room is.</span>
           <Button size="sm" variant="secondary" onClick={onSeeDebrief}>
             See your debrief
