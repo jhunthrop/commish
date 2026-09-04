@@ -24,7 +24,9 @@ All three drivers funnel into the SAME store paths the ticker uses today. Nothin
 
 Per call:
 
-1. **Deferred start.** A `scheduled` draft first gets its due start applied:
+1. **Deferred start.** A `scheduled` draft first gets its due start applied. A deferred start
+   stamps at the moment it finally runs — exactly what the live due scan would do; the log
+   records when the room REALLY began, and think-delays/clocks run from there.
    - a mock room whose `mock_rooms.starts_at` has passed goes through `startMockDraft`
      (`@/mock-draft-service/start`) — the ONE callable every mock start path shares; a mapped
      409 is the benign lost race, absorbed exactly the way the ticker's due scan absorbs it;
@@ -123,9 +125,10 @@ level-triggered sweep that reruns every minute):
 - `sweep`: `autoStartDueDrafts` (real due starts AND kickoff rolls), `startDueMockRooms`
   (due mock rooms), then `liveDraftsQuery` (bounded at `maxDraftsPerTick`, same as the ticker)
   and one `advance` per live draft, under a sweep-wide action budget
-  (`DRAFT_ADVANCE_CONFIG.sweepMaxActions`) so one sweep can never outgrow the runner's tick
-  budget — work left over is found by the next minute's fire (level-triggered: `drafts.status`
-  never lies, unfinished work is always findable).
+  (`DRAFT_ADVANCE_CONFIG.sweepMaxActions`) threaded into each `advance` call as
+  `opts.maxActions`, so one draft's deep backlog can never outgrow the runner's tick budget —
+  work left over is found by the next minute's fire (level-triggered: `drafts.status` never
+  lies, unfinished work is always findable).
 - Terminal-vs-retryable per the jobs contract: nothing in the sweep is a refusal worth
   dead-lettering — the advance routine absorbs per-draft failures — so any thrown error is
   transient weather; `maxAttempts: 2` with a short backoff (a third attempt would just race the
