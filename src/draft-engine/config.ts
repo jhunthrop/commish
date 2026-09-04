@@ -103,6 +103,39 @@ export const DRAFT_QUEUE_CONFIG = {
  */
 export const PERSISTED_QUEUE_MAX = 100;
 
+/**
+ * The clock-expiry autopick's own scoring dials (spec:
+ * `docs/superpowers/specs/2026-09-03-autopick-design.md`). When a real manager's clock runs
+ * out and their queue is empty or exhausted, `bestAvailableFor` (`selectors.ts`) takes a
+ * deterministic argmax over every legal available player, scored
+ * `rankWeight(legalIndex, temperature) × needMultiplier(position)` — the identical
+ * rank-and-need SHAPE the practice bots sample from (`scoring.ts`, shared), with no RNG
+ * anywhere: a money room's autopick must replay byte-identically from the action log.
+ *
+ * These values deliberately MATCH `MOCK_CONFIG.strategy`'s (the tuning the founder already
+ * approved for the bots) but are the engine's OWN constants: `src/mock-draft` sits above this
+ * engine and is never imported here, and retuning a practice bot must never retune a money
+ * room's autopick.
+ *
+ * The need term is RAMPED by the team's own draft progress (`roster.length`, never the global
+ * pick number, so owed catch-up picks score sanely): zero on a team's first pick (the argmax
+ * provably degenerates to plain board order), scaling LINEARLY to full weight once the roster
+ * is `rampFullAtRosterFraction` full. Linear on purpose — the exponential rankWeight already
+ * dominates early, and a money-room dispute must be re-derivable by hand. The worst "reach"
+ * this scoring can ever make is `temperature × ln(maxBoost / minDamp)` ranks (≈3.3 at these
+ * values), bounded by construction rather than by a depth cap.
+ */
+export const AUTOPICK_CONFIG = {
+  /** Exponential decay steepness of `rankWeight`: one board rank costs ×exp(-1/3) ≈ 0.72. */
+  temperature: 3.0,
+  /** Additive warmth per open dedicated starting slot, at full ramp. */
+  needPerOpenStartingSlot: 0.4,
+  /** The cooled multiplier for a position whose dedicated starters are all filled, at full ramp. */
+  startersFilledDamp: 0.6,
+  /** Fraction of the roster a team must have filled for the need ramp to reach full weight. */
+  rampFullAtRosterFraction: 0.5,
+} as const;
+
 export const AUCTION_CONFIG = {
   /** Lowest legal opening bid, in whole dollars. */
   minBid: 1,

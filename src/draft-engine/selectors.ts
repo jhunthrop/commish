@@ -4,7 +4,8 @@ import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
 import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
-import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type PauseWindow } from "./config";
+import { needMultiplier, rankWeight } from "./scoring";
+import { AUCTION_CONFIG, AUTOPICK_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type PauseWindow } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 import { deadlineAfter, pausedUntil as pauseWindowEndAt } from "./pause";
 import { queuedEntriesFor } from "./queue";
@@ -154,32 +155,92 @@ export function queueFor(state: DraftState, teamId: string): readonly string[] {
 }
 
 /**
- * The autopick policy, stated once, for BOTH formats — `reduceSnakeExpiry` and
- * `reduceAuctionExpiry` each call exactly this, so the moderator's queue plugs into the one
- * existing path rather than adding a second.
- *
- * Order of preference: the team's own ranked queue (first entry it can still legally roster
- * and nobody has taken), then `state.pool`'s ranking. Both are explicit inputs carried in
- * the action log, never an ambient lookup, so the same log always autopicks the same player.
+ * The pieces both autopick-flavored selectors below share: the team's roster, the undrafted
+ * pool, and the first LEGAL queued entry (the manager's own recorded intent, which beats any
+ * heuristic in both of them). Computed once — `availablePool` already derives the drafted set
+ * internally, so a queued entry's availability is checked against the pool it produces rather
+ * than a second, separately-computed drafted-ids set.
  */
-export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEntry | null {
+function autopickContext(state: DraftState, teamId: string): {
+  readonly roster: readonly RosterSlot[];
+  readonly available: readonly DraftPoolEntry[];
+  readonly canFill: (entry: DraftPoolEntry) => boolean;
+  readonly queuedFirst: DraftPoolEntry | null;
+} {
   const roster = rosterFor(state, teamId);
-  // Computed once: `availablePool` already derives the drafted set internally, so a queued
-  // entry's availability is checked against the pool it produces rather than a second,
-  // separately-computed drafted-ids set.
   const available = availablePool(state);
   const availableIds = new Set(available.map((entry) => entry.playerId));
-  const canRoster = (entry: DraftPoolEntry): boolean =>
-    availableIds.has(entry.playerId) &&
+  const canFill = (entry: DraftPoolEntry): boolean =>
     assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok;
+  const queuedFirst = queuedEntriesFor(state, teamId).find((entry) => availableIds.has(entry.playerId) && canFill(entry)) ?? null;
+  return { roster, available, canFill, queuedFirst };
+}
 
-  for (const entry of queuedEntriesFor(state, teamId)) {
-    if (canRoster(entry)) return entry;
-  }
+/**
+ * How awake the need term is for this team: 0 on its first pick, scaling linearly to 1 once
+ * its OWN roster (never the global pick number, so owed catch-up picks score sanely) is
+ * `AUTOPICK_CONFIG.rampFullAtRosterFraction` full. See the config's docblock and the spec
+ * (`docs/superpowers/specs/2026-09-03-autopick-design.md`) for why linear.
+ */
+function needRamp(rosterLength: number, state: DraftState): number {
+  return Math.min(1, rosterLength / (AUTOPICK_CONFIG.rampFullAtRosterFraction * totalRosterSlots(state.config.slotConfig)));
+}
+
+/**
+ * The clock-expiry autopick policy, stated once — what `reduceSnakeExpiry` and
+ * `reduceCatchUpExpiry` (`snake.ts`) fire when a real manager's clock runs out.
+ *
+ * Order of preference: the team's own ranked queue (first entry it can still legally roster
+ * and nobody has taken — the manager's recorded intent, which beats any heuristic outright),
+ * then a DETERMINISTIC argmax over every legal available player, scored
+ * `rankWeight(legalIndex) × needMultiplier(position)` with the need term ramped by the team's
+ * own draft progress (`needRamp` above). On a team's first pick the ramp is exactly 0, every
+ * multiplier is exactly 1, and the argmax degenerates to plain board order — the pre-upgrade
+ * behavior, provably. No RNG anywhere: `state.pool` and the roster are explicit inputs
+ * carried in the action log, and equal scores resolve to the earlier board index (the strict
+ * `>` below), so the same log always autopicks the same player — non-negotiable in a money
+ * room. Legality is `assignSlot`'s alone, so the endgame forcing (bench full ⇒ only unfilled
+ * starters legal) is inherited, never restated.
+ */
+export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEntry | null {
+  const { roster, available, canFill, queuedFirst } = autopickContext(state, teamId);
+  if (queuedFirst !== null) return queuedFirst;
+
+  const ramp = needRamp(roster.length, state);
+  const needOptions = {
+    openSlotBoost: ramp * AUTOPICK_CONFIG.needPerOpenStartingSlot,
+    filledDamp: 1 - ramp * (1 - AUTOPICK_CONFIG.startersFilledDamp),
+  };
+  let best: DraftPoolEntry | null = null;
+  let bestScore = -Infinity;
+  let legalIndex = 0;
   for (const entry of available) {
-    if (canRoster(entry)) return entry;
+    if (!canFill(entry)) continue;
+    const score =
+      rankWeight(legalIndex, AUTOPICK_CONFIG.temperature) *
+      needMultiplier(entry.position, roster, state.config.slotConfig, needOptions);
+    if (score > bestScore) {
+      best = entry;
+      bestScore = score;
+    }
+    legalIndex += 1;
   }
-  return null;
+  return best;
+}
+
+/**
+ * The auto-NOMINATION policy — what `reduceAuctionExpiry` (`auction.ts`) puts up when the
+ * nominating team stalls: the team's own ranked queue first, then plain board order.
+ * Byte-identical to the policy both formats shared before the autopick above became
+ * need-aware, ON PURPOSE: nomination is "which player do I put up for the whole room to bid
+ * on", not "which player do I add to my roster", and a need-aware nomination would put up
+ * exactly the players the stalled team needs — inviting the room to bid up its own shopping
+ * list. Auction economics do not change by accident; see the spec's per-caller table.
+ */
+export function bestNominationFor(state: DraftState, teamId: string): DraftPoolEntry | null {
+  const { available, canFill, queuedFirst } = autopickContext(state, teamId);
+  if (queuedFirst !== null) return queuedFirst;
+  return available.find(canFill) ?? null;
 }
 
 /** The tier in force for the turn that's currently running, or null when no turn is running. */

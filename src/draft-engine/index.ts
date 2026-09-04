@@ -1,5 +1,5 @@
 export {
-  DRAFT_CLOCK_SCHEDULE, DRAFT_PAUSE_WINDOW, DRAFT_SKIP_POLICY, AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, DRAFT_VIEW_CONFIG,
+  DRAFT_CLOCK_SCHEDULE, DRAFT_PAUSE_WINDOW, DRAFT_SKIP_POLICY, AUCTION_CONFIG, AUTOPICK_CONFIG, DRAFT_QUEUE_CONFIG, DRAFT_VIEW_CONFIG,
   type ClockTier, type PauseWindow, type DraftSkipPolicy,
 } from "./config";
 export {
@@ -7,6 +7,7 @@ export {
   type DraftConfig, type DraftState, type CompletedPick, type AuctionLot, type AuctionState, type DraftReduceResult,
 } from "./state";
 export { assignSlot, type SlotAssignment } from "./slotting";
+export { rankWeight, openStartingSlots, needMultiplier, type NeedMultiplierOptions } from "./scoring";
 export { snakeTeamForPick, roundForPick } from "./order";
 export { reduceDraft } from "./reduce";
 export { admitCommand, type AdmitResult } from "./admit";
@@ -15,7 +16,7 @@ export { replayDraft, DraftReplayError } from "./replay";
 export { draftEventsFor, newlySkippedPick, type DraftEventEnvelope, type DraftEventType } from "./events";
 export { clockTierFor, tierIndexFor, nextTighteningAfter, hoursUntil, type Tightening } from "./clock-schedule";
 export {
-  draftedPlayerIds, availablePool, openSlotCount, isComplete, teamOnClock, upcomingOnClock, nextNominator, bestAvailableFor, queueFor, nudgeDeadline,
+  draftedPlayerIds, availablePool, openSlotCount, isComplete, teamOnClock, upcomingOnClock, nextNominator, bestAvailableFor, bestNominationFor, queueFor, nudgeDeadline,
   remainingBudget, minBidFor, maxBidFor, maxBidsFor, currentTier, currentClockSeconds, currentDeadline, nextTightening, isPaused,
   hasOwedPicks, catchUpTeamId,
   draftClockView, draftStateView, type DraftClockView, type DraftStateView,

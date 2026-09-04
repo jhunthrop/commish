@@ -2,7 +2,7 @@ import type { BidAction, NominateAction } from "@/domain/draft";
 import { rosterFor, type AuctionState, type DraftReduceResult, type DraftState } from "./state";
 import { assignSlot } from "./slotting";
 import { applyPick, expectApplied } from "./apply-pick";
-import { bestAvailableFor, nextNominator, remainingBudget } from "./selectors";
+import { bestNominationFor, nextNominator, remainingBudget } from "./selectors";
 
 /**
  * Every function here takes the already-resolved `AuctionState`. The "is this even an
@@ -86,7 +86,7 @@ export function reduceAuctionExpiry(state: DraftState, auction: AuctionState, ti
     // `reduceDraft` rejects every action once the draft is complete before dispatch
     // reaches here — so a live call always has a real nominator.
     const nominator = auction.nominatingTeamId!;
-    const best = bestAvailableFor(state, nominator);
+    const best = bestNominationFor(state, nominator);
     if (best === null) return { ok: false, reason: "No eligible player is available to auto-pick." };
     return { ok: true, state: openLot(state, nominator, best.playerId, auction.minBid, timestamp, true) };
   }
