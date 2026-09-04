@@ -17,10 +17,13 @@ import type { PickFactCopy } from "./state/format";
  */
 export interface MockShareInfo {
   readonly shareCode: string;
-  /** An absolute PATH, not a full URL — the browser already knows its own origin, the same
-   *  convention `InviteBody.path` (`@/league-room/contract`) already keeps for a real league's
-   *  own invite link. */
+  /** An absolute PATH — the same convention `InviteBody.path` (`@/league-room/contract`) keeps
+   *  for a real league's own invite link: for callers that only ever navigate within the app. */
   readonly path: string;
+  /** The absolute URL (flow analysis C-01, applied here by the 2026-09-04 link audit): the
+   *  value `ShareLinkPanel` actually shows, because a bare path pasted into a text message
+   *  opens nothing — the identical lesson `InviteBody.url` already carries. */
+  readonly url: string;
   readonly teamCount: number;
   readonly seatsFilled: number;
   /** ISO instant the fill window fires — `ShareLinkPanel`'s own countdown target. */

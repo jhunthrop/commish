@@ -1685,14 +1685,14 @@ describe("ShareLinkPanel says nothing that breaks the house copy rules", () => {
   it("is clean with a share code, a partial seat count and a live countdown", () => {
     const { container } = render(
       <ShareLinkPanel
-        path="/app/mock-drafts/ABC123"
+        url="https://commish.football/app/mock-drafts/ABC123"
         shareCode="ABC123"
         seatsFilled={3}
         seatsTotal={8}
         startsAt={new Date(Date.now() + 3 * 60_000).toISOString()}
       />,
     );
-    expectClean(container, "ABC123", "/app/mock-drafts/ABC123");
+    expectClean(container, "ABC123", "https://commish.football/app/mock-drafts/ABC123");
   });
 });
 

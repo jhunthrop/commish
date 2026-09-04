@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, type Db } from "@/db/client";
 import { drafts, leagues, mockRooms, teams as teamsTable } from "@/db/schema";
+import { originFor } from "@/lib/api/origin";
 import { fail, ok } from "@/lib/api/respond";
 import { draftStateView, queueFor } from "@/draft-engine";
 import { advanceDraftNow, getDraftStore } from "@/draft-service";
@@ -22,7 +23,7 @@ export const dynamic = "force-dynamic";
  * request never pays for the extra query below (this is only ever called once `isMock` and
  * `phase === "scheduled"` are already known true).
  */
-async function mockShareInfoFor(db: Db, leagueId: string): Promise<MockShareInfo | null> {
+async function mockShareInfoFor(db: Db, leagueId: string, origin: string): Promise<MockShareInfo | null> {
   const [room] = await db
     .select({ shareCode: mockRooms.shareCode, mode: mockRooms.mode, startsAt: mockRooms.startsAt, teamCount: leagues.teamCount })
     .from(mockRooms)
@@ -31,11 +32,14 @@ async function mockShareInfoFor(db: Db, leagueId: string): Promise<MockShareInfo
   if (room === undefined || room.mode !== "link") return null;
 
   const seated = await db.select({ id: teamsTable.id }).from(teamsTable).where(eq(teamsTable.leagueId, leagueId));
+  const path = `/app/mock-drafts/${room.shareCode}`;
   return {
     shareCode: room.shareCode,
-    // The invite-code idiom (`InviteBody.path`, `@/league-room/contract`): an absolute PATH,
-    // not a full URL — the browser already knows its own origin.
-    path: `/app/mock-drafts/${room.shareCode}`,
+    path,
+    // The invite idiom in FULL now (link audit, 2026-09-04 — flow analysis C-01): the panel
+    // shows `url`, because the value a person pastes into a text message has to open by itself;
+    // `path` stays for callers that only ever navigate within the app.
+    url: `${origin}${path}`,
     teamCount: room.teamCount,
     seatsFilled: seated.length,
     startsAt: room.startsAt.toISOString(),
@@ -161,7 +165,7 @@ export async function GET(request: Request, context: RouteContext) {
               teams.filter((team) => team.isBot !== true).length === 1
                 ? 0
                 : expectedBotThinkDelaySeconds(state.config.clockSchedule[state.config.clockSchedule.length - 1]!.pickSeconds),
-            share: view.phase === "scheduled" ? await mockShareInfoFor(getDb(), actor.leagueId) : null,
+            share: view.phase === "scheduled" ? await mockShareInfoFor(getDb(), actor.leagueId, originFor(request)) : null,
             results:
               view.phase === "complete"
                 ? await mockResultsInfo(getDb(), actor.leagueId, actor.userId, actor.teamId !== null)

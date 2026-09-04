@@ -146,7 +146,7 @@ export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
       {room.mock ? <PracticeBanner message={room.mock.practiceBanner} /> : null}
       {room.mock?.share ? (
         <ShareLinkPanel
-          path={room.mock.share.path}
+          url={room.mock.share.url}
           shareCode={room.mock.share.shareCode}
           seatsFilled={room.mock.share.seatsFilled}
           seatsTotal={room.mock.share.teamCount}

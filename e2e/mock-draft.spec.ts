@@ -397,7 +397,11 @@ test("a link room's share code, claimed by a second seeded identity, moves the s
 
   const sharePanel = managerB.getByTestId("share-link-panel");
   await expect(sharePanel).toBeVisible();
-  const sharePath = await managerB.getByLabel("Share link").inputValue();
+  // ABSOLUTE now (link audit 2026-09-04, the C-01 idiom the invite panel already keeps): the
+  // panel shows a URL a member can paste anywhere, and `managerA.goto` below follows it exactly
+  // as a recipient would.
+  const shareUrl = await managerB.getByLabel("Share link").inputValue();
+  expect(shareUrl).toMatch(/^https?:\/\/[^/]+\/app\/mock-drafts\//);
   // R2's own carry (Task 10's report): the scheduled rail's kickoff countdown and its
   // trigger-aware sentence render for an unstarted link room too, beside `ShareLinkPanel`'s own
   // countdown to the identical instant — two views of the SAME fill window, never two clocks.
@@ -406,8 +410,8 @@ test("a link room's share code, claimed by a second seeded identity, moves the s
   await expect(managerB.getByText(`1 of ${teamCount} seated`)).toBeVisible();
 
   // --- managerA, a second seeded identity in a wholly separate browser context, arrives signed
-  // in at the exact share path and claims a seat ---------------------------------------------
-  await managerA.goto(sharePath);
+  // in at the exact share link and claims a seat ---------------------------------------------
+  await managerA.goto(shareUrl);
   await expect(managerA.getByRole("heading", { name: "You are invited to a mock draft" })).toBeVisible();
   await expect(managerA.getByText(`${teamCount} teams`)).toBeVisible();
   await managerA.getByRole("button", { name: "Join this mock draft" }).click();

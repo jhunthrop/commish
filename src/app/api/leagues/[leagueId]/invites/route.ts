@@ -1,4 +1,5 @@
 import { getDb } from "@/db/client";
+import { originFor } from "@/lib/api/origin";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { createInvite, createInviteSchema, listInvites, revokeInvite, revokeInviteSchema } from "@/league-service";
 import type { InviteBody, InviteListBody } from "@/league-room/contract";
@@ -17,25 +18,8 @@ function cryptoRandom(): number {
   return buf[0]! / 2 ** 32;
 }
 
-/**
- * Flow analysis C-01: the value a commissioner actually shares has to be a URL that opens, not
- * `InviteBody.path` alone — a relative path pasted into a text message does nothing. Read off
- * THIS request's own origin, never assumed from a browser this server never sees: Next.js
- * rewrites `request.url` to carry the incoming `Host` header, the same origin a browser hitting
- * this route would have used to reach it, in dev and behind a proxy alike.
- *
- * `NEXT_PUBLIC_APP_URL` is the documented, honest fallback (`.env.example`) for the one case a
- * request has no parseable URL at all — never true in production, since every request this
- * route handler runs inside already has one; kept so a malformed edge case degrades to a
- * configured value instead of a thrown exception.
- */
-function originFor(request: Request): string {
-  try {
-    return new URL(request.url).origin;
-  } catch {
-    return process.env.NEXT_PUBLIC_APP_URL ?? "";
-  }
-}
+// `originFor` (C-01's "the shared value is a URL that opens") moved to `@/lib/api/origin` when
+// the mock room's share link became its second consumer (link audit, 2026-09-04).
 
 function inviteBodyFor(origin: string, invite: { readonly code: string; readonly expiresAt: string; readonly maxUses: number; readonly uses: number }): InviteBody {
   const path = `/app/join/${invite.code}`;
