@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
-import { clockOf, fixtureDeps, MOCK_RESULTS_INFO, MOCK_ROOM, renderInRoom, SNAKE_VIEW, type FixtureDeps } from "../test-fixtures";
+import { AUCTION_VIEW, clockOf, fixtureDeps, MOCK_RESULTS_INFO, MOCK_ROOM, renderInRoom, SNAKE_VIEW, type FixtureDeps } from "../test-fixtures";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { DraftRoomDepsProvider } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
@@ -392,6 +392,23 @@ describe("DraftRoom — the finale", () => {
     expect(screen.queryByTestId("finale-panel")).not.toBeInTheDocument();
     // The completed board stays browsable.
     expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
+  });
+
+  it("plays the same beat and panel over the auction shell — the overlay rides the viewport, not the format", async () => {
+    const fixture = fixtureDeps(AUCTION_VIEW);
+    mount(fixture);
+    await waitFor(() => expect(fixture.sources).toHaveLength(1));
+    await waitFor(() => expect(screen.getByTestId("room-viewport")).toBeInTheDocument());
+
+    const completeAuction = { ...AUCTION_VIEW, phase: "complete" as const, sequence: 2, onClockTeamId: null, deadlineAt: null };
+    fixture.view = completeAuction;
+    vi.useFakeTimers();
+    act(() => fixture.sources[0]!.emit("draft.status", { draftId: "d1", clock: clockOf(completeAuction), phase: "complete" }));
+
+    expect(screen.getByTestId("finale-banner")).toHaveTextContent("The draft is in the books.");
+    await advance(momentMs);
+    expect(screen.getByTestId("finale-panel")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open your league room" })).toHaveAttribute("href", "/app/leagues/l1");
   });
 
   it("gives a real draft already complete at load no fanfare at all — no beat, no panel, no refetch", async () => {
