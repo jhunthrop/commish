@@ -15,11 +15,11 @@ const LANDED: QuiltCell = {
   yourPickLabel: null,
 };
 
-function renderCell(withFace: boolean) {
+function renderCell(withFace: boolean, rowHeight = 96, cell: QuiltCell = LANDED) {
   return render(
     <QuiltCellView
-      cell={LANDED}
-      player={qb1}
+      cell={cell}
+      player={cell.pick === null ? null : qb1}
       teamCount={2}
       lens="picks"
       verdict={null}
@@ -28,6 +28,7 @@ function renderCell(withFace: boolean) {
       onPeek={() => {}}
       peeked={false}
       withFace={withFace}
+      rowHeight={rowHeight}
     />,
   );
 }
@@ -43,6 +44,32 @@ describe("QuiltCellView faces", () => {
   it("without the face flag the cell stays text-only — compacted geometry never carries one", () => {
     renderCell(false);
     expect(screen.getByTestId("quilt-pick-cell").querySelector("[data-testid='player-face-team']")).toBeNull();
+  });
+});
+
+describe("QuiltCellView height degradation (the one-height-per-row law)", () => {
+  const YOURS: QuiltCell = { teamId: "t2", pick: null, onClock: false, yourPickLabel: "2.01" };
+
+  it("a squeezed active-round cell drops the face (under 44) and then the fact line (under 36), name last", () => {
+    const { unmount } = renderCell(true, 40);
+    expect(screen.getByTestId("quilt-pick-cell").querySelector("[data-testid='player-face-team']")).toBeNull();
+    unmount();
+    renderCell(true, 30);
+    const cell = screen.getByTestId("quilt-pick-cell");
+    expect(cell).toHaveTextContent(shortName(qb1.name));
+    expect(cell).not.toHaveTextContent(`${qb1.position} · ${qb1.nflTeam}`);
+  });
+
+  it("a dashed YOURS cell keeps both lines only with room, and its border alone when squeezed", () => {
+    const { unmount } = renderCell(false, 96, YOURS);
+    expect(screen.getByTestId("quilt-your-cell")).toHaveTextContent("2.01");
+    expect(screen.getByTestId("quilt-your-cell")).toHaveTextContent("YOURS");
+    unmount();
+    renderCell(false, 12, YOURS);
+    const squeezed = screen.getByTestId("quilt-your-cell");
+    expect(squeezed.textContent).toBe("");
+    expect(squeezed.className).toContain("border-dashed");
+    expect(squeezed.className).toContain("h-full");
   });
 });
 

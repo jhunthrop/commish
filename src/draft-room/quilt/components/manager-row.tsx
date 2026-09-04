@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { TeamCard } from "@/domain/league";
 import { Avatar, Crest } from "@/components/ui";
+import { BOARD_HEIGHTS } from "../state/heights";
 import { teamCodesById } from "../lib/team-code";
 
 /** Who a column head is, in the channel law's grammar (amber = yours, red = live). */
@@ -32,7 +33,13 @@ export interface ManagerRowProps {
   /** The board's OWN grid columns — the row is part of the quilt, so a lens switch or a
    *  compaction change can never move a column out from under its manager. */
   readonly columns: { readonly gridTemplateColumns: string };
+  /** The height model's ladder step 1 (a squeezed stage): smaller heads, no name codes — the
+   *  manager row gives ground BEFORE the active round ever has to (fix requirement 3). */
+  readonly compact?: boolean;
 }
+
+/** Head diameters per density; full is the founding 26px, compact fits `managerCompact`. */
+const CREST_SIZE = { full: 26, compact: 20 } as const;
 
 /**
  * THE MANAGER ROW (founder addition 1, WarmQuilt mock): every swimlane wears its manager's
@@ -47,28 +54,40 @@ export interface ManagerRowProps {
  * row stays a row of faces. The full team name rides every head as an `abbr` title — the codes
  * are furniture, the name is the fact.
  */
-export function ManagerRow({ draftOrder, teams, myTeamId, onClockTeamId, columns }: ManagerRowProps) {
+export function ManagerRow({ draftOrder, teams, myTeamId, onClockTeamId, columns, compact = false }: ManagerRowProps) {
   const byId = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
   const codes = useMemo(() => teamCodesById(teams), [teams]);
+  const height = compact ? BOARD_HEIGHTS.headerPx.managerCompact : BOARD_HEIGHTS.headerPx.manager;
 
   return (
-    <div data-testid="manager-row" className="grid gap-1.5 pb-0.5" style={columns}>
+    <div
+      data-testid="manager-row"
+      data-density={compact ? "compact" : "full"}
+      className="grid shrink-0 gap-1.5 overflow-hidden"
+      style={{ ...columns, height }}
+    >
       <div />
       {draftOrder.map((teamId) => {
         const team = byId.get(teamId) ?? null;
         const state: HeadState = teamId === myTeamId ? "you" : teamId === onClockTeamId ? "live" : "quiet";
         return (
-          <div key={teamId} data-testid="manager-head" data-state={state} className="flex min-w-0 flex-col items-center gap-0.5">
+          <div key={teamId} data-testid="manager-head" data-state={state} className="flex min-w-0 flex-col items-center justify-center gap-0.5">
             <span aria-hidden="true" className={`inline-flex shrink-0 overflow-hidden rounded-pill ring-2 ${RING[state]}`}>
               {team === null || team.ownerAvatarUrl === null ? (
-                <Crest id={teamId} name={team?.name ?? teamId} size={26} />
+                <Crest id={teamId} name={team?.name ?? teamId} size={compact ? CREST_SIZE.compact : CREST_SIZE.full} />
               ) : (
                 <Avatar name={team.ownerDisplayName} avatar={team.ownerAvatarUrl} size="sm" />
               )}
             </span>
-            <abbr title={team?.name ?? teamId} className={`max-w-full truncate font-display text-xs font-bold tracking-wide no-underline ${teamId === myTeamId ? LABEL.you : LABEL[state]}`}>
-              {teamId === myTeamId ? "YOU" : (codes.get(teamId) ?? "")}
-            </abbr>
+            {/* Compact drops the code line — the ring's channel color still says who is who,
+                and the full team name survives on the head itself. */}
+            {compact ? (
+              <span className="sr-only">{team?.name ?? teamId}</span>
+            ) : (
+              <abbr title={team?.name ?? teamId} className={`max-w-full truncate font-display text-xs font-bold tracking-wide no-underline ${teamId === myTeamId ? LABEL.you : LABEL[state]}`}>
+                {teamId === myTeamId ? "YOU" : (codes.get(teamId) ?? "")}
+              </abbr>
+            )}
           </div>
         );
       })}
