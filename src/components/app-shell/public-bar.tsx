@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BrandLockup } from "@/components/ui/brand-mark";
 import { RAIL_LABEL } from "@/components/ui/config";
 import { SignInLink } from "./sign-in-link";
 
@@ -64,14 +65,16 @@ export function PublicBar({ intent, signedIn, nav = [], action = null }: PublicB
   return (
     <header className="border-b border-line bg-surface">
       <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
-        {/* The mark: the condensed face at its earned weight, with the amber full stop every
-            v5 mock signs off with — the one place the furniture colour appears in the rail's
-            left half. */}
+        {/* The whistle beside the condensed wordmark, with the amber full stop every v5 mock
+            signs off with — the one place the furniture colour appears in the rail's left half.
+            `aria-label` pins the accessible name to the word alone, the same reasoning
+            `TopBar`'s own lockup link carries. */}
         <Link
           href="/"
-          className="font-display text-xl font-extrabold tracking-[-0.01em] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          aria-label="Commish"
+          className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          Commish<span className="text-accent">.</span>
+          <BrandLockup />
         </Link>
         {nav.length === 0 ? null : (
           // Order-last + full width below sm: the rail wraps to its own row on a phone instead

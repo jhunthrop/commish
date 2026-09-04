@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
+import { BrandLockup } from "@/components/ui/brand-mark";
 import { RailNav } from "./rail-nav";
 import { Icon } from "@/components/ui/icon";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
@@ -78,12 +79,17 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
           spans across row 1 — "above the content column", never a second header. */}
       <div className="flex w-full items-center justify-between gap-2 border-b border-line px-2 py-3">
         <div className="flex items-center gap-8">
-          {/* The mark signs off with the amber full stop, matching the storefront rail. */}
+          {/* The whistle beside the wordmark, signing off with the amber full stop, matching
+              the storefront rail. `aria-label` pins the accessible name to the word alone —
+              `BrandLockup` renders its mark decoratively (`brand-mark.tsx`), so nothing else in
+              here would contribute to the name computation, but a link's own label should never
+              depend on how a child component happens to compose its text nodes. */}
           <Link
             href="/app"
-            className="font-display text-xl font-extrabold tracking-[-0.01em] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            aria-label="Commish"
+            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            Commish<span className="text-accent">.</span>
+            <BrandLockup />
           </Link>
           {/* Hidden below sm, the PublicBar precedent — the 360px row already runs at capacity
               (this file's own fix-round history), and a mobile nav is the shell work's problem. */}
