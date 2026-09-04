@@ -1,0 +1,12 @@
+# Build inputs are src/, drizzle/, public/, and the config files. Everything below is local
+# tooling output or session state that the Vercel CLI would otherwise upload with `vercel --prod`.
+.next
+.next-e2e
+coverage
+test-results
+playwright-report
+.superpowers
+.claude
+.lab
+e2e/.auth
+*.tsbuildinfo
