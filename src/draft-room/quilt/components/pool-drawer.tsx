@@ -32,6 +32,10 @@ export interface PoolDrawerProps extends RoomActs {
   readonly onSheetMove: (playerId: string, delta: number) => void;
   readonly onSheetReset: () => void;
   readonly onSeedQueue: (playerIds: readonly string[]) => void;
+  /** Draft HQ's sync contract (spec §4, Task 5) — whether the SHEET tab found a server sheet for
+   *  this league. `false` offers "start your sheet" instead of the room's usual sheet controls. */
+  readonly hasServerSheet: boolean;
+  readonly onStartServerSheet: () => void;
 }
 
 /**
@@ -106,6 +110,8 @@ export function PoolDrawer(props: PoolDrawerProps) {
             submitting={props.submitting}
             onDraft={props.onDraft}
             onPeek={props.onPeek}
+            hasServerSheet={props.hasServerSheet}
+            onStartServerSheet={props.onStartServerSheet}
           />
         ) : tab === "roster" ? (
           <DrawerRosterTab view={view} myTeamId={props.myTeamId} playersById={props.playersById} onPeek={props.onPeek} />

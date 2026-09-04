@@ -18,6 +18,11 @@ export interface DrawerSheetTabProps extends Pick<RoomActs, "canDraft" | "submit
   readonly onMove: (playerId: string, delta: number) => void;
   readonly onSeedQueue: (playerIds: readonly string[]) => void;
   readonly onReset: () => void;
+  /** Draft HQ's sync contract (spec §4, Task 5): whether this room found a server sheet (My
+   *  Sheet, `/api/draft/sheets`) for this league. `false` offers to start one from the room's
+   *  current local sheet — every row below still behaves exactly as it always has either way. */
+  readonly hasServerSheet: boolean;
+  readonly onStartServerSheet: () => void;
 }
 
 /**
@@ -26,12 +31,20 @@ export interface DrawerSheetTabProps extends Pick<RoomActs, "canDraft" | "submit
  * where the manager and the board disagree, and the sheet's one bridge to the server is the
  * queue seed: the top five undrafted names become the autopick queue in one tap.
  */
-export function DrawerSheetTab({ sheet, playersById, boardRanks, available, onMove, onSeedQueue, onReset, canDraft, submitting, onDraft, onPeek }: DrawerSheetTabProps) {
+export function DrawerSheetTab({ sheet, playersById, boardRanks, available, onMove, onSeedQueue, onReset, canDraft, submitting, onDraft, onPeek, hasServerSheet, onStartServerSheet }: DrawerSheetTabProps) {
   const seed = useMemo(() => sheetQueueSeed(sheet, available, QUILT_CONFIG.sheetQueueSeedCount), [sheet, available]);
   let firstAvailableSeen = false;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {hasServerSheet ? null : (
+        <div className="flex items-center gap-2 rounded-md bg-surface-elevated px-2 py-1.5 text-xs text-text-muted">
+          <span>{"This room's sheet is local to this browser only."}</span>
+          <Button size="sm" variant="secondary" className="ml-auto" onClick={onStartServerSheet}>
+            Save it to My Sheet
+          </Button>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <p className="text-xs text-text-faint">Your prep, live. Drafted players strike through. Notes live on the player card.</p>
         <span className="ml-auto flex items-center gap-1">

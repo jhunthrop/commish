@@ -56,6 +56,9 @@ export interface MobileRoomProps {
   readonly onSheetReset: () => void;
   readonly onSeedQueue: (playerIds: readonly string[]) => void;
   readonly available: ReadonlySet<string>;
+  /** Draft HQ's sync contract (spec §4, Task 5) — same meaning as `PoolDrawerProps`'s own pair. */
+  readonly hasServerSheet: boolean;
+  readonly onStartServerSheet: () => void;
   /** The room-lifetime season-history cache, shared with the desktop tree. */
   readonly historyCache: PlayerHistoryCache;
 }
@@ -167,6 +170,8 @@ export function MobileRoom(props: MobileRoomProps) {
             submitting={acts.submitting}
             onDraft={mobileActs.onDraft}
             onPeek={mobileActs.onPeek}
+            hasServerSheet={props.hasServerSheet}
+            onStartServerSheet={props.onStartServerSheet}
           />
         ) : tab === "roster" ? (
           <DrawerRosterTab view={view} myTeamId={room.myTeamId} playersById={playersById} onPeek={mobileActs.onPeek} />
