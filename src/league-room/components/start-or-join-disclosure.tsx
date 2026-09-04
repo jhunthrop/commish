@@ -59,12 +59,29 @@ const SECTIONS: Readonly<Record<TierOrderedPathKey, () => ReactElement>> = {
  * this is the one piece of Task 5 that genuinely needs a client component instead of a plain
  * server-rendered `<details open>`. That anchor keeps resolving in EITHER order, since the
  * `create` section always carries `id="create-league"` wherever it lands in the list.
+ *
+ * AND ON EVERY LATER CLICK, not just mount (production incident, 2026-09-03): the page's own
+ * "Create a league" button is a fragment link to this hash, and a click on an ALREADY-LOADED
+ * /app only changes the hash. With a mount-only read, nothing listened; and a browser neither
+ * opens a closed `<details>` nor scrolls to an anchor hidden inside one — so the button did
+ * exactly nothing. The `hashchange` listener opens the disclosure and walks the viewport to
+ * the create section; a repeat click on the same hash scrolls natively once the section is
+ * out from behind the closed disclosure.
  */
 export function StartOrJoinDisclosure({ experienceTier }: { readonly experienceTier: ExperienceTier }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (window.location.hash === CREATE_LEAGUE_HASH) setOpen(true);
+    const openFromHash = () => {
+      if (window.location.hash !== CREATE_LEAGUE_HASH) return;
+      setOpen(true);
+      // After the open state paints: bring the create section into view. Instant, not smooth —
+      // an anchor jump, so no reduced-motion branch to carry.
+      requestAnimationFrame(() => document.getElementById("create-league")?.scrollIntoView());
+    };
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => window.removeEventListener("hashchange", openFromHash);
   }, []);
 
   return (

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { StartOrJoinDisclosure } from "./start-or-join-disclosure";
@@ -44,6 +44,29 @@ describe("StartOrJoinDisclosure", () => {
     window.location.hash = "#something-else";
     render(<StartOrJoinDisclosure experienceTier="beginner" />);
     expect(detailsElement().open).toBe(false);
+  });
+
+  it("opens when the fragment arrives AFTER load: the Create a league button's own click path", () => {
+    // Production incident, 2026-09-03: the /app button is a fragment link, and clicking it on
+    // an already-loaded page only fires hashchange. A mount-only read left the disclosure shut
+    // and the click doing nothing.
+    window.location.hash = "";
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    render(<StartOrJoinDisclosure experienceTier="beginner" />);
+    expect(detailsElement().open).toBe(false);
+    window.location.hash = "#create-league";
+    act(() => {
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(detailsElement().open).toBe(true);
+    // The viewport walks to the create section once it is out from behind the disclosure.
+    return new Promise<void>((resolve) =>
+      requestAnimationFrame(() => {
+        expect(scrolled).toHaveBeenCalled();
+        resolve();
+      }),
+    );
   });
 
   it("still resolves the #create-league anchor to a real, present section, because three other surfaces link to it", () => {
