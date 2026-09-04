@@ -41,14 +41,25 @@ import type { DraftStore } from "./store";
  * other driver got there first", reloads fresh state, and stops after two consecutive refusals
  * rather than ever spinning.
  */
+/**
+ * The tri-state a caller steers by (fix round HIGH 1): `"ok"` — the call ran to a quiet end
+ * (work applied, or nothing due); `"not_found"` — this draft is terminally gone (never existed,
+ * swept away mid-call, or dissolved), so a loop should stop; `"error"` — transient weather (a
+ * dropped connection, a store throw), which a loop must TICK THROUGH: collapsing it into
+ * `not_found` is exactly the bug that let one failed query kill a watcher's loop for the rest
+ * of its connection.
+ */
+export type AdvanceResultKind = "ok" | "not_found" | "error";
+
 export interface AdvanceOutcome {
   readonly draftId: string;
   /** Actions this call applied (a deferred start counts as one). */
   readonly applied: number;
   /** True when the loop stopped at `maxActionsPerAdvance` with due work possibly remaining. */
   readonly exhausted: boolean;
-  /** The draft's phase after this call, or null for a draft that does not exist. */
+  /** The draft's phase after this call, or null when it has none to report (`not_found`/`error`). */
   readonly phase: DraftState["phase"] | null;
+  readonly outcome: AdvanceResultKind;
 }
 
 export interface DraftAdvancer {
@@ -147,21 +158,21 @@ export function createDraftAdvancer({
       let applied = 0;
       try {
         let state = await store.getDraftState(draftId);
-        if (state === null) return { draftId, applied, exhausted: false, phase: null };
+        if (state === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found" };
 
         if (state.phase === "scheduled") {
           const start = await startIfDue(state, now);
           if (start === "started") applied += 1;
-          if (start === "not-due") return { draftId, applied, exhausted: false, phase: state.phase };
+          if (start === "not-due") return { draftId, applied, exhausted: false, phase: state.phase, outcome: "ok" };
           const fresh = await store.getDraftState(draftId);
-          if (fresh === null) return { draftId, applied, exhausted: false, phase: null };
+          if (fresh === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found" };
           state = fresh;
         }
 
         const nowMs = Date.parse(now);
         let refusals = 0;
         while (state.phase === "in_progress") {
-          if (applied >= maxActions) return { draftId, applied, exhausted: true, phase: state.phase };
+          if (applied >= maxActions) return { draftId, applied, exhausted: true, phase: state.phase, outcome: "ok" };
           const result = await applyNextDue(state, nowMs);
           if (result === null) {
             // Nothing due — the clock is still running: the moderator's window, exactly where
@@ -182,7 +193,7 @@ export function createDraftAdvancer({
           refusals += 1;
           if (refusals >= 2) break;
           const fresh = await store.getDraftState(draftId);
-          if (fresh === null) return { draftId, applied, exhausted: false, phase: null };
+          if (fresh === null) return { draftId, applied, exhausted: false, phase: null, outcome: "not_found" };
           state = fresh;
         }
 
@@ -192,12 +203,12 @@ export function createDraftAdvancer({
         if (state.phase === "complete" && state.config.isMock === true) {
           await settleMockDraftCompletion(db, draftId);
         }
-        return { draftId, applied, exhausted: false, phase: state.phase };
+        return { draftId, applied, exhausted: false, phase: state.phase, outcome: "ok" };
       } catch (error: unknown) {
         // The ticker's own discipline, held per call: one draft's DB error must not fail the
         // read (or stream, or sweep) that triggered the advance.
         console.error("[draft] advance failed", { draftId }, error);
-        return { draftId, applied, exhausted: false, phase: null };
+        return { draftId, applied, exhausted: false, phase: null, outcome: "error" };
       }
     },
   };
@@ -224,6 +235,9 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
   const intervalMs = deps.intervalMs ?? DRAFT_ADVANCE_CONFIG.sseIntervalMs;
   let running = false;
   let stopped = false;
+  // True while the last tick(s) errored — the log-once-per-streak latch (fix round HIGH 1): a
+  // transient failure must neither kill the loop nor log once a second for the connection's life.
+  let erroring = false;
 
   const stop = (): void => {
     if (stopped) return;
@@ -236,7 +250,16 @@ export function runDraftAdvanceLoop(draftId: string, signal: AbortSignal, deps: 
     running = true;
     try {
       const outcome = await deps.advance(draftId, deps.clock.now());
-      if (outcome.phase === "complete" || outcome.phase === null) stop();
+      if (outcome.outcome === "error") {
+        // Transient weather: KEEP TICKING — the next tick may succeed (and in the reviewer's
+        // repro, does). Stopping here left a watched room frozen for the rest of its connection.
+        if (!erroring) console.error("[draft] advance loop erroring; ticking on", { draftId });
+        erroring = true;
+        return;
+      }
+      erroring = false;
+      // Terminal: a finished draft, or one that is gone (vanished or dissolved) — no timer left open.
+      if (outcome.outcome === "not_found" || outcome.phase === "complete") stop();
     } finally {
       running = false;
     }

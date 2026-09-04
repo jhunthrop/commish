@@ -299,7 +299,88 @@ describe("deferred starts (the production incident: a room whose start nobody re
   });
 });
 
+describe("transient errors vs a missing draft (fix round HIGH 1: the tri-state outcome)", () => {
+  it("a transient store failure reports outcome 'error' — distinct from not_found — and the next call succeeds", async () => {
+    const fixture = await seedAbandonedMock("flaky");
+    const real = testStore();
+    await real.startDraft(fixture.draftId);
+
+    let thrown = false;
+    const flaky: DraftStore = {
+      ...real,
+      getDraftState: async (draftId) => {
+        if (!thrown) {
+          thrown = true;
+          throw new Error("simulated transient DB failure");
+        }
+        return real.getDraftState(draftId);
+      },
+    };
+    now = atMs(10 * 60_000);
+    const advancer = createDraftAdvancer({ db, store: flaky, mockDriver: createMockBotDriver({ db, store: flaky }) });
+
+    const first = await advancer.advance(fixture.draftId, now);
+    expect(first.outcome).toBe("error");
+    expect(first.applied).toBe(0);
+
+    const second = await advancer.advance(fixture.draftId, now);
+    expect(second.outcome).toBe("ok");
+    expect(second.phase).toBe("complete");
+  });
+
+  it("a draft that does not exist is 'not_found', never 'error'", async () => {
+    const outcome = await testAdvancer(testStore()).advance("draft_never_was", now);
+    expect(outcome.outcome).toBe("not_found");
+    expect(outcome.phase).toBeNull();
+  });
+});
+
 describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
+  it("keeps ticking through a transient error and succeeds later — one log per error streak, never per tick (the reviewer's repro)", async () => {
+    vi.useFakeTimers();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const script: ("error" | "ok")[] = ["error", "error", "ok", "ok"];
+      const phases: ("in_progress" | "complete")[] = ["in_progress", "complete"];
+      const advance = vi.fn(async (draftId: string) => {
+        const kind = script.shift() ?? "ok";
+        if (kind === "error") return { draftId, applied: 0, exhausted: false, phase: null, outcome: "error" as const };
+        return { draftId, applied: 1, exhausted: false, phase: phases.shift() ?? ("complete" as const), outcome: "ok" as const };
+      });
+      const controller = new AbortController();
+      runDraftAdvanceLoop("draft_flaky_loop", controller.signal, { advance, clock, intervalMs: 1_000 });
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      // The two transient errors did NOT kill the loop: the later ok ticks ran, and the loop
+      // stopped itself only on completion.
+      expect(advance.mock.calls.length).toBe(4);
+      // One structured line for the whole error streak, not one per erroring tick.
+      expect(errorLog.mock.calls.filter((call) => String(call[0]).includes("advance loop"))).toHaveLength(1);
+    } finally {
+      errorLog.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops on not_found — a vanished draft holds no timer open", async () => {
+    vi.useFakeTimers();
+    try {
+      const advance = vi.fn(async (draftId: string) => ({
+        draftId,
+        applied: 0,
+        exhausted: false,
+        phase: null,
+        outcome: "not_found" as const,
+      }));
+      const controller = new AbortController();
+      runDraftAdvanceLoop("draft_vanished", controller.signal, { advance, clock, intervalMs: 1_000 });
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(advance.mock.calls.length).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("advances on the interval while connected, never overlaps, and stops cleanly on abort", async () => {
     vi.useFakeTimers();
     try {
@@ -309,7 +390,7 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
         calls.push(draftId);
         // The first call blocks until released — interval fires during it must be skipped.
         if (calls.length === 1) await new Promise<void>((resolve) => (release = resolve));
-        return { draftId, applied: 0, exhausted: false, phase: "in_progress" as const };
+        return { draftId, applied: 0, exhausted: false, phase: "in_progress" as const, outcome: "ok" as const };
       });
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_loop", controller.signal, { advance, clock, intervalMs: 1_000 });
@@ -338,6 +419,7 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
         applied: 0,
         exhausted: false,
         phase: phases.shift() ?? "complete",
+        outcome: "ok" as const,
       }));
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_done", controller.signal, { advance, clock, intervalMs: 1_000 });
