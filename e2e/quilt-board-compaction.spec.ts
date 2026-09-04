@@ -111,10 +111,15 @@ function auditBoard(geometry: BoardGeometry, stage: string): void {
     expect(above.labelBottom, `${stage}: label ${above.id} must not overlap ${below.id}`).toBeLessThanOrEqual(below.labelTop + EPSILON);
   }
 
-  // LAW: the active round keeps a readable minimum at these viewports.
-  const full = rows.find((row) => row.kind === "full");
-  expect(full, `${stage}: an active round exists`).toBeDefined();
-  expect(full!.height, `${stage}: active round stays readable`).toBeGreaterThanOrEqual(28 - EPSILON);
+  // LAW: the full window (the active round plus up to the prior three, 2026-09-03 roster
+  // ruling) exists, never exceeds its four-round depth, and EVERY row in it keeps the 28px
+  // readable minimum at these viewports.
+  const fulls = rows.filter((row) => row.kind === "full");
+  expect(fulls.length, `${stage}: a full window exists`).toBeGreaterThanOrEqual(1);
+  expect(fulls.length, `${stage}: the window is at most four rounds`).toBeLessThanOrEqual(4);
+  for (const full of fulls) {
+    expect(full.height, `${stage} ${full.id}: window row stays readable`).toBeGreaterThanOrEqual(28 - EPSILON);
+  }
 }
 
 async function auditAndShoot(page: Page, stage: string): Promise<void> {
@@ -164,5 +169,18 @@ test("the quilt keeps one height per row at every drawer height and viewport", a
   await managerA.keyboard.press(" ");
   await expect(drawer).toHaveAttribute("data-drawer-height", "half");
   await auditAndShoot(managerA, "half-800");
+  await managerA.keyboard.press("Escape");
+
+  // 5 — the window WIDENS (2026-09-03 ruling): draft from the last seat and the snake hands
+  // the turn straight back at 2.01, so rounds 1 AND 2 must both ride full — measured on the
+  // same short viewport, drawer at half, the squeeze's worst case again.
+  await strip.getByRole("button", { name: "Draft" }).first().click();
+  await expect(managerA.getByTestId("quilt-room").getByTestId("undo-pill")).toBeHidden({ timeout: 10_000 });
+  await expect(strip).toHaveAttribute("data-strip-state", "your-turn", { timeout: ON_CLOCK_TIMEOUT_MS });
+  await managerA.keyboard.press(" ");
+  await expect(drawer).toHaveAttribute("data-drawer-height", "half");
+  await expect(managerA.getByTestId("quilt-round-1")).toHaveAttribute("data-round-kind", "full");
+  await expect(managerA.getByTestId("quilt-round-2")).toHaveAttribute("data-round-kind", "full");
+  await auditAndShoot(managerA, "round2-half-800");
   await managerA.keyboard.press("Escape");
 });
