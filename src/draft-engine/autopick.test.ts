@@ -122,6 +122,14 @@ describe("need-aware autopick (bestAvailableFor fallback)", () => {
     expect(bestAvailableFor(state, "t1")?.playerId).toBe("k1");
   });
 
+  it("answers null, never NaN arithmetic, for a degenerate zero-slot config", () => {
+    // No slot config means nothing is ever legal AND `totalRosterSlots` is 0 — the ramp's
+    // divisor. The guard pins the ramp to 0 (instead of 0/0 = NaN flowing into every score),
+    // and the answer is the same null every no-legal-player state produces.
+    const state = midDraftState({ ...SNAKE_CONFIG, slotConfig: [] }, ROUND8_POOL, { t1: [], t2: [] });
+    expect(bestAvailableFor(state, "t1")).toBeNull();
+  });
+
   it("is deterministic: the same state produces the same pick, twice, and from a clone", () => {
     const state = round8State();
     const first = bestAvailableFor(state, "t1");

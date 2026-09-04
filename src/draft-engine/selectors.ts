@@ -185,7 +185,11 @@ function autopickContext(state: DraftState, teamId: string): {
  * enforces that by construction.
  */
 function needRamp(rosterLength: number, state: DraftState, policy: DraftAutopickPolicy): number {
-  return Math.min(1, rosterLength / (policy.rampFullAtRosterFraction * totalRosterSlots(state.config.slotConfig)));
+  const fullAt = policy.rampFullAtRosterFraction * totalRosterSlots(state.config.slotConfig);
+  // A zero-slot config (nothing is ever legal, so the roster is forever empty) would make the
+  // division 0/0 = NaN; ramp 0 keeps every multiplier a defined number instead.
+  if (fullAt <= 0) return 0;
+  return Math.min(1, rosterLength / fullAt);
 }
 
 /**
