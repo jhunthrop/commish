@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320">
+  <!-- The whistle mark on a rounded-square tile — the browser-tab / app-icon asset. A standalone
+       .svg is a static file rather than a themed component, so it carries the dark colorway's own
+       literal colors (matching commish-mark.svg) the same way a rasterized app icon always would;
+       this file is outside the .tsx sweep `no-raw-color.source.test.ts` walks. -->
+  <rect width="320" height="320" rx="64" fill="#05070C"/>
+  <g transform="translate(40 67.6923) scale(0.9230769)">
+    <path d="M100 34
+             l88 0
+             a16 16 0 0 1 16 16
+             l0 42
+             a16 16 0 0 1 -16 16
+             l-24 0
+             a66 66 0 1 1 -64 -74z"
+          fill="#131B2A" stroke="#FFFFFF" stroke-width="10" stroke-linejoin="round"/>
+    <circle cx="26" cy="80" r="14" fill="none" stroke="#FFFFFF" stroke-width="10"/>
+    <rect x="140" y="40" width="30" height="12" rx="4" fill="#FFB627"/>
+    <circle cx="100" cy="112" r="38" fill="#FFB627"/>
+  </g>
+</svg>
