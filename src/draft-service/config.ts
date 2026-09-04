@@ -47,6 +47,32 @@ export const DRAFT_SERVICE_CONFIG = {
   houseReconcileIntervalMs: 30_000,
 } as const;
 
+/**
+ * The serverless drivers' own knobs (draft-driver design, 2026-09-03): advance-on-read, the SSE
+ * watcher loop, and the minute-cron sweep all read from here — never a literal at a call site.
+ */
+export const DRAFT_ADVANCE_CONFIG = {
+  /**
+   * Ceiling on actions one `advance()` call may apply. Sized to carry the deepest realistic
+   * backlog in one call — a fully abandoned 12-team, 15-round board is 180 expiries — while
+   * still bounding a pathological loop; an exhausted call reports it and the next driver
+   * (another read, the SSE tick, the sweep) resumes from the log.
+   */
+  maxActionsPerAdvance: 200,
+  /**
+   * How often a connected draft-room watcher's SSE loop advances its draft (ms). One second is
+   * the same cadence the dev ticker keeps (`tickIntervalMs`), which is what makes a watched
+   * room on Vercel feel exactly like a watched room locally.
+   */
+  sseIntervalMs: 1_000,
+  /**
+   * Sweep-wide ceiling on actions one `draft-sweep` job run may apply across ALL drafts, so a
+   * minute tick's sweep can never outgrow the job runner's own budget. Level-triggered: work
+   * left over is found by the next minute's fire.
+   */
+  sweepMaxActions: 600,
+} as const;
+
 export const DRAFT_NUDGE_CONFIG = {
   /**
    * The spec's `DRAFT_NUDGE_THRESHOLD_PCT`: how far through the current turn's clock the

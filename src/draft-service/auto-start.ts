@@ -115,7 +115,7 @@ export interface AutoStartDeps {
  * same shape `browseQuery`/`chatPageQuery`/`pendingFlagQuery` already use — the one seam an
  * `EXPLAIN` assertion can wrap without running the query twice or duplicating its shape.
  */
-export function dueDraftsQuery(db: Db, nowIso: string) {
+export function dueDraftsQuery(db: Db, nowIso: string, draftId?: string) {
   return db
     .select({ draftId: drafts.id })
     .from(drafts)
@@ -126,6 +126,12 @@ export function dueDraftsQuery(db: Db, nowIso: string) {
         lte(drafts.kickoffAt, new Date(nowIso)),
         ENFORCED_LEAGUE_SQL,
         sql`(select count(*)::int from ${teams} where ${teams.leagueId} = ${leagues.id}) >= ${leagues.teamCount}`,
+        // The advance-on-read driver's narrowing (draft-driver design, 2026-09-03): ONE draft's
+        // own due check rides the identical predicates the platform scan uses — never a second,
+        // hand-copied eligibility rule. `undefined` leaves the scan's measured shape untouched
+        // (drizzle drops an undefined member of `and(...)`), which is what keeps the EXPLAIN
+        // assertion in `src/db/index-plans.test.ts` honest about the query it measures.
+        draftId === undefined ? undefined : eq(drafts.id, draftId),
       ),
     )
     .orderBy(asc(drafts.id))
