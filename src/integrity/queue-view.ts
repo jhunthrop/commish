@@ -327,8 +327,10 @@ const ICON_FOR_FLAG_TYPE: Readonly<Record<FlagType, IconName>> = {
   multi_account: "users",
   review_report: "alert-triangle",
   chat_report: "alert-triangle",
-  trade_fairness: "refresh-cw",
-  trade_hold: "refresh-cw",
+  // Task 5, brand adoption pass: both trade-flag types are a trade, in the exact sense the
+  // domain glyph names — a generic "something changed" arrow was standing in for it.
+  trade_fairness: "trade",
+  trade_hold: "trade",
 };
 
 export interface QueueRowInput {
@@ -548,7 +550,7 @@ export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<strin
     return {
       eventId: event.eventId,
       occurredAt: event.occurredAt,
-      icon: "refresh-cw",
+      icon: "trade",
       headline: `${trailActorName(event.actorId, actorNames)} offered this trade.`,
       detail: null,
     };
@@ -565,7 +567,7 @@ export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<strin
   if (event.eventType === "roster_move") {
     const reason = payloadStr(event.payload, "reason");
     if (reason === "trade") {
-      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "Two players changed teams.", detail: null };
+      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "trade", headline: "Two players changed teams.", detail: null };
     }
     // Task 7: `reverseTradeInTx`'s own compensating transfer, on the SAME league chain, with the
     // SAME event type — a reversal is a roster_move, not a second trade-typed event
@@ -577,7 +579,7 @@ export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<strin
     // trail row using a different verb than `DECISION_PHRASE.trade_reversed`'s own "reversed the
     // trade" and the notice title both use for the identical action.
     if (reason === "trade_reversed") {
-      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "An operator reversed the trade.", detail: null };
+      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "trade", headline: "An operator reversed the trade.", detail: null };
     }
     return null;
   }

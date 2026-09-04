@@ -294,7 +294,7 @@ describe("activityRowFor", () => {
     expect(activityRowFor(event("prize_paid", { winnerUserId: "user_alice", place: 2, amountCents: 32_00, operatorUserId: "user_op" }, null), viewer, names)).toEqual({
       eventId: "evt_1",
       occurredAt: "2026-08-20T17:00:00.000Z",
-      icon: "trophy",
+      icon: "payout",
       headline: "Alice won $32.00 for finishing 2nd.",
       detail: null,
     });
@@ -434,7 +434,7 @@ describe("renderTradeAccepted", () => {
     expect(activityRowFor(event("trade_accepted", payload, "user_alice"), viewer, names)).toEqual({
       eventId: "evt_1",
       occurredAt: "2026-08-20T17:00:00.000Z",
-      icon: "check",
+      icon: "trade",
       headline: "Alice's team and Another team completed a trade.",
       detail: "Alice's team sent Bijan Robinson and got A player who is no longer listed.",
     });
@@ -469,7 +469,7 @@ describe("renderRosterMove", () => {
     expect(activityRowFor(event("roster_move", payload, "user_alice"), viewer, names)).toEqual({
       eventId: "evt_1",
       occurredAt: "2026-08-20T17:00:00.000Z",
-      icon: "refresh-cw",
+      icon: "trade",
       headline: "Alice's team and Another team swapped rosters.",
       detail: null,
     });

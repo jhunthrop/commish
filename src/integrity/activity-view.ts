@@ -276,7 +276,7 @@ function renderDraftCompleted(event: AuditEvent): Rendered {
 function renderLineupChange(event: AuditEvent): Rendered | null {
   const weekNumber = num(event.payload, "weekNumber");
   if (weekNumber === undefined) return null;
-  return { icon: "refresh-cw", headline: `You set your week ${weekNumber} lineup.`, detail: null };
+  return { icon: "lineup", headline: `You set your week ${weekNumber} lineup.`, detail: null };
 }
 
 /**
@@ -330,7 +330,7 @@ function renderTradeAccepted(event: AuditEvent, names: ActivityNames): Rendered 
   const gave = TRADE_ASSET_LIST_FORMAT.format(proposerAssetIds.map((id) => names.player(id)));
   const got = TRADE_ASSET_LIST_FORMAT.format(counterpartyAssetIds.map((id) => names.player(id)));
   return {
-    icon: "check",
+    icon: "trade",
     headline: `${proposerTeamName} and ${counterpartyTeamName} completed a trade.`,
     detail: `${proposerTeamName} sent ${gave} and got ${got}.`,
   };
@@ -405,8 +405,8 @@ function renderRosterMove(event: AuditEvent, names: ActivityNames): Rendered | n
   const proposerTeamName = names.team(proposerTeamId);
   const counterpartyTeamName = names.team(counterpartyTeamId);
   return reason === "trade"
-    ? { icon: "refresh-cw", headline: `${proposerTeamName} and ${counterpartyTeamName} swapped rosters.`, detail: null }
-    : { icon: "refresh-cw", headline: `${proposerTeamName} and ${counterpartyTeamName}'s roster swap was reversed.`, detail: null };
+    ? { icon: "trade", headline: `${proposerTeamName} and ${counterpartyTeamName} swapped rosters.`, detail: null }
+    : { icon: "trade", headline: `${proposerTeamName} and ${counterpartyTeamName}'s roster swap was reversed.`, detail: null };
 }
 
 /**
@@ -446,7 +446,7 @@ function renderPrizePaid(event: AuditEvent, names: ActivityNames): Rendered | nu
   const place = num(event.payload, "place");
   const amountCents = num(event.payload, "amountCents");
   if (winnerUserId === undefined || place === undefined || !Number.isInteger(place) || amountCents === undefined || !Number.isInteger(amountCents)) return null;
-  return { icon: "trophy", headline: `${names.member(winnerUserId)} won ${formatUsd(amountCents)} for finishing ${ordinalPlace(place)}.`, detail: null };
+  return { icon: "payout", headline: `${names.member(winnerUserId)} won ${formatUsd(amountCents)} for finishing ${ordinalPlace(place)}.`, detail: null };
 }
 
 function renderSystemAction(event: AuditEvent, viewer: { readonly userId: string }): Rendered | null {
