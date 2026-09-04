@@ -5,7 +5,7 @@ import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionSta
 import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
 import { needMultiplier, rankWeight } from "./scoring";
-import { AUCTION_CONFIG, AUTOPICK_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type PauseWindow } from "./config";
+import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type DraftAutopickPolicy, type PauseWindow } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 import { deadlineAfter, pausedUntil as pauseWindowEndAt } from "./pause";
 import { queuedEntriesFor } from "./queue";
@@ -179,11 +179,13 @@ function autopickContext(state: DraftState, teamId: string): {
 /**
  * How awake the need term is for this team: 0 on its first pick, scaling linearly to 1 once
  * its OWN roster (never the global pick number, so owed catch-up picks score sanely) is
- * `AUTOPICK_CONFIG.rampFullAtRosterFraction` full. See the config's docblock and the spec
- * (`docs/superpowers/specs/2026-09-03-autopick-design.md`) for why linear.
+ * `policy.rampFullAtRosterFraction` full. See the config's docblock and the spec
+ * (`docs/superpowers/specs/2026-09-03-autopick-design.md`) for why linear. The policy is the
+ * DRAFT'S OWN snapshot (`state.config.autopick`), never the module constant — the caller below
+ * enforces that by construction.
  */
-function needRamp(rosterLength: number, state: DraftState): number {
-  return Math.min(1, rosterLength / (AUTOPICK_CONFIG.rampFullAtRosterFraction * totalRosterSlots(state.config.slotConfig)));
+function needRamp(rosterLength: number, state: DraftState, policy: DraftAutopickPolicy): number {
+  return Math.min(1, rosterLength / (policy.rampFullAtRosterFraction * totalRosterSlots(state.config.slotConfig)));
 }
 
 /**
@@ -196,20 +198,28 @@ function needRamp(rosterLength: number, state: DraftState): number {
  * `rankWeight(legalIndex) × needMultiplier(position)` with the need term ramped by the team's
  * own draft progress (`needRamp` above). On a team's first pick the ramp is exactly 0, every
  * multiplier is exactly 1, and the argmax degenerates to plain board order — the pre-upgrade
- * behavior, provably. No RNG anywhere: `state.pool` and the roster are explicit inputs
- * carried in the action log, and equal scores resolve to the earlier board index (the strict
- * `>` below), so the same log always autopicks the same player — non-negotiable in a money
- * room. Legality is `assignSlot`'s alone, so the endgame forcing (bench full ⇒ only unfilled
+ * behavior, provably. No RNG anywhere: `state.pool`, the roster AND the scoring policy are
+ * explicit inputs carried in the action log (`config.autopick`, snapshotted at START_DRAFT —
+ * this function never reads `AUTOPICK_CONFIG` itself, so a later retune can never change what
+ * an already-persisted TIMER_EXPIRE picked), and equal scores resolve to the earlier board
+ * index (the strict `>` below), so the same log always autopicks the same player —
+ * non-negotiable in a money room. A config with NO snapshot is a log from before the upgrade:
+ * it replays under the policy its expiries were actually derived with, the plain board-order
+ * fallback (the F3 discipline — absent means the OLD behavior, never today's tunables).
+ * Legality is `assignSlot`'s alone, so the endgame forcing (bench full ⇒ only unfilled
  * starters legal) is inherited, never restated.
  */
 export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEntry | null {
   const { roster, available, canFill, queuedFirst } = autopickContext(state, teamId);
   if (queuedFirst !== null) return queuedFirst;
 
-  const ramp = needRamp(roster.length, state);
+  const policy = state.config.autopick ?? null;
+  if (policy === null) return available.find(canFill) ?? null;
+
+  const ramp = needRamp(roster.length, state, policy);
   const needOptions = {
-    openSlotBoost: ramp * AUTOPICK_CONFIG.needPerOpenStartingSlot,
-    filledDamp: 1 - ramp * (1 - AUTOPICK_CONFIG.startersFilledDamp),
+    openSlotBoost: ramp * policy.needPerOpenStartingSlot,
+    filledDamp: 1 - ramp * (1 - policy.startersFilledDamp),
   };
   let best: DraftPoolEntry | null = null;
   let bestScore = -Infinity;
@@ -217,7 +227,7 @@ export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEn
   for (const entry of available) {
     if (!canFill(entry)) continue;
     const score =
-      rankWeight(legalIndex, AUTOPICK_CONFIG.temperature) *
+      rankWeight(legalIndex, policy.temperature) *
       needMultiplier(entry.position, roster, state.config.slotConfig, needOptions);
     if (score > bestScore) {
       best = entry;

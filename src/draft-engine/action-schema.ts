@@ -40,6 +40,24 @@ const skipPolicy = z
   .optional();
 
 /**
+ * ABSENT MEANS "the pre-upgrade autopick policy" (plain board-order fallback), not "today's
+ * tunables" — `skipPolicy`'s own F3 lesson, applied on day one this time instead of after the
+ * defect. A log persisted before the need-aware upgrade derived its TIMER_EXPIRE autopicks
+ * under the old algorithm; `.optional()` (NEVER `.default(AUTOPICK_CONFIG)`) sends those rows
+ * down `bestAvailableFor`'s legacy branch (`state.config.autopick ?? null` -> board order), so
+ * their reconstructed rosters keep agreeing with the picks the live draft actually made. A log
+ * written from the upgrade on always carries its own values.
+ */
+const autopickPolicy = z
+  .object({
+    temperature: z.number().positive(),
+    needPerOpenStartingSlot: z.number().nonnegative(),
+    startersFilledDamp: z.number().positive(),
+    rampFullAtRosterFraction: z.number().positive(),
+  })
+  .optional();
+
+/**
  * The persisted-row boundary. `draft_actions.action` is jsonb written by an earlier
  * process (possibly an earlier deploy), so replay validates it rather than trusting it.
  * Unknown `v` values fail loudly instead of being reinterpreted as v1.
@@ -49,7 +67,7 @@ export const draftActionSchema: z.ZodType<DraftAction> = z.discriminatedUnion("t
   // may reach an old draft's replay, and only for those legacy rows (new logs carry it).
   z.object({
     v: version, type: z.literal("START_DRAFT"), timestamp, draftOrder: z.array(teamId).min(2), pool: z.array(poolEntry).min(1),
-    minBid: dollars.default(AUCTION_CONFIG.minBid), skipPolicy,
+    minBid: dollars.default(AUCTION_CONFIG.minBid), skipPolicy, autopick: autopickPolicy,
   }),
   z.object({ v: version, type: z.literal("MAKE_PICK"), timestamp, teamId, playerId }),
   z.object({ v: version, type: z.literal("NOMINATE"), timestamp, teamId, playerId, openingBid: dollars }),

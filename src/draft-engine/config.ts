@@ -104,13 +104,38 @@ export const DRAFT_QUEUE_CONFIG = {
 export const PERSISTED_QUEUE_MAX = 100;
 
 /**
+ * The need-aware autopick scoring dials (the 2026-09-03 upgrade). Like `DraftSkipPolicy`
+ * above, this is read by a REDUCER path — `bestAvailableFor` folds every TIMER_EXPIRE's
+ * autopick — so it must be a value frozen into each draft's own history rather than one
+ * re-read fresh on every load: `applyAction` snapshots `AUTOPICK_CONFIG` below onto the
+ * `START_DRAFT` action (`StartDraftAction.autopick`, `@/domain/draft`), `reduceStart` copies
+ * it into `DraftConfig.autopick`, and the selector reads ONLY that snapshot. A deploy that
+ * retunes these numbers changes future drafts and never what an already-persisted
+ * TIMER_EXPIRE did. A config with NO snapshot (a log from before the upgrade) replays under
+ * the pre-upgrade policy: plain board-order fallback, need weight permanently zero.
+ */
+export interface DraftAutopickPolicy {
+  /** Exponential decay steepness of `rankWeight`: one board rank costs ×exp(-1/3) ≈ 0.72. */
+  readonly temperature: number;
+  /** Additive warmth per open dedicated starting slot, at full ramp. */
+  readonly needPerOpenStartingSlot: number;
+  /** The cooled multiplier for a position whose dedicated starters are all filled, at full ramp. */
+  readonly startersFilledDamp: number;
+  /** Fraction of the roster a team must have filled for the need ramp to reach full weight. */
+  readonly rampFullAtRosterFraction: number;
+}
+
+/**
  * The clock-expiry autopick's own scoring dials (spec:
  * `docs/superpowers/specs/2026-09-03-autopick-design.md`). When a real manager's clock runs
  * out and their queue is empty or exhausted, `bestAvailableFor` (`selectors.ts`) takes a
  * deterministic argmax over every legal available player, scored
  * `rankWeight(legalIndex, temperature) × needMultiplier(position)` — the identical
  * rank-and-need SHAPE the practice bots sample from (`scoring.ts`, shared), with no RNG
- * anywhere: a money room's autopick must replay byte-identically from the action log.
+ * anywhere: the same action log always replays to the same autopick. That determinism claim
+ * is scoped to a single JavaScript engine build — `Math.exp` is specified as a
+ * good-faith approximation, not bit-exact across engines — which is one more reason the
+ * values ride the action log (`DraftAutopickPolicy` above) instead of being read live.
  *
  * These values deliberately MATCH `MOCK_CONFIG.strategy`'s (the tuning the founder already
  * approved for the bots) but are the engine's OWN constants: `src/mock-draft` sits above this
@@ -125,16 +150,12 @@ export const PERSISTED_QUEUE_MAX = 100;
  * this scoring can ever make is `temperature × ln(maxBoost / minDamp)` ranks (≈3.3 at these
  * values), bounded by construction rather than by a depth cap.
  */
-export const AUTOPICK_CONFIG = {
-  /** Exponential decay steepness of `rankWeight`: one board rank costs ×exp(-1/3) ≈ 0.72. */
+export const AUTOPICK_CONFIG: DraftAutopickPolicy = {
   temperature: 3.0,
-  /** Additive warmth per open dedicated starting slot, at full ramp. */
   needPerOpenStartingSlot: 0.4,
-  /** The cooled multiplier for a position whose dedicated starters are all filled, at full ramp. */
   startersFilledDamp: 0.6,
-  /** Fraction of the roster a team must have filled for the need ramp to reach full weight. */
   rampFullAtRosterFraction: 0.5,
-} as const;
+};
 
 export const AUCTION_CONFIG = {
   /** Lowest legal opening bid, in whole dollars. */

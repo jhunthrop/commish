@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DRAFT_QUEUE_CONFIG, DRAFT_SKIP_POLICY, PERSISTED_QUEUE_MAX } from "./config";
+import { AUTOPICK_CONFIG, DRAFT_QUEUE_CONFIG, DRAFT_SKIP_POLICY, PERSISTED_QUEUE_MAX } from "./config";
 import { clientDraftActionSchema, clientQueueSchema, draftActionSchema, toDraftAction, toSetQueueAction } from "./action-schema";
 
 describe("draftActionSchema (persisted jsonb boundary)", () => {
@@ -11,12 +11,27 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
   it("accepts a v1 START_DRAFT row with its order and pool", () => {
     const row = {
       v: 1,
-      type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY,
+      type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, autopick: AUTOPICK_CONFIG,
       timestamp: "2026-09-01T00:00:00.000Z",
       draftOrder: ["t1", "t2"],
       pool: [{ playerId: "p1", position: "QB" }],
     };
     expect(draftActionSchema.parse(row)).toEqual(row);
+  });
+
+  it("leaves a persisted START_DRAFT row with no autopick snapshot WITHOUT one, rather than handing an old draft today's scoring", () => {
+    // The skipPolicy/F3 discipline, applied on day one this time: a pre-upgrade log derived
+    // its autopicks under the old board-order policy, and `.default(AUTOPICK_CONFIG)` here
+    // would re-derive them under today's tunables on every replay. The replay proof itself
+    // lives in `autopick.test.ts` ("history replays under the policy it was made with").
+    const row = {
+      v: 1,
+      type: "START_DRAFT", minBid: 1,
+      timestamp: "2026-09-01T00:00:00.000Z",
+      draftOrder: ["t1", "t2"],
+      pool: [{ playerId: "p1", position: "QB" }],
+    };
+    expect(draftActionSchema.parse(row)).not.toHaveProperty("autopick");
   });
 
   it("leaves a persisted START_DRAFT row with no skipPolicy WITHOUT one, rather than handing an old draft today's allowance", () => {

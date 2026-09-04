@@ -1,6 +1,6 @@
 export {
   DRAFT_CLOCK_SCHEDULE, DRAFT_PAUSE_WINDOW, DRAFT_SKIP_POLICY, AUCTION_CONFIG, AUTOPICK_CONFIG, DRAFT_QUEUE_CONFIG, DRAFT_VIEW_CONFIG,
-  type ClockTier, type PauseWindow, type DraftSkipPolicy,
+  type ClockTier, type PauseWindow, type DraftSkipPolicy, type DraftAutopickPolicy,
 } from "./config";
 export {
   initialDraftState, totalRosterSlots, totalPickCount, rosterFor, auctionOf,

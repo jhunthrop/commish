@@ -1,7 +1,7 @@
 import type { DraftFormat } from "@/domain/league";
 import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
 import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
-import type { ClockTier, DraftSkipPolicy, PauseWindow } from "./config";
+import type { ClockTier, DraftAutopickPolicy, DraftSkipPolicy, PauseWindow } from "./config";
 
 /** Static, DB-derived setup. Never changes during a draft. */
 export interface DraftConfig {
@@ -39,6 +39,19 @@ export interface DraftConfig {
    * the schema defaulted the field to TODAY's tunable.
    */
   readonly skipPolicy?: DraftSkipPolicy | null;
+  /**
+   * The need-aware autopick scoring in force for THIS draft (the 2026-09-03 upgrade), set from
+   * `StartDraftAction.autopick` by `reduceStart` — never by `loadDraftConfig` — for exactly the
+   * reason `skipPolicy` above is: `bestAvailableFor` reads it while folding a TIMER_EXPIRE, so
+   * it must be a value baked into this draft's own history, and a deploy that retunes
+   * `AUTOPICK_CONFIG` must never change what an already-persisted expiry picked. Absent (a log
+   * that predates the upgrade, or a hand-written test literal) MUST mean the PRE-upgrade
+   * policy — plain board-order fallback, need weight permanently zero — never today's tunables:
+   * those drafts derived their autopicks under the old algorithm, and their reconstructed
+   * rosters have to keep agreeing with the picks the live draft actually made (the identical F3
+   * lesson `StartDraftAction.skipPolicy` records).
+   */
+  readonly autopick?: DraftAutopickPolicy | null;
   /**
    * True for a mock draft (Task 4), set by `loadDraftConfig` from the `mock_rooms` sidecar
    * beside `clockSchedule`/`pauseWindow` above — the same kind of tunable, injected the same

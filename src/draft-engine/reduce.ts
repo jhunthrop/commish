@@ -43,7 +43,10 @@ function reduceStart(state: DraftState, action: StartDraftAction): DraftReduceRe
       // reducer-side read of a tunable this whole file's own rule forbids everywhere else,
       // made safe because it reads the ACTION (this draft's own frozen history), never a
       // module-level constant. See `DraftSkipPolicy`'s docblock (`config.ts`) for why.
-      config: { ...state.config, skipPolicy: action.skipPolicy },
+      // `autopick` rides the same snapshot: the need-aware scoring in force when THIS draft
+      // started, absent for logs that predate the upgrade (which must replay as the old
+      // board-order policy — see `DraftConfig.autopick`, `state.ts`).
+      config: { ...state.config, skipPolicy: action.skipPolicy, autopick: action.autopick },
       draftOrder: action.draftOrder,
       pool: action.pool,
       rosters,

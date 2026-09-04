@@ -4,7 +4,7 @@ import type { Position } from "@/domain/player";
 import type { RosterSlot } from "@/domain/roster";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { initialDraftState, totalRosterSlots, type CompletedPick, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE } from "./config";
+import { AUTOPICK_CONFIG, DRAFT_CLOCK_SCHEDULE } from "./config";
 import { assignSlot } from "./slotting";
 import { reduceDraft } from "./reduce";
 import { availablePool, bestAvailableFor, bestNominationFor, isComplete } from "./selectors";
@@ -12,9 +12,14 @@ import { expireAt, submitCommand } from "./test-support";
 
 const T = "2026-09-01T00:00:00.000Z";
 
+// Carries the autopick snapshot the way every post-upgrade draft's config does (`reduceStart`
+// copies it from the START_DRAFT action): the need-aware scoring only ever reads this snapshot,
+// so a hand-built config without it is, by definition, a pre-upgrade draft (see the history
+// describe block at the bottom).
 const SNAKE_CONFIG: DraftConfig = {
   draftId: "d_auto", leagueId: "l_auto", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",
   auctionBudget: null, slotConfig: STANDARD_ROSTER_SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
+  autopick: AUTOPICK_CONFIG,
 };
 
 /**
@@ -141,8 +146,10 @@ describe("endgame regression: a full 15-round all-autopick draft", () => {
     return [...ranked].sort((a, b) => a.rank - b.rank || a.bucketIndex - b.bucketIndex).map((r) => r.entry);
   })();
   // No skipPolicy on START: every expiry autopicks (no queues, no skips) — the pure
-  // clock-makes-every-pick draft the endgame forcing must survive.
-  const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: TEAMS, pool: POOL };
+  // clock-makes-every-pick draft the endgame forcing must survive. The autopick snapshot IS
+  // present, the way every post-upgrade START_DRAFT carries it, so this drives the need-aware
+  // path end to end.
+  const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: TEAMS, pool: POOL, autopick: AUTOPICK_CONFIG };
 
   const final = (() => {
     let state = initialDraftState(SNAKE_CONFIG);
@@ -206,5 +213,90 @@ describe("auction nomination stays on board order (economics pinned)", () => {
     if (!result.ok) throw new Error(result.reason);
     expect(result.state.auction?.lot?.playerId).toBe("te2");
     expect(result.state.auction?.lot?.autoNominated).toBe(true);
+  });
+});
+
+describe("history replays under the policy it was made with (the skipPolicy/F3 discipline)", () => {
+  // A tiny 2-team, 3-slot league whose autopicks DIVERGE between the old and new policies by
+  // round 2, so equivalence assertions below cannot pass by accident.
+  const SPRINT_SLOTS = [
+    { slot: "QB", count: 1, eligiblePositions: ["QB"] },
+    { slot: "RB", count: 1, eligiblePositions: ["RB"] },
+    { slot: "BENCH", count: 1, eligiblePositions: ["QB", "RB", "WR", "TE", "K", "DEF"] },
+  ] as const;
+  const SPRINT_POOL: readonly DraftPoolEntry[] = [
+    { playerId: "qb1", position: "QB" }, { playerId: "qb2", position: "QB" }, { playerId: "qb3", position: "QB" },
+    { playerId: "rb1", position: "RB" }, { playerId: "rb2", position: "RB" }, { playerId: "rb3", position: "RB" },
+  ];
+  const SPRINT_CONFIG: DraftConfig = {
+    draftId: "d_hist", leagueId: "l_hist", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",
+    auctionBudget: null, slotConfig: SPRINT_SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
+  };
+
+  /** Folds a START (as given) plus expiries to completion, returning "team:player" per pick. */
+  function replayAllExpiries(start: StartDraftAction): readonly string[] {
+    let state = initialDraftState(SPRINT_CONFIG);
+    const started = submitCommand(state, start);
+    if (!started.ok) throw new Error(started.reason);
+    state = started.state;
+    while (!isComplete(state)) {
+      const next = submitCommand(state, expireAt(state));
+      if (!next.ok) throw new Error(next.reason);
+      state = next.state;
+    }
+    return state.picks.map((p) => `${p.teamId}:${p.playerId}`);
+  }
+
+  it("replays a pre-upgrade log (no autopick snapshot) to exactly the OLD algorithm's picks", () => {
+    // A log persisted before the upgrade: START_DRAFT carries no autopick snapshot (and no
+    // skipPolicy — the oldest shape), and its live TIMER_EXPIREs derived every autopick under
+    // the OLD policy: queue first, then plain board order. The expectation below is that
+    // algorithm's output, derived BY HAND from board order alone — round 2 is where the new
+    // scoring would diverge (t2 holding qb2 would take rb1 over the board-first qb3), so this
+    // sequence can only be produced by the legacy path.
+    const preUpgradeStart: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: SPRINT_POOL };
+    expect(replayAllExpiries(preUpgradeStart)).toEqual([
+      "t1:qb1", // pick 1: board head
+      "t2:qb2", // pick 2: board head
+      "t2:qb3", // pick 3 (round 2 reversed): board head again — a THIRD QB, onto the bench
+      "t1:rb1", // pick 4: board head among what remains
+      "t1:rb2", // pick 5 (round 3): bench
+      "t2:rb3", // pick 6: the last RB slot
+    ]);
+  });
+
+  it("keeps a snapshotted draft's replay identical even after the module tunables are retuned", () => {
+    // The persisted-row round trip: a stored action holds the VALUES, not a reference to the
+    // module constant — spread here models exactly that.
+    const snapshottedStart: StartDraftAction = {
+      v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: SPRINT_POOL,
+      autopick: { ...AUTOPICK_CONFIG },
+    };
+    const before = replayAllExpiries(snapshottedStart);
+    // Round 2 takes the open-need RB over the board-first third QB: proof the need-aware path
+    // (not the legacy one) is what this test is holding still.
+    expect(before[2]).toBe("t2:rb1");
+
+    const mutable = AUTOPICK_CONFIG as { temperature: number; needPerOpenStartingSlot: number };
+    const saved = { temperature: mutable.temperature, needPerOpenStartingSlot: mutable.needPerOpenStartingSlot };
+    try {
+      // A hostile future retune. If bestAvailableFor read the module constant anywhere, the
+      // replay below would flip picks; reading only the log's own snapshot, it cannot.
+      mutable.temperature = 0.5;
+      mutable.needPerOpenStartingSlot = 5;
+      expect(replayAllExpiries(snapshottedStart)).toEqual(before);
+    } finally {
+      mutable.temperature = saved.temperature;
+      mutable.needPerOpenStartingSlot = saved.needPerOpenStartingSlot;
+    }
+  });
+
+  it("takes the plain board-order fallback for a pre-upgrade state even where need would differ", () => {
+    // The round-8 TE-need scenario from above, minus the snapshot: the old policy takes the
+    // board's best (rb5), never the roster's need (te1) — byte-equivalent to the pre-upgrade
+    // fallback, which is what an absent snapshot MUST mean.
+    const legacyConfig: DraftConfig = { ...SNAKE_CONFIG, autopick: null };
+    const state = midDraftState(legacyConfig, ROUND8_POOL, { t1: ROUND8_ROSTER, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("rb5");
   });
 });

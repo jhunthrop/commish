@@ -64,6 +64,26 @@ export interface StartDraftAction {
     readonly maxOwedPerTeam: number;
     readonly appliesAtOrAbovePickSeconds: number;
   };
+  /**
+   * The need-aware autopick scoring in force when this draft started (the 2026-09-03 autopick
+   * upgrade), snapshotted here for the identical reason `minBid` and `skipPolicy` are:
+   * `bestAvailableFor` reads it while folding a TIMER_EXPIRE, so replaying this log must never
+   * depend on `AUTOPICK_CONFIG`'s CURRENT values — a retuned temperature would otherwise change
+   * what an already-persisted draft's autopick WAS.
+   *
+   * OPTIONAL, and absent MUST MEAN the pre-upgrade policy (plain board-order fallback, need
+   * weight permanently zero), NEVER "today's tunables" — the exact F3 lesson `skipPolicy` above
+   * records: a log written before this field existed derived its autopicks under the old
+   * algorithm, and replaying it under the new one would reconstruct rosters that disagree with
+   * the picks (and `draft_auto_picked` notices) the live draft actually produced. Every
+   * `START_DRAFT` this codebase writes from the upgrade on carries the value.
+   */
+  readonly autopick?: {
+    readonly temperature: number;
+    readonly needPerOpenStartingSlot: number;
+    readonly startersFilledDamp: number;
+    readonly rampFullAtRosterFraction: number;
+  };
 }
 
 export interface MakePickAction {

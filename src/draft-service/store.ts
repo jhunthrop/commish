@@ -7,6 +7,7 @@ import type { Clock } from "@/domain/timing";
 import {
   admitCommand,
   AUCTION_CONFIG,
+  AUTOPICK_CONFIG,
   DRAFT_SKIP_POLICY,
   draftActionSchema,
   draftEventsFor,
@@ -739,6 +740,10 @@ export function createDraftStore({
             // here on, so a later deploy that changes `DRAFT_SKIP_POLICY` can never change what
             // an already-persisted TIMER_EXPIRE did on replay.
             skipPolicy: DRAFT_SKIP_POLICY,
+            // The need-aware autopick scoring rides the action the same way: `bestAvailableFor`
+            // reads ONLY this snapshot while folding an expiry, so retuning `AUTOPICK_CONFIG`
+            // changes future drafts and never what an already-persisted autopick WAS.
+            autopick: AUTOPICK_CONFIG,
           };
         },
         {
