@@ -225,7 +225,7 @@ describe("activityRowFor", () => {
     expect(activityRowFor(event("draft_pick", { ...pickPayload }, "user_alice"), viewer, names)).toEqual({
       eventId: "evt_1",
       occurredAt: "2026-08-20T17:00:00.000Z",
-      icon: "check",
+      icon: "draft-pick",
       headline: "Alice drafted Bijan Robinson.",
       detail: "Round 2, pick 24.",
     });
@@ -354,7 +354,7 @@ describe("activityRowFor", () => {
   it("keeps the human sentence for a user-attributed pick whose actor id could not be resolved", () => {
     const orphaned: AuditEvent = { ...event("draft_pick", pickPayload, null), actorType: "user" };
     expect(activityRowFor(orphaned, viewer, names)).toMatchObject({
-      icon: "check",
+      icon: "draft-pick",
       headline: "A former member drafted Bijan Robinson.",
     });
   });

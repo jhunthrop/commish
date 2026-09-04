@@ -247,7 +247,7 @@ function renderDraftPick(event: AuditEvent, names: ActivityNames): Rendered | nu
   const detail = `Round ${round}, pick ${pickNumber}.${price === undefined ? "" : ` Won for $${price}.`}`;
 
   if (event.actorType !== "system") {
-    return { icon: "check", headline: `${names.member(actorId)} drafted ${playerName}.`, detail };
+    return { icon: "draft-pick", headline: `${names.member(actorId)} drafted ${playerName}.`, detail };
   }
 
   const teamId = str(payload, "teamId");

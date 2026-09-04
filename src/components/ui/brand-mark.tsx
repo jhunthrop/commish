@@ -8,7 +8,10 @@
  * same way `Icon`'s `currentColor` strokes do, so ONE markup serves both themes:
  *
  * - the barrel/chamber silhouette fills `surfaceRaised` — the same "a thing lifted off its
- *   surface" role a card or a row uses, so the mark reads as a raised plate in both themes.
+ *   surface" role a card or a row uses. In dark the fill visibly lifts (#131B2A over #05070C);
+ *   in light `surfaceRaised` is white on paper, a near-invisible step, and the `textPrimary`
+ *   outline below is what carries the silhouette there — the fill is along for consistency of
+ *   role, not doing light mode's work.
  * - the outline stroke is `textPrimary` — floodlit ink, same role the wordmark beside it renders
  *   in.
  * - the mouth notch and the chamber disc are `accent` — amber at night, brand blue in daylight,
