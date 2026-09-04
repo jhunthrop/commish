@@ -145,8 +145,8 @@ Sequencing note: 2027 launch, 2026 data year — the suite must be complete and 
 - **Commissioner**: draft grades and the room-wide board make their league louder; wants the brief in league chat. Served (share verbs).
 - **First-timer**: the assistant's plain sentences and the sheet's seeded start are the on-ramp; jargon stays behind `why`. Served.
 
-## 15. Open questions for the founder
+## 15. Open questions — RULED 2026-09-04 (founder delegated; rulings recorded so the build runs unattended)
 
-1. Is Draft HQ part of the base product, or the paid tier's anchor? (Pricing shapes nothing structural yet; alerts and 10k-run sims are natural premium gates.)
-2. Auction depth in phase 2 vs deferred to phase 3?
-3. Draft grades for real leagues: visible to the whole league by default, or opt-in per league?
+1. **Base vs paid: Draft HQ ships in the base product.** Per `docs/research/2026-09-04-draft-prep-market-tiering.md`: free is the acquisition weapon (league-aware board, sheet, mocks, in-room assistant all free); premium anchors later on Simulator depth (10k runs, pick-path, exposure), market alerts, and pro data at ~$39-49/season with a paid-league-membership bundle lever. BUILD CONSEQUENCE: no paywall UI in this program; heavy-compute surfaces read budgets from config with generous defaults; the premium boundary arrives with billing work, not here.
+2. **Auction depth: snake first.** Auction dollar values ship on the Board in phase 1 (cheap, high value). The auction Simulator and auction Assistant move to phase 3 with the room work — auction leagues are the minority and snake sims maximize early value. Cost if wrong: auction managers wait one phase.
+3. **Draft grades: league-visible by default, per-league opt-out.** The room-wide grade board is a shared moment and the commissioner-automation market's kind of loud; a league that hates it turns it off in league settings. Mock-draft grades stay private to the manager always. Cost if wrong: one setting flip.
