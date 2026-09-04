@@ -141,18 +141,23 @@ export function createDraftAdvancer({
     if (state.config.isMock === true) {
       const due = await mockDriver.dueBotPick(state);
       if (due !== null && due.dueAtMs <= nowMs) {
-        // `Math.ceil`: the seeded delay is fractional-millisecond arithmetic; the stamp is
-        // the first whole millisecond at-or-after it, so the recorded instant never precedes
-        // the true due instant and two advancers stamp identically.
-        const timestamp = new Date(Math.ceil(due.dueAtMs)).toISOString();
-        const result = await store.applyAction(state.config.draftId, {
-          v: DRAFT_ACTION_VERSION,
-          type: "MAKE_PICK",
-          timestamp,
-          teamId: due.teamId,
-          playerId: due.playerId,
-        });
-        return { dueWork: `bot-pick due ${timestamp}`, result };
+        // The selection runs only past the due check (fix round LOW 5); a null choice means the
+        // roster can take nothing, so the turn falls through to the clock's own expiry below.
+        const playerId = due.choosePick();
+        if (playerId !== null) {
+          // `Math.ceil`: the seeded delay is fractional-millisecond arithmetic; the stamp is
+          // the first whole millisecond at-or-after it, so the recorded instant never precedes
+          // the true due instant and two advancers stamp identically.
+          const timestamp = new Date(Math.ceil(due.dueAtMs)).toISOString();
+          const result = await store.applyAction(state.config.draftId, {
+            v: DRAFT_ACTION_VERSION,
+            type: "MAKE_PICK",
+            timestamp,
+            teamId: due.teamId,
+            playerId,
+          });
+          return { dueWork: `bot-pick due ${timestamp}`, result };
+        }
       }
     }
     const deadline = currentDeadline(state);

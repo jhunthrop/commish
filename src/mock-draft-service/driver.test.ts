@@ -662,13 +662,17 @@ describe("dueBotPick (the drivers' one due computation — paced ticker, sim lan
     // The identical stream the live driver derives: the room's stored seed, this pick's own key.
     const delaySeconds = botThinkDelaySeconds(30, rngFor(FIXTURE_BOT_SEED, `${onClock}:delay:1`));
     expect(due!.dueAtMs).toBe(Date.parse(state.turnStartedAt!) + delaySeconds * 1000);
+    // The selection thunk is pure: asking twice answers identically and moves no cursor.
+    const playerId = due!.choosePick();
+    expect(playerId).not.toBeNull();
+    expect(due!.choosePick()).toBe(playerId);
 
     // One computation, two callers: the live drive at the due instant lands THIS pick.
     now = new Date(Math.ceil(due!.dueAtMs)).toISOString();
     const driven = await driver.driveBotPick(state, now);
     expect(driven).toEqual({ picked: true, picks: 1 });
     const after = (await store.getDraftState(fixture.draftId))!;
-    expect(after.picks[0]!.playerId).toBe(due!.playerId);
+    expect(after.picks[0]!.playerId).toBe(playerId);
   });
 
   it("prices a sim room's bot turn at the turn's own start (zero delay) and answers null while the human holds the clock", async () => {
@@ -710,7 +714,7 @@ describe("dueBotPick (the drivers' one due computation — paced ticker, sim lan
         type: "MAKE_PICK",
         timestamp: now,
         teamId: due!.teamId,
-        playerId: due!.playerId,
+        playerId: due!.choosePick()!,
       });
       if (!applied.ok) throw new Error(applied.reason);
       state = applied.state;
