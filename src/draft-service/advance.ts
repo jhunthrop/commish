@@ -103,8 +103,11 @@ export function createDraftAdvancer({
       const outcome = await startMockDraft(db, state.config.leagueId, { store, newId });
       if (outcome.ok) return "started";
       // A mapped 409 is the benign lost race (the T5 carry): another driver already produced
-      // the state this one wanted — an answer, not an error. Anything else is a real refusal.
-      return outcome.status === 409 ? "raced" : "not-due";
+      // the state this one wanted — an answer, not an error. Anything else is a real refusal,
+      // logged here the way the ticker's due-scan lane reports its own non-benign failures.
+      if (outcome.status === 409) return "raced";
+      console.error("[draft] deferred mock start refused", { leagueId: state.config.leagueId, reason: outcome.reason });
+      return "not-due";
     }
     const due = await dueDraftsQuery(db, now, state.config.draftId);
     if (due.length === 0) return "not-due";
