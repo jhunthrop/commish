@@ -50,11 +50,13 @@ describe("QuiltCellView faces", () => {
 describe("QuiltCellView height degradation (the one-height-per-row law)", () => {
   const YOURS: QuiltCell = { teamId: "t2", pick: null, onClock: false, yourPickLabel: "2.01" };
 
-  it("a squeezed active-round cell drops the face (under 44) and then the fact line (under 36), name last", () => {
-    const { unmount } = renderCell(true, 40);
-    expect(screen.getByTestId("quilt-pick-cell").querySelector("[data-testid='player-face-team']")).toBeNull();
+  it("a squeezed window cell drops the face (under 34) and then the fact line (under 30), name last", () => {
+    const { unmount } = renderCell(true, 32);
+    const withCaption = screen.getByTestId("quilt-pick-cell");
+    expect(withCaption.querySelector("[data-testid='player-face-team']")).toBeNull();
+    expect(withCaption).toHaveTextContent(`${qb1.position} · ${qb1.nflTeam}`);
     unmount();
-    renderCell(true, 30);
+    renderCell(true, 28);
     const cell = screen.getByTestId("quilt-pick-cell");
     expect(cell).toHaveTextContent(shortName(qb1.name));
     expect(cell).not.toHaveTextContent(`${qb1.position} · ${qb1.nflTeam}`);

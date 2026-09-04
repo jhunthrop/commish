@@ -18,7 +18,6 @@ import { peekFactsFor } from "./lib/peek-facts";
 import { ConnectionBanner } from "../components/connection-banner";
 import { ClockStrip } from "./components/clock-strip";
 import { QuiltBoard } from "./components/quilt-board";
-import { RosterSpine } from "./components/roster-spine";
 import { PoolDrawer } from "./components/pool-drawer";
 import { PeekSheet } from "./components/peek-sheet";
 import { UndoPill } from "./components/undo-pill";
@@ -32,10 +31,12 @@ export interface QuiltRoomProps {
 
 /**
  * THE QUILT ROOM — the snake draft room, rebuilt to the blueprint mocks. The quilt owns the
- * stage; the clock strip, the drawer, the peek and the spine borrow space and give it back, one
- * at a time (`reduceCollapse` is that law as a data structure). Desktop and phone are two
- * compositions over the same state: at phone widths the room INVERTS — pool first, the quilt
- * demoted to the BOARD tab — because a 390pt screen drafts from a list, not a grid.
+ * stage; the clock strip, the drawer and the peek borrow space and give it back, one at a time
+ * (`reduceCollapse` is that law as a data structure). The caller's roster lives in the drawer's
+ * own ROSTER tab (founder ruling 2026-09-03 — the left-edge spine is retired, the board takes
+ * the width). Desktop and phone are two compositions over the same state: at phone widths the
+ * room INVERTS — pool first, the quilt demoted to the BOARD tab — because a 390pt screen drafts
+ * from a list, not a grid.
  */
 export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const view = room.view!;
@@ -143,15 +144,6 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           lensChips={lensChips}
         />
         <div className="relative flex min-h-0 flex-1">
-          {room.myTeamId === null ? null : (
-            <RosterSpine
-              view={view}
-              myTeamId={room.myTeamId}
-              playersById={playersById}
-              expanded={surface.kind === "spine"}
-              onToggle={() => dispatch({ type: "TOGGLE_SPINE" })}
-            />
-          )}
           <div className={`min-h-0 flex-1 flex-col p-3 ${surface.kind === "drawer" && surface.height === "full" ? "hidden" : "flex"}`}>
             <QuiltBoard
               view={view}

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { pickLabel } from "../state/board";
+import { unfilledStartingPositions } from "../state/lens";
 import { QUILT_CONFIG } from "../state/config";
 import { teamCode } from "../lib/team-code";
 import { shortName } from "./quilt-cell";
@@ -50,9 +51,10 @@ function yourNext(view: DraftStateView, myTeamId: string | null): { readonly lab
 /**
  * THE CLOCK STRIP BREATHES (law 1). Slim ribbon while the room drafts: the running clock in the
  * room's own red, whose turn it is, and where your next pick sits. On YOUR turn it swells amber
- * — `accentGlow` wash, accent border, your queue's top three inlined with one-tap DRAFT — and
- * the growth eases inside the 250ms motion ceiling. Amber is yours, red is the room's; nothing
- * here ever flashes red at you.
+ * — `accentGlow` wash, accent border, your queue's top three inlined with one-tap DRAFT, and
+ * one quiet line of what your starting roster still needs — and the growth eases inside the
+ * 250ms motion ceiling. Amber is yours, red is the room's; nothing here ever flashes red at
+ * you, and the needs line never rides the red state.
  */
 export function ClockStrip({ view, teams, playersById, myTeamId, queue, myTurn, submitting, onDraft, clockLabel, lensChips }: ClockStripProps) {
   const reducedMotion = usePrefersReducedMotion();
@@ -70,33 +72,45 @@ export function ClockStrip({ view, teams, playersById, myTeamId, queue, myTurn, 
   const suggested = fromBoard ? view.availablePlayerIds.slice(0, QUILT_CONFIG.clockQueueCount) : queued;
 
   if (myTurn) {
+    // The quiet needs line (founder ruling 2026-09-03): the starting positions still open,
+    // K/DEF included — spoken only HERE, on the amber state, to the one manager deciding.
+    // The red room state never carries it; red is the room's channel, and the room does not
+    // nag (see `unfilledStartingPositions` for the scope judgment).
+    const stillNeeded = myTeamId === null ? [] : unfilledStartingPositions(view.slotConfig, view.rosters[myTeamId] ?? []);
     return (
       <div
         data-testid="clock-strip"
         data-strip-state="your-turn"
-        className={`accent-wash flex items-center gap-3 border-b-2 border-accent px-4 py-2 ${reducedMotion ? "" : "animate-strip-grow"}`}
+        className={`accent-wash flex flex-col gap-1 border-b-2 border-accent px-4 py-2 ${reducedMotion ? "" : "animate-strip-grow"}`}
       >
-        <div id="room-clock" className="flex items-center gap-2 rounded-sm bg-accent px-3 py-1.5">
-          <span className="font-display text-2xl font-bold text-accent-text tabular-nums">{clockLabel ?? "…"}</span>
-          <span className="font-display text-sm font-bold text-accent-text">YOUR PICK · {currentPlace}</span>
+        <div className="flex items-center gap-3">
+          <div id="room-clock" className="flex items-center gap-2 rounded-sm bg-accent px-3 py-1.5">
+            <span className="font-display text-2xl font-bold text-accent-text tabular-nums">{clockLabel ?? "…"}</span>
+            <span className="font-display text-sm font-bold text-accent-text">YOUR PICK · {currentPlace}</span>
+          </div>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            {suggested.map((playerId, index) => {
+              const player = playersById.get(playerId);
+              if (player === undefined) return null;
+              return (
+                <div key={playerId} className={`flex items-center gap-2 rounded-sm bg-surface-raised px-3 py-1.5 ${index === 0 ? "border border-accent" : ""}`}>
+                  <span className="font-display text-md font-semibold text-text-primary">{shortName(player.name)}</span>
+                  <span className="text-xs text-text-faint">{player.position}</span>
+                  <Button size="sm" variant={index === 0 ? "verb" : "secondary"} disabled={submitting} onClick={() => onDraft(playerId)}>
+                    Draft
+                  </Button>
+                </div>
+              );
+            })}
+            <span className={`hidden ${MICRO_LABEL} text-text-faint xl:inline`}>{fromBoard ? "board" : "your queue"}</span>
+          </div>
+          <LensChips {...lensChips} />
         </div>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          {suggested.map((playerId, index) => {
-            const player = playersById.get(playerId);
-            if (player === undefined) return null;
-            return (
-              <div key={playerId} className={`flex items-center gap-2 rounded-sm bg-surface-raised px-3 py-1.5 ${index === 0 ? "border border-accent" : ""}`}>
-                <span className="font-display text-md font-semibold text-text-primary">{shortName(player.name)}</span>
-                <span className="text-xs text-text-faint">{player.position}</span>
-                <Button size="sm" variant={index === 0 ? "verb" : "secondary"} disabled={submitting} onClick={() => onDraft(playerId)}>
-                  Draft
-                </Button>
-              </div>
-            );
-          })}
-          <span className={`hidden ${MICRO_LABEL} text-text-faint xl:inline`}>{fromBoard ? "board" : "your queue"}</span>
-        </div>
-        <LensChips {...lensChips} />
+        {stillNeeded.length === 0 ? null : (
+          <p data-testid="needs-line" className="text-xs text-text-muted">
+            Still need {stillNeeded.join(" · ")}
+          </p>
+        )}
       </div>
     );
   }

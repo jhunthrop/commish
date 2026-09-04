@@ -2,8 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { QuiltRowKind } from "./board";
 import { BOARD_HEIGHTS, planBoardHeights, type HeightPlanInput } from "./heights";
 
-/** A live room's usual shape: round 2 on the clock, one track round ahead, the rest micro. */
-const LIVE_KINDS: readonly QuiltRowKind[] = ["micro", "full", "track", ...Array.from({ length: 12 }, (): QuiltRowKind => "micro")];
+/**
+ * A live room's usual mid-draft shape under the four-round window (2026-09-03 roster pass):
+ * round 5 on the clock, so rounds 2–5 ride full, round 6 is the track ahead, the rest micro.
+ * Expectations below are recomputed FROM the constants (spec, "the height math"), never from
+ * the code's own output: fixed manager-full spend is 48 header + 15 gaps × 6 = 138, and the
+ * preferred rounds total is 4×36 + 11×14 = 298 — an exact-preferred stage of 436.
+ */
+const LIVE_KINDS: readonly QuiltRowKind[] = ["micro", "full", "full", "full", "full", "track", ...Array.from({ length: 9 }, (): QuiltRowKind => "micro")];
+/** The indexes LIVE_KINDS marks full — the window the assertions walk. */
+const FULL_INDEXES = [1, 2, 3, 4] as const;
 
 function plan(boardHeight: number, overrides: Partial<HeightPlanInput> = {}) {
   return planBoardHeights({ boardHeight, kinds: LIVE_KINDS, header: "manager", needsRow: false, ...overrides });
@@ -24,57 +32,74 @@ function spent(boardHeight: number, overrides: Partial<HeightPlanInput> = {}): n
 }
 
 describe("planBoardHeights — the roomy stage", () => {
-  it("caps every kind at its old max-h ceiling and keeps the manager row full", () => {
+  it("caps every kind at its ceiling and keeps the manager row full", () => {
+    // Budget 1000 − 138 = 862 clears the cap total 4×56 + 48 + 10×28 = 552.
     const result = plan(1000);
     expect(result.managerCompact).toBe(false);
-    expect(result.rows[1]!.height).toBe(BOARD_HEIGHTS.row.full.max);
-    expect(result.rows[2]!.height).toBe(BOARD_HEIGHTS.row.track.max);
-    for (const index of [0, 3, 14]) expect(result.rows[index]!.height).toBe(BOARD_HEIGHTS.row.micro.max);
+    for (const index of FULL_INDEXES) expect(result.rows[index]!.height).toBe(BOARD_HEIGHTS.row.full.max);
+    expect(result.rows[5]!.height).toBe(BOARD_HEIGHTS.row.track.max);
+    for (const index of [0, 6, 14]) expect(result.rows[index]!.height).toBe(BOARD_HEIGHTS.row.micro.max);
     expect(result.rows.every((row) => row.label)).toBe(true);
   });
 
-  it("gives the active round the biggest share of a partial surplus", () => {
-    // Preferred total is 44 + 14×14 = 240; hand the rounds ~90px of surplus.
+  it("gives the window's rounds the biggest share of a partial surplus", () => {
+    // Budget 422 leaves a 124px surplus over the 298 preferred total; the waterfill weights
+    // (full 3, track 2, micro 1) hand each full row 124×3/24 = 15.5.
     const result = plan(560);
-    const [micro, full, track] = [result.rows[0]!.height, result.rows[1]!.height, result.rows[2]!.height];
+    const [micro, full, track] = [result.rows[0]!.height, result.rows[1]!.height, result.rows[5]!.height];
     expect(full).toBeGreaterThan(track);
     expect(track).toBeGreaterThan(micro);
     expect(full).toBeLessThanOrEqual(BOARD_HEIGHTS.row.full.max);
+    for (const index of FULL_INDEXES) expect(result.rows[index]!.height).toBeCloseTo(full, 5);
+  });
+
+  it("four full rounds, the manager row and the past fit the common stages without degrading", () => {
+    // The spec's three-viewport proof: budgets 662 / 762 / 912 all clear the 298 preferred
+    // total, so the window never squeezes and the manager row stays full.
+    for (const height of [800, 900, 1050]) {
+      const result = plan(height);
+      expect(result.managerCompact).toBe(false);
+      for (const index of FULL_INDEXES) expect(result.rows[index]!.height).toBeGreaterThanOrEqual(BOARD_HEIGHTS.row.full.preferred);
+      expect(spent(height)).toBeLessThanOrEqual(height + 0.5);
+    }
   });
 
   it("never spends more than the stage it was given", () => {
-    for (const height of [1200, 900, 700, 560, 430, 380, 330, 260, 200, 120]) {
+    for (const height of [1200, 900, 700, 560, 436, 380, 330, 260, 200, 120]) {
       expect(spent(height)).toBeLessThanOrEqual(height + 0.5);
     }
   });
 });
 
 describe("planBoardHeights — the degradation ladder", () => {
-  // Fixed costs at manager-full: 48 header + 15×6 gaps = 138; preferred rounds need 240 more.
+  // Fixed costs at manager-full: 48 header + 15×6 gaps = 138; preferred rounds need 298 more.
   it("holds every row at its preferred height when the budget exactly covers it", () => {
-    const result = plan(378);
+    const result = plan(436);
     expect(result.managerCompact).toBe(false);
-    expect(result.rows[1]!.height).toBeCloseTo(BOARD_HEIGHTS.row.full.preferred, 5);
+    for (const index of FULL_INDEXES) expect(result.rows[index]!.height).toBeCloseTo(BOARD_HEIGHTS.row.full.preferred, 5);
     expect(result.rows[0]!.height).toBeCloseTo(BOARD_HEIGHTS.row.micro.preferred, 5);
   });
 
   it("step 1: compacts the manager row before touching the rounds", () => {
-    // 370 misses the manager-full budget by 8; compacting the header buys back 20, so every
+    // 428 misses the manager-full budget by 8; compacting the header buys back 20, so every
     // round keeps at least its preferred height (the 12px change waterfills as surplus).
-    const result = plan(370);
+    const result = plan(428);
     expect(result.managerCompact).toBe(true);
-    expect(result.rows[1]!.height).toBeGreaterThanOrEqual(BOARD_HEIGHTS.row.full.preferred);
+    for (const index of FULL_INDEXES) expect(result.rows[index]!.height).toBeGreaterThanOrEqual(BOARD_HEIGHTS.row.full.preferred);
     expect(result.rows[0]!.height).toBeGreaterThanOrEqual(BOARD_HEIGHTS.row.micro.preferred);
     expect(result.rows.every((row) => row.label)).toBe(true);
   });
 
-  it("step 2: squeezes track and micro rows evenly while the active round holds 44, and their labels hide", () => {
-    const result = plan(330);
+  it("step 2: squeezes track and micro rows evenly while the window holds 36, and their labels hide", () => {
+    // Compact budget 390 − 118 = 272: the eleven other rows share 272 − 144 = 128 → ~11.64px.
+    const result = plan(390);
     expect(result.managerCompact).toBe(true);
-    const full = result.rows[1]!;
-    expect(full.height).toBeCloseTo(BOARD_HEIGHTS.row.full.preferred, 5);
-    expect(full.label).toBe(true);
-    const others = result.rows.filter((_, index) => index !== 1);
+    for (const index of FULL_INDEXES) {
+      const full = result.rows[index]!;
+      expect(full.height).toBeCloseTo(BOARD_HEIGHTS.row.full.preferred, 5);
+      expect(full.label).toBe(true);
+    }
+    const others = result.rows.filter((_, index) => !FULL_INDEXES.includes(index as (typeof FULL_INDEXES)[number]));
     const first = others[0]!.height;
     for (const row of others) {
       expect(row.height).toBeCloseTo(first, 5);
@@ -84,12 +109,18 @@ describe("planBoardHeights — the degradation ladder", () => {
     }
   });
 
-  it("step 3: the active round gives ground only after the others reach their floor", () => {
-    const result = plan(240);
-    const full = result.rows[1]!;
-    expect(full.height).toBeLessThan(BOARD_HEIGHTS.row.full.preferred);
-    expect(full.height).toBeGreaterThanOrEqual(BOARD_HEIGHTS.row.full.floor);
-    for (const row of result.rows.filter((_, index) => index !== 1)) {
+  it("step 3: the window gives ground only after the others reach their floor", () => {
+    // Compact budget 290 − 118 = 172: the others floor at 11×4 = 44 and the four full rows
+    // share (172 − 44)/4 = 32 — under preferred, over the 28px readable floor.
+    const result = plan(290);
+    for (const index of FULL_INDEXES) {
+      const full = result.rows[index]!;
+      expect(full.height).toBeCloseTo(32, 5);
+      expect(full.height).toBeLessThan(BOARD_HEIGHTS.row.full.preferred);
+      expect(full.height).toBeGreaterThanOrEqual(BOARD_HEIGHTS.row.full.floor);
+    }
+    for (const [index, row] of result.rows.entries()) {
+      if (FULL_INDEXES.includes(index as (typeof FULL_INDEXES)[number])) continue;
       expect(row.height).toBeCloseTo(BOARD_HEIGHTS.row.micro.floor, 5);
     }
   });

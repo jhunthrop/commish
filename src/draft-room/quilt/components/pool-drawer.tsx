@@ -12,6 +12,7 @@ import { QUILT_CONFIG } from "../state/config";
 import { DrawerHandles } from "./drawer-handles";
 import { DrawerPoolTab } from "./drawer-pool-tab";
 import { DrawerSheetTab } from "./drawer-sheet-tab";
+import { DrawerRosterTab } from "./drawer-roster-tab";
 import { DrawerByesTab } from "./drawer-byes-tab";
 import { DrawerPicksTab } from "./drawer-picks-tab";
 import type { RoomActs } from "./room-acts";
@@ -46,6 +47,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
   const open = surface.kind === "drawer";
   const hasByes = byeWeeks.size > 0;
+  const hasRoster = myTeamId !== null;
 
   // The Sleeper-grammar need fractions for the filter row (spec, addition 2): starting slots
   // vs the roster the room state already carries — filtering and needing become one glance.
@@ -59,7 +61,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
       <div id="dock-queue" data-testid="pool-drawer" data-drawer-height="collapsed" className="flex flex-col">
         {/* `player-pool` stays mounted for the tour's anchor even at rest. */}
         <div id="player-pool">
-          <DrawerHandles surface={surface} dispatch={dispatch} hasByes={hasByes} />
+          <DrawerHandles surface={surface} dispatch={dispatch} hasByes={hasByes} hasRoster={hasRoster} />
         </div>
       </div>
     );
@@ -74,7 +76,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
       className={`flex flex-col ${height === "full" ? "min-h-0 flex-1" : ""}`}
       style={height === "half" ? { height: QUILT_CONFIG.drawerHeight.half } : undefined}
     >
-      <DrawerHandles surface={surface} dispatch={dispatch} hasByes={hasByes} />
+      <DrawerHandles surface={surface} dispatch={dispatch} hasByes={hasByes} hasRoster={hasRoster} />
       <div id="player-pool" className="flex min-h-0 flex-1 flex-col bg-surface-elevated px-4 py-2">
         {tab === "pool" ? (
           <DrawerPoolTab
@@ -105,6 +107,8 @@ export function PoolDrawer(props: PoolDrawerProps) {
             onDraft={props.onDraft}
             onPeek={props.onPeek}
           />
+        ) : tab === "roster" ? (
+          <DrawerRosterTab view={view} myTeamId={props.myTeamId} playersById={props.playersById} onPeek={props.onPeek} />
         ) : tab === "byes" ? (
           <DrawerByesTab
             players={props.players}

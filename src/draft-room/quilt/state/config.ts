@@ -29,9 +29,17 @@ export const QUILT_CONFIG = {
   /**
    * The quilt's compaction (law 4): the active round renders full cells; this many rounds
    * after it render full-height EMPTY tracks so the eye can see what is coming; everything
-   * beyond, and every completed round, renders as micro color tiles. Zero scroll at 15 rounds.
+   * beyond, and every round older than the window below, renders as micro color tiles. Zero
+   * scroll at 15 rounds.
    */
   fullRoundsAhead: 1,
+  /**
+   * The window behind (founder ruling 2026-09-03): this many rounds BEFORE the active one
+   * stay full too — the story so far, readable, not just the present tense. Clamped at the
+   * draft's start (round 1 shows one full row, round 2 two). The shorter card constants in
+   * `heights.ts` are what make four full rows fit where one did.
+   */
+  fullRoundsBehind: 3,
   /** localStorage key prefix for the cheat sheet, suffixed with the draft id. */
   sheetStorageKeyPrefix: "commish.draft-sheet.",
   /** The consistency strip's own bar: a week at or over this many fantasy points counts as a

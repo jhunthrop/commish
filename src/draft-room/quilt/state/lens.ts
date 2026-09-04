@@ -55,18 +55,47 @@ export interface NeedFraction {
   readonly satisfied: boolean;
 }
 
-/** The filter row's fractions, in the slot config's own order. */
-export function needFractions(slotConfig: readonly RosterSlotConfig[], roster: readonly RosterSlot[]): readonly NeedFraction[] {
+/** Every dedicated STARTING position — the clock strip's needs line speaks all six, because a
+ *  late-round K/DEF hole is exactly the decision that line exists for (see
+ *  `unfilledStartingPositions`). FLEX and bench are not positions and appear nowhere. */
+const STARTING_POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
+
+/** The one fraction derivation both scopes share — the chips and the needs line can never
+ *  disagree with each other, or with the NEEDS lens, about what a roster has filled. */
+function fractionsFor(
+  slotConfig: readonly RosterSlotConfig[],
+  roster: readonly RosterSlot[],
+  positions: readonly Position[],
+): readonly NeedFraction[] {
   const filled = new Map<string, number>();
   for (const slot of roster) filled.set(slot.slot, (filled.get(slot.slot) ?? 0) + 1);
   const fractions: NeedFraction[] = [];
   for (const config of slotConfig) {
-    const position = NEED_POSITIONS.find((candidate) => candidate === config.slot);
+    const position = positions.find((candidate) => candidate === config.slot);
     if (position === undefined) continue;
     const count = Math.min(filled.get(config.slot) ?? 0, config.count);
     fractions.push({ position, filled: count, total: config.count, satisfied: count >= config.count });
   }
   return fractions;
+}
+
+/** The filter row's fractions, in the slot config's own order. */
+export function needFractions(slotConfig: readonly RosterSlotConfig[], roster: readonly RosterSlot[]): readonly NeedFraction[] {
+  return fractionsFor(slotConfig, roster, NEED_POSITIONS);
+}
+
+/**
+ * The clock strip's quiet your-turn line (founder ruling 2026-09-03): the dedicated starting
+ * positions whose copies are not all filled, once each, in the slot config's own order —
+ * "Still need TE · K · DEF". Wider than the NEEDS dots' scope on purpose: the dots paint the
+ * whole room for thirteen rounds (where twelve K dots say nothing twelve times), while this
+ * line speaks once, to one manager, at the exact moment a K/DEF hole is the decision. Empty
+ * when the starting roster is complete — and the line disappears with it.
+ */
+export function unfilledStartingPositions(slotConfig: readonly RosterSlotConfig[], roster: readonly RosterSlot[]): readonly Position[] {
+  return fractionsFor(slotConfig, roster, STARTING_POSITIONS)
+    .filter((fraction) => !fraction.satisfied)
+    .map((fraction) => fraction.position);
 }
 
 /** teamId → its open position needs, for the whole room in one pass. */

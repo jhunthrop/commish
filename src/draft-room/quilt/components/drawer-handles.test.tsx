@@ -7,24 +7,40 @@ const COLLAPSED: ExpandedSurface = { kind: "none" };
 const HALF: ExpandedSurface = { kind: "drawer", height: "half", tab: "pool" };
 const FULL: ExpandedSurface = { kind: "drawer", height: "full", tab: "pool" };
 
-function renderHandles(surface: ExpandedSurface, hasByes = true) {
+function renderHandles(surface: ExpandedSurface, hasByes = true, hasRoster = true) {
   const dispatch = vi.fn<(event: CollapseEvent) => void>();
-  render(<DrawerHandles surface={surface} dispatch={dispatch} hasByes={hasByes} />);
+  render(<DrawerHandles surface={surface} dispatch={dispatch} hasByes={hasByes} hasRoster={hasRoster} />);
   return dispatch;
 }
 
 describe("DrawerHandles", () => {
   it("shows every tab handle and the grabber even collapsed — opening is never a mystery gesture", () => {
     renderHandles(COLLAPSED);
-    for (const name of ["Pool", "My sheet", "Byes", "Picks"]) {
+    for (const name of ["Pool", "My sheet", "Roster", "Byes", "Picks"]) {
       expect(screen.getByRole("tab", { name: new RegExp(name) })).toBeInTheDocument();
     }
     expect(screen.getByTestId("drawer-grabber")).toHaveTextContent(/drag or tap · space/i);
   });
 
+  it("keeps the founder-ruled handle order: Pool, My sheet, Roster, Byes, Picks", () => {
+    renderHandles(COLLAPSED);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Pool", "My sheet", "Roster", "Byes", "Picks"]);
+  });
+
   it("hides the Byes handle when the schedule has nothing to claim", () => {
     renderHandles(COLLAPSED, false);
     expect(screen.queryByRole("tab", { name: /Byes/ })).toBeNull();
+  });
+
+  it("hides the Roster handle for a caller with no team of their own", () => {
+    renderHandles(COLLAPSED, true, false);
+    expect(screen.queryByRole("tab", { name: /Roster/ })).toBeNull();
+  });
+
+  it("opens the drawer at half on the Roster tab like any other tab (SET_TAB)", () => {
+    const dispatch = renderHandles(COLLAPSED);
+    fireEvent.click(screen.getByRole("tab", { name: /Roster/ }));
+    expect(dispatch).toHaveBeenCalledWith({ type: "SET_TAB", tab: "roster" });
   });
 
   it("collapsed, tapping any tab opens the drawer at half on that surface (SET_TAB)", () => {

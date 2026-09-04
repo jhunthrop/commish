@@ -59,22 +59,24 @@ describe("DraftRoom", () => {
     );
   });
 
-  // THE QUILT (2026-09-02, the blueprint mocks): the snake room's right-edge aside is GONE by
-  // design law — the quilt owns the stage, the roster becomes the 44px spine on the left, and
-  // the mocks carry no chat column. League chat stays reachable from the league room, and the
-  // auction room still renders the old shell's band (`auction-room.test.tsx` covers it).
-  it("gives a manager the roster spine instead of the old aside — the quilt owns the stage", async () => {
+  // THE QUILT (2026-09-02, the blueprint mocks; roster ruling 2026-09-03): the snake room's
+  // right-edge aside is GONE by design law — the quilt owns the stage, the roster lives in the
+  // drawer's own ROSTER tab (the left-edge spine is retired), and the mocks carry no chat
+  // column. League chat stays reachable from the league room, and the auction room still
+  // renders the old shell's band (`auction-room.test.tsx` covers it).
+  it("gives a manager the drawer's Roster tab instead of the old aside — the quilt owns the stage", async () => {
     mount();
-    await waitFor(() => expect(screen.getByTestId("roster-spine")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Roster" })).toBeInTheDocument());
     expect(screen.queryByTestId("room-aside")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("roster-spine")).not.toBeInTheDocument();
   });
 
-  it("renders no spine for a commissioner with no team of their own", async () => {
+  it("offers no Roster tab to a commissioner with no team of their own", async () => {
     const fixture = fixtureDeps();
     fixture.teamId = null;
     mount(fixture);
     await waitFor(() => expect(screen.getByTestId("quilt-room")).toBeInTheDocument());
-    expect(screen.queryByTestId("roster-spine")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Roster" })).not.toBeInTheDocument();
   });
 
   it("offers a retry when the draft cannot be loaded", async () => {

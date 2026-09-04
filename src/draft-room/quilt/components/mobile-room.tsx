@@ -16,6 +16,7 @@ import { shortName } from "./quilt-cell";
 import { QuiltBoard } from "./quilt-board";
 import { DrawerPoolTab } from "./drawer-pool-tab";
 import { DrawerSheetTab } from "./drawer-sheet-tab";
+import { DrawerRosterTab } from "./drawer-roster-tab";
 import { DrawerPicksTab } from "./drawer-picks-tab";
 import { MobileConfirmSheet } from "./mobile-confirm-sheet";
 import { PeekSheet } from "./peek-sheet";
@@ -23,10 +24,14 @@ import { UndoPill } from "./undo-pill";
 import { LensChips } from "./lens-chips";
 import type { RoomActs } from "./room-acts";
 
-const MOBILE_TABS = ["pool", "sheet", "board", "picks"] as const;
+const MOBILE_TABS = ["pool", "sheet", "roster", "board", "picks"] as const;
 type MobileTab = (typeof MOBILE_TABS)[number];
 
-const TAB_LABEL: Readonly<Record<MobileTab, string>> = { pool: "POOL", sheet: "SHEET", board: "BOARD", picks: "PICKS" };
+/** Literal caps are the tab bar's own data-register (the sweep bans the CLASS, not acronyms).
+ *  Five tabs at 390px: the widest label (ROSTER) measures ~52px of text-sm bold against the
+ *  ~78px a five-way flex-1 split leaves, so the existing font and padding hold (spec, mobile
+ *  judgment). */
+const TAB_LABEL: Readonly<Record<MobileTab, string>> = { pool: "POOL", sheet: "SHEET", roster: "ROSTER", board: "BOARD", picks: "PICKS" };
 
 export interface MobileRoomProps {
   readonly room: DraftRoomState;
@@ -57,9 +62,10 @@ export interface MobileRoomProps {
 
 /**
  * THE PHONE ROOM INVERTS (`MobilePool` / `MobileYourTurn` / `MobileQuilt` mocks): pool-first
- * list with big draft verbs, bottom tabs POOL / SHEET / BOARD / PICKS, the quilt demoted to the
- * BOARD tab as micro tiles with tap-to-inspect. Picking is two-step — the confirm sheet — and
- * then the same undo window desktop gets.
+ * list with big draft verbs, bottom tabs POOL / SHEET / ROSTER / BOARD / PICKS, the quilt
+ * demoted to the BOARD tab as micro tiles with tap-to-inspect. ROSTER renders the same rows as
+ * the desktop drawer's tab (founder ruling 2026-09-03). Picking is two-step — the confirm
+ * sheet — and then the same undo window desktop gets.
  */
 export function MobileRoom(props: MobileRoomProps) {
   const { room, view, playersById, myTurn, acts, pending, onUndo, clockLabel } = props;
@@ -162,6 +168,8 @@ export function MobileRoom(props: MobileRoomProps) {
             onDraft={mobileActs.onDraft}
             onPeek={mobileActs.onPeek}
           />
+        ) : tab === "roster" ? (
+          <DrawerRosterTab view={view} myTeamId={room.myTeamId} playersById={playersById} onPeek={mobileActs.onPeek} />
         ) : tab === "board" ? (
           <div className="flex flex-col gap-2">
             <QuiltBoard
@@ -195,9 +203,10 @@ export function MobileRoom(props: MobileRoomProps) {
         </div>
       )}
 
-      {/* Bottom tab bar — the inversion's spine. */}
+      {/* Bottom tab bar — the inversion's backbone. ROSTER hides for a teamless caller, the
+          same "nothing to say" gating the desktop handles apply. */}
       <nav aria-label="Draft room tabs" className="flex border-t border-line bg-surface-elevated">
-        {MOBILE_TABS.map((candidate) => (
+        {MOBILE_TABS.filter((candidate) => candidate !== "roster" || room.myTeamId !== null).map((candidate) => (
           <button
             key={candidate}
             type="button"

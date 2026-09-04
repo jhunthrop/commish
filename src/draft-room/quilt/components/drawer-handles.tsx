@@ -10,6 +10,7 @@ import { QUILT_CONFIG } from "../state/config";
 const TAB_LABEL: Readonly<Record<DrawerTab, string>> = {
   pool: "Pool",
   sheet: "My sheet",
+  roster: "Roster",
   byes: "Byes",
   picks: "Picks",
 };
@@ -19,6 +20,9 @@ export interface DrawerHandlesProps {
   readonly dispatch: (event: CollapseEvent) => void;
   /** Byes needs bye data to say anything — same rule as the lens chip. */
   readonly hasByes: boolean;
+  /** Roster needs a team of the caller's own — a commissioner has nothing this tab can show
+   *  (the "nothing to say" law, same gating shape as Byes). */
+  readonly hasRoster: boolean;
 }
 
 /**
@@ -37,7 +41,7 @@ export interface DrawerHandlesProps {
  * half, half to full), released downward it lowers (full to half, half to closed); a
  * sub-threshold wiggle is a tap, which is space's own toggle.
  */
-export function DrawerHandles({ surface, dispatch, hasByes }: DrawerHandlesProps) {
+export function DrawerHandles({ surface, dispatch, hasByes, hasRoster }: DrawerHandlesProps) {
   const open = surface.kind === "drawer";
   const activeTab = open ? surface.tab : null;
   const chevronTab: DrawerTab = activeTab ?? "pool";
@@ -57,7 +61,7 @@ export function DrawerHandles({ surface, dispatch, hasByes }: DrawerHandlesProps
   return (
     <div data-testid="drawer-handles" className="flex items-end gap-1.5 px-4">
       <div role="tablist" aria-label="Drawer surfaces" className="flex items-end gap-1.5">
-        {DRAWER_TABS.filter((candidate) => candidate !== "byes" || hasByes).map((candidate) => {
+        {DRAWER_TABS.filter((candidate) => (candidate !== "byes" || hasByes) && (candidate !== "roster" || hasRoster)).map((candidate) => {
           const active = activeTab === candidate;
           return (
             <button

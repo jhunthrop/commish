@@ -54,9 +54,11 @@ export function totalRounds(view: DraftStateView): number {
 }
 
 /**
- * Every round of the quilt, compacted: completed rounds go micro, the active round stays full,
- * the next `QUILT_CONFIG.fullRoundsAhead` rounds stay full-height empty tracks, and everything
- * further compresses to micro empty rows. All rounds, always — the zero-scroll law.
+ * Every round of the quilt, compacted: the active round plus the prior
+ * `QUILT_CONFIG.fullRoundsBehind` stay full (clamped at the draft's start), the next
+ * `QUILT_CONFIG.fullRoundsAhead` rounds stay full-height empty tracks, and everything further
+ * — older than the window, or past the tracks — compresses to micro rows. All rounds, always —
+ * the zero-scroll law.
  */
 export function buildQuiltRows(view: DraftStateView, myTeamId: string | null): readonly QuiltRow[] {
   const rounds = totalRounds(view);
@@ -70,7 +72,12 @@ export function buildQuiltRows(view: DraftStateView, myTeamId: string | null): r
 
   return Array.from({ length: rounds }, (_, index): QuiltRow => {
     const round = index + 1;
-    const kind: QuiltRowKind = round === activeRound ? "full" : round > activeRound && round <= activeRound + QUILT_CONFIG.fullRoundsAhead ? "track" : "micro";
+    const kind: QuiltRowKind =
+      round <= activeRound && round >= activeRound - QUILT_CONFIG.fullRoundsBehind
+        ? "full"
+        : round > activeRound && round <= activeRound + QUILT_CONFIG.fullRoundsAhead
+          ? "track"
+          : "micro";
     const cells = view.draftOrder.map((teamId): QuiltCell => {
       const pick = byCell.get(`${teamId}:${round}`) ?? null;
       const onClock = teamId === view.onClockTeamId && (nextRound.get(teamId) ?? 1) === round;

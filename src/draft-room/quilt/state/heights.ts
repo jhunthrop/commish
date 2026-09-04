@@ -11,9 +11,10 @@ import type { QuiltRowKind } from "./board";
  * The ladder, in order, when the stage is too short for the preferred layout:
  *   1. the manager row goes compact (avatars shrink, its labels drop);
  *   2. track and micro rows squeeze from their preferred height toward their floor, while the
- *      active round holds its readable minimum — a row that drops under `labelMinPx` hands its
- *      R-label to screen readers only (labels HIDE below the threshold; they never overlap);
- *   3. the active round itself shrinks, down to its own floor;
+ *      full window (the active round plus the prior three, since the 2026-09-03 roster pass)
+ *      holds its readable preferred — a row that drops under `labelMinPx` hands its R-label to
+ *      screen readers only (labels HIDE below the threshold; they never overlap);
+ *   3. the window's own rows shrink, down to their floor;
  *   4. last resort, every floor scales proportionally — still zero overlap, still zero scroll.
  */
 export const BOARD_HEIGHTS = {
@@ -24,11 +25,17 @@ export const BOARD_HEIGHTS = {
   /** The NEEDS lens's dot row — fixed, present only while that lens is on. */
   needsRowPx: 32,
   /** Per-kind row geometry: preferred is the height a squeezed stage still tries to honor,
-   *  max is the roomy-stage cap (the old max-h-24/20/7 values), floor is the squeeze limit. */
+   *  max is the roomy-stage cap, floor is the squeeze limit. Retuned for the four-round window
+   *  (founder ruling 2026-09-03): full cards run a tighter two-line lockup at 36px preferred
+   *  (down from 44) capped at 56 (a 96px ceiling was a card with air), the track's cap stays
+   *  under the full cap (an empty upcoming row must never outstand the cards it will become),
+   *  and the compacted past floors at 4 (down from 6) — eleven micro rows paying 2px each is
+   *  what keeps all four window rows at the 28px readable floor on a short laptop with the
+   *  drawer at half. */
   row: {
-    full: { max: 96, preferred: 44, floor: 28, weight: 3 },
-    track: { max: 80, preferred: 14, floor: 6, weight: 2 },
-    micro: { max: 28, preferred: 14, floor: 6, weight: 1 },
+    full: { max: 56, preferred: 36, floor: 28, weight: 3 },
+    track: { max: 48, preferred: 14, floor: 4, weight: 2 },
+    micro: { max: 28, preferred: 14, floor: 4, weight: 1 },
   },
   /** A micro tile's own cap inside its row (the design's 14px sliver, `max-h-3.5`). */
   microTilePx: 14,
@@ -36,13 +43,15 @@ export const BOARD_HEIGHTS = {
   labelMinPx: 14,
   /** Rows shorter than this drop the label to the 10px face instead of text-xs. */
   labelSmallPx: 24,
-  /** Full/track cells drop their second line (fact / caption) under this row height… */
-  cellCaptionMinPx: 36,
+  /** Full/track cells drop their second line (fact / caption) under this row height — 30 so
+   *  the tighter lockup's fact line survives at the 36px preferred card… */
+  cellCaptionMinPx: 30,
   /** …and their primary text line under this one — a dashed YOURS cell keeps its amber
    *  dashed border as its whole identity below it (fix requirement 1). */
   cellTextMinPx: 20,
-  /** An active-round cell stops carrying the player face under this row height. */
-  cellFaceMinPx: 44,
+  /** A window cell stops carrying the 32px player face under this row height — the face is
+   *  the first thing a shrinking card sheds, before either text line. */
+  cellFaceMinPx: 34,
   /** Assumed stage height for the first paint, before the ResizeObserver's real number. */
   defaultBoardPx: 800,
 } as const;

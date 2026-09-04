@@ -22,8 +22,9 @@ export interface QuiltCellProps {
   readonly onPeek: (playerId: string) => void;
   /** True while the peek sheet is open on this cell's player. */
   readonly peeked: boolean;
-  /** True only for the ACTIVE round's cells (founder addition 4): a landed pick renders the
-   *  player's face beside the condensed name. Track and micro geometry never carries one. */
+  /** True for the full WINDOW's cells (founder addition 4, widened by the 2026-09-03
+   *  four-round ruling): a landed pick renders the player's face beside the condensed name.
+   *  Track and micro geometry never carries one. */
   readonly withFace: boolean;
   /** The row's ONE height from the board's height model. Every cell fills it exactly — the
    *  law behind the 2026-09-03 fix — and sheds its lines as it shrinks: the caption under

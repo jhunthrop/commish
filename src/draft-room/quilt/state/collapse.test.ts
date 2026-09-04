@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { RESTING, reduceCollapse, type CollapseEvent, type ExpandedSurface } from "./collapse";
+import { DRAWER_TABS, RESTING, reduceCollapse, type CollapseEvent, type ExpandedSurface } from "./collapse";
 
 function run(state: ExpandedSurface, ...events: readonly CollapseEvent[]): ExpandedSurface {
   return events.reduce(reduceCollapse, state);
 }
 
 describe("reduceCollapse", () => {
+  it("keeps the founder-ruled handle order: pool, sheet, roster, byes, picks", () => {
+    expect(DRAWER_TABS).toEqual(["pool", "sheet", "roster", "byes", "picks"]);
+  });
+
   it("space walks none → half → none, and steps full back to half", () => {
     const half = run(RESTING, { type: "TOGGLE_DRAWER" });
     expect(half).toEqual({ kind: "drawer", height: "half", tab: "pool" });
@@ -15,7 +19,7 @@ describe("reduceCollapse", () => {
   });
 
   it("slash opens search: the drawer at full, on the pool tab, from anywhere", () => {
-    for (const from of [RESTING, run(RESTING, { type: "TOGGLE_SPINE" }), run(RESTING, { type: "OPEN_PEEK", playerId: "p1" })]) {
+    for (const from of [RESTING, run(RESTING, { type: "SET_TAB", tab: "roster" }), run(RESTING, { type: "OPEN_PEEK", playerId: "p1" })]) {
       expect(run(from, { type: "OPEN_SEARCH" })).toEqual({ kind: "drawer", height: "full", tab: "pool" });
     }
   });
@@ -34,15 +38,9 @@ describe("reduceCollapse", () => {
     expect(run(peek, { type: "CLOSE_PEEK" })).toEqual(RESTING);
   });
 
-  it("the spine toggles, and yields to any other surface", () => {
-    const spine = run(RESTING, { type: "TOGGLE_SPINE" });
-    expect(spine).toEqual({ kind: "spine" });
-    expect(run(spine, { type: "TOGGLE_SPINE" })).toEqual(RESTING);
-    expect(run(spine, { type: "TOGGLE_DRAWER" })).toEqual({ kind: "drawer", height: "half", tab: "pool" });
-  });
-
-  it("a tab names the drawer: from rest it opens the drawer at that tab", () => {
+  it("a tab names the drawer: from rest it opens the drawer at that tab — roster included, no new machinery", () => {
     expect(run(RESTING, { type: "SET_TAB", tab: "byes" })).toEqual({ kind: "drawer", height: "half", tab: "byes" });
+    expect(run(RESTING, { type: "SET_TAB", tab: "roster" })).toEqual({ kind: "drawer", height: "half", tab: "roster" });
     const full = run(RESTING, { type: "OPEN_SEARCH" });
     expect(run(full, { type: "SET_TAB", tab: "sheet" })).toEqual({ kind: "drawer", height: "full", tab: "sheet" });
   });
@@ -53,7 +51,7 @@ describe("reduceCollapse", () => {
       run(RESTING, { type: "TOGGLE_DRAWER" }),
       run(RESTING, { type: "OPEN_SEARCH" }),
       run(RESTING, { type: "OPEN_PEEK", playerId: "p9" }),
-      run(RESTING, { type: "TOGGLE_SPINE" }),
+      run(RESTING, { type: "SET_TAB", tab: "roster" }),
     ];
     for (const surface of surfaces) expect(run(surface, { type: "COLLAPSE_ALL" })).toEqual(RESTING);
   });

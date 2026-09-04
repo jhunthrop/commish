@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@/domain/roster";
-import { needFractions, needsByTeam, pickValueVerdict, positionNeeds } from "./lens";
+import { needFractions, needsByTeam, pickValueVerdict, positionNeeds, unfilledStartingPositions } from "./lens";
 
 const filled = (slot: RosterSlot["slot"], slotIndex: number): RosterSlot => ({ slot, slotIndex, playerId: `p-${slot}-${slotIndex}` });
 
@@ -55,6 +55,31 @@ describe("needFractions", () => {
       total: 2,
       satisfied: true,
     });
+  });
+});
+
+describe("unfilledStartingPositions", () => {
+  it("names every dedicated starting position still open, K and DEF included, in config order", () => {
+    expect(unfilledStartingPositions(STANDARD_ROSTER_SLOTS, [])).toEqual(["QB", "RB", "WR", "TE", "K", "DEF"]);
+  });
+
+  it("a position appears once however many copies stay open; FLEX and bench never appear", () => {
+    const roster = [filled("QB", 0), filled("RB", 0), filled("WR", 0), filled("WR", 1), filled("FLEX", 0), filled("BENCH", 0)];
+    expect(unfilledStartingPositions(STANDARD_ROSTER_SLOTS, roster)).toEqual(["RB", "TE", "K", "DEF"]);
+  });
+
+  it("says nothing once every starting slot is filled — the needs line goes away", () => {
+    const roster = [
+      filled("QB", 0),
+      filled("RB", 0),
+      filled("RB", 1),
+      filled("WR", 0),
+      filled("WR", 1),
+      filled("TE", 0),
+      filled("K", 0),
+      filled("DEF", 0),
+    ];
+    expect(unfilledStartingPositions(STANDARD_ROSTER_SLOTS, roster)).toEqual([]);
   });
 });
 
