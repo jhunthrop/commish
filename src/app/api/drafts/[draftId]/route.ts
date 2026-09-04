@@ -3,7 +3,7 @@ import { getDb, type Db } from "@/db/client";
 import { drafts, leagues, mockRooms, teams as teamsTable } from "@/db/schema";
 import { fail, ok } from "@/lib/api/respond";
 import { draftStateView, queueFor } from "@/draft-engine";
-import { getDraftStore } from "@/draft-service";
+import { advanceDraftNow, getDraftStore } from "@/draft-service";
 import { leagueNameFor, listTeamCards } from "@/draft-service/teams";
 import { describeStartTiming } from "@/matchmaking/roll";
 import { expectedBotThinkDelaySeconds } from "@/mock-draft/bots";
@@ -135,6 +135,10 @@ async function mockResultsInfo(db: Db, leagueId: string, userId: string, hasSeat
  */
 export async function GET(request: Request, context: RouteContext) {
   return withLeagueMember(request, context, async (actor) => {
+    // ADVANCE-ON-READ (driver 1, draft-driver design 2026-09-03): apply all due work — a
+    // deferred start, due expiries, due bot picks — BEFORE loading state, so a reopened room
+    // fast-forwards to the true present even when no long-lived ticker exists (Vercel).
+    await advanceDraftNow(actor.draftId);
     const state = await getDraftStore().getDraftState(actor.draftId);
     if (state === null) return fail("That draft does not exist.", 404);
 

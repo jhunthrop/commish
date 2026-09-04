@@ -1,9 +1,12 @@
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
+import { drafts } from "@/db/schema";
 import { isLLMEnabled, getLlmClient } from "@/lib/llm/client";
 import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "./store";
 import { createMockBotDriver, type MockBotDriver } from "@/mock-draft-service/driver";
-import { createNudgeScheduler } from "./nudge";
+import { createDraftAdvancer, runDraftAdvanceLoop, type DraftAdvancer } from "./advance";
+import { createNudgeScheduler, type NudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
 import { createDraftStore, type DraftStore } from "./store";
 import { createDraftTicker, type DraftTicker } from "./ticker";
@@ -14,6 +17,8 @@ const systemClock = { now: () => new Date().toISOString() };
 let store: DraftStore | undefined;
 let ticker: DraftTicker | undefined;
 let mockDriver: MockBotDriver | undefined;
+let advancer: DraftAdvancer | undefined;
+let nudger: NudgeScheduler | undefined;
 
 /**
  * The store's `onPublishError` wiring, extracted to its own name — same reasoning as
@@ -90,6 +95,25 @@ export async function simMockToNextHumanTurn(draftId: string): Promise<void> {
   }
 }
 
+/**
+ * The ONE moderator instance the ticker (dev) and the advancer (the serverless drivers) share —
+ * a single `isBot` cache and one LLM-copy wiring, and the `draft_nudges` claim row already makes
+ * a nudge once-per-pick across any number of instances regardless.
+ */
+function getNudgeScheduler(): NudgeScheduler {
+  if (nudger === undefined) {
+    nudger = createNudgeScheduler({
+      db: getDb(),
+      publish: publishDraftEvent,
+      // `isLLMEnabled()` is read once, here, at the edge — the copy function itself never
+      // touches process.env, so tests drive both states by construction.
+      copy: createNudgeCopy({ enabled: isLLMEnabled(), llm: getLlmClient() }),
+      onError: logDraftNudgeError,
+    });
+  }
+  return nudger;
+}
+
 export function getDraftTicker(): DraftTicker {
   if (ticker === undefined) {
     ticker = createDraftTicker({
@@ -97,17 +121,57 @@ export function getDraftTicker(): DraftTicker {
       store: getDraftStore(),
       clock: systemClock,
       mockDriver: getMockBotDriver(),
-      nudger: createNudgeScheduler({
-        db: getDb(),
-        publish: publishDraftEvent,
-        // `isLLMEnabled()` is read once, here, at the edge — the copy function itself never
-        // touches process.env, so tests drive both states by construction.
-        copy: createNudgeCopy({ enabled: isLLMEnabled(), llm: getLlmClient() }),
-        onError: logDraftNudgeError,
-      }),
+      nudger: getNudgeScheduler(),
     });
   }
   return ticker;
+}
+
+/**
+ * The process-wide advance funnel (draft-driver design, 2026-09-03) — the routine every
+ * serverless driver calls: advance-on-read, the SSE watcher loop, and the `draft-sweep` job.
+ * Wired over the SAME store, bot driver and moderator the ticker uses, so dev (where the ticker
+ * also runs) and Vercel (where it does not) advance drafts through one implementation.
+ */
+export function getDraftAdvancer(): DraftAdvancer {
+  if (advancer === undefined) {
+    advancer = createDraftAdvancer({
+      db: getDb(),
+      store: getDraftStore(),
+      mockDriver: getMockBotDriver(),
+      nudger: getNudgeScheduler(),
+    });
+  }
+  return advancer;
+}
+
+/**
+ * ADVANCE-ON-READ (driver 1): applied by every authenticated draft read before it loads state,
+ * so a room someone reopens fast-forwards to the true present — deferred starts, due expiries
+ * and due bot picks included. Never throws (`DraftAdvancer.advance`'s own contract): a broken
+ * advance must never fail the read that triggered it.
+ */
+export async function advanceDraftNow(draftId: string): Promise<void> {
+  await getDraftAdvancer().advance(draftId, systemClock.now());
+}
+
+/**
+ * THE SSE STREAM'S TICK (driver 2): called by the league events route as it accepts a
+ * connection. Resolves the league's draft and — while it still has work to ever do — runs the
+ * advance loop until the client disconnects or the draft completes. Fire-and-forget and
+ * never-throwing for the same reason `advanceDraftNow` is: the stream must open regardless.
+ */
+export async function startDraftAdvanceLoopForLeague(leagueId: string, signal: AbortSignal): Promise<void> {
+  try {
+    const [row] = await getDb()
+      .select({ id: drafts.id, status: drafts.status })
+      .from(drafts)
+      .where(eq(drafts.leagueId, leagueId));
+    if (row === undefined || row.status === "complete") return;
+    runDraftAdvanceLoop(row.id, signal, { advance: getDraftAdvancer().advance, clock: systemClock });
+  } catch (error: unknown) {
+    console.error("[draft] could not start the stream's advance loop", { leagueId }, error);
+  }
 }
 
 // Barrel surface: only names actually imported through `@/draft-service` elsewhere in the

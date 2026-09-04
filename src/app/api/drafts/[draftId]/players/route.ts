@@ -1,6 +1,7 @@
 import type { Db } from "@/db/client";
 import { getDb } from "@/db/client";
 import { ok } from "@/lib/api/respond";
+import { advanceDraftNow } from "@/draft-service";
 import { rankedPlayers } from "@/draft-service/pool";
 import type { DraftPlayersBody } from "@/draft-room/contract";
 import type { Player } from "@/domain/player";
@@ -50,6 +51,9 @@ async function reasonsByLeaguePlayerId(db: Db, players: readonly Player[]): Prom
  */
 export async function GET(request: Request, context: RouteContext) {
   return withLeagueMember(request, context, async (actor) => {
+    // ADVANCE-ON-READ (driver 1): this route is the room's other first-load read, so it too
+    // fast-forwards the draft before answering — see `advanceDraftNow`'s own docblock.
+    await advanceDraftNow(actor.draftId);
     const db = getDb();
     const players = await rankedPlayers(db, actor.leagueId);
     const [reasons, byes] = await Promise.all([reasonsByLeaguePlayerId(db, players), byeWeeksByTeam(db)]);
