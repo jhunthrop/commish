@@ -3,6 +3,7 @@ import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { ToastProvider } from "@/components/ui";
+import { TopBar } from "@/components/app-shell/top-bar";
 import { DraftRoom } from "@/draft-room/components/draft-room";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 
@@ -41,7 +42,14 @@ export default async function DraftRoomPage({ params }: PageProps) {
   return (
     <ToastProvider>
       <main className="w-full">
-        <DraftRoom draftId={draftId} dismissedAt={preferences.draftTourDismissedAt} />
+        {/* The bar is composed HERE because this Server Component holds the CurrentUser; the
+            client room renders it only on the settled mock debrief (see DraftRoomProps.topBar)
+            — the live room keeps its no-chrome contract. */}
+        <DraftRoom
+          draftId={draftId}
+          dismissedAt={preferences.draftTourDismissedAt}
+          topBar={<TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />}
+        />
       </main>
     </ToastProvider>
   );

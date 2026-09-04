@@ -92,6 +92,23 @@ describe("ReasonChip — a discovered law's reason", () => {
     render(<ReasonChip reason={reason} registry={[]} />);
     expect(screen.getByText(/Not a real candidate id: measured -1\.4 pts per game/)).toBeInTheDocument();
   });
+
+  it("compact leads with the effect alone and moves the whole sentence to the screen reader", () => {
+    // The draft board's sticker (founder screenshot, 2026-09-04): a full sentence in a fixed
+    // cell truncates to a bare figure and half a word, so compact shows the one fact that
+    // never truncates and keeps the sentence as sr-only elaboration.
+    const law = discoveredLawFixture({
+      id: "threshold:WR:touchdownPointsShare:q80",
+      primaryQuantityNoun: "touchdown-points share",
+      primaryQuantityUnit: "percent",
+    });
+    const reason: BoardReason = { code: "law", lawId: law.id, effect: -1.4, magnitude: 0.235 };
+    const { container } = render(<ReasonChip reason={reason} registry={[law]} compact />);
+    expect(screen.getByText(/^-1\.4 pts$/)).toBeInTheDocument();
+    const srOnly = container.querySelector(".sr-only");
+    expect(srOnly?.textContent).toContain("23.5% touchdown-points share: measured -1.4 pts per game");
+    expect(srOnly?.textContent).toContain(law.claim);
+  });
 });
 
 describe("ReasonChip — market_anchor and market_unlisted (I6/M8 fix round)", () => {

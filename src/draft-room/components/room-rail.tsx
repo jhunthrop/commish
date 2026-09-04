@@ -6,6 +6,7 @@ import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { WaitingInfo } from "../contract";
 import { Badge, EYEBROW } from "@/components/ui";
+import { BrandMark } from "@/components/ui/brand-mark";
 import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SessionNotice } from "@/components/app-shell/session-notice";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
@@ -294,7 +295,11 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
             it opened in. The ROOM variant is where a human sits, and that is where the way
             home belongs. */}
         {variant === "room" ? (
-          <Link href="/app" className="shrink-0 text-xs font-medium text-text-muted hover:text-text-primary">
+          // The whistle beside the word (founder, 2026-09-04: "there's no navigation" — there
+          // WAS, but muted 12px text read as a label, not a door). The mark gives the way home
+          // a shape the eye already knows from every other bar; still one link, same href.
+          <Link href="/app" className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-text-muted hover:text-text-primary">
+            <BrandMark size={16} />
             Commish
           </Link>
         ) : null}

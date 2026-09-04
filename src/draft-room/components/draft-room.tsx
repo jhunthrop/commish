@@ -35,13 +35,22 @@ export interface DraftRoomProps {
    * room's critical path just to decide whether to show `RoomTour`.
    */
   readonly dismissedAt: string | null;
+  /**
+   * The app's own `TopBar`, composed server-side by `DraftRoomPage` (it holds the
+   * `CurrentUser` this Server Component slot needs) and rendered by exactly ONE branch below:
+   * the settled mock debrief, which is a normal scrolling page that deserves normal wayfinding
+   * (founder, 2026-09-04: "there's no navigation... should there be?"). The LIVE room keeps
+   * declining it on purpose — `RoomRail` is that surface's chrome, and two chromes stacked
+   * would break the no-page-scroll contract (`(room)/layout` reasoning, unchanged).
+   */
+  readonly topBar?: React.ReactNode;
 }
 
 /**
  * The client entry point. Owns the three page-level states (loading / error / ready) and the
  * one place a rejected action becomes a toast — components below never talk to the server.
  */
-export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
+export function DraftRoom({ draftId, dismissedAt, topBar = null }: DraftRoomProps) {
   const room = useDraftRoom(draftId);
   const deps = useDraftRoomDeps();
   const { show } = useToast();
@@ -180,6 +189,10 @@ export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
           renders the debrief exactly as before. */}
       {room.mock?.results && finale.stage !== "moment" ? (
         <>
+          {/* The settled debrief is a page again, so the page chrome returns (see
+              DraftRoomProps.topBar). Above mockChrome: the practice banner belongs to the
+              content below the bar, same as every (shell) page's own banners. */}
+          {topBar}
           {mockChrome}
           {/* The debrief (results review, 2026-08-26): the room's own chrome answers D4 — the
               rail's complete-phase state says "Draft complete", the wire closes the story with

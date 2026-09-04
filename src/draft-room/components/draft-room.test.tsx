@@ -30,7 +30,9 @@ function mount(fixture = fixtureDeps(), dismissedAt: string | null = TOUR_DISMIS
   const rendered = renderInRoom(
     <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
       <ToastProvider>
-        <DraftRoom draftId="d1" dismissedAt={dismissedAt} />
+        {/* The topBar slot is whatever the page composed — a stub here, because these tests
+            assert WHERE the room mounts it, not what TopBar renders (top-bar.test.tsx's job). */}
+        <DraftRoom draftId="d1" dismissedAt={dismissedAt} topBar={<div data-testid="top-bar-slot" />} />
       </ToastProvider>
     </ChatRoomDepsProvider>,
     fixture.deps,
@@ -209,6 +211,21 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     // The board and dock are gone — the debrief is what the room shows now.
     expect(screen.queryByRole("list", { name: /available players/i })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open the mock draft lobby" })).toBeInTheDocument();
+  });
+
+  it("mounts the page's topBar slot on the settled debrief, and ONLY there — the live room stays chrome-less", async () => {
+    // Founder, 2026-09-04: the debrief is a normal scrolling page again, so it gets normal
+    // wayfinding; the live room's chrome remains RoomRail alone (no-page-scroll contract).
+    const settled = fixtureDeps({ ...SNAKE_VIEW, phase: "complete", onClockTeamId: null });
+    settled.mock = { ...MOCK_ROOM, results: MOCK_RESULTS_INFO };
+    const { rendered } = mount(settled);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "The debrief" })).toBeInTheDocument());
+    expect(screen.getByTestId("top-bar-slot")).toBeInTheDocument();
+    rendered.unmount();
+
+    mount(fixtureDeps());
+    await waitFor(() => expect(screen.getByTestId("room-viewport")).toBeInTheDocument());
+    expect(screen.queryByTestId("top-bar-slot")).not.toBeInTheDocument();
   });
 
   it("is axe-clean with every one of its own additions mounted at once, in both themes", async () => {

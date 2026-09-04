@@ -231,7 +231,11 @@ function StickerCell({
     // `reasons` (a caller that never threaded the pool's reason map) and an unranked player both
     // resolve to "no chips", exactly like every other reason surface's "absent means nothing to
     // say" rule.
-    const chips = strongestLawReasons(reasons?.get(cell.pick.playerId) ?? []);
+    // ONE chip, compact (founder screenshot, 2026-09-04): two full-sentence chips in a fixed
+    // sticker truncated to near-identical half-stats on every card. The strongest law's effect
+    // is the fact worth a sticker's pixels; the full chain lives where there is room (the pool
+    // row, the peek).
+    const chips = strongestLawReasons(reasons?.get(cell.pick.playerId) ?? [], 1);
     const layout = `flex h-full items-center gap-2 px-2 py-2 ${slap ? "animate-sticker-slap" : ""}`;
     const body = (
       <>
@@ -259,7 +263,7 @@ function StickerCell({
           {chips.length === 0 ? null : (
             <div className="flex flex-col gap-0.5">
               {chips.map((reason) => (
-                <ReasonChip key={reason.lawId} reason={reason} registry={laws} />
+                <ReasonChip key={reason.lawId} reason={reason} registry={laws} compact />
               ))}
             </div>
           )}

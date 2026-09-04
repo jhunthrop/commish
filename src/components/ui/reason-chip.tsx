@@ -183,6 +183,16 @@ export interface ReasonChipProps {
    * registry's own drift guard (`registry.ts` already throws where that guard belongs).
    */
   readonly registry: readonly Law[];
+  /**
+   * Effect-first, prose-last, for fixed-width cells (the draft board's sticker, founder
+   * screenshot 2026-09-04): a full sentence in a 140px column truncates to a bare figure and
+   * half a word ("94.4% snap s"), and two laws over the same quantity truncate to what LOOKS
+   * like the same line twice. Compact renders the one fact that never truncates, the measured
+   * effect ("+2.1 pts"), and moves the whole sentence to the screen-reader elaboration. Only a
+   * "law" reason has an effect to lead with; every other code ignores this flag and renders its
+   * full copy, which is fine because the one compact consumer only ever passes law reasons.
+   */
+  readonly compact?: boolean;
   readonly className?: string;
 }
 
@@ -197,8 +207,16 @@ export interface ReasonChipProps {
  * `Badge`'s own `whitespace-nowrap` risks everywhere else it is dropped into a narrow cell. This
  * chip is always the one that yields.
  */
-export function ReasonChip({ reason, registry, className = "" }: ReasonChipProps) {
+export function ReasonChip({ reason, registry, compact = false, className = "" }: ReasonChipProps) {
   const law = reason.code === "law" ? registry.find((entry) => entry.id === reason.lawId) : undefined;
+  if (compact && reason.code === "law") {
+    return (
+      <Badge tone="neutral" className={`max-w-full truncate ${className}`}>
+        {`${signedPoints(reason.effect)} pts`}
+        <span className="sr-only">{` ${copyFor(reason, law)}${law === undefined ? "" : ` ${law.claim}`}`}</span>
+      </Badge>
+    );
+  }
   return (
     <Badge tone="neutral" className={`max-w-full truncate ${className}`}>
       {copyFor(reason, law)}
