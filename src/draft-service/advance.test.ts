@@ -138,6 +138,39 @@ describe("catch-up chaining (the decided timestamp semantics)", () => {
     expect(oneShotLog.length).toBeGreaterThan(1);
   });
 
+  it("catch-up across a clock-tier tightening: each turn's clock derives from its own chained instant (fix round MEDIUM 4)", async () => {
+    // A REAL draft (the full DRAFT_CLOCK_SCHEDULE, not a mock's single tier) whose abandonment
+    // window straddles the 2-hours-before-kickoff tightening: kickoff sits 2h25m after the
+    // start, so turns 1-3 run in the 10-minute tier (>2h out) and turn 4's chained start lands
+    // INSIDE 2h — the tightened 90s clock. Stamping "now" instead of chaining would have judged
+    // every turn against read time and given all six the tightened clock.
+    const kickoffMs = Date.parse(BASE_NOW) + (2 * 60 + 25) * 60_000;
+    const fixture = await seedDraftFixture(db, {
+      draftId: "draft_tier",
+      leagueId: "league_tier",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(kickoffMs),
+      auctionBudget: null,
+    });
+    await seedSprintPlayers();
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+
+    now = atMs(60 * 60_000); // an hour of abandonment — every turn, both tiers, long overdue
+    const outcome = await testAdvancer(store).advance(fixture.draftId, now);
+    expect(outcome.applied).toBe(6);
+
+    const log = await actionLog(fixture.draftId);
+    expect(log.map((row) => row.action.type)).toEqual(["START_DRAFT", ...Array.from({ length: 6 }, () => "TIMER_EXPIRE")]);
+    // Turns 1-3: 600s clocks (chained instants still >2h before kickoff). Turns 4-6: their
+    // chained starts are inside 2h, so the TIGHTENED 90s clock prices their deadlines.
+    const offsets = log.slice(1).map((row) => (Date.parse(row.action.timestamp) - Date.parse(BASE_NOW)) / 1000);
+    expect(offsets).toEqual([600, 1200, 1800, 1890, 1980, 2070]);
+    expect((await store.getDraftState(fixture.draftId))!.phase).toBe("complete");
+  });
+
   it("stops at the action ceiling and reports exhaustion; the next call resumes from the log", async () => {
     const fixture = await seedAbandonedMock("bounded");
     const store = testStore();
