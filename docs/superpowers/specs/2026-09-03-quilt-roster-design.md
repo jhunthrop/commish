@@ -121,10 +121,13 @@ manager-full: 48 header + 15 gaps x 6 = 138. Preferred rounds total:
 All three are pinned by planner tests (`heights.test.ts`, "four full rounds fit the common
 stages"), with expectations computed from the constants above, not from the code. The
 worst live case — 800px viewport, drawer at half (45dvh = 360), banner + strip + padding —
-leaves a stage near 314: budget 314 − 28 compact − 90 gaps = 196; the others floor at
-11x4 = 44 and the four full rows share (196−44)/4 = 38 each; even a stage of 274 still
-yields exactly the 28px floor. Zero scroll at every height remains the planner's own
-construction (squeeze/scale spend ≤ budget always).
+leaves a stage near 314 (budget 196), where the full rows HOLD their 36px preferred and the
+micro rows settle near 4.7px (the floor-forcing branch never fires; verified by re-running
+squeeze() against the constants in the review, which corrected this paragraph's first
+draft). The readable-minimum guarantee is the harder point below it: a stage of 274 (budget
+156) forces the micro floor (11 x 4 = 44) and yields exactly the 28px full-row floor,
+(156 − 44) / 4 = 28. Zero scroll at every height remains the planner's own construction
+(squeeze/scale spend ≤ budget always).
 
 ### The geometry e2e
 
