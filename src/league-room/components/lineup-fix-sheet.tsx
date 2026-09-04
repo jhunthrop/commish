@@ -9,6 +9,7 @@ import type { LineupBody } from "../contract";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatPoints } from "../lib/format";
 import { slotLabelFor, startersWithFix, type LineupCandidate, type LineupFixPlan } from "../lib/lineup-problems";
+import { PlayerName } from "./player-peek";
 
 export interface LineupFixSheetProps {
   readonly leagueId: string;
@@ -105,7 +106,10 @@ export function LineupFixSheet({ leagueId, weekNumber, lineup, rosterSlots, plan
         <div className="accent-wash flex items-center gap-3 rounded-md p-3 ring-2 ring-accent/40">
           <PositionBadge position={recommended.position} size="md" />
           <div className="flex min-w-0 flex-col">
-            <p className="font-display text-md font-semibold text-text-primary">Start {recommended.playerName}</p>
+            <p className="font-display text-md font-semibold text-text-primary">
+              Start{" "}
+              <PlayerName leagueId={leagueId} playerId={recommended.playerId} name={recommended.playerName} className="inline" />
+            </p>
             <p className="text-sm text-text-muted">{evidence(recommended)}</p>
           </div>
           <div className="ml-auto flex shrink-0 flex-col items-end gap-1.5">
@@ -127,7 +131,12 @@ export function LineupFixSheet({ leagueId, weekNumber, lineup, rosterSlots, plan
           {alternatives.map((candidate) => (
             <div key={candidate.playerId} className="flex items-center gap-3 rounded-md bg-surface-raised px-3 py-2 shadow-raised">
               <PositionBadge position={candidate.position} size="sm" />
-              <p className="min-w-0 truncate font-display text-sm font-semibold text-text-primary">{candidate.playerName}</p>
+              <PlayerName
+                leagueId={leagueId}
+                playerId={candidate.playerId}
+                name={candidate.playerName}
+                className="min-w-0 truncate font-display text-sm font-semibold text-text-primary"
+              />
               <p className="min-w-0 truncate text-xs text-text-muted">{evidence(candidate)}</p>
               <Button
                 variant="secondary"

@@ -63,6 +63,7 @@ function flattenRoster(rostersByTeamId: TradeRoomContext["rostersByTeamId"]): Re
  * precisely: this band is the "you" one.
  */
 function Band({
+  leagueId,
   marker,
   consequence,
   tone,
@@ -80,6 +81,7 @@ function Band({
   onDecline,
   onWithdraw,
 }: {
+  readonly leagueId: string;
   readonly marker: string;
   readonly consequence: string;
   readonly tone: ChapterBandTone;
@@ -106,6 +108,7 @@ function Band({
         {trades.map((trade) => (
           <TradeCard
             key={trade.id}
+            leagueId={leagueId}
             trade={trade}
             meTeamId={meTeamId}
             playersById={playersById}
@@ -186,6 +189,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
   if (composing) {
     return (
       <TradeComposer
+        leagueId={leagueId}
         context={context}
         onAssess={assess}
         onPropose={propose}
@@ -219,6 +223,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
   // to a given status (`isAnswerable`/`isMineWaiting`), so a settled-history card is handed the
   // same three callbacks as an open one and simply never calls them.
   const bandProps = {
+    leagueId,
     meTeamId: meTeamId ?? "",
     playersById,
     rosterById,

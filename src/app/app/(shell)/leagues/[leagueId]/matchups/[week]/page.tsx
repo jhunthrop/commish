@@ -9,6 +9,7 @@ import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { TeamStandingsRow } from "@/league-room/contract";
 import type { RecordsByTeamId } from "@/league-room/components/matchup-hero";
 import { LiveMatchupWeek } from "@/league-room/components/live-matchup-week";
+import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { WeekNav } from "@/league-room/components/week-nav";
 import { formatWeek } from "@/league-room/lib/format";
 import { liveScoringCopy } from "@/stats/live-scoring-copy";
@@ -63,6 +64,10 @@ export default async function MatchupWeekPage({ params }: PageProps) {
 
   return (
     <>
+      {/* Task 4 (player-name adoption sweep): this route renders `LiveMatchupWeek` outside
+          `RoomShell`, which mounts its own host — this page needs its own, or every `PlayerName`
+          press in the lineup tables (`matchup-panel.tsx`) is a dead click. */}
+      <PlayerPeekHost />
       <PageTitle>{`${home.name} · Week ${weekNumber}`}</PageTitle>
       <WeekNav leagueId={leagueId} weekNumber={weekNumber} totalWeeks={body.totalWeeks} />
       {/* WHERE THE NUMBERS COME FROM, said once, at the top. It used to be the last line on the

@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { UI_CONFIG } from "@/components/ui/config";
 import { renderSurface } from "@/components/ui/test-utils";
+import { PlayerPeekHost } from "./player-peek";
 import { fixtureLeagueDeps, MATCHUP, MATCHUP_WITH_MEDIAN, renderInLeague } from "../test-fixtures";
 import { MatchupPanel } from "./matchup-panel";
 
@@ -11,7 +12,7 @@ const inProgressMatchup = { ...MATCHUP, final: false, weekStatus: "in_progress" 
 
 describe("MatchupPanel", () => {
   it("shows both lineups, per-player points and the final score, in both themes, axe-clean", async () => {
-    await renderSurface(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />, async ({ container }) => {
+    await renderSurface(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />, async ({ container }) => {
       expect(screen.getByRole("heading", { name: "Bay Bandits" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Iron Owls" })).toBeInTheDocument();
       expect(screen.getByText("112.50")).toBeInTheDocument();
@@ -25,8 +26,27 @@ describe("MatchupPanel", () => {
   // its matchup an eyebrow `<span>` rather than a heading. A real `<h2>` now anchors the
   // matchup, so `Side`'s `<h3>` nests under something instead of being the first heading at all.
   it("anchors the matchup with a real h2, so the side tables' h3s are never the first heading under the page title (D5)", () => {
-    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
     expect(screen.getByRole("heading", { level: 2, name: "Bay Bandits against Iron Owls" })).toBeInTheDocument();
+  });
+
+  // Task 4 (player-name adoption sweep): a lineup's Player cell used to be a bare `<span>` — a
+  // standalone player name with no other control on the row, so it goes straight through
+  // `PlayerName` with no restructuring needed.
+  it("makes every starter's name a pressable button that opens the season peek", async () => {
+    const { deps } = fixtureLeagueDeps({ ok: true, data: {} }, { deferred: true });
+    renderInLeague(
+      <>
+        <PlayerPeekHost />
+        <MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />
+      </>,
+      deps,
+    );
+    const name = screen.getByRole("button", { name: "Josh Allen" });
+    await act(async () => {
+      fireEvent.click(name);
+    });
+    expect(screen.getByRole("dialog", { name: "Josh Allen" })).toBeInTheDocument();
   });
 
   // D4 (competition review, HIGH): a starter with no stat line for the week used to coalesce to
@@ -37,7 +57,7 @@ describe("MatchupPanel", () => {
       ...MATCHUP,
       home: { ...MATCHUP.home, starters: [{ ...MATCHUP.home.starters[0]!, points: null }] },
     };
-    render(<MatchupPanel matchup={notYetPlayed} myTeamId="t1" weekStatus="final" />);
+    render(<MatchupPanel leagueId="l1" matchup={notYetPlayed} myTeamId="t1" weekStatus="final" />);
     expect(screen.getByRole("cell", { name: "—" })).toBeInTheDocument();
     expect(screen.queryByText("0.00")).not.toBeInTheDocument();
   });
@@ -46,7 +66,7 @@ describe("MatchupPanel", () => {
   // already say who is ahead, and the delta form ("+14.25") lives in the page's lower third
   // (`LiveMatchupWeek`), not in this panel. The panel must never grow the sentence back.
   it("prints no margin sentence — the delta lives in the lower third, not the hero", () => {
-    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
     expect(screen.queryByText(/You are up/)).not.toBeInTheDocument();
     expect(screen.getByText("112.50")).toBeInTheDocument();
   });
@@ -57,14 +77,14 @@ describe("MatchupPanel", () => {
   // states a week is in, and must never show a moving number with no state beside it.
   it("says which state the week is in, and never shows a score with no state", async () => {
     const { deps } = fixtureLeagueDeps();
-    renderInLeague(<MatchupPanel matchup={inProgressMatchup} myTeamId="t1" weekStatus="in_progress" />, deps);
+    renderInLeague(<MatchupPanel leagueId="l1" matchup={inProgressMatchup} myTeamId="t1" weekStatus="in_progress" />, deps);
     expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.queryByText("Final")).not.toBeInTheDocument();
   });
 
   it("says a week is not scored yet rather than showing a zero", async () => {
     const pending = { ...MATCHUP, final: false, home: { ...MATCHUP.home, score: null }, away: { ...MATCHUP.away, score: null } };
-    await renderSurface(<MatchupPanel matchup={pending} myTeamId="t1" weekStatus="scheduled" />, async ({ container }) => {
+    await renderSurface(<MatchupPanel leagueId="l1" matchup={pending} myTeamId="t1" weekStatus="scheduled" />, async ({ container }) => {
       expect(screen.getByText("Not started")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -73,13 +93,13 @@ describe("MatchupPanel", () => {
   // Non-median league: `matchup.median` is `null`, the same "nothing to say" state a week with
   // no scores reads as — no median residue anywhere on the page.
   it("shows no median line at all for a non-median league", () => {
-    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
     expect(screen.queryByText(/league median/)).not.toBeInTheDocument();
   });
 
   it("shows each team's own median result, second person for the viewer's own team, third person for the other, in both themes, axe-clean", async () => {
     await renderSurface(
-      <MatchupPanel matchup={MATCHUP_WITH_MEDIAN} myTeamId="t1" weekStatus="final" />,
+      <MatchupPanel leagueId="l1" matchup={MATCHUP_WITH_MEDIAN} myTeamId="t1" weekStatus="final" />,
       async ({ container }) => {
         // `t1` (home, myTeamId) beat the median; `t2` (away) missed it.
         expect(
@@ -96,7 +116,7 @@ describe("MatchupPanel", () => {
   // The exact same matchup, viewed by nobody in it (a bye-week spectator, or a commissioner
   // browsing another pairing) — both sides read in the third person, and neither says "You".
   it("reads both sides in the third person for a viewer with no team in this matchup", () => {
-    render(<MatchupPanel matchup={MATCHUP_WITH_MEDIAN} myTeamId={null} weekStatus="final" />);
+    render(<MatchupPanel leagueId="l1" matchup={MATCHUP_WITH_MEDIAN} myTeamId={null} weekStatus="final" />);
     expect(
       screen.getByText("Bay Bandits scored 112.50. The league median was 104.20, so they won that one too."),
     ).toBeInTheDocument();
@@ -110,7 +130,7 @@ describe("MatchupPanel", () => {
   // a median exists for the week, but this particular side has no score to compare it to.
   it("shows no median line for a side with no score yet, even when the week's median is known", () => {
     const halfScored = { ...MATCHUP_WITH_MEDIAN, home: { ...MATCHUP_WITH_MEDIAN.home, score: null } };
-    render(<MatchupPanel matchup={halfScored} myTeamId="t1" weekStatus="in_progress" />);
+    render(<MatchupPanel leagueId="l1" matchup={halfScored} myTeamId="t1" weekStatus="in_progress" />);
     expect(screen.queryByText(/Bay Bandits scored|You scored/)).not.toBeInTheDocument();
     expect(screen.getByText(/Iron Owls scored 98.25/)).toBeInTheDocument();
   });
@@ -119,7 +139,7 @@ describe("MatchupPanel", () => {
   // InfoTip. Two crests, two records and two 84px scores under the word "Matchup" define the
   // term better than a tip paragraph did, so the eyebrow is plain text and no tip button exists.
   it("renders a plain Matchup eyebrow with no glossary tip button", () => {
-    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
     expect(screen.getByText("Matchup")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "What is a matchup?" })).not.toBeInTheDocument();
   });
@@ -127,7 +147,7 @@ describe("MatchupPanel", () => {
   // Step 3c: the last two `Table` consumers to converge dense (the other is `budget-table.tsx`,
   // Task 12) — see `table.tsx`'s own docblock for the density-default decision this leaves.
   it("renders its starters table dense, at whatever vertical cell padding the density token carries", () => {
-    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
     const headerCell = screen.getAllByRole("columnheader", { name: "Player" })[0]!;
     // Gameday law 4, density is respect (2026-08-28): v3 set this at 11px, which was the
     // Sunday Standard mock's own figure and airier than a fantasy table wants. A manager on a
@@ -142,7 +162,7 @@ describe("MatchupPanel", () => {
   // that survives (the same precedent `LineupEditor`'s own roster table already sets); this
   // table no longer renders a `PositionBadge` at all.
   it("renders every starter's roster slot as a SlotChip, with no separate position column", () => {
-    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
     expect(screen.queryByRole("columnheader", { name: "Pos" })).not.toBeInTheDocument();
     const slot = MATCHUP.home.starters[0]!.slot;
     expect(screen.getAllByText(slot).length).toBeGreaterThan(0);
@@ -161,7 +181,7 @@ describe("MatchupPanel", () => {
     const QB_WEEK = new Map([["QB" as const, [4, 8, 12, 19.25, 24.5]]]);
 
     it("compares a starter against the players who share their job, and says so out loud", () => {
-      render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />);
+      render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />);
       // 24.5 is the best of the five, which is 0.9 on a tie-split percentile rank — "Top 10%",
       // never "Top 0%" and never a claim of perfection. 19.25 sits fourth of five, at 0.7.
       expect(screen.getByText("Top 10% of starting quarterbacks this week.")).toBeInTheDocument();
@@ -173,7 +193,7 @@ describe("MatchupPanel", () => {
       // "running backs this week". A heat map that filled that gap with a guess would be the
       // decoration rule 6 rejects, so the cell simply stays a number.
       const { container } = render(
-        <MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />,
+        <MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />,
       );
       const steps = Array.from(container.querySelectorAll("[data-magnitude]")).map((el) => el.getAttribute("data-magnitude"));
       expect(steps).toContain("strong");
@@ -183,7 +203,7 @@ describe("MatchupPanel", () => {
 
     it("keeps the number readable as a number, and keeps the caret that survives with no colour", () => {
       const { container } = render(
-        <MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />,
+        <MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />,
       );
       expect(screen.getByText("24.50")).toBeInTheDocument();
       expect(screen.getByText("19.25")).toBeInTheDocument();
@@ -193,7 +213,7 @@ describe("MatchupPanel", () => {
     });
 
     it("tints nothing at all when the page named no population, which is every other caller", () => {
-      const { container } = render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+      const { container } = render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
       const steps = Array.from(container.querySelectorAll("[data-magnitude]")).map((el) => el.getAttribute("data-magnitude"));
       expect(steps.length).toBeGreaterThan(0);
       expect(steps.every((step) => step === "neutral")).toBe(true);
@@ -205,7 +225,7 @@ describe("MatchupPanel", () => {
         home: { ...MATCHUP.home, starters: [{ ...MATCHUP.home.starters[0]!, points: null }] },
       };
       const { container } = render(
-        <MatchupPanel matchup={notPlayed} myTeamId="t1" weekStatus="in_progress" positionPoints={QB_WEEK} />,
+        <MatchupPanel leagueId="l1" matchup={notPlayed} myTeamId="t1" weekStatus="in_progress" positionPoints={QB_WEEK} />,
       );
       expect(screen.getAllByText("—").length).toBeGreaterThan(0);
       // Scoped to the tables. The hero's own bench chip may legitimately print "0.00 on your
@@ -216,7 +236,7 @@ describe("MatchupPanel", () => {
     });
 
     it("prints the column name once per table on screen, never visibly under every number", () => {
-      render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />);
+      render(<MatchupPanel leagueId="l1" matchup={MATCHUP} myTeamId="t1" weekStatus="final" positionPoints={QB_WEEK} />);
       // The `<th>` is the label a reader sees, for both side tables. Every other "Points" in the
       // document belongs to a cell's `Stat` and is `sr-only` — the number still has a name in the
       // accessibility tree, and the page still reads as a table rather than eighteen captioned

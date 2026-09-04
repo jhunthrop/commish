@@ -8,6 +8,7 @@ import type { TradeRoomContext, TradeRosterPlayer } from "../contract";
 import type { ProposedTrade, TradeActionResult } from "../hooks/use-trades";
 import type { TradeAssessmentBody } from "../contract";
 import { formatExpiry } from "../lib/format";
+import { PlayerName } from "./player-peek";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
 
 /** The full window a fresh offer stands for, in days — `TRADE_CONFIG.proposalTtlHours` read as a
@@ -15,6 +16,7 @@ import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
 const PROPOSAL_TTL_DAYS = Math.round(TRADE_CONFIG.proposalTtlHours / 24);
 
 export interface TradeComposerProps {
+  readonly leagueId: string;
   readonly context: TradeRoomContext;
   readonly onAssess: (input: { weekNumber: number; counterpartyTeamId: string; give: readonly string[]; receive: readonly string[] }) => Promise<TradeActionResult<TradeAssessmentBody>>;
   readonly onPropose: (input: ProposeTradeBody) => Promise<TradeActionResult<ProposedTrade>>;
@@ -32,11 +34,13 @@ function togglePlayer(selected: readonly string[], playerId: string, max: number
 }
 
 function PlayerPicker({
+  leagueId,
   legend,
   roster,
   selected,
   onToggle,
 }: {
+  readonly leagueId: string;
   readonly legend: string;
   readonly roster: readonly TradeRosterPlayer[];
   readonly selected: readonly string[];
@@ -64,18 +68,30 @@ function PlayerPicker({
               // same full-width slab the trade card carried — around every checkbox label. A
               // plain row with a `PositionBadge` chip is the treatment the matchup table and
               // `LineupEditor` already use; the sticker fill stays on the board it was built for.
-              <li key={player.playerId}>
-                <label className="flex min-w-0 items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={atCap}
-                    onChange={() => onToggle(player.playerId)}
-                    className="size-4 accent-accent"
-                  />
-                  <PositionBadge position={player.position} size="sm" />
-                  <span className="min-w-0 break-words text-sm font-medium text-text-primary">{player.name}</span>
-                </label>
+              //
+              // Player-name adoption sweep (task 4): the row used to be one `<label>` wrapping
+              // the checkbox AND the name, so a manager's tap anywhere on the name toggled the
+              // trade selection. That label can no longer wrap the name — `PlayerName` is a real
+              // button, and a button inside a label toggles BOTH the checkbox and the peek on one
+              // tap, the exact nested-interactive shape the sweep rules out. The checkbox keeps
+              // its own accessible name instead (no visible label needed: the row already reads
+              // "checkbox, badge, name"), and the name is a plain sibling.
+              <li key={player.playerId} className="flex min-w-0 items-center gap-2">
+                <input
+                  type="checkbox"
+                  aria-label={`${checked ? "Remove" : "Add"} ${player.name} ${checked ? "from" : "to"} the trade`}
+                  checked={checked}
+                  disabled={atCap}
+                  onChange={() => onToggle(player.playerId)}
+                  className="size-4 accent-accent"
+                />
+                <PositionBadge position={player.position} size="sm" />
+                <PlayerName
+                  leagueId={leagueId}
+                  playerId={player.playerId}
+                  name={player.name}
+                  className="min-w-0 break-words text-sm font-medium text-text-primary"
+                />
               </li>
             );
           })}
@@ -93,7 +109,7 @@ function PlayerPicker({
  * itself never depends on the verdict resolving, let alone on what it says: the advisor writes
  * prose about a decision `tradeBalance` already made, and a human still clicks Send.
  */
-export function TradeComposer({ context, onAssess, onPropose, onDone, onCancel }: TradeComposerProps) {
+export function TradeComposer({ leagueId, context, onAssess, onPropose, onDone, onCancel }: TradeComposerProps) {
   const [counterpartyTeamId, setCounterpartyTeamId] = useState("");
   const [give, setGive] = useState<readonly string[]>([]);
   const [receive, setReceive] = useState<readonly string[]>([]);
@@ -189,11 +205,11 @@ export function TradeComposer({ context, onAssess, onPropose, onDone, onCancel }
         <p className="text-sm text-text-muted">{`Choose up to ${TRADE_CONFIG.maxAssetsPerSide} players on each side.`}</p>
 
         <div className="flex flex-col gap-4 sm:flex-row">
-          <PlayerPicker legend="Your players" roster={myRoster} selected={give} onToggle={(playerId) => setGive((current) => togglePlayer(current, playerId, TRADE_CONFIG.maxAssetsPerSide))} />
+          <PlayerPicker leagueId={leagueId} legend="Your players" roster={myRoster} selected={give} onToggle={(playerId) => setGive((current) => togglePlayer(current, playerId, TRADE_CONFIG.maxAssetsPerSide))} />
           {counterpartyTeamId === "" ? (
             <p className="min-w-0 flex-1 text-sm text-text-muted">Choose a team to see their roster.</p>
           ) : (
-            <PlayerPicker legend="Their players" roster={theirRoster} selected={receive} onToggle={(playerId) => setReceive((current) => togglePlayer(current, playerId, TRADE_CONFIG.maxAssetsPerSide))} />
+            <PlayerPicker leagueId={leagueId} legend="Their players" roster={theirRoster} selected={receive} onToggle={(playerId) => setReceive((current) => togglePlayer(current, playerId, TRADE_CONFIG.maxAssetsPerSide))} />
           )}
         </div>
 

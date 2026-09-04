@@ -9,6 +9,7 @@ import type { FixtureLabel } from "@/league-service/nfl-schedule";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeekdayClock, ordinal } from "../lib/format";
+import { PlayerName } from "./player-peek";
 
 const POSITION_FILTERS = ["ALL", "QB", "RB", "WR", "TE", "K", "DEF"] as const;
 type PositionFilter = (typeof POSITION_FILTERS)[number];
@@ -146,7 +147,8 @@ export function RoomSurfacePlayers(props: RoomSurfacePlayersProps) {
           >
             <PositionBadge position={agent.position as Position} size="sm" />
             <span className="min-w-0 truncate font-display text-sm font-semibold text-text-primary">
-              {agent.name} <span className="font-mono text-xs font-normal text-text-faint">{agent.nflTeam}</span>
+              <PlayerName leagueId={leagueId} playerId={agent.id} name={agent.name} className="inline" />{" "}
+              <span className="font-mono text-xs font-normal text-text-faint">{agent.nflTeam}</span>
             </span>
             <span className="hidden text-right font-mono text-sm text-text-primary sm:block">
               {projection === null ? "·" : projection.toFixed(1)}

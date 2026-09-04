@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { TRADE_CONFIG } from "@/trades/config";
 import type { TradeRoomContext } from "../contract";
+import { PlayerPeekHost } from "./player-peek";
 import { TradeComposer } from "./trade-composer";
 
 const CONTEXT: TradeRoomContext = {
@@ -32,7 +33,7 @@ describe("TradeComposer", () => {
     const onAssess = vi.fn();
     const onPropose = vi.fn();
     await renderSurface(
-      <TradeComposer context={CONTEXT} onAssess={onAssess} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />,
+      <TradeComposer leagueId="l1" context={CONTEXT} onAssess={onAssess} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />,
       async ({ container }) => {
         expect(screen.getByText(new RegExp(`up to ${TRADE_CONFIG.maxAssetsPerSide} players`))).toBeVisible();
         expect(await axe(container)).toHaveNoViolations();
@@ -44,13 +45,33 @@ describe("TradeComposer", () => {
   // `Sticker` slab — the same treatment that made the trade card 40.4% saturated pigment. A
   // plain row with a `PositionBadge` chip replaces it.
   it("renders the roster picker as quiet rows with a PositionBadge chip, never a sticker slab (E5)", () => {
-    const { container } = render(<TradeComposer context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
+    const { container } = render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
     expect(container.querySelector(".shadow-sticker")).toBeNull();
     expect(screen.getByText("RB").className).toContain("bg-pos-rb");
   });
 
+  // Player-name adoption sweep (task 4): the checkbox used to be a `<label>` wrapping the name,
+  // so a tap on the name toggled selection. The checkbox now carries its own accessible name and
+  // the name is a real sibling `PlayerName` button, opening the season peek without touching the
+  // trade selection.
+  it("makes the picker's name a pressable button that opens the season peek, without toggling the trade selection", async () => {
+    render(
+      <>
+        <PlayerPeekHost />
+        <TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />
+      </>,
+    );
+    const checkbox = screen.getByLabelText(/Bijan Robinson/);
+    const name = screen.getByRole("button", { name: "Bijan Robinson" });
+    await act(async () => {
+      fireEvent.click(name);
+    });
+    expect(screen.getByRole("dialog", { name: "Bijan Robinson" })).toBeInTheDocument();
+    expect(checkbox).not.toBeChecked();
+  });
+
   it("shows the counterparty's roster only once a team is chosen", () => {
-    render(<TradeComposer context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByText("Choose a team to see their roster.")).toBeInTheDocument();
     selectCounterparty();
     expect(screen.getByText("Puka Nacua")).toBeInTheDocument();
@@ -58,7 +79,7 @@ describe("TradeComposer", () => {
 
   it("calls the advisor trade route once a player is picked on each side, and renders the verdict before Send", async () => {
     const onAssess = vi.fn().mockResolvedValue(ASSESSMENT_OK);
-    render(<TradeComposer context={CONTEXT} onAssess={onAssess} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={onAssess} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
 
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
@@ -79,7 +100,7 @@ describe("TradeComposer", () => {
       adp: null,
     }));
     const context: TradeRoomContext = { ...CONTEXT, rostersByTeamId: { ...CONTEXT.rostersByTeamId, me: roster } };
-    render(<TradeComposer context={context} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={context} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
 
     for (let index = 0; index < TRADE_CONFIG.maxAssetsPerSide; index += 1) {
       fireEvent.click(screen.getByLabelText(new RegExp(`Player ${index}\\b`)));
@@ -88,7 +109,7 @@ describe("TradeComposer", () => {
   });
 
   it("keeps Send disabled until both sides have at least one player", () => {
-    render(<TradeComposer context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Propose trade" })).toBeDisabled();
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
@@ -99,7 +120,7 @@ describe("TradeComposer", () => {
 
   it("sends the counterparty team and assets, never the proposer's own identity", async () => {
     const onPropose = vi.fn().mockResolvedValue({ ok: true, data: { tradeId: "t1", verdict: { givingValue: 18, receivingValue: 15, delta: 3, verdict: "favors_receiver", flags: [] } } });
-    render(<TradeComposer context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
 
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
@@ -125,7 +146,7 @@ describe("TradeComposer", () => {
   it("shows the sender's own advisory read once more after sending, then hands off on Done", async () => {
     const onPropose = vi.fn().mockResolvedValue({ ok: true, data: { tradeId: "t1", verdict: { givingValue: 18, receivingValue: 40, delta: -22, verdict: "favors_proposer", flags: [] } } });
     const onDone = vi.fn();
-    render(<TradeComposer context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={onDone} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={onDone} onCancel={vi.fn()} />);
 
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
@@ -143,7 +164,7 @@ describe("TradeComposer", () => {
   // derived from config, never a hardcoded "three".
   it("tells the sender when the offer expires and what happens if nobody answers", async () => {
     const onPropose = vi.fn().mockResolvedValue({ ok: true, data: { tradeId: "t1", verdict: { givingValue: 18, receivingValue: 17, delta: 1, verdict: "even", flags: [] } } });
-    render(<TradeComposer context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
 
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
@@ -156,7 +177,7 @@ describe("TradeComposer", () => {
 
   it("shows the server's reason when a proposal is refused", async () => {
     const onPropose = vi.fn().mockResolvedValue({ ok: false, error: "You have 10 offers out already. Withdraw one before you send another." });
-    render(<TradeComposer context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
 
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
@@ -169,14 +190,14 @@ describe("TradeComposer", () => {
   it("cancels back to the inbox without sending anything", () => {
     const onCancel = vi.fn();
     const onPropose = vi.fn();
-    render(<TradeComposer context={CONTEXT} onAssess={vi.fn()} onPropose={onPropose} onDone={vi.fn()} onCancel={onCancel} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn()} onPropose={onPropose} onDone={vi.fn()} onCancel={onCancel} />);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalled();
     expect(onPropose).not.toHaveBeenCalled();
   });
 
   it("carries no em dash or en dash", () => {
-    render(<TradeComposer context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
     expect(document.body.textContent).not.toMatch(/[–—]/);
   });
 
@@ -190,7 +211,7 @@ describe("TradeComposer", () => {
     const user = userEvent.setup();
     const onAssess = vi.fn().mockResolvedValue(ASSESSMENT_OK);
     const onPropose = vi.fn().mockResolvedValue({ ok: true, data: { tradeId: "t1", verdict: { givingValue: 18, receivingValue: 17.5, delta: 0.5, verdict: "even", flags: [] } } });
-    render(<TradeComposer context={CONTEXT} onAssess={onAssess} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
+    render(<TradeComposer leagueId="l1" context={CONTEXT} onAssess={onAssess} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
 
     await user.selectOptions(screen.getByLabelText("Trade with"), "them");
 
@@ -199,10 +220,18 @@ describe("TradeComposer", () => {
     await user.keyboard(" ");
     expect(screen.getByLabelText(/Bijan Robinson/)).toBeChecked();
 
+    // Player-name adoption sweep (task 4): the row's name is now its own focusable stop
+    // (`PlayerName`, a sibling of the checkbox) between the checkbox and the next row.
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Bijan Robinson" })).toHaveFocus();
+
     await user.tab();
     expect(screen.getByLabelText(/Puka Nacua/)).toHaveFocus();
     await user.keyboard(" ");
     expect(screen.getByLabelText(/Puka Nacua/)).toBeChecked();
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Puka Nacua" })).toHaveFocus();
 
     await waitFor(() => expect(onAssess).toHaveBeenCalled());
     expect(await screen.findByText(/close to even/i)).toBeInTheDocument();
