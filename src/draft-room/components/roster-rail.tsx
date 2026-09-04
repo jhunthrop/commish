@@ -56,6 +56,7 @@ export function RosterRail({ view, myTeamId, playersById, slotConfig }: RosterRa
           return (
             <RosterRow
               key={`${row.slot}:${row.slotIndex}`}
+              leagueId={view.leagueId}
               slot={row.slot}
               player={row.playerId === null ? null : (playersById.get(row.playerId) ?? null)}
               className={startsBench ? "mt-2 border-t border-line pt-2" : undefined}

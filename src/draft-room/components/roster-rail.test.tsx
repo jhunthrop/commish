@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { DraftStateView } from "@/draft-engine";
 import { renderSurface } from "@/components/ui/test-utils";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { SNAKE_VIEW, playersById } from "../test-fixtures";
 import { RosterRail } from "./roster-rail";
 
@@ -67,5 +69,20 @@ describe("RosterRail", () => {
     render(<RosterRail view={VIEW} myTeamId="t1" playersById={playersById()} slotConfig={VIEW.slotConfig} />);
     // rb1 (Marcus Reed) carries no headshotUrl in the fixture — Avatar's initials fallback.
     expect(screen.getByText("MR")).toBeInTheDocument();
+  });
+
+  // Task 3 (player-name adoption sweep): a filled spot's name is a pressable `PlayerName`.
+  it("makes a filled spot's name a pressable button that opens the season peek", async () => {
+    render(
+      <LeagueRoomDepsProvider deps={{ fetchJson: () => new Promise(() => {}), openEventSource: () => ({ addEventListener: () => {}, close: () => {} }) }}>
+        <PlayerPeekHost />
+        <RosterRail view={VIEW} myTeamId="t1" playersById={playersById()} slotConfig={VIEW.slotConfig} />
+      </LeagueRoomDepsProvider>,
+    );
+    const name = screen.getByRole("button", { name: "Andre Salas" });
+    await act(async () => {
+      fireEvent.click(name);
+    });
+    expect(screen.getByRole("dialog", { name: "Andre Salas" })).toBeInTheDocument();
   });
 });

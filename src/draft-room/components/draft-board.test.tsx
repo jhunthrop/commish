@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
 import { renderSurface } from "@/components/ui/test-utils";
 import { blendOver, contrastRatio } from "@/design/test-support";
 import { TOKENS } from "@/design/tokens";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { AUCTION_VIEW, PLAYERS, SNAKE_VIEW, TEAMS, TEAMS_WITH_BOT, playersById } from "../test-fixtures";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { DraftBoard } from "./draft-board";
@@ -95,6 +97,36 @@ describe("DraftBoard", () => {
     expect(roundOne[1]).toHaveTextContent("Marcus Reed");
     expect(roundOne[0]!.querySelector(".bg-pos-qb")).not.toBeNull();
     expect(roundOne[1]!.querySelector(".bg-pos-rb")).not.toBeNull();
+  });
+
+  // Task 3 (player-name adoption sweep): the room variant's sticker is otherwise
+  // non-interactive, so the name is the one control in it — the standing law keeps the TV
+  // variant fully inert.
+  describe("sticker names (task 3)", () => {
+    it("makes the room variant's sticker name a pressable button that opens the season peek, axe-clean", async () => {
+      stubMatchMedia(false);
+      await renderSurface(
+        <LeagueRoomDepsProvider deps={{ fetchJson: () => new Promise(() => {}), openEventSource: () => ({ addEventListener: () => {}, close: () => {} }) }}>
+          <PlayerPeekHost />
+          <DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} />
+        </LeagueRoomDepsProvider>,
+        async ({ container }) => {
+          const name = within(grid()).getByRole("button", { name: "Jalen Croft" });
+          expect(await axe(container)).toHaveNoViolations();
+          await act(async () => {
+            fireEvent.click(name);
+          });
+          expect(screen.getByRole("dialog", { name: "Jalen Croft" })).toBeInTheDocument();
+        },
+      );
+    });
+
+    it("keeps every TV sticker name inert — no control on it is ever clickable", () => {
+      stubMatchMedia(false);
+      render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} variant="tv" />);
+      expect(within(grid()).getByText("Jalen Croft").tagName).toBe("SPAN");
+      expect(screen.queryByRole("button", { name: "Jalen Croft" })).not.toBeInTheDocument();
+    });
   });
 
   it("marks the team on the clock with a spotlight cell, in their next empty round", () => {

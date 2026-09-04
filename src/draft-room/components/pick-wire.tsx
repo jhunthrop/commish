@@ -5,6 +5,7 @@ import type { TeamCard } from "@/domain/league";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { PositionBadge } from "@/components/ui";
 import type { PositionBadgeSize } from "@/components/ui/position-badge";
+import { PlayerName } from "@/league-room/components/player-peek";
 import { teamsById, teamName } from "../lib/lookups";
 import { verdictForPick, verdictPopulation } from "../lib/verdict";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
@@ -106,7 +107,18 @@ export function PickWire({ view, teams, playersById, players, variant = "room" }
                   dash characters outright (`@/integrity/copy-rules`), and a wire item reads as a
                   label and its value anyway. */}
               {`#${pick.pickNumber} ${teamName(teamsMap, pick.teamId)}: `}
-              <span className={index === 0 ? "font-semibold text-text-primary" : undefined}>{player.name}</span>{" "}
+              {/* Task 3: room-variant names are pressable; the TV keeps every control inert
+                  (standing law), so it never receives `PlayerName`'s button. */}
+              {variant === "room" ? (
+                <PlayerName
+                  leagueId={view.leagueId}
+                  playerId={player.id}
+                  name={player.name}
+                  className={`inline ${index === 0 ? "font-semibold text-text-primary" : ""}`}
+                />
+              ) : (
+                <span className={index === 0 ? "font-semibold text-text-primary" : undefined}>{player.name}</span>
+              )}{" "}
               <PositionBadge position={player.position} size={BADGE_SIZE[variant]} />
               {index === 0 ? (
                 <>

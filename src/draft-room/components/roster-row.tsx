@@ -1,8 +1,10 @@
 import type { Player } from "@/domain/player";
 import type { RosterSlotType } from "@/domain/roster";
 import { PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
+import { PlayerName } from "@/league-room/components/player-peek";
 
 export interface RosterRowProps {
+  readonly leagueId: string;
   readonly slot: RosterSlotType;
   readonly player: Player | null;
   readonly className?: string;
@@ -24,7 +26,7 @@ export interface RosterRowProps {
  * on eight boxes containing nothing. Law 4: space separates kinds of information, it never exists
  * to fill a column.
  */
-export function RosterRow({ slot, player, className }: RosterRowProps) {
+export function RosterRow({ leagueId, slot, player, className }: RosterRowProps) {
   return (
     <li className={`flex items-center gap-2 py-0.5 ${className ?? ""}`}>
       {player === null ? (
@@ -46,7 +48,12 @@ export function RosterRow({ slot, player, className }: RosterRowProps) {
           {/* Law 3: the club colour behind the face. Decorative — the name right beside it
               already says who this is, and the position badge states the fourth attribute. */}
           <PlayerFace player={player} size="sm" />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">{player.name}</span>
+          <PlayerName
+            leagueId={leagueId}
+            playerId={player.id}
+            name={player.name}
+            className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary"
+          />
           {/* The player's OWN position, never the slot's — a WR filling FLEX shows WR, so the
               badge always states a real, colored position rather than "FLEX" (which cannot
               wear one). */}

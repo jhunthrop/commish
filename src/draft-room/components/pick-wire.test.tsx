@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { axe } from "vitest-axe";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CompletedPick } from "@/draft-engine";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { PLAYERS, TEAMS, SNAKE_VIEW, playersById } from "../test-fixtures";
 import { PickWire } from "./pick-wire";
@@ -158,5 +161,32 @@ describe("PickWire", () => {
     const picks = [pick({ pickNumber: 1, teamId: "t1", playerId: "qb1" })];
     render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} variant="tv" />);
     expect(screen.getByTestId("pick-wire").className).toMatch(/text-base/);
+  });
+
+  // Task 3 (player-name adoption sweep): the room variant's name is pressable; the TV keeps
+  // every control inert (standing law).
+  describe("player names (task 3)", () => {
+    const picks = [pick({ pickNumber: 1, teamId: "t1", playerId: "qb1" })];
+
+    it("makes the room variant's newest-pick name a pressable button that opens the season peek, axe-clean", async () => {
+      const { container } = render(
+        <LeagueRoomDepsProvider deps={{ fetchJson: () => new Promise(() => {}), openEventSource: () => ({ addEventListener: () => {}, close: () => {} }) }}>
+          <PlayerPeekHost />
+          <PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} />
+        </LeagueRoomDepsProvider>,
+      );
+      const name = screen.getByRole("button", { name: "Jalen Croft" });
+      expect(await axe(container)).toHaveNoViolations();
+      await act(async () => {
+        fireEvent.click(name);
+      });
+      expect(screen.getByRole("dialog", { name: "Jalen Croft" })).toBeInTheDocument();
+    });
+
+    it("keeps the TV variant's name inert — no control on it is ever clickable", () => {
+      render(<PickWire view={{ ...SNAKE_VIEW, picks }} teams={TEAMS} playersById={playersById(PLAYERS)} players={PLAYERS} variant="tv" />);
+      expect(screen.getByText("Jalen Croft").tagName).toBe("SPAN");
+      expect(screen.queryByRole("button", { name: "Jalen Croft" })).not.toBeInTheDocument();
+    });
   });
 });
