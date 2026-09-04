@@ -73,7 +73,7 @@ export async function sweepDrafts(ctx: DraftSweepContext): Promise<StepOutcome> 
     summary: `sweep: ${started.filter((s) => s.started).length} auto-starts, ${mocks.filter((m) => m.started).length} mock starts, ${actions} actions across ${advanced} of ${rows.length} live drafts${exhausted ? " (budget hit — the next fire resumes)" : ""}`,
     detail: [
       ...started.filter((s) => !s.started && s.rolled !== true && s.reason !== undefined).map((s) => `auto-start ${s.draftId}: ${s.reason}`),
-      ...mocks.filter((m) => !m.started && !m.benignRace).map((m) => `mock ${m.leagueId}: ${m.reason}`),
+      ...mocks.flatMap((m) => (!m.started && !m.benignRace ? [`mock ${m.leagueId}: ${m.reason}`] : [])),
     ],
   };
 }
