@@ -53,8 +53,9 @@ export interface AdvanceOutcome {
 
 export interface DraftAdvancer {
   /** Apply all due work for one draft as of `now`. NEVER throws — a broken advance must not
-   *  fail the read (or the stream, or the sweep) that triggered it. */
-  advance(draftId: string, now: string): Promise<AdvanceOutcome>;
+   *  fail the read (or the stream, or the sweep) that triggered it. `opts.maxActions` lets a
+   *  caller with its own budget (the sweep job) cap this call under the advancer's ceiling. */
+  advance(draftId: string, now: string, opts?: { readonly maxActions?: number }): Promise<AdvanceOutcome>;
 }
 
 export interface DraftAdvancerDeps {
@@ -138,7 +139,8 @@ export function createDraftAdvancer({
   }
 
   return {
-    async advance(draftId, now) {
+    async advance(draftId, now, opts) {
+      const maxActions = Math.min(maxActionsPerAdvance, opts?.maxActions ?? maxActionsPerAdvance);
       let applied = 0;
       try {
         let state = await store.getDraftState(draftId);
@@ -156,7 +158,7 @@ export function createDraftAdvancer({
         const nowMs = Date.parse(now);
         let refusals = 0;
         while (state.phase === "in_progress") {
-          if (applied >= maxActionsPerAdvance) return { draftId, applied, exhausted: true, phase: state.phase };
+          if (applied >= maxActions) return { draftId, applied, exhausted: true, phase: state.phase };
           const result = await applyNextDue(state, nowMs);
           if (result === null) {
             // Nothing due — the clock is still running: the moderator's window, exactly where

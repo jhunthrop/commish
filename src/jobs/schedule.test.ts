@@ -21,7 +21,18 @@ const noopDefinition = defineJob({
   parsePayload: () => ({}),
   steps: [{ name: "only", run: async () => ({ summary: "noop", detail: [] }) }],
 });
-const definitions: ReadonlyMap<string, AnyJobDefinition> = new Map([["season-week", noopDefinition]]);
+const sweepNoop = defineJob({
+  name: "draft-sweep",
+  maxAttempts: 2,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 30_000, maxMs: 60_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "sweep", run: async () => ({ summary: "noop", detail: [] }) }],
+});
+const definitions: ReadonlyMap<string, AnyJobDefinition> = new Map([
+  ["season-week", noopDefinition],
+  ["draft-sweep", sweepNoop],
+]);
 
 /** Just the Tuesday schedule, so fire counts in tests are one schedule's worth. */
 const tueOnly: readonly ScheduleDefinition[] = [SCHEDULES.find((s) => s.name === "season-week-tue-data")!];
@@ -100,6 +111,33 @@ describe("tickSchedules", () => {
     expect(reports[0]!.enqueued).toEqual(["2026-09-08T12:00:00.000Z"]);
     expect(reports[0]!.droppedBeforeWindow).toBe(4); // Aug 11, 18, 25, Sep 1
     expect(await db.select().from(jobs)).toHaveLength(1);
+  });
+
+  it("honors a schedule's own catchUpMs: a minute-cadence sweep drops the slept-through backlog instead of replaying it", async () => {
+    const minuteSweep: ScheduleDefinition = {
+      name: "minute-sweep",
+      cron: "* * * * *",
+      expression: parseCronExpression("* * * * *"),
+      timezone: "UTC",
+      job: "season-week",
+      payload: {},
+      description: "level-triggered minute schedule under test",
+      catchUpMs: 5 * 60_000,
+    };
+    // Cursor an hour back: sixty missed fires. A level-triggered sweep's one caught-up run does
+    // the work of every older one, so only the five inside ITS OWN window enqueue.
+    await setCursor("minute-sweep", "2026-09-08T15:00:00.000Z");
+    const reports = await tickSchedules(db, clockAt("2026-09-08T16:00:00.000Z"), definitions, [minuteSweep]);
+
+    expect(reports[0]!.enqueued).toEqual([
+      "2026-09-08T15:56:00.000Z",
+      "2026-09-08T15:57:00.000Z",
+      "2026-09-08T15:58:00.000Z",
+      "2026-09-08T15:59:00.000Z",
+      "2026-09-08T16:00:00.000Z",
+    ]);
+    expect(reports[0]!.droppedBeforeWindow).toBe(55);
+    expect(await db.select().from(jobs)).toHaveLength(5);
   });
 
   it("refuses a schedule naming an unregistered job", async () => {

@@ -53,7 +53,18 @@ describe("scheduleStatuses", () => {
       parsePayload: () => ({}),
       steps: [{ name: "only", run: async () => ({ summary: "noop", detail: [] }) }],
     });
-    const definitions = new Map([["season-week", canned]]);
+    const cannedSweep = defineJob({
+      name: "draft-sweep",
+      maxAttempts: 2,
+      timeoutMs: 5_000,
+      backoff: { baseMs: 30_000, maxMs: 60_000 },
+      parsePayload: () => ({}),
+      steps: [{ name: "sweep", run: async () => ({ summary: "noop", detail: [] }) }],
+    });
+    const definitions = new Map([
+      ["season-week", canned],
+      ["draft-sweep", cannedSweep],
+    ]);
 
     // Bootstrap, then rewind the Tuesday cursor so the second tick enqueues the 12:00Z fire.
     await tickSchedules(db, { now: () => "2026-09-08T00:00:00.000Z" }, definitions, SCHEDULES);

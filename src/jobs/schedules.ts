@@ -19,6 +19,14 @@ export interface ScheduleDefinition {
   readonly payload: JsonObject;
   /** One line for the admin page — what an operator scanning the schedule list needs. */
   readonly description: string;
+  /**
+   * This schedule's own catch-up window, overriding `JOBS_CONFIG.maxCatchUpMs`. A minute-cadence,
+   * LEVEL-TRIGGERED schedule (the draft sweep) sets this small: one caught-up run does the work
+   * of every older missed one, and replaying a slept-through hour as sixty queued no-ops would be
+   * queue noise, not recovery — the identical reasoning `maxCatchUpMs`'s own docblock records at
+   * the week scale. Omit for the cadence jobs, which keep the global window.
+   */
+  readonly catchUpMs?: number;
 }
 
 function schedule(definition: Omit<ScheduleDefinition, "expression">): ScheduleDefinition {
@@ -49,5 +57,16 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
     job: "season-week",
     payload: {},
     description: "Thursday 14:00 ET freeze pass. Hours of margin before the week's first kickoff.",
+  }),
+  schedule({
+    name: "draft-sweep-minutely",
+    cron: "* * * * *",
+    timezone: "UTC",
+    job: "draft-sweep",
+    payload: {},
+    description: "Every minute: start due drafts and advance abandoned rooms — the serverless drivers' backstop.",
+    // Level-triggered, so one caught-up sweep does the work of every missed one; replaying a
+    // slept-through hour would be sixty queued no-ops (see `ScheduleDefinition.catchUpMs`).
+    catchUpMs: 5 * 60_000,
   }),
 ];

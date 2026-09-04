@@ -30,12 +30,23 @@ const cannedSeasonWeek: AnyJobDefinition = defineJob({
   steps: [{ name: "only", run: async () => ({ summary: "canned", detail: [] }) }],
 });
 
+/** Same reason: the real SCHEDULES now also fire "draft-sweep" every minute. */
+const cannedDraftSweep: AnyJobDefinition = defineJob({
+  name: "draft-sweep",
+  maxAttempts: 2,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 30_000, maxMs: 60_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "sweep", run: async () => ({ summary: "canned", detail: [] }) }],
+});
+
 function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET: SECRET }): TickHandlerDeps {
   return {
     db,
     definitions: new Map([
       ["noop", noop],
       ["season-week", cannedSeasonWeek],
+      ["draft-sweep", cannedDraftSweep],
     ]),
     env,
     workerId: "tick-test",

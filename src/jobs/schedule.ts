@@ -64,7 +64,7 @@ async function tickOne(
     return { schedule: schedule.name, bootstrapped: true, enqueued: [], deduped: 0, droppedBeforeWindow: 0 };
   }
 
-  const windowFloor = new Date(now.getTime() - JOBS_CONFIG.maxCatchUpMs);
+  const windowFloor = new Date(now.getTime() - (schedule.catchUpMs ?? JOBS_CONFIG.maxCatchUpMs));
   const start = cursor.lastEvaluatedAt.getTime() > windowFloor.getTime() ? cursor.lastEvaluatedAt : windowFloor;
   const dropped =
     cursor.lastEvaluatedAt.getTime() < windowFloor.getTime()
