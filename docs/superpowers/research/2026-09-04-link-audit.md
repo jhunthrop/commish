@@ -183,3 +183,15 @@ npx dotenv -e .env.local -- npx tsx scripts/mint-dev-session.ts .lab-session.jso
 LAB_BASE_URL=http://localhost:3210 LAB_SESSION_FILE=.lab-session.json npx tsx scripts/link-crawl.ts
 LAB_BASE_URL=http://localhost:3210 LAB_SIGNED_OUT=1 npx tsx scripts/link-crawl.ts
 ```
+
+## Suite state, for the record
+
+The full vitest suite on this branch: 10539 passed, 44 failed. The failures were re-run
+serially on this branch AND at the base commit (`279fcbf`, main) in a clean worktree: the two
+failure sets are byte-identical - every one predates this audit (stale copy/design assertions
+of the same rebuild vintage as judgment item 4, plus a handful of DB-backed route tests that
+fail the same way on main). None involve files this branch touches. Touched suites are green:
+room-shell, share-link-panel, draft-room, rendered-copy, invites route, api-routes,
+waiting-room, and the new link-integrity sweep (173 tests). Gates: tsc clean; eslint 0 errors
+(6 pre-existing warnings in untouched files); e2e invite-anchor passes; e2e mock-draft's
+link-room test passes end to end with the absolute share URL.
