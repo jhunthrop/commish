@@ -217,7 +217,9 @@ test("front door -> mock draft lobby -> a solo mock -> a real pick -> bots pick 
 
   // --- Front door -> the practice CTA -------------------------------------------------------
   await managerA.goto("/");
-  await expect(managerA.getByRole("heading", { name: "Real leagues. Real seats. Drafting this week." })).toBeVisible();
+  // The front-door rebuild's hero (2026-09-02): "There is always a seat." replaced the old
+  // "Real leagues. Real seats. Drafting this week." — reconciled by the 2026-09-04 link audit.
+  await expect(managerA.getByRole("heading", { name: "There is always a seat." })).toBeVisible();
   await managerA.getByRole("link", { name: "Try a mock draft" }).click();
   await expect(managerA).toHaveURL(/\/app\/mock-drafts$/);
   await expect(managerA.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
@@ -402,11 +404,10 @@ test("a link room's share code, claimed by a second seeded identity, moves the s
   // as a recipient would.
   const shareUrl = await managerB.getByLabel("Share link").inputValue();
   expect(shareUrl).toMatch(/^https?:\/\/[^/]+\/app\/mock-drafts\//);
-  // R2's own carry (Task 10's report): the scheduled rail's kickoff countdown and its
-  // trigger-aware sentence render for an unstarted link room too, beside `ShareLinkPanel`'s own
-  // countdown to the identical instant — two views of the SAME fill window, never two clocks.
-  await expect(managerB.getByTestId("kickoff-countdown")).toBeVisible();
-  await expect(managerB.getByText(MOCK_COPY.waitingDetail)).toBeVisible();
+  // THE QUILT (2026-09-02) retired the scheduled rail from this room — R2's two-views-of-one
+  // window (the rail's `kickoff-countdown` beside the panel's) is one view now: the fill
+  // window's clock lives on `ShareLinkPanel` itself. Reconciled by the 2026-09-04 link audit.
+  await expect(managerB.getByTestId("share-link-countdown")).toBeVisible();
   await expect(managerB.getByText(`1 of ${teamCount} seated`)).toBeVisible();
 
   // --- managerA, a second seeded identity in a wholly separate browser context, arrives signed
