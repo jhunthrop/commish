@@ -15,7 +15,7 @@ import { DRAFT_ROOM_CONFIG } from "./config";
 describe("DRAFT_ROOM_CONFIG", () => {
   it("defines every numeric tunable as a positive number", () => {
     const numericKeys: readonly (keyof typeof DRAFT_ROOM_CONFIG)[] = ["poolPageSize", "celebrationMs"];
-    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire", "tv", "verdict", "tiers", "boardFutureRoundsShown", "dock", "debrief"] as const;
+    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire", "tv", "verdict", "tiers", "boardFutureRoundsShown", "dock", "debrief", "finale"] as const;
     expect(Object.keys(DRAFT_ROOM_CONFIG).sort()).toEqual([...allKeys].sort());
     for (const key of numericKeys) {
       expect(Number.isFinite(DRAFT_ROOM_CONFIG[key])).toBe(true);
@@ -78,6 +78,16 @@ describe("DRAFT_ROOM_CONFIG", () => {
     expect(DRAFT_ROOM_CONFIG.debrief.reachRankedHigher).toBeGreaterThan(0);
     expect(DRAFT_ROOM_CONFIG.debrief.shapeRounds).toBeGreaterThanOrEqual(1);
     expect(DRAFT_ROOM_CONFIG.debrief.byeStackMin).toBeGreaterThanOrEqual(3);
+  });
+
+  // The finale (2026-09-04): a zero beat is no moment at all, and the retry pair is what
+  // keeps "never an infinite spinner" true — zero attempts would skip straight to the manual
+  // fallback, a zero spacing would hammer the snapshot route in a tight loop.
+  it("keeps the finale's beat and its bounded retry cycle positive", () => {
+    expect(DRAFT_ROOM_CONFIG.finale.momentMs).toBeGreaterThan(0);
+    expect(DRAFT_ROOM_CONFIG.finale.resultsRetryMs).toBeGreaterThan(0);
+    expect(DRAFT_ROOM_CONFIG.finale.resultsRetryCount).toBeGreaterThan(0);
+    expect(Number.isInteger(DRAFT_ROOM_CONFIG.finale.resultsRetryCount)).toBe(true);
   });
 
   // `DraftBoard`'s empty-cell recede: a future round's border may shrink, never dim past

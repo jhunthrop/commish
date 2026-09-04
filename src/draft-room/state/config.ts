@@ -65,6 +65,25 @@ export const DRAFT_ROOM_CONFIG = {
     byeStackMin: 3,
   },
   /**
+   * THE FINALE (the draft-completion moment, 2026-09-04 —
+   * `docs/superpowers/specs/2026-09-04-draft-finale-design.md`; `useDraftFinale` reads these
+   * and nothing else does).
+   *
+   * - `momentMs`: how long the completion beat (the banner plus the shared `Celebration`)
+   *   holds over the finished board before the room transitions — long enough to land as a
+   *   moment, short enough that the debrief or the panel is what the manager remembers.
+   * - `resultsRetryMs` / `resultsRetryCount`: the mock debrief's bounded refetch cycle. The
+   *   room's own GET only carries `mock.results` once the driver has settled the finished
+   *   draft, and the beat can beat settlement — so the room retries `resultsRetryCount` times,
+   *   `resultsRetryMs` apart, once silently and once behind a quiet "Preparing your debrief"
+   *   line, and then STOPS: the fallback is a manual button, never an infinite spinner.
+   */
+  finale: {
+    momentMs: 2_600,
+    resultsRetryMs: 900,
+    resultsRetryCount: 3,
+  },
+  /**
    * `PickWire`'s own tunable (2026-08-26 design review, R1): how many of the draft's most
    * recent picks the band shows, newest first. One number, read by both the room's `text-xs`
    * band and the TV's `text-base` one, so a future retune never drifts between the two.

@@ -7,7 +7,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
-import { fixtureDeps, MOCK_RESULTS_INFO, MOCK_ROOM, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
+import { clockOf, fixtureDeps, MOCK_RESULTS_INFO, MOCK_ROOM, renderInRoom, SNAKE_VIEW, type FixtureDeps } from "../test-fixtures";
+import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { DraftRoomDepsProvider } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
 
@@ -274,5 +275,140 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     expect(viewport.className).toContain("lg:overflow-hidden");
     expect(viewport.contains(screen.getByTestId("practice-banner"))).toBe(true);
     expect(viewport.contains(screen.getByTestId("quilt-room"))).toBe(true);
+  });
+});
+
+/**
+ * THE FINALE (2026-09-04, `docs/superpowers/specs/2026-09-04-draft-finale-design.md`): the
+ * completion moment and what follows it. Every case here drives the live room through the
+ * `in_progress → complete` TRANSITION over the stream — the one gate the detector fires on —
+ * except the guards, which prove a draft already complete at load stays exactly as it was.
+ */
+describe("DraftRoom — the finale", () => {
+  const { momentMs, resultsRetryMs, resultsRetryCount } = DRAFT_ROOM_CONFIG.finale;
+
+  /** The stream frame that finishes the draft: the same view, phase flipped, one sequence on. */
+  const COMPLETE_VIEW = { ...SNAKE_VIEW, phase: "complete" as const, sequence: 2, onClockTeamId: null, deadlineAt: null };
+
+  async function mountLive(fixture: FixtureDeps) {
+    mount(fixture);
+    await waitFor(() => expect(fixture.sources).toHaveLength(1));
+    await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
+  }
+
+  /** Flips the room to complete over the stream, under fake timers, and asserts the beat. */
+  function finish(fixture: FixtureDeps): void {
+    vi.useFakeTimers();
+    act(() => fixture.sources[0]!.emit("draft.status", { draftId: "d1", clock: clockOf(COMPLETE_VIEW), phase: "complete" }));
+  }
+
+  async function advance(ms: number): Promise<void> {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("plays the beat on a mock's completion, then refetches and swaps to the debrief in place", async () => {
+    const fixture = fixtureDeps();
+    fixture.mock = MOCK_ROOM;
+    await mountLive(fixture);
+
+    // The draft finishes on the stream; settlement means the NEXT snapshot carries results.
+    fixture.view = COMPLETE_VIEW;
+    fixture.mock = { ...MOCK_ROOM, results: MOCK_RESULTS_INFO };
+    finish(fixture);
+
+    // The beat: the banner in the strip's place, the celebration, the board still the room —
+    // and NOT the debrief yet, even though the server already has it.
+    expect(screen.getByTestId("finale-banner")).toHaveTextContent("The draft is in the books.");
+    expect(screen.getByTestId("finale-celebration")).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "The debrief" })).not.toBeInTheDocument();
+
+    // The beat ends, the refetch lands, and the debrief takes the room in place — no reload.
+    await advance(momentMs);
+    await advance(0);
+    await advance(0);
+    expect(screen.getByRole("heading", { name: "The debrief" })).toBeInTheDocument();
+    expect(screen.queryByTestId("finale-banner")).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: /available players/i })).not.toBeInTheDocument();
+  });
+
+  it("retries when the refetch races settlement, says so quietly, then offers the manual door — which opens the debrief", async () => {
+    const fixture = fixtureDeps();
+    fixture.mock = MOCK_ROOM;
+    await mountLive(fixture);
+
+    // The draft finishes but settlement never lands: every refetch answers without results.
+    fixture.view = COMPLETE_VIEW;
+    finish(fixture);
+    await advance(momentMs);
+
+    // Walk the bounded cycles: the quiet line appears along the way, then the manual door —
+    // and the room never spins (no progressbar, ever).
+    let sawPreparing = false;
+    for (let step = 0; step < (resultsRetryCount + 2) * 4; step++) {
+      await advance(resultsRetryMs);
+      sawPreparing ||= screen.queryByTestId("finale-preparing") !== null;
+    }
+    expect(sawPreparing).toBe(true);
+    expect(screen.getByRole("button", { name: "See your debrief" })).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
+
+    // Settlement finally lands; the manual door refetches its way to the debrief.
+    fixture.mock = { ...MOCK_ROOM, results: MOCK_RESULTS_INFO };
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "See your debrief" }));
+    });
+    await advance(0);
+    await advance(0);
+    expect(screen.getByRole("heading", { name: "The debrief" })).toBeInTheDocument();
+  });
+
+  it("gives a real league the completion panel after the beat — one verb home, and a dismiss back to the board", async () => {
+    const fixture = fixtureDeps();
+    await mountLive(fixture);
+
+    fixture.view = COMPLETE_VIEW;
+    finish(fixture);
+    expect(screen.getByTestId("finale-banner")).toHaveTextContent("The draft is in the books.");
+    expect(screen.queryByTestId("finale-panel")).not.toBeInTheDocument();
+
+    await advance(momentMs);
+    const panel = screen.getByTestId("finale-panel");
+    expect(panel).toHaveTextContent("The draft is in the books.");
+    expect(screen.getByRole("link", { name: "Open your league room" })).toHaveAttribute("href", "/app/leagues/l1");
+    // No refetch machinery for a real draft: the room asked for its snapshot once, at mount.
+    expect(fixture.calls.filter((call) => call === "GET /api/drafts/d1")).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Stay on the board" }));
+    });
+    expect(screen.queryByTestId("finale-panel")).not.toBeInTheDocument();
+    // The completed board stays browsable.
+    expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
+  });
+
+  it("gives a real draft already complete at load no fanfare at all — no beat, no panel, no refetch", async () => {
+    const fixture = fixtureDeps({ ...SNAKE_VIEW, phase: "complete", onClockTeamId: null, deadlineAt: null });
+    await mountLive(fixture);
+    expect(screen.queryByTestId("finale-banner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("finale-panel")).not.toBeInTheDocument();
+    expect(fixture.calls.filter((call) => call === "GET /api/drafts/d1")).toHaveLength(1);
+  });
+
+  it("gives a mock already complete at load the debrief directly, with no beat and no retry chrome", async () => {
+    const fixture = fixtureDeps({ ...SNAKE_VIEW, phase: "complete", onClockTeamId: null, deadlineAt: null });
+    fixture.mock = { ...MOCK_ROOM, results: MOCK_RESULTS_INFO };
+    mount(fixture);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "The debrief" })).toBeInTheDocument());
+    expect(screen.queryByTestId("finale-banner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("finale-preparing")).not.toBeInTheDocument();
+    expect(fixture.calls.filter((call) => call === "GET /api/drafts/d1")).toHaveLength(1);
   });
 });

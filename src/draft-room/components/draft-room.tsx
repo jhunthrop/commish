@@ -5,9 +5,11 @@ import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import { useDraftRoom } from "../hooks/use-draft-room";
+import { useDraftFinale } from "../hooks/use-draft-finale";
 import { useDraftRoomDeps } from "../hooks/deps";
 import { actionLabelFor, playersById as buildPlayersById } from "../lib/lookups";
 import { DraftBoard } from "./draft-board";
+import { DraftFinaleOverlay } from "./draft-finale";
 import { MockResults } from "./mock-results";
 import { PickWire } from "./pick-wire";
 import { PracticeBanner } from "./practice-banner";
@@ -56,6 +58,19 @@ export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
    * state after mount.
    */
   const [chatOpen, setChatOpen] = useState<boolean>(false);
+  /**
+   * THE FINALE (2026-09-04, `docs/superpowers/specs/2026-09-04-draft-finale-design.md`): the
+   * completion beat and what follows it. Fires only on the TRANSITION `in_progress → complete`
+   * witnessed in this room's own state — a page that loads an already-complete draft keeps
+   * today's paths byte-for-byte (the `room.mock?.results` branch below for a settled mock, the
+   * completed board for everything else) because the detector never saw `in_progress`.
+   */
+  const finale = useDraftFinale({
+    phase: room.view?.phase ?? null,
+    isMock: room.mock !== null,
+    hasResults: room.mock?.results != null,
+    refresh: room.refresh,
+  });
 
   const act = (action: ClientDraftAction): void => {
     void room.submit(action).then((outcome) => {
@@ -158,7 +173,12 @@ export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
 
   return (
     <>
-      {room.mock?.results ? (
+      {/* `finale.stage !== "moment"` is the one addition to this branch: a resync can deliver
+          `mock.results` in the same breath as the phase flip, and the beat still deserves its
+          2.6 seconds over the finished board before the debrief takes the room. Every load
+          that never fired the detector (an already-complete mock) has `stage === "idle"` and
+          renders the debrief exactly as before. */}
+      {room.mock?.results && finale.stage !== "moment" ? (
         <>
           {mockChrome}
           {/* The debrief (results review, 2026-08-26): the room's own chrome answers D4 — the
@@ -202,7 +222,7 @@ export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
         // the live room wears (the practice banner, the share panel) lives INSIDE this frame,
         // and `RoomLayout` flexes into what remains. A sibling above an h-dvh frame scrolls
         // the page by its own height; a child inside it never can.
-        <div data-testid="room-viewport" className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+        <div data-testid="room-viewport" className="relative flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
           {mockChrome}
           <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} actionLabel={actionLabelFor(room.view.format)} />
           {room.view.format === "auction" ? (
@@ -210,6 +230,17 @@ export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
           ) : (
             <SnakeRoom room={room} playersById={playersById} onAct={act} aside={aside} />
           )}
+          {/* The finale rides the viewport, over whichever composition owns the stage — the
+              quilt, the auction shell and the phone inversion all inherit the beat (and the
+              real-draft panel) from this one placement. `relative` above is its anchor. */}
+          <DraftFinaleOverlay
+            stage={finale.stage}
+            view={room.view}
+            playersById={playersById}
+            myTeamId={room.myTeamId}
+            onDismiss={finale.dismiss}
+            onSeeDebrief={finale.seeDebrief}
+          />
         </div>
       )}
     </>
