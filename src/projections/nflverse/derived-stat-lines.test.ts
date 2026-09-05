@@ -12,6 +12,7 @@ import {
   derivedSeasonSanityReport,
   derivedStatLineObservations,
   seasonPointsAgreement,
+  statLinesAsOfForLiveSurface,
   statLinesAsOfForMeasurement,
   weekAsOfFromDerivedLines,
 } from "./derived-stat-lines";
@@ -512,6 +513,79 @@ describe("statLinesAsOfForMeasurement", () => {
     ]);
 
     const lines = await statLinesAsOfForMeasurement(db, { season: GAP_SEASON, week: 2, asOf: AS_OF });
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.line.rushingYards).toBe(55);
+  });
+});
+
+/**
+ * `statLinesAsOfForLiveSurface` — the narrower admission a real player screen reads through.
+ * `2019` is a real `STAT_LINE_GAPS` season that is NOT on `LIVE_ADMITTED_DERIVED_SEASONS`; `2025`
+ * is the one gap season that is on both lists today. Using the real constants rather than a
+ * fixture keeps this test honest about what a live surface is actually allowed to show.
+ */
+describe("statLinesAsOfForLiveSurface", () => {
+  const db = createTestDb();
+
+  const LIVE_ADMITTED_GAP_SEASON = 2025;
+  const NON_ADMITTED_GAP_SEASON = 2019;
+  const NON_GAP_SEASON = 2018;
+  const AS_OF = new Date("2025-12-01T00:00:00.000Z");
+
+  beforeEach(async () => {
+    await truncateAll(db);
+    await db.insert(nflPlayers).values([
+      { id: "p1", pfrId: "OneOn00", name: "One", position: "RB", latestTeam: "KC", rookieSeason: 2016, lastSeason: 2026 },
+    ]);
+  });
+
+  afterAll(async () => {
+    await truncateAll(db);
+  });
+
+  function observation(over: Partial<PlayerWeekObservation> = {}): PlayerWeekObservation {
+    return { season: LIVE_ADMITTED_GAP_SEASON, week: 2, playerId: "p1", source: DERIVED_STAT_LINE_SOURCE, metric: "rushing_yards", value: 40, asOf: AS_OF, ...over };
+  }
+
+  it("returns published only for a non-gap season, even when a derived row exists for it", async () => {
+    await recordObservations(db, [
+      observation({ season: NON_GAP_SEASON, source: STAT_LINE_SOURCE, value: 55 }),
+      observation({ season: NON_GAP_SEASON, source: DERIVED_STAT_LINE_SOURCE, value: 999 }),
+    ]);
+
+    const lines = await statLinesAsOfForLiveSurface(db, { season: NON_GAP_SEASON, week: 2, asOf: AS_OF });
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.line.rushingYards).toBe(55);
+  });
+
+  it("merges in the derived source for a gap season on the LIVE allowlist", async () => {
+    await recordObservations(db, [observation({ source: DERIVED_STAT_LINE_SOURCE, value: 40 })]);
+
+    const lines = await statLinesAsOfForLiveSurface(db, { season: LIVE_ADMITTED_GAP_SEASON, week: 2, asOf: AS_OF });
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.line.rushingYards).toBe(40);
+  });
+
+  it("refuses the derived fallback for a gap season NOT on the LIVE allowlist — decade-old history has no business on a manager's screen", async () => {
+    await recordObservations(db, [
+      observation({ season: NON_ADMITTED_GAP_SEASON, source: DERIVED_STAT_LINE_SOURCE, value: 40 }),
+    ]);
+
+    const lines = await statLinesAsOfForLiveSurface(db, { season: NON_ADMITTED_GAP_SEASON, week: 2, asOf: AS_OF });
+
+    expect(lines).toEqual([]);
+  });
+
+  it("lets a published row win a collision with a derived row for the same week and player, on an admitted gap season", async () => {
+    await recordObservations(db, [
+      observation({ source: STAT_LINE_SOURCE, value: 55 }),
+      observation({ source: DERIVED_STAT_LINE_SOURCE, value: 999 }),
+    ]);
+
+    const lines = await statLinesAsOfForLiveSurface(db, { season: LIVE_ADMITTED_GAP_SEASON, week: 2, asOf: AS_OF });
 
     expect(lines).toHaveLength(1);
     expect(lines[0]?.line.rushingYards).toBe(55);

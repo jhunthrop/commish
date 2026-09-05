@@ -8,7 +8,7 @@ import type { ObservationQuery, PlayerWeekObservation } from "../store";
 import { NFLVERSE_CONFIG } from "./config";
 import type { CsvRow } from "./csv";
 import { kickoffAsOf } from "./schedule";
-import { STAT_LINE_GAPS } from "./stat-lines";
+import { LIVE_ADMITTED_DERIVED_SEASONS, STAT_LINE_GAPS } from "./stat-lines";
 
 /**
  * THE GAP FILL — stat-line OUTCOMES derived from play-by-play, for the one season (2019) nflverse
@@ -368,6 +368,31 @@ export async function statLinesAsOfForMeasurement(
 ): Promise<readonly SeasonStatLine[]> {
   const published = await statLinesAsOf(db, query, STAT_LINE_SOURCE);
   if (!STAT_LINE_GAPS.includes(query.season)) return published;
+  const derived = await statLinesAsOf(db, query, DERIVED_STAT_LINE_SOURCE);
+  const publishedKeys = new Set(published.map((row) => `${row.line.week}|${row.line.playerId}`));
+  return [...published, ...derived.filter((row) => !publishedKeys.has(`${row.line.week}|${row.line.playerId}`))];
+}
+
+/**
+ * THE LIVE-PRODUCT-SURFACE READ — a prior season's stat lines for a screen a manager actually
+ * opens, never a backtest. `statLinesAsOfForMeasurement`'s admission (`STAT_LINE_GAPS`, unscoped)
+ * exists for the laws harness, which is allowed to read ANY season it has validated a derivation
+ * for — 2019 included. A live surface is not: 2019 is eleven-plus-year-old history whose only job
+ * is filling a hole in a historical measurement, and it has no business reaching a player card.
+ * This is the exact predicate `preseason/source.ts`'s `admitsDerivedPriorSeason` applies to a LIVE
+ * board's own prior season — `STAT_LINE_GAPS` narrowed by `LIVE_ADMITTED_DERIVED_SEASONS` — kept
+ * here beside the other admission wrapper so the two seams cannot drift apart, and reused by every
+ * product-facing season history read (`draft-service/player-history.ts`, `league-service/player.ts`).
+ *
+ * For a season that is not a gap, or a gap season not on the live allowlist, this is identical to
+ * `statLinesAsOf(db, query, STAT_LINE_SOURCE)` — nothing invented, nothing borrowed.
+ */
+export async function statLinesAsOfForLiveSurface(
+  db: ReadonlyDb,
+  query: Omit<ObservationQuery, "source">,
+): Promise<readonly SeasonStatLine[]> {
+  const published = await statLinesAsOf(db, query, STAT_LINE_SOURCE);
+  if (!STAT_LINE_GAPS.includes(query.season) || !LIVE_ADMITTED_DERIVED_SEASONS.includes(query.season)) return published;
   const derived = await statLinesAsOf(db, query, DERIVED_STAT_LINE_SOURCE);
   const publishedKeys = new Set(published.map((row) => `${row.line.week}|${row.line.playerId}`));
   return [...published, ...derived.filter((row) => !publishedKeys.has(`${row.line.week}|${row.line.playerId}`))];

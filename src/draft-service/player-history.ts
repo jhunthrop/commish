@@ -6,9 +6,8 @@ import { PPR_SCORING } from "@/domain/scoring";
 import type { PlayerHistoryBody, PlayerSeasonSummary, PlayerWeekPoints } from "@/draft-room/contract";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
 import { nflPlayerIdsFor } from "@/projections/crosswalk";
-import { statLinesAsOf, type SeasonStatLine } from "@/projections/lines";
-import { DERIVED_STAT_LINE_SOURCE } from "@/projections/nflverse/derived-stat-lines";
-import { LIVE_ADMITTED_DERIVED_SEASONS, STAT_LINE_GAPS } from "@/projections/nflverse/stat-lines";
+import type { SeasonStatLine } from "@/projections/lines";
+import { statLinesAsOfForLiveSurface } from "@/projections/nflverse/derived-stat-lines";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 
 /** How many finished seasons the peek card looks back over — the mock's own three. */
@@ -78,14 +77,10 @@ export async function playerHistory(db: Db | DbTx, leagueId: string, playerId: s
 }
 
 /** One season's stat lines for the peer set: the published feed, plus the derived fallback for
- *  an admitted gap season — published weeks always win. */
+ *  an admitted gap season — published weeks always win. See `statLinesAsOfForLiveSurface`'s own
+ *  docblock for why this is narrower than the laws harness's `statLinesAsOfForMeasurement`. */
 async function seasonLines(db: Db | DbTx, season: number, peerIds: readonly string[], asOf: Date): Promise<readonly SeasonStatLine[]> {
-  const query = { season, week: { from: 1, to: NFL_REGULAR_SEASON_WEEKS }, asOf, playerIds: peerIds };
-  const published = await statLinesAsOf(db, query);
-  if (!STAT_LINE_GAPS.includes(season) || !LIVE_ADMITTED_DERIVED_SEASONS.includes(season)) return published;
-  const derived = await statLinesAsOf(db, query, DERIVED_STAT_LINE_SOURCE);
-  const publishedKeys = new Set(published.map((row) => `${row.line.week}|${row.line.playerId}`));
-  return [...published, ...derived.filter((row) => !publishedKeys.has(`${row.line.week}|${row.line.playerId}`))];
+  return statLinesAsOfForLiveSurface(db, { season, week: { from: 1, to: NFL_REGULAR_SEASON_WEEKS }, asOf, playerIds: peerIds });
 }
 
 interface SeasonSummaryResult {
