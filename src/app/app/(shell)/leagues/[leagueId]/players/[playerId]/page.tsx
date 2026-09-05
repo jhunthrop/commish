@@ -89,7 +89,7 @@ export default async function PlayerPage({ params, searchParams }: PageProps) {
           <Edge body={body} />
         </div>
 
-        <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} />
+        <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} capsule={body.capsule} />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className={`${MICRO_LABEL} text-text-faint`}>{body.season} season</span>

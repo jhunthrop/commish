@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { upsertCapsule } from "@/capsules/store";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { matchups, players, playerStatLines, scoringSettings, statWeeks, teams, users } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
@@ -471,6 +472,21 @@ describe("playerSeason's season history", () => {
     expect(body.season).toBe(PRODUCT_SEASON);
     expect(typeof body.totals!.carries).toBe("number");
     expect(typeof body.totals!.targets).toBe("number");
+  });
+
+  it("carries null for a player the capsule sweep has not reached yet, and the stored capsule once it has", async () => {
+    const leagueId = await league();
+    const untouched = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(untouched.capsule).toBeNull();
+
+    await upsertCapsule(db, "rb1", "hash-1", {
+      compact: { text: "Compact body.", source: "llm", usage: null },
+      full: { text: "Full body.", source: "llm", usage: null },
+      source: "llm",
+      model: "zai/glm-5.3-flash",
+    });
+    const withCapsule = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(withCapsule.capsule).toEqual({ bodyCompact: "Compact body.", bodyFull: "Full body.", source: "llm" });
   });
 });
 
