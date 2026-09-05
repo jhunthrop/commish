@@ -2,7 +2,7 @@ import { CAPSULE_MODEL } from "./config";
 import type { PlayerFacts } from "./facts";
 import { renderTemplateCapsule } from "./template";
 import { validateCapsule, type CapsuleSize } from "./validate";
-import { generateCapsuleBody, type CapsuleWriterDeps, type GatewayUsage } from "./write";
+import { addGatewayUsage, CapsuleGenerationError, generateCapsuleBody, type CapsuleWriterDeps, type GatewayUsage } from "./write";
 
 /**
  * WHY a size fell back to its template (sweep resilience, color v2, Task 4) — an operator scanning
@@ -29,20 +29,6 @@ export interface CapsuleSizeResult {
   /** `null` when `source` is `"llm"` — nothing to explain. Set exactly once, when `source` is
    *  `"template"`; see `CapsuleFallbackReason`'s own docblock. */
   readonly fallbackReason: CapsuleFallbackReason | null;
-}
-
-function sumNullable(a: number | null, b: number | null): number | null {
-  return a === null && b === null ? null : (a ?? 0) + (b ?? 0);
-}
-
-function addUsage(accumulated: GatewayUsage | null, next: GatewayUsage): GatewayUsage {
-  if (accumulated === null) return next;
-  return {
-    promptTokens: sumNullable(accumulated.promptTokens, next.promptTokens),
-    completionTokens: sumNullable(accumulated.completionTokens, next.completionTokens),
-    totalTokens: sumNullable(accumulated.totalTokens, next.totalTokens),
-    costUsd: sumNullable(accumulated.costUsd, next.costUsd),
-  };
 }
 
 export interface CapsuleGenerationResult {
@@ -75,7 +61,7 @@ async function generateOneSize(facts: PlayerFacts, size: CapsuleSize, deps: Caps
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
       const generated = await generateCapsuleBody(facts, size, deps, attempt === 1 ? undefined : { body: priorBody, violations });
-      usage = addUsage(usage, generated.usage);
+      usage = addGatewayUsage(usage, generated.usage);
       const result = validateCapsule(generated.text, facts, size);
       if (result.ok) return { text: generated.text, source: "llm", usage, fallbackReason: null };
       priorBody = generated.text;
@@ -85,8 +71,12 @@ async function generateOneSize(facts: PlayerFacts, size: CapsuleSize, deps: Caps
       // A transport failure that survived `write.ts`'s own retry (which, for a 429 specifically,
       // already spent up to three backoff retries of its own — see `write.ts`'s own docblock).
       // One more whole attempt (the "one regeneration" the spec promises) before the template,
-      // same as a validation failure. No billable usage to add here — a pure transport failure
-      // never got back a response.
+      // same as a validation failure. A PURE transport failure never got back a response and
+      // bills nothing, but a degenerate (near-empty) completion inside `write.ts`'s own retry
+      // loop was billed — the error carries that spend out, and it lands in the ledger here.
+      if (error instanceof CapsuleGenerationError && error.billedUsage !== null) {
+        usage = addGatewayUsage(usage, error.billedUsage);
+      }
       priorBody = "";
       violations = [`The previous attempt failed to generate at all (${error instanceof Error ? error.message : String(error)}). Try again.`];
       lastAttemptWasTransportFailure = true;

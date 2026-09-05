@@ -125,7 +125,7 @@ function seasonLine(facts: PlayerFacts): string {
     `${t.fantasyPoints} fantasy points`,
   ];
   const gameWord = season.gamesPlayed === 1 ? "game" : "games";
-  return `Season so far (${season.season}): ${season.gamesPlayed} ${gameWord}, ${season.pointsPerGame} points per game. Totals: ${parts.join(", ")}.`;
+  return `Season so far (${season.season}): ${season.gamesPlayed} ${gameWord}, ${season.pointsPerGame.toFixed(1)} points per game. Totals: ${parts.join(", ")}.`;
 }
 
 function byeLine(facts: PlayerFacts): string {
@@ -185,7 +185,7 @@ function lastSeasonStoryLine(facts: PlayerFacts): string | null {
   const wholeNumber = (value: number): string => `${Math.round(value)}`;
   const sentences = [
     `Last season (${story.season}): ${rankedStatSentence(position, "total points", story.pointsRank, wholeNumber)}`,
-    `Over ${story.gamesPlayed} ${gameWord}, averaging ${story.pointsPerGame} points a game.`,
+    `Over ${story.gamesPlayed} ${gameWord}, averaging ${story.pointsPerGame.toFixed(1)} points a game.`,
     `His best week was week ${story.bestWeek.week} with ${story.bestWeek.points} points.`,
     `He scored above the position's own weekly median in ${story.weeksAboveMedian} of those ${story.gamesPlayed} ${gameWord}.`,
   ];

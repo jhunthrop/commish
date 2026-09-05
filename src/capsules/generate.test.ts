@@ -25,6 +25,11 @@ function okResponse(content: string): Response {
   return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 300, completion_tokens: 80, total_tokens: 380, cost: 0.00005 } }), { status: 200 });
 }
 
+/** Twenty-plus words (the degenerate-completion guard retries anything shorter as transport
+ *  weather) that still FAIL validation: "999" traces to no supplied fact. */
+const BAD_COMPLETION =
+  "He will score 999 touchdowns this year for this SF offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and the market simply cannot price a season like that.";
+
 const GOOD_COMPACT =
   "Rashad Long is a clear buy for this SF offense. Our number says 248 season points against board rank 14 overall, well clear of ADP 12.5. He carries the load for a team leaning on him every week, and the range from 178 to 275 still lands him firmly in the RB6 tier. Draft him with confidence at his current price this season.";
 const GOOD_FULL =
@@ -56,7 +61,7 @@ describe("generateCapsule", () => {
       const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       if (isFull) return okResponse(GOOD_FULL);
       compactCalls += 1;
-      return okResponse(compactCalls === 1 ? "He will score 999 touchdowns this year, an absurd number nobody else has ever hit for this SF offense." : GOOD_COMPACT);
+      return okResponse(compactCalls === 1 ? BAD_COMPLETION : GOOD_COMPACT);
     });
 
     const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
@@ -73,7 +78,7 @@ describe("generateCapsule", () => {
     // A fresh Response per call — reusing one `Response` instance across attempts would throw on
     // its second `.text()` read (the body stream is already consumed), which is a test-harness
     // bug, not the thing under test.
-    const fetchMock = vi.fn().mockImplementation(async () => okResponse("He will score 999 touchdowns this year for this offense, an absurd fabricated number nobody has hit."));
+    const fetchMock = vi.fn().mockImplementation(async () => okResponse(BAD_COMPLETION));
 
     const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
     expect(result.source).toBe("template");
@@ -111,7 +116,7 @@ describe("generateCapsule", () => {
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
       const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
-      return isFull ? okResponse("He will score 999 touchdowns this year for this offense, a fabricated absurd number.") : okResponse(GOOD_COMPACT);
+      return isFull ? okResponse(BAD_COMPLETION) : okResponse(GOOD_COMPACT);
     });
 
     const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });

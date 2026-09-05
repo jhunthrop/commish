@@ -17,9 +17,14 @@ export class CapsuleGenerationError extends Error {
    *  empty completion) that already absorbed this module's own one retry — `false` for a
    *  request the gateway plainly refused (401/403/400), which retrying would never fix. */
   readonly retryable: boolean;
-  constructor(message: string, retryable: boolean) {
+  /** Usage the gateway BILLED before this failure — a degenerate (near-empty) completion is a
+   *  real charge even though its text is discarded, and that spend must reach the caller's
+   *  ledger even when every retry exhausts. `null` when no attempt ever got a billable body. */
+  readonly billedUsage: GatewayUsage | null;
+  constructor(message: string, retryable: boolean, billedUsage: GatewayUsage | null = null) {
     super(message);
     this.retryable = retryable;
+    this.billedUsage = billedUsage;
   }
 }
 
@@ -35,6 +40,23 @@ export interface GatewayUsage {
 export interface GeneratedCapsuleBody {
   readonly text: string;
   readonly usage: GatewayUsage;
+}
+
+function sumNullable(a: number | null, b: number | null): number | null {
+  return a === null ? b : b === null ? a : a + b;
+}
+
+/** Sums two usage reports field by field, `null`-tolerant per field — the single source of truth
+ *  for "the gateway billed twice, log the whole spend", used both here (a degenerate completion
+ *  retried inside one call) and by `generate.ts` (a failed validation attempt plus its retry). */
+export function addGatewayUsage(accumulated: GatewayUsage | null, next: GatewayUsage): GatewayUsage {
+  if (accumulated === null) return next;
+  return {
+    promptTokens: sumNullable(accumulated.promptTokens, next.promptTokens),
+    completionTokens: sumNullable(accumulated.completionTokens, next.completionTokens),
+    totalTokens: sumNullable(accumulated.totalTokens, next.totalTokens),
+    costUsd: sumNullable(accumulated.costUsd, next.costUsd),
+  };
 }
 
 export interface CapsuleWriterDeps {
@@ -163,6 +185,9 @@ async function postChatCompletion(
   // 429 track (three retries = four attempts) — with each branch below deciding independently,
   // from ITS OWN budget, whether this particular attempt may still retry.
   const maxAttemptsOverall = Math.max(retry.maxAttempts, retry.rateLimitBackoffMs.length + 1);
+  // Usage billed by attempts whose text was DISCARDED (the degenerate-completion branch below) —
+  // real spend either way, folded into the winning attempt's usage or carried out on the error.
+  let billedUsage: GatewayUsage | null = null;
 
   for (let attempt = 1; attempt <= maxAttemptsOverall; attempt += 1) {
     const controller = new AbortController();
@@ -182,14 +207,14 @@ async function postChatCompletion(
           await new Promise((resolve) => setTimeout(resolve, delayMs));
           continue;
         }
-        throw new CapsuleGenerationError(`Gateway returned HTTP 429 after ${retry.rateLimitBackoffMs.length} backoff retries.`, true);
+        throw new CapsuleGenerationError(`Gateway returned HTTP 429 after ${retry.rateLimitBackoffMs.length} backoff retries.`, true, billedUsage);
       }
       if (response.status >= 500) {
         if (attempt < retry.maxAttempts) {
           await new Promise((resolve) => setTimeout(resolve, retry.baseDelayMs * attempt));
           continue;
         }
-        throw new CapsuleGenerationError(`Gateway returned HTTP ${response.status} after its retry.`, true);
+        throw new CapsuleGenerationError(`Gateway returned HTTP ${response.status} after its retry.`, true, billedUsage);
       }
       if (!response.ok) {
         throw new CapsuleGenerationError(`Gateway refused the request: HTTP ${response.status}.`, false);
@@ -197,17 +222,21 @@ async function postChatCompletion(
 
       const raw = await response.text();
       const { content, usage } = parseGatewayResponse(raw);
-      if (content.trim() === "") {
+      if (content.trim().split(/\s+/).filter(Boolean).length < 20) {
         // A REASONING model can spend its whole completion budget thinking and return empty
-        // prose while still billing. Treated as a generation failure, retried once like any
-        // other transport weather, never returned as a blank capsule.
+        // OR NEAR-EMPTY prose while still billing (live-fire 2026-09-05: a one-word "full"
+        // completion slipped past the exact-empty check and read as a validation failure).
+        // Anything under twenty words cannot be a capsule of either size, so it is transport
+        // weather, retried, never returned for the validator to mistake for prose. The gateway
+        // billed it all the same — that usage rides along, never dropped.
+        billedUsage = addGatewayUsage(billedUsage, usage);
         if (attempt < retry.maxAttempts) {
           await new Promise((resolve) => setTimeout(resolve, retry.baseDelayMs * attempt));
           continue;
         }
-        throw new CapsuleGenerationError("Gateway returned an empty completion after its retry.", true);
+        throw new CapsuleGenerationError("Gateway returned an empty completion after its retry.", true, billedUsage);
       }
-      return { content, usage };
+      return { content, usage: addGatewayUsage(billedUsage, usage) };
     } catch (error: unknown) {
       clearTimeout(timer);
       if (error instanceof CapsuleGenerationError) throw error;
@@ -216,7 +245,7 @@ async function postChatCompletion(
         await new Promise((resolve) => setTimeout(resolve, retry.baseDelayMs * attempt));
         continue;
       }
-      throw new CapsuleGenerationError(`Gateway request failed after its retry: ${error instanceof Error ? error.message : String(error)}`, true);
+      throw new CapsuleGenerationError(`Gateway request failed after its retry: ${error instanceof Error ? error.message : String(error)}`, true, billedUsage);
     }
   }
   // Unreachable: the loop above always either returns or throws before exhausting its attempts.

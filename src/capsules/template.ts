@@ -39,7 +39,7 @@ export function renderTemplateCapsule(facts: PlayerFacts): string {
 
   const strongestLaw = [...facts.evidence].filter((item) => item.kind === "law").sort((a, b) => Math.abs(b.netEffectPoints) - Math.abs(a.netEffectPoints))[0];
   if (strongestLaw !== undefined && strongestLaw.kind === "law") {
-    sentences.push(`${strongestLaw.headline} is worth ${strongestLaw.netEffectPoints >= 0 ? "+" : ""}${strongestLaw.netEffectPoints} points a game to his outlook.`);
+    sentences.push(`${strongestLaw.headline} is worth ${strongestLaw.netEffectPoints >= 0 ? "+" : ""}${strongestLaw.netEffectPoints.toFixed(1)} points a game to his outlook.`);
   }
 
   if (season !== null) {

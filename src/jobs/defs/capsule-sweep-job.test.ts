@@ -116,7 +116,9 @@ describe("runCapsuleSweepStep", () => {
 
   it("labels a detail line \"template (failed validation: ...)\" quoting the first violation when the gateway talks but the content fails the validator", async () => {
     await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
-    const fabricatingFetch = async () => okResponse("He will score 999 touchdowns this year, an absurd fabricated number nobody has ever hit for this offense.");
+    // Twenty-plus words (the degenerate-completion guard retries anything shorter) that still fail validation: "999" traces to no fact.
+    const fabricatedBody = "He will score 999 touchdowns this year for this offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and the market simply cannot price a season like that.";
+    const fabricatingFetch = async () => okResponse(fabricatedBody);
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
     expect(outcome.detail).toHaveLength(1);
     expect(outcome.detail[0]).toMatch(/^Rashad Long: template \(failed validation: .+\)$/);

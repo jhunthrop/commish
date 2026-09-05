@@ -25,21 +25,26 @@ function okResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200 });
 }
 
+/** Twenty-plus words — anything shorter is treated by `postChatCompletion` as a degenerate
+ *  (reasoning-model) completion and retried as transport weather, never returned. */
+const LONG_BODY =
+  "Rashad Long is a clear buy at his current price, our number says 248 season points against board rank 14, and the range from 178 to 275 keeps him firmly in the RB6 conversation this season.";
+
 describe("generateCapsuleBody", () => {
   it("returns the completion text and usage on a clean 200", async () => {
     const facts = buildPlayerFacts(baseInput());
     const fetchMock = vi.fn().mockResolvedValue(
-      okResponse({ choices: [{ message: { content: "Rashad Long is a buy." } }], usage: { prompt_tokens: 400, completion_tokens: 60, total_tokens: 460, cost: 0.00005 } }),
+      okResponse({ choices: [{ message: { content: LONG_BODY } }], usage: { prompt_tokens: 400, completion_tokens: 60, total_tokens: 460, cost: 0.00005 } }),
     );
     const result = await generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock });
-    expect(result.text).toBe("Rashad Long is a buy.");
+    expect(result.text).toBe(LONG_BODY);
     expect(result.usage).toEqual({ promptTokens: 400, completionTokens: 60, totalTokens: 460, costUsd: 0.00005 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("sends the model id, system voice rules, and the rendered fact sheet", async () => {
     const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: "Body text here." } }] }));
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
     await generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const payload = JSON.parse(init.body as string) as { model: string; messages: { role: string; content: string }[] };
@@ -54,7 +59,7 @@ describe("generateCapsuleBody", () => {
    *  depth, honest worry, the call, the two tail outcomes) rather than the old four-beat shape. */
   it("asks the compact size for exactly one rank and one worry, never a second of either", async () => {
     const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: "Body text here." } }] }));
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
     await generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const payload = JSON.parse(init.body as string) as { messages: { role: string; content: string }[] };
@@ -65,7 +70,7 @@ describe("generateCapsuleBody", () => {
 
   it("walks the full size through the five-beat CMC structure: ranks first, role depth, the honest worry, the call, the two tail outcomes", async () => {
     const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: "Body text here." } }] }));
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
     await generateCapsuleBody(facts, "full", { apiKey: "test-key", fetch: fetchMock });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const payload = JSON.parse(init.body as string) as { messages: { role: string; content: string }[] };
@@ -78,7 +83,7 @@ describe("generateCapsuleBody", () => {
 
   it("system voice rules ban reciting ranks as a list and require the two tail outcomes in the writer's own words", async () => {
     const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: "Body text here." } }] }));
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
     await generateCapsuleBody(facts, "full", { apiKey: "test-key", fetch: fetchMock });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const payload = JSON.parse(init.body as string) as { messages: { role: string; content: string }[] };
@@ -90,7 +95,7 @@ describe("generateCapsuleBody", () => {
 
   it("recovers from a raw control character in the JSON body via the tolerant parse path", async () => {
     const facts = buildPlayerFacts(baseInput());
-    const dirtyJson = `{"choices":[{"message":{"content":"Text with a \x01 stray byte."}}]}`;
+    const dirtyJson = `{"choices":[{"message":{"content":"Text with a \x01 stray byte, plus enough surrounding words that the degenerate completion guard never mistakes this tolerant parse fixture for an empty reasoning model answer."}}]}`;
     const fetchMock = vi.fn().mockResolvedValue(new Response(dirtyJson, { status: 200 }));
     const result = await generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock });
     expect(result.text).toContain("stray byte");
@@ -101,6 +106,50 @@ describe("generateCapsuleBody", () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: "   " } }] }));
     await expect(generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock })).rejects.toThrow(CapsuleGenerationError);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  /** THE DEGENERATE-COMPLETION GUARD (live-fire 2026-09-05): a reasoning model can spend its whole
+   *  completion budget thinking and return one word of prose while still billing. Under twenty
+   *  words is transport weather, retried — and the billed spend of the discarded attempt is never
+   *  dropped from the ledger. */
+  it("retries a near-empty completion and folds its billed usage into the winning attempt's", async () => {
+    vi.useFakeTimers();
+    try {
+      const facts = buildPlayerFacts(baseInput());
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: "Draft him." } }], usage: { prompt_tokens: 300, completion_tokens: 900, total_tokens: 1200, cost: 0.00005 } }))
+        .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: LONG_BODY } }], usage: { prompt_tokens: 300, completion_tokens: 80, total_tokens: 380, cost: 0.00005 } }));
+      const promise = generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock });
+      await vi.advanceTimersByTimeAsync(1_500);
+      const result = await promise;
+      expect(result.text).toBe(LONG_BODY);
+      expect(result.usage.costUsd).toBeCloseTo(0.0001, 10);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("carries the billed usage out on the error when every near-empty retry exhausts", async () => {
+    vi.useFakeTimers();
+    try {
+      const facts = buildPlayerFacts(baseInput());
+      // A fresh Response per call — a reused instance would throw on its second body read.
+      const fetchMock = vi
+        .fn()
+        .mockImplementation(async () => okResponse({ choices: [{ message: { content: "Draft him." } }], usage: { prompt_tokens: 300, completion_tokens: 900, total_tokens: 1200, cost: 0.00005 } }));
+      const promise = generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock }).catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(1_500);
+      const error = await promise;
+      expect(error).toBeInstanceOf(CapsuleGenerationError);
+      const generationError = error as CapsuleGenerationError;
+      expect(generationError.retryable).toBe(true);
+      expect(generationError.billedUsage?.costUsd).toBeCloseTo(0.0001, 10);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   /**
@@ -119,13 +168,13 @@ describe("generateCapsuleBody", () => {
         .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
         .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
         .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
-        .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: "Recovered after backoff." } }] }));
+        .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
       const promise = generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock });
       await vi.advanceTimersByTimeAsync(20_000);
       await vi.advanceTimersByTimeAsync(40_000);
       await vi.advanceTimersByTimeAsync(80_000);
       const result = await promise;
-      expect(result.text).toBe("Recovered after backoff.");
+      expect(result.text).toBe(LONG_BODY);
       expect(fetchMock).toHaveBeenCalledTimes(4);
     } finally {
       vi.useRealTimers();
@@ -173,7 +222,7 @@ describe("generateCapsuleBody", () => {
 
   it("quotes a prior attempt's violations into the retry's own user message", async () => {
     const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: "Fixed body." } }] }));
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: LONG_BODY } }] }));
     await generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock }, { body: "Old bad body.", violations: ['The number "37" does not trace to any supplied fact.'] });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const payload = JSON.parse(init.body as string) as { messages: { role: string; content: string }[] };

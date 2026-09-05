@@ -46,7 +46,10 @@ export const CAPSULE_CONFIG = {
     full: {
       minWords: 180,
       maxWords: 280,
-      maxTokens: 900,
+      // 1600, not 900 (live-fire 2026-09-05): glm-5.3-flash is a reasoning model, and the
+      // longer Read prompt can spend most of a tight cap thinking, returning a near-empty
+      // completion that reads as a validation failure instead of the truncation it is.
+      maxTokens: 1600,
     },
   },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
@@ -59,7 +62,10 @@ export const CAPSULE_CONFIG = {
    *  that lets a full board's first run clear the free-tier throttle across several nightly
    *  sweeps rather than exhausting it in one run. Generous, per the base-product ruling (spec
    *  §15.1): no paywall gates capsule coverage, only pacing against the gateway. */
-  sweepGenerationBudget: 40,
+  // 25 players a night, not 40: at 15s pacing plus two generations each, 40 players cannot
+  // finish inside the job's own 480s timeout. 25 fits with headroom, and the sweep's
+  // "left for the next sweep" carryover makes the smaller bite harmless.
+  sweepGenerationBudget: 25,
   /** Pause between players inside one sweep. The gateway rate-limits per minute, and the first
    *  live sweep proved a burst (two calls per player, back to back) throttles everything after
    *  the first player into the template floor (2026-09-05). Fifteen seconds a player was the
@@ -67,7 +73,9 @@ export const CAPSULE_CONFIG = {
    *  Task 4, same night): raised to forty-five seconds, paired with the 429-only backoff above, so
    *  a real per-minute cap has room to reset between players as well as between one player's own
    *  retries. */
-  sweepPacingMs: 45_000,
+  // Back to 15s (2026-09-05): prepaid credits lifted the free-tier throttle, and the 429
+  // backoff track handles the rare residual limit. 45s was the throttled-era setting.
+  sweepPacingMs: 15_000,
 } as const;
 
 /**
