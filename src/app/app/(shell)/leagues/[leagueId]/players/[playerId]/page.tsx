@@ -9,6 +9,7 @@ import { MICRO_LABEL } from "@/components/ui/config";
 import { parseSeasonParam, playerSeason, type PlayerSeasonBody } from "@/league-service/player";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PlayerPageSeasonSwitcher } from "@/league-room/components/season-switcher";
+import { Outlook } from "@/league-room/outlook/outlook";
 import { sourcesFor, weeksFor } from "@/league-room/lib/player-season-view";
 
 export const dynamic = "force-dynamic";
@@ -25,14 +26,22 @@ export function generateMetadata(): Metadata {
 }
 
 /**
- * ONE PLAYER, AS THREE THINGS AND NO FOURTH: the object, the strip, the season.
+ * THE OBJECT, THE STRIP, THE SEASON — AND THE OUTLOOK (widened 2026-09-04; this page carried only
+ * the first three until the founder's Outlook redesign gave the full page the same evidence
+ * section the bottom-sheet peek already had, in the SAME component (`league-room/outlook/
+ * outlook.tsx`) so the two surfaces can never drift apart on grouping or wording).
  *
- * There is no prose on this page and there must never be any. Not a heading over the strip, not a
- * legend under it, not a sentence explaining what the bars are. The reference product the founder
- * named reads SIMPLE while being denser than us, and the reason is exactly this: its player panel
- * is four elements and no explanatory sentence anywhere on it. The chips carry the facts we would
- * otherwise write out, the source names are their own legend, and the week numbers are their own
- * axis. Everything a screen reader needs is on the elements themselves.
+ * THE ONE DELIBERATE SENTENCE ON THIS PAGE is the Outlook's own verdict line
+ * (`outlook/verdict.ts`) — every other rule below about "no prose" still governs the object, the
+ * strip and the season chart exactly as it always has. The reference product the founder named
+ * reads SIMPLE while being denser than us, and the reason is exactly this: its player panel wastes
+ * no element on an explanatory sentence. The chips carry the facts we would otherwise write out,
+ * the source names are their own legend, and the week numbers are their own axis. The Outlook's
+ * verdict is not an explanation of another element — it IS the evidence, stated as a conclusion
+ * rather than left for a reader to add up himself, which is what a diagnostic engine's own
+ * "product and diagnostics are the same artifact" principle has always meant for this section
+ * (`reason-chip.tsx`'s own docblock). Everything a screen reader needs is on the elements
+ * themselves.
  *
  * THE ONE NEW LABEL (2026-09-04 widening) is the season itself. `playerSeason` can now answer for a
  * season other than the one a manager assumes he opened — a card viewed in August, before this
@@ -79,6 +88,8 @@ export default async function PlayerPage({ params, searchParams }: PageProps) {
           <SourceStrip label={`Where ${body.player.name} is ranked, by source`} sources={sourcesFor(body)} />
           <Edge body={body} />
         </div>
+
+        <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className={`${MICRO_LABEL} text-text-faint`}>{body.season} season</span>

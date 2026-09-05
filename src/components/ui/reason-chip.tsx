@@ -116,13 +116,36 @@ function wordOrderFor(unit: PrimaryQuantityUnit): "value-first" | "noun-first" {
  * `board-reasons.ts`'s `lawReasonsFor`, which asserts a discovered law's persisted
  * `primaryQuantityId` against the live template BEFORE this component ever sees the reason.
  */
+/**
+ * ONE NAMED EXCEPTION TO THE GENERIC RULE ABOVE (founder, 2026-09-04, Outlook redesign) — the
+ * `"pointsPerGame"` quantity (`discovery/templates.ts`'s own `noun: "points per game that
+ * season"`) is the one primary quantity whose noun is also the unit `copyFor`'s "law" case always
+ * appends: `"{value} points per game: measured {effect} pts per game"` says "per game" twice and
+ * reads as the law re-stating its own effect back at the reader rather than a fact about the
+ * player. Every other quantity's noun (a share, an age, a touch count, ...) is a DIFFERENT unit
+ * from the effect it precedes, so the sentence states two distinct facts; this is the only one
+ * where the two clauses measure the same thing in the same words. Rephrased to what the quantity
+ * actually is — the player's own scoring rate the season before this one
+ * (`templates.ts`'s own docblock: "season N's own points per game, as a CONDITION ... with the
+ * outcome still read at season N+1") — rather than suppressed, because the number is still the
+ * fact the law's condition is keyed on.
+ */
+const POINTS_PER_GAME_QUANTITY_ID = "pointsPerGame";
+
 export function discoveredHeadline(magnitude: number, law: Law): string | undefined {
   if (law.primaryQuantityNoun === null || law.primaryQuantityUnit === null) return undefined;
   const value = formatMagnitude(law.primaryQuantityUnit, magnitude);
+  if (law.primaryQuantityId === POINTS_PER_GAME_QUANTITY_ID) return `averaging ${value} a game last season`;
   return wordOrderFor(law.primaryQuantityUnit) === "noun-first" ? `${law.primaryQuantityNoun} ${value}` : `${value} ${law.primaryQuantityNoun}`;
 }
 
-function lawHeadline(lawId: string, magnitude: number, law: Law | undefined): string {
+/** The headline for ANY law reason — tribal (`LAW_HEADLINES`) or discovered
+ *  (`discoveredHeadline`) — the one function `copyFor`'s own "law" case calls, and the one
+ *  `league-room/outlook/groups.ts` reuses to headline a GROUP of law reasons sharing one quantity
+ *  (Outlook redesign, 2026-09-04): a group's members always share an identical `magnitude` (it is
+ *  a fact about the player, not about which law fired), so headlining the group from any one
+ *  member is the same headline this function has always produced for that member alone. */
+export function lawHeadline(lawId: string, magnitude: number, law: Law | undefined): string {
   const build = LAW_HEADLINES[lawId];
   if (build !== undefined) return build(magnitude);
   const discovered = law === undefined ? undefined : discoveredHeadline(magnitude, law);

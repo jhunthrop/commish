@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
-import { discoveredHeadline, ReasonChip, strongestLawReasons } from "./reason-chip";
+import { discoveredHeadline, lawHeadline, ReasonChip, strongestLawReasons } from "./reason-chip";
 
 /**
  * `discoveredHeadline`'s GENERIC RENDERER, PINNED against small hand-built `Law` fixtures — never
@@ -61,6 +61,20 @@ describe("discoveredHeadline", () => {
     expect(discoveredHeadline(182, law)).toBeUndefined();
   });
 
+  it("rephrases the pointsPerGame quantity rather than repeating \"points per game\" against copyFor's own \"pts per game\" (founder, 2026-09-04 — the circular '9.9 points per game: measured +1.2 pts per game' phrasing)", () => {
+    const law = discoveredLawFixture({
+      id: "delta:RB:pointsPerGame:q30:rose_into",
+      primaryQuantityId: "pointsPerGame",
+      primaryQuantityNoun: "points per game",
+      primaryQuantityUnit: "one_decimal",
+    });
+    expect(discoveredHeadline(9.87, law)).toBe("averaging 9.9 a game last season");
+    const reason: BoardReason = { code: "law", lawId: law.id, effect: 1.2, magnitude: 9.87 };
+    render(<ReasonChip reason={reason} registry={[law]} />);
+    expect(screen.getByText(/averaging 9\.9 a game last season: measured \+1\.2 pts per game/)).toBeInTheDocument();
+    expect(screen.queryByText(/9\.9 points per game/)).not.toBeInTheDocument();
+  });
+
   it("never renders an em-dash across every unit shape", () => {
     const units = [
       ["whole", "carries and receptions", 182] as const,
@@ -72,6 +86,21 @@ describe("discoveredHeadline", () => {
       const law = discoveredLawFixture({ primaryQuantityNoun: noun, primaryQuantityUnit: unit });
       expect(discoveredHeadline(magnitude, law)).not.toMatch(/—/);
     }
+  });
+});
+
+describe("lawHeadline — the shared headline `copyFor` and `outlook/groups.ts` both call", () => {
+  it("dispatches to LAW_HEADLINES for a tribal id", () => {
+    expect(lawHeadline("rb_age_curve", 29, undefined)).toBe("Age 29 season");
+  });
+
+  it("dispatches to discoveredHeadline for an id with no LAW_HEADLINES case, given its own law", () => {
+    const law = discoveredLawFixture({ primaryQuantityNoun: "target share", primaryQuantityUnit: "percent" });
+    expect(lawHeadline(law.id, 0.31, law)).toBe("31.0% target share");
+  });
+
+  it("falls back to the mechanical fallback headline when no law is given for an unknown id", () => {
+    expect(lawHeadline("some_renamed_id", 5, undefined)).toBe("Some renamed id");
   });
 });
 

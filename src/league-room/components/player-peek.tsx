@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { BottomSheet, NOT_STARTED_DASH, PlayerObject, ReasonChip, SeasonBars, SourceStrip } from "@/components/ui";
+import { BottomSheet, NOT_STARTED_DASH, PlayerObject, SeasonBars, SourceStrip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import { sourcesFor, weeksFor } from "../lib/player-season-view";
 import { useLeagueRoomDeps } from "../hooks/deps";
+import { Outlook } from "../outlook/outlook";
 import { SeasonSwitcher } from "./season-switcher";
 
 interface PeekTarget {
@@ -134,7 +135,12 @@ export function PlayerPeekHost() {
                     <span className="rounded-sm bg-negative px-1.5 py-0.5 font-mono text-sm font-semibold text-negative-text">{body.injuryDesignation}</span>
                   )}
                 </div>
-                <p className="text-sm text-text-muted">{body.ownedBy === null ? "Free agent in this league" : `On ${body.ownedBy}`}</p>
+                {/* Task 4, context honesty: a roster-status claim is a fact about a REAL room —
+                    a mock draft's own practice room has no such room to be a free agent "in",
+                    so this line is silent there rather than naming one that does not exist. */}
+                {body.isMockLeague ? null : (
+                  <p className="text-sm text-text-muted">{body.ownedBy === null ? "Free agent in this league" : `On ${body.ownedBy}`}</p>
+                )}
               </div>
               <Link
                 className={`${MICRO_LABEL} pt-2 text-accent underline`}
@@ -146,26 +152,13 @@ export function PlayerPeekHost() {
             </div>
             <SourceStrip label={`Where ${body.player.name} is ranked, by source`} sources={sourcesFor(body)} />
 
-            {/* THE OUTLOOK (Task 8): the board's own "why", in full — every reason
-                `boardReasons` stored for him this season, never truncated to a compact row's
-                top two the way the draft board's sticker is. Absent when the board never ranked
-                him (no crosswalk placement, no board this season), which is the honest state:
-                nothing here invents a reason a store does not carry. */}
-            {body.reasons.length === 0 ? null : (
-              <div className="flex flex-col gap-2">
-                <h3 className={`${MICRO_LABEL} text-text-faint`}>Outlook</h3>
-                <div className="flex flex-col gap-1.5">
-                  {body.reasons.map((reason) => (
-                    <ReasonChip
-                      key={reason.code === "law" ? `law:${reason.lawId}` : reason.code}
-                      reason={reason}
-                      registry={body.laws}
-                      className="w-fit"
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* THE OUTLOOK, REDESIGNED (founder, 2026-09-04): a verdict sentence first, then the
+                board's own "why" as GROUPED evidence — every law reason `boardReasons` stored for
+                him this season, collapsed one group per measured quantity, never a flat stammer
+                of chips (`../outlook/outlook.tsx`'s own docblock has the full account). Capped at
+                five groups here (the bottom-sheet's own constraint); the full page shows every
+                group. Renders nothing when the board never ranked him. */}
+            <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} capped />
 
             {/* THE SEASON LABEL + SWITCHER (2026-09-04 widening) — every number below this line
                 answers for `body.season` explicitly, never a silent "this season" that could mean

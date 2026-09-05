@@ -23,7 +23,10 @@ export function sourcesFor(body: PlayerSeasonBody): readonly SourceValue[] {
   const { player, positionRank, expertRank, modelRank, pointsPerGame, pointsPerGamePercentile } = body;
   return [
     { label: player.position, value: positionRank === null ? null : String(positionRank) },
-    { label: "Market", value: player.adp === null ? null : player.adp.toFixed(1) },
+    // "ADP" (Task 5, 2026-09-04 — was "Market"): this cell sits among three RANKS
+    // (position, experts, model) and a plain draft-position number labelled "Market" read as a
+    // fourth rank rather than the average draft position it actually is.
+    { label: "ADP", value: player.adp === null ? null : player.adp.toFixed(1) },
     { label: "Experts", value: expertRank === null ? null : String(expertRank) },
     { label: "Model", value: modelRank === null ? null : String(modelRank) },
     {

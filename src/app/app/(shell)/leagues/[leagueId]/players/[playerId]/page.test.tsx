@@ -49,6 +49,7 @@ function bodyFor(season: number, availableSeasons: readonly number[]): PlayerSea
     pointsPerGamePercentile: 0.7,
     weeks: [{ week: 1, points: 12.5, percentile: 0.7 }],
     ownedBy: null,
+    isMockLeague: false,
     injuryDesignation: null,
     log: [],
     totals: null,
@@ -71,6 +72,7 @@ const ROOKIE_BODY: PlayerSeasonBody = {
   pointsPerGamePercentile: null,
   weeks: [],
   ownedBy: null,
+  isMockLeague: false,
   injuryDesignation: null,
   log: [],
   totals: null,
@@ -160,5 +162,41 @@ describe("PlayerPage — season label and switcher", () => {
   it("404s a player id `playerSeason` cannot find, same as before the widening", async () => {
     vi.mocked(playerSeason).mockResolvedValue(null);
     await expect(callPage()).rejects.toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
+  });
+});
+
+/**
+ * THE OUTLOOK, NEWLY ON THE FULL PAGE (2026-09-04) — this page never rendered `body.reasons` at
+ * all before the redesign; these pin the page's own wiring of `<Outlook>` (the grouping and
+ * verdict logic itself is `outlook/groups.test.ts` and `outlook/verdict.test.ts`'s job, not
+ * re-tested here).
+ */
+describe("PlayerPage — the Outlook", () => {
+  it("renders nothing when the board never ranked him", async () => {
+    vi.mocked(playerSeason).mockResolvedValue(bodyFor(2026, [2026]));
+    await renderPage();
+    expect(screen.queryByText("Outlook")).not.toBeInTheDocument();
+  });
+
+  it("renders the verdict line and every grouped fact, uncapped (unlike the peek's five-group cap)", async () => {
+    vi.mocked(playerSeason).mockResolvedValue({
+      ...bodyFor(2026, [2026]),
+      reasons: [
+        { code: "market_anchor", marketPoints: 200, delta: 14.2 },
+        { code: "scarcity", positionRank: 4, replacementLevel: 140 },
+        { code: "law", lawId: "rb_age_curve", effect: -1.8, magnitude: 29 },
+        { code: "law", lawId: "rb_workload_cliff", effect: -0.9, magnitude: 320 },
+        { code: "changed_team", from: "SF", to: "MIA" },
+        { code: "availability", expectedGames: 14, floorGames: 10, ceilingGames: 17 },
+        { code: "rookie", overallPick: null, landingMultiplier: 1 },
+      ],
+    });
+    await renderPage();
+    expect(screen.getByText("Outlook")).toBeInTheDocument();
+    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
+    // Five groups total (two law groups, three fact groups) — no cap, no "The full case" expander.
+    expect(screen.getByText(/Age 29 season/)).toBeInTheDocument();
+    expect(screen.getByText(/320 touches last season/)).toBeInTheDocument();
+    expect(screen.queryByText(/The full case/)).not.toBeInTheDocument();
   });
 });
