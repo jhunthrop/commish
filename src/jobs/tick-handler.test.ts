@@ -40,6 +40,16 @@ const cannedDraftSweep: AnyJobDefinition = defineJob({
   steps: [{ name: "sweep", run: async () => ({ summary: "canned", detail: [] }) }],
 });
 
+/** Same reason: the real SCHEDULES now also fire "adp-snapshot" nightly (Draft HQ phase 2 Task 6). */
+const cannedAdpSnapshot: AnyJobDefinition = defineJob({
+  name: "adp-snapshot",
+  maxAttempts: 3,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 60_000, maxMs: 600_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "capture", run: async () => ({ summary: "canned", detail: [] }) }],
+});
+
 function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET: SECRET }): TickHandlerDeps {
   return {
     db,
@@ -47,6 +57,7 @@ function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET:
       ["noop", noop],
       ["season-week", cannedSeasonWeek],
       ["draft-sweep", cannedDraftSweep],
+      ["adp-snapshot", cannedAdpSnapshot],
     ]),
     env,
     workerId: "tick-test",
