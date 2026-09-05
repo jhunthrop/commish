@@ -83,6 +83,14 @@ export interface StartDraftAction {
     readonly needPerOpenStartingSlot: number;
     readonly startersFilledDamp: number;
     readonly rampFullAtRosterFraction: number;
+    /**
+     * The 2026-09-05 surplus-damping fix (`DraftAutopickPolicy.surplusDamp`, `@/draft-engine/
+     * config`). OPTIONAL for the identical F3 reason every other field here is: a log persisted
+     * before this fix shipped carries no value, and absent MUST mean no compounding at all —
+     * never today's tunable — so that draft's reconstructed roster keeps agreeing with the
+     * picks the live draft actually made.
+     */
+    readonly surplusDamp?: number;
   };
 }
 

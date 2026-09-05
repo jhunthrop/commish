@@ -54,6 +54,13 @@ const autopickPolicy = z
     needPerOpenStartingSlot: z.number().nonnegative(),
     startersFilledDamp: z.number().positive(),
     rampFullAtRosterFraction: z.number().positive(),
+    // The 2026-09-05 surplus-damping fix (`DraftAutopickPolicy.surplusDamp`, `./config`).
+    // Optional for the identical F3 reason the rest of this object's fields are: a pre-fix log
+    // carries none, and absent must mean no compounding, never today's tunable. `(0, 1]`: 0
+    // would zero out every surplus body's score outright (a discontinuity this dial never
+    // intends — steep, not disqualifying), and anything above 1 would warm a surplus instead of
+    // cooling it.
+    surplusDamp: z.number().gt(0).lte(1).optional(),
   })
   .optional();
 

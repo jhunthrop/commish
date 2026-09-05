@@ -1,5 +1,6 @@
 import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
 import type { DraftFormat } from "@/domain/league";
+import type { Position } from "@/domain/player";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
 import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
@@ -193,6 +194,24 @@ function needRamp(rosterLength: number, state: DraftState, policy: DraftAutopick
 }
 
 /**
+ * How many of `teamId`'s own drafted players sit at each position — the join `surplusDamp`
+ * needs (`NeedMultiplierOptions.rosteredAtPosition`, `scoring.ts`) and the one place it's
+ * possible: `roster` (this team's filled `RosterSlot`s) only knows SLOT LABELS ("BENCH", not
+ * "QB"), and `state.pool` is the only thing that knows every drafted player's true position.
+ * Cross-referencing them here — instead of inside `scoring.ts` — is what keeps that module a
+ * pure function of caller-supplied numbers, never of engine state.
+ */
+function rosteredCountsByPosition(roster: readonly RosterSlot[], pool: readonly DraftPoolEntry[]): ReadonlyMap<Position, number> {
+  const positionOf = new Map(pool.map((entry) => [entry.playerId, entry.position]));
+  const counts = new Map<Position, number>();
+  for (const filled of roster) {
+    const position = filled.playerId === null ? undefined : positionOf.get(filled.playerId);
+    if (position !== undefined) counts.set(position, (counts.get(position) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
  * The clock-expiry autopick policy, stated once — what `reduceSnakeExpiry` and
  * `reduceCatchUpExpiry` (`snake.ts`) fire when a real manager's clock runs out.
  *
@@ -221,15 +240,28 @@ export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEn
   if (policy === null) return available.find(canFill) ?? null;
 
   const ramp = needRamp(roster.length, state, policy);
-  const needOptions = {
+  const baseNeedOptions = {
     openSlotBoost: ramp * policy.needPerOpenStartingSlot,
     filledDamp: 1 - ramp * (1 - policy.startersFilledDamp),
+    // Ramped the identical way `filledDamp` above is — see `NeedMultiplierOptions.surplusDamp`
+    // (`scoring.ts`) and `DraftAutopickPolicy.surplusDamp` (`config.ts`) — so a team's very
+    // first pick still degenerates to exactly board order (every dial neutral at ramp 0), and a
+    // barely-awake ramp doesn't let this dial alone override what `filledDamp`'s own gentle
+    // warm-up already guarantees. Undefined stays undefined: a config with no `surplusDamp` at
+    // all (pre-fix snapshot) must never gain one from ramping arithmetic.
+    surplusDamp: policy.surplusDamp === undefined ? undefined : 1 - ramp * (1 - policy.surplusDamp),
   };
+  // Only computed when a snapshot actually carries `surplusDamp` — every pre-fix log (every log
+  // today) skips this join entirely, exactly as cheap as before this fix existed.
+  const rosteredCounts = policy.surplusDamp === undefined ? null : rosteredCountsByPosition(roster, state.pool);
   let best: DraftPoolEntry | null = null;
   let bestScore = -Infinity;
   let legalIndex = 0;
   for (const entry of available) {
     if (!canFill(entry)) continue;
+    const needOptions = rosteredCounts === null
+      ? baseNeedOptions
+      : { ...baseNeedOptions, rosteredAtPosition: rosteredCounts.get(entry.position) ?? 0 };
     const score =
       rankWeight(legalIndex, policy.temperature) *
       needMultiplier(entry.position, roster, state.config.slotConfig, needOptions);
