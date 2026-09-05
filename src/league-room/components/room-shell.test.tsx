@@ -155,6 +155,29 @@ describe("RoomShell", () => {
     expect(screen.queryByText("The league this week")).toBeNull();
   });
 
+  // Task 10: the commissioner's own toggle for `GradeBoard`'s visibility, mounted in the rail.
+  it("mounts the draft grades toggle for the commissioner once the league has drafted", () => {
+    render(wrap(ROOM_DATA));
+    expect(screen.getByText("Draft grades on league home")).toBeInTheDocument();
+  });
+
+  it("never mounts the draft grades toggle for an ordinary member", () => {
+    render(wrap({ ...ROOM_DATA, home: { ...ROOM_DATA.home, isCommissioner: false } }));
+    expect(screen.queryByText("Draft grades on league home")).not.toBeInTheDocument();
+  });
+
+  it("never mounts the draft grades toggle before the league has drafted — there is nothing yet for it to control", () => {
+    render(
+      wrap({
+        ...ROOM_DATA,
+        home: { ...HOME, draftStatus: "scheduled", draftSchedule: { ...HOME.draftSchedule!, status: "scheduled" } },
+        lineup: null,
+        week: null,
+      }),
+    );
+    expect(screen.queryByText("Draft grades on league home")).not.toBeInTheDocument();
+  });
+
   it("space opens the drawer at half on players, esc walks it back down", () => {
     render(wrap(ROOM_DATA));
     fireEvent.keyDown(window, { key: " " });

@@ -50,6 +50,7 @@ const HOME = {
   draftSchedule: null,
   justSeated: false,
   compositionCategory: "open" as const,
+  draftGradesVisible: true,
 };
 
 const WEEK_BODY = {

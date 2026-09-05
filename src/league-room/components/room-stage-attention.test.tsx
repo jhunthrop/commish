@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import type { ActivityRow } from "@/integrity/activity-view";
 import type { LeagueHomeBody, MatchupDetail, MatchupWeekBody } from "../contract";
 import type { LineupFixPlan } from "../lib/lineup-problems";
-import { HOME, MATCHUP, ROOM_DATA } from "../test-fixtures";
+import { GRADES, HOME, MATCHUP, ROOM_DATA } from "../test-fixtures";
 import { RoomStageAttention, type RoomStageAttentionProps } from "./room-stage-attention";
 
 const noop = () => undefined;
@@ -53,6 +53,8 @@ function renderStage(overrides: Partial<RoomStageAttentionProps>) {
     myMatchupDetail: null,
     projectionsByPlayerId: new Map(),
     activityRows: [],
+    grades: [],
+    gradesBasis: "",
     drawerOpen: false,
     onFixLineup: noop,
     onViewTrade: noop,
@@ -130,6 +132,19 @@ describe("RoomStageAttention", () => {
     });
     expect(screen.getByText("No matchup for your team this week.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Bay Bandits vs Iron Owls" })).toHaveAttribute("href", "/app/leagues/l1/matchups/3");
+  });
+
+  it("shows the grade board when the room carries stored grades, sorted by projected rank", () => {
+    renderStage({ grades: GRADES, gradesBasis: "August 1" });
+    const rows = screen.getAllByRole("row").filter((row) => row.textContent?.includes("Bandits") || row.textContent?.includes("Owls"));
+    expect(rows[0]!.textContent).toContain("Iron Owls");
+    expect(rows[1]!.textContent).toContain("Bay Bandits");
+    expect(screen.getByText("Graded against our board of August 1")).toBeInTheDocument();
+  });
+
+  it("omits the grade board entirely when the room carries no stored grades", () => {
+    renderStage({ grades: [] });
+    expect(screen.queryByText("Draft grades")).not.toBeInTheDocument();
   });
 
   it("keeps the next-matchup card unchanged when the viewer has one", () => {

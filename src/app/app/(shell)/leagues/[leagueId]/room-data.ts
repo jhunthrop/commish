@@ -1,14 +1,17 @@
 import { getDb } from "@/db/client";
+import type { Db } from "@/db/client";
 import { readPreferences } from "@/identity-service/preferences";
 import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices, quoteFor } from "@/integrity-service/notify";
-import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtureLabelsByTeam } from "@/league-service";
+import { leagueHome, lineupView, matchupWeek, weeklyProjectionsByPlayerId, fixtureLabelsByTeam, gradesForDraft } from "@/league-service";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import { pendingWaiverClaims } from "@/league-service/claims";
 import { listTrades } from "@/league-service/trades";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { CurrentUser } from "@/lib/auth/current-user";
+import { formatDate } from "@/league-room/lib/format";
 import type {
+  LeagueGradeRow,
   MatchupLineupEntry,
   MatchupWeekBody,
   PlatformNoticeView,
@@ -17,6 +20,21 @@ import type {
   TradeRoomContext,
   TradeRosterPlayer,
 } from "@/league-room/contract";
+
+/** Task 10: `RoomData.grades`/`gradesBasis` — loaded only for a completed, opted-in draft, and
+ *  empty otherwise (the pre-draft branch below, and a league that has opted out). `formatDate`
+ *  ("August 18") is applied here, once, so `GradeBoard` stays a pure "print this string"
+ *  component with no date arithmetic of its own. */
+async function gradesFor(
+  db: Db,
+  home: { readonly draftStatus: string | null; readonly draftGradesVisible: boolean; readonly draftId: string | null },
+): Promise<{ readonly grades: readonly LeagueGradeRow[]; readonly gradesBasis: string }> {
+  if (home.draftStatus !== "complete" || !home.draftGradesVisible || home.draftId === null) {
+    return { grades: [], gradesBasis: "" };
+  }
+  const { grades, boardGeneration } = await gradesForDraft(db, home.draftId);
+  return { grades, gradesBasis: boardGeneration === null ? "" : formatDate(boardGeneration) };
+}
 
 export interface RoomDataOptions {
   /** The activity feed's untrusted `?before` cursor, already parsed by the page. */
@@ -61,11 +79,13 @@ export async function loadRoomData(
       activityNotices: [],
       tradeContext: null,
       helpLevel: preferences.helpLevel,
+      grades: [],
+      gradesBasis: "",
     };
   }
 
   const teamId = home.myTeamId;
-  const [lineup, week, projectionsByPlayerId, fixturesByNflTeam, byeWeeksByNflTeam, trades, pendingClaims, activity, notices] =
+  const [lineup, week, projectionsByPlayerId, fixturesByNflTeam, byeWeeksByNflTeam, trades, pendingClaims, activity, notices, gradesRead] =
     await Promise.all([
       teamId === null ? null : lineupView(db, { leagueId, teamId, weekNumber: home.currentWeek }),
       matchupWeek(db, leagueId, home.currentWeek, user.id, getReferenceCache()),
@@ -76,6 +96,7 @@ export async function loadRoomData(
       teamId === null ? [] : pendingWaiverClaims(db, leagueId, teamId),
       listLeagueActivity(db, { leagueId, viewerUserId: user.id, before: options.activityBefore }),
       options.includeNotices === true ? listNotices(db, user.id) : null,
+      gradesFor(db, home),
     ]);
 
   // The viewer's OWN notices, filtered to this league — the same bounded, cursorless inbox page
@@ -101,6 +122,8 @@ export async function loadRoomData(
     activityNotices,
     tradeContext: teamId === null ? null : tradeContext(home.name, home.currentWeek, teamId, home.teams, week),
     helpLevel: preferences.helpLevel,
+    grades: gradesRead.grades,
+    gradesBasis: gradesRead.gradesBasis,
   };
 }
 

@@ -4,7 +4,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import type { LeagueTerms } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import type { DraftScheduleBody, LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, RoomData, TeamStandingsRow } from "./contract";
+import type { DraftScheduleBody, LeagueGradeRow, LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, RoomData, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
 
 /** Server rank order (wins, then points for, then team id) — never re-derived in a test. */
@@ -160,6 +160,7 @@ export const HOME: LeagueHomeBody = {
   draftSchedule: DRAFT_SCHEDULE,
   justSeated: false,
   compositionCategory: "open",
+  draftGradesVisible: true,
 };
 
 /** Everything `RoomShell` needs, built from the fixtures above: mid-season, drafted, the week
@@ -198,7 +199,32 @@ export const ROOM_DATA: RoomData = {
     leagueName: "Sunday Money",
   },
   helpLevel: "standard",
+  // Task 10: the base fixture carries no grades — `GRADES` below (and the room-stage-attention
+  // / room-shell tests that spread `{ ...ROOM_DATA, grades: GRADES, gradesBasis: ... }`) opt a
+  // specific test into the board, so every existing test asserting on the resting room's other
+  // content is untouched by this field's addition.
+  grades: [],
+  gradesBasis: "",
 };
+
+/** Two teams' stored grades (Task 10) — `t2` finished first, `t1` second, deliberately out of
+ *  rank order so a test built on this fixture proves `GradeBoard` sorts rather than trusts. */
+export const GRADES: readonly LeagueGradeRow[] = [
+  {
+    teamId: "t1",
+    teamName: "Bay Bandits",
+    letter: "B",
+    projectedRank: 2,
+    components: { valueCaptured: -6.5, startingSlotsFilled: 8, startingSlotsTotal: 9, byeCollisions: 1, projectedPoints: 118.4 },
+  },
+  {
+    teamId: "t2",
+    teamName: "Iron Owls",
+    letter: "A",
+    projectedRank: 1,
+    components: { valueCaptured: -1.2, startingSlotsFilled: 9, startingSlotsTotal: 9, byeCollisions: 0, projectedPoints: 132.7 },
+  },
+];
 
 /** Three managers, an open seat implied by `teamCount`, and `t1`'s owner running the league —
  *  the fixture `LeagueMembersPanel`'s own tests build on (`components/league-members-panel.test.tsx`). */

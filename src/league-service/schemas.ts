@@ -180,6 +180,11 @@ export const setDraftKickoffSchema = z.object({
   kickoffAt: z.iso.datetime({ message: "That does not look like a valid time." }),
 });
 
+/** `PUT /api/leagues/[leagueId]/settings`'s body (Task 10) — the one league setting today. */
+export const setDraftGradesVisibleSchema = z.object({
+  draftGradesVisible: z.boolean(),
+});
+
 export const setLineupSchema = z.object({
   weekNumber: weekNumberSchema,
   slots: z

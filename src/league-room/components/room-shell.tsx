@@ -20,6 +20,7 @@ import { stageFor } from "../lib/stage-priority";
 import { useRailVisible } from "../hooks/use-rail-visible";
 import { tradeSheetMath } from "../lib/trade-math";
 import { ClaimSheet } from "./claim-sheet";
+import { DraftGradesToggle } from "./draft-grades-toggle";
 import { InvitePanel } from "./invite-panel";
 import { LeagueMembersPanel } from "./league-members-panel";
 import { LeagueTermsPanel } from "./league-terms-panel";
@@ -296,6 +297,8 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
                 myMatchupDetail={myMatchupDetail}
                 projectionsByPlayerId={data.projectionsByPlayerId}
                 activityRows={data.activityRows}
+                grades={data.grades}
+                gradesBasis={data.gradesBasis}
                 drawerOpen={drawer.surface !== null}
                 onFixLineup={(plan) => setSheet({ kind: "lineup", plan })}
                 onViewTrade={(trade) => setSheet({ kind: "trade", trade })}
@@ -336,6 +339,13 @@ export function RoomShell({ data, initialSurface, playoffTeams, regularSeasonWee
               <div id="invite-managers">
                 <InvitePanel leagueId={home.leagueId} leagueName={home.name} />
               </div>
+            ) : null}
+            {/* Task 10: the commissioner's own toggle for `GradeBoard`'s visibility. Gated on
+                `draftStatus === "complete"` too — a league still waiting to draft has no grades
+                for the flag to ever show or hide, so the control waits for the fact it controls
+                to exist. */}
+            {home.isCommissioner && home.draftStatus === "complete" ? (
+              <DraftGradesToggle leagueId={home.leagueId} visible={home.draftGradesVisible} />
             ) : null}
             {home.isCommissioner ? <ModerationSummary leagueId={home.leagueId} /> : null}
           </aside>

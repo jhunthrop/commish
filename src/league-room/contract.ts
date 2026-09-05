@@ -12,6 +12,7 @@ import type { ActivityRow } from "@/integrity/activity-view";
 import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
 import type { LeagueAuthority } from "@/league-service/authority";
 import type { CompositionCategory } from "@/participation/composition";
+import type { TeamGrade } from "@/draft-service/grades/engine";
 
 /**
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
@@ -394,6 +395,14 @@ export interface LeagueHomeBody {
    * keep closed (ruling 19). `RoomRoster` renders this rather than a per-manager history tag.
    */
   readonly compositionCategory: CompositionCategory;
+  /**
+   * `leagues.draft_grades_visible` (Task 9's own column, default `true`) — whether the
+   * commissioner has opted this league's draft grades onto league home at all. Every member
+   * reads this, not just the commissioner: `DraftGradesToggle` (commissioner-only) is what may
+   * ever WRITE it, but the flag itself decides what `RoomData.grades` carries for everybody, so
+   * it rides here beside the other facts every member's own home render already needs.
+   */
+  readonly draftGradesVisible: boolean;
 }
 
 export interface MatchupLineupEntry {
@@ -668,6 +677,36 @@ export interface RoomData {
   /** The trade surface's composer context — null for a viewer with no team. */
   readonly tradeContext: TradeRoomContext | null;
   readonly helpLevel: HelpLevel;
+  /**
+   * Task 10: every team's stored draft grade, joined to its team name — empty unless the draft
+   * is complete, `home.draftGradesVisible` is true, AND `draft-grades-job.ts` has actually
+   * written rows (a real gap: the job runs after commit, so a visitor who lands in the seconds
+   * between draft completion and the job's write sees an empty board, same as an opted-out
+   * league). `GradeBoard` renders nothing for an empty array either way, so this field alone
+   * decides whether the board shows — no separate visibility flag threaded to the component.
+   */
+  readonly grades: readonly LeagueGradeRow[];
+  /**
+   * The evidence board's own generation stamp `grades` was computed against, already formatted
+   * ("August 18") for `GradeBoard`'s fine print — `""` when `grades` is empty, where it goes
+   * unused. Formatted here rather than by the component: `formatDate` (`../lib/format`) is a
+   * plain function either side of the client boundary is free to call, and this keeps `GradeBoard`
+   * a pure "given a string, print it" component with no date arithmetic of its own.
+   */
+  readonly gradesBasis: string;
+}
+
+/** One team's stored grade (`@/draft-service/grades/engine`'s own `TeamGrade`, unchanged) plus
+ *  the one fact the engine never carries: whose team it is. `gradesForDraft`
+ *  (`@/league-service/grades`) is the one place this join happens. */
+export interface LeagueGradeRow extends TeamGrade {
+  readonly teamName: string;
+}
+
+/** `PUT /api/leagues/[leagueId]/settings`'s whole response — the one league setting Task 10
+ *  ships. Grows a field per future toggle rather than becoming a second `LeagueHomeBody`. */
+export interface LeagueSettingsBody {
+  readonly draftGradesVisible: boolean;
 }
 
 /** One platform notice as the activity surface renders it: pre-resolved server-side (the quote

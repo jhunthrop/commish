@@ -341,6 +341,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     draftSchedule,
     justSeated,
     compositionCategory,
+    draftGradesVisible: league.draftGradesVisible,
   };
 }
 

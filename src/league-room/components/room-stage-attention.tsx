@@ -5,7 +5,8 @@ import type { PendingWaiverClaim } from "@/league-service/claims";
 import type { ActivityRow } from "@/integrity/activity-view";
 import type { TradeProposalView } from "@/trades/contract";
 import { assetPlayerIds } from "@/trades/assets";
-import type { LeagueHomeBody, LineupBody, MatchupDetail, MatchupWeekBody, TradeRoomContext, TradeRosterPlayer } from "../contract";
+import type { LeagueGradeRow, LeagueHomeBody, LineupBody, MatchupDetail, MatchupWeekBody, TradeRoomContext, TradeRosterPlayer } from "../contract";
+import { GradeBoard } from "./grade-board";
 import { RoomArrivalCard } from "./room-arrival-card";
 import { RoomSurfaceStandings } from "./room-surface-standings";
 import { RoomWeekStory } from "./room-week-story";
@@ -33,6 +34,13 @@ export interface RoomStageAttentionProps {
   readonly myMatchupDetail: MatchupDetail | null;
   readonly projectionsByPlayerId: ReadonlyMap<string, number>;
   readonly activityRows: readonly ActivityRow[];
+  /** Task 10: the league's own stored draft grades, joined to team names — empty unless the
+   *  draft is complete, the commissioner has opted in, and the grading job has written its rows
+   *  (`RoomData.grades`'s own docblock names both gaps). `GradeBoard` renders nothing for an
+   *  empty array, so this stage never checks `home.draftGradesVisible` itself. */
+  readonly grades: readonly LeagueGradeRow[];
+  /** The evidence board's own generation, pre-formatted for `GradeBoard`'s fine print. */
+  readonly gradesBasis: string;
   /** True while any drawer surface is open over the stage. The expanded pulse yields to the
    *  compact row then — the collapse law's own rule (a surface borrows space and the stage
    *  gives it back), and it keeps the drawer's standings from doubling the stage's. */
@@ -215,6 +223,12 @@ export function RoomStageAttention(props: RoomStageAttentionProps) {
           projectedLine={projectedLine}
         />
       ) : null}
+
+      {/* Task 10, the morning-after board: right beside the arrival moment when both land on the
+          same week-1 visit, and on its own every later week a member returns to a league whose
+          grades are still opted in. `GradeBoard` renders nothing for an empty `grades`, so no
+          extra gate is checked here. */}
+      <GradeBoard grades={props.grades} basis={props.gradesBasis} />
 
       {hasCards ? <p className={`${MICRO_LABEL} text-text-faint`}>Needs you before Sunday</p> : null}
 
