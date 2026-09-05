@@ -2812,3 +2812,98 @@ export const draftSheetEntries = pgTable(
     index("draft_sheet_entries_sheet_rank_idx").on(t.sheetId, t.rank),
   ],
 );
+
+/**
+ * THE SIMULATOR'S OWN REPORTS (Draft HQ phase 2, spec §5, §10) — one row per requested sim, from
+ * the moment a user (or the sync fast path) asks for one through its finished summary. Reuses
+ * `jobStatusEnum` (`pending | running | succeeded | failed | abandoned`) rather than a second,
+ * near-identical enum: a sim run's own lifecycle IS a job's lifecycle (`src/jobs/defs/sim-job.ts`
+ * drives the transitions for every run above the sync-run threshold; the sync fast path writes
+ * `succeeded` directly, skipping `pending`/`running` entirely since nothing else observes it
+ * mid-flight).
+ *
+ * `configHash` is what makes a repeat request cheap: `src/draft-service/sim/store.ts`'s cache
+ * lookup is `(user_id, config_hash, board_generation)` — SCOPED TO THE REQUESTING USER, a
+ * deliberately narrower cache than a global one keyed on config alone. A sim's own numbers carry
+ * no per-user fact (every input is league settings plus the shared evidence board), so a global
+ * cache would be equally correct and would serve more repeats; the narrower scope was chosen so
+ * a user's own "my recent sims" list (`sim_runs_user_idx`) and its cache hits are the same query
+ * shape, and is recorded here as a real, if not maximal, choice rather than an oversight.
+ */
+export const simRuns = pgTable(
+  "sim_runs",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Null for a sim run against the generic (no-league) default settings — the same "generic"
+     *  option `@/draft-hq/board/service.ts`'s own board picker already offers. */
+    leagueId: text("league_id").references(() => leagues.id, { onDelete: "cascade" }),
+    /** The exact `SimConfig` this run was asked to compute (`@/draft-service/sim/types.ts`) —
+     *  persisted so a stored run can be replayed byte-for-byte and so `configHash` below is
+     *  always re-derivable from a row already in hand. */
+    config: jsonb("config").$type<JsonObject>().notNull(),
+    /** A stable hash of `config`, the cache key's first half. */
+    configHash: text("config_hash").notNull(),
+    /** The evidence board's own generation this run was computed against (`PreseasonProjectionRow.asOf`,
+     *  ISO string) — the cache key's second half, so a board refresh naturally invalidates a stale
+     *  cached run without a separate expiry policy. */
+    boardGeneration: text("board_generation").notNull(),
+    status: jobStatusEnum("status").notNull().default("pending"),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    /** The computed `SimSummary` (`@/draft-service/sim/types.ts`) once `status` reaches
+     *  `succeeded`; null before then and for a run that never finished. */
+    summary: jsonb("summary").$type<JsonObject>(),
+    /** Scrubbed failure text, mirroring `job_runs.error` — set only when `status` is `failed`. */
+    error: text("error"),
+  },
+  (t) => [
+    /** The cache lookup and "my recent sims" list share this index: newest first, scoped to one
+     *  user, narrowed further by an equality filter on `configHash`/`boardGeneration` at query
+     *  time for the cache path. */
+    index("sim_runs_user_idx").on(t.userId, t.requestedAt),
+    index("sim_runs_cache_idx").on(t.userId, t.configHash, t.boardGeneration),
+  ],
+);
+
+/**
+ * THE ADP TREND ARCHIVE (Draft HQ phase 2 Task 6, spec §10) — append-only, unlike
+ * `preseason_rankings` (which a live season's re-ingest may delete-and-replace, per that table's
+ * own docblock): the live-tables rule is that a writer which OVERWRITES a live claim must retire
+ * it transactionally, and a table meant to grow a TREND must never be that writer. Every nightly
+ * capture is a new row, never an update, so `adp_snapshots` is the one place this product can
+ * ever answer "what was his ADP two weeks ago" — the market page phase 4 builds on this.
+ *
+ * `playerId` references `nfl_players`, the SAME id space `preseason_rankings`/`preseason_projections`
+ * already key their own market/evidence rows on (`ADP_SNAPSHOT_CONFIG`'s own docblock,
+ * `@/draft-service/adp-snapshot/ingest.ts`), because the feed this table captures is the identical
+ * `fetchAverageDraftPosition` feed `market_anchor` already resolves through that same crosswalk —
+ * one resolution path, not two.
+ */
+export const adpSnapshots = pgTable(
+  "adp_snapshots",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** Free text, matching `preseason_rankings.source`'s own convention (`ffc_adp_ppr_12`) —
+     *  which market/format this snapshot came from. */
+    source: text("source").notNull(),
+    /** The scoring/team-count format the source's own board is drafted under (`ppr_12` today —
+     *  the one format `BENCHMARK_SOURCES.adp`'s feed publishes). A future second format is a new
+     *  value here, never a schema change. */
+    format: text("format").notNull(),
+    adp: real("adp").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** The trend read: one player's history over time, newest last. */
+    index("adp_snapshots_player_idx").on(t.playerId, t.capturedAt),
+    /** One capture per player per source per run — a re-run of the same night's job (a retry
+     *  after a partial failure) must never double an already-written night's row. */
+    uniqueIndex("adp_snapshots_player_source_captured_idx").on(t.playerId, t.source, t.capturedAt),
+  ],
+);

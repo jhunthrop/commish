@@ -17,14 +17,26 @@ export interface SimPlayerEvidence {
 export interface SimConfig {
   readonly teamCount: number;
   readonly rosterSlots: readonly RosterSlotConfig[];
-  /** 1-based seat in the (arbitrary, internal) draft order the sim measures "your slot" from. */
-  readonly slot: number;
+  /**
+   * 1-based seat in the (arbitrary, internal) draft order the sim measures "your slot" from, or
+   * `"all"` for the "find my best slot" mode (spec §5) — `simulateDrafts` itself only ever
+   * accepts a number; `"all"` is resolved one level up by `simulateAllSlots`, which runs the
+   * identical config once per seat and returns one `SimSummary` per slot.
+   */
+  readonly slot: number | "all";
   readonly rounds: number;
   readonly runs: number;
   /** 0 (casual) to 1 (sharp) — `board-order.ts`'s own blend. */
   readonly sharpness: number;
   readonly seed: number;
 }
+
+/** `SimConfig` narrowed to the single-slot shape `simulateDrafts` requires. */
+export type SingleSlotSimConfig = Omit<SimConfig, "slot"> & { readonly slot: number };
+
+/** What `sim_runs.summary` actually holds: one `SimSummary` for a numeric slot, or one per seat
+ *  for `slot: "all"` (`simulateAllSlots`, `simulate.ts`). */
+export type StoredSimSummary = SimSummary | { readonly bySlot: readonly SimSummary[] };
 
 export interface BuildOutcome {
   readonly label: BuildLabel;

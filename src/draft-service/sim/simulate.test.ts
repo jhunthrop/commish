@@ -3,8 +3,8 @@ import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { totalRosterSlots } from "@/draft-engine";
 import { BUILD_LABELS } from "./classify";
-import { simulateDrafts } from "./simulate";
-import type { SimConfig, SimPlayerEvidence } from "./types";
+import { simulateAllSlots, simulateDrafts } from "./simulate";
+import type { SimPlayerEvidence, SingleSlotSimConfig } from "./types";
 
 const TEAM_COUNT = 12;
 
@@ -42,7 +42,7 @@ function pool(size: number): readonly SimPlayerEvidence[] {
   }));
 }
 
-function baseConfig(overrides: Partial<SimConfig> = {}): SimConfig {
+function baseConfig(overrides: Partial<SingleSlotSimConfig> = {}): SingleSlotSimConfig {
   return {
     teamCount: TEAM_COUNT,
     rosterSlots: STANDARD_ROSTER_SLOTS,
@@ -116,4 +116,31 @@ describe("simulateDrafts", () => {
     },
     60_000,
   );
+});
+
+describe("simulateAllSlots", () => {
+  const evidence: readonly SimPlayerEvidence[] = (() => {
+    const config = baseConfig();
+    const size = config.teamCount * totalRosterSlots(STANDARD_ROSTER_SLOTS) + 40;
+    const plan: readonly (readonly [Position, number])[] = [
+      ["QB", Math.max(30, Math.ceil(size * 0.12))],
+      ["RB", Math.max(70, Math.ceil(size * 0.28))],
+      ["WR", Math.max(80, Math.ceil(size * 0.32))],
+      ["TE", Math.max(30, Math.ceil(size * 0.12))],
+      ["K", Math.max(20, Math.ceil(size * 0.08))],
+      ["DEF", Math.max(20, Math.ceil(size * 0.08))],
+    ];
+    const entries: { playerId: string; position: Position }[] = [];
+    for (const [position, count] of plan) for (let i = 0; i < count; i += 1) entries.push({ playerId: `${position.toLowerCase()}${i + 1}`, position });
+    const buckets = plan.map(([position, count]) => entries.filter((e) => e.position === position).slice(0, count));
+    const ranked = buckets.flatMap((bucket, bucketIndex) => bucket.map((entry, i) => ({ entry, rank: (i + 0.5) / bucket.length, bucketIndex })));
+    ranked.sort((a, b) => a.rank - b.rank || a.bucketIndex - b.bucketIndex);
+    return ranked.map(({ entry }, index): SimPlayerEvidence => ({ playerId: entry.playerId, position: entry.position, evidenceRank: index, marketRank: index, projectedPoints: Math.max(1, 300 - index * 1.2) }));
+  })();
+
+  it("returns one summary per seat, each for a distinct slot", () => {
+    const summaries = simulateAllSlots({ teamCount: TEAM_COUNT, rosterSlots: STANDARD_ROSTER_SLOTS, rounds: 6, runs: 5, sharpness: 0.5, seed: 3 }, evidence);
+    expect(summaries).toHaveLength(TEAM_COUNT);
+    expect(summaries.map((s) => s.slot)).toEqual(Array.from({ length: TEAM_COUNT }, (_, i) => i + 1));
+  });
 });

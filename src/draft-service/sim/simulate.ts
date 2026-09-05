@@ -12,7 +12,7 @@ import { BUILD_LABELS, classifyBuild, type BuildLabel, type ClassifiablePick } f
 import { bestStartingLineupPoints } from "./lineup-score";
 import { rngFor } from "@/mock-draft/rng";
 import { runOneDraft } from "./run";
-import type { BuildOutcome, ExposureRow, PickAvailabilityRow, SimConfig, SimPlayerEvidence, SimSummary } from "./types";
+import type { BuildOutcome, ExposureRow, PickAvailabilityRow, SimConfig, SimPlayerEvidence, SimSummary, SingleSlotSimConfig } from "./types";
 
 function teamIdsFor(teamCount: number): readonly string[] {
   return Array.from({ length: teamCount }, (_, i) => `seat_${i + 1}`);
@@ -34,7 +34,7 @@ function baselineTop3Rate(teamCount: number): number {
   return Math.min(3, teamCount) / teamCount;
 }
 
-export function simulateDrafts(config: SimConfig, pool: readonly SimPlayerEvidence[]): SimSummary {
+export function simulateDrafts(config: SingleSlotSimConfig, pool: readonly SimPlayerEvidence[]): SimSummary {
   const startedAt = Date.now();
   const teamIds = teamIdsFor(config.teamCount);
   const targetTeamId = teamIds[config.slot - 1];
@@ -153,7 +153,7 @@ export function simulateDrafts(config: SimConfig, pool: readonly SimPlayerEviden
 function rankFinish(
   rosters: Readonly<Record<string, readonly { readonly playerId: string; readonly position: string }[]>>,
   targetTeamId: string,
-  rosterSlots: SimConfig["rosterSlots"],
+  rosterSlots: SingleSlotSimConfig["rosterSlots"],
   pointsByPlayerId: ReadonlyMap<string, number>,
 ): number {
   const scores = Object.entries(rosters)
@@ -161,4 +161,19 @@ function rankFinish(
     .sort((a, b) => b.score - a.score || a.teamId.localeCompare(b.teamId));
   const index = scores.findIndex((row) => row.teamId === targetTeamId);
   return index === -1 ? scores.length : index + 1;
+}
+
+/**
+ * THE "FIND MY BEST SLOT" MODE (spec §5) — `config.slot === "all"` resolved here, one level above
+ * `simulateDrafts`: an identical `{teamCount, rosterSlots, rounds, runs, sharpness}` run once per
+ * seat, each with its own summary, so a caller can rank slots by their own finish rate/build mix
+ * rather than the sim having to invent a single combined notion of "best." `seed` is offset per
+ * slot (`config.seed + slot * config.runs`) so no two slots' runs ever draw the identical
+ * per-draft seed sequence, while the WHOLE call stays reproducible from `config` alone.
+ */
+export function simulateAllSlots(config: Omit<SimConfig, "slot">, pool: readonly SimPlayerEvidence[]): readonly SimSummary[] {
+  return Array.from({ length: config.teamCount }, (_, i) => {
+    const slot = i + 1;
+    return simulateDrafts({ ...config, slot, seed: config.seed + slot * config.runs }, pool);
+  });
 }

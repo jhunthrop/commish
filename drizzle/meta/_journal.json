@@ -498,6 +498,13 @@
       "when": 1788562988545,
       "tag": "0070_draft_sheets",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1788570928295,
+      "tag": "0071_known_red_hulk",
+      "breakpoints": true
     }
   ]
 }
