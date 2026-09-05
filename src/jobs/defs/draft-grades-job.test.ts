@@ -7,6 +7,7 @@ import { currentDeadline, DRAFT_SKIP_POLICY } from "@/draft-engine";
 import type { DraftAction } from "@/domain/draft";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
+import type { MemberNotice } from "@/integrity-service/notify";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { parseDraftGradesJobPayload, runDraftGradesJobStep } from "./draft-grades-job";
@@ -142,6 +143,57 @@ describe("draft grades job", () => {
     expect(notices).toHaveLength(2);
     expect(notices.map((n) => n.userId).sort()).toEqual([...f.userIds].sort());
     expect(notices[0]!.body).toBe("Draft grades are up on your league home. Every grade shows its work.");
+  });
+
+  // The fix for the review's Important finding: every other leagueful notice site in this
+  // codebase calls `deliverNotice` after its write transaction commits (`store.ts`,
+  // `trades.ts`, `auto-lineup.ts`, `fill-trigger.ts`) so a member sitting on their league home
+  // gets a live nudge, not just a row they see on their next poll. This job must too.
+  it("delivers a live notice to every seated member after the write commits", async () => {
+    const f = await seedCompletedDraft("draft_deliver_1", "league_deliver_1");
+    const delivered: MemberNotice[] = [];
+    const deliver = async (notice: MemberNotice) => {
+      delivered.push(notice);
+    };
+
+    const outcome = await runDraftGradesJobStep(db, { draftId: f.draftId }, { deliver });
+
+    expect(outcome.summary).toContain("2 members notified");
+    expect(delivered).toHaveLength(2);
+    expect(delivered.map((n) => n.userId).sort()).toEqual([...f.userIds].sort());
+    for (const notice of delivered) {
+      expect(notice.noticeType).toBe("draft_grades_ready");
+      expect(notice.leagueId).toBe(f.leagueId);
+    }
+    // Every delivered notice is the SAME row `member_notices` holds, not a re-derived copy.
+    const stored = await db.select().from(memberNotices).where(eq(memberNotices.noticeType, "draft_grades_ready"));
+    expect(delivered.map((n) => n.id).sort()).toEqual(stored.map((n) => n.id).sort());
+  });
+
+  it("never delivers, and never fails the job, when the opted-out league sends no notices", async () => {
+    const f = await seedCompletedDraft("draft_deliver_2", "league_deliver_2", { draftGradesVisible: false });
+    const delivered: MemberNotice[] = [];
+    const deliver = async (notice: MemberNotice) => {
+      delivered.push(notice);
+    };
+
+    await runDraftGradesJobStep(db, { draftId: f.draftId }, { deliver });
+    expect(delivered).toHaveLength(0);
+  });
+
+  it("swallows a delivery failure rather than failing the job — the row already committed", async () => {
+    const f = await seedCompletedDraft("draft_deliver_3", "league_deliver_3");
+    const deliver = async () => {
+      throw new Error("redis is down");
+    };
+
+    const outcome = await runDraftGradesJobStep(db, { draftId: f.draftId }, { deliver });
+    expect(outcome.summary).toContain("2 members notified");
+
+    const rows = await db.select().from(draftGrades).where(eq(draftGrades.draftId, f.draftId));
+    expect(rows).toHaveLength(2);
+    const notices = await db.select().from(memberNotices).where(eq(memberNotices.noticeType, "draft_grades_ready"));
+    expect(notices).toHaveLength(2);
   });
 
   it("is idempotent on re-run: no duplicate rows and no duplicate notices", async () => {

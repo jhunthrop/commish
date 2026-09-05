@@ -5,7 +5,8 @@
 // this job for a `!isMock` completion only — a mock draft never reaches this file at all, and
 // never should (ruling 3: mock grades are read-time, Task 11's own call into the same engine).
 //
-// ONE bounded step, `sim-job.ts`'s own shape: idempotency check, load, compute, write, notify.
+// ONE bounded step, `sim-job.ts`'s own shape: idempotency check, load, compute, write, notify,
+// deliver.
 // IDEMPOTENT BY EARLY RETURN, not by re-running the write every time: a draft's committed picks
 // and rosters never change once `commitDraftState` writes them, so a SECOND run for the same
 // draft (a retried attempt, an operator re-enqueue) would recompute byte-identical rows — the
@@ -29,7 +30,7 @@ import { excludedSetFor } from "@/db/upsert";
 import type { GradeDraftInput } from "@/draft-service/grades/engine";
 import { gradeDraft } from "@/draft-service/grades/engine";
 import { evidencePoolFor } from "@/draft-service/sim/evidence";
-import { notifyAffectedMember } from "@/integrity-service/notify";
+import { deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import { valueBoardIndexed, type LeagueShape } from "@/projections/decide/replacement";
 import { enqueueJob } from "../store";
@@ -81,7 +82,31 @@ async function nflTeamsByPlayer(db: Db, leagueId: string): Promise<ReadonlyMap<s
   return new Map(rows.map((row) => [row.playerId, row.nflTeam] as const));
 }
 
-export async function runDraftGradesJobStep(db: Db, payload: DraftGradesJobPayload): Promise<StepOutcome> {
+/**
+ * The delivery twin of `enqueueDraftGradesJobQuietly`'s own "swallows its own failures"
+ * discipline, mirroring `auto-lineup.ts`'s `deliverNoticeQuietly` exactly (same reasoning: the
+ * durable `member_notices` row already committed by the time this runs, so a push failure here
+ * must never be mistaken for the job itself having failed). `deliver` is an injected dependency
+ * — the same seam `deliverNoticeQuietly` takes it through — so a test can fake it without a real
+ * Redis connection.
+ */
+async function deliverNoticeQuietly(deliver: typeof deliverNotice, notice: MemberNotice): Promise<void> {
+  try {
+    await deliver(notice);
+  } catch (error: unknown) {
+    console.error("[draft-grades] notice delivery failed", { noticeId: notice.id, userId: notice.userId }, error);
+  }
+}
+
+export interface DraftGradesJobDeps {
+  /** Defaults to the real `deliverNotice` (`@/integrity-service/notify`), called once per
+   *  recipient after the write transaction commits. Injectable so a test can fake it without a
+   *  real Redis connection — the same seam `auto-lineup.ts`'s own `deliver` takes. */
+  readonly deliver?: typeof deliverNotice;
+}
+
+export async function runDraftGradesJobStep(db: Db, payload: DraftGradesJobPayload, deps: DraftGradesJobDeps = {}): Promise<StepOutcome> {
+  const deliver = deps.deliver ?? deliverNotice;
   const [draft] = await db.select({ leagueId: drafts.leagueId, status: drafts.status }).from(drafts).where(eq(drafts.id, payload.draftId));
   if (draft === undefined) {
     throw new TerminalJobError(`draft-grades: no drafts row for id ${payload.draftId}.`);
@@ -142,7 +167,7 @@ export async function runDraftGradesJobStep(db: Db, payload: DraftGradesJobPaylo
   // respect beyond the ordinary FK locks both inserts already take.
   const seats = league.draftGradesVisible ? await db.select({ userId: teams.userId }).from(teams).where(eq(teams.leagueId, draft.leagueId)) : [];
   const occurredAt = new Date().toISOString();
-  await db.transaction(async (tx) => {
+  const createdNotices = await db.transaction(async (tx) => {
     if (grades.length > 0) {
       await tx
         .insert(draftGrades)
@@ -166,18 +191,27 @@ export async function runDraftGradesJobStep(db: Db, payload: DraftGradesJobPaylo
           set: excludedSetFor(draftGrades, ["id", "draftId", "teamId"]),
         });
     }
+    const notices: MemberNotice[] = [];
     for (const seat of seats) {
-      await notifyAffectedMember(tx, {
-        leagueId: draft.leagueId,
-        userId: seat.userId,
-        noticeType: "draft_grades_ready",
-        context: { leagueName: league.name },
-        occurredAt,
-        auditEventId: null,
-      });
+      notices.push(
+        await notifyAffectedMember(tx, {
+          leagueId: draft.leagueId,
+          userId: seat.userId,
+          noticeType: "draft_grades_ready",
+          context: { leagueName: league.name },
+          occurredAt,
+          auditEventId: null,
+        }),
+      );
     }
+    return notices;
   });
   const notified = seats.length;
+  // Best-effort, AFTER the commit — the inverse of `notifyAffectedMember`'s own discipline: the
+  // durable row above already failed the transaction if it had to, so a live push failure here
+  // must never look like the job itself failed. Without this, a member sitting on their league
+  // home only learns grades are ready on their next page load/poll, never a live nudge.
+  for (const notice of createdNotices) await deliverNoticeQuietly(deliver, notice);
 
   return {
     summary: `draft-grades ${payload.draftId}: ${grades.length} team grade${grades.length === 1 ? "" : "s"} written, ${notified} member${notified === 1 ? "" : "s"} notified`,
