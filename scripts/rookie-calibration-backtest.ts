@@ -67,7 +67,7 @@ function requireEnv(name: string): string {
  * capital-insensitive collapse the founder's own audit diagnosed. See `fit.ts`'s
  * `isotonicRateOrdering` docblock for the mechanism that produced it.
  */
-const PRE_FIX_ROOKIE_GAME_RATE: Record<Position, Record<string, number>> = {
+export const PRE_FIX_ROOKIE_GAME_RATE: Record<Position, Record<string, number>> = {
   QB: { round1: 0.6558823529411764, round2: 0.2196078431372549, round3: 0.2196078431372549, rounds4to5: 0.20235294117647057, rounds6to7: 0.20235294117647057, undrafted: 0.16323529411764703 },
   RB: { round1: 0.47689075630252103, round2: 0.47689075630252103, round3: 0.47689075630252103, rounds4to5: 0.47689075630252103, rounds6to7: 0.47689075630252103, undrafted: 0.211484593837535 },
   WR: { round1: 0.7351086714635412, round2: 0.6321807411489185, round3: 0.6321807411489185, rounds4to5: 0.5019286403085824, rounds6to7: 0.3954676952748313, undrafted: 0.12377515786854137 },
