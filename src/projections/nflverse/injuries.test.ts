@@ -10,6 +10,9 @@ import { ingestInjuries, injuryRowsFor, mapInjuryRows, recordInjuryRows, type In
  *  a hand-written table tests our understanding of the file rather than the file itself. */
 const BUF_2024_W1_3 = parseCsv(readFixture("injuries_2024_buf_w1-3.csv"));
 
+/** The post-2025 shape: `season_type` added, `date_modified` gone entirely. */
+const BUF_2025_W1_3 = parseCsv(readFixture("injuries_2025_buf_w1-3.csv"));
+
 function row(over: Partial<Record<string, string>> = {}): CsvRow {
   return {
     season: "2024",
@@ -25,6 +28,16 @@ function row(over: Partial<Record<string, string>> = {}): CsvRow {
     date_modified: "2024-09-20T19:05:30Z",
     ...over,
   };
+}
+
+/** The 2025+ shape: `season_type` present, `date_modified` genuinely absent from the header —
+ *  not merely blank, since `"date_modified" in row` is how `mapInjuryRows` tells the two shapes
+ *  apart. Building this by deleting the key (rather than typing a literal without it) keeps the
+ *  fixture in one place if the base `row()` shape ever grows another column. */
+function row2025(over: Partial<Record<string, string>> = {}): CsvRow {
+  const base: Record<string, string> = { ...row(), season_type: "REG", ...over };
+  delete base.date_modified;
+  return base;
 }
 
 describe("mapInjuryRows", () => {
@@ -80,6 +93,40 @@ describe("mapInjuryRows", () => {
   it("empty input is not a shape drift — a season nflverse has not published rows for yet", () => {
     expect(mapInjuryRows([])).toEqual([]);
   });
+
+  it("the 2024 shape (date_modified present) still stamps every row with a real Date, unchanged", () => {
+    const rows = mapInjuryRows(BUF_2024_W1_3);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(r.dateModified).toBeInstanceOf(Date);
+    }
+  });
+
+  it("the 2025 shape (date_modified absent, season_type present) ingests with null stamps, ignoring season_type", () => {
+    const rows = mapInjuryRows(BUF_2025_W1_3);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(r.dateModified).toBeNull();
+    }
+    // Tre'Davious White moves Doubtful (week 1) -> Questionable (week 2) in the real release.
+    const white = rows.find((r) => r.playerId === "00-0033884" && r.week === 1);
+    expect(white).toMatchObject({ reportStatus: "Doubtful", primaryInjury: "Groin" });
+  });
+
+  it("refuses a 2025-shape file missing report_status, exactly as the 2024 shape does", () => {
+    const withoutReportStatus: Record<string, string> = { ...row2025() };
+    delete withoutReportStatus.report_status;
+    expect(() => mapInjuryRows([withoutReportStatus as CsvRow])).toThrow(/missing column/);
+  });
+
+  it("two null-stamped revisions of one player-week: the later row in file order wins, since neither carries a filing timestamp to compare", () => {
+    const earlier = row2025({ report_status: "Questionable" });
+    const later = row2025({ report_status: "Out" });
+    expect(mapInjuryRows([earlier, later])[0]).toMatchObject({ reportStatus: "Out" });
+    // Reversed file order flips which row is "later" — last-row-wins, not a stable preference.
+    expect(mapInjuryRows([later, earlier])[0]).toMatchObject({ reportStatus: "Questionable" });
+  });
+
 });
 
 describe("the store", () => {
@@ -121,6 +168,40 @@ describe("the store", () => {
     it("refuses a player the universe does not hold, rather than orphaning a row", async () => {
       await expect(recordInjuryRows(db, [{ ...OUT_ROW, playerId: "00-9999999" }])).rejects.toThrow();
     });
+
+    it("writes a null date_modified (the 2025+ shape) and reads it back as null, never a fabricated stamp", async () => {
+      const nullStamped: InjuryRow = { ...OUT_ROW, dateModified: null };
+      expect(await recordInjuryRows(db, [nullStamped])).toBe(1);
+      const rows = await injuryRowsFor(db, ALLEN.id, 2024);
+      expect(rows[0]!.dateModified).toBeNull();
+    });
+
+    it("two null-stamped re-ingestions of an unchanged row: the second is a true no-op, exactly like two stamped ones", async () => {
+      const nullStamped: InjuryRow = { ...OUT_ROW, dateModified: null };
+      expect(await recordInjuryRows(db, [nullStamped])).toBe(1);
+      expect(await recordInjuryRows(db, [nullStamped])).toBe(0);
+    });
+
+    it("a null incoming date_modified never erases a stamp already on record — stamped wins", async () => {
+      await recordInjuryRows(db, [OUT_ROW]);
+      // Same key, a genuinely different designation, but the incoming row carries no stamp at all.
+      const revisedButUnstamped: InjuryRow = { ...OUT_ROW, reportStatus: "Questionable", dateModified: null };
+      expect(await recordInjuryRows(db, [revisedButUnstamped])).toBe(1);
+
+      const rows = await injuryRowsFor(db, ALLEN.id, 2024);
+      expect(rows[0]).toMatchObject({ reportStatus: "Questionable" });
+      expect(rows[0]!.dateModified).toEqual(OUT_ROW.dateModified);
+    });
+
+    it("a real incoming stamp always replaces whatever was on record, stamped or null", async () => {
+      const nullStamped: InjuryRow = { ...OUT_ROW, dateModified: null };
+      await recordInjuryRows(db, [nullStamped]);
+      const nowStamped: InjuryRow = { ...OUT_ROW, reportStatus: "Questionable", dateModified: new Date("2024-10-06T00:00:00Z") };
+      expect(await recordInjuryRows(db, [nowStamped])).toBe(1);
+
+      const rows = await injuryRowsFor(db, ALLEN.id, 2024);
+      expect(rows[0]!.dateModified).toEqual(nowStamped.dateModified);
+    });
   });
 
   describe("injuryRowsFor", () => {
@@ -154,6 +235,24 @@ describe("the store", () => {
       // Josh Allen is not on the week-1 report at all (no row for him that week) — only weeks 2-3.
       const rows = await injuryRowsFor(db, ALLEN.id, 2024);
       expect(rows.map((r) => r.week)).toEqual([2, 3]);
+    });
+
+    it("ingests the 2025 shape (no date_modified column) end to end, archiving the row with a null stamp", async () => {
+      const WHITE = { id: "00-0033884", espnId: null, pfrId: "WhitTr00", name: "Tre'Davious White", position: "CB", latestTeam: "BUF", rookieSeason: 2017, lastSeason: 2025 };
+      await recordNflPlayers(db, [WHITE]);
+      const client = createNflverseClient({
+        fetch: (async () => new Response(readFixture("injuries_2025_buf_w1-3.csv"), { status: 200 })) as typeof globalThis.fetch,
+      });
+      const [report] = await ingestInjuries(db, client, [2025]);
+      expect(report!.season).toBe(2025);
+      expect(report!.written).toBeGreaterThan(0);
+
+      const rows = await injuryRowsFor(db, WHITE.id, 2025);
+      expect(rows.length).toBeGreaterThan(0);
+      for (const r of rows) {
+        expect(r.dateModified).toBeNull();
+      }
+      expect(rows.find((r) => r.week === 1)).toMatchObject({ reportStatus: "Doubtful" });
     });
 
     it("is idempotent — a re-run of a landed ingestion writes nothing new", async () => {

@@ -1,0 +1,25 @@
+season,season_type,game_type,team,week,gsis_id,position,full_name,first_name,last_name,report_primary_injury,report_secondary_injury,report_status,practice_primary_injury,practice_secondary_injury,practice_status
+2025,REG,REG,BUF,1,00-0033884,CB,Tre'Davious White,Tre'Davious,White,Groin,,Doubtful,Groin,,Did Not Participate In Practice
+2025,REG,REG,BUF,1,00-0036162,K,Tyler Bass,Tyler,Bass,Hip,Groin,Out,Hip,Groin,Did Not Participate In Practice
+2025,REG,REG,BUF,1,00-0036980,WR,Elijah Moore,Elijah,Moore,,,,Not injury related - personal matter,,Full Participation in Practice
+2025,REG,REG,BUF,1,00-0037261,WR,Khalil Shakir,Khalil,Shakir,,,,Ankle,,Full Participation in Practice
+2025,REG,REG,BUF,1,00-0037288,CB,Christian Benford,Christian,Benford,,,,Groin,,Full Participation in Practice
+2025,REG,REG,BUF,1,00-0039873,DT,DeWayne Carter,DeWayne,Carter,,,,Achilles,,Did Not Participate In Practice
+2025,REG,REG,BUF,1,00-0039901,WR,Keon Coleman,Keon,Coleman,,,,Groin,,Full Participation in Practice
+2025,REG,REG,BUF,2,00-0031550,LB,Shaq Thompson,Shaquille,Thompson,Hamstring,Hand,Questionable,Hamstring,Hand,Limited Participation in Practice
+2025,REG,REG,BUF,2,00-0033884,CB,Tre'Davious White,Tre'Davious,White,Groin,,Questionable,Groin,,Limited Participation in Practice
+2025,REG,REG,BUF,2,00-0034376,CB,Taron Johnson,Taron,Johnson,Quadricep,,Questionable,Quadricep,,Limited Participation in Practice
+2025,REG,REG,BUF,2,00-0035230,DT,Ed Oliver,Edward,Oliver,Ankle,,Out,Ankle,,Did Not Participate In Practice
+2025,REG,REG,BUF,2,00-0035689,TE,Dawson Knox,Dawson,Knox,,,,Hip,,Full Participation in Practice
+2025,REG,REG,BUF,2,00-0036914,DE,Greg Rousseau,Gregory,Rousseau,,,,Knee,,Full Participation in Practice
+2025,REG,REG,BUF,2,00-0037248,RB,James Cook,James,Cook,,,,Hamstring,,Full Participation in Practice
+2025,REG,REG,BUF,2,00-0037288,CB,Christian Benford,Christian,Benford,,,,Groin,,Full Participation in Practice
+2025,REG,REG,BUF,2,00-0039333,CB,Brandon Codrington,Brandon,Codrington,,,,Knee,,Full Participation in Practice
+2025,REG,REG,BUF,2,00-0039901,WR,Keon Coleman,Keon,Coleman,,,,Groin,,Full Participation in Practice
+2025,REG,REG,BUF,2,00-0040192,S,Jordan Hancock,Jordan,Hancock,Shoulder,,Questionable,Shoulder,,Limited Participation in Practice
+2025,REG,REG,BUF,3,00-0031550,LB,Shaq Thompson,Shaquille,Thompson,Hamstring,Hand,Questionable,Hamstring,Hand,Limited Participation in Practice
+2025,REG,REG,BUF,3,00-0033571,LB,Matt Milano,Matthew,Milano,Pectoral,,Out,Pectoral,,Did Not Participate In Practice
+2025,REG,REG,BUF,3,00-0034376,CB,Taron Johnson,Taron,Johnson,Quadricep,,Questionable,Quadricep,,Limited Participation in Practice
+2025,REG,REG,BUF,3,00-0035230,DT,Ed Oliver,Edward,Oliver,Ankle,,Out,Ankle,,Did Not Participate In Practice
+2025,REG,REG,BUF,3,00-0035357,CB,Cam Lewis,Cameron,Lewis,Shoulder,,Questionable,Shoulder,,Limited Participation in Practice
+2025,REG,REG,BUF,3,00-0040192,S,Jordan Hancock,Jordan,Hancock,,,,Shoulder,,Full Participation in Practice

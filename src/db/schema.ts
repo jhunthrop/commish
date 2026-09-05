@@ -2268,8 +2268,18 @@ export const nflverseInjuries = pgTable(
     /** The Wednesday-through-Friday practice designation, verbatim, or "" when not on the report. */
     practiceStatus: text("practice_status").notNull(),
     /** The league's own filing timestamp for this row — nflverse's `date_modified`, taken literally
-     *  exactly as `news/retrieve.ts`'s `reportFiledAt` does for the same column. */
-    dateModified: timestamp("date_modified", { withTimezone: true }).notNull(),
+     *  exactly as `news/retrieve.ts`'s `reportFiledAt` does for the same column.
+     *
+     *  NULLABLE since the 2025 release: nflverse dropped this column outright starting with
+     *  `injuries_2025.csv` (measured against the live files; `season_type` was added the same
+     *  release). An absent stamp is recorded as absent — `null`, never a fabricated "now" or a
+     *  copy of `ingested_at` — because a manufactured timestamp would misrepresent WHEN the league
+     *  filed the report, the one fact this column exists to preserve. See `injuries.ts`'s
+     *  `mapInjuryRows` for which shape a given season's file is read as, and `recordInjuryRows` for
+     *  how a null stamp is treated on re-ingestion (a null-stamped row is always taken to be the
+     *  latest word for its player-week — see `changedRowWhere`'s docblock there — since a 2025+
+     *  file carries no timestamp to compare two revisions by at all). */
+    dateModified: timestamp("date_modified", { withTimezone: true }),
     /** Provenance: which release this row came from. Free text, matching the convention every other
      *  `source` column in this schema keeps, rather than a boolean nobody could extend. */
     source: text("source").notNull().default("nflverse_injuries"),

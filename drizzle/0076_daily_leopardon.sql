@@ -1,0 +1,1 @@
+ALTER TABLE "nflverse_injuries" ALTER COLUMN "date_modified" DROP NOT NULL;
