@@ -3,19 +3,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Card, EmptyState, ErrorState, Meter, NOT_STARTED_DASH, SegmentGroup, Skeleton, StatPill, Table, type SegmentOption, type TableColumn } from "@/components/ui";
-import type { BuildLabel } from "@/draft-service/sim/classify";
+import { BUILD_LABEL_TEXT } from "@/draft-service/sim/classify";
 import type { ExposureRow, PickAvailabilityRow, SimSummary } from "@/draft-service/sim/types";
 import type { SimRunView } from "@/draft-service/sim/view";
 import { showsConfidenceInterval, wilsonInterval } from "./confidence";
 import { SIM_RUN_OPTIONS, SIM_SHARPNESS, SIM_SHARPNESS_OPTIONS, type SimSharpnessName } from "./constants";
-
-const BUILD_LABEL_TEXT: Readonly<Record<BuildLabel, string>> = {
-  "hero-RB": "Hero-RB",
-  "zero-RB": "Zero-RB",
-  "robust-RB": "Robust RB",
-  "early-TE": "Early TE",
-  "late-QB": "Late QB",
-};
 
 async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);

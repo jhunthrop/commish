@@ -4,7 +4,9 @@ import { useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
+import type { PickReason } from "@/projections/decide/draft";
 import type { Law } from "@/projections/laws/types";
+import type { BuildLabel } from "@/draft-service/sim/classify";
 import { PositionBadge } from "@/components/ui";
 import { PlayerName } from "@/league-room/components/player-peek";
 import { postPickBeat } from "../../assistant/beat";
@@ -34,6 +36,28 @@ export interface DrawerAssistantTabProps {
 }
 
 const NO_SEAT_COPY = "You have no seat in this draft. The assistant argues for a seat.";
+const EMPTY_CALL_COPY = "The assistant has nothing to say right now.";
+const FETCH_FAILED_COPY = "We could not reach the assistant. It tries again on the next pick.";
+
+/** `PickReason` codes whose sentence is a closed-form restatement of the same survival number the
+ *  candidate's own `makeItBack` line already states measured (R-1: displayed odds come from the
+ *  micro-sim). `reasonSentence` still exists and is still correct for a candidate with no measured
+ *  odds — this list is only for candidates that already show one survival claim, so they never
+ *  show two that could disagree. */
+const SURVIVAL_REASON_CODES = new Set<PickReason["code"]>(["will_not_survive", "safe_to_wait"]);
+
+/** The Simulator (`simulator-client.tsx`) and My Sheet's insights rail carry the identical map —
+ *  duplicated here rather than imported because `@/draft-service/sim/classify` is server-side
+ *  code, and this client room may only `import type` from it (the room/server boundary this
+ *  repo's own lint rule enforces): `BuildLabel` the type crosses that line, but this const, a
+ *  runtime value, cannot. */
+const BUILD_LABEL_TEXT: Readonly<Record<BuildLabel, string>> = {
+  "hero-RB": "Hero-RB",
+  "zero-RB": "Zero-RB",
+  "robust-RB": "Robust RB",
+  "early-TE": "Early TE",
+  "late-QB": "Late QB",
+};
 
 /** The asking seat's own rostered NFL team codes — `byeCollisionFor`'s own space (its docblock:
  *  team codes, not player ids). An empty roster slot (`playerId === null`) and a player id the
@@ -65,7 +89,7 @@ function rosterStackCandidates(view: DraftStateView, teamId: string, playersById
  * behind (it is never gated out of the drawer's tab row).
  */
 export function DrawerAssistantTab({ draftId, view, myTeamId, players, playersById, available, byeWeeks, reasons, laws }: DrawerAssistantTabProps) {
-  const { call, prePickCall, loading } = useAssistant(draftId, view.pickNumber, myTeamId);
+  const { call, prePickCall, loading, error } = useAssistant(draftId, view.pickNumber, myTeamId);
 
   const positionsById = useMemo(() => new Map([...playersById].map(([id, player]) => [id, player.position] as const)), [playersById]);
   const undraftedIds = useMemo(() => players.filter((player) => available.has(player.id)).map((player) => player.id), [players, available]);
@@ -102,12 +126,30 @@ export function DrawerAssistantTab({ draftId, view, myTeamId, players, playersBy
   const myRosterTeamCodes = useMemo(() => (myTeamId === null ? [] : rosterTeamCodes(view, myTeamId, playersById)), [myTeamId, view, playersById]);
   const myRosterStack = useMemo(() => (myTeamId === null ? [] : rosterStackCandidates(view, myTeamId, playersById)), [myTeamId, view, playersById]);
 
+  // THE BUILDS LINE — Task 6's honest wiring of `call.yourBuild`/`call.winningBuilds` (both
+  // already computed by `assistantCallCore`, never rendered before this). `winningBuilds` is the
+  // whole gate: `null` means no cached sim run exists for this league and seat yet, an honest
+  // absence rather than an invented list, so the block renders nothing rather than a guess. The
+  // top three by `top3FinishRate`, ties broken by label, so the ordering never depends on the
+  // registry's own iteration order.
+  const topWinningBuilds = useMemo(
+    () =>
+      call === null || call.winningBuilds === null
+        ? []
+        : [...call.winningBuilds].sort((a, b) => b.top3FinishRate - a.top3FinishRate || a.label.localeCompare(b.label)).slice(0, 3),
+    [call],
+  );
+
   if (myTeamId === null) {
     return <p className="text-sm text-text-faint">{NO_SEAT_COPY}</p>;
   }
 
   if (call === null) {
-    return <p className="text-sm text-text-faint">{loading ? "Reading the board." : "The assistant has nothing to say right now."}</p>;
+    // A dropped request is not the same story as an honestly empty call — `error` is set only
+    // when the fetch itself failed (see `use-assistant.ts`'s own contract), so a network failure
+    // gets its own honest line rather than reading as "the assistant looked and found nothing."
+    const text = loading ? "Reading the board." : error !== null ? FETCH_FAILED_COPY : EMPTY_CALL_COPY;
+    return <p className="text-sm text-text-faint">{text}</p>;
   }
 
   const top = call.candidates[0] ?? null;
@@ -143,6 +185,13 @@ export function DrawerAssistantTab({ draftId, view, myTeamId, players, playersBy
         {call.candidates.flatMap((candidate) => {
           const player = playersById.get(candidate.playerId);
           if (player === undefined) return [];
+          // R-1: displayed odds come from the micro-sim. A candidate whose `makeItBack` is
+          // already rendering the measured survival number below drops the reason list's own
+          // closed-form restatement of that same claim, so the card never states two survival
+          // numbers that could read as disagreeing with each other.
+          const displayedSurvival = candidate.makeItBack === null ? null : candidate.makeItBack.survival;
+          const hasDisplayedOdds = displayedSurvival !== null;
+          const reasons = hasDisplayedOdds ? candidate.reasons.filter((reason) => !SURVIVAL_REASON_CODES.has(reason.code)) : candidate.reasons;
           return [
             <li key={candidate.playerId} className="flex flex-col gap-1 rounded-sm bg-surface-raised px-2.5 py-1.5">
               <div className="flex items-center gap-2">
@@ -155,19 +204,33 @@ export function DrawerAssistantTab({ draftId, view, myTeamId, players, playersBy
                 />
               </div>
               <ul className="flex flex-col gap-0.5 text-xs text-text-faint">
-                {candidate.reasons.map((reason) => (
+                {reasons.map((reason) => (
                   <li key={reason.code}>{reasonSentence(reason)}</li>
                 ))}
               </ul>
-              {candidate.makeItBack === null || candidate.makeItBack.survival === null ? null : (
-                <p className="text-xs text-text-faint">
-                  Our sims make it {oddsPhrase(candidate.makeItBack.survival)} he is still here at your next turn.
-                </p>
+              {displayedSurvival === null ? null : (
+                <p className="text-xs text-text-faint">Our sims make it {oddsPhrase(displayedSurvival)} he is still here at your next turn.</p>
               )}
             </li>,
           ];
         })}
       </ol>
+      {call.winningBuilds === null ? null : (
+        <div data-testid="assistant-builds" className="flex flex-col gap-1">
+          <p className="text-xs text-text-faint">
+            Your build so far: {call.yourBuild.length === 0 ? "no shape yet" : call.yourBuild.map((label) => BUILD_LABEL_TEXT[label]).join(", ")}.
+          </p>
+          {topWinningBuilds.length === 0 ? null : (
+            <ul className="flex flex-col gap-0.5 text-xs text-text-faint">
+              {topWinningBuilds.map((build) => (
+                <li key={build.label}>
+                  {BUILD_LABEL_TEXT[build.label]} wins {Math.round(build.top3FinishRate * 100)}% of sims from your slot.
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {byeNote === null && stackNote === null ? null : (
         <div className="flex flex-col gap-1">
           {byeNote === null || topPlayer === null ? null : (

@@ -52,8 +52,12 @@ import { candidateCopyIn, sourceFilesIn } from "./test-support";
  *  gap explicitly since Task 8 ("`account-room` carries no directory-derived source sweep at
  *  all") and this is the task that closes it, the same commit that gives the room two genuinely
  *  new components (`StandingPanel`, `ThemeSwitcher`) worth sweeping from day one rather than
- *  from whenever somebody next remembers to add a `describe` block for them. */
-const ROOM_DIRS = ["src/chat-room", "src/admin-room", "src/league-room", "src/app/reviews", "src/account-room"];
+ *  from whenever somebody next remembers to add a `describe` block for them.
+ *
+ *  `src/draft-room`, added by the Draft HQ phase-3 final-review fix wave (finding 8): the whole
+ *  live snake/auction room had shipped with no directory-derived source sweep of its own, the
+ *  same structural gap this file exists to close for every other room. */
+const ROOM_DIRS = ["src/chat-room", "src/admin-room", "src/league-room", "src/app/reviews", "src/account-room", "src/draft-room"];
 
 const REPO_ROOT = process.cwd();
 
@@ -72,6 +76,7 @@ describe("the chat room and the admin room write in the house voice", () => {
     expect(files.some((file) => file.startsWith("src/admin-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/league-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/account-room"))).toBe(true);
+    expect(files.some((file) => file.startsWith("src/draft-room"))).toBe(true);
     expect(files).toContain(join("src", "app", "reviews", "page.tsx"));
     // Its own tests, and the module holding this scan's helpers, are the things DOING the
     // checking rather than things being checked — the same exclusion `flag-only.test.ts`'s own

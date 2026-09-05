@@ -35,5 +35,5 @@ export function postPickBeat(input: BeatInput): string | null {
   // before it ever reaches an `AssistantCallView`, so this branch is unreachable via today's
   // construction. Kept because the type does not promise that for every future caller.
   if (top.makeItBack === null || top.makeItBack.survival === null) return first;
-  return `${first} ${oddsPhrase(top.makeItBack.survival)} he is still there at your next turn.`;
+  return `${first} Our sims make it ${oddsPhrase(top.makeItBack.survival)} he is still there at your next turn.`;
 }

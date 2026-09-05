@@ -93,10 +93,10 @@ describe("reasonSentence", () => {
       "He ranks No. 3 at RB, 15.2 points over replacement.",
     );
     expect(reasonSentence({ code: "will_not_survive", survivalProbability: 0.2, nextPick: 9 })).toBe(
-      "He probably will not last. about 1 in 4 he is still there at pick 9.",
+      "He probably will not last. Our sims make it about 1 in 4 he is still there at pick 9.",
     );
     expect(reasonSentence({ code: "safe_to_wait", survivalProbability: 0.85, nextPick: 9 })).toBe(
-      "He can wait. about 3 in 4 he is still there at pick 9.",
+      "He can wait. Our sims make it about 3 in 4 he is still there at pick 9.",
     );
     expect(reasonSentence({ code: "no_further_turn", pickNumber: 14 })).toBe("Pick 14 is your last turn of the draft. There is no next pick to wait for.");
     expect(reasonSentence({ code: "tier_cliff", position: "TE", dropToNextTier: 4.5, playersLeftInTier: 2 })).toBe(
@@ -132,6 +132,20 @@ describe("DrawerAssistantTab", () => {
     renderTab({ myTeamId: null });
     expect(screen.getByText("You have no seat in this draft. The assistant argues for a seat.")).toBeInTheDocument();
     expect(screen.queryByTestId("assistant-run-alert")).toBeNull();
+  });
+
+  it("shows the honest empty-state line for a genuinely empty successful call, never the network-failure line", () => {
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: null, error: null }));
+    renderTab();
+    expect(screen.getByText("The assistant has nothing to say right now.")).toBeInTheDocument();
+    expect(screen.queryByText(/We could not reach the assistant/)).toBeNull();
+  });
+
+  it("shows a distinct honest failure line when the fetch itself failed, never reading as an empty call", () => {
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: null, error: "We couldn't reach the assistant. Check your connection and try again." }));
+    renderTab();
+    expect(screen.getByText("We could not reach the assistant. It tries again on the next pick.")).toBeInTheDocument();
+    expect(screen.queryByText("The assistant has nothing to say right now.")).toBeNull();
   });
 
   it("renders three candidates, their reason sentences and make-it-back odds sentences", () => {
@@ -172,6 +186,49 @@ describe("DrawerAssistantTab", () => {
     expect(screen.getByText("Our sims make it about 3 in 4 he is still here at your next turn.")).toBeInTheDocument();
     expect(screen.getByText("Our sims make it about 1 in 2 he is still here at your next turn.")).toBeInTheDocument();
     expect(screen.getByText("He fills your starting TE slot.")).toBeInTheDocument();
+  });
+
+  it("shows exactly one survival claim when a candidate carries both a will_not_survive reason and measured odds", () => {
+    const call = makeCall({
+      candidates: [
+        {
+          playerId: "rb1",
+          position: "RB",
+          reasons: [{ code: "will_not_survive", survivalProbability: 0.2, nextPick: 9 }],
+          makeItBack: { playerId: "rb1", survival: 0.75, runs: 200 },
+        },
+      ],
+    });
+    mockedUseAssistant.mockReturnValue(assistantResult({ call }));
+    renderTab();
+    expect(screen.queryByText(/He probably will not last/)).toBeNull();
+    expect(screen.getByText("Our sims make it about 3 in 4 he is still here at your next turn.")).toBeInTheDocument();
+  });
+
+  it("shows exactly one survival claim when a candidate carries both a safe_to_wait reason and measured odds", () => {
+    const call = makeCall({
+      candidates: [
+        {
+          playerId: "rb1",
+          position: "RB",
+          reasons: [{ code: "safe_to_wait", survivalProbability: 0.85, nextPick: 9 }],
+          makeItBack: { playerId: "rb1", survival: 0.5, runs: 200 },
+        },
+      ],
+    });
+    mockedUseAssistant.mockReturnValue(assistantResult({ call }));
+    renderTab();
+    expect(screen.queryByText(/He can wait/)).toBeNull();
+    expect(screen.getByText("Our sims make it about 1 in 2 he is still here at your next turn.")).toBeInTheDocument();
+  });
+
+  it("keeps the will_not_survive reason sentence when the candidate carries no measured odds", () => {
+    const call = makeCall({
+      candidates: [{ playerId: "rb1", position: "RB", reasons: [{ code: "will_not_survive", survivalProbability: 0.2, nextPick: 9 }], makeItBack: null }],
+    });
+    mockedUseAssistant.mockReturnValue(assistantResult({ call }));
+    renderTab();
+    expect(screen.getByText("He probably will not last. Our sims make it about 1 in 4 he is still there at pick 9.")).toBeInTheDocument();
   });
 
   it("renders the run alert when the room detects one, from view.picks alone", () => {
@@ -227,6 +284,46 @@ describe("DrawerAssistantTab", () => {
     expect(screen.queryByTestId("assistant-stack-note")).toBeNull();
   });
 
+  it("renders nothing for the builds line when the call carries no cached sim run", () => {
+    const call = makeCall({ candidates: [{ playerId: "te1", position: "TE", reasons: [], makeItBack: null }], winningBuilds: null });
+    mockedUseAssistant.mockReturnValue(assistantResult({ call }));
+    renderTab();
+    expect(screen.queryByTestId("assistant-builds")).toBeNull();
+  });
+
+  it("renders your build and the top winning builds, by percent, when a cached sim run exists", () => {
+    const call = makeCall({
+      candidates: [{ playerId: "te1", position: "TE", reasons: [], makeItBack: null }],
+      yourBuild: ["hero-RB", "early-TE"],
+      winningBuilds: [
+        { label: "zero-RB", runsWithLabel: 400, top3FinishRate: 0.31 },
+        { label: "hero-RB", runsWithLabel: 600, top3FinishRate: 0.624 },
+        { label: "robust-RB", runsWithLabel: 200, top3FinishRate: 0.4 },
+        { label: "late-QB", runsWithLabel: 300, top3FinishRate: 0.5 },
+      ],
+    });
+    mockedUseAssistant.mockReturnValue(assistantResult({ call }));
+    renderTab();
+    const builds = screen.getByTestId("assistant-builds");
+    expect(builds).toHaveTextContent("Your build so far: Hero-RB, Early TE.");
+    expect(builds).toHaveTextContent("Hero-RB wins 62% of sims from your slot.");
+    expect(builds).toHaveTextContent("Late QB wins 50% of sims from your slot.");
+    expect(builds).toHaveTextContent("Robust RB wins 40% of sims from your slot.");
+    // Only the top three by top3FinishRate — zero-RB (31%) is the fourth and does not appear.
+    expect(builds).not.toHaveTextContent("Zero-RB");
+  });
+
+  it("says there is no shape yet when your build is empty but a cached sim run still exists", () => {
+    const call = makeCall({
+      candidates: [{ playerId: "te1", position: "TE", reasons: [], makeItBack: null }],
+      yourBuild: [],
+      winningBuilds: [{ label: "hero-RB", runsWithLabel: 600, top3FinishRate: 0.5 }],
+    });
+    mockedUseAssistant.mockReturnValue(assistantResult({ call }));
+    renderTab();
+    expect(screen.getByTestId("assistant-builds")).toHaveTextContent("Your build so far: no shape yet.");
+  });
+
   it("renders identically for a mock room — the tab carries no mock-only branch", () => {
     const call = makeCall({ candidates: [{ playerId: "rb1", position: "RB", reasons: [], makeItBack: null }] });
     mockedUseAssistant.mockReturnValue(assistantResult({ call }));
@@ -271,7 +368,9 @@ describe("DrawerAssistantTab post-pick beat", () => {
   it("names the passed-on top candidate with his make-it-back odds when you took someone else", () => {
     mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), prePickCall }));
     renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "wr1" })] }) });
-    expect(screen.getByTestId("assistant-beat")).toHaveTextContent("Our board had Marcus Reed first. about 3 in 4 he is still there at your next turn.");
+    expect(screen.getByTestId("assistant-beat")).toHaveTextContent(
+      "Our board had Marcus Reed first. Our sims make it about 3 in 4 he is still there at your next turn.",
+    );
   });
 
   it("stops at the first sentence when the passed-on top candidate carries no make-it-back odds", () => {

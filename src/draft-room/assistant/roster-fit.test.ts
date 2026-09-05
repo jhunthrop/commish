@@ -74,10 +74,10 @@ describe("reachSentence", () => {
     expect(result).toBe("The market has him going about 20 picks from now.");
   });
 
-  it("appends the odds sentence, rounded to a whole percent, when odds are known", () => {
+  it("appends the odds sentence, in the product's one shared quarter-phrasing, when odds are known", () => {
     const result = reachSentence(input({ candidateAdp: 40, currentPick: 20, makeItBack: 0.624 }));
     expect(result).toBe(
-      "The market has him going about 20 picks from now. Our sims make it 62% he is still here at your next turn.",
+      "The market has him going about 20 picks from now. Our sims make it about 1 in 2 he is still here at your next turn.",
     );
   });
 
@@ -86,9 +86,10 @@ describe("reachSentence", () => {
     expect(result).toBe("The market has him going about 14 picks from now.");
   });
 
-  it("formats certain odds as 100%", () => {
+  it("speaks certain odds through the shared phrasing, never a raw percent", () => {
     const result = reachSentence(input({ candidateAdp: 40, currentPick: 20, makeItBack: 1 }));
-    expect(result).toContain("100%");
+    expect(result).toContain("better than 9 in 10");
+    expect(result).not.toContain("%");
   });
 
   it("never contains an em-dash or a semicolon", () => {

@@ -28,6 +28,17 @@ export type BuildLabel = "hero-RB" | "zero-RB" | "robust-RB" | "early-TE" | "lat
 
 export const BUILD_LABELS: readonly BuildLabel[] = ["hero-RB", "zero-RB", "robust-RB", "early-TE", "late-QB"];
 
+/** The one plain-words rendering of each `BuildLabel` — the Simulator (`simulator-client.tsx`)
+ *  and My Sheet's insights rail both need this exact mapping, so it lives here once rather than
+ *  each screen hand-typing its own copy of the same five strings. */
+export const BUILD_LABEL_TEXT: Readonly<Record<BuildLabel, string>> = {
+  "hero-RB": "Hero-RB",
+  "zero-RB": "Zero-RB",
+  "robust-RB": "Robust RB",
+  "early-TE": "Early TE",
+  "late-QB": "Late QB",
+};
+
 /** One drafted pick, as the classifier needs to see it — round-1-based, matching
  *  `CompletedPick.round` (`@/draft-engine`). */
 export interface ClassifiablePick {

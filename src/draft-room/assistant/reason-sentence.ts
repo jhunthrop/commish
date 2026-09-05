@@ -21,9 +21,9 @@ export function reasonSentence(reason: PickReason): string {
     case "value_over_replacement":
       return `He ranks No. ${reason.positionRank} at ${reason.position}, ${reason.valueOverReplacement.toFixed(1)} points over replacement.`;
     case "will_not_survive":
-      return `He probably will not last. ${oddsPhrase(reason.survivalProbability)} he is still there at pick ${reason.nextPick}.`;
+      return `He probably will not last. Our sims make it ${oddsPhrase(reason.survivalProbability)} he is still there at pick ${reason.nextPick}.`;
     case "safe_to_wait":
-      return `He can wait. ${oddsPhrase(reason.survivalProbability)} he is still there at pick ${reason.nextPick}.`;
+      return `He can wait. Our sims make it ${oddsPhrase(reason.survivalProbability)} he is still there at pick ${reason.nextPick}.`;
     case "no_further_turn":
       return `Pick ${reason.pickNumber} is your last turn of the draft. There is no next pick to wait for.`;
     case "tier_cliff":

@@ -30,12 +30,17 @@ const MOBILE_TABS = ["pool", "assistant", "sheet", "roster", "board", "picks"] a
 type MobileTab = (typeof MOBILE_TABS)[number];
 
 /** Literal caps are the tab bar's own data-register (the sweep bans the CLASS, not acronyms).
- *  Six tabs at 390px: the widest label (ASSISTANT) measures under the ~65px a six-way flex-1
- *  split leaves at text-sm bold (spec, mobile judgment) — the same fit reasoning the five-tab
- *  row was accepted under, one tab narrower per label now. */
+ *  Six tabs at 390px: a six-way flex-1 split with no horizontal padding on the row itself leaves
+ *  390 / 6 = 65px per tab. At this row's own text-sm font-bold tracking-wide, measured glyph
+ *  width runs about 8.7px/char (ASSISTANT's own 9 characters measured ~78px before this fix,
+ *  78 / 9 = 8.67) — so a label has to stay at 6 characters or fewer (6 * 8.7 = 52.2px) to clear
+ *  the 65px budget with room to spare. ASSIST (6) replaces ASSISTANT (9, ~78px, over budget by
+ *  design's own math): the desktop/drawer label stays the full word ("Assistant",
+ *  `drawer-handles.tsx`) — only this narrower phone row shortens it. ROSTER ties ASSIST at 6
+ *  characters; every other label is shorter still. */
 const TAB_LABEL: Readonly<Record<MobileTab, string>> = {
   pool: "POOL",
-  assistant: "ASSISTANT",
+  assistant: "ASSIST",
   sheet: "SHEET",
   roster: "ROSTER",
   board: "BOARD",

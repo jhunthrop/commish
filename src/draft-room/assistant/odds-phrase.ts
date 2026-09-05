@@ -16,9 +16,13 @@ export function oddsPhrase(survival: number): string {
       return "about 1 in 4";
     case 0.5:
       return "about 1 in 2";
+    // Quarter 1 is reachable here (survival in [0.875, 0.9], since anything above 0.9 already
+    // returned above) — rounding it up to "better than 9 in 10" would claim more than the sim
+    // measured, so it falls back to the nearest phrase the measured number actually clears.
     case 0.75:
+    case 1:
       return "about 3 in 4";
     default:
-      return survival >= 0.5 ? "better than 9 in 10" : "long odds";
+      return "long odds";
   }
 }

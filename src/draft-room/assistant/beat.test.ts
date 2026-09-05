@@ -32,7 +32,7 @@ describe("postPickBeat", () => {
       ],
     });
     expect(postPickBeat({ pickedPlayerId: "wr1", prePickCall, playerName: names })).toBe(
-      "Our board had Marcus Reed first. about 3 in 4 he is still there at your next turn.",
+      "Our board had Marcus Reed first. Our sims make it about 3 in 4 he is still there at your next turn.",
     );
   });
 

@@ -1,5 +1,6 @@
 import type { Position } from "@/domain/player";
 import type { Law } from "@/projections/laws/types";
+import { oddsPhrase } from "./odds-phrase";
 
 /**
  * ROSTER FIT — Task 5: three pure client-side readings of how a candidate fits the roster you
@@ -72,11 +73,11 @@ export function reachSentence(input: ReachInput): string | null {
   const lead = `The market has him going about ${picksFromNow} picks from now.`;
   if (makeItBack === null) return lead;
 
-  return `${lead} Our sims make it ${formatOdds(makeItBack)} he is still here at your next turn.`;
-}
-
-function formatOdds(probability: number): string {
-  return `${Math.round(probability * 100)}%`;
+  // ONE ODDS VOICE (final review finding 7): the shared `oddsPhrase` — the same quarter-rounded
+  // phrasing `drawer-assistant-tab.tsx` and `reasonSentence` already speak in — rather than this
+  // module's own raw percent. `reachSentence` stays unmounted this branch (deferral recorded in
+  // the ledger), but its own copy no longer disagrees with the rest of the product's one voice.
+  return `${lead} Our sims make it ${oddsPhrase(makeItBack)} he is still here at your next turn.`;
 }
 
 export interface StackCandidate {
