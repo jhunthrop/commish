@@ -1,0 +1,57 @@
+// THE NIGHTLY ADP SNAPSHOT JOB (Draft HQ phase 2 Task 6) — fires once a night
+// (`schedules.ts`'s own cron entry) and captures the current market ADP feed into the
+// append-only `adp_snapshots` archive (`@/projections/market/adp-snapshot.ts`).
+//
+// TERMINAL VS RETRYABLE: everything this job can throw is either the feed's own network/HTTP
+// weather (`fetchAverageDraftPosition`'s fetch call) or the feed publishing no board at all for
+// this season yet — both are worth retrying (the identical schedule-fire cadence recovers either
+// one tomorrow night, and `maxAttempts` covers a same-night blip), so nothing here is classified
+// terminal. A season with genuinely nothing published yet dead-letters after its attempts and
+// tries again on the next night's fire, which is the correct behavior for "not yet, not never."
+import type { Db } from "@/db/client";
+import type { JsonObject } from "@/domain/audit";
+import { ingestAdpSnapshot } from "@/projections/market/adp-snapshot";
+import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
+
+export const ADP_SNAPSHOT_JOB_NAME = "adp-snapshot";
+
+export interface AdpSnapshotPayload {
+  /**
+   * Fix round 1, MEDIUM 2 — the schedule's own fire instant (`schedule.ts`'s `tickOne`, which
+   * merges `firedAt` onto every schedule-born job's payload), reached here so `capturedAt` is
+   * DERIVED from it rather than from wall-clock `Date.now()` at attempt time. Optional because a
+   * hand-enqueued run (an operator re-run, or a future test) carries no schedule fire; those fall
+   * back to the injected clock.
+   */
+  readonly firedAt?: string;
+}
+
+export function parseAdpSnapshotPayload(raw: JsonObject): AdpSnapshotPayload {
+  const firedAt = raw.firedAt;
+  if (firedAt === undefined) return {};
+  if (typeof firedAt !== "string" || Number.isNaN(Date.parse(firedAt))) {
+    throw new Error(`adp-snapshot payload: firedAt must be an ISO instant string, got ${JSON.stringify(firedAt)}.`);
+  }
+  return { firedAt };
+}
+
+export async function runAdpSnapshotStep(db: Db, clock: { readonly now: () => string }, payload: AdpSnapshotPayload): Promise<StepOutcome> {
+  const now = payload.firedAt !== undefined ? () => new Date(payload.firedAt!) : () => new Date(clock.now());
+  const result = await ingestAdpSnapshot(db, { now });
+  const ratePct = result.resolutionRate === null ? "n/a" : `${(result.resolutionRate * 100).toFixed(1)}%`;
+  return {
+    summary: `adp-snapshot: ${result.candidatesRead} published, ${result.written} rows written (${ratePct} resolved)`,
+    detail: result.written === 0 ? [`no rows written this capture (resolution ${ratePct})`] : [],
+  };
+}
+
+export const adpSnapshotJob: AnyJobDefinition = defineJob<AdpSnapshotPayload>({
+  name: ADP_SNAPSHOT_JOB_NAME,
+  maxAttempts: 3,
+  // A single HTTP fetch plus one batched insert — comfortably short, but generous against a slow
+  // upstream night, matching the season-week job's own network-step budget.
+  timeoutMs: 60_000,
+  backoff: { baseMs: 60_000, maxMs: 10 * 60_000 },
+  parsePayload: parseAdpSnapshotPayload,
+  steps: [{ name: "capture", run: (ctx, payload) => runAdpSnapshotStep(ctx.db, ctx.clock, payload) }],
+});

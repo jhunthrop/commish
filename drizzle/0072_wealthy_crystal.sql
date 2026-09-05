@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "sim_runs_inflight_idx" ON "sim_runs" USING btree ("user_id","config_hash","board_generation") WHERE "sim_runs"."status" in ('pending', 'running');

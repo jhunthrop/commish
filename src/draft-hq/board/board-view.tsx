@@ -4,9 +4,11 @@ import { Fragment, useMemo, useState } from "react";
 import type { Player } from "@/domain/player";
 import { auctionValues, type AuctionShape } from "@/projections/auction/value";
 import type { BoardReason } from "@/projections/preseason/board";
-import { BottomSheet, EdgeCell, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, ReasonChip, SegmentGroup, TierDivider, strongestLawReasons } from "@/components/ui";
+import { BottomSheet, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, ReasonChip, SegmentGroup, TierDivider } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { Law } from "@/projections/laws/types";
+import { groupReasons } from "@/league-room/outlook/groups";
+import { strongestEvidenceSentence, tierBandSentence, vsMarketLabel } from "./copy";
 import type { BoardRow } from "./service";
 
 const POSITION_TABS: readonly { readonly value: string; readonly label: string }[] = [
@@ -20,8 +22,10 @@ const POSITION_TABS: readonly { readonly value: string; readonly label: string }
 ];
 
 /** The comma-separated header row a CSV export prints — one column per field
- *  `rowToCsv` below writes, in the same order. */
-const CSV_HEADER = ["Rank", "Name", "Position", "Team", "Bye", "Evidence pts", "Floor", "Ceiling", "Market ADP", "Edge vs market", "Strongest law", "Auction value"];
+ *  `rowToCsv` below writes, in the same order. "Strongest law" retired (board persona fix 3):
+ *  the strongest-evidence sentence now lives in the why drawer's top line, not a column that was
+ *  mostly blank and, when it did fire, a bare "+1.3 pts" figure nobody could place. */
+const CSV_HEADER = ["Rank", "Name", "Position", "Team", "Bye", "Evidence pts", "Floor", "Ceiling", "Market ADP", "Vs market (picks)", "Auction value"];
 
 function csvField(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
@@ -38,7 +42,6 @@ export function boardCsvLines(orderedRows: readonly BoardRow[], auctionShape: Au
 }
 
 function rowToCsv(row: BoardRow, dollarValue: number | null): string {
-  const strongest = strongestLawReasons(row.reasons, 1)[0];
   const edge = row.marketAdp === null ? "" : (row.marketAdp - row.rank).toFixed(1);
   return [
     String(row.rank),
@@ -51,7 +54,6 @@ function rowToCsv(row: BoardRow, dollarValue: number | null): string {
     row.ceilingPoints.toFixed(1),
     row.marketAdp === null ? "" : row.marketAdp.toFixed(1),
     edge,
-    strongest === undefined ? "" : `${strongest.lawId} (${strongest.effect >= 0 ? "+" : ""}${strongest.effect.toFixed(1)} pts)`,
     dollarValue === null ? "" : `$${dollarValue}`,
   ]
     .map(csvField)
@@ -81,6 +83,12 @@ interface EvidenceDrawerState {
 }
 
 function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDrawerState; readonly laws: readonly Law[]; readonly onClose: () => void }) {
+  // Fix 3 (board persona review, 2026-09-04): the retired "Strongest law" column's own sentence
+  // opens the drawer instead, built from the SAME grouped-outlook machinery the Outlook already
+  // renders (`groupReasons`/`lawGroupLabel`) — one voice product-wide, never a second phrasing.
+  const groups = groupReasons(state.row.reasons, laws);
+  const strongest = strongestEvidenceSentence(groups);
+
   return (
     <BottomSheet label={`Why ${state.row.name} ranks here`} onClose={onClose}>
       <div className="flex flex-col gap-4">
@@ -93,6 +101,7 @@ function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDraw
             </span>
           </div>
         </div>
+        {strongest === null ? null : <p className="text-base font-medium text-text-primary">{strongest}</p>}
         {state.row.reasons.length === 0 ? (
           <p className="text-sm text-text-muted">No laws fired for this player. His number comes from the base model alone.</p>
         ) : (
@@ -204,16 +213,13 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                 Evidence pts
               </th>
               <th scope="col" className="px-2 py-2 text-right">
-                Floor–ceiling
+                Season range
               </th>
               <th scope="col" className="px-2 py-2 text-right">
                 Market ADP
               </th>
               <th scope="col" className="px-2 py-2 text-right">
-                Edge
-              </th>
-              <th scope="col" className="px-2 py-2">
-                Strongest law
+                Vs market
               </th>
               <th scope="col" className="px-2 py-2" />
               {dollarView ? (
@@ -226,7 +232,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
           <tbody>
             {ordered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-2 py-6 text-center text-sm text-text-muted">
+                <td colSpan={8} className="px-2 py-6 text-center text-sm text-text-muted">
                   No players match this filter.
                 </td>
               </tr>
@@ -235,27 +241,38 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
               const tierRow =
                 showTiers && row.tier !== lastTier ? (
                   <tr key={`tier-${row.playerId}`}>
-                    <td colSpan={9} className="pt-3 pb-1">
+                    <td colSpan={8} className="pt-3 pb-1">
                       <TierDivider
                         grade={row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C"}
-                        label={
-                          (row.dropToNextTier ?? 0) > 0
-                            ? `${row.playersLeftInTier} left, ${row.dropToNextTier!.toFixed(1)} pt cliff`
-                            : `${row.playersLeftInTier} left`
-                        }
+                        label={tierBandSentence(
+                          row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C",
+                          position,
+                          row.playersLeftInTier ?? 0,
+                          row.dropToNextTier ?? 0,
+                        )}
                       />
                     </td>
                   </tr>
                 ) : null;
               if (showTiers) lastTier = row.tier;
-              const strongest = strongestLawReasons(row.reasons, 1)[0];
               const edge = row.marketAdp === null ? null : row.marketAdp - row.rank;
+              const vsMarket = vsMarketLabel(edge);
               const dollarValue = dollarValues.get(row.playerId) ?? null;
+              // Fix 1 (board persona review): on a position tab, positional rank leads and the
+              // overall rank becomes the sub-fact — never a bare overall number on its own. On
+              // "Overall" there is no single position context to lead with, so the overall rank
+              // stays the lead, unchanged.
+              const leadingRank = position === "ALL" ? row.rank : (row.positionRankInValue ?? row.rank);
               return (
                 <Fragment key={row.playerId}>
                   {tierRow}
                   <tr className="border-b border-line/50">
-                    <td className="px-2 py-2 tabular-nums text-text-faint">{row.rank}</td>
+                    <td className="px-2 py-2 tabular-nums text-text-faint">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-text-primary">{leadingRank}</span>
+                        {position === "ALL" ? null : <span className="text-xs text-text-faint">{`#${row.rank} overall`}</span>}
+                      </div>
+                    </td>
                     <td className="px-2 py-2">
                       <div className="flex items-center gap-2">
                         <PlayerFace player={toPlayer(row)} size="sm" />
@@ -282,10 +299,16 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                         row.marketAdp.toFixed(1)
                       )}
                     </td>
-                    <td className="px-2 py-2 text-right">
-                      <EdgeCell gap={edge} against="the market" />
+                    <td className="px-2 py-2 text-right text-sm">
+                      {vsMarket === null ? (
+                        <>
+                          <span aria-hidden="true">{NOT_STARTED_DASH}</span>
+                          <span className="sr-only">No comparison against the market yet</span>
+                        </>
+                      ) : (
+                        <span className={vsMarket.tone === "positive" ? "font-medium text-positive" : "text-text-muted"}>{vsMarket.text}</span>
+                      )}
                     </td>
-                    <td className="px-2 py-2">{strongest === undefined ? null : <ReasonChip reason={strongest} registry={laws} compact />}</td>
                     <td className="px-2 py-2">
                       <button type="button" onClick={() => setDrawer({ row })} className="text-sm font-medium text-accent hover:underline">
                         why
@@ -301,8 +324,8 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
       </div>
 
       <p className="text-xs text-text-faint">
-        Edge = market ADP minus our rank. Positive means we rate him earlier than the market. Why opens the full evidence chain: every law that
-        fired, its measured effect, and the seasons it was tested against. Nothing on this board is an opinion.
+        Season range is the floor and ceiling of his own season point total, from games-played risk alone. Why opens the full evidence chain: every
+        law that fired, its measured effect, and the seasons it was tested against. Nothing on this board is an opinion.
       </p>
 
       {drawer === null ? null : <EvidenceDrawer state={drawer} laws={laws} onClose={() => setDrawer(null)} />}

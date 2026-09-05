@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { players } from "@/db/schema";
+import { leagues, players } from "@/db/schema";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { pageTitle } from "@/components/app-shell/page-metadata";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { getSheet, listSheets } from "@/draft-hq/sheet/service";
 import { boardOptionsFrom, sheetEntryViews } from "@/draft-hq/sheet/view";
 import { byeStackWarning, mockHistoryInsights } from "@/draft-hq/sheet/insights";
+import { sheetHealth } from "@/draft-hq/sheet/health";
+import { canonicalSimFor } from "@/draft-hq/playbook/service";
 import { MySheetClient } from "@/draft-hq/sheet/my-sheet-client";
 import { DraftSubnav } from "@/draft-hq/subnav";
 
@@ -17,13 +20,23 @@ interface PageProps {
   readonly searchParams: Promise<Record<string, string | readonly string[] | undefined>>;
 }
 
+/** The sheet's own league shape, if it has one — the exact `{teamCount, rosterSlots}` pair a sim
+ *  needs, resolved from `leagues` directly rather than through `league-context.ts` (which answers
+ *  "which league is this ABOUT", a question a sheet's own `leagueId` has already settled). */
+async function shapeFor(db: ReturnType<typeof getDb>, leagueId: string | null): Promise<{ readonly teamCount: number; readonly rosterSlots: readonly RosterSlotConfig[] }> {
+  if (leagueId === null) return { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
+  const [league] = await db.select({ teamCount: leagues.teamCount, rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, leagueId)).limit(1);
+  return league === undefined ? { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } : league;
+}
+
 /**
  * MY SHEET (spec §4) — server-fetches the caller's sheets, the selected one's entries joined to
- * real player identity and the board's own rank, the insights rail's two real inputs, and hands
- * all of it to the client half for editing. Every mutation (reorder, notes, tags, remove, seed,
- * CSV import, sheet management) posts through `/api/draft/sheets/**` and then asks Next to
- * refresh this server render — one source of truth, never a client-only cache that could drift
- * from what the room's own SHEET tab reads.
+ * real player identity and the board's own rank, the insights rail's real inputs (including, as
+ * of Task 5, sheet health against a real canonical sim), and hands all of it to the client half
+ * for editing. Every mutation (reorder, notes, tags, remove, seed, CSV import, sheet management)
+ * posts through `/api/draft/sheets/**` and then asks Next to refresh this server render — one
+ * source of truth, never a client-only cache that could drift from what the room's own SHEET tab
+ * reads.
  */
 export default async function MySheetPage({ searchParams }: PageProps) {
   const user = await requireCurrentUser();
@@ -40,6 +53,21 @@ export default async function MySheetPage({ searchParams }: PageProps) {
     mockHistoryInsights(db, user.id),
   ]);
   const byeStack = entries.length === 0 ? null : await byeStackWarning(db, entries);
+
+  // Task 5's own unblocking: sheet health needs a real canonical sim for this sheet's own league
+  // (or the generic default) at a slot. No sheet carries a stored draft slot today, so this reads
+  // slot 1 — the identical, documented default the Playbook itself falls back to — rather than
+  // inventing a per-sheet slot concept this phase has no real data for.
+  const shape = await shapeFor(db, selected?.leagueId ?? null);
+  const canonicalSim = entries.length === 0 ? null : await canonicalSimFor(db, user.id, { leagueId: selected?.leagueId ?? null, shape, slot: 1 });
+  const health =
+    canonicalSim === null || canonicalSim.outcome !== "ready"
+      ? null
+      : sheetHealth(
+          entries.map((entry) => ({ playerId: entry.playerId, name: entry.name, position: entry.position, tag: entry.tag, boardRank: entry.boardRank })),
+          canonicalSim.summary!,
+          shape.teamCount,
+        );
 
   const mostDraftedIds = mockHistory.mostDrafted.map((row) => row.playerId);
   const mostDraftedNames =
@@ -59,7 +87,7 @@ export default async function MySheetPage({ searchParams }: PageProps) {
         selectedSheetName={selected?.name ?? null}
         entries={entries}
         boardOptions={boardOptionsFrom(board)}
-        insights={{ mockHistory: { ...mockHistory, mostDrafted: mostDraftedWithNames }, byeStack }}
+        insights={{ mockHistory: { ...mockHistory, mostDrafted: mostDraftedWithNames }, byeStack, sheetHealth: health }}
       />
     </div>
   );

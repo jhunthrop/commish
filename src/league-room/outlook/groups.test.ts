@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
-import { groupReasons } from "./groups";
+import { groupReasons, lawGroupLabel } from "./groups";
 
 function discoveredLaw(over: Partial<Law> = {}): Law {
   return {
@@ -136,5 +136,27 @@ describe("groupReasons", () => {
     const groups = groupReasons(reasons, []);
     expect(groups).toHaveLength(1);
     expect(groups[0]!.key).toBe("stale_discovered_id");
+  });
+});
+
+describe("lawGroupLabel", () => {
+  it("states a single-member group plainly, no 'together'", () => {
+    const reasons: readonly BoardReason[] = [{ code: "law", lawId: "rb_age_curve", effect: -1.8, magnitude: 29 }];
+    const [group] = groupReasons(reasons, []);
+    expect(lawGroupLabel(group as Extract<(typeof group), { kind: "law" }>)).toBe("-1.8 pts, Age 29 season");
+  });
+
+  it("marks a multi-member group as 'together', with the member count", () => {
+    const lawA = discoveredLaw({ id: "threshold:WR:snapShare:q70" });
+    const lawB = discoveredLaw({ id: "and:WR:snapShare:q70+threshold:WR:teamAirYardsShare:q70" });
+    const reasons: readonly BoardReason[] = [
+      { code: "law", lawId: lawA.id, effect: -1.2, magnitude: 0.848 },
+      { code: "law", lawId: lawB.id, effect: -0.6, magnitude: 0.848 },
+    ];
+    const [group] = groupReasons(reasons, [lawA, lawB]);
+    const label = lawGroupLabel(group as Extract<(typeof group), { kind: "law" }>);
+    expect(label).toContain("together");
+    expect(label).toContain("2 laws");
+    expect(label).toContain("-1.8 pts");
   });
 });

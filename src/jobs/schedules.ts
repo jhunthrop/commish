@@ -69,4 +69,12 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
     // slept-through hour would be sixty queued no-ops (see `ScheduleDefinition.catchUpMs`).
     catchUpMs: 5 * 60_000,
   }),
+  schedule({
+    name: "adp-snapshot-nightly",
+    cron: "0 3 * * *",
+    timezone: "America/New_York",
+    job: "adp-snapshot",
+    payload: {},
+    description: "Nightly 03:00 ET capture of the market ADP feed into the append-only trend archive (Draft HQ phase 4's data, started early).",
+  }),
 ];

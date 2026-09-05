@@ -29,9 +29,19 @@ const sweepNoop = defineJob({
   parsePayload: () => ({}),
   steps: [{ name: "sweep", run: async () => ({ summary: "noop", detail: [] }) }],
 });
+/** The real SCHEDULES now also fire "adp-snapshot" nightly (Draft HQ phase 2 Task 6). */
+const adpSnapshotNoop = defineJob({
+  name: "adp-snapshot",
+  maxAttempts: 3,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 60_000, maxMs: 600_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "capture", run: async () => ({ summary: "noop", detail: [] }) }],
+});
 const definitions: ReadonlyMap<string, AnyJobDefinition> = new Map([
   ["season-week", noopDefinition],
   ["draft-sweep", sweepNoop],
+  ["adp-snapshot", adpSnapshotNoop],
 ]);
 
 /** Just the Tuesday schedule, so fire counts in tests are one schedule's worth. */
