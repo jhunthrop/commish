@@ -178,9 +178,15 @@ export function PlayerPeekHost() {
             </div>
 
             {body.isRookie ? (
-              // LAW 7, the rookie case: nothing to chart, so one honest sentence stands in for it
-              // rather than an empty chart or a "no data" dead end.
+              // A CONFIRMED rookie (`isRookie`, never inferred from `availableSeasons` alone — see
+              // `PlayerSeasonBody`'s own docblock): nothing to chart, so one honest sentence
+              // stands in for it rather than an empty chart or a "no data" dead end.
               <p className="text-sm text-text-muted">His first NFL season.</p>
+            ) : body.availableSeasons.length === 0 ? (
+              // THE THIRD STATE (fix round 1, CRITICAL): not a confirmed rookie, and no season on
+              // record either — a crosswalk miss, or a placed veteran the store has no weeks for.
+              // Never the rookie sentence, which would assert a biography fact this state lacks.
+              <p className="text-sm text-text-muted">No prior seasons on record.</p>
             ) : played ? (
               <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
             ) : (

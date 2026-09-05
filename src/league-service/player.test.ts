@@ -12,7 +12,7 @@ import { recordPreseasonRankings } from "@/projections/preseason/store";
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
 import { recordNflPlayers } from "@/projections/universe";
 import { createLeague } from "./creation";
-import { playerSeason } from "./player";
+import { parseSeasonParam, playerSeason } from "./player";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
@@ -280,9 +280,9 @@ describe("playerSeason's season history", () => {
   /** rb1 -> `CHASE` through the real crosswalk mechanism, plus one historical peer (`PEER`) who
    *  never drafted in this league — present only so a prior season has a population to judge a
    *  week against. */
-  async function crossOverRb1(): Promise<void> {
+  async function crossOverRb1({ rookieSeason = 2018 }: { readonly rookieSeason?: number } = {}): Promise<void> {
     await recordNflPlayers(db, [
-      { id: CHASE, pfrId: "LongRa00", espnId: "rb1", name: "Rashad Long", position: "RB", latestTeam: "SF", rookieSeason: 2018, lastSeason: PRODUCT_SEASON },
+      { id: CHASE, pfrId: "LongRa00", espnId: "rb1", name: "Rashad Long", position: "RB", latestTeam: "SF", rookieSeason, lastSeason: PRODUCT_SEASON },
       { id: PEER, pfrId: "PeerBa00", espnId: "peer-x", name: "Peer Back", position: "RB", latestTeam: "GB", rookieSeason: 2018, lastSeason: PRODUCT_SEASON },
     ]);
     await recordCrosswalk(db, crosswalkRows(resolveCrosswalk(
@@ -393,12 +393,20 @@ describe("playerSeason's season history", () => {
     expect(body.pointsPerGame).toBe(16);
   });
 
-  it("is a true rookie — no current-season row and no prior season anywhere — only when BOTH are absent", async () => {
+  /**
+   * FIX ROUND 1, CRITICAL — `isRookie` is a CONFIRMED rookie fact (`nfl_players.rookie_season`),
+   * never inferred from `availableSeasons` being empty. The pre-fix version of this widening set
+   * `isRookie` from data absence alone, which told a real veteran the crosswalk had not placed
+   * "his first NFL season" — a biography claim built from nothing. These four tests pin the
+   * three-state contract `PlayerSeasonBody`'s own docblock now describes.
+   */
+  it("a veteran the crosswalk could not place gets the honest 'no record' state, never the rookie one", async () => {
     const leagueId = await league({ played: false });
-    // No crosswalk placement at all: the projection engine has nobody to look up.
+    // No crosswalk placement at all: the projection engine has nobody to look up, so it cannot
+    // say EITHER way whether this is a rookie — the honest answer is "no record", not a guess.
     const unplaced = (await playerSeason(db, leagueId, "rb1", clock))!;
     expect(unplaced.availableSeasons).toEqual([]);
-    expect(unplaced.isRookie).toBe(true);
+    expect(unplaced.isRookie).toBe(false);
     expect(unplaced.season).toBe(PRODUCT_SEASON); // still names a year, with nothing under it
     expect(unplaced.weeks).toEqual([]);
     expect(unplaced.log).toEqual([]);
@@ -407,12 +415,30 @@ describe("playerSeason's season history", () => {
     expect(unplaced.pointsPerGamePercentile).toBeNull();
   });
 
-  it("placement through the crosswalk alone is not enough to escape rookie status — the store must actually carry a week", async () => {
+  it("a placed VETERAN (rookieSeason in the past) with no recorded week anywhere also gets the honest 'no record' state, not the rookie one", async () => {
     const leagueId = await league({ played: false });
-    await crossOverRb1(); // placed, but no observations are ever recorded for him
+    await crossOverRb1({ rookieSeason: 2018 }); // placed, but no observations are ever recorded for him
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.availableSeasons).toEqual([]);
+    expect(body.isRookie).toBe(false);
+  });
+
+  it("a true rookie (rookieSeason === PRODUCT_SEASON) with nothing recorded yet gets the honest rookie flag", async () => {
+    const leagueId = await league({ played: false });
+    await crossOverRb1({ rookieSeason: PRODUCT_SEASON });
     const body = (await playerSeason(db, leagueId, "rb1", clock))!;
     expect(body.availableSeasons).toEqual([]);
     expect(body.isRookie).toBe(true);
+  });
+
+  it("a rookie's own confirmed status does not survive into a season he has actually played — normal chart, not a rookie sentence", async () => {
+    // The league HAS played weeks, so the current season is available regardless of whether this
+    // particular rookie has a stat line — `isRookie` only ever gates the "nothing to show" case.
+    const leagueId = await league({ played: true });
+    await crossOverRb1({ rookieSeason: PRODUCT_SEASON });
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.availableSeasons).toEqual([PRODUCT_SEASON]);
+    expect(body.isRookie).toBe(false);
   });
 
   it("keeps the current season's carries/targets numeric — the widening changes nothing about what today's season already showed", async () => {
@@ -421,5 +447,48 @@ describe("playerSeason's season history", () => {
     expect(body.season).toBe(PRODUCT_SEASON);
     expect(typeof body.totals!.carries).toBe("number");
     expect(typeof body.totals!.targets).toBe("number");
+  });
+});
+
+/**
+ * FIX ROUND 1, MEDIUM/LOW — the one place a `season` query param becomes a number, shared by the
+ * API route and the player page rather than duplicated inline in both.
+ */
+describe("parseSeasonParam", () => {
+  it("treats absent, null and empty input as 'let the service pick'", () => {
+    expect(parseSeasonParam(undefined)).toBeUndefined();
+    expect(parseSeasonParam(null)).toBeUndefined();
+    expect(parseSeasonParam("")).toBeUndefined();
+  });
+
+  it("parses a clean in-range year", () => {
+    expect(parseSeasonParam(String(PRODUCT_SEASON - 1))).toBe(PRODUCT_SEASON - 1);
+  });
+
+  it("rejects a non-integer year", () => {
+    expect(parseSeasonParam("2025.5")).toBeUndefined();
+  });
+
+  it("rejects exponential notation that Number() would otherwise accept", () => {
+    // Number("2025e2") is 202500, a clean integer — only the upper bound catches it, and that is
+    // exactly why the check has to run here rather than relying on `Number.isInteger` alone.
+    expect(parseSeasonParam("2025e2")).toBeUndefined();
+  });
+
+  it("rejects garbage text", () => {
+    expect(parseSeasonParam("abc")).toBeUndefined();
+  });
+
+  it("rejects a year before the earliest plausible season", () => {
+    expect(parseSeasonParam("1999")).toBeUndefined();
+  });
+
+  it("rejects a year after the season being drafted for", () => {
+    expect(parseSeasonParam(String(PRODUCT_SEASON + 1))).toBeUndefined();
+  });
+
+  it("accepts the boundary years", () => {
+    expect(parseSeasonParam("2000")).toBe(2000);
+    expect(parseSeasonParam(String(PRODUCT_SEASON))).toBe(PRODUCT_SEASON);
   });
 });

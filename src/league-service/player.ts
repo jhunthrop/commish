@@ -31,6 +31,33 @@ const HISTORY_SEASONS = 3;
  *  in this directory has it. */
 const systemClock: Clock = { now: () => new Date().toISOString() };
 
+/** The earliest season this product will ever entertain as a real request — nowhere near
+ *  `HISTORY_SEASONS`' own three-year lookback, just a sanity floor against garbage input. */
+const EARLIEST_PLAUSIBLE_SEASON = 2000;
+
+/**
+ * THE ONE PLACE A `season` QUERY PARAM BECOMES A NUMBER (fix round 1, MEDIUM/LOW) — both the API
+ * route and the player page parsed this identically inline before this extraction, which is
+ * exactly the kind of duplication that drifts the moment one call site gets a bound the other
+ * does not.
+ *
+ * `undefined` in, `undefined` out: an absent or empty param means "let the service pick its own
+ * default", never a fabricated year. Anything that is not a clean, in-range integer — `"2025.5"`,
+ * `"2025e2"`, `"abc"`, a season before this product's earliest plausible one, or one after the
+ * season being drafted for — is REJECTED here rather than surviving to `playerSeason`'s own
+ * `availableSeasons.includes(...)` membership check. Both would end up at the same fallback
+ * (the service's own default), but rejecting malformed input up front, in one place, is the
+ * difference between "this looks like validation" and "this happens to work because a later
+ * filter also failed to match".
+ */
+export function parseSeasonParam(raw: string | null | undefined): number | undefined {
+  if (raw === null || raw === undefined || raw === "") return undefined;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed)) return undefined;
+  if (parsed < EARLIEST_PLAUSIBLE_SEASON || parsed > PRODUCT_SEASON) return undefined;
+  return parsed;
+}
+
 /**
  * One week of a player's season, as the detail screen draws it.
  *
@@ -149,12 +176,26 @@ export interface PlayerSeasonTotals {
  *   carry for him simply never enters `availableSeasons`, the same absence-over-invention rule
  *   `expertRank`/`modelRank` below already keep. `carries`/`targets` are `null` on a prior season's
  *   game log rows: see `PlayerGameLogRow`'s own docblock for why the store cannot honestly fill them.
- * - `isRookie` is true only when `availableSeasons` is empty — no current-season row AND no prior
- *   season anywhere, the one case with nothing honest to chart. `season` still names a year even
- *   then (`PRODUCT_SEASON`, the one he is about to play), so the screen has something to label; the
- *   `weeks`/`log`/`totals` fields are simply all-empty/`null`, exactly as they already were for the
- *   pre-widening "no scored week for him this season" case, and the UI is expected to print one
- *   honest sentence instead of a chart for this case specifically.
+ * - `isRookie` and `availableSeasons` TOGETHER carry a THREE-STATE fact, and a caller must read
+ *   both rather than inferring one from the other (fix round 1, CRITICAL — the first version of
+ *   this widening set `isRookie` from `availableSeasons.length === 0` alone, which told a real
+ *   veteran the crosswalk had not placed "his first NFL season", a biography claim `isRookie` has
+ *   no business making from mere data absence):
+ *     1. `availableSeasons.length > 0` — normal: chart whichever season `season` names.
+ *     2. `availableSeasons.length === 0 && isRookie` — a CONFIRMED rookie (`nfl_players
+ *        .rookie_season === PRODUCT_SEASON`, read through the crosswalk — the one authoritative
+ *        "which season did this man enter the league" fact this product carries; there is no
+ *        product-side rookie flag on `players` itself). Nothing to chart because nothing has
+ *        happened yet, not because nothing is known. `season` still names a year
+ *        (`PRODUCT_SEASON`) so the screen has something to label. The UI prints "his first NFL
+ *        season" here and nowhere else.
+ *     3. `availableSeasons.length === 0 && !isRookie` — a THIRD state: not a rookie (or a rookie
+ *        status this product cannot confirm, which is the SAME honest position as not being one),
+ *        and no prior season on record either. Reached by a crosswalk miss (rookie status is only
+ *        ever reachable through the crosswalk) or by a placed veteran the store simply has no
+ *        weeks for. The UI must print a sentence that claims only what is known — "no prior
+ *        seasons on record" — never the rookie sentence, which would assert a biography fact this
+ *        state is defined by NOT having.
  *
  * `positionRank`, `adpPercentile`, `expertRank`, `modelRank`, `reasons` and `laws` below are NOT
  * season-selected: they are this year's draft outlook (ADP, expert consensus, our own board, the
@@ -163,11 +204,15 @@ export interface PlayerSeasonTotals {
  */
 export interface PlayerSeasonBody {
   readonly player: Player;
-  /** Every season this body could answer for, newest first. Empty only for `isRookie`. */
+  /** Every season this body could answer for, newest first. Can be empty for a reason `isRookie`
+   *  does NOT settle on its own — see this interface's own docblock's three-state account. */
   readonly availableSeasons: readonly number[];
   /** Which season `weeks`/`log`/`totals`/`pointsPerGame`/`pointsPerGamePercentile` describe. */
   readonly season: number;
-  /** No current-season row and no prior season anywhere — see this interface's own docblock. */
+  /** A CONFIRMED rookie fact (`nfl_players.rookie_season`), never inferred from `availableSeasons`
+   *  being empty — a crosswalk miss or an unrecorded veteran also has an empty `availableSeasons`
+   *  and is NOT this. Read `isRookie` and `availableSeasons` together; see this interface's own
+   *  docblock for the three states the pair can be in. */
   readonly isRookie: boolean;
   /** His rank among players at his position by market draft position, or `null` where the ADP
    *  feed does not carry him. */
@@ -366,6 +411,22 @@ async function currentSeasonStats(
 async function priorSeasonHasData(db: Db, gsisId: string, season: number, asOf: Date): Promise<boolean> {
   const mine = await statLinesAsOfForLiveSurface(db, { season, week: { from: 1, to: finalWeekOf(season) }, asOf, playerIds: [gsisId] });
   return mine.length > 0;
+}
+
+/**
+ * THE ACTUAL ROOKIE SIGNAL (fix round 1, CRITICAL) — never inferred from `availableSeasons` being
+ * empty. Absence of data and rookie status are different facts: a real veteran the crosswalk has
+ * not placed also has an empty `availableSeasons`, and answering him with "his first NFL season"
+ * would be a biography claim this function has no way to back up. `nfl_players.rookie_season` is
+ * fixed at the universe's own ingestion and is the authoritative "which season did this man enter
+ * the league" fact this product carries — there is no product-side rookie flag on `players` itself
+ * (checked: `players` has no draft-class column), so this is the one honest source, and it is
+ * reachable ONLY through the crosswalk, which is exactly why a crosswalk miss must be its own
+ * state rather than folded into this one.
+ */
+async function isConfirmedRookie(db: Db, gsisId: string, season: number): Promise<boolean> {
+  const [row] = await db.select({ rookieSeason: nflPlayers.rookieSeason }).from(nflPlayers).where(eq(nflPlayers.id, gsisId));
+  return row?.rookieSeason === season;
 }
 
 /**
@@ -576,7 +637,12 @@ export async function playerSeason(
     }
   }
   const availableSeasons = [...(played.length > 0 ? [PRODUCT_SEASON] : []), ...priorSeasonsWithData];
-  const isRookie = availableSeasons.length === 0;
+  // `isRookie` is TRUE ROOKIE STATUS, not "nothing to show" — see `isConfirmedRookie`'s own
+  // docblock. Only asked when there is nothing to show in the first place: a rookie who has
+  // already played a week this season has a normal `availableSeasons` and needs no special
+  // handling. A crosswalk miss with nothing to show falls through to neither branch, which is
+  // the third, honest state ("no prior seasons on record") the body's own docblock describes.
+  const isRookie = availableSeasons.length === 0 && gsisId !== null && (await isConfirmedRookie(db, gsisId, PRODUCT_SEASON));
   const season = requestedSeason !== undefined && availableSeasons.includes(requestedSeason) ? requestedSeason : (availableSeasons[0] ?? PRODUCT_SEASON);
 
   // `gsisId === null` is folded into this condition (rather than a non-null assertion below) so

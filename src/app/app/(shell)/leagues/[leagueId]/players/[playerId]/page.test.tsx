@@ -10,7 +10,13 @@ import type { PlayerSeasonBody } from "@/league-service/player";
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
 vi.mock("@/lib/leagues/membership", () => ({ resolveLeagueMembership: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
-vi.mock("@/league-service/player", () => ({ playerSeason: vi.fn() }));
+// `parseSeasonParam` is left as its real implementation (pure, no DB) — only `playerSeason`
+// itself is stubbed. Mocking it too would let a bug in the page's use of `parseSeasonParam`
+// hide behind a mock that always echoes back whatever the test expected.
+vi.mock("@/league-service/player", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/league-service/player")>();
+  return { ...actual, playerSeason: vi.fn() };
+});
 
 const push = vi.fn();
 // `PlayerPageSeasonSwitcher` navigates via `next/navigation`'s `useRouter`, which throws outside a
@@ -72,6 +78,11 @@ const ROOKIE_BODY: PlayerSeasonBody = {
   reasons: [],
   laws: [],
 };
+
+/** THE THIRD STATE (fix round 1, CRITICAL) — `availableSeasons` is empty exactly like a true
+ *  rookie's, but `isRookie` is `false`: a crosswalk miss, or a placed veteran the store has no
+ *  weeks for. The page must tell these apart. */
+const NO_RECORD_BODY: PlayerSeasonBody = { ...ROOKIE_BODY, isRookie: false };
 
 function callPage(searchParams: Record<string, string> = {}) {
   return PlayerPage({
@@ -136,6 +147,14 @@ describe("PlayerPage — season label and switcher", () => {
     await renderPage();
     expect(screen.getByText("His first NFL season.")).toBeInTheDocument();
     expect(screen.queryByText(/No scored week for him/)).not.toBeInTheDocument();
+    expect(screen.queryByText("No prior seasons on record.")).not.toBeInTheDocument();
+  });
+
+  it("gives a veteran with no recorded season the honest 'no record' sentence, never the rookie one (fix round 1, CRITICAL)", async () => {
+    vi.mocked(playerSeason).mockResolvedValue(NO_RECORD_BODY);
+    await renderPage();
+    expect(screen.getByText("No prior seasons on record.")).toBeInTheDocument();
+    expect(screen.queryByText("His first NFL season.")).not.toBeInTheDocument();
   });
 
   it("404s a player id `playerSeason` cannot find, same as before the widening", async () => {

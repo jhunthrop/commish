@@ -63,6 +63,15 @@ const ROOKIE_BODY: PlayerSeasonBody = {
   laws: [],
 };
 
+/** THE THIRD STATE (fix round 1, CRITICAL) — `availableSeasons` is empty exactly like a true
+ *  rookie's, but `isRookie` is `false`: a crosswalk miss, or a placed veteran the store has no
+ *  weeks for. The UI must tell these apart. */
+const NO_RECORD_BODY: PlayerSeasonBody = {
+  ...ROOKIE_BODY,
+  player: { ...PLAYER, id: "rb_unrecorded", name: "Quiet Veteran" },
+  isRookie: false,
+};
+
 /** Answers `/player-season` from a season-keyed table of bodies, exactly as the real route
  *  answers `?season=`: absent means the service's own default. `calls` records every URL this
  *  fixture was asked for, so a test can assert on what a season switch actually requested. */
@@ -129,6 +138,17 @@ describe("PlayerPeekHost — season label and switcher", () => {
 
     await waitFor(() => expect(screen.getByText("His first NFL season.")).toBeInTheDocument());
     expect(screen.queryByText(/No scored week for him/)).not.toBeInTheDocument();
+    expect(screen.queryByText("No prior seasons on record.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Season" })).not.toBeInTheDocument();
+  });
+
+  it("gives a veteran with no recorded season the honest 'no record' sentence, never the rookie one (fix round 1, CRITICAL)", async () => {
+    const bodies = new Map([[2026, NO_RECORD_BODY]]);
+    mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb_unrecorded", name: "Quiet Veteran" });
+
+    await waitFor(() => expect(screen.getByText("No prior seasons on record.")).toBeInTheDocument());
+    expect(screen.queryByText("His first NFL season.")).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Season" })).not.toBeInTheDocument();
   });
 

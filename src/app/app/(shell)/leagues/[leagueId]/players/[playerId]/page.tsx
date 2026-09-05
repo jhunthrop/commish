@@ -6,7 +6,7 @@ import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import Link from "next/link";
 import { Card, EdgeCell, PlayerObject, SeasonBars, SourceStrip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { playerSeason, type PlayerSeasonBody } from "@/league-service/player";
+import { parseSeasonParam, playerSeason, type PlayerSeasonBody } from "@/league-service/player";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PlayerPageSeasonSwitcher } from "@/league-room/components/season-switcher";
 import { sourcesFor, weeksFor } from "@/league-room/lib/player-season-view";
@@ -51,8 +51,7 @@ export default async function PlayerPage({ params, searchParams }: PageProps) {
   const user = await requireCurrentUser();
   const { leagueId, playerId } = await params;
   const { season: rawSeason } = await searchParams;
-  const requestedSeason = rawSeason === undefined || rawSeason === "" ? undefined : Number(rawSeason);
-  const season = requestedSeason !== undefined && Number.isFinite(requestedSeason) ? requestedSeason : undefined;
+  const season = parseSeasonParam(rawSeason);
 
   // The cheap, canonical gate — a team in this league or its commissioner. A non-member gets the
   // same 404 the matchup page gives them, never a "you are not allowed" page that confirms the
@@ -89,9 +88,17 @@ export default async function PlayerPage({ params, searchParams }: PageProps) {
         </div>
 
         {body.isRookie ? (
-          // The rookie case: nothing anywhere to chart, so one honest sentence stands in for it —
-          // the same "state the absence, draw no chart" discipline LAW 7 already established below.
+          // A CONFIRMED rookie (`isRookie`, never inferred from `availableSeasons` alone — see
+          // `PlayerSeasonBody`'s own docblock): nothing anywhere to chart, so one honest sentence
+          // stands in for it, the same "state the absence, draw no chart" discipline LAW 7 already
+          // established below.
           <p className="text-sm text-text-muted">His first NFL season.</p>
+        ) : body.availableSeasons.length === 0 ? (
+          // THE THIRD STATE (fix round 1, CRITICAL): not a confirmed rookie, and no season on
+          // record either — a crosswalk miss, or a placed veteran the store has no weeks for.
+          // This sentence claims only what is known; it must never be the rookie one, which would
+          // assert a biography fact this state is defined by not having.
+          <p className="text-sm text-text-muted">No prior seasons on record.</p>
         ) : played ? (
           <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
         ) : (

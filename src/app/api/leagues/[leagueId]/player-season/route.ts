@@ -1,6 +1,6 @@
 import { getDb } from "@/db/client";
 import { fail, ok } from "@/lib/api/respond";
-import { playerSeason } from "@/league-service/player";
+import { parseSeasonParam, playerSeason } from "@/league-service/player";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";
 
 export const runtime = "nodejs";
@@ -23,9 +23,7 @@ export async function GET(request: Request, context: LeagueRouteContext) {
     const params = new URL(req.url).searchParams;
     const playerId = params.get("playerId") ?? "";
     if (playerId === "") return fail("Say which player.", 400);
-    const rawSeason = params.get("season");
-    const requestedSeason = rawSeason === null || rawSeason === "" ? undefined : Number(rawSeason);
-    const season = requestedSeason !== undefined && Number.isFinite(requestedSeason) ? requestedSeason : undefined;
+    const season = parseSeasonParam(params.get("season"));
     const body = await playerSeason(getDb(), actor.leagueId, playerId, undefined, season);
     if (body === null) return fail("No such player.", 404);
     return ok(body);
