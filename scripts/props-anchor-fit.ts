@@ -42,8 +42,22 @@
 // which weight is better. Whole-board and per-position numbers are also printed, in full, at every
 // step, so a reader can see the diluted effect and any offsetting cost.
 //
+// THE GATE, MECHANICAL AND UNCONDITIONAL (Task 2's own instruction: "if 0 wins, wire nothing").
+// This script writes TWO files, never one without the other kept in sync:
+//   docs/research/2026-09-05-props-anchor-backtest.md  -- the human report, every number, always.
+//   src/projections/market/props-anchor-fitted.ts       -- GENERATED, `FITTED_PROPS_ANCHOR_WEIGHT`,
+//                                                          `null` when the judge season did not beat
+//                                                          the incumbent, the winning weight when it
+//                                                          did. `preseason-persist.ts` reads this and
+//                                                          only merges a non-null value onto
+//                                                          `FITTED_BLEND_CONSTANTS` for its blended
+//                                                          arm -- the plumbing that makes a future
+//                                                          re-fit's own verdict, in either direction,
+//                                                          reach the live board without a hand edit.
+//
 // Run: npm run projections:props-anchor:fit
-import { writeFileSync } from "node:fs";
+//      npm run projections:props-anchor:fit -- --check   (recomputes both files, exits 1 on drift)
+import { readFileSync, writeFileSync } from "node:fs";
 import { createDb } from "@/db/client";
 import type { ReadonlyDb } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
@@ -51,8 +65,7 @@ import type { Position } from "@/domain/player";
 import { blendBoard, seasonPointsOf, type BlendConstants } from "@/projections/market/blend";
 import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
 import { marketBoard, isCurvePosition, type CurvePosition, type MarketPriorEntry } from "@/projections/market/curve";
-import { loadArchivedPropLines, propsAnchorPoints } from "@/projections/market/props-anchor";
-import { firstKickoffFor } from "@/projections/team-store";
+import { propsAnchorForSeason } from "@/projections/market/props-anchor";
 import { registry } from "@/projections/laws/registry";
 import type { Law } from "@/projections/laws/types";
 import { statLinesAsOfForMeasurement } from "@/projections/nflverse/derived-stat-lines";
@@ -71,6 +84,7 @@ import { gradableInputs } from "@/projections/preseason/scorecard";
 import { spearman, meanAbsoluteError, type Observation } from "@/projections/metrics";
 
 const REPORT_PATH = "docs/research/2026-09-05-props-anchor-backtest.md";
+const FITTED_OUTPUT = "src/projections/market/props-anchor-fitted.ts";
 
 /** Fit/validate evidence — scored together, never separately selected on. */
 const FIT_SEASONS = [2023, 2024] as const;
@@ -137,16 +151,13 @@ async function factsForSeason(db: ReadonlyDb, season: number): Promise<SeasonFac
   const { entries: market } = await marketBoard(db, season, inputs.moment);
   const actual = await actualSeasonPoints(db, season, inputs.positions);
 
-  const firstKickoff = await firstKickoffFor(db, season);
-  const propsAnchor =
-    firstKickoff === null
-      ? new Map<string, number>()
-      : propsAnchorPoints(await loadArchivedPropLines(db, season, firstKickoff), {
-          firstKickoff,
-          positionByPlayerId: inputs.positions,
-          marketPointsByPlayerId: new Map(market.map((entry) => [entry.playerId, entry.marketPoints] as const)),
-          impliedGamesByPosition: FITTED_BLEND_CONSTANTS.impliedGamesByPosition,
-        });
+  const propsAnchor = await propsAnchorForSeason(
+    db,
+    season,
+    inputs.positions,
+    new Map(market.map((entry) => [entry.playerId, entry.marketPoints] as const)),
+    FITTED_BLEND_CONSTANTS.impliedGamesByPosition,
+  );
 
   return { season, candidates, market, actual, propsAnchor };
 }
@@ -380,13 +391,73 @@ async function main(): Promise<void> {
     perPositionLines,
     judgeBeats,
   });
+  const fitted = renderFitted({
+    weight: judgeBeats ? winner.weight : null,
+    judgeCoveredRhoZero: spearman(judgeAtZero.covered),
+    judgeCoveredRhoWinner: spearman(judgeAtWinner.covered),
+    judgeCoveredMaeZero: meanAbsoluteError(judgeAtZero.covered),
+    judgeCoveredMaeWinner: meanAbsoluteError(judgeAtWinner.covered),
+  });
 
   if (check) {
-    console.log("\n--check: report generation verified, not writing (this script is not a fitted-constants generator).");
+    let drift = false;
+    try {
+      const committedFitted = readFileSync(FITTED_OUTPUT, "utf-8");
+      if (committedFitted !== fitted) drift = true;
+    } catch {
+      drift = true;
+    }
+    if (drift) {
+      console.error(`\n${FITTED_OUTPUT} does not match this run. Run \`npm run projections:props-anchor:fit\` and commit the result.`);
+      process.exit(1);
+    }
+    console.log(`\n${FITTED_OUTPUT} matches this run. No drift. (${REPORT_PATH} is not diffed by --check; it is a report, not a generated constant.)`);
     return;
   }
   writeFileSync(REPORT_PATH, report);
+  writeFileSync(FITTED_OUTPUT, fitted);
   console.log(`\nwrote ${REPORT_PATH}`);
+  console.log(`wrote ${FITTED_OUTPUT}`);
+}
+
+interface FittedInputs {
+  readonly weight: number | null;
+  readonly judgeCoveredRhoZero: number | null;
+  readonly judgeCoveredRhoWinner: number | null;
+  readonly judgeCoveredMaeZero: number | null;
+  readonly judgeCoveredMaeWinner: number | null;
+}
+
+/** `src/projections/market/props-anchor-fitted.ts`'s own content — GENERATED, and `null` exactly
+ *  when the judge season did not beat the incumbent (the gate, mechanical and unconditional). */
+function renderFitted(inputs: FittedInputs): string {
+  const verdict =
+    inputs.weight === null
+      ? `THE GATE: NOT BEATEN. The ${JUDGE_SEASON} judge season's props-covered rank correlation did not improve over the propsAnchorWeight=0 incumbent (rho ${fmt(inputs.judgeCoveredRhoZero)} vs ${fmt(inputs.judgeCoveredRhoWinner)}). \`FITTED_PROPS_ANCHOR_WEIGHT\` is \`null\`, and \`preseason-persist.ts\` leaves \`FITTED_BLEND_CONSTANTS\` unmerged when it reads null -- the live board stays ADP-only on this axis.`
+      : `THE GATE: BEATEN. The ${JUDGE_SEASON} judge season's props-covered rank correlation improved over the propsAnchorWeight=0 incumbent (rho ${fmt(inputs.judgeCoveredRhoZero)} -> ${fmt(inputs.judgeCoveredRhoWinner)}, MAE ${fmt(inputs.judgeCoveredMaeZero)} -> ${fmt(inputs.judgeCoveredMaeWinner)}).`;
+  return `/**
+ * GENERATED by \`npm run projections:props-anchor:fit\`. Do not edit by hand.
+ *
+ * THE ONE FITTED NUMBER \`scripts/blend-fit.ts\` CANNOT PRODUCE (see that script's own header): its
+ * train window, 2013-2021, predates the props archive (2023 onward) entirely, so \`propsAnchorWeight\`
+ * is structurally a no-op there and its own grid pins the null cell (0) by construction.
+ * \`scripts/props-anchor-fit.ts\` fits this ONE axis on the seasons the archive actually covers --
+ * fit evidence ${FIT_SEASONS.join("+")} (pooled), judge season ${JUDGE_SEASON} scored once and never fed
+ * back into the grid -- and writes the result here, SEPARATELY from \`blend-fitted.ts\`, so that
+ * file's own "GENERATED... do not edit by hand" contract and its corrections-only, single-cell
+ * regeneration stay exactly what they say: this is a second, independent fitted constant, not a
+ * hand-edit of the first one.
+ *
+ * ${verdict}
+ *
+ * Full numbers, per-position breakdown and honesty notes: docs/research/2026-09-05-props-anchor-backtest.md.
+ *
+ * \`preseason-persist.ts\` is the one live-board consumer: when this is non-null, it merges
+ * \`{ propsAnchorWeight: FITTED_PROPS_ANCHOR_WEIGHT }\` onto \`FITTED_BLEND_CONSTANTS\` for the
+ * BLENDED arm only -- the raw (v1) arm never reads \`BlendConstants\` at all.
+ */
+export const FITTED_PROPS_ANCHOR_WEIGHT: number | null = ${inputs.weight === null ? "null" : inputs.weight};
+`;
 }
 
 interface ReportInputs {

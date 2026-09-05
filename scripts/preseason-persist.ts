@@ -39,7 +39,11 @@ import type { Position } from "@/domain/player";
 import type { Clock } from "@/domain/timing";
 import { nflPlayers } from "@/db/schema";
 import type { LeagueShape } from "@/projections/decide/replacement";
-import { shippedPreseasonCandidates } from "@/projections/market/blend";
+import { shippedPreseasonCandidates, type BlendConstants } from "@/projections/market/blend";
+import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
+import { marketBoard } from "@/projections/market/curve";
+import { propsAnchorForSeason } from "@/projections/market/props-anchor";
+import { FITTED_PROPS_ANCHOR_WEIGHT } from "@/projections/market/props-anchor-fitted";
 import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
 import {
   BOARD_SOURCE,
@@ -129,6 +133,20 @@ const PRIORS: PreseasonPriors = {
   career: FITTED_CAREER_PRIORS,
 };
 
+/**
+ * THE PROPS-ANCHOR BLEND CONSTANTS (fit-round Task 3, plumbing round 2026-09-05).
+ * `FITTED_BLEND_CONSTANTS` itself carries no `propsAnchorWeight` — `scripts/blend-fit.ts`'s own
+ * train window (2013-2021) predates the props archive entirely, so that fit cannot move this axis
+ * (see its own header) — `scripts/props-anchor-fit.ts` fits it separately, on the seasons the
+ * archive actually covers, and this merges the result onto the committed constants for the BLENDED
+ * arm only. `FITTED_PROPS_ANCHOR_WEIGHT` is `null` exactly when that fit's own judge-season gate was
+ * not beaten, in which case `FITTED_BLEND_CONSTANTS` is used BY REFERENCE, unchanged — a future
+ * re-fit that lands back on the null cell reproduces today's board bit for bit, the same "the null
+ * cell renders the incumbent's own shape" discipline `scripts/blend-fit.ts`'s own axes already keep.
+ */
+const BLENDED_CONSTANTS: BlendConstants =
+  FITTED_PROPS_ANCHOR_WEIGHT === null ? FITTED_BLEND_CONSTANTS : { ...FITTED_BLEND_CONSTANTS, propsAnchorWeight: FITTED_PROPS_ANCHOR_WEIGHT };
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (value === undefined || value === "") {
@@ -152,6 +170,10 @@ function requireEnv(name: string): string {
  * `unfrozen` is threaded through rather than read from module scope so `persistSeason` stays callable
  * from a test with either value; the guard it lifts lives in `writePreseasonBoard`, where no caller
  * can go around it.
+ *
+ * `blendEvidence` (plumbing round 2026-09-05) carries the season's own props-anchor map and the
+ * merged `BLENDED_CONSTANTS` — omitted entirely for the raw (v1) call, which does not read
+ * `BlendConstants` at all (`shippedPreseasonCandidates`'s own `raw: true` early return).
  */
 async function persistBoard(
   db: Db,
@@ -159,8 +181,12 @@ async function persistBoard(
   source: string,
   raw: boolean,
   unfrozen: boolean,
+  blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
 ): Promise<{ readonly board: readonly BoardEntry[]; readonly write: BoardWriteCounts }> {
-  const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, { raw });
+  const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, {
+    raw,
+    ...(blendEvidence !== undefined ? { constants: blendEvidence.constants, propsAnchor: blendEvidence.propsAnchor } : {}),
+  });
   const board = preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
   const write = await writePreseasonBoard(
     db,
@@ -205,7 +231,23 @@ export async function persistSeason(
   const inputs = await loadPreseason(db, season, { boardMoment });
   console.log(`${season}  moment kind: ${boardMoment.kind}  taken at ${inputs.moment.toISOString()}`);
 
-  const blended = await persistBoard(db, inputs, BOARD_SOURCE, false, unfrozen);
+  // THE PROPS ANCHOR (plumbing round 2026-09-05) — built once per season, for the BLENDED arm only.
+  // This is a SECOND `marketBoard` read: `shippedPreseasonCandidates` fetches its own inside the
+  // blend, and this one exists purely to hand `propsAnchorForSeason` the market points it needs to
+  // rescale against. The identical duplicate-read tradeoff `scripts/blend-fit.ts`'s own
+  // `factsForSeason` and `scripts/props-anchor-fit.ts`'s own `factsForSeason` already accept, for
+  // the same reason: the anchor's own rescale (`props-anchor.ts`'s step 5) needs a season's market
+  // prices before the blend that will later read the anchor has been built.
+  const { entries: marketForAnchor } = await marketBoard(db, season, inputs.moment);
+  const propsAnchor = await propsAnchorForSeason(
+    db,
+    season,
+    inputs.positions,
+    new Map(marketForAnchor.map((entry) => [entry.playerId, entry.marketPoints] as const)),
+    FITTED_BLEND_CONSTANTS.impliedGamesByPosition,
+  );
+
+  const blended = await persistBoard(db, inputs, BOARD_SOURCE, false, unfrozen, { constants: BLENDED_CONSTANTS, propsAnchor });
   console.log(
     `${season}  [blend, ${BOARD_SOURCE}]  ${String(blended.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
       `${String(blended.write.written).padStart(4)} new projection rows  ${String(blended.write.reasonsWritten).padStart(4)} reason rows written` +

@@ -6,6 +6,7 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { isPropMarket, type PropMarket } from "../odds/props-store";
 import { seasonOfKickoff } from "../odds/player-map";
 import { computeFantasyPoints } from "@/scoring/compute";
+import { firstKickoffFor } from "../team-store";
 import { isCurvePosition, type ImpliedGamesByPosition } from "./curve";
 
 /**
@@ -235,4 +236,34 @@ export async function loadArchivedPropLines(db: ReadonlyDb, season: number, firs
     lines.push({ playerId, market: row.market, point: row.point, commenceTime: row.commenceTime, fetchedAt: row.fetchedAt });
   }
   return lines;
+}
+
+/**
+ * ONE SEASON'S PROPS ANCHOR, ASSEMBLED FROM THE STORE (fit-round Task 3, plumbing round 2026-09-05)
+ * — `firstKickoffFor`, `loadArchivedPropLines` and `propsAnchorPoints` composed in the one order
+ * every caller needs them in: `scripts/blend-fit.ts`'s `factsForSeason`, `scripts/props-anchor-
+ * fit.ts`'s own sibling fit, and `scripts/preseason-persist.ts`'s live path all built this exact
+ * three-call sequence separately before this existed. Extracted here so a future change to any one
+ * step (a different leakage window, a different implied-games table) lands in one place rather than
+ * three.
+ *
+ * Empty when the season has no ingested schedule yet (`firstKickoffFor` returns `null` — no kickoff
+ * to gate against) or the archive holds no pre-kickoff line for it. Both are the identical ADP-only
+ * null cell `propsAnchorPoints` itself already returns for an unanchored player.
+ */
+export async function propsAnchorForSeason(
+  db: ReadonlyDb,
+  season: number,
+  positionByPlayerId: ReadonlyMap<string, Position>,
+  marketPointsByPlayerId: ReadonlyMap<string, number>,
+  impliedGamesByPosition: ImpliedGamesByPosition,
+): Promise<ReadonlyMap<string, number>> {
+  const firstKickoff = await firstKickoffFor(db, season);
+  if (firstKickoff === null) return new Map();
+  return propsAnchorPoints(await loadArchivedPropLines(db, season, firstKickoff), {
+    firstKickoff,
+    positionByPlayerId,
+    marketPointsByPlayerId,
+    impliedGamesByPosition,
+  });
 }
