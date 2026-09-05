@@ -57,6 +57,7 @@
     "projections:market:fit": "dotenv -e .env.local -- tsx scripts/market-curve-fit.ts",
     "projections:blend:fit": "dotenv -e .env.local -- tsx scripts/blend-fit.ts",
     "projections:blend:diagnose": "dotenv -e .env.local -- tsx scripts/blend-diagnostic.ts",
+    "projections:props-anchor:fit": "dotenv -e .env.local -- tsx scripts/props-anchor-fit.ts",
     "projections:preseason": "dotenv -e .env.local -- tsx scripts/preseason-report.ts",
     "projections:preseason:diagnose": "dotenv -e .env.local -- tsx scripts/preseason-diagnose.ts",
     "projections:crosswalk": "dotenv -e .env.local -- tsx scripts/build-crosswalk.ts",
