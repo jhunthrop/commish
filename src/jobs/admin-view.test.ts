@@ -79,11 +79,21 @@ describe("scheduleStatuses", () => {
       parsePayload: () => ({}),
       steps: [{ name: "snapshot", run: async () => ({ summary: "noop", detail: [] }) }],
     });
+    // The real SCHEDULES now also fire "capsule-sweep" nightly (player capsules).
+    const cannedCapsuleSweep = defineJob({
+      name: "capsule-sweep",
+      maxAttempts: 2,
+      timeoutMs: 5_000,
+      backoff: { baseMs: 60_000, maxMs: 600_000 },
+      parsePayload: () => ({}),
+      steps: [{ name: "sweep", run: async () => ({ summary: "noop", detail: [] }) }],
+    });
     const definitions = new Map([
       ["season-week", canned],
       ["draft-sweep", cannedSweep],
       ["adp-snapshot", cannedAdpSnapshot],
       ["props-preseason-snapshot", cannedPropsPreseasonSnapshot],
+      ["capsule-sweep", cannedCapsuleSweep],
     ]);
 
     // Bootstrap, then rewind the Tuesday cursor so the second tick enqueues the 12:00Z fire.

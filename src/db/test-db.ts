@@ -44,7 +44,7 @@ export async function truncateAll(db: Db): Promise<void> {
       register_freeze_rows, register_grade_rows,
       nfl_draft_picks,
       draft_sheet_entries, draft_sheets,
-      sim_runs, adp_snapshots,
+      sim_runs, adp_snapshots, player_capsules,
       nfl_players, player_stat_lines, players, stat_weeks, nfl_games, capture_snapshots,
       matchups, weeks, draft_picks, draft_nudges, draft_slot_preferences, draft_actions, drafts,
       lineup_slots, roster_slots, league_invites,

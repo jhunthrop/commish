@@ -158,7 +158,7 @@ export function PlayerPeekHost() {
                 of chips (`../outlook/outlook.tsx`'s own docblock has the full account). Capped at
                 five groups here (the bottom-sheet's own constraint); the full page shows every
                 group. Renders nothing when the board never ranked him. */}
-            <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} capped />
+            <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} capsule={body.capsule} capped />
 
             {/* THE SEASON LABEL + SWITCHER (2026-09-04 widening) — every number below this line
                 answers for `body.season` explicitly, never a silent "this season" that could mean

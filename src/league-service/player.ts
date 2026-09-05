@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { getPlayerCapsule, type PlayerCapsuleView } from "@/capsules/store";
 import type { Db } from "@/db/client";
 import { captureSnapshots, leagues, matchups, nflPlayers, players, playerStatLines, rosterSlots, scoringSettings, statWeeks, teams } from "@/db/schema";
 import type { Player, Position, StatLine } from "@/domain/player";
@@ -17,6 +18,7 @@ import { BOARD_SOURCE, assertSingleGeneration, boardReasons, preseasonProjection
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { preseasonRankingsFor } from "@/projections/preseason/store";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
+import { newsFor } from "./news";
 
 /**
  * How many finished seasons before `PRODUCT_SEASON` a player card will offer, at most — the same
@@ -268,6 +270,16 @@ export interface PlayerSeasonBody {
   readonly reasons: readonly BoardReason[];
   /** The law registry, for `ReasonChip`'s own claim lookup on a `"law"` reason. */
   readonly laws: readonly Law[];
+  /**
+   * The auto-written capsule (spec §9 AMENDED 2026-09-04) — LLM voice over verified facts, the
+   * SAME facts the sweep job computes off the board (`src/capsules/collect.ts`), mechanically
+   * validated before it is ever stored. `null` for a player the sweep has not reached yet (a
+   * board-irrelevant player, or one not swept), never a placeholder string standing in for
+   * absence. Optional on the type (rather than always-present) so the many existing fixtures
+   * that build a `PlayerSeasonBody` by hand need not all learn about capsules at once; every real
+   * read through `playerSeason` sets it.
+   */
+  readonly capsule?: PlayerCapsuleView | null;
 }
 
 /**
@@ -537,30 +549,6 @@ async function injuryDesignationFor(db: Db, playerId: string): Promise<string | 
   return null;
 }
 
-/** Headlines that name him, from the latest harvested news snapshot. The feed carries no
- *  playerID, only titles in Tank01's own "Name: sentence" convention — the prefix is the join,
- *  strict on purpose: a missed headline costs nothing, another man's headline on his card is
- *  the failure this guards. */
-async function newsFor(db: Db, name: string): Promise<readonly { readonly title: string; readonly link: string }[]> {
-  const [snapshot] = await db
-    .select({ payload: captureSnapshots.payload })
-    .from(captureSnapshots)
-    .where(eq(captureSnapshots.source, "tank01_news"))
-    .orderBy(desc(captureSnapshots.capturedAt))
-    .limit(1);
-  const body = snapshot?.payload;
-  if (!Array.isArray(body)) return [];
-  const stories: { title: string; link: string }[] = [];
-  for (const raw of body) {
-    const entry = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
-    const title = typeof entry.title === "string" ? entry.title : "";
-    const link = typeof entry.link === "string" ? entry.link : "";
-    if (title.startsWith(`${name}:`) && link !== "") stories.push({ title, link });
-    if (stories.length === 3) break;
-  }
-  return stories;
-}
-
 /**
  * A player's whole season on one screen, read under one league's scoring rules.
  *
@@ -678,9 +666,10 @@ export async function playerSeason(
     .innerJoin(teams, eq(teams.id, rosterSlots.teamId))
     .where(and(eq(teams.leagueId, leagueId), eq(rosterSlots.playerId, playerId)))
     .limit(1);
-  const [injuryDesignation, news] = await Promise.all([injuryDesignationFor(db, playerId), newsFor(db, player.name)]);
+  const [injuryDesignation, news, capsule] = await Promise.all([injuryDesignationFor(db, playerId), newsFor(db, player.name), getPlayerCapsule(db, playerId)]);
 
   return {
+    capsule,
     ownedBy: holder?.teamName ?? null,
     isMockLeague,
     injuryDesignation,

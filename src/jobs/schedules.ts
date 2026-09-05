@@ -86,4 +86,12 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
     description:
       "Daily 03:30 ET capture of pre-kickoff player props into the archive the props anchor's leakage gate reads from. Self-disables (no network call, no credit spend) once the product season's own first kickoff has passed.",
   }),
+  schedule({
+    name: "capsule-sweep-nightly",
+    cron: "0 4 * * *",
+    timezone: "America/New_York",
+    job: "capsule-sweep",
+    payload: {},
+    description: "Nightly 04:00 ET pass over every board-relevant player: recompute facts, regenerate a capsule wherever the hash moved or the row is missing or still template-sourced.",
+  }),
 ];

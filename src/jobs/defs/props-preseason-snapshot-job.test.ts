@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestDb } from "@/db/test-db";
 import type { ResolveAllPropNamesResult } from "@/projections/odds/player-map";
 import type { SnapshotSummary } from "@/projections/odds/snapshot";
@@ -40,6 +40,16 @@ function depsWithKickoff(
 }
 
 describe("props-preseason-snapshot job step", () => {
+  beforeEach(() => {
+    // The step reads ODDS_API_KEY before the (stubbed) capture runs; the tests must not depend
+    // on the ambient shell env, so a throwaway key is stubbed here and cleared after.
+    vi.stubEnv("ODDS_API_KEY", "test-key-never-used");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("before kickoff: calls the real snapshot and reports credits", async () => {
     const snapshot = vi.fn().mockResolvedValue(SUMMARY);
     const deps = depsWithKickoff(KICKOFF, snapshot);

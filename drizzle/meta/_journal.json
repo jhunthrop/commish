@@ -512,6 +512,13 @@
       "when": 1788575443614,
       "tag": "0072_wealthy_crystal",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1788578848451,
+      "tag": "0073_flimsy_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge, ReasonChip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import type { PlayerCapsuleView } from "@/capsules/store";
 import type { Position } from "@/domain/player";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
@@ -31,9 +32,23 @@ export interface OutlookProps {
   /** `true` for the bottom-sheet peek's own cap; `false` (the default) for the full page's
    *  "show everything" posture. */
   readonly capped?: boolean;
+  /**
+   * The auto-written capsule (spec §9 AMENDED 2026-09-04), when the sweep has reached this
+   * player — `undefined`/`null` renders nothing, the same "absence means nothing to say" rule
+   * every other optional fact on this body already keeps. Rendered directly under the verdict
+   * line and before the grouped evidence, in BOTH consumers (the peek's own "after the verdict,
+   * before the grouped chips" placement and the full page's "top of the evidence section, under
+   * the verdict line" placement are the identical slot in this one shared component — that is
+   * the whole point of building both surfaces off one `Outlook`).
+   *
+   * `capped` doubles as the SIZE selector: the peek (`capped`) shows the compact capsule, the
+   * full page (uncapped) shows "The Read" — the same boolean already distinguishing the two
+   * surfaces, rather than a second prop threading the identical decision twice.
+   */
+  readonly capsule?: PlayerCapsuleView | null;
 }
 
-export function Outlook({ reasons, laws, position, capped = false }: OutlookProps) {
+export function Outlook({ reasons, laws, position, capped = false, capsule }: OutlookProps) {
   const [showFullCase, setShowFullCase] = useState(false);
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
 
@@ -57,6 +72,15 @@ export function Outlook({ reasons, laws, position, capped = false }: OutlookProp
     <div className="flex flex-col gap-2">
       <h3 className={`${MICRO_LABEL} text-text-faint`}>Outlook</h3>
       {verdict === null ? null : <p className="text-sm text-text-primary">{verdict}</p>}
+      {capsule === null || capsule === undefined ? null : (
+        <div className="flex flex-col gap-1">
+          <p className="text-sm text-text-primary">{capped ? capsule.bodyCompact : capsule.bodyFull}</p>
+          {/* The quiet, honest provenance line (spec §9 AMENDED): "the short version while we
+              write him up" class of honesty — a plain sentence, no apology — whenever the
+              gateway has not yet cleared this player's own capsule. */}
+          {capsule.source === "template" ? <p className="text-xs text-text-faint">The short version while we write him up.</p> : null}
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
         {visible.map((group) => (
           <EvidenceGroupRow key={group.key} group={group} laws={laws} open={openGroups.has(group.key)} onToggle={() => toggleGroup(group.key)} />

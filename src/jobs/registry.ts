@@ -3,6 +3,7 @@
 // rather than guessing. `registry.test.ts` pins that every schedule's job is registered.
 import type { AnyJobDefinition } from "./contract";
 import { adpSnapshotJob } from "./defs/adp-snapshot-job";
+import { capsuleSweepJob } from "./defs/capsule-sweep-job";
 import { draftSweepJob } from "./defs/draft-sweep-job";
 import { propsPreseasonSnapshotJob } from "./defs/props-preseason-snapshot-job";
 import { seasonWeekJob } from "./defs/season-week-job";
@@ -14,6 +15,7 @@ const ALL_DEFINITIONS: readonly AnyJobDefinition[] = [
   simJob,
   adpSnapshotJob,
   propsPreseasonSnapshotJob,
+  capsuleSweepJob,
 ];
 
 export const JOB_DEFINITIONS: ReadonlyMap<string, AnyJobDefinition> = new Map(

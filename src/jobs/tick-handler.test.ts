@@ -60,6 +60,15 @@ const cannedPropsPreseasonSnapshot: AnyJobDefinition = defineJob({
   parsePayload: () => ({}),
   steps: [{ name: "snapshot", run: async () => ({ summary: "canned", detail: [] }) }],
 });
+/** Same reason: the real SCHEDULES now also fire "capsule-sweep" nightly (player capsules). */
+const cannedCapsuleSweep: AnyJobDefinition = defineJob({
+  name: "capsule-sweep",
+  maxAttempts: 2,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 60_000, maxMs: 600_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "sweep", run: async () => ({ summary: "canned", detail: [] }) }],
+});
 
 function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET: SECRET }): TickHandlerDeps {
   return {
@@ -70,6 +79,7 @@ function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET:
       ["draft-sweep", cannedDraftSweep],
       ["adp-snapshot", cannedAdpSnapshot],
       ["props-preseason-snapshot", cannedPropsPreseasonSnapshot],
+      ["capsule-sweep", cannedCapsuleSweep],
     ]),
     env,
     workerId: "tick-test",
