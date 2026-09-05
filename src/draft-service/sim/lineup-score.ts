@@ -28,13 +28,20 @@ export interface RosteredPlayer {
 }
 
 /**
- * The best legal starting lineup's total points from `roster` under `slotConfig`, scored by
- * `pointsByPlayerId` (a player absent from the map — no evidence board entry — contributes 0
- * rather than being dropped, so an unranked deep-bench pick never silently shrinks the roster
- * `bestStartingLineupPoints` counts against). Bench slots and any slot instance no eligible
- * player remains for are simply left empty; nothing here fabricates a starter.
+ * The greedy assignment itself (see the module docblock for why most-restrictive-slot-first is
+ * optimal here) plus everything both `bestStartingLineupPoints` and the grades engine
+ * (`@/draft-service/grades/engine.ts`) need from it: which players started, and how many of the
+ * league's own starting slots this particular roster could actually fill (a short bench, or a
+ * roster missing a position entirely, leaves some slot instances empty rather than fabricating a
+ * starter). One assignment, two READERS, so neither can drift from what the other reports as
+ * "started."
  */
-export function bestStartingLineupPoints(roster: readonly RosteredPlayer[], slotConfig: readonly RosterSlotConfig[], pointsByPlayerId: ReadonlyMap<string, number>): number {
+export interface StartingLineupAssignment {
+  readonly starterIds: readonly string[];
+  readonly startingSlotsTotal: number;
+}
+
+export function assignStartingLineup(roster: readonly RosteredPlayer[], slotConfig: readonly RosterSlotConfig[], pointsByPlayerId: ReadonlyMap<string, number>): StartingLineupAssignment {
   const pointsOf = (playerId: string): number => pointsByPlayerId.get(playerId) ?? 0;
   const remaining = [...roster].sort((a, b) => pointsOf(b.playerId) - pointsOf(a.playerId) || a.playerId.localeCompare(b.playerId));
   const taken = new Set<string>();
@@ -43,15 +50,30 @@ export function bestStartingLineupPoints(roster: readonly RosteredPlayer[], slot
     .filter((slot) => slot.slot !== BENCH_SLOT)
     .sort((a, b) => a.eligiblePositions.length - b.eligiblePositions.length);
 
-  let total = 0;
+  const starterIds: string[] = [];
+  let startingSlotsTotal = 0;
   for (const slot of startingSlots) {
+    startingSlotsTotal += slot.count;
     for (let unit = 0; unit < slot.count; unit += 1) {
       const eligible = new Set(slot.eligiblePositions as readonly string[]);
       const pick = remaining.find((player) => !taken.has(player.playerId) && eligible.has(player.position));
       if (pick === undefined) continue;
       taken.add(pick.playerId);
-      total += pointsOf(pick.playerId);
+      starterIds.push(pick.playerId);
     }
   }
-  return total;
+  return { starterIds, startingSlotsTotal };
+}
+
+/**
+ * The best legal starting lineup's total points from `roster` under `slotConfig`, scored by
+ * `pointsByPlayerId` (a player absent from the map — no evidence board entry — contributes 0
+ * rather than being dropped, so an unranked deep-bench pick never silently shrinks the roster
+ * `bestStartingLineupPoints` counts against). Bench slots and any slot instance no eligible
+ * player remains for are simply left empty; nothing here fabricates a starter.
+ */
+export function bestStartingLineupPoints(roster: readonly RosteredPlayer[], slotConfig: readonly RosterSlotConfig[], pointsByPlayerId: ReadonlyMap<string, number>): number {
+  const pointsOf = (playerId: string): number => pointsByPlayerId.get(playerId) ?? 0;
+  const { starterIds } = assignStartingLineup(roster, slotConfig, pointsByPlayerId);
+  return starterIds.reduce((total, playerId) => total + pointsOf(playerId), 0);
 }
