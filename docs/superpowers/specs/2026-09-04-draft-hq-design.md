@@ -106,7 +106,8 @@ Lives in the live room's right rail (real and mock; the `/app/draft/assistant` p
 
 ## 9. Cross-cutting: player capsules and draft grades
 
-- **Capsules**: every player page gains an auto-written evidence summary — deterministic sentence templates over the player's fired laws, availability, market context. Same voice as the assistant. No hand-written hot takes, ever.
+- **Capsules**: every player page gains an auto-written evidence summary over the player's fired laws, availability, market context. Same voice as the assistant. No hand-written hot takes, ever.
+  AMENDED 2026-09-04 (founder-approved, Vercel AI Gateway provisioned): capsules are LLM VOICE OVER VERIFIED FACTS, mechanically validated. The engine computes every fact deterministically; the model (config `CAPSULE_MODEL`, founder-selected default `zai/glm-5.3-flash` through the AI Gateway, `AI_GATEWAY_API_KEY`) receives only those facts and writes connective prose; a validator then requires every number and name in the output to appear in the input facts and enforces the copy rules (no em-dashes, no competitor names, length caps). One regeneration on failure, then the deterministic template — which remains the permanent floor, so a gateway outage or rate limit never blanks a page or fabricates a word. Outputs cache by input-facts hash; generation runs in the job system. Free-tier note: the gateway throttles this model until credits are added; the job's backoff absorbs it.
 - **Draft grades**: after any draft (mock or real), every team gets a grade (value captured vs available, needs filled, bye/stack hygiene) and projected standings from evidence points. Room-wide grade board in the debrief; real leagues get it on league home the morning after. Grades cite their components; the register grades US at season's end on the same page (accountability loop).
 
 ## 10. Data model (new tables)
