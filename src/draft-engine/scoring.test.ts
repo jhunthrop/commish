@@ -59,40 +59,57 @@ describe("needMultiplier", () => {
   });
 });
 
-describe("needMultiplier's surplusDamp (the 2026-09-05 QB-stacking fix)", () => {
+describe("needMultiplier's surplusDamp (the 2026-09-05 QB-stacking fix, corrected 2026-09-06)", () => {
   const opts = { openSlotBoost: 0.4, filledDamp: 0.6 };
+  // One filled dedicated QB slot is enough to reach the surplus branch for every test below;
+  // `rosteredAtPosition` (never the roster's own slot labels — see `extraSurplusBodies`'s
+  // docblock, `scoring.ts`) is what actually drives the exponent from here on. This is
+  // deliberately a PURE-FUNCTION CONTRACT over a caller-supplied count, not a simulation of a
+  // real roster shape: the real join (a team's picks against the pool's own positions) is
+  // `selectors.ts`'s `rosteredCountsByPosition`, proven end to end with real engine-built
+  // rosters in `autopick.test.ts`'s "surplus damp" describe block.
+  const oneFilledDedicated = [slot("QB", 0)];
 
   it("with surplusDamp ABSENT, is byte-identical to the pre-fix flat filledDamp — the replay-determinism law", () => {
     // Same numbers as the "cools to the damp" test above, pinned again here so a future edit to
-    // this describe block can never quietly regress the absent-field contract.
+    // this describe block can never quietly regress the absent-field contract. No `rosteredAtPosition`
+    // either: absent stays absent, exactly like every historical snapshot (none carries this field).
     expect(needMultiplier("RB", [slot("RB", 0), slot("RB", 1)], SLOTS, opts)).toBe(0.6);
-    expect(needMultiplier("QB", [slot("QB", 0)], SLOTS, opts)).toBe(0.6);
+    expect(needMultiplier("QB", oneFilledDedicated, SLOTS, opts)).toBe(0.6);
   });
 
-  it("compounds filledDamp by surplusDamp^1 for the first surplus body — the candidate counts itself", () => {
-    // QB slots = 1, one QB already rostered: the candidate would be the SECOND, i.e. one over
-    // capacity the instant it lands — extraBodies = 1, not 0.
-    expect(needMultiplier("QB", [slot("QB", 0)], SLOTS, { ...opts, surplusDamp: 0.25 })).toBeCloseTo(0.6 * 0.25, 12);
+  it("compounds filledDamp by surplusDamp^1 for the 2nd body overall (the 1st surplus)", () => {
+    expect(needMultiplier("QB", oneFilledDedicated, SLOTS, { ...opts, surplusDamp: 0.25, rosteredAtPosition: 1 }))
+      .toBeCloseTo(0.6 * 0.25 ** 1, 12);
   });
 
-  it("compounds by surplusDamp^2 for a second surplus body already rostered", () => {
-    // A roster with two RB-typed entries against a configured count of 2 (QB's own capacity,
-    // reused here as the position under test): the exponent scales with how far over capacity
-    // the position already sits, not a flat one-time penalty.
-    const oneSlot = [{ slot: "QB", count: 1, eligiblePositions: ["QB"] }] as const;
-    const twoRostered: readonly RosterSlot[] = [
-      { slot: "QB", slotIndex: 0, playerId: "p_QB0" },
-      { slot: "QB", slotIndex: 1, playerId: "p_QB1" },
-    ];
-    expect(needMultiplier("QB", twoRostered, oneSlot, { ...opts, surplusDamp: 0.25 })).toBeCloseTo(0.6 * 0.25 ** 2, 12);
+  it("compounds by surplusDamp^2 for the 3rd body overall (the 2nd surplus)", () => {
+    expect(needMultiplier("QB", oneFilledDedicated, SLOTS, { ...opts, surplusDamp: 0.25, rosteredAtPosition: 2 }))
+      .toBeCloseTo(0.6 * 0.25 ** 2, 12);
   });
 
-  it("never engages while the position still has an open dedicated slot", () => {
-    expect(needMultiplier("RB", [], SLOTS, { ...opts, surplusDamp: 0.25 })).toBeCloseTo(1.8, 12);
-    expect(needMultiplier("RB", [slot("RB", 0)], SLOTS, { ...opts, surplusDamp: 0.25 })).toBeCloseTo(1.4, 12);
+  it("compounds by surplusDamp^3 for the 4th body overall (the 3rd surplus) — it genuinely keeps escalating", () => {
+    expect(needMultiplier("QB", oneFilledDedicated, SLOTS, { ...opts, surplusDamp: 0.25, rosteredAtPosition: 3 }))
+      .toBeCloseTo(0.6 * 0.25 ** 3, 12);
+  });
+
+  it("each additional already-rostered body compounds by exactly one more factor of surplusDamp", () => {
+    const at = (rosteredAtPosition: number) =>
+      needMultiplier("QB", oneFilledDedicated, SLOTS, { ...opts, surplusDamp: 0.25, rosteredAtPosition });
+    expect(at(2) / at(1)).toBeCloseTo(0.25, 12);
+    expect(at(3) / at(2)).toBeCloseTo(0.25, 12);
+  });
+
+  it("falls back to the dedicated-slot-label count when rosteredAtPosition is omitted (defensive default; no real caller takes this path)", () => {
+    expect(needMultiplier("QB", oneFilledDedicated, SLOTS, { ...opts, surplusDamp: 0.25 })).toBeCloseTo(0.6 * 0.25 ** 1, 12);
+  });
+
+  it("never engages while the position still has an open dedicated slot, whatever rosteredAtPosition claims", () => {
+    expect(needMultiplier("RB", [], SLOTS, { ...opts, surplusDamp: 0.25, rosteredAtPosition: 5 })).toBeCloseTo(1.8, 12);
+    expect(needMultiplier("RB", [slot("RB", 0)], SLOTS, { ...opts, surplusDamp: 0.25, rosteredAtPosition: 5 })).toBeCloseTo(1.4, 12);
   });
 
   it("is a no-op at surplusDamp: 1 (compounding by 1 changes nothing)", () => {
-    expect(needMultiplier("QB", [slot("QB", 0)], SLOTS, { ...opts, surplusDamp: 1 })).toBe(0.6);
+    expect(needMultiplier("QB", oneFilledDedicated, SLOTS, { ...opts, surplusDamp: 1, rosteredAtPosition: 3 })).toBe(0.6);
   });
 });

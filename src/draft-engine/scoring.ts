@@ -33,15 +33,34 @@ export function openStartingSlots(position: Position, roster: readonly RosterSlo
 /**
  * How many bodies beyond capacity a NEW candidate at `position` would make, counting the
  * candidate itself: 1 the first time a filled position is asked for one more (dedicated slots
- * exactly at capacity — the instant `openStartingSlots` reaches 0, `rosteredAtPosition` already
- * equals `configuredDedicatedSlots`, and the candidate is what tips it over), 2 the next time,
- * and so on. `Math.max(0, …)` keeps this 0 (no surplus discount at all) for a position that
- * still has an open starting slot — `needMultiplier` only ever calls this once `open <= 0`.
+ * exactly at capacity, the candidate the one that tips it over), 2 the next time, and so on.
+ * `Math.max(0, …)` keeps this 0 (no surplus discount at all) for a position that still has an
+ * open starting slot — `needMultiplier` only ever calls this once `open <= 0`.
+ *
+ * `rosteredAtPosition` MUST be the team's true count of already-drafted players at this exact
+ * position, never `roster.filter((s) => s.slot === position).length` — that counts ROSTER SLOT
+ * LABELS, and a surplus body's label is "BENCH" (or "FLEX"), not the position's own name, the
+ * instant it goes one over its dedicated slots' capacity. Counting labels therefore pins this
+ * at exactly 1 forever once a position is filled (a team's 2nd, 3rd and 4th extra QB would all
+ * read as "1 already rostered"), which is the bug the 2026-09-06 review caught: the compounding
+ * this function promises could never actually compound. The caller (`bestAvailableFor`,
+ * `selectors.ts`) computes the true count from `state.picks` joined to `state.pool`'s own
+ * positions — the one place that join is possible — and this module stays pure over whatever
+ * number it is handed.
+ *
+ * Falls back to the label count when the caller omits `rosteredAtPosition` entirely: a
+ * defensive default for a hypothetical future caller that supplies `surplusDamp` without the
+ * true count, never the path any real caller in this codebase takes today.
  */
-function extraSurplusBodies(position: Position, roster: readonly RosterSlot[], slotConfig: readonly RosterSlotConfig[]): number {
+function extraSurplusBodies(
+  position: Position,
+  roster: readonly RosterSlot[],
+  slotConfig: readonly RosterSlotConfig[],
+  rosteredAtPosition: number | undefined,
+): number {
   const configured = configuredDedicatedSlots(position, slotConfig);
-  const rosteredAtPosition = roster.filter((s) => s.slot === position).length;
-  return Math.max(0, rosteredAtPosition - configured + 1);
+  const rostered = rosteredAtPosition ?? roster.filter((s) => s.slot === position).length;
+  return Math.max(0, rostered - configured + 1);
 }
 
 /** The dials `needMultiplier` turns — the caller owns the values, this module the shape. */
@@ -52,16 +71,24 @@ export interface NeedMultiplierOptions {
   readonly filledDamp: number;
   /**
    * The 2026-09-05 fix for the QB-stacking incident (prod mock 25642877-0841-49a5-8511-
-   * f3655d8064b1): once a position is filled, EVERY further body there used to cool to the same
-   * flat `filledDamp` regardless of how many are already rostered — a second QB in a 1-QB room
-   * scored identically to the position's very first starter going one over. When present,
-   * `filledDamp` compounds by `surplusDamp` once per `extraSurplusBodies` above:
-   * `filledDamp × surplusDamp^extraBodies`, so a second body is merely unattractive and a third
-   * is cooled again on top of that. OPTIONAL and undefined by default: absent means EXACTLY
-   * `filledDamp` with no compounding at all — today's behavior, byte for byte (the replay-
-   * determinism law every dial in this module already follows).
+   * f3655d8064b1), corrected 2026-09-06 after review: once a position is filled, EVERY further
+   * body there used to cool to the same flat `filledDamp` regardless of how many are already
+   * rostered — a second QB in a 1-QB room scored identically to the position's very first
+   * starter going one over. When present, `filledDamp` compounds by `surplusDamp` once per
+   * `extraSurplusBodies` (see `rosteredAtPosition` below): `filledDamp × surplusDamp^extraBodies`,
+   * so a second body is merely unattractive, a third is cooled again on top of that, and so on —
+   * genuinely, not just on paper. OPTIONAL and undefined by default: absent means EXACTLY
+   * `filledDamp` with no compounding at all — today's (and every historical snapshot's)
+   * behavior, byte for byte. No stored `START_DRAFT` snapshot carries `surplusDamp` yet, so this
+   * change touches ONLY the WITH-`surplusDamp` path; replay of every existing log is untouched.
    */
   readonly surplusDamp?: number;
+  /**
+   * The team's true count of already-drafted players at the candidate's position — see
+   * `extraSurplusBodies`'s own docblock for why this cannot be derived from `roster` alone.
+   * Only read when `surplusDamp` is also supplied; ignored otherwise.
+   */
+  readonly rosteredAtPosition?: number;
 }
 
 /**
@@ -77,10 +104,11 @@ export function needMultiplier(
   position: Position,
   roster: readonly RosterSlot[],
   slotConfig: readonly RosterSlotConfig[],
-  { openSlotBoost, filledDamp, surplusDamp }: NeedMultiplierOptions,
+  { openSlotBoost, filledDamp, surplusDamp, rosteredAtPosition }: NeedMultiplierOptions,
 ): number {
   const open = openStartingSlots(position, roster, slotConfig);
-  if (open > 0) return 1 + openSlotBoost * open;
-  if (surplusDamp === undefined) return open === 0 ? filledDamp : 1 + openSlotBoost * open;
-  return filledDamp * surplusDamp ** extraSurplusBodies(position, roster, slotConfig);
+  const warmed = 1 + openSlotBoost * open;
+  if (open > 0) return warmed;
+  if (surplusDamp === undefined) return open === 0 ? filledDamp : warmed;
+  return filledDamp * surplusDamp ** extraSurplusBodies(position, roster, slotConfig, rosteredAtPosition);
 }

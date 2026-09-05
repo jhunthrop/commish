@@ -6,6 +6,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { initialDraftState, totalRosterSlots, type CompletedPick, type DraftConfig, type DraftState } from "./state";
 import { AUTOPICK_CONFIG, DRAFT_CLOCK_SCHEDULE } from "./config";
 import { assignSlot } from "./slotting";
+import { needMultiplier } from "./scoring";
 import { reduceDraft } from "./reduce";
 import { availablePool, bestAvailableFor, bestNominationFor, isComplete } from "./selectors";
 import { expireAt, submitCommand } from "./test-support";
@@ -173,12 +174,86 @@ describe("surplus damp cools a stacked QB below a genuinely open skill need (202
     expect(bestAvailableFor(state, "t1")?.playerId).toBe("qb2");
   });
 
-  it("replay determinism: neither outcome drifts when the live AUTOPICK_CONFIG.surplusDamp is retuned afterward", () => {
+  // The 2026-09-06 review's own demand: prove the compounding is REAL, not just documented.
+  // Both rosters below are built the one way a real draft ever builds one — `midDraftState`
+  // drives every pick through the actual `assignSlot` (the same call `MAKE_PICK` and autopick
+  // itself use), so a 2nd/3rd QB lands on the real BENCH slot label exactly like it would live.
+  // If `rosteredAtPosition` were still derived from `roster.filter((s) => s.slot === "QB")`
+  // (the pre-review bug), both scenarios below would see exactly 1 "QB"-labeled slot — the
+  // dedicated starter — and score every stacked QB identically, however many bench copies
+  // already exist. `selectors.ts`'s `rosteredCountsByPosition` instead counts the true
+  // per-position total off `state.pool`, so the two scenarios below score genuinely differently.
+  describe("the compounding escalates for real: a 2nd extra QB cools by ^2, a 3rd by ^3", () => {
+    // t1 already holds ONE extra QB (qb1 the starter, qb2 riding the bench) plus both RB/WR
+    // starters — six picks, ramp 0.8. A further QB candidate would be the roster's 2nd surplus
+    // body: rosteredAtPosition(QB) = 2, configured = 1, extraBodies = max(0, 2 − 1 + 1) = 2.
+    const TWO_QB_ROSTER = ["qb1", "qb2", "rb1", "rb2", "wr1", "wr2"];
+    // t1 already holds TWO extra QBs (qb1, qb2, qb3) plus both RB/WR starters — seven picks,
+    // ramp 0.93̄. A further QB candidate would be the 3rd surplus body: rosteredAtPosition(QB)
+    // = 3, extraBodies = max(0, 3 − 1 + 1) = 3.
+    const THREE_QB_ROSTER = ["qb1", "qb2", "qb3", "rb1", "rb2", "wr1", "wr2"];
+    // qb3 is the board-topping stacked-QB candidate against `TWO_QB_ROSTER` (t1 hasn't drafted
+    // it yet there); against `THREE_QB_ROSTER`, t1 already holds qb3 too, so qb4 becomes the
+    // board-topping stacked-QB candidate instead. Both are simply "QB" to `needMultiplier` —
+    // the assertions below check the POSITION's multiplier, not a specific player id.
+    const WEAK_ALTERNATIVES_POOL: readonly DraftPoolEntry[] = [
+      { playerId: "qb1", position: "QB" }, { playerId: "qb2", position: "QB" }, { playerId: "qb3", position: "QB" },
+      ...players("RB", 2), ...players("WR", 2), // t1's own non-QB starters
+      { playerId: "qb4", position: "QB" },
+      { playerId: "rb3", position: "RB" }, { playerId: "wr3", position: "WR" }, // weak, already-filled alternatives
+      { playerId: "te1", position: "TE" }, // the one genuinely open skill need
+      ...players("K", 2), ...players("DEF", 2),
+    ];
+
+    it("2 QBs already rostered: the next QB candidate (qb3) scores exactly filledDamp × surplusDamp^2, and autopick routes to TE instead", () => {
+      const state = midDraftState(SNAKE_CONFIG, WEAK_ALTERNATIVES_POOL, { t1: TWO_QB_ROSTER, t2: [] });
+      const roster = state.rosters["t1"] ?? [];
+      const ramp = roster.length / (0.5 * totalRosterSlots(STANDARD_ROSTER_SLOTS)); // 6 / 7.5 = 0.8
+      const filledDamp = 1 - ramp * (1 - AUTOPICK_CONFIG.startersFilledDamp);
+      const surplusDampRamped = 1 - ramp * (1 - AUTOPICK_CONFIG.surplusDamp!);
+      const stackedQbMultiplier = needMultiplier("QB", roster, STANDARD_ROSTER_SLOTS, {
+        openSlotBoost: ramp * AUTOPICK_CONFIG.needPerOpenStartingSlot,
+        filledDamp,
+        surplusDamp: surplusDampRamped,
+        rosteredAtPosition: 2, // qb1 (starter) + qb2 (bench) — the true count, not the slot label
+      });
+      expect(stackedQbMultiplier).toBeCloseTo(filledDamp * surplusDampRamped ** 2, 12);
+      expect(bestAvailableFor(state, "t1")?.playerId).toBe("te1");
+    });
+
+    it("3 QBs already rostered: the next QB candidate (qb4) scores exactly filledDamp × surplusDamp^3 — genuinely cooler than the 2-rostered case above, and autopick still routes to TE", () => {
+      const state = midDraftState(SNAKE_CONFIG, WEAK_ALTERNATIVES_POOL, { t1: THREE_QB_ROSTER, t2: [] });
+      const roster = state.rosters["t1"] ?? [];
+      const ramp = roster.length / (0.5 * totalRosterSlots(STANDARD_ROSTER_SLOTS)); // 7 / 7.5 = 0.9333…
+      const filledDamp = 1 - ramp * (1 - AUTOPICK_CONFIG.startersFilledDamp);
+      const surplusDampRamped = 1 - ramp * (1 - AUTOPICK_CONFIG.surplusDamp!);
+      const stackedQbMultiplier = needMultiplier("QB", roster, STANDARD_ROSTER_SLOTS, {
+        openSlotBoost: ramp * AUTOPICK_CONFIG.needPerOpenStartingSlot,
+        filledDamp,
+        surplusDamp: surplusDampRamped,
+        rosteredAtPosition: 3, // qb1 (starter) + qb2 + qb3 (both bench)
+      });
+      expect(stackedQbMultiplier).toBeCloseTo(filledDamp * surplusDampRamped ** 3, 12);
+      // The escalation is real, not just each scenario's own internal arithmetic: three
+      // rostered QBs cools the candidate harder than two did above, even though this scenario's
+      // ramp (and therefore its filledDamp/surplusDamp) is itself further along.
+      expect(stackedQbMultiplier).toBeLessThan(0.1088); // < the 2-rostered case's ≈0.1088
+      expect(bestAvailableFor(state, "t1")?.playerId).toBe("te1");
+    });
+  });
+
+  it("replay determinism: a live retune of AUTOPICK_CONFIG.surplusDamp never leaks into either frozen snapshot's replay", () => {
+    // This test proves CONFIG-MUTATION INDEPENDENCE (the "keeps a snapshotted draft's replay
+    // identical even after the module tunables are retuned" test above proves the identical
+    // thing for `temperature`/`needPerOpenStartingSlot`) — NOT byte-identity with the pre-fix
+    // algorithm itself. Byte-identity for the ABSENT-`surplusDamp` path is what the test above
+    // ("with surplusDamp ABSENT…") and `scoring.test.ts`'s "is byte-identical to the pre-fix
+    // flat filledDamp" test each pin directly. No stored `START_DRAFT` row carries `surplusDamp`
+    // yet (it ships in this same change), so this is a forward-looking guarantee: once a draft's
+    // OWN snapshot is written, no later deploy may rewrite what it already decided.
+    //
     // Both configs below are frozen COPIES (`{ ...AUTOPICK_CONFIG }`, never the module's own
-    // reference) — the identical discipline the "keeps a snapshotted draft's replay identical"
-    // test above already applies to `temperature`/`needPerOpenStartingSlot`. Whether a draft's
-    // own snapshot carries `surplusDamp` or not, a later deploy retuning the live constant must
-    // change neither: only a NEW draft's own START_DRAFT would ever pick up the new value.
+    // reference) for that reason.
     const withSnapshot: DraftConfig = { ...SNAKE_CONFIG, autopick: { ...AUTOPICK_CONFIG } };
     const withoutSnapshot: DraftConfig = { ...SNAKE_CONFIG, autopick: PRE_FIX_AUTOPICK };
     const mutable = AUTOPICK_CONFIG as { surplusDamp?: number };
