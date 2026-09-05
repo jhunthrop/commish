@@ -431,6 +431,20 @@ describe("playerSeason's season history", () => {
     expect(body.isRookie).toBe(true);
   });
 
+  it("a true rookie fact BEHIND a crosswalk miss still resolves to the no-record state, by design", async () => {
+    // Re-review round 1's note, pinned: `nfl_players` knows he is a rookie, but with no
+    // crosswalk placement the product cannot CONNECT that fact to this player — and a rookie
+    // status the product cannot confirm is the same honest position as not being one
+    // (PlayerSeasonBody's docblock). "No prior seasons on record" stays literally true.
+    const leagueId = await league({ played: false });
+    await recordNflPlayers(db, [
+      { id: CHASE, pfrId: "LongRa00", espnId: "rb1", name: "Rashad Long", position: "RB", latestTeam: "SF", rookieSeason: PRODUCT_SEASON, lastSeason: PRODUCT_SEASON },
+    ]);
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.availableSeasons).toEqual([]);
+    expect(body.isRookie).toBe(false);
+  });
+
   it("a rookie's own confirmed status does not survive into a season he has actually played — normal chart, not a rookie sentence", async () => {
     // The league HAS played weeks, so the current season is available regardless of whether this
     // particular rookie has a stat line — `isRookie` only ever gates the "nothing to show" case.
