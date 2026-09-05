@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import type { Player } from "@/domain/player";
-import { auctionValues } from "@/projections/auction/value";
+import { auctionValues, type AuctionShape } from "@/projections/auction/value";
 import type { BoardReason } from "@/projections/preseason/board";
 import { BottomSheet, EdgeCell, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, ReasonChip, SegmentGroup, TierDivider, strongestLawReasons } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
@@ -27,6 +27,16 @@ function csvField(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
+/**
+ * The whole export, as data: header plus one line per row, auction values computed HERE from
+ * the rows themselves — never threaded from view state, so no on-screen toggle can blank a
+ * column of a downloaded file (re-review round 2's regression, pinned by board-csv.test.ts).
+ */
+export function boardCsvLines(orderedRows: readonly BoardRow[], auctionShape: AuctionShape): readonly string[] {
+  const values = auctionValues(orderedRows.map((row) => ({ playerId: row.playerId, valueOverReplacement: row.valueOverReplacement })), auctionShape);
+  return [CSV_HEADER.map(csvField).join(","), ...orderedRows.map((row) => rowToCsv(row, values.get(row.playerId) ?? null))];
+}
+
 function rowToCsv(row: BoardRow, dollarValue: number | null): string {
   const strongest = strongestLawReasons(row.reasons, 1)[0];
   const edge = row.marketAdp === null ? "" : (row.marketAdp - row.rank).toFixed(1);
@@ -48,8 +58,10 @@ function rowToCsv(row: BoardRow, dollarValue: number | null): string {
     .join(",");
 }
 
-function downloadCsv(filename: string, rows: readonly string[]): void {
-  const blob = new Blob([[CSV_HEADER.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
+/** `lines` is the COMPLETE file, header included — `boardCsvLines` owns the content, this owns
+ *  only the browser download mechanics. */
+function downloadCsv(filename: string, lines: readonly string[]): void {
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -167,7 +179,10 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
         </div>
         <button
           type="button"
-          onClick={() => downloadCsv(exportFilename, ordered.map((row) => rowToCsv(row, dollarValues.get(row.playerId) ?? null)))}
+          // The export always carries real auction values, whatever the on-screen toggle says
+          // (re-review finding: a CSV column silently blanking on an unrelated view toggle is a
+          // silent data drop). Computed at click time, so the render path still skips the pass.
+          onClick={() => downloadCsv(exportFilename, boardCsvLines(ordered, auctionShape))}
           className="ml-auto rounded-md bg-surface-elevated px-3 py-2 text-sm font-medium text-text-muted hover:text-text-primary"
         >
           Export CSV
