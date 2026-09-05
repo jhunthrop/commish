@@ -14,13 +14,22 @@ import type { PlayerFacts } from "./facts";
  * complements its neighbours; it never repeats them. Season points round to whole numbers here
  * for the same reason "p10" never ships: 247.12 is register precision, 247 is a number a
  * manager says out loud.
+ *
+ * ONE COLOR SENTENCE, AT MOST (spec §9 AMENDED 2026-09-05) — last season's own finish and points
+ * per game, when the store carries one, so the floor benefits from the same color the writer gets
+ * without turning a fallback into a second capsule: never the props lines, the Vegas win total, or
+ * the usage shares, which stay the writer's own material.
  */
 export function renderTemplateCapsule(facts: PlayerFacts): string {
-  const { identity, market, projection, season, byeWeek, injury } = facts;
+  const { identity, market, projection, season, byeWeek, injury, lastSeasonStory } = facts;
   const sentences: string[] = [
     `${identity.name} (${identity.position}, ${identity.team}) projects for ${Math.round(projection.projectedPoints)} points this season.`,
     `Most seasons land between ${Math.round(projection.typicalLow)} and ${Math.round(projection.typicalHigh)}. The full range runs ${Math.round(projection.floorPoints)} to ${Math.round(projection.ceilingPoints)}, where the low end is what an injury year looks like and the high end is the smash case.`,
   ];
+
+  if (lastSeasonStory !== null) {
+    sentences.push(`Last season he finished ${identity.position}${lastSeasonStory.positionRank} at the position, averaging ${lastSeasonStory.pointsPerGame} points a game.`);
+  }
 
   if (market.adp === null) {
     // The one market sentence the floor keeps: an UNPRICED player is a fact no other surface

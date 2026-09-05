@@ -1,3 +1,4 @@
+import type { PropMarket } from "@/projections/odds/props-store";
 import type { PlayerFacts } from "./facts";
 
 /**
@@ -42,6 +43,14 @@ import type { PlayerFacts } from "./facts";
  * because `facts.ts` carries no "checked, did not fire" ledger to license that claim honestly
  * (see `facts.ts`'s own docblock on this scope limit) — the system prompt (`write.ts`) repeats
  * this as a hard rule for the same reason.
+ *
+ * "THE COLOR" (spec §9 AMENDED 2026-09-05, founder: "make it feel like a real analyst breaking it
+ * down") is one more section, same discipline: `lastSeasonStoryLine`/`booksNumbersLine`/
+ * `usageLine` each translate one of `facts.ts`'s three new color-fact groups into plain sentences,
+ * omitted entirely (never a placeholder line) when the underlying store held nothing for him. The
+ * props line's own market key (`player_reception_yds`) is exactly the internal-vocabulary hazard
+ * this file exists to keep out of a prompt, so `PROP_MARKET_LABELS` is the one place it is turned
+ * into English before the model ever sees it.
  */
 
 function signed(value: number, digits = 1): string {
@@ -139,6 +148,64 @@ function newsLines(facts: PlayerFacts): readonly string[] {
   return facts.news.map((story) => `"${story.title}"${story.publishedAt === null ? "" : ` (${story.publishedAt.slice(0, 10)})`}`);
 }
 
+/**
+ * THE COLOR (spec §9 AMENDED 2026-09-05, "an analyst breaking it down") — `facts.lastSeasonStory`/
+ * `facts.booksNumbers`/`facts.usage` translated into the same plain, manager-language sentences
+ * every other section here already uses, never a bare recitation of the raw fields. `write.ts`'s
+ * own VOICE_RULES tells the model to weave two or three of these into the story rather than list
+ * them, so each sentence below states one clean idea a model can lift in part.
+ */
+function lastSeasonStoryLine(facts: PlayerFacts): string | null {
+  const story = facts.lastSeasonStory;
+  if (story === null) return null;
+  const gameWord = story.gamesPlayed === 1 ? "game" : "games";
+  return (
+    `Last season (${story.season}): finished ${facts.identity.position}${story.positionRank} at the position by total points, ` +
+    `over ${story.gamesPlayed} ${gameWord}, averaging ${story.pointsPerGame} points a game. ` +
+    `His best week was week ${story.bestWeek.week} with ${story.bestWeek.points} points. ` +
+    `He scored above the position's own weekly median in ${story.weeksAboveMedian} of those ${story.gamesPlayed} ${gameWord}.`
+  );
+}
+
+/** Never echoed to the model as `player_reception_yds` (`facts.ts`'s own two-audience rule): a
+ *  raw market key is exactly the kind of internal vocabulary the p10/p90 incident already taught
+ *  this engine to keep out of a prompt. */
+const PROP_MARKET_LABELS: Readonly<Record<PropMarket, string>> = {
+  player_pass_yds: "pass yards",
+  player_reception_yds: "receiving yards",
+  player_receptions: "receptions",
+  player_rush_yds: "rush yards",
+  player_pass_tds: "pass touchdowns",
+};
+
+function booksNumbersLine(facts: PlayerFacts): string | null {
+  const { propsLines, teamVegasWinTotal } = facts.booksNumbers;
+  const sentences: string[] = [];
+  if (propsLines.length > 0) {
+    const named = propsLines.map((line) => `${PROP_MARKET_LABELS[line.market]} ${line.medianLine}`).join(", ");
+    sentences.push(`The books hang these pre-kickoff lines on him this season: ${named}. That is what they returned, not this engine's own claim.`);
+  }
+  if (teamVegasWinTotal !== null) {
+    sentences.push(`His team's own Vegas win total for this season is ${teamVegasWinTotal}.`);
+  }
+  return sentences.length === 0 ? null : sentences.join(" ");
+}
+
+function usageLine(facts: PlayerFacts): string | null {
+  const usage = facts.usage;
+  if (usage === null) return null;
+  const shares: string[] = [];
+  if (usage.snapShare !== null) shares.push(`snap share ${(usage.snapShare * 100).toFixed(1)}%`);
+  if (usage.targetShare !== null) shares.push(`target share ${(usage.targetShare * 100).toFixed(1)}%`);
+  if (usage.redZoneShare !== null) shares.push(`red-zone share of his own touches ${(usage.redZoneShare * 100).toFixed(1)}%`);
+  if (shares.length === 0) return null;
+  return `Last season's usage (${usage.season}): ${shares.join(", ")}.`;
+}
+
+function colorLines(facts: PlayerFacts): readonly string[] {
+  return [lastSeasonStoryLine(facts), booksNumbersLine(facts), usageLine(facts)].filter((line): line is string => line !== null);
+}
+
 /** The whole fact sheet, plain text, section by section — what `write.ts` sends as the user
  *  message. Every line traces to a `PlayerFacts` field; nothing here is invented and nothing here
  *  echoes another module's own copy (see this file's own docblock). */
@@ -151,6 +218,8 @@ export function renderFactsForModel(facts: PlayerFacts): string {
   if (availability !== null) sections.push(availability);
   const evidence = evidenceLines(facts);
   if (evidence.length > 0) sections.push(`The case:\n${evidence.map((line) => `- ${line}`).join("\n")}`);
+  const color = colorLines(facts);
+  if (color.length > 0) sections.push(`The color:\n${color.map((line) => `- ${line}`).join("\n")}`);
   sections.push(seasonLine(facts));
   sections.push(byeLine(facts));
   sections.push(injuryLine(facts));
