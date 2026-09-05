@@ -38,7 +38,14 @@ function count(rand: () => number, p: number, max: number): number {
   return n;
 }
 
-function statLineFor(rand: () => number, player: Player, week: number): StatLine {
+/**
+ * One player's line for one week, at realistic per-position magnitudes — exported (2026-09-04)
+ * so `scripts/dev-seed-stat-fixtures.ts` can reuse the SAME distributions for a small, bounded
+ * current-season fixture without duplicating the per-position ranges here a second time. That
+ * script seeds REAL local players, never this file's own synthetic roster — only the shape of a
+ * plausible week, which is exactly what this function decides and nothing else.
+ */
+export function statLineFor(rand: () => number, player: Player, week: number): StatLine {
   const zero: StatLine = {
     playerId: player.id, week,
     passingYards: 0, passingTouchdowns: 0, interceptions: 0,
