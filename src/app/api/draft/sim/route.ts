@@ -2,7 +2,8 @@ import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { createSimRunSchema } from "@/draft-service/sim/schemas";
 import { requestSimRun } from "@/draft-service/sim/service";
-import { listSimRunsForUser, type SimRunRow } from "@/draft-service/sim/store";
+import { listSimRunsForUser } from "@/draft-service/sim/store";
+import { toSimRunView, type SimRunView } from "@/draft-service/sim/view";
 import { assertLeagueAccessible, withCurrentUser } from "@/app/api/draft/_shared";
 
 export const runtime = "nodejs";
@@ -10,35 +11,13 @@ export const dynamic = "force-dynamic";
 
 const LIST_LIMIT = 20;
 
-export interface SimRunView {
-  readonly id: string;
-  readonly leagueId: string | null;
-  readonly config: SimRunRow["config"];
-  readonly status: SimRunRow["status"];
-  readonly requestedAt: string;
-  readonly finishedAt: string | null;
-  readonly summary: SimRunRow["summary"];
-  readonly error: string | null;
-}
-
-function toView(row: SimRunRow): SimRunView {
-  return {
-    id: row.id,
-    leagueId: row.leagueId,
-    config: row.config,
-    status: row.status,
-    requestedAt: row.requestedAt.toISOString(),
-    finishedAt: row.finishedAt?.toISOString() ?? null,
-    summary: row.summary,
-    error: row.error,
-  };
-}
-
 /** Every sim the caller has requested, newest first — the Simulator page's "my sims" list. */
 export async function GET(request: Request) {
   return withCurrentUser(request, async (userId) => {
-    const rows = await listSimRunsForUser(getDb(), userId, LIST_LIMIT);
-    return ok<readonly SimRunView[]>(rows.map(toView));
+    const db = getDb();
+    const rows = await listSimRunsForUser(db, userId, LIST_LIMIT);
+    const views = await Promise.all(rows.map((row) => toSimRunView(db, row)));
+    return ok<readonly SimRunView[]>(views);
   });
 }
 
@@ -52,11 +31,12 @@ export async function POST(request: Request) {
     const parsed = await parseJson(req, createSimRunSchema);
     if (!parsed.ok) return parsed.response;
 
+    const db = getDb();
     const leagueId = parsed.value.leagueId ?? null;
     const refused = await assertLeagueAccessible(userId, leagueId);
     if (refused !== null) return refused;
 
-    const result = await requestSimRun(getDb(), userId, {
+    const result = await requestSimRun(db, userId, {
       leagueId,
       slot: parsed.value.slot,
       rounds: parsed.value.rounds,
@@ -72,7 +52,7 @@ export async function POST(request: Request) {
       case "cached":
       case "completed":
       case "queued":
-        return ok<SimRunView>(toView(result.run));
+        return ok<SimRunView>(await toSimRunView(db, result.run));
     }
   });
 }

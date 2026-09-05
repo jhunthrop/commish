@@ -9,7 +9,7 @@ import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { registry } from "@/projections/laws/registry";
 import { boardRows } from "@/draft-hq/board/service";
 import { BoardView } from "@/draft-hq/board/board-view";
-import { LeaguePicker } from "@/draft-hq/board/league-picker";
+import { LeaguePicker } from "@/draft-hq/league-picker";
 import { myDraftLeagues, nextDraftingLeague, type DraftLeagueRow } from "@/draft-hq/league-context";
 import { DraftSubnav } from "@/draft-hq/subnav";
 
@@ -96,7 +96,7 @@ export default async function BoardPage({ searchParams }: PageProps) {
         <p className="text-sm text-text-muted">Rankings measured from evidence, not averaged from experts. Every row shows its receipts.</p>
       </div>
 
-      <LeaguePicker options={leaguePickerOptions(leagues)} value={isGeneric ? "generic" : leagueParam !== undefined ? (selected?.leagueId ?? "next") : "next"} />
+      <LeaguePicker options={leaguePickerOptions(leagues)} value={isGeneric ? "generic" : leagueParam !== undefined ? (selected?.leagueId ?? "next") : "next"} basePath="/app/draft/board" />
 
       {isGeneric ? (
         <Card className="text-sm text-text-muted">
