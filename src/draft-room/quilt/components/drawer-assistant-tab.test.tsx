@@ -259,3 +259,60 @@ describe("DrawerAssistantTab", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe("DrawerAssistantTab post-pick beat", () => {
+  // previousCall.onTheClock === true is the hook's own signal (use-assistant.ts docblock) that the
+  // call it replaced was live during YOUR turn — i.e. the fetch that just landed was triggered by
+  // your own pick resolving. Every wiring test below turns on that one condition.
+  const prePickCall = makeCall({
+    pickNumber: 3,
+    candidates: [
+      { playerId: "rb1", position: "RB", reasons: [], makeItBack: { playerId: "rb1", survival: 0.75, runs: 200 } },
+      { playerId: "wr1", position: "WR", reasons: [], makeItBack: null },
+    ],
+  });
+
+  it("renders 'Best available.' when your pick matches the pre-pick call's own top candidate", () => {
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: prePickCall }));
+    renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "rb1" })] }) });
+    expect(screen.getByTestId("assistant-beat")).toHaveTextContent("Best available.");
+  });
+
+  it("names the passed-on top candidate with his make-it-back odds when you took someone else", () => {
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: prePickCall }));
+    renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "wr1" })] }) });
+    expect(screen.getByTestId("assistant-beat")).toHaveTextContent("Our board had Marcus Reed first. about 3 in 4 he is still there at your next turn.");
+  });
+
+  it("stops at the first sentence when the passed-on top candidate carries no make-it-back odds", () => {
+    const noOddsCall = makeCall({
+      pickNumber: 3,
+      candidates: [
+        { playerId: "rb1", position: "RB", reasons: [], makeItBack: null },
+        { playerId: "wr1", position: "WR", reasons: [], makeItBack: null },
+      ],
+    });
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: noOddsCall }));
+    renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "wr1" })] }) });
+    expect(screen.getByTestId("assistant-beat")).toHaveTextContent("Our board had Marcus Reed first.");
+  });
+
+  it("renders no beat when the pre-pick call never loaded", () => {
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: null }));
+    renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "wr1" })] }) });
+    expect(screen.queryByTestId("assistant-beat")).toBeNull();
+  });
+
+  it("renders no beat when the call the hook replaced was not live during your own turn", () => {
+    const someoneElsesTurn = makeCall({ pickNumber: 3, onTheClock: false, candidates: prePickCall.candidates });
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: someoneElsesTurn }));
+    renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "wr1" })] }) });
+    expect(screen.queryByTestId("assistant-beat")).toBeNull();
+  });
+
+  it("renders no beat when the room carries no matching pick for the pre-pick call's own pick number", () => {
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: prePickCall }));
+    renderTab({ view: view({ picks: [] }) });
+    expect(screen.queryByTestId("assistant-beat")).toBeNull();
+  });
+});

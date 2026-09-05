@@ -8,6 +8,7 @@ import type { Law } from "@/projections/laws/types";
 import type { PickReason } from "@/projections/decide/draft";
 import { PositionBadge } from "@/components/ui";
 import { PlayerName } from "@/league-room/components/player-peek";
+import { postPickBeat } from "../../assistant/beat";
 import { detectRun, tierCountdowns } from "../../assistant/reads";
 import { byeCollisionFor, stackNoteFor, type StackCandidate } from "../../assistant/roster-fit";
 import { useAssistant } from "../../assistant/use-assistant";
@@ -102,7 +103,7 @@ function rosterStackCandidates(view: DraftStateView, teamId: string, playersById
  * behind (it is never gated out of the drawer's tab row).
  */
 export function DrawerAssistantTab({ draftId, view, myTeamId, players, playersById, available, byeWeeks, reasons, laws }: DrawerAssistantTabProps) {
-  const { call, loading } = useAssistant(draftId, view.pickNumber, myTeamId);
+  const { call, previousCall, loading } = useAssistant(draftId, view.pickNumber, myTeamId);
 
   const positionsById = useMemo(() => new Map([...playersById].map(([id, player]) => [id, player.position] as const)), [playersById]);
   const undraftedIds = useMemo(() => players.filter((player) => available.has(player.id)).map((player) => player.id), [players, available]);
@@ -115,6 +116,22 @@ export function DrawerAssistantTab({ draftId, view, myTeamId, players, playersBy
     });
   }, [view, positionsById]);
   const run = useMemo(() => detectRun(recentPositions), [recentPositions]);
+
+  // THE POST-PICK BEAT — Task 7. `previousCall.onTheClock === true` is the hook's own signal
+  // (use-assistant.ts docblock) that the call it just replaced was live during YOUR turn, i.e. the
+  // fetch that landed it was triggered by your own pick resolving, not some other seat's. Absent
+  // that signal, or absent a matching pick in the room's own history, there is nothing honest to
+  // say (absence, not invention) and the beat stays null.
+  const beat = useMemo(() => {
+    if (previousCall === null || !previousCall.onTheClock) return null;
+    const pickedPick = view.picks.find((entry) => entry.pickNumber === previousCall.pickNumber);
+    if (pickedPick === undefined) return null;
+    return postPickBeat({
+      pickedPlayerId: pickedPick.playerId,
+      prePickCall: previousCall,
+      playerName: (id) => playersById.get(id)?.name ?? id,
+    });
+  }, [previousCall, view.picks, playersById]);
 
   const myRosterTeamCodes = useMemo(() => (myTeamId === null ? [] : rosterTeamCodes(view, myTeamId, playersById)), [myTeamId, view, playersById]);
   const myRosterStack = useMemo(() => (myTeamId === null ? [] : rosterStackCandidates(view, myTeamId, playersById)), [myTeamId, view, playersById]);
@@ -137,6 +154,11 @@ export function DrawerAssistantTab({ draftId, view, myTeamId, players, playersBy
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto" aria-label="The assistant's call">
+      {beat === null ? null : (
+        <p data-testid="assistant-beat" className="rounded-sm bg-surface-raised px-2.5 py-1.5 text-sm font-semibold text-text-primary">
+          {beat}
+        </p>
+      )}
       {run === null ? null : (
         <p data-testid="assistant-run-alert" className="rounded-sm bg-surface-raised px-2.5 py-1.5 text-sm font-semibold text-text-primary">
           {run.position} is on a run. {run.count} of the last {run.window} picks were {run.position}.
