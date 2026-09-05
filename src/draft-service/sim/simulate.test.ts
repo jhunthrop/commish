@@ -108,10 +108,11 @@ describe("simulateDrafts", () => {
   });
 
   it(
+    // Fix round 1, LOW: the measured number itself lives in the build's own report and this
+    // file's docblock, not a console.log a real run would otherwise print on every test pass.
     "PERFORMANCE (Task 1's own gate): 1,000 runs of a 12-team, 15-round snake draft complete in seconds, not minutes",
     () => {
       const summary = simulateDrafts(baseConfig({ runs: 1_000, rounds: 15 }), evidence);
-      console.log(`[sim perf] 1,000 runs of a 12-team, 15-round snake draft: ${summary.elapsedMs}ms measured`);
       expect(summary.elapsedMs).toBeLessThan(30_000);
     },
     60_000,
