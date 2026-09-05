@@ -31,6 +31,19 @@ describe("tiersOf", () => {
     // would rule out the fifty-eight-point drop it exists to catch.
     expect(tiersOf([70, 12, 12, 12, 12, 12])).toEqual([0, 1, 1, 1, 1, 1]);
   });
+
+  it("does not fragment a real top on a plateau-heavy pool (founder board audit, 2026-09-04)", () => {
+    // The market curve's isotonic fit gives whole runs of tail players ONE value; those zero
+    // gaps are texture, not degeneracy, and the top's ordinary spacing must not read as one
+    // cliff per row. Top six real WR values from the live board plus a flat tail.
+    const pool = [331, 311.2, 289.7, 273.2, 271.1, 262.9, ...Array.from({ length: 20 }, () => 100)];
+    const tiers = tiersOf(pool);
+    const topTiers = tiers.slice(0, 6);
+    // The top six land in at most three tiers, never six singletons.
+    expect(new Set(topTiers).size).toBeLessThanOrEqual(3);
+    // The genuine break to the flat tail is still a cliff.
+    expect(tiers[6]).toBeGreaterThan(tiers[5]!);
+  });
 });
 
 describe("tierStanding", () => {

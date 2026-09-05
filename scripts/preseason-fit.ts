@@ -15,10 +15,18 @@ import { createDb } from "@/db/client";
 import { FIT_SEASONS, HELD_OUT_SEASONS } from "@/projections/model/fitted";
 import { FITTED_MODEL } from "@/projections/model/source";
 import { AGE_BRACKETS, ROLE_BRACKETS, expectedGamesPlayed } from "@/projections/preseason/availability";
-import { fitAvailabilityPriors, fitCareerPriors, fitDepthPriors, fitRookiePriors } from "@/projections/preseason/fit";
+import {
+  fitAvailabilityPriors,
+  fitCareerPriors,
+  fitDepthPriors,
+  fitRookieGameRate,
+  fitRookiePriors,
+  ROOKIE_DURABILITY_HELD_OUT_SEASONS,
+  ROOKIE_DURABILITY_TRAIN_SEASONS,
+} from "@/projections/preseason/fit";
 import { DEPTH_RANKS, depthMultiplier } from "@/projections/preseason/depth";
 import { EXPERIENCE_BANDS, careerMultiplier } from "@/projections/preseason/career";
-import { DRAFT_BUCKETS } from "@/projections/preseason/rookies";
+import { DRAFT_BUCKETS, draftBucketFor } from "@/projections/preseason/rookies";
 import {
   loadAvailabilityObservations,
   loadCareerObservations,
@@ -53,6 +61,12 @@ import type { RookiePriors } from "./rookies";
  *
  * Fitted on ${FIT_SEASONS.join(" and ")} and on nothing else. ${HELD_OUT_SEASONS.join(" and ")} are held out and
  * \`fitAvailabilityPriors\` throws if it is handed either.
+ *
+ * ONE EXCEPTION: \`FITTED_ROOKIE_PRIORS.gameRate\` — the rookie DURABILITY prior — is fitted on
+ * \`${ROOKIE_DURABILITY_TRAIN_SEASONS.join(" and ")}\` instead (calibration fix round, 2026-09-04, Task 1),
+ * with \`${ROOKIE_DURABILITY_HELD_OUT_SEASONS.join(" and ")}\` held out. Every other field of
+ * \`FITTED_ROOKIE_PRIORS\` (\`byBucket\`, \`typicalIncumbentClaim\`, ...) is still fitted on
+ * ${FIT_SEASONS.join(" and ")}. See \`fit.ts\`'s \`fitRookieGameRate\` docblock for why.
  */
 `;
 }
@@ -63,10 +77,21 @@ async function main(): Promise<void> {
   const availabilityObservations = await loadAvailabilityObservations(db, FIT_SEASONS);
   const availability = fitAvailabilityPriors(availabilityObservations, { heldOutSeasons: HELD_OUT_SEASONS });
   const rookieObservations = await loadRookieObservations(db, FIT_SEASONS, FITTED_MODEL);
-  const rookies = fitRookiePriors(rookieObservations, {
+  const rookiesWithSharesWindowGameRate = fitRookiePriors(rookieObservations, {
     heldOutSeasons: HELD_OUT_SEASONS,
     leagueTeamVolume: FITTED_MODEL.opportunity.leagueTeamVolume,
   });
+  // THE DURABILITY PRIOR (calibration fix round, 2026-09-04, Task 1) gets its OWN, fresher fit
+  // window — 2023-2024 rather than the shares table's 2021-2022 — and REPLACES the `gameRate` field
+  // `fitRookiePriors` just produced above. See `fit.ts`'s `fitRookieGameRate` docblock for why the
+  // window differs, and `ROOKIE_DURABILITY_TRAIN_SEASONS`/`ROOKIE_DURABILITY_HELD_OUT_SEASONS` for
+  // the register discipline (fit 2023-2024, score 2025, 2026 never touched) this calibration round
+  // reports under.
+  const durabilityObservations = await loadRookieObservations(db, ROOKIE_DURABILITY_TRAIN_SEASONS, FITTED_MODEL);
+  const durabilityGameRate = fitRookieGameRate(durabilityObservations, {
+    heldOutSeasons: ROOKIE_DURABILITY_HELD_OUT_SEASONS,
+  });
+  const rookies = { ...rookiesWithSharesWindowGameRate, gameRate: durabilityGameRate };
 
   const depthObservations = await loadDepthObservations(db, FIT_SEASONS, FITTED_MODEL);
   const depth = fitDepthPriors(depthObservations, { heldOutSeasons: HELD_OUT_SEASONS });
@@ -143,6 +168,16 @@ async function main(): Promise<void> {
       );
     }
     console.log(`    typical incumbent claim ${rookies.typicalIncumbentClaim[position].toFixed(3)}`);
+  }
+
+  console.log(`\nROOKIE DURABILITY (gameRate), fitted separately on ${durabilityObservations.length} rookie-seasons (${ROOKIE_DURABILITY_TRAIN_SEASONS.join("-")})`);
+  for (const position of POSITIONS) {
+    const counts = DRAFT_BUCKETS.map(
+      (bucket) => durabilityObservations.filter((o) => o.position === position && draftBucketFor(o.overallPick) === bucket).length,
+    );
+    console.log(
+      `  ${position.padEnd(4)} ${DRAFT_BUCKETS.map((bucket, index) => `${bucket} ${durabilityGameRate[position][bucket].toFixed(3)} (n=${counts[index]})`).join("   ")}`,
+    );
   }
 
   console.log(`\nDEPTH CHART, fitted on ${depthObservations.length} player-seasons`);

@@ -4,6 +4,8 @@ import type { ProjectionDistribution } from "../decide/outlook";
 import { valueBoard, type LeagueShape, type SeasonProjection, type ValuedPlayer } from "../decide/replacement";
 import { tiersOf } from "../decide/tiers";
 import type { GamesPlayedOutlook } from "./availability";
+import { FITTED_GAME_VARIANCE } from "./game-variance-fitted";
+import { seasonPointsBand, VARIANCE_POSITIONS, type GameVariancePriors, type PlayerClass, type VariancePosition } from "./game-variance";
 
 /**
  * THE PRESEASON BOARD — every player ranked before a ball is thrown, in one league's own scoring.
@@ -125,6 +127,14 @@ export interface PreseasonBoardOptions {
   readonly asOf: Date;
   readonly rules: ScoringRules;
   readonly shape: LeagueShape;
+  /**
+   * PER-GAME PERFORMANCE VARIANCE (calibration fix round, 2026-09-04, Task 4) — defaults to the
+   * committed `FITTED_GAME_VARIANCE`, exactly like `rules`/`shape` are the only things a caller
+   * normally has to supply at all. A test (or a future fit script) passes its own to drive the band
+   * with different cells; see `game-variance.ts`'s own module docblock for what this measures and
+   * why it is fit separately from the rest of the model.
+   */
+  readonly gameVariance?: GameVariancePriors;
 }
 
 export interface BoardEntry extends ValuedPlayer {
@@ -136,7 +146,15 @@ export interface BoardEntry extends ValuedPlayer {
   readonly expectedGames: number;
   /** The season line the points were composed from — the intermediate worth arguing with. */
   readonly seasonLine: StatLine;
-  /** Season points at the tenth, fiftieth and ninetieth percentiles of his games distribution. */
+  /**
+   * Season points at the tenth, fiftieth and ninetieth percentiles — COMPOSED FROM BOTH SOURCES
+   * (calibration fix round, Task 4): per-game performance variance (`game-variance.ts`, fit on real
+   * week-level observations) AND the games-played distribution (`availability.ts`). Before this
+   * round the band varied ONLY the games-played term, so two players with identical availability
+   * outlooks but very different week-to-week per-game swings got an identical band — mislabelling
+   * availability risk as the whole of outcome range. `BoardRow.floorPoints`/`ceilingPoints` keep
+   * their name; this is a documented change to what the numbers underneath them mean.
+   */
   readonly outlook: ProjectionDistribution;
   /** 0-based tier within his position, from `decide/tiers.ts` gap rule. See `overlapTiers`. */
   readonly tier: number;
@@ -220,9 +238,28 @@ function tierStandings(tiers: readonly number[], values: readonly number[]): rea
  * candidates, and a second gate here would be a second place for the two to disagree about what was
  * knowable — which is how a leak gets in wearing a defence's clothes.
  */
+/** Whether a candidate carries a `"rookie"` reason — the same test `market/blend.ts`'s own
+ *  `rookieReasonOf` runs, restated locally rather than imported: `market/` imports FROM
+ *  `preseason/`, never the reverse. */
+function isRookieCandidate(candidate: BoardCandidate): boolean {
+  return candidate.reasons.some((reason) => reason.code === "rookie");
+}
+
+/** The per-game variance cell for one candidate — the class/position lookup `seasonPointsBand`
+ *  needs, GAMES-ONLY (zero) for a position this round did not fit one for (K, DEF — never a
+ *  rookie-curve position and never drafted onto this board at meaningful volume): that class's band
+ *  claims only what it measures, exactly as availability-only banding always did for everyone before
+ *  this round, rather than a borrowed number from a population it was never measured against. */
+function gameVarianceFor(candidate: BoardCandidate, priors: GameVariancePriors): number {
+  if (!(VARIANCE_POSITIONS as readonly Position[]).includes(candidate.position)) return 0;
+  const position = candidate.position as VariancePosition;
+  const playerClass: PlayerClass = isRookieCandidate(candidate) ? "rookie" : "veteran";
+  return priors[playerClass][position];
+}
+
 export function preseasonBoard(
   candidates: readonly BoardCandidate[],
-  { rules, shape }: PreseasonBoardOptions,
+  { rules, shape, gameVariance = FITTED_GAME_VARIANCE }: PreseasonBoardOptions,
 ): readonly BoardEntry[] {
   const byPlayer = new Map<string, { candidate: BoardCandidate; seasonLine: StatLine; outlook: ProjectionDistribution }>();
   const projections: SeasonProjection[] = [];
@@ -234,13 +271,10 @@ export function preseasonBoard(
     byPlayer.set(candidate.playerId, {
       candidate,
       seasonLine,
-      // The interval is the games distribution carried through the same multiplication. It is
-      // honest about what it covers and silent about what it does not: see `overlapTiers`.
-      outlook: {
-        floor: perGamePoints * candidate.games.distribution.floor,
-        median: perGamePoints * candidate.games.distribution.median,
-        ceiling: perGamePoints * candidate.games.distribution.ceiling,
-      },
+      // BOTH SOURCES COMPOSED (Task 4): per-game performance variance and the games-played
+      // distribution. See `game-variance.ts`'s `seasonPointsBand` for the law-of-total-variance
+      // composition and `overlapTiers` for what the resulting interval is honest about and silent on.
+      outlook: seasonPointsBand(perGamePoints, candidate.games, gameVarianceFor(candidate, gameVariance)),
     });
     projections.push({ playerId: candidate.playerId, position: candidate.position, projectedPoints });
   }

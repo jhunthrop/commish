@@ -39,8 +39,13 @@ export interface BoardRow {
   readonly position: Position;
   readonly team: string;
   readonly headshotUrl: string | null;
-  /** The shipped board's own overall rank, by points — fixed, never recomputed per league. */
+  /** The shipped board's own overall rank, by points — fixed, never recomputed per league.
+   *  A provenance fact, NOT the display order: the board displays `overallRank`. */
   readonly rank: number;
+  /** The board's served order: rank in VALUE under the caller's shape (points over replacement),
+   *  with no-value positions last. This is what "overall rank" means to a drafter, and what the
+   *  Edge comparison against ADP (itself a value ordering) must use — founder ruling 2026-09-04. */
+  readonly overallRank: number;
   readonly projectedPoints: number;
   readonly floorPoints: number;
   readonly medianPoints: number;
@@ -132,8 +137,13 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
   const positions = new Set(valued.map((entry) => entry.position));
   for (const position of positions) {
     const pool = valued.filter((entry) => entry.position === position);
-    const standings = tierStandingsOf(pool.map((entry) => entry.valueOverReplacement));
-    pool.forEach((entry, index) => standingsByPlayer.set(entry.playerId, standings[index]!));
+    // Tiers are measured among DRAFT-RELEVANT players only (founder board audit, 2026-09-04):
+    // below replacement level the isotonic plateaus pack players a hair apart, and letting that
+    // texture into the pool distorts what a cliff means. Below-replacement rows carry no tier
+    // and draw no band, which is itself the honest statement about them.
+    const relevant = pool.filter((entry) => entry.valueOverReplacement > 0);
+    const standings = tierStandingsOf(relevant.map((entry) => entry.valueOverReplacement));
+    relevant.forEach((entry, index) => standingsByPlayer.set(entry.playerId, standings[index]!));
   }
 
   return withPosition
@@ -148,6 +158,7 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
         team: identity.team,
         headshotUrl: identity.headshotUrl,
         rank: row.rank,
+        overallRank: 0, // assigned below, after the value sort — see the docblock on the field
         projectedPoints: row.projectedPoints,
         floorPoints: row.floorPoints,
         medianPoints: row.medianPoints,
@@ -164,5 +175,42 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
         reasons: reasonsByNflId.get(row.playerId) ?? [],
       };
     })
-    .sort((a, b) => a.rank - b.rank);
+    .sort((a, b) => {
+      // THE BOARD ORDERS BY VALUE, NOT RAW POINTS (founder, 2026-09-04: "we have way too many
+      // QBs ranked too high"). Raw season points crown quarterbacks because everyone starts one
+      // and replacement-level QB scoring is high; draft VALUE is points over replacement under
+      // the league's shape, which the auction dollars and the tier bands already used. A row
+      // with no value rank (a position this shape never starts) sinks to the bottom, points as
+      // the tiebreak within it.
+      const aValue = a.valueRank ?? Number.POSITIVE_INFINITY;
+      const bValue = b.valueRank ?? Number.POSITIVE_INFINITY;
+      // TIES DEFER TO THE MARKET (founder audit, 2026-09-04: two RBs identical to the hundredth
+      // in points AND value were split RB1/RB2 by a sort artifact, against the market's order).
+      // When our own evidence cannot separate two players, the market's preference is
+      // information — the same doctrine as the thin-evidence shrinkage. Ceiling is deliberately
+      // NOT the tiebreak: at an equal mean a wider band is more variance, not more player, and
+      // risk preference belongs to the drafter's slot (the Simulator's question), never baked
+      // into the board's order.
+      if (a.valueOverReplacement !== null && a.valueOverReplacement === b.valueOverReplacement) {
+        const aAdp = a.marketAdp ?? Number.POSITIVE_INFINITY;
+        const bAdp = b.marketAdp ?? Number.POSITIVE_INFINITY;
+        if (aAdp !== bAdp) return aAdp - bAdp;
+      }
+      return aValue - bValue || a.rank - b.rank;
+    })
+    .map((row, index) => ({ ...row, overallRank: index + 1 }))
+    // The positional badge follows the SERVED order, so a tie the market just broke cannot
+    // leave the badges contradicting the rows (RB2 listed above RB1). Only valued rows carry a
+    // positional rank; a position the shape never starts keeps null, exactly as before.
+    .map(
+      (() => {
+        const seen = new Map<string, number>();
+        return (row: BoardRow): BoardRow => {
+          if (row.valueRank === null) return row;
+          const next = (seen.get(row.position) ?? 0) + 1;
+          seen.set(row.position, next);
+          return row.positionRankInValue === next ? row : { ...row, positionRankInValue: next };
+        };
+      })(),
+    );
 }

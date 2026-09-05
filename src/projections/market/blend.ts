@@ -9,7 +9,8 @@ import type { Law } from "../laws/types";
 import { spearman, type Observation } from "../metrics";
 import { scaleStatLine, type BoardCandidate, type BoardReason } from "../preseason/board";
 import { withAvailabilityRecency } from "../preseason/availability";
-import { rookieCurve } from "../preseason/rookie-curve";
+import { historicalRookieExpectedGames, rookieCurve, rookieCurveEvidenceN } from "../preseason/rookie-curve";
+import { shrinkTowardMarket } from "./thin-evidence-shrink";
 import {
   preseasonCandidates,
   SHIPPED_PRESEASON_FEATURES,
@@ -528,16 +529,40 @@ export function blendBoard(market: readonly MarketPriorEntry[], model: readonly 
     evidence.propsAnchor ?? EMPTY_PROPS_ANCHOR,
   );
   const marketByPlayer = new Map(market.map((entry) => [entry.playerId, entry] as const));
-  return model.map((candidate) => blendCandidate(candidate, marketByPlayer.get(candidate.playerId), context));
+  return model.map((candidate) => blendCandidate(candidate, marketByPlayer.get(candidate.playerId), context, evidence.season));
+}
+
+/**
+ * ONE CANDIDATE'S HONESTLY-RECOMPOSED ROOKIE SEASON TOTAL (calibration fix round, 2026-09-04,
+ * Task 2) — REPLACES the earlier `rookieCurve(pick)` passed straight into `pointsOnlyPerGame`,
+ * which divided a SEASON number by `candidate.games.expected` (THIS player's own, individually
+ * fitted availability) to fake a per-game rate: two numbers from two different populations,
+ * multiplied back together as though they described the same one.
+ *
+ * THE HONEST ALGEBRA: `rookieCurve(pick)` is a season total already averaged over the SAME
+ * 2003-2021 population, WITHIN THE SAME DRAFT-CAPITAL BUCKET (fix round 1 — see
+ * `historicalRookieExpectedGames`'s own docblock for why the denominator has to be bucket-matched
+ * rather than pooled across every round), that `historicalRookieExpectedGames` measures its own
+ * games-played rate against. Dividing by THAT bucket's own expected games — not this player's —
+ * recovers the per-game rate that bucket's curve actually implies; multiplying back out by
+ * `candidate.games.expected` (Task 1's OWN, separately-fitted availability distribution for THIS
+ * player) then composes two honestly-sourced numbers instead of dividing a population total by an
+ * unrelated individual estimate.
+ */
+function recomposeRookieSeasonPoints(candidate: BoardCandidate, overallPick: number, season: number): number {
+  const historicalGames = historicalRookieExpectedGames(candidate.position, overallPick, season);
+  const perGameRate = historicalGames > 0 ? rookieCurve(candidate.position, overallPick) / historicalGames : 0;
+  return perGameRate * candidate.games.expected;
 }
 
 /**
  * ONE CANDIDATE, BLENDED — every branch `blendBoard`'s own docblock describes, for a single player.
  * Split out of `blendBoard` (fit-round Task 3) so the fit's scoring loop can blend row by row against
  * ONE prebuilt context instead of rebuilding the law map per row; `blendBoard` itself is now that map
- * plus this function.
+ * plus this function. `season` (calibration fix round, Task 2) is threaded separately from `context`
+ * because `scoreBlendConstants` reuses ONE context across rows spanning several different seasons.
  */
-function blendCandidate(candidate: BoardCandidate, marketEntry: MarketPriorEntry | undefined, context: BlendContext): BoardCandidate {
+function blendCandidate(candidate: BoardCandidate, marketEntry: MarketPriorEntry | undefined, context: BlendContext, season: number): BoardCandidate {
   if (marketEntry === undefined) {
     return {
       ...candidate,
@@ -546,16 +571,23 @@ function blendCandidate(candidate: BoardCandidate, marketEntry: MarketPriorEntry
     };
   }
 
-  // CLAUSE (c) — a rookie WITH a recorded draft pick REPLACES the anchor outright, ignoring the
-  // market's own number entirely: the market prices rookie hype (name recognition, landing-spot
-  // buzz, summer narrative), `rookieCurve` prices draft capital (what an NFL front office actually
-  // paid for him), and Task 4's whole argument for that curve is that the two answer different
-  // questions. A rookie the draft-pick table has no record of (`overallPick: null` — a UDFA the
-  // model still emits a candidate for) has no curve value to substitute, so he falls through to
-  // the ordinary anchor-plus-evidence path below like anyone else on the market board.
+  // CLAUSE (c) — a rookie WITH a recorded draft pick. Draft capital, not the market's own hype
+  // pricing, still supplies the model's own opinion (`recomposeRookieSeasonPoints`, above) — but
+  // that opinion no longer stands UNCONDITIONALLY against the market (calibration fix round, Task
+  // 3): `shrinkTowardMarket` pulls it toward the market's own number in proportion to how THIN the
+  // real historical evidence behind this exact pick's curve value is
+  // (`rookieCurveEvidenceN` — "n of about 1-2 observations" at the earliest, most speculative picks,
+  // the module docblock's own example). A well-evidenced pick barely moves; a razor-thin one — the
+  // diagnosed defect, a rookie running back at pick three whose curve knot rested on a single
+  // historical comparable — moves substantially. A rookie the draft-pick table has no record of
+  // (`overallPick: null` — a UDFA the model still emits a candidate for) has no curve value to
+  // substitute at all, so he falls through to the ordinary anchor-plus-evidence path below like
+  // anyone else on the market board.
   const rookie = rookieReasonOf(candidate);
   if (rookie !== null && rookie.overallPick !== null) {
-    const rookiePoints = rookieCurve(candidate.position, rookie.overallPick);
+    const modelPoints = recomposeRookieSeasonPoints(candidate, rookie.overallPick, season);
+    const evidenceN = rookieCurveEvidenceN(candidate.position, rookie.overallPick);
+    const rookiePoints = shrinkTowardMarket(modelPoints, marketEntry.marketPoints, evidenceN);
     return {
       ...candidate,
       perGame: pointsOnlyPerGame(candidate, rookiePoints),
@@ -696,7 +728,7 @@ export function scoreBlendConstants(rows: readonly BlendTrainRow[], constants: B
     return built;
   };
   const observations: Observation[] = rows.map((row) => ({
-    predicted: seasonPointsOf(blendCandidate(row.candidate, row.market, contextFor(row.propsAnchor))),
+    predicted: seasonPointsOf(blendCandidate(row.candidate, row.market, contextFor(row.propsAnchor), row.season)),
     actual: row.actualPoints,
   }));
   return spearman(observations);

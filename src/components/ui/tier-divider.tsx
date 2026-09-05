@@ -6,6 +6,10 @@ export interface TierDividerProps {
   readonly grade: TierGrade;
   /** What the band is, in the manager's own words: "Elite backs", "Round 3 targets". */
   readonly label: string;
+  /** The letter printed on the badge, when it outruns the four designed pigments: a board deep
+   *  in tiers keeps C's quiet fill but tells the TRUE tier letter (founder audit, 2026-09-04) —
+   *  the pigment ladder is a design token, the letter is a fact. Defaults to the grade. */
+  readonly letter?: string;
   readonly className?: string;
 }
 
@@ -55,7 +59,7 @@ const TIER_CLASS: Readonly<Record<TierGrade, string>> = {
  * The rule is `aria-hidden`: it is the band's geometry, not its content, and a screen reader
  * already hears the grade and the label.
  */
-export function TierDivider({ grade, label, className = "" }: TierDividerProps) {
+export function TierDivider({ grade, label, letter = grade, className = "" }: TierDividerProps) {
   return (
     <div data-grade={grade} className={`flex items-center gap-2 ${className}`}>
       {/* THE BAND IS A FILLED PLATE, NOT A LETTER BESIDE A LINE (2026-08-28). Rendered rather
@@ -77,7 +81,7 @@ export function TierDivider({ grade, label, className = "" }: TierDividerProps) 
       <span
         className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm px-1.5 py-0.5 font-display leading-display ${TIER_CLASS[grade]}`}
       >
-        <span className="text-xs font-semibold">{grade}</span>
+        <span className="text-xs font-semibold">{letter}</span>
         <span className={MICRO_LABEL}>{label}</span>
       </span>
       {/* Law 4: the rule takes the leftover width so the band separates two KINDS of thing

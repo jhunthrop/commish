@@ -3,12 +3,13 @@
 import { Fragment, useMemo, useState } from "react";
 import type { Player } from "@/domain/player";
 import { auctionValues, type AuctionShape } from "@/projections/auction/value";
+import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles";
 import type { BoardReason } from "@/projections/preseason/board";
 import { BottomSheet, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, ReasonChip, SegmentGroup, TierDivider } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { Law } from "@/projections/laws/types";
 import { groupReasons } from "@/league-room/outlook/groups";
-import { strongestEvidenceSentence, tierBandSentence, vsMarketLabel } from "./copy";
+import { strongestEvidenceSentence, tierBandSentence, tierLetter, vsMarketLabel } from "./copy";
 import type { BoardRow } from "./service";
 
 const POSITION_TABS: readonly { readonly value: string; readonly label: string }[] = [
@@ -25,7 +26,7 @@ const POSITION_TABS: readonly { readonly value: string; readonly label: string }
  *  `rowToCsv` below writes, in the same order. "Strongest law" retired (board persona fix 3):
  *  the strongest-evidence sentence now lives in the why drawer's top line, not a column that was
  *  mostly blank and, when it did fire, a bare "+1.3 pts" figure nobody could place. */
-const CSV_HEADER = ["Rank", "Name", "Position", "Team", "Bye", "Evidence pts", "Floor", "Ceiling", "Market ADP", "Vs market (picks)", "Auction value"];
+const CSV_HEADER = ["Rank", "Name", "Position", "Team", "Bye", "Projected pts", "Floor", "Ceiling", "Market ADP", "Vs market (picks)", "Auction value"];
 
 function csvField(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
@@ -42,9 +43,9 @@ export function boardCsvLines(orderedRows: readonly BoardRow[], auctionShape: Au
 }
 
 function rowToCsv(row: BoardRow, dollarValue: number | null): string {
-  const edge = row.marketAdp === null ? "" : (row.marketAdp - row.rank).toFixed(1);
+  const edge = row.marketAdp === null ? "" : (row.marketAdp - row.overallRank).toFixed(1);
   return [
-    String(row.rank),
+    String(row.overallRank),
     row.name,
     row.position,
     row.team,
@@ -97,7 +98,7 @@ function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDraw
           <div className="flex flex-col">
             <span className="font-display text-xl font-semibold leading-display text-text-primary">{state.row.name}</span>
             <span className="text-sm text-text-muted">
-              {state.row.team} · bye {state.row.byeWeek ?? "?"} · rank {state.row.rank}
+              {state.row.team} · bye {state.row.byeWeek ?? "?"} · rank {state.row.overallRank}
             </span>
           </div>
         </div>
@@ -210,10 +211,10 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                 Player
               </th>
               <th scope="col" className="px-2 py-2 text-right">
-                Evidence pts
+                Projected
               </th>
               <th scope="col" className="px-2 py-2 text-right">
-                Season range
+                Most seasons
               </th>
               <th scope="col" className="px-2 py-2 text-right">
                 Market ADP
@@ -244,8 +245,9 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                     <td colSpan={8} className="pt-3 pb-1">
                       <TierDivider
                         grade={row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C"}
+                        letter={tierLetter(row.tier)}
                         label={tierBandSentence(
-                          row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C",
+                          tierLetter(row.tier),
                           position,
                           row.playersLeftInTier ?? 0,
                           row.dropToNextTier ?? 0,
@@ -255,14 +257,14 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                   </tr>
                 ) : null;
               if (showTiers) lastTier = row.tier;
-              const edge = row.marketAdp === null ? null : row.marketAdp - row.rank;
+              const edge = row.marketAdp === null ? null : row.marketAdp - row.overallRank;
               const vsMarket = vsMarketLabel(edge);
               const dollarValue = dollarValues.get(row.playerId) ?? null;
               // Fix 1 (board persona review): on a position tab, positional rank leads and the
               // overall rank becomes the sub-fact — never a bare overall number on its own. On
               // "Overall" there is no single position context to lead with, so the overall rank
               // stays the lead, unchanged.
-              const leadingRank = position === "ALL" ? row.rank : (row.positionRankInValue ?? row.rank);
+              const leadingRank = position === "ALL" ? row.overallRank : (row.positionRankInValue ?? row.overallRank);
               return (
                 <Fragment key={row.playerId}>
                   {tierRow}
@@ -270,7 +272,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                     <td className="px-2 py-2 tabular-nums text-text-faint">
                       <div className="flex flex-col">
                         <span className="font-medium text-text-primary">{leadingRank}</span>
-                        {position === "ALL" ? null : <span className="text-xs text-text-faint">{`#${row.rank} overall`}</span>}
+                        {position === "ALL" ? null : <span className="text-xs text-text-faint">{`#${row.overallRank} overall`}</span>}
                       </div>
                     </td>
                     <td className="px-2 py-2">
@@ -287,7 +289,20 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums font-medium text-text-primary">{row.projectedPoints.toFixed(1)}</td>
                     <td className="px-2 py-2 text-right tabular-nums text-text-muted">
-                      {row.floorPoints.toFixed(0)}–{row.ceilingPoints.toFixed(0)}
+                      {/* The everyday band leads (p25-p75, "most seasons"), the tail band rides
+                          behind it in the accessible name and the faint sub-line — founder,
+                          2026-09-04: the honest p10-p90 stays measured, the TELLING gets kinder. */}
+                      {(() => {
+                        const { p25, p75 } = quartilesFromSeasonBand(row.medianPoints, row.floorPoints, row.ceilingPoints);
+                        return (
+                          <span aria-label={`Most seasons ${p25.toFixed(0)} to ${p75.toFixed(0)} points; the full range with injury tails runs ${row.floorPoints.toFixed(0)} to ${row.ceilingPoints.toFixed(0)}.`}>
+                            <span className="text-text-primary">{p25.toFixed(0)}–{p75.toFixed(0)}</span>
+                            <span aria-hidden="true" className="block text-xs text-text-faint">
+                              tails {row.floorPoints.toFixed(0)}–{row.ceilingPoints.toFixed(0)}
+                            </span>
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums text-text-muted">
                       {row.marketAdp === null ? (
@@ -324,7 +339,8 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
       </div>
 
       <p className="text-xs text-text-faint">
-        Season range is the floor and ceiling of his own season point total, from games-played risk alone. Why opens the full evidence chain: every
+        Projected is his season point total under the scoring selected above, built from the evidence. Most seasons is where the middle half of his
+        measured outcomes land; the faint tails line is the full range, injury seasons and smash seasons included. Both come from the same measured spread of games played and per-game scoring. Why opens the full evidence chain: every
         law that fired, its measured effect, and the seasons it was tested against. Nothing on this board is an opinion.
       </p>
 

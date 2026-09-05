@@ -13,6 +13,19 @@ import type { RookiePriors } from "./rookies";
  *
  * Fitted on 2021 and 2022 and on nothing else. 2023 and 2024 are held out and
  * `fitAvailabilityPriors` throws if it is handed either.
+ *
+ * ONE EXCEPTION: `FITTED_ROOKIE_PRIORS.gameRate` — the rookie DURABILITY prior — is fitted on 2023
+ * and 2024 instead (calibration fix round, 2026-09-04, Task 1), with 2025 and 2026 held out. Every
+ * other field of `FITTED_ROOKIE_PRIORS` (`byBucket`, `typicalIncumbentClaim`, ...) is still fitted
+ * on 2021 and 2022, UNCHANGED from the prior committed fit — this round's re-run of the full
+ * `npm run projections:preseason:fit` pipeline also picked up incidental drift in every OTHER table
+ * here (a handful of stat-line corrections ingested since the last run moved `priorGames`,
+ * `recencyDecay` and a few availability cells by a few hundredths), and that drift is deliberately
+ * NOT shipped in this round: it is unrelated to the diagnosed defect, unreviewed, and belongs to
+ * whichever change actually re-runs the full fit on purpose. Only `gameRate`'s six-cell-per-position
+ * table was hand-spliced in from a narrow, `gameRate`-only re-fit; everything else below is
+ * byte-for-byte what the previous committed fit produced. See `fit.ts`'s `fitRookieGameRate`
+ * docblock for why the durability prior gets its own window at all.
  */
 
 export const FITTED_AVAILABILITY_PRIORS: AvailabilityPriors = {
@@ -351,36 +364,36 @@ export const FITTED_ROOKIE_PRIORS: RookiePriors = {
   },
   "gameRate": {
     "QB": {
-      "round1": 0.6558823529411764,
-      "round2": 0.2196078431372549,
-      "round3": 0.2196078431372549,
-      "rounds4to5": 0.20235294117647057,
-      "rounds6to7": 0.20235294117647057,
-      "undrafted": 0.16323529411764703
+      "round1": 0.6047116635351929,
+      "round2": 0.3545310015898251,
+      "round3": 0.24439947969359732,
+      "rounds4to5": 0.24439947969359732,
+      "rounds6to7": 0.09930395051502318,
+      "undrafted": 0.09930395051502318
     },
     "RB": {
-      "round1": 0.47689075630252103,
-      "round2": 0.47689075630252103,
-      "round3": 0.47689075630252103,
-      "rounds4to5": 0.47689075630252103,
-      "rounds6to7": 0.47689075630252103,
-      "undrafted": 0.211484593837535
+      "round1": 0.692549019607843,
+      "round2": 0.6888369364839952,
+      "round3": 0.6888369364839952,
+      "rounds4to5": 0.6888369364839952,
+      "rounds6to7": 0.3748306595365418,
+      "undrafted": 0.25160784313725487
     },
     "WR": {
-      "round1": 0.7351086714635412,
-      "round2": 0.6321807411489185,
-      "round3": 0.6321807411489185,
-      "rounds4to5": 0.5019286403085824,
-      "rounds6to7": 0.3954676952748313,
-      "undrafted": 0.12377515786854137
+      "round1": 0.8695977482452704,
+      "round2": 0.8187123668364984,
+      "round3": 0.7276516905974988,
+      "rounds4to5": 0.6203180484792342,
+      "rounds6to7": 0.558073182028717,
+      "undrafted": 0.14723064740247124
     },
     "TE": {
-      "round1": 0.5922643029814666,
-      "round2": 0.5922643029814666,
-      "round3": 0.5922643029814666,
-      "rounds4to5": 0.5922643029814666,
-      "rounds6to7": 0.4719312382487242,
-      "undrafted": 0.16991173659651815
+      "round1": 0.7624873225152129,
+      "round2": 0.7624873225152129,
+      "round3": 0.6954505940307159,
+      "rounds4to5": 0.6778535865756963,
+      "rounds6to7": 0.4173427991886409,
+      "undrafted": 0.24036511156186613
     },
     "K": {
       "round1": 0,
