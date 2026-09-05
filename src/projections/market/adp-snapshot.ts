@@ -65,16 +65,29 @@ export interface AdpSnapshotOptions {
   /** Injected for the same reason `fetchAverageDraftPosition` itself injects it: no test may
    *  touch the network. */
   readonly fetchImpl?: typeof globalThis.fetch;
-  /** Injected clock — the capture instant becomes every written row's own `capturedAt`. */
+  /**
+   * The capture instant — becomes every written row's own `capturedAt`. Fix round 1, MEDIUM 2:
+   * this is NOT a wall clock in production. `src/jobs/defs/adp-snapshot-job.ts`'s
+   * `runAdpSnapshotStep` derives it from the schedule's own `firedAt` (threaded onto the job's
+   * payload by `schedule.ts`'s `tickOne`) rather than `Date.now()` at attempt time, so a
+   * SAME-NIGHT RETRY of the identical scheduled fire (a crashed attempt, a redelivered tick)
+   * recomputes the IDENTICAL `capturedAt` and therefore the identical
+   * `(player_id, source, captured_at)` tuple — the unique index
+   * (`adp_snapshots_player_source_captured_idx`) is what makes that retry a genuine no-op rather
+   * than a second row for the same night. Only a caller with no schedule fire at all (a hand-run
+   * operator invocation) falls back to a real wall-clock default here, and that path has no
+   * retry-safety guarantee beyond "don't retry within the same instant" — the honest, narrower
+   * claim this docblock used to make for every caller.
+   */
   readonly now?: () => Date;
 }
 
 /**
  * One capture: fetch the live feed, resolve it against the current season's own roster, write
- * whatever resolved as a fresh, append-only batch of rows. Idempotent PER CALL only in the sense
- * that `onConflictDoNothing` protects a retried attempt from double-writing the SAME instant
- * twice (`adp_snapshots_player_source_captured_idx`); a genuinely later capture is always a new
- * row, by design.
+ * whatever resolved as a fresh, append-only batch of rows. Safe against a same-night retry
+ * STRUCTURALLY, not by luck: see `AdpSnapshotOptions.now`'s own docblock for the real mechanism
+ * (the schedule's fire instant, not wall-clock `Date.now()`) that makes the unique index catch a
+ * retried attempt rather than merely a retry that happens to land in the same millisecond.
  */
 export async function ingestAdpSnapshot(db: Db, options: AdpSnapshotOptions = {}): Promise<AdpSnapshotResult> {
   const season = options.season ?? PRODUCT_SEASON;

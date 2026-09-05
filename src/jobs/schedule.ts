@@ -79,7 +79,14 @@ async function tickOne(
       await enqueueJob(db, clock, {
         name: schedule.job,
         idempotencyKey: `${schedule.name}@${fire.toISOString()}`,
-        payload: schedule.payload,
+        // Fix round 1, MEDIUM 2: every schedule-born job's payload carries its OWN fire instant
+        // (`firedAt`) alongside whatever the schedule itself always sends — the same instant the
+        // idempotency key already embeds, now reachable from INSIDE the job step too. A job whose
+        // own work must be stamped with "when" (the ADP snapshot's `capturedAt`) reads this
+        // instead of the wall clock, so a same-night retry of the identical fire always computes
+        // the identical stamp rather than a fresh one. `schedule.payload`'s own keys always win on
+        // collision (spread order), though no schedule today defines a `firedAt` of its own.
+        payload: { ...schedule.payload, firedAt: fire.toISOString() },
         maxAttempts: definition.maxAttempts,
         runAt: fire,
         scheduleName: schedule.name,

@@ -15,8 +15,29 @@ import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract"
 
 export const ADP_SNAPSHOT_JOB_NAME = "adp-snapshot";
 
-export async function runAdpSnapshotStep(db: Db, clock: { readonly now: () => string }): Promise<StepOutcome> {
-  const result = await ingestAdpSnapshot(db, { now: () => new Date(clock.now()) });
+export interface AdpSnapshotPayload {
+  /**
+   * Fix round 1, MEDIUM 2 — the schedule's own fire instant (`schedule.ts`'s `tickOne`, which
+   * merges `firedAt` onto every schedule-born job's payload), reached here so `capturedAt` is
+   * DERIVED from it rather than from wall-clock `Date.now()` at attempt time. Optional because a
+   * hand-enqueued run (an operator re-run, or a future test) carries no schedule fire; those fall
+   * back to the injected clock.
+   */
+  readonly firedAt?: string;
+}
+
+export function parseAdpSnapshotPayload(raw: JsonObject): AdpSnapshotPayload {
+  const firedAt = raw.firedAt;
+  if (firedAt === undefined) return {};
+  if (typeof firedAt !== "string" || Number.isNaN(Date.parse(firedAt))) {
+    throw new Error(`adp-snapshot payload: firedAt must be an ISO instant string, got ${JSON.stringify(firedAt)}.`);
+  }
+  return { firedAt };
+}
+
+export async function runAdpSnapshotStep(db: Db, clock: { readonly now: () => string }, payload: AdpSnapshotPayload): Promise<StepOutcome> {
+  const now = payload.firedAt !== undefined ? () => new Date(payload.firedAt!) : () => new Date(clock.now());
+  const result = await ingestAdpSnapshot(db, { now });
   const ratePct = result.resolutionRate === null ? "n/a" : `${(result.resolutionRate * 100).toFixed(1)}%`;
   return {
     summary: `adp-snapshot: ${result.candidatesRead} published, ${result.written} rows written (${ratePct} resolved)`,
@@ -24,18 +45,13 @@ export async function runAdpSnapshotStep(db: Db, clock: { readonly now: () => st
   };
 }
 
-export const adpSnapshotJob: AnyJobDefinition = defineJob<Record<string, never>>({
+export const adpSnapshotJob: AnyJobDefinition = defineJob<AdpSnapshotPayload>({
   name: ADP_SNAPSHOT_JOB_NAME,
   maxAttempts: 3,
   // A single HTTP fetch plus one batched insert — comfortably short, but generous against a slow
   // upstream night, matching the season-week job's own network-step budget.
   timeoutMs: 60_000,
   backoff: { baseMs: 60_000, maxMs: 10 * 60_000 },
-  parsePayload: (): Record<string, never> => ({}),
-  steps: [{ name: "capture", run: (ctx) => runAdpSnapshotStep(ctx.db, ctx.clock) }],
+  parsePayload: parseAdpSnapshotPayload,
+  steps: [{ name: "capture", run: (ctx, payload) => runAdpSnapshotStep(ctx.db, ctx.clock, payload) }],
 });
-
-// Re-exported so `registry.ts` and `schedules.ts` can both name the payload type without a second
-// import path, matching `season-week-job.ts`'s own shape (`SeasonWeekPayload`) even though this
-// job's payload happens to be empty today.
-export type AdpSnapshotPayload = JsonObject;
