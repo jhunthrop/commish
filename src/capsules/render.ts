@@ -67,7 +67,7 @@ function boardLine(facts: PlayerFacts): string {
   const rankBits = [`overall rank ${market.boardRank}`];
   if (market.positionRank !== null) rankBits.push(`position rank ${facts.identity.position}${market.positionRank} by our own board`);
   const bandLine = `Most seasons land between ${Math.round(projection.typicalLow)} and ${Math.round(projection.typicalHigh)} points. The full tails run ${Math.round(projection.floorPoints)} to ${Math.round(projection.ceilingPoints)}, and the low end of that tail is the injury seasons, not a talent read.`;
-  const line = `Our number: ${projection.projectedPoints} season points. ${bandLine} ${rankBits.join(", ")}.`;
+  const line = `Our number: ${Math.round(projection.projectedPoints)} season points. ${bandLine} ${rankBits.join(", ")}.`;
   const marketBits: string[] = [];
   marketBits.push(market.adp === null ? "The market has not priced him." : `Market ADP ${market.adp}${market.positionAdp !== null ? ` (${market.positionAdp} by market rank)` : ""}.`);
   if (market.marketAnchorPoints !== null) {
