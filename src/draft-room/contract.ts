@@ -1,6 +1,7 @@
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
+import type { TeamGrade } from "@/draft-service/grades/engine";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { PickFactCopy } from "./state/format";
@@ -89,6 +90,20 @@ export interface MockResultsHabits {
   readonly earlyBestAvailableCount: number;
 }
 
+/**
+ * Task 11 (plan ruling R-2): the requesting manager's OWN grade for this mock, computed fresh at
+ * read time against today's evidence board — a mock stores nothing (retention sweep unaffected),
+ * so this is never a stored `draft_grades` row the way a real league's is. PRIVATE always
+ * (ruling 3, spec §15): `MockResultsInfo` never carries another seat's grade, even for a
+ * commissioner watching without a team of their own (`yourGrade` is null for them).
+ */
+export interface MockResultsYourGrade {
+  readonly grade: TeamGrade;
+  /** The evidence board's own `asOf` stamp `grade` was computed against — the basis line's fact
+   *  ("graded against our board of {date}"). */
+  readonly boardGeneration: string;
+}
+
 /** Everything the finished mock's debrief needs beyond the draft state itself. */
 export interface MockResultsInfo {
   readonly copy: MockResultsCopy;
@@ -96,6 +111,7 @@ export interface MockResultsInfo {
    *  guessed table. */
   readonly table: MockResultsTable | null;
   readonly habits: MockResultsHabits | null;
+  readonly yourGrade: MockResultsYourGrade | null;
 }
 
 /**

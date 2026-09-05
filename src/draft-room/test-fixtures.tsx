@@ -85,6 +85,7 @@ export const MOCK_RESULTS_INFO: MockResultsInfo = {
   copy: MOCK_RESULTS_COPY,
   table: { teamCount: 2, pickSeconds: 60, scoringPreset: "half_ppr", rosterShape: "standard" },
   habits: null,
+  yourGrade: null,
 };
 
 export const SNAKE_VIEW: DraftStateView = {

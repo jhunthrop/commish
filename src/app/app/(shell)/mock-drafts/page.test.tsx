@@ -45,6 +45,8 @@ const SUMMARY: MockDebriefSummary = {
   earlyBestAvailable: true,
   best: { pickNumber: 8, playerName: "Marcus Reed", position: "RB", bestAvailableDelta: 0 },
   worstReach: { pickNumber: 65, playerName: "Dalton Price", position: "TE", bestAvailableDelta: 8 },
+  yourGrade: null,
+  gradeBoardGeneration: null,
 };
 
 function searchParams(query: Record<string, string> = {}) {

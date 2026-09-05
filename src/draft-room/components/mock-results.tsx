@@ -8,8 +8,9 @@ import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Button, ButtonLink, EYEBROW, PlayerFace, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import { formatDate } from "@/league-room/lib/format";
 import { PlayerName } from "@/league-room/components/player-peek";
-import type { MockResultsCopy, MockResultsInfo } from "../contract";
+import type { MockResultsCopy, MockResultsInfo, MockResultsYourGrade } from "../contract";
 import { useDraftRoomDeps } from "../hooks/deps";
 import { playersById as buildPlayersById } from "../lib/lookups";
 import { verdictFor, verdictPopulation, type Verdict } from "../lib/verdict";
@@ -38,8 +39,22 @@ import { VerdictChip } from "./verdict-chip";
  * are counts OF those verdicts (`debriefCounts`), the room-average clause renders only when
  * every other seat actually drafted the position (`roomAverageFirstRound`'s gate), the bye
  * clause only from the real schedule read (`byeWeeks`), and the habits card only from stored
- * completed mocks, computed server-side (`MockResultsInfo.habits`). No letter grade, ever
- * (ruling 5) — a debrief states facts, it never scores them.
+ * completed mocks, computed server-side (`MockResultsInfo.habits`).
+ *
+ * SUPERSEDED (Task 11, plan ruling R-2, `docs/superpowers/plans/2026-09-05-draft-hq-room.md`):
+ * this docblock used to end here with "No letter grade, ever (ruling 5) — a debrief states
+ * facts, it never scores them." That ruling stood from the 2026-08-26 mock-results pass, and its
+ * reasoning is kept rather than erased: an uncited letter tells a manager they lost without
+ * saying why, which is a judgment, not a fact. `docs/superpowers/specs/2026-09-04-draft-hq-design
+ * .md` §9 and its §15 ruling 3 are newer and founder-ruled, and answer that exact objection
+ * instead of ignoring it: every draft earns a grade, mock included, and the grade always cites
+ * the components behind its letter on the same card — value captured, starting slots filled, bye
+ * collisions, projected points, the identical facts `GradeBoard`
+ * (`@/league-room/components/grade-board`) shows for a real league. A cited letter is a
+ * compressed fact, not a verdict from nowhere, which is what the old rule actually objected to.
+ * PRIVATE always (ruling 3, spec §15): `YourGradeCard` below renders only the requesting
+ * manager's own grade, computed fresh at read time since a mock stores nothing — never another
+ * seat's.
  */
 export interface MockResultsProps {
   readonly view: DraftStateView;
@@ -226,6 +241,51 @@ function TeamCardSection({
   );
 }
 
+/** `grade.components.valueCaptured`, one decimal — `GradeBoard`'s own formatting
+ *  (`@/league-room/components/grade-board`), kept identical so the same number reads the same way
+ *  on both cards. */
+function formatValueCaptured(value: number): string {
+  return value.toFixed(1);
+}
+
+/**
+ * YOUR GRADE (Task 11, plan ruling R-2): private to the requesting manager, computed fresh at
+ * read time (a mock stores nothing) and always shown WITH the components behind the letter —
+ * `GradeBoard`'s own copy patterns for a single team rather than a room table. Renders nothing
+ * when `results.yourGrade` is null, whether that is because there was no board to grade against
+ * or because this caller has no seat in the room at all.
+ */
+function YourGradeCard({ yourGrade }: { readonly yourGrade: MockResultsYourGrade | null }) {
+  if (yourGrade === null) return null;
+  const { grade, boardGeneration } = yourGrade;
+  return (
+    <section aria-label="Your grade" className="flex flex-col gap-2 rounded-lg bg-surface-elevated p-3.5 shadow-card">
+      <h2 className={`${MICRO_LABEL} text-text-faint`}>Your grade</h2>
+      <div className="flex items-baseline gap-2">
+        <span className="font-display text-3xl font-bold text-text-primary">{grade.letter}</span>
+        <span className="text-sm tabular-nums text-text-muted">{formatValueCaptured(grade.components.valueCaptured)} value captured</span>
+      </div>
+      <dl className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
+        <div className="flex flex-col">
+          <dt className="text-text-faint">Starting slots filled</dt>
+          <dd className="tabular-nums text-text-primary">
+            {grade.components.startingSlotsFilled} of {grade.components.startingSlotsTotal}
+          </dd>
+        </div>
+        <div className="flex flex-col">
+          <dt className="text-text-faint">Bye collisions</dt>
+          <dd className="tabular-nums text-text-primary">{grade.components.byeCollisions}</dd>
+        </div>
+        <div className="flex flex-col">
+          <dt className="text-text-faint">Projected points</dt>
+          <dd className="tabular-nums text-text-primary">{grade.components.projectedPoints.toFixed(1)}</dd>
+        </div>
+      </dl>
+      <p className="text-xs text-text-faint">Graded against our board of {formatDate(boardGeneration)}</p>
+    </section>
+  );
+}
+
 /** ACROSS YOUR LAST MOCKS — renders only what the server derived from 2+ stored mocks; a
  *  clause whose fact is missing (a mock with no tight end) drops, the card stays. */
 function HabitsSection({ results }: { readonly results: MockResultsInfo }) {
@@ -359,6 +419,7 @@ export function MockResults({ view, teams, board, players, byeWeeks, myTeamId, r
             </div>
             <div className="order-2 flex min-w-0 flex-col gap-3">
               <TeamCardSection view={view} playersById={playersById} positionOf={positionOf} byeWeeks={byeWeeks} myTeamId={myTeamId} copy={copy} />
+              <YourGradeCard yourGrade={results.yourGrade} />
               {/* TAKE IT WITH YOU — the loop back to the real room. Outline verbs, never the
                   solid: the page's one act is the rematch in the headline. */}
               <section aria-label={copy.takeItHeading} className="flex flex-col gap-2 rounded-lg bg-surface-elevated p-3.5 shadow-card ring-2 ring-accent/40">

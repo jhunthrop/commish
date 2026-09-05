@@ -29,10 +29,11 @@ import type { Clock } from "@/domain/timing";
 import { excludedSetFor } from "@/db/upsert";
 import type { GradeDraftInput } from "@/draft-service/grades/engine";
 import { gradeDraft } from "@/draft-service/grades/engine";
+import { gradeEvidenceMaps } from "@/draft-service/grades/evidence-maps";
 import { evidencePoolFor } from "@/draft-service/sim/evidence";
 import { deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
-import { valueBoardIndexed, type LeagueShape } from "@/projections/decide/replacement";
+import type { LeagueShape } from "@/projections/decide/replacement";
 import { enqueueJob } from "../store";
 import { defineJob, TerminalJobError, type AnyJobDefinition, type StepOutcome } from "../contract";
 
@@ -150,10 +151,8 @@ export async function runDraftGradesJobStep(db: Db, payload: DraftGradesJobPaylo
     evidencePoolFor(db),
   ]);
 
-  const pointsByPlayerId = new Map(pool.map((entry) => [entry.playerId, entry.projectedPoints] as const));
   const shape: LeagueShape = { teamCount: league.teamCount, rosterSlots: league.rosterSlots };
-  const { byPlayerId } = valueBoardIndexed(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
-  const valueByPlayerId = new Map([...byPlayerId].map(([playerId, valued]) => [playerId, valued.valueOverReplacement] as const));
+  const { pointsByPlayerId, valueByPlayerId } = gradeEvidenceMaps(pool, shape);
 
   const input: GradeDraftInput = { picks, rosters, slotConfig: league.rosterSlots, pointsByPlayerId, valueByPlayerId, byeWeeks, nflTeamByPlayerId };
   const grades = gradeDraft(input);

@@ -218,6 +218,67 @@ describe("MockResults — the debrief", () => {
     });
   });
 
+  describe("your grade (Task 11, plan ruling R-2)", () => {
+    it("renders nothing when the debrief carries no grade to show", () => {
+      mount();
+      expect(screen.queryByRole("region", { name: "Your grade" })).not.toBeInTheDocument();
+    });
+
+    it("cites the letter, the components, and the basis line", () => {
+      mount({
+        results: {
+          ...MOCK_RESULTS_INFO,
+          yourGrade: {
+            grade: {
+              teamId: "t1",
+              letter: "B",
+              components: { valueCaptured: -3.2, startingSlotsFilled: 4, startingSlotsTotal: 5, byeCollisions: 2, projectedPoints: 142.7 },
+              projectedRank: 2,
+            },
+            boardGeneration: "2026-08-18T00:00:00.000Z",
+          },
+        },
+      });
+      const card = screen.getByRole("region", { name: "Your grade" });
+      expect(within(card).getByText("B")).toBeInTheDocument();
+      expect(within(card).getByText(/-3\.2/)).toBeInTheDocument();
+      expect(within(card).getByText(/4 of 5/)).toBeInTheDocument();
+      expect(within(card).getByText("2")).toBeInTheDocument();
+      expect(within(card).getByText(/142\.7/)).toBeInTheDocument();
+      expect(within(card).getByText(/Graded against our board of August 18/)).toBeInTheDocument();
+    });
+
+    it("is axe-clean with the card present", async () => {
+      await renderSurface(
+        <DraftRoomDepsProvider deps={{ fetchJson: () => Promise.reject(new Error("no")), openEventSource: () => ({ addEventListener: () => {}, close: () => {} }) }}>
+          <MockResults
+            view={COMPLETE_VIEW}
+            teams={TEAMS}
+            board={null}
+            players={PLAYERS}
+            byeWeeks={BYES}
+            myTeamId="t1"
+            results={{
+              ...MOCK_RESULTS_INFO,
+              yourGrade: {
+                grade: {
+                  teamId: "t1",
+                  letter: "B",
+                  components: { valueCaptured: -3.2, startingSlotsFilled: 4, startingSlotsTotal: 5, byeCollisions: 2, projectedPoints: 142.7 },
+                  projectedRank: 2,
+                },
+                boardGeneration: "2026-08-18T00:00:00.000Z",
+              },
+            }}
+          />
+        </DraftRoomDepsProvider>,
+        async ({ container }) => {
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+  });
+
   describe("across your last mocks", () => {
     it("renders nothing at all under two completed mocks", () => {
       mount();

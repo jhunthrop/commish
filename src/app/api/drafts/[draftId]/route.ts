@@ -1,17 +1,19 @@
 import { eq } from "drizzle-orm";
 import { getDb, type Db } from "@/db/client";
 import { drafts, leagues, mockRooms, teams as teamsTable } from "@/db/schema";
+import type { Player } from "@/domain/player";
 import { originFor } from "@/lib/api/origin";
 import { fail, ok } from "@/lib/api/respond";
-import { draftStateView, queueFor } from "@/draft-engine";
+import { draftStateView, queueFor, type DraftStateView } from "@/draft-engine";
 import { advanceDraftNow, getDraftStore } from "@/draft-service";
+import { rankedPlayers } from "@/draft-service/pool";
 import { leagueNameFor, listTeamCards } from "@/draft-service/teams";
 import { describeStartTiming } from "@/matchmaking/roll";
 import { expectedBotThinkDelaySeconds } from "@/mock-draft/bots";
 import { MOCK_COPY } from "@/mock-draft/config";
-import type { DraftSnapshotBody, MockResultsCopy, MockResultsInfo, MockRoomInfo, MockShareInfo, WaitingInfo } from "@/draft-room/contract";
+import type { DraftSnapshotBody, MockResultsCopy, MockResultsInfo, MockResultsYourGrade, MockRoomInfo, MockShareInfo, WaitingInfo } from "@/draft-room/contract";
 import { mockHabits } from "@/draft-room/state/debrief";
-import { completedMockDebriefs, habitFactsOf, tableForMockRoom } from "@/mock-draft-service/debrief";
+import { completedMockDebriefs, gradeForMockSeat, habitFactsOf, loadMockGradeEvidence, tableForMockRoom } from "@/mock-draft-service/debrief";
 import { withLeagueMember, type RouteContext } from "./_shared";
 
 export const runtime = "nodejs";
@@ -107,21 +109,43 @@ function mockResultsCopy(): MockResultsCopy {
 }
 
 /**
- * The finished debrief's own extras (the workflow pass, law 4): the room's table for RUN IT
- * BACK, and the caller's across-mocks habits — server-computed from stored completed mocks
- * through the SAME derivations the page renders (`completedMockDebriefs`), gated to 2+ by
- * `mockHabits` itself. A commissioner with no seat gets no habits card: the card is about the
- * caller's own picks.
+ * Task 11 (plan ruling R-2): this room's own grade for the requesting manager alone — computed
+ * fresh against today's evidence board and schedule, since a mock stores nothing (ruling 3).
+ * Null for a commissioner with no seat (`myTeamId` null) without paying for the evidence read at
+ * all, and null again if the board itself has nothing to grade against.
  */
-async function mockResultsInfo(db: Db, leagueId: string, userId: string, hasSeat: boolean): Promise<MockResultsInfo> {
-  const [table, summaries] = await Promise.all([
+async function mockResultsYourGrade(db: Db, view: DraftStateView, players: readonly Player[], myTeamId: string | null): Promise<MockResultsYourGrade | null> {
+  if (myTeamId === null) return null;
+  const evidence = await loadMockGradeEvidence(db);
+  return gradeForMockSeat({ view, players, myTeamId, evidence });
+}
+
+/**
+ * The finished debrief's own extras (the workflow pass, law 4): the room's table for RUN IT
+ * BACK, the caller's across-mocks habits, and (Task 11) the caller's own grade for THIS room —
+ * server-computed from stored completed mocks through the SAME derivations the page renders
+ * (`completedMockDebriefs`), gated to 2+ by `mockHabits` itself. A commissioner with no seat gets
+ * no habits card and no grade: both are about the caller's own picks.
+ */
+async function mockResultsInfo(
+  db: Db,
+  leagueId: string,
+  userId: string,
+  hasSeat: boolean,
+  view: DraftStateView,
+  players: readonly Player[],
+  myTeamId: string | null,
+): Promise<MockResultsInfo> {
+  const [table, summaries, yourGrade] = await Promise.all([
     tableForMockRoom(db, leagueId),
     hasSeat ? completedMockDebriefs(db, userId) : Promise.resolve([]),
+    mockResultsYourGrade(db, view, players, myTeamId),
   ]);
   return {
     copy: mockResultsCopy(),
     table,
     habits: mockHabits(summaries.map(habitFactsOf)),
+    yourGrade,
   };
 }
 
@@ -148,6 +172,12 @@ export async function GET(request: Request, context: RouteContext) {
 
     const [teams, leagueName] = await Promise.all([listTeamCards(getDb(), actor.leagueId), leagueNameFor(getDb(), actor.leagueId)]);
     const view = draftStateView(state);
+    // Task 11: the just-finished mock's own grade needs the same ranked player list the client
+    // fetches separately from `/players` — loaded here too, but only for a completed mock room
+    // the caller actually has a seat in, so a real league's completed draft (`results` stays
+    // null for it) and a commissioner with no team never pay for this read.
+    const resultsPlayers: readonly Player[] =
+      state.config.isMock === true && view.phase === "complete" && actor.teamId !== null ? await rankedPlayers(getDb(), actor.leagueId) : [];
     const mock: MockRoomInfo | null =
       state.config.isMock !== true
         ? null
@@ -168,7 +198,7 @@ export async function GET(request: Request, context: RouteContext) {
             share: view.phase === "scheduled" ? await mockShareInfoFor(getDb(), actor.leagueId, originFor(request)) : null,
             results:
               view.phase === "complete"
-                ? await mockResultsInfo(getDb(), actor.leagueId, actor.userId, actor.teamId !== null)
+                ? await mockResultsInfo(getDb(), actor.leagueId, actor.userId, actor.teamId !== null, view, resultsPlayers, actor.teamId)
                 : null,
           };
 
