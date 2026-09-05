@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { captureSnapshots, matchups, nflPlayers, players, playerStatLines, rosterSlots, scoringSettings, statWeeks, teams } from "@/db/schema";
+import { captureSnapshots, leagues, matchups, nflPlayers, players, playerStatLines, rosterSlots, scoringSettings, statWeeks, teams } from "@/db/schema";
 import type { Player, Position, StatLine } from "@/domain/player";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
@@ -239,6 +239,17 @@ export interface PlayerSeasonBody {
   readonly weeks: readonly PlayerWeekView[];
   /** Which of THIS league's teams holds him, or `null` for a free agent here. */
   readonly ownedBy: string | null;
+  /**
+   * `leagues.isMock` for THIS league (Task 4, context honesty, 2026-09-04) — `true` for a mock
+   * draft's own practice room. A roster-status claim built from `ownedBy` ("Free agent in this
+   * league" / "On {team}") is a fact about a REAL room; a mock room's teams are the founder-required
+   * seeded bot roster (`domain/league.ts`'s own `isBot` docblock), and telling a manager practicing
+   * a mock that a player is "a free agent in this league" describes a room that does not exist the
+   * way a real league does. Consumers gate that one line on this flag; every other field on this
+   * body is already honest either way (`ownedBy` itself still answers correctly for a mock room's
+   * own bot rosters, this flag only says whether stating it as a LEAGUE fact is honest).
+   */
+  readonly isMockLeague: boolean;
   /** His current designation from the harvested injuries feed ("Q", "O", "IR"), or `null` when
    *  the feed does not name him — absence means healthy as far as the source says. */
   readonly injuryDesignation: string | null;
@@ -611,6 +622,11 @@ export async function playerSeason(
   const adp = player.adp;
   const now = new Date(clock.now());
 
+  // Task 4 (context honesty): one cheap primary-key-bounded read, alongside every other
+  // per-league fact this function already reads (`scoringSettings`, `matchups`).
+  const [leagueRow] = await db.select({ isMock: leagues.isMock }).from(leagues).where(eq(leagues.id, leagueId));
+  const isMockLeague = leagueRow?.isMock ?? false;
+
   const fixtures = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const { totalWeeks } = seasonProgress(fixtures, LEAGUE_CONFIG.regularSeasonWeeks);
   const weekRows = await db.select({ week: statWeeks.week }).from(statWeeks).where(ne(statWeeks.status, "scheduled"));
@@ -666,6 +682,7 @@ export async function playerSeason(
 
   return {
     ownedBy: holder?.teamName ?? null,
+    isMockLeague,
     injuryDesignation,
     log: stats.log,
     totals: stats.totals,

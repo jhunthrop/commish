@@ -64,7 +64,7 @@ afterAll(async () => {
  * row (the stat lines, the rosters) exactly as `played: true` does, since `stat_weeks` alone is
  * what `playerSeason` gates the current season's availability on.
  */
-async function league({ played = true }: { readonly played?: boolean } = {}) {
+async function league({ played = true, isMock = false }: { readonly played?: boolean; readonly isMock?: boolean } = {}) {
   await db.insert(users).values([
     { id: "u1", email: "u1@test.local", displayName: "Manager 1" },
     { id: "u2", email: "u2@test.local", displayName: "Manager 2" },
@@ -72,7 +72,7 @@ async function league({ played = true }: { readonly played?: boolean } = {}) {
   const created = await createLeague({ db, clock, newId }, {
     name: "Duel", format: "snake", teamCount: 2, scoringPreset: "ppr", auctionBudget: null,
     rosterSlots: SLOTS, owner: { kind: "member", userId: "u1", teamName: "Team One" },
-    experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame: false,
+    experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame: false, isMock,
   });
   if (!created.ok) throw new Error(created.reason);
   const leagueId = created.leagueId;
@@ -151,6 +151,16 @@ describe("playerSeason", () => {
   it("answers null for a player the feed does not carry at all", async () => {
     const leagueId = await league();
     expect(await playerSeason(db, leagueId, "nobody")).toBeNull();
+  });
+
+  it("carries isMockLeague false for a real league", async () => {
+    const leagueId = await league();
+    expect((await playerSeason(db, leagueId, "rb1"))!.isMockLeague).toBe(false);
+  });
+
+  it("carries isMockLeague true for a mock/practice league (Task 4, context honesty)", async () => {
+    const leagueId = await league({ isMock: true });
+    expect((await playerSeason(db, leagueId, "rb1"))!.isMockLeague).toBe(true);
   });
 });
 

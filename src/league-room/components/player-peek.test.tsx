@@ -30,6 +30,7 @@ function bodyFor(season: number, availableSeasons: readonly number[]): PlayerSea
     pointsPerGamePercentile: 0.7,
     weeks: [{ week: 1, points: 12.5, percentile: 0.7 }],
     ownedBy: null,
+    isMockLeague: false,
     injuryDesignation: null,
     log: [{ week: 1, points: 12.5, carries: season === 2026 ? 15 : null, rushingYards: 80, targets: season === 2026 ? 3 : null, receptions: 2, receivingYards: 20, passingYards: 0, touchdowns: 1 }],
     totals: {
@@ -55,6 +56,7 @@ const ROOKIE_BODY: PlayerSeasonBody = {
   pointsPerGamePercentile: null,
   weeks: [],
   ownedBy: null,
+  isMockLeague: false,
   injuryDesignation: null,
   log: [],
   totals: null,
@@ -171,5 +173,83 @@ describe("PlayerPeekHost — season label and switcher", () => {
     openPlayerPeek({ leagueId: "lg1", playerId: "rb2", name: "Second Back" });
     await waitFor(() => expect(calls.at(-1)).toContain("playerId=rb2"));
     expect(calls.at(-1)).not.toContain("season=");
+  });
+});
+
+describe("PlayerPeekHost — context honesty (Task 4, 2026-09-04)", () => {
+  it("states the real roster fact in a real league", async () => {
+    const bodies = new Map([[2026, { ...bodyFor(2026, [2026]), ownedBy: "Team Two" }]]);
+    mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText("On Team Two")).toBeInTheDocument());
+  });
+
+  it("states free agency in a real league", async () => {
+    const bodies = new Map([[2026, bodyFor(2026, [2026])]]);
+    mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText("Free agent in this league")).toBeInTheDocument());
+  });
+
+  it("says nothing about roster status in a mock/practice league — there is no real room to be a free agent in", async () => {
+    const bodies = new Map([[2026, { ...bodyFor(2026, [2026]), isMockLeague: true }]]);
+    mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText("2026 season")).toBeInTheDocument());
+    expect(screen.queryByText("Free agent in this league")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^On /)).not.toBeInTheDocument();
+  });
+});
+
+describe("PlayerPeekHost — the Outlook, grouped (2026-09-04 redesign)", () => {
+  const REASONS: PlayerSeasonBody["reasons"] = [
+    { code: "market_anchor", marketPoints: 200, delta: 14.2 },
+    { code: "scarcity", positionRank: 4, replacementLevel: 140 },
+    { code: "law", lawId: "rb_age_curve", effect: -1.8, magnitude: 29 },
+    { code: "law", lawId: "rb_workload_cliff", effect: -0.9, magnitude: 320 },
+    { code: "changed_team", from: "SF", to: "MIA" },
+    { code: "availability", expectedGames: 14, floorGames: 10, ceilingGames: 17 },
+    { code: "rookie", overallPick: null, landingMultiplier: 1 },
+    { code: "new_play_caller", team: "MIA" },
+  ];
+
+  it("renders nothing when the board never ranked him", async () => {
+    const bodies = new Map([[2026, bodyFor(2026, [2026])]]);
+    mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText("2026 season")).toBeInTheDocument());
+    expect(screen.queryByText("Outlook")).not.toBeInTheDocument();
+  });
+
+  it("opens with a verdict sentence, then caps at 5 groups behind a 'The full case (N)' expander", async () => {
+    const user = userEvent.setup();
+    const bodies = new Map([[2026, { ...bodyFor(2026, [2026]), reasons: REASONS }]]);
+    mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText("Outlook")).toBeInTheDocument());
+    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
+    // 6 groups total (2 law groups + 4 fact groups: changed_team, availability, rookie,
+    // new_play_caller — market_anchor/scarcity feed the verdict, never a peer chip) capped to 5,
+    // the weakest (last-listed) fact group hidden behind the expander.
+    expect(screen.getByText("The full case (6)")).toBeInTheDocument();
+    expect(screen.queryByText(/New play caller/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("The full case (6)"));
+    expect(screen.getByText(/New play caller/)).toBeInTheDocument();
+    expect(screen.queryByText("The full case (6)")).not.toBeInTheDocument();
+  });
+
+  it("presses a law group open to show its own member laws as receipts", async () => {
+    const user = userEvent.setup();
+    const bodies = new Map([[2026, { ...bodyFor(2026, [2026]), reasons: REASONS }]]);
+    mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText(/Age 29 season/)).toBeInTheDocument());
+    // The receipt sentence is not visible until the group is pressed open.
+    expect(screen.queryByText(/measured -1\.8 pts per game/)).not.toBeInTheDocument();
+    await user.click(screen.getByText(/Age 29 season/));
+    expect(screen.getByText(/Age 29 season: measured -1\.8 pts per game/)).toBeInTheDocument();
   });
 });
