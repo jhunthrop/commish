@@ -1,12 +1,15 @@
+import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { matchups, players, playerStatLines, statWeeks, teams, users } from "@/db/schema";
+import { matchups, players, playerStatLines, scoringSettings, statWeeks, teams, users } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
 import { crosswalkRows, recordCrosswalk, resolveCrosswalk } from "@/projections/crosswalk";
+import { statMetricName, STAT_LINE_SOURCE } from "@/projections/lines";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { BOARD_SOURCE, recordPreseasonProjections } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { recordPreseasonRankings } from "@/projections/preseason/store";
+import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
 import { recordNflPlayers } from "@/projections/universe";
 import { createLeague } from "./creation";
 import { playerSeason } from "./player";
@@ -52,11 +55,16 @@ afterAll(async () => {
 
 /**
  * One league with a three-week schedule, three running backs, and stat lines in weeks 1 through
- * 3 — but only weeks 1 and 2 marked played. Week 3's rows exist ON PURPOSE: the product's own
- * dataset carries stat lines for weeks nobody has played yet, and the whole point of the
- * `stat_weeks` gate is that those rows are not results.
+ * 3 — but only weeks 1 and 2 marked played (weeks 1 and 2 `final`). Week 3's rows exist ON
+ * PURPOSE: the product's own dataset carries stat lines for weeks nobody has played yet, and the
+ * whole point of the `stat_weeks` gate is that those rows are not results.
+ *
+ * `played: false` (the current-season-empty widening, 2026-09-04) marks EVERY week `scheduled`
+ * instead — the preseason state a card must show prior-year data for — while leaving every other
+ * row (the stat lines, the rosters) exactly as `played: true` does, since `stat_weeks` alone is
+ * what `playerSeason` gates the current season's availability on.
  */
-async function league() {
+async function league({ played = true }: { readonly played?: boolean } = {}) {
   await db.insert(users).values([
     { id: "u1", email: "u1@test.local", displayName: "Manager 1" },
     { id: "u2", email: "u2@test.local", displayName: "Manager 2" },
@@ -76,8 +84,8 @@ async function league() {
   // chart's week list independently of how many NFL weeks have been played.
   await db.insert(matchups).values([1, 2, 3].map((weekNumber) => ({ leagueId, weekNumber, homeTeamId, awayTeamId: "team_2" })));
   await db.insert(statWeeks).values([
-    { week: 1, status: "final" as const },
-    { week: 2, status: "final" as const },
+    { week: 1, status: played ? ("final" as const) : ("scheduled" as const) },
+    { week: 2, status: played ? ("final" as const) : ("scheduled" as const) },
     { week: 3, status: "scheduled" as const },
   ]);
   await db.insert(players).values([
@@ -251,5 +259,167 @@ describe("playerSeason's preseason readings", () => {
         ceilingPoints: 320.0, tier: 1, asOf: NOW, momentKind: "live" },
     ]);
     await expect(playerSeason(db, leagueId, "rb1", clock)).rejects.toThrow(/distinct as_of generations/);
+  });
+});
+
+/**
+ * THE SEASON WIDENING (2026-09-04, founder: "make sure our player cards show prior year data
+ * when the season hasn't started"). `player_stat_lines`/`stat_weeks` are single-season; these
+ * tests pin the seam that lets `playerSeason` answer for a season that store cannot even name —
+ * a prior one, read through the crosswalk from the projection engine's point-in-time store and
+ * scored under THIS league's own rules, never a different league's or a default's.
+ */
+describe("playerSeason's season history", () => {
+  const CHASE = "00-0036900";
+  const PEER = "00-0036950";
+  const NOW = new Date(clock.now());
+  const LAST = PRODUCT_SEASON - 1;
+  const PRIOR = PRODUCT_SEASON - 2;
+  const TOO_FAR_BACK = PRODUCT_SEASON - 4;
+
+  /** rb1 -> `CHASE` through the real crosswalk mechanism, plus one historical peer (`PEER`) who
+   *  never drafted in this league — present only so a prior season has a population to judge a
+   *  week against. */
+  async function crossOverRb1(): Promise<void> {
+    await recordNflPlayers(db, [
+      { id: CHASE, pfrId: "LongRa00", espnId: "rb1", name: "Rashad Long", position: "RB", latestTeam: "SF", rookieSeason: 2018, lastSeason: PRODUCT_SEASON },
+      { id: PEER, pfrId: "PeerBa00", espnId: "peer-x", name: "Peer Back", position: "RB", latestTeam: "GB", rookieSeason: 2018, lastSeason: PRODUCT_SEASON },
+    ]);
+    await recordCrosswalk(db, crosswalkRows(resolveCrosswalk(
+      [{ id: "rb1", name: "Rashad Long", position: "RB" }],
+      [{ id: CHASE, espnId: "rb1", name: "Rashad Long" }],
+    ), NOW));
+  }
+
+  /** One player's one recorded week, spelled the way the nflverse weekly file writes it into the
+   *  point-in-time store — the same helper shape `player-history-route.test.ts` uses for the
+   *  identical read. */
+  function week(gsisId: string, season: number, weekNumber: number, stats: Readonly<Record<string, number>>): readonly PlayerWeekObservation[] {
+    const asOf = new Date(Date.UTC(season, 10, 1));
+    return Object.entries(stats).map(([field, value]) => ({
+      season, week: weekNumber, playerId: gsisId, source: STAT_LINE_SOURCE, metric: statMetricName(field), value, asOf,
+    }));
+  }
+
+  it("lists a prior season only once THIS player has a recorded week there, capped at three seasons back, newest first", async () => {
+    const leagueId = await league();
+    await crossOverRb1();
+    await recordObservations(db, [
+      ...week(CHASE, LAST, 1, { rushingYards: 100 }),
+      ...week(CHASE, PRIOR, 5, { rushingYards: 80 }),
+      // Four seasons back is on record but outside the three-season lookback — must not appear.
+      ...week(CHASE, TOO_FAR_BACK, 1, { rushingYards: 500 }),
+    ]);
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    // The current season is here too: `league()`'s own weeks 1-2 are `final`.
+    expect(body.availableSeasons).toEqual([PRODUCT_SEASON, LAST, PRIOR]);
+    expect(body.isRookie).toBe(false);
+  });
+
+  it("defaults to the current season once the league has played a week, even with prior seasons on record", async () => {
+    const leagueId = await league();
+    await crossOverRb1();
+    await recordObservations(db, [...week(CHASE, LAST, 1, { rushingYards: 100 })]);
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.season).toBe(PRODUCT_SEASON);
+    // The untouched current-season path: identical to the pre-widening assertion above.
+    expect(body.pointsPerGame).toBe(20);
+  });
+
+  it("answers for a requested prior season, scored under THIS league's rules, from the engine's own store — never the single-season table", async () => {
+    const leagueId = await league();
+    await crossOverRb1();
+    await recordObservations(db, [
+      ...week(CHASE, LAST, 1, { rushingYards: 100, rushingTouchdowns: 1, receptions: 2 }),
+      ...week(CHASE, LAST, 2, { rushingYards: 40 }),
+      ...week(PEER, LAST, 1, { rushingYards: 200, rushingTouchdowns: 3 }),
+    ]);
+    const body = (await playerSeason(db, leagueId, "rb1", clock, LAST))!;
+    expect(body.season).toBe(LAST);
+    expect(body.availableSeasons[0]).toBe(PRODUCT_SEASON); // still offered, just not the one answered for
+    // PPR (this league's own preset): 100*0.1 + 1*6 + 2*1 = 18; 40*0.1 = 4.
+    expect(body.weeks[0]).toEqual({ week: 1, points: 18, percentile: 0.5 });
+    expect(body.weeks[1]).toEqual({ week: 2, points: 4, percentile: 0 });
+    expect(body.pointsPerGame).toBe(11);
+    expect(body.pointsPerGamePercentile).toBe(0); // PEER's 38 PPG towers over CHASE's 11
+    // Newest week first, and never a fabricated carry count — the store cannot honestly supply one.
+    expect(body.log[0]).toMatchObject({ week: 2, points: 4, carries: null, rushingYards: 40, targets: null });
+    expect(body.log[1]).toMatchObject({ week: 1, points: 18, carries: null, receptions: 2, touchdowns: 1 });
+    expect(body.totals).toEqual({
+      games: 2, carries: null, rushingYards: 140, targets: null, receptions: 2,
+      receivingYards: 0, passingYards: 0, touchdowns: 1, fantasyPoints: 22,
+    });
+  });
+
+  it("scores a prior season under a NON-default league setting, proving the read is not a hardcoded PPR assumption", async () => {
+    const leagueId = await league();
+    await db.update(scoringSettings).set({ pointsPerReception: 2 }).where(eq(scoringSettings.leagueId, leagueId));
+    await crossOverRb1();
+    await recordObservations(db, [...week(CHASE, LAST, 1, { rushingYards: 100, rushingTouchdowns: 1, receptions: 2 })]);
+    const body = (await playerSeason(db, leagueId, "rb1", clock, LAST))!;
+    // 100*0.1 + 1*6 + 2*2 (double-PPR) = 20, not the 18 the default PPR preset would have scored.
+    expect(body.weeks[0]!.points).toBe(20);
+  });
+
+  it("draft-outlook cells (ADP-based) do not move with the requested season — they are a fact about the season he is drafted for, not the one on screen", async () => {
+    const leagueId = await league();
+    await crossOverRb1();
+    await recordObservations(db, [...week(CHASE, LAST, 1, { rushingYards: 100 })]);
+    const current = (await playerSeason(db, leagueId, "rb1", clock))!;
+    const prior = (await playerSeason(db, leagueId, "rb1", clock, LAST))!;
+    expect(prior.positionRank).toBe(current.positionRank);
+    expect(prior.adpPercentile).toBe(current.adpPercentile);
+  });
+
+  it("falls back to the newest available season when the request names one with no data, rather than fabricating it", async () => {
+    const leagueId = await league();
+    await crossOverRb1();
+    await recordObservations(db, [...week(CHASE, LAST, 1, { rushingYards: 100 })]);
+    const body = (await playerSeason(db, leagueId, "rb1", clock, PRIOR))!; // PRIOR has no data
+    expect(body.season).toBe(PRODUCT_SEASON);
+  });
+
+  it("defaults to the newest PRIOR season when the current season has not been played yet — no empty chrome, no dead end", async () => {
+    const leagueId = await league({ played: false });
+    await crossOverRb1();
+    await recordObservations(db, [
+      ...week(CHASE, LAST, 1, { rushingYards: 100, rushingTouchdowns: 1 }),
+    ]);
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.availableSeasons).toEqual([LAST]);
+    expect(body.isRookie).toBe(false);
+    expect(body.season).toBe(LAST);
+    expect(body.weeks[0]).toMatchObject({ week: 1, points: 16 }); // 100*0.1 + 6
+    expect(body.pointsPerGame).toBe(16);
+  });
+
+  it("is a true rookie — no current-season row and no prior season anywhere — only when BOTH are absent", async () => {
+    const leagueId = await league({ played: false });
+    // No crosswalk placement at all: the projection engine has nobody to look up.
+    const unplaced = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(unplaced.availableSeasons).toEqual([]);
+    expect(unplaced.isRookie).toBe(true);
+    expect(unplaced.season).toBe(PRODUCT_SEASON); // still names a year, with nothing under it
+    expect(unplaced.weeks).toEqual([]);
+    expect(unplaced.log).toEqual([]);
+    expect(unplaced.totals).toBeNull();
+    expect(unplaced.pointsPerGame).toBeNull();
+    expect(unplaced.pointsPerGamePercentile).toBeNull();
+  });
+
+  it("placement through the crosswalk alone is not enough to escape rookie status — the store must actually carry a week", async () => {
+    const leagueId = await league({ played: false });
+    await crossOverRb1(); // placed, but no observations are ever recorded for him
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.availableSeasons).toEqual([]);
+    expect(body.isRookie).toBe(true);
+  });
+
+  it("keeps the current season's carries/targets numeric — the widening changes nothing about what today's season already showed", async () => {
+    const leagueId = await league();
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.season).toBe(PRODUCT_SEASON);
+    expect(typeof body.totals!.carries).toBe("number");
+    expect(typeof body.totals!.targets).toBe("number");
   });
 });

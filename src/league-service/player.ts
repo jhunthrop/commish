@@ -1,19 +1,31 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { captureSnapshots, matchups, players, playerStatLines, rosterSlots, scoringSettings, statWeeks, teams } from "@/db/schema";
-import type { Player, Position } from "@/domain/player";
+import { captureSnapshots, matchups, nflPlayers, players, playerStatLines, rosterSlots, scoringSettings, statWeeks, teams } from "@/db/schema";
+import type { Player, Position, StatLine } from "@/domain/player";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG, seasonProgress } from "@/league";
-import { nflPlayerIdFor } from "@/projections/crosswalk";
+import { nflPlayerIdFor, nflPlayerIdsFor } from "@/projections/crosswalk";
+import type { SeasonStatLine } from "@/projections/lines";
 import type { Law } from "@/projections/laws/types";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
+import { statLinesAsOfForLiveSurface } from "@/projections/nflverse/derived-stat-lines";
+import { finalWeekOf } from "@/projections/nflverse/team-eras";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import type { BoardReason } from "@/projections/preseason/board";
 import { BOARD_SOURCE, assertSingleGeneration, boardReasons, preseasonProjectionsFor } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { preseasonRankingsFor } from "@/projections/preseason/store";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
+
+/**
+ * How many finished seasons before `PRODUCT_SEASON` a player card will offer, at most — the same
+ * three seasons the draft room's own peek card looks back over (`draft-service/player-history.ts`'s
+ * `HISTORY_SEASONS`). Kept as this file's own constant rather than importing that one: the two
+ * screens share a number today by coincidence of product taste, not by a rule that binds them
+ * together, and a founder narrowing one is not a reason to narrow the other.
+ */
+const HISTORY_SEASONS = 3;
 
 /** The outermost edge is the only place a wall clock is allowed, exactly as every other service
  *  in this directory has it. */
@@ -37,13 +49,23 @@ export interface PlayerWeekView {
   readonly percentile: number | null;
 }
 
-/** One played week's raw production — the game log's row (founder, 2026-08-30: ESPN-depth card). */
+/**
+ * One played week's raw production — the game log's row (founder, 2026-08-30: ESPN-depth card).
+ *
+ * `carries` and `targets` are `null` for a PRIOR season (2026-09-04 widening): they are the
+ * "harvest block" in `StatLine` — optional, deliberately outside `STAT_FIELDS` (see that constant's
+ * own docblock) — and the point-in-time store's `statLinesAsOf` therefore never fills them from an
+ * observation, for any season. The CURRENT season's rows come from `player_stat_lines` instead,
+ * whose columns default to `0` and are always present, so this widening changes nothing about what
+ * today's season already showed. `null` here is never a fabricated zero: a receiver who plainly
+ * caught passes in a season this product cannot see his carry count for gets a dash, not a lie.
+ */
 export interface PlayerGameLogRow {
   readonly week: number;
   readonly points: number;
-  readonly carries: number;
+  readonly carries: number | null;
   readonly rushingYards: number;
-  readonly targets: number;
+  readonly targets: number | null;
   readonly receptions: number;
   readonly receivingYards: number;
   readonly passingYards: number;
@@ -51,12 +73,13 @@ export interface PlayerGameLogRow {
   readonly touchdowns: number;
 }
 
-/** The season summed, from the same lines the log itemizes. */
+/** The season summed, from the same lines the log itemizes. `carries`/`targets` are `null` exactly
+ *  when every row they are summed from is — see `PlayerGameLogRow`'s own docblock. */
 export interface PlayerSeasonTotals {
   readonly games: number;
-  readonly carries: number;
+  readonly carries: number | null;
   readonly rushingYards: number;
-  readonly targets: number;
+  readonly targets: number | null;
   readonly receptions: number;
   readonly receivingYards: number;
   readonly passingYards: number;
@@ -100,8 +123,52 @@ export interface PlayerSeasonTotals {
  * lives in the present, so "everything knowable now" is both the honest read and exactly the
  * predicate a replay would use standing here — which is what lets the same store serve both.
  */
+/**
+ * SEASON SELECTION (2026-09-04 widening, founder: "make sure our player cards show prior year data
+ * when the season hasn't started"). `player_stat_lines`/`stat_weeks` are single-season — the CURRENT
+ * season only — and are empty until the league's own weeks start reporting results, which for a
+ * fresh season can be months. `availableSeasons`, `season` and `isRookie` below make the rest of
+ * this body ANSWER FOR ONE SEASON, chosen honestly rather than left to draw an empty current season:
+ *
+ * - `availableSeasons` lists every season this body could have answered for, newest first. The
+ *   current season (`PRODUCT_SEASON`) is in it only once the league has actually played a week —
+ *   the same `stat_weeks.status != 'scheduled'` gate the chart itself already enforced, so a
+ *   preseason card never claims a current season it has zero rows for. A prior season is in it
+ *   only when THIS PLAYER has at least one recorded week for it in the projection engine's
+ *   point-in-time store (`player_week_observations`, read through the crosswalk) — never a season
+ *   with league-wide history but nothing for him, and never a season absent from the store at all.
+ * - `season` is which one of those the rest of this body (`weeks`, `log`, `totals`, `pointsPerGame`,
+ *   `pointsPerGamePercentile`) actually describes: the caller's request when it named an available
+ *   one, otherwise the newest available season — which is the CURRENT season once it has played a
+ *   week, and the most recent PRIOR season for as long as it has not. That fallback is the whole
+ *   point: a card opened in August, before this year's first snap, shows last year's real season
+ *   instead of thirteen empty columns.
+ * - A PRIOR season's `weeks`/`log`/`totals` are scored under THIS league's own rules from the SAME
+ *   engine store `draft-service/player-history.ts`'s peek card already reads
+ *   (`statLinesAsOfForLiveSurface`), never borrowed or interpolated — a season the store does not
+ *   carry for him simply never enters `availableSeasons`, the same absence-over-invention rule
+ *   `expertRank`/`modelRank` below already keep. `carries`/`targets` are `null` on a prior season's
+ *   game log rows: see `PlayerGameLogRow`'s own docblock for why the store cannot honestly fill them.
+ * - `isRookie` is true only when `availableSeasons` is empty — no current-season row AND no prior
+ *   season anywhere, the one case with nothing honest to chart. `season` still names a year even
+ *   then (`PRODUCT_SEASON`, the one he is about to play), so the screen has something to label; the
+ *   `weeks`/`log`/`totals` fields are simply all-empty/`null`, exactly as they already were for the
+ *   pre-widening "no scored week for him this season" case, and the UI is expected to print one
+ *   honest sentence instead of a chart for this case specifically.
+ *
+ * `positionRank`, `adpPercentile`, `expertRank`, `modelRank`, `reasons` and `laws` below are NOT
+ * season-selected: they are this year's draft outlook (ADP, expert consensus, our own board, the
+ * board's own reasons), which is a fact about the season a manager is drafting for, not about
+ * whichever season's game log he happens to be looking at.
+ */
 export interface PlayerSeasonBody {
   readonly player: Player;
+  /** Every season this body could answer for, newest first. Empty only for `isRookie`. */
+  readonly availableSeasons: readonly number[];
+  /** Which season `weeks`/`log`/`totals`/`pointsPerGame`/`pointsPerGamePercentile` describe. */
+  readonly season: number;
+  /** No current-season row and no prior season anywhere — see this interface's own docblock. */
+  readonly isRookie: boolean;
   /** His rank among players at his position by market draft position, or `null` where the ADP
    *  feed does not carry him. */
   readonly positionRank: number | null;
@@ -118,10 +185,12 @@ export interface PlayerSeasonBody {
    *  A real, unborrowed projection for the current season once the live board is persisted, never
    *  measured against an outcome the season has not produced yet — see the type's own docblock. */
   readonly modelRank: number | null;
-  /** Points per game over the weeks he actually played, under THIS league's scoring rules. */
+  /** Points per game over the weeks he actually played in `season`, under THIS league's scoring
+   *  rules. */
   readonly pointsPerGame: number | null;
   readonly pointsPerGamePercentile: number | null;
-  /** Every week of this league's season that has actually been played, in order. */
+  /** Every week of `season` that has actually been played, in order — every league week for the
+   *  current season, every NFL regular-season week for a prior one. */
   readonly weeks: readonly PlayerWeekView[];
   /** Which of THIS league's teams holds him, or `null` for a free agent here. */
   readonly ownedBy: string | null;
@@ -145,8 +214,6 @@ export interface PlayerSeasonBody {
   readonly laws: readonly Law[];
 }
 
-type Line = typeof playerStatLines.$inferSelect;
-
 /**
  * Where `value` sits in `population`, 0..1, with 1 the best in the set.
  *
@@ -167,13 +234,20 @@ function percentileOf(value: number, population: readonly number[], better: "hig
 /**
  * Every played week, with his own number and where that number stands.
  *
- * The population is EVERY WEEK PLAYED AT HIS POSITION THIS SEASON, not his own thirteen. A
+ * The population is EVERY WEEK PLAYED AT HIS POSITION THAT SEASON, not his own thirteen. A
  * player's weeks judged against themselves always produce a full spread of verdicts — a man with
  * thirteen identical afternoons gets a red week and a green one, which is a lie the reader has no
  * way to see. Against his position's whole season, a twenty-one point week is a big week because
  * it was a big week for a running back, which is the question a manager is actually asking.
+ *
+ * `lines` are `StatLine`s rather than the current season's own `player_stat_lines` row shape, so
+ * this and `peerPointsPerGame` below serve BOTH stat-store shapes this file reads from: the
+ * current season's DB rows (which structurally satisfy `StatLine` — every optional harvest field
+ * present as a real, defaulted number) and a prior season's `SeasonStatLine.line` read from the
+ * observation store (which does not carry those optional fields at all). Neither function reads
+ * the optional fields, so the shape difference is invisible to both.
  */
-function weekViews(lines: readonly Line[], played: readonly number[], playerId: string, position: Position, rules: ScoringRules): readonly PlayerWeekView[] {
+function weekViews(lines: readonly StatLine[], played: readonly number[], playerId: string, position: Position, rules: ScoringRules): readonly PlayerWeekView[] {
   const population = lines.map((line) => computeFantasyPoints(line, position, rules));
   const mine = new Map(lines.filter((line) => line.playerId === playerId).map((line) => [line.week, line] as const));
   return played.map((week): PlayerWeekView => {
@@ -186,14 +260,155 @@ function weekViews(lines: readonly Line[], played: readonly number[], playerId: 
 
 /** Each peer's own points per game over the played weeks — the population `pointsPerGame` is
  *  judged against. A man with no played week is not in it: a season he did not have is not a
- *  season anyone's average should be measured against. */
-function peerPointsPerGame(lines: readonly Line[], position: Position, rules: ScoringRules): readonly number[] {
+ *  season anyone's average should be measured against. See `weekViews`' own note on why this
+ *  takes `StatLine`s rather than one store's own row shape. */
+function peerPointsPerGame(lines: readonly StatLine[], position: Position, rules: ScoringRules): readonly number[] {
   const totals = new Map<string, { total: number; games: number }>();
   for (const line of lines) {
     const running = totals.get(line.playerId) ?? { total: 0, games: 0 };
     totals.set(line.playerId, { total: running.total + computeFantasyPoints(line, position, rules), games: running.games + 1 });
   }
   return [...totals.values()].map((running) => roundPoints(running.total / running.games));
+}
+
+/** The season summed from a game log, honestly: `carries`/`targets` total only when EVERY row in
+ *  the log carries a real number for it, `null` when the season's own source cannot (a prior
+ *  season, always — see `PlayerGameLogRow`'s own docblock). `null` for an empty log — a season he
+ *  did not play is not a season with a zero total. */
+function totalsFromLog(log: readonly PlayerGameLogRow[]): PlayerSeasonTotals | null {
+  if (log.length === 0) return null;
+  const carriesKnown = log.every((row) => row.carries !== null);
+  const targetsKnown = log.every((row) => row.targets !== null);
+  const seed: PlayerSeasonTotals = {
+    games: 0,
+    carries: carriesKnown ? 0 : null,
+    rushingYards: 0,
+    targets: targetsKnown ? 0 : null,
+    receptions: 0,
+    receivingYards: 0,
+    passingYards: 0,
+    touchdowns: 0,
+    fantasyPoints: 0,
+  };
+  return log.reduce(
+    (sum, row): PlayerSeasonTotals => ({
+      games: sum.games + 1,
+      carries: sum.carries === null ? null : sum.carries + (row.carries ?? 0),
+      rushingYards: sum.rushingYards + row.rushingYards,
+      targets: sum.targets === null ? null : sum.targets + (row.targets ?? 0),
+      receptions: sum.receptions + row.receptions,
+      receivingYards: sum.receivingYards + row.receivingYards,
+      passingYards: sum.passingYards + row.passingYards,
+      touchdowns: sum.touchdowns + row.touchdowns,
+      fantasyPoints: roundPoints(sum.fantasyPoints + row.points),
+    }),
+    seed,
+  );
+}
+
+/** The four fields that vary by which season is being shown — everything else in
+ *  `PlayerSeasonBody` (the draft outlook cells, ownership, injury, news) is season-independent.
+ *  See `PlayerSeasonBody`'s own docblock. */
+interface PlayerSeasonStats {
+  readonly weeks: readonly PlayerWeekView[];
+  readonly pointsPerGame: number | null;
+  readonly pointsPerGamePercentile: number | null;
+  readonly log: readonly PlayerGameLogRow[];
+  readonly totals: PlayerSeasonTotals | null;
+}
+
+/**
+ * THE CURRENT SEASON'S PATH, UNCHANGED (2026-09-04 widening carries this over byte-for-byte from
+ * before seasons existed as a concept here): `player_stat_lines`, gated by `stat_weeks`, exactly as
+ * `playerSeason`'s own top-level docblock describes. The one thing that moved is the wrapper — this
+ * used to be inlined in `playerSeason` itself; it is a function now only so a prior season's
+ * differently-sourced stats (`priorSeasonStats` below) can sit beside it as the other half of one
+ * `season === PRODUCT_SEASON ? … : …` choice.
+ */
+async function currentSeasonStats(
+  db: Db,
+  playerId: string,
+  position: Position,
+  peerIds: readonly string[],
+  played: readonly number[],
+  rules: ScoringRules,
+): Promise<PlayerSeasonStats> {
+  const lines =
+    peerIds.length === 0 || played.length === 0
+      ? []
+      : await db.select().from(playerStatLines).where(and(inArray(playerStatLines.playerId, peerIds), inArray(playerStatLines.week, played)));
+
+  const weeks = weekViews(lines, played, playerId, position, rules);
+  const mine = weeks.flatMap((week) => (week.points === null ? [] : [week.points]));
+  const pointsPerGame = mine.length === 0 ? null : roundPoints(mine.reduce((sum, points) => sum + points, 0) / mine.length);
+  const pointsPerGamePercentile = pointsPerGame === null ? null : percentileOf(pointsPerGame, peerPointsPerGame(lines, position, rules), "higher");
+
+  const myLines = lines.filter((line) => line.playerId === playerId).sort((a, b) => b.week - a.week);
+  const log: PlayerGameLogRow[] = myLines.map((line) => ({
+    week: line.week,
+    points: computeFantasyPoints(line, position, rules),
+    carries: line.carries,
+    rushingYards: line.rushingYards,
+    targets: line.targets,
+    receptions: line.receptions,
+    receivingYards: line.receivingYards,
+    passingYards: line.passingYards,
+    touchdowns: line.rushingTouchdowns + line.receivingTouchdowns + line.passingTouchdowns,
+  }));
+
+  return { weeks, pointsPerGame, pointsPerGamePercentile, log, totals: totalsFromLog(log) };
+}
+
+/** Whether the point-in-time store has at least one recorded week for `gsisId` in `season` — the
+ *  cheap presence check `availableSeasons` runs per candidate season, before anything pays for a
+ *  whole position's peer population. One player id in the filter, so this is a primary-key-bounded
+ *  read regardless of how big the season's own table has grown. */
+async function priorSeasonHasData(db: Db, gsisId: string, season: number, asOf: Date): Promise<boolean> {
+  const mine = await statLinesAsOfForLiveSurface(db, { season, week: { from: 1, to: finalWeekOf(season) }, asOf, playerIds: [gsisId] });
+  return mine.length > 0;
+}
+
+/**
+ * A PRIOR season's stats, scored under THIS league's rules from the projection engine's own
+ * point-in-time store — the same read `draft-service/player-history.ts`'s peek card makes
+ * (`statLinesAsOfForLiveSurface`), never the live product's single-season table (which cannot even
+ * name this season).
+ *
+ * The population is every historical person nflverse lists at this position, UNIONED WITH THE
+ * PLAYER'S OWN id so he can never rank outside his own population — `player-history.ts`'s own
+ * guarantee, carried over here for the identical reason. `week` runs `1..finalWeekOf(season)`: a
+ * finished NFL season's own regular-season length, not this league's — the current season's own
+ * `weeks` list is capped by the LEAGUE's schedule because a league week is a fact about matchups
+ * that have not been played yet, and a prior season has no such future to cap against.
+ */
+async function priorSeasonStats(db: Db, gsisId: string, season: number, position: Position, rules: ScoringRules, asOf: Date): Promise<PlayerSeasonStats> {
+  const positionPeers = await db.select({ id: nflPlayers.id }).from(nflPlayers).where(eq(nflPlayers.position, position));
+  const peerIds = [...new Set([gsisId, ...positionPeers.map((peer) => peer.id)])];
+  const lastWeek = finalWeekOf(season);
+  const peerLines: readonly SeasonStatLine[] = await statLinesAsOfForLiveSurface(db, { season, week: { from: 1, to: lastWeek }, asOf, playerIds: peerIds });
+  const lines = peerLines.map((row) => row.line);
+  const everyWeek = Array.from({ length: lastWeek }, (_, index) => index + 1);
+
+  const weeks = weekViews(lines, everyWeek, gsisId, position, rules);
+  const mine = weeks.flatMap((week) => (week.points === null ? [] : [week.points]));
+  const pointsPerGame = mine.length === 0 ? null : roundPoints(mine.reduce((sum, points) => sum + points, 0) / mine.length);
+  const pointsPerGamePercentile = pointsPerGame === null ? null : percentileOf(pointsPerGame, peerPointsPerGame(lines, position, rules), "higher");
+
+  const myLines = lines.filter((line) => line.playerId === gsisId).sort((a, b) => b.week - a.week);
+  const log: PlayerGameLogRow[] = myLines.map((line) => ({
+    week: line.week,
+    points: computeFantasyPoints(line, position, rules),
+    // THE STORE NEVER CARRIES THESE — see `PlayerGameLogRow`'s own docblock. `null`, not `0`.
+    carries: null,
+    rushingYards: line.rushingYards,
+    targets: null,
+    receptions: line.receptions,
+    receivingYards: line.receivingYards,
+    passingYards: line.passingYards,
+    touchdowns: line.rushingTouchdowns + line.receivingTouchdowns + line.passingTouchdowns,
+  }));
+
+  return { weeks, pointsPerGame, pointsPerGamePercentile, log, totals: totalsFromLog(log) };
 }
 
 /**
@@ -231,35 +446,6 @@ async function preseasonReadings(
   return { expertRank: consensus?.rank ?? null, modelRank: ours?.rank ?? null, reasons };
 }
 
-/**
- * A player's whole season on one screen, read under one league's scoring rules.
- *
- * WHY THE LEAGUE IS A PARAMETER AND NOT A CONVENIENCE. A fantasy point is not a property of a
- * player, it is a property of a player inside a rule set: the same catch is 1.0 points in this
- * league and 0.5 in the one next door. There is no honest league-free version of this page, which
- * is why it lives under `/leagues/[leagueId]/` and why this function reads the league's own
- * `scoring_settings` row (falling back to the same `PPR_SCORING` default `matchupWeek` already
- * falls back to, for a league whose row has not been written).
- *
- * ONLY WEEKS THAT HAPPENED. The gate is `stat_weeks.status`, never the presence of a stat line,
- * and the difference is not academic in this dataset: `player_stat_lines` carries rows for all
- * seventeen weeks while `stat_weeks` says thirteen have been played. A chart built on the rows
- * would draw four weeks of the future as results. The list is then capped by the LEAGUE's own
- * season length, so a fourteen-week league never draws a week it does not play.
- *
- * FOUR READS, and the one that could have been expensive is bounded: the peer stat lines are
- * fetched by an id list at his position (four hundred receivers, never sixteen hundred players)
- * crossed with the played weeks, and BOTH populations — every week at his position, and every
- * peer's points per game — are folded out of that single result rather than queried twice.
- *
- * THE RANKING READS ARE BOUNDED TO ONE MAN BY CONSTRUCTION: the crosswalk is a primary-key
- * lookup and both `preseasonRankingsFor`/`preseasonProjectionsFor` reads take his single gsis id,
- * so nothing here loads a five-hundred-name board to find one row on it. Skipped entirely for a
- * player the crosswalk could not place, which is the cheap case as well as the correct one.
- * `boardReasons` (Task 8's Outlook read) is the one exception: it has no per-player narrowing
- * yet, so it reads every reason the season's board stored and this function keeps only his own —
- * see `preseasonReadings`'s own inline note.
- */
 /** His designation off the latest harvested injuries snapshot; `null` when the feed does not
  *  name him. One small read, latest row only. */
 async function injuryDesignationFor(db: Db, playerId: string): Promise<string | null> {
@@ -303,11 +489,53 @@ async function newsFor(db: Db, name: string): Promise<readonly { readonly title:
   return stories;
 }
 
+/**
+ * A player's whole season on one screen, read under one league's scoring rules.
+ *
+ * WHY THE LEAGUE IS A PARAMETER AND NOT A CONVENIENCE. A fantasy point is not a property of a
+ * player, it is a property of a player inside a rule set: the same catch is 1.0 points in this
+ * league and 0.5 in the one next door. There is no honest league-free version of this page, which
+ * is why it lives under `/leagues/[leagueId]/` and why this function reads the league's own
+ * `scoring_settings` row (falling back to the same `PPR_SCORING` default `matchupWeek` already
+ * falls back to, for a league whose row has not been written) — for EVERY season this body can
+ * show, a prior one included: see `priorSeasonStats`.
+ *
+ * ONLY WEEKS THAT HAPPENED. For the current season the gate is `stat_weeks.status`, never the
+ * presence of a stat line, and the difference is not academic in this dataset: `player_stat_lines`
+ * carries rows for all seventeen weeks while `stat_weeks` says thirteen have been played. A chart
+ * built on the rows would draw four weeks of the future as results. The list is then capped by the
+ * LEAGUE's own season length, so a fourteen-week league never draws a week it does not play. A
+ * prior season has no such future to cap against and is instead bounded by the NFL's own finished
+ * regular season (`finalWeekOf`) — see `priorSeasonStats`'s own docblock.
+ *
+ * SEASON SELECTION (2026-09-04 widening): `requestedSeason` is honoured only when it names a
+ * season `availableSeasons` actually offers; otherwise the newest available season answers, which
+ * is `PRODUCT_SEASON` once the league has played a week and the most recent PRIOR season for as
+ * long as it has not — see `PlayerSeasonBody`'s own docblock for the full account.
+ *
+ * FOUR READS FOR THE DRAFT-OUTLOOK CELLS, and the one that could have been expensive is bounded:
+ * for the CURRENT season, the peer stat lines are fetched by an id list at his position (four
+ * hundred receivers, never sixteen hundred players) crossed with the played weeks, and BOTH
+ * populations — every week at his position, and every peer's points per game — are folded out of
+ * that single result rather than queried twice. A prior season pays the same shape of cost against
+ * the observation store instead (`priorSeasonStats`), plus one cheap presence check per candidate
+ * season while building `availableSeasons` (`priorSeasonHasData`, a single-id-bounded read).
+ *
+ * THE RANKING READS ARE BOUNDED TO ONE MAN BY CONSTRUCTION: the crosswalk is a primary-key
+ * lookup and both `preseasonRankingsFor`/`preseasonProjectionsFor` reads take his single gsis id,
+ * so nothing here loads a five-hundred-name board to find one row on it. Skipped entirely for a
+ * player the crosswalk could not place, which is the cheap case as well as the correct one — and
+ * the same crosswalk miss means he can offer no prior season either, by construction.
+ * `boardReasons` (Task 8's Outlook read) is the one exception: it has no per-player narrowing
+ * yet, so it reads every reason the season's board stored and this function keeps only his own —
+ * see `preseasonReadings`'s own inline note.
+ */
 export async function playerSeason(
   db: Db,
   leagueId: string,
   playerId: string,
   clock: Clock = systemClock,
+  requestedSeason?: number,
 ): Promise<PlayerSeasonBody | null> {
   const [row] = await db.select().from(players).where(eq(players.id, playerId));
   if (row === undefined) return null;
@@ -320,6 +548,7 @@ export async function playerSeason(
     adp: row.adp,
   };
   const adp = player.adp;
+  const now = new Date(clock.now());
 
   const fixtures = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const { totalWeeks } = seasonProgress(fixtures, LEAGUE_CONFIG.regularSeasonWeeks);
@@ -333,52 +562,33 @@ export async function playerSeason(
   const everyone = await db.select({ id: players.id, position: players.position, adp: players.adp }).from(players);
   const peers = everyone.filter((other) => other.position === player.position);
   const rankedAll = everyone.flatMap((other) => (other.adp === null ? [] : [other.adp]));
-
   const peerIds = peers.map((peer) => peer.id);
-  const lines =
-    peerIds.length === 0 || played.length === 0
-      ? []
-      : await db.select().from(playerStatLines).where(and(inArray(playerStatLines.playerId, peerIds), inArray(playerStatLines.week, played)));
 
-  const weeks = weekViews(lines, played, playerId, player.position, rules);
-  const mine = weeks.flatMap((week) => (week.points === null ? [] : [week.points]));
-  const pointsPerGame = mine.length === 0 ? null : roundPoints(mine.reduce((sum, points) => sum + points, 0) / mine.length);
+  // SEASON AVAILABILITY. The current season counts once the league has played a week; a prior
+  // season counts once the crosswalk places him AND the observation store has at least one
+  // recorded week for him there — see `PlayerSeasonBody`'s own docblock for the full rule.
+  const gsisId = (await nflPlayerIdsFor(db, [playerId])).get(playerId) ?? null;
+  const priorCandidates = Array.from({ length: HISTORY_SEASONS }, (_, back) => PRODUCT_SEASON - (back + 1));
+  const priorSeasonsWithData: number[] = [];
+  if (gsisId !== null) {
+    for (const candidate of priorCandidates) {
+      if (await priorSeasonHasData(db, gsisId, candidate, now)) priorSeasonsWithData.push(candidate);
+    }
+  }
+  const availableSeasons = [...(played.length > 0 ? [PRODUCT_SEASON] : []), ...priorSeasonsWithData];
+  const isRookie = availableSeasons.length === 0;
+  const season = requestedSeason !== undefined && availableSeasons.includes(requestedSeason) ? requestedSeason : (availableSeasons[0] ?? PRODUCT_SEASON);
 
-  const preseason = await preseasonReadings(db, playerId, new Date(clock.now()));
+  // `gsisId === null` is folded into this condition (rather than a non-null assertion below) so
+  // TypeScript, not just this file's own logic, can see why `priorSeasonStats` never runs unplaced:
+  // a season only ever reaches `priorSeasonsWithData` — and so only ever becomes `season` — once
+  // the crosswalk has already placed him.
+  const stats: PlayerSeasonStats =
+    season === PRODUCT_SEASON || gsisId === null
+      ? await currentSeasonStats(db, playerId, player.position, peerIds, played, rules)
+      : await priorSeasonStats(db, gsisId, season, player.position, rules, now);
 
-  // The ESPN-depth additions (founder, 2026-08-30): his own raw lines are already in `lines`
-  // (he is his own peer), so the log and the totals cost no extra read.
-  const myLines = lines
-    .filter((line) => line.playerId === playerId)
-    .sort((a, b) => b.week - a.week);
-  const log: PlayerGameLogRow[] = myLines.map((line) => ({
-    week: line.week,
-    points: computeFantasyPoints(line, player.position, rules),
-    carries: line.carries,
-    rushingYards: line.rushingYards,
-    targets: line.targets,
-    receptions: line.receptions,
-    receivingYards: line.receivingYards,
-    passingYards: line.passingYards,
-    touchdowns: line.rushingTouchdowns + line.receivingTouchdowns + line.passingTouchdowns,
-  }));
-  const totals: PlayerSeasonTotals | null =
-    log.length === 0
-      ? null
-      : log.reduce(
-          (sum, row) => ({
-            games: sum.games + 1,
-            carries: sum.carries + row.carries,
-            rushingYards: sum.rushingYards + row.rushingYards,
-            targets: sum.targets + row.targets,
-            receptions: sum.receptions + row.receptions,
-            receivingYards: sum.receivingYards + row.receivingYards,
-            passingYards: sum.passingYards + row.passingYards,
-            touchdowns: sum.touchdowns + row.touchdowns,
-            fantasyPoints: roundPoints(sum.fantasyPoints + row.points),
-          }),
-          { games: 0, carries: 0, rushingYards: 0, targets: 0, receptions: 0, receivingYards: 0, passingYards: 0, touchdowns: 0, fantasyPoints: 0 },
-        );
+  const preseason = await preseasonReadings(db, playerId, now);
 
   const [holder] = await db
     .select({ teamName: teams.name })
@@ -391,17 +601,20 @@ export async function playerSeason(
   return {
     ownedBy: holder?.teamName ?? null,
     injuryDesignation,
-    log,
-    totals,
+    log: stats.log,
+    totals: stats.totals,
     news,
     player,
+    availableSeasons,
+    season,
+    isRookie,
     positionRank: adp === null ? null : 1 + peers.filter((peer) => peer.adp !== null && peer.adp < adp).length,
     adpPercentile: adp === null ? null : percentileOf(adp, rankedAll, "lower"),
     expertRank: preseason.expertRank,
     modelRank: preseason.modelRank,
-    pointsPerGame,
-    pointsPerGamePercentile: pointsPerGame === null ? null : percentileOf(pointsPerGame, peerPointsPerGame(lines, player.position, rules), "higher"),
-    weeks,
+    pointsPerGame: stats.pointsPerGame,
+    pointsPerGamePercentile: stats.pointsPerGamePercentile,
+    weeks: stats.weeks,
     reasons: preseason.reasons,
     // Chip-eligible only (IMPORTANT 3 RULING, fix round; widened Task 8) — every tribal law plus
     // every CONFIRMED discovered one; see `chipEligibleLaws`'s own docblock.
