@@ -1,4 +1,5 @@
 import type { Position } from "@/domain/player";
+import { isotonicNonIncreasing } from "../isotonic";
 import type { RosterStatus } from "../nflverse/rosters";
 import { ROSTER_STATUSES } from "../nflverse/rosters";
 import { EXPERIENCE_BANDS, type CareerPriors, type ExperienceBand } from "./career";
@@ -474,15 +475,112 @@ function meanGameRate(observations: readonly RookieObservation[]): number | null
   );
 }
 
-/** Caps each cell at the one above it, for the reason `enforceCapitalOrdering` gives for shares. */
-function enforceRateOrdering(cells: Record<DraftBucket, number>): Record<DraftBucket, number> {
+/**
+ * ENFORCES MONOTONE-NON-INCREASING DRAFT-CAPITAL ORDERING ON THE GAME-RATE TABLE, via the SAME
+ * weighted isotonic regression (pool-adjacent-violators, `isotonic.ts`'s `isotonicNonIncreasing`)
+ * `rookie-curve.ts`'s points curve is fit with — not the one-pass "cap this bucket at the one above
+ * it" `enforceCapitalOrdering` still uses for shares below.
+ *
+ * THE BUG THIS REPLACES (calibration fix round, 2026-09-04, Task 1). Capping only ever pulls a
+ * LATER, lower-capital bucket DOWN to an EARLIER one's value — it can never raise an earlier bucket
+ * to meet a later one. When the EARLY bucket's own raw rate is the noisy low outlier — round one for
+ * running backs, on the handful of true top-ten picks the fit seasons actually contained — every
+ * later, genuinely-lower-capital bucket got clamped down to that one low, unstable number, and the
+ * whole capped table came out FLAT rather than falling off with capital: RB's `gameRate` measured
+ * 0.4769 for round one clear through rounds four-and-five before this fix, an availability model
+ * dividing a healthy top-three pick's season into 8.4 expected games — a number no better than a
+ * seventh-rounder's. PAVA fixes the offending pair by POOLING A WEIGHTED AVERAGE of the two,
+ * whichever direction the violation runs, rather than asserting one side's cell over the other's; a
+ * thin, noisy cell now gets diluted into its neighbours' shared mean instead of dictating every
+ * bucket beneath it.
+ */
+function isotonicRateOrdering(
+  cells: Readonly<Record<DraftBucket, number>>,
+  weights: Readonly<Record<DraftBucket, number>>,
+): Record<DraftBucket, number> {
+  const values = DRAFT_BUCKETS.map((bucket) => cells[bucket]);
+  // Floored above zero: `isotonicNonIncreasing`'s pooling formula divides by the sum of the two
+  // blocks' own weights, and an empty bucket (a position with no observations at all in that draft
+  // round on the fit seasons) would otherwise divide by zero rather than simply carrying no
+  // influence into its neighbours' pooled mean.
+  const cellWeights = DRAFT_BUCKETS.map((bucket) => Math.max(weights[bucket], 1e-9));
+  const fitted = isotonicNonIncreasing(values, cellWeights);
   const ordered = {} as Record<DraftBucket, number>;
-  let ceiling = Number.POSITIVE_INFINITY;
-  for (const bucket of DRAFT_BUCKETS) {
-    ordered[bucket] = Math.min(cells[bucket], ceiling);
-    ceiling = ordered[bucket];
-  }
+  DRAFT_BUCKETS.forEach((bucket, index) => {
+    ordered[bucket] = fitted[index]!;
+  });
   return ordered;
+}
+
+/**
+ * ONE POSITION'S GAME-RATE TABLE: each bucket's own mean rate (over the whole cell, survivors and
+ * non-dressers alike — see `meanGameRate`), shrunk toward the position's own rookie mean on the same
+ * `ROOKIE_CELL_PRIOR` prior the shares table uses, then monotone-ordered by `isotonicRateOrdering`
+ * rather than assumed already ordered.
+ *
+ * SHARED by `fitRookiePriors` (fitting `byBucket` and `gameRate` together, on the same observations)
+ * and `fitRookieGameRate` (fitting `gameRate` ALONE, on its own season window — see that function's
+ * own docblock for why the durability prior earned a separate entry point).
+ */
+function fitPositionGameRate(atPosition: readonly RookieObservation[]): Record<DraftBucket, number> {
+  const positionRate = meanGameRate(atPosition) ?? 0;
+  const rates = {} as Record<DraftBucket, number>;
+  const weights = {} as Record<DraftBucket, number>;
+  for (const bucket of DRAFT_BUCKETS) {
+    const inCell = atPosition.filter((observation) => draftBucketFor(observation.overallPick) === bucket);
+    const rate = meanGameRate(inCell);
+    const weight = inCell.length / (ROOKIE_CELL_PRIOR + inCell.length);
+    rates[bucket] = rate === null ? positionRate : positionRate * (1 - weight) + rate * weight;
+    weights[bucket] = inCell.length;
+  }
+  return isotonicRateOrdering(rates, weights);
+}
+
+/**
+ * THE ROOKIE DURABILITY PRIOR, FITTED ON ITS OWN SEASON WINDOW (calibration fix round, 2026-09-04,
+ * Task 1) — `RookiePriors.gameRate` alone, independent of `fitRookiePriors`'s shares fit.
+ *
+ * WHY A SEPARATE ENTRY POINT RATHER THAN JUST FIXING THE ALGORITHM IN PLACE. The diagnosed defect —
+ * a healthy top-three rookie running back's availability collapsing to an undifferentiated 8.4-game
+ * "no-history" rate — was ENTIRELY in the rate table; nothing about the shares fit (`byBucket`) was
+ * implicated, and `docs/superpowers/specs`' own register discipline for this calibration round fits
+ * on 2023-2024 and scores on 2025 rather than the model's original 2021-2022/2023-2024 split. Rather
+ * than move the WHOLE rookie fit's window and re-litigate a shares table nobody found wrong,
+ * `scripts/preseason-fit.ts` keeps `byBucket` on `FIT_SEASONS` (2021, 2022) and calls this function
+ * separately, on the fresher, more recent `ROOKIE_DURABILITY_TRAIN_SEASONS` (2023, 2024) window, then
+ * splices the result into the committed `RookiePriors.gameRate` field. Two windows for two tables
+ * measuring two different things is a documented choice, not an oversight: see that script's own
+ * comment at the call site.
+ */
+/**
+ * THE DURABILITY PRIOR'S OWN FIT WINDOW (calibration fix round, 2026-09-04) — 2023 and 2024, per this
+ * round's own register discipline (`docs/superpowers/specs`): fit on 2023-2024, score on 2025, 2026
+ * held out absolutely. Distinct from the rest of the preseason model's `FIT_SEASONS` (2021, 2022) —
+ * see `fitRookieGameRate`'s own docblock for why this one table gets a fresher, separate window.
+ */
+export const ROOKIE_DURABILITY_TRAIN_SEASONS: readonly number[] = [2023, 2024];
+/** Everything after the durability prior's own train window — 2025 is the backtest's scoring
+ *  season and 2026 is the register's permanent holdout; neither may ever reach this fit. */
+export const ROOKIE_DURABILITY_HELD_OUT_SEASONS: readonly number[] = [2025, 2026];
+
+export function fitRookieGameRate(
+  observations: readonly RookieObservation[],
+  { heldOutSeasons }: { readonly heldOutSeasons: readonly number[] },
+): Readonly<Record<Position, Readonly<Record<DraftBucket, number>>>> {
+  const forbidden = new Set(heldOutSeasons);
+  for (const observation of observations) {
+    if (forbidden.has(observation.season)) {
+      throw new Error(
+        `The rookie durability fit was handed ${observation.season}, which is held out. A parameter fitted on a season it is later scored on is not a measurement.`,
+      );
+    }
+  }
+  const gameRate = {} as Record<Position, Record<DraftBucket, number>>;
+  for (const position of ALL_POSITIONS) {
+    const atPosition = observations.filter((observation) => observation.position === position);
+    gameRate[position] = fitPositionGameRate(atPosition);
+  }
+  return gameRate;
 }
 
 export interface RookieFitOptions {
@@ -511,20 +609,16 @@ export function fitRookiePriors(
   for (const position of ALL_POSITIONS) {
     const atPosition = observations.filter((observation) => observation.position === position);
     const positionMean = meanShares(atPosition) ?? NO_SHARES;
-    const positionRate = meanGameRate(atPosition) ?? 0;
     const cells = {} as Record<DraftBucket, RookieShares>;
-    const rates = {} as Record<DraftBucket, number>;
     for (const bucket of DRAFT_BUCKETS) {
       const inCell = atPosition.filter((observation) => draftBucketFor(observation.overallPick) === bucket);
       const withGames = inCell.filter((observation) => observation.shares !== null);
       cells[bucket] = blendShares(positionMean, meanShares(inCell), withGames.length);
-      // Shrunk toward the position's own rookie mean on the SAME prior as the shares, and over the
-      // whole cell rather than over its survivors, so a thin cell cannot assert a starter's season.
-      const rate = meanGameRate(inCell);
-      const weight = inCell.length / (ROOKIE_CELL_PRIOR + inCell.length);
-      rates[bucket] = rate === null ? positionRate : positionRate * (1 - weight) + rate * weight;
     }
-    gameRate[position] = enforceRateOrdering(rates);
+    // See `fitPositionGameRate`'s own docblock: shrunk toward the position's own rookie mean on the
+    // same prior as the shares, over the whole cell rather than over its survivors, then
+    // monotone-ordered by isotonic regression rather than the naive cap this replaced.
+    gameRate[position] = fitPositionGameRate(atPosition);
     // Monotone in draft capital by construction. A thin cell can otherwise say that third-rounders
     // out-target first-rounders, which is noise rather than a finding, and a board that acted on it
     // would rank a fifth-round back above a top-ten pick for no reason a reader could defend.
