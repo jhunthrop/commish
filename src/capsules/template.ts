@@ -7,27 +7,30 @@ import type { PlayerFacts } from "./facts";
  * a page or fabricates a word. One template serves BOTH the peek's compact slot and the full
  * page's "Read" slot — a fallback's job is honesty and availability, not matching a stylistic
  * length band a template was never trying to hit.
+ *
+ * WHAT IT DELIBERATELY DOES NOT SAY (founder card review, 2026-09-05): the rank, the ADP, and
+ * the expected-games figure all live on the SAME screen already (the rail above, the evidence
+ * chips below), and the first live card read as three surfaces echoing one another. The floor
+ * complements its neighbours; it never repeats them. Season points round to whole numbers here
+ * for the same reason "p10" never ships: 247.12 is register precision, 247 is a number a
+ * manager says out loud.
  */
 export function renderTemplateCapsule(facts: PlayerFacts): string {
-  const { identity, market, projection, availability, season, byeWeek, injury } = facts;
+  const { identity, market, projection, season, byeWeek, injury } = facts;
   const sentences: string[] = [
-    `${identity.name} (${identity.position}, ${identity.team}) is ranked ${market.boardRank} overall on our board, projected for ${projection.projectedPoints} points this season.`,
+    `${identity.name} (${identity.position}, ${identity.team}) projects for ${Math.round(projection.projectedPoints)} points this season.`,
     `Most seasons land between ${Math.round(projection.typicalLow)} and ${Math.round(projection.typicalHigh)}; the full range (injury seasons on the low end, smash seasons on the high end) runs ${Math.round(projection.floorPoints)} to ${Math.round(projection.ceilingPoints)}.`,
   ];
 
-  if (market.adp !== null) {
-    sentences.push(`The market has him at ADP ${market.adp}${market.positionAdp !== null ? ` (${market.positionAdp})` : ""}.`);
-  } else {
+  if (market.adp === null) {
+    // The one market sentence the floor keeps: an UNPRICED player is a fact no other surface
+    // states. A priced player's ADP already sits in the rail above this card.
     sentences.push("The market has not priced him.");
   }
 
   const strongestLaw = [...facts.evidence].filter((item) => item.kind === "law").sort((a, b) => Math.abs(b.netEffectPoints) - Math.abs(a.netEffectPoints))[0];
   if (strongestLaw !== undefined && strongestLaw.kind === "law") {
     sentences.push(`${strongestLaw.headline} is worth ${strongestLaw.netEffectPoints >= 0 ? "+" : ""}${strongestLaw.netEffectPoints} points a game to his outlook.`);
-  }
-
-  if (availability !== null) {
-    sentences.push(`He is expected to play ${Math.round(availability.expectedGames)} games this season.`);
   }
 
   if (season !== null) {

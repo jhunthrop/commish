@@ -39,20 +39,28 @@ describe("renderTemplateCapsule", () => {
     expect(renderTemplateCapsule(facts)).toBe(renderTemplateCapsule(facts));
   });
 
-  it("states only facts already on the sheet: board rank, projection, market, strongest law, availability, and an honest 'never checked' injury read", () => {
+  it("states the floor's own facts and never echoes the surfaces around it (founder card review, 2026-09-05)", () => {
     const facts = buildPlayerFacts(baseInput());
     const text = renderTemplateCapsule(facts);
     expect(text).toContain("Rashad Long (RB, SF)");
-    expect(text).toContain("ranked 14 overall");
     expect(text).toContain("248 points");
-    expect(text).toContain("ADP 12.5 (RB6)");
     expect(text).toContain("Age 29 season");
     expect(text).toContain("-1.8 points a game");
-    expect(text).toContain("15 games");
     expect(text).toContain("bye is week 9");
+    // The rail above carries rank and ADP; the evidence chips below carry expected games. The
+    // floor repeats none of them, and season points round to a whole number.
+    expect(text).not.toContain("ranked 14 overall");
+    expect(text).not.toContain("ADP 12.5");
+    expect(text).not.toContain("expected to play");
+    expect(text).not.toContain("248.");
     // THE TRI-STATE (fix round 1, CRITICAL 2): the fixture's default injury state is "unknown"
     // (no snapshot has ever run) — this must NEVER read as a healthy claim.
     expect(text).toContain("No injury feed has been checked for him yet.");
+  });
+
+  it("keeps the unpriced-market sentence: the one market fact no other surface states", () => {
+    const facts = buildPlayerFacts({ ...baseInput(), market: { adp: null, positionAdp: null, boardRank: 14 } });
+    expect(renderTemplateCapsule(facts)).toContain("The market has not priced him.");
   });
 
   it("states a genuinely clean read, dated, distinct from 'never checked'", () => {
