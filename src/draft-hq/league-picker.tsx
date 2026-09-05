@@ -13,10 +13,24 @@ import { SegmentGroup, type SegmentOption } from "@/components/ui";
  * is displayed.
  *
  * `basePath` is the one thing that varies per surface (`/app/draft/board`, `/app/draft/simulator`,
- * …) — moved here from a board-only component (Task 3) once the Simulator needed the identical
- * picker rather than a second, near-copy of it.
+ * `/app/draft/playbook`, …) — moved here from a board-only component (Task 3) once the Simulator
+ * needed the identical picker rather than a second, near-copy of it.
+ *
+ * `extraQuery` (Task 4, the Playbook's own slot advisor) carries every OTHER query param the
+ * current page depends on — the Playbook's `?slot=` — through a league change, so switching
+ * leagues never silently resets the slot the reader had picked.
  */
-export function LeaguePicker({ options, value, basePath }: { readonly options: readonly SegmentOption[]; readonly value: string; readonly basePath: string }) {
+export function LeaguePicker({
+  options,
+  value,
+  basePath,
+  extraQuery = {},
+}: {
+  readonly options: readonly SegmentOption[];
+  readonly value: string;
+  readonly basePath: string;
+  readonly extraQuery?: Readonly<Record<string, string>>;
+}) {
   const router = useRouter();
   return (
     <SegmentGroup
@@ -24,7 +38,12 @@ export function LeaguePicker({ options, value, basePath }: { readonly options: r
       labelled={false}
       options={options}
       value={value}
-      onChange={(next) => router.push(next === "next" ? basePath : `${basePath}?league=${encodeURIComponent(next)}`)}
+      onChange={(next) => {
+        const params = new URLSearchParams(extraQuery);
+        if (next !== "next") params.set("league", next);
+        const query = params.toString();
+        router.push(query === "" ? basePath : `${basePath}?${query}`);
+      }}
     />
   );
 }
