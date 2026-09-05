@@ -29,6 +29,9 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
     season: null,
     injury: { state: "unknown" },
     news: [],
+    lastSeasonStory: null,
+    booksNumbers: { propsLines: [], teamVegasWinTotal: null },
+    usage: null,
     ...overrides,
   };
 }
@@ -103,5 +106,33 @@ describe("renderTemplateCapsule", () => {
     );
     const text = renderTemplateCapsule(facts);
     expect(text).toContain("Through 3 games this season he is averaging 18.4 points a game.");
+  });
+
+  it("adds one color sentence, last season's finish and points per game, when the store carries one", () => {
+    const facts = buildPlayerFacts(
+      baseInput({ lastSeasonStory: { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 } }),
+    );
+    const text = renderTemplateCapsule(facts);
+    expect(text).toContain("Last season he finished RB4 at the position, averaging 18.2 points a game.");
+  });
+
+  it("never fabricates the color sentence when the store carries no prior season", () => {
+    const facts = buildPlayerFacts(baseInput());
+    const text = renderTemplateCapsule(facts);
+    expect(text).not.toContain("Last season he finished");
+  });
+
+  it("never states the props lines, the Vegas win total or the usage shares — the writer's own material, not the floor's", () => {
+    const facts = buildPlayerFacts(
+      baseInput({
+        lastSeasonStory: { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 },
+        booksNumbers: { propsLines: [{ market: "player_reception_yds", medianLine: 1150.5 }], teamVegasWinTotal: 9.5 },
+        usage: { season: 2025, snapShare: 0.848, targetShare: 0.263, redZoneShare: 0.19 },
+      }),
+    );
+    const text = renderTemplateCapsule(facts);
+    expect(text).not.toContain("1150.5");
+    expect(text).not.toContain("Vegas");
+    expect(text).not.toContain("snap share");
   });
 });

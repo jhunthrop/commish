@@ -1,10 +1,21 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { captureSnapshots, nflPlayers, playerCrosswalk, players, playerStatLines, preseasonProjections, statWeeks } from "@/db/schema";
+import { statMetricName, STAT_LINE_SOURCE } from "@/projections/lines";
+import { PARTICIPATION_METRICS, NFLVERSE_SOURCE } from "@/projections/nflverse/map";
+import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "@/projections/nflverse/pbp-players";
+import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
+import { recordPropPlayerMap } from "@/projections/odds/player-map";
+import { recordPropObservations } from "@/projections/odds/props-store";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
+import { recordTeamObservations, type TeamWeekObservation } from "@/projections/team-store";
+import { VEGAS_METRICS, VEGAS_SOURCE } from "@/projections/vegas/ingest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { collectAllPlayerFacts } from "./collect";
+
+const PRIOR_SEASON = PRODUCT_SEASON - 1;
 
 async function seedPlayer(db: Db, input: { readonly id: string; readonly nflId: string; readonly name: string; readonly position: "RB" | "WR" | "QB"; readonly team: string; readonly points: number; readonly rank: number; readonly adp: number | null }): Promise<void> {
   await db.insert(nflPlayers).values({ id: input.nflId, name: input.name, position: input.position });
@@ -106,5 +117,154 @@ describe("collectAllPlayerFacts", () => {
 
     const facts = await collectAllPlayerFacts(db);
     expect(facts[0]!.season).toBeNull();
+  });
+});
+
+/** One player's one prior-season week, spelled the way the nflverse weekly file writes it into
+ *  the point-in-time store — the identical shape `league-service/player.test.ts`'s own `week`
+ *  helper uses for the same read (`STAT_LINE_SOURCE`/`statMetricName`). `PRIOR_SEASON` throughout:
+ *  the color facts describe LAST season, never the current one. */
+function priorSeasonWeek(gsisId: string, weekNumber: number, stats: Readonly<Record<string, number>>): readonly PlayerWeekObservation[] {
+  const asOf = new Date(Date.UTC(PRIOR_SEASON, 10, 1));
+  return Object.entries(stats).map(([field, value]) => ({
+    season: PRIOR_SEASON, week: weekNumber, playerId: gsisId, source: STAT_LINE_SOURCE, metric: statMetricName(field), value, asOf,
+  }));
+}
+
+/** A raw participation observation not carried by `StatLine` itself (a team total, a snap count) —
+ *  written directly rather than through `priorSeasonWeek`'s stats dict, which only knows a
+ *  player's OWN box-score fields. */
+function participationRow(gsisId: string, weekNumber: number, source: string, metric: string, value: number): PlayerWeekObservation {
+  return { season: PRIOR_SEASON, week: weekNumber, playerId: gsisId, source, metric, value, asOf: new Date(Date.UTC(PRIOR_SEASON, 10, 1)) };
+}
+
+describe("collectAllPlayerFacts — last season's story", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  it("ranks by total points among peers who played, and states ppg, games, best week and consistency", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1000001", name: "Rashad Long", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await seedPlayer(db, { id: "p2", nflId: "00-1000002", name: "Peer Back", position: "RB", team: "DAL", points: 150, rank: 2, adp: 40 });
+    await recordObservations(db, [
+      // RB1: 20, 10, 30 points across three weeks — total 60, best week 3.
+      ...priorSeasonWeek("00-1000001", 1, { rushingYards: 200 }),
+      ...priorSeasonWeek("00-1000001", 2, { rushingYards: 100 }),
+      ...priorSeasonWeek("00-1000001", 3, { rushingYards: 300 }),
+      // RB2: 5 points across one week — total 5.
+      ...priorSeasonWeek("00-1000002", 1, { rushingYards: 50 }),
+    ]);
+
+    const facts = await collectAllPlayerFacts(db);
+    const rb1 = facts.find((f) => f.identity.id === "p1")!;
+    const rb2 = facts.find((f) => f.identity.id === "p2")!;
+
+    // Pooled RB weeks: [20, 10, 30, 5] -> median 15. RB1 clears it twice (20, 30); RB2 never does.
+    expect(rb1.lastSeasonStory).toEqual({ season: PRIOR_SEASON, positionRank: 1, pointsPerGame: 20, gamesPlayed: 3, bestWeek: { week: 3, points: 30 }, weeksAboveMedian: 2 });
+    expect(rb2.lastSeasonStory).toEqual({ season: PRIOR_SEASON, positionRank: 2, pointsPerGame: 5, gamesPlayed: 1, bestWeek: { week: 1, points: 5 }, weeksAboveMedian: 0 });
+  });
+
+  it("is null for a player the prior-season store carries no played week for (a rookie, most often)", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1000003", name: "Rookie Runner", position: "RB", team: "SF", points: 200, rank: 1, adp: 20 });
+
+    const facts = await collectAllPlayerFacts(db);
+    expect(facts[0]!.lastSeasonStory).toBeNull();
+  });
+});
+
+describe("collectAllPlayerFacts — usage, plain", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  it("states last season's snap share, target share and red-zone share straight off the observation store", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-2000001", name: "Rashad Long", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await recordObservations(db, [
+      // A played week, so `discoveryFactsForSeason` has a points-per-game entry to build off.
+      ...priorSeasonWeek("00-2000001", 1, { rushingYards: 100, targets: 5 }),
+      participationRow("00-2000001", 1, STAT_LINE_SOURCE, PARTICIPATION_METRICS.teamTargets, 20),
+      participationRow("00-2000001", 1, NFLVERSE_SOURCE.snapCounts, PARTICIPATION_METRICS.offensiveSnaps, 50),
+      participationRow("00-2000001", 1, NFLVERSE_SOURCE.snapCounts, PARTICIPATION_METRICS.teamOffensiveSnaps, 60),
+      participationRow("00-2000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.carries, 8),
+      participationRow("00-2000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.targets, 5),
+      participationRow("00-2000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.redZoneCarries, 2),
+      participationRow("00-2000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.redZoneTargets, 1),
+      participationRow("00-2000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.insideTenCarries, 1),
+      participationRow("00-2000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.insideTenTargets, 0),
+      participationRow("00-2000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.airYards, 40),
+      participationRow("00-2000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.airYardTargets, 5),
+    ]);
+
+    const facts = await collectAllPlayerFacts(db);
+    const usage = facts[0]!.usage!;
+    expect(usage.season).toBe(PRIOR_SEASON);
+    expect(usage.snapShare).toBeCloseTo(50 / 60, 10);
+    expect(usage.targetShare).toBeCloseTo(5 / 20, 10);
+    // Red-zone share of his OWN touches: (2 red-zone carries + 1 red-zone target) / (8 pbp carries + 5 pbp targets).
+    expect(usage.redZoneShare).toBeCloseTo(3 / 13, 10);
+  });
+
+  it("is null when the store carries no prior season for him at all", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-2000002", name: "Rookie Runner", position: "RB", team: "SF", points: 200, rank: 1, adp: 20 });
+
+    const facts = await collectAllPlayerFacts(db);
+    expect(facts[0]!.usage).toBeNull();
+  });
+});
+
+describe("collectAllPlayerFacts — the books' own numbers", () => {
+  let db: Db;
+  const FIRST_KICKOFF = new Date(`${PRODUCT_SEASON}-09-07T20:20:00.000Z`);
+  const WEEK_ONE_GAME = new Date(`${PRODUCT_SEASON}-09-10T17:00:00.000Z`);
+  const BEFORE_KICKOFF = new Date(`${PRODUCT_SEASON}-09-05T12:00:00.000Z`);
+  const AFTER_KICKOFF = new Date(`${PRODUCT_SEASON}-09-08T12:00:00.000Z`);
+
+  function kickoffFact(overrides: Partial<TeamWeekObservation> = {}): TeamWeekObservation {
+    return { season: PRODUCT_SEASON, week: 1, team: "SF", source: SCHEDULE_SOURCE.kickoff, metric: SCHEDULE_METRICS.kickoffInstant, value: 1, asOf: FIRST_KICKOFF, ...overrides };
+  }
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  it("states the median pre-kickoff props line per market and his team's Vegas win total", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-3000001", name: "Rashad Long", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await recordTeamObservations(db, [kickoffFact(), { season: PRODUCT_SEASON, week: 1, team: "SF", source: VEGAS_SOURCE, metric: VEGAS_METRICS.winTotal, value: 9.5, asOf: BEFORE_KICKOFF }]);
+    await recordPropPlayerMap(db, [{ propName: "Rashad Long", season: PRODUCT_SEASON, playerId: "00-3000001", method: "exact" }]);
+    await recordPropObservations(db, [
+      { eventId: "e1", commenceTime: WEEK_ONE_GAME, bookmaker: "draftkings", market: "player_rush_yds", playerName: "Rashad Long", point: 70.5, overPrice: -110, underPrice: -110, fetchedAt: BEFORE_KICKOFF },
+      { eventId: "e1", commenceTime: WEEK_ONE_GAME, bookmaker: "fanduel", market: "player_rush_yds", playerName: "Rashad Long", point: 68.5, overPrice: -110, underPrice: -110, fetchedAt: BEFORE_KICKOFF },
+    ]);
+
+    const facts = await collectAllPlayerFacts(db);
+    const books = facts[0]!.booksNumbers;
+    expect(books.propsLines).toEqual([{ market: "player_rush_yds", medianLine: 69.5 }]);
+    expect(books.teamVegasWinTotal).toBe(9.5);
+  });
+
+  it("never admits a props line fetched at or after kickoff — the leakage gate holds in the collector too", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-3000002", name: "Rashad Long", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await recordTeamObservations(db, [kickoffFact()]);
+    await recordPropPlayerMap(db, [{ propName: "Rashad Long", season: PRODUCT_SEASON, playerId: "00-3000002", method: "exact" }]);
+    await recordPropObservations(db, [
+      { eventId: "e1", commenceTime: WEEK_ONE_GAME, bookmaker: "draftkings", market: "player_rush_yds", playerName: "Rashad Long", point: 999, overPrice: -110, underPrice: -110, fetchedAt: AFTER_KICKOFF },
+    ]);
+
+    const facts = await collectAllPlayerFacts(db);
+    expect(facts[0]!.booksNumbers.propsLines).toEqual([]);
+  });
+
+  it("is honestly empty/null when the archive holds no line and the win-totals store holds no row", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-3000003", name: "Rashad Long", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+
+    const facts = await collectAllPlayerFacts(db);
+    expect(facts[0]!.booksNumbers).toEqual({ propsLines: [], teamVegasWinTotal: null });
   });
 });

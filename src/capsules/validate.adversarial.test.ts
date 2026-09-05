@@ -31,6 +31,9 @@ const RASHAD_LONG: PlayerFactsInput = {
   season: null,
   injury: { state: "unknown" },
   news: [],
+  lastSeasonStory: null,
+  booksNumbers: { propsLines: [], teamVegasWinTotal: null },
+  usage: null,
 };
 
 describe("probe check — CRITICAL 1 name grounding", () => {

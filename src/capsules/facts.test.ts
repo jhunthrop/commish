@@ -30,6 +30,9 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
     season: null,
     injury: { state: "unknown" },
     news: [],
+    lastSeasonStory: null,
+    booksNumbers: { propsLines: [], teamVegasWinTotal: null },
+    usage: null,
     ...overrides,
   };
 }
@@ -114,5 +117,54 @@ describe("buildPlayerFacts", () => {
     ];
     const facts = buildPlayerFacts(baseInput({ reasons }));
     expect(facts.nameLedger).toEqual(expect.arrayContaining(["MIA"]));
+  });
+});
+
+/**
+ * THE COLOR FACTS (spec §9 AMENDED 2026-09-05) — `collect.ts` computes each of these fully before
+ * `buildPlayerFacts` ever sees them, so this suite only pins the pass-through, the ledger
+ * additions, absence handling, and `factsHash` freshness — the same contract `season`/`byeWeek`
+ * already had before this task.
+ */
+describe("buildPlayerFacts — color facts", () => {
+  const lastSeasonStory = { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 };
+  const booksNumbers = { propsLines: [{ market: "player_reception_yds" as const, medianLine: 1150.5 }], teamVegasWinTotal: 9.5 };
+  const usage = { season: 2025, snapShare: 0.848, targetShare: 0.263, redZoneShare: 0.19 };
+
+  it("is null/empty by default, honest absence rather than a fabricated debut season", () => {
+    const facts = buildPlayerFacts(baseInput());
+    expect(facts.lastSeasonStory).toBeNull();
+    expect(facts.booksNumbers).toEqual({ propsLines: [], teamVegasWinTotal: null });
+    expect(facts.usage).toBeNull();
+  });
+
+  it("carries each color group straight through when collect.ts supplies one", () => {
+    const facts = buildPlayerFacts(baseInput({ lastSeasonStory, booksNumbers, usage }));
+    expect(facts.lastSeasonStory).toEqual(lastSeasonStory);
+    expect(facts.booksNumbers).toEqual(booksNumbers);
+    expect(facts.usage).toEqual(usage);
+  });
+
+  it("puts every color number into the number ledger, including whole-percent forms of each share", () => {
+    const facts = buildPlayerFacts(baseInput({ lastSeasonStory, booksNumbers, usage }));
+    expect(facts.numberLedger).toEqual(
+      expect.arrayContaining([
+        2025, 4, 18.2, 16, 9, 32.4, 9, // lastSeasonStory
+        1150.5, 9.5, // booksNumbers
+        84.8, 26.3, 19, // usage, whole-percent forms (usage.season 2025 already covered above)
+      ]),
+    );
+  });
+
+  it("never puts a null share into the ledger, and a partial usage row still passes its real shares through", () => {
+    const facts = buildPlayerFacts(baseInput({ usage: { season: 2025, snapShare: 0.5, targetShare: null, redZoneShare: null } }));
+    expect(facts.numberLedger).toContain(50);
+    expect(facts.numberLedger.filter((n) => n === null)).toHaveLength(0);
+  });
+
+  it("changes the hash when a color fact changes, proving factsHash includes them", () => {
+    const without = buildPlayerFacts(baseInput());
+    const withColor = buildPlayerFacts(baseInput({ lastSeasonStory, booksNumbers, usage }));
+    expect(withColor.factsHash).not.toBe(without.factsHash);
   });
 });

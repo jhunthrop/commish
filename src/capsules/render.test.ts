@@ -41,6 +41,9 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
     },
     injury: { state: "designated", designation: "Q", asOf: "2026-09-01T00:00:00.000Z" },
     news: [{ title: "Rashad Long: limited in practice", link: "https://example.com/1", publishedAt: "2026-09-02T00:00:00.000Z" }],
+    lastSeasonStory: null,
+    booksNumbers: { propsLines: [], teamVegasWinTotal: null },
+    usage: null,
     ...overrides,
   };
 }
@@ -111,5 +114,65 @@ describe("renderFactsForModel", () => {
   it("is deterministic for identical facts", () => {
     const facts = buildPlayerFacts(baseInput());
     expect(renderFactsForModel(facts)).toBe(renderFactsForModel(facts));
+  });
+});
+
+describe("renderFactsForModel — the color", () => {
+  it("omits 'The color' section entirely when the store carries none of the three groups", () => {
+    const facts = buildPlayerFacts(baseInput());
+    expect(renderFactsForModel(facts)).not.toContain("The color:");
+  });
+
+  it("states last season's finish, points per game, best week and consistency read in plain words", () => {
+    const facts = buildPlayerFacts(
+      baseInput({ lastSeasonStory: { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 } }),
+    );
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).toContain("The color:");
+    expect(rendered).toContain("Last season (2025): finished RB4 at the position by total points");
+    expect(rendered).toContain("averaging 18.2 points a game");
+    expect(rendered).toContain("His best week was week 9 with 32.4 points");
+    expect(rendered).toContain("above the position's own weekly median in 9 of those 16 games");
+  });
+
+  it("states props lines in plain English, never the raw market key, and frames them as what the books returned", () => {
+    const facts = buildPlayerFacts(
+      baseInput({ booksNumbers: { propsLines: [{ market: "player_reception_yds", medianLine: 1150.5 }, { market: "player_pass_tds", medianLine: 28.5 }], teamVegasWinTotal: 9.5 } }),
+    );
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).toContain("receiving yards 1150.5");
+    expect(rendered).toContain("pass touchdowns 28.5");
+    expect(rendered).not.toContain("player_reception_yds");
+    expect(rendered).not.toContain("player_pass_tds");
+    expect(rendered).toContain("His team's own Vegas win total for this season is 9.5");
+    expect(rendered).not.toMatch(/impl(y|ying|ied)/i);
+  });
+
+  it("omits the props sentence when the archive captured nothing, but still states a real win total", () => {
+    const facts = buildPlayerFacts(baseInput({ booksNumbers: { propsLines: [], teamVegasWinTotal: 9.5 } }));
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).not.toContain("pre-kickoff lines");
+    expect(rendered).toContain("Vegas win total for this season is 9.5");
+  });
+
+  it("states last season's usage shares as whole-percent numbers, omitting any share the store lacks", () => {
+    const facts = buildPlayerFacts(baseInput({ usage: { season: 2025, snapShare: 0.848, targetShare: null, redZoneShare: 0.19 } }));
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).toContain("Last season's usage (2025): snap share 84.8%, red-zone share of his own touches 19.0%.");
+    expect(rendered).not.toContain("target share");
+  });
+
+  it("never emits any banned-vocabulary term even with every color group populated", () => {
+    const facts = buildPlayerFacts(
+      baseInput({
+        lastSeasonStory: { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 },
+        booksNumbers: { propsLines: [{ market: "player_reception_yds", medianLine: 1150.5 }], teamVegasWinTotal: 9.5 },
+        usage: { season: 2025, snapShare: 0.848, targetShare: 0.263, redZoneShare: 0.19 },
+      }),
+    );
+    const rendered = renderFactsForModel(facts).toLowerCase();
+    for (const term of BANNED_VOCABULARY) {
+      expect(rendered.includes(term.toLowerCase())).toBe(false);
+    }
   });
 });

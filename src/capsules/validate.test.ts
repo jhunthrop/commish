@@ -14,6 +14,9 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
     season: null,
     injury: { state: "unknown" },
     news: [],
+    lastSeasonStory: null,
+    booksNumbers: { propsLines: [], teamVegasWinTotal: null },
+    usage: null,
     ...overrides,
   };
 }
