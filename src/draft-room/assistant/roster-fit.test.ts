@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LAW_SPECS } from "@/projections/laws/populations";
 import type { Law } from "@/projections/laws/types";
 import {
   REACH_THRESHOLD_PICKS,
@@ -120,18 +121,12 @@ function player(id: string, position: StackCandidate["position"], nflTeam: strin
 
 describe("stackNoteFor", () => {
   it("returns null when no law in the registry states a QB and pass-catcher correlation (today's real registry)", () => {
-    // These are the six real tribal claims (`src/projections/laws/populations.ts`) — none of them
-    // measure a QB-to-teammate correlation. This pins the honest-absence behavior against the
-    // actual production law set, not just a synthetic fixture.
-    const realClaims = [
-      "The workload cliff: a running back who racks up 300 or more combined carries and receptions in a season loses points per game the next season.",
-      "The running back age curve: a running back who is 28 or older at the season opener produces fewer points per game the following season than an otherwise similar younger back.",
-      "Another primary receiver on his team: a wide receiver with a WR/TE teammate whose own target share that same season is at least 20% and at least as large as the receiver's own share loses points per game the following season.",
-      "The play-caller fingerprint: a pass-catcher (WR or TE) whose team enters a season with a first-year play-caller whose own history elsewhere shows a positive pass-rate-over-expected gains points per game.",
-      "Target share persistence: a wide receiver commanding 24% or more of his team's targets in a season sustains stronger points per game the following season than his raw scoring alone predicts.",
-      "Touchdown regression: a player whose touchdown points make up at least 1.5x his position's typical share of a regular's own points loses points per game the following season. Covers QB, RB, WR and TE.",
-    ];
-    const laws = realClaims.map((claim) => makeLaw({ claim }));
+    // Import the ACTUAL registry claim strings (`LAW_SPECS`, built straight from
+    // `populations.ts`'s `LAW_ENTRIES` via `claim: entry.claim`) rather than hand-typed
+    // paraphrases, so a future wording change in the registry that happened to introduce a real
+    // stacking correlation would flip this test red instead of silently drifting out of sync.
+    const laws = LAW_SPECS.map((spec) => makeLaw({ claim: spec.claim }));
+    expect(laws.length).toBeGreaterThan(0);
     const qb = player("qb1", "QB", "KC");
     const wr = player("wr1", "WR", "KC");
     expect(stackNoteFor(qb, [wr], laws)).toBeNull();
@@ -160,11 +155,19 @@ describe("stackNoteFor", () => {
     expect(note).not.toMatch(/[—;]/);
   });
 
-  it("also matches the pass-catcher's own side of the pairing (WR looking for his QB)", () => {
+  it("also matches the pass-catcher's own side of the pairing (TE looking for his QB)", () => {
     const laws = [makeLaw({ claim: "A quarterback paired with his own tight end gains points per game together." })];
     const te = player("te1", "TE", "DAL");
     const qb = player("qb1", "QB", "DAL");
     const note = stackNoteFor(te, [qb], laws);
+    expect(note).not.toBeNull();
+  });
+
+  it("also matches the pass-catcher's own side of the pairing (WR looking for his QB)", () => {
+    const laws = [makeLaw({ claim: "A quarterback paired with his own wide receiver gains points per game together." })];
+    const wr = player("wr1", "WR", "DAL");
+    const qb = player("qb1", "QB", "DAL");
+    const note = stackNoteFor(wr, [qb], laws);
     expect(note).not.toBeNull();
   });
 
@@ -173,5 +176,40 @@ describe("stackNoteFor", () => {
     const qb = player("qb1", "QB", "KC");
     const rb = player("rb1", "RB", "KC");
     expect(stackNoteFor(rb, [qb], laws)).toBeNull();
+  });
+
+  it("does not stitch a TE-specific law's claim onto a mismatched WR teammate", () => {
+    const laws = [makeLaw({ claim: "A quarterback paired with his own tight end gains points per game together." })];
+    const qb = player("qb1", "QB", "KC");
+    const wr = player("wr1", "WR", "KC");
+    expect(stackNoteFor(qb, [wr], laws)).toBeNull();
+  });
+
+  it("does not stitch a WR-specific law's claim onto a mismatched TE teammate", () => {
+    const laws = [makeLaw({ claim: "A quarterback paired with his own wide receiver gains points per game together." })];
+    const qb = player("qb1", "QB", "KC");
+    const te = player("te1", "TE", "KC");
+    expect(stackNoteFor(qb, [te], laws)).toBeNull();
+  });
+
+  it("matches either pass-catcher position when the law uses generic pass-catcher wording", () => {
+    const laws = [makeLaw({ claim: "A quarterback paired with his own pass-catcher gains points per game together." })];
+    const qb = player("qb1", "QB", "KC");
+    const te = player("te1", "TE", "KC");
+    expect(stackNoteFor(qb, [te], laws)).not.toBeNull();
+  });
+
+  it("checks every stacking law in the payload, not just the first, so an earlier mismatched law cannot shadow a real match", () => {
+    const laws = [
+      makeLaw({ id: "qb_wr_stack", claim: "A quarterback paired with his own wide receiver gains points per game together." }),
+      makeLaw({ id: "qb_te_stack", claim: "A quarterback paired with his own tight end gains points per game together." }),
+    ];
+    const qb = player("qb1", "QB", "KC");
+    const te = player("te1", "TE", "KC");
+    // Only the second law names TE, and only a TE is on the roster — the WR-specific first law
+    // must not consume the search and return null before the TE-specific law is even tried.
+    const note = stackNoteFor(qb, [te], laws);
+    expect(note).not.toBeNull();
+    expect(note).toContain("tight end");
   });
 });

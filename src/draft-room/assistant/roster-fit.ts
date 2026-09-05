@@ -86,11 +86,33 @@ export interface StackCandidate {
   readonly nflTeam: string;
 }
 
-const PASS_CATCHER_POSITIONS: ReadonlySet<Position> = new Set(["WR", "TE"]);
+/**
+ * Which pass-catcher position(s) a law's own claim actually names — the SPECIFIC position(s) the
+ * measured correlation is about, not "any pass-catcher" once any pass-catcher word appears
+ * anywhere in the text. A claim naming "wide receiver" but not "tight end" is a WR-only
+ * correlation; a TE rostered alongside the QB is not evidence of anything that claim measured.
+ * A claim using the generic "pass-catcher"/"pass catcher" wording without naming either position
+ * specifically is read as covering both, since that is what the word itself means. A claim
+ * naming both positions individually covers both for the same reason. Empty means the claim
+ * names no pass-catcher position at all, so it cannot be a stacking law regardless of whether it
+ * mentions a quarterback.
+ */
+function passCatcherPositionsNamedIn(claim: string): ReadonlySet<Position> {
+  const lower = claim.toLowerCase();
+  const named = new Set<Position>();
+  if (lower.includes("wide receiver")) named.add("WR");
+  if (lower.includes("tight end")) named.add("TE");
+  if (named.size === 0 && (lower.includes("pass-catcher") || lower.includes("pass catcher"))) {
+    named.add("WR");
+    named.add("TE");
+  }
+  return named;
+}
 
 /**
- * True when a law's own plain-words claim states a correlation between a quarterback and one of
- * his pass-catchers — the only shape of law a stack suggestion is allowed to ride on.
+ * True when a law's own plain-words claim states a correlation between a quarterback and a
+ * specifically-named pass-catcher position — the only shape of law a stack suggestion is allowed
+ * to ride on.
  *
  * AS OF THIS WRITING (2026-09-05) NO LAW IN THE REGISTRY MATCHES THIS. The six tribal claims
  * (`src/projections/laws/populations.ts`) measure single-player, within-season effects only:
@@ -103,27 +125,28 @@ const PASS_CATCHER_POSITIONS: ReadonlySet<Position> = new Set(["WR", "TE"]);
  * stacking law is discovered and measured — until then every call returns null, honestly.
  */
 function isStackCorrelationLaw(law: Law): boolean {
-  const claim = law.claim.toLowerCase();
-  const mentionsQuarterback = claim.includes("quarterback");
-  const mentionsPassCatcher =
-    claim.includes("wide receiver") || claim.includes("tight end") || claim.includes("pass-catcher") || claim.includes("pass catcher");
-  return mentionsQuarterback && mentionsPassCatcher;
+  return law.claim.toLowerCase().includes("quarterback") && passCatcherPositionsNamedIn(law.claim).size > 0;
 }
 
-function isPassCatcher(position: Position): boolean {
-  return PASS_CATCHER_POSITIONS.has(position);
-}
-
-/** The roster teammate, if any, that pairs with `candidate` under a QB+pass-catcher stack. */
-function findStackTeammate(candidate: StackCandidate, roster: readonly StackCandidate[]): StackCandidate | null {
+/**
+ * The roster teammate, if any, that pairs with `candidate` under a stack whose pass-catcher half
+ * is restricted to `passCatcherPositions` — the positions the law's OWN claim actually named
+ * (`passCatcherPositionsNamedIn`), so a TE-specific law can never be satisfied by a rostered WR
+ * and vice versa.
+ */
+function findStackTeammate(
+  candidate: StackCandidate,
+  roster: readonly StackCandidate[],
+  passCatcherPositions: ReadonlySet<Position>,
+): StackCandidate | null {
   const candidateIsQb = candidate.position === "QB";
-  const candidateIsPassCatcher = isPassCatcher(candidate.position);
-  if (!candidateIsQb && !candidateIsPassCatcher) return null;
+  const candidateIsNamedPassCatcher = passCatcherPositions.has(candidate.position);
+  if (!candidateIsQb && !candidateIsNamedPassCatcher) return null;
 
   return (
     roster.find((teammate) => {
       if (teammate.nflTeam !== candidate.nflTeam) return false;
-      if (candidateIsQb) return isPassCatcher(teammate.position);
+      if (candidateIsQb) return passCatcherPositions.has(teammate.position);
       return teammate.position === "QB";
     }) ?? null
   );
@@ -131,21 +154,27 @@ function findStackTeammate(candidate: StackCandidate, roster: readonly StackCand
 
 /**
  * A stack note only where a law in the payload actually supports the QB+pass-catcher correlation
- * AND the roster already holds the matching half of the pair on the same NFL team. Absent either
- * condition, this returns null — never an invented suggestion (see `isStackCorrelationLaw`'s
- * docblock for why that is the honest answer today).
+ * AND the roster already holds the matching half of the pair, at the SPECIFIC pass-catcher
+ * position that law's claim names, on the same NFL team. Checks every stacking law in the payload
+ * (not just the first one found) so a TE-specific law sitting before a WR-specific one, say,
+ * cannot shadow a real WR match. Absent a matching law-plus-teammate pair, this returns null —
+ * never an invented suggestion, and never a law's claim stitched onto a position it never
+ * measured (see `isStackCorrelationLaw`'s docblock for why no real law matches today).
  */
 export function stackNoteFor(candidate: StackCandidate, roster: readonly StackCandidate[], laws: readonly Law[]): string | null {
-  const stackLaw = laws.find(isStackCorrelationLaw);
-  if (stackLaw === undefined) return null;
+  for (const law of laws) {
+    if (!isStackCorrelationLaw(law)) continue;
 
-  const teammate = findStackTeammate(candidate, roster);
-  if (teammate === null) return null;
+    const teammate = findStackTeammate(candidate, roster, passCatcherPositionsNamedIn(law.claim));
+    if (teammate === null) continue;
 
-  // `stackLaw.claim` is server-authored registry content, appended verbatim rather than
-  // reworded here (this module states numbers and facts, never rewrites someone else's claim
-  // text). No real law matches `isStackCorrelationLaw` today, so this branch is unreachable in
-  // production; a future stacking law's own claim should itself follow the copy rules, the same
-  // bar every other registry claim (`populations.ts`'s `LAW_ENTRIES`) is already held to.
-  return `${candidate.name} stacks with your ${teammate.name} on ${candidate.nflTeam}. ${stackLaw.claim}`;
+    // `law.claim` is server-authored registry content, appended verbatim rather than reworded
+    // here (this module states numbers and facts, never rewrites someone else's claim text). No
+    // real law matches `isStackCorrelationLaw` today, so this branch is unreachable in
+    // production; a future stacking law's own claim should itself follow the copy rules, the
+    // same bar every other registry claim (`populations.ts`'s `LAW_ENTRIES`) is already held to.
+    return `${candidate.name} stacks with your ${teammate.name} on ${candidate.nflTeam}. ${law.claim}`;
+  }
+
+  return null;
 }
