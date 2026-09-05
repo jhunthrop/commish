@@ -28,7 +28,7 @@ export function renderTemplateCapsule(facts: PlayerFacts): string {
   ];
 
   if (lastSeasonStory !== null) {
-    sentences.push(`Last season he finished ${identity.position}${lastSeasonStory.positionRank} at the position, averaging ${lastSeasonStory.pointsPerGame} points a game.`);
+    sentences.push(`Last season he finished ${identity.position}${lastSeasonStory.pointsRank.positionRank} at the position, averaging ${lastSeasonStory.pointsPerGame} points a game.`);
   }
 
   if (market.adp === null) {

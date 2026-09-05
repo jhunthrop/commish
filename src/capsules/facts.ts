@@ -6,6 +6,7 @@ import type { PropMarket } from "@/projections/odds/props-store";
 import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
+import type { RankedStat } from "./rank";
 
 /**
  * THE PLAYER CAPSULE'S FACT SHEET (spec §9 AMENDED 2026-09-04, Task 1) — every number and name a
@@ -121,11 +122,21 @@ export interface PlayerFactsSeasonSummary {
  *       observation store's own usage quantities (`projections/laws/discovery-facts.ts`'s
  *       `DiscoveryQuantityValues`), independent of whether any law fired on them.
  */
+/** One quantity's finish among his position's peers who played that season — see `rank.ts`'s own
+ *  docblock for the ranking rule, the qualifier-count honesty guarantee, and the tie convention.
+ *  Re-exported here under this file's own naming convention (every other type on `PlayerFacts` is
+ *  named `PlayerFacts*`); `rank.ts` stays the single source of truth for the shape. */
+export type PlayerFactsRankedStat = RankedStat;
+
 export interface PlayerFactsLastSeasonStory {
   readonly season: number;
-  /** 1-based finish among his position's peers who played that season, by TOTAL points (never
-   *  points per game) — "RB4 last season" is `positionRank: 4`. */
-  readonly positionRank: number;
+  /** His finish among his position's peers who played that season, by TOTAL points (never points
+   *  per game) — "RB4 last season" is `pointsRank.positionRank: 4`. `value` is that season total,
+   *  a NEW number on the ledger no earlier field carried (`pointsPerGame` below is the average,
+   *  not the total). The qualifier: every peer at his position with at least one played week that
+   *  season — the SAME population this field always ranked against, before this task added the
+   *  count and the neighbor name to it. */
+  readonly pointsRank: PlayerFactsRankedStat;
   readonly pointsPerGame: number;
   readonly gamesPlayed: number;
   /** His single best-scoring week that season. */
@@ -136,6 +147,16 @@ export interface PlayerFactsLastSeasonStory {
    *  for a consistency read ("9 of 13 weeks above the position median"), `gamesPlayed` being the
    *  honest denominator. */
   readonly weeksAboveMedian: number;
+  /** Season-total carries plus receptions, ranked among the SAME position's peers with a real
+   *  (non-null) touches reading that season — see `collect.ts`'s own `lastSeasonStoriesFor`
+   *  docblock for why this is sourced from `discoveryFactsForSeason`'s own participation-derived
+   *  `touches` quantity rather than a `StatLine`'s own (nonexistent) `carries` field. `null` when
+   *  the participation feed never placed him at all that season — no evidence, never a fabricated
+   *  zero. */
+  readonly touchesRank: PlayerFactsRankedStat | null;
+  /** Season-total receiving yards, ranked the same way and against the same qualifier as
+   *  `pointsRank`. */
+  readonly receivingYardsRank: PlayerFactsRankedStat;
 }
 
 /** One sportsbook market's own median pre-kickoff line for this season — read through the same
@@ -166,10 +187,16 @@ export interface PlayerFactsBooksNumbers {
 export interface PlayerFactsUsage {
   readonly season: number;
   readonly snapShare: number | null;
+  /** Rank among the position's peers with a real (non-null) snap share that season — see
+   *  `rank.ts`. `null` exactly when `snapShare` itself is `null`: there is nothing honest to rank
+   *  a fact that does not exist. */
+  readonly snapShareRank: PlayerFactsRankedStat | null;
   readonly targetShare: number | null;
+  readonly targetShareRank: PlayerFactsRankedStat | null;
   /** Share of his OWN carries and targets that fell inside the twenty — see
    *  `DiscoveryQuantityValues.redZoneTouchShare`'s own docblock for the exact numerator/denominator. */
   readonly redZoneShare: number | null;
+  readonly redZoneShareRank: PlayerFactsRankedStat | null;
 }
 
 /** THE THREE HONEST STATES an injury read can be in — see `PlayerFacts.injury`'s own docblock
@@ -386,26 +413,38 @@ function evidenceNumbers(evidence: readonly PlayerFactsEvidenceItem[]): readonly
 
 /** The color facts' own share of the number ledger — see `buildNumberLedger`'s own docblock for
  *  why a fraction contributes both its raw and whole-percent forms. */
+/** Every number one `PlayerFactsRankedStat` carries — its own value, its rank, and the honest
+ *  qualifier count behind that rank (color v2, Task 1). The named neighbor is a NAME, not a
+ *  number, so it belongs to `buildNameLedger` instead. */
+function rankedStatNumbers(rank: PlayerFactsRankedStat): readonly number[] {
+  return [rank.value, rank.positionRank, rank.qualifierCount];
+}
+
 function colorNumbers(lastSeasonStory: PlayerFactsLastSeasonStory | null, booksNumbers: PlayerFactsBooksNumbers, usage: PlayerFactsUsage | null): readonly number[] {
   const numbers: number[] = [];
   if (lastSeasonStory !== null) {
     numbers.push(
       lastSeasonStory.season,
-      lastSeasonStory.positionRank,
+      ...rankedStatNumbers(lastSeasonStory.pointsRank),
       lastSeasonStory.pointsPerGame,
       lastSeasonStory.gamesPlayed,
       lastSeasonStory.bestWeek.week,
       lastSeasonStory.bestWeek.points,
       lastSeasonStory.weeksAboveMedian,
+      ...rankedStatNumbers(lastSeasonStory.receivingYardsRank),
     );
+    if (lastSeasonStory.touchesRank !== null) numbers.push(...rankedStatNumbers(lastSeasonStory.touchesRank));
   }
   for (const line of booksNumbers.propsLines) numbers.push(line.medianLine);
   if (booksNumbers.teamVegasWinTotal !== null) numbers.push(booksNumbers.teamVegasWinTotal);
   if (usage !== null) {
     numbers.push(usage.season);
     if (usage.snapShare !== null) numbers.push(usage.snapShare, usage.snapShare * 100);
+    if (usage.snapShareRank !== null) numbers.push(...rankedStatNumbers(usage.snapShareRank));
     if (usage.targetShare !== null) numbers.push(usage.targetShare, usage.targetShare * 100);
+    if (usage.targetShareRank !== null) numbers.push(...rankedStatNumbers(usage.targetShareRank));
     if (usage.redZoneShare !== null) numbers.push(usage.redZoneShare, usage.redZoneShare * 100);
+    if (usage.redZoneShareRank !== null) numbers.push(...rankedStatNumbers(usage.redZoneShareRank));
   }
   return numbers;
 }
@@ -454,6 +493,23 @@ function buildNameLedger(facts: Omit<PlayerFacts, "numberLedger" | "nameLedger" 
       addName(item.to);
     }
     if (item.kind === "new_play_caller") addName(item.team);
+  }
+  // NAMED NEIGHBORS (color v2, Task 1) — a top-three finish names the peer one rank better than
+  // him, and that name must be groundable exactly like any other proper noun the model may cite.
+  // `addName` also decomposes it into its own individual words, the same shorthand rule this
+  // ledger already gives the subject's own name.
+  const addRankedStatNeighbor = (rank: PlayerFactsRankedStat | null) => {
+    if (rank !== null && rank.namedNeighbor !== null) addName(rank.namedNeighbor);
+  };
+  if (facts.lastSeasonStory !== null) {
+    addRankedStatNeighbor(facts.lastSeasonStory.pointsRank);
+    addRankedStatNeighbor(facts.lastSeasonStory.touchesRank);
+    addRankedStatNeighbor(facts.lastSeasonStory.receivingYardsRank);
+  }
+  if (facts.usage !== null) {
+    addRankedStatNeighbor(facts.usage.snapShareRank);
+    addRankedStatNeighbor(facts.usage.targetShareRank);
+    addRankedStatNeighbor(facts.usage.redZoneShareRank);
   }
   return [...names];
 }

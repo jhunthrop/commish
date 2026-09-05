@@ -125,14 +125,27 @@ describe("renderFactsForModel — the color", () => {
 
   it("states last season's finish, points per game, best week and consistency read in plain words", () => {
     const facts = buildPlayerFacts(
-      baseInput({ lastSeasonStory: { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 } }),
+      baseInput({
+        lastSeasonStory: {
+          season: 2025,
+          pointsRank: { value: 264, positionRank: 4, qualifierCount: 42, namedNeighbor: null },
+          pointsPerGame: 18.2,
+          gamesPlayed: 16,
+          bestWeek: { week: 9, points: 32.4 },
+          weeksAboveMedian: 9,
+          touchesRank: { value: 210, positionRank: 6, qualifierCount: 42, namedNeighbor: null },
+          receivingYardsRank: { value: 612, positionRank: 3, qualifierCount: 42, namedNeighbor: "Star Wideout" },
+        },
+      }),
     );
     const rendered = renderFactsForModel(facts);
     expect(rendered).toContain("The color:");
-    expect(rendered).toContain("Last season (2025): finished RB4 at the position by total points");
+    expect(rendered).toContain("Last season (2025): total points 264, RB4 among 42 qualifying running backs");
     expect(rendered).toContain("averaging 18.2 points a game");
     expect(rendered).toContain("His best week was week 9 with 32.4 points");
     expect(rendered).toContain("above the position's own weekly median in 9 of those 16 games");
+    expect(rendered).toContain("Touches 210, RB6 among 42 qualifying running backs.");
+    expect(rendered).toContain("Receiving yards 612, RB3 among 42 qualifying running backs, one spot behind Star Wideout.");
   });
 
   it("states props lines in plain English, never the raw market key, and frames them as what the books returned", () => {
@@ -156,18 +169,55 @@ describe("renderFactsForModel — the color", () => {
   });
 
   it("states last season's usage shares as whole-percent numbers, omitting any share the store lacks", () => {
-    const facts = buildPlayerFacts(baseInput({ usage: { season: 2025, snapShare: 0.848, targetShare: null, redZoneShare: 0.19 } }));
+    const facts = buildPlayerFacts(
+      baseInput({ usage: { season: 2025, snapShare: 0.848, snapShareRank: null, targetShare: null, targetShareRank: null, redZoneShare: 0.19, redZoneShareRank: null } }),
+    );
     const rendered = renderFactsForModel(facts);
     expect(rendered).toContain("Last season's usage (2025): snap share 84.8%, red-zone share of his own touches 19.0%.");
     expect(rendered).not.toContain("target share");
   });
 
+  it("states a usage share's own rank and named neighbor when the store carries one", () => {
+    const facts = buildPlayerFacts(
+      baseInput({
+        usage: {
+          season: 2025,
+          snapShare: 0.848,
+          snapShareRank: { value: 0.848, positionRank: 2, qualifierCount: 40, namedNeighbor: "Snap King" },
+          targetShare: null,
+          targetShareRank: null,
+          redZoneShare: null,
+          redZoneShareRank: null,
+        },
+      }),
+    );
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).toContain("Last season's usage (2025): snap share 84.8%, RB2 among 40 qualifying running backs, one spot behind Snap King.");
+  });
+
   it("never emits any banned-vocabulary term even with every color group populated", () => {
     const facts = buildPlayerFacts(
       baseInput({
-        lastSeasonStory: { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 },
+        lastSeasonStory: {
+          season: 2025,
+          pointsRank: { value: 264, positionRank: 4, qualifierCount: 42, namedNeighbor: null },
+          pointsPerGame: 18.2,
+          gamesPlayed: 16,
+          bestWeek: { week: 9, points: 32.4 },
+          weeksAboveMedian: 9,
+          touchesRank: { value: 210, positionRank: 6, qualifierCount: 42, namedNeighbor: null },
+          receivingYardsRank: { value: 612, positionRank: 3, qualifierCount: 42, namedNeighbor: "Star Wideout" },
+        },
         booksNumbers: { propsLines: [{ market: "player_reception_yds", medianLine: 1150.5 }], teamVegasWinTotal: 9.5 },
-        usage: { season: 2025, snapShare: 0.848, targetShare: 0.263, redZoneShare: 0.19 },
+        usage: {
+          season: 2025,
+          snapShare: 0.848,
+          snapShareRank: { value: 0.848, positionRank: 1, qualifierCount: 40, namedNeighbor: null },
+          targetShare: 0.263,
+          targetShareRank: { value: 0.263, positionRank: 2, qualifierCount: 40, namedNeighbor: "Target Hog" },
+          redZoneShare: 0.19,
+          redZoneShareRank: { value: 0.19, positionRank: 5, qualifierCount: 40, namedNeighbor: null },
+        },
       }),
     );
     const rendered = renderFactsForModel(facts).toLowerCase();

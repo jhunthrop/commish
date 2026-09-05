@@ -1,5 +1,7 @@
+import type { Position } from "@/domain/player";
+import { POSITION_PLURAL } from "@/league-room/lib/player-season-view";
 import type { PropMarket } from "@/projections/odds/props-store";
-import type { PlayerFacts } from "./facts";
+import type { PlayerFacts, PlayerFactsRankedStat } from "./facts";
 
 /**
  * THE MODEL-FACING FACT SHEET — a SEPARATE, TESTED SERIALIZATION from `facts.ts`'s own internal
@@ -155,16 +157,43 @@ function newsLines(facts: PlayerFacts): readonly string[] {
  * own VOICE_RULES tells the model to weave two or three of these into the story rather than list
  * them, so each sentence below states one clean idea a model can lift in part.
  */
+/** One `PlayerFactsRankedStat` as a plain clause, WITHOUT a trailing period (color v2, Task 1) —
+ *  the value, the honest "Nth among M qualifying Xs" read, and, for a top-three finish, the
+ *  leader's own name or the peer one rank above. Shared by `lastSeasonStoryLine` (points, touches,
+ *  receiving yards, each its own sentence) and `usageLine` (the three shares, comma-joined into
+ *  one sentence), so the "who's ahead of him" phrasing never drifts between the two sections. */
+function rankedStatClause(position: Position, label: string, rank: PlayerFactsRankedStat, formatValue: (value: number) => string): string {
+  const qualifierNoun = POSITION_PLURAL[position];
+  const rankBit = `${position}${rank.positionRank} among ${rank.qualifierCount} qualifying ${qualifierNoun}`;
+  if (rank.positionRank === 1) return `${label} ${formatValue(rank.value)}, ${rankBit}, best at the position`;
+  if (rank.namedNeighbor !== null) return `${label} ${formatValue(rank.value)}, ${rankBit}, one spot behind ${rank.namedNeighbor}`;
+  return `${label} ${formatValue(rank.value)}, ${rankBit}`;
+}
+
+/** `rankedStatClause`, as its own complete sentence — the shape `lastSeasonStoryLine` wants for
+ *  touches/receiving yards, each stated on its own. */
+function rankedStatSentence(position: Position, label: string, rank: PlayerFactsRankedStat, formatValue: (value: number) => string): string {
+  return `${rankedStatClause(position, label, rank, formatValue)}.`;
+}
+
 function lastSeasonStoryLine(facts: PlayerFacts): string | null {
   const story = facts.lastSeasonStory;
   if (story === null) return null;
+  const position = facts.identity.position;
   const gameWord = story.gamesPlayed === 1 ? "game" : "games";
-  return (
-    `Last season (${story.season}): finished ${facts.identity.position}${story.positionRank} at the position by total points, ` +
-    `over ${story.gamesPlayed} ${gameWord}, averaging ${story.pointsPerGame} points a game. ` +
-    `His best week was week ${story.bestWeek.week} with ${story.bestWeek.points} points. ` +
-    `He scored above the position's own weekly median in ${story.weeksAboveMedian} of those ${story.gamesPlayed} ${gameWord}.`
-  );
+  const wholeNumber = (value: number): string => `${Math.round(value)}`;
+  const sentences = [
+    `Last season (${story.season}): ${rankedStatSentence(position, "total points", story.pointsRank, wholeNumber)}`,
+    `Over ${story.gamesPlayed} ${gameWord}, averaging ${story.pointsPerGame} points a game.`,
+    `His best week was week ${story.bestWeek.week} with ${story.bestWeek.points} points.`,
+    `He scored above the position's own weekly median in ${story.weeksAboveMedian} of those ${story.gamesPlayed} ${gameWord}.`,
+  ];
+  // `touchesRank` is `null` on the honest "the participation feed never placed him" absence (see
+  // facts.ts's own docblock) — omitted entirely rather than a placeholder sentence, the same rule
+  // every other color fact in this file already keeps.
+  if (story.touchesRank !== null) sentences.push(rankedStatSentence(position, "Touches", story.touchesRank, wholeNumber));
+  sentences.push(rankedStatSentence(position, "Receiving yards", story.receivingYardsRank, wholeNumber));
+  return sentences.join(" ");
 }
 
 /** Never echoed to the model as `player_reception_yds` (`facts.ts`'s own two-audience rule): a
@@ -194,10 +223,13 @@ function booksNumbersLine(facts: PlayerFacts): string | null {
 function usageLine(facts: PlayerFacts): string | null {
   const usage = facts.usage;
   if (usage === null) return null;
+  const position = facts.identity.position;
+  const asPercent = (value: number): string => `${(value * 100).toFixed(1)}%`;
   const shares: string[] = [];
-  if (usage.snapShare !== null) shares.push(`snap share ${(usage.snapShare * 100).toFixed(1)}%`);
-  if (usage.targetShare !== null) shares.push(`target share ${(usage.targetShare * 100).toFixed(1)}%`);
-  if (usage.redZoneShare !== null) shares.push(`red-zone share of his own touches ${(usage.redZoneShare * 100).toFixed(1)}%`);
+  if (usage.snapShare !== null) shares.push(usage.snapShareRank === null ? `snap share ${asPercent(usage.snapShare)}` : rankedStatClause(position, "snap share", usage.snapShareRank, asPercent));
+  if (usage.targetShare !== null) shares.push(usage.targetShareRank === null ? `target share ${asPercent(usage.targetShare)}` : rankedStatClause(position, "target share", usage.targetShareRank, asPercent));
+  if (usage.redZoneShare !== null)
+    shares.push(usage.redZoneShareRank === null ? `red-zone share of his own touches ${asPercent(usage.redZoneShare)}` : rankedStatClause(position, "red-zone share of his own touches", usage.redZoneShareRank, asPercent));
   if (shares.length === 0) return null;
   return `Last season's usage (${usage.season}): ${shares.join(", ")}.`;
 }

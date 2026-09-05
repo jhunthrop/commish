@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
+import { buildPlayerFacts, type PlayerFactsInput, type PlayerFactsLastSeasonStory } from "./facts";
 import { renderTemplateCapsule } from "./template";
+
+/** A last-season story fixture the floor's own single color sentence reads
+ *  (`pointsRank.positionRank`/`pointsPerGame`) — the template never touches touches or receiving
+ *  yards, so those ranks are filled in with plausible, unused values. */
+const LAST_SEASON_STORY_FIXTURE: PlayerFactsLastSeasonStory = {
+  season: 2025,
+  pointsRank: { value: 264, positionRank: 4, qualifierCount: 42, namedNeighbor: null },
+  pointsPerGame: 18.2,
+  gamesPlayed: 16,
+  bestWeek: { week: 9, points: 32.4 },
+  weeksAboveMedian: 9,
+  touchesRank: { value: 210, positionRank: 6, qualifierCount: 42, namedNeighbor: null },
+  receivingYardsRank: { value: 612, positionRank: 3, qualifierCount: 42, namedNeighbor: null },
+};
 
 function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput {
   return {
@@ -109,9 +123,7 @@ describe("renderTemplateCapsule", () => {
   });
 
   it("adds one color sentence, last season's finish and points per game, when the store carries one", () => {
-    const facts = buildPlayerFacts(
-      baseInput({ lastSeasonStory: { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 } }),
-    );
+    const facts = buildPlayerFacts(baseInput({ lastSeasonStory: LAST_SEASON_STORY_FIXTURE }));
     const text = renderTemplateCapsule(facts);
     expect(text).toContain("Last season he finished RB4 at the position, averaging 18.2 points a game.");
   });
@@ -125,9 +137,17 @@ describe("renderTemplateCapsule", () => {
   it("never states the props lines, the Vegas win total or the usage shares — the writer's own material, not the floor's", () => {
     const facts = buildPlayerFacts(
       baseInput({
-        lastSeasonStory: { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 },
+        lastSeasonStory: LAST_SEASON_STORY_FIXTURE,
         booksNumbers: { propsLines: [{ market: "player_reception_yds", medianLine: 1150.5 }], teamVegasWinTotal: 9.5 },
-        usage: { season: 2025, snapShare: 0.848, targetShare: 0.263, redZoneShare: 0.19 },
+        usage: {
+          season: 2025,
+          snapShare: 0.848,
+          snapShareRank: null,
+          targetShare: 0.263,
+          targetShareRank: null,
+          redZoneShare: 0.19,
+          redZoneShareRank: null,
+        },
       }),
     );
     const text = renderTemplateCapsule(facts);

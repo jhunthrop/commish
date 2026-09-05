@@ -163,8 +163,58 @@ describe("collectAllPlayerFacts — last season's story", () => {
     const rb2 = facts.find((f) => f.identity.id === "p2")!;
 
     // Pooled RB weeks: [20, 10, 30, 5] -> median 15. RB1 clears it twice (20, 30); RB2 never does.
-    expect(rb1.lastSeasonStory).toEqual({ season: PRIOR_SEASON, positionRank: 1, pointsPerGame: 20, gamesPlayed: 3, bestWeek: { week: 3, points: 30 }, weeksAboveMedian: 2 });
-    expect(rb2.lastSeasonStory).toEqual({ season: PRIOR_SEASON, positionRank: 2, pointsPerGame: 5, gamesPlayed: 1, bestWeek: { week: 1, points: 5 }, weeksAboveMedian: 0 });
+    // Neither player's own weeks carried a `receivingYards` reading, so receiving yards is an
+    // honest zero for each of them, tied at rank one. Neither carried a real PARTICIPATION
+    // reading either (no snap-count/pbp rows at all), so `touches` has no evidence and its rank
+    // is honestly `null`, never a fabricated zero-touches tie.
+    const zeroReceivingYards = { value: 0, positionRank: 1, qualifierCount: 2, namedNeighbor: null };
+    expect(rb1.lastSeasonStory).toEqual({
+      season: PRIOR_SEASON,
+      pointsRank: { value: 60, positionRank: 1, qualifierCount: 2, namedNeighbor: null },
+      pointsPerGame: 20,
+      gamesPlayed: 3,
+      bestWeek: { week: 3, points: 30 },
+      weeksAboveMedian: 2,
+      touchesRank: null,
+      receivingYardsRank: zeroReceivingYards,
+    });
+    expect(rb2.lastSeasonStory).toEqual({
+      season: PRIOR_SEASON,
+      pointsRank: { value: 5, positionRank: 2, qualifierCount: 2, namedNeighbor: "Rashad Long" },
+      pointsPerGame: 5,
+      gamesPlayed: 1,
+      bestWeek: { week: 1, points: 5 },
+      weeksAboveMedian: 0,
+      touchesRank: null,
+      receivingYardsRank: zeroReceivingYards,
+    });
+  });
+
+  it("ranks touches and receiving yards, and names the peer one rank above for a top-three finish", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1000010", name: "Volume Back", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await seedPlayer(db, { id: "p2", nflId: "00-1000011", name: "Middle Back", position: "RB", team: "DAL", points: 200, rank: 2, adp: 20 });
+    await seedPlayer(db, { id: "p3", nflId: "00-1000012", name: "Third Back", position: "RB", team: "NYJ", points: 150, rank: 3, adp: 40 });
+    await recordObservations(db, [
+      // Volume Back: 20 carries + 5 receptions = 25 touches, 80 receiving yards.
+      ...priorSeasonWeek("00-1000010", 1, { rushingYards: 100, carries: 20, receptions: 5, receivingYards: 80 }),
+      // Middle Back: 10 carries + 2 receptions = 12 touches, 40 receiving yards.
+      ...priorSeasonWeek("00-1000011", 1, { rushingYards: 50, carries: 10, receptions: 2, receivingYards: 40 }),
+      // Third Back: 2 carries + 1 reception = 3 touches, 10 receiving yards.
+      ...priorSeasonWeek("00-1000012", 1, { rushingYards: 10, carries: 2, receptions: 1, receivingYards: 10 }),
+    ]);
+
+    const facts = await collectAllPlayerFacts(db);
+    const volume = facts.find((f) => f.identity.id === "p1")!.lastSeasonStory!;
+    const middle = facts.find((f) => f.identity.id === "p2")!.lastSeasonStory!;
+    const third = facts.find((f) => f.identity.id === "p3")!.lastSeasonStory!;
+
+    expect(volume.touchesRank).toEqual({ value: 25, positionRank: 1, qualifierCount: 3, namedNeighbor: null });
+    expect(middle.touchesRank).toEqual({ value: 12, positionRank: 2, qualifierCount: 3, namedNeighbor: "Volume Back" });
+    expect(third.touchesRank).toEqual({ value: 3, positionRank: 3, qualifierCount: 3, namedNeighbor: "Middle Back" });
+
+    expect(volume.receivingYardsRank).toEqual({ value: 80, positionRank: 1, qualifierCount: 3, namedNeighbor: null });
+    expect(middle.receivingYardsRank).toEqual({ value: 40, positionRank: 2, qualifierCount: 3, namedNeighbor: "Volume Back" });
+    expect(third.receivingYardsRank).toEqual({ value: 10, positionRank: 3, qualifierCount: 3, namedNeighbor: "Middle Back" });
   });
 
   it("is null for a player the prior-season store carries no played week for (a rookie, most often)", async () => {
@@ -208,6 +258,27 @@ describe("collectAllPlayerFacts — usage, plain", () => {
     expect(usage.targetShare).toBeCloseTo(5 / 20, 10);
     // Red-zone share of his OWN touches: (2 red-zone carries + 1 red-zone target) / (8 pbp carries + 5 pbp targets).
     expect(usage.redZoneShare).toBeCloseTo(3 / 13, 10);
+    // The lone RB with a real snap-share reading in this test's own database: rank one, of one.
+    expect(usage.snapShareRank).toEqual({ value: usage.snapShare, positionRank: 1, qualifierCount: 1, namedNeighbor: null });
+  });
+
+  it("ranks a usage share against the peers with a real reading of that SAME share, and names the leader for a second-place finish", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-2000010", name: "Heavy Snaps", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await seedPlayer(db, { id: "p2", nflId: "00-2000011", name: "Light Snaps", position: "RB", team: "DAL", points: 150, rank: 2, adp: 40 });
+    await recordObservations(db, [
+      ...priorSeasonWeek("00-2000010", 1, { rushingYards: 100 }),
+      participationRow("00-2000010", 1, NFLVERSE_SOURCE.snapCounts, PARTICIPATION_METRICS.offensiveSnaps, 55),
+      participationRow("00-2000010", 1, NFLVERSE_SOURCE.snapCounts, PARTICIPATION_METRICS.teamOffensiveSnaps, 60),
+      ...priorSeasonWeek("00-2000011", 1, { rushingYards: 50 }),
+      participationRow("00-2000011", 1, NFLVERSE_SOURCE.snapCounts, PARTICIPATION_METRICS.offensiveSnaps, 15),
+      participationRow("00-2000011", 1, NFLVERSE_SOURCE.snapCounts, PARTICIPATION_METRICS.teamOffensiveSnaps, 60),
+    ]);
+
+    const facts = await collectAllPlayerFacts(db);
+    const heavy = facts.find((f) => f.identity.id === "p1")!.usage!;
+    const light = facts.find((f) => f.identity.id === "p2")!.usage!;
+    expect(heavy.snapShareRank).toEqual({ value: 55 / 60, positionRank: 1, qualifierCount: 2, namedNeighbor: null });
+    expect(light.snapShareRank).toEqual({ value: 15 / 60, positionRank: 2, qualifierCount: 2, namedNeighbor: "Heavy Snaps" });
   });
 
   it("is null when the store carries no prior season for him at all", async () => {

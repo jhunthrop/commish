@@ -127,9 +127,26 @@ describe("buildPlayerFacts", () => {
  * already had before this task.
  */
 describe("buildPlayerFacts — color facts", () => {
-  const lastSeasonStory = { season: 2025, positionRank: 4, pointsPerGame: 18.2, gamesPlayed: 16, bestWeek: { week: 9, points: 32.4 }, weeksAboveMedian: 9 };
+  const lastSeasonStory = {
+    season: 2025,
+    pointsRank: { value: 264, positionRank: 4, qualifierCount: 42, namedNeighbor: null },
+    pointsPerGame: 18.2,
+    gamesPlayed: 16,
+    bestWeek: { week: 9, points: 32.4 },
+    weeksAboveMedian: 9,
+    touchesRank: { value: 210, positionRank: 2, qualifierCount: 42, namedNeighbor: "Leader Back" },
+    receivingYardsRank: { value: 612, positionRank: 3, qualifierCount: 42, namedNeighbor: "Runner Up Back" },
+  };
   const booksNumbers = { propsLines: [{ market: "player_reception_yds" as const, medianLine: 1150.5 }], teamVegasWinTotal: 9.5 };
-  const usage = { season: 2025, snapShare: 0.848, targetShare: 0.263, redZoneShare: 0.19 };
+  const usage = {
+    season: 2025,
+    snapShare: 0.848,
+    snapShareRank: { value: 0.848, positionRank: 1, qualifierCount: 40, namedNeighbor: null },
+    targetShare: 0.263,
+    targetShareRank: { value: 0.263, positionRank: 2, qualifierCount: 40, namedNeighbor: "Target Hog" },
+    redZoneShare: 0.19,
+    redZoneShareRank: { value: 0.19, positionRank: 5, qualifierCount: 40, namedNeighbor: null },
+  };
 
   it("is null/empty by default, honest absence rather than a fabricated debut season", () => {
     const facts = buildPlayerFacts(baseInput());
@@ -145,19 +162,26 @@ describe("buildPlayerFacts — color facts", () => {
     expect(facts.usage).toEqual(usage);
   });
 
-  it("puts every color number into the number ledger, including whole-percent forms of each share", () => {
+  it("puts every color number into the number ledger, including whole-percent forms of each share and every rank's own value/rank/qualifier count", () => {
     const facts = buildPlayerFacts(baseInput({ lastSeasonStory, booksNumbers, usage }));
     expect(facts.numberLedger).toEqual(
       expect.arrayContaining([
-        2025, 4, 18.2, 16, 9, 32.4, 9, // lastSeasonStory
+        2025, 264, 4, 42, 18.2, 16, 9, 32.4, 9, 210, 2, 42, 612, 3, 42, // lastSeasonStory, incl. touches/receivingYards ranks
         1150.5, 9.5, // booksNumbers
-        84.8, 26.3, 19, // usage, whole-percent forms (usage.season 2025 already covered above)
+        84.8, 0.848, 1, 40, 26.3, 0.263, 2, 40, 19, 0.19, 5, 40, // usage shares, each with its own rank triple
       ]),
     );
   });
 
+  it("puts a top-three named neighbor into the name ledger, groundable for a capsule to cite", () => {
+    const facts = buildPlayerFacts(baseInput({ lastSeasonStory, booksNumbers, usage }));
+    expect(facts.nameLedger).toEqual(expect.arrayContaining(["Leader Back", "Runner Up Back", "Target Hog"]));
+  });
+
   it("never puts a null share into the ledger, and a partial usage row still passes its real shares through", () => {
-    const facts = buildPlayerFacts(baseInput({ usage: { season: 2025, snapShare: 0.5, targetShare: null, redZoneShare: null } }));
+    const facts = buildPlayerFacts(
+      baseInput({ usage: { season: 2025, snapShare: 0.5, snapShareRank: null, targetShare: null, targetShareRank: null, redZoneShare: null, redZoneShareRank: null } }),
+    );
     expect(facts.numberLedger).toContain(50);
     expect(facts.numberLedger.filter((n) => n === null)).toHaveLength(0);
   });
