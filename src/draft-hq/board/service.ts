@@ -39,8 +39,13 @@ export interface BoardRow {
   readonly position: Position;
   readonly team: string;
   readonly headshotUrl: string | null;
-  /** The shipped board's own overall rank, by points — fixed, never recomputed per league. */
+  /** The shipped board's own overall rank, by points — fixed, never recomputed per league.
+   *  A provenance fact, NOT the display order: the board displays `overallRank`. */
   readonly rank: number;
+  /** The board's served order: rank in VALUE under the caller's shape (points over replacement),
+   *  with no-value positions last. This is what "overall rank" means to a drafter, and what the
+   *  Edge comparison against ADP (itself a value ordering) must use — founder ruling 2026-09-04. */
+  readonly overallRank: number;
   readonly projectedPoints: number;
   readonly floorPoints: number;
   readonly medianPoints: number;
@@ -148,6 +153,7 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
         team: identity.team,
         headshotUrl: identity.headshotUrl,
         rank: row.rank,
+        overallRank: 0, // assigned below, after the value sort — see the docblock on the field
         projectedPoints: row.projectedPoints,
         floorPoints: row.floorPoints,
         medianPoints: row.medianPoints,
@@ -164,5 +170,16 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
         reasons: reasonsByNflId.get(row.playerId) ?? [],
       };
     })
-    .sort((a, b) => a.rank - b.rank);
+    .sort((a, b) => {
+      // THE BOARD ORDERS BY VALUE, NOT RAW POINTS (founder, 2026-09-04: "we have way too many
+      // QBs ranked too high"). Raw season points crown quarterbacks because everyone starts one
+      // and replacement-level QB scoring is high; draft VALUE is points over replacement under
+      // the league's shape, which the auction dollars and the tier bands already used. A row
+      // with no value rank (a position this shape never starts) sinks to the bottom, points as
+      // the tiebreak within it.
+      const aValue = a.valueRank ?? Number.POSITIVE_INFINITY;
+      const bValue = b.valueRank ?? Number.POSITIVE_INFINITY;
+      return aValue - bValue || a.rank - b.rank;
+    })
+    .map((row, index) => ({ ...row, overallRank: index + 1 }));
 }

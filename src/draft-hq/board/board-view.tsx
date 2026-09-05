@@ -43,9 +43,9 @@ export function boardCsvLines(orderedRows: readonly BoardRow[], auctionShape: Au
 }
 
 function rowToCsv(row: BoardRow, dollarValue: number | null): string {
-  const edge = row.marketAdp === null ? "" : (row.marketAdp - row.rank).toFixed(1);
+  const edge = row.marketAdp === null ? "" : (row.marketAdp - row.overallRank).toFixed(1);
   return [
-    String(row.rank),
+    String(row.overallRank),
     row.name,
     row.position,
     row.team,
@@ -98,7 +98,7 @@ function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDraw
           <div className="flex flex-col">
             <span className="font-display text-xl font-semibold leading-display text-text-primary">{state.row.name}</span>
             <span className="text-sm text-text-muted">
-              {state.row.team} · bye {state.row.byeWeek ?? "?"} · rank {state.row.rank}
+              {state.row.team} · bye {state.row.byeWeek ?? "?"} · rank {state.row.overallRank}
             </span>
           </div>
         </div>
@@ -256,14 +256,14 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                   </tr>
                 ) : null;
               if (showTiers) lastTier = row.tier;
-              const edge = row.marketAdp === null ? null : row.marketAdp - row.rank;
+              const edge = row.marketAdp === null ? null : row.marketAdp - row.overallRank;
               const vsMarket = vsMarketLabel(edge);
               const dollarValue = dollarValues.get(row.playerId) ?? null;
               // Fix 1 (board persona review): on a position tab, positional rank leads and the
               // overall rank becomes the sub-fact — never a bare overall number on its own. On
               // "Overall" there is no single position context to lead with, so the overall rank
               // stays the lead, unchanged.
-              const leadingRank = position === "ALL" ? row.rank : (row.positionRankInValue ?? row.rank);
+              const leadingRank = position === "ALL" ? row.overallRank : (row.positionRankInValue ?? row.overallRank);
               return (
                 <Fragment key={row.playerId}>
                   {tierRow}
@@ -271,7 +271,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                     <td className="px-2 py-2 tabular-nums text-text-faint">
                       <div className="flex flex-col">
                         <span className="font-medium text-text-primary">{leadingRank}</span>
-                        {position === "ALL" ? null : <span className="text-xs text-text-faint">{`#${row.rank} overall`}</span>}
+                        {position === "ALL" ? null : <span className="text-xs text-text-faint">{`#${row.overallRank} overall`}</span>}
                       </div>
                     </td>
                     <td className="px-2 py-2">

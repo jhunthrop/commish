@@ -57,7 +57,16 @@ describe("boardRows", () => {
     const rows = await boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS }, asOf: new Date("2026-09-04T00:00:00Z") });
 
     expect(rows).toHaveLength(3);
-    expect(rows.map((row) => row.rank)).toEqual([1, 2, 3]);
+    // VALUE ordering (founder ruling 2026-09-04): the WR's 280 points clear the WR replacement
+    // line by more than the second RB's 250 clear the RB line, so the served order flips the
+    // raw points-rank order — QBs stop crowning the board for the same reason. `rank` stays the
+    // stored points-rank provenance; `overallRank` is the served, value-ordered rank.
+    expect(rows.map((row) => row.name)).toEqual(["Top Back", "A Receiver", "Second Back"]);
+    expect(rows.map((row) => row.rank)).toEqual([1, 3, 2]);
+    expect(rows.map((row) => row.overallRank)).toEqual([1, 2, 3]);
+    for (let i = 1; i < rows.length; i += 1) {
+      expect((rows[i - 1]!.valueRank ?? Infinity) <= (rows[i]!.valueRank ?? Infinity)).toBe(true);
+    }
     const topBack = rows.find((row) => row.playerId === "p1");
     expect(topBack?.name).toBe("Top Back");
     expect(topBack?.marketAdp).toBe(1.2);
