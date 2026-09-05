@@ -9,7 +9,7 @@ import { BottomSheet, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, Reason
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { Law } from "@/projections/laws/types";
 import { groupReasons } from "@/league-room/outlook/groups";
-import { strongestEvidenceSentence, tierBandSentence, vsMarketLabel } from "./copy";
+import { strongestEvidenceSentence, tierBandSentence, tierLetter, vsMarketLabel } from "./copy";
 import type { BoardRow } from "./service";
 
 const POSITION_TABS: readonly { readonly value: string; readonly label: string }[] = [
@@ -26,7 +26,7 @@ const POSITION_TABS: readonly { readonly value: string; readonly label: string }
  *  `rowToCsv` below writes, in the same order. "Strongest law" retired (board persona fix 3):
  *  the strongest-evidence sentence now lives in the why drawer's top line, not a column that was
  *  mostly blank and, when it did fire, a bare "+1.3 pts" figure nobody could place. */
-const CSV_HEADER = ["Rank", "Name", "Position", "Team", "Bye", "Evidence pts", "Floor", "Ceiling", "Market ADP", "Vs market (picks)", "Auction value"];
+const CSV_HEADER = ["Rank", "Name", "Position", "Team", "Bye", "Projected pts", "Floor", "Ceiling", "Market ADP", "Vs market (picks)", "Auction value"];
 
 function csvField(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
@@ -211,7 +211,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                 Player
               </th>
               <th scope="col" className="px-2 py-2 text-right">
-                Evidence pts
+                Projected
               </th>
               <th scope="col" className="px-2 py-2 text-right">
                 Most seasons
@@ -245,8 +245,9 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                     <td colSpan={8} className="pt-3 pb-1">
                       <TierDivider
                         grade={row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C"}
+                        letter={tierLetter(row.tier)}
                         label={tierBandSentence(
-                          row.tier === 0 ? "S" : row.tier === 1 ? "A" : row.tier === 2 ? "B" : "C",
+                          tierLetter(row.tier),
                           position,
                           row.playersLeftInTier ?? 0,
                           row.dropToNextTier ?? 0,
@@ -338,8 +339,8 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
       </div>
 
       <p className="text-xs text-text-faint">
-        Most seasons is where the middle half of his measured outcomes land; the faint tails line is the full range, injury seasons and smash
-        seasons included. Both come from the same measured spread of games played and per-game scoring. Why opens the full evidence chain: every
+        Projected is his season point total under the scoring selected above, built from the evidence. Most seasons is where the middle half of his
+        measured outcomes land; the faint tails line is the full range, injury seasons and smash seasons included. Both come from the same measured spread of games played and per-game scoring. Why opens the full evidence chain: every
         law that fired, its measured effect, and the seasons it was tested against. Nothing on this board is an opinion.
       </p>
 

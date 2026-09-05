@@ -56,9 +56,17 @@ export function vsMarketLabel(gap: number | null): VsMarketLabel | null {
  * `dropToNextTier` of zero or less means this is the board's last tier at this position: there is
  * no next drop to name, so the sentence states the count alone rather than inventing a drop.
  */
-export function tierBandSentence(grade: "S" | "A" | "B" | "C", position: string, playersLeftInTier: number, dropToNextTier: number): string {
+export function tierBandSentence(grade: string, position: string, playersLeftInTier: number, dropToNextTier: number): string {
   const count = playersLeftInTier === 1 ? "one" : String(playersLeftInTier);
   const left = `${count} ${position} left`;
   if (dropToNextTier <= 0) return `Tier ${grade} · ${left}`;
   return `Tier ${grade} · ${left} before a ${dropToNextTier.toFixed(1)} point drop`;
+}
+
+/** Tier letters, honestly unbounded: S for the summit, then the alphabet from A — never a clamp
+ *  that dresses tier five as tier C (founder board audit, 2026-09-04). */
+export function tierLetter(tier: number | null): string {
+  if (tier === null || tier < 0) return "?";
+  if (tier === 0) return "S";
+  return String.fromCharCode(64 + Math.min(tier, 26));
 }

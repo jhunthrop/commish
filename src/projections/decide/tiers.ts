@@ -45,13 +45,25 @@ function median(values: readonly number[]): number {
 export function tiersOf(valuesDescending: readonly number[]): readonly number[] {
   if (valuesDescending.length < MIN_POOL_FOR_TIERS) return valuesDescending.map(() => 0);
   const gaps = valuesDescending.slice(1).map((value, index) => valuesDescending[index]! - value);
-  const typical = median(gaps);
-  // A PLATEAU WITH BREAKS IN IT. When most neighbours are identical the median gap is zero, and
-  // "several times zero" would rule out every break including a hundred-point one. The honest
-  // reading of a typical gap of nothing is that ANY gap separates tiers, so the threshold falls
-  // to the smallest positive number. A pool that is identical the whole way down has no positive
-  // gap at all and correctly stays one tier.
-  const threshold = typical > 0 ? CLIFF_MULTIPLE * typical : Number.MIN_VALUE;
+  // A PLATEAU WITH BREAKS IN IT, take two (founder board audit, 2026-09-04). The market curve is
+  // an isotonic fit, so whole runs of players legitimately share ONE fitted value: zero gaps are
+  // the pool's normal texture, not a sign the pool is degenerate. The first version read a zero
+  // median as "any gap separates tiers", and the moment plateaus dominated a position the board
+  // fragmented into singleton tiers on ordinary gaps. The typical gap is now the median of the
+  // POSITIVE gaps: plateaus contribute nothing to it, real spacing defines it, and a pool with
+  // no positive gap at all (identical the whole way down) correctly stays one tier.
+  const positiveGaps = gaps.filter((gap) => gap > 0);
+  // ...and the same median-over-mean argument, one step further: the LARGEST gap is the cliff
+  // candidate, so it does not get a vote on what "typical" means (with one real break in a flat
+  // field, letting it vote made it its own alibi). No positive gap at all: one tier. Exactly one:
+  // that gap IS the break. Otherwise: several times the typical of the rest.
+  const restDescending = [...positiveGaps].sort((a, b) => b - a).slice(1);
+  const threshold =
+    positiveGaps.length === 0
+      ? Number.POSITIVE_INFINITY
+      : positiveGaps.length === 1
+        ? positiveGaps[0]!
+        : CLIFF_MULTIPLE * median(restDescending);
   let tier = 0;
   const tiers = [0];
   for (const gap of gaps) {

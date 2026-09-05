@@ -137,8 +137,13 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
   const positions = new Set(valued.map((entry) => entry.position));
   for (const position of positions) {
     const pool = valued.filter((entry) => entry.position === position);
-    const standings = tierStandingsOf(pool.map((entry) => entry.valueOverReplacement));
-    pool.forEach((entry, index) => standingsByPlayer.set(entry.playerId, standings[index]!));
+    // Tiers are measured among DRAFT-RELEVANT players only (founder board audit, 2026-09-04):
+    // below replacement level the isotonic plateaus pack players a hair apart, and letting that
+    // texture into the pool distorts what a cliff means. Below-replacement rows carry no tier
+    // and draw no band, which is itself the honest statement about them.
+    const relevant = pool.filter((entry) => entry.valueOverReplacement > 0);
+    const standings = tierStandingsOf(relevant.map((entry) => entry.valueOverReplacement));
+    relevant.forEach((entry, index) => standingsByPlayer.set(entry.playerId, standings[index]!));
   }
 
   return withPosition
