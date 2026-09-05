@@ -14,7 +14,7 @@ describe("verdictLine", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: 14.2 }, SCARCITY];
     const line = verdictLine(reasons, "WR");
     expect(line).toContain("The market is underpricing him");
-    expect(line).toContain("+14.2 points a season");
+    expect(line).toContain("worth about 14 more points");
     expect(line).toContain("He sits WR21.");
   });
 
@@ -22,7 +22,7 @@ describe("verdictLine", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: -9.5 }, SCARCITY];
     const line = verdictLine(reasons, "RB");
     expect(line).toContain("The market is overpricing him");
-    expect(line).toContain("-9.5 points a season");
+    expect(line).toContain("about 9 points under his price");
   });
 
   it("fairly-priced: a delta inside the band reads as agreement, not a direction", () => {
@@ -41,7 +41,7 @@ describe("verdictLine", () => {
   it("no-market, with a position rank on record: the evidence alone states his rank", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_unlisted" }, SCARCITY];
     const line = verdictLine(reasons, "RB");
-    expect(line).toBe("The evidence makes him RB21; the market has not priced him.");
+    expect(line).toBe("The evidence makes him RB21. The market has not priced him.");
   });
 
   it("no-market, with nothing else on record either: the honest last resort", () => {
@@ -52,14 +52,14 @@ describe("verdictLine", () => {
   it("a tier cliff supersedes the plain position-rank supporting clause", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: 14.2 }, SCARCITY, TIER_CLIFF];
     const line = verdictLine(reasons, "WR");
-    expect(line).toContain("3 left in his tier before a 4.2-point cliff.");
+    expect(line).toContain("3 left in his tier before a 4.2 point drop.");
     expect(line).not.toContain("He sits WR21");
   });
 
   it("a tier cliff also supports the no-market branch", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_unlisted" }, SCARCITY, TIER_CLIFF];
     const line = verdictLine(reasons, "WR");
-    expect(line).toBe("The evidence makes him WR21; the market has not priced him. 3 left in his tier before a 4.2-point cliff.");
+    expect(line).toBe("The evidence makes him WR21. The market has not priced him. 3 left in his tier before a 4.2 point drop.");
   });
 
   it("never renders an em-dash", () => {

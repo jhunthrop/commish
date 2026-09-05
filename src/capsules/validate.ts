@@ -1,4 +1,4 @@
-import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, EM_DASH } from "./config";
+import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, EM_DASH, SEMICOLON } from "./config";
 import type { PlayerFacts } from "./facts";
 
 export type CapsuleSize = "compact" | "full";
@@ -244,6 +244,10 @@ export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleS
 
   if (trimmed.includes(EM_DASH)) {
     violations.push("The text contains an em-dash. Rewrite without one.");
+  }
+
+  if (trimmed.includes(SEMICOLON)) {
+    violations.push("The text contains a semicolon. Split it into two sentences instead.");
   }
 
   const bannedTerm = containsBannedVocabulary(trimmed);

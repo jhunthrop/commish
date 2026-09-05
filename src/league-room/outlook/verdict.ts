@@ -1,4 +1,3 @@
-import { signedPoints } from "@/components/ui/event-feed-row";
 import type { Position } from "@/domain/player";
 import type { BoardReason } from "@/projections/preseason/board";
 
@@ -18,7 +17,7 @@ import type { BoardReason } from "@/projections/preseason/board";
  *
  * MISSING MARKET DATA gets a verdict from the evidence alone, never a blank: a player the board
  * ranked but the market never listed still has a position rank (`scarcity`) to state — "the
- * evidence makes him WR21; the market has not priced him" — and a player with neither gets the
+ * evidence makes him WR21. The market has not priced him" — and a player with neither gets the
  * honest last resort, "the evidence stands alone."
  *
  * NO REASONS AT ALL — the board never ranked him (a crosswalk miss, or no board this season) —
@@ -47,7 +46,11 @@ function findReason<T extends BoardReason["code"]>(reasons: readonly BoardReason
  *  alone, which `marketGapClause`/the no-market branch already state on their own. */
 function tierClause(tierCliff: TierCliffReason | undefined): string | null {
   if (tierCliff === undefined) return null;
-  return `${tierCliff.playersLeftInTier} left in his tier before a ${tierCliff.dropToNextTier.toFixed(1)}-point cliff.`;
+  const count = tierCliff.playersLeftInTier;
+  const drop = tierCliff.dropToNextTier.toFixed(1);
+  return count === 1
+    ? `He is the last man in his tier, with a ${drop} point drop behind him.`
+    : `${count} left in his tier before a ${drop} point drop.`;
 }
 
 function positionRankLabel(position: Position, scarcity: ScarcityReason): string {
@@ -61,15 +64,17 @@ function marketGapSentence(marketAnchor: MarketAnchorReason): string {
   if (Math.abs(delta) < FAIR_PRICE_BAND_POINTS) {
     return `The market has him about right, within ${FAIR_PRICE_BAND_POINTS} points of the evidence.`;
   }
-  const direction = delta > 0 ? "underpricing" : "overpricing";
-  return `The market is ${direction} him: the evidence is ${signedPoints(delta)} points a season from his market line.`;
+  const rounded = Math.abs(Math.round(delta));
+  return delta > 0
+    ? `The market is underpricing him. Our number says he is worth about ${rounded} more points than where he is going.`
+    : `The market is overpricing him. Our number sits about ${rounded} points under his price, so let someone else pay it.`;
 }
 
 /** The one sentence for a player the market never priced at all — the evidence's own position
  *  rank (`scarcity`) when the board has one, otherwise the honest last resort. */
 function noMarketSentence(position: Position, scarcity: ScarcityReason | undefined): string {
   if (scarcity === undefined) return "The market has not priced him; the evidence stands alone.";
-  return `The evidence makes him ${positionRankLabel(position, scarcity)}; the market has not priced him.`;
+  return `The evidence makes him ${positionRankLabel(position, scarcity)}. The market has not priced him.`;
 }
 
 /**

@@ -19,7 +19,7 @@ export function renderTemplateCapsule(facts: PlayerFacts): string {
   const { identity, market, projection, season, byeWeek, injury } = facts;
   const sentences: string[] = [
     `${identity.name} (${identity.position}, ${identity.team}) projects for ${Math.round(projection.projectedPoints)} points this season.`,
-    `Most seasons land between ${Math.round(projection.typicalLow)} and ${Math.round(projection.typicalHigh)}; the full range (injury seasons on the low end, smash seasons on the high end) runs ${Math.round(projection.floorPoints)} to ${Math.round(projection.ceilingPoints)}.`,
+    `Most seasons land between ${Math.round(projection.typicalLow)} and ${Math.round(projection.typicalHigh)}. The full range runs ${Math.round(projection.floorPoints)} to ${Math.round(projection.ceilingPoints)}, where the low end is what an injury year looks like and the high end is the smash case.`,
   ];
 
   if (market.adp === null) {
@@ -44,7 +44,7 @@ export function renderTemplateCapsule(facts: PlayerFacts): string {
   // an "unknown" read must never claim health, since no snapshot has actually checked.
   if (injury.state === "designated") sentences.push(`The injury report lists him as ${injury.designation} as of ${injury.asOf.slice(0, 10)}.`);
   else if (injury.state === "clean") sentences.push(`The injury report showed no designation for him as of ${injury.asOf.slice(0, 10)}.`);
-  else sentences.push("No injury feed has been checked for him yet.");
+  else sentences.push("We have not checked an injury feed for him yet.");
 
   return sentences.join(" ");
 }

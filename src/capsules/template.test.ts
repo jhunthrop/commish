@@ -55,7 +55,7 @@ describe("renderTemplateCapsule", () => {
     expect(text).not.toContain("248.");
     // THE TRI-STATE (fix round 1, CRITICAL 2): the fixture's default injury state is "unknown"
     // (no snapshot has ever run) — this must NEVER read as a healthy claim.
-    expect(text).toContain("No injury feed has been checked for him yet.");
+    expect(text).toContain("We have not checked an injury feed for him yet.");
   });
 
   it("keeps the unpriced-market sentence: the one market fact no other surface states", () => {
@@ -86,7 +86,7 @@ describe("renderTemplateCapsule", () => {
     const facts = buildPlayerFacts(baseInput());
     const text = renderTemplateCapsule(facts);
     expect(text).toContain("Most seasons land between");
-    expect(text).toContain("injury seasons on the low end");
+    expect(text).toContain("the low end is what an injury year looks like");
   });
 
   it("never fabricates a season line when no season data exists", () => {

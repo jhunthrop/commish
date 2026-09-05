@@ -112,3 +112,6 @@ export const COMPETITOR_NAMES: readonly string[] = [
 ];
 
 export const EM_DASH = "—";
+/** Founder law, 2026-09-05, extending the em-dash rule: a semicolon never appears in analysis
+ *  prose. People do not talk in semicolons. Two sentences beat one stitched one. */
+export const SEMICOLON = ";";
