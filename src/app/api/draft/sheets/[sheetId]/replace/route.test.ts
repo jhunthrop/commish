@@ -60,4 +60,11 @@ describe("PUT /api/draft/sheets/[sheetId]/replace", () => {
     const body = (await response.json()) as { readonly data: { readonly entries: readonly { readonly playerId: string; readonly rank: number }[] } };
     expect(body.data.entries.map((entry) => entry.playerId)).toEqual(["p2", "p1"]);
   });
+
+  it("fix round 1, HIGH 2: 400s a body naming the same player twice, before it can ever reach the unique-index write", async () => {
+    const sheet = await createSheet(db, "u1", { name: "Sheet" });
+    const response = await PUT(req({ entries: [{ playerId: "p1" }, { playerId: "p1" }] }), ctx(sheet.id));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ ok: false, error: "entries: The same player cannot appear twice in one sheet." });
+  });
 });

@@ -120,9 +120,12 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
   const [dollarView, setDollarView] = useState(false);
   const [drawer, setDrawer] = useState<EvidenceDrawerState | null>(null);
 
+  // Fix round 1, LOW: gated on `dollarView` — every row's auction value is a real computation
+  // (`auctionValues` sorts and ranks the whole board), and there is no reason to pay for it on
+  // every render of a board most managers view in points, never dollars.
   const dollarValues = useMemo(
-    () => auctionValues(rows.map((row) => ({ playerId: row.playerId, valueOverReplacement: row.valueOverReplacement })), auctionShape),
-    [rows, auctionShape],
+    () => (dollarView ? auctionValues(rows.map((row) => ({ playerId: row.playerId, valueOverReplacement: row.valueOverReplacement })), auctionShape) : new Map<string, number>()),
+    [dollarView, rows, auctionShape],
   );
 
   const filtered = useMemo(() => {

@@ -41,7 +41,7 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
   const [modal, setModal] = useState<ModalKind>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [search, setSearch] = useState("");
-  const [unresolved, setUnresolved] = useState<readonly string[] | null>(null);
+  const [unresolved, setUnresolved] = useState<{ readonly unresolvedNames: readonly string[]; readonly duplicateNames: readonly string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function refresh(): void {
@@ -147,8 +147,11 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
   async function importCsv(file: File): Promise<void> {
     if (selectedSheetId === null) return;
     const text = await file.text();
-    const { rows, unresolvedNames } = parseSheetCsv(text, boardOptions);
-    setUnresolved(unresolvedNames.length > 0 ? unresolvedNames : null);
+    const { rows, unresolvedNames, duplicateNames } = parseSheetCsv(text, boardOptions);
+    // Fix round 1, HIGH 2: a duplicate playerId is reported through this SAME warning channel as
+    // an unresolved name — both are rows the import skipped, and a manager fixing the file wants
+    // to see every skipped row in one place, not learn about duplicates from a second surface.
+    setUnresolved(unresolvedNames.length > 0 || duplicateNames.length > 0 ? { unresolvedNames, duplicateNames } : null);
     if (rows.length === 0) return;
     await api(`/api/draft/sheets/${selectedSheetId}/replace`, { method: "PUT", body: JSON.stringify({ entries: rows }) });
     refresh();
@@ -224,7 +227,14 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
           </div>
 
           {unresolved === null ? null : (
-            <Card className="text-sm text-warning">{`${unresolved.length} name(s) from that CSV could not be matched to a player and were skipped: ${unresolved.join(", ")}`}</Card>
+            <Card className="flex flex-col gap-1 text-sm text-warning">
+              {unresolved.unresolvedNames.length === 0 ? null : (
+                <span>{`${unresolved.unresolvedNames.length} name(s) from that CSV could not be matched to a player and were skipped: ${unresolved.unresolvedNames.join(", ")}`}</span>
+              )}
+              {unresolved.duplicateNames.length === 0 ? null : (
+                <span>{`${unresolved.duplicateNames.length} row(s) named a player already on the sheet earlier in the file; the first row won and the rest were skipped: ${unresolved.duplicateNames.join(", ")}`}</span>
+              )}
+            </Card>
           )}
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
