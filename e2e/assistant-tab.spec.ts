@@ -36,18 +36,20 @@ async function setTableChip(page: import("@playwright/test").Page, chip: string,
 
 const AVAILABLE_PLAYERS_LIST = "Available players, best first";
 
-/** See `mock-draft.spec.ts`'s own `makeTopPick` docblock for why this is click-and-verify on the
- *  top row's own name+team pair, retried, rather than a naive `.first()` click. */
+/** Click-and-verify on the top QUILT drawer row, retried, rather than a naive `.first()` click
+ *  (same race reasoning as `mock-draft.spec.ts`'s own `makeTopPick` docblock). The quilt's pool
+ *  rows are `drawer-row`s whose name is a `PlayerName` BUTTON (the row's first button in DOM
+ *  order) — there is no name testid contract in the quilt, so the name is read from that button
+ *  and the row is re-found by it. */
 async function makeTopPick(page: import("@playwright/test").Page): Promise<void> {
   const pool = page.getByRole("list", { name: AVAILABLE_PLAYERS_LIST });
-  await pool.getByRole("button", { name: "Draft" }).first().waitFor({ timeout: 15_000 });
-  const firstRow = pool.getByRole("listitem").first();
-  const pickedName = await firstRow.getByTestId("pool-player-name").innerText();
-  const pickedTeam = await firstRow.getByTestId("pool-player-team").innerText();
-  const uniqueRow = pool.getByRole("listitem").filter({ hasText: pickedName }).filter({ hasText: pickedTeam });
+  await pool.getByRole("button", { name: "Draft", exact: true }).first().waitFor({ timeout: 15_000 });
+  const firstRow = pool.getByTestId("drawer-row").first();
+  const pickedName = await firstRow.getByRole("button").first().innerText();
+  const uniqueRow = pool.getByTestId("drawer-row").filter({ hasText: pickedName });
   await expect(async () => {
     if ((await uniqueRow.count()) > 0) {
-      await uniqueRow.getByRole("button", { name: "Draft" }).click({ timeout: 5_000 });
+      await uniqueRow.first().getByRole("button", { name: "Draft", exact: true }).click({ timeout: 5_000 });
     }
     await expect(uniqueRow).toHaveCount(0, { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
@@ -87,7 +89,9 @@ test("mock room -> the Assistant tab shows three candidates before your pick, an
   await expect(candidates).toHaveCount(3);
 
   // --- The human's own real turn, then a real pick through the Pool tab -----------------------
-  await expect(managerA.getByTestId("room-rail").getByText("You're on the clock")).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
+  // The room's real on-clock copy is the clock strip's "YOUR PICK · {place}" (clock-strip.tsx) —
+  // never "You're on the clock", which the copy law's contraction ban forbids anyway.
+  await expect(managerA.getByText(/YOUR PICK/).first()).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
   await managerA.getByTestId("drawer-handles").getByRole("tab", { name: "Pool" }).click();
   await makeTopPick(managerA);
 

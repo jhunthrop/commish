@@ -109,7 +109,10 @@ export function PlayerRow({ player, positionRank, meta, chips, verdict, action, 
             weight 600). Law 2 says the largest thing on a screen is a number or a NAME, and on a
             board of sixty rows the name is the thing being scanned — it outranks the meta line
             under it rather than matching it. 600 is the cap, not a step toward 700. */}
-        <span className="truncate text-md font-semibold leading-tight text-text-primary">{player.name}</span>
+        {/* `pool-player-name` is a TEST CONTRACT (e2e makeTopPick helpers read the picked name
+            through it, never through DOM adjacency — see mock-draft.spec.ts's own docblock). A
+            room refactor silently dropped it once and both draft e2e specs went dark. */}
+        <span data-testid="pool-player-name" className="truncate text-md font-semibold leading-tight text-text-primary">{player.name}</span>
         {/* Law 3's third attribute rides here rather than beside the face: the sticker is a fact
             about the player and belongs with the other facts, and putting it on the tile would
             cover the club colour that is the tile's only job. Mono because this line is data —
