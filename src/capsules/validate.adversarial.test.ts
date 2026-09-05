@@ -164,3 +164,134 @@ describe("re-review round 2: honest shorthand passes, fabrication still fails", 
     expect(validateCapsule(pad("Marcus Brown had a day for DET, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(false);
   });
 });
+
+/**
+ * PRECISION FIX ROUND 2 (live full-board regeneration, 2026-09-05: 454/659 template fallbacks,
+ * a large share from FALSE rejections of honest prose) — pins the two live false-rejection
+ * classes and the safety properties that must survive fixing them. See `validate.ts`'s own
+ * docblocks on `extractProperNamePhrases` (PART A, sentence-boundary tokenization) and
+ * `isNameGroundedWithShedding` (PART B, verb+lastname shorthand) for the mechanism.
+ */
+describe("precision fix round 2 — PART A: sentence-boundary tokenization", () => {
+  it('a ledgered name followed by the next sentence\'s capitalized first word still grounds ("Tre Tucker. The")', () => {
+    const facts = buildPlayerFacts({ ...RASHAD_LONG, identity: { id: "p3", name: "Tre Tucker", position: "WR", team: "LV" } });
+    const r = validateCapsule(
+      pad("Tre Tucker. The board loves him plenty for the LV offense, our number of 248 season points and board rank 14 overall this season."),
+      facts,
+      "compact",
+    );
+    expect(r.violations.some((v) => v.includes("does not trace"))).toBe(false);
+  });
+
+  it('a ledgered named neighbor followed by the next sentence\'s capitalized first word still grounds ("Bijan Robinson. He")', () => {
+    const lastSeasonStory = {
+      season: 2025,
+      pointsRank: { value: 264, positionRank: 2, qualifierCount: 42, namedNeighbor: "Bijan Robinson" },
+      pointsPerGame: 18.2,
+      gamesPlayed: 16,
+      bestWeek: { week: 9, points: 32.4 },
+      weeksAboveMedian: 9,
+      touchesRank: null,
+      receivingYardsRank: { value: 612, positionRank: 3, qualifierCount: 42, namedNeighbor: null },
+    };
+    const facts = buildPlayerFacts({ ...RASHAD_LONG, lastSeasonStory });
+    const r = validateCapsule(
+      pad("Rashad Long trails Bijan Robinson. He still profiles well for the SF offense, our number of 248 season points and board rank 14 overall this season."),
+      facts,
+      "compact",
+    );
+    expect(r.violations.some((v) => v.includes("does not trace"))).toBe(false);
+  });
+
+  it('a genuinely unledgered name at the very same sentence-boundary shape still fails ("Marcus Fakename. The")', () => {
+    const facts = buildPlayerFacts(RASHAD_LONG);
+    const r = validateCapsule(
+      pad("Rashad Long splits time with Marcus Fakename. The rest of the backfield rounds out the SF offense, our number of 248 season points and board rank 14 overall this season."),
+      facts,
+      "compact",
+    );
+    expect(r.violations.some((v) => v.includes("Marcus Fakename"))).toBe(true);
+  });
+
+  it("keeps the pinned in-name abbreviations matching: St. Brown, T.J. Hockenson, Tyrone Tracy Jr.", () => {
+    const stBrownFacts = buildPlayerFacts({ ...RASHAD_LONG, identity: { id: "p4", name: "Amon-Ra St. Brown", position: "WR", team: "DET" } });
+    expect(
+      validateCapsule(pad("Amon-Ra St. Brown anchors the DET offense, our number of 248 season points and board rank 14 overall this season."), stBrownFacts, "compact").violations.some((v) =>
+        v.includes("does not trace"),
+      ),
+    ).toBe(false);
+
+    const hockensonFacts = buildPlayerFacts({ ...RASHAD_LONG, identity: { id: "p5", name: "T.J. Hockenson", position: "TE", team: "MIN" } });
+    expect(
+      validateCapsule(pad("T.J. Hockenson anchors the MIN offense, our number of 248 season points and board rank 14 overall this season."), hockensonFacts, "compact").violations.some((v) =>
+        v.includes("does not trace"),
+      ),
+    ).toBe(false);
+
+    const tracyFacts = buildPlayerFacts({ ...RASHAD_LONG, identity: { id: "p6", name: "Tyrone Tracy Jr.", position: "RB", team: "NYG" } });
+    expect(
+      validateCapsule(pad("Tyrone Tracy Jr. anchors the NYG offense, our number of 248 season points and board rank 14 overall this season."), tracyFacts, "compact").violations.some((v) =>
+        v.includes("does not trace"),
+      ),
+    ).toBe(false);
+  });
+
+  describe("a name suffix ('Jr.') immediately before a new sentence (review round 2, Important)", () => {
+    const tracyFacts = buildPlayerFacts({ ...RASHAD_LONG, identity: { id: "p8", name: "Tyrone Tracy Jr.", position: "RB", team: "NYG" } });
+
+    it('grounds when the suffix is followed by the next sentence\'s capitalized first word ("Tyrone Tracy Jr. He is a stud")', () => {
+      const r = validateCapsule(
+        pad("Tyrone Tracy Jr. He is a stud for the NYG offense, our number of 248 season points and board rank 14 overall this season."),
+        tracyFacts,
+        "compact",
+      );
+      expect(r.violations.some((v) => v.includes("does not trace"))).toBe(false);
+    });
+
+    it("still grounds the ordinary mid-name form (no following sentence break)", () => {
+      const r = validateCapsule(pad("Tyrone Tracy Jr. leads the NYG backfield, our number of 248 season points and board rank 14 overall this season."), tracyFacts, "compact");
+      expect(r.violations.some((v) => v.includes("does not trace"))).toBe(false);
+    });
+
+    it('a fabricated name with the same suffix-then-sentence-break shape still fails ("Fake Name Jr. He")', () => {
+      const r = validateCapsule(
+        pad("Fake Name Jr. He is a stud for the NYG offense, our number of 248 season points and board rank 14 overall this season."),
+        tracyFacts,
+        "compact",
+      );
+      expect(r.violations.some((v) => v.includes("Fake Name Jr"))).toBe(true);
+    });
+  });
+});
+
+describe("precision fix round 2 — PART B: verb + lastname shorthand", () => {
+  const mccaffreyFacts = buildPlayerFacts({ ...RASHAD_LONG, identity: { id: "p7", name: "Christian McCaffrey", position: "RB", team: "SF" } });
+
+  it('a verb + lastname pair grounds via the surname suffix rule ("Buy McCaffrey")', () => {
+    const r = validateCapsule(pad("Buy McCaffrey for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
+    expect(r.violations.some((v) => v.includes("does not trace"))).toBe(false);
+  });
+
+  it("an unledgered surname after the same verb still fails closed", () => {
+    const r = validateCapsule(pad("Buy Fakename for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
+    expect(r.violations.some((v) => v.includes("Buy Fakename"))).toBe(true);
+  });
+
+  it("a plausible given name in that slot (not a sentence verb) still fails, even though the surname matches (Marcus McCaffrey)", () => {
+    const r = validateCapsule(pad("Marcus McCaffrey had a day for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
+    expect(r.violations.some((v) => v.includes("Marcus McCaffrey"))).toBe(true);
+  });
+
+  it('review round 2, CRITICAL (executed probe): a real NFL given name in that slot ("Chase McCaffrey") still fails, even though the surname matches', () => {
+    // "Chase" was removed from SENTENCE_VERB_WORDS after the reviewer's own executed probe showed
+    // it false-passing here (Chase Brown, Chase Claypool, Chase Edmonds are all real given names).
+    const r = validateCapsule(pad("Chase McCaffrey had a huge day for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
+    expect(r.violations.some((v) => v.includes("Chase McCaffrey"))).toBe(true);
+  });
+
+  it("the ledgered decomposed single-word floor still holds: a ledgered 'Rashad Long' never lets bare 'Long' pass under a real first name", () => {
+    const facts = buildPlayerFacts(RASHAD_LONG);
+    const r = validateCapsule(pad("Marcus Long anchors the SF offense, our number of 248 season points and board rank 14 overall this season."), facts, "compact");
+    expect(r.violations.some((v) => v.includes("Marcus Long"))).toBe(true);
+  });
+});
