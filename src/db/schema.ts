@@ -2761,6 +2761,11 @@ export const scheduleCursors = pgTable("schedule_cursors", {
  * stored fact) so a future fourth tag is one enum value, not a schema migration plus a rename.
  */
 export const draftSheetTagEnum = pgEnum("draft_sheet_tag", ["target", "avoid", "never"]);
+/** `"llm"` only when BOTH a capsule's sizes were freshly written and cleared the validator this
+ *  run; `"template"` whenever either fell back to the deterministic floor — see
+ *  `src/capsules/generate.ts`'s own docblock for why this stays one conservative flag rather than
+ *  one per size. */
+export const capsuleSourceEnum = pgEnum("capsule_source", ["llm", "template"]);
 
 export const draftSheets = pgTable(
   "draft_sheets",
@@ -2920,3 +2925,37 @@ export const adpSnapshots = pgTable(
     uniqueIndex("adp_snapshots_player_source_captured_idx").on(t.playerId, t.source, t.capturedAt),
   ],
 );
+
+/**
+ * THE PLAYER CAPSULE STORE (spec §9 AMENDED 2026-09-04, Task 3) — one row per player, LLM voice
+ * over verified facts, mechanically validated. `factsHash` is the cache key: the sweep job
+ * (`src/jobs/defs/capsule-sweep-job.ts`) recomputes a player's facts every run and regenerates
+ * only when this hash has moved or the row is missing — never on a timer alone.
+ *
+ * TWO SIZES, ONE ROW (founder, live-fire review, "a competitor's player readout set the quality
+ * bar"): `bodyCompact` is the bottom-sheet peek's own capsule (60-110 words), `bodyFull` is the
+ * full player page's "Read" (180-280 words) — same facts, same writer/validator machinery, two
+ * prompts. `source`/`model` describe the PAIR: `"llm"` only when both sizes were freshly written
+ * and cleared the validator this run (`generate.ts`'s own conservative provenance rule); either
+ * one falling back to the deterministic template marks the whole row `"template"`, and BOTH
+ * columns then hold template text — a template's job is honesty and availability, not matching a
+ * stylistic length band it was never trying to hit (see `template.ts`'s own docblock).
+ *
+ * NO player-id CASCADE FROM `nfl_players` — this keys on `players.id`, the product's own directory
+ * (the same id space `player_stat_lines`/`injuries.ts`/the harvested news feed already join on),
+ * never the historical projections engine's gsis id space `nfl_players`/`preseason_projections`
+ * use. A capsule is a product-surface artifact, not a projection-engine one.
+ */
+export const playerCapsules = pgTable("player_capsules", {
+  playerId: text("player_id")
+    .primaryKey()
+    .references(() => players.id, { onDelete: "cascade" }),
+  factsHash: text("facts_hash").notNull(),
+  bodyCompact: text("body_compact").notNull(),
+  bodyFull: text("body_full").notNull(),
+  source: capsuleSourceEnum("source").notNull(),
+  /** `CAPSULE_MODEL` at generation time, or `null` for a `"template"`-sourced row — a template
+   *  was never asked of any model. */
+  model: text("model"),
+  generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
+});

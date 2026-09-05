@@ -77,4 +77,12 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
     payload: {},
     description: "Nightly 03:00 ET capture of the market ADP feed into the append-only trend archive (Draft HQ phase 4's data, started early).",
   }),
+  schedule({
+    name: "capsule-sweep-nightly",
+    cron: "0 4 * * *",
+    timezone: "America/New_York",
+    job: "capsule-sweep",
+    payload: {},
+    description: "Nightly 04:00 ET pass over every board-relevant player: recompute facts, regenerate a capsule wherever the hash moved or the row is missing or still template-sourced.",
+  }),
 ];
