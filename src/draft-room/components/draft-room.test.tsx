@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { screen, waitFor, fireEvent, act, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { hydrateSurface, renderSurface } from "@/components/ui/test-utils";
@@ -165,6 +165,21 @@ describe("DraftRoom", () => {
     await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  // Task 1 (player-name adoption sweep): the host is mounted in the live room viewport, inert
+  // until a name is pressed — a real press reaches all the way to the season peek.
+  it("mounts the player-peek host in the live room, reachable from a pool row's name", async () => {
+    mount();
+    await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
+    const name = screen.getByRole("button", { name: "Jalen Croft" });
+    await act(async () => {
+      fireEvent.click(name);
+    });
+    expect(screen.getByRole("dialog", { name: "Jalen Croft" })).toBeInTheDocument();
+    // The room's own no-page-scroll contract is untouched: the sheet overlays, it does not add
+    // a scrolling child to the viewport frame.
+    expect(screen.getByTestId("room-viewport").className).toContain("lg:overflow-hidden");
+  });
 });
 
 /**
@@ -198,6 +213,28 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     mount(fixture);
     await waitFor(() => expect(screen.getByTestId("share-link-panel")).toBeInTheDocument());
     expect(screen.getByLabelText("Share link")).toHaveValue("https://commish.football/app/mock-drafts/ABC123");
+  });
+
+  // Task 1 (player-name adoption sweep): the host is mounted in the settled debrief branch too
+  // — the founder's own screenshot — reachable from the pick-log's name.
+  it("mounts the player-peek host in the settled debrief, reachable from a pick-log row's name", async () => {
+    const fixture = fixtureDeps({
+      ...SNAKE_VIEW,
+      phase: "complete",
+      onClockTeamId: null,
+      picks: [{ pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1", slot: "QB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:00:00.000Z", auto: false }],
+      rosters: { t1: [{ slot: "QB", slotIndex: 0, playerId: "qb1" }], t2: [] },
+    });
+    fixture.mock = { ...MOCK_ROOM, results: MOCK_RESULTS_INFO };
+    mount(fixture);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "The debrief" })).toBeInTheDocument());
+    // Scoped to the wire: the same name also shows on the verdict lane and the finished board,
+    // and this test only needs proof that ONE of them reaches the host.
+    const name = within(screen.getByTestId("pick-wire")).getByRole("button", { name: "Jalen Croft" });
+    await act(async () => {
+      fireEvent.click(name);
+    });
+    expect(screen.getByRole("dialog", { name: "Jalen Croft" })).toBeInTheDocument();
   });
 
   it("lets the board yield entirely to MockResults once a mock draft finishes", async () => {

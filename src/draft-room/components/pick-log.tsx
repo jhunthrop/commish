@@ -6,6 +6,7 @@ import type { Player } from "@/domain/player";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { PlayerFace, PositionBadge } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import { PlayerName } from "@/league-room/components/player-peek";
 import { rosterSpots } from "../state/format";
 import { teamName, teamsById } from "../lib/lookups";
 import { verdictForPick, verdictPopulation } from "../lib/verdict";
@@ -116,7 +117,7 @@ export function PickLog({ view, teams, playersById, players, myTeamId }: PickLog
                   they describe, which is the opposite of law 3: an object's attributes belong on
                   the object. */}
               <span className="flex min-w-0 flex-1 items-center gap-2">
-                <span className="truncate text-sm font-semibold text-text-primary">{player.name}</span>
+                <PlayerName leagueId={view.leagueId} playerId={player.id} name={player.name} className="truncate text-sm font-semibold text-text-primary" />
                 <PositionBadge position={player.position} size="sm" />
                 <span className="shrink-0 font-mono text-xs text-text-muted">{player.nflTeam}</span>
               </span>

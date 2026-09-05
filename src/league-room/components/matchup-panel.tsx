@@ -2,6 +2,7 @@ import type { Position } from "@/domain/player";
 import type { MedianResult, WeekStatus } from "@/league";
 import type { MatchupDetail, MatchupLineupEntry, MatchupSide } from "../contract";
 import { Card, EYEBROW, PlayerFace, PositionBadge, SlotChip, Stat, Table, type TableColumn } from "@/components/ui";
+import { PlayerName } from "./player-peek";
 import { formatPoints } from "../lib/format";
 import { playerOf } from "../lib/player";
 import { summaryOf } from "../lib/matchup-facts";
@@ -60,7 +61,7 @@ function pointsStat(row: MatchupLineupEntry, points: number, positionPoints: Pos
  * a grey placeholder tile pretending to be somebody would be the same failure `PlayerFace` refuses
  * for an unknown club.
  */
-function PlayerCell({ row }: { readonly row: MatchupLineupEntry }) {
+function PlayerCell({ leagueId, row }: { readonly leagueId: string; readonly row: MatchupLineupEntry }) {
   const player = playerOf(row);
   if (player === null) {
     // An empty slot has no player to name, so the slot itself is the whole cell — the one row
@@ -76,7 +77,7 @@ function PlayerCell({ row }: { readonly row: MatchupLineupEntry }) {
     <span className="flex min-w-0 items-center gap-2">
       <PlayerFace player={player} size="sm" />
       <span className="flex min-w-0 flex-col leading-tight">
-        <span className="truncate text-text-primary">{player.name}</span>
+        <PlayerName leagueId={leagueId} playerId={player.id} name={player.name} className="truncate text-text-primary" />
         <span className="flex items-center gap-1.5">
           <PositionBadge position={player.position} size="sm" />
           {/* THE SLOT ONLY WHEN IT IS NOT THE POSITION (2026-08-28) — see `columnsFor`. On eight
@@ -116,9 +117,9 @@ function PlayerCell({ row }: { readonly row: MatchupLineupEntry }) {
  * it judged would rank a kicker against a quarterback for sharing a column. The head states the
  * set instead, in the same two registers a judged head uses, so a reader gets the same claim.
  */
-function columnsFor(positionPoints: PositionPoints | undefined): readonly TableColumn<MatchupLineupEntry>[] {
+function columnsFor(leagueId: string, positionPoints: PositionPoints | undefined): readonly TableColumn<MatchupLineupEntry>[] {
   return [
-    { key: "player", header: "Player", cell: (row) => <PlayerCell row={row} /> },
+    { key: "player", header: "Player", cell: (row) => <PlayerCell leagueId={leagueId} row={row} /> },
     {
       key: "points",
       header: (
@@ -165,12 +166,14 @@ function medianLineFor(
  * alone used to take.
  */
 function Side({
+  leagueId,
   side,
   isMine,
   median,
   positionPoints,
   weekStatus,
 }: {
+  readonly leagueId: string;
   readonly side: MatchupSide;
   readonly isMine: boolean;
   readonly weekStatus: WeekStatus;
@@ -187,7 +190,7 @@ function Side({
       </div>
       <Table
         caption={`${side.teamName} starters`}
-        columns={columnsFor(positionPoints)}
+        columns={columnsFor(leagueId, positionPoints)}
         rows={side.starters}
         rowKey={(row) => `${row.slot}:${row.slotIndex}`}
         empty={<p className="text-sm text-text-muted">No starters set.</p>}
@@ -212,10 +215,12 @@ function Side({
  * nothing, and that is only true while the thing behind its rows is the identical lineup pair.
  */
 export function MatchupLineups({
+  leagueId,
   matchup,
   myTeamId,
   positionPoints,
 }: {
+  readonly leagueId: string;
   readonly matchup: MatchupDetail;
   readonly myTeamId: string | null;
   readonly positionPoints?: PositionPoints;
@@ -223,6 +228,7 @@ export function MatchupLineups({
   return (
     <div className="grid gap-4 lg:grid-cols-2 lg:gap-6">
       <Side
+        leagueId={leagueId}
         side={matchup.home}
         isMine={matchup.home.teamId === myTeamId}
         median={medianLineFor(matchup, "home")}
@@ -230,6 +236,7 @@ export function MatchupLineups({
         weekStatus={matchup.weekStatus}
       />
       <Side
+        leagueId={leagueId}
         side={matchup.away}
         isMine={matchup.away.teamId === myTeamId}
         median={medianLineFor(matchup, "away")}
@@ -259,6 +266,7 @@ export function MatchupLineups({
  * behind a button could, which is the whole substance of the ruling.
  */
 export function MatchupPanel({
+  leagueId,
   matchup,
   myTeamId,
   weekStatus,
@@ -266,6 +274,7 @@ export function MatchupPanel({
   records,
   eyebrow = "Matchup",
 }: {
+  readonly leagueId: string;
   readonly matchup: MatchupDetail;
   readonly myTeamId: string | null;
   readonly weekStatus: WeekStatus;
@@ -301,7 +310,7 @@ export function MatchupPanel({
       </div>
       <MatchupHero matchup={summaryOf(matchup)} myTeamId={myTeamId} records={records} />
       <div className="border-t border-line pt-3">
-        <MatchupLineups matchup={matchup} myTeamId={myTeamId} positionPoints={positionPoints} />
+        <MatchupLineups leagueId={leagueId} matchup={matchup} myTeamId={myTeamId} positionPoints={positionPoints} />
       </div>
     </Card>
   );

@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
+import { Button, PlayerFace, PositionBadge, SlotChip } from "@/components/ui";
+import { PlayerName } from "@/league-room/components/player-peek";
 import { rosterFillRows } from "../../state/roster-fill";
 import { pickPlace } from "../state/board";
 import type { RoomActs } from "./room-acts";
@@ -18,11 +19,13 @@ export interface DrawerRosterTabProps extends Pick<RoomActs, "onPeek"> {
  * THE ROSTER TAB (founder ruling 2026-09-03 — the spine's replacement): the caller's roster as
  * drawer rows, one per configured spot in the league's own slot order, through the SAME shared
  * derivation the rail and the debrief use (`rosterFillRows` — no second slot-assignment
- * opinion). A filled spot states its facts: the slot chip, the face, the name (the peek button,
- * law 3), the player's OWN position badge (a WR filling FLEX shows WR), and the pick's place in
- * the sport's grammar — the fact the retired spine never stated. An open spot is a dashed row
- * carrying just its slot chip: the quilt's own dashed-promise vocabulary, saying a row will
- * land here.
+ * opinion). A filled spot states its facts: the slot chip, the face, the name (`PlayerName`, the
+ * product's one pressable-name primitive — opens the season peek), a sibling "Card" button for
+ * this room's own draft-context card (board rank, sheet rank, notes — what the name used to
+ * open before the player-name adoption sweep gave the name itself to the season sheet), the
+ * player's OWN position badge (a WR filling FLEX shows WR), and the pick's place in the sport's
+ * grammar — the fact the retired spine never stated. An open spot is a dashed row carrying just
+ * its slot chip: the quilt's own dashed-promise vocabulary, saying a row will land here.
  *
  * The handles hide this tab for a caller with no team (the "nothing to say" law, the Byes
  * gating pattern); the sentence below is the total-function fallback, never the expected path.
@@ -64,13 +67,20 @@ export function DrawerRosterTab({ view, myTeamId, playersById, onPeek }: DrawerR
               <SlotChip slot={row.slot} />
             </span>
             <PlayerFace player={player} size="sm" />
-            <button
-              type="button"
-              onClick={() => onPeek(player.id)}
-              className="min-w-0 truncate text-left font-display text-md font-semibold text-text-primary focus-visible:outline-2 focus-visible:outline-accent"
-            >
-              {player.name}
-            </button>
+            <PlayerName
+              leagueId={view.leagueId}
+              playerId={player.id}
+              name={player.name}
+              className="min-w-0 truncate font-display text-md font-semibold text-text-primary"
+            />
+            {/* Task 3: the name opens the season peek; the room's own draft-context card (board
+                rank, sheet rank, notes) is a sibling "Card" button, matching `DrawerRow`'s own
+                restructuring. */}
+            <Button size="sm" variant="ghost" aria-label={`${player.name}'s draft card`} onClick={() => onPeek(player.id)}>
+              <span aria-hidden="true" className="text-text-muted">
+                ›
+              </span>
+            </Button>
             <PositionBadge position={player.position} size="sm" />
             {pick === null ? null : (
               <span className="ml-auto shrink-0 font-display text-sm font-bold text-text-muted tabular-nums">{pickPlace(pick, teamCount)}</span>

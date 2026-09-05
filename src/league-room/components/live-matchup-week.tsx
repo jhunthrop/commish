@@ -138,6 +138,7 @@ export function LiveMatchupWeek({ leagueId, body, records, act = null }: {
       {notice === null ? null : <p className="text-sm text-text-muted">{notice}</p>}
 
       <MatchupPanel
+        leagueId={leagueId}
         matchup={lead}
         myTeamId={body.myTeamId}
         weekStatus={live.status}
@@ -150,7 +151,7 @@ export function LiveMatchupWeek({ leagueId, body, records, act = null }: {
         <section aria-label="Around the league" className="flex flex-col gap-2">
           <h2 className={`${EYEBROW} text-text-muted`}>Around the league</h2>
           <MatchupStrip matchups={rest}>
-            {(matchup) => <MatchupLineups matchup={matchup} myTeamId={body.myTeamId} positionPoints={positionPoints} />}
+            {(matchup) => <MatchupLineups leagueId={leagueId} matchup={matchup} myTeamId={body.myTeamId} positionPoints={positionPoints} />}
           </MatchupStrip>
         </section>
       )}

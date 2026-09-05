@@ -11,5 +11,12 @@ export interface RoomActs {
   readonly queuedPlayerIds: ReadonlySet<string>;
   readonly onDraft: (playerId: string) => void;
   readonly onQueueToggle: (playerId: string) => void;
+  /** Opens this room's own draft-context card (`PeekSheet`): board rank, sheet rank, notes,
+   *  Draft/Queue. A sibling control to the player's NAME (player-name adoption sweep, task 3)
+   *  wherever a row has room for both — the name itself goes through `PlayerName`
+   *  (`@/league-room/components/player-peek`), the product's one pressable-name primitive, which
+   *  opens the season peek instead. The quilt's own grid cells (`quilt-cell.tsx`,
+   *  `quilt-board.tsx`) still use the whole tile as this one control — too small to carry a
+   *  second focusable target — so `onPeek` stays their only trigger. */
   readonly onPeek: (playerId: string) => void;
 }

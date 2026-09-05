@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { axe } from "vitest-axe";
 import type { TradeProposalView } from "@/trades/contract";
 import type { TradeRoomContext } from "../contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "../hooks/deps";
 import type { TradeSheetMath } from "../lib/trade-math";
+import { PlayerPeekHost } from "./player-peek";
 import { TradeSheet } from "./trade-sheet";
 
 /** First response answers the assessment fetch; the second answers the decision POST. */
@@ -79,6 +81,33 @@ describe("TradeSheet", () => {
     expect(screen.getByText("15.1")).toBeTruthy();
     await waitFor(() => expect(screen.getByText("side value 248")).toBeTruthy());
     expect(screen.getByText("side value 232")).toBeTruthy();
+  });
+
+  // Task 4 (player-name adoption sweep): each asset's name is a bare `<p>` with no other control
+  // on its row, so it goes straight through `PlayerName`.
+  it("makes every asset's name a pressable button that opens the season peek, axe-clean", async () => {
+    const base = capturingDeps([ASSESSMENT]).deps;
+    // The season-peek fetch (`/player-season`) answers `ok: false` — `capturingDeps` otherwise
+    // hands every call the same assessment envelope, which is not a `PlayerSeasonBody`.
+    const deps: LeagueRoomDeps = {
+      ...base,
+      fetchJson: (url, init) =>
+        url.includes("/player-season")
+          ? Promise.resolve({ json: () => Promise.resolve({ ok: false, error: "not available" }) } as Response)
+          : base.fetchJson(url, init),
+    };
+    const { container } = render(
+      <LeagueRoomDepsProvider deps={deps}>
+        <PlayerPeekHost />
+        <TradeSheet leagueId="l1" trade={TRADE} context={CONTEXT} math={MATH} onClose={vi.fn()} onCounter={vi.fn()} onDecided={vi.fn()} />
+      </LeagueRoomDepsProvider>,
+    );
+    const name = screen.getByRole("button", { name: "Jahmyr Gibbs" });
+    expect(await axe(container)).toHaveNoViolations();
+    await act(async () => {
+      fireEvent.click(name);
+    });
+    expect(screen.getByRole("dialog", { name: "Jahmyr Gibbs" })).toBeInTheDocument();
   });
 
   it("asks the advisor endpoint from the viewer's own seat", async () => {

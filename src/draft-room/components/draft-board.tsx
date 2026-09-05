@@ -9,6 +9,7 @@ import { Avatar, Badge, EYEBROW, ReasonChip, Sticker, strongestLawReasons } from
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { plural } from "@/domain/duration";
+import { PlayerName } from "@/league-room/components/player-peek";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { rosterSpots } from "../state/format";
 import { teamName, teamsById } from "../lib/lookups";
@@ -208,6 +209,7 @@ function buildRows(view: DraftStateView, columnIds: readonly string[]): BuiltBoa
 }
 
 function StickerCell({
+  leagueId,
   cell,
   playersById,
   variant,
@@ -216,6 +218,7 @@ function StickerCell({
   reasons,
   laws,
 }: {
+  readonly leagueId: string;
   readonly cell: BoardCell;
   readonly playersById: ReadonlyMap<string, Player>;
   readonly variant: DraftBoardVariant;
@@ -247,9 +250,23 @@ function StickerCell({
             nowhere — display none costs nothing. */}
         <Avatar name={player?.name ?? cell.pick.playerId} avatar={player?.headshotUrl ?? null} size="sm" className="hidden shrink-0 bg-scrim/20 xl:flex" />
         <div className="flex min-w-0 flex-col justify-center gap-0.5">
-          <span className={`truncate font-display font-semibold leading-display ${CELL_TEXT[variant]}`}>
-            {player?.name ?? cell.pick.playerId}
-          </span>
+          {/* Task 3 (player-name adoption sweep): the room variant's sticker is otherwise
+              non-interactive, so the name becomes the ONE control in it — the TV variant keeps
+              every control inert (standing law: "no control on it is ever clickable"), and a
+              player metadata gap (`player === null`) keeps the raw id as inert text either way,
+              since `PlayerName` needs a real name to show. */}
+          {variant === "room" && player !== null ? (
+            <PlayerName
+              leagueId={leagueId}
+              playerId={cell.pick.playerId}
+              name={player.name}
+              className={`truncate font-display font-semibold leading-display ${CELL_TEXT[variant]}`}
+            />
+          ) : (
+            <span className={`truncate font-display font-semibold leading-display ${CELL_TEXT[variant]}`}>
+              {player?.name ?? cell.pick.playerId}
+            </span>
+          )}
           {/* Law 4, on a cell that got taller once the round horizon reclaimed the stage: the
               pick's own NUMBER leads the meta line. It is the fact a manager asks about a
               sticker he is looking at ("when did that go?"), it is already on the payload, and
@@ -363,6 +380,7 @@ export function DraftBoard({
 
   const cellFor = (cell: BoardCell) => (
     <StickerCell
+      leagueId={view.leagueId}
       cell={cell}
       playersById={playersById}
       variant={variant}

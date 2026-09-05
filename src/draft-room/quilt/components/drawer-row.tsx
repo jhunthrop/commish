@@ -2,9 +2,11 @@
 
 import type { ReactNode } from "react";
 import type { Player } from "@/domain/player";
-import { PositionBadge } from "@/components/ui";
+import { Button, PositionBadge } from "@/components/ui";
+import { PlayerName } from "@/league-room/components/player-peek";
 
 export interface DrawerRowProps {
+  readonly leagueId: string;
   readonly player: Player;
   readonly positionRank?: number;
   /** The ordinal printed in the row's first column — board rank in the pool, sheet rank on the
@@ -21,17 +23,35 @@ export interface DrawerRowProps {
   /** Struck through and dimmed — a sheet row whose player is already gone. */
   readonly drafted?: boolean;
   readonly highlight?: boolean;
-  /** Opens the peek sheet on this player — the name itself is the button. */
+  /** Opens the quilt's own draft-context card (board rank, sheet rank, notes, Draft/Queue) — a
+   *  SIBLING control to the name now (player-name adoption sweep, task 3): the name itself went
+   *  through `PlayerName` to reach the product's one season-stats peek, so this row's own richer
+   *  in-draft card needed its own trigger rather than double-booking the name button (the "one
+   *  primitive per feature" rule — see `player-peek.tsx`'s docblock — reads as "the name is
+   *  ONE thing", not "a name click can only ever mean one product surface"). */
   readonly onPeek: (playerId: string) => void;
 }
 
 /**
  * One drawer row — the quilt's denser sibling of `PlayerRow`, shared by the POOL, MY SHEET and
- * BYES tabs so the three lists read as one surface. The NAME is the peek button (law 3: click
- * any row for the card), which keeps the row's other verbs — star, DRAFT, reorder — as plain
- * siblings with no click-through gymnastics.
+ * BYES tabs so the three lists read as one surface. The name opens the season peek (`PlayerName`,
+ * the product's one pressable-name primitive); the small "Card" button beside it is what law 3
+ * used to hang off the name itself — this room's own richer draft-context card (board rank,
+ * sheet rank, notes, Draft/Queue) — now a plain sibling, never nested inside another control.
  */
-export function DrawerRow({ player, positionRank, rank, rankAccent = false, meta, verdict, actions, drafted = false, highlight = false, onPeek }: DrawerRowProps) {
+export function DrawerRow({
+  leagueId,
+  player,
+  positionRank,
+  rank,
+  rankAccent = false,
+  meta,
+  verdict,
+  actions,
+  drafted = false,
+  highlight = false,
+  onPeek,
+}: DrawerRowProps) {
   return (
     <li
       data-testid="drawer-row"
@@ -42,16 +62,20 @@ export function DrawerRow({ player, positionRank, rank, rankAccent = false, meta
       )}
       <PositionBadge position={player.position} rank={positionRank} size="sm" />
       <span className="flex min-w-0 flex-1 flex-col">
-        <button
-          type="button"
-          onClick={() => onPeek(player.id)}
-          className={`w-full truncate text-left font-display text-md font-semibold focus-visible:outline-2 focus-visible:outline-accent ${drafted ? "text-text-faint line-through" : "text-text-primary"}`}
-        >
-          {player.name}
-        </button>
+        <PlayerName
+          leagueId={leagueId}
+          playerId={player.id}
+          name={player.name}
+          className={`w-full truncate font-display text-md font-semibold ${drafted ? "text-text-faint line-through" : "text-text-primary"}`}
+        />
         {meta === undefined ? null : <span className="min-w-0 truncate text-xs text-text-faint">{meta}</span>}
       </span>
       <span className="ml-auto flex shrink-0 items-center gap-2">
+        <Button size="sm" variant="ghost" aria-label={`${player.name}'s draft card`} onClick={() => onPeek(player.id)}>
+          <span aria-hidden="true" className="text-text-muted">
+            ›
+          </span>
+        </Button>
         {verdict}
         {actions}
       </span>

@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { axe } from "vitest-axe";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "../hooks/deps";
 import type { LineupFixPlan } from "../lib/lineup-problems";
 import { LINEUP } from "../test-fixtures";
 import { LineupFixSheet } from "./lineup-fix-sheet";
+import { PlayerPeekHost } from "./player-peek";
 
 function capturingDeps(response: unknown = { ok: true, data: {} }) {
   const calls: { url: string; body: unknown }[] = [];
@@ -73,7 +75,10 @@ describe("LineupFixSheet", () => {
   it("leads with the recommendation, its evidence, and the priced delta", () => {
     render(sheet(capturingDeps().deps));
     expect(screen.getByRole("dialog", { name: "Fix your WR2" })).toBeTruthy();
-    expect(screen.getByText("Start Romeo Doubs")).toBeTruthy();
+    // Player-name adoption sweep (task 4): the name is now `PlayerName` (a real button), so the
+    // sentence splits across two nodes — checked at the paragraph's own combined text content.
+    const name = screen.getByRole("button", { name: "Romeo Doubs" });
+    expect(name.closest("p")).toHaveTextContent("Start Romeo Doubs");
     expect(screen.getByText("Projects 9.8 this week · plays Sun 1:00p vs MIN")).toBeTruthy();
     expect(screen.getByText("+9.8 over a player on bye")).toBeTruthy();
   });
@@ -83,6 +88,23 @@ describe("LineupFixSheet", () => {
     expect(screen.getByText("114.60")).toBeTruthy();
     expect(screen.getByText("124.40")).toBeTruthy();
     expect(screen.getByText("Quentin Johnston")).toBeTruthy();
+  });
+
+  // Task 4 (player-name adoption sweep): both the recommended candidate and each alternative
+  // are a name beside a "Start" verb button — sibling controls already, so the name goes
+  // straight through `PlayerName` with no restructuring needed.
+  it("makes both the recommendation's and an alternative's name a pressable button that opens the season peek, axe-clean", async () => {
+    const { container } = render(
+      <>
+        <PlayerPeekHost />
+        {sheet(capturingDeps().deps)}
+      </>,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Quentin Johnston" }));
+    });
+    expect(screen.getByRole("dialog", { name: "Quentin Johnston" })).toBeInTheDocument();
   });
 
   it("commits the chosen start through the lineup endpoint, starters only", async () => {

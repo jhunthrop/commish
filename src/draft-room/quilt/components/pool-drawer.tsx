@@ -84,6 +84,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
       <div id="player-pool" className="flex min-h-0 flex-1 flex-col bg-surface-elevated px-4 py-2">
         {tab === "pool" ? (
           <DrawerPoolTab
+            leagueId={view.leagueId}
             players={props.players}
             available={available}
             byeWeeks={props.byeWeeks}
@@ -99,6 +100,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
           />
         ) : tab === "sheet" ? (
           <DrawerSheetTab
+            leagueId={view.leagueId}
             sheet={props.sheet}
             playersById={props.playersById}
             boardRanks={props.boardRanks}
@@ -117,6 +119,7 @@ export function PoolDrawer(props: PoolDrawerProps) {
           <DrawerRosterTab view={view} myTeamId={props.myTeamId} playersById={props.playersById} onPeek={props.onPeek} />
         ) : tab === "byes" ? (
           <DrawerByesTab
+            leagueId={view.leagueId}
             players={props.players}
             available={available}
             byeWeeks={props.byeWeeks}

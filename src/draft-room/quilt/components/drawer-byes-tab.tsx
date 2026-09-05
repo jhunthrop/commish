@@ -9,6 +9,7 @@ import { DrawerRow } from "./drawer-row";
 import type { RoomActs } from "./room-acts";
 
 export interface DrawerByesTabProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft" | "onPeek"> {
+  readonly leagueId: string;
   /** Server-ranked, best first. */
   readonly players: readonly Player[];
   readonly available: ReadonlySet<string>;
@@ -20,7 +21,7 @@ export interface DrawerByesTabProps extends Pick<RoomActs, "canDraft" | "submitt
  * band in board order. A player whose team the schedule cannot claim a bye for sits under "No
  * bye on record" at the end rather than being invented into a week (law 7).
  */
-export function DrawerByesTab({ players, available, byeWeeks, canDraft, submitting, onDraft, onPeek }: DrawerByesTabProps) {
+export function DrawerByesTab({ leagueId, players, available, byeWeeks, canDraft, submitting, onDraft, onPeek }: DrawerByesTabProps) {
   const bands = useMemo(() => {
     const byWeek = new Map<number | null, Player[]>();
     for (const player of players) {
@@ -50,6 +51,7 @@ export function DrawerByesTab({ players, available, byeWeeks, canDraft, submitti
               return (
                 <DrawerRow
                   key={player.id}
+                  leagueId={leagueId}
                   player={player}
                   onPeek={onPeek}
                   meta={

@@ -706,6 +706,7 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
     for (const { trade, meTeamId } of states) {
       const { container, unmount } = render(
         <TradeCard
+          leagueId="l1"
           trade={trade}
           meTeamId={meTeamId}
           playersById={TRADE_PLAYERS}
@@ -720,7 +721,7 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
   });
 
   it("is clean on the accept confirm dialog", () => {
-    const { container } = render(<TradeCard trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} />);
+    const { container } = render(<TradeCard leagueId="l1" trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} />);
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     expectClean(container, ...TRADE_CONTENT);
   });
@@ -733,7 +734,7 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
    * directly rather than trusting the two authors to never drift.
    */
   it("says the identical sentence a held trade's own notice says — the banner and the notice must never drift", () => {
-    render(<TradeCard trade={{ ...TRADE_BASE, status: "held" }} meTeamId="me" playersById={TRADE_PLAYERS} leagueName="Sunday Money" />);
+    render(<TradeCard leagueId="l1" trade={{ ...TRADE_BASE, status: "held" }} meTeamId="me" playersById={TRADE_PLAYERS} leagueName="Sunday Money" />);
     const notice = renderNotice("trade_held_for_review", { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls" });
     expect(screen.getByText(notice.body)).toBeInTheDocument();
   });
@@ -743,7 +744,7 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
   // the lazy-verdict fix existed.
   it("is clean idle, loading, and on a failed verdict fetch", () => {
     for (const status of ["idle", "loading", "error"] as const) {
-      const { container, unmount } = render(<TradeCard trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} assessmentStatus={status} />);
+      const { container, unmount } = render(<TradeCard leagueId="l1" trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} assessmentStatus={status} />);
       expectClean(container, ...TRADE_CONTENT);
       unmount();
     }
@@ -769,7 +770,7 @@ describe("TradeComposer says nothing that breaks the house copy rules, with and 
     });
     const { container } = render(
       <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
-        <TradeComposer context={TRADE_CONTEXT} onAssess={onAssess} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />
+        <TradeComposer leagueId="l1" context={TRADE_CONTEXT} onAssess={onAssess} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />
       </LeagueRoomDepsProvider>,
     );
     expectClean(container, ...TRADE_CONTENT);

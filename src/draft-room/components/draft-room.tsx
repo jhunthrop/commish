@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
+import { PlayerPeekHost } from "@/league-room/components/player-peek";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { useDraftFinale } from "../hooks/use-draft-finale";
 import { useDraftRoomDeps } from "../hooks/deps";
@@ -189,6 +190,13 @@ export function DraftRoom({ draftId, dismissedAt, topBar = null }: DraftRoomProp
           renders the debrief exactly as before. */}
       {room.mock?.results && finale.stage !== "moment" ? (
         <>
+          {/* Task 1 (player-name adoption sweep): the one mounted receiver for every `PlayerName`
+              press in this room — inert until a name is pressed (`target === null` renders
+              nothing), so it never touches the debrief's normal scroll. `useLeagueRoomDeps`'s
+              context default (`BROWSER_DEPS`) stands alone with no provider required; the room
+              never wraps itself in `LeagueRoomDepsProvider`, so the host reads real `fetchJson`
+              here exactly as `RoomShell`'s own mount does. */}
+          <PlayerPeekHost />
           {/* The settled debrief is a page again, so the page chrome returns (see
               DraftRoomProps.topBar). Above mockChrome: the practice banner belongs to the
               content below the bar, same as every (shell) page's own banners. */}
@@ -236,6 +244,11 @@ export function DraftRoom({ draftId, dismissedAt, topBar = null }: DraftRoomProp
         // and `RoomLayout` flexes into what remains. A sibling above an h-dvh frame scrolls
         // the page by its own height; a child inside it never can.
         <div data-testid="room-viewport" className="relative flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+          {/* Task 1: the same host, mounted here too — a `BottomSheet` is `fixed inset-0` (see
+              its own docblock), so it overlays this frame without adding a scrolling child to
+              it, and the live room's no-page-scroll contract (`lg:h-dvh lg:overflow-hidden`
+              above) is untouched. */}
+          <PlayerPeekHost />
           {mockChrome}
           <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} actionLabel={actionLabelFor(room.view.format)} />
           {room.view.format === "auction" ? (

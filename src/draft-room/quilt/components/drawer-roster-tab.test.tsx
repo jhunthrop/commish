@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { axe } from "vitest-axe";
 import type { DraftStateView } from "@/draft-engine";
 import { PLAYERS, SNAKE_VIEW } from "../../test-fixtures";
 import { DrawerRosterTab } from "./drawer-roster-tab";
@@ -48,9 +49,14 @@ describe("DrawerRosterTab", () => {
     }
   });
 
-  it("the name is the peek button — the drawer's own law 3 posture", () => {
+  // Player-name adoption sweep (task 3): the name itself now goes through `PlayerName` (the
+  // product's one pressable-name primitive, opening the season peek) rather than this room's
+  // own `onPeek` — a sibling "Card" button carries that draft-context card instead, so the two
+  // controls sit beside each other rather than one name doing double duty.
+  it("makes the name pressable through PlayerName, and keeps the room's own draft card one tap away on a sibling button", () => {
     const onPeek = renderTab();
-    fireEvent.click(screen.getByRole("button", { name: "Jalen Croft" }));
+    expect(screen.getByRole("button", { name: "Jalen Croft" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Jalen Croft's draft card" }));
     expect(onPeek).toHaveBeenCalledWith("qb1");
   });
 
@@ -58,5 +64,10 @@ describe("DrawerRosterTab", () => {
     renderTab(null);
     expect(screen.queryAllByTestId("roster-tab-row")).toHaveLength(0);
     expect(screen.getByText("You have no team in this room.")).toBeInTheDocument();
+  });
+
+  it("is axe-clean with the name, the card button and the position badge all present — no nested-interactive controls", async () => {
+    const { container } = render(<DrawerRosterTab view={VIEW} myTeamId="t1" playersById={playersById} onPeek={vi.fn()} />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

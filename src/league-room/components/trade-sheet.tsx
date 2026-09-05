@@ -12,6 +12,7 @@ import type { TradeAssessmentBody, TradeRoomContext } from "../contract";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeekdayClock } from "../lib/format";
 import type { PricedAsset, TradeSheetMath } from "../lib/trade-math";
+import { PlayerName } from "./player-peek";
 import { TradeVerdict } from "./trade-verdict";
 
 export interface TradeSheetProps {
@@ -40,11 +41,13 @@ const DECIDED_COPY: Readonly<Record<string, string>> = {
 };
 
 function AssetCard({
+  leagueId,
   label,
   tone,
   assets,
   value,
 }: {
+  readonly leagueId: string;
   readonly label: string;
   readonly tone: "positive" | "negative";
   readonly assets: readonly PricedAsset[];
@@ -57,7 +60,12 @@ function AssetCard({
         <div key={asset.playerId} className="flex items-center gap-2.5">
           {asset.position === null ? null : <PositionBadge position={asset.position} size="md" />}
           <div className="flex min-w-0 flex-col">
-            <p className="truncate font-display text-md font-semibold text-text-primary">{asset.name}</p>
+            <PlayerName
+              leagueId={leagueId}
+              playerId={asset.playerId}
+              name={asset.name}
+              className="truncate font-display text-md font-semibold text-text-primary"
+            />
             <p className="font-mono text-xs text-text-faint">
               {asset.nflTeam ?? ""}
               {asset.byeWeek === null ? "" : ` · bye week ${asset.byeWeek}`}
@@ -224,8 +232,8 @@ export function TradeSheet({ leagueId, trade, context, math, onClose, onCounter,
       }
     >
       <div className="flex flex-col gap-3 sm:flex-row">
-        <AssetCard label="You receive" tone="positive" assets={math.receive} value={values.receiving} />
-        <AssetCard label="You send" tone="negative" assets={math.send} value={values.giving} />
+        <AssetCard leagueId={leagueId} label="You receive" tone="positive" assets={math.receive} value={values.receiving} />
+        <AssetCard leagueId={leagueId} label="You send" tone="negative" assets={math.send} value={values.giving} />
       </div>
 
       {assessment.state === "ready" ? (

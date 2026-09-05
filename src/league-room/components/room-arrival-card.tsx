@@ -3,6 +3,7 @@ import { Card, EYEBROW, PlayerFace, PositionBadge } from "@/components/ui";
 import type { LineupBody, MatchupSummary } from "../contract";
 import { formatWeek } from "../lib/format";
 import { playerOf } from "../lib/player";
+import { PlayerName } from "./player-peek";
 
 export interface RoomArrivalCardProps {
   readonly leagueId: string;
@@ -48,7 +49,11 @@ export function RoomArrivalCard({ leagueId, draftId, lineup, matchup, projectedL
           return (
             <li key={`${slot.slot}:${slot.slotIndex}`} className="flex min-w-0 items-center gap-2 text-sm text-text-primary">
               {player === null ? null : <PlayerFace player={player} size="sm" />}
-              <span className="truncate">{slot.playerName}</span>
+              {player === null ? (
+                <span className="truncate">{slot.playerName}</span>
+              ) : (
+                <PlayerName leagueId={leagueId} playerId={player.id} name={slot.playerName ?? player.name} className="truncate" />
+              )}
               {player === null ? null : <PositionBadge position={player.position} size="sm" />}
             </li>
           );

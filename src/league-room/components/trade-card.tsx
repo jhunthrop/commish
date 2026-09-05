@@ -11,9 +11,11 @@ import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useNow } from "../hooks/use-now";
 import { daysUntil, formatDate, formatExpired, formatExpiry, formatWeek } from "../lib/format";
 import { HeldTradeBanner } from "./held-trade-banner";
+import { PlayerName } from "./player-peek";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
 
 export interface TradeCardProps {
+  readonly leagueId: string;
   readonly trade: TradeProposalView;
   /** The viewer's own team id, from `useTrades`' `meTeamId` — never the proposer's or the
    *  counterparty's assumed identity, since a league history card can belong to neither. */
@@ -69,7 +71,19 @@ export interface TradeCardProps {
  * table already use for "this player, and their position" — the sticker fill stays exactly
  * where LED-2 ruled it belongs, on a board cell, never a list row.
  */
-function AssetList({ heading, assets, playersById, rosterById }: { readonly heading: string; readonly assets: readonly TradeAsset[]; readonly playersById: Readonly<Record<string, ValuedPlayer>>; readonly rosterById: Readonly<Record<string, TradeRosterPlayer>> }) {
+function AssetList({
+  leagueId,
+  heading,
+  assets,
+  playersById,
+  rosterById,
+}: {
+  readonly leagueId: string;
+  readonly heading: string;
+  readonly assets: readonly TradeAsset[];
+  readonly playersById: Readonly<Record<string, ValuedPlayer>>;
+  readonly rosterById: Readonly<Record<string, TradeRosterPlayer>>;
+}) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-2">
       <h3 className={`${EYEBROW} text-text-muted`}>{heading}</h3>
@@ -84,12 +98,29 @@ function AssetList({ heading, assets, playersById, rosterById }: { readonly head
           // renders no face, which is the same "we do not know" branch `PlayerFace` already takes
           // for an unknown club rather than a placeholder standing in for a person.
           const roster = asset.kind === "player" ? rosterById[asset.playerId] : undefined;
+          // Player-name adoption sweep (task 4): `described.label` is a real name only when
+          // `describeAsset`'s OWN lookup (`playersById`) resolved — not merely when `roster`
+          // did. The two maps agree in production (`TradeInbox`'s `flattenPlayers` and
+          // `flattenRoster` both fold the identical roster read), but they are two independent
+          // props here, and gating on the wrong one would turn `describeAsset`'s own prose
+          // fallback ("a player no longer on this roster") into a dead-looking peek button the
+          // moment they diverge.
+          const isRealName = asset.kind === "player" && playersById[asset.playerId] !== undefined;
           return (
             <li key={`${asset.kind}:${asset.kind === "player" ? asset.playerId : index}`} className="flex min-w-0 items-center gap-2">
               {roster === undefined ? null : (
                 <PlayerFace player={{ id: roster.playerId, name: roster.name, position: roster.position, nflTeam: roster.nflTeam, headshotUrl: roster.headshotUrl, adp: roster.adp }} size="sm" />
               )}
-              <span className="min-w-0 break-words text-sm font-medium text-text-primary">{described.label}</span>
+              {!isRealName ? (
+                <span className="min-w-0 break-words text-sm font-medium text-text-primary">{described.label}</span>
+              ) : (
+                <PlayerName
+                  leagueId={leagueId}
+                  playerId={asset.playerId}
+                  name={described.label}
+                  className="min-w-0 break-words text-sm font-medium text-text-primary"
+                />
+              )}
               {described.position === null ? null : <PositionBadge position={described.position} size="sm" />}
               {roster === undefined || roster.nflTeam === "" ? null : <span className="font-mono text-xs text-text-faint">{roster.nflTeam}</span>}
             </li>
@@ -149,6 +180,7 @@ function myAndTheirSides(trade: TradeProposalView, meTeamId: string): { readonly
  * offer — everyone else sees a settled state's own sentence instead.
  */
 export function TradeCard({
+  leagueId,
   trade,
   meTeamId,
   playersById,
@@ -232,8 +264,8 @@ export function TradeCard({
         ) : null}
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <AssetList heading={givingHeading} assets={givingSide.assets} playersById={playersById} rosterById={rosterById} />
-          <AssetList heading={gettingHeading} assets={gettingSide.assets} playersById={playersById} rosterById={rosterById} />
+          <AssetList leagueId={leagueId} heading={givingHeading} assets={givingSide.assets} playersById={playersById} rosterById={rosterById} />
+          <AssetList leagueId={leagueId} heading={gettingHeading} assets={gettingSide.assets} playersById={playersById} rosterById={rosterById} />
         </div>
 
         {trade.note === null ? null : <p className="break-words text-sm italic text-text-muted">{`"${trade.note}"`}</p>}
