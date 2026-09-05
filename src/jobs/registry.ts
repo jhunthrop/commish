@@ -4,10 +4,17 @@
 import type { AnyJobDefinition } from "./contract";
 import { adpSnapshotJob } from "./defs/adp-snapshot-job";
 import { draftSweepJob } from "./defs/draft-sweep-job";
+import { propsPreseasonSnapshotJob } from "./defs/props-preseason-snapshot-job";
 import { seasonWeekJob } from "./defs/season-week-job";
 import { simJob } from "./defs/sim-job";
 
-const ALL_DEFINITIONS: readonly AnyJobDefinition[] = [seasonWeekJob, draftSweepJob, simJob, adpSnapshotJob];
+const ALL_DEFINITIONS: readonly AnyJobDefinition[] = [
+  seasonWeekJob,
+  draftSweepJob,
+  simJob,
+  adpSnapshotJob,
+  propsPreseasonSnapshotJob,
+];
 
 export const JOB_DEFINITIONS: ReadonlyMap<string, AnyJobDefinition> = new Map(
   ALL_DEFINITIONS.map((definition) => [definition.name, definition]),

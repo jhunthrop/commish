@@ -38,10 +38,20 @@ const adpSnapshotNoop = defineJob({
   parsePayload: () => ({}),
   steps: [{ name: "capture", run: async () => ({ summary: "noop", detail: [] }) }],
 });
+/** The real SCHEDULES also fire "props-preseason-snapshot" daily (props-anchor activation, Task 3). */
+const propsPreseasonSnapshotNoop = defineJob({
+  name: "props-preseason-snapshot",
+  maxAttempts: 3,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 60_000, maxMs: 600_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "snapshot", run: async () => ({ summary: "noop", detail: [] }) }],
+});
 const definitions: ReadonlyMap<string, AnyJobDefinition> = new Map([
   ["season-week", noopDefinition],
   ["draft-sweep", sweepNoop],
   ["adp-snapshot", adpSnapshotNoop],
+  ["props-preseason-snapshot", propsPreseasonSnapshotNoop],
 ]);
 
 /** Just the Tuesday schedule, so fire counts in tests are one schedule's worth. */

@@ -77,4 +77,13 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
     payload: {},
     description: "Nightly 03:00 ET capture of the market ADP feed into the append-only trend archive (Draft HQ phase 4's data, started early).",
   }),
+  schedule({
+    name: "props-preseason-snapshot-daily",
+    cron: "30 3 * * *",
+    timezone: "America/New_York",
+    job: "props-preseason-snapshot",
+    payload: {},
+    description:
+      "Daily 03:30 ET capture of pre-kickoff player props into the archive the props anchor's leakage gate reads from. Self-disables (no network call, no credit spend) once the product season's own first kickoff has passed.",
+  }),
 ];

@@ -70,10 +70,20 @@ describe("scheduleStatuses", () => {
       parsePayload: () => ({}),
       steps: [{ name: "capture", run: async () => ({ summary: "noop", detail: [] }) }],
     });
+    // The real SCHEDULES now also fire "props-preseason-snapshot" daily (props-anchor activation, Task 3).
+    const cannedPropsPreseasonSnapshot = defineJob({
+      name: "props-preseason-snapshot",
+      maxAttempts: 3,
+      timeoutMs: 5_000,
+      backoff: { baseMs: 60_000, maxMs: 600_000 },
+      parsePayload: () => ({}),
+      steps: [{ name: "snapshot", run: async () => ({ summary: "noop", detail: [] }) }],
+    });
     const definitions = new Map([
       ["season-week", canned],
       ["draft-sweep", cannedSweep],
       ["adp-snapshot", cannedAdpSnapshot],
+      ["props-preseason-snapshot", cannedPropsPreseasonSnapshot],
     ]);
 
     // Bootstrap, then rewind the Tuesday cursor so the second tick enqueues the 12:00Z fire.

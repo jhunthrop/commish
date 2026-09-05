@@ -50,6 +50,17 @@ const cannedAdpSnapshot: AnyJobDefinition = defineJob({
   steps: [{ name: "capture", run: async () => ({ summary: "canned", detail: [] }) }],
 });
 
+/** Same reason: the real SCHEDULES now also fire "props-preseason-snapshot" daily (props-anchor
+ *  activation, Task 3). */
+const cannedPropsPreseasonSnapshot: AnyJobDefinition = defineJob({
+  name: "props-preseason-snapshot",
+  maxAttempts: 3,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 60_000, maxMs: 600_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "snapshot", run: async () => ({ summary: "canned", detail: [] }) }],
+});
+
 function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET: SECRET }): TickHandlerDeps {
   return {
     db,
@@ -58,6 +69,7 @@ function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET:
       ["season-week", cannedSeasonWeek],
       ["draft-sweep", cannedDraftSweep],
       ["adp-snapshot", cannedAdpSnapshot],
+      ["props-preseason-snapshot", cannedPropsPreseasonSnapshot],
     ]),
     env,
     workerId: "tick-test",
