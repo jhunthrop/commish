@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState } from "react";
 import type { Player } from "@/domain/player";
 import { auctionValues, type AuctionShape } from "@/projections/auction/value";
+import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles";
 import type { BoardReason } from "@/projections/preseason/board";
 import { BottomSheet, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, ReasonChip, SegmentGroup, TierDivider } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
@@ -213,7 +214,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                 Evidence pts
               </th>
               <th scope="col" className="px-2 py-2 text-right">
-                Season range
+                Most seasons
               </th>
               <th scope="col" className="px-2 py-2 text-right">
                 Market ADP
@@ -287,7 +288,20 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums font-medium text-text-primary">{row.projectedPoints.toFixed(1)}</td>
                     <td className="px-2 py-2 text-right tabular-nums text-text-muted">
-                      {row.floorPoints.toFixed(0)}–{row.ceilingPoints.toFixed(0)}
+                      {/* The everyday band leads (p25-p75, "most seasons"), the tail band rides
+                          behind it in the accessible name and the faint sub-line — founder,
+                          2026-09-04: the honest p10-p90 stays measured, the TELLING gets kinder. */}
+                      {(() => {
+                        const { p25, p75 } = quartilesFromSeasonBand(row.medianPoints, row.floorPoints, row.ceilingPoints);
+                        return (
+                          <span aria-label={`Most seasons ${p25.toFixed(0)} to ${p75.toFixed(0)} points; the full range with injury tails runs ${row.floorPoints.toFixed(0)} to ${row.ceilingPoints.toFixed(0)}.`}>
+                            <span className="text-text-primary">{p25.toFixed(0)}–{p75.toFixed(0)}</span>
+                            <span aria-hidden="true" className="block text-xs text-text-faint">
+                              tails {row.floorPoints.toFixed(0)}–{row.ceilingPoints.toFixed(0)}
+                            </span>
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums text-text-muted">
                       {row.marketAdp === null ? (
@@ -324,7 +338,8 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
       </div>
 
       <p className="text-xs text-text-faint">
-        Season range is the floor and ceiling of his own season point total, from games-played risk alone. Why opens the full evidence chain: every
+        Most seasons is where the middle half of his measured outcomes land; the faint tails line is the full range, injury seasons and smash
+        seasons included. Both come from the same measured spread of games played and per-game scoring. Why opens the full evidence chain: every
         law that fired, its measured effect, and the seasons it was tested against. Nothing on this board is an opinion.
       </p>
 
