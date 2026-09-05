@@ -34,15 +34,52 @@ export type EvidenceGroup =
   | { readonly kind: "fact"; readonly key: string; readonly reason: FactReason };
 
 /**
- * THE GROUPING KEY — reuses `reason-chip.tsx`'s OWN keying rather than a second vocabulary. A
- * TRIBAL law groups on its own `lawId` (the same key `LAW_HEADLINES` is keyed by; today's six
- * tribal laws each measure a distinct quantity, so this never merges two of them on one player,
- * but it is the correct key the day one does). A DISCOVERED law groups on its persisted
- * `primaryQuantityId` (`registry.ts`'s own field, the same one `discoveredHeadline` reads) — the
- * founder's own "snap share" example is two DIFFERENT discovered law ids sharing one
- * `primaryQuantityId`, which is exactly what this key collapses.
+ * TRIBAL LAW → QUANTITY ID (fix round 1, HIGH — the founder's own screenshot case: `rb_age_curve`
+ * and any confirmed discovered RB age law both measure "age", and keying a tribal reason on its
+ * own `lawId` while a discovered one keys on `primaryQuantityId` split that one quantity into two
+ * groups, which is the exact stammer this whole module exists to close, only committed a second
+ * time between origins instead of between two discovered ids). Six entries, one per `LAW_SPECS` id
+ * (`populations.ts`) — the same set `LAW_HEADLINES` is keyed by, and the same six facts
+ * `board-reasons.ts`'s `magnitudeForLaw` reads.
+ *
+ * Uses the discovery template's OWN quantity id (`discovery/templates.ts`'s `QUANTITY_DEFS`)
+ * wherever the fact a tribal law reads is the SAME fact a discovered quantity id already names:
+ * `rb_workload_cliff` reads `facts.touches` → `"touches"`; `rb_age_curve` reads `facts.age` →
+ * `"age"`; `target_share_persistence` reads the player's OWN `facts.targetShare` → `"targetShare"`;
+ * `play_caller_fingerprint` reads `facts.incomingCoachPriorPassRateOverExpected`, a verbatim
+ * quantity id match. A STABLE SYNTHETIC id, prefixed `tribal:` so it can never collide with a real
+ * discovery quantity id, covers the two tribal quantities discovery's own vocabulary has no entry
+ * for: `wr_target_competition` reads `facts.bestTeammateTargetShare` — his BEST TEAMMATE's share,
+ * a different fact from `target_share_persistence`'s own (`board-reasons.ts`'s own docblock states
+ * the distinction), so merging it with a discovered "targetShare" law would silently claim two
+ * different people's shares are one quantity; `td_regression` reads a touchdown-share-over-
+ * THRESHOLD ratio (a unitless multiple, `LAW_HEADLINES`'s own "1.5x touchdown share" — never the
+ * raw percent a discovered law over `"touchdownPointsShare"` reports), so it gets its own key
+ * rather than merging with that quantity's raw-percent laws.
+ */
+const TRIBAL_QUANTITY_ID: Readonly<Record<string, string>> = {
+  rb_workload_cliff: "touches",
+  rb_age_curve: "age",
+  wr_target_competition: "tribal:bestTeammateTargetShare",
+  target_share_persistence: "targetShare",
+  td_regression: "tribal:touchdownPointsShareOverThreshold",
+  play_caller_fingerprint: "incomingCoachPriorPassRateOverExpected",
+};
+
+/**
+ * THE GROUPING KEY — one shared quantity vocabulary for BOTH origins, closing the HIGH finding
+ * above. A tribal law (any `lawId` in `TRIBAL_QUANTITY_ID`) keys on its own quantity id from that
+ * mapping, checked FIRST so it never falls through to the registry lookup below. A discovered law
+ * keys on its persisted `primaryQuantityId` (`registry.ts`'s own field, the same one
+ * `discoveredHeadline` reads) — the founder's own "snap share" example is two DIFFERENT discovered
+ * law ids sharing one `primaryQuantityId`, which this key collapses exactly as before. Anything
+ * else (a future tribal law not yet added to the mapping above, or a discovered id the registry no
+ * longer carries) falls back to its own bare `lawId` — a singleton group, the same safe default
+ * this function has always had for evidence it cannot otherwise place.
  */
 function groupKeyFor(reason: LawReason, law: Law | undefined): string {
+  const tribalQuantityId = TRIBAL_QUANTITY_ID[reason.lawId];
+  if (tribalQuantityId !== undefined) return tribalQuantityId;
   if (law !== undefined && law.origin === "discovered" && law.primaryQuantityId !== null) return law.primaryQuantityId;
   return reason.lawId;
 }
@@ -51,11 +88,28 @@ type LawGroup = Extract<EvidenceGroup, { kind: "law" }>;
 type FactGroup = Extract<EvidenceGroup, { kind: "fact" }>;
 
 /**
- * Every law reason sharing one quantity collapsed to one group (headline stated once, off any one
- * member — see `lawHeadline`'s own docblock for why every member shares an identical `magnitude`),
- * strongest `|netEffect|` first; every other reason its own singleton "fact" group, in the order
- * the board itself listed them, appended after every law group; `market_anchor`/`scarcity`/
- * `tier_cliff` dropped (they feed `./verdict.ts`).
+ * THE GROUP'S OWN HEADLINE SOURCE — a TRIBAL member, when the group has one, ALWAYS wins over a
+ * discovered member, regardless of whose `|effect|` is larger: a tribal headline is this product's
+ * own hand-curated, polished phrasing for that quantity ("Age 29 season"), and picking it by
+ * strongest-effect alone would let the SAME group read as "Age 29 season" or the mechanically
+ * built "age 29.00" depending on which law happened to measure a slightly bigger delta this round
+ * — two honest numbers, but an inconsistent STATEMENT of the one quantity, which is exactly what
+ * "the group headline must remain a single honest statement of the quantity" (fix round 1) rules
+ * out. At most one tribal member can ever be in a group (the six tribal laws each own a distinct
+ * key in `TRIBAL_QUANTITY_ID`), so "the" tribal member is unambiguous when one exists.
+ */
+function headlineSourceOf(sortedMembers: readonly LawReason[]): LawReason {
+  const tribalMember = sortedMembers.find((member) => TRIBAL_QUANTITY_ID[member.lawId] !== undefined);
+  return tribalMember ?? sortedMembers[0]!;
+}
+
+/**
+ * Every law reason sharing one quantity collapsed to one group (headline stated once, off
+ * `headlineSourceOf` — every member shares an identical `magnitude` regardless of origin, since a
+ * magnitude is a fact about the PLAYER, not about which law reported it), strongest `|netEffect|`
+ * first; every other reason its own singleton "fact" group, in the order the board itself listed
+ * them, appended after every law group; `market_anchor`/`scarcity`/`tier_cliff` dropped (they feed
+ * `./verdict.ts`).
  */
 export function groupReasons(reasons: readonly BoardReason[], laws: readonly Law[]): readonly EvidenceGroup[] {
   const byId = new Map(laws.map((law) => [law.id, law] as const));
@@ -76,9 +130,9 @@ export function groupReasons(reasons: readonly BoardReason[], laws: readonly Law
 
   const lawGroups: LawGroup[] = [...lawReasonsByKey.entries()].map(([key, members]) => {
     const sortedMembers = [...members].sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
-    const strongest = sortedMembers[0]!;
+    const headlineSource = headlineSourceOf(sortedMembers);
     const netEffect = members.reduce((sum, member) => sum + member.effect, 0);
-    return { kind: "law", key, headline: lawHeadline(strongest.lawId, strongest.magnitude, byId.get(strongest.lawId)), netEffect, members: sortedMembers };
+    return { kind: "law", key, headline: lawHeadline(headlineSource.lawId, headlineSource.magnitude, byId.get(headlineSource.lawId)), netEffect, members: sortedMembers };
   });
   lawGroups.sort((a, b) => Math.abs(b.netEffect) - Math.abs(a.netEffect));
 

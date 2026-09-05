@@ -67,6 +67,7 @@ export function Outlook({ reasons, laws, position, capped = false }: OutlookProp
         <button
           type="button"
           onClick={() => setShowFullCase(true)}
+          aria-expanded={showFullCase}
           className={`${MICRO_LABEL} w-fit text-accent underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
         >
           {`The full case (${groups.length})`}
@@ -78,15 +79,22 @@ export function Outlook({ reasons, laws, position, capped = false }: OutlookProp
 
 /** One group, one row: a non-law fact renders through the same `ReasonChip` a flat list always
  *  used; a law group leads with its net effect and the quantity phrase, presses open to show its
- *  own member laws as the receipts (each one, headline and effect, through `ReasonChip`'s
- *  existing `compact` rendering — nothing here re-derives a law's own copy). */
+ *  own member laws as the receipts (each one, headline and effect, through `ReasonChip`'s own
+ *  full, non-compact rendering — the same sentence a flat list already used, one per member —
+ *  nothing here re-derives a law's own copy). */
 function EvidenceGroupRow({ group, laws, open, onToggle }: { readonly group: EvidenceGroup; readonly laws: readonly Law[]; readonly open: boolean; readonly onToggle: () => void }) {
   if (group.kind === "fact") {
     return <ReasonChip reason={group.reason} registry={laws} className="w-fit" />;
   }
 
   const { headline, netEffect, members } = group;
-  const label = `${signedPoints(netEffect)} pts, ${headline}${members.length > 1 ? ` · ${members.length} laws` : ""}`;
+  // MEDIUM 2 (fix round 1): a bare "-1.8 pts, Age 29 season · 2 laws" reads as ONE measured
+  // number, not a sum of two. "together" makes the aggregate self-evident in the copy itself for
+  // N > 1; a single-law group carries no such ambiguity and keeps the plain form.
+  const label =
+    members.length > 1
+      ? `together ${signedPoints(netEffect)} pts, ${headline} · ${members.length} laws`
+      : `${signedPoints(netEffect)} pts, ${headline}`;
 
   return (
     <div className="flex flex-col gap-1">

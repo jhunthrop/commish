@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Player } from "@/domain/player";
 import type { PlayerSeasonBody } from "@/league-service/player";
+import type { Law } from "@/projections/laws/types";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "../hooks/deps";
 import { openPlayerPeek, PlayerPeekHost } from "./player-peek";
 
@@ -251,5 +252,40 @@ describe("PlayerPeekHost — the Outlook, grouped (2026-09-04 redesign)", () => 
     expect(screen.queryByText(/measured -1\.8 pts per game/)).not.toBeInTheDocument();
     await user.click(screen.getByText(/Age 29 season/));
     expect(screen.getByText(/Age 29 season: measured -1\.8 pts per game/)).toBeInTheDocument();
+  });
+
+  it("labels a single-law group plainly, with no 'together' prefix", async () => {
+    const bodies = new Map([[2026, { ...bodyFor(2026, [2026]), reasons: REASONS }]]);
+    mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText(/Age 29 season/)).toBeInTheDocument());
+    expect(screen.queryByText(/together/)).not.toBeInTheDocument();
+  });
+
+  it("fix round 1 (HIGH + MEDIUM 2): a tribal law and a discovered law over the SAME quantity merge into one group, labelled 'together' with the summed effect", async () => {
+    const discoveredAgeLaw: Law = {
+      id: "and:RB:threshold:RB:age:q70+threshold:RB:experienceYear:q70",
+      position: "RB",
+      claim: "Fixture claim.",
+      measured: { effect: -0.7, ci: [-1, -0.4], sample: 80, seasons: "fixture" },
+      trainEffect: -0.7,
+      verdict: "confirmed",
+      modelPath: null,
+      hasFoldEvidence: true,
+      origin: "discovered",
+      primaryQuantityId: "age",
+      primaryQuantityNoun: "age",
+      primaryQuantityUnit: "two_decimal",
+    };
+    const mergedReasons: PlayerSeasonBody["reasons"] = [
+      { code: "law", lawId: "rb_age_curve", effect: -1.8, magnitude: 29 },
+      { code: "law", lawId: discoveredAgeLaw.id, effect: -0.7, magnitude: 29 },
+    ];
+    const bodies = new Map([[2026, { ...bodyFor(2026, [2026]), reasons: mergedReasons, laws: [discoveredAgeLaw] }]]);
+    mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText(/together -2\.5 pts, Age 29 season · 2 laws/)).toBeInTheDocument());
+    // Only ONE group rendered for the quantity — the stammer this fix closes.
+    expect(screen.queryByText(/^-2\.5 pts, Age 29 season$/)).not.toBeInTheDocument();
   });
 });

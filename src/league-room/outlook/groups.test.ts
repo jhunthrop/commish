@@ -41,14 +41,14 @@ describe("groupReasons", () => {
     expect(group.members[0]!.lawId).toBe(lawA.id);
   });
 
-  it("keeps two tribal laws as separate groups — distinct quantities never merge on lawId alone", () => {
+  it("keeps two tribal laws as separate groups — distinct quantities never merge just because they're both tribal", () => {
     const reasons: readonly BoardReason[] = [
       { code: "law", lawId: "rb_age_curve", effect: -1.8, magnitude: 29 },
       { code: "law", lawId: "rb_workload_cliff", effect: -0.9, magnitude: 320 },
     ];
     const groups = groupReasons(reasons, []);
     expect(groups).toHaveLength(2);
-    expect(groups.map((group) => group.key).sort()).toEqual(["rb_age_curve", "rb_workload_cliff"]);
+    expect(groups.map((group) => group.key).sort()).toEqual(["age", "touches"]);
   });
 
   it("orders law groups by |net effect| descending", () => {
@@ -57,7 +57,53 @@ describe("groupReasons", () => {
       { code: "law", lawId: "rb_age_curve", effect: -2.5, magnitude: 30 },
     ];
     const groups = groupReasons(reasons, []);
-    expect(groups.map((group) => group.key)).toEqual(["rb_age_curve", "rb_workload_cliff"]);
+    expect(groups.map((group) => group.key)).toEqual(["age", "touches"]);
+  });
+
+  it("HIGH fix, fix round 1: a tribal law and a discovered law measuring the SAME quantity (age) merge into ONE group, effect summed — the founder's own screenshot case", () => {
+    const discoveredAgeLaw = discoveredLaw({
+      id: "and:RB:threshold:RB:age:q70+threshold:RB:experienceYear:q70",
+      position: "RB",
+      primaryQuantityId: "age",
+      primaryQuantityNoun: "age",
+      primaryQuantityUnit: "two_decimal",
+    });
+    const reasons: readonly BoardReason[] = [
+      { code: "law", lawId: "rb_age_curve", effect: -1.8, magnitude: 29 },
+      { code: "law", lawId: discoveredAgeLaw.id, effect: -0.7, magnitude: 29 },
+    ];
+    const groups = groupReasons(reasons, [discoveredAgeLaw]);
+    expect(groups).toHaveLength(1);
+    const group = groups[0]!;
+    expect(group.kind).toBe("law");
+    if (group.kind !== "law") throw new Error("expected a law group");
+    expect(group.key).toBe("age");
+    expect(group.members).toHaveLength(2);
+    expect(group.netEffect).toBeCloseTo(-2.5);
+    // The tribal member's own curated headline wins over the discovered mechanical one, even
+    // though the discovered member here would NOT be the strongest by |effect| either way — see
+    // `headlineSourceOf`'s own docblock for why this is never left to whichever effect is bigger.
+    expect(group.headline).toBe("Age 29 season");
+  });
+
+  it("the tribal headline wins even when the discovered member's own |effect| is the larger of the two", () => {
+    const discoveredAgeLaw = discoveredLaw({
+      id: "threshold:RB:age:q90",
+      position: "RB",
+      primaryQuantityId: "age",
+      primaryQuantityNoun: "age",
+      primaryQuantityUnit: "two_decimal",
+    });
+    const reasons: readonly BoardReason[] = [
+      { code: "law", lawId: "rb_age_curve", effect: -1.2, magnitude: 29 },
+      { code: "law", lawId: discoveredAgeLaw.id, effect: -5, magnitude: 29 },
+    ];
+    const group = groupReasons(reasons, [discoveredAgeLaw])[0]!;
+    if (group.kind !== "law") throw new Error("expected a law group");
+    // The discovered member sorts first inside the group (bigger |effect|) but never supplies the
+    // group's own headline.
+    expect(group.members[0]!.lawId).toBe(discoveredAgeLaw.id);
+    expect(group.headline).toBe("Age 29 season");
   });
 
   it("drops market_anchor, scarcity and tier_cliff entirely — they feed the verdict, never a peer chip", () => {
@@ -76,7 +122,7 @@ describe("groupReasons", () => {
       { code: "availability", expectedGames: 14, floorGames: 10, ceilingGames: 17 },
     ];
     const groups = groupReasons(reasons, []);
-    expect(groups.map((group) => group.key)).toEqual(["rb_age_curve", "changed_team", "availability"]);
+    expect(groups.map((group) => group.key)).toEqual(["age", "changed_team", "availability"]);
     expect(groups[1]).toEqual({ kind: "fact", key: "changed_team", reason: reasons[0] });
     expect(groups[2]).toEqual({ kind: "fact", key: "availability", reason: reasons[2] });
   });
