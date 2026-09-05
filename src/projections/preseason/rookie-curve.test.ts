@@ -16,7 +16,7 @@ import {
 } from "./rookie-curve";
 
 function observation(overrides: Partial<RookieCurveObservation> = {}): RookieCurveObservation {
-  return { season: 2020, position: "RB", overallPick: 10, points: 100, ...overrides };
+  return { season: 2020, position: "RB", overallPick: 10, points: 100, gamesPlayed: 10, teamGames: 17, ...overrides };
 }
 
 describe("fitRookieCurve", () => {
@@ -243,21 +243,22 @@ describe("loadRookieCurveObservations", () => {
       statLine({ season: 2020, week: 2, playerId: PLAYER_A, value: 50 }),
     ]);
     const observations = await loadRookieCurveObservations(db, [2020]);
-    // 150 rushing yards at PPR_SCORING.pointsPerRushingYard (0.1) each => 15 points.
-    expect(observations).toEqual([{ season: 2020, position: "RB", overallPick: 3, points: 15 }]);
+    // 150 rushing yards at PPR_SCORING.pointsPerRushingYard (0.1) each => 15 points, over the two
+    // weeks a stat line was recorded, in a sixteen-game 2020 season.
+    expect(observations).toEqual([{ season: 2020, position: "RB", overallPick: 3, points: 15, gamesPlayed: 2, teamGames: 16 }]);
   });
 
   it("counts a rookie who never recorded a single stat line at ZERO, never dropping him", async () => {
     await recordDraftPicks(db, [pick({ pick: 40, playerId: PLAYER_B })]);
     const observations = await loadRookieCurveObservations(db, [2020]);
-    expect(observations).toEqual([{ season: 2020, position: "RB", overallPick: 40, points: 0 }]);
+    expect(observations).toEqual([{ season: 2020, position: "RB", overallPick: 40, points: 0, gamesPlayed: 0, teamGames: 16 }]);
   });
 
   it("reads a rookie season via the pbp-derived fallback when it falls in a published stats gap", async () => {
     await recordDraftPicks(db, [pick({ season: 2019, playerId: PLAYER_C })]);
     await recordObservations(db, [statLine({ season: 2019, week: 1, playerId: PLAYER_C, value: 200, source: DERIVED_STAT_LINE_SOURCE })]);
     const observations = await loadRookieCurveObservations(db, [2019]);
-    expect(observations).toEqual([{ season: 2019, position: "RB", overallPick: 3, points: 20 }]);
+    expect(observations).toEqual([{ season: 2019, position: "RB", overallPick: 3, points: 20, gamesPlayed: 1, teamGames: 16 }]);
   });
 
   it("answers empty for a season with no draft picks ingested, never a guess", async () => {

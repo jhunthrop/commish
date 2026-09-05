@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { StatLine } from "@/domain/player";
 import type { Law } from "../laws/types";
 import type { BoardCandidate, BoardReason } from "../preseason/board";
-import { rookieCurve } from "../preseason/rookie-curve";
+import { historicalRookieExpectedGames, rookieCurve, rookieCurveEvidenceN } from "../preseason/rookie-curve";
+import { shrinkTowardMarket } from "./thin-evidence-shrink";
 import type { MarketPriorEntry } from "./curve";
 import {
   assertLiveMarketCoverage,
@@ -206,21 +207,29 @@ describe("blendBoard", () => {
     expect(seasonPointsOf(blended!)).toBe(0);
   });
 
-  it("REPLACES marketPoints with rookieCurve for a listed rookie, ignoring the market's own number entirely, and records the substitution as market_anchor", () => {
+  it("RECOMPOSES the rookie curve honestly and SHRINKS it toward the market by the curve's own evidence thinness at that pick (calibration fix round, Tasks 2/3)", () => {
     const rookie = candidate({
       position: "WR",
       reasons: [{ code: "rookie", overallPick: 5, landingMultiplier: 1 }],
     });
     const [blended] = blendBoard([market({ marketPoints: 999 })], [rookie], { season: SEASON, constants: CONSTANTS, laws: [] });
-    const curvePoints = rookieCurve("WR", 5);
-    // TWO DECIMALS, NOT SIX (fit-round Task 4). The substituted total does not travel as a number:
-    // it becomes a per-game stat line and is re-scored through `computeFantasyPoints`, whose
-    // `roundPoints` is the product's own two-decimal rule. The round trip is therefore exact only to
-    // the scoring layer's own precision. Six decimals passed before only because the previous
-    // committed curve happened to read a clean 206.5 at this pick; the full-cohort refit reads
-    // 179.4538..., which rounds. The assertion now pins the guarantee that actually exists.
-    expect(seasonPointsOf(blended!)).toBeCloseTo(curvePoints, 2);
-    expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 999, delta: curvePoints - 999 });
+    // THE HONEST ALGEBRA (Task 2): the curve's own season total, divided by the SAME 2003-2021
+    // population's historical games-played rate (not this candidate's own `games.expected`), gives
+    // a per-game rate that is then multiplied back out by THIS candidate's own availability
+    // (`IMPLIED_GAMES`) — two honestly-sourced numbers, never a season total divided by an unrelated
+    // individual estimate.
+    const historicalGames = historicalRookieExpectedGames("WR", SEASON);
+    const perGameRate = rookieCurve("WR", 5) / historicalGames;
+    const modelPoints = perGameRate * IMPLIED_GAMES;
+    // THE SHRINK (Task 3): pulled toward the market in proportion to how thin the curve's own
+    // evidence is at pick 5.
+    const evidenceN = rookieCurveEvidenceN("WR", 5);
+    const expectedPoints = shrinkTowardMarket(modelPoints, 999, evidenceN);
+    // TWO DECIMALS, NOT SIX. The recomposed total does not travel as a number: it becomes a per-game
+    // stat line and is re-scored through `computeFantasyPoints`, whose `roundPoints` is the
+    // product's own two-decimal rule.
+    expect(seasonPointsOf(blended!)).toBeCloseTo(expectedPoints, 2);
+    expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 999, delta: expectedPoints - 999 });
   });
 
   it("a rookie with no draft pick on record (overallPick null) is NOT substituted — falls through to the market/evidence path", () => {

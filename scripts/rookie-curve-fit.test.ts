@@ -39,7 +39,7 @@ function deps(observations: readonly RookieCurveObservation[] = []): {
 }
 
 function observation(overrides: Partial<RookieCurveObservation> = {}): RookieCurveObservation {
-  return { season: 2015, position: "RB", overallPick: 10, points: 120, ...overrides };
+  return { season: 2015, position: "RB", overallPick: 10, points: 120, gamesPlayed: 10, teamGames: 17, ...overrides };
 }
 
 describe("runRookieCurveFit — CHECK MODE IS READ-ONLY", () => {

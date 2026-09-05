@@ -7,6 +7,8 @@ import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import { draftPicksFor } from "../nflverse/draft-picks";
 import { projectedPosition } from "../nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "../store";
+import { teamGamesIn } from "./availability";
+import { FITTED_HISTORICAL_ROOKIE_GAMES_RATE, FITTED_ROOKIE_CURVE_EVIDENCE } from "./rookie-historical-games-fitted";
 import { FITTED_ROOKIE_CURVE } from "./rookie-curve-fitted";
 
 /**
@@ -68,6 +70,17 @@ export interface RookieCurveObservation {
    * shares, not "what does he score conditional on making the field".
    */
   readonly points: number;
+  /**
+   * Games with a recorded stat line that season (calibration fix round, 2026-09-04, Task 2) — the
+   * SAME population `points` is summed over, counted the same unconditional way: zero for a rookie
+   * who never dressed, never dropped. `fitHistoricalRookieGamesRate` uses this, alongside
+   * `teamGames`, to measure the games-played rate this curve's own POINTS were actually produced
+   * against — see that function's own docblock for why the points curve needs a matching
+   * denominator at all.
+   */
+  readonly gamesPlayed: number;
+  /** His own season's team-game count (`teamGamesIn`) — the denominator `gamesPlayed` is a share of. */
+  readonly teamGames: number;
 }
 
 /**
@@ -102,7 +115,7 @@ export async function loadRookieCurveObservations(db: ReadonlyDb, seasons: reado
       if (position === null || !isCurvePosition(position)) continue;
       const weeks = byPlayer.get(pick.playerId) ?? [];
       const points = weeks.reduce((sum, line) => sum + computeFantasyPoints(line, position, PPR_SCORING), 0);
-      observations.push({ season, position, overallPick: pick.pick, points });
+      observations.push({ season, position, overallPick: pick.pick, points, gamesPlayed: weeks.length, teamGames: teamGamesIn(season) });
     }
   }
   return observations;
@@ -128,20 +141,17 @@ export interface RookieCurveFitOptions {
 }
 
 /**
- * FITTING THE DRAFT-CAPITAL CURVE — one isotonic regression per position, on the fit seasons' own
- * (pick, mean points) pairs, and nothing else. No shrinkage, no search: `rookies.ts`'s bucket fit
- * already carries the shrunk, cautious version of this signal in its `byBucket` shares, and this
- * curve's whole job is to add the pick-to-pick SHAPE that a six-cell table cannot — see the module
- * docblock.
+ * THE TRAIN-WINDOW GUARD, shared by every fit this module runs against `RookieCurveObservation`s.
+ *
+ * STRUCTURAL, not caller discipline: `ROOKIE_CURVE_TRAIN_CUTOFF_SEASON` is the contract this whole
+ * module is fit under, so it is enforced here directly rather than trusted to whatever
+ * `heldOutSeasons` a caller happened to pass. A fix round caught an earlier version of this gate
+ * sitting entirely behind `heldOutSeasons` — `rookie-curve-fit.ts` passed `[]`, so the guard the
+ * module docblock and the generated file's own header advertised never armed.
  */
-export function fitRookieCurve(observations: readonly RookieCurveObservation[], { heldOutSeasons }: RookieCurveFitOptions): RookieCurvePriors {
+function assertRookieCurveTrainWindow(observations: readonly RookieCurveObservation[], heldOutSeasons: readonly number[]): void {
   const forbidden = new Set(heldOutSeasons);
   for (const observation of observations) {
-    // STRUCTURAL, not caller discipline: `ROOKIE_CURVE_TRAIN_CUTOFF_SEASON` is the contract this
-    // whole module is fit under, so it is enforced here directly rather than trusted to whatever
-    // `heldOutSeasons` a caller happened to pass. A fix round caught the earlier version of this
-    // gate sitting entirely behind `heldOutSeasons` — `rookie-curve-fit.ts` passed `[]`, so the
-    // guard the module docblock and the generated file's own header advertised never armed.
     if (observation.season > ROOKIE_CURVE_TRAIN_CUTOFF_SEASON) {
       throw new Error(
         `The rookie curve fit was handed ${observation.season}, which is past ROOKIE_CURVE_TRAIN_CUTOFF_SEASON ` +
@@ -155,6 +165,17 @@ export function fitRookieCurve(observations: readonly RookieCurveObservation[], 
       );
     }
   }
+}
+
+/**
+ * FITTING THE DRAFT-CAPITAL CURVE — one isotonic regression per position, on the fit seasons' own
+ * (pick, mean points) pairs, and nothing else. No shrinkage, no search: `rookies.ts`'s bucket fit
+ * already carries the shrunk, cautious version of this signal in its `byBucket` shares, and this
+ * curve's whole job is to add the pick-to-pick SHAPE that a six-cell table cannot — see the module
+ * docblock.
+ */
+export function fitRookieCurve(observations: readonly RookieCurveObservation[], { heldOutSeasons }: RookieCurveFitOptions): RookieCurvePriors {
+  assertRookieCurveTrainWindow(observations, heldOutSeasons);
 
   const result = {} as Record<CurvePosition, readonly RookieCurveKnot[]>;
   for (const position of CURVE_POSITIONS) {
@@ -173,6 +194,127 @@ export function fitRookieCurve(observations: readonly RookieCurveObservation[], 
     result[position] = picks.map((pick, index) => ({ pick, points: fitted[index]! }));
   }
   return result;
+}
+
+/**
+ * THE CURVE'S OWN GAMES-PLAYED RATE, by position (calibration fix round, 2026-09-04, Task 2) — one
+ * scalar per position, over the IDENTICAL 2003-2021 population `fitRookieCurve` measures its points
+ * against, counted the same unconditional way (a rookie who never dressed contributes a zero).
+ *
+ * WHY THE POINTS CURVE NEEDS THIS AT ALL. `rookieCurve(position, pick)` returns a SEASON
+ * expectation that already has THAT historical population's own typical rookie availability baked
+ * into it — the mean is over the whole class, survivors and non-dressers alike, exactly like
+ * `rookies.ts`'s `capitalGameRate` was before this fix round. The board used to divide that season
+ * number by the CURRENT PLAYER's own `games.expected` to fabricate a per-game rate — mixing a
+ * population-level historical season total with an individual, board-specific games estimate that
+ * has nothing to do with the population the curve was fitted on. `market/blend.ts`'s
+ * `recomposeRookieSeasonPoints` divides by THIS instead: `rookieCurve(pick) / historicalGamesRate *
+ * teamGamesIn(season)` gives the honest per-game rate the SAME population's points curve implies,
+ * which is then multiplied back out by Task 1's OWN, separately-fitted availability distribution
+ * (`candidate.games.expected`) — two honestly-sourced numbers composed together rather than one
+ * population's season total divided by an unrelated population's per-player estimate.
+ *
+ * A SINGLE SCALAR PER POSITION, DELIBERATELY, rather than a second pick-indexed curve. The points
+ * curve needs pick-level resolution because draft capital's value visibly does not fall in a
+ * straight line; a rookie's games-played rate is a far flatter relationship against pick number
+ * than his expected production is, so a single, well-populated per-position mean is the honest
+ * measurement this round can defend rather than a pick-level curve thin enough at the extremes to
+ * reintroduce the exact instability Task 1 just fixed. This is a documented simplification, not an
+ * oversight — `docs/research/2026-09-04-rookie-calibration-backtest.md` reports its sensitivity.
+ */
+export interface HistoricalRookieGamesRate {
+  readonly byPosition: Readonly<Record<CurvePosition, number>>;
+}
+
+export function fitHistoricalRookieGamesRate(
+  observations: readonly RookieCurveObservation[],
+  { heldOutSeasons }: RookieCurveFitOptions,
+): HistoricalRookieGamesRate {
+  assertRookieCurveTrainWindow(observations, heldOutSeasons);
+
+  const byPosition = {} as Record<CurvePosition, number>;
+  for (const position of CURVE_POSITIONS) {
+    const atPosition = observations.filter((observation) => observation.position === position);
+    const totalGames = atPosition.reduce((sum, observation) => sum + observation.gamesPlayed, 0);
+    const totalTeamGames = atPosition.reduce((sum, observation) => sum + observation.teamGames, 0);
+    byPosition[position] = totalTeamGames > 0 ? totalGames / totalTeamGames : 0;
+  }
+  return { byPosition };
+}
+
+/**
+ * `historicalRookieExpectedGames(position, season)` — the mean games a rookie of this position, over
+ * the whole 2003-2021 class, played in a season of `teamGamesIn(season)` games. Reads the committed
+ * fit by default, exactly like `rookieCurve` reads `FITTED_ROOKIE_CURVE`.
+ */
+export function historicalRookieExpectedGames(
+  position: Position,
+  season: number,
+  priors: HistoricalRookieGamesRate = FITTED_HISTORICAL_ROOKIE_GAMES_RATE,
+): number {
+  if (!isCurvePosition(position)) return 0;
+  return priors.byPosition[position] * teamGamesIn(season);
+}
+
+/**
+ * THE CURVE'S OWN EVIDENCE COUNT, per pick (calibration fix round, 2026-09-04, Task 3) — how many
+ * real historical rookie-seasons fed the points knot at (or nearest) a given pick, over the SAME
+ * 2003-2021 population `fitRookieCurve` fits its points against.
+ *
+ * WHAT THIS IS FOR: `market/thin-evidence-shrink.ts`'s `shrinkTowardMarket` needs a measure of "how
+ * much real evidence backs our own number" for a rookie, and the honest answer is the exact count of
+ * historical rookie-seasons the curve's own knot at his pick was built from — the same quantity the
+ * module docblock's "n of about 1-2 observations" describes for the earliest picks. A rookie whose
+ * curve value came from nineteen years of similarly-drafted comparables is well evidenced; one whose
+ * value came from a single unlucky bust is not, however confident the resulting number LOOKS.
+ */
+export interface RookieCurveEvidence {
+  readonly byPosition: Readonly<Record<CurvePosition, readonly { readonly pick: number; readonly n: number }[]>>;
+}
+
+export function fitRookieCurveEvidence(
+  observations: readonly RookieCurveObservation[],
+  { heldOutSeasons }: RookieCurveFitOptions,
+): RookieCurveEvidence {
+  assertRookieCurveTrainWindow(observations, heldOutSeasons);
+
+  const byPosition = {} as Record<CurvePosition, readonly { pick: number; n: number }[]>;
+  for (const position of CURVE_POSITIONS) {
+    const counts = new Map<number, number>();
+    for (const observation of observations) {
+      if (observation.position !== position) continue;
+      counts.set(observation.overallPick, (counts.get(observation.overallPick) ?? 0) + 1);
+    }
+    const picks = [...counts.keys()].sort((a, b) => a - b);
+    byPosition[position] = picks.map((pick) => ({ pick, n: counts.get(pick)! }));
+  }
+  return { byPosition };
+}
+
+/**
+ * `rookieCurveEvidenceN(position, overallPick)` — the evidence count NEAREST a pick, for a position
+ * this curve carries no exact knot for at that precise number (a pick a real draft produced that the
+ * 2003-2021 window never happened to see at exactly that slot). Zero for a position this curve does
+ * not cover, matching `rookieCurve`'s own contract.
+ */
+export function rookieCurveEvidenceN(
+  position: Position,
+  overallPick: number,
+  evidence: RookieCurveEvidence = FITTED_ROOKIE_CURVE_EVIDENCE,
+): number {
+  if (!isCurvePosition(position)) return 0;
+  const knots = evidence.byPosition[position];
+  if (knots.length === 0) return 0;
+  let nearest = knots[0]!;
+  let nearestDistance = Math.abs(overallPick - nearest.pick);
+  for (const knot of knots) {
+    const distance = Math.abs(overallPick - knot.pick);
+    if (distance < nearestDistance) {
+      nearest = knot;
+      nearestDistance = distance;
+    }
+  }
+  return nearest.n;
 }
 
 /**
