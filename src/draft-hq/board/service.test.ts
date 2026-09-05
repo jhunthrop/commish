@@ -76,6 +76,20 @@ describe("boardRows", () => {
     expect(unlisted?.marketAdp).toBeNull();
   });
 
+  it("breaks an exact value tie by the market's order, and the badges follow the served order", async () => {
+    // Founder audit 2026-09-04: two RBs identical in points and value were split by a sort
+    // artifact against the market. The earlier ADP now leads the tie, and wears the 1 badge.
+    await seedPlayer({ id: "t1", nflId: "00-0000011", name: "Later Market Back", position: "RB", team: "ATL", points: 200, rank: 1, adp: 4.2 });
+    await seedPlayer({ id: "t2", nflId: "00-0000012", name: "Earlier Market Back", position: "RB", team: "DET", points: 200, rank: 2, adp: 2.5 });
+    const rows = await boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS }, asOf: new Date("2026-09-04T00:00:00Z") });
+    const names = rows.filter((row) => row.position === "RB").map((row) => row.name);
+    expect(names).toEqual(["Earlier Market Back", "Later Market Back"]);
+    const earlier = rows.find((row) => row.name === "Earlier Market Back");
+    const later = rows.find((row) => row.name === "Later Market Back");
+    expect(earlier?.positionRankInValue).toBe(1);
+    expect(later?.positionRankInValue).toBe(2);
+  });
+
   it("drops a stored row whose player the crosswalk cannot resolve back to the product's own directory", async () => {
     await db.insert(nflPlayers).values({ id: "00-orphan", name: "Ghost Player", position: "RB" });
     await db.insert(preseasonProjections).values({

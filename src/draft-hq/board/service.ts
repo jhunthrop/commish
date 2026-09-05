@@ -179,7 +179,33 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
       // the tiebreak within it.
       const aValue = a.valueRank ?? Number.POSITIVE_INFINITY;
       const bValue = b.valueRank ?? Number.POSITIVE_INFINITY;
+      // TIES DEFER TO THE MARKET (founder audit, 2026-09-04: two RBs identical to the hundredth
+      // in points AND value were split RB1/RB2 by a sort artifact, against the market's order).
+      // When our own evidence cannot separate two players, the market's preference is
+      // information — the same doctrine as the thin-evidence shrinkage. Ceiling is deliberately
+      // NOT the tiebreak: at an equal mean a wider band is more variance, not more player, and
+      // risk preference belongs to the drafter's slot (the Simulator's question), never baked
+      // into the board's order.
+      if (a.valueOverReplacement !== null && a.valueOverReplacement === b.valueOverReplacement) {
+        const aAdp = a.marketAdp ?? Number.POSITIVE_INFINITY;
+        const bAdp = b.marketAdp ?? Number.POSITIVE_INFINITY;
+        if (aAdp !== bAdp) return aAdp - bAdp;
+      }
       return aValue - bValue || a.rank - b.rank;
     })
-    .map((row, index) => ({ ...row, overallRank: index + 1 }));
+    .map((row, index) => ({ ...row, overallRank: index + 1 }))
+    // The positional badge follows the SERVED order, so a tie the market just broke cannot
+    // leave the badges contradicting the rows (RB2 listed above RB1). Only valued rows carry a
+    // positional rank; a position the shape never starts keeps null, exactly as before.
+    .map(
+      (() => {
+        const seen = new Map<string, number>();
+        return (row: BoardRow): BoardRow => {
+          if (row.valueRank === null) return row;
+          const next = (seen.get(row.position) ?? 0) + 1;
+          seen.set(row.position, next);
+          return row.positionRankInValue === next ? row : { ...row, positionRankInValue: next };
+        };
+      })(),
+    );
 }
