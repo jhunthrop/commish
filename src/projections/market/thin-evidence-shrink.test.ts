@@ -8,7 +8,7 @@ describe("shrinkTowardMarket", () => {
   });
 
   it("moves SUBSTANTIALLY toward market on razor-thin evidence (n around 1-2)", () => {
-    const result = shrinkTowardMarket(254.7, 175, 1.5);
+    const result = shrinkTowardMarket(254.7, 175, 1.5, 3);
     // weight = 3 / (3 + 1.5) = 2/3 — the model's own number counts for a third, the market for two.
     expect(result).toBeCloseTo(254.7 * (1 / 3) + 175 * (2 / 3), 6);
     expect(result).toBeLessThan(254.7);
@@ -16,7 +16,7 @@ describe("shrinkTowardMarket", () => {
   });
 
   it("moves almost NOT AT ALL for a well-evidenced player (large n) — a veteran's full history", () => {
-    const result = shrinkTowardMarket(300, 250, 200);
+    const result = shrinkTowardMarket(300, 250, 2000, 3);
     expect(Math.abs(result - 300)).toBeLessThan(1);
   });
 

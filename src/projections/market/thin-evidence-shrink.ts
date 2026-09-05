@@ -34,9 +34,25 @@
  */
 
 /**
- * THE PRIOR-N CONSTANT — see the module docblock's own paragraph on how this is chosen. Documented
- * rather than silently hardcoded: `docs/research/2026-09-04-rookie-calibration-backtest.md` reports
- * the full grid this value was picked from and how sensitive the 2025 rookie score is to it.
+ * THE PRIOR-N CONSTANT — grid-searched against 2025 rookie MAE
+ * (`scripts/rookie-calibration-backtest.ts`), over `[0.5, 1, 2, 3, 5, 8, 15, 30, 50, ...]`, broken
+ * out per exact evidence count rather than trusted as one aggregate number.
+ *
+ * THE AGGREGATE GRID'S OWN ARG-MIN CLIMBS TOWARD PURE MARKET WITHOUT BOUND, and is NOT what this is
+ * set to: `docs/research/2026-09-04-rookie-calibration-backtest.md` reports the full grid, including
+ * that tail, in the open. Chasing it would weight every rookie almost entirely toward market
+ * regardless of evidence — the "never a market override" philosophy the founder's review explicitly
+ * rejected — and would make `effectiveN` meaningless in practice, since a real pick's evidence count
+ * rarely exceeds single digits.
+ *
+ * 3 IS ALSO NOT THE AGGREGATE'S OWN BEST SCORE — a larger value (15) scores better in the COMBINED
+ * average. It was rejected anyway: broken out by exact evidence count, priorN=15 REGRESSES the n=1
+ * stratum below the pure model's own MAE (the exact evidence level Player A, the diagnosed defect's
+ * own pick-three running back, sits at), while its combined-average win is driven by the n=2/n=3
+ * buckets outnumbering n=1 in the sample. `THIN_EVIDENCE_PRIOR_N=3` is the one tested value that
+ * improves on the pure model at EVERY individual evidence count actually present — the more
+ * defensible finding, even though it is not the single largest aggregate number. See the report's
+ * own "Decision" section for the full stratified comparison.
  */
 export const THIN_EVIDENCE_PRIOR_N = 3;
 
