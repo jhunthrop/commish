@@ -102,12 +102,28 @@ function extractProperNamePhrases(text: string): readonly string[] {
  * rival — can never exact-match and is correctly caught.
  */
 function isNameGrounded(phrase: string, nameLedger: readonly string[]): boolean {
-  const isMultiWord = phrase.trim().includes(" ");
-  const lowerPhrase = phrase.toLowerCase();
+  // Re-review round 2 (availability, not fabrication): honest prose about the SUBJECT uses
+  // possessives ("Herbert's arm") and surname shorthand for multi-part surnames ("St. Brown"
+  // for "Amon-Ra St. Brown"). A possessive is stripped before comparison, and a multi-word
+  // candidate may match as the exact TRAILING WORDS of a ledger entry — a word-suffix test,
+  // never a substring test, so "Marcus Long" still cannot ride "Rashad Long", and a fabricated
+  // possessive still fails with its name.
+  const cleaned = phrase.trim().replace(/[’']s?$/i, "");
+  const isMultiWord = cleaned.includes(" ");
+  const lowerPhrase = cleaned.toLowerCase();
   return nameLedger.some((name) => {
     const nameIsMultiWord = name.trim().includes(" ");
     if (isMultiWord !== nameIsMultiWord) return false;
-    return name.toLowerCase() === lowerPhrase;
+    const lowerName = name.toLowerCase();
+    if (lowerName === lowerPhrase) return true;
+    // Word-suffix shorthand: the candidate's words must equal the ledger entry's LAST N words,
+    // and only for entries longer than the candidate (a two-word ledger entry offers no
+    // shorthand a two-word candidate would need).
+    if (!nameIsMultiWord || !isMultiWord) return false;
+    const nameWords = lowerName.split(" ");
+    const phraseWords = lowerPhrase.split(" ");
+    if (phraseWords.length >= nameWords.length) return false;
+    return nameWords.slice(nameWords.length - phraseWords.length).join(" ") === lowerPhrase;
   });
 }
 

@@ -137,3 +137,20 @@ describe("probe check — LOW banned-vocab inflection and tension cue", () => {
     expect(r.violations.some((v) => v.includes("Mixed evidence"))).toBe(false);
   });
 });
+
+describe("re-review round 2: honest shorthand passes, fabrication still fails", () => {
+  const facts = buildPlayerFacts({
+    ...RASHAD_LONG,
+    identity: { id: "p2", name: "Amon-Ra St. Brown", position: "WR", team: "DET" },
+  });
+
+  it("accepts the subject's own possessive and his surname shorthand", () => {
+    expect(validateCapsule(pad("Amon-Ra St. Brown's role is safe in the DET offense, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(true);
+    expect(validateCapsule(pad("St. Brown owns the slot for DET, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(true);
+  });
+
+  it("still rejects a fabricated name, possessive or shorthand alike", () => {
+    expect(validateCapsule(pad("Justin Herbert's arm shows up for DET, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(false);
+    expect(validateCapsule(pad("Marcus Brown had a day for DET, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(false);
+  });
+});
