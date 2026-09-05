@@ -49,7 +49,7 @@ export const DEMO_ROUNDS = 4;
 export const DEMO_SEED = 20260905;
 
 const DEMO_SEED_NAMESPACE = "assistant-demo";
-const DEMO_COMPUTED_BASIS = "A replayed room, seeded and reproducible — not a live board.";
+const DEMO_COMPUTED_BASIS = "A replayed room, seeded and reproducible. Not a live board.";
 
 const TEAM_IDS: readonly string[] = Array.from({ length: DEMO_TEAM_COUNT }, (_, i) => `team_${i + 1}`);
 /** Seat 4 of 10 — neither the first nor the last to pick, so the demo shows an ordinary snake

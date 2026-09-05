@@ -269,6 +269,15 @@ export async function assistantCall(db: Db, draftId: string, userId: string): Pr
   const state = await getDraftStore().getDraftState(draftId);
   if (state === null || state.phase !== "in_progress") return null;
 
+  // SHORT-CIRCUIT BEFORE EITHER REMAINING DB READ (review fix, Task 12). The extraction into
+  // `assistantCallCore` moved this exact guard behind `evidencePoolFor`/`winningBuildsFor` —
+  // a seat with no turn left to advise (the ORDINARY state of every seat during a draft's own
+  // tail, once its roster is full) would otherwise pay for two Postgres reads on every poll,
+  // at the highest-concurrency moment a room ever sees. `assistantCallCore` re-derives this
+  // same window internally (a pure, in-memory scan — never I/O), so recomputing it here costs
+  // nothing next to the DB round trips it now guards.
+  if (askingWindow(state, teamId) === null) return null;
+
   const shape: LeagueShape = { teamCount: state.draftOrder.length, rosterSlots: state.config.slotConfig };
   const { pool, boardGeneration } = await evidencePoolFor(db);
   const valued = valuedEvidence(pool, shape);

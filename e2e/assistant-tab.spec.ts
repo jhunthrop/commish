@@ -76,7 +76,13 @@ test("mock room -> the Assistant tab shows three candidates before your pick, an
   // clock (see `call.ts`'s own module docblock).
   await managerA.getByTestId("drawer-handles").getByRole("tab", { name: "Assistant" }).click();
   const callList = managerA.locator('[aria-label="The assistant\'s call"]');
-  const candidates = callList.getByRole("listitem");
+  // `getByRole("listitem")` would ALSO match every candidate's own nested reason `<li>`s
+  // (`DrawerAssistantTab` renders each `PickReason` as a further `<li>` inside a `<ul>` nested
+  // inside each candidate's own `<li>`) — every candidate carries at least one reason, so that
+  // locator's count could never land on exactly 3. Scoped to DIRECT children of the candidate
+  // `<ol>` instead: the reason `<li>`s sit inside a `<ul>`, never directly under the `<ol>`, so
+  // this count is immune to how many reasons any one candidate happens to carry.
+  const candidates = callList.locator("ol > li");
   await expect(candidates.first()).toBeVisible({ timeout: 15_000 });
   await expect(candidates).toHaveCount(3);
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // getDraftStore() (called by assistantCall) uses the process-wide getDb() — point it at the test
 // infrastructure before any module is imported, the same idiom `api-routes.test.ts` uses.
@@ -14,12 +14,16 @@ import { leagues, nflPlayers, playerCrosswalk, players, preseasonProjections, us
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
+import type { DraftState } from "@/draft-engine";
 import { totalRosterSlots } from "@/draft-engine";
+import * as draftServiceModule from "@/draft-service";
 import { getDraftStore } from "@/draft-service";
 import { seedDraftFixture } from "@/draft-service/test-support";
 import { SIM_CONFIG, SIM_SHARPNESS } from "@/draft-service/sim/config";
+import * as evidenceModule from "@/draft-service/sim/evidence";
 import { deriveSeed } from "@/draft-service/sim/service";
 import { createSimRun, hashSimConfig, markSimRunSucceeded } from "@/draft-service/sim/store";
+import * as simStoreModule from "@/draft-service/sim/store";
 import type { SimConfig, SimSummary } from "@/draft-service/sim/types";
 import { assistantCall } from "./call";
 
@@ -83,6 +87,13 @@ describe("assistantCall", () => {
     for (const draftId of ["draft_stranger", "draft_scheduled", "draft_commish", "draft_top3", "draft_last"]) {
       getDraftStore().invalidate(draftId);
     }
+  });
+
+  afterEach(() => {
+    // Only the "short-circuits" describe block below ever spies on these module namespaces —
+    // restoring unconditionally here is a no-op for every other test in this file, and keeps a
+    // spy installed by one test from ever leaking into the next.
+    vi.restoreAllMocks();
   });
 
   it("returns null for a signed-in stranger with no team in this league", async () => {
@@ -233,6 +244,72 @@ describe("assistantCall", () => {
       for (const candidate of view!.candidates) {
         expect(candidate.makeItBack).toBeNull();
       }
+    });
+  });
+
+  describe("short-circuits before either remaining DB read when the asking seat has no further turn", () => {
+    /**
+     * Review fix (Task 12): the `assistantCallCore` extraction moved this guard BEHIND
+     * `evidencePoolFor`/`findCachedRun` — a real regression, since a seat with no turn left to
+     * advise now paid for two Postgres reads it used to skip entirely. `askingWindow`'s own
+     * docblock notes this state is "defensive only" in an ORDINARY snake draft (every in-progress
+     * draft owes every seat at least one more pick, by `totalPickCount`'s own construction) — so
+     * rather than chase an unreachable-in-practice real draft into this state, this stubs
+     * `getDraftStore`/`resolveDraftActor` (the same `@/draft-service` module namespace `call.ts`
+     * itself imports from, spied the identical way `adp-snapshot-job.test.ts` already spies on a
+     * sibling module) to hand `assistantCall` a hand-built `DraftState` whose `pickNumber` already
+     * sits past `totalPickCount` while `phase` stays `"in_progress"` — an internally consistent
+     * `DraftState` for `askingWindow` to read, however it came to exist. The actual assertion is
+     * `evidencePoolFor`/`findCachedRun` are NEVER CALLED — the one fact the pre-refactor ordering
+     * guaranteed and the regression broke.
+     */
+    const GUARD_TEAM_ID = "team_guard_test";
+    const GUARD_SLOTS: readonly RosterSlotConfig[] = [{ slot: "QB", count: 1, eligiblePositions: ["QB"] }];
+
+    function stateWithNoFurtherTurn(): DraftState {
+      return {
+        config: {
+          draftId: "draft_guard_test",
+          leagueId: "league_guard_test",
+          format: "snake",
+          kickoffAt: "2026-09-10T17:00:00.000Z",
+          auctionBudget: null,
+          slotConfig: GUARD_SLOTS,
+          clockSchedule: [],
+        },
+        phase: "in_progress",
+        sequence: 1,
+        draftOrder: [GUARD_TEAM_ID, "team_guard_other"],
+        pool: [],
+        picks: [],
+        rosters: {},
+        budgets: {},
+        queues: {},
+        owedPicks: {},
+        auction: null,
+        // `totalPickCount` for this config is 2 (2 teams x 1 round) — comfortably past it, so
+        // `askingWindow`'s own forward scan finds no match for either team and returns null.
+        pickNumber: 999,
+        turnStartedAt: null,
+      };
+    }
+
+    it("never reads the evidence board or a cached sim run", async () => {
+      const evidenceSpy = vi.spyOn(evidenceModule, "evidencePoolFor");
+      const findCachedRunSpy = vi.spyOn(simStoreModule, "findCachedRun");
+      vi.spyOn(draftServiceModule, "resolveDraftActor").mockResolvedValue({
+        ok: true,
+        actor: { draftId: "draft_guard_test", leagueId: "league_guard_test", userId: "user_guard_test", teamId: GUARD_TEAM_ID, isCommissioner: false },
+      });
+      vi.spyOn(draftServiceModule, "getDraftStore").mockReturnValue({
+        getDraftState: vi.fn().mockResolvedValue(stateWithNoFurtherTurn()),
+      } as unknown as ReturnType<typeof draftServiceModule.getDraftStore>);
+
+      const view = await assistantCall(db, "draft_guard_test", "user_guard_test");
+
+      expect(view).toBeNull();
+      expect(evidenceSpy).not.toHaveBeenCalled();
+      expect(findCachedRunSpy).not.toHaveBeenCalled();
     });
   });
 });
