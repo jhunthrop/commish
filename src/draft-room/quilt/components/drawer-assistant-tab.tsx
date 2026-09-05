@@ -5,14 +5,19 @@ import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { Law } from "@/projections/laws/types";
-import type { PickReason } from "@/projections/decide/draft";
 import { PositionBadge } from "@/components/ui";
 import { PlayerName } from "@/league-room/components/player-peek";
 import { postPickBeat } from "../../assistant/beat";
 import { oddsPhrase } from "../../assistant/odds-phrase";
 import { detectRun, tierCountdowns } from "../../assistant/reads";
+import { reasonSentence } from "../../assistant/reason-sentence";
 import { byeCollisionFor, stackNoteFor, type StackCandidate } from "../../assistant/roster-fit";
 import { useAssistant } from "../../assistant/use-assistant";
+
+// Re-exported for this file's own existing import sites (`drawer-assistant-tab.test.tsx`) — the
+// actual definition now lives in `../../assistant/reason-sentence.ts` (see that module's own
+// docblock for why), shared verbatim with the Assistant demo rather than duplicated.
+export { reasonSentence };
 
 export interface DrawerAssistantTabProps {
   readonly draftId: string;
@@ -29,28 +34,6 @@ export interface DrawerAssistantTabProps {
 }
 
 const NO_SEAT_COPY = "You have no seat in this draft. The assistant argues for a seat.";
-
-/** One plain sentence per `PickReason` variant, numbers straight off the reason's own fields —
- *  never a fresh estimate. Exhaustive over the union with no `default`, so a new reason code
- *  fails to compile here rather than rendering silently as nothing. */
-export function reasonSentence(reason: PickReason): string {
-  switch (reason.code) {
-    case "value_over_replacement":
-      return `He ranks No. ${reason.positionRank} at ${reason.position}, ${reason.valueOverReplacement.toFixed(1)} points over replacement.`;
-    case "will_not_survive":
-      return `He probably will not last. ${oddsPhrase(reason.survivalProbability)} he is still there at pick ${reason.nextPick}.`;
-    case "safe_to_wait":
-      return `He can wait. ${oddsPhrase(reason.survivalProbability)} he is still there at pick ${reason.nextPick}.`;
-    case "no_further_turn":
-      return `Pick ${reason.pickNumber} is your last turn of the draft. There is no next pick to wait for.`;
-    case "tier_cliff":
-      return `Only ${reason.playersLeftInTier} ${reason.position} left in this tier. The price drops ${reason.dropToNextTier.toFixed(1)} points after that.`;
-    case "fills_starting_slot":
-      return `He fills your starting ${reason.slot} slot.`;
-    case "roster_saturated":
-      return `You already roster ${reason.alreadyRostered} ${reason.position} and bench ${reason.alreadyBenched} more. He adds depth only.`;
-  }
-}
 
 /** The asking seat's own rostered NFL team codes — `byeCollisionFor`'s own space (its docblock:
  *  team codes, not player ids). An empty roster slot (`playerId === null`) and a player id the

@@ -37,6 +37,14 @@
  * matches without a second formula that could drift). Unlike `canonicalSimFor`, this NEVER
  * triggers a sim run: a live pick clock is not the place to pay for one, and "the user has not
  * run a sim for this league yet" is an honest `null`, never a fabricated build list.
+ *
+ * `assistantCallCore` (Task 12) IS the whole of the above minus the two DB reads
+ * (`evidencePoolFor`, `findCachedRun`) and the membership guard — a pure function of an already-
+ * valued board and a `DraftState`, exported so the Assistant demo page
+ * (`@/draft-hq/assistant-demo/fixture.ts`) can compute a REAL `AssistantCallView` over a headless
+ * replayed room without a database, rather than a second, drifting reimplementation of "what the
+ * call actually is." `assistantCall` itself is now nothing but the DB plumbing plus one call into
+ * this core.
  */
 import { createHash } from "node:crypto";
 import type { Db } from "@/db/client";
@@ -71,13 +79,20 @@ export interface AssistantCallView {
 
 /** A valued evidence row, the market's own price attached — exactly `DraftCandidate`'s shape,
  *  kept under its own name here because this module also reuses it to price a ROSTERED player
- *  (who is deliberately excluded from `DraftCandidate`'s own "undrafted" population). */
-interface ValuedEntry extends ValuedPlayer {
+ *  (who is deliberately excluded from `DraftCandidate`'s own "undrafted" population). Exported so
+ *  a caller building its own valued board (the Assistant demo's synthetic evidence pool, never a
+ *  DB read) can hand `assistantCallCore` the exact shape it expects. */
+export interface ValuedEntry extends ValuedPlayer {
   readonly averageDraftPosition: number;
 }
 
-function seedFor(draftId: string, pickNumber: number): number {
-  const hex = createHash("sha256").update(`${draftId}:${pickNumber}`).digest("hex").slice(0, 8);
+/** `${seedNamespace}:${pickNumber}` hashed the same way `sim/store.ts`'s `hashSimConfig` hashes a
+ *  config. `seedNamespace` is a draft id for a real room; the demo fixture hands its own fixed
+ *  namespace instead, which is all this function actually needs — a string that never repeats
+ *  across two different "rooms" being seeded. Same pick, same seed, same odds: a refetch never
+ *  flickers, and a demo step never reshuffles on a re-render. */
+function seedFor(seedNamespace: string, pickNumber: number): number {
+  const hex = createHash("sha256").update(`${seedNamespace}:${pickNumber}`).digest("hex").slice(0, 8);
   return parseInt(hex, 16);
 }
 
@@ -181,6 +196,64 @@ async function winningBuildsFor(db: Db, userId: string, leagueId: string, shape:
   return summaryForSlot(cached.summary, slot)?.builds ?? null;
 }
 
+export interface AssistantCallCoreInput {
+  /** A snake `DraftState` mid-draft — a real room's replayed state, or a headless sim's own. */
+  readonly state: DraftState;
+  readonly askingTeamId: string;
+  /** Every player in this room's evidence pool, drafted and undrafted alike, valued once through
+   *  `valueBoardIndexed` — a real room's `valuedEvidence(pool, shape)`, or the demo's own
+   *  synthetic equivalent. See the module docblock: a rostered player's `valueOverReplacement`
+   *  cannot be computed at all from a population that has already excluded him. */
+  readonly valued: ReadonlyMap<string, ValuedEntry>;
+  readonly shape: LeagueShape;
+  /** Hashed with the asking pick number for the make-it-back seed (`seedFor`'s own docblock) — a
+   *  real room's `draftId`, or the demo's own fixed namespace. */
+  readonly seedNamespace: string;
+  /** Looked up, never computed here — see the module docblock. `null` is the honest answer for
+   *  a room (or a demo) with no cached sim run of its own. */
+  readonly winningBuilds: readonly BuildOutcome[] | null;
+  /** Stated provenance for the numbers below — a real room's evidence-board `asOf` stamp, or the
+   *  demo's own "replayed, not live" label. Carried through rather than fixed to one shape,
+   *  since a demo and a real room have two honestly different things to say here. */
+  readonly computedBasis: string;
+}
+
+/**
+ * THE CALL, MINUS THE TWO DB READS. Everything `assistantCall` does after it has a `DraftState`
+ * and a valued board: the asking seat's own current-or-next decision window, the shortlist,
+ * live make-it-back odds, this seat's build classification. `null` only when the asking seat has
+ * no further turn left to advise (`askingWindow`'s own defensive case) — see the module docblock
+ * for why this is the one function both the real Assistant and its replayed demo call.
+ */
+export function assistantCallCore(input: AssistantCallCoreInput): AssistantCallView | null {
+  const { state, askingTeamId, valued, shape, seedNamespace, winningBuilds, computedBasis } = input;
+
+  const window = askingWindow(state, askingTeamId);
+  if (window === null) return null;
+
+  const drafted = draftedPlayerIds(state);
+  const board = [...valued.values()].filter((entry) => !drafted.has(entry.playerId));
+
+  const recommendations = recommendPick({
+    board,
+    roster: rosterSoFar(state, askingTeamId, valued),
+    shape,
+    pickNumber: window.pickNumber,
+    nextPickNumber: window.nextPickNumber,
+    shortlistSize: 3,
+  });
+  const candidates = candidatesWithOdds(state, askingTeamId, recommendations, window.nextPickNumber, seedFor(seedNamespace, window.pickNumber));
+
+  return {
+    pickNumber: window.pickNumber,
+    onTheClock: teamOnClock(state) === askingTeamId,
+    candidates,
+    yourBuild: classifyBuild(classifiablePicks(state, askingTeamId)),
+    winningBuilds,
+    computedBasis,
+  };
+}
+
 /**
  * `null` when the caller is not a member of this draft's league, has no seat of their own to
  * advise (commissioner or not), or the draft is not currently `in_progress` — see the module
@@ -196,34 +269,12 @@ export async function assistantCall(db: Db, draftId: string, userId: string): Pr
   const state = await getDraftStore().getDraftState(draftId);
   if (state === null || state.phase !== "in_progress") return null;
 
-  const window = askingWindow(state, teamId);
-  if (window === null) return null;
-
   const shape: LeagueShape = { teamCount: state.draftOrder.length, rosterSlots: state.config.slotConfig };
   const { pool, boardGeneration } = await evidencePoolFor(db);
   const valued = valuedEvidence(pool, shape);
-  const drafted = draftedPlayerIds(state);
-  const board = [...valued.values()].filter((entry) => !drafted.has(entry.playerId));
-
-  const recommendations = recommendPick({
-    board,
-    roster: rosterSoFar(state, teamId, valued),
-    shape,
-    pickNumber: window.pickNumber,
-    nextPickNumber: window.nextPickNumber,
-    shortlistSize: 3,
-  });
-  const candidates = candidatesWithOdds(state, teamId, recommendations, window.nextPickNumber, seedFor(draftId, window.pickNumber));
 
   const slot = state.draftOrder.indexOf(teamId) + 1;
   const winningBuilds = await winningBuildsFor(db, userId, actor.leagueId, shape, slot, boardGeneration);
 
-  return {
-    pickNumber: window.pickNumber,
-    onTheClock: teamOnClock(state) === teamId,
-    candidates,
-    yourBuild: classifyBuild(classifiablePicks(state, teamId)),
-    winningBuilds,
-    computedBasis: boardGeneration,
-  };
+  return assistantCallCore({ state, askingTeamId: teamId, valued, shape, seedNamespace: draftId, winningBuilds, computedBasis: boardGeneration });
 }
