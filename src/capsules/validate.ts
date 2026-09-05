@@ -69,14 +69,75 @@ function isDerivedFromLedger(value: number, ledger: readonly number[]): boolean 
   return false;
 }
 
+/** In-name abbreviations that end in a period WITHOUT ending the candidate name (fix round 2,
+ *  PART A, live full-board regeneration 2026-09-05) — "St." ("Amon-Ra St. Brown"), the short
+ *  honorifics/suffixes it stands beside ("Jr.", "Sr.", "Mr.", "Mrs.", "Ms.", "Dr."), and a lone
+ *  initial ("T." inside "T.J. Hockenson", matched separately by `INITIALS_PATTERN` below). Bare,
+ *  i.e. with its own trailing period already stripped before the lookup. */
+const IN_NAME_ABBREVIATIONS = new Set(["St", "Jr", "Sr", "Mr", "Mrs", "Ms", "Dr"]);
+
+/** A chain of single-letter initials with their own periods ("T", "T.J", "T.J.K") — the OTHER
+ *  in-name abbreviation shape `IN_NAME_ABBREVIATIONS` does not cover, since it is not a fixed
+ *  word. Tested against the token with its OWN trailing period already stripped, exactly like
+ *  `IN_NAME_ABBREVIATIONS` — "T.J." strips to "T.J", which this matches. */
+const INITIALS_PATTERN = /^[A-Z](?:\.[A-Z])*$/;
+
+/** True when `word` (as extracted — its own trailing period, if any, still attached) ends a
+ *  sentence rather than continuing an abbreviation. Only a TRAILING period is ever in question:
+ *  `!`/`?` never appear inside a name token to begin with (`NAME_WORD_CHARS` below excludes them,
+ *  same as the prior regex did), so they already stop a candidate the ordinary way. */
+function endsSentence(word: string): boolean {
+  if (!word.endsWith(".")) return false;
+  const bare = word.slice(0, -1);
+  return !IN_NAME_ABBREVIATIONS.has(bare) && !INITIALS_PATTERN.test(bare);
+}
+
 /** Sequences of two-or-more consecutive Titlecase words — the shape a genuine proper name takes
  *  ("Justin Jefferson", "Kansas City"). A LONE capitalized word is left alone: ordinary sentence
  *  capitalization, a position abbreviation (`RB`) or a stray "Age 29" reads as a false positive
  *  far more often than it reads as a fabricated name, and a name-check that nukes every ordinary
- *  capsule into a template defeats the point of writing one at all. */
+ *  capsule into a template defeats the point of writing one at all.
+ *
+ * SENTENCE-BOUNDARY TOKENIZATION (fix round 2, PART A, live full-board regeneration 2026-09-05,
+ * 454/659 template fallbacks) — the prior single regex treated a period as just another
+ * name-internal character, so a legitimately ledgered name immediately followed by the NEXT
+ * sentence's capitalized first word ("Tre Tucker. The", "Bijan Robinson. He") merged into one
+ * candidate and failed grounding wholesale, even though "Tre Tucker" alone was perfectly honest.
+ * `T.` never anchored the OLD regex's match either (its trailing `\b` could not close across a
+ * period followed by whitespace), which meant "Tyrone Tracy Jr." silently matched as "Tyrone
+ * Tracy Jr" — no trailing period — and then failed grounding against a ledger entry that DOES
+ * carry the period (`facts.ts`'s `buildNameLedger` splits the name on whitespace verbatim).
+ *
+ * THE FIX: build candidates word-by-word instead of one regex. Two whitespace-adjacent Titlecase
+ * tokens still join into the same run exactly as before (a non-whitespace separator, e.g. a
+ * comma, still breaks the run — unchanged). The one new rule: once a token in the run `endsSentence`
+ * (a trailing period that is not a sanctioned in-name abbreviation), the run stops AT that token —
+ * a following capitalized word starts its OWN, separate candidate — and that token's own trailing
+ * period is stripped from the emitted phrase (it is punctuation, not part of the name). An
+ * abbreviation's period is always kept (`"St. Brown"`, `"T.J. Hockenson"`, `"Tyrone Tracy Jr."`
+ * all still emit with their periods intact, since none of those tokens `endsSentence`). */
 function extractProperNamePhrases(text: string): readonly string[] {
-  const matches = text.match(/\b[A-Z][a-zA-Z'.-]*(?:\s+[A-Z][a-zA-Z'.-]*)+\b/g) ?? [];
-  return [...new Set(matches)];
+  const wordPattern = /\b[A-Z][a-zA-Z'.-]*/g;
+  const words: { readonly text: string; readonly start: number; readonly end: number }[] = [];
+  for (const match of text.matchAll(wordPattern)) words.push({ text: match[0], start: match.index, end: match.index + match[0].length });
+
+  const phrases = new Set<string>();
+  let i = 0;
+  while (i < words.length) {
+    const run = [words[i]!];
+    let j = i;
+    while (j + 1 < words.length && /^\s+$/.test(text.slice(words[j]!.end, words[j + 1]!.start)) && !endsSentence(words[j]!.text)) {
+      run.push(words[j + 1]!);
+      j += 1;
+    }
+    if (run.length >= 2) {
+      const last = run[run.length - 1]!;
+      const rendered = run.map((word, idx) => (idx === run.length - 1 && endsSentence(last.text) ? word.text.slice(0, -1) : word.text));
+      phrases.add(rendered.join(" "));
+    }
+    i = j + 1;
+  }
+  return [...phrases];
 }
 
 /**
@@ -127,21 +188,65 @@ function isNameGrounded(phrase: string, nameLedger: readonly string[]): boolean 
   });
 }
 
+/** A curated set of imperative sentence-starters that show up as the FIRST word of a fabricated
+ *  two-word candidate in fantasy-analyst prose ("Buy McCaffrey", "Fade St. Brown") — fix round 2,
+ *  PART B, live full-board regeneration 2026-09-05. None of these is ever a person's given name,
+ *  which is exactly why it is safe to gate the verb+lastname shorthand below on membership in this
+ *  list: an ACTUAL given name occupying that slot ("Marcus Long") is never in it, so that case
+ *  never reaches the shorthand branch at all and keeps failing exactly as CRITICAL 1 requires. */
+const SENTENCE_VERB_WORDS = new Set([
+  "Buy", "Sell", "Draft", "Target", "Avoid", "Fade", "Stash", "Trust", "Start", "Sit",
+  "Take", "Grab", "Pick", "Rank", "Love", "Skip", "Pass", "Wait", "Roster", "Hold",
+  "Bet", "Watch", "Chase", "Ride", "Ditch", "Cut", "Drop", "Add", "Claim", "Rostering",
+]);
+
+/** True when `word` alone equals the trailing word of some MULTI-word ledger entry — the exact
+ *  word-suffix relationship `isNameGrounded` already grants a full shorthand phrase ("St. Brown"
+ *  as the tail of "Amon-Ra St. Brown"), narrowed here to a single lone word. Used ONLY by the
+ *  verb+lastname branch in `isNameGroundedWithShedding`, and only once that branch has confirmed
+ *  the word standing in front of `word` is a sentence verb, never a name — see that function's own
+ *  docblock for why gating on `SENTENCE_VERB_WORDS` is what keeps this from reopening CRITICAL 1's
+ *  bypass (a bare decomposed surname passing on its own). */
+function isLoneWordSurnameOf(word: string, nameLedger: readonly string[]): boolean {
+  const lowerWord = word.toLowerCase();
+  return nameLedger.some((name) => {
+    const nameWords = name.trim().toLowerCase().split(/\s+/);
+    return nameWords.length >= 2 && nameWords[nameWords.length - 1] === lowerWord;
+  });
+}
+
 /**
  * Sentence-initial capitalized verbs merge into a name's capitalized run ("Buy Jahmyr Gibbs",
  * "Draft St. Brown" — first live sweep, 2026-09-05), so a failed multi-word candidate sheds its
  * LEADING word and tries again. Fabrication-safe by construction: shedding only ever reduces the
  * candidate, and the reduced phrase still faces the same exact-or-suffix grounding — "Buy Justin
  * Herbert" sheds to "Justin Herbert", which fails for any other subject exactly as before.
+ *
+ * VERB + LASTNAME (fix round 2, PART B, live full-board regeneration 2026-09-05) — "Buy McCaffrey"
+ * false-rejected with a ledgered "Christian McCaffrey": the floor below stops shedding at two
+ * words on purpose (reducing to the single decomposed ledger fragment "McCaffrey" would reopen
+ * CRITICAL 1's own bypass), so the ordinary shedding loop above never gets a chance to check the
+ * bare surname alone. The floor stays exactly as strict for the general case; what changes is one
+ * narrow, ADDITIONAL exit at the floor: when the candidate is still two words, its FIRST word is a
+ * known sentence verb (never a name — `SENTENCE_VERB_WORDS`), and its SECOND word alone is a
+ * word-suffix of some ledgered multi-word name (`isLoneWordSurnameOf`, the same suffix test
+ * `isNameGrounded` already runs, just narrowed to one trailing word), the candidate grounds. A real
+ * given name in the verb's slot ("Marcus Long") is never in `SENTENCE_VERB_WORDS`, so it never
+ * reaches this exit and still fails exactly as before; an unledgered surname after a genuine verb
+ * ("Buy Fakename") still finds no ledger entry ending in "fakename" and still fails too.
  */
 function isNameGroundedWithShedding(phrase: string, nameLedger: readonly string[]): boolean {
   let candidate = phrase.trim();
   for (;;) {
     if (isNameGrounded(candidate, nameLedger)) return true;
+    const words = candidate.split(" ");
     // Never shed below two words: a two-word candidate IS the name under test, and reducing it
     // to a single decomposed ledger fragment would reopen exactly the bypass CRITICAL 1 closed
     // ("Marcus Long" must never pass by shedding to "Long").
-    if (candidate.split(" ").length <= 2) return false;
+    if (words.length <= 2) {
+      if (words.length === 2 && SENTENCE_VERB_WORDS.has(words[0]!) && isLoneWordSurnameOf(words[1]!, nameLedger)) return true;
+      return false;
+    }
     candidate = candidate.slice(candidate.indexOf(" ") + 1);
   }
 }
