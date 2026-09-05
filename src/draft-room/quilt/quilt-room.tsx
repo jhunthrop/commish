@@ -72,7 +72,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const queueHandlers = useQueueHandlers(room);
 
   const boardIds = useMemo(() => room.players.map((player) => player.id), [room.players]);
-  const { sheet, move, note, reset } = useSheet(view.draftId, boardIds);
+  const { sheet, move, note, reset, hasServerSheet, startServerSheet } = useSheet(view.draftId, boardIds, view.leagueId);
   const ranks = useMemo(() => boardRanks(room.players), [room.players]);
   const mySheetRanks = useMemo(() => sheetRanksOf(sheet), [sheet]);
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
@@ -198,6 +198,8 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           onSheetMove={move}
           onSheetReset={reset}
           onSeedQueue={seedQueue}
+          hasServerSheet={hasServerSheet}
+          onStartServerSheet={startServerSheet}
           {...acts}
         />
       </div>
@@ -226,6 +228,8 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           onSheetReset={reset}
           onSeedQueue={seedQueue}
           available={available}
+          hasServerSheet={hasServerSheet}
+          onStartServerSheet={startServerSheet}
         />
       </div>
     </>

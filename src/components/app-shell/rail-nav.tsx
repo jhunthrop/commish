@@ -21,13 +21,34 @@ interface RailDestination {
  * absent: a broadcast rail lists destinations, not settings, and the avatar beside this nav is
  * the door to who you are.
  *
+ * THE BOARD JOINED THIS LIST (Draft HQ phase 1, 2026-09-04): `DRAFT` sits between Leagues and
+ * Rooms — prepare in Draft, perform in Rooms — and the day named above has come. It is not an
+ * empty room: HQ, The Board and My Sheet are real, league-aware surfaces from the day this
+ * lands (`docs/superpowers/specs/2026-09-04-draft-hq-design.md`); the Simulator/Assistant/
+ * Market/Playbook links behind it render an honest "arriving soon" state rather than fabricated
+ * content, which is what keeps this addition inside the D3 rule rather than breaking it.
+ *
  * ROOMS names where drafting happens — the practice lobby now, live rooms when you are in one.
  */
 const DESTINATIONS: readonly RailDestination[] = [
   { href: "/app", label: "Leagues", also: ["/app/leagues"] },
+  { href: "/app/draft", label: "Draft" },
   { href: "/app/mock-drafts", label: "Rooms", also: ["/app/drafts"] },
   { href: "/app/wallet", label: "Wallet" },
 ];
+
+/**
+ * A path is "under" a prefix only at a real segment boundary — an EXACT match, or the prefix
+ * followed by `/`. Fix round 1, HIGH 1: bare `pathname.startsWith(prefix)` treats
+ * `/app/drafts/abc123` as starting with `/app/draft`, one string being a character-for-character
+ * prefix of the other with no `/` between them — so a live draft room lit BOTH Draft and Rooms
+ * at once, breaking the v5 one-here-marker law on the product's highest-traffic page. Every
+ * destination and every `also` prefix goes through this one boundary-safe check now, not just
+ * the ones a reviewer happened to test.
+ */
+function pathIsUnder(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
 
 /** Client-side only because the here-marker needs the live pathname; the list itself is static. */
 export function RailNav({ className = "" }: { readonly className?: string }) {
@@ -38,10 +59,13 @@ export function RailNav({ className = "" }: { readonly className?: string }) {
     // (jsdom tests render this bar directly) — the same `?.` guard `LeagueRail` has always
     // carried; a bar with no pathname simply marks nothing as here.
     if (pathname === null) return false;
+    // `/app` is a literal prefix of every signed-in route, so its OWN href can never use the
+    // boundary-safe prefix check the way every other destination does — that would light
+    // Leagues on `/app/wallet` too. It only ever matches exactly, or through its own `also` list.
     if (destination.href === "/app") {
-      return pathname === "/app" || (destination.also ?? []).some((prefix) => pathname.startsWith(prefix));
+      return pathname === "/app" || (destination.also ?? []).some((prefix) => pathIsUnder(pathname, prefix));
     }
-    return pathname.startsWith(destination.href) || (destination.also ?? []).some((prefix) => pathname.startsWith(prefix));
+    return pathIsUnder(pathname, destination.href) || (destination.also ?? []).some((prefix) => pathIsUnder(pathname, prefix));
   };
 
   return (

@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { DraftRoomDepsProvider, type DraftRoomDeps } from "@/draft-room/hooks/deps";
 import { QUILT_CONFIG } from "../state/config";
 import { encodeSheet } from "../state/sheet";
 import { writeSeedSheet } from "../state/sheet-seed";
@@ -48,5 +50,89 @@ describe("useSheet — the seed import (the workflow pass)", () => {
     const { result } = renderHook(() => useSheet("draft_bare", BOARD));
     await waitFor(() => expect(result.current.sheet.order.length).toBeGreaterThan(0));
     expect(result.current.sheet.order).toEqual(BOARD);
+  });
+});
+
+/** A fake `fetchJson` that never leaves the process, matching `use-draft-room.test.tsx`'s own
+ *  idiom for injecting `DraftRoomDeps`. */
+function jsonOf(body: unknown): Response {
+  return { json: async () => body } as unknown as Response;
+}
+
+function wrapper(deps: DraftRoomDeps) {
+  return function Wrapper({ children }: { readonly children: ReactNode }) {
+    return <DraftRoomDepsProvider deps={deps}>{children}</DraftRoomDepsProvider>;
+  };
+}
+
+const NO_OPEN_EVENT_SOURCE: DraftRoomDeps["openEventSource"] = () => {
+  throw new Error("not used by useSheet");
+};
+
+describe("useSheet — Draft HQ's server sync (Task 5, spec §4)", () => {
+  it("omitting leagueId never attempts a fetch — every existing caller is unaffected", async () => {
+    const fetchJson = vi.fn();
+    const { result } = renderHook(() => useSheet("draft_no_league", BOARD), { wrapper: wrapper({ fetchJson, openEventSource: NO_OPEN_EVENT_SOURCE }) });
+    await waitFor(() => expect(result.current.sheet.order.length).toBeGreaterThan(0));
+    expect(fetchJson).not.toHaveBeenCalled();
+    expect(result.current.hasServerSheet).toBe(false);
+  });
+
+  it("adopts a server sheet's own order as the room's sheet when one exists for this league", async () => {
+    const fetchJson = vi.fn(async () => jsonOf({ ok: true, data: { id: "sheet-1", entries: [{ playerId: "p3", rank: 1, note: null }, { playerId: "p1", rank: 2, note: "sleeper" }] } }));
+    const { result } = renderHook(() => useSheet("draft_league", BOARD, "league-1"), { wrapper: wrapper({ fetchJson, openEventSource: NO_OPEN_EVENT_SOURCE }) });
+    await waitFor(() => expect(result.current.hasServerSheet).toBe(true));
+    // Reconciled against the board (`reconcileSheet`'s own rule): p3, p1 survive from the
+    // server in their own order, and p2 — a board id the server sheet never saw — inserts at
+    // its own (clamped) board index among them, landing between the two.
+    expect(result.current.sheet.order).toEqual(["p3", "p2", "p1"]);
+    expect(result.current.sheet.notes).toEqual({ p1: "sleeper" });
+    expect(fetchJson).toHaveBeenCalledWith("/api/draft/sheets/default?leagueId=league-1");
+  });
+
+  it("stays on local-only behavior when the league has no server sheet yet", async () => {
+    const fetchJson = vi.fn(async () => jsonOf({ ok: true, data: null }));
+    const { result } = renderHook(() => useSheet("draft_league_none", BOARD, "league-1"), { wrapper: wrapper({ fetchJson, openEventSource: NO_OPEN_EVENT_SOURCE }) });
+    await waitFor(() => expect(result.current.sheet.order.length).toBeGreaterThan(0));
+    expect(result.current.hasServerSheet).toBe(false);
+    expect(result.current.sheet.order).toEqual(BOARD);
+  });
+
+  it("writes a reorder through to the server sheet once one is adopted", async () => {
+    const calls: { readonly url: string; readonly init?: RequestInit }[] = [];
+    const fetchJson = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      if (url.startsWith("/api/draft/sheets/default")) return jsonOf({ ok: true, data: { id: "sheet-1", entries: [{ playerId: "p1", rank: 1, note: null }, { playerId: "p2", rank: 2, note: null }, { playerId: "p3", rank: 3, note: null }] } });
+      return jsonOf({ ok: true, data: {} });
+    });
+    const { result } = renderHook(() => useSheet("draft_league_move", BOARD, "league-1"), { wrapper: wrapper({ fetchJson, openEventSource: NO_OPEN_EVENT_SOURCE }) });
+    await waitFor(() => expect(result.current.hasServerSheet).toBe(true));
+
+    result.current.move("p3", -2);
+
+    await waitFor(() => expect(calls.some((call) => call.url === "/api/draft/sheets/sheet-1/entries")).toBe(true));
+    const reorderCall = calls.find((call) => call.url === "/api/draft/sheets/sheet-1/entries")!;
+    expect(reorderCall.init?.method).toBe("PUT");
+    expect(JSON.parse(String(reorderCall.init?.body))).toEqual({ order: ["p3", "p1", "p2"] });
+  });
+
+  it("startServerSheet creates a sheet from the room's current local order and switches onto it", async () => {
+    const calls: { readonly url: string; readonly init?: RequestInit }[] = [];
+    const fetchJson = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      if (url.startsWith("/api/draft/sheets/default")) return jsonOf({ ok: true, data: null });
+      if (url === "/api/draft/sheets") return jsonOf({ ok: true, data: { id: "sheet-new" } });
+      return jsonOf({ ok: true, data: {} });
+    });
+    const { result } = renderHook(() => useSheet("draft_start", BOARD, "league-1"), { wrapper: wrapper({ fetchJson, openEventSource: NO_OPEN_EVENT_SOURCE }) });
+    await waitFor(() => expect(result.current.sheet.order.length).toBeGreaterThan(0));
+    expect(result.current.hasServerSheet).toBe(false);
+
+    result.current.startServerSheet();
+
+    await waitFor(() => expect(result.current.hasServerSheet).toBe(true));
+    const replaceCall = calls.find((call) => call.url === "/api/draft/sheets/sheet-new/replace");
+    expect(replaceCall?.init?.method).toBe("PUT");
+    expect(JSON.parse(String(replaceCall?.init?.body))).toEqual({ entries: BOARD.map((playerId) => ({ playerId, note: null })) });
   });
 });
