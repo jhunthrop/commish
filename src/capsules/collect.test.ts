@@ -51,11 +51,14 @@ describe("collectAllPlayerFacts", () => {
     expect(rashad.market.adp).toBe(12.5);
     expect(rashad.projection.projectedPoints).toBe(248);
     expect(rashad.season).toBeNull();
-    expect(rashad.injuryDesignation).toBeNull();
+    // THE TRI-STATE (fix round 1, CRITICAL 2): no injury snapshot has ever been captured in this
+    // test's own database, so the honest read is "unknown" — NEVER a healthy claim, which would
+    // be indistinguishable from a real snapshot that actually checked and found nothing.
+    expect(rashad.injury).toEqual({ state: "unknown" });
     expect(rashad.news).toEqual([]);
   });
 
-  it("attaches the injury designation and its capture instant, honestly null when the feed does not name him", async () => {
+  it("attaches a designated player's status and capture instant, and a genuinely clean read for a player the feed checked and did not name", async () => {
     await seedPlayer(db, { id: "p1", nflId: "00-0000001", name: "Rashad Long", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
     await seedPlayer(db, { id: "p2", nflId: "00-0000002", name: "Healthy Back", position: "RB", team: "DAL", points: 200, rank: 2, adp: 20 });
     const capturedAt = new Date("2026-09-01T12:00:00Z");
@@ -64,10 +67,10 @@ describe("collectAllPlayerFacts", () => {
     const facts = await collectAllPlayerFacts(db);
     const rashad = facts.find((f) => f.identity.id === "p1")!;
     const healthy = facts.find((f) => f.identity.id === "p2")!;
-    expect(rashad.injuryDesignation).toBe("Q");
-    expect(rashad.injuryAsOf).toBe(capturedAt.toISOString());
-    expect(healthy.injuryDesignation).toBeNull();
-    expect(healthy.injuryAsOf).toBeNull();
+    expect(rashad.injury).toEqual({ state: "designated", designation: "Q", asOf: capturedAt.toISOString() });
+    // A snapshot DID run and did not name him — a genuine, dated "clean" read, distinct from
+    // "unknown" (see the previous test): the snapshot's own presence is what licenses this.
+    expect(healthy.injury).toEqual({ state: "clean", asOf: capturedAt.toISOString() });
   });
 
   it("attaches up to three recent headlines by name, from one shared snapshot read", async () => {

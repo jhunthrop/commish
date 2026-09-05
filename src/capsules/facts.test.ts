@@ -28,8 +28,7 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
     projection: { projectedPoints: 248, floorPoints: 178, medianPoints: 240, ceilingPoints: 275 },
     byeWeek: 9,
     season: null,
-    injuryDesignation: null,
-    injuryAsOf: null,
+    injury: { state: "unknown" },
     news: [],
     ...overrides,
   };
@@ -46,7 +45,7 @@ describe("buildPlayerFacts", () => {
 
   it("changes the hash when a fact changes (injury designation)", () => {
     const withoutInjury = buildPlayerFacts(baseInput());
-    const withInjury = buildPlayerFacts(baseInput({ injuryDesignation: "Q", injuryAsOf: "2026-09-01T00:00:00.000Z" }));
+    const withInjury = buildPlayerFacts(baseInput({ injury: { state: "designated", designation: "Q", asOf: "2026-09-01T00:00:00.000Z" } }));
     expect(withInjury.factsHash).not.toBe(withoutInjury.factsHash);
   });
 

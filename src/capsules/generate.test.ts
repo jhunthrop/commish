@@ -12,8 +12,7 @@ function baseInput(): PlayerFactsInput {
     projection: { projectedPoints: 248, floorPoints: 178, medianPoints: 240, ceilingPoints: 275 },
     byeWeek: 9,
     season: null,
-    injuryDesignation: null,
-    injuryAsOf: null,
+    injury: { state: "unknown" },
     news: [],
   };
 }
@@ -60,11 +59,17 @@ describe("generateCapsule", () => {
     expect(result.compact.source).toBe("llm");
     expect(result.compact.text).toBe(GOOD_COMPACT);
     expect(compactCalls).toBe(2);
+    // Fix round 1, MEDIUM c: usage accumulates across BOTH attempts (the failed one billed too),
+    // never just the winning one.
+    expect(result.compact.usage?.costUsd).toBeCloseTo(0.0001, 10);
   });
 
   it("falls back to the deterministic template after two failed attempts, and never blanks the capsule", async () => {
     const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockResolvedValue(okResponse("He will score 999 touchdowns this year for this offense, an absurd fabricated number nobody has hit."));
+    // A fresh Response per call — reusing one `Response` instance across attempts would throw on
+    // its second `.text()` read (the body stream is already consumed), which is a test-harness
+    // bug, not the thing under test.
+    const fetchMock = vi.fn().mockImplementation(async () => okResponse("He will score 999 touchdowns this year for this offense, an absurd fabricated number nobody has hit."));
 
     const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
     expect(result.source).toBe("template");
@@ -73,6 +78,10 @@ describe("generateCapsule", () => {
     expect(result.full.source).toBe("template");
     expect(result.compact.text.length).toBeGreaterThan(0);
     expect(result.full.text.length).toBeGreaterThan(0);
+    // Fix round 1, MEDIUM c: both failed attempts were genuinely billed by the gateway — that
+    // spend must still be logged even though the row ultimately falls back to template.
+    expect(result.compact.usage?.costUsd).toBeCloseTo(0.0001, 10);
+    expect(result.full.usage?.costUsd).toBeCloseTo(0.0001, 10);
   });
 
   it("falls back to the template when the gateway is unreachable throughout, never throwing", async () => {
@@ -81,6 +90,8 @@ describe("generateCapsule", () => {
     const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
     expect(result.source).toBe("template");
     expect(result.compact.text).toBe(result.full.text);
+    // No attempt ever got back a billable response — nothing to log.
+    expect(result.compact.usage).toBeNull();
   });
 
   it("marks the whole capsule template-sourced when only one size falls back, never claiming a mixed llm provenance", async () => {

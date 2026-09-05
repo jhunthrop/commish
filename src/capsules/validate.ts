@@ -14,17 +14,43 @@ function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter((word) => word.length > 0).length;
 }
 
-/** Every roughly-decimal number token in `text` — `%`/comma-stripped, sign kept. Deliberately
- *  permissive (a false EXTRA match just gets checked against the ledger and either clears it or
- *  fails the capsule into a regeneration, never the other way around). */
-/** `(?<![A-Za-z])`/`(?![A-Za-z])` keep this from pulling the "6" out of "RB6" or the "12" out of
- *  "Q12" — a position/market-rank compound token is not a bare number, and validating its digits
- *  against the ledger would demand a `positionAdp`-style string be represented numerically too. */
-const NUMBER_TOKEN_PATTERN = /(?<![A-Za-z])-?\d[\d,]*(?:\.\d+)?%?(?![A-Za-z])/g;
+/** `(?<![A-Za-z0-9])`/`(?![A-Za-z])` keep this from pulling the "6" out of "RB6" or the "12" out
+ *  of "Q12" — a position/market-rank compound token is not a bare number, and validating its
+ *  digits against the ledger would demand a `positionAdp`-style string be represented numerically
+ *  too. The lookbehind ALSO excludes a preceding DIGIT (fix round 1, MEDIUM d) so the leading `-`
+ *  in a range or a year span ("20-25 touches", "2023-2024") is never consumed as a sign: at the
+ *  position right after "20", the previous character is a digit, so a match cannot START there,
+ *  and the regex engine instead starts fresh at the digit right after the hyphen — "25", positive,
+ *  never "-25". A genuine negative ("-1.8 a game") is untouched: the character before its `-` is
+ *  a space, not alphanumeric, so the sign is still consumed normally. */
+const NUMBER_TOKEN_PATTERN = /(?<![A-Za-z0-9])-?\d[\d,]*(?:\.\d+)?%?(?![A-Za-z])/g;
+
+/** Spelled-out cardinals one through twenty (fix round 1, HIGH) — "he caught seven passes" is
+ *  otherwise invisible to `extractNumbers`, which reads digits only. Capped at twenty: past that,
+ *  analyst prose overwhelmingly reverts to digits ("he ran for 340 yards"), so there is no real
+ *  coverage gap above it worth the false-positive risk of matching an ordinary sentence's stray
+ *  number word in a longer list. */
+const CARDINAL_WORDS: Readonly<Record<string, number>> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
+};
+const CARDINAL_WORD_PATTERN = new RegExp(`\\b(${Object.keys(CARDINAL_WORDS).join("|")})\\b`, "gi");
+
+/** Ordinals 1st through 30th (fix round 1, HIGH) — "his 3rd season", "in his 21st start". The
+ *  leading `\b` already excludes a compound token ("RB21st" has no boundary between "B" and "2"),
+ *  so this needs no separate digit-only guard the way `NUMBER_TOKEN_PATTERN` does. */
+const ORDINAL_PATTERN = /\b([1-9]|1[0-9]|2[0-9]|30)(st|nd|rd|th)\b/gi;
 
 function extractNumbers(text: string): readonly { readonly raw: string; readonly value: number }[] {
-  const matches = text.match(NUMBER_TOKEN_PATTERN) ?? [];
-  return matches.map((raw) => ({ raw, value: Number(raw.replace(/,/g, "").replace(/%$/, "")) })).filter((n) => Number.isFinite(n.value));
+  const digitMatches = text.match(NUMBER_TOKEN_PATTERN) ?? [];
+  const digitNumbers = digitMatches
+    .map((raw) => ({ raw, value: Number(raw.replace(/,/g, "").replace(/%$/, "")) }))
+    .filter((n) => Number.isFinite(n.value));
+
+  const cardinalNumbers = [...text.matchAll(CARDINAL_WORD_PATTERN)].map((match) => ({ raw: match[0], value: CARDINAL_WORDS[match[1]!.toLowerCase()]! }));
+  const ordinalNumbers = [...text.matchAll(ORDINAL_PATTERN)].map((match) => ({ raw: match[0], value: Number(match[1]) }));
+
+  return [...digitNumbers, ...cardinalNumbers, ...ordinalNumbers];
 }
 
 /** `value` is an honest reading of some entry in `ledger` when it equals that entry, or a
@@ -53,10 +79,47 @@ function extractProperNamePhrases(text: string): readonly string[] {
   return [...new Set(matches)];
 }
 
+/**
+ * NAME GROUNDING (fix round 1, CRITICAL 1) — a REAL security-shaped bug in the prior version:
+ * `nameLedger` decomposes a full name into its individual words ("Rashad Long" → also "Rashad",
+ * "Long") so a capsule can say "Long" alone and still be honest, and it carries the player's OWN
+ * position/team as single-word entries too ("RB", "SF"). The prior check was bidirectional
+ * substring containment against every ledger entry regardless of word count, which meant a
+ * two-word FABRICATED name passed the moment it merely CONTAINED — or was contained by — any
+ * ledger fragment. Two ways that bit: a decomposed single word licensing an entirely different
+ * two-word phrase ("Marcus Long" passing because "Long" is in the ledger), and a short
+ * position/team code appearing as a coincidental SUBSTRING inside a fabricated name's letters
+ * ("Justin Herbert" passing because "RB" — the subject's own position — is a substring of
+ * "heRBert").
+ *
+ * THE FIX: a multi-word candidate phrase must EXACT-MATCH (case-insensitive, whole phrase) a
+ * multi-word ledger entry — never a substring in either direction, and never built from
+ * decomposed single words. A single-word candidate may still match a single-word ledger entry
+ * (kept for the day `extractProperNamePhrases` widens to single-word candidates; nothing in this
+ * engine emits one today, since a lone capitalized word is deliberately left unchecked — see that
+ * function's own docblock). This engine only ever has ONE person's full name in the ledger (the
+ * subject himself), so a genuinely different two-word name — a fabricated teammate, a coach, a
+ * rival — can never exact-match and is correctly caught.
+ */
+function isNameGrounded(phrase: string, nameLedger: readonly string[]): boolean {
+  const isMultiWord = phrase.trim().includes(" ");
+  const lowerPhrase = phrase.toLowerCase();
+  return nameLedger.some((name) => {
+    const nameIsMultiWord = name.trim().includes(" ");
+    if (isMultiWord !== nameIsMultiWord) return false;
+    return name.toLowerCase() === lowerPhrase;
+  });
+}
+
+/** Simple inflections of a single-word banned term (fix round 1, LOW) — "GOATed" is otherwise
+ *  invisible to a bare `\bgoat\b`, since a plain word boundary sits between "t" and "e" only when
+ *  nothing follows "goat" at all. Deliberately narrow (s/d/ed/ing) rather than a general stemmer:
+ *  wide enough to catch the realistic case, not so wide it starts matching an unrelated word that
+ *  merely shares a prefix. */
 function containsBannedVocabulary(text: string): string | null {
   const lower = text.toLowerCase();
   for (const term of BANNED_VOCABULARY) {
-    const pattern = /^[a-z]+$/.test(term) ? new RegExp(`\\b${term}\\b`, "i") : null;
+    const pattern = /^[a-z]+$/.test(term) ? new RegExp(`\\b${term}(?:s|d|ed|ing)?\\b`, "i") : null;
     const hit = pattern !== null ? pattern.test(text) : lower.includes(term.toLowerCase());
     if (hit) return term;
   }
@@ -74,7 +137,14 @@ function containsCompetitorName(text: string): string | null {
  *  `render.ts` never uses the word at all (it frames the low tail as "the injury seasons"
  *  directly), so any capsule that says "floor" is EITHER quoting the fact sheet's own vocabulary
  *  it was told not to, or introducing the word on its own — either way it must pair the word with
- *  real injury/availability language somewhere in the same text, or this fails it. */
+ *  real injury/availability language somewhere in the same text, or this fails it.
+ *
+ *  KNOWN LIMIT, ACCEPTED (fix round 1, LOW 3): the injury/availability word need only appear
+ *  ANYWHERE in the text, not in the same sentence as "floor" — a capsule could in principle say
+ *  "floor of 91" in one sentence and mention an unrelated injury elsewhere and still clear this
+ *  check. Tightening to same-sentence proximity is a real improvement but a low-value one against
+ *  the actual failure mode this exists to catch (a bare, unexplained floor claim with NO injury
+ *  language anywhere), so it is left as a document limitation rather than built. */
 function hasUnframedFloorClaim(text: string): boolean {
   if (!/\bfloor\b/i.test(text)) return false;
   return !/injur|missed time|games missed|availability/i.test(text);
@@ -95,6 +165,25 @@ function strongestNegativeLawEffect(facts: PlayerFacts): number | null {
     .filter((item) => Math.abs(item.netEffectPoints) >= CAPSULE_CONFIG.tensionThresholdPoints);
   if (negatives.length === 0) return null;
   return negatives.reduce((strongest, item) => (Math.abs(item.netEffectPoints) > Math.abs(strongest) ? item.netEffectPoints : strongest), negatives[0]!.netEffectPoints);
+}
+
+/** A cost-cue word — "this costs him 1.8 a game", "down 1.8 a game", "shaves 1.8 off his ceiling".
+ *  Naive sentence split on `.`/`!`/`?` — good enough to scope the unsigned-magnitude allowance
+ *  (below) to the SAME clause the cue word appears in, rather than the whole capsule. */
+const COST_CUE_PATTERN = /\b(costs?|minus|down|shaves?)\b/i;
+
+function splitSentences(text: string): readonly string[] {
+  return text.split(/(?<=[.!?])\s+/).filter((sentence) => sentence.trim() !== "");
+}
+
+/** Fix round 1, LOW 2 — a signed citation ("-1.8") always satisfies the tension mandate; an
+ *  UNSIGNED one ("1.8") also satisfies it, but ONLY in a sentence that also carries an explicit
+ *  cost-cue word, since "he averaged 1.8 yards" and "this costs him 1.8 a game" read very
+ *  differently and only the second is an honest hesitation about the SAME downside. */
+function citesTensionNumber(text: string, requiredTension: number): boolean {
+  if (extractNumbers(text).some(({ value }) => isDerivedFromLedger(value, [requiredTension]))) return true;
+  const magnitude = Math.abs(requiredTension);
+  return splitSentences(text).some((sentence) => COST_CUE_PATTERN.test(sentence) && extractNumbers(sentence).some(({ value }) => isDerivedFromLedger(Math.abs(value), [magnitude])));
 }
 
 /**
@@ -143,14 +232,14 @@ export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleS
   }
 
   for (const phrase of extractProperNamePhrases(trimmed)) {
-    const grounded = facts.nameLedger.some((name) => phrase.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(phrase.toLowerCase()));
-    if (!grounded) violations.push(`The name "${phrase}" does not trace to any supplied fact.`);
+    if (!isNameGrounded(phrase, facts.nameLedger)) {
+      violations.push(`The name "${phrase}" does not trace to any supplied fact.`);
+    }
   }
 
   const requiredTension = strongestNegativeLawEffect(facts);
-  if (requiredTension !== null) {
-    const cited = extractNumbers(trimmed).some(({ value }) => isDerivedFromLedger(value, [requiredTension]));
-    if (!cited) violations.push(`Mixed evidence: the strongest downside (${requiredTension} pts/game) must be cited as an honest hesitation before the call.`);
+  if (requiredTension !== null && !citesTensionNumber(trimmed, requiredTension)) {
+    violations.push(`Mixed evidence: the strongest downside (${requiredTension} pts/game) must be cited as an honest hesitation before the call.`);
   }
 
   return { ok: violations.length === 0, violations };

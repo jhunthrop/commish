@@ -113,17 +113,25 @@ function seasonLine(facts: PlayerFacts): string {
     `${t.touchdowns} touchdowns`,
     `${t.fantasyPoints} fantasy points`,
   ];
-  return `Season so far (${season.season}): ${season.gamesPlayed} games, ${season.pointsPerGame} points per game. Totals: ${parts.join(", ")}.`;
+  const gameWord = season.gamesPlayed === 1 ? "game" : "games";
+  return `Season so far (${season.season}): ${season.gamesPlayed} ${gameWord}, ${season.pointsPerGame} points per game. Totals: ${parts.join(", ")}.`;
 }
 
 function byeLine(facts: PlayerFacts): string {
   return facts.byeWeek === null ? "Bye week not yet set." : `Bye: week ${facts.byeWeek}.`;
 }
 
+/** THE TRI-STATE READ (fix round 1, CRITICAL 2) — "clean" and "unknown" must never render the
+ *  same sentence: a snapshot that genuinely checked and found nothing carries a dated "measured
+ *  clean" claim (with its own as-of date, so the model never states health as a timeless fact);
+ *  "unknown" (no snapshot has ever been read) says exactly that and nothing more — never the
+ *  healthy claim, which would be a fabrication the moment a real designation was simply never
+ *  captured yet. */
 function injuryLine(facts: PlayerFacts): string {
-  if (facts.injuryDesignation === null) return "Injury report: no designation. The feed lists him healthy.";
-  const asOf = facts.injuryAsOf === null ? "" : ` (as of ${facts.injuryAsOf.slice(0, 10)})`;
-  return `Injury report: designation ${facts.injuryDesignation}${asOf}.`;
+  const injury = facts.injury;
+  if (injury.state === "designated") return `Injury report: designation ${injury.designation} as of ${injury.asOf.slice(0, 10)}.`;
+  if (injury.state === "clean") return `Injury report: checked as of ${injury.asOf.slice(0, 10)} and no designation was on file that day.`;
+  return "Injury report: no injury feed has been checked for him yet. This is not a health claim either way.";
 }
 
 function newsLines(facts: PlayerFacts): readonly string[] {

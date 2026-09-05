@@ -39,8 +39,7 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
       pointsPerGame: 18.4,
       totals: { carries: 42, rushingYards: 210, targets: 9, receptions: 7, receivingYards: 55, passingYards: 0, touchdowns: 3, fantasyPoints: 55.2 },
     },
-    injuryDesignation: "Q",
-    injuryAsOf: "2026-09-01T00:00:00.000Z",
+    injury: { state: "designated", designation: "Q", asOf: "2026-09-01T00:00:00.000Z" },
     news: [{ title: "Rashad Long: limited in practice", link: "https://example.com/1", publishedAt: "2026-09-02T00:00:00.000Z" }],
     ...overrides,
   };
@@ -87,6 +86,26 @@ describe("renderFactsForModel", () => {
     expect(rendered).toContain("Most seasons land between");
     expect(rendered).toContain("The full tails run 178 to 275");
     expect(rendered).toContain("injury seasons, not a talent read");
+  });
+
+  it("carries the designated state with its own as-of date", () => {
+    const facts = buildPlayerFacts(baseInput({ injury: { state: "designated", designation: "Q", asOf: "2026-09-01T00:00:00.000Z" } }));
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).toContain("designation Q as of 2026-09-01");
+  });
+
+  it("carries a genuinely clean read as a DATED claim, never a timeless health statement", () => {
+    const facts = buildPlayerFacts(baseInput({ injury: { state: "clean", asOf: "2026-09-01T00:00:00.000Z" } }));
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).toContain("checked as of 2026-09-01");
+    expect(rendered).toContain("no designation was on file that day");
+  });
+
+  it("fix round 1 CRITICAL 2: never states a healthy claim when no injury snapshot has ever been read", () => {
+    const facts = buildPlayerFacts(baseInput({ injury: { state: "unknown" } }));
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).toContain("no injury feed has been checked for him yet");
+    expect(rendered).not.toMatch(/healthy|no designation was on file/i);
   });
 
   it("is deterministic for identical facts", () => {

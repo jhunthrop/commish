@@ -105,6 +105,13 @@ export interface PlayerFactsSeasonSummary {
   readonly totals: PlayerFactsSeasonTotals;
 }
 
+/** THE THREE HONEST STATES an injury read can be in — see `PlayerFacts.injury`'s own docblock
+ *  (fix round 1, CRITICAL 2) for why a nullable string could not tell two of them apart. */
+export type PlayerFactsInjuryStatus =
+  | { readonly state: "designated"; readonly designation: string; readonly asOf: string }
+  | { readonly state: "clean"; readonly asOf: string }
+  | { readonly state: "unknown" };
+
 export interface PlayerFactsNewsItem {
   readonly title: string;
   readonly link: string;
@@ -130,10 +137,18 @@ export interface PlayerFacts {
    *  preseason state, never a fabricated zero. */
   readonly season: PlayerFactsSeasonSummary | null;
   readonly byeWeek: number | null;
-  readonly injuryDesignation: string | null;
-  /** When the injury snapshot naming him was captured; `null` exactly when `injuryDesignation`
-   *  is `null`. */
-  readonly injuryAsOf: string | null;
+  /**
+   * A TRI-STATE, not a nullable string (fix round 1, CRITICAL 2). The prior shape (`string | null`
+   * for the designation, paired with an `asOf` that was ALSO `null` whenever there was no
+   * designation) rendered a genuinely clean read identically to "no injury feed has ever been
+   * read at all" — a real, dangerous conflation: a player the sweep ran before any injury
+   * snapshot existed would read exactly like a player a fresh snapshot just cleared. `"unknown"`
+   * is now its own state, distinct from `"clean"` (a snapshot exists and does not name him — a
+   * dated, honest "healthy as of X") and `"designated"` (a snapshot names him, with what and as
+   * of when). `render.ts`/`template.ts` both read this directly and never say a bare "healthy"
+   * sentence for `"unknown"`.
+   */
+  readonly injury: PlayerFactsInjuryStatus;
   /** Newest first, at most three — see `collect.ts`'s `newsForPlayers`. */
   readonly news: readonly PlayerFactsNewsItem[];
   /** Every number the validator will accept in a capsule's own prose, in this object's own
@@ -172,8 +187,7 @@ export interface PlayerFactsInput {
   readonly projection: { readonly projectedPoints: number; readonly floorPoints: number; readonly medianPoints: number; readonly ceilingPoints: number };
   readonly byeWeek: number | null;
   readonly season: PlayerFactsSeasonSummary | null;
-  readonly injuryDesignation: string | null;
-  readonly injuryAsOf: string | null;
+  readonly injury: PlayerFactsInjuryStatus;
   readonly news: readonly PlayerFactsNewsItem[];
 }
 
@@ -347,8 +361,7 @@ function computeFactsHash(content: Omit<PlayerFacts, "numberLedger" | "nameLedge
     availability: content.availability,
     season: content.season,
     byeWeek: content.byeWeek,
-    injuryDesignation: content.injuryDesignation,
-    injuryAsOf: content.injuryAsOf,
+    injury: content.injury,
     news: content.news,
   };
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
@@ -368,8 +381,7 @@ export function buildPlayerFacts(input: PlayerFactsInput): PlayerFacts {
     availability: availabilityFrom(input.reasons),
     season: input.season,
     byeWeek: input.byeWeek,
-    injuryDesignation: input.injuryDesignation,
-    injuryAsOf: input.injuryAsOf,
+    injury: input.injury,
     news: input.news,
   };
   return {

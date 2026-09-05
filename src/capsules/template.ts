@@ -9,7 +9,7 @@ import type { PlayerFacts } from "./facts";
  * length band a template was never trying to hit.
  */
 export function renderTemplateCapsule(facts: PlayerFacts): string {
-  const { identity, market, projection, availability, season, byeWeek, injuryDesignation } = facts;
+  const { identity, market, projection, availability, season, byeWeek, injury } = facts;
   const sentences: string[] = [
     `${identity.name} (${identity.position}, ${identity.team}) is ranked ${market.boardRank} overall on our board, projected for ${projection.projectedPoints} points this season.`,
     `Most seasons land between ${Math.round(projection.typicalLow)} and ${Math.round(projection.typicalHigh)}; the full range (injury seasons on the low end, smash seasons on the high end) runs ${Math.round(projection.floorPoints)} to ${Math.round(projection.ceilingPoints)}.`,
@@ -31,12 +31,17 @@ export function renderTemplateCapsule(facts: PlayerFacts): string {
   }
 
   if (season !== null) {
-    sentences.push(`Through ${season.gamesPlayed} games this season he is averaging ${season.pointsPerGame} points a game.`);
+    const gameWord = season.gamesPlayed === 1 ? "game" : "games";
+    sentences.push(`Through ${season.gamesPlayed} ${gameWord} this season he is averaging ${season.pointsPerGame} points a game.`);
   }
 
   if (byeWeek !== null) sentences.push(`His bye is week ${byeWeek}.`);
 
-  sentences.push(injuryDesignation === null ? "The injury report lists no designation for him." : `The injury report lists him as ${injuryDesignation}.`);
+  // THE TRI-STATE READ (fix round 1, CRITICAL 2) — "clean" and "unknown" never share a sentence:
+  // an "unknown" read must never claim health, since no snapshot has actually checked.
+  if (injury.state === "designated") sentences.push(`The injury report lists him as ${injury.designation} as of ${injury.asOf.slice(0, 10)}.`);
+  else if (injury.state === "clean") sentences.push(`The injury report showed no designation for him as of ${injury.asOf.slice(0, 10)}.`);
+  else sentences.push("No injury feed has been checked for him yet.");
 
   return sentences.join(" ");
 }

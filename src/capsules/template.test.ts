@@ -27,8 +27,7 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
     projection: { projectedPoints: 248, floorPoints: 178, medianPoints: 240, ceilingPoints: 275 },
     byeWeek: 9,
     season: null,
-    injuryDesignation: null,
-    injuryAsOf: null,
+    injury: { state: "unknown" },
     news: [],
     ...overrides,
   };
@@ -40,7 +39,7 @@ describe("renderTemplateCapsule", () => {
     expect(renderTemplateCapsule(facts)).toBe(renderTemplateCapsule(facts));
   });
 
-  it("states only facts already on the sheet: board rank, projection, market, strongest law, availability, injury", () => {
+  it("states only facts already on the sheet: board rank, projection, market, strongest law, availability, and an honest 'never checked' injury read", () => {
     const facts = buildPlayerFacts(baseInput());
     const text = renderTemplateCapsule(facts);
     expect(text).toContain("Rashad Long (RB, SF)");
@@ -51,7 +50,16 @@ describe("renderTemplateCapsule", () => {
     expect(text).toContain("-1.8 points a game");
     expect(text).toContain("15 games");
     expect(text).toContain("bye is week 9");
-    expect(text).toContain("no designation");
+    // THE TRI-STATE (fix round 1, CRITICAL 2): the fixture's default injury state is "unknown"
+    // (no snapshot has ever run) — this must NEVER read as a healthy claim.
+    expect(text).toContain("No injury feed has been checked for him yet.");
+  });
+
+  it("states a genuinely clean read, dated, distinct from 'never checked'", () => {
+    const facts = buildPlayerFacts(baseInput({ injury: { state: "clean", asOf: "2026-09-01T00:00:00.000Z" } }));
+    const text = renderTemplateCapsule(facts);
+    expect(text).toContain("showed no designation for him as of 2026-09-01");
+    expect(text).not.toContain("never been checked");
   });
 
   it("states an unpriced market honestly rather than a fabricated ADP", () => {
@@ -61,7 +69,7 @@ describe("renderTemplateCapsule", () => {
   });
 
   it("states the real injury designation when present", () => {
-    const facts = buildPlayerFacts(baseInput({ injuryDesignation: "Q", injuryAsOf: "2026-09-01T00:00:00.000Z" }));
+    const facts = buildPlayerFacts(baseInput({ injury: { state: "designated", designation: "Q", asOf: "2026-09-01T00:00:00.000Z" } }));
     const text = renderTemplateCapsule(facts);
     expect(text).toContain("lists him as Q");
   });

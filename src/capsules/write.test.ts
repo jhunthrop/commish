@@ -12,8 +12,7 @@ function baseInput(): PlayerFactsInput {
     projection: { projectedPoints: 248, floorPoints: 178, medianPoints: 240, ceilingPoints: 275 },
     byeWeek: 9,
     season: null,
-    injuryDesignation: null,
-    injuryAsOf: null,
+    injury: { state: "unknown" },
     news: [],
   };
 }

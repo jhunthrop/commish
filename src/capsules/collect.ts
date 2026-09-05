@@ -5,7 +5,7 @@ import type { Position, StatLine } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
 import { boardRows, type BoardOptions, type BoardRow } from "@/draft-hq/board/service";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { injurySnapshot } from "@/league-service/injuries";
+import { injurySnapshot, type InjurySnapshot } from "@/league-service/injuries";
 import { newsForPlayers, type NewsStory } from "@/league-service/news";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
@@ -98,14 +98,26 @@ async function currentSeasonSummaries(db: Db, playerIds: readonly string[], posi
   return summaries;
 }
 
+/** THE TRI-STATE READ (fix round 1, CRITICAL 2) — `injuries.capturedAt` is the read-PRESENCE
+ *  signal: `null` means no snapshot has EVER been captured (`"unknown"`, never a healthy claim);
+ *  a real capture instant with no designation for this player is a genuine, dated "clean" read;
+ *  a real capture instant that DOES name him is `"designated"`. Collapsing "clean" and "unknown"
+ *  into one nullable string (the prior shape) rendered "never checked" identically to "checked
+ *  and healthy" — a real conflation `facts.ts`'s own `PlayerFactsInjuryStatus` docblock covers. */
+function injuryStatusFor(playerId: string, injuries: InjurySnapshot): PlayerFactsInput["injury"] {
+  if (injuries.capturedAt === null) return { state: "unknown" };
+  const asOf = injuries.capturedAt.toISOString();
+  const designation = injuries.designations.get(playerId);
+  return designation === undefined ? { state: "clean", asOf } : { state: "designated", designation, asOf };
+}
+
 function factsInputFor(
   row: BoardRow,
   season: PlayerFactsSeasonSummary | undefined,
-  injuries: { readonly capturedAt: Date | null; readonly designations: ReadonlyMap<string, string> },
+  injuries: InjurySnapshot,
   news: ReadonlyMap<string, readonly NewsStory[]>,
   laws: PlayerFactsInput["laws"],
 ): PlayerFactsInput {
-  const injuryDesignation = injuries.designations.get(row.playerId) ?? null;
   return {
     identity: { id: row.playerId, name: row.name, position: row.position, team: row.team },
     productSeason: PRODUCT_SEASON,
@@ -115,8 +127,7 @@ function factsInputFor(
     projection: { projectedPoints: row.projectedPoints, floorPoints: row.floorPoints, medianPoints: row.medianPoints, ceilingPoints: row.ceilingPoints },
     byeWeek: row.byeWeek,
     season: season ?? null,
-    injuryDesignation,
-    injuryAsOf: injuryDesignation === null ? null : injuries.capturedAt?.toISOString() ?? null,
+    injury: injuryStatusFor(row.playerId, injuries),
     news: news.get(row.name) ?? [],
   };
 }

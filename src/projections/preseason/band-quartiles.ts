@@ -15,10 +15,6 @@
  * Guards: a degenerate band (floor = ceiling, a distribution the store pinned to a point)
  * returns the median for both quartiles; inputs that violate floor <= median <= ceiling throw,
  * because a band that disagrees with its own median is corrupt data, not a display question.
- *
- * COPIED FROM `origin/main` (2026-09-04, read via `git show`, never merged into this branch —
- * this implementation task's own hard rule is "never merge, never push"). Verbatim, so a later
- * merge of this branch reconciles as a no-op on this file rather than a conflict.
  */
 
 const Z_90 = 1.2816;
