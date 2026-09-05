@@ -70,6 +70,15 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
     catchUpMs: 5 * 60_000,
   }),
   schedule({
+    name: "capture-harvest-nightly",
+    cron: "0 2 * * *",
+    timezone: "America/New_York",
+    job: "capture-harvest",
+    payload: {},
+    description:
+      "Nightly 02:00 ET capture of injuries, news, depth charts, inactives and betting odds into the append-only capture_snapshots archive that player cards and capsules read facts from. Ahead of the 03:00/03:30/04:00 ET passes below so their inputs are fresh.",
+  }),
+  schedule({
     name: "adp-snapshot-nightly",
     cron: "0 3 * * *",
     timezone: "America/New_York",
