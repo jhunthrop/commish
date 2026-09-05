@@ -213,3 +213,23 @@ export function valueBoard(projections: readonly SeasonProjection[], shape: Leag
     (a, b) => b.valueOverReplacement - a.valueOverReplacement || a.playerId.localeCompare(b.playerId),
   );
 }
+
+/** `valueBoard`'s own sorted output, plus the same entries indexed by player id. */
+export interface ValuedBoard {
+  /** `valueBoard`'s sorted array, unchanged — a caller that needs RANK (index in this order) as
+   *  well as a by-id lookup would otherwise have to rebuild it from a map's insertion order. */
+  readonly sorted: readonly ValuedPlayer[];
+  readonly byPlayerId: ReadonlyMap<string, ValuedPlayer>;
+}
+
+/**
+ * `valueBoard`, indexed by player id — the one small piece of wiring every league-aware valuation
+ * reader repeats: run the valuation once, then look a specific player up by id without re-scanning
+ * the array. `@/draft-hq/board/service.ts`'s `boardRows` (the Board's own read of this valuation)
+ * and `@/draft-service/assistant/call.ts`'s `valuedEvidence` (the live Assistant's) both need
+ * exactly this — one shared helper here rather than each hand-rolling the same `new Map(...)`.
+ */
+export function valueBoardIndexed(projections: readonly SeasonProjection[], shape: LeagueShape): ValuedBoard {
+  const sorted = valueBoard(projections, shape);
+  return { sorted, byPlayerId: new Map(sorted.map((entry) => [entry.playerId, entry] as const)) };
+}

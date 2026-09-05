@@ -13,14 +13,17 @@
  * Assistant has nothing to say to either — there is no seat's turn to advise — so one guard
  * answers both, exactly as this function's own contract states.
  *
- * VALUATION, COMPUTED ONCE OVER THE WHOLE EVIDENCE POOL. `valueBoard` runs once against every
- * player `evidencePoolFor` returns (drafted and undrafted alike) — the identical population
- * `@/draft-hq/board/service.ts`'s `boardRows` values the Board from, and the identical pattern
- * `@/projections/decide/replay.ts`'s own harness uses (one `valueBoard` call up front, `board`
- * re-filtered to what remains undrafted at each turn). This is what lets a ROSTERED player's own
- * `valueOverReplacement` (`RosteredPlayer`'s docblock: required, never defaulted) be computed at
- * all — a player already off the board cannot be re-valued from a population that excludes him.
- * `RecommendationQuery.board` itself is then every UNDRAFTED entry of that one valuation.
+ * VALUATION, COMPUTED ONCE OVER THE WHOLE EVIDENCE POOL, THROUGH ONE SHARED HELPER.
+ * `valueBoardIndexed` (`@/projections/decide/replacement.ts`) runs once against every player
+ * `evidencePoolFor` returns (drafted and undrafted alike) — the identical population
+ * `@/draft-hq/board/service.ts`'s `boardRows` values the Board from (both now read their own
+ * valuation through this one helper, rather than each hand-rolling `new Map(valueBoard(...))`),
+ * and the identical PATTERN `@/projections/decide/replay.ts`'s own harness uses (one valuation
+ * call up front, `board` re-filtered to what remains undrafted at each turn). This is what lets a
+ * ROSTERED player's own `valueOverReplacement` (`RosteredPlayer`'s docblock: required, never
+ * defaulted) be computed at all — a player already off the board cannot be re-valued from a
+ * population that excludes him. `RecommendationQuery.board` itself is then every UNDRAFTED entry
+ * of that one valuation.
  *
  * SEEDING. `${draftId}:${pickNumber}` hashed the same way `sim/store.ts`'s `hashSimConfig` hashes
  * a config — a small local helper rather than a shared one, because this hash's input shape
@@ -41,7 +44,7 @@ import type { Position } from "@/domain/player";
 import { draftedPlayerIds, snakeTeamForPick, teamOnClock, totalPickCount, totalRosterSlots, type DraftState } from "@/draft-engine";
 import { getDraftStore, resolveDraftActor } from "@/draft-service";
 import { recommendPick, type PickReason, type Recommendation, type RosteredPlayer } from "@/projections/decide/draft";
-import { valueBoard, type LeagueShape, type ValuedPlayer } from "@/projections/decide/replacement";
+import { valueBoardIndexed, type LeagueShape, type ValuedPlayer } from "@/projections/decide/replacement";
 import { classifyBuild, type BuildLabel, type ClassifiablePick } from "../sim/classify";
 import { evidencePoolFor } from "../sim/evidence";
 import { makeItBackOdds, type MakeItBackOdds } from "../sim/make-it-back";
@@ -78,14 +81,16 @@ function seedFor(draftId: string, pickNumber: number): number {
   return parseInt(hex, 16);
 }
 
-/** Every evidence player, valued once under `shape` — see the module docblock. `averageDraftPosition`
- *  is the market's own rank when the ADP feed carries one, falling back to the evidence board's own
- *  rank otherwise (the identical fallback `sim/board-order.ts`'s `baseBlendRank` already uses): "any
+/** Every evidence player, valued once under `shape` through the SAME `valueBoardIndexed` wiring
+ *  `@/draft-hq/board/service.ts`'s `boardRows` reads its own valuation through — one shared helper
+ *  rather than two hand-rolled `new Map(valueBoard(...).map(...))`s. `averageDraftPosition` is the
+ *  market's own rank when the ADP feed carries one, falling back to the evidence board's own rank
+ *  otherwise (the identical fallback `sim/board-order.ts`'s `baseBlendRank` already uses): "any
  *  consistent market will do" is `BoardEntry`'s own docblock, and a rank is a consistent market. */
 function valuedEvidence(pool: readonly SimPlayerEvidence[], shape: LeagueShape): ReadonlyMap<string, ValuedEntry> {
-  const valued = valueBoard(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
+  const { byPlayerId } = valueBoardIndexed(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
   const marketByPlayerId = new Map(pool.map((entry) => [entry.playerId, entry.marketRank ?? entry.evidenceRank] as const));
-  return new Map(valued.map((entry) => [entry.playerId, { ...entry, averageDraftPosition: marketByPlayerId.get(entry.playerId)! }]));
+  return new Map([...byPlayerId].map(([playerId, entry]) => [playerId, { ...entry, averageDraftPosition: marketByPlayerId.get(playerId)! }]));
 }
 
 interface AskingWindow {

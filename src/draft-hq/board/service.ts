@@ -3,7 +3,7 @@ import type { Db } from "@/db/client";
 import { players as playersTable, playerCrosswalk } from "@/db/schema";
 import type { Position } from "@/domain/player";
 import type { LeagueShape } from "@/projections/decide/replacement";
-import { valueBoard } from "@/projections/decide/replacement";
+import { valueBoardIndexed } from "@/projections/decide/replacement";
 import { tiersOf } from "@/projections/decide/tiers";
 import type { BoardReason } from "@/projections/preseason/board";
 import { BOARD_SOURCE, boardReasons, preseasonProjectionsAsOf } from "@/projections/preseason/board-store";
@@ -126,12 +126,11 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
     return identity === undefined ? [] : [{ row, identity }];
   });
 
-  const valued = valueBoard(
+  const { sorted: valued, byPlayerId: valuedByPlayer } = valueBoardIndexed(
     withPosition.map(({ row, identity }) => ({ playerId: row.playerId, position: identity.position, projectedPoints: row.projectedPoints })),
     shape,
   );
   const valueRanks = new Map(valued.map((entry, index) => [entry.playerId, index + 1] as const));
-  const valuedByPlayer = new Map(valued.map((entry) => [entry.playerId, entry] as const));
 
   const standingsByPlayer = new Map<string, { readonly tier: number; readonly playersLeftInTier: number; readonly dropToNextTier: number }>();
   const positions = new Set(valued.map((entry) => entry.position));
