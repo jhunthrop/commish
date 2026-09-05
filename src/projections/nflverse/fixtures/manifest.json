@@ -32,6 +32,12 @@
       "release": "draft_picks",
       "asset": "draft_picks.csv",
       "filtered": "season=2020, position in QB/RB/WR/TE. One whole skill-position draft class (78 picks, rounds 1-7) rather than a handful of hand-picked rows, because the curve fit reads pick-to-pick spacing and a thin hand-written table would test our understanding of the shape rather than the shape itself. Keeps two real Cole McDonald rows (round 7, pick 224, blank gsis_id) exactly as the release publishes them — a round-seven quarterback pfr never assigned an NFL id — which is the real case `mapDraftPicks` drops rather than a synthetic one."
+    },
+    {
+      "file": "injuries_2024_buf_w1-3.csv",
+      "release": "injuries",
+      "asset": "injuries_2024.csv",
+      "filtered": "season=2024, game_type=REG, week in 1..3, team=BUF. Real rows, byte-for-byte: a player listed with practice information but no game-status designation yet (Cole Bishop, week 1 — the empty `report_status` the archive stores verbatim rather than coalescing to a guess), the full Out/Doubtful/Questionable spread (Javon Solomon's oblique moves Out -> Doubtful -> healthy across the three weeks), and Josh Allen himself carrying a practice-only hand note in weeks 2-3 while never missing a game — the ordinary case of being on the report at all without it costing him a start."
     }
   ]
 }

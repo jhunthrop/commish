@@ -1,0 +1,23 @@
+season,game_type,team,week,gsis_id,position,full_name,first_name,last_name,report_primary_injury,report_secondary_injury,report_status,practice_primary_injury,practice_secondary_injury,practice_status,date_modified
+2024,REG,BUF,1,00-0039872,S,Cole Bishop,Cole,Bishop,,,,Shoulder,,Full Participation in Practice,2024-09-07T20:07:55Z
+2024,REG,BUF,1,00-0036590,TE,Quintin Morris,Quintin,Morris,,,,Shoulder,,Full Participation in Practice,2024-09-07T20:07:55Z
+2024,REG,BUF,1,00-0033282,WR,Curtis Samuel,Curtis,Samuel,,,,Toe,,Full Participation in Practice,2024-09-07T20:07:55Z
+2024,REG,BUF,1,00-0033869,QB,Mitchell Trubisky,Mitchell,Trubisky,,,,Knee,,Full Participation in Practice,2024-09-07T20:07:55Z
+2024,REG,BUF,1,00-0039879,DE,Javon Solomon,Javon,Solomon,Oblique,,Out,Oblique,,Did Not Participate In Practice,2024-09-06T19:35:04Z
+2024,REG,BUF,1,00-0033907,DE,Dawuane Smoot,Dawuane,Smoot,Toe,,Questionable,Toe,,Did Not Participate In Practice,2024-09-06T19:35:24Z
+2024,REG,BUF,2,00-0034857,QB,Josh Allen,Josh,Allen,,,,Left Hand,,Full Participation in Practice,2024-09-11T15:19:40Z
+2024,REG,BUF,2,00-0035537,RB,Ty Johnson,Ty,Johnson,,,,Knee,,Full Participation in Practice,2024-09-11T15:19:49Z
+2024,REG,BUF,2,00-0036590,TE,Quintin Morris,Quintin,Morris,,,,Shoulder,,Full Participation in Practice,2024-09-11T15:19:40Z
+2024,REG,BUF,2,00-0033869,QB,Mitchell Trubisky,Mitchell,Trubisky,,,,Knee,,Full Participation in Practice,2024-09-11T15:19:40Z
+2024,REG,BUF,2,00-0034376,CB,Taron Johnson,Taron,Johnson,Forearm,,Out,Forearm,,Did Not Participate In Practice,2024-09-11T15:20:31Z
+2024,REG,BUF,2,00-0033907,DE,Dawuane Smoot,Dawuane,Smoot,Toe,,Out,Toe,,Did Not Participate In Practice,2024-09-11T15:20:36Z
+2024,REG,BUF,2,00-0039879,DE,Javon Solomon,Javon,Solomon,Oblique,,Doubtful,Oblique,,Limited Participation in Practice,2024-09-11T15:20:25Z
+2024,REG,BUF,3,00-0034857,QB,Josh Allen,Josh,Allen,,,,Left Hand,,Full Participation in Practice,2024-09-21T17:36:46Z
+2024,REG,BUF,3,00-0035537,RB,Ty Johnson,Ty,Johnson,,,,Knee,,Full Participation in Practice,2024-09-21T17:36:46Z
+2024,REG,BUF,3,00-0036590,TE,Quintin Morris,Quintin,Morris,,,,Shoulder,,Full Participation in Practice,2024-09-21T17:36:46Z
+2024,REG,BUF,3,00-0033907,DE,Dawuane Smoot,Dawuane,Smoot,,,,Toe,,Full Participation in Practice,2024-09-21T17:36:55Z
+2024,REG,BUF,3,00-0039879,DE,Javon Solomon,Javon,Solomon,,,,Oblique,,Full Participation in Practice,2024-09-21T17:37:02Z
+2024,REG,BUF,3,00-0036403,DE,Casey Toohill,Casey,Toohill,,,,Knee,,Full Participation in Practice,2024-09-21T17:36:46Z
+2024,REG,BUF,3,00-0033869,QB,Mitchell Trubisky,Mitchell,Trubisky,,,,Knee,,Full Participation in Practice,2024-09-21T17:36:46Z
+2024,REG,BUF,3,00-0037254,LB,Terrel Bernard,Terrel,Bernard,Pectoral,,Out,Pectoral,,Did Not Participate In Practice,2024-09-21T17:38:02Z
+2024,REG,BUF,3,00-0034376,CB,Taron Johnson,Taron,Johnson,Forearm,,Out,Forearm,,Did Not Participate In Practice,2024-09-21T17:38:08Z
