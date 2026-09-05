@@ -231,4 +231,5 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   league_dissolved: { leagueName: "Sunday Money", refundedCents: 20_00 },
   prize_paid: { leagueName: "Sunday Money", place: 1, amountCents: 44_00 },
   payout_released: { amountCents: 44_00 },
+  draft_grades_ready: { leagueName: "Sunday Money" },
 };

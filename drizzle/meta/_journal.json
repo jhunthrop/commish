@@ -519,6 +519,13 @@
       "when": 1788578848451,
       "tag": "0073_flimsy_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1788640260115,
+      "tag": "0074_first_apocalypse",
+      "breakpoints": true
     }
   ]
 }

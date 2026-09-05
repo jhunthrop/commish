@@ -377,6 +377,22 @@ export interface NoticeContexts {
   readonly payout_released: {
     readonly amountCents: number;
   };
+  /**
+   * `draft-grades-job.ts`'s own notice (Task 9, spec §9) — sent to every SEATED member of a REAL
+   * league once its draft's grades are written (`draft_grades`, one row per team). A mock draft
+   * never reaches this at all: `store.ts` enqueues the writing job only for a `!isMock`
+   * completion (ruling 3). Gated by `leagues.draft_grades_visible` at the JOB, not by this
+   * template — an opted-out league still gets its rows written, it simply never sends this
+   * notice, so a commissioner who flips the toggle back on finds last draft's grades already
+   * there. `leagueName` rides along for the audit context even though the TEMPLATE below leaves
+   * it unused (`house_league_filled`'s own docblock states the same reasoning): which specific
+   * league just graded is a fact the member already sees on the league home they are standing
+   * in. No "no reply to this message" line: this is not a sanction, and there is nothing about
+   * any member's own conduct to appeal — it is one league's own draft finishing.
+   */
+  readonly draft_grades_ready: {
+    readonly leagueName: string;
+  };
 }
 
 /**
@@ -628,6 +644,16 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   payout_released: ({ amountCents }) => ({
     title: `${formatUsd(amountCents)} is in your wallet`,
     body: `${formatUsd(amountCents)} in winnings is in your wallet.`,
+  }),
+  // `leagueName` is carried on the row for the record (`NOTICE_SAMPLES`'s own precedent, and
+  // `house_league_filled`'s docblock above states the same reasoning) but deliberately unused
+  // HERE: the brief's own sentence names no league, on the same "which specific league is a fact
+  // the member already sees on the room they are standing in" reasoning `house_league_filled`
+  // states in full. No "no reply to this message" line: this is not a sanction, and there is
+  // nothing about any member's own conduct to appeal.
+  draft_grades_ready: () => ({
+    title: "Your draft grades are ready",
+    body: "Draft grades are up on your league home. Every grade shows its work.",
   }),
 };
 

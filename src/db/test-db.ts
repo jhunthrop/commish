@@ -46,7 +46,7 @@ export async function truncateAll(db: Db): Promise<void> {
       draft_sheet_entries, draft_sheets,
       sim_runs, adp_snapshots, player_capsules,
       nfl_players, player_stat_lines, players, stat_weeks, nfl_games, capture_snapshots,
-      matchups, weeks, draft_picks, draft_nudges, draft_slot_preferences, draft_actions, drafts,
+      matchups, weeks, draft_grades, draft_picks, draft_nudges, draft_slot_preferences, draft_actions, drafts,
       lineup_slots, roster_slots, league_invites,
       scoring_settings, trade_proposals, teams, leagues, user_preferences, member_notices, users
     RESTART IDENTITY CASCADE

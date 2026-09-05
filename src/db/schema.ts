@@ -19,6 +19,7 @@ import {
 import { sql } from "drizzle-orm";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { AUDIT_EVENT_TYPES, type JsonObject } from "@/domain/audit";
+import type { GradeComponents } from "@/draft-service/grades/engine";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { MONEY_ACCOUNT_KINDS } from "@/money/accounts";
 import type { MoneyPostingDirection } from "@/money/posting";
@@ -46,6 +47,10 @@ export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress
  * together, in the one migration file, even though Task 7's own read/write code lands later).
  */
 export const draftStartTriggerEnum = pgEnum("draft_start_trigger", ["scheduled", "when_full"]);
+/** `TeamGrade.letter`'s own closed vocabulary (`@/draft-service/grades/engine`) — no `F`, by that
+ *  module's own quartile rule: the bottom quartile already carries the worst word the copy law
+ *  allows. */
+export const draftGradeLetterEnum = pgEnum("draft_grade_letter", ["A", "B", "C", "D"]);
 export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "TE", "K", "DEF"]);
 export const weekStatusEnum = pgEnum("week_status", ["scheduled", "in_progress", "final"]);
 export const helpLevelEnum = pgEnum("help_level", ["guided", "standard"]);
@@ -314,6 +319,15 @@ export const leagues = pgTable(
      * leagues.
      */
     isMock: boolean("is_mock").notNull().default(false),
+    /**
+     * Task 9 (Draft HQ, spec §9): the per-league opt-out for the `draft_grades_ready` notice
+     * (ruling 3) — `draft-grades-job.ts` still WRITES every team's `draft_grades` row regardless
+     * of this flag (a commissioner who flips it back on later should not find last draft's
+     * grades missing), it only gates whether the job tells anyone. `true` by default: every
+     * league before this column existed, and every league a commissioner creates today, keeps
+     * getting told when its draft's grades are ready unless it opts out.
+     */
+    draftGradesVisible: boolean("draft_grades_visible").notNull().default(true),
   },
   (t) => [
     /**
@@ -821,6 +835,56 @@ export const draftPicks = pgTable(
   (t) => [
     primaryKey({ columns: [t.draftId, t.pickNumber] }),
     uniqueIndex("draft_picks_draft_player_idx").on(t.draftId, t.playerId),
+  ],
+);
+
+/**
+ * THE STORED GRADE (Task 9, spec §9) — one row per team per REAL completed draft, written once by
+ * `draft-grades-job.ts` at draft completion (`src/draft-service/store.ts`'s post-commit block,
+ * beside `sweepQuietly`). A mock draft never reaches this table: `store.ts` enqueues the writing
+ * job only for a `!isMock` completion, so `draftId` here always names a draft whose league is a
+ * real one — Task 11's mock debrief calls the same pure `gradeDraft` engine at READ time instead,
+ * and stores nothing.
+ *
+ * `letter`/`components`/`projectedRank` are exactly `TeamGrade`'s own three facts
+ * (`@/draft-service/grades/engine`), stored rather than recomputed on every read: a real draft's
+ * picks and rosters never change once committed, so the grade is a fact about a fixed history,
+ * not a live computation. `boardGeneration` is the evidence board's own `asOf` stamp the job fed
+ * `gradeDraft` (`evidencePoolFor`'s own return, `@/draft-service/sim/evidence`) — carried so a
+ * later reader can see exactly what evidence a grade was computed against (ruling R-4), the
+ * identical honesty `sim_runs.board_generation` already keeps for a sim run.
+ *
+ * `bigserial` id, not `(draftId, teamId)` as the primary key directly: the unique index below
+ * enforces the one-row-per-team invariant, and a surrogate id is what lets the job's own upsert
+ * (`onConflictDoUpdate` on that unique key) restate every non-key column through `excludedSetFor`
+ * without a composite key's extra ceremony — the identical shape `adp_snapshots` already uses for
+ * a job-written, upsert-idempotent table.
+ */
+export const draftGrades = pgTable(
+  "draft_grades",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    leagueId: text("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    letter: draftGradeLetterEnum("letter").notNull(),
+    components: jsonb("components").$type<GradeComponents>().notNull(),
+    projectedRank: integer("projected_rank").notNull(),
+    boardGeneration: text("board_generation").notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** One grade per team per draft — the job's own upsert conflict target, and what makes a
+     *  re-run of the job (a retried job attempt, an operator re-enqueue) idempotent by construction. */
+    uniqueIndex("draft_grades_draft_team_idx").on(t.draftId, t.teamId),
+    /** The debrief page's own read: every team's grade for one draft, in one indexed scan. */
+    index("draft_grades_draft_idx").on(t.draftId),
   ],
 );
 

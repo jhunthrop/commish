@@ -19,6 +19,7 @@ import {
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { sweepQuietly } from "@/integrity-service/multi-account";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
+import { enqueueDraftGradesJobQuietly } from "@/jobs/defs/draft-grades-job";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { hasOpenSeat } from "@/matchmaking/filter";
@@ -609,6 +610,15 @@ export function createDraftStore({
           // existence exactly when its draft finishes, and until then the join-time trigger's
           // arithmetic cannot reach `flagThreshold` at all (see `triggerMultiAccountSweep`).
           if (completedLeagueId !== null) await sweepQuietly(db, completedLeagueId, "draft_completed");
+          // TASK 9'S OWN TRIGGER, beside the sweep above and for the identical reason: this
+          // transaction has just released `drafts` FOR UPDATE, and the grades job's own writes
+          // (a `draft_grades` insert per team, then a `member_notices` insert per seated member)
+          // take locks this transaction cannot still be holding when they run (ruling 3). A mock
+          // draft never sets `completedLeagueId` at all (Task 4's own guard, above) — an
+          // isMock check here would be redundant, not a second gate. `enqueueDraftGradesJobQuietly`
+          // swallows its own failures, the identical `sweepQuietly` discipline, so a queue outage
+          // never rolls back a finished draft.
+          if (completedLeagueId !== null) await enqueueDraftGradesJobQuietly(db, clock, draftId);
           // Best-effort, after the commit, beside `broadcast` — the inverse of `notifyAffectedMember`'s
           // own discipline: the durable row above already failed the transaction if it had to;
           // this frame never fails anything, because the write it announces already landed.

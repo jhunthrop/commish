@@ -2,14 +2,15 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { createTestDb, recordStatements, truncateAll } from "@/db/test-db";
-import { auditEvents, draftActions, drafts, memberNotices, players, teams } from "@/db/schema";
+import { auditEvents, draftActions, drafts, jobs, memberNotices, players, teams } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline, DRAFT_SKIP_POLICY, initialDraftState, type DraftConfig } from "@/draft-engine";
 import type { MemberNotice } from "@/integrity-service/notify";
+import { DRAFT_GRADES_JOB_NAME } from "@/jobs/defs/draft-grades-job";
+import { PUBLIC_ROOM_SHORT_REFUSAL } from "@/matchmaking/roll";
 import { settleMockDraftCompletion } from "@/mock-draft-service/driver";
 import { draftOrderFor } from "./order";
 import { setSlotPreference, slotPreferencesFor } from "./slot-preference";
-import { PUBLIC_ROOM_SHORT_REFUSAL } from "@/matchmaking/roll";
 import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type DraftStoreDeps, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -567,6 +568,28 @@ describe("draft store — audit", () => {
     expect(result.ok).toBe(false);
     expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"))).toHaveLength(0);
   });
+
+  // Task 9: the grades job's own trigger, beside `sweepQuietly`'s (same post-commit block, same
+  // "after the commit, never inside it" reasoning). A REAL draft's completion is the one and only
+  // thing this enqueue fires on — the mock lane's own mirror test below is the other half.
+  //
+  // Filtered by this test's own `idempotencyKey`, not merely by job name: `jobs` is not one of
+  // `truncateAll`'s tables (a separate `truncateJobs` covers it), and `fixture()`'s `draftId` is
+  // the fixed literal `"draft_1"` every other test in this describe block also completes a draft
+  // under — so a prior test's own enqueue can already have inserted this exact row before this
+  // one runs. That is fine: the unique idempotency key still proves the SAME fact (exactly one
+  // `draft-grades` job for this draft, with the right payload), regardless of which test's own
+  // `applyAction` call happened to win the insert.
+  it("enqueues the draft-grades job exactly once when a real draft completes", async () => {
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    await runFullDraft(store, draftId);
+
+    const rows = await db.select().from(jobs).where(eq(jobs.idempotencyKey, `draft-grades:${draftId}`));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ name: DRAFT_GRADES_JOB_NAME, payload: { draftId }, status: "pending" });
+  });
 });
 
 describe("draft store — audit — auction attribution", () => {
@@ -999,6 +1022,10 @@ describe("draft store — the mock lane (Task 4)", () => {
     });
 
     expect(statements.filter((s) => REAL_WORLD_CONSEQUENCE_TABLES.test(s))).toHaveLength(0);
+    // Task 9: the grades job's own enqueue is gated on the identical `completedLeagueId` a mock
+    // never sets (`store.ts`'s own Task 4 guard, above `sweepQuietly`'s call) — so a mock
+    // completion writes no `jobs` row either, the same silence the consequence tables above keep.
+    expect(statements.some((s) => /"jobs"/.test(s))).toBe(false);
 
     // The silence above must not be "it never really ran": the engine genuinely finished the
     // draft (the same reducer, the same clock), while `drafts.status` never left `scheduled` —
@@ -1038,6 +1065,10 @@ describe("draft store — the mock lane (Task 4)", () => {
     expect(statements.some((s) => /draft_picks/.test(s))).toBe(true);
     expect(statements.some((s) => /roster_slots/.test(s))).toBe(true);
     expect(statements.some((s) => /matchups/.test(s))).toBe(true);
+    // Task 9: the mirror half of the mock test's silence above — a real completion's own branch
+    // genuinely runs, proving the guard is a real branch and not a change that quietly always
+    // skips the enqueue regardless of `isMock`.
+    expect(statements.some((s) => /"jobs"/.test(s))).toBe(true);
 
     const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
     expect(row?.status).toBe("complete");

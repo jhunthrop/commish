@@ -208,6 +208,7 @@ describe("NOTICE_TEMPLATES", () => {
       "draft_auto_started",
       "draft_fill_reversed",
       "draft_fill_triggered",
+      "draft_grades_ready",
       "draft_kickoff_rolled",
       "draft_pick_skipped",
       "house_league_filled",
