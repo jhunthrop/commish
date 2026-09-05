@@ -51,6 +51,7 @@
     "projections:preseason:fit": "dotenv -e .env.local -- tsx scripts/preseason-fit.ts",
     "projections:rookie-curve:fit": "dotenv -e .env.local -- tsx scripts/rookie-curve-fit.ts",
     "projections:rookie-historical-games:fit": "dotenv -e .env.local -- tsx scripts/rookie-historical-games-fit.ts",
+    "projections:game-variance:fit": "dotenv -e .env.local -- tsx scripts/game-variance-fit.ts",
     "projections:market:fit": "dotenv -e .env.local -- tsx scripts/market-curve-fit.ts",
     "projections:blend:fit": "dotenv -e .env.local -- tsx scripts/blend-fit.ts",
     "projections:blend:diagnose": "dotenv -e .env.local -- tsx scripts/blend-diagnostic.ts",
