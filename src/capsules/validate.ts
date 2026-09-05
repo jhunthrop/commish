@@ -242,7 +242,7 @@ function isNameGrounded(phrase: string, nameLedger: readonly string[]): boolean 
  */
 const SENTENCE_VERB_WORDS = new Set([
   "Buy", "Sell", "Draft", "Target", "Avoid", "Fade", "Stash", "Trust", "Start", "Sit",
-  "Take", "Grab", "Pick", "Rank", "Skip", "Pass", "Wait", "Roster", "Hold",
+  "Take", "Grab", "Pick", "Rank", "Pass", "Wait", "Roster", "Hold",
   "Bet", "Watch", "Ride", "Ditch", "Cut", "Drop", "Add", "Claim", "Rostering",
 ]);
 
