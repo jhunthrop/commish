@@ -6,6 +6,7 @@ import { Button, Card, Input, Modal, PageTitle, SegmentGroup } from "@/component
 import type { SheetSummary, SheetTag } from "./types";
 import type { BoardOption, SheetEntryView } from "./view";
 import type { ByeStackWarning, MockHistoryInsights, MostDraftedPlayerView } from "./insights";
+import type { SheetHealthReport } from "./health";
 import { SheetTable } from "./sheet-table";
 import { InsightsRail } from "./insights-rail";
 import { parseSheetCsv, sheetToCsv } from "./csv";
@@ -19,6 +20,7 @@ export interface MySheetClientProps {
   readonly insights: {
     readonly mockHistory: Omit<MockHistoryInsights, "mostDrafted"> & { readonly mostDrafted: readonly MostDraftedPlayerView[] };
     readonly byeStack: ByeStackWarning | null;
+    readonly sheetHealth: SheetHealthReport | null;
   };
 }
 
@@ -262,7 +264,12 @@ export function MySheetClient({ sheets, selectedSheetId, selectedSheetName, entr
               <SheetTable entries={entries} onReorder={reorder} onRemove={removeEntry} onNote={setNote} onTag={setTag} onTierLabel={setTierLabel} />
             </div>
             <div className="print:hidden">
-              <InsightsRail mockHistory={insights.mockHistory} byeStack={insights.byeStack} entryNamesByPlayerId={new Map(entries.map((entry) => [entry.playerId, entry.name]))} />
+              <InsightsRail
+                mockHistory={insights.mockHistory}
+                byeStack={insights.byeStack}
+                sheetHealth={insights.sheetHealth}
+                entryNamesByPlayerId={new Map(entries.map((entry) => [entry.playerId, entry.name]))}
+              />
             </div>
           </div>
         </>
