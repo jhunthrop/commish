@@ -103,22 +103,65 @@ describe("generateCapsuleBody", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("retries once on a 429 and succeeds if the retry clears", async () => {
-    const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
-      .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: "Recovered text." } }] }));
-    const result = await generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock });
-    expect(result.text).toBe("Recovered text.");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+  /**
+   * THE 429 BACKOFF CLASSIFICATION (sweep resilience, color v2, Task 4) — a 429 gets its OWN
+   * three-retry, doubling-from-twenty-seconds track, distinct from every other transport failure's
+   * original one-retry budget. Real time is never spent here: `vi.useFakeTimers` lets the test
+   * advance through 20s/40s/80s of backoff instantly while still exercising the exact `setTimeout`
+   * calls `postChatCompletion` makes.
+   */
+  it("retries a 429 up to three times with exponential backoff (20s, 40s, 80s) and succeeds once it clears", async () => {
+    vi.useFakeTimers();
+    try {
+      const facts = buildPlayerFacts(baseInput());
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
+        .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
+        .mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
+        .mockResolvedValueOnce(okResponse({ choices: [{ message: { content: "Recovered after backoff." } }] }));
+      const promise = generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock });
+      await vi.advanceTimersByTimeAsync(20_000);
+      await vi.advanceTimersByTimeAsync(40_000);
+      await vi.advanceTimersByTimeAsync(80_000);
+      const result = await promise;
+      expect(result.text).toBe("Recovered after backoff.");
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it("exhausts its retry on a persistent 429 and throws a retryable error", async () => {
-    const facts = buildPlayerFacts(baseInput());
-    const fetchMock = vi.fn().mockResolvedValue(new Response("rate limited", { status: 429 }));
-    await expect(generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock })).rejects.toMatchObject({ retryable: true });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+  it("exhausts three backoff retries (four attempts total) on a persistent 429 and throws a retryable error", async () => {
+    vi.useFakeTimers();
+    try {
+      const facts = buildPlayerFacts(baseInput());
+      const fetchMock = vi.fn().mockResolvedValue(new Response("rate limited", { status: 429 }));
+      const assertion = expect(generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock })).rejects.toMatchObject({ retryable: true });
+      await vi.advanceTimersByTimeAsync(20_000);
+      await vi.advanceTimersByTimeAsync(40_000);
+      await vi.advanceTimersByTimeAsync(80_000);
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a 5xx on its original, shorter one-retry budget, never borrowing the 429 track's extra attempts", async () => {
+    vi.useFakeTimers();
+    try {
+      const facts = buildPlayerFacts(baseInput());
+      const fetchMock = vi.fn().mockResolvedValue(new Response("server error", { status: 500 }));
+      const assertion = expect(generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock })).rejects.toMatchObject({ retryable: true });
+      // The non-429 track's own delay is `baseDelayMs * attempt` = 1_500ms — nowhere near a 429's
+      // twenty-second first backoff, and only one retry is ever offered before this throws.
+      await vi.advanceTimersByTimeAsync(1_500);
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("never retries a plain refusal (401) — a retry would only repeat it", async () => {

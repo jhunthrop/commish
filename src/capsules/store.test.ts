@@ -7,8 +7,8 @@ import { getPlayerCapsule, getStoredCapsule, upsertCapsule } from "./store";
 
 function llmResult(overrides: Partial<CapsuleGenerationResult> = {}): CapsuleGenerationResult {
   return {
-    compact: { text: "Compact body.", source: "llm", usage: null },
-    full: { text: "Full body.", source: "llm", usage: null },
+    compact: { text: "Compact body.", source: "llm", usage: null, fallbackReason: null },
+    full: { text: "Full body.", source: "llm", usage: null, fallbackReason: null },
     source: "llm",
     model: "zai/glm-5.3-flash",
     ...overrides,
@@ -39,7 +39,7 @@ describe("capsule store", () => {
   });
 
   it("stores a template-sourced capsule with a null model", async () => {
-    await upsertCapsule(db, "p1", "hash-1", llmResult({ source: "template", model: null, compact: { text: "Template compact.", source: "template", usage: null } }));
+    await upsertCapsule(db, "p1", "hash-1", llmResult({ source: "template", model: null, compact: { text: "Template compact.", source: "template", usage: null, fallbackReason: { kind: "throttled" } } }));
     const stored = await getStoredCapsule(db, "p1");
     expect(stored?.source).toBe("template");
     expect(stored?.model).toBeNull();
@@ -47,7 +47,7 @@ describe("capsule store", () => {
 
   it("upserts in place on a second write, never creating a second row", async () => {
     await upsertCapsule(db, "p1", "hash-1", llmResult());
-    await upsertCapsule(db, "p1", "hash-2", llmResult({ compact: { text: "Updated compact.", source: "llm", usage: null } }));
+    await upsertCapsule(db, "p1", "hash-2", llmResult({ compact: { text: "Updated compact.", source: "llm", usage: null, fallbackReason: null } }));
     const stored = await getStoredCapsule(db, "p1");
     expect(stored?.factsHash).toBe("hash-2");
     expect(stored?.bodyCompact).toBe("Updated compact.");

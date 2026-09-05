@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
-import { generateCapsule } from "./generate";
+import { describeCapsuleFallback, generateCapsule, type CapsuleSizeResult } from "./generate";
 
 function baseInput(): PlayerFactsInput {
   return {
@@ -86,6 +86,10 @@ describe("generateCapsule", () => {
     // spend must still be logged even though the row ultimately falls back to template.
     expect(result.compact.usage?.costUsd).toBeCloseTo(0.0001, 10);
     expect(result.full.usage?.costUsd).toBeCloseTo(0.0001, 10);
+    // Sweep resilience, color v2, Task 4: the gateway DID respond both times, it was the content
+    // that failed the validator, so the labeled reason is "failed validation", never "throttled".
+    expect(result.compact.fallbackReason).toMatchObject({ kind: "failed_validation" });
+    expect(result.full.fallbackReason).toMatchObject({ kind: "failed_validation" });
   });
 
   it("falls back to the template when the gateway is unreachable throughout, never throwing", async () => {
@@ -96,6 +100,10 @@ describe("generateCapsule", () => {
     expect(result.compact.text).toBe(result.full.text);
     // No attempt ever got back a billable response — nothing to log.
     expect(result.compact.usage).toBeNull();
+    // A pure transport failure (never even got a response to validate) labels as "throttled",
+    // never "failed validation" — there was nothing to validate.
+    expect(result.compact.fallbackReason).toEqual({ kind: "throttled" });
+    expect(result.full.fallbackReason).toEqual({ kind: "throttled" });
   });
 
   it("marks the whole capsule template-sourced when only one size falls back, never claiming a mixed llm provenance", async () => {
@@ -111,5 +119,41 @@ describe("generateCapsule", () => {
     expect(result.full.source).toBe("template");
     expect(result.source).toBe("template");
     expect(result.model).toBeNull();
+    expect(result.compact.fallbackReason).toBeNull();
+    expect(result.full.fallbackReason).toMatchObject({ kind: "failed_validation" });
+  });
+});
+
+/** THE LABELED DETAIL (sweep resilience, color v2, Task 4) — pure, so the classification rule
+ *  itself is tested without a gateway or a database in the loop. `capsule-sweep-job.ts`'s own
+ *  detail lines are the one caller. */
+describe("describeCapsuleFallback", () => {
+  function llmResult(): CapsuleSizeResult {
+    return { text: "Body.", source: "llm", usage: null, fallbackReason: null };
+  }
+  function throttledResult(): CapsuleSizeResult {
+    return { text: "Template body.", source: "template", usage: null, fallbackReason: { kind: "throttled" } };
+  }
+  function failedValidationResult(firstViolation: string): CapsuleSizeResult {
+    return { text: "Template body.", source: "template", usage: null, fallbackReason: { kind: "failed_validation", firstViolation } };
+  }
+
+  it("reports \"llm\" when neither size fell back", () => {
+    expect(describeCapsuleFallback(llmResult(), llmResult())).toBe("llm");
+  });
+
+  it("labels a throttled fallback plainly", () => {
+    expect(describeCapsuleFallback(throttledResult(), llmResult())).toBe("template (throttled)");
+  });
+
+  it("labels a failed-validation fallback with its own first violation", () => {
+    expect(describeCapsuleFallback(failedValidationResult('The number "37" does not trace to any supplied fact.'), llmResult())).toBe(
+      'template (failed validation: The number "37" does not trace to any supplied fact.)',
+    );
+  });
+
+  it("prefers the throttled label when the two sizes disagree, the systemic condition an operator most needs to see", () => {
+    expect(describeCapsuleFallback(throttledResult(), failedValidationResult("some violation"))).toBe("template (throttled)");
+    expect(describeCapsuleFallback(failedValidationResult("some violation"), throttledResult())).toBe("template (throttled)");
   });
 });

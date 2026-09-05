@@ -15,10 +15,20 @@ export const CAPSULE_CONFIG = {
     baseUrl: "https://ai-gateway.vercel.sh/v1",
     envVars: { apiKey: "AI_GATEWAY_API_KEY" },
     timeoutMs: 20_000,
-    /** One retry on a 429 or 5xx, matching the free-tier throttle note in the spec's own
-     *  AMENDED paragraph — a 429'd capsule stays on its template until the next sweep rather
-     *  than spinning here. */
-    retry: { maxAttempts: 2, baseDelayMs: 1_500 },
+    /**
+     * TWO SEPARATE RETRY BUDGETS (sweep resilience, color v2, Task 4, 2026-09-05: the live
+     * gateway kept returning 429 even at fifteen-second sweep pacing) — a 429 gets its OWN,
+     * longer exponential backoff; every other transport failure (5xx, a network error, an
+     * unparseable body, an empty completion) keeps the original one-retry budget, since those are
+     * ordinary transient weather rather than a known, structured throttle.
+     *
+     * `maxAttempts`/`baseDelayMs` govern the non-429 track exactly as before (one retry, linear
+     * backoff). `rateLimitBackoffMs` is 429-ONLY: three retries (four attempts total), the delay
+     * doubling each time starting at twenty seconds, so a genuinely saturated minute on the
+     * gateway's own side has real room to clear before this player's write gives up and the
+     * sweep's template floor takes over for this run.
+     */
+    retry: { maxAttempts: 2, baseDelayMs: 1_500, rateLimitBackoffMs: [20_000, 40_000, 80_000] },
   },
   /** The two sizes a capsule ships in — same facts, same writer/validator machinery, two prompts
    *  and two length bands (founder, live-fire review: "a competitor's player readout set the
@@ -52,9 +62,12 @@ export const CAPSULE_CONFIG = {
   sweepGenerationBudget: 40,
   /** Pause between players inside one sweep. The gateway rate-limits per minute, and the first
    *  live sweep proved a burst (two calls per player, back to back) throttles everything after
-   *  the first player into the template floor (2026-09-05). A nightly job has no latency budget
-   *  to protect; fifteen seconds a player clears any per-minute cap with room. */
-  sweepPacingMs: 15_000,
+   *  the first player into the template floor (2026-09-05). Fifteen seconds a player was the
+   *  first fix and still was not enough against a live gateway that kept 429-ing anyway (color v2,
+   *  Task 4, same night): raised to forty-five seconds, paired with the 429-only backoff above, so
+   *  a real per-minute cap has room to reset between players as well as between one player's own
+   *  retries. */
+  sweepPacingMs: 45_000,
 } as const;
 
 /**

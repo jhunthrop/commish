@@ -24,7 +24,7 @@ const GOOD_FULL =
 function sizeAwareFetch(): typeof globalThis.fetch {
   return (async (_url: unknown, init: unknown) => {
     const { messages } = JSON.parse((init as RequestInit).body as string) as { messages: { content: string }[] };
-    const isFull = messages[1]!.content.includes("(1) the case for him");
+    const isFull = messages[1]!.content.includes("(1) the volume or role case");
     return okResponse(isFull ? GOOD_FULL : GOOD_COMPACT);
   }) as typeof globalThis.fetch;
 }
@@ -102,6 +102,25 @@ describe("runCapsuleSweepStep", () => {
     expect(outcome.summary).toContain("1 needed a fresh generation");
     const second = await getStoredCapsule(db, "p1");
     expect(second?.source).toBe("llm");
+  });
+
+  /** THE LABELED DETAIL (sweep resilience, color v2, Task 4) — an operator scanning a sweep's own
+   *  detail lines must be able to tell "the gateway never gave us anything" apart from "the
+   *  gateway talked, the content failed the validator" at a glance. */
+  it("labels a detail line \"template (throttled)\" when the gateway never returns a usable response", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
+    const failingFetch = async () => new Response("bad request", { status: 401 });
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingFetch }, {});
+    expect(outcome.detail).toEqual(["Rashad Long: template (throttled)"]);
+  });
+
+  it("labels a detail line \"template (failed validation: ...)\" quoting the first violation when the gateway talks but the content fails the validator", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
+    const fabricatingFetch = async () => okResponse("He will score 999 touchdowns this year, an absurd fabricated number nobody has ever hit for this offense.");
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
+    expect(outcome.detail).toHaveLength(1);
+    expect(outcome.detail[0]).toMatch(/^Rashad Long: template \(failed validation: .+\)$/);
+    expect(outcome.detail[0]).not.toContain("throttled");
   });
 
   it("bounds a run to its own generation budget, leaving the rest for the next sweep", async () => {

@@ -15,7 +15,7 @@ import type { JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import { CAPSULE_CONFIG } from "@/capsules/config";
 import { collectAllPlayerFacts } from "@/capsules/collect";
-import { generateCapsule } from "@/capsules/generate";
+import { describeCapsuleFallback, generateCapsule } from "@/capsules/generate";
 import { getStoredCapsulesFor, upsertCapsule, type StoredPlayerCapsule } from "@/capsules/store";
 import type { PlayerFacts } from "@/capsules/facts";
 import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
@@ -74,7 +74,12 @@ export async function runCapsuleSweepStep(db: Db, clock: Clock, deps: CapsuleSwe
       detail.push(`${one.identity.name}: llm, $${cost.toFixed(6)}`);
     } else {
       templateCount += 1;
-      detail.push(`${one.identity.name}: template (fell back)`);
+      // Labeled by REASON (sweep resilience, color v2, Task 4) — "throttled" (the gateway never
+      // gave either size a usable response, even after write.ts's own 429 backoff) reads as a
+      // wholly different operational condition from "failed validation" (the gateway talked, the
+      // model kept writing something the validator rejected), and an operator scanning a run's own
+      // detail lines needs to tell the two apart at a glance.
+      detail.push(`${one.identity.name}: ${describeCapsuleFallback(result.compact, result.full)}`);
     }
   }
 

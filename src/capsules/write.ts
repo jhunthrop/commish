@@ -135,9 +135,23 @@ function parseGatewayResponse(raw: string): { readonly content: string; readonly
   return { content, usage };
 }
 
-/** One HTTP round trip, with one retry on a 429/5xx or a transport error (timeout, network
- *  failure, unparseable body, empty completion) — never on a plain refusal (401/403/400), which
- *  a retry would only repeat. */
+/**
+ * One HTTP round trip. TWO RETRY TRACKS, never confused with each other (sweep resilience, color
+ * v2, Task 4): a 429 gets its OWN exponential backoff (`retry.rateLimitBackoffMs` — three retries,
+ * doubling from twenty seconds), since a live sweep proved this gateway's throttle needs real
+ * minutes to clear, not seconds. Every other transport failure (5xx, a network error, a timeout, an
+ * unparseable body, an empty completion) keeps the ORIGINAL one-retry budget
+ * (`retry.maxAttempts`/`baseDelayMs`) — ordinary transient weather, not a known throttle, so it
+ * still fails fast rather than holding a sweep run hostage. A plain refusal (401/403/400) is never
+ * retried on either track: nothing about waiting would change the gateway's answer.
+ *
+ * ONE SHARED ATTEMPT COUNTER drives both tracks: which budget applies is decided by what THIS
+ * attempt's own failure actually was, not by a separately tracked "how many 429s have I seen"
+ * count. The rare mixed case (a 500 on attempt one, a 429 on attempt two) reads the 429 backoff at
+ * the SAME index as the attempt number it happened on — documented here as a deliberate
+ * simplification, not an oversight: tracking two independent retry counters for a failure mode
+ * this rare would be real complexity bought for a case that barely occurs in practice.
+ */
 async function postChatCompletion(
   messages: readonly { readonly role: string; readonly content: string }[],
   maxTokens: number,
@@ -145,8 +159,12 @@ async function postChatCompletion(
 ): Promise<{ readonly content: string; readonly usage: GatewayUsage }> {
   const doFetch = deps.fetch ?? globalThis.fetch;
   const { baseUrl, timeoutMs, retry } = CAPSULE_CONFIG.gateway;
+  // The outer loop's own ceiling is whichever track needs more attempts — today, always the
+  // 429 track (three retries = four attempts) — with each branch below deciding independently,
+  // from ITS OWN budget, whether this particular attempt may still retry.
+  const maxAttemptsOverall = Math.max(retry.maxAttempts, retry.rateLimitBackoffMs.length + 1);
 
-  for (let attempt = 1; attempt <= retry.maxAttempts; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttemptsOverall; attempt += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -158,7 +176,15 @@ async function postChatCompletion(
       });
       clearTimeout(timer);
 
-      if (response.status === 429 || response.status >= 500) {
+      if (response.status === 429) {
+        const delayMs = attempt <= retry.rateLimitBackoffMs.length ? retry.rateLimitBackoffMs[attempt - 1] : undefined;
+        if (delayMs !== undefined) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
+        throw new CapsuleGenerationError(`Gateway returned HTTP 429 after ${retry.rateLimitBackoffMs.length} backoff retries.`, true);
+      }
+      if (response.status >= 500) {
         if (attempt < retry.maxAttempts) {
           await new Promise((resolve) => setTimeout(resolve, retry.baseDelayMs * attempt));
           continue;

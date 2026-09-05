@@ -480,8 +480,8 @@ describe("playerSeason's season history", () => {
     expect(untouched.capsule).toBeNull();
 
     await upsertCapsule(db, "rb1", "hash-1", {
-      compact: { text: "Compact body.", source: "llm", usage: null },
-      full: { text: "Full body.", source: "llm", usage: null },
+      compact: { text: "Compact body.", source: "llm", usage: null, fallbackReason: null },
+      full: { text: "Full body.", source: "llm", usage: null, fallbackReason: null },
       source: "llm",
       model: "zai/glm-5.3-flash",
     });
