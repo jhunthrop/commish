@@ -214,11 +214,11 @@ describe("blendBoard", () => {
     });
     const [blended] = blendBoard([market({ marketPoints: 999 })], [rookie], { season: SEASON, constants: CONSTANTS, laws: [] });
     // THE HONEST ALGEBRA (Task 2): the curve's own season total, divided by the SAME 2003-2021
-    // population's historical games-played rate (not this candidate's own `games.expected`), gives
-    // a per-game rate that is then multiplied back out by THIS candidate's own availability
-    // (`IMPLIED_GAMES`) — two honestly-sourced numbers, never a season total divided by an unrelated
-    // individual estimate.
-    const historicalGames = historicalRookieExpectedGames("WR", SEASON);
+    // population's historical games-played rate WITHIN THE SAME DRAFT-CAPITAL BUCKET (fix round 1
+    // — not this candidate's own `games.expected`), gives a per-game rate that is then multiplied
+    // back out by THIS candidate's own availability (`IMPLIED_GAMES`) — two honestly-sourced
+    // numbers, never a season total divided by an unrelated individual estimate.
+    const historicalGames = historicalRookieExpectedGames("WR", 5, SEASON);
     const perGameRate = rookieCurve("WR", 5) / historicalGames;
     const modelPoints = perGameRate * IMPLIED_GAMES;
     // THE SHRINK (Task 3): pulled toward the market in proportion to how thin the curve's own

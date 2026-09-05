@@ -166,9 +166,11 @@ export function fitGameVariance(observations: readonly GameVarianceObservation[]
       // THE FALLBACK: a class/position cell too thin to trust on its own borrows the position's
       // COMBINED rookie+veteran pool instead of asserting its own unstable number — an honest
       // "we cannot separate these populations at this position yet" rather than a confident-looking
-      // guess. Every position this calibration round measured had enough of both classes that this
-      // branch never actually engages; see `docs/research/2026-09-04-rookie-calibration-backtest.md`
-      // for the real cell sizes.
+      // guess. THIS BRANCH DOES ENGAGE on the 2023-2024 fit: rookie QB has only 15 eligible
+      // player-seasons, below `MINIMUM_POOLED_PLAYER_SEASONS` (20), so its own variance cell borrows
+      // the combined QB pool rather than the thin rookie-only sample. Every OTHER class/position
+      // cell in that fit cleared the threshold on its own; see
+      // `docs/research/2026-09-04-rookie-calibration-backtest.md` for the real cell sizes.
       const atPosition = observations.filter((o) => o.position === position);
       result[playerClass][position] = pooledVariance(atPosition);
     }

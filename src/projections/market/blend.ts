@@ -540,15 +540,17 @@ export function blendBoard(market: readonly MarketPriorEntry[], model: readonly 
  * multiplied back together as though they described the same one.
  *
  * THE HONEST ALGEBRA: `rookieCurve(pick)` is a season total already averaged over the SAME
- * 2003-2021 population `historicalRookieExpectedGames` measures its own games-played rate against
- * (`rookie-curve.ts`'s module docblock). Dividing by THAT population's own expected games — not this
- * player's — recovers the per-game rate that population's curve actually implies; multiplying back
- * out by `candidate.games.expected` (Task 1's OWN, separately-fitted availability distribution for
- * THIS player) then composes two honestly-sourced numbers instead of dividing a population total by
- * an unrelated individual estimate.
+ * 2003-2021 population, WITHIN THE SAME DRAFT-CAPITAL BUCKET (fix round 1 — see
+ * `historicalRookieExpectedGames`'s own docblock for why the denominator has to be bucket-matched
+ * rather than pooled across every round), that `historicalRookieExpectedGames` measures its own
+ * games-played rate against. Dividing by THAT bucket's own expected games — not this player's —
+ * recovers the per-game rate that bucket's curve actually implies; multiplying back out by
+ * `candidate.games.expected` (Task 1's OWN, separately-fitted availability distribution for THIS
+ * player) then composes two honestly-sourced numbers instead of dividing a population total by an
+ * unrelated individual estimate.
  */
 function recomposeRookieSeasonPoints(candidate: BoardCandidate, overallPick: number, season: number): number {
-  const historicalGames = historicalRookieExpectedGames(candidate.position, season);
+  const historicalGames = historicalRookieExpectedGames(candidate.position, overallPick, season);
   const perGameRate = historicalGames > 0 ? rookieCurve(candidate.position, overallPick) / historicalGames : 0;
   return perGameRate * candidate.games.expected;
 }

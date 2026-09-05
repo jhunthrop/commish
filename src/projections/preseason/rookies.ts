@@ -1,6 +1,12 @@
 import type { Position } from "@/domain/player";
 import type { PredictedOpportunity } from "../model/opportunity";
+import { BUCKET_ANCHOR, DRAFT_BUCKETS, draftBucketFor, UNDRAFTED_PICK, type DraftBucket } from "./draft-buckets";
 import { rookieCurve } from "./rookie-curve";
+
+// Re-exported so no existing consumer of `DRAFT_BUCKETS`/`draftBucketFor`/`UNDRAFTED_PICK`/
+// `DraftBucket` from `"./rookies"` has to change — see `draft-buckets.ts`'s own module docblock for
+// why these moved there (an import cycle `rookie-curve.ts` would otherwise hit).
+export { DRAFT_BUCKETS, draftBucketFor, UNDRAFTED_PICK, type DraftBucket };
 
 /**
  * ROOKIES — no NFL history at all, so DRAFT CAPITAL carries them.
@@ -55,61 +61,6 @@ import { rookieCurve } from "./rookie-curve";
  * must be measurable without it. Athletic testing likewise. Adding either would make the ablation
  * measure two things at once.
  */
-
-/**
- * The draft-capital buckets the prior is estimated in.
- *
- * Buckets rather than a curve on the pick number, for the reason `availability.ts` brackets age: the
- * shape is not a line and it is not an exponential either. The gap between pick 5 and pick 25 is
- * enormous, the gap between 130 and 150 is nothing, and the gap between the last pick and the first
- * undrafted free agent is real but small. Six buckets say that; a fitted decay would smooth it into
- * something that is wrong at both ends.
- */
-export const DRAFT_BUCKETS = ["round1", "round2", "round3", "rounds4to5", "rounds6to7", "undrafted"] as const;
-export type DraftBucket = (typeof DRAFT_BUCKETS)[number];
-
-/**
- * Where an undrafted man sits on the pick axis: behind the last pick of a seven-round draft.
- *
- * One constant, consumed by the capital curve here and by the draft-capital counterfactual the
- * research script scores against it, so the two can never disagree about what "undrafted" means.
- */
-export const UNDRAFTED_PICK = 300;
-
-/**
- * The pick each bucket's fitted mean is anchored at: the middle of the picks that bucket covers.
- *
- * A bucket mean is an average over its members, so the pick it describes is the middle of the
- * bucket rather than its first pick. Anchoring at the midpoint and interpolating between anchors
- * leaves every fitted mean exactly where the fit put it and invents nothing in between — the value
- * at pick 48 is the round-2 mean because that is what was measured, and the value at pick 40 is
- * between the round-1 and round-2 means because a fit over six cells has nothing finer to say.
- */
-const BUCKET_ANCHOR: Readonly<Record<DraftBucket, number>> = {
-  round1: 16.5,
-  round2: 48.5,
-  round3: 84.5,
-  rounds4to5: 142.5,
-  rounds6to7: 220,
-  undrafted: UNDRAFTED_PICK,
-};
-
-/**
- * Which bucket an overall pick falls in.
- *
- * Boundaries are the modern seven-round draft's own: 32 picks a round, plus compensatory selections
- * which push each round's real end a little later. The bucket edges use the nominal round lengths
- * because a compensatory pick at the end of round three is, in every way that matters to a depth
- * chart, a round-four pick.
- */
-export function draftBucketFor(overallPick: number | null): DraftBucket {
-  if (overallPick === null || overallPick <= 0) return "undrafted";
-  if (overallPick <= 32) return "round1";
-  if (overallPick <= 64) return "round2";
-  if (overallPick <= 105) return "round3";
-  if (overallPick <= 180) return "rounds4to5";
-  return "rounds6to7";
-}
 
 /** The shares a rookie is expected to take, before his landing spot is considered. */
 export interface RookieShares {

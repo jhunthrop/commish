@@ -6,8 +6,12 @@ import { STAT_LINE_SOURCE } from "../lines";
 import { DERIVED_STAT_LINE_SOURCE } from "../nflverse/derived-stat-lines";
 import { recordObservations, type PlayerWeekObservation } from "../store";
 import { FITTED_ROOKIE_CURVE } from "./rookie-curve-fitted";
+import { FITTED_HISTORICAL_ROOKIE_GAMES_RATE } from "./rookie-historical-games-fitted";
+import { DRAFT_BUCKETS } from "./draft-buckets";
 import {
+  fitHistoricalRookieGamesRate,
   fitRookieCurve,
+  historicalRookieExpectedGames,
   loadRookieCurveObservations,
   rookieCurve,
   ROOKIE_CURVE_TRAIN_CUTOFF_SEASON,
@@ -277,4 +281,134 @@ describe("loadRookieCurveObservations", () => {
       ...overrides,
     };
   }
+});
+
+describe("fitHistoricalRookieGamesRate", () => {
+  it("refuses a held-out season", () => {
+    expect(() => fitHistoricalRookieGamesRate([observation({ season: 2025 })], { heldOutSeasons: [2025] })).toThrow(/held out/);
+  });
+
+  it("refuses a season past the structural train cutoff even with an empty heldOutSeasons", () => {
+    expect(() => fitHistoricalRookieGamesRate([observation({ season: 2022 })], { heldOutSeasons: [] })).toThrow(/past ROOKIE_CURVE_TRAIN_CUTOFF_SEASON/);
+  });
+
+  it("is monotone non-increasing by draft-capital bucket, per position", () => {
+    // `overallPick` is a real, positive pick number for every actual `RookieCurveObservation` — an
+    // undrafted player never appears in `nfl_draft_picks` and so never becomes one of these at all
+    // (`loadRookieCurveObservations` only iterates real picks). The buckets that DO get real
+    // observations here are round1 through rounds6to7; "undrafted" inherits from the position mean
+    // via the shrink step regardless, and monotonicity is checked across all six regardless.
+    const DRAFT_ROUND_ANCHOR_PICKS = [16, 56, 96, 156, 220] as const;
+    const observations: readonly RookieCurveObservation[] = DRAFT_ROUND_ANCHOR_PICKS.flatMap((anchorPick, index) =>
+      Array.from({ length: 8 }, () => observation({ overallPick: anchorPick, gamesPlayed: 14 - index, teamGames: 17 })),
+    );
+    const priors = fitHistoricalRookieGamesRate(observations, { heldOutSeasons: [] });
+    for (let index = 1; index < DRAFT_BUCKETS.length; index += 1) {
+      expect(priors.byBucket.RB[DRAFT_BUCKETS[index]!]).toBeLessThanOrEqual(priors.byBucket.RB[DRAFT_BUCKETS[index - 1]!]);
+    }
+  });
+
+  it("BUCKETS THE DENOMINATOR — a pick-one QB's bucket rate is NOT dragged down by a large day-three population (the exact defect this fix round found)", () => {
+    // Round one: a handful of real starters who play close to a full season.
+    const round1 = Array.from({ length: 10 }, (_, i) => observation({ position: "QB", overallPick: 5 + i, gamesPlayed: 15, teamGames: 17 }));
+    // Rounds six/seven and undrafted: a LARGE population of clipboard quarterbacks who almost never
+    // play — exactly the volume that dominated the old pooled-across-every-round scalar.
+    const clipboardQbs = Array.from({ length: 200 }, (_, i) => observation({ position: "QB", overallPick: 220 + i, gamesPlayed: 1, teamGames: 17 }));
+    const priors = fitHistoricalRookieGamesRate([...round1, ...clipboardQbs], { heldOutSeasons: [] });
+    // The OLD pooled scalar would have been dominated by the 200 clipboard quarterbacks: roughly
+    // (10*15 + 200*1) / (210*17) ≈ 0.098 — a rate no real starting quarterback's own bucket should
+    // ever be reduced to.
+    const oldPooledScalar = (10 * 15 + 200 * 1) / (210 * 17);
+    expect(priors.byBucket.QB.round1).toBeGreaterThan(oldPooledScalar * 3);
+    // And it should be close to what round one's own real games actually were (15/17), not diluted
+    // toward the day-three population's own much lower rate.
+    expect(priors.byBucket.QB.round1).toBeGreaterThan(0.7);
+  });
+});
+
+describe("historicalRookieExpectedGames", () => {
+  it("reads the bucket matching the given pick, not a pooled-across-everyone number", () => {
+    const anchorPicks: readonly number[] = [16, 56, 96, 156, 220];
+    const priors = fitHistoricalRookieGamesRate(
+      anchorPicks.flatMap((anchorPick, index) =>
+        Array.from({ length: 6 }, () => observation({ position: "QB", overallPick: anchorPick, gamesPlayed: 15 - index * 2, teamGames: 17 })),
+      ),
+      { heldOutSeasons: [] },
+    );
+    const round1Games = historicalRookieExpectedGames("QB", 3, 2024, priors);
+    const round6Games = historicalRookieExpectedGames("QB", 230, 2024, priors);
+    expect(round1Games).toBeGreaterThan(round6Games);
+  });
+
+  it("returns zero for a position this curve does not cover", () => {
+    expect(historicalRookieExpectedGames("K", 1, 2024)).toBe(0);
+  });
+});
+
+describe("the committed historical games rate", () => {
+  it("is monotone non-increasing by bucket, at every skill position", () => {
+    for (const position of ["QB", "RB", "WR", "TE"] as const) {
+      for (let index = 1; index < DRAFT_BUCKETS.length; index += 1) {
+        expect(FITTED_HISTORICAL_ROOKIE_GAMES_RATE.byBucket[position][DRAFT_BUCKETS[index]!]).toBeLessThanOrEqual(
+          FITTED_HISTORICAL_ROOKIE_GAMES_RATE.byBucket[position][DRAFT_BUCKETS[index - 1]!],
+        );
+      }
+    }
+  });
+});
+
+/**
+ * THE CROSS-POSITION REGRESSION TEST (review fix round 1) — the exact defect the review caught:
+ * `historicalRookieExpectedGames` pooled across every draft round, so a pick-one quarterback's
+ * curve-implied per-game rate (`rookieCurve(pick) / historicalRookieExpectedGames(pick)`) could
+ * exceed anything any real historical rookie quarterback season ever produced, because the
+ * DENOMINATOR population (day-three clipboard quarterbacks) did not match the NUMERATOR's pick
+ * neighbourhood (a locked-in starter). The bound below is derived FROM THE TEST'S OWN FIXTURE DATA,
+ * never a hardcoded magic number: the maximum per-game rate any observation in the fit population
+ * actually achieved.
+ *
+ * WHY ROUND ONE SHARES ONE GAMES COUNT HERE. A real round-one cohort's own games counts vary
+ * player to player, and a games-mismatch WITHIN the correct bucket can still nudge a composed rate
+ * a little past any one individual's own historical rate (a real, separately-worth-tracking
+ * residual of averaging games and points across the same bucket rather than a single player's own
+ * record) — checked directly against the REAL committed fit below in "the committed fit stays
+ * inside the historical range", where it holds with room to spare (15.85 against a 23.55 ceiling).
+ * This test isolates the ONE property fix round 1 is actually about — the denominator population
+ * has to be the numerator's own draft-capital neighbourhood, not every round pooled together — by
+ * removing that unrelated confound: every round-one member here shares an identical games count, so
+ * the bucket's own blended rate exactly reproduces what an internally-consistent bucket implies,
+ * and the OLD pooled-everyone denominator's manufactured blowout is visible for what it is.
+ */
+describe("cross-position regression: a pick-one QB's derived per-game rate stays inside the historical range", () => {
+  it("never exceeds the max per-game rate any rookie QB in the fit population actually achieved, once the denominator is bucket-matched", () => {
+    // Round one: ten real starters, points spread out but EVERY member playing the same 14 games —
+    // the pick-one QB (highest points, so pick-one's own knot is never pooled below its true value)
+    // is just the top of this cohort, not a special isolated case.
+    const round1 = Array.from({ length: 10 }, (_, i) => observation({ position: "QB", overallPick: 1 + i, points: 260 - i * 4, gamesPlayed: 14, teamGames: 17 }));
+    // A large day-three/undrafted population who rarely play — the exact volume that dominated the
+    // OLD pooled-across-every-round denominator (0-0-0-0-0... `points` values kept at the module
+    // floor's clamp-worthy tail rather than zero, matching a real late-pick class that mostly never
+    // dresses).
+    const clipboardQbs = Array.from({ length: 50 }, (_, i) => observation({ position: "QB", overallPick: 210 + i, points: 5, gamesPlayed: 1, teamGames: 17 }));
+    const observations = [...round1, ...clipboardQbs];
+
+    const curvePriors = fitRookieCurve(observations, { heldOutSeasons: [] });
+    const gamesRatePriors = fitHistoricalRookieGamesRate(observations, { heldOutSeasons: [] });
+
+    const bucketedGames = historicalRookieExpectedGames("QB", 1, 2024, gamesRatePriors);
+    const bucketedRate = rookieCurve("QB", 1, curvePriors) / bucketedGames;
+
+    // THE OLD DEFECT, RECONSTRUCTED: pooling every round's games together manufactures a denominator
+    // dominated by the fifty clipboard quarterbacks who almost never play.
+    const pooledGames = observations.reduce((sum, o) => sum + o.gamesPlayed, 0) / observations.reduce((sum, o) => sum + o.teamGames, 0) * 17;
+    const pooledRate = rookieCurve("QB", 1, curvePriors) / pooledGames;
+
+    // THE BOUND, DERIVED FROM THE FIXTURE — not asserted against any number this test invented.
+    const maxHistoricalPerGameRate = Math.max(...observations.filter((o) => o.gamesPlayed > 0).map((o) => o.points / o.gamesPlayed));
+
+    expect(bucketedRate).toBeLessThanOrEqual(maxHistoricalPerGameRate + 1e-9);
+    // THE OLD MECHANISM FAILS THIS EXACT BOUND — proving the test would have caught the diagnosed
+    // defect, not merely proving the new code agrees with itself.
+    expect(pooledRate).toBeGreaterThan(maxHistoricalPerGameRate);
+  });
 });

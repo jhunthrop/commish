@@ -28,9 +28,17 @@
  *
  * `n0` ITSELF (`THIN_EVIDENCE_PRIOR_N`, below) is chosen by the calibration backtest
  * (`scripts/rookie-calibration-backtest.ts`), which grid-searches a small set of candidates against
- * 2025 rookie MAE (2023-2024 fit, 2025 score, 2026 never touched) and reports every candidate's
- * score in `docs/research/2026-09-04-rookie-calibration-backtest.md` — not eyeballed. See that
- * report for the grid and the sensitivity of the choice.
+ * 2025 rookie MAE and reports every candidate's score in
+ * `docs/research/2026-09-04-rookie-calibration-backtest.md` — not eyeballed.
+ *
+ * THIS ONE PARAMETER IS TUNED ON THE TEST SEASON, NAMED PLAINLY: unlike every other fitted table
+ * this calibration round produced (fit on 2023-2024, scored on 2025 only), `THIN_EVIDENCE_PRIOR_N`
+ * is selected directly against 2025 rookie MAE, which is tuned-on-test rather than a genuine
+ * held-out evaluation. The committed value (3) is deliberately the conservative choice from that
+ * grid rather than the score-maximising one — see the report's own "Decision" section. The
+ * recommended follow-up, not yet run: fit on 2023, select this constant against 2024 as a real
+ * validation season, and reserve 2025 as a never-touched-for-tuning test — see the report's own
+ * "tuned on the test season" section for why that three-way split is next, not this round's own gate.
  */
 
 /**

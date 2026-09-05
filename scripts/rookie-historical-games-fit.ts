@@ -21,6 +21,7 @@ import {
   type RookieCurveEvidence,
 } from "@/projections/preseason/rookie-curve";
 import { HISTORICAL_ROSTER_FLOOR } from "@/projections/nflverse/rosters";
+import { DRAFT_BUCKETS, draftBucketFor } from "@/projections/preseason/draft-buckets";
 import { rookieCurveTrainSeasons } from "./rookie-curve-fit";
 
 const OUTPUT = "src/projections/preseason/rookie-historical-games-fitted.ts";
@@ -45,6 +46,12 @@ function header(): string {
  * against (\`rookieCurveTrainSeasons()\`) — and on nothing else. See \`rookie-curve.ts\`'s
  * \`fitHistoricalRookieGamesRate\` and \`fitRookieCurveEvidence\` docblocks for why the points curve
  * needs a matching games-played rate and evidence count at all.
+ *
+ * \`FITTED_HISTORICAL_ROOKIE_GAMES_RATE\` IS BUCKETED BY DRAFT CAPITAL (fix round 1, 2026-09-04),
+ * on the SAME \`DRAFT_BUCKETS\` boundaries \`rookies.ts\` uses — a single pooled-across-every-round
+ * scalar manufactured an absurd per-game rate for a pick-one quarterback, whose curve knot is
+ * pick-specific but whose old denominator was dominated by day-three clipboard quarterbacks. See
+ * that function's own docblock for the fix.
  */
 `;
 }
@@ -67,8 +74,10 @@ async function main(): Promise<void> {
 
   console.log(`ROOKIE HISTORICAL GAMES RATE, fit on ${observations.length} rookie-season observations across seasons ${seasons.join(", ")}`);
   for (const position of POSITIONS) {
-    const n = observations.filter((o) => o.position === position).length;
-    console.log(`  ${position.padEnd(4)} rate ${rate.byPosition[position].toFixed(4)} (n=${n} rookie-seasons)`);
+    const counts = DRAFT_BUCKETS.map((bucket) => observations.filter((o) => o.position === position && draftBucketFor(o.overallPick) === bucket).length);
+    console.log(
+      `  ${position.padEnd(4)} ${DRAFT_BUCKETS.map((bucket, index) => `${bucket} ${rate.byBucket[position][bucket].toFixed(3)} (n=${counts[index]})`).join("   ")}`,
+    );
   }
 
   writeFileSync(OUTPUT, render(rate, evidence));

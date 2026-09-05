@@ -11,6 +11,10 @@
 // stored live generation. A real prod refresh of the 2026 live board is a SEPARATE, deliberate act
 // (`npm run projections:preseason:persist -- 2026`, against the production database) — see this
 // task's own final report for what that requires.
+//
+// THE PRODUCTION CONTROL (fix round 1): the controller runs `projections:preseason:persist -- 2026`
+// against prod as part of the SAME ship sequence that merges this branch — a merge without that run
+// serves stale numbers. That run, not this script, is what makes the fix visible in production.
 import { createDb, type Db } from "@/db/client";
 import type { Clock } from "@/domain/timing";
 import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";

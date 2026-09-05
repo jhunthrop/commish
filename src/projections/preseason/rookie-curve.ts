@@ -8,6 +8,7 @@ import { draftPicksFor } from "../nflverse/draft-picks";
 import { projectedPosition } from "../nflverse/players";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import { teamGamesIn } from "./availability";
+import { DRAFT_BUCKETS, draftBucketFor, type DraftBucket } from "./draft-buckets";
 import { FITTED_HISTORICAL_ROOKIE_GAMES_RATE, FITTED_ROOKIE_CURVE_EVIDENCE } from "./rookie-historical-games-fitted";
 import { FITTED_ROOKIE_CURVE } from "./rookie-curve-fitted";
 
@@ -197,33 +198,52 @@ export function fitRookieCurve(observations: readonly RookieCurveObservation[], 
 }
 
 /**
- * THE CURVE'S OWN GAMES-PLAYED RATE, by position (calibration fix round, 2026-09-04, Task 2) — one
- * scalar per position, over the IDENTICAL 2003-2021 population `fitRookieCurve` measures its points
- * against, counted the same unconditional way (a rookie who never dressed contributes a zero).
+ * THE CURVE'S OWN GAMES-PLAYED RATE, BY DRAFT-CAPITAL BUCKET (fix round 1, 2026-09-04) — conditioned
+ * on the SAME `DRAFT_BUCKETS`/`draftBucketFor` boundaries `rookies.ts`'s share and game-rate tables
+ * use, over the IDENTICAL 2003-2021 population `fitRookieCurve` measures its points against, counted
+ * the same unconditional way (a rookie who never dressed contributes a zero).
  *
- * WHY THE POINTS CURVE NEEDS THIS AT ALL. `rookieCurve(position, pick)` returns a SEASON
- * expectation that already has THAT historical population's own typical rookie availability baked
- * into it — the mean is over the whole class, survivors and non-dressers alike, exactly like
- * `rookies.ts`'s `capitalGameRate` was before this fix round. The board used to divide that season
- * number by the CURRENT PLAYER's own `games.expected` to fabricate a per-game rate — mixing a
- * population-level historical season total with an individual, board-specific games estimate that
- * has nothing to do with the population the curve was fitted on. `market/blend.ts`'s
- * `recomposeRookieSeasonPoints` divides by THIS instead: `rookieCurve(pick) / historicalGamesRate *
- * teamGamesIn(season)` gives the honest per-game rate the SAME population's points curve implies,
- * which is then multiplied back out by Task 1's OWN, separately-fitted availability distribution
- * (`candidate.games.expected`) — two honestly-sourced numbers composed together rather than one
- * population's season total divided by an unrelated population's per-player estimate.
+ * THE DEFECT THIS REPLACES (review fix round 1). The first version of this table was a SINGLE SCALAR
+ * per position, pooled across every round — for QB that meant a 0.2994 rate (≈5.1 games), dominated
+ * by the volume of day-three clipboard quarterbacks who never see the field, while the NUMERATOR
+ * (`rookieCurve(pick)`) is pick-specific. Dividing a pick-ONE quarterback's own season curve value by
+ * that pooled-everyone denominator manufactured an absurd 33.75 points/game — no rookie QB season in
+ * the historical record sustains that — and then the player's own clear-starter availability
+ * multiplied it back OUT, double-counting exactly the availability signal Task 1 already fixed once
+ * (the identical shape of defect, one level up the pipeline). THE DENOMINATOR POPULATION HAS TO MATCH
+ * THE NUMERATOR'S PICK NEIGHBOURHOOD, or the division is comparing two different populations' own
+ * typical rookie and calling the ratio a per-game rate.
  *
- * A SINGLE SCALAR PER POSITION, DELIBERATELY, rather than a second pick-indexed curve. The points
- * curve needs pick-level resolution because draft capital's value visibly does not fall in a
- * straight line; a rookie's games-played rate is a far flatter relationship against pick number
- * than his expected production is, so a single, well-populated per-position mean is the honest
- * measurement this round can defend rather than a pick-level curve thin enough at the extremes to
- * reintroduce the exact instability Task 1 just fixed. This is a documented simplification, not an
- * oversight — `docs/research/2026-09-04-rookie-calibration-backtest.md` reports its sensitivity.
+ * WHY THE POINTS CURVE NEEDS THIS AT ALL. `rookieCurve(position, pick)` returns a SEASON expectation
+ * that already has ITS OWN bucket's typical rookie availability baked into it — the mean is over the
+ * whole bucket, survivors and non-dressers alike, exactly like `rookies.ts`'s `capitalGameRate` was
+ * before Task 1. The board used to divide that season number by the CURRENT PLAYER's own
+ * `games.expected` to fabricate a per-game rate — mixing a population-level historical season total
+ * with an individual, board-specific games estimate that has nothing to do with the population the
+ * curve was fitted on. `market/blend.ts`'s `recomposeRookieSeasonPoints` divides by THIS instead:
+ * `rookieCurve(pick) / historicalRookieExpectedGames(pick)` gives the honest per-game rate the SAME
+ * bucket's points curve implies, which is then multiplied back out by Task 1's OWN,
+ * separately-fitted availability distribution (`candidate.games.expected`) — two honestly-sourced
+ * numbers composed together rather than one population's season total divided by an unrelated
+ * population's per-player estimate.
+ *
+ * EACH BUCKET'S OWN RAW RATE, ISOTONIC-ORDERED — NOT SHRUNK TOWARD THE POSITION-WIDE MEAN FIRST,
+ * which is the deliberate difference from `fit.ts`'s `fitPositionGameRate` (Task 1's own
+ * `RookiePriors.gameRate`) and itself a fix-round-1 finding, documented at the shrink-would-have-
+ * lived call site below. A position-wide mean is pooled ACROSS EVERY ROUND, so shrinking a
+ * well-populated bucket toward it re-admits a diluted amount of the exact cross-round contamination
+ * this whole function exists to remove. Instead, every bucket's own raw rate (or the position mean,
+ * ONLY as a seed for a bucket with literally zero observations) is pooled into a
+ * monotone-non-increasing sequence by the SAME weighted isotonic regression (`isotonic.ts`) the
+ * points curve and the durability prior both trust — a thin, unstable bucket is "borrowed" from its
+ * neighbours by the pooling itself, whichever direction the violation runs, which is the real
+ * evidence-weighted regularisation this table needs (the historical population here runs tens of
+ * observations per bucket at every skill position — see the fit script's own printed counts — so a
+ * second, additive shrink is not the thinness guard `RookiePriors.gameRate` needed on a much smaller
+ * per-season population).
  */
 export interface HistoricalRookieGamesRate {
-  readonly byPosition: Readonly<Record<CurvePosition, number>>;
+  readonly byBucket: Readonly<Record<CurvePosition, Readonly<Record<DraftBucket, number>>>>;
 }
 
 export function fitHistoricalRookieGamesRate(
@@ -232,28 +252,70 @@ export function fitHistoricalRookieGamesRate(
 ): HistoricalRookieGamesRate {
   assertRookieCurveTrainWindow(observations, heldOutSeasons);
 
-  const byPosition = {} as Record<CurvePosition, number>;
+  const rateOf = (group: readonly RookieCurveObservation[]): number | null => {
+    const totalTeamGames = group.reduce((sum, observation) => sum + observation.teamGames, 0);
+    if (totalTeamGames === 0) return null;
+    const totalGames = group.reduce((sum, observation) => sum + observation.gamesPlayed, 0);
+    return totalGames / totalTeamGames;
+  };
+
+  const byBucket = {} as Record<CurvePosition, Record<DraftBucket, number>>;
   for (const position of CURVE_POSITIONS) {
     const atPosition = observations.filter((observation) => observation.position === position);
-    const totalGames = atPosition.reduce((sum, observation) => sum + observation.gamesPlayed, 0);
-    const totalTeamGames = atPosition.reduce((sum, observation) => sum + observation.teamGames, 0);
-    byPosition[position] = totalTeamGames > 0 ? totalGames / totalTeamGames : 0;
+    const positionRate = rateOf(atPosition) ?? 0;
+    const values: number[] = [];
+    const weights: number[] = [];
+    for (const bucket of DRAFT_BUCKETS) {
+      const inBucket = atPosition.filter((observation) => draftBucketFor(observation.overallPick) === bucket);
+      const rawRate = rateOf(inBucket);
+      // NO SHRINKAGE TOWARD THE POSITION-WIDE MEAN HERE — the deliberate difference from
+      // `fit.ts`'s `fitPositionGameRate` (Task 1's `RookiePriors.gameRate`), and a fix-round-1
+      // finding, not an oversight. `positionRate` is pooled ACROSS EVERY ROUND, so shrinking a
+      // well-populated bucket toward it re-admits a diluted amount of the exact cross-round
+      // contamination this whole function exists to remove — verified directly: a synthetic
+      // top-heavy round-one cohort against a large day-three population can still push the
+      // composed per-game rate a few percent past the bucket's own true rate once ANY shrink
+      // weight toward that pooled mean is nonzero, however small
+      // (`rookie-curve.test.ts`'s "never exceeds the max per-game rate" regression). `positionRate`
+      // is used ONLY as a seed for a bucket with LITERALLY ZERO observations (draft picks never
+      // reach every bucket at every position in every fit), where there is no real rate to protect
+      // in the first place. Every non-empty bucket's raw rate is thinness-regularised by weight
+      // alone in the isotonic step below: a thin bucket that violates monotonicity gets pooled with
+      // its NEIGHBOUR (a real "borrow from the neighbouring bucket," per this fix round's own
+      // review), and a thin bucket that does not violate it is left at its own honest measurement
+      // rather than diluted by a population it does not belong to.
+      values.push(rawRate ?? positionRate);
+      weights.push(inBucket.length);
+    }
+    // Floored above zero for the identical reason `fit.ts`'s `isotonicRateOrdering` floors its own
+    // weights: an empty bucket must not divide the PAV pooling formula by zero.
+    const bucketWeights = weights.map((weight) => Math.max(weight, 1e-9));
+    const fitted = isotonicNonIncreasing(values, bucketWeights);
+    const ordered = {} as Record<DraftBucket, number>;
+    DRAFT_BUCKETS.forEach((bucket, index) => {
+      ordered[bucket] = fitted[index]!;
+    });
+    byBucket[position] = ordered;
   }
-  return { byPosition };
+  return { byBucket };
 }
 
 /**
- * `historicalRookieExpectedGames(position, season)` — the mean games a rookie of this position, over
- * the whole 2003-2021 class, played in a season of `teamGamesIn(season)` games. Reads the committed
- * fit by default, exactly like `rookieCurve` reads `FITTED_ROOKIE_CURVE`.
+ * `historicalRookieExpectedGames(position, overallPick, season)` — the mean games a rookie of this
+ * position AND draft-capital bucket, over the whole 2003-2021 class, played in a season of
+ * `teamGamesIn(season)` games. Reads the committed fit by default, exactly like `rookieCurve` reads
+ * `FITTED_ROOKIE_CURVE`. `overallPick` is REQUIRED (fix round 1): the whole point of bucketing this
+ * table is that a pick-one quarterback and a seventh-round one draw from different denominators.
  */
 export function historicalRookieExpectedGames(
   position: Position,
+  overallPick: number | null,
   season: number,
   priors: HistoricalRookieGamesRate = FITTED_HISTORICAL_ROOKIE_GAMES_RATE,
 ): number {
   if (!isCurvePosition(position)) return 0;
-  return priors.byPosition[position] * teamGamesIn(season);
+  const bucket = draftBucketFor(overallPick);
+  return priors.byBucket[position][bucket] * teamGamesIn(season);
 }
 
 /**

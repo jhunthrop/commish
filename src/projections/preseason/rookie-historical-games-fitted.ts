@@ -8,14 +8,48 @@ import type { HistoricalRookieGamesRate, RookieCurveEvidence } from "./rookie-cu
  * against (`rookieCurveTrainSeasons()`) — and on nothing else. See `rookie-curve.ts`'s
  * `fitHistoricalRookieGamesRate` and `fitRookieCurveEvidence` docblocks for why the points curve
  * needs a matching games-played rate and evidence count at all.
+ *
+ * `FITTED_HISTORICAL_ROOKIE_GAMES_RATE` IS BUCKETED BY DRAFT CAPITAL (fix round 1, 2026-09-04),
+ * on the SAME `DRAFT_BUCKETS` boundaries `rookies.ts` uses — a single pooled-across-every-round
+ * scalar manufactured an absurd per-game rate for a pick-one quarterback, whose curve knot is
+ * pick-specific but whose old denominator was dominated by day-three clipboard quarterbacks. See
+ * that function's own docblock for the fix.
  */
 
 export const FITTED_HISTORICAL_ROOKIE_GAMES_RATE: HistoricalRookieGamesRate = {
-  "byPosition": {
-    "QB": 0.2993739328400683,
-    "RB": 0.5195289206917114,
-    "WR": 0.48939313984168864,
-    "TE": 0.40875565072567216
+  "byBucket": {
+    "QB": {
+      "round1": 0.6487046632124353,
+      "round2": 0.40498442367601245,
+      "round3": 0.26459143968871596,
+      "rounds4to5": 0.13263979193758127,
+      "rounds6to7": 0.061375661379695245,
+      "undrafted": 0.061375661379695245
+    },
+    "RB": {
+      "round1": 0.776595744680851,
+      "round2": 0.6836368524020617,
+      "round3": 0.6836368524020617,
+      "rounds4to5": 0.5667752442996743,
+      "rounds6to7": 0.27898711683867955,
+      "undrafted": 0.27898711683867955
+    },
+    "WR": {
+      "round1": 0.7535744322960471,
+      "round2": 0.7146994931209268,
+      "round3": 0.591372079089275,
+      "rounds4to5": 0.4362764682381143,
+      "rounds6to7": 0.24698133918913182,
+      "undrafted": 0.24698133918913182
+    },
+    "TE": {
+      "round1": 0.7311475409836066,
+      "round2": 0.6737967914438503,
+      "round3": 0.5043586550435866,
+      "rounds4to5": 0.3675832127351664,
+      "rounds6to7": 0.177083333336551,
+      "undrafted": 0.177083333336551
+    }
   }
 };
 
