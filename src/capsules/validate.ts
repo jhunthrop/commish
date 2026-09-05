@@ -82,14 +82,39 @@ const IN_NAME_ABBREVIATIONS = new Set(["St", "Jr", "Sr", "Mr", "Mrs", "Ms", "Dr"
  *  `IN_NAME_ABBREVIATIONS` — "T.J." strips to "T.J", which this matches. */
 const INITIALS_PATTERN = /^[A-Z](?:\.[A-Z])*$/;
 
-/** True when `word` (as extracted — its own trailing period, if any, still attached) ends a
- *  sentence rather than continuing an abbreviation. Only a TRAILING period is ever in question:
- *  `!`/`?` never appear inside a name token to begin with (`NAME_WORD_CHARS` below excludes them,
- *  same as the prior regex did), so they already stop a candidate the ordinary way. */
-function endsSentence(word: string): boolean {
+/** A curated set of capitalized words that begin a NEW sentence and can never continue a name —
+ *  pronouns, determiners, and common transition words (fix round 2 review, code review 2026-09-05:
+ *  "Tyrone Tracy Jr. He is a stud" was over-merging into "Tyrone Tracy Jr. He"). Used ONLY to
+ *  decide whether an in-name ABBREVIATION's period is also a sentence end — a real name-continuing
+ *  word after an abbreviation ("St. Brown") is never in this list, so that case is unaffected. */
+const COMMON_SENTENCE_STARTERS = new Set([
+  "He", "She", "It", "They", "This", "That", "The", "A", "An", "His", "Her", "Their",
+  "There", "But", "And", "Yet", "So", "Still", "Also", "However", "Meanwhile", "Now", "Then",
+]);
+
+function isInNameAbbreviation(bareWord: string): boolean {
+  return IN_NAME_ABBREVIATIONS.has(bareWord) || INITIALS_PATTERN.test(bareWord);
+}
+
+/** True when the run must stop AFTER `word` — either `word` is an ordinary word ending a
+ *  sentence (any trailing period that is not a sanctioned in-name abbreviation), or `word` IS an
+ *  abbreviation ("Jr.", "St.", ...) but `nextWord` is a `COMMON_SENTENCE_STARTERS` word that
+ *  cannot itself continue a name ("Jr. He", never "St. Brown"). `nextWord` is `null` when `word`
+ *  is the last Titlecase token in the text. */
+function isRunBreak(word: string, nextWord: string | null): boolean {
   if (!word.endsWith(".")) return false;
   const bare = word.slice(0, -1);
-  return !IN_NAME_ABBREVIATIONS.has(bare) && !INITIALS_PATTERN.test(bare);
+  if (!isInNameAbbreviation(bare)) return true;
+  return nextWord !== null && COMMON_SENTENCE_STARTERS.has(nextWord);
+}
+
+/** True when `word`'s own trailing period is punctuation to be stripped from the emitted
+ *  candidate, rather than part of the name. An abbreviation's period is NEVER stripped, even when
+ *  `isRunBreak` also stopped the run right after it (fix round 2 review) — "Tyrone Tracy Jr." must
+ *  still render with its period whether or not "He" followed it. */
+function isPunctuationPeriod(word: string): boolean {
+  if (!word.endsWith(".")) return false;
+  return !isInNameAbbreviation(word.slice(0, -1));
 }
 
 /** Sequences of two-or-more consecutive Titlecase words — the shape a genuine proper name takes
@@ -110,12 +135,13 @@ function endsSentence(word: string): boolean {
  *
  * THE FIX: build candidates word-by-word instead of one regex. Two whitespace-adjacent Titlecase
  * tokens still join into the same run exactly as before (a non-whitespace separator, e.g. a
- * comma, still breaks the run — unchanged). The one new rule: once a token in the run `endsSentence`
- * (a trailing period that is not a sanctioned in-name abbreviation), the run stops AT that token —
- * a following capitalized word starts its OWN, separate candidate — and that token's own trailing
- * period is stripped from the emitted phrase (it is punctuation, not part of the name). An
- * abbreviation's period is always kept (`"St. Brown"`, `"T.J. Hockenson"`, `"Tyrone Tracy Jr."`
- * all still emit with their periods intact, since none of those tokens `endsSentence`). */
+ * comma, still breaks the run — unchanged). The new rule (`isRunBreak`): a token ending in an
+ * ordinary (non-abbreviation) period always stops the run there; a token ending in a sanctioned
+ * in-name abbreviation's period ("Jr.", "St.", "T.") stops the run ONLY when the very next word is
+ * a `COMMON_SENTENCE_STARTERS` word that could never continue a name — so "St. Brown" still joins
+ * (`"Brown"` is not a sentence starter) while "Jr. He" still splits, in BOTH cases keeping the
+ * abbreviation's own period in the rendered candidate (`isPunctuationPeriod` only ever strips a
+ * TRUE sentence-ending period, never an abbreviation's). */
 function extractProperNamePhrases(text: string): readonly string[] {
   const wordPattern = /\b[A-Z][a-zA-Z'.-]*/g;
   const words: { readonly text: string; readonly start: number; readonly end: number }[] = [];
@@ -126,18 +152,26 @@ function extractProperNamePhrases(text: string): readonly string[] {
   while (i < words.length) {
     const run = [words[i]!];
     let j = i;
-    while (j + 1 < words.length && /^\s+$/.test(text.slice(words[j]!.end, words[j + 1]!.start)) && !endsSentence(words[j]!.text)) {
+    while (j + 1 < words.length && /^\s+$/.test(text.slice(words[j]!.end, words[j + 1]!.start)) && !isRunBreak(words[j]!.text, words[j + 1]!.text)) {
       run.push(words[j + 1]!);
       j += 1;
     }
     if (run.length >= 2) {
       const last = run[run.length - 1]!;
-      const rendered = run.map((word, idx) => (idx === run.length - 1 && endsSentence(last.text) ? word.text.slice(0, -1) : word.text));
+      const rendered = run.map((word, idx) => (idx === run.length - 1 && isPunctuationPeriod(last.text) ? word.text.slice(0, -1) : word.text));
       phrases.add(rendered.join(" "));
     }
     i = j + 1;
   }
   return [...phrases];
+}
+
+/** The one word-splitter every name/phrase comparison in this file uses (code review 2026-09-05,
+ *  minor: `candidate.split(" ")` and `name.split(/\s+/)` had drifted apart) — a candidate is always
+ *  built from single-space joins (`extractProperNamePhrases`), but a ledger entry is arbitrary
+ *  input, so splitting on run of whitespace everywhere is the one rule that is correct for both. */
+function splitWords(text: string): readonly string[] {
+  return text.trim().split(/\s+/);
 }
 
 /**
@@ -181,23 +215,35 @@ function isNameGrounded(phrase: string, nameLedger: readonly string[]): boolean 
     // and only for entries longer than the candidate (a two-word ledger entry offers no
     // shorthand a two-word candidate would need).
     if (!nameIsMultiWord || !isMultiWord) return false;
-    const nameWords = lowerName.split(" ");
-    const phraseWords = lowerPhrase.split(" ");
+    const nameWords = splitWords(lowerName);
+    const phraseWords = splitWords(lowerPhrase);
     if (phraseWords.length >= nameWords.length) return false;
     return nameWords.slice(nameWords.length - phraseWords.length).join(" ") === lowerPhrase;
   });
 }
 
-/** A curated set of imperative sentence-starters that show up as the FIRST word of a fabricated
- *  two-word candidate in fantasy-analyst prose ("Buy McCaffrey", "Fade St. Brown") — fix round 2,
- *  PART B, live full-board regeneration 2026-09-05. None of these is ever a person's given name,
- *  which is exactly why it is safe to gate the verb+lastname shorthand below on membership in this
- *  list: an ACTUAL given name occupying that slot ("Marcus Long") is never in it, so that case
- *  never reaches the shorthand branch at all and keeps failing exactly as CRITICAL 1 requires. */
+/**
+ * A curated set of imperative sentence-starters that show up as the FIRST word of a fabricated
+ * two-word candidate in fantasy-analyst prose ("Buy McCaffrey", "Fade St. Brown") — fix round 2,
+ * PART B, live full-board regeneration 2026-09-05. None of these is ever a person's given name,
+ * which is exactly why it is safe to gate the verb+lastname shorthand below on membership in this
+ * list: an ACTUAL given name occupying that slot ("Marcus Long") is never in it, so that case
+ * never reaches the shorthand branch at all and keeps failing exactly as CRITICAL 1 requires.
+ *
+ * THIS IS A CORRECTNESS PROPERTY, NOT JUST A WORD LIST (code review 2026-09-05, CRITICAL): the
+ * reviewer's own executed probe found "Chase" — a common real NFL given name (Chase Brown, Chase
+ * Claypool, Chase Edmonds) — sitting in this set, which let "Chase McCaffrey" false-pass against a
+ * ledgered "Christian McCaffrey" exactly like the fabrication CRITICAL 1 exists to catch. "Chase"
+ * is removed. EVERY entry below has been re-audited against real NFL given names as of this fix;
+ * whoever adds a new one MUST do the same re-audit before committing it, and should re-check the
+ * existing set whenever a word on it becomes a common given name in the league (names trend; this
+ * list can silently rot). When in doubt, leave the word out — a missed imperative just falls back
+ * to a template regeneration, never a fabrication passing as fact.
+ */
 const SENTENCE_VERB_WORDS = new Set([
   "Buy", "Sell", "Draft", "Target", "Avoid", "Fade", "Stash", "Trust", "Start", "Sit",
-  "Take", "Grab", "Pick", "Rank", "Love", "Skip", "Pass", "Wait", "Roster", "Hold",
-  "Bet", "Watch", "Chase", "Ride", "Ditch", "Cut", "Drop", "Add", "Claim", "Rostering",
+  "Take", "Grab", "Pick", "Rank", "Skip", "Pass", "Wait", "Roster", "Hold",
+  "Bet", "Watch", "Ride", "Ditch", "Cut", "Drop", "Add", "Claim", "Rostering",
 ]);
 
 /** True when `word` alone equals the trailing word of some MULTI-word ledger entry — the exact
@@ -210,7 +256,7 @@ const SENTENCE_VERB_WORDS = new Set([
 function isLoneWordSurnameOf(word: string, nameLedger: readonly string[]): boolean {
   const lowerWord = word.toLowerCase();
   return nameLedger.some((name) => {
-    const nameWords = name.trim().toLowerCase().split(/\s+/);
+    const nameWords = splitWords(name.toLowerCase());
     return nameWords.length >= 2 && nameWords[nameWords.length - 1] === lowerWord;
   });
 }
@@ -239,7 +285,7 @@ function isNameGroundedWithShedding(phrase: string, nameLedger: readonly string[
   let candidate = phrase.trim();
   for (;;) {
     if (isNameGrounded(candidate, nameLedger)) return true;
-    const words = candidate.split(" ");
+    const words = splitWords(candidate);
     // Never shed below two words: a two-word candidate IS the name under test, and reducing it
     // to a single decomposed ledger fragment would reopen exactly the bypass CRITICAL 1 closed
     // ("Marcus Long" must never pass by shedding to "Long").
@@ -247,7 +293,7 @@ function isNameGroundedWithShedding(phrase: string, nameLedger: readonly string[
       if (words.length === 2 && SENTENCE_VERB_WORDS.has(words[0]!) && isLoneWordSurnameOf(words[1]!, nameLedger)) return true;
       return false;
     }
-    candidate = candidate.slice(candidate.indexOf(" ") + 1);
+    candidate = words.slice(1).join(" ");
   }
 }
 

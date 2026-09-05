@@ -235,6 +235,33 @@ describe("precision fix round 2 — PART A: sentence-boundary tokenization", () 
       ),
     ).toBe(false);
   });
+
+  describe("a name suffix ('Jr.') immediately before a new sentence (review round 2, Important)", () => {
+    const tracyFacts = buildPlayerFacts({ ...RASHAD_LONG, identity: { id: "p8", name: "Tyrone Tracy Jr.", position: "RB", team: "NYG" } });
+
+    it('grounds when the suffix is followed by the next sentence\'s capitalized first word ("Tyrone Tracy Jr. He is a stud")', () => {
+      const r = validateCapsule(
+        pad("Tyrone Tracy Jr. He is a stud for the NYG offense, our number of 248 season points and board rank 14 overall this season."),
+        tracyFacts,
+        "compact",
+      );
+      expect(r.violations.some((v) => v.includes("does not trace"))).toBe(false);
+    });
+
+    it("still grounds the ordinary mid-name form (no following sentence break)", () => {
+      const r = validateCapsule(pad("Tyrone Tracy Jr. leads the NYG backfield, our number of 248 season points and board rank 14 overall this season."), tracyFacts, "compact");
+      expect(r.violations.some((v) => v.includes("does not trace"))).toBe(false);
+    });
+
+    it('a fabricated name with the same suffix-then-sentence-break shape still fails ("Fake Name Jr. He")', () => {
+      const r = validateCapsule(
+        pad("Fake Name Jr. He is a stud for the NYG offense, our number of 248 season points and board rank 14 overall this season."),
+        tracyFacts,
+        "compact",
+      );
+      expect(r.violations.some((v) => v.includes("Fake Name Jr"))).toBe(true);
+    });
+  });
 });
 
 describe("precision fix round 2 — PART B: verb + lastname shorthand", () => {
@@ -253,6 +280,13 @@ describe("precision fix round 2 — PART B: verb + lastname shorthand", () => {
   it("a plausible given name in that slot (not a sentence verb) still fails, even though the surname matches (Marcus McCaffrey)", () => {
     const r = validateCapsule(pad("Marcus McCaffrey had a day for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
     expect(r.violations.some((v) => v.includes("Marcus McCaffrey"))).toBe(true);
+  });
+
+  it('review round 2, CRITICAL (executed probe): a real NFL given name in that slot ("Chase McCaffrey") still fails, even though the surname matches', () => {
+    // "Chase" was removed from SENTENCE_VERB_WORDS after the reviewer's own executed probe showed
+    // it false-passing here (Chase Brown, Chase Claypool, Chase Edmonds are all real given names).
+    const r = validateCapsule(pad("Chase McCaffrey had a huge day for the SF offense, our number of 248 season points and board rank 14 overall this season."), mccaffreyFacts, "compact");
+    expect(r.violations.some((v) => v.includes("Chase McCaffrey"))).toBe(true);
   });
 
   it("the ledgered decomposed single-word floor still holds: a ledgered 'Rashad Long' never lets bare 'Long' pass under a real first name", () => {
