@@ -59,7 +59,12 @@ export async function runCapsuleSweepStep(db: Db, clock: Clock, deps: CapsuleSwe
   let totalCostUsd = 0;
   const detail: string[] = [];
 
+  let first = true;
   for (const one of toProcess) {
+    // Paced, not burst: see CAPSULE_CONFIG.sweepPacingMs. The pause sits BEFORE each player
+    // after the first so a one-player run pays nothing.
+    if (!first) await new Promise((resolve) => setTimeout(resolve, CAPSULE_CONFIG.sweepPacingMs));
+    first = false;
     const result = await generateCapsule(one, { apiKey: deps.apiKey, fetch: deps.fetch });
     await upsertCapsule(db, one.identity.id, one.factsHash, result);
     const cost = (result.compact.usage?.costUsd ?? 0) + (result.full.usage?.costUsd ?? 0);

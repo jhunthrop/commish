@@ -50,6 +50,11 @@ export const CAPSULE_CONFIG = {
    *  sweeps rather than exhausting it in one run. Generous, per the base-product ruling (spec
    *  §15.1): no paywall gates capsule coverage, only pacing against the gateway. */
   sweepGenerationBudget: 40,
+  /** Pause between players inside one sweep. The gateway rate-limits per minute, and the first
+   *  live sweep proved a burst (two calls per player, back to back) throttles everything after
+   *  the first player into the template floor (2026-09-05). A nightly job has no latency budget
+   *  to protect; fifteen seconds a player clears any per-minute cap with room. */
+  sweepPacingMs: 15_000,
 } as const;
 
 /**
