@@ -2221,6 +2221,76 @@ export const nflDraftPicks = pgTable(
 );
 
 /**
+ * THE OFFICIAL WEEKLY INJURY REPORT, ARCHIVED VERBATIM — the raw fact `availability/season-end.ts`
+ * derives a "his season ended after week 4 (knee, placed on injured reserve)" claim from.
+ *
+ * `news/retrieve.ts`'s `mapInjuries` already turns this same release into ordinal
+ * `player_week_observations` (a MODEL FEATURE: how bad is his outlook, as a number a fit can weigh).
+ * This is a different job. A fact sheet needs the report's OWN WORDS — "Knee", "Out" — not the
+ * ordinal a model prefers, and it needs every player the release names, not only the skill positions
+ * `mapInjuries` narrows to for the projection engine. Two consumers, two shapes; forcing the fact
+ * sheet to reverse-engineer a designation's text back out of an integer would be guessing at
+ * something the source already said in plain words.
+ *
+ * ONE ROW PER (season, week, gsis_id), matching the release itself: measured against six seasons of
+ * the real file (2009, 2015, 2018, 2020, 2023-2025), nflverse already collapses a player's week to a
+ * single row — the rare exception (two 2024 rows, a designation revised mid-week) is resolved by
+ * `mapInjuryRows` keeping the later `date_modified`, so this table only ever holds nflverse's OWN
+ * latest word for that player-week, never two competing rows for a caller to disagree about.
+ *
+ * APPEND-ONLY BY UPSERT, NOT BY INSERT-ONLY. A re-ingested season's row for a week already stored is
+ * an update in place keyed on the unique index below, not a second row and not silently discarded:
+ * unlike `nfl_draft_picks` (a pick never changes once made), nflverse DOES occasionally republish a
+ * week's designation, and `onConflictDoNothing` would freeze the first version an operator happened
+ * to fetch. The archive is still append-only at the SEASON grain a `live-tables` reader cares about
+ * — nothing here is ever deleted, and a corrected row still carries its own `date_modified`, so the
+ * history of what nflverse said and when remains reconstructable from `ingested_at` order alone.
+ *
+ * `report_status` and `report_primary_injury` are stored EXACTLY as published, including the empty
+ * string nflverse uses for "on the report, no game-status designation yet" — never null-coalesced
+ * into a guess and never a step more specific than the source. See `season-end.ts`'s own docblock
+ * for why upgrading "Knee" to "ACL" would be exactly the fabrication this table exists to prevent.
+ */
+export const nflverseInjuries = pgTable(
+  "nflverse_injuries",
+  {
+    season: integer("season").notNull(),
+    week: integer("week").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** The league's own game-status designation ("Out", "Questionable", "Doubtful", or "" when
+     *  listed with none), verbatim — never the ordinal `news/retrieve.ts` maps it to. */
+    reportStatus: text("report_status").notNull(),
+    /** The report's own injury text ("Knee", "Hamstring"), or "" when none was published. Never
+     *  narrowed or inferred to something more specific than these words. */
+    primaryInjury: text("primary_injury").notNull(),
+    /** The Wednesday-through-Friday practice designation, verbatim, or "" when not on the report. */
+    practiceStatus: text("practice_status").notNull(),
+    /** The league's own filing timestamp for this row — nflverse's `date_modified`, taken literally
+     *  exactly as `news/retrieve.ts`'s `reportFiledAt` does for the same column. */
+    dateModified: timestamp("date_modified", { withTimezone: true }).notNull(),
+    /** Provenance: which release this row came from. Free text, matching the convention every other
+     *  `source` column in this schema keeps, rather than a boolean nobody could extend. */
+    source: text("source").notNull().default("nflverse_injuries"),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** The natural key IS the primary key, deliberately — not a surrogate `bigserial` beside a
+     *  unique index the way `nfl_draft_picks` carries one. This table's writer upserts on conflict
+     *  (`recordInjuryRows`, `db/upsert.ts`'s `excludedSetFor`/`changedRowWhere`), and a serial `id`
+     *  sitting outside the conflict target would itself be rewritten to a freshly-consumed sequence
+     *  value on every re-ingested row — a surrogate key that changes under upsert is worse than
+     *  none. `ingested_at` is deliberately excluded from the update set for the same reason
+     *  `player_week_observations` never lets a re-run touch its own timestamp: it names when this
+     *  fact was FIRST written down, not when it was last confirmed. */
+    primaryKey({ columns: [t.season, t.week, t.playerId] }),
+    /** `season-end.ts`'s read: every row for one player, one season, in week order. */
+    index("nflverse_injuries_player_season_idx").on(t.playerId, t.season, t.week),
+  ],
+);
+
+/**
  * THE ONE EDGE BETWEEN THE TWO ID SPACES THIS PRODUCT HOLDS (migration 0051).
  *
  * `nfl_players`' own docblock refused to guess at this link and said who should draw it: "mapping

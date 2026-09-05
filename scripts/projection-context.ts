@@ -15,6 +15,7 @@
 import { createDb } from "@/db/client";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ingestCoaches, ingestInjuryReports, ingestOpponentDefence, ingestPlayByPlay, ingestSchedule } from "@/projections/nflverse/ingest";
+import { ingestInjuries } from "@/projections/nflverse/injuries";
 
 const FIRST_SEASON = Number(process.argv[2] ?? 2020);
 const LAST_SEASON = Number(process.argv[3] ?? 2024);
@@ -64,6 +65,17 @@ async function main(): Promise<void> {
     console.log(
       `${report.season}: ${report.reportRows} injury report rows -> ${report.observationsWritten} new observations` +
         (report.unknownPlayers === 0 ? "" : `, ${report.unknownPlayers} listed players the universe does not project`),
+    );
+  }
+
+  // The SAME release, archived verbatim rather than turned into ordinals — `nflverse_injuries`,
+  // which a fact sheet reads for the report's own words ("Knee", "Out") rather than a model's
+  // number. See `injuries.ts`'s own docblock for why this is a second table and not a second read
+  // of `ingestInjuryReports` above.
+  for (const report of await ingestInjuries(db, client, seasons)) {
+    console.log(
+      `${report.season}: ${report.rowsRead} injury report rows archived -> ${report.written} new/changed rows` +
+        (report.unknownToUniverse === 0 ? "" : `, ${report.unknownToUniverse} listed players the universe does not hold`),
     );
   }
 
