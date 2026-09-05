@@ -57,12 +57,22 @@ const capsuleSweepNoop = defineJob({
   parsePayload: () => ({}),
   steps: [{ name: "sweep", run: async () => ({ summary: "noop", detail: [] }) }],
 });
+/** The real SCHEDULES now also fire "capture-harvest" nightly (injuries, news, depth charts). */
+const captureHarvestNoop = defineJob({
+  name: "capture-harvest",
+  maxAttempts: 3,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 60_000, maxMs: 600_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "harvest", run: async () => ({ summary: "noop", detail: [] }) }],
+});
 const definitions: ReadonlyMap<string, AnyJobDefinition> = new Map([
   ["season-week", noopDefinition],
   ["draft-sweep", sweepNoop],
   ["adp-snapshot", adpSnapshotNoop],
   ["props-preseason-snapshot", propsPreseasonSnapshotNoop],
   ["capsule-sweep", capsuleSweepNoop],
+  ["capture-harvest", captureHarvestNoop],
 ]);
 
 /** Just the Tuesday schedule, so fire counts in tests are one schedule's worth. */

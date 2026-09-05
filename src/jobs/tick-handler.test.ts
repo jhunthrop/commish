@@ -70,6 +70,17 @@ const cannedCapsuleSweep: AnyJobDefinition = defineJob({
   steps: [{ name: "sweep", run: async () => ({ summary: "canned", detail: [] }) }],
 });
 
+/** Same reason: the real SCHEDULES now also fire "capture-harvest" nightly (injuries, news, depth
+ *  charts). */
+const cannedCaptureHarvest: AnyJobDefinition = defineJob({
+  name: "capture-harvest",
+  maxAttempts: 3,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 60_000, maxMs: 600_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "harvest", run: async () => ({ summary: "canned", detail: [] }) }],
+});
+
 function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET: SECRET }): TickHandlerDeps {
   return {
     db,
@@ -80,6 +91,7 @@ function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET:
       ["adp-snapshot", cannedAdpSnapshot],
       ["props-preseason-snapshot", cannedPropsPreseasonSnapshot],
       ["capsule-sweep", cannedCapsuleSweep],
+      ["capture-harvest", cannedCaptureHarvest],
     ]),
     env,
     workerId: "tick-test",
