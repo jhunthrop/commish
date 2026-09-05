@@ -2865,6 +2865,19 @@ export const simRuns = pgTable(
      *  time for the cache path. */
     index("sim_runs_user_idx").on(t.userId, t.requestedAt),
     index("sim_runs_cache_idx").on(t.userId, t.configHash, t.boardGeneration),
+    /**
+     * Fix round 1, MEDIUM 1 — closes the check-then-act race `service.ts`'s own docblock now
+     * names: two concurrent identical requests could both pass `findCachedRun` (nothing succeeded
+     * yet) and `countInFlightSimRuns` (both read the budget before either's insert lands), and
+     * both would create a genuinely duplicate in-flight run for the same work. AT MOST ONE
+     * pending-or-running row may exist per `(user_id, config_hash, board_generation)` — the exact
+     * "at most one OPEN X" shape `trade_proposals_open_fingerprint_idx` already uses for an open
+     * trade proposal, applied here to an in-flight sim. The loser's insert raises a unique
+     * violation `store.ts`'s `createSimRun` catches (`isUniqueViolation`, `@/db/errors`) and
+     * answers with the WINNER's own row — a concurrent duplicate request joins the run already in
+     * flight rather than erroring or starting a second one.
+     */
+    uniqueIndex("sim_runs_inflight_idx").on(t.userId, t.configHash, t.boardGeneration).where(sql`${t.status} in ('pending', 'running')`),
   ],
 );
 

@@ -68,8 +68,17 @@ export async function requestSimRun(db: Db, userId: string, input: RequestSimRun
   const inFlight = await countInFlightSimRuns(db, userId);
   if (inFlight >= SIM_CONFIG.maxInFlightPerUser) return { outcome: "over_budget" };
 
+  // Fix round 1, MEDIUM 1: `countInFlightSimRuns` above and this insert are still two separate
+  // statements, so two concurrent identical requests can both read the budget as available and
+  // both reach here — that race is real and is NOT what closes it. What closes it is
+  // `SIM_RUNS_INFLIGHT_INDEX` (`schema.ts`) plus `createSimRun`'s own conflict handling: the
+  // LOSER's insert fails at the database, and it reads back the WINNER's row instead of creating
+  // a genuine duplicate. The budget check above stays as the fast, un-raced common path (it still
+  // correctly refuses a caller who already has `maxInFlightPerUser` DIFFERENT runs going); this is
+  // the narrower, structural backstop for the identical-request race specifically.
   const id = crypto.randomUUID();
-  await createSimRun(db, { id, userId, leagueId: input.leagueId, config, configHash, boardGeneration });
+  const created = await createSimRun(db, { id, userId, leagueId: input.leagueId, config, configHash, boardGeneration });
+  if (created.outcome === "joined_in_flight") return { outcome: "queued", run: created.existing };
 
   if (input.runs <= SIM_CONFIG.syncRunThreshold) {
     try {

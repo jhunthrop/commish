@@ -7,6 +7,7 @@ import {
   countInFlightSimRuns,
   createSimRun,
   findCachedRun,
+  findInFlightRun,
   getSimRun,
   hashSimConfig,
   listSimRunsForUser,
@@ -100,20 +101,84 @@ describe("sim_runs store", () => {
 
   it("lists a user's own runs, newest first", async () => {
     const hash = hashSimConfig(CONFIG);
+    // Distinct board generations: each row is its own real piece of work, not a duplicate of the
+    // other, so both may sit `pending` at once under `SIM_RUNS_INFLIGHT_INDEX`.
     await createSimRun(db, { id: "run-a", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
-    await createSimRun(db, { id: "run-b", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
+    await createSimRun(db, { id: "run-b", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-2" });
     const rows = await listSimRunsForUser(db, USER, 10);
     expect(rows.map((r) => r.id).sort()).toEqual(["run-a", "run-b"]);
   });
 
   it("counts only pending/running runs as in flight", async () => {
     const hash = hashSimConfig(CONFIG);
-    await createSimRun(db, { id: "run-p", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
-    await createSimRun(db, { id: "run-r", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
+    // Three DISTINCT board generations, so all three may exist without tripping the in-flight
+    // uniqueness constraint — this test is about the status filter, not about the race guard.
+    await createSimRun(db, { id: "run-p", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-p" });
+    await createSimRun(db, { id: "run-r", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-r" });
     await markSimRunRunning(db, "run-r");
-    await createSimRun(db, { id: "run-s", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
+    await createSimRun(db, { id: "run-s", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-s" });
     await markSimRunSucceeded(db, "run-s", SUMMARY);
 
     expect(await countInFlightSimRuns(db, USER)).toBe(2);
+  });
+
+  describe("the in-flight uniqueness constraint (fix round 1, MEDIUM 1)", () => {
+    it("createSimRun returns 'created' for the first insert of a (user, config, generation)", async () => {
+      const hash = hashSimConfig(CONFIG);
+      const result = await createSimRun(db, { id: "run-1", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
+      expect(result).toEqual({ outcome: "created" });
+    });
+
+    it("a second insert for the IDENTICAL (user, config, generation), while the first is still in flight, joins it instead of creating a duplicate", async () => {
+      const hash = hashSimConfig(CONFIG);
+      await createSimRun(db, { id: "run-1", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
+      const second = await createSimRun(db, { id: "run-2", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
+
+      expect(second.outcome).toBe("joined_in_flight");
+      if (second.outcome === "joined_in_flight") expect(second.existing.id).toBe("run-1");
+      // The loser's own row was never written.
+      expect(await getSimRun(db, "run-2")).toBeNull();
+      const rows = await listSimRunsForUser(db, USER, 10);
+      expect(rows).toHaveLength(1);
+    });
+
+    it("once the first run finishes (no longer in flight), a fresh identical request creates its own new row", async () => {
+      const hash = hashSimConfig(CONFIG);
+      await createSimRun(db, { id: "run-1", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
+      await markSimRunSucceeded(db, "run-1", SUMMARY);
+
+      const result = await createSimRun(db, { id: "run-2", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
+      expect(result).toEqual({ outcome: "created" });
+    });
+
+    it("findInFlightRun answers null once nothing is pending/running for that key", async () => {
+      const hash = hashSimConfig(CONFIG);
+      expect(await findInFlightRun(db, USER, hash, "gen-1")).toBeNull();
+      await createSimRun(db, { id: "run-1", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" });
+      expect((await findInFlightRun(db, USER, hash, "gen-1"))?.id).toBe("run-1");
+      await markSimRunSucceeded(db, "run-1", SUMMARY);
+      expect(await findInFlightRun(db, USER, hash, "gen-1")).toBeNull();
+    });
+
+    it("REAL CONCURRENCY: two genuinely simultaneous identical requests never both create a row", async () => {
+      const hash = hashSimConfig(CONFIG);
+      const [a, b] = await Promise.all([
+        createSimRun(db, { id: "run-a", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" }),
+        createSimRun(db, { id: "run-b", userId: USER, leagueId: null, config: CONFIG, configHash: hash, boardGeneration: "gen-1" }),
+      ]);
+      const outcomes = [a.outcome, b.outcome].sort();
+      expect(outcomes).toEqual(["created", "joined_in_flight"]);
+      const rows = await listSimRunsForUser(db, USER, 10);
+      expect(rows).toHaveLength(1); // exactly one row exists, whichever request won
+    });
+
+    it("two DIFFERENT configs for the same user never collide", async () => {
+      const hashA = hashSimConfig(CONFIG);
+      const hashB = hashSimConfig({ ...CONFIG, seed: 999 });
+      const a = await createSimRun(db, { id: "run-a", userId: USER, leagueId: null, config: CONFIG, configHash: hashA, boardGeneration: "gen-1" });
+      const b = await createSimRun(db, { id: "run-b", userId: USER, leagueId: null, config: CONFIG, configHash: hashB, boardGeneration: "gen-1" });
+      expect(a).toEqual({ outcome: "created" });
+      expect(b).toEqual({ outcome: "created" });
+    });
   });
 });

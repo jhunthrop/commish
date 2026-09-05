@@ -6,9 +6,15 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
+import { isUniqueViolation } from "@/db/errors";
 import { simRuns } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
 import type { SimConfig, StoredSimSummary } from "./types";
+
+/** The exact index name `schema.ts`'s `simRuns` table names for the "at most one in-flight run
+ *  per (user, config, board generation)" constraint — named once so `createSimRun`'s own conflict
+ *  catch can never drift from the migration that actually creates it. */
+export const SIM_RUNS_INFLIGHT_INDEX = "sim_runs_inflight_idx";
 
 /** A stable hash of a `SimConfig` — key order never matters, since every field is spelled out
  *  explicitly rather than serialized from whatever order the caller built the object in. */
@@ -68,6 +74,28 @@ export async function findCachedRun(db: Db, userId: string, configHash: string, 
   return row === undefined ? null : toRow(row);
 }
 
+/** The user's own CURRENTLY IN-FLIGHT (pending/running) run of the identical config against the
+ *  identical board generation, if one exists — what a caller that lost the `createSimRun` race
+ *  (fix round 1, MEDIUM 1) reads back instead of the row it failed to insert. At most one such
+ *  row can ever exist, by `SIM_RUNS_INFLIGHT_INDEX`'s own constraint, so `limit(1)` is a safety
+ *  net rather than a real ambiguity to resolve. */
+export async function findInFlightRun(db: Db, userId: string, configHash: string, boardGeneration: string): Promise<SimRunRow | null> {
+  const [row] = await db
+    .select()
+    .from(simRuns)
+    .where(
+      and(
+        eq(simRuns.userId, userId),
+        eq(simRuns.configHash, configHash),
+        eq(simRuns.boardGeneration, boardGeneration),
+        inArray(simRuns.status, ["pending", "running"]),
+      ),
+    )
+    .orderBy(desc(simRuns.requestedAt))
+    .limit(1);
+  return row === undefined ? null : toRow(row);
+}
+
 export interface CreateSimRunInput {
   readonly id: string;
   readonly userId: string;
@@ -77,16 +105,41 @@ export interface CreateSimRunInput {
   readonly boardGeneration: string;
 }
 
-export async function createSimRun(db: Db, input: CreateSimRunInput): Promise<void> {
-  await db.insert(simRuns).values({
-    id: input.id,
-    userId: input.userId,
-    leagueId: input.leagueId,
-    config: input.config as unknown as JsonObject,
-    configHash: input.configHash,
-    boardGeneration: input.boardGeneration,
-    status: "pending",
-  });
+export type CreateSimRunResult =
+  | { readonly outcome: "created" }
+  /** Fix round 1, MEDIUM 1: another concurrent, identical request won the race — `existing` is
+   *  ITS row, already in flight for the exact same `(user, configHash, boardGeneration)`. The
+   *  caller's own freshly-generated `input.id` was never written; nothing to clean up. */
+  | { readonly outcome: "joined_in_flight"; readonly existing: SimRunRow };
+
+/**
+ * Inserts a fresh `pending` row, UNLESS a concurrent request already has one in flight for the
+ * identical `(userId, configHash, boardGeneration)` — `SIM_RUNS_INFLIGHT_INDEX` makes that a
+ * unique-violation at the database, caught here (`isUniqueViolation`, the same idiom
+ * `trades.ts`'s open-fingerprint guard already uses) rather than raced past it in application
+ * code, which is the only place a check-then-act gap can ever be fully closed.
+ */
+export async function createSimRun(db: Db, input: CreateSimRunInput): Promise<CreateSimRunResult> {
+  try {
+    await db.insert(simRuns).values({
+      id: input.id,
+      userId: input.userId,
+      leagueId: input.leagueId,
+      config: input.config as unknown as JsonObject,
+      configHash: input.configHash,
+      boardGeneration: input.boardGeneration,
+      status: "pending",
+    });
+    return { outcome: "created" };
+  } catch (error: unknown) {
+    if (!isUniqueViolation(error, SIM_RUNS_INFLIGHT_INDEX)) throw error;
+    const existing = await findInFlightRun(db, input.userId, input.configHash, input.boardGeneration);
+    // The conflict just proved a row exists; a `null` here would mean it finished (and left
+    // in-flight status) between the failed insert and this read — vanishingly unlikely for a
+    // sync-path run and still handled honestly rather than assumed away.
+    if (existing === null) throw error;
+    return { outcome: "joined_in_flight", existing };
+  }
 }
 
 export async function markSimRunRunning(db: Db, id: string): Promise<void> {
