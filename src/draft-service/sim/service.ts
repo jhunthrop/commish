@@ -36,8 +36,14 @@ export type RequestSimRunResult =
 /** A stable, deterministic seed from every user-controllable knob EXCEPT the seed itself: two
  *  requests with identical parameters always sim identically, which is both what makes the cache
  *  correct and what the brief's own "deterministic under a seed" testability requirement asks
- *  for at the service layer, not only inside `simulateDrafts`. */
-function deriveSeed(shape: { readonly teamCount: number; readonly rosterSlots: readonly RosterSlotConfig[] }, input: RequestSimRunInput): number {
+ *  for at the service layer, not only inside `simulateDrafts`.
+ *
+ *  Exported so a caller that wants to LOOK UP a canonical sim without ever triggering one — the
+ *  live-room Assistant's `winningBuilds` (`@/draft-service/assistant/call.ts`), which reads
+ *  `findCachedRun` directly rather than through `requestSimRun` — can reconstruct the identical
+ *  `SimConfig`/`configHash` a Playbook-triggered canonical run used, without a second seed
+ *  formula that could quietly drift from this one. */
+export function deriveSeed(shape: { readonly teamCount: number; readonly rosterSlots: readonly RosterSlotConfig[] }, input: RequestSimRunInput): number {
   const canonical = JSON.stringify({
     teamCount: shape.teamCount,
     rosterSlots: shape.rosterSlots.map((s) => ({ slot: s.slot, count: s.count, eligiblePositions: [...s.eligiblePositions] })),

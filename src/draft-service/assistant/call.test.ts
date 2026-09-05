@@ -1,0 +1,238 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// getDraftStore() (called by assistantCall) uses the process-wide getDb() — point it at the test
+// infrastructure before any module is imported, the same idiom `api-routes.test.ts` uses.
+vi.hoisted(() => {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? "postgres://commish:commish@localhost:5433/commish_test";
+  process.env.REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
+});
+
+import { eq } from "drizzle-orm";
+import type { Db } from "@/db/client";
+import { createTestDb, truncateAll } from "@/db/test-db";
+import { leagues, nflPlayers, playerCrosswalk, players, preseasonProjections, users } from "@/db/schema";
+import { BOARD_SOURCE } from "@/projections/preseason/board-store";
+import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
+import { totalRosterSlots } from "@/draft-engine";
+import { getDraftStore } from "@/draft-service";
+import { seedDraftFixture } from "@/draft-service/test-support";
+import { SIM_CONFIG, SIM_SHARPNESS } from "@/draft-service/sim/config";
+import { deriveSeed } from "@/draft-service/sim/service";
+import { createSimRun, hashSimConfig, markSimRunSucceeded } from "@/draft-service/sim/store";
+import type { SimConfig, SimSummary } from "@/draft-service/sim/types";
+import { assistantCall } from "./call";
+
+/** Two rounds, two positions — enough rounds to reach a real "next turn" without a large fixture. */
+const TWO_ROUND_SLOTS: readonly RosterSlotConfig[] = [
+  { slot: "QB", count: 1, eligiblePositions: ["QB"] },
+  { slot: "RB", count: 1, eligiblePositions: ["RB"] },
+];
+
+/** One round only — every seat's only pick is also its forced last pick of the draft. */
+const ONE_ROUND_SLOTS: readonly RosterSlotConfig[] = [{ slot: "QB", count: 1, eligiblePositions: ["QB"] }];
+
+const ASOF = new Date("2026-09-01T00:00:00.000Z");
+
+/** Seeds the evidence board (`nfl_players` + `players` + `player_crosswalk` + `preseason_projections`)
+ *  for a small closed set of players, with clean, well-separated value-over-replacement gaps so a
+ *  recommendation's ranking is unambiguous regardless of the small survival/roster-fit adjustments
+ *  `recommendPick` layers on top of raw value. */
+async function seedEvidence(db: Db, byPosition: Readonly<Record<string, readonly { readonly id: string; readonly points: number }[]>>): Promise<void> {
+  const rows = Object.entries(byPosition).flatMap(([position, entries]) =>
+    entries.map((entry, index) => ({ position, ...entry, positionRank: index + 1 })),
+  );
+  await db.insert(nflPlayers).values(rows.map((row) => ({ id: `nfl-${row.id}`, name: row.id, position: row.position as never })));
+  await db.insert(players).values(rows.map((row) => ({ id: row.id, name: row.id, position: row.position as never, nflTeam: "SF" })));
+  await db.insert(playerCrosswalk).values(rows.map((row) => ({ playerId: row.id, nflPlayerId: `nfl-${row.id}`, method: "espn_id", resolvedAt: new Date() })));
+  const byPointsDescending = [...rows].sort((a, b) => b.points - a.points);
+  await db.insert(preseasonProjections).values(preseasonProjectionsRows(byPointsDescending));
+}
+
+// Drizzle insert helper split out only so `seedEvidence` above reads as one paragraph of intent.
+function preseasonProjectionsRows(
+  rows: readonly { readonly id: string; readonly position: string; readonly points: number; readonly positionRank: number }[],
+) {
+  return rows.map((row, index) => ({
+    season: PRODUCT_SEASON,
+    source: BOARD_SOURCE,
+    playerId: `nfl-${row.id}`,
+    rank: index + 1,
+    positionRank: row.positionRank,
+    projectedPoints: row.points,
+    valueOverReplacement: 0,
+    valueRank: index + 1,
+    expectedGames: 17,
+    floorPoints: 0,
+    medianPoints: 0,
+    ceilingPoints: 0,
+    tier: 0,
+    asOf: ASOF,
+  }));
+}
+
+describe("assistantCall", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+    // `getDraftStore()`'s replay cache is process-wide and keyed by draft id alone — a truncate
+    // between tests must invalidate every id this file reuses, or a later test could replay a
+    // sequence number left over from an earlier test's now-deleted rows.
+    for (const draftId of ["draft_stranger", "draft_scheduled", "draft_commish", "draft_top3", "draft_last"]) {
+      getDraftStore().invalidate(draftId);
+    }
+  });
+
+  it("returns null for a signed-in stranger with no team in this league", async () => {
+    await seedDraftFixture(db, {
+      draftId: "draft_stranger", leagueId: "league_stranger", format: "snake", teamCount: 2,
+      slotConfig: STANDARD_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    await getDraftStore().startDraft("draft_stranger");
+    expect(await assistantCall(db, "draft_stranger", "a-total-stranger")).toBeNull();
+  });
+
+  it("returns null before the draft has started", async () => {
+    const f = await seedDraftFixture(db, {
+      draftId: "draft_scheduled", leagueId: "league_scheduled", format: "snake", teamCount: 2,
+      slotConfig: STANDARD_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    expect(await assistantCall(db, "draft_scheduled", f.userIds[0]!)).toBeNull();
+  });
+
+  it("returns null for a commissioner who fields no team of their own", async () => {
+    const f = await seedDraftFixture(db, {
+      draftId: "draft_commish", leagueId: "league_commish", format: "snake", teamCount: 2,
+      slotConfig: STANDARD_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    const commissionerId = "league_commish_commish_no_team";
+    await db.insert(users).values({ id: commissionerId, email: `${commissionerId}@test.local`, displayName: commissionerId });
+    await db.update(leagues).set({ commissionerUserId: commissionerId }).where(eq(leagues.id, f.leagueId));
+    await getDraftStore().startDraft("draft_commish");
+    expect(await assistantCall(db, "draft_commish", commissionerId)).toBeNull();
+  });
+
+  describe("mid-draft, with a real next turn", () => {
+    const DRAFT_ID = "draft_top3";
+    const LEAGUE_ID = "league_top3";
+
+    async function seeded() {
+      const f = await seedDraftFixture(db, {
+        draftId: DRAFT_ID, leagueId: LEAGUE_ID, format: "snake", teamCount: 2,
+        slotConfig: TWO_ROUND_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+      });
+      await seedEvidence(db, {
+        QB: [
+          { id: "qb1", points: 1200 },
+          { id: "qb2", points: 200 },
+          { id: "qb3", points: 150 },
+        ],
+        RB: [
+          { id: "rb1", points: 10200 },
+          { id: "rb2", points: 200 },
+          { id: "rb3", points: 150 },
+        ],
+      });
+      const started = await getDraftStore().startDraft(DRAFT_ID);
+      if (!started.ok) throw new Error(started.reason);
+      // The draft order is drawn fresh at START_DRAFT — never assume it matches `f.teamIds`'
+      // own insertion order; read the real on-clock team back and map it to its user.
+      const onClockUserId = f.userIds[f.teamIds.indexOf(started.state.draftOrder[0]!)]!;
+      return { ...f, onClockUserId };
+    }
+
+    it("puts the two runaway-value players at the top, each carrying reasons and a live odds row", async () => {
+      const { onClockUserId } = await seeded();
+
+      const view = await assistantCall(db, DRAFT_ID, onClockUserId);
+      expect(view).not.toBeNull();
+      expect(view!.pickNumber).toBe(1);
+      expect(view!.onTheClock).toBe(true);
+      expect(view!.candidates.length).toBeGreaterThan(0);
+      expect(view!.candidates.length).toBeLessThanOrEqual(3);
+
+      // rb1 and qb1 are worth orders of magnitude more than anything else on the board — the
+      // shortlist's top two spots, in that order, regardless of who fills the (much closer) third.
+      const ids = view!.candidates.map((c) => c.playerId);
+      expect(ids.slice(0, 2)).toEqual(["rb1", "qb1"]);
+
+      for (const candidate of view!.candidates) {
+        expect(candidate.reasons.length).toBeGreaterThan(0);
+        // A real next turn exists (2 rounds, 2 teams): every candidate's odds are either a real
+        // measured row, or null only because that specific measurement ended in every run.
+        if (candidate.makeItBack !== null) {
+          expect(candidate.makeItBack.playerId).toBe(candidate.playerId);
+          expect(candidate.makeItBack.survival).not.toBeNull();
+          expect(candidate.makeItBack.survival).toBeGreaterThanOrEqual(0);
+          expect(candidate.makeItBack.survival).toBeLessThanOrEqual(1);
+        }
+      }
+
+      expect(view!.computedBasis).toBe(ASOF.toISOString());
+      // No picks made yet: classifyBuild's own honest reading of an empty roster (zero backs in
+      // the first three rounds, zero quarterbacks in the first six — both technically true of
+      // nothing at all).
+      expect(view!.yourBuild).toEqual(["zero-RB", "late-QB"]);
+    });
+
+    it("is deterministic: two calls at the same pick return identical odds", async () => {
+      const { onClockUserId } = await seeded();
+      const first = await assistantCall(db, DRAFT_ID, onClockUserId);
+      const second = await assistantCall(db, DRAFT_ID, onClockUserId);
+      expect(second).toEqual(first);
+    });
+
+    it("no cached sim for this league means an honest null, never a fabricated build list", async () => {
+      const { onClockUserId } = await seeded();
+      const view = await assistantCall(db, DRAFT_ID, onClockUserId);
+      expect(view!.winningBuilds).toBeNull();
+    });
+
+    it("reads a build list straight from the canonical cached sim, never triggering one of its own", async () => {
+      const { onClockUserId } = await seeded(); // draftOrder[0], so this seat's slot is 1
+      const shape = { teamCount: 2, rosterSlots: TWO_ROUND_SLOTS };
+      const knobs = { slot: 1, rounds: totalRosterSlots(TWO_ROUND_SLOTS), runs: SIM_CONFIG.syncRunThreshold, sharpness: SIM_SHARPNESS.mixed };
+      const config: SimConfig = { ...shape, ...knobs, seed: deriveSeed(shape, { leagueId: LEAGUE_ID, ...knobs }) };
+      const summary: SimSummary = {
+        runs: knobs.runs, teamCount: 2, slot: 1, rounds: knobs.rounds, baselineTop3Rate: 0.5,
+        builds: [{ label: "hero-RB", runsWithLabel: 40, top3FinishRate: 0.6 }],
+        availability: [], exposure: [], meanFinishRank: 4, elapsedMs: 12,
+      };
+      await createSimRun(db, { id: "cached-run", userId: onClockUserId, leagueId: LEAGUE_ID, config, configHash: hashSimConfig(config), boardGeneration: ASOF.toISOString() });
+      await markSimRunSucceeded(db, "cached-run", summary);
+
+      const view = await assistantCall(db, DRAFT_ID, onClockUserId);
+      expect(view!.winningBuilds).toEqual(summary.builds);
+    });
+  });
+
+  describe("a forced last pick — no next turn exists at all", () => {
+    it("nulls every candidate's make-it-back odds, never a fabricated survival number", async () => {
+      const f = await seedDraftFixture(db, {
+        draftId: "draft_last", leagueId: "league_last", format: "snake", teamCount: 2,
+        slotConfig: ONE_ROUND_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+      });
+      await seedEvidence(db, {
+        QB: [
+          { id: "qb1", points: 500 },
+          { id: "qb2", points: 200 },
+          { id: "qb3", points: 150 },
+        ],
+      });
+      const started = await getDraftStore().startDraft("draft_last");
+      if (!started.ok) throw new Error(started.reason);
+      const onClockUserId = f.userIds[f.teamIds.indexOf(started.state.draftOrder[0]!)]!;
+
+      const view = await assistantCall(db, "draft_last", onClockUserId);
+      expect(view).not.toBeNull();
+      expect(view!.pickNumber).toBe(1);
+      expect(view!.onTheClock).toBe(true);
+      expect(view!.candidates.length).toBeGreaterThan(0);
+      for (const candidate of view!.candidates) {
+        expect(candidate.makeItBack).toBeNull();
+      }
+    });
+  });
+});
