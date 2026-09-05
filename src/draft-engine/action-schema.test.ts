@@ -51,6 +51,43 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
     expect(draftActionSchema.parse(row)).not.toHaveProperty("skipPolicy");
   });
 
+  it("accepts an autopick snapshot carrying surplusDamp (the 2026-09-05 QB-stacking fix)", () => {
+    const row = {
+      v: 1,
+      type: "START_DRAFT", minBid: 1, autopick: { ...AUTOPICK_CONFIG, surplusDamp: 0.25 },
+      timestamp: "2026-09-01T00:00:00.000Z",
+      draftOrder: ["t1", "t2"],
+      pool: [{ playerId: "p1", position: "QB" }],
+    };
+    expect(draftActionSchema.parse(row)).toEqual(row);
+  });
+
+  it("accepts an autopick snapshot with surplusDamp absent — a pre-fix log, never today's tunable", () => {
+    const { surplusDamp: _omit, ...preFixAutopick } = AUTOPICK_CONFIG;
+    void _omit;
+    const row = {
+      v: 1,
+      type: "START_DRAFT", minBid: 1, autopick: preFixAutopick,
+      timestamp: "2026-09-01T00:00:00.000Z",
+      draftOrder: ["t1", "t2"],
+      pool: [{ playerId: "p1", position: "QB" }],
+    };
+    expect(draftActionSchema.parse(row)).toEqual(row);
+  });
+
+  it("rejects surplusDamp: 0 and anything above 1 — steep is fine, disqualifying or warming is not", () => {
+    const baseRow = {
+      v: 1,
+      type: "START_DRAFT", minBid: 1,
+      timestamp: "2026-09-01T00:00:00.000Z",
+      draftOrder: ["t1", "t2"],
+      pool: [{ playerId: "p1", position: "QB" }],
+    };
+    expect(() => draftActionSchema.parse({ ...baseRow, autopick: { ...AUTOPICK_CONFIG, surplusDamp: 0 } })).toThrow();
+    expect(() => draftActionSchema.parse({ ...baseRow, autopick: { ...AUTOPICK_CONFIG, surplusDamp: 1.01 } })).toThrow();
+    expect(draftActionSchema.parse({ ...baseRow, autopick: { ...AUTOPICK_CONFIG, surplusDamp: 1 } }).type).toBe("START_DRAFT");
+  });
+
   it("accepts a v1 SET_QUEUE row", () => {
     const row = { v: 1, type: "SET_QUEUE", timestamp: "2026-09-01T00:00:00.000Z", teamId: "t1", playerIds: ["p1", "p2"] };
     expect(draftActionSchema.parse(row)).toEqual(row);

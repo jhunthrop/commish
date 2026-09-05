@@ -123,6 +123,25 @@ export interface DraftAutopickPolicy {
   readonly startersFilledDamp: number;
   /** Fraction of the roster a team must have filled for the need ramp to reach full weight. */
   readonly rampFullAtRosterFraction: number;
+  /**
+   * The 2026-09-05 fix for the QB-stacking incident (prod mock draft
+   * 25642877-0841-49a5-8511-f3655d8064b1, replayed in full): `needMultiplier` was saturation-
+   * blind — once a position's dedicated starters were filled, EVERY further body there cooled
+   * to the same flat `startersFilledDamp` forever, so a team's second and third QB in a 1-QB
+   * room scored no worse than its first starter going one over. With every skill position
+   * equally "filled" by round 7, board order alone decided, and autopick stacked QB2 (Purdy,
+   * pick 95) and QB3 (Dart, pick 98) as the top of the remaining board.
+   *
+   * `startersFilledDamp` now compounds by this value once per extra body already rostered at a
+   * filled position (`scoring.ts`'s `NeedMultiplierOptions.surplusDamp`, ramped the same way
+   * `startersFilledDamp` itself is — see `bestAvailableFor`, `selectors.ts`): a second body
+   * merely unattractive, a third effectively never. OPTIONAL, and absent means NO compounding at
+   * all — the flat pre-fix `startersFilledDamp`, byte for byte — for the identical F3 reason
+   * `startersFilledDamp` itself must never retroactively change what an already-persisted
+   * autopick did: a log from before this fix carries no `surplusDamp` and must keep replaying
+   * without it.
+   */
+  readonly surplusDamp?: number;
 }
 
 /**
@@ -150,11 +169,20 @@ export interface DraftAutopickPolicy {
  * this scoring can ever make is `temperature × ln(maxBoost / minDamp)` ranks (≈3.3 at these
  * values), bounded by construction rather than by a depth cap.
  */
+/**
+ * `surplusDamp: 0.25` — the incident's own arithmetic (`DraftAutopickPolicy.surplusDamp`'s
+ * docblock above), at full ramp: a first surplus body (dedicated slots exactly at capacity, the
+ * candidate the one over) scores `startersFilledDamp × 0.25^1 = 0.15` instead of the flat `0.6`
+ * every other filled position still gets; a second surplus body scores `0.6 × 0.25^2 = 0.0375`.
+ * Steep on purpose — a bench QB behind a 1-QB starter is close to dead weight, not merely a
+ * worse RB3.
+ */
 export const AUTOPICK_CONFIG: DraftAutopickPolicy = {
   temperature: 3.0,
   needPerOpenStartingSlot: 0.4,
   startersFilledDamp: 0.6,
   rampFullAtRosterFraction: 0.5,
+  surplusDamp: 0.25,
 };
 
 export const AUCTION_CONFIG = {

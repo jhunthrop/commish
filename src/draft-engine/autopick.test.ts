@@ -140,6 +140,61 @@ describe("need-aware autopick (bestAvailableFor fallback)", () => {
   });
 });
 
+describe("surplus damp cools a stacked QB below a genuinely open skill need (2026-09-05 incident fix, prod mock 25642877-0841-49a5-8511-f3655d8064b1)", () => {
+  // t1 hand-drafted six clean rounds: QB (1/1), RB (2/2 dedicated plus one more in FLEX), WR
+  // (2/2) — every skill starter it can fill right now is full except TE, still wide open. The
+  // board is topped by two more QBs — the incident's own shape: a 1-QB room where the bots left
+  // QBs on the board, and every filled skill position wore the identical flat damp.
+  const SURPLUS_ROSTER = ["qb1", "rb1", "rb2", "rb3", "wr1", "wr2"];
+  const SURPLUS_POOL: readonly DraftPoolEntry[] = [
+    { playerId: "qb1", position: "QB" }, ...players("RB", 3), ...players("WR", 2), // t1's own six
+    { playerId: "qb2", position: "QB" }, { playerId: "qb3", position: "QB" },
+    { playerId: "rb4", position: "RB" }, { playerId: "wr3", position: "WR" }, { playerId: "te1", position: "TE" },
+    ...players("K", 3), ...players("DEF", 3),
+  ];
+  // The identical policy MINUS `surplusDamp` — a hand-built stand-in for a pre-fix persisted
+  // snapshot, the same discipline `SPRINT_CONFIG`'s "history replays" block below uses for
+  // `skipPolicy`/`autopick` entirely absent.
+  const PRE_FIX_AUTOPICK = {
+    temperature: AUTOPICK_CONFIG.temperature,
+    needPerOpenStartingSlot: AUTOPICK_CONFIG.needPerOpenStartingSlot,
+    startersFilledDamp: AUTOPICK_CONFIG.startersFilledDamp,
+    rampFullAtRosterFraction: AUTOPICK_CONFIG.rampFullAtRosterFraction,
+  };
+
+  it("with surplusDamp on the snapshot, routes to the still-needed TE instead of stacking a second QB", () => {
+    const state = midDraftState(SNAKE_CONFIG, SURPLUS_POOL, { t1: SURPLUS_ROSTER, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("te1");
+  });
+
+  it("with surplusDamp ABSENT from the snapshot, replays the pre-fix behavior: the board-topping QB wins", () => {
+    const legacyConfig: DraftConfig = { ...SNAKE_CONFIG, autopick: PRE_FIX_AUTOPICK };
+    const state = midDraftState(legacyConfig, SURPLUS_POOL, { t1: SURPLUS_ROSTER, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("qb2");
+  });
+
+  it("replay determinism: neither outcome drifts when the live AUTOPICK_CONFIG.surplusDamp is retuned afterward", () => {
+    // Both configs below are frozen COPIES (`{ ...AUTOPICK_CONFIG }`, never the module's own
+    // reference) — the identical discipline the "keeps a snapshotted draft's replay identical"
+    // test above already applies to `temperature`/`needPerOpenStartingSlot`. Whether a draft's
+    // own snapshot carries `surplusDamp` or not, a later deploy retuning the live constant must
+    // change neither: only a NEW draft's own START_DRAFT would ever pick up the new value.
+    const withSnapshot: DraftConfig = { ...SNAKE_CONFIG, autopick: { ...AUTOPICK_CONFIG } };
+    const withoutSnapshot: DraftConfig = { ...SNAKE_CONFIG, autopick: PRE_FIX_AUTOPICK };
+    const mutable = AUTOPICK_CONFIG as { surplusDamp?: number };
+    const saved = mutable.surplusDamp;
+    try {
+      mutable.surplusDamp = 0.9; // a hostile future retune of the live module constant
+      const withState = midDraftState(withSnapshot, SURPLUS_POOL, { t1: SURPLUS_ROSTER, t2: [] });
+      const withoutState = midDraftState(withoutSnapshot, SURPLUS_POOL, { t1: SURPLUS_ROSTER, t2: [] });
+      expect(bestAvailableFor(withState, "t1")?.playerId).toBe("te1");
+      expect(bestAvailableFor(withoutState, "t1")?.playerId).toBe("qb2");
+    } finally {
+      mutable.surplusDamp = saved;
+    }
+  });
+});
+
 describe("endgame regression: a full 15-round all-autopick draft", () => {
   const TEAMS = Array.from({ length: 12 }, (_, i) => `t${String(i + 1).padStart(2, "0")}`);
   // A proportionally interleaved 250-player pool, so the ranking isn't position-sorted

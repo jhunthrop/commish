@@ -224,6 +224,13 @@ export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEn
   const needOptions = {
     openSlotBoost: ramp * policy.needPerOpenStartingSlot,
     filledDamp: 1 - ramp * (1 - policy.startersFilledDamp),
+    // Ramped the identical way `filledDamp` above is — see `NeedMultiplierOptions.surplusDamp`
+    // (`scoring.ts`) and `DraftAutopickPolicy.surplusDamp` (`config.ts`) — so a team's very
+    // first pick still degenerates to exactly board order (every dial neutral at ramp 0), and a
+    // barely-awake ramp doesn't let this dial alone override what `filledDamp`'s own gentle
+    // warm-up already guarantees. Undefined stays undefined: a config with no `surplusDamp` at
+    // all (pre-fix snapshot) must never gain one from ramping arithmetic.
+    surplusDamp: policy.surplusDamp === undefined ? undefined : 1 - ramp * (1 - policy.surplusDamp),
   };
   let best: DraftPoolEntry | null = null;
   let bestScore = -Infinity;
