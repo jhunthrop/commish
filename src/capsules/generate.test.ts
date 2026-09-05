@@ -35,7 +35,7 @@ describe("generateCapsule", () => {
     const facts = buildPlayerFacts(baseInput());
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
-      const isFull = payload.messages[1]!.content.includes("(1) the case for him");
+      const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       return okResponse(isFull ? GOOD_FULL : GOOD_COMPACT);
     });
 
@@ -53,7 +53,7 @@ describe("generateCapsule", () => {
     let compactCalls = 0;
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
-      const isFull = payload.messages[1]!.content.includes("(1) the case for him");
+      const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       if (isFull) return okResponse(GOOD_FULL);
       compactCalls += 1;
       return okResponse(compactCalls === 1 ? "He will score 999 touchdowns this year, an absurd number nobody else has ever hit for this SF offense." : GOOD_COMPACT);
@@ -102,7 +102,7 @@ describe("generateCapsule", () => {
     const facts = buildPlayerFacts(baseInput());
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
-      const isFull = payload.messages[1]!.content.includes("(1) the case for him");
+      const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       return isFull ? okResponse("He will score 999 touchdowns this year for this offense, a fabricated absurd number.") : okResponse(GOOD_COMPACT);
     });
 

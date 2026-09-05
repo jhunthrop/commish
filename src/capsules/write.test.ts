@@ -48,6 +48,46 @@ describe("generateCapsuleBody", () => {
     expect(payload.messages[1]!.content).toContain("Rashad Long");
   });
 
+  /** THE CMC STRUCTURE (color v2, Task 3) — pins the prompt shape itself rather than any live
+   *  model's obedience to it: a compact request must ask for exactly one rank and one worry, and
+   *  a full request must walk the five-beat structure (volume/role case with ranks first, role
+   *  depth, honest worry, the call, the two tail outcomes) rather than the old four-beat shape. */
+  it("asks the compact size for exactly one rank and one worry, never a second of either", async () => {
+    const facts = buildPlayerFacts(baseInput());
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: "Body text here." } }] }));
+    await generateCapsuleBody(facts, "compact", { apiKey: "test-key", fetch: fetchMock });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(init.body as string) as { messages: { role: string; content: string }[] };
+    expect(payload.messages[1]!.content).toContain("ONE rank from the fact sheet");
+    expect(payload.messages[1]!.content).toContain("ONE honest worry");
+    expect(payload.messages[1]!.content).toContain("Do not stack a second rank or a second worry");
+  });
+
+  it("walks the full size through the five-beat CMC structure: ranks first, role depth, the honest worry, the call, the two tail outcomes", async () => {
+    const facts = buildPlayerFacts(baseInput());
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: "Body text here." } }] }));
+    await generateCapsuleBody(facts, "full", { apiKey: "test-key", fetch: fetchMock });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(init.body as string) as { messages: { role: string; content: string }[] };
+    const prompt = payload.messages[1]!.content;
+    expect(prompt).toContain("the volume or role case, leading with the fact sheet's own ranks");
+    expect(prompt).toContain("the role depth");
+    expect(prompt).toContain("the honest worry");
+    expect(prompt).toContain("the two outcomes the \"most seasons\" band's own two tails point to");
+  });
+
+  it("system voice rules ban reciting ranks as a list and require the two tail outcomes in the writer's own words", async () => {
+    const facts = buildPlayerFacts(baseInput());
+    const fetchMock = vi.fn().mockResolvedValue(okResponse({ choices: [{ message: { content: "Body text here." } }] }));
+    await generateCapsuleBody(facts, "full", { apiKey: "test-key", fetch: fetchMock });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(init.body as string) as { messages: { role: string; content: string }[] };
+    const systemPrompt = payload.messages[0]!.content;
+    expect(systemPrompt).toContain("never a bare recitation of three or four numbers back to back");
+    expect(systemPrompt).toContain("league-winning at the top of that range and a team-crusher at the bottom");
+    expect(systemPrompt).toContain("never words to copy verbatim");
+  });
+
   it("recovers from a raw control character in the JSON body via the tolerant parse path", async () => {
     const facts = buildPlayerFacts(baseInput());
     const dirtyJson = `{"choices":[{"message":{"content":"Text with a \x01 stray byte."}}]}`;
