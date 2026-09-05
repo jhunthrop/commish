@@ -127,6 +127,25 @@ function isNameGrounded(phrase: string, nameLedger: readonly string[]): boolean 
   });
 }
 
+/**
+ * Sentence-initial capitalized verbs merge into a name's capitalized run ("Buy Jahmyr Gibbs",
+ * "Draft St. Brown" — first live sweep, 2026-09-05), so a failed multi-word candidate sheds its
+ * LEADING word and tries again. Fabrication-safe by construction: shedding only ever reduces the
+ * candidate, and the reduced phrase still faces the same exact-or-suffix grounding — "Buy Justin
+ * Herbert" sheds to "Justin Herbert", which fails for any other subject exactly as before.
+ */
+function isNameGroundedWithShedding(phrase: string, nameLedger: readonly string[]): boolean {
+  let candidate = phrase.trim();
+  for (;;) {
+    if (isNameGrounded(candidate, nameLedger)) return true;
+    // Never shed below two words: a two-word candidate IS the name under test, and reducing it
+    // to a single decomposed ledger fragment would reopen exactly the bypass CRITICAL 1 closed
+    // ("Marcus Long" must never pass by shedding to "Long").
+    if (candidate.split(" ").length <= 2) return false;
+    candidate = candidate.slice(candidate.indexOf(" ") + 1);
+  }
+}
+
 /** Simple inflections of a single-word banned term (fix round 1, LOW) — "GOATed" is otherwise
  *  invisible to a bare `\bgoat\b`, since a plain word boundary sits between "t" and "e" only when
  *  nothing follows "goat" at all. Deliberately narrow (s/d/ed/ing) rather than a general stemmer:
@@ -248,7 +267,7 @@ export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleS
   }
 
   for (const phrase of extractProperNamePhrases(trimmed)) {
-    if (!isNameGrounded(phrase, facts.nameLedger)) {
+    if (!isNameGroundedWithShedding(phrase, facts.nameLedger)) {
       violations.push(`The name "${phrase}" does not trace to any supplied fact.`);
     }
   }

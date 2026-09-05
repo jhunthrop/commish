@@ -149,6 +149,12 @@ describe("re-review round 2: honest shorthand passes, fabrication still fails", 
     expect(validateCapsule(pad("St. Brown owns the slot for DET, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(true);
   });
 
+  it("sheds a sentence-initial verb from the subject's name, and only from the subject's", () => {
+    // First live sweep, 2026-09-05: "Buy Jahmyr Gibbs" extracted as one capitalized run.
+    expect(validateCapsule(pad("Buy Amon-Ra St. Brown for the DET offense, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(true);
+    expect(validateCapsule(pad("Buy Justin Herbert for the DET offense, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(false);
+  });
+
   it("still rejects a fabricated name, possessive or shorthand alike", () => {
     expect(validateCapsule(pad("Justin Herbert's arm shows up for DET, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(false);
     expect(validateCapsule(pad("Marcus Brown had a day for DET, our number of 248 season points and board rank 14 overall this season."), facts, "compact").ok).toBe(false);
