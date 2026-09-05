@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Position } from "@/domain/player";
 import { groupReasons } from "@/league-room/outlook/groups";
 import { verdictLine } from "@/league-room/outlook/verdict";
+import type { PropMarket } from "@/projections/odds/props-store";
 import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
@@ -105,6 +106,72 @@ export interface PlayerFactsSeasonSummary {
   readonly totals: PlayerFactsSeasonTotals;
 }
 
+/**
+ * THE COLOR FACTS (spec §9 AMENDED 2026-09-05, "an analyst breaking it down") — every one of these
+ * comes from a store this product already holds; a store without the row means the field is
+ * `null`/absent, never estimated. Three independent groups, matching the founder's own split:
+ *
+ *   (a) `PlayerFactsLastSeasonStory` — last season's story, computed from the SAME prior-season
+ *       stat machinery `league-service/player.ts`'s `priorSeasonStats` already reads
+ *       (`statLinesAsOfForLiveSurface`), but built ONCE for the whole board's population in
+ *       `collect.ts` rather than per league request.
+ *   (b) the props line / Vegas win total pair, on `PlayerFacts.booksNumbers` — the sportsbooks' OWN
+ *       numbers, phrased in `render.ts` as what the books "hang on him", never this engine's claim.
+ *   (c) `PlayerFactsUsage` — last season's snap/target/red-zone shares, straight off the
+ *       observation store's own usage quantities (`projections/laws/discovery-facts.ts`'s
+ *       `DiscoveryQuantityValues`), independent of whether any law fired on them.
+ */
+export interface PlayerFactsLastSeasonStory {
+  readonly season: number;
+  /** 1-based finish among his position's peers who played that season, by TOTAL points (never
+   *  points per game) — "RB4 last season" is `positionRank: 4`. */
+  readonly positionRank: number;
+  readonly pointsPerGame: number;
+  readonly gamesPlayed: number;
+  /** His single best-scoring week that season. */
+  readonly bestWeek: { readonly week: number; readonly points: number };
+  /** How many of his own played weeks scored above the POSITION's pooled weekly median that
+   *  season (every week played by every peer at his position, the same population
+   *  `league-service/player.ts`'s `weekViews` judges a single week against) — the raw ingredient
+   *  for a consistency read ("9 of 13 weeks above the position median"), `gamesPlayed` being the
+   *  honest denominator. */
+  readonly weeksAboveMedian: number;
+}
+
+/** One sportsbook market's own median pre-kickoff line for this season — read through the same
+ *  leakage-gated archive `projections/market/props-anchor.ts` anchors the board with
+ *  (`medianPropLinesByPlayer`), never the blended season-points figure that function folds it
+ *  into. `market` is the raw enum; `render.ts` alone turns it into English (`facts.ts`'s own
+ *  two-audience docblock). */
+export interface PlayerFactsPropsLine {
+  readonly market: PropMarket;
+  readonly medianLine: number;
+}
+
+/** The books' own numbers — see this module's own "color facts" docblock, group (b). */
+export interface PlayerFactsBooksNumbers {
+  /** Every market the archive actually captured for him pre-kickoff, in `PROP_MARKETS`' own
+   *  fixed order (never DB row order) for `factsHash`'s determinism. Empty when the archive holds
+   *  nothing for him. */
+  readonly propsLines: readonly PlayerFactsPropsLine[];
+  /** His CURRENT team's posted regular-season win total for the season being drafted
+   *  (`team_week_observations`, source `vegas_win_totals`) — `null` when the archive holds no
+   *  line for that team-season. */
+  readonly teamVegasWinTotal: number | null;
+}
+
+/** Last season's usage, plain — see this module's own "color facts" docblock, group (c). Each
+ *  share is `null` on the identical no-evidence rule `DiscoveryQuantityValues` itself keeps (the
+ *  play-by-play never saw him, or the snap-count file never named him), never a fabricated zero. */
+export interface PlayerFactsUsage {
+  readonly season: number;
+  readonly snapShare: number | null;
+  readonly targetShare: number | null;
+  /** Share of his OWN carries and targets that fell inside the twenty — see
+   *  `DiscoveryQuantityValues.redZoneTouchShare`'s own docblock for the exact numerator/denominator. */
+  readonly redZoneShare: number | null;
+}
+
 /** THE THREE HONEST STATES an injury read can be in — see `PlayerFacts.injury`'s own docblock
  *  (fix round 1, CRITICAL 2) for why a nullable string could not tell two of them apart. */
 export type PlayerFactsInjuryStatus =
@@ -151,6 +218,16 @@ export interface PlayerFacts {
   readonly injury: PlayerFactsInjuryStatus;
   /** Newest first, at most three — see `collect.ts`'s `newsForPlayers`. */
   readonly news: readonly PlayerFactsNewsItem[];
+  /** LAST SEASON'S STORY (spec §9 AMENDED 2026-09-05) — `null` for a player the prior-season stat
+   *  store carries nothing for (a rookie, most often), never a fabricated debut season. See this
+   *  module's own "color facts" docblock, group (a). */
+  readonly lastSeasonStory: PlayerFactsLastSeasonStory | null;
+  /** The books' own numbers — see this module's own "color facts" docblock, group (b). */
+  readonly booksNumbers: PlayerFactsBooksNumbers;
+  /** Last season's usage, plain — `null` when the store carries no season for him at all (a
+   *  rookie); a real season with individually-absent shares still returns non-null with some or
+   *  all of its own fields `null` — see this module's own "color facts" docblock, group (c). */
+  readonly usage: PlayerFactsUsage | null;
   /** Every number the validator will accept in a capsule's own prose, in this object's own
    *  declaration order. A fraction-valued fact (a share change) contributes BOTH its raw fraction
    *  and its whole-percent form, since prose almost always states the latter ("+4%") and the
@@ -189,6 +266,12 @@ export interface PlayerFactsInput {
   readonly season: PlayerFactsSeasonSummary | null;
   readonly injury: PlayerFactsInjuryStatus;
   readonly news: readonly PlayerFactsNewsItem[];
+  /** Already fully computed by `collect.ts` — see that module's own docblock for where each of
+   *  the three color-fact groups is read from. `buildPlayerFacts` copies these straight across,
+   *  exactly as it already does for `season`/`byeWeek`. */
+  readonly lastSeasonStory: PlayerFactsLastSeasonStory | null;
+  readonly booksNumbers: PlayerFactsBooksNumbers;
+  readonly usage: PlayerFactsUsage | null;
 }
 
 function findReason<T extends BoardReason["code"]>(reasons: readonly BoardReason[], code: T): Extract<BoardReason, { code: T }> | undefined {
@@ -301,6 +384,32 @@ function evidenceNumbers(evidence: readonly PlayerFactsEvidenceItem[]): readonly
   return numbers;
 }
 
+/** The color facts' own share of the number ledger — see `buildNumberLedger`'s own docblock for
+ *  why a fraction contributes both its raw and whole-percent forms. */
+function colorNumbers(lastSeasonStory: PlayerFactsLastSeasonStory | null, booksNumbers: PlayerFactsBooksNumbers, usage: PlayerFactsUsage | null): readonly number[] {
+  const numbers: number[] = [];
+  if (lastSeasonStory !== null) {
+    numbers.push(
+      lastSeasonStory.season,
+      lastSeasonStory.positionRank,
+      lastSeasonStory.pointsPerGame,
+      lastSeasonStory.gamesPlayed,
+      lastSeasonStory.bestWeek.week,
+      lastSeasonStory.bestWeek.points,
+      lastSeasonStory.weeksAboveMedian,
+    );
+  }
+  for (const line of booksNumbers.propsLines) numbers.push(line.medianLine);
+  if (booksNumbers.teamVegasWinTotal !== null) numbers.push(booksNumbers.teamVegasWinTotal);
+  if (usage !== null) {
+    numbers.push(usage.season);
+    if (usage.snapShare !== null) numbers.push(usage.snapShare, usage.snapShare * 100);
+    if (usage.targetShare !== null) numbers.push(usage.targetShare, usage.targetShare * 100);
+    if (usage.redZoneShare !== null) numbers.push(usage.redZoneShare, usage.redZoneShare * 100);
+  }
+  return numbers;
+}
+
 function buildNumberLedger(facts: Omit<PlayerFacts, "numberLedger" | "nameLedger" | "factsHash">): readonly number[] {
   const numbers: number[] = [facts.productSeason];
   const { market, projection, availability, season, byeWeek } = facts;
@@ -324,6 +433,7 @@ function buildNumberLedger(facts: Omit<PlayerFacts, "numberLedger" | "nameLedger
     numbers.push(t.receptions, t.receivingYards, t.passingYards, t.touchdowns, t.fantasyPoints);
   }
   if (byeWeek !== null) numbers.push(byeWeek);
+  numbers.push(...colorNumbers(facts.lastSeasonStory, facts.booksNumbers, facts.usage));
   return numbers;
 }
 
@@ -363,6 +473,9 @@ function computeFactsHash(content: Omit<PlayerFacts, "numberLedger" | "nameLedge
     byeWeek: content.byeWeek,
     injury: content.injury,
     news: content.news,
+    lastSeasonStory: content.lastSeasonStory,
+    booksNumbers: content.booksNumbers,
+    usage: content.usage,
   };
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
@@ -383,6 +496,9 @@ export function buildPlayerFacts(input: PlayerFactsInput): PlayerFacts {
     byeWeek: input.byeWeek,
     injury: input.injury,
     news: input.news,
+    lastSeasonStory: input.lastSeasonStory,
+    booksNumbers: input.booksNumbers,
+    usage: input.usage,
   };
   return {
     ...content,

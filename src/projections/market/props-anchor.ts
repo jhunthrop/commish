@@ -110,26 +110,28 @@ function propsPerGameLine(playerId: string, medians: ReadonlyMap<PropMarket, num
   };
 }
 
-function median(values: readonly number[]): number {
+export function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 1 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
 }
 
 /**
- * THE ANCHOR — player id to his props-implied season points, in the market curve's own units.
- *
- * Pure: every fact it needs is in its arguments, so the leakage gate and the mapping are testable
- * without a database and the same function serves a fit and a live board.
+ * EVERY ARCHIVED LINE'S OWN MEDIAN, BY PLAYER AND MARKET — the leakage gate and the week-one
+ * window applied ONCE, here, so `propsAnchorPoints` (which folds the result into one blended
+ * points number) and a capsule's own "the books' own numbers" fact (`capsules/collect.ts`, spec
+ * Task 1b — a plain median receiving-yards/receptions/rush-yards/pass-yards/pass-TDs line, never
+ * the blended points figure) read the identical, narrowly-gated population rather than two
+ * independently-maintained copies of the same three-line filter.
  */
-export function propsAnchorPoints(lines: readonly ArchivedPropLine[], inputs: PropsAnchorInputs): ReadonlyMap<string, number> {
-  const windowEnd = new Date(inputs.firstKickoff.getTime() + WEEK_ONE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+export function medianPropLinesByPlayer(lines: readonly ArchivedPropLine[], firstKickoff: Date): ReadonlyMap<string, ReadonlyMap<PropMarket, number>> {
+  const windowEnd = new Date(firstKickoff.getTime() + WEEK_ONE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const pointsByPlayerMarket = new Map<string, number[]>();
   for (const entry of lines) {
     // THE LEAKAGE GATE. Strictly before, never at: a line stamped at the instant of kickoff is a line
     // that may already know the inactives.
-    if (entry.fetchedAt.getTime() >= inputs.firstKickoff.getTime()) continue;
-    if (entry.commenceTime.getTime() < inputs.firstKickoff.getTime()) continue;
+    if (entry.fetchedAt.getTime() >= firstKickoff.getTime()) continue;
+    if (entry.commenceTime.getTime() < firstKickoff.getTime()) continue;
     if (entry.commenceTime.getTime() >= windowEnd.getTime()) continue;
     if (!Number.isFinite(entry.point)) continue;
     const key = `${entry.playerId}|${entry.market}`;
@@ -148,6 +150,17 @@ export function propsAnchorPoints(lines: readonly ArchivedPropLine[], inputs: Pr
     forPlayer.set(market, median(values));
     mediansByPlayer.set(playerId, forPlayer);
   }
+  return mediansByPlayer;
+}
+
+/**
+ * THE ANCHOR — player id to his props-implied season points, in the market curve's own units.
+ *
+ * Pure: every fact it needs is in its arguments, so the leakage gate and the mapping are testable
+ * without a database and the same function serves a fit and a live board.
+ */
+export function propsAnchorPoints(lines: readonly ArchivedPropLine[], inputs: PropsAnchorInputs): ReadonlyMap<string, number> {
+  const mediansByPlayer = medianPropLinesByPlayer(lines, inputs.firstKickoff);
 
   /** Raw props season points, before the per-position rescale. */
   const rawByPlayer = new Map<string, { readonly position: Position; readonly raw: number }>();
