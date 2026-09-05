@@ -46,8 +46,9 @@ import { rngFor } from "@/mock-draft/rng";
 /** A fixed instant every action in a sim carries. `MAKE_PICK` is admitted unconditionally
  *  (`admit.ts`'s own docblock) and no reducer this file exercises reads the clock, so the exact
  *  value is inert — one shared literal, never `Date.now()`, so a sim's own log is as
- *  reproducible as everything else about it. */
-const SIM_INSTANT = "2026-01-01T00:00:00.000Z";
+ *  reproducible as everything else about it. Exported so `continue.ts` (Draft HQ's live-room
+ *  continuation seam) carries the identical literal rather than a second one that could drift. */
+export const SIM_INSTANT = "2026-01-01T00:00:00.000Z";
 
 export interface RunOneDraftInput {
   readonly teamIds: readonly string[];
@@ -68,7 +69,9 @@ export interface RunOneDraftResult {
   readonly rosters: Readonly<Record<string, readonly { readonly playerId: string; readonly position: string }[]>>;
 }
 
-function submit(state: DraftState, action: Parameters<typeof reduceDraft>[1]): DraftState {
+/** Admit-then-reduce, thrown on refusal at either step. Exported so `continue.ts` drives the
+ *  same real-engine submission path a headless run does — one submit helper, never two. */
+export function submit(state: DraftState, action: Parameters<typeof reduceDraft>[1]): DraftState {
   const admitted = admitCommand(state, action);
   if (!admitted.ok) throw new Error(`sim: ${action.type} refused at admit: ${admitted.reason}`);
   const result = reduceDraft(state, action);
