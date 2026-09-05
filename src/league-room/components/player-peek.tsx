@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { BottomSheet, PlayerObject, ReasonChip, SeasonBars, SourceStrip } from "@/components/ui";
+import { BottomSheet, NOT_STARTED_DASH, PlayerObject, ReasonChip, SeasonBars, SourceStrip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import { sourcesFor, weeksFor } from "../lib/player-season-view";
 import { useLeagueRoomDeps } from "../hooks/deps";
+import { SeasonSwitcher } from "./season-switcher";
 
 interface PeekTarget {
   readonly leagueId: string;
@@ -68,11 +69,20 @@ export function PlayerPeekHost() {
   const [target, setTarget] = useState<PeekTarget | null>(null);
   const [body, setBody] = useState<PlayerSeasonBody | null>(null);
   const [failed, setFailed] = useState(false);
+  // `null` means "let the service pick" — its own default, the newest season with data for him.
+  // Set only once a manager presses a segment in the switcher below (2026-09-04 widening).
+  const [season, setSeason] = useState<number | null>(null);
 
   useEffect(() => {
-    host = setTarget;
+    // Opening a new target resets any season a prior peek's manager had picked — his choice on
+    // one player's card has no business surviving onto the next name pressed.
+    const openTarget = (next: PeekTarget) => {
+      setSeason(null);
+      setTarget(next);
+    };
+    host = openTarget;
     return () => {
-      if (host === setTarget) host = null;
+      if (host === openTarget) host = null;
     };
   }, []);
 
@@ -83,7 +93,11 @@ export function PlayerPeekHost() {
     let alive = true;
     void (async () => {
       try {
-        const response = await fetchJson(`/api/leagues/${target.leagueId}/player-season?playerId=${encodeURIComponent(target.playerId)}`, { method: "GET" });
+        const seasonParam = season === null ? "" : `&season=${season}`;
+        const response = await fetchJson(
+          `/api/leagues/${target.leagueId}/player-season?playerId=${encodeURIComponent(target.playerId)}${seasonParam}`,
+          { method: "GET" },
+        );
         const envelope = (await response.json()) as ApiEnvelope<PlayerSeasonBody>;
         if (!alive) return;
         if (envelope.ok) setBody(envelope.data);
@@ -95,7 +109,7 @@ export function PlayerPeekHost() {
     return () => {
       alive = false;
     };
-  }, [target, fetchJson]);
+  }, [target, season, fetchJson]);
 
   if (target === null) return null;
   const played = body?.weeks.some((week) => week.points !== null) ?? false;
@@ -153,24 +167,41 @@ export function PlayerPeekHost() {
               </div>
             )}
 
-            {played ? (
+            {/* THE SEASON LABEL + SWITCHER (2026-09-04 widening) — every number below this line
+                answers for `body.season` explicitly, never a silent "this season" that could mean
+                two different years depending on when a manager opens the card. The switcher only
+                renders once there is a choice to make; a single-season player gets the label with
+                nothing to press beside it. */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className={`${MICRO_LABEL} text-text-faint`}>{body.season} season</span>
+              {body.availableSeasons.length > 1 ? <SeasonSwitcher seasons={body.availableSeasons} season={season ?? body.season} onSelect={setSeason} /> : null}
+            </div>
+
+            {body.isRookie ? (
+              // LAW 7, the rookie case: nothing to chart, so one honest sentence stands in for it
+              // rather than an empty chart or a "no data" dead end.
+              <p className="text-sm text-text-muted">His first NFL season.</p>
+            ) : played ? (
               <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
             ) : (
-              <p className="text-sm text-text-muted">No scored week for him this season.</p>
+              <p className="text-sm text-text-muted">No scored week for him in the {body.season} season.</p>
             )}
 
             {/* SEASON TOTALS + GAME LOG (founder, 2026-08-30: ESPN-depth). Raw production from
                 the harvest block, points under THIS league's rules. Columns are position-blind
-                on purpose: a zero column is honest and a per-position table is four tables. */}
+                on purpose: a zero column is honest and a per-position table is four tables.
+                `Carries`/`Targets` print a dash for a PRIOR season (2026-09-04 widening): the
+                observation store never carries them — see `PlayerGameLogRow`'s own docblock —
+                and a dash is the honest "not recorded", never a fabricated zero. */}
             {body.totals === null ? null : (
               <div className="flex flex-col gap-2">
-                <h3 className={`${MICRO_LABEL} text-text-faint`}>Season</h3>
+                <h3 className={`${MICRO_LABEL} text-text-faint`}>{body.season} totals</h3>
                 <div className="flex flex-wrap gap-x-8 gap-y-2">
                   {[
                     ["Games", String(body.totals.games)],
-                    ["Carries", String(body.totals.carries)],
+                    ["Carries", body.totals.carries === null ? NOT_STARTED_DASH : String(body.totals.carries)],
                     ["Rush yds", String(body.totals.rushingYards)],
-                    ["Targets", String(body.totals.targets)],
+                    ["Targets", body.totals.targets === null ? NOT_STARTED_DASH : String(body.totals.targets)],
                     ["Rec", String(body.totals.receptions)],
                     ["Rec yds", String(body.totals.receivingYards)],
                     ["Pass yds", String(body.totals.passingYards)],
@@ -188,7 +219,7 @@ export function PlayerPeekHost() {
 
             {body.log.length === 0 ? null : (
               <div className="flex flex-col gap-2">
-                <h3 className={`${MICRO_LABEL} text-text-faint`}>Game log</h3>
+                <h3 className={`${MICRO_LABEL} text-text-faint`}>{body.season} game log</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-sm tabular-nums">
                     <thead>
@@ -208,9 +239,9 @@ export function PlayerPeekHost() {
                       {body.log.map((row) => (
                         <tr key={row.week} className="border-b border-line/50">
                           <td className="py-1.5 pr-3 text-text-muted">{row.week}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.carries}</td>
+                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.carries === null ? NOT_STARTED_DASH : row.carries}</td>
                           <td className="py-1.5 pr-3 text-right text-text-muted">{row.rushingYards}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.targets}</td>
+                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.targets === null ? NOT_STARTED_DASH : row.targets}</td>
                           <td className="py-1.5 pr-3 text-right text-text-muted">{row.receptions}</td>
                           <td className="py-1.5 pr-3 text-right text-text-muted">{row.receivingYards}</td>
                           <td className="py-1.5 pr-3 text-right text-text-muted">{row.passingYards}</td>

@@ -4,99 +4,24 @@ import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import Link from "next/link";
-import { Card, EdgeCell, PlayerObject, SeasonBars, SourceStrip, type SeasonWeek, type SourceValue } from "@/components/ui";
+import { Card, EdgeCell, PlayerObject, SeasonBars, SourceStrip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import type { Position } from "@/domain/player";
 import { playerSeason, type PlayerSeasonBody } from "@/league-service/player";
 import { pageTitle } from "@/components/app-shell/page-metadata";
+import { PlayerPageSeasonSwitcher } from "@/league-room/components/season-switcher";
+import { sourcesFor, weeksFor } from "@/league-room/lib/player-season-view";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
   readonly params: Promise<{ readonly leagueId: string; readonly playerId: string }>;
+  readonly searchParams: Promise<{ readonly season?: string }>;
 }
 
 /** An honest static title rather than a database read that exists only to name a browser tab —
  *  `pageTitle`'s own ruling (flow analysis A5). */
 export function generateMetadata(): Metadata {
   return pageTitle("Player");
-}
-
-/**
- * A position in the words a manager would use, PLURAL, because that is the shape a population
- * takes in a sentence: "Top 8% of running backs this season."
- *
- * The words live at the call site rather than beside `PositionBadge`, and deliberately: a badge
- * owns a pigment and a three-letter code, and `Stat`'s own contract says the caller names the
- * population "in the words a manager would use". This screen is that caller.
- */
-const POSITION_PLURAL: Readonly<Record<Position, string>> = {
-  QB: "quarterbacks",
-  RB: "running backs",
-  WR: "receivers",
-  TE: "tight ends",
-  K: "kickers",
-  DEF: "defenses",
-};
-
-/**
- * THE SOURCE STRIP'S FIVE CELLS: a positional rank, three readings of one quantity, and what he
- * has actually produced.
- *
- * The shape is borrowed from the reference product and the middle three are where ours is meant
- * to be better than theirs: they compare three platforms' draft positions, which is three
- * aggregations of the same crowd, and we compare the market against expert consensus against our
- * own model, which is a disagreement somebody can be right or wrong about.
- *
- * ALL THREE NOW REACH THIS PAGE (live-board plan, Task 4). `PlayerSeasonBody`'s docblock carries
- * the full account; the short version is that expert consensus arrives through the crosswalk for
- * this season, and our own board's `modelRank` now fills too, once `scripts/preseason-persist.ts`
- * has stored a LIVE-taken row for the current season — never borrowed from a finished one.
- *
- * A DASH IS NEVER FILLED FROM A NEIGHBOURING SEASON, and that discipline is why `modelRank` prints
- * a dash for a player the live board genuinely has no row for, rather than reaching back to 2024
- * for one. The board's own docblock section on this cell states the honest line for the number
- * that DOES show: a live-taken projection is real and un-borrowed, but it is UNMEASURED — the
- * scorecard structurally refuses to grade a season that has not been played, so this cell carries
- * no accuracy claim, exactly as the market and expert-consensus cells beside it never have either.
- *
- * ONLY ONE CELL IS TINTED. Points per game is a verdict about the player and has a population
- * behind it. The three draft-position cells are one quantity read by different sources: colouring
- * them would be colouring a SOURCE rather than a player, which is a claim none of them makes.
- */
-function sourcesFor(body: PlayerSeasonBody): readonly SourceValue[] {
-  const { player, positionRank, expertRank, modelRank, pointsPerGame, pointsPerGamePercentile } = body;
-  return [
-    { label: player.position, value: positionRank === null ? null : String(positionRank) },
-    // One decimal, the precision `formatAdp` (`@/draft-room/lib/tiers`) already rules on: a
-    // consensus of real drafts genuinely carries it, and rounding to a whole number makes two
-    // different players look identical.
-    { label: "Market", value: player.adp === null ? null : player.adp.toFixed(1) },
-    // Whole numbers, both: a consensus rank and a board rank are ordinals and a decimal place on
-    // one would claim a precision neither publishes. `Market` keeps its decimal because an average
-    // draft position genuinely carries one.
-    { label: "Experts", value: expertRank === null ? null : String(expertRank) },
-    { label: "Model", value: modelRank === null ? null : String(modelRank) },
-    {
-      label: "PPG",
-      value: pointsPerGame === null ? null : pointsPerGame.toFixed(1),
-      comparison:
-        pointsPerGamePercentile === null
-          ? undefined
-          : { percentile: pointsPerGamePercentile, population: `${POSITION_PLURAL[player.position]} this season` },
-    },
-  ];
-}
-
-/** Each played week, with the population that makes its colour mean something: not his own
- *  thirteen afternoons, but every week played at his position this season. */
-function weeksFor(body: PlayerSeasonBody): readonly SeasonWeek[] {
-  const population = `${POSITION_PLURAL[body.player.position]} in a week this season`;
-  return body.weeks.map((week) => ({
-    week: week.week,
-    points: week.points,
-    comparison: week.percentile === null ? undefined : { percentile: week.percentile, population },
-  }));
 }
 
 /**
@@ -109,13 +34,25 @@ function weeksFor(body: PlayerSeasonBody): readonly SeasonWeek[] {
  * otherwise write out, the source names are their own legend, and the week numbers are their own
  * axis. Everything a screen reader needs is on the elements themselves.
  *
+ * THE ONE NEW LABEL (2026-09-04 widening) is the season itself. `playerSeason` can now answer for a
+ * season other than the one a manager assumes he opened — a card viewed in August, before this
+ * year's first snap, defaults to LAST year's real season — and silence about which year the numbers
+ * below it belong to would read as a bug, not as simplicity. The label is a fact stamp in the same
+ * micro-label register `Edge`'s "Experts vs market" already uses, never a sentence explaining
+ * anything; the switcher beside it (when there is more than one season to choose from) is the same
+ * segmented rail every other "pick one of a few" surface in this product uses, and needs no caption
+ * of its own — the years printed on it are the caption.
+ *
  * WHY THE PAGE IS UNDER A LEAGUE. A fantasy point is not a property of a player, it is a property
  * of a player inside a rule set — see `playerSeason`. There is no honest league-free version of
  * this screen, so there is no league-free route to it.
  */
-export default async function PlayerPage({ params }: PageProps) {
+export default async function PlayerPage({ params, searchParams }: PageProps) {
   const user = await requireCurrentUser();
   const { leagueId, playerId } = await params;
+  const { season: rawSeason } = await searchParams;
+  const requestedSeason = rawSeason === undefined || rawSeason === "" ? undefined : Number(rawSeason);
+  const season = requestedSeason !== undefined && Number.isFinite(requestedSeason) ? requestedSeason : undefined;
 
   // The cheap, canonical gate — a team in this league or its commissioner. A non-member gets the
   // same 404 the matchup page gives them, never a "you are not allowed" page that confirms the
@@ -123,7 +60,7 @@ export default async function PlayerPage({ params }: PageProps) {
   const membership = await resolveLeagueMembership(getDb(), leagueId, user.id);
   if (!membership.ok) notFound();
 
-  const body = await playerSeason(getDb(), leagueId, playerId);
+  const body = await playerSeason(getDb(), leagueId, playerId, undefined, season);
   if (body === null) notFound();
 
   const played = body.weeks.some((week) => week.points !== null);
@@ -143,14 +80,26 @@ export default async function PlayerPage({ params }: PageProps) {
           <SourceStrip label={`Where ${body.player.name} is ranked, by source`} sources={sourcesFor(body)} />
           <Edge body={body} />
         </div>
-        {played ? (
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className={`${MICRO_LABEL} text-text-faint`}>{body.season} season</span>
+          {body.availableSeasons.length > 1 ? (
+            <PlayerPageSeasonSwitcher leagueId={leagueId} playerId={playerId} seasons={body.availableSeasons} season={body.season} />
+          ) : null}
+        </div>
+
+        {body.isRookie ? (
+          // The rookie case: nothing anywhere to chart, so one honest sentence stands in for it —
+          // the same "state the absence, draw no chart" discipline LAW 7 already established below.
+          <p className="text-sm text-text-muted">His first NFL season.</p>
+        ) : played ? (
           <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
         ) : (
           // LAW 7. `SeasonBars` draws nothing at all for a season with no points in it, which is
           // right — thirteen empty columns under thirteen week numbers read as a rendering fault
           // rather than as an absence — but a card that then just ends leaves the reader to guess
           // whether the chart failed. One line, stating the absence, and no chart.
-          <p className="text-sm text-text-muted">No scored week for him this season.</p>
+          <p className="text-sm text-text-muted">No scored week for him in the {body.season} season.</p>
         )}
       </Card>
     </div>
