@@ -17,22 +17,40 @@ describe("describeBuild", () => {
     expect(describeBuild(build, RUNS, BASELINE)).toMatch(/did not emerge/);
   });
 
-  it("states the real share, rate, and an above-baseline comparison", () => {
+  it("states the real share, rate, its own confidence interval, and an above-baseline verdict when the interval clears the baseline", () => {
+    // n=40, rate 40%: Wilson 95% CI is roughly [26%, 55%], clear of the 25% baseline.
     const build: BuildOutcome = { label: "hero-RB", runsWithLabel: 40, top3FinishRate: 0.4 };
     const sentence = describeBuild(build, RUNS, BASELINE);
     expect(sentence).toContain("40%");
-    expect(sentence).toContain("40%"); // rate happens to match share in this fixture; both real numbers
+    expect(sentence).toMatch(/95% confidence: \d+% to \d+%/);
     expect(sentence).toMatch(/above the 25% baseline/);
   });
 
-  it("states a below-baseline comparison honestly", () => {
-    const build: BuildOutcome = { label: "zero-RB", runsWithLabel: 20, top3FinishRate: 0.1 };
-    expect(describeBuild(build, RUNS, BASELINE)).toMatch(/below the 25% baseline/);
+  it("states a below-baseline verdict only when the interval clears the baseline on the low side", () => {
+    // n=100, rate 5%: Wilson 95% CI is roughly [2%, 11%], clearly below the 25% baseline.
+    const build: BuildOutcome = { label: "zero-RB", runsWithLabel: 100, top3FinishRate: 0.05 };
+    const sentence = describeBuild(build, RUNS, BASELINE);
+    expect(sentence).toMatch(/95% confidence: \d+% to \d+%/);
+    expect(sentence).toMatch(/below the 25% baseline/);
   });
 
-  it("states an even comparison when the rate exactly matches the baseline", () => {
+  it("fix round 1, HIGH: hedges instead of declaring a verdict when the interval straddles the baseline", () => {
+    // n=20, rate 10%: Wilson 95% CI is roughly [3%, 30%] -- it straddles the 25% baseline, so
+    // this sample cannot honestly call above or below.
+    const build: BuildOutcome = { label: "zero-RB", runsWithLabel: 20, top3FinishRate: 0.1 };
+    const sentence = describeBuild(build, RUNS, BASELINE);
+    expect(sentence).toMatch(/95% confidence: \d+% to \d+%/);
+    expect(sentence).toMatch(/straddles the 25% baseline/);
+    expect(sentence).toMatch(/too small a sample to call/);
+    expect(sentence).not.toMatch(/\babove the 25% baseline\b/);
+    expect(sentence).not.toMatch(/\bbelow the 25% baseline\b/);
+  });
+
+  it("a rate landing exactly at the baseline is a straddling case too, not an 'even' verdict", () => {
     const build: BuildOutcome = { label: "late-QB", runsWithLabel: 50, top3FinishRate: 0.25 };
-    expect(describeBuild(build, RUNS, BASELINE)).toMatch(/even with the 25% baseline/);
+    const sentence = describeBuild(build, RUNS, BASELINE);
+    expect(sentence).toMatch(/straddles the 25% baseline/);
+    expect(sentence).not.toMatch(/even with/);
   });
 });
 

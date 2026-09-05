@@ -14,6 +14,7 @@ import { requestSimRun } from "@/draft-service/sim/service";
 import type { BuildOutcome, SimSummary } from "@/draft-service/sim/types";
 import { SIM_CONFIG, SIM_SHARPNESS } from "@/draft-service/sim/config";
 import { totalRosterSlots } from "@/draft-engine";
+import { wilsonInterval } from "@/draft-hq/simulator/confidence";
 
 export interface CanonicalSimResult {
   readonly outcome: "ready" | "no_evidence_board" | "over_budget" | "league_not_found";
@@ -43,6 +44,16 @@ export async function canonicalSimFor(db: Db, userId: string, params: { readonly
  * carries: how often the build emerged naturally across the runs, its measured top-3 rate, and
  * how that rate compares to the arithmetic baseline. `runsWithLabel === 0` (the label never fired
  * in this sample) says so plainly rather than dividing by zero into a fabricated rate.
+ *
+ * FIX ROUND 1, HIGH — the Playbook pins its canonical sims at exactly `SIM_CONFIG.syncRunThreshold`
+ * runs, and a build's own label routinely fires in only 20-40 of those (`runsWithLabel`, the five
+ * labels are not a partition — `classify.ts`'s own docblock). A bare "36%, above the 25% baseline"
+ * at that sample size reads as settled when a real 95% interval (`wilsonInterval`,
+ * `@/draft-hq/simulator/confidence.ts` — reused, never duplicated, the same interval the Simulator
+ * page itself shows at 100 runs) routinely straddles the baseline. Every sentence now STATES its
+ * own interval, so the card carries the honest margin whether the reading is a clear verdict or
+ * not; when the interval straddles the baseline the sentence explicitly REFUSES the above/below
+ * verdict rather than declaring one the sample cannot actually support.
  */
 export function describeBuild(build: BuildOutcome, runs: number, baselineTop3Rate: number): string {
   if (build.runsWithLabel === 0) {
@@ -51,13 +62,18 @@ export function describeBuild(build: BuildOutcome, runs: number, baselineTop3Rat
   const sharePct = Math.round((build.runsWithLabel / runs) * 100);
   const ratePct = Math.round(build.top3FinishRate * 100);
   const baselinePct = Math.round(baselineTop3Rate * 100);
-  const comparison =
-    build.top3FinishRate > baselineTop3Rate
-      ? `above the ${baselinePct}% baseline`
-      : build.top3FinishRate < baselineTop3Rate
-        ? `below the ${baselinePct}% baseline`
-        : `even with the ${baselinePct}% baseline`;
-  return `This build emerged in ${sharePct}% of the ${runs} simulated rooms from this slot and finished top-3 ${ratePct}% of those times, ${comparison}.`;
+  const successes = Math.round(build.top3FinishRate * build.runsWithLabel);
+  const ci = wilsonInterval(successes, build.runsWithLabel);
+  const ciLowPct = Math.round(ci.low * 100);
+  const ciHighPct = Math.round(ci.high * 100);
+  const base = `This build emerged in ${sharePct}% of the ${runs} simulated rooms from this slot and finished top-3 ${ratePct}% of those times (95% confidence: ${ciLowPct}% to ${ciHighPct}%)`;
+
+  const straddlesBaseline = baselineTop3Rate >= ci.low && baselineTop3Rate <= ci.high;
+  if (straddlesBaseline) {
+    return `${base}. That range straddles the ${baselinePct}% baseline, too small a sample to call which side it is really on.`;
+  }
+  const comparison = build.top3FinishRate > baselineTop3Rate ? `above the ${baselinePct}% baseline` : `below the ${baselinePct}% baseline`;
+  return `${base}, ${comparison}.`;
 }
 
 export interface ScarcityPoint {
