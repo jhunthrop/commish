@@ -9,8 +9,8 @@ function jsonOf(body: unknown): Response {
   return { json: async () => body } as unknown as Response;
 }
 
-function callView(pickNumber: number): AssistantCallView {
-  return { pickNumber, onTheClock: true, candidates: [], yourBuild: [], winningBuilds: null, computedBasis: "gen1" };
+function callView(pickNumber: number, onTheClock = true): AssistantCallView {
+  return { pickNumber, onTheClock, candidates: [], yourBuild: [], winningBuilds: null, computedBasis: "gen1" };
 }
 
 const wrapper = (deps: DraftRoomDeps) =>
@@ -76,7 +76,39 @@ describe("useAssistant", () => {
       await Promise.resolve();
     });
     await waitFor(() => expect(result.current.call?.pickNumber).toBe(2));
-    expect(result.current.previousCall?.pickNumber).toBe(1);
+    expect(result.current.prePickCall?.pickNumber).toBe(1);
+  });
+
+  it("latches the pre-pick call across other teams' intervening picks, and clears once your own next turn arrives", async () => {
+    const bodies = [
+      jsonOf({ ok: true, data: callView(1, true) }), // your turn — pick 1
+      jsonOf({ ok: true, data: callView(2, false) }), // someone else resolves pick 2
+      jsonOf({ ok: true, data: callView(3, false) }), // someone else resolves pick 3
+      jsonOf({ ok: true, data: callView(4, true) }), // your next turn — pick 4
+    ];
+    let index = 0;
+    const fetchJson = vi.fn(async () => bodies[index++]);
+    const deps: DraftRoomDeps = { fetchJson, openEventSource: noopSource };
+    const { result, rerender } = renderHook(({ pickNumber }) => useAssistant("d1", pickNumber, "t1"), {
+      wrapper: wrapper(deps),
+      initialProps: { pickNumber: 1 },
+    });
+    await waitFor(() => expect(result.current.call?.pickNumber).toBe(1));
+    expect(result.current.prePickCall).toBeNull();
+
+    rerender({ pickNumber: 2 });
+    await waitFor(() => expect(result.current.call?.pickNumber).toBe(2));
+    expect(result.current.prePickCall?.pickNumber).toBe(1);
+
+    rerender({ pickNumber: 3 });
+    await waitFor(() => expect(result.current.call?.pickNumber).toBe(3));
+    // A second other-team pick landed since — the latch still holds your own pre-pick call.
+    expect(result.current.prePickCall?.pickNumber).toBe(1);
+
+    rerender({ pickNumber: 4 });
+    await waitFor(() => expect(result.current.call?.pickNumber).toBe(4));
+    // Your own next turn has arrived — the stale beat about pick 1 is gone.
+    expect(result.current.prePickCall).toBeNull();
   });
 
   it("surfaces the server's own honest message on a 409, without inventing a call", async () => {

@@ -8,13 +8,18 @@ import { useDraftRoomDeps } from "../hooks/deps";
 export interface UseAssistantResult {
   readonly call: AssistantCallView | null;
   /**
-   * The call that was live just before the most recent successful fetch replaced it — Task 7's
-   * post-pick beat reads this as "the call captured at your pick": once your own pick lands,
-   * `pickNumber` advances, this hook refetches, and whatever `call` held right before that
-   * refetch landed here. Null until a second call has ever loaded (the draft's first turn, or a
-   * commissioner who just gained a seat — neither has a "before" to report).
+   * THE POST-PICK BEAT'S OWN CAPTURE — Task 7. The call that was live during THIS seat's most
+   * recently resolved turn, latched the instant a fetch lands whose immediately-prior call had
+   * `onTheClock === true` — only the seat on the clock for a given pick number can be the one who
+   * resolves it, so that condition can only be true right after THIS seat's own pick. Unlike
+   * `call`, this is NOT overwritten by every subsequent refetch: it survives every other seat's
+   * picks in between, so the beat stays available through a full waiting turn, not just until the
+   * very next pick anywhere in the draft. It clears (back to null) the moment a call arrives with
+   * `onTheClock === true` again (this seat's NEXT turn has arrived, so the old beat is stale), when
+   * this seat loses its seat (`myTeamId === null`), or when the draft changes out from under the
+   * hook. Null until this seat's first pick of the current draft has ever landed.
    */
-  readonly previousCall: AssistantCallView | null;
+  readonly prePickCall: AssistantCallView | null;
   readonly loading: boolean;
   /** The server's own honest word for why there is no call right now (409's message, or a
    *  network failure) — never fabricated copy. Cleared on the next successful fetch. */
@@ -40,18 +45,29 @@ const NETWORK_ERROR = "We couldn't reach the assistant. Check your connection an
 export function useAssistant(draftId: string, pickNumber: number, myTeamId: string | null): UseAssistantResult {
   const deps = useDraftRoomDeps();
   const [call, setCall] = useState<AssistantCallView | null>(null);
-  const [previousCall, setPreviousCall] = useState<AssistantCallView | null>(null);
+  const [prePickCall, setPrePickCall] = useState<AssistantCallView | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Mirrors `call` for the fetch closure below — reading `call` there would rebuild the effect
   // on every response and refetch is keyed on `pickNumber` alone.
   const callRef = useRef<AssistantCallView | null>(null);
+  // Tracks which draft this hook's state belongs to, so a `draftId` change (a different room
+  // entirely, not just a new pick in the same one) resets the latch rather than carrying a stale
+  // call from one draft into the next.
+  const draftIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (draftIdRef.current !== draftId) {
+      draftIdRef.current = draftId;
+      callRef.current = null;
+      setCall(null);
+      setPrePickCall(null);
+    }
+
     if (myTeamId === null) {
       callRef.current = null;
       setCall(null);
-      setPreviousCall(null);
+      setPrePickCall(null);
       setLoading(false);
       setError(null);
       return;
@@ -69,7 +85,17 @@ export function useAssistant(draftId: string, pickNumber: number, myTeamId: stri
           setLoading(false);
           return;
         }
-        setPreviousCall(callRef.current);
+
+        const previous = callRef.current;
+        if (previous !== null && previous.onTheClock) {
+          // This seat's own pick just resolved — latch the call it was looking at, and let it
+          // survive every refetch that follows until this seat is back on the clock.
+          setPrePickCall(previous);
+        } else if (body.data.onTheClock) {
+          // This seat's NEXT turn has arrived — any beat about the pick before that is stale.
+          setPrePickCall(null);
+        }
+
         callRef.current = body.data;
         setCall(body.data);
         setError(null);
@@ -86,5 +112,5 @@ export function useAssistant(draftId: string, pickNumber: number, myTeamId: stri
     };
   }, [deps, draftId, pickNumber, myTeamId]);
 
-  return { call, previousCall, loading, error };
+  return { call, prePickCall, loading, error };
 }

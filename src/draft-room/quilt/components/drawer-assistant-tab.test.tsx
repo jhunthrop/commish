@@ -7,14 +7,14 @@ import type { AssistantCallView } from "@/draft-service/assistant/call";
 import type { Law } from "@/projections/laws/types";
 import { SNAKE_VIEW } from "../../test-fixtures";
 import { useAssistant, type UseAssistantResult } from "../../assistant/use-assistant";
-import { DrawerAssistantTab, oddsPhrase, reasonSentence } from "./drawer-assistant-tab";
+import { DrawerAssistantTab, reasonSentence } from "./drawer-assistant-tab";
 
 vi.mock("../../assistant/use-assistant", () => ({ useAssistant: vi.fn() }));
 
 const mockedUseAssistant = vi.mocked(useAssistant);
 
 function assistantResult(over: Partial<UseAssistantResult> = {}): UseAssistantResult {
-  return { call: null, previousCall: null, loading: false, error: null, ...over };
+  return { call: null, prePickCall: null, loading: false, error: null, ...over };
 }
 
 const PLAYERS: readonly Player[] = [
@@ -86,16 +86,6 @@ function renderTab(options: RenderOptions = {}) {
     />,
   );
 }
-
-describe("oddsPhrase", () => {
-  it("rounds to quarters with fixed, pinned phrasings", () => {
-    expect(oddsPhrase(0.95)).toBe("better than 9 in 10");
-    expect(oddsPhrase(0.75)).toBe("about 3 in 4");
-    expect(oddsPhrase(0.5)).toBe("about 1 in 2");
-    expect(oddsPhrase(0.25)).toBe("about 1 in 4");
-    expect(oddsPhrase(0.05)).toBe("long odds");
-  });
-});
 
 describe("reasonSentence", () => {
   it("renders one plain sentence per PickReason variant, from the reason's own numbers", () => {
@@ -261,9 +251,9 @@ describe("DrawerAssistantTab", () => {
 });
 
 describe("DrawerAssistantTab post-pick beat", () => {
-  // previousCall.onTheClock === true is the hook's own signal (use-assistant.ts docblock) that the
-  // call it replaced was live during YOUR turn — i.e. the fetch that just landed was triggered by
-  // your own pick resolving. Every wiring test below turns on that one condition.
+  // `prePickCall` is the hook's own latch (use-assistant.ts docblock): by construction it is only
+  // ever set from a call that was live during THIS seat's own turn, so the tab trusts it directly
+  // rather than re-checking `onTheClock` itself — see the wiring's own invariant comment.
   const prePickCall = makeCall({
     pickNumber: 3,
     candidates: [
@@ -273,13 +263,13 @@ describe("DrawerAssistantTab post-pick beat", () => {
   });
 
   it("renders 'Best available.' when your pick matches the pre-pick call's own top candidate", () => {
-    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: prePickCall }));
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), prePickCall }));
     renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "rb1" })] }) });
     expect(screen.getByTestId("assistant-beat")).toHaveTextContent("Best available.");
   });
 
   it("names the passed-on top candidate with his make-it-back odds when you took someone else", () => {
-    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: prePickCall }));
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), prePickCall }));
     renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "wr1" })] }) });
     expect(screen.getByTestId("assistant-beat")).toHaveTextContent("Our board had Marcus Reed first. about 3 in 4 he is still there at your next turn.");
   });
@@ -292,26 +282,19 @@ describe("DrawerAssistantTab post-pick beat", () => {
         { playerId: "wr1", position: "WR", reasons: [], makeItBack: null },
       ],
     });
-    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: noOddsCall }));
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), prePickCall: noOddsCall }));
     renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "wr1" })] }) });
     expect(screen.getByTestId("assistant-beat")).toHaveTextContent("Our board had Marcus Reed first.");
   });
 
   it("renders no beat when the pre-pick call never loaded", () => {
-    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: null }));
-    renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "wr1" })] }) });
-    expect(screen.queryByTestId("assistant-beat")).toBeNull();
-  });
-
-  it("renders no beat when the call the hook replaced was not live during your own turn", () => {
-    const someoneElsesTurn = makeCall({ pickNumber: 3, onTheClock: false, candidates: prePickCall.candidates });
-    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: someoneElsesTurn }));
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), prePickCall: null }));
     renderTab({ view: view({ picks: [pick({ pickNumber: 3, playerId: "wr1" })] }) });
     expect(screen.queryByTestId("assistant-beat")).toBeNull();
   });
 
   it("renders no beat when the room carries no matching pick for the pre-pick call's own pick number", () => {
-    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), previousCall: prePickCall }));
+    mockedUseAssistant.mockReturnValue(assistantResult({ call: makeCall(), prePickCall }));
     renderTab({ view: view({ picks: [] }) });
     expect(screen.queryByTestId("assistant-beat")).toBeNull();
   });

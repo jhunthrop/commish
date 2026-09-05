@@ -9,6 +9,7 @@ import type { PickReason } from "@/projections/decide/draft";
 import { PositionBadge } from "@/components/ui";
 import { PlayerName } from "@/league-room/components/player-peek";
 import { postPickBeat } from "../../assistant/beat";
+import { oddsPhrase } from "../../assistant/odds-phrase";
 import { detectRun, tierCountdowns } from "../../assistant/reads";
 import { byeCollisionFor, stackNoteFor, type StackCandidate } from "../../assistant/roster-fit";
 import { useAssistant } from "../../assistant/use-assistant";
@@ -28,28 +29,6 @@ export interface DrawerAssistantTabProps {
 }
 
 const NO_SEAT_COPY = "You have no seat in this draft. The assistant argues for a seat.";
-
-/**
- * ROUNDS TO QUARTERS, honestly. The extremes get their own words rather than a misleading
- * "about 1 in 1" or "about 0 in 4" — nobody reads "better than 9 in 10" as a promise, but a
- * rounded quarter at the edges reads as false precision in the other direction (Task 7's
- * `postPickBeat` reuses this exact export, so the phrasing here is the product's only one).
- */
-export function oddsPhrase(survival: number): string {
-  if (survival > 0.9) return "better than 9 in 10";
-  if (survival < 0.1) return "long odds";
-  const quarter = Math.round(survival * 4) / 4;
-  switch (quarter) {
-    case 0.25:
-      return "about 1 in 4";
-    case 0.5:
-      return "about 1 in 2";
-    case 0.75:
-      return "about 3 in 4";
-    default:
-      return survival >= 0.5 ? "better than 9 in 10" : "long odds";
-  }
-}
 
 /** One plain sentence per `PickReason` variant, numbers straight off the reason's own fields —
  *  never a fresh estimate. Exhaustive over the union with no `default`, so a new reason code
@@ -103,7 +82,7 @@ function rosterStackCandidates(view: DraftStateView, teamId: string, playersById
  * behind (it is never gated out of the drawer's tab row).
  */
 export function DrawerAssistantTab({ draftId, view, myTeamId, players, playersById, available, byeWeeks, reasons, laws }: DrawerAssistantTabProps) {
-  const { call, previousCall, loading } = useAssistant(draftId, view.pickNumber, myTeamId);
+  const { call, prePickCall, loading } = useAssistant(draftId, view.pickNumber, myTeamId);
 
   const positionsById = useMemo(() => new Map([...playersById].map(([id, player]) => [id, player.position] as const)), [playersById]);
   const undraftedIds = useMemo(() => players.filter((player) => available.has(player.id)).map((player) => player.id), [players, available]);
@@ -117,21 +96,25 @@ export function DrawerAssistantTab({ draftId, view, myTeamId, players, playersBy
   }, [view, positionsById]);
   const run = useMemo(() => detectRun(recentPositions), [recentPositions]);
 
-  // THE POST-PICK BEAT — Task 7. `previousCall.onTheClock === true` is the hook's own signal
-  // (use-assistant.ts docblock) that the call it just replaced was live during YOUR turn, i.e. the
-  // fetch that landed it was triggered by your own pick resolving, not some other seat's. Absent
-  // that signal, or absent a matching pick in the room's own history, there is nothing honest to
+  // THE POST-PICK BEAT — Task 7. `prePickCall` is the hook's own latch (`use-assistant.ts`
+  // docblock): it is set only from a call that was live while THIS seat was on the clock, and
+  // survives every other seat's picks in between, so it is already guaranteed to be "my turn's
+  // call" — no further onTheClock check needed here. INVARIANT: a pick number and `onTheClock`
+  // together identify the asking seat's own turn (only the seat on the clock for a given pick
+  // number can be the one who resolves it), so looking up `view.picks` by `prePickCall.pickNumber`
+  // alone is enough to find the exact player this seat picked — no teamId match required. Absent
+  // that latch, or absent a matching pick in the room's own history, there is nothing honest to
   // say (absence, not invention) and the beat stays null.
   const beat = useMemo(() => {
-    if (previousCall === null || !previousCall.onTheClock) return null;
-    const pickedPick = view.picks.find((entry) => entry.pickNumber === previousCall.pickNumber);
+    if (prePickCall === null) return null;
+    const pickedPick = view.picks.find((entry) => entry.pickNumber === prePickCall.pickNumber);
     if (pickedPick === undefined) return null;
     return postPickBeat({
       pickedPlayerId: pickedPick.playerId,
-      prePickCall: previousCall,
+      prePickCall,
       playerName: (id) => playersById.get(id)?.name ?? id,
     });
-  }, [previousCall, view.picks, playersById]);
+  }, [prePickCall, view.picks, playersById]);
 
   const myRosterTeamCodes = useMemo(() => (myTeamId === null ? [] : rosterTeamCodes(view, myTeamId, playersById)), [myTeamId, view, playersById]);
   const myRosterStack = useMemo(() => (myTeamId === null ? [] : rosterStackCandidates(view, myTeamId, playersById)), [myTeamId, view, playersById]);
