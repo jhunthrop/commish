@@ -247,6 +247,18 @@ export async function persistSeason(
     FITTED_BLEND_CONSTANTS.impliedGamesByPosition,
   );
 
+  // THE LOUD WARNING (fix round 1, MEDIUM 1b) — an empty props anchor on a REPLAY board is
+  // ordinary (2021/2022 predate the archive entirely; see `props-anchor.ts`'s own null-cell
+  // docblock), so this is scoped to a LIVE board only: the one case where "zero players anchored"
+  // means the product's own served board silently fell back to ADP-only, with nothing anywhere
+  // else that would ever say so. `console.warn`, never a throw — an empty archive is a real,
+  // recoverable state (the daily snapshot job has not run yet, or its resolve step has not caught
+  // up), not a reason to refuse a board the way `assertLiveMarketCoverage` refuses a degenerate
+  // market.
+  if (boardMoment.kind === "live" && propsAnchor.size === 0) {
+    console.warn(`props anchor: 0 players anchored for ${season} — resolve has not run or the archive is empty`);
+  }
+
   const blended = await persistBoard(db, inputs, BOARD_SOURCE, false, unfrozen, { constants: BLENDED_CONSTANTS, propsAnchor });
   console.log(
     `${season}  [blend, ${BOARD_SOURCE}]  ${String(blended.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +

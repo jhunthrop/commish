@@ -236,3 +236,40 @@ export async function playerIdForPropName(db: ReadonlyDb, propName: string, seas
     .limit(1);
   return row?.playerId ?? null;
 }
+
+/** What one `resolveAllPropNames` run did, in the shape both its callers need: `scripts/odds-
+ *  props-resolve.ts`'s own report (which additionally reads `observationCountsByPropName` for its
+ *  count-weighted match rate) and the props-preseason-snapshot job's one-line summary. */
+export interface ResolveAllPropNamesResult {
+  readonly observed: readonly PropNameToResolve[];
+  readonly matched: readonly PlayerMapRow[];
+  readonly unmatched: readonly UnmatchedPropName[];
+  readonly written: number;
+}
+
+/**
+ * THE RESOLVE CORE (fix round 1, MEDIUM 1a, 2026-09-05) — every distinct observed prop name across
+ * the WHOLE archive, resolved against its own season's roster and written to `props_player_map`.
+ * Extracted out of `scripts/odds-props-resolve.ts` so that script's own report and the props-
+ * preseason-snapshot job's self-resolving capture share ONE resolution rather than two copies of
+ * this sequence drifting apart. The script keeps working exactly as before — it is now the
+ * operator's own report ON TOP of this core, not a second implementation of it.
+ *
+ * IDEMPOTENT — `recordPropPlayerMap`'s own `onConflictDoNothing` on the (prop_name, season) unique
+ * index — so a caller running this after EVERY capture, even one with nothing new to resolve,
+ * costs a full-table read and a comparison, never a duplicate row. This is what makes the archive
+ * SELF-RESOLVING: a late-posted name (a call-up signed days before kickoff) is captured by whatever
+ * snapshot first sees his line and resolved by the very next run of this function, with no operator
+ * needing to remember to re-run `npm run projections:odds:resolve` by hand.
+ */
+export async function resolveAllPropNames(db: Db): Promise<ResolveAllPropNamesResult> {
+  const observed = await distinctObservedPropNames(db);
+  const seasons = [...new Set(observed.map((entry) => entry.season))].sort((a, b) => a - b);
+  const candidatesBySeason = new Map<number, readonly PlayerMapCandidate[]>();
+  for (const season of seasons) {
+    candidatesBySeason.set(season, await candidateSeasonRoster(db, season));
+  }
+  const { matched, unmatched } = resolvePropNames(observed, candidatesBySeason);
+  const written = await recordPropPlayerMap(db, matched);
+  return { observed, matched, unmatched, written };
+}

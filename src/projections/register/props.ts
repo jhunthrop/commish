@@ -64,9 +64,21 @@ export interface PropsConsensusQuery {
   readonly asOf: Date;
 }
 
-/** How each market's median line is priced. Derived from `REGISTER_SCORING` rather than written out,
- *  so a scoring change cannot leave this table saying something the board does not. */
-const MARKET_WEIGHT: Readonly<Record<PropMarket, number>> = {
+/**
+ * How each market's median line is priced. Derived from `REGISTER_SCORING` rather than written
+ * out, so a scoring change cannot leave this table saying something the board does not.
+ *
+ * A `Partial` record, not `Record<PropMarket, number>` (props-anchor fix round 1, MEDIUM 2,
+ * 2026-09-05): `player_pass_tds` joined `PROP_MARKETS`'s raw capture this round, and this benchmark
+ * reads whatever markets the archive actually holds, but pricing a market into `points` here is a
+ * scoring-weight decision, not a rescale fit — unlike `props-anchor.ts`'s own rescale, which
+ * genuinely cannot move without a re-fit, this ONE market's price is already sitting in
+ * `REGISTER_SCORING.pointsPerPassingTouchdown` and adding it here would be entirely correct. It
+ * stays out anyway, on purpose, to keep this round's change to exactly what was asked (raw capture
+ * only) — see `getPropsConsensus`'s own loop below for how an unweighted-but-observed market still
+ * reaches `PropsStance.markets` (the raw line, unpriced) rather than being silently dropped.
+ */
+const MARKET_WEIGHT: Readonly<Partial<Record<PropMarket, number>>> = {
   player_pass_yds: REGISTER_SCORING.pointsPerPassingYard,
   player_rush_yds: REGISTER_SCORING.pointsPerRushingYard,
   player_reception_yds: REGISTER_SCORING.pointsPerReceivingYard,
@@ -166,7 +178,10 @@ export async function weekPropsConsensus(
     for (const [market, keys] of byMarket) {
       const line = median(keys.map((key) => latest.get(key)!.point));
       markets[market] = line;
-      points += line * MARKET_WEIGHT[market];
+      // Observed but unweighted (`player_pass_tds`, this round) still lands in `markets` above —
+      // the raw line is never hidden — it just does not move `points` until a weight is added.
+      const weight = MARKET_WEIGHT[market];
+      if (weight !== undefined) points += line * weight;
     }
     stances.set(playerId, { points, markets });
   }

@@ -9,6 +9,7 @@ import {
   observationCountsByPropName,
   playerIdForPropName,
   recordPropPlayerMap,
+  resolveAllPropNames,
   resolvePropNames,
   seasonOfKickoff,
   type PlayerMapCandidate,
@@ -218,5 +219,72 @@ describe("recordPropPlayerMap / playerIdForPropName — the builder and the read
     await recordPropPlayerMap(db, [{ propName: "Josh Allen", season: 2023, playerId: "p1", method: "exact" }]);
     const second = await recordPropPlayerMap(db, [{ propName: "Josh Allen", season: 2023, playerId: "p1", method: "exact" }]);
     expect(second).toBe(0);
+  });
+});
+
+/**
+ * `resolveAllPropNames` (fix round 1, MEDIUM 1a) — the resolve core `scripts/odds-props-resolve.ts`
+ * and the props-preseason-snapshot job now share, rather than each composing
+ * `distinctObservedPropNames` + `candidateSeasonRoster` + `resolvePropNames` + `recordPropPlayerMap`
+ * on its own.
+ */
+describe("resolveAllPropNames", () => {
+  it("resolves every observed name against its own season's roster and writes the matches", async () => {
+    await db.insert(nflPlayers).values([{ id: "p1", name: "Josh Allen", position: "QB", rookieSeason: 2018, lastSeason: 2026 }]);
+    await recordPropObservations(db, [
+      { eventId: "e1", commenceTime: new Date("2023-09-10T17:00:00.000Z"), bookmaker: "dk", market: "player_pass_yds", playerName: "Josh Allen", point: 245.5, overPrice: -110, underPrice: -110, fetchedAt: new Date("2023-09-09T00:00:00.000Z") },
+    ]);
+
+    const result = await resolveAllPropNames(db);
+
+    expect(result.observed).toEqual([{ propName: "Josh Allen", season: 2023 }]);
+    expect(result.matched).toEqual([{ propName: "Josh Allen", season: 2023, playerId: "p1", method: "exact" }]);
+    expect(result.unmatched).toEqual([]);
+    expect(result.written).toBe(1);
+    expect(await playerIdForPropName(db, "Josh Allen", 2023)).toBe("p1");
+  });
+
+  it("reports an unmatched name rather than guessing, and writes nothing for it", async () => {
+    await recordPropObservations(db, [
+      { eventId: "e1", commenceTime: new Date("2023-09-10T17:00:00.000Z"), bookmaker: "dk", market: "player_pass_yds", playerName: "Nobody At All", point: 245.5, overPrice: -110, underPrice: -110, fetchedAt: new Date("2023-09-09T00:00:00.000Z") },
+    ]);
+
+    const result = await resolveAllPropNames(db);
+
+    expect(result.matched).toEqual([]);
+    expect(result.unmatched).toEqual([{ propName: "Nobody At All", season: 2023, reason: "not_found" }]);
+    expect(result.written).toBe(0);
+  });
+
+  it("is idempotent -- a second run against the identical archive writes nothing new", async () => {
+    await db.insert(nflPlayers).values([{ id: "p1", name: "Josh Allen", position: "QB", rookieSeason: 2018, lastSeason: 2026 }]);
+    await recordPropObservations(db, [
+      { eventId: "e1", commenceTime: new Date("2023-09-10T17:00:00.000Z"), bookmaker: "dk", market: "player_pass_yds", playerName: "Josh Allen", point: 245.5, overPrice: -110, underPrice: -110, fetchedAt: new Date("2023-09-09T00:00:00.000Z") },
+    ]);
+
+    const first = await resolveAllPropNames(db);
+    const second = await resolveAllPropNames(db);
+
+    expect(first.written).toBe(1);
+    expect(second.written).toBe(0);
+  });
+
+  it("returns an empty result when the archive holds no observations at all", async () => {
+    const result = await resolveAllPropNames(db);
+    expect(result).toEqual({ observed: [], matched: [], unmatched: [], written: 0 });
+  });
+
+  it("resolves a name posted LATE (a call-up near kickoff) exactly like any other -- self-resolving, no special case", async () => {
+    await recordPropObservations(db, [
+      { eventId: "e1", commenceTime: new Date("2023-09-10T17:00:00.000Z"), bookmaker: "dk", market: "player_rush_yds", playerName: "Late Callup", point: 20.5, overPrice: -110, underPrice: -110, fetchedAt: new Date("2023-09-09T00:00:00.000Z") },
+    ]);
+    expect((await resolveAllPropNames(db)).matched).toEqual([]);
+
+    // The roster only learns about him the day he is signed -- days after the first snapshot saw
+    // his line.
+    await db.insert(nflPlayers).values([{ id: "p-late", name: "Late Callup", position: "RB", rookieSeason: 2023, lastSeason: 2026 }]);
+    const second = await resolveAllPropNames(db);
+    expect(second.matched).toEqual([{ propName: "Late Callup", season: 2023, playerId: "p-late", method: "exact" }]);
+    expect(second.written).toBe(1);
   });
 });

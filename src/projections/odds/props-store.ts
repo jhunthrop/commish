@@ -12,9 +12,26 @@ import { playerPropObservations } from "@/db/schema";
  * event-odds response into rows, writes rows, and counts what landed.
  */
 
-/** The four markets this tier's key was verified against (`progress.md`, founder update 2). Any
- *  other market key in a response is a contract change this store refuses to guess at. */
-export const PROP_MARKETS = ["player_pass_yds", "player_reception_yds", "player_receptions", "player_rush_yds"] as const;
+/**
+ * The markets this tier's key was verified against. Any other market key in a response is a
+ * contract change this store refuses to guess at.
+ *
+ * FOUR MARKETS verified at `progress.md`, founder update 2. A FIFTH, `player_pass_tds`, was added
+ * in the props-anchor activation's fix round 1 (MEDIUM 2, 2026-09-05) after a single live
+ * `/events/{id}/odds` request confirmed the paid tier serves it (`player_rush_tds`, requested in
+ * the SAME call, was NOT served — six bookmakers returned zero rows for it, so it is deliberately
+ * left off this list; see `docs/research/2026-09-05-props-anchor-backtest.md`'s own follow-ups
+ * section for the full finding and credit cost).
+ *
+ * `player_pass_tds` IS CAPTURED AS A RAW ROW ONLY, going forward, from this commit on — it is
+ * NOT wired into `props-anchor.ts`'s `propsPerGameLine` or the anchor rescale this round. A market
+ * this store did not previously archive has no historical (2023-2025) coverage to fit against, and
+ * QB is the one position `docs/research/2026-09-05-props-anchor-backtest.md`'s own backtest found
+ * the current four-market anchor REGRESSES (the archived markets price passing yards but never
+ * touchdowns) — adding this market to the price math without a proper fit is exactly the kind of
+ * eyeballed change this engine's own discipline forbids. The next fit round is what prices it.
+ */
+export const PROP_MARKETS = ["player_pass_yds", "player_reception_yds", "player_receptions", "player_rush_yds", "player_pass_tds"] as const;
 export type PropMarket = (typeof PROP_MARKETS)[number];
 
 const PROP_MARKET_SET: ReadonlySet<string> = new Set(PROP_MARKETS);

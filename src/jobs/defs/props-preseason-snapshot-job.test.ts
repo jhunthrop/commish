@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTestDb } from "@/db/test-db";
+import type { ResolveAllPropNamesResult } from "@/projections/odds/player-map";
 import type { SnapshotSummary } from "@/projections/odds/snapshot";
 import {
   parsePropsPreseasonSnapshotPayload,
@@ -20,8 +21,22 @@ const SUMMARY: SnapshotSummary = {
   credits: { remaining: "9500", used: "500" },
 };
 
-function depsWithKickoff(kickoff: Date | null, snapshot = vi.fn<PropsPreseasonSnapshotDeps["snapshot"]>()): PropsPreseasonSnapshotDeps {
-  return { firstKickoff: vi.fn().mockResolvedValue(kickoff), snapshot };
+const RESOLVED: ResolveAllPropNamesResult = {
+  observed: [
+    { propName: "Josh Allen", season: 2026 },
+    { propName: "Late Callup", season: 2026 },
+  ],
+  matched: [{ propName: "Josh Allen", season: 2026, playerId: "p1", method: "exact" }],
+  unmatched: [{ propName: "Late Callup", season: 2026, reason: "not_found" }],
+  written: 1,
+};
+
+function depsWithKickoff(
+  kickoff: Date | null,
+  snapshot = vi.fn<PropsPreseasonSnapshotDeps["snapshot"]>().mockResolvedValue(SUMMARY),
+  resolve = vi.fn<PropsPreseasonSnapshotDeps["resolve"]>().mockResolvedValue(RESOLVED),
+): PropsPreseasonSnapshotDeps {
+  return { firstKickoff: vi.fn().mockResolvedValue(kickoff), snapshot, resolve };
 }
 
 describe("props-preseason-snapshot job step", () => {
@@ -37,34 +52,52 @@ describe("props-preseason-snapshot job step", () => {
     expect(outcome.summary).toContain("credits remaining=9500 used=500");
   });
 
-  it("AT kickoff: self-disables, never calls the network (strictly before, never at)", async () => {
+  it("runs the resolve step after a successful capture, and reports its own summary (MEDIUM 1a)", async () => {
+    const resolve = vi.fn().mockResolvedValue(RESOLVED);
+    const deps = depsWithKickoff(KICKOFF, vi.fn().mockResolvedValue(SUMMARY), resolve);
+
+    const outcome = await runPropsPreseasonSnapshotStep(db, CLOCK, { firedAt: "2026-09-05T07:30:00.000Z" }, deps);
+
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(resolve).toHaveBeenCalledWith(db);
+    expect(outcome.summary).toContain("resolved 1/2 prop name(s)");
+    expect(outcome.summary).toContain("(1 newly mapped)");
+  });
+
+  it("AT kickoff: self-disables, never calls the network OR the resolve step (strictly before, never at)", async () => {
     const snapshot = vi.fn();
-    const deps = depsWithKickoff(KICKOFF, snapshot);
+    const resolve = vi.fn();
+    const deps = depsWithKickoff(KICKOFF, snapshot, resolve);
 
     const outcome = await runPropsPreseasonSnapshotStep(db, CLOCK, { firedAt: KICKOFF.toISOString() }, deps);
 
     expect(snapshot).not.toHaveBeenCalled();
+    expect(resolve).not.toHaveBeenCalled();
     expect(outcome.summary).toContain("the pre-kickoff window is closed");
     expect(outcome.summary).toContain("no network call made");
   });
 
-  it("after kickoff: self-disables permanently, never calls the network", async () => {
+  it("after kickoff: self-disables permanently, never calls the network or resolve", async () => {
     const snapshot = vi.fn();
-    const deps = depsWithKickoff(KICKOFF, snapshot);
+    const resolve = vi.fn();
+    const deps = depsWithKickoff(KICKOFF, snapshot, resolve);
 
     const outcome = await runPropsPreseasonSnapshotStep(db, CLOCK, { firedAt: "2026-09-15T12:00:00.000Z" }, deps);
 
     expect(snapshot).not.toHaveBeenCalled();
+    expect(resolve).not.toHaveBeenCalled();
     expect(outcome.summary).toContain("the pre-kickoff window is closed");
   });
 
-  it("no ingested schedule yet: skips without a network call rather than throwing", async () => {
+  it("no ingested schedule yet: skips without a network call or a resolve call rather than throwing", async () => {
     const snapshot = vi.fn();
-    const deps = depsWithKickoff(null, snapshot);
+    const resolve = vi.fn();
+    const deps = depsWithKickoff(null, snapshot, resolve);
 
     const outcome = await runPropsPreseasonSnapshotStep(db, CLOCK, {}, deps);
 
     expect(snapshot).not.toHaveBeenCalled();
+    expect(resolve).not.toHaveBeenCalled();
     expect(outcome.summary).toContain("no kickoff to gate against");
     expect(outcome.summary).toContain("no network call made");
   });

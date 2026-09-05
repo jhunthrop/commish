@@ -109,9 +109,8 @@ import {
   marketBoard,
   type ImpliedGamesByPosition,
 } from "@/projections/market/curve";
-import { loadArchivedPropLines, propsAnchorPoints } from "@/projections/market/props-anchor";
+import { propsAnchorForSeason } from "@/projections/market/props-anchor";
 import { withAvailabilityRecency } from "@/projections/preseason/availability";
-import { firstKickoffFor } from "@/projections/team-store";
 import { registry } from "@/projections/laws/registry";
 import { statLinesAsOfForMeasurement } from "@/projections/nflverse/derived-stat-lines";
 import { BENCHMARK_BOARD_FLOOR } from "@/projections/preseason/benchmarks";
@@ -253,19 +252,18 @@ async function factsForSeason(db: ReadonlyDb, season: number, impliedGamesByPosi
   const marketByPlayer = new Map(market.map((entry) => [entry.playerId, entry] as const));
   const actual = await actualSeasonPoints(db, season, inputs.positions);
 
-  // THE PROPS ANCHOR (deliverable C). `firstKickoffFor` is the leakage boundary AND the week-one
-  // window's origin; a season with no schedule rows at all (never for a completed season) or no
-  // archived pre-kickoff lines yields an empty map, which is exactly the ADP-only null cell.
-  const firstKickoff = await firstKickoffFor(db, season);
-  const propsAnchor =
-    firstKickoff === null
-      ? new Map<string, number>()
-      : propsAnchorPoints(await loadArchivedPropLines(db, season, firstKickoff), {
-          firstKickoff,
-          positionByPlayerId: inputs.positions,
-          marketPointsByPlayerId: new Map([...marketByPlayer].map(([playerId, entry]) => [playerId, entry.marketPoints] as const)),
-          impliedGamesByPosition,
-        });
+  // THE PROPS ANCHOR (deliverable C) — `propsAnchorForSeason` (`market/props-anchor.ts`), the one
+  // firstKickoffFor -> loadArchivedPropLines -> propsAnchorPoints sequence every caller of the
+  // props archive shares (props-round plumbing, 2026-09-05). A season with no schedule rows at all
+  // (never for a completed season) or no archived pre-kickoff lines yields an empty map, which is
+  // exactly the ADP-only null cell.
+  const propsAnchor = await propsAnchorForSeason(
+    db,
+    season,
+    inputs.positions,
+    new Map([...marketByPlayer].map(([playerId, entry]) => [playerId, entry.marketPoints] as const)),
+    impliedGamesByPosition,
+  );
 
   return { season, inputs, marketByPlayer, actual, droppedCount, propsAnchor };
 }

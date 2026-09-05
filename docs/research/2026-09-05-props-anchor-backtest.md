@@ -88,3 +88,15 @@ QB is the one position that gets WORSE on the judge season at this weight (rho 0
 - Every grid cell above is printed regardless of which way it points, coarse and fine alike.
 - `propsAnchorWeight` only ever moves a player whose season carries an archived pre-kickoff line for him; every other candidate's predicted points are bit-for-bit identical to the incumbent at every weight tested, which is why the whole-board numbers move far less than the props-covered ones and are reported for completeness rather than as the deciding metric.
 - The fit evidence pools 2023 and 2024 rather than fitting on 2023 alone and validating on 2024 as a second, independent step — a genuine three-way split (fit strictly on 2023, select against 2024, judge on 2025) is the rookie round's own recommended follow-up protocol and would need more archive-covered seasons than exist today to run without a two-season fit evidence pool being thin on its own.
+
+## Fix round 1 follow-ups (2026-09-05)
+
+**MEDIUM 2 — the QB market gap, verified rather than assumed.** QB is this backtest's own disclosed regression (per-position table above), and the archived four markets price passing yards but never touchdowns or interceptions — a plausible cause, worth checking cheaply rather than working around blind. One live `/events/{id}/odds` request against `New England Patriots @ Seattle Seahawks (kickoff 2026-09-10T00:20:00Z)`, asking for the four archived markets plus `player_pass_tds` and `player_rush_tds`:
+
+- Served (6 bookmakers responded): player_pass_yds, player_reception_yds, player_receptions, player_rush_yds, player_pass_tds.
+- NOT served by any bookmaker on that event: player_rush_tds.
+- Cost of this one check: 5 credits.
+
+`player_pass_tds` is added to `PROP_MARKETS` (raw capture only, from this commit forward — see that constant's own docblock in `props-store.ts`) so the archive starts accumulating it now, ahead of a future fit round that can price it with proper discipline once it has historical coverage to fit against. `player_rush_tds` is not available at this tier; no further action taken.
+
+**The reviewer's correction on "the window closes forever."** An earlier draft of the props-preseason-snapshot job's own docblock claimed the pre-kickoff window closes PERMANENTLY at kickoff. That is verified true for THIS job's own live-tier capture (`props-anchor.ts`'s leakage gate refuses any row fetched at or after kickoff, unconditionally). What is NOT verified, and is left explicitly open: the 2023-2025 archive was built through the Odds API's HISTORICAL endpoint (`scripts/odds-props-backfill.ts`), which reconstructs a snapshot AT A PAST INSTANT after the fact — so whether a missed 2026 pre-kickoff window could later be recovered retroactively through that same endpoint (subject to its own retention and cost) is a genuinely open question this round did not test. The daily snapshot job (Task 3) exists so 2026 never needs to find out the hard way.

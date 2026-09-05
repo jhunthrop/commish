@@ -17,15 +17,7 @@
 import { writeFileSync } from "node:fs";
 import { createDb } from "@/db/client";
 import { requireEnv } from "@/projections/odds/http";
-import {
-  candidateSeasonRoster,
-  distinctObservedPropNames,
-  observationCountsByPropName,
-  recordPropPlayerMap,
-  resolvePropNames,
-  type PlayerMapCandidate,
-  type UnmatchedPropName,
-} from "@/projections/odds/player-map";
+import { observationCountsByPropName, resolveAllPropNames, type UnmatchedPropName } from "@/projections/odds/player-map";
 
 const UNMATCHED_REPORT_PATH = ".superpowers/sdd/2026-09-01-props-backfill/props-unmatched-report.json";
 /** How many of each season's unmatched names to name in the printed summary -- enough to see the
@@ -49,7 +41,10 @@ interface SeasonReport {
 async function main(): Promise<void> {
   const db = createDb(requireEnv("DATABASE_URL"));
 
-  const observed = await distinctObservedPropNames(db);
+  // THE RESOLVE CORE (fix round 1, MEDIUM 1a) — `player-map.ts`'s `resolveAllPropNames`, the same
+  // function the props-preseason-snapshot job now calls after every capture. This script is the
+  // operator's own REPORT on top of that core, never a second implementation of it.
+  const { observed, matched, unmatched, written } = await resolveAllPropNames(db);
   const counts = await observationCountsByPropName(db);
   const seasons = [...new Set(observed.map((o) => o.season))].sort((a, b) => a - b);
 
@@ -59,14 +54,6 @@ async function main(): Promise<void> {
     await db.$client.end();
     return;
   }
-
-  const candidatesBySeason = new Map<number, readonly PlayerMapCandidate[]>();
-  for (const season of seasons) {
-    candidatesBySeason.set(season, await candidateSeasonRoster(db, season));
-  }
-
-  const { matched, unmatched } = resolvePropNames(observed, candidatesBySeason);
-  const written = await recordPropPlayerMap(db, matched);
 
   const matchedKeys = new Set(matched.map((m) => `${m.propName}|${m.season}`));
   const unmatchedBySeason = new Map<number, UnmatchedPropName[]>();
