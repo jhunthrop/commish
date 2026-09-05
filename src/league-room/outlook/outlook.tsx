@@ -3,11 +3,10 @@
 import { useState } from "react";
 import { Badge, ReasonChip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { signedPoints } from "@/components/ui/event-feed-row";
 import type { Position } from "@/domain/player";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
-import { groupReasons, type EvidenceGroup } from "./groups";
+import { groupReasons, lawGroupLabel, type EvidenceGroup } from "./groups";
 import { verdictLine } from "./verdict";
 
 /**
@@ -87,14 +86,11 @@ function EvidenceGroupRow({ group, laws, open, onToggle }: { readonly group: Evi
     return <ReasonChip reason={group.reason} registry={laws} className="w-fit" />;
   }
 
-  const { headline, netEffect, members } = group;
   // MEDIUM 2 (fix round 1): a bare "-1.8 pts, Age 29 season · 2 laws" reads as ONE measured
-  // number, not a sum of two. "together" makes the aggregate self-evident in the copy itself for
-  // N > 1; a single-law group carries no such ambiguity and keeps the plain form.
-  const label =
-    members.length > 1
-      ? `together ${signedPoints(netEffect)} pts, ${headline} · ${members.length} laws`
-      : `${signedPoints(netEffect)} pts, ${headline}`;
+  // number, not a sum of two. "together" (`lawGroupLabel`, `./groups.ts`) makes the aggregate
+  // self-evident in the copy itself for N > 1; a single-law group carries no such ambiguity and
+  // keeps the plain form.
+  const label = lawGroupLabel(group);
 
   return (
     <div className="flex flex-col gap-1">
@@ -105,7 +101,7 @@ function EvidenceGroupRow({ group, laws, open, onToggle }: { readonly group: Evi
       </button>
       {!open ? null : (
         <div className="flex flex-col gap-1.5 border-l border-line pl-3">
-          {members.map((member) => (
+          {group.members.map((member) => (
             <ReasonChip key={member.lawId} reason={member} registry={laws} className="w-fit" />
           ))}
         </div>

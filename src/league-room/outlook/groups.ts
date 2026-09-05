@@ -1,6 +1,7 @@
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
 import { lawHeadline, type LawReason } from "@/components/ui/reason-chip";
+import { signedPoints } from "@/components/ui/event-feed-row";
 
 /**
  * THE GROUPED EVIDENCE VIEW-MODEL (founder, 2026-09-04, Outlook redesign) — the fix for "three
@@ -137,4 +138,19 @@ export function groupReasons(reasons: readonly BoardReason[], laws: readonly Law
   lawGroups.sort((a, b) => Math.abs(b.netEffect) - Math.abs(a.netEffect));
 
   return [...lawGroups, ...factGroups];
+}
+
+/**
+ * ONE LAW GROUP'S OWN SENTENCE — "one voice product-wide" (Draft HQ phase 2, board persona fix
+ * 3): the identical copy `outlook.tsx`'s `EvidenceGroupRow` renders for a law group's own badge,
+ * extracted here so a second surface (the evidence board's why-drawer top line) can state the
+ * SAME group the SAME way rather than growing its own phrasing. A bare "-1.8 pts, Age 29 season"
+ * reads as one measured number; "together" makes an aggregate of two-or-more laws self-evident in
+ * the copy itself rather than left for a reader to infer from a member count alone.
+ */
+export function lawGroupLabel(group: Extract<EvidenceGroup, { kind: "law" }>): string {
+  const { headline, netEffect, members } = group;
+  return members.length > 1
+    ? `together ${signedPoints(netEffect)} pts, ${headline} · ${members.length} laws`
+    : `${signedPoints(netEffect)} pts, ${headline}`;
 }
