@@ -9,6 +9,7 @@ import { QUILT_CONFIG } from "../state/config";
 /** Sentence case per the v6 label ruling — the shouted register belongs to `MICRO_LABEL` alone. */
 const TAB_LABEL: Readonly<Record<DrawerTab, string>> = {
   pool: "Pool",
+  assistant: "Assistant",
   sheet: "My sheet",
   roster: "Roster",
   byes: "Byes",

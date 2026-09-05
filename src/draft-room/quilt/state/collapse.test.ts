@@ -6,8 +6,8 @@ function run(state: ExpandedSurface, ...events: readonly CollapseEvent[]): Expan
 }
 
 describe("reduceCollapse", () => {
-  it("keeps the founder-ruled handle order: pool, sheet, roster, byes, picks", () => {
-    expect(DRAWER_TABS).toEqual(["pool", "sheet", "roster", "byes", "picks"]);
+  it("keeps the founder-ruled handle order: pool, assistant, sheet, roster, byes, picks", () => {
+    expect(DRAWER_TABS).toEqual(["pool", "assistant", "sheet", "roster", "byes", "picks"]);
   });
 
   it("space walks none → half → none, and steps full back to half", () => {

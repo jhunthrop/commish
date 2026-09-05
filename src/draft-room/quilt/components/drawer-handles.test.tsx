@@ -16,15 +16,15 @@ function renderHandles(surface: ExpandedSurface, hasByes = true, hasRoster = tru
 describe("DrawerHandles", () => {
   it("shows every tab handle and the grabber even collapsed — opening is never a mystery gesture", () => {
     renderHandles(COLLAPSED);
-    for (const name of ["Pool", "My sheet", "Roster", "Byes", "Picks"]) {
+    for (const name of ["Pool", "Assistant", "My sheet", "Roster", "Byes", "Picks"]) {
       expect(screen.getByRole("tab", { name: new RegExp(name) })).toBeInTheDocument();
     }
     expect(screen.getByTestId("drawer-grabber")).toHaveTextContent(/drag or tap · space/i);
   });
 
-  it("keeps the founder-ruled handle order: Pool, My sheet, Roster, Byes, Picks", () => {
+  it("keeps the founder-ruled handle order: Pool, Assistant, My sheet, Roster, Byes, Picks", () => {
     renderHandles(COLLAPSED);
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Pool", "My sheet", "Roster", "Byes", "Picks"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Pool", "Assistant", "My sheet", "Roster", "Byes", "Picks"]);
   });
 
   it("hides the Byes handle when the schedule has nothing to claim", () => {

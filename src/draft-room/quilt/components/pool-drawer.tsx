@@ -5,12 +5,14 @@ import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
+import type { Law } from "@/projections/laws/types";
 import type { CheatSheet } from "../state/sheet";
 import type { CollapseEvent, ExpandedSurface } from "../state/collapse";
 import { needFractions } from "../state/lens";
 import { QUILT_CONFIG } from "../state/config";
 import { DrawerHandles } from "./drawer-handles";
 import { DrawerPoolTab } from "./drawer-pool-tab";
+import { DrawerAssistantTab } from "./drawer-assistant-tab";
 import { DrawerSheetTab } from "./drawer-sheet-tab";
 import { DrawerRosterTab } from "./drawer-roster-tab";
 import { DrawerByesTab } from "./drawer-byes-tab";
@@ -27,6 +29,7 @@ export interface PoolDrawerProps extends RoomActs {
   readonly myTeamId: string | null;
   readonly byeWeeks: ReadonlyMap<string, number>;
   readonly reasons: ReadonlyMap<string, readonly BoardReason[]>;
+  readonly laws: readonly Law[];
   readonly boardRanks: ReadonlyMap<string, number>;
   readonly sheet: CheatSheet;
   readonly onSheetMove: (playerId: string, delta: number) => void;
@@ -97,6 +100,18 @@ export function PoolDrawer(props: PoolDrawerProps) {
             onDraft={props.onDraft}
             onQueueToggle={props.onQueueToggle}
             onPeek={props.onPeek}
+          />
+        ) : tab === "assistant" ? (
+          <DrawerAssistantTab
+            draftId={view.draftId}
+            view={view}
+            myTeamId={props.myTeamId}
+            players={props.players}
+            playersById={props.playersById}
+            available={available}
+            byeWeeks={props.byeWeeks}
+            reasons={props.reasons}
+            laws={props.laws}
           />
         ) : tab === "sheet" ? (
           <DrawerSheetTab

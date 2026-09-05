@@ -78,6 +78,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
   const byeWeeks = room.byeWeeks ?? new Map<string, number>();
   const reasons = room.reasons ?? new Map();
+  const laws = room.laws ?? [];
 
   // The season-history cache lives for the room, shared by both trees — a player peeked on the
   // phone is already warm on the desktop and vice versa.
@@ -193,6 +194,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           myTeamId={room.myTeamId}
           byeWeeks={byeWeeks}
           reasons={reasons}
+          laws={laws}
           boardRanks={ranks}
           sheet={sheet}
           onSheetMove={move}
@@ -220,6 +222,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           onLens={setLens}
           byeWeeks={byeWeeks}
           reasons={reasons}
+          laws={laws}
           boardRanks={ranks}
           sheetRanks={mySheetRanks}
           sheet={sheet}

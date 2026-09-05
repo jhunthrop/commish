@@ -13,7 +13,7 @@
  * cells all dispatch the same events, and the transitions are testable without a DOM.
  */
 
-export const DRAWER_TABS = ["pool", "sheet", "roster", "byes", "picks"] as const;
+export const DRAWER_TABS = ["pool", "assistant", "sheet", "roster", "byes", "picks"] as const;
 export type DrawerTab = (typeof DRAWER_TABS)[number];
 
 export type DrawerHeight = "half" | "full";

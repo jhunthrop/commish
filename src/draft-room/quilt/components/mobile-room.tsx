@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import type { BoardReason } from "@/projections/preseason/board";
+import type { Law } from "@/projections/laws/types";
 import { PositionBadge } from "@/components/ui";
 import type { DraftRoom as DraftRoomState } from "../../hooks/use-draft-room";
 import type { CheatSheet } from "../state/sheet";
@@ -15,6 +16,7 @@ import { teamCode } from "../lib/team-code";
 import { shortName } from "./quilt-cell";
 import { QuiltBoard } from "./quilt-board";
 import { DrawerPoolTab } from "./drawer-pool-tab";
+import { DrawerAssistantTab } from "./drawer-assistant-tab";
 import { DrawerSheetTab } from "./drawer-sheet-tab";
 import { DrawerRosterTab } from "./drawer-roster-tab";
 import { DrawerPicksTab } from "./drawer-picks-tab";
@@ -24,14 +26,21 @@ import { UndoPill } from "./undo-pill";
 import { LensChips } from "./lens-chips";
 import type { RoomActs } from "./room-acts";
 
-const MOBILE_TABS = ["pool", "sheet", "roster", "board", "picks"] as const;
+const MOBILE_TABS = ["pool", "assistant", "sheet", "roster", "board", "picks"] as const;
 type MobileTab = (typeof MOBILE_TABS)[number];
 
 /** Literal caps are the tab bar's own data-register (the sweep bans the CLASS, not acronyms).
- *  Five tabs at 390px: the widest label (ROSTER) measures ~52px of text-sm bold against the
- *  ~78px a five-way flex-1 split leaves, so the existing font and padding hold (spec, mobile
- *  judgment). */
-const TAB_LABEL: Readonly<Record<MobileTab, string>> = { pool: "POOL", sheet: "SHEET", roster: "ROSTER", board: "BOARD", picks: "PICKS" };
+ *  Six tabs at 390px: the widest label (ASSISTANT) measures under the ~65px a six-way flex-1
+ *  split leaves at text-sm bold (spec, mobile judgment) — the same fit reasoning the five-tab
+ *  row was accepted under, one tab narrower per label now. */
+const TAB_LABEL: Readonly<Record<MobileTab, string>> = {
+  pool: "POOL",
+  assistant: "ASSISTANT",
+  sheet: "SHEET",
+  roster: "ROSTER",
+  board: "BOARD",
+  picks: "PICKS",
+};
 
 export interface MobileRoomProps {
   readonly room: DraftRoomState;
@@ -48,6 +57,7 @@ export interface MobileRoomProps {
   readonly onLens: (lens: Lens) => void;
   readonly byeWeeks: ReadonlyMap<string, number>;
   readonly reasons: ReadonlyMap<string, readonly BoardReason[]>;
+  readonly laws: readonly Law[];
   readonly boardRanks: ReadonlyMap<string, number>;
   readonly sheetRanks: ReadonlyMap<string, number>;
   readonly sheet: CheatSheet;
@@ -157,6 +167,18 @@ export function MobileRoom(props: MobileRoomProps) {
             reasons={props.reasons}
             focusSearch={false}
             {...mobileActs}
+          />
+        ) : tab === "assistant" ? (
+          <DrawerAssistantTab
+            draftId={view.draftId}
+            view={view}
+            myTeamId={room.myTeamId}
+            players={room.players}
+            playersById={playersById}
+            available={props.available}
+            byeWeeks={props.byeWeeks}
+            reasons={props.reasons}
+            laws={props.laws}
           />
         ) : tab === "sheet" ? (
           <DrawerSheetTab
