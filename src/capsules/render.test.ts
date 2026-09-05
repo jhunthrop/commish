@@ -44,6 +44,7 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
     lastSeasonStory: null,
     booksNumbers: { propsLines: [], teamVegasWinTotal: null },
     usage: null,
+    trend: null,
     ...overrides,
   };
 }
@@ -193,6 +194,51 @@ describe("renderFactsForModel — the color", () => {
     );
     const rendered = renderFactsForModel(facts);
     expect(rendered).toContain("Last season's usage (2025): snap share 84.8%, RB2 among 40 qualifying running backs, one spot behind Snap King.");
+  });
+
+  it("states a material trend as an honest rose/fell sentence with both raw seasons", () => {
+    const facts = buildPlayerFacts(
+      baseInput({
+        trend: {
+          pointsPerGame: { priorSeason: 2023, priorValue: 10, recentSeason: 2024, recentValue: 30, delta: 20, material: true },
+          yardsPerOpportunity: { priorSeason: 2023, priorValue: 5.4, recentSeason: 2024, recentValue: 4.6, delta: -0.8, material: true },
+          targetShare: null,
+        },
+      }),
+    );
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).toContain("His points per game rose from 10 in 2023 to 30 in 2024.");
+    expect(rendered).toContain("His yards per touch fell from 5.4 in 2023 to 4.6 in 2024.");
+  });
+
+  it("uses yards per target, not yards per touch, for a WR/TE subject", () => {
+    const facts = buildPlayerFacts(
+      baseInput({
+        identity: { id: "p1", name: "Star Wideout", position: "WR", team: "SF" },
+        trend: {
+          pointsPerGame: null,
+          yardsPerOpportunity: { priorSeason: 2023, priorValue: 8.1, recentSeason: 2024, recentValue: 10.5, delta: 2.4, material: true },
+          targetShare: null,
+        },
+      }),
+    );
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).toContain("His yards per target rose from 8.1 in 2023 to 10.5 in 2024.");
+  });
+
+  it("never narrates an immaterial trend, even though it still exists on the fact sheet", () => {
+    const facts = buildPlayerFacts(
+      baseInput({
+        trend: {
+          pointsPerGame: { priorSeason: 2023, priorValue: 10, recentSeason: 2024, recentValue: 10.1, delta: 0.1, material: false },
+          yardsPerOpportunity: null,
+          targetShare: { priorSeason: 2023, priorValue: 0.2, recentSeason: 2024, recentValue: 0.21, delta: 0.01, material: false },
+        },
+      }),
+    );
+    const rendered = renderFactsForModel(facts);
+    expect(rendered).not.toMatch(/points per game (rose|fell)/);
+    expect(rendered).not.toMatch(/target share (rose|fell)/);
   });
 
   it("never emits any banned-vocabulary term even with every color group populated", () => {

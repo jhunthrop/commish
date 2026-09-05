@@ -46,6 +46,7 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
     lastSeasonStory: null,
     booksNumbers: { propsLines: [], teamVegasWinTotal: null },
     usage: null,
+    trend: null,
     ...overrides,
   };
 }

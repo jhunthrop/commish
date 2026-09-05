@@ -12,12 +12,15 @@ import { nflPlayerIdsFor } from "@/projections/crosswalk";
 import { discoveryFactsForSeason, type DiscoveryFacts, type DiscoveryQuantityValues } from "@/projections/laws/discovery-facts";
 import { isSkillPosition } from "@/projections/laws/populations";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
+import { STAT_LINE_SOURCE } from "@/projections/lines";
 import { loadArchivedPropLines, median, medianPropLinesByPlayer } from "@/projections/market/props-anchor";
 import { statLinesAsOfForLiveSurface } from "@/projections/nflverse/derived-stat-lines";
+import { PARTICIPATION_METRICS } from "@/projections/nflverse/map";
 import { LIVE_ADMITTED_DERIVED_SEASONS } from "@/projections/nflverse/stat-lines";
 import { finalWeekOf } from "@/projections/nflverse/team-eras";
 import { PROP_MARKETS, type PropMarket } from "@/projections/odds/props-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { LAST_POSSIBLE_WEEK, observationsAsOf } from "@/projections/store";
 import { firstKickoffFor, teamObservationsAsOf } from "@/projections/team-store";
 import { VEGAS_METRICS, VEGAS_SOURCE } from "@/projections/vegas/ingest";
 import { computeFantasyPoints, roundPoints } from "@/scoring";
@@ -30,9 +33,11 @@ import {
   type PlayerFactsPropsLine,
   type PlayerFactsRankedStat,
   type PlayerFactsSeasonSummary,
+  type PlayerFactsTrend,
   type PlayerFactsUsage,
 } from "./facts";
 import { rankWithinGroups, type RankableStat } from "./rank";
+import { buildTrendMetric } from "./trend";
 
 /**
  * THE FACTS COLLECTOR — every database read `buildPlayerFacts` needs, gathered ONCE for every
@@ -60,7 +65,7 @@ import { rankWithinGroups, type RankableStat } from "./rank";
  * duplicate to ship an honest preseason capsule.
  *
  * THE COLOR FACTS (spec §9 AMENDED 2026-09-05) ARE A DELIBERATELY SEPARATE READ from the scope line
- * just above: `lastSeasonStoriesFor`/`usageAndTouchesFactsFor`/`propsLinesByPlayer`/`vegasWinTotalsByTeam`
+ * just above: `lastSeasonStoriesFor`/`usageTouchesAndTrendFactsFor`/`propsLinesByPlayer`/`vegasWinTotalsByTeam`
  * below all target LAST season (or, for the props/win-total pair, the CURRENT season's own
  * pre-kickoff market) on purpose — a different question ("how did he do, what do the books say")
  * from the scope note above's ("has HE played a week of the CURRENT season yet"), so widening one
@@ -223,16 +228,131 @@ function rankedDiscoveryQuantity(discoveryFacts: ReadonlyMap<string, DiscoveryFa
   return rankWithinGroups(byPosition);
 }
 
-/** `usageAndTouchesFactsFor`'s own return, plus the touches rank `lastSeasonStoriesFor` cannot honestly
- *  compute itself (see that function's own docblock) — both come out of the SAME
- *  `discoveryFactsForSeason` read, so they are built together rather than paying for that read
- *  twice. */
-interface UsageAndTouchesFacts {
-  readonly usageByPlayerId: ReadonlyMap<string, PlayerFactsUsage>;
-  readonly touchesRankByPlayerId: ReadonlyMap<string, PlayerFactsRankedStat>;
+/** Season-total real yards (rushing plus receiving, both genuine `StatLine` fields) and season-
+ *  total real targets (a raw PARTICIPATION count, the same observations `populations.ts`'s own
+ *  private `seasonParticipation` reads, summed here directly since that function is not exported)
+ *  — the two ingredients `yardsPerOpportunityFor` needs that `DiscoveryQuantityValues` does not
+ *  carry (color v2, Task 2). */
+interface SeasonYardsAndTargets {
+  readonly totalYards: number;
+  readonly targets: number;
 }
 
-async function usageAndTouchesFactsFor(db: Db, priorSeason: number, positions: ReadonlyMap<string, Position>, asOf: Date): Promise<UsageAndTouchesFacts> {
+async function seasonYardsAndTargetsFor(db: Db, season: number, skillPlayerIds: readonly string[], asOf: Date): Promise<ReadonlyMap<string, SeasonYardsAndTargets>> {
+  if (skillPlayerIds.length === 0) return new Map();
+  const lastWeek = finalWeekOf(season);
+  const [statRows, participationRows] = await Promise.all([
+    statLinesAsOfForLiveSurface(db, { season, week: { from: 1, to: lastWeek }, asOf, playerIds: skillPlayerIds }),
+    observationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf, source: STAT_LINE_SOURCE, playerIds: skillPlayerIds }),
+  ]);
+  const totalYardsByPlayer = new Map<string, number>();
+  for (const { line } of statRows) totalYardsByPlayer.set(line.playerId, (totalYardsByPlayer.get(line.playerId) ?? 0) + line.rushingYards + line.receivingYards);
+  const targetsByPlayer = new Map<string, number>();
+  for (const row of participationRows) {
+    if (row.metric !== PARTICIPATION_METRICS.targets) continue;
+    targetsByPlayer.set(row.playerId, (targetsByPlayer.get(row.playerId) ?? 0) + row.value);
+  }
+  const out = new Map<string, SeasonYardsAndTargets>();
+  for (const playerId of skillPlayerIds) out.set(playerId, { totalYards: totalYardsByPlayer.get(playerId) ?? 0, targets: targetsByPlayer.get(playerId) ?? 0 });
+  return out;
+}
+
+/** Nearest tenth — the same precision the task's own worked example states ("5.4 to 4.6"), never
+ *  register precision on a rate this coarse. */
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/** RB/QB read their workload in TOUCHES (carries plus receptions); WR/TE read it in raw TARGETS —
+ *  a pure receiver's opportunity is better measured against every ball thrown his way, drops and
+ *  broken-up passes included, than against catches alone (`PlayerFactsTrend.yardsPerOpportunity`'s
+ *  own docblock). `null` when the chosen denominator itself has no real evidence, or is zero (a
+ *  ratio with a zero denominator is not an honest number, never a fabricated infinity). */
+function yardsPerOpportunityFor(position: Position, touches: number | null, yards: SeasonYardsAndTargets | undefined): number | null {
+  if (yards === undefined) return null;
+  const denominator = position === "WR" || position === "TE" ? yards.targets : touches;
+  return denominator === null || denominator <= 0 ? null : round1(yards.totalYards / denominator);
+}
+
+/** Every real (non-null) reading of one quantity, pooled by position, across BOTH the current and
+ *  the prior `DiscoveryQuantityValues` a `DiscoveryFacts` entry carries — the population
+ *  `buildTrendMetric` measures materiality against (`trend.ts`'s own docblock: "pooled across both
+ *  of the two seasons a trend measures"). */
+function pooledDiscoveryValuesByPosition(discoveryFacts: ReadonlyMap<string, DiscoveryFacts>, select: (values: DiscoveryQuantityValues) => number | null): ReadonlyMap<Position, number[]> {
+  const byPosition = new Map<Position, number[]>();
+  const add = (position: Position, value: number | null) => {
+    if (value === null) return;
+    const list = byPosition.get(position);
+    if (list === undefined) byPosition.set(position, [value]);
+    else list.push(value);
+  };
+  for (const facts of discoveryFacts.values()) {
+    add(facts.position, select(facts.current));
+    if (facts.prior !== null) add(facts.position, select(facts.prior));
+  }
+  return byPosition;
+}
+
+/** `usageTouchesAndTrendFactsFor`'s own return: the usage shares, the touches rank
+ *  `lastSeasonStoriesFor` cannot honestly compute itself (see that function's own docblock), and
+ *  the year-over-year trend — all three come out of the SAME `discoveryFactsForSeason` read, so
+ *  they are built together rather than paying for that read twice. */
+interface UsageTouchesAndTrendFacts {
+  readonly usageByPlayerId: ReadonlyMap<string, PlayerFactsUsage>;
+  readonly touchesRankByPlayerId: ReadonlyMap<string, PlayerFactsRankedStat>;
+  readonly trendByPlayerId: ReadonlyMap<string, PlayerFactsTrend>;
+}
+
+/**
+ * THE TREND (color v2, Task 2) — year-over-year deltas from his own prior two seasons.
+ * `discoveryFactsForSeason(db, recentSeason, …)` already reads BOTH seasons in one call
+ * (`current` = `recentSeason`, `prior` = `recentSeason - 1`), so `pointsPerGame` and `targetShare`
+ * cost nothing extra; `yardsPerOpportunity` needs one more pair of season reads
+ * (`seasonYardsAndTargetsFor`) since neither total yards nor a raw target count live on
+ * `DiscoveryQuantityValues`. A player `discoveryFacts.prior` is `null` for (his own prior two
+ * seasons do not both exist — a sophomore, most often) gets no entry in the returned map at all,
+ * matching `PlayerFacts.trend`'s own `null` contract.
+ */
+async function trendsFor(db: Db, discoveryFacts: ReadonlyMap<string, DiscoveryFacts>, recentSeason: number, asOf: Date): Promise<ReadonlyMap<string, PlayerFactsTrend>> {
+  const olderSeason = recentSeason - 1;
+  const skillPlayerIds = [...discoveryFacts.keys()];
+  const [recentYards, olderYards] = await Promise.all([
+    seasonYardsAndTargetsFor(db, recentSeason, skillPlayerIds, asOf),
+    seasonYardsAndTargetsFor(db, olderSeason, skillPlayerIds, asOf),
+  ]);
+
+  const yardsPerOpportunityByPlayer = new Map<string, { readonly recent: number | null; readonly older: number | null }>();
+  for (const [playerId, facts] of discoveryFacts) {
+    const recent = yardsPerOpportunityFor(facts.position, facts.current.touches, recentYards.get(playerId));
+    const older = facts.prior === null ? null : yardsPerOpportunityFor(facts.position, facts.prior.touches, olderYards.get(playerId));
+    yardsPerOpportunityByPlayer.set(playerId, { recent, older });
+  }
+  const yardsPerOpportunityPools = new Map<Position, number[]>();
+  for (const [playerId, { recent, older }] of yardsPerOpportunityByPlayer) {
+    const position = discoveryFacts.get(playerId)!.position;
+    const list = yardsPerOpportunityPools.get(position) ?? [];
+    if (recent !== null) list.push(recent);
+    if (older !== null) list.push(older);
+    if (list.length > 0) yardsPerOpportunityPools.set(position, list);
+  }
+
+  const pointsPerGamePools = pooledDiscoveryValuesByPosition(discoveryFacts, (v) => v.pointsPerGame);
+  const targetSharePools = pooledDiscoveryValuesByPosition(discoveryFacts, (v) => v.targetShare);
+
+  const trends = new Map<string, PlayerFactsTrend>();
+  for (const [playerId, facts] of discoveryFacts) {
+    if (facts.prior === null) continue;
+    const pointsPerGame = buildTrendMetric(olderSeason, facts.prior.pointsPerGame, recentSeason, facts.current.pointsPerGame, pointsPerGamePools.get(facts.position) ?? []);
+    const targetShare = buildTrendMetric(olderSeason, facts.prior.targetShare, recentSeason, facts.current.targetShare, targetSharePools.get(facts.position) ?? []);
+    const opportunityYards = yardsPerOpportunityByPlayer.get(playerId)!;
+    const yardsPerOpportunity = buildTrendMetric(olderSeason, opportunityYards.older, recentSeason, opportunityYards.recent, yardsPerOpportunityPools.get(facts.position) ?? []);
+    if (pointsPerGame === null && targetShare === null && yardsPerOpportunity === null) continue;
+    trends.set(playerId, { pointsPerGame, yardsPerOpportunity, targetShare });
+  }
+  return trends;
+}
+
+async function usageTouchesAndTrendFactsFor(db: Db, priorSeason: number, positions: ReadonlyMap<string, Position>, asOf: Date): Promise<UsageTouchesAndTrendFacts> {
   const admitDerived = LIVE_ADMITTED_DERIVED_SEASONS.includes(priorSeason);
   const discoveryFacts = await discoveryFactsForSeason(db, priorSeason, positions, PPR_SCORING, admitDerived, asOf);
   const names = await namesForNflPlayerIds(db, [...discoveryFacts.keys()]);
@@ -241,6 +361,7 @@ async function usageAndTouchesFactsFor(db: Db, priorSeason: number, positions: R
   const targetShareRanks = rankedDiscoveryQuantity(discoveryFacts, names, (v) => v.targetShare);
   const redZoneShareRanks = rankedDiscoveryQuantity(discoveryFacts, names, (v) => v.redZoneTouchShare);
   const touchesRankByPlayerId = rankedDiscoveryQuantity(discoveryFacts, names, (v) => v.touches);
+  const trendByPlayerId = await trendsFor(db, discoveryFacts, priorSeason, asOf);
 
   const usageByPlayerId = new Map<string, PlayerFactsUsage>();
   for (const [playerId, playerFacts] of discoveryFacts) {
@@ -254,7 +375,7 @@ async function usageAndTouchesFactsFor(db: Db, priorSeason: number, positions: R
       redZoneShareRank: redZoneShareRanks.get(playerId) ?? null,
     });
   }
-  return { usageByPlayerId, touchesRankByPlayerId };
+  return { usageByPlayerId, touchesRankByPlayerId, trendByPlayerId };
 }
 
 /**
@@ -375,6 +496,7 @@ interface ColorFacts {
   readonly lastSeasonStoryByGsisId: ReadonlyMap<string, Omit<PlayerFactsLastSeasonStory, "touchesRank">>;
   readonly touchesRankByGsisId: ReadonlyMap<string, PlayerFactsRankedStat>;
   readonly usageByGsisId: ReadonlyMap<string, PlayerFactsUsage>;
+  readonly trendByGsisId: ReadonlyMap<string, PlayerFactsTrend>;
   readonly propsLinesByGsisId: ReadonlyMap<string, readonly PlayerFactsPropsLine[]>;
   readonly winTotalByTeam: ReadonlyMap<string, number>;
   readonly gsisIdByPlayerId: ReadonlyMap<string, string>;
@@ -411,6 +533,7 @@ function factsInputFor(
     news: news.get(row.name) ?? [],
     lastSeasonStory: lastSeasonStoryFor(gsisId, color),
     usage: (gsisId === undefined ? undefined : color.usageByGsisId.get(gsisId)) ?? null,
+    trend: (gsisId === undefined ? undefined : color.trendByGsisId.get(gsisId)) ?? null,
     booksNumbers,
   };
 }
@@ -419,7 +542,7 @@ function factsInputFor(
  *  snapshot read, one news-snapshot read (serving every name at once,
  *  `newsForPlayers`), one season-stat-lines read, the law registry read once off disk, and the
  *  "color facts" reads (spec §9 AMENDED 2026-09-05 — `lastSeasonStoriesFor`/
- *  `usageAndTouchesFactsFor`/`propsLinesByPlayer`/`vegasWinTotalsByTeam`, this module's own
+ *  `usageTouchesAndTrendFactsFor`/`propsLinesByPlayer`/`vegasWinTotalsByTeam`, this module's own
  *  docblock), each batched once for the whole board rather than once per player. The sweep job
  *  calls this once per run and diffs each player's own `factsHash` against the stored row
  *  (`store.ts`) to decide who actually needs a fresh generation. */
@@ -438,16 +561,17 @@ export async function collectAllPlayerFacts(db: Db, asOf: Date = new Date()): Pr
     nflPlayerIdsFor(db, rows.map((row) => row.playerId)),
   ]);
 
-  const [lastSeasonStoryByGsisId, usageAndTouches, propsLinesByGsisId, winTotalByTeam] = await Promise.all([
+  const [lastSeasonStoryByGsisId, usageTouchesAndTrend, propsLinesByGsisId, winTotalByTeam] = await Promise.all([
     lastSeasonStoriesFor(db, priorSeason, positions, asOf),
-    usageAndTouchesFactsFor(db, priorSeason, positions, asOf),
+    usageTouchesAndTrendFactsFor(db, priorSeason, positions, asOf),
     propsLinesByPlayer(db, PRODUCT_SEASON),
     vegasWinTotalsByTeam(db, PRODUCT_SEASON, asOf),
   ]);
   const color: ColorFacts = {
     lastSeasonStoryByGsisId,
-    touchesRankByGsisId: usageAndTouches.touchesRankByPlayerId,
-    usageByGsisId: usageAndTouches.usageByPlayerId,
+    touchesRankByGsisId: usageTouchesAndTrend.touchesRankByPlayerId,
+    usageByGsisId: usageTouchesAndTrend.usageByPlayerId,
+    trendByGsisId: usageTouchesAndTrend.trendByPlayerId,
     propsLinesByGsisId,
     winTotalByTeam,
     gsisIdByPlayerId,

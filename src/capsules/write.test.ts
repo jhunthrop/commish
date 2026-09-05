@@ -17,6 +17,7 @@ function baseInput(): PlayerFactsInput {
     lastSeasonStory: null,
     booksNumbers: { propsLines: [], teamVegasWinTotal: null },
     usage: null,
+    trend: null,
   };
 }
 

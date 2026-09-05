@@ -289,6 +289,65 @@ describe("collectAllPlayerFacts — usage, plain", () => {
   });
 });
 
+/** One player's one week of a named season — `priorSeasonWeek`'s own shape, parameterized by
+ *  season (color v2, Task 2's own trend needs TWO prior seasons on record, not just the one every
+ *  other color-facts describe block above tests against). */
+function seasonWeek(gsisId: string, season: number, weekNumber: number, stats: Readonly<Record<string, number>>): readonly PlayerWeekObservation[] {
+  const asOf = new Date(Date.UTC(season, 10, 1));
+  return Object.entries(stats).map(([field, value]) => ({
+    season, week: weekNumber, playerId: gsisId, source: STAT_LINE_SOURCE, metric: statMetricName(field), value, asOf,
+  }));
+}
+
+describe("collectAllPlayerFacts — the year-over-year trend", () => {
+  let db: Db;
+  const OLDER_SEASON = PRIOR_SEASON - 1;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  it("states a material trend from his own prior two seasons where both exist, and an honest non-material one for a flat peer", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-4000001", name: "Trend Back", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await seedPlayer(db, { id: "p2", nflId: "00-4000002", name: "Steady Back", position: "RB", team: "DAL", points: 150, rank: 2, adp: 40 });
+
+    await recordObservations(db, [
+      // Trend Back: 10 points per game (100 rushing yards, 20 carries) two seasons ago, 30 points
+      // per game (300 rushing yards, same 20 carries) last season — a real jump in both ppg and
+      // yards per touch (5.0 -> 15.0).
+      ...seasonWeek("00-4000001", OLDER_SEASON, 1, { rushingYards: 100, carries: 20 }),
+      ...seasonWeek("00-4000001", PRIOR_SEASON, 1, { rushingYards: 300, carries: 20 }),
+      // Steady Back: identical both seasons — the honest zero-delta, non-material case, and the
+      // second population member that gives the pooled stddev real spread to measure against.
+      ...seasonWeek("00-4000002", OLDER_SEASON, 1, { rushingYards: 100, carries: 20 }),
+      ...seasonWeek("00-4000002", PRIOR_SEASON, 1, { rushingYards: 100, carries: 20 }),
+    ]);
+
+    const facts = await collectAllPlayerFacts(db);
+    const trendBack = facts.find((f) => f.identity.id === "p1")!.trend!;
+    expect(trendBack.pointsPerGame).toEqual({ priorSeason: OLDER_SEASON, priorValue: 10, recentSeason: PRIOR_SEASON, recentValue: 30, delta: 20, material: true });
+    expect(trendBack.yardsPerOpportunity).toEqual({ priorSeason: OLDER_SEASON, priorValue: 5, recentSeason: PRIOR_SEASON, recentValue: 15, delta: 10, material: true });
+    // No target/team-target observations were ever recorded, so target share has no evidence in
+    // either season — absent seasons (of evidence) means an absent fact, never a fabricated share.
+    expect(trendBack.targetShare).toBeNull();
+
+    const steadyBack = facts.find((f) => f.identity.id === "p2")!.trend!;
+    expect(steadyBack.pointsPerGame!.delta).toBe(0);
+    expect(steadyBack.pointsPerGame!.material).toBe(false);
+    expect(steadyBack.yardsPerOpportunity!.delta).toBe(0);
+    expect(steadyBack.yardsPerOpportunity!.material).toBe(false);
+  });
+
+  it("is null when only one of his own prior two seasons exists on the store", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-4000003", name: "Sophomore Back", position: "RB", team: "SF", points: 200, rank: 1, adp: 20 });
+    await recordObservations(db, seasonWeek("00-4000003", PRIOR_SEASON, 1, { rushingYards: 100, carries: 20 }));
+
+    const facts = await collectAllPlayerFacts(db);
+    expect(facts[0]!.trend).toBeNull();
+  });
+});
+
 describe("collectAllPlayerFacts — the books' own numbers", () => {
   let db: Db;
   const FIRST_KICKOFF = new Date(`${PRODUCT_SEASON}-09-07T20:20:00.000Z`);

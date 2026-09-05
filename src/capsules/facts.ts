@@ -7,6 +7,7 @@ import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles"
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { RankedStat } from "./rank";
+import type { TrendMetric } from "./trend";
 
 /**
  * THE PLAYER CAPSULE'S FACT SHEET (spec §9 AMENDED 2026-09-04, Task 1) — every number and name a
@@ -110,17 +111,23 @@ export interface PlayerFactsSeasonSummary {
 /**
  * THE COLOR FACTS (spec §9 AMENDED 2026-09-05, "an analyst breaking it down") — every one of these
  * comes from a store this product already holds; a store without the row means the field is
- * `null`/absent, never estimated. Three independent groups, matching the founder's own split:
+ * `null`/absent, never estimated. Four independent groups, matching the founder's own split:
  *
  *   (a) `PlayerFactsLastSeasonStory` — last season's story, computed from the SAME prior-season
  *       stat machinery `league-service/player.ts`'s `priorSeasonStats` already reads
  *       (`statLinesAsOfForLiveSurface`), but built ONCE for the whole board's population in
- *       `collect.ts` rather than per league request.
+ *       `collect.ts` rather than per league request. Extended (color v2, Task 1) with an honest
+ *       position rank, qualifier count and named neighbor for total points, touches and receiving
+ *       yards.
  *   (b) the props line / Vegas win total pair, on `PlayerFacts.booksNumbers` — the sportsbooks' OWN
  *       numbers, phrased in `render.ts` as what the books "hang on him", never this engine's claim.
  *   (c) `PlayerFactsUsage` — last season's snap/target/red-zone shares, straight off the
  *       observation store's own usage quantities (`projections/laws/discovery-facts.ts`'s
- *       `DiscoveryQuantityValues`), independent of whether any law fired on them.
+ *       `DiscoveryQuantityValues`), independent of whether any law fired on them. Extended (color
+ *       v2, Task 1) with the same rank/qualifier/neighbor triple as group (a), per share.
+ *   (d) `PlayerFactsTrend` (color v2, Task 2) — year-over-year deltas from his own prior two
+ *       seasons, serialized only when material against the position's own real spread. See
+ *       `trend.ts`'s own docblock.
  */
 /** One quantity's finish among his position's peers who played that season — see `rank.ts`'s own
  *  docblock for the ranking rule, the qualifier-count honesty guarantee, and the tie convention.
@@ -199,6 +206,28 @@ export interface PlayerFactsUsage {
   readonly redZoneShareRank: PlayerFactsRankedStat | null;
 }
 
+/** One quantity's year-over-year read, from his own prior two seasons — see `trend.ts`'s own
+ *  docblock for the materiality rule and the population it is measured against. Re-exported here
+ *  under this file's own naming convention, the same pattern `PlayerFactsRankedStat` already
+ *  follows for `rank.ts`. */
+export type PlayerFactsTrendMetric = TrendMetric;
+
+/** THE TREND (color v2, Task 2) — year-over-year deltas from his own prior two seasons, where BOTH
+ *  exist (`collect.ts`'s own `null` handling: a rookie-adjacent player with only one prior season
+ *  on record gets `PlayerFacts.trend: null` entirely, never a half comparison). Each field can
+ *  still be independently `null` even when the object itself is not: a specific quantity can lack
+ *  real evidence in one of the two seasons (the participation feed never placed him, say) even
+ *  though his season TOTALS exist for both. */
+export interface PlayerFactsTrend {
+  readonly pointsPerGame: PlayerFactsTrendMetric | null;
+  /** Yards per touch (carries plus receptions) for every position except WR/TE, which use yards
+   *  per TARGET instead — a pure receiver's workload is better read against every ball thrown his
+   *  way, drops and broken-up passes included, than against catches alone. See `collect.ts`'s own
+   *  `opportunityDenominator`. */
+  readonly yardsPerOpportunity: PlayerFactsTrendMetric | null;
+  readonly targetShare: PlayerFactsTrendMetric | null;
+}
+
 /** THE THREE HONEST STATES an injury read can be in — see `PlayerFacts.injury`'s own docblock
  *  (fix round 1, CRITICAL 2) for why a nullable string could not tell two of them apart. */
 export type PlayerFactsInjuryStatus =
@@ -255,6 +284,10 @@ export interface PlayerFacts {
    *  rookie); a real season with individually-absent shares still returns non-null with some or
    *  all of its own fields `null` — see this module's own "color facts" docblock, group (c). */
   readonly usage: PlayerFactsUsage | null;
+  /** THE TREND (color v2, Task 2) — `null` when the store carries no season two years before the
+   *  product season for him at all (his own prior two seasons do not both exist). See
+   *  `PlayerFactsTrend`'s own docblock. */
+  readonly trend: PlayerFactsTrend | null;
   /** Every number the validator will accept in a capsule's own prose, in this object's own
    *  declaration order. A fraction-valued fact (a share change) contributes BOTH its raw fraction
    *  and its whole-percent form, since prose almost always states the latter ("+4%") and the
@@ -299,6 +332,7 @@ export interface PlayerFactsInput {
   readonly lastSeasonStory: PlayerFactsLastSeasonStory | null;
   readonly booksNumbers: PlayerFactsBooksNumbers;
   readonly usage: PlayerFactsUsage | null;
+  readonly trend: PlayerFactsTrend | null;
 }
 
 function findReason<T extends BoardReason["code"]>(reasons: readonly BoardReason[], code: T): Extract<BoardReason, { code: T }> | undefined {
@@ -411,8 +445,6 @@ function evidenceNumbers(evidence: readonly PlayerFactsEvidenceItem[]): readonly
   return numbers;
 }
 
-/** The color facts' own share of the number ledger — see `buildNumberLedger`'s own docblock for
- *  why a fraction contributes both its raw and whole-percent forms. */
 /** Every number one `PlayerFactsRankedStat` carries — its own value, its rank, and the honest
  *  qualifier count behind that rank (color v2, Task 1). The named neighbor is a NAME, not a
  *  number, so it belongs to `buildNameLedger` instead. */
@@ -420,7 +452,27 @@ function rankedStatNumbers(rank: PlayerFactsRankedStat): readonly number[] {
   return [rank.value, rank.positionRank, rank.qualifierCount];
 }
 
-function colorNumbers(lastSeasonStory: PlayerFactsLastSeasonStory | null, booksNumbers: PlayerFactsBooksNumbers, usage: PlayerFactsUsage | null): readonly number[] {
+/** Every number one `PlayerFactsTrendMetric` carries (color v2, Task 2) — both raw season values
+ *  and the delta between them, whether or not that delta turned out material. A share-valued
+ *  metric (`targetShare`) also contributes its whole-percent form, the same rule every other
+ *  fraction on this ledger already follows. */
+function trendMetricNumbers(metric: PlayerFactsTrendMetric, isShare: boolean): readonly number[] {
+  const numbers = [metric.priorValue, metric.recentValue, metric.delta];
+  return isShare ? [...numbers, metric.priorValue * 100, metric.recentValue * 100, metric.delta * 100] : numbers;
+}
+
+/** The trend's own share of the number ledger — see `PlayerFactsTrend`'s own docblock for why
+ *  each of the three fields can be independently absent even when the object itself is not. */
+function trendNumbers(trend: PlayerFactsTrend | null): readonly number[] {
+  if (trend === null) return [];
+  const numbers: number[] = [];
+  if (trend.pointsPerGame !== null) numbers.push(...trendMetricNumbers(trend.pointsPerGame, false));
+  if (trend.yardsPerOpportunity !== null) numbers.push(...trendMetricNumbers(trend.yardsPerOpportunity, false));
+  if (trend.targetShare !== null) numbers.push(...trendMetricNumbers(trend.targetShare, true));
+  return numbers;
+}
+
+function colorNumbers(lastSeasonStory: PlayerFactsLastSeasonStory | null, booksNumbers: PlayerFactsBooksNumbers, usage: PlayerFactsUsage | null, trend: PlayerFactsTrend | null): readonly number[] {
   const numbers: number[] = [];
   if (lastSeasonStory !== null) {
     numbers.push(
@@ -446,6 +498,7 @@ function colorNumbers(lastSeasonStory: PlayerFactsLastSeasonStory | null, booksN
     if (usage.redZoneShare !== null) numbers.push(usage.redZoneShare, usage.redZoneShare * 100);
     if (usage.redZoneShareRank !== null) numbers.push(...rankedStatNumbers(usage.redZoneShareRank));
   }
+  numbers.push(...trendNumbers(trend));
   return numbers;
 }
 
@@ -472,7 +525,7 @@ function buildNumberLedger(facts: Omit<PlayerFacts, "numberLedger" | "nameLedger
     numbers.push(t.receptions, t.receivingYards, t.passingYards, t.touchdowns, t.fantasyPoints);
   }
   if (byeWeek !== null) numbers.push(byeWeek);
-  numbers.push(...colorNumbers(facts.lastSeasonStory, facts.booksNumbers, facts.usage));
+  numbers.push(...colorNumbers(facts.lastSeasonStory, facts.booksNumbers, facts.usage, facts.trend));
   return numbers;
 }
 
@@ -532,6 +585,7 @@ function computeFactsHash(content: Omit<PlayerFacts, "numberLedger" | "nameLedge
     lastSeasonStory: content.lastSeasonStory,
     booksNumbers: content.booksNumbers,
     usage: content.usage,
+    trend: content.trend,
   };
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
@@ -555,6 +609,7 @@ export function buildPlayerFacts(input: PlayerFactsInput): PlayerFacts {
     lastSeasonStory: input.lastSeasonStory,
     booksNumbers: input.booksNumbers,
     usage: input.usage,
+    trend: input.trend,
   };
   return {
     ...content,

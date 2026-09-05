@@ -33,6 +33,7 @@ function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput 
     lastSeasonStory: null,
     booksNumbers: { propsLines: [], teamVegasWinTotal: null },
     usage: null,
+    trend: null,
     ...overrides,
   };
 }
@@ -190,5 +191,37 @@ describe("buildPlayerFacts — color facts", () => {
     const without = buildPlayerFacts(baseInput());
     const withColor = buildPlayerFacts(baseInput({ lastSeasonStory, booksNumbers, usage }));
     expect(withColor.factsHash).not.toBe(without.factsHash);
+  });
+});
+
+/** THE TREND (color v2, Task 2) — `collect.ts` computes the whole object before `buildPlayerFacts`
+ *  ever sees it (the same pass-through contract every other color-fact group already has), so this
+ *  suite pins the pass-through, the ledger additions (including the whole-percent form of the
+ *  share-valued metric), and honest absence. */
+describe("buildPlayerFacts — the trend", () => {
+  const trend = {
+    pointsPerGame: { priorSeason: 2023, priorValue: 10, recentSeason: 2024, recentValue: 30, delta: 20, material: true },
+    yardsPerOpportunity: { priorSeason: 2023, priorValue: 5.4, recentSeason: 2024, recentValue: 4.6, delta: -0.8, material: true },
+    targetShare: { priorSeason: 2023, priorValue: 0.2, recentSeason: 2024, recentValue: 0.25, delta: 0.05, material: false },
+  };
+
+  it("is null by default, honest absence rather than a fabricated comparison", () => {
+    expect(buildPlayerFacts(baseInput()).trend).toBeNull();
+  });
+
+  it("carries the trend straight through when collect.ts supplies one", () => {
+    const facts = buildPlayerFacts(baseInput({ trend }));
+    expect(facts.trend).toEqual(trend);
+  });
+
+  it("puts every trend number into the ledger, including the whole-percent form of a share-valued metric", () => {
+    const facts = buildPlayerFacts(baseInput({ trend }));
+    expect(facts.numberLedger).toEqual(expect.arrayContaining([10, 30, 20, 5.4, 4.6, -0.8, 0.2, 0.25, 0.05, 20, 25, 5]));
+  });
+
+  it("changes the hash when the trend changes, proving factsHash includes it", () => {
+    const without = buildPlayerFacts(baseInput());
+    const withTrend = buildPlayerFacts(baseInput({ trend }));
+    expect(withTrend.factsHash).not.toBe(without.factsHash);
   });
 });

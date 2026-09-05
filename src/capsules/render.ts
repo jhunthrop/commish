@@ -1,7 +1,7 @@
 import type { Position } from "@/domain/player";
 import { POSITION_PLURAL } from "@/league-room/lib/player-season-view";
 import type { PropMarket } from "@/projections/odds/props-store";
-import type { PlayerFacts, PlayerFactsRankedStat } from "./facts";
+import type { PlayerFacts, PlayerFactsRankedStat, PlayerFactsTrendMetric } from "./facts";
 
 /**
  * THE MODEL-FACING FACT SHEET — a SEPARATE, TESTED SERIALIZATION from `facts.ts`'s own internal
@@ -152,10 +152,11 @@ function newsLines(facts: PlayerFacts): readonly string[] {
 
 /**
  * THE COLOR (spec §9 AMENDED 2026-09-05, "an analyst breaking it down") — `facts.lastSeasonStory`/
- * `facts.booksNumbers`/`facts.usage` translated into the same plain, manager-language sentences
- * every other section here already uses, never a bare recitation of the raw fields. `write.ts`'s
- * own VOICE_RULES tells the model to weave two or three of these into the story rather than list
- * them, so each sentence below states one clean idea a model can lift in part.
+ * `facts.booksNumbers`/`facts.usage`/`facts.trend` (the last one, color v2, Task 2) translated
+ * into the same plain, manager-language sentences every other section here already uses, never a
+ * bare recitation of the raw fields. `write.ts`'s own VOICE_RULES tells the model to weave two or
+ * three of these into the story rather than list them, so each sentence below states one clean
+ * idea a model can lift in part.
  */
 /** One `PlayerFactsRankedStat` as a plain clause, WITHOUT a trailing period (color v2, Task 1) —
  *  the value, the honest "Nth among M qualifying Xs" read, and, for a top-three finish, the
@@ -234,8 +235,33 @@ function usageLine(facts: PlayerFacts): string | null {
   return `Last season's usage (${usage.season}): ${shares.join(", ")}.`;
 }
 
+/** One material trend metric as a plain sentence (color v2, Task 2) — "rose"/"fell" plus both raw
+ *  seasons, never a bare delta a manager would have to do the subtraction on himself. An
+ *  IMMATERIAL metric renders nothing at all: its real numbers still ground the fact sheet
+ *  (`facts.ts`'s own ledger), but this file only ever narrates a movement worth a manager's
+ *  attention, matching `trend.ts`'s own documented threshold. */
+function trendMetricSentence(subject: string, metric: PlayerFactsTrendMetric, formatValue: (value: number) => string): string | null {
+  if (!metric.material) return null;
+  const verb = metric.delta >= 0 ? "rose" : "fell";
+  return `${subject} ${verb} from ${formatValue(metric.priorValue)} in ${metric.priorSeason} to ${formatValue(metric.recentValue)} in ${metric.recentSeason}.`;
+}
+
+function trendLine(facts: PlayerFacts): string | null {
+  const trend = facts.trend;
+  if (trend === null) return null;
+  const position = facts.identity.position;
+  const opportunityNoun = position === "WR" || position === "TE" ? "yards per target" : "yards per touch";
+  const asPercent = (value: number): string => `${(value * 100).toFixed(1)}%`;
+  const sentences = [
+    trend.pointsPerGame === null ? null : trendMetricSentence("His points per game", trend.pointsPerGame, (v) => `${v}`),
+    trend.yardsPerOpportunity === null ? null : trendMetricSentence(`His ${opportunityNoun}`, trend.yardsPerOpportunity, (v) => `${v}`),
+    trend.targetShare === null ? null : trendMetricSentence("His target share", trend.targetShare, asPercent),
+  ].filter((sentence): sentence is string => sentence !== null);
+  return sentences.length === 0 ? null : sentences.join(" ");
+}
+
 function colorLines(facts: PlayerFacts): readonly string[] {
-  return [lastSeasonStoryLine(facts), booksNumbersLine(facts), usageLine(facts)].filter((line): line is string => line !== null);
+  return [lastSeasonStoryLine(facts), booksNumbersLine(facts), usageLine(facts), trendLine(facts)].filter((line): line is string => line !== null);
 }
 
 /** The whole fact sheet, plain text, section by section — what `write.ts` sends as the user
