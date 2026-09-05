@@ -92,3 +92,24 @@ The aggregate grid's MAE-minimising choice climbs toward pure market as priorN g
 - Every number above is printed regardless of which way it points, including the aggregate grid's own arg-min (which argues for a far more extreme setting than what shipped) and priorN=15's regression at n=1, which is why 15 was rejected.
 - The 'well-evidenced' slice (n > 3) is four rookies. Its own dramatic swing (MAE 58 -> 18 from priorN=0.5 to ≈pure market) is reported for completeness and should NOT be read as a reliable finding on its own — four players is not a sample a constant should be tuned against.
 
+
+
+## Per-position effect of the bucket fix (re-review isolation run, 2026-09-04)
+
+The re-review isolated commit `ca74856`'s bucketed denominator against the immediately prior
+pooled mechanism on the same 2025 held-out population (n=67), holding every other change fixed.
+Printed per this report's own discipline: every number, whichever way it points.
+
+| position | n | pooled MAE | bucketed MAE | direction |
+|---|---|---|---|---|
+| QB | 8 | 67.67 | 54.24 | improved |
+| WR | 26 | 36.71 | 35.22 | improved |
+| TE | 11 | 48.46 | 42.52 | improved |
+| RB | 22 | 44.64 | 46.36 | WORSE (+3.9%) |
+
+The RB regression is plausibly small-sample noise from one productive rookie RB class rather
+than a structural flaw (the mechanism is identical across positions), and the aggregate plus
+three of four positions improved — but it is a real, disclosed tradeoff, not a footnote.
+Follow-up for the next calibration round: the backtest script prints this per-position
+breakdown itself (the data already sits in its `rows`), so this table regenerates instead of
+being transcribed from a review run.
