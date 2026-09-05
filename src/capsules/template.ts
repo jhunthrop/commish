@@ -1,0 +1,42 @@
+import type { PlayerFacts } from "./facts";
+
+/**
+ * THE PERMANENT FLOOR (spec §9 AMENDED) — assembled from the SAME `PlayerFacts` the writer reads,
+ * with no gateway call and no chance of ever failing validation: every sentence here is a plain
+ * statement of a fact already in `facts`, so a gateway outage or a free-tier throttle never blanks
+ * a page or fabricates a word. One template serves BOTH the peek's compact slot and the full
+ * page's "Read" slot — a fallback's job is honesty and availability, not matching a stylistic
+ * length band a template was never trying to hit.
+ */
+export function renderTemplateCapsule(facts: PlayerFacts): string {
+  const { identity, market, projection, availability, season, byeWeek, injuryDesignation } = facts;
+  const sentences: string[] = [
+    `${identity.name} (${identity.position}, ${identity.team}) is ranked ${market.boardRank} overall on our board, projected for ${projection.projectedPoints} points this season.`,
+    `Most seasons land between ${Math.round(projection.typicalLow)} and ${Math.round(projection.typicalHigh)}; the full range (injury seasons on the low end, smash seasons on the high end) runs ${Math.round(projection.floorPoints)} to ${Math.round(projection.ceilingPoints)}.`,
+  ];
+
+  if (market.adp !== null) {
+    sentences.push(`The market has him at ADP ${market.adp}${market.positionAdp !== null ? ` (${market.positionAdp})` : ""}.`);
+  } else {
+    sentences.push("The market has not priced him.");
+  }
+
+  const strongestLaw = [...facts.evidence].filter((item) => item.kind === "law").sort((a, b) => Math.abs(b.netEffectPoints) - Math.abs(a.netEffectPoints))[0];
+  if (strongestLaw !== undefined && strongestLaw.kind === "law") {
+    sentences.push(`${strongestLaw.headline} is worth ${strongestLaw.netEffectPoints >= 0 ? "+" : ""}${strongestLaw.netEffectPoints} points a game to his outlook.`);
+  }
+
+  if (availability !== null) {
+    sentences.push(`He is expected to play ${Math.round(availability.expectedGames)} games this season.`);
+  }
+
+  if (season !== null) {
+    sentences.push(`Through ${season.gamesPlayed} games this season he is averaging ${season.pointsPerGame} points a game.`);
+  }
+
+  if (byeWeek !== null) sentences.push(`His bye is week ${byeWeek}.`);
+
+  sentences.push(injuryDesignation === null ? "The injury report lists no designation for him." : `The injury report lists him as ${injuryDesignation}.`);
+
+  return sentences.join(" ");
+}
