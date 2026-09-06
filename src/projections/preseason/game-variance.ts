@@ -240,14 +240,41 @@ export function seasonPointsBand(
   games: GamesPlayedOutlook,
   perGameVariance: number,
 ): { readonly floor: number; readonly median: number; readonly ceiling: number } {
+  return seasonPointsInterval(perGamePoints, games, perGameVariance, Z90);
+}
+
+/** The tenth and ninetieth percentiles, which is the band the board renders. */
+export const Z90 = 1.2815515655446004;
+
+/**
+ * The twenty-fifth and seventy-fifth percentiles — the "most seasons" interval the kicker and team
+ * defence preregistration's gate G3 is measured on (the 2026-09-05 round).
+ *
+ * A DELIBERATE DIFFERENCE FROM THE BAND THE BOARD RENDERS, and it is recorded rather than glossed:
+ * the spec names p25 to p75 for that gate and `seasonPointsBand` computes p10 to p90. Rather than
+ * measure the gate on a wider interval than the one the spec wrote down (which would make it easier
+ * to pass), the judgment computes the named interval from the same composed mean and variance. See
+ * the preregistration document for the amendment recording this.
+ */
+export const Z75 = 0.6744897501960817;
+
+/**
+ * The composed interval at an arbitrary z, which both percentile pairs above go through so the two
+ * can never be computed from different arithmetic.
+ */
+export function seasonPointsInterval(
+  perGamePoints: number,
+  games: GamesPlayedOutlook,
+  perGameVariance: number,
+  z: number,
+): { readonly floor: number; readonly median: number; readonly ceiling: number } {
   const meanSeason = perGamePoints * games.expected;
   const gamesVariance = games.probabilities.reduce((sum, probability, count) => sum + probability * (count - games.expected) ** 2, 0);
   const seasonVariance = games.expected * perGameVariance + gamesVariance * perGamePoints ** 2;
   const sd = Math.sqrt(Math.max(0, seasonVariance));
-  const Z90 = 1.2815515655446004;
   return {
-    floor: Math.max(0, meanSeason - Z90 * sd),
+    floor: Math.max(0, meanSeason - z * sd),
     median: meanSeason,
-    ceiling: meanSeason + Z90 * sd,
+    ceiling: meanSeason + z * sd,
   };
 }

@@ -95,14 +95,60 @@ describe("resolveRankings", () => {
     expect(resolution.resolved).toHaveLength(0);
   });
 
-  it("leaves a kicker or a team defence unresolved rather than guessing, and says so in the rate", () => {
+  /**
+   * THE TWO POSITIONS THIS RESOLVER USED TO LOSE ENTIRELY (the 2026-09-05 round). Measured against
+   * the real 2025 FFC board: 249 rows published, 205 resolved, and every one of the 44 misses was a
+   * kicker (published as `PK`, spelled `K` on the roster) or a team defence (not a person, so it has
+   * no roster row and never will). The store therefore held no market price for either position,
+   * which is what gate G2 and the market-order fallback both need.
+   */
+  it("places a team defence by TEAM CODE, since it is not a person and has no roster row", () => {
     const resolution = resolveRankings(
       [candidate(), candidate({ name: "Buffalo Bills", position: "DST", team: "BUF" })],
       ROSTER,
     );
-    expect(resolution.resolved).toHaveLength(1);
-    expect(resolution.unresolved.map((row) => row.name)).toEqual(["Buffalo Bills"]);
-    expect(resolution.resolutionRate).toBe(0.5);
+    expect(resolution.resolved).toHaveLength(2);
+    expect(resolution.resolved.map((row) => row.playerId)).toContain("team-def:BUF");
+    expect(resolution.unresolved).toEqual([]);
+    expect(resolution.resolutionRate).toBe(1);
+  });
+
+  it("absorbs the market's own mixed team spellings, which are neither feed's consistently", () => {
+    // The real board carries `LAR` (the product's spelling) and `WAS` (the source's) in one list.
+    const resolution = resolveRankings(
+      [
+        candidate({ name: "Los Angeles Rams", position: "DEF", team: "LAR" }),
+        candidate({ name: "Washington Commanders", position: "DEF", team: "WAS" }),
+      ],
+      ROSTER,
+    );
+    expect(resolution.resolved.map((row) => row.playerId)).toEqual(["team-def:LA", "team-def:WAS"]);
+  });
+
+  it("leaves a defence whose team code neither feed answers to unresolved, rather than guessing", () => {
+    const resolution = resolveRankings([candidate({ name: "Nowhere Defense", position: "DEF", team: "XXX" })], ROSTER);
+    expect(resolution.resolved).toEqual([]);
+    expect(resolution.unresolved.map((row) => row.name)).toEqual(["Nowhere Defense"]);
+  });
+
+  it("never lists one club's defence twice, however a publisher spells it", () => {
+    const resolution = resolveRankings(
+      [
+        candidate({ name: "Los Angeles Rams", position: "DEF", team: "LAR", rank: 90 }),
+        candidate({ name: "LA Rams D/ST", position: "D/ST", team: "LAR", rank: 140 }),
+      ],
+      ROSTER,
+    );
+    expect(resolution.resolved).toEqual([{ playerId: "team-def:LA", rank: 90 }]);
+    expect(resolution.unresolved).toHaveLength(1);
+  });
+
+  it("places a kicker the market publishes as PK against a roster that spells him K", () => {
+    const resolution = resolveRankings(
+      [candidate({ name: "Tyler Bass", position: "PK", team: "BUF" })],
+      [...ROSTER, { playerId: "gsis-bass-k", name: "Tyler Bass", position: "K", team: "BUF" }],
+    );
+    expect(resolution.resolved.map((row) => row.playerId)).toEqual(["gsis-bass-k"]);
   });
 
   it("keeps the better rank when a publisher lists the same man twice", () => {
