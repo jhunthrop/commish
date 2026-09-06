@@ -28,7 +28,7 @@ function archived(overrides: Partial<TeamDefenseWeekRow>): TeamDefenseWeekRow {
     season: 2024, week: 1, team: "SF", opponentTeam: "SEA",
     sacks: 2, interceptions: 1, fumbleRecoveries: 0, defensiveTouchdowns: 0, safeties: 0,
     puntBlocks: 0, extraPointBlocks: 0, fieldGoalBlocks: 0, specialTeamsTouchdowns: 0,
-    passingYardsAllowed: 200, rushingYardsAllowed: 130,
+    passingYardsAllowed: 200, rushingYardsAllowed: 130, pointsAllowed: null,
     ...overrides,
   };
 }

@@ -19,7 +19,7 @@ export function roundPoints(n: number): number {
  * the tables are the standard sheet every incumbent ships. A configurable tier editor is a
  * later commissioner feature; the shape lives here so the values have exactly one spelling.
  */
-const POINTS_ALLOWED_TIERS: readonly (readonly [number, number])[] = [
+export const POINTS_ALLOWED_TIERS: readonly (readonly [number, number])[] = [
   [0, 5], [6, 4], [13, 3], [17, 1], [27, 0], [34, -1], [45, -3], [Infinity, -5],
 ];
 const YARDS_ALLOWED_TIERS: readonly (readonly [number, number])[] = [
@@ -29,6 +29,34 @@ const YARDS_ALLOWED_TIERS: readonly (readonly [number, number])[] = [
 function tierPoints(value: number, tiers: readonly (readonly [number, number])[]): number {
   for (const [ceiling, points] of tiers) if (value <= ceiling) return points;
   return 0;
+}
+
+/** One points-allowed bracket, named the way a reader would say it out loud. */
+export interface PointsAllowedBand {
+  /** "0", "1 to 6", "46 or more" — derived from the tier table, never written out twice. */
+  readonly label: string;
+  readonly points: number;
+}
+
+/**
+ * The points-allowed brackets as a surface can print them, DERIVED from `POINTS_ALLOWED_TIERS`
+ * rather than restated beside it. A hand-written second copy of these boundaries is how a screen
+ * ends up naming a band the engine does not score.
+ */
+export function pointsAllowedBands(): readonly PointsAllowedBand[] {
+  let floor = 0;
+  return POINTS_ALLOWED_TIERS.map(([ceiling, points]) => {
+    const label = !Number.isFinite(ceiling) ? `${floor} or more` : floor === ceiling ? `${ceiling}` : `${floor} to ${ceiling}`;
+    floor = ceiling + 1;
+    return { label, points };
+  });
+}
+
+/** Which `pointsAllowedBands()` bracket a game's points allowed falls in. Always in range: the
+ *  last bracket's ceiling is unbounded. */
+export function pointsAllowedBandIndex(pointsAllowed: number): number {
+  const index = POINTS_ALLOWED_TIERS.findIndex(([ceiling]) => pointsAllowed <= ceiling);
+  return index === -1 ? POINTS_ALLOWED_TIERS.length - 1 : index;
 }
 
 /** Pure. Every stat category is weighted by the league's configurable settings — no magic numbers here. */

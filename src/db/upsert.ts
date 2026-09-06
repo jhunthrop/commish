@@ -1,4 +1,4 @@
-import { getTableColumns, sql, type SQL } from "drizzle-orm";
+import { getTableColumns, getTableName, sql, type SQL } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 
 /** A bare, lowercase SQL identifier — the only shape safe to interpolate via `sql.raw`. */
@@ -17,9 +17,36 @@ function assertSafeIdentifier(name: string, caller: string): string {
   return name;
 }
 
+/** The table's own SQL name, for the one expression below that has to spell it out. */
+function tableNameOf<T extends PgTable>(table: T): string {
+  return getTableName(table);
+}
+
 /** The table's own columns, excluding the conflict-target `keys` (JS property names). */
 function nonKeyColumns<T extends PgTable>(table: T, keys: readonly string[]) {
   return Object.entries(getTableColumns(table)).filter(([key]) => !keys.includes(key));
+}
+
+/**
+ * The value one non-key column actually receives on conflict.
+ *
+ * Normally `excluded.<column>` — the incoming row wins outright. A column named in `keepWhenNull`
+ * (JS property names) is written as `COALESCE(excluded.<column>, <table>.<column>)` instead, which
+ * means "the incoming row wins when it HAS a value, and a stored value survives an incoming null".
+ *
+ * WHAT THAT IS FOR, and it is narrow on purpose: a nullable column added to an existing archive
+ * after the rows were written. A re-ingestion that can resolve the new fact fills it; one that
+ * cannot (an upstream file that has not published it for that row yet) leaves what is already
+ * there rather than erasing a fact the archive has and the current run does not. Every other
+ * column keeps the plain last-writer-wins rule, because for them an incoming null IS the fact.
+ *
+ * Shared by `excludedSetFor` and `changedRowWhere` so the value a row is compared against is
+ * always, by construction, the value it would be written to.
+ */
+function incomingExpression(columnName: string, tableName: string, keep: boolean, caller: string): SQL {
+  const column = assertSafeIdentifier(columnName, caller);
+  if (!keep) return sql.raw(`excluded.${column}`);
+  return sql.raw(`coalesce(excluded.${column}, ${assertSafeIdentifier(tableName, caller)}.${column})`);
 }
 
 /**
@@ -28,13 +55,16 @@ function nonKeyColumns<T extends PgTable>(table: T, keys: readonly string[]) {
  * the schema grows) and never accidentally write a no-op self-assignment (e.g.
  * `{ set: { playerId: rosterSlots.playerId } }`, which updates a column to itself instead of
  * to the incoming row). `keys` are the JS property names of the conflict target columns.
+ *
+ * `keepWhenNull` names the columns an incoming null must NOT erase — see `incomingExpression`.
  */
-export function excludedSetFor<T extends PgTable>(table: T, keys: readonly string[]): Record<string, SQL> {
+export function excludedSetFor<T extends PgTable>(table: T, keys: readonly string[], keepWhenNull: readonly string[] = []): Record<string, SQL> {
+  const tableName = tableNameOf(table);
   return Object.fromEntries(
-    nonKeyColumns(table, keys).map(([key, column]) => {
-      assertSafeIdentifier(column.name, "excludedSetFor");
-      return [key, sql.raw(`excluded.${column.name}`)];
-    }),
+    nonKeyColumns(table, keys).map(([key, column]) => [
+      key,
+      incomingExpression(column.name, tableName, keepWhenNull.includes(key), "excludedSetFor"),
+    ]),
   );
 }
 
@@ -52,12 +82,13 @@ export function excludedSetFor<T extends PgTable>(table: T, keys: readonly strin
  * own `changed` list (which can be stale the moment its source — a Redis digest snapshot — is
  * lost or evicted).
  */
-export function changedRowWhere<T extends PgTable>(table: T, keys: readonly string[]): SQL {
-  const columns = nonKeyColumns(table, keys).map(([, column]) => column);
-  const tableSide = sql.join(columns.map((column) => sql`${column}`), sql`, `);
-  const excludedSide = sql.join(
-    columns.map((column) => sql.raw(`excluded.${assertSafeIdentifier(column.name, "changedRowWhere")}`)),
+export function changedRowWhere<T extends PgTable>(table: T, keys: readonly string[], keepWhenNull: readonly string[] = []): SQL {
+  const tableName = tableNameOf(table);
+  const entries = nonKeyColumns(table, keys);
+  const tableSide = sql.join(entries.map(([, column]) => sql`${column}`), sql`, `);
+  const incomingSide = sql.join(
+    entries.map(([key, column]) => incomingExpression(column.name, tableName, keepWhenNull.includes(key), "changedRowWhere")),
     sql`, `,
   );
-  return sql`(${tableSide}) IS DISTINCT FROM (${excludedSide})`;
+  return sql`(${tableSide}) IS DISTINCT FROM (${incomingSide})`;
 }

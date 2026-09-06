@@ -2454,9 +2454,13 @@ export const nflverseKickingWeeks = pgTable(
  * that join backwards would produce a defense graded on how good its own offense was, and nothing
  * downstream would look wrong.
  *
- * POINTS ALLOWED IS DELIBERATELY ABSENT. `schedule.ts` already stores every game's score as team
- * observations, so a defense's points allowed is a join away from a fact this store already holds,
- * and a second copy is a second number that can disagree with the first.
+ * POINTS ALLOWED WAS DELIBERATELY ABSENT AND IS NOW A NULLABLE COLUMN (migration 0079). The
+ * original argument stood on `schedule.ts` already storing every game's score as team observations,
+ * which is true for the FIT path and stays true: that join is untouched. It does not hold for a
+ * product surface, because the observation store carries only the season in play, so a finished
+ * season's defense weeks join to nothing and the whole history stops at the database boundary. Both
+ * copies are written from the same `games.csv`, so they have one origin rather than two opinions.
+ * See the column's own docblock.
  *
  * NO FOREIGN KEY, because a team code is not an `nfl_players.id`. The 32 synthetic universe rows
  * (`team-codes.ts`'s `teamDefenseUniverseId`) exist for the PROJECTION store's key, not for this
@@ -2486,6 +2490,24 @@ export const nflverseTeamDefenseWeeks = pgTable(
     passingYardsAllowed: integer("passing_yards_allowed").notNull(),
     /** THE OPPONENT's rushing yards in this game. */
     rushingYardsAllowed: integer("rushing_yards_allowed").notNull(),
+    /**
+     * THE OPPONENT's final score in this game, from the schedule file, or NULL when that file had
+     * no scoreline for the pairing.
+     *
+     * NULLABLE AND NOT `notNull`, deliberately: a defense week with no points allowed on it is a
+     * week this archive cannot say what the defense gave up, and the points-allowed tier is then
+     * left unscored rather than scored as a shutout. Zero is the single most flattering fabricated
+     * number a defense row can carry, so it is the one this column must never invent.
+     *
+     * WHY IT IS HERE AT ALL, against the table docblock's original refusal. The refusal was right
+     * about the FIT path, which reads `team_week_observations` and still does, untouched. It is
+     * wrong about a product surface: the schedule observation store holds only the season in play,
+     * so a reader asking what a defense allowed in a finished season joins to nothing there and a
+     * kicker's and a defense's whole history stops at the database boundary. The column is filled
+     * from the same `games.csv` those observations are themselves written from, so the two copies
+     * have one origin and cannot drift apart on their own.
+     */
+    pointsAllowed: integer("points_allowed"),
     source: text("source").notNull().default("nflverse_team_defense_weeks"),
     ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
   },
