@@ -2368,6 +2368,135 @@ export const nflverseRosterWeeks = pgTable(
 );
 
 /**
+ * THE HISTORICAL KICKING RECORD, one row per (season, week, kicker), exactly as the release
+ * published it.
+ *
+ * WHY IT DID NOT ALREADY EXIST. `player_week_observations` is built by a mapper that reads the
+ * skill-position columns of this same release family and nothing else, and `projectedPosition`
+ * narrowed every row to QB, RB, WR or TE, so a kicker has never had a row anywhere in this store. A
+ * preseason board that ranks kickers needs the four quantities a kicker's fantasy season decomposes
+ * into — field-goal attempts, field-goal make rate, extra-point attempts, extra-point make rate —
+ * and every one of them is in this file and nowhere else we hold.
+ *
+ * THE DISTANCE BUCKETS ARE STORED AND NOT YET SCORED, deliberately. The product's scoring shape
+ * carries ONE flat field-goal weight and the live in-season feed carries no distance at all, so a
+ * distance-weighted preset would be a projection nothing could ever be scored against. The history
+ * does carry the buckets, storing them costs one column each, and not storing them would mean
+ * re-ingesting thirteen seasons the day the scoring shape widens. `fg_made` is archived BESIDE the
+ * buckets rather than derived from them, because a derived total that disagreed with the published
+ * one would be silently wrong in exactly the direction nobody checks.
+ *
+ * REGULAR SEASON ONLY (`NFLVERSE_CONFIG.seasonType`), matching every other ingester in the adapter.
+ */
+export const nflverseKickingWeeks = pgTable(
+  "nflverse_kicking_weeks",
+  {
+    season: integer("season").notNull(),
+    week: integer("week").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** The club the row lists him with. nflverse's own team code, UNMAPPED — `team-codes.ts` is
+     *  where a reader translates it, so this archive stays a verbatim copy of what was published. */
+    team: text("team").notNull(),
+    fieldGoalsMade: integer("fg_made").notNull(),
+    fieldGoalsAttempted: integer("fg_att").notNull(),
+    fieldGoalsMissed: integer("fg_missed").notNull(),
+    fieldGoalsBlocked: integer("fg_blocked").notNull(),
+    fieldGoalsMade0To19: integer("fg_made_0_19").notNull(),
+    fieldGoalsMade20To29: integer("fg_made_20_29").notNull(),
+    fieldGoalsMade30To39: integer("fg_made_30_39").notNull(),
+    fieldGoalsMade40To49: integer("fg_made_40_49").notNull(),
+    fieldGoalsMade50To59: integer("fg_made_50_59").notNull(),
+    fieldGoalsMade60Plus: integer("fg_made_60").notNull(),
+    fieldGoalsMissed0To19: integer("fg_missed_0_19").notNull(),
+    fieldGoalsMissed20To29: integer("fg_missed_20_29").notNull(),
+    fieldGoalsMissed30To39: integer("fg_missed_30_39").notNull(),
+    fieldGoalsMissed40To49: integer("fg_missed_40_49").notNull(),
+    fieldGoalsMissed50To59: integer("fg_missed_50_59").notNull(),
+    fieldGoalsMissed60Plus: integer("fg_missed_60").notNull(),
+    extraPointsMade: integer("pat_made").notNull(),
+    extraPointsAttempted: integer("pat_att").notNull(),
+    extraPointsMissed: integer("pat_missed").notNull(),
+    extraPointsBlocked: integer("pat_blocked").notNull(),
+    source: text("source").notNull().default("nflverse_kicking_weeks"),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** The natural key IS the primary key, for the identical reason `nflverse_roster_weeks` gives:
+     *  the writer upserts on conflict (`db/upsert.ts`'s `excludedSetFor`/`changedRowWhere`) and a
+     *  surrogate rewritten on every re-ingested row would be worse than none. `ingested_at` is
+     *  excluded from the update set by the writer, because it names when this fact was FIRST
+     *  written and not when it was last confirmed. */
+    primaryKey({ columns: [t.season, t.week, t.playerId] }),
+    /** The component fit's own read: every week one kicker played, across the seasons it asks for. */
+    index("nflverse_kicking_weeks_player_season_idx").on(t.playerId, t.season, t.week),
+    /** The team-opportunity read: every kicking week a club produced, whoever kicked it. Attempts
+     *  travel with the offense, so this index is the one a kicker's opportunity term walks. */
+    index("nflverse_kicking_weeks_team_season_idx").on(t.team, t.season, t.week),
+  ],
+);
+
+/**
+ * THE HISTORICAL TEAM-DEFENSE RECORD, one row per (season, week, team), already in the frame a
+ * fantasy defense is scored in.
+ *
+ * WHY THE PER-PLAYER FILE COULD NOT ANSWER THIS. `map.ts` deliberately refuses the per-person
+ * defensive columns and is right to: a linebacker's three sacks are a fact about him, and summing a
+ * roster's worth of them back into a team total would depend on every man on that defense having a
+ * row in a file built for fantasy skill positions. The team release publishes the team's own totals
+ * directly, which is the quantity being projected.
+ *
+ * YARDS ALLOWED IS COMPUTED AT INGEST, NEVER AT READ TIME. A row's `passing_yards` and
+ * `rushing_yards` in the published file are that team's OWN offense. A fantasy defense is scored on
+ * what it ALLOWED, which is the other row of the same game. `team-defense-weeks.ts` joins the pair
+ * once and writes the result here under names that say whose yards they are. A later reader who got
+ * that join backwards would produce a defense graded on how good its own offense was, and nothing
+ * downstream would look wrong.
+ *
+ * POINTS ALLOWED IS DELIBERATELY ABSENT. `schedule.ts` already stores every game's score as team
+ * observations, so a defense's points allowed is a join away from a fact this store already holds,
+ * and a second copy is a second number that can disagree with the first.
+ *
+ * NO FOREIGN KEY, because a team code is not an `nfl_players.id`. The 32 synthetic universe rows
+ * (`team-codes.ts`'s `teamDefenseUniverseId`) exist for the PROJECTION store's key, not for this
+ * one: this table is an archive of a published file and is keyed the way the file is.
+ */
+export const nflverseTeamDefenseWeeks = pgTable(
+  "nflverse_team_defense_weeks",
+  {
+    season: integer("season").notNull(),
+    week: integer("week").notNull(),
+    /** nflverse's own team code, UNMAPPED, contemporary to the season (`STL`, `SD` and `OAK` all
+     *  appear in the early seasons of the covered span). `team-codes.ts` translates on read. */
+    team: text("team").notNull(),
+    /** Who they played. Carried so the yards-allowed join stays auditable after the fact. */
+    opponentTeam: text("opponent_team").notNull(),
+    /** `real` and not `integer`: a shared sack is credited as a half in the published file. */
+    sacks: real("def_sacks").notNull(),
+    interceptions: integer("def_interceptions").notNull(),
+    fumbleRecoveries: integer("fumble_recovery_opp").notNull(),
+    defensiveTouchdowns: integer("def_tds").notNull(),
+    safeties: integer("def_safeties").notNull(),
+    puntBlocks: integer("def_punt_blocks").notNull(),
+    extraPointBlocks: integer("def_pat_blocks").notNull(),
+    fieldGoalBlocks: integer("def_fg_blocks").notNull(),
+    specialTeamsTouchdowns: integer("special_teams_tds").notNull(),
+    /** THE OPPONENT's passing yards in this game. See the table docblock. */
+    passingYardsAllowed: integer("passing_yards_allowed").notNull(),
+    /** THE OPPONENT's rushing yards in this game. */
+    rushingYardsAllowed: integer("rushing_yards_allowed").notNull(),
+    source: text("source").notNull().default("nflverse_team_defense_weeks"),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.season, t.week, t.team] }),
+    /** The component fit's own read: every defensive week one club produced. */
+    index("nflverse_team_defense_weeks_team_season_idx").on(t.team, t.season, t.week),
+  ],
+);
+
+/**
  * THE ONE EDGE BETWEEN THE TWO ID SPACES THIS PRODUCT HOLDS (migration 0051).
  *
  * `nfl_players`' own docblock refused to guess at this link and said who should draw it: "mapping
