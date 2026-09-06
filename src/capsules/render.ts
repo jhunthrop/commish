@@ -1,6 +1,6 @@
 import type { Position } from "@/domain/player";
 import { POSITION_PLURAL } from "@/league-room/lib/player-season-view";
-import type { PropMarket } from "@/projections/odds/props-store";
+import { PROP_MARKET_LABELS } from "./prop-market-labels";
 import type { PlayerFacts, PlayerFactsRankedStat, PlayerFactsTrendMetric } from "./facts";
 
 /**
@@ -196,17 +196,6 @@ function lastSeasonStoryLine(facts: PlayerFacts): string | null {
   sentences.push(rankedStatSentence(position, "Receiving yards", story.receivingYardsRank, wholeNumber));
   return sentences.join(" ");
 }
-
-/** Never echoed to the model as `player_reception_yds` (`facts.ts`'s own two-audience rule): a
- *  raw market key is exactly the kind of internal vocabulary the p10/p90 incident already taught
- *  this engine to keep out of a prompt. */
-const PROP_MARKET_LABELS: Readonly<Record<PropMarket, string>> = {
-  player_pass_yds: "pass yards",
-  player_reception_yds: "receiving yards",
-  player_receptions: "receptions",
-  player_rush_yds: "rush yards",
-  player_pass_tds: "pass touchdowns",
-};
 
 function booksNumbersLine(facts: PlayerFacts): string | null {
   const { propsLines, teamVegasWinTotal } = facts.booksNumbers;

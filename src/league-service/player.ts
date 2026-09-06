@@ -18,6 +18,7 @@ import { BOARD_SOURCE, assertSingleGeneration, boardReasons, preseasonProjection
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { preseasonRankingsFor } from "@/projections/preseason/store";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
+import { dossierFactsFor, type PlayerDossierFacts } from "./dossier-facts";
 import { newsFor } from "./news";
 
 /**
@@ -280,6 +281,21 @@ export interface PlayerSeasonBody {
    * read through `playerSeason` sets it.
    */
   readonly capsule?: PlayerCapsuleView | null;
+  /**
+   * Player Dossier plan, Task 2 — the same fact sheet the capsule sweep computes
+   * (`capsules/collect-one.ts`'s single-player sibling of `collect.ts`), reshaped for the client
+   * (`league-service/dossier-facts.ts`'s `dossierFactsFor`). `null` for exactly the players
+   * `collectPlayerFacts` itself answers `null` for — the board never ranked him — never a
+   * placeholder standing in for that absence. Unlike `capsule` (LLM prose over these same facts),
+   * this is the raw, structured numbers themselves: market, projection (with the per-game rate
+   * and its position rank added), availability, usage, trend, books, last season's story, injury
+   * and a news count, plus which board generation and scoring format they were computed under.
+   *
+   * Optional on the type, the SAME reason `capsule` is (see that field's own docblock): the many
+   * existing fixtures that build a `PlayerSeasonBody` by hand need not all learn about the
+   * dossier at once. Every real read through `playerSeason` sets it.
+   */
+  readonly dossier?: PlayerDossierFacts | null;
 }
 
 /**
@@ -589,6 +605,12 @@ async function injuryDesignationFor(db: Db, playerId: string): Promise<string | 
  * `boardReasons` (Task 8's Outlook read) is the one exception: it has no per-player narrowing
  * yet, so it reads every reason the season's board stored and this function keeps only his own —
  * see `preseasonReadings`'s own inline note.
+ *
+ * `dossier` (Player Dossier plan, Task 2) is its own read, `dossierFactsFor`
+ * (`league-service/dossier-facts.ts`), run alongside the others in the same `Promise.all` below:
+ * mostly row-scoped (it wraps Task 1's `collectPlayerFacts`) plus one whole-board pass of its own
+ * for the per-game points rank — see that module's own docblock for exactly what stays wide and
+ * why.
  */
 export async function playerSeason(
   db: Db,
@@ -666,10 +688,16 @@ export async function playerSeason(
     .innerJoin(teams, eq(teams.id, rosterSlots.teamId))
     .where(and(eq(teams.leagueId, leagueId), eq(rosterSlots.playerId, playerId)))
     .limit(1);
-  const [injuryDesignation, news, capsule] = await Promise.all([injuryDesignationFor(db, playerId), newsFor(db, player.name), getPlayerCapsule(db, playerId)]);
+  const [injuryDesignation, news, capsule, dossier] = await Promise.all([
+    injuryDesignationFor(db, playerId),
+    newsFor(db, player.name),
+    getPlayerCapsule(db, playerId),
+    dossierFactsFor(db, playerId, now),
+  ]);
 
   return {
     capsule,
+    dossier,
     ownedBy: holder?.teamName ?? null,
     isMockLeague,
     injuryDesignation,

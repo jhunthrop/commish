@@ -121,7 +121,7 @@ async function namesForNflPlayerIds(db: Db, ids: readonly string[]): Promise<Rea
  * real participation feed and already known-correct (`board-reasons.ts` already leans on it for
  * a law's own magnitude). `factsInputFor` merges that rank onto this function's own story object.
  */
-async function lastSeasonStoriesFor(db: Db, priorSeason: number, positions: ReadonlyMap<string, Position>, asOf: Date): Promise<ReadonlyMap<string, Omit<PlayerFactsLastSeasonStory, "touchesRank">>> {
+export async function lastSeasonStoriesFor(db: Db, priorSeason: number, positions: ReadonlyMap<string, Position>, asOf: Date): Promise<ReadonlyMap<string, Omit<PlayerFactsLastSeasonStory, "touchesRank">>> {
   const skillPlayerIds = [...positions.entries()].filter(([, position]) => isSkillPosition(position)).map(([id]) => id);
   if (skillPlayerIds.length === 0) return new Map();
 
@@ -297,7 +297,7 @@ function pooledDiscoveryValuesByPosition(discoveryFacts: ReadonlyMap<string, Dis
  *  `lastSeasonStoriesFor` cannot honestly compute itself (see that function's own docblock), and
  *  the year-over-year trend — all three come out of the SAME `discoveryFactsForSeason` read, so
  *  they are built together rather than paying for that read twice. */
-interface UsageTouchesAndTrendFacts {
+export interface UsageTouchesAndTrendFacts {
   readonly usageByPlayerId: ReadonlyMap<string, PlayerFactsUsage>;
   readonly touchesRankByPlayerId: ReadonlyMap<string, PlayerFactsRankedStat>;
   readonly trendByPlayerId: ReadonlyMap<string, PlayerFactsTrend>;
@@ -352,7 +352,7 @@ async function trendsFor(db: Db, discoveryFacts: ReadonlyMap<string, DiscoveryFa
   return trends;
 }
 
-async function usageTouchesAndTrendFactsFor(db: Db, priorSeason: number, positions: ReadonlyMap<string, Position>, asOf: Date): Promise<UsageTouchesAndTrendFacts> {
+export async function usageTouchesAndTrendFactsFor(db: Db, priorSeason: number, positions: ReadonlyMap<string, Position>, asOf: Date): Promise<UsageTouchesAndTrendFacts> {
   const admitDerived = LIVE_ADMITTED_DERIVED_SEASONS.includes(priorSeason);
   const discoveryFacts = await discoveryFactsForSeason(db, priorSeason, positions, PPR_SCORING, admitDerived, asOf);
   const names = await namesForNflPlayerIds(db, [...discoveryFacts.keys()]);
@@ -390,7 +390,7 @@ async function usageTouchesAndTrendFactsFor(db: Db, priorSeason: number, positio
  * archive holds no pre-kickoff line at all — the identical "nothing to anchor on" state
  * `propsAnchorForSeason` itself already treats as empty, never an error.
  */
-async function propsLinesByPlayer(db: Db, season: number): Promise<ReadonlyMap<string, readonly PlayerFactsPropsLine[]>> {
+export async function propsLinesByPlayer(db: Db, season: number): Promise<ReadonlyMap<string, readonly PlayerFactsPropsLine[]>> {
   const firstKickoff = await firstKickoffFor(db, season);
   if (firstKickoff === null) return new Map();
   const lines = await loadArchivedPropLines(db, season, firstKickoff);
@@ -409,7 +409,7 @@ async function propsLinesByPlayer(db: Db, season: number): Promise<ReadonlyMap<s
  *  CURRENT team (`BoardRow.team`), never a prior season's, so a player who changed teams this
  *  offseason is never credited with his old team's number: a fact this direct has no honest
  *  approximation to fall back on. */
-async function vegasWinTotalsByTeam(db: Db, season: number, asOf: Date): Promise<ReadonlyMap<string, number>> {
+export async function vegasWinTotalsByTeam(db: Db, season: number, asOf: Date): Promise<ReadonlyMap<string, number>> {
   const rows = await teamObservationsAsOf(db, { season, week: 1, asOf, source: VEGAS_SOURCE });
   const winTotals = new Map<string, number>();
   for (const row of rows) if (row.metric === VEGAS_METRICS.winTotal) winTotals.set(row.team, row.value);
@@ -419,7 +419,7 @@ async function vegasWinTotalsByTeam(db: Db, season: number, asOf: Date): Promise
 /** Every played-week total for `playerIds`, under this product's standard PPR scoring (the same
  *  fixed format the shipped board itself is composed under). A player with no played week yet
  *  this season is simply absent from the returned map — never a fabricated zero. */
-async function currentSeasonSummaries(db: Db, playerIds: readonly string[], positionOf: ReadonlyMap<string, Position>): Promise<ReadonlyMap<string, PlayerFactsSeasonSummary>> {
+export async function currentSeasonSummaries(db: Db, playerIds: readonly string[], positionOf: ReadonlyMap<string, Position>): Promise<ReadonlyMap<string, PlayerFactsSeasonSummary>> {
   const summaries = new Map<string, PlayerFactsSeasonSummary>();
   if (playerIds.length === 0) return summaries;
 
@@ -492,7 +492,7 @@ function injuryStatusFor(playerId: string, injuries: InjurySnapshot): PlayerFact
  *  `lastSeasonStoryByGsisId` and `touchesRankByGsisId` are two SEPARATE reads (`lastSeasonStoriesFor`
  *  cannot honestly compute a touches rank itself — see its own docblock); `factsInputFor` merges
  *  them into one `PlayerFactsLastSeasonStory` below. */
-interface ColorFacts {
+export interface ColorFacts {
   readonly lastSeasonStoryByGsisId: ReadonlyMap<string, Omit<PlayerFactsLastSeasonStory, "touchesRank">>;
   readonly touchesRankByGsisId: ReadonlyMap<string, PlayerFactsRankedStat>;
   readonly usageByGsisId: ReadonlyMap<string, PlayerFactsUsage>;
@@ -502,6 +502,15 @@ interface ColorFacts {
   readonly gsisIdByPlayerId: ReadonlyMap<string, string>;
 }
 
+/** The subset of `BoardRow` (`draft-hq/board/service.ts`) `factsInputFor` actually reads — the
+ *  shape-INDEPENDENT fields this module's own top docblock already names (never `valueOverReplacement`/
+ *  `valueRank`/`positionRankInValue`/`tier`/`overallRank`/`nflPlayerId`/`headshotUrl`, all absent
+ *  here on purpose). Narrowed to a `Pick` rather than the full `BoardRow` so `collect-one.ts`'s
+ *  single-player collector can build one of these from a single narrow-scoped row read instead of
+ *  running the whole-board value/tier recompute for one man; a real `BoardRow` still satisfies this
+ *  type structurally, so `collectAllPlayerFacts` below passes one unchanged. */
+export type FactsBoardRowInput = Pick<BoardRow, "playerId" | "name" | "position" | "team" | "marketAdp" | "marketPositionAdp" | "rank" | "projectedPoints" | "floorPoints" | "medianPoints" | "ceilingPoints" | "byeWeek" | "reasons">;
+
 function lastSeasonStoryFor(gsisId: string | undefined, color: ColorFacts): PlayerFactsLastSeasonStory | null {
   if (gsisId === undefined) return null;
   const story = color.lastSeasonStoryByGsisId.get(gsisId);
@@ -509,8 +518,8 @@ function lastSeasonStoryFor(gsisId: string | undefined, color: ColorFacts): Play
   return { ...story, touchesRank: color.touchesRankByGsisId.get(gsisId) ?? null };
 }
 
-function factsInputFor(
-  row: BoardRow,
+export function factsInputFor(
+  row: FactsBoardRowInput,
   season: PlayerFactsSeasonSummary | undefined,
   injuries: InjurySnapshot,
   news: ReadonlyMap<string, readonly NewsStory[]>,

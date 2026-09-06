@@ -274,6 +274,54 @@ describe("playerSeason's preseason readings", () => {
 });
 
 /**
+ * Player Dossier plan, Task 2 fix round — the review's one Important finding: nothing pinned the
+ * `Promise.all` wiring itself, so a future refactor could silently drop `dossier` from the
+ * returned body and no test would notice. `dossierFactsFor`'s own logic is fully covered in
+ * `dossier-facts.test.ts`; this only pins that `playerSeason` actually calls it and actually
+ * returns what it hands back.
+ */
+describe("playerSeason's dossier", () => {
+  const CHASE = "00-0037900";
+  const PEER = "00-0037901";
+  const NOW = new Date(clock.now());
+  const LAST_WEEK = new Date(NOW.getTime() - 7 * 86_400_000);
+
+  async function crossOverBoth(leagueId: string): Promise<string> {
+    await recordNflPlayers(db, [
+      { id: CHASE, pfrId: "LongRa01", espnId: "rb1", name: "Rashad Long", position: "RB", latestTeam: "SF", rookieSeason: 2021, lastSeason: PRODUCT_SEASON },
+      { id: PEER, pfrId: "PeerBa01", espnId: "rb2", name: "Second Back", position: "RB", latestTeam: "NYG", rookieSeason: 2020, lastSeason: PRODUCT_SEASON },
+    ]);
+    await recordCrosswalk(db, crosswalkRows(resolveCrosswalk(
+      [{ id: "rb1", name: "Rashad Long", position: "RB" }, { id: "rb2", name: "Second Back", position: "RB" }],
+      [{ id: CHASE, espnId: "rb1", name: "Rashad Long" }, { id: PEER, espnId: "rb2", name: "Second Back" }],
+    ), NOW));
+    return leagueId;
+  }
+
+  it("wires a non-null dossier onto the body for a board-ranked player, per-game rank carrying its qualifier count", async () => {
+    const leagueId = await crossOverBoth(await league());
+    await recordPreseasonProjections(db, [
+      { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: CHASE, rank: 1, positionRank: 1, projectedPoints: 240,
+        valueOverReplacement: 96.4, valueRank: 1, expectedGames: 16, floorPoints: 200, medianPoints: 240, ceilingPoints: 280,
+        tier: 0, asOf: LAST_WEEK, momentKind: "live" },
+      { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: PEER, rank: 2, positionRank: 2, projectedPoints: 160,
+        valueOverReplacement: 60.0, valueRank: 2, expectedGames: 16, floorPoints: 120, medianPoints: 160, ceilingPoints: 200,
+        tier: 0, asOf: LAST_WEEK, momentKind: "live" },
+    ]);
+
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.dossier).not.toBeNull();
+    expect(body.dossier!.projection.perGamePositionRank).toEqual({ value: 15, positionRank: 1, qualifierCount: 2 });
+  });
+
+  it("answers a null dossier for a player the board never ranked, exactly as collectPlayerFacts does", async () => {
+    const leagueId = await league();
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.dossier).toBeNull();
+  });
+});
+
+/**
  * THE SEASON WIDENING (2026-09-04, founder: "make sure our player cards show prior year data
  * when the season hasn't started"). `player_stat_lines`/`stat_weeks` are single-season; these
  * tests pin the seam that lets `playerSeason` answer for a season that store cannot even name —

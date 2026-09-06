@@ -1,33 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
-import { BottomSheet, NOT_STARTED_DASH, PlayerObject, SeasonBars, SourceStrip } from "@/components/ui";
+import type { ReactNode } from "react";
+import { BottomSheet, PlayerObject } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import type { ApiEnvelope } from "@/lib/api/respond";
 import type { PlayerSeasonBody } from "@/league-service/player";
-import { sourcesFor, weeksFor } from "../lib/player-season-view";
-import { useLeagueRoomDeps } from "../hooks/deps";
-import { Outlook } from "../outlook/outlook";
+import { DossierComposition } from "../dossier/dossier-composition";
+import { openPlayerPeek as openPlayerPeekImpl, usePeekLoad, type PeekTarget } from "./use-peek-load";
 import { SeasonSwitcher } from "./season-switcher";
 
-interface PeekTarget {
-  readonly leagueId: string;
-  readonly playerId: string;
-  readonly name: string;
-}
-
-/**
- * ONE listener, module scope: `PlayerName` triggers anywhere in the tree reach the single
- * `PlayerPeekHost` the page mounts, with no context threading through the server components
- * between them. A trigger pressed with no host mounted does nothing, quietly — the failure mode
- * is a dead click, never a crash.
- */
-let host: ((target: PeekTarget) => void) | null = null;
-
-export function openPlayerPeek(target: PeekTarget): void {
-  host?.(target);
-}
+/** Re-exported unchanged (fix round 2 moved the module-scope `host` listener itself into
+ *  `use-peek-load.ts`, alongside the hook that is its one real reader) — every existing caller
+ *  keeps importing this from `player-peek.tsx`. */
+export const openPlayerPeek = openPlayerPeekImpl;
 
 /**
  * A PLAYER'S NAME, PRESSABLE (founder, 2026-08-30: "we should be able to click the players name
@@ -60,62 +45,68 @@ export function PlayerName({
   );
 }
 
+/** The header's own identity line — bye week moved up beside the roster fact (dossier plan, Task
+ *  5: "WR · NYG · Bye week 8 · Free agent…" in the approved mock). `PlayerObject` already draws
+ *  the position and team as chips right above this line, so this states only the two facts it
+ *  does not: his bye (from `body.dossier`, `null` when there is no dossier to read it off) and the
+ *  roster fact (Task 4, context honesty: silent in a mock league, which has no real room to be a
+ *  free agent "in"). Either half missing simply drops out of the joined sentence rather than
+ *  leaving a dangling separator. */
+function identityLine(body: PlayerSeasonBody): string {
+  const byeWeek = body.dossier?.byeWeek ?? null;
+  const rosterFact = body.isMockLeague ? null : body.ownedBy === null ? "Free agent in this league" : `On ${body.ownedBy}`;
+  return [byeWeek === null ? null : `Bye week ${byeWeek}`, rosterFact].filter((clause): clause is string => clause !== null).join(" · ");
+}
+
+/**
+ * THE SHEET'S OWN HEADER (fix round 2, extracted from `PlayerPeekHost` for the same under-fifty-
+ * line rule `dossier-composition.tsx`'s own extraction served): the name/position chips, the
+ * injury designation pill, the bye/roster identity line, and the link to the full page. No
+ * behavior change — byte-identical markup to what `PlayerPeekHost` used to render inline.
+ */
+function PeekHeader({ body, target, onClose }: { readonly body: PlayerSeasonBody; readonly target: PeekTarget; readonly onClose: () => void }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-3">
+          <PlayerObject player={body.player} />
+          {/* The designation, said in the verdict channel: "Q"/"O"/"IR" beside the name is the
+              one fact a manager checks before anything else. Absent = the feed does not name
+              him, and nothing prints. Unchanged by the dossier composition below —
+              `StoryModule`'s own pill covers the story card, this one covers the header, and
+              both may say the same thing at once on purpose. */}
+          {body.injuryDesignation === null ? null : (
+            <span className="rounded-sm bg-negative px-1.5 py-0.5 font-mono text-sm font-semibold text-negative-text">{body.injuryDesignation}</span>
+          )}
+        </div>
+        {identityLine(body) === "" ? null : <p className="text-sm text-text-muted">{identityLine(body)}</p>}
+      </div>
+      <Link className={`${MICRO_LABEL} pt-2 text-accent underline`} href={`/app/leagues/${target.leagueId}/players/${target.playerId}`} onClick={onClose}>
+        Full page
+      </Link>
+    </div>
+  );
+}
+
 /**
  * The one mounted receiver for `PlayerName` presses: fetches the player's season under this
- * league's rules (the same body the full page reads) and raises the sheet. Loading shows the
- * name immediately — the reader pressed a name, the sheet answers with it before the wire does.
+ * league's rules (the same body the full page reads, via `usePeekLoad`) and raises the sheet.
+ * Loading shows the name immediately — the reader pressed a name, the sheet answers with it
+ * before the wire does.
  */
 export function PlayerPeekHost() {
-  const { fetchJson } = useLeagueRoomDeps();
-  const [target, setTarget] = useState<PeekTarget | null>(null);
-  const [body, setBody] = useState<PlayerSeasonBody | null>(null);
-  const [failed, setFailed] = useState(false);
-  // `null` means "let the service pick" — its own default, the newest season with data for him.
-  // Set only once a manager presses a segment in the switcher below (2026-09-04 widening).
-  const [season, setSeason] = useState<number | null>(null);
-
-  useEffect(() => {
-    // Opening a new target resets any season a prior peek's manager had picked — his choice on
-    // one player's card has no business surviving onto the next name pressed.
-    const openTarget = (next: PeekTarget) => {
-      setSeason(null);
-      setTarget(next);
-    };
-    host = openTarget;
-    return () => {
-      if (host === openTarget) host = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (target === null) return;
-    setBody(null);
-    setFailed(false);
-    let alive = true;
-    void (async () => {
-      try {
-        const seasonParam = season === null ? "" : `&season=${season}`;
-        const response = await fetchJson(
-          `/api/leagues/${target.leagueId}/player-season?playerId=${encodeURIComponent(target.playerId)}${seasonParam}`,
-          { method: "GET" },
-        );
-        const envelope = (await response.json()) as ApiEnvelope<PlayerSeasonBody>;
-        if (!alive) return;
-        if (envelope.ok) setBody(envelope.data);
-        else setFailed(true);
-      } catch {
-        if (alive) setFailed(true);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [target, season, fetchJson]);
+  const { target, body, failed, season, setSeason, close } = usePeekLoad();
 
   if (target === null) return null;
   const played = body?.weeks.some((week) => week.points !== null) ?? false;
+  // Player Dossier plan, Task 5 — `undefined` (a fixture predating the dossier) and `null` (the
+  // board never ranked him, `collectPlayerFacts`'s own honest answer) are the SAME "nothing to
+  // build the dossier composition from" state; the double-check idiom folds both into one.
+  const dossier = body?.dossier ?? null;
+  const switcher = body !== null && body.availableSeasons.length > 1 ? <SeasonSwitcher seasons={body.availableSeasons} season={season ?? body.season} onSelect={setSeason} /> : undefined;
+
   return (
-    <BottomSheet label={target.name} onClose={() => setTarget(null)}>
+    <BottomSheet label={target.name} onClose={close}>
       <div className="flex flex-col gap-6">
         {body === null ? (
           <div className="flex flex-col gap-2">
@@ -124,150 +115,13 @@ export function PlayerPeekHost() {
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-3">
-                  <PlayerObject player={body.player} />
-                  {/* The designation, said in the verdict channel: "Q"/"O"/"IR" beside the name
-                      is the one fact a manager checks before anything else. Absent = the feed
-                      does not name him, and nothing prints. */}
-                  {body.injuryDesignation === null ? null : (
-                    <span className="rounded-sm bg-negative px-1.5 py-0.5 font-mono text-sm font-semibold text-negative-text">{body.injuryDesignation}</span>
-                  )}
-                </div>
-                {/* Task 4, context honesty: a roster-status claim is a fact about a REAL room —
-                    a mock draft's own practice room has no such room to be a free agent "in",
-                    so this line is silent there rather than naming one that does not exist. */}
-                {body.isMockLeague ? null : (
-                  <p className="text-sm text-text-muted">{body.ownedBy === null ? "Free agent in this league" : `On ${body.ownedBy}`}</p>
-                )}
-              </div>
-              <Link
-                className={`${MICRO_LABEL} pt-2 text-accent underline`}
-                href={`/app/leagues/${target.leagueId}/players/${target.playerId}`}
-                onClick={() => setTarget(null)}
-              >
-                Full page
-              </Link>
-            </div>
-            <SourceStrip label={`Where ${body.player.name} is ranked, by source`} sources={sourcesFor(body)} />
+            <PeekHeader body={body} target={target} onClose={close} />
 
-            {/* THE OUTLOOK, REDESIGNED (founder, 2026-09-04): a verdict sentence first, then the
-                board's own "why" as GROUPED evidence — every law reason `boardReasons` stored for
-                him this season, collapsed one group per measured quantity, never a flat stammer
-                of chips (`../outlook/outlook.tsx`'s own docblock has the full account). Capped at
-                five groups here (the bottom-sheet's own constraint); the full page shows every
-                group. Renders nothing when the board never ranked him. */}
-            <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} capsule={body.capsule} capped />
-
-            {/* THE SEASON LABEL + SWITCHER (2026-09-04 widening) — every number below this line
-                answers for `body.season` explicitly, never a silent "this season" that could mean
-                two different years depending on when a manager opens the card. The switcher only
-                renders once there is a choice to make; a single-season player gets the label with
-                nothing to press beside it. */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className={`${MICRO_LABEL} text-text-faint`}>{body.season} season</span>
-              {body.availableSeasons.length > 1 ? <SeasonSwitcher seasons={body.availableSeasons} season={season ?? body.season} onSelect={setSeason} /> : null}
-            </div>
-
-            {body.isRookie ? (
-              // A CONFIRMED rookie (`isRookie`, never inferred from `availableSeasons` alone — see
-              // `PlayerSeasonBody`'s own docblock): nothing to chart, so one honest sentence
-              // stands in for it rather than an empty chart or a "no data" dead end.
-              <p className="text-sm text-text-muted">His first NFL season.</p>
-            ) : body.availableSeasons.length === 0 ? (
-              // THE THIRD STATE (fix round 1, CRITICAL): not a confirmed rookie, and no season on
-              // record either — a crosswalk miss, or a placed veteran the store has no weeks for.
-              // Never the rookie sentence, which would assert a biography fact this state lacks.
-              <p className="text-sm text-text-muted">No prior seasons on record.</p>
-            ) : played ? (
-              <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
-            ) : (
-              <p className="text-sm text-text-muted">No scored week for him in the {body.season} season.</p>
-            )}
-
-            {/* SEASON TOTALS + GAME LOG (founder, 2026-08-30: ESPN-depth). Raw production from
-                the harvest block, points under THIS league's rules. Columns are position-blind
-                on purpose: a zero column is honest and a per-position table is four tables.
-                `Carries`/`Targets` print a dash for a PRIOR season (2026-09-04 widening): the
-                observation store never carries them — see `PlayerGameLogRow`'s own docblock —
-                and a dash is the honest "not recorded", never a fabricated zero. */}
-            {body.totals === null ? null : (
-              <div className="flex flex-col gap-2">
-                <h3 className={`${MICRO_LABEL} text-text-faint`}>{body.season} totals</h3>
-                <div className="flex flex-wrap gap-x-8 gap-y-2">
-                  {[
-                    ["Games", String(body.totals.games)],
-                    ["Carries", body.totals.carries === null ? NOT_STARTED_DASH : String(body.totals.carries)],
-                    ["Rush yds", String(body.totals.rushingYards)],
-                    ["Targets", body.totals.targets === null ? NOT_STARTED_DASH : String(body.totals.targets)],
-                    ["Rec", String(body.totals.receptions)],
-                    ["Rec yds", String(body.totals.receivingYards)],
-                    ["Pass yds", String(body.totals.passingYards)],
-                    ["TD", String(body.totals.touchdowns)],
-                    ["Pts", body.totals.fantasyPoints.toFixed(2)],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex flex-col">
-                      <span className={`${MICRO_LABEL} text-text-faint`}>{label}</span>
-                      <span className="font-display text-xl font-bold tabular-nums text-text-primary">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {body.log.length === 0 ? null : (
-              <div className="flex flex-col gap-2">
-                <h3 className={`${MICRO_LABEL} text-text-faint`}>{body.season} game log</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm tabular-nums">
-                    <thead>
-                      <tr className={`${MICRO_LABEL} border-b border-line text-text-faint`}>
-                        <th className="py-1 pr-3 text-left font-normal">Wk</th>
-                        <th className="py-1 pr-3 text-right font-normal">Car</th>
-                        <th className="py-1 pr-3 text-right font-normal">Rush</th>
-                        <th className="py-1 pr-3 text-right font-normal">Tgt</th>
-                        <th className="py-1 pr-3 text-right font-normal">Rec</th>
-                        <th className="py-1 pr-3 text-right font-normal">Rec yds</th>
-                        <th className="py-1 pr-3 text-right font-normal">Pass</th>
-                        <th className="py-1 pr-3 text-right font-normal">TD</th>
-                        <th className="py-1 text-right font-normal">Pts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {body.log.map((row) => (
-                        <tr key={row.week} className="border-b border-line/50">
-                          <td className="py-1.5 pr-3 text-text-muted">{row.week}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.carries === null ? NOT_STARTED_DASH : row.carries}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.rushingYards}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.targets === null ? NOT_STARTED_DASH : row.targets}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.receptions}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.receivingYards}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.passingYards}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.touchdowns}</td>
-                          <td className="py-1.5 text-right font-display font-bold text-text-primary">{row.points.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {body.news.length === 0 ? null : (
-              <div className="flex flex-col gap-2">
-                <h3 className={`${MICRO_LABEL} text-text-faint`}>News</h3>
-                <ul className="flex flex-col gap-1.5">
-                  {body.news.map((story) => (
-                    <li key={story.link}>
-                      <a href={story.link} target="_blank" rel="noreferrer" className="text-sm text-text-primary underline hover:text-accent">
-                        {story.title}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {/* THE SHARED DOSSIER COMPOSITION (fix round 1, IMPORTANT 4) — call card through
+                `WhyGroups`, plus the season totals/log and the dossier-null fallback, identical
+                to the full page's own composition apart from what `depth`/`readVariant`/`whyCap`
+                state below. See `dossier-composition.tsx`'s own docblock. */}
+            <DossierComposition body={body} dossier={dossier} depth="peek" switcher={switcher} played={played} readVariant="compact" whyCap={5} />
           </>
         )}
       </div>

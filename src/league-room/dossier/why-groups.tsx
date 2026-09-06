@@ -1,0 +1,130 @@
+"use client";
+
+import { useState } from "react";
+import { MICRO_LABEL } from "@/components/ui/config";
+import { signedPoints } from "@/components/ui/event-feed-row";
+import type { Position } from "@/domain/player";
+import type { Law } from "@/projections/laws/types";
+import type { BoardReason } from "@/projections/preseason/board";
+import { groupReasons, type EvidenceGroup, type FactReason } from "../outlook/groups";
+
+export interface WhyGroupsProps {
+  readonly reasons: readonly BoardReason[];
+  readonly laws: readonly Law[];
+  /** Not read by this component's own copy — no group here states a position-qualified fact the
+   *  way `Outlook`'s own verdict line does ("he sits RB4"), and that sentence stays `CallCard`'s
+   *  alone. Kept in the prop list anyway for drop-in parity with `OutlookProps`'s own
+   *  `reasons`/`laws`/`position` triple, and because a future group is more likely to need it than
+   *  not (a share fact phrased "24% of RB touches", say). */
+  readonly position: Position;
+  /** `undefined` (the full page's own posture) — every group, no expander. A number (the peek's
+   *  own `5`) — the strongest groups up to that count, with a "The full case (N)" expander for the
+   *  rest, the identical cap/expander UX `Outlook` used before this task, parameterized rather
+   *  than a fixed five. */
+  readonly cap?: number;
+}
+
+/** A fraction as a signed whole-number percent: "+4%", "-12%" — the same shape
+ *  `reason-chip.tsx`'s own private `signedPercent` keeps, redefined here rather than exported
+ *  across a client/client boundary for three lines with no other caller. */
+function signedPercent(fraction: number): string {
+  const rounded = Math.round(fraction * 100);
+  return `${rounded < 0 ? "-" : "+"}${Math.abs(rounded)}%`;
+}
+
+/** One law group's sentence pair — the bold lead is the group's own headline (`groupReasons`'
+ *  `headlineSourceOf`, already the "one honest statement of the quantity" `groups.ts` picks), the
+ *  explanation states the net measured effect, naming "together" for a multi-law group exactly as
+ *  `lawGroupLabel`'s own copy already does for the chip surface. */
+function lawSentence(group: Extract<EvidenceGroup, { kind: "law" }>): { readonly lead: string; readonly explanation: string } {
+  const effect = signedPoints(group.netEffect);
+  return {
+    lead: group.headline,
+    explanation: group.members.length > 1 ? `Together, ${group.members.length} laws measure ${effect} points per game.` : `Measured ${effect} points per game.`,
+  };
+}
+
+/** One non-law fact's sentence pair. Every `FactReason` code gets its own bold lead and plain
+ *  explanation — the same facts `reason-chip.tsx`'s own `copyFor` states as one chip line, split
+ *  here into the mock's two-clause shape rather than duplicating that switch verbatim. */
+function factSentence(reason: FactReason): { readonly lead: string; readonly explanation: string } {
+  switch (reason.code) {
+    case "availability":
+      return { lead: "Availability", explanation: `Expected ${Math.round(reason.expectedGames)} games, ${Math.round(reason.floorGames)} to ${Math.round(reason.ceilingGames)}.` };
+    case "offseason_share_gained":
+      return { lead: "Offseason share gained", explanation: `Targets ${signedPercent(reason.targetShare)}, carries ${signedPercent(reason.carryShare)}.` };
+    case "offseason_share_lost":
+      return { lead: "Offseason share lost", explanation: `Targets ${signedPercent(-reason.targetShare)}, carries ${signedPercent(-reason.carryShare)}.` };
+    case "changed_team":
+      return { lead: "Changed team", explanation: `${reason.from} to ${reason.to}.` };
+    case "new_play_caller":
+      return { lead: "New play caller", explanation: `At ${reason.team}.` };
+    case "rookie":
+      return { lead: "Rookie", explanation: reason.overallPick === null ? "Undrafted." : `Pick ${reason.overallPick}.` };
+    case "market_unlisted":
+      return { lead: "Not on the market", explanation: "The feed carries no ADP for him." };
+    default: {
+      // Exhaustiveness guard: a future `BoardReason` variant with no case above fails `tsc` here
+      // rather than rendering silently wrong copy.
+      const exhaustive: never = reason;
+      return exhaustive;
+    }
+  }
+}
+
+function sentenceFor(group: EvidenceGroup): { readonly lead: string; readonly explanation: string } {
+  return group.kind === "law" ? lawSentence(group) : factSentence(group.reason);
+}
+
+/**
+ * THE WHY, AS SENTENCES (dossier plan, Task 6) — the Outlook's grouped evidence
+ * (`../outlook/groups.ts`'s `groupReasons`, reused unchanged: no new grouping logic lives here)
+ * restyled as the approved mock's own shape: a bold lead clause plus a plain explanation, one
+ * group per line, strongest first ("The market disagrees with us by -20 points. His price implies
+ * 217. Our number is 197." is the mock's own worked example of the STYLE — a market gap, which
+ * `groupReasons` itself never surfaces here since `market_anchor` feeds `CallCard`'s verdict
+ * instead; every group this component actually renders is a law or a structural fact).
+ *
+ * NEVER A VERDICT LINE. `Outlook` used to open with `verdictLine`'s own sentence before this
+ * task; this component prints none — `CallCard` states the verdict once, from the identical
+ * `reasons`/`position`, and a second copy here would be the exact duplication ruling R-d2 closed.
+ *
+ * `cap` IS THE ONLY SIZE KNOB: `undefined` renders every group (the full page's own posture);
+ * a number renders the strongest that many, with a "The full case (N)" expander for the rest —
+ * the peek passes `5`, unchanged from `Outlook`'s own prior fixed cap.
+ */
+export function WhyGroups({ reasons, laws, cap }: WhyGroupsProps) {
+  const [showFullCase, setShowFullCase] = useState(false);
+
+  if (reasons.length === 0) return null;
+
+  const groups = groupReasons(reasons, laws);
+  const visible = cap !== undefined && !showFullCase ? groups.slice(0, cap) : groups;
+  const hiddenCount = groups.length - visible.length;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className={`${MICRO_LABEL} text-text-faint`}>Why</h3>
+      <div className="flex flex-col gap-1.5">
+        {visible.map((group) => {
+          const { lead, explanation } = sentenceFor(group);
+          return (
+            <p key={group.key} className="text-sm">
+              <span className="font-semibold text-text-primary">{lead}.</span> <span className="text-text-muted">{explanation}</span>
+            </p>
+          );
+        })}
+      </div>
+      {hiddenCount <= 0 ? null : (
+        <button
+          type="button"
+          onClick={() => setShowFullCase(true)}
+          aria-expanded={showFullCase}
+          className={`${MICRO_LABEL} w-fit text-accent underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+        >
+          {`The full case (${groups.length})`}
+        </button>
+      )}
+    </div>
+  );
+}

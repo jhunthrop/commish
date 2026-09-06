@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Player } from "@/domain/player";
+import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
 import type { PlayerSeasonBody } from "@/league-service/player";
 
 // Route-level: the page's own season default/label/switcher, mocked the way `activity/page.test.tsx`
@@ -198,5 +199,169 @@ describe("PlayerPage — the Outlook", () => {
     expect(screen.getByText(/Age 29 season/)).toBeInTheDocument();
     expect(screen.getByText(/320 touches last season/)).toBeInTheDocument();
     expect(screen.queryByText(/The full case/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * THE FULL PAGE, UNCAPPED (Player Dossier plan, Task 6) — the same dossier composition the peek
+ * renders (`player-peek.test.tsx`'s own "the dossier composition" block), at its uncapped depth:
+ * the full capsule Read, every why group with no expander, the complete game log (new to this
+ * page), and both scoring bases named. `body.dossier` absent — `null` or `undefined` alike —
+ * falls back to the page's own pre-dossier composition, pinned unmodified by every test above
+ * this block.
+ */
+describe("PlayerPage — the dossier composition (Task 6)", () => {
+  const DOSSIER_REASONS: PlayerSeasonBody["reasons"] = [
+    { code: "market_anchor", marketPoints: 200, delta: 14.2 },
+    { code: "scarcity", positionRank: 4, replacementLevel: 140 },
+    { code: "law", lawId: "rb_age_curve", effect: -1.8, magnitude: 29 },
+    { code: "law", lawId: "rb_workload_cliff", effect: -0.9, magnitude: 320 },
+    { code: "changed_team", from: "SF", to: "MIA" },
+    { code: "availability", expectedGames: 14, floorGames: 10, ceilingGames: 17 },
+    { code: "rookie", overallPick: null, landingMultiplier: 1 },
+    { code: "new_play_caller", team: "MIA" },
+  ];
+
+  const DOSSIER: PlayerDossierFacts = {
+    market: { adp: 24.3, positionAdp: "RB3", boardRank: 9, positionRank: 4, replacementLevel: 140, playersLeftInTier: null, dropToNextTier: null, marketAnchorPoints: 200, marketAnchorDelta: 14.2 },
+    projection: {
+      projectedPoints: 214.2, floorPoints: 150, medianPoints: 210, ceilingPoints: 280, typicalLow: 190, typicalHigh: 230,
+      perGamePoints: 15, perGamePositionRank: { value: 15, positionRank: 8, qualifierCount: 32 },
+    },
+    availability: { expectedGames: 15.4, floorGames: 10, ceilingGames: 17 },
+    usage: {
+      season: 2025, snapShare: 0.62, snapShareRank: { value: 0.62, positionRank: 4, qualifierCount: 32, namedNeighbor: null },
+      targetShare: null, targetShareRank: null, redZoneShare: null, redZoneShareRank: null,
+    },
+    trend: null,
+    books: { propsLines: [{ market: "player_rush_yds", medianLine: 70.5 }], teamVegasWinTotal: 9.5 },
+    lastSeasonStory: {
+      season: 2025, pointsRank: { value: 260, positionRank: 4, qualifierCount: 32, namedNeighbor: null }, pointsPerGame: 18.1, gamesPlayed: 15,
+      bestWeek: { week: 12, points: 34.6 }, weeksAboveMedian: 9, touchesRank: null,
+      receivingYardsRank: { value: 410, positionRank: 12, qualifierCount: 45, namedNeighbor: null },
+    },
+    injury: { state: "unknown" },
+    newsCount: 1,
+    basis: { scoringLabel: "PPR" },
+    byeWeek: 8,
+  };
+
+  function dossierBody(overrides: Partial<PlayerSeasonBody> = {}): PlayerSeasonBody {
+    return {
+      ...bodyFor(2026, [2026]),
+      reasons: DOSSIER_REASONS,
+      dossier: DOSSIER,
+      capsule: { bodyCompact: "The compact read.", bodyFull: "The full, uncapped read.", source: "llm" },
+      injuryDesignation: "Q",
+      news: [{ title: "Rashad Long: full practice", link: "https://example.com/1" }],
+      totals: { games: 1, carries: 15, rushingYards: 80, targets: 3, receptions: 2, receivingYards: 20, passingYards: 0, touchdowns: 1, fantasyPoints: 12.5 },
+      log: [{ week: 1, points: 12.5, carries: 15, rushingYards: 80, targets: 3, receptions: 2, receivingYards: 20, passingYards: 0, touchdowns: 1 }],
+      ...overrides,
+    };
+  }
+
+  it("composes the call card and the full dossier grid when the dossier is real", async () => {
+    // `season: 2025` — matching `DOSSIER.lastSeasonStory.season` (fix round 1, CRITICAL 2: a
+    // mismatched pair renders the honest fallback instead of `SeasonStrip`; see the dedicated
+    // regression test below for that case). This test's own purpose is proving every module is
+    // present, `SeasonStrip` included, so it needs the season on screen to actually match the
+    // story.
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody({ season: 2025 }));
+    await renderPage();
+    expect(screen.getByLabelText("The call")).toBeInTheDocument();
+    expect(screen.getByLabelText("Season range")).toBeInTheDocument();
+    expect(screen.getByLabelText("Role")).toBeInTheDocument();
+    expect(screen.getByLabelText("The read")).toBeInTheDocument();
+    expect(screen.getByLabelText("The books")).toBeInTheDocument();
+    expect(screen.getByLabelText("2025 season")).toBeInTheDocument();
+    expect(screen.getByLabelText("Story")).toBeInTheDocument();
+    expect(screen.getByText("Why")).toBeInTheDocument();
+  });
+
+  it("fix round 1, CRITICAL 2: shows the honest season fallback, never a mismatched SeasonStrip, when the story's own season differs from the one on screen", async () => {
+    // The default fixture's own `season` is 2026 (the current season, already played);
+    // `DOSSIER.lastSeasonStory.season` is always 2025 (last season) — the realistic default
+    // mismatch this fix closes. Before the fix, this rendered a "2025 season" card captioned
+    // over 2026's own weekly bars, with the switcher inside the card moving the bars but never
+    // the header; after it, the honest fallback (labeled with whichever season IS on screen)
+    // covers it instead.
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    await renderPage();
+    expect(screen.queryByLabelText("2025 season")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Rashad Long, points by week")).toBeInTheDocument();
+  });
+
+  it("states the FULL capsule read, never the compact one, when the capsule is a genuine LLM write-up", async () => {
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    await renderPage();
+    expect(screen.getByText("The full, uncapped read.")).toBeInTheDocument();
+    expect(screen.queryByText("The compact read.")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the compact read, labeled honestly, when the capsule is template-sourced (full is not a genuine longer write-up)", async () => {
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody({ capsule: { bodyCompact: "The template's own sentence.", bodyFull: "The template's own sentence.", source: "template" } }));
+    await renderPage();
+    expect(screen.getByText("The template's own sentence.")).toBeInTheDocument();
+    expect(screen.getByText("The short version while we write him up.")).toBeInTheDocument();
+  });
+
+  it("shows every why group uncapped, never a 'the full case' expander (unlike the peek's own cap)", async () => {
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    await renderPage();
+    expect(screen.getByText("Age 29 season.")).toBeInTheDocument();
+    expect(screen.getByText("New play caller.")).toBeInTheDocument();
+    expect(screen.queryByText(/The full case/)).not.toBeInTheDocument();
+  });
+
+  it("names both scoring bases — the dossier's own board basis and this league's own scoring", async () => {
+    // `season: 2025` — matching `DOSSIER.lastSeasonStory.season`, so `SeasonStrip` itself renders
+    // (fix round 1, CRITICAL 2: a mismatched pair shows the honest fallback instead, which never
+    // states the board's basis at all). Both bases still fully coexist here: `SeasonStrip`'s own
+    // basis and `SeasonTotalsAndLog`'s own league basis, for the SAME season now on screen.
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody({ season: 2025 }));
+    await renderPage();
+    // SeasonStrip's own "points per game" fact states the board's basis as its sub-note.
+    expect(screen.getByText("PPR")).toBeInTheDocument();
+    // SeasonTotalsAndLog names the OTHER basis, on both of its own headers.
+    expect(screen.getByText("2025 totals · under this league's scoring")).toBeInTheDocument();
+    expect(screen.getByText("2025 game log · under this league's scoring")).toBeInTheDocument();
+  });
+
+  it("also names the league's own scoring on the default (current-season) view, even though the board's basis has no honest place to render there", async () => {
+    // The realistic default: the board's own basis (`SeasonStrip`'s "PPR") only ever shows for
+    // the PRIOR season it actually describes; the CURRENT season's own totals/log still name
+    // their basis on every render, mismatch or not.
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    await renderPage();
+    expect(screen.getByText("2026 totals · under this league's scoring")).toBeInTheDocument();
+    expect(screen.getByText("2026 game log · under this league's scoring")).toBeInTheDocument();
+  });
+
+  it("shows the complete game log, which this page never rendered before this task", async () => {
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    await renderPage();
+    expect(screen.getByText("2026 game log · under this league's scoring")).toBeInTheDocument();
+    expect(screen.getAllByRole("row").length).toBeGreaterThan(1);
+  });
+
+  it("falls back to today's layout — no dossier modules — when the dossier is null", async () => {
+    vi.mocked(playerSeason).mockResolvedValue({ ...bodyFor(2026, [2026]), reasons: DOSSIER_REASONS, dossier: null });
+    await renderPage();
+    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Season range")).not.toBeInTheDocument();
+  });
+
+  it("falls back to today's layout when the dossier field is simply absent (a fixture predating this task)", async () => {
+    vi.mocked(playerSeason).mockResolvedValue(bodyFor(2026, [2026]));
+    await renderPage();
+    expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
+  });
+
+  it("follows the copy rules across the whole uncapped composition — no em-dash, no semicolon", async () => {
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    const { container } = await renderPage();
+    expect(container.textContent).not.toMatch(/—/);
+    expect(container.textContent).not.toMatch(/;/);
   });
 });
