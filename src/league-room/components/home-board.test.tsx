@@ -75,6 +75,27 @@ const PRE_DRAFT_LEAGUE: HomeBody["leagues"][number] = {
 };
 const ALL_PRE_DRAFT: HomeBody = { leagues: [PRE_DRAFT_LEAGUE], firstRun: null, liveState: null };
 
+const PRE_DRAFT_LEAGUE_2: HomeBody["leagues"][number] = {
+  ...PRE_DRAFT_LEAGUE,
+  id: "l_predraft2",
+  name: "Dynasty Draft",
+  draftId: "d_predraft2",
+  startTrigger: "when_full",
+  kickoffAt: null,
+};
+const PRE_DRAFT_LEAGUE_3: HomeBody["leagues"][number] = {
+  ...PRE_DRAFT_LEAGUE,
+  id: "l_predraft3",
+  name: "Best Ball Bash",
+  draftId: "d_predraft3",
+  kickoffAt: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString(),
+};
+const ALL_PRE_DRAFT_MANY: HomeBody = {
+  leagues: [PRE_DRAFT_LEAGUE, PRE_DRAFT_LEAGUE_2, PRE_DRAFT_LEAGUE_3],
+  firstRun: null,
+  liveState: null,
+};
+
 afterEach(() => {
   if (vi.isFakeTimers()) vi.useRealTimers();
   Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
@@ -225,5 +246,48 @@ describe("HomeBoard", () => {
       expect(queryByRole("table")).toBeNull();
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  // The regression this round fixes: every league pre-draft used to promote the nearest one to
+  // a hero and RETURN, hiding every sibling league from this page while the shell's rail (the
+  // same `crossLeagueHome` read) kept showing all of them. The hero still leads; nothing this
+  // manager is in disappears beneath it.
+  it("leads with the nearest draft's hero but still lists every league when the manager has more than one", async () => {
+    await renderSurface(<HomeBoard initial={ALL_PRE_DRAFT_MANY} />, async ({ getByTestId, getByRole, queryByRole, container }) => {
+      expect(getByTestId("pre-draft-hero")).toBeInTheDocument();
+      // The `when_full` league sorts nearest (`nearestPreDraft`'s own rule) and leads as the hero.
+      expect(getByRole("heading", { name: "Dynasty Draft" })).toBeInTheDocument();
+      // Every league the manager is in still renders as a row beneath the hero.
+      expect(getByRole("link", { name: /Rookie Room\./ })).toBeInTheDocument();
+      expect(getByRole("link", { name: /Dynasty Draft\./ })).toBeInTheDocument();
+      expect(getByRole("link", { name: /Best Ball Bash\./ })).toBeInTheDocument();
+      expect(queryByRole("table")).toBeNull();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("keeps the single-league all-pre-draft screen hero-only, with nothing to repeat beneath it", () => {
+    render(<HomeBoard initial={ALL_PRE_DRAFT} />);
+    expect(screen.getByTestId("pre-draft-hero")).toBeInTheDocument();
+    expect(screen.queryByTestId("league-rows-page")).not.toBeInTheDocument();
+  });
+
+  it("keeps the mixed-leagues page unchanged: no hero, the rows render as before", () => {
+    const mixed: HomeBody = { leagues: [SCHEDULED_CARD, PRE_DRAFT_LEAGUE], firstRun: null, liveState: null };
+    render(<HomeBoard initial={mixed} />);
+    expect(screen.queryByTestId("pre-draft-hero")).not.toBeInTheDocument();
+    expect(screen.getByTestId("league-rows-page")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Sunday Money\./ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Rookie Room\./ })).toBeInTheDocument();
+  });
+
+  // Wide-viewport overflow fix (2026-09-05): the hero card carries its own width cap so the
+  // meter, countdown, and seat row all measure from the same center as the box grows toward a
+  // 1440px+ column, instead of `Meter`'s own `max-w-xs` disagreeing with an uncapped card.
+  it("caps the pre-draft hero card's width so the seat meter cannot drift from the league name at wide viewports", () => {
+    const { getByTestId } = render(<HomeBoard initial={ALL_PRE_DRAFT} />);
+    const card = getByTestId("pre-draft-hero").firstElementChild as HTMLElement;
+    expect(card.className).toMatch(/\bmax-w-md\b/);
+    expect(card.className).toMatch(/\bmx-auto\b/);
   });
 });

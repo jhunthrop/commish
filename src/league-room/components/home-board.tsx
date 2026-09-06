@@ -100,7 +100,14 @@ function PreDraftHero({
 
   return (
     <div data-testid="pre-draft-hero" className="flex flex-col gap-4">
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
+      {/* `mx-auto max-w-md` (overflow fix, 2026-09-05): this box used to have no width cap of
+       *  its own, so at wide viewports (1440px+) it stretched to the full column while `Meter`
+       *  stayed pinned to its own `max-w-xs` — the two disagreed on where "the middle" was, and
+       *  `SeatMeter`'s un-capped flex row (its bar is `flex-1`) filled whatever was left, reading
+       *  as the seat count sliding away from the league name toward the right edge. One shared
+       *  cap on the card means the meter, the countdown, and the seat row all measure from the
+       *  same center at any width. */}
+      <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
         <Crest id={league.id} name={league.name} size={64} />
         <h2 className="font-display text-2xl font-semibold leading-display text-text-primary">{league.name}</h2>
         {league.startTrigger === "when_full" ? (
@@ -110,7 +117,7 @@ function PreDraftHero({
           // that one frame rather than a false "0:00".
           <Countdown remainingMs={remainingMs} size="xl" />
         )}
-        <SeatMeter filled={league.filledTeams} total={league.teamCount} />
+        <SeatMeter filled={league.filledTeams} total={league.teamCount} className="w-full max-w-xs" />
       </div>
       <WaitingChecklist items={items} />
       {tourOpen ? <RoomTour dismissedAt={null} onDismiss={() => setTourOpen(false)} actionLabel={actionLabelFor(league.format)} /> : null}
@@ -144,8 +151,12 @@ function PreDraftHero({
  *   - Exactly one league: the board IS the league (Step 1's own n=1 test) — a heading and the
  *     ordinary `HomeLeagueCard`, never the multi-league table and never a sort announced over a
  *     list of one.
- *   - Every league pre-draft: the nearest draft's row promoted to a hero (Step 2b), no table of
- *     games that do not exist.
+ *   - Every league pre-draft: the nearest draft's row promoted to a hero (Step 2b) — but with
+ *     more than one league, `LeagueRows` still renders beneath it (fix round 2026-09-05: the
+ *     hero used to RETURN there, which hid every other league the manager is in from this page
+ *     while the shell's rail kept showing all of them — the same read, `crossLeagueHome`, two
+ *     different truths). The nearest draft leads; nothing this manager is in disappears. At
+ *     n=1 the hero alone is already the whole truth, so nothing renders beneath it.
  *   - Otherwise: `AttentionQueue` above `LeagueBoard`, the dense multi-league table.
  *
  * `OpenSeatsPanel` renders below always, quieter for the single pre-draft manager (Step 4), and
@@ -234,6 +245,10 @@ export function HomeBoard({
       <div className="flex flex-col gap-6">
         <CreateLeagueCta />
         <PreDraftHero league={preDraftHero} remainingMs={remainingMs} myTeamName={preDraftHero.myTeamName} helpLevel={helpLevel} />
+        {/* The nearest draft leads, but a manager in more than one league still sees every one
+         *  of them below it — the same `LeagueRows` the non-pre-draft branch renders (this fix,
+         *  2026-09-05). At n=1 the hero above already IS the whole truth, so nothing repeats it. */}
+        {body.leagues.length > 1 ? <LeagueRows leagues={body.leagues} /> : null}
         {openSeats}
       </div>
     );
