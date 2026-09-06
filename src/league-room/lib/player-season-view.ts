@@ -67,6 +67,22 @@ export function callCardPropsFor(body: PlayerSeasonBody, dossier: PlayerDossierF
   };
 }
 
+/** Whether `ReadCard` will render anything for this body — dossier plan, Task 6: shared by the
+ *  peek and the full page so their own grids agree on when `BooksModule` spans alone (no capsule
+ *  yet, the common state — Task 4's own note) versus when the two share the row. */
+export function hasReadCardFor(body: PlayerSeasonBody): boolean {
+  return body.capsule !== null && body.capsule !== undefined;
+}
+
+/** Whether the story cell (`StoryModule` + `NewsList`) will render anything for this body — the
+ *  same "does either half of this cell have real content" question `hasReadCardFor` answers for
+ *  the read/books row, kept alongside it for the identical reason. `StoryModule`'s own `story`
+ *  prop is always `null` today (ruling R-d1: the service wiring converges post-merge), so its own
+ *  visibility reduces to whether a current designation exists. */
+export function hasStoryCellFor(body: PlayerSeasonBody): boolean {
+  return body.injuryDesignation !== null || body.news.length > 0;
+}
+
 /** Each played week, judged against every week played at his position this season. */
 export function weeksFor(body: PlayerSeasonBody): readonly SeasonWeek[] {
   const population = `${POSITION_PLURAL[body.player.position]} in a week this season`;

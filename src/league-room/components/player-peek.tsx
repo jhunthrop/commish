@@ -2,17 +2,22 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { BottomSheet, Card, NOT_STARTED_DASH, PlayerObject, SeasonBars, SourceStrip } from "@/components/ui";
+import { BottomSheet, PlayerObject, SourceStrip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import { BooksModule } from "../dossier/books-module";
 import { CallCard } from "../dossier/call-card";
+import { NewsList } from "../dossier/news-list";
 import { RangeRail } from "../dossier/range-rail";
+import { ReadCard } from "../dossier/read-card";
 import { RoleModule } from "../dossier/role-module";
+import { SeasonChartFallback } from "../dossier/season-chart-fallback";
 import { SeasonStrip } from "../dossier/season-strip";
+import { SeasonTotalsAndLog } from "../dossier/season-totals-and-log";
 import { StoryModule } from "../dossier/story-module";
-import { callCardPropsFor, sourcesFor, weeksFor } from "../lib/player-season-view";
+import { WhyGroups } from "../dossier/why-groups";
+import { callCardPropsFor, hasReadCardFor, hasStoryCellFor, sourcesFor, weeksFor } from "../lib/player-season-view";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { Outlook } from "../outlook/outlook";
 import { SeasonSwitcher } from "./season-switcher";
@@ -79,77 +84,6 @@ function identityLine(body: PlayerSeasonBody): string {
   return [byeWeek === null ? null : `Bye week ${byeWeek}`, rosterFact].filter((clause): clause is string => clause !== null).join(" · ");
 }
 
-/** The auto-written capsule, restyled as its own module Card ("The read") — Task 5 moves this out
- *  of `Outlook`'s own body (where it used to sit directly under the verdict line) now that the
- *  dossier composition gives it a card of its own beside `BooksModule`. `null`/`undefined` renders
- *  nothing, the identical "the sweep has not reached him yet" absence `Outlook` always kept. */
-function ReadCard({ capsule }: { readonly capsule: PlayerSeasonBody["capsule"] }) {
-  if (capsule === null || capsule === undefined) return null;
-  return (
-    <Card as="section" aria-label="The read" className="flex flex-col gap-1">
-      <h3 className={`${MICRO_LABEL} text-text-faint`}>The read</h3>
-      <p className="text-sm text-text-primary">{capsule.bodyCompact}</p>
-      {capsule.source === "template" ? <p className="text-xs text-text-faint">The short version while we write him up.</p> : null}
-    </Card>
-  );
-}
-
-/** Newest headlines that name him — unchanged content from the pre-dossier peek, only ever
- *  rendered ONCE per render: the dossier composition relocates this into the grid beside
- *  `StoryModule`, and the fallback (no dossier) composition keeps it below the fold, exactly
- *  where it always was. */
-function NewsList({ news }: { readonly news: PlayerSeasonBody["news"] }) {
-  if (news.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-2">
-      <h3 className={`${MICRO_LABEL} text-text-faint`}>News</h3>
-      <ul className="flex flex-col gap-1.5">
-        {news.map((story) => (
-          <li key={story.link}>
-            <a href={story.link} target="_blank" rel="noreferrer" className="text-sm text-text-primary underline hover:text-accent">
-              {story.title}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** The season label, its switcher, and the rookie/no-record/chart branch — byte-identical to the
- *  peek's own pre-dossier composition. Used twice: as the WHOLE fallback when `body.dossier` is
- *  absent, and as the dossier grid's own "last season" cell when the dossier exists but carries no
- *  `lastSeasonStory` for him (a board-ranked rookie, most often) — the same honest substitute
- *  either way, never a `SeasonStrip` built from a story that does not exist. */
-function SeasonChartFallback({ body, switcher, played }: { readonly body: PlayerSeasonBody; readonly switcher: ReactNode; readonly played: boolean }) {
-  return (
-    // `gap-6` matches the pre-Task-5 peek exactly: the label/switcher row and the chart below it
-    // used to be flat siblings under the peek's own `gap-6` column, and extracting them into this
-    // component must not shrink that spacing to whatever gap this wrapper happens to pick.
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className={`${MICRO_LABEL} text-text-faint`}>{body.season} season</span>
-        {switcher}
-      </div>
-      {body.isRookie ? (
-        // A CONFIRMED rookie (`isRookie`, never inferred from `availableSeasons` alone — see
-        // `PlayerSeasonBody`'s own docblock): nothing to chart, so one honest sentence stands in
-        // for it rather than an empty chart or a "no data" dead end.
-        <p className="text-sm text-text-muted">His first NFL season.</p>
-      ) : body.availableSeasons.length === 0 ? (
-        // THE THIRD STATE (fix round 1, CRITICAL): not a confirmed rookie, and no season on record
-        // either — a crosswalk miss, or a placed veteran the store has no weeks for. Never the
-        // rookie sentence, which would assert a biography fact this state lacks.
-        <p className="text-sm text-text-muted">No prior seasons on record.</p>
-      ) : played ? (
-        <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
-      ) : (
-        <p className="text-sm text-text-muted">No scored week for him in the {body.season} season.</p>
-      )}
-    </div>
-  );
-}
-
 /**
  * The one mounted receiver for `PlayerName` presses: fetches the player's season under this
  * league's rules (the same body the full page reads) and raises the sheet. Loading shows the
@@ -212,8 +146,8 @@ export function PlayerPeekHost() {
   // Whether the grid's `ReadCard`/story cells have anything to pair with `BooksModule`/`SeasonStrip`
   // against — review fix: a missing partner spans its own row's full width instead of leaving the
   // other column empty (see the grid's own inline docblock below for why this must be per-row).
-  const hasReadCard = body !== null && body.capsule !== null && body.capsule !== undefined;
-  const hasStoryCell = body !== null && (body.injuryDesignation !== null || body.news.length > 0);
+  const hasReadCard = body !== null && hasReadCardFor(body);
+  const hasStoryCell = body !== null && hasStoryCellFor(body);
 
   return (
     <BottomSheet label={target.name} onClose={() => setTarget(null)}>
@@ -278,7 +212,7 @@ export function PlayerPeekHost() {
                   <RoleModule position={body.player.position} usage={dossier.usage} trend={dossier.trend} />
                 </div>
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <ReadCard capsule={body.capsule} />
+                  <ReadCard capsule={body.capsule} variant="compact" />
                   <div className={hasReadCard ? undefined : "lg:col-span-2"}>
                     <BooksModule books={dossier.books} />
                   </div>
@@ -302,83 +236,21 @@ export function PlayerPeekHost() {
                   )}
                 </div>
 
-                {/* THE WHY, UNCHANGED IN SUBSTANCE (ruling R-d2) — the same capped, grouped
-                    `Outlook` the peek always rendered, minus the verdict sentence (`CallCard`
-                    above already states it from the identical `reasons`/`position`) and minus the
-                    capsule prose (`ReadCard` above already states it). Task 6 replaces this with
-                    the uncapped why-groups module; this task only stops it from repeating itself. */}
-                <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} capped showVerdict={false} />
+                {/* THE WHY, AS SENTENCES (ruling R-d2's completion, Task 6) — `WhyGroups` replaces
+                    the capped `Outlook` here: the same grouped evidence (`groupReasons`, reused
+                    unchanged), restyled as the mock's bold-lead-plus-explanation sentences, and
+                    printing no verdict of its own (`CallCard` above already states it from the
+                    identical `reasons`/`position`, and no capsule prose either — `ReadCard` above
+                    already states that). Capped at 5, the peek's own historical cap. */}
+                <WhyGroups reasons={body.reasons} laws={body.laws} position={body.player.position} cap={5} />
               </>
             )}
 
-            {/* SEASON TOTALS + GAME LOG (founder, 2026-08-30: ESPN-depth). Raw production from
-                the harvest block, points under THIS league's rules. Columns are position-blind
-                on purpose: a zero column is honest and a per-position table is four tables.
-                `Carries`/`Targets` print a dash for a PRIOR season (2026-09-04 widening): the
-                observation store never carries them — see `PlayerGameLogRow`'s own docblock —
-                and a dash is the honest "not recorded", never a fabricated zero. Stays below the
-                fold in both compositions, exactly as before this task. */}
-            {body.totals === null ? null : (
-              <div className="flex flex-col gap-2">
-                <h3 className={`${MICRO_LABEL} text-text-faint`}>{body.season} totals</h3>
-                <div className="flex flex-wrap gap-x-8 gap-y-2">
-                  {[
-                    ["Games", String(body.totals.games)],
-                    ["Carries", body.totals.carries === null ? NOT_STARTED_DASH : String(body.totals.carries)],
-                    ["Rush yds", String(body.totals.rushingYards)],
-                    ["Targets", body.totals.targets === null ? NOT_STARTED_DASH : String(body.totals.targets)],
-                    ["Rec", String(body.totals.receptions)],
-                    ["Rec yds", String(body.totals.receivingYards)],
-                    ["Pass yds", String(body.totals.passingYards)],
-                    ["TD", String(body.totals.touchdowns)],
-                    ["Pts", body.totals.fantasyPoints.toFixed(2)],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex flex-col">
-                      <span className={`${MICRO_LABEL} text-text-faint`}>{label}</span>
-                      <span className="font-display text-xl font-bold tabular-nums text-text-primary">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {body.log.length === 0 ? null : (
-              <div className="flex flex-col gap-2">
-                <h3 className={`${MICRO_LABEL} text-text-faint`}>{body.season} game log</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm tabular-nums">
-                    <thead>
-                      <tr className={`${MICRO_LABEL} border-b border-line text-text-faint`}>
-                        <th className="py-1 pr-3 text-left font-normal">Wk</th>
-                        <th className="py-1 pr-3 text-right font-normal">Car</th>
-                        <th className="py-1 pr-3 text-right font-normal">Rush</th>
-                        <th className="py-1 pr-3 text-right font-normal">Tgt</th>
-                        <th className="py-1 pr-3 text-right font-normal">Rec</th>
-                        <th className="py-1 pr-3 text-right font-normal">Rec yds</th>
-                        <th className="py-1 pr-3 text-right font-normal">Pass</th>
-                        <th className="py-1 pr-3 text-right font-normal">TD</th>
-                        <th className="py-1 text-right font-normal">Pts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {body.log.map((row) => (
-                        <tr key={row.week} className="border-b border-line/50">
-                          <td className="py-1.5 pr-3 text-text-muted">{row.week}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.carries === null ? NOT_STARTED_DASH : row.carries}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.rushingYards}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.targets === null ? NOT_STARTED_DASH : row.targets}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.receptions}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.receivingYards}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.passingYards}</td>
-                          <td className="py-1.5 pr-3 text-right text-text-muted">{row.touchdowns}</td>
-                          <td className="py-1.5 text-right font-display font-bold text-text-primary">{row.points.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {/* SEASON TOTALS + GAME LOG (founder, 2026-08-30: ESPN-depth; Task 6 extracted this
+                into a shared component, `SeasonTotalsAndLog`, that also names its own scoring
+                basis — the "both bases" law the plan's Global Constraints state directly. Stays
+                below the fold in both compositions, exactly where it always was. */}
+            <SeasonTotalsAndLog body={body} />
 
             {/* News stays below the fold ONLY in the fallback composition (no dossier) — the
                 dossier composition already rendered this same list once, beside `StoryModule`,

@@ -294,9 +294,9 @@ describe("PlayerPeekHost — the Outlook, grouped (2026-09-04 redesign)", () => 
 /**
  * THE PEEK BECOMES THE DOSSIER (Task 5) — once `body.dossier` is real, the mock's own module
  * order composes: `CallCard` full width, then the two-column grid (`RangeRail`/`RoleModule`,
- * `ReadCard`/`BooksModule`, `SeasonStrip`/`StoryModule`+news), then the capped `Outlook` with its
- * verdict suppressed (`CallCard` already stated it). `body.dossier` absent — `null` OR
- * `undefined` alike — falls back to the pre-dossier composition every test above this block
+ * `ReadCard`/`BooksModule`, `SeasonStrip`/`StoryModule`+news), then `WhyGroups` capped at 5,
+ * printing no verdict of its own (`CallCard` already stated it). `body.dossier` absent — `null`
+ * OR `undefined` alike — falls back to the pre-dossier composition every test above this block
  * already pins byte-for-byte (`SourceStrip`, `Outlook` with its verdict, the season chart, news
  * below the fold).
  */
@@ -353,9 +353,6 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     await waitFor(() => expect(screen.getByLabelText("The call")).toBeInTheDocument());
 
     const sheet = screen.getByRole("dialog");
-    const order = ["The call", "Role", "The read", "The books", "2025 season", "Story", "Outlook"]
-      .map((label) => sheet.querySelector(`[aria-label="${label}"], h3`))
-      .filter((el): el is Element => el !== null);
     // Every named module is present at all (a missing one would make the order check vacuous).
     expect(screen.getByLabelText("The call")).toBeInTheDocument();
     expect(screen.getByLabelText("Season range")).toBeInTheDocument();
@@ -364,17 +361,16 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     expect(screen.getByLabelText("The books")).toBeInTheDocument();
     expect(screen.getByLabelText("2025 season")).toBeInTheDocument();
     expect(screen.getByLabelText("Story")).toBeInTheDocument();
-    expect(screen.getByText("Outlook")).toBeInTheDocument();
+    expect(screen.getByText("Why")).toBeInTheDocument();
 
     // DOM order IS the mobile stacking order (no media query runs in jsdom): the call, then the
     // grid's six cells in the mock's own row order, then the why slot.
     const labelled = Array.from(sheet.querySelectorAll("[aria-label]")).map((el) => el.getAttribute("aria-label"));
     const positions = ["The call", "Season range", "Role", "The read", "The books", "2025 season", "Story"].map((label) => labelled.indexOf(label));
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    expect(order.length).toBeGreaterThan(0);
   });
 
-  it("prints the verdict exactly once, from the call card, never doubled by the Outlook", async () => {
+  it("prints the verdict exactly once, from the call card, never doubled by WhyGroups", async () => {
     const bodies = new Map([[2026, dossierBody()]]);
     render(
       <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
@@ -398,11 +394,34 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
       </LeagueRoomDepsProvider>,
     );
     openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
-    await waitFor(() => expect(screen.getByText("Outlook")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Why")).toBeInTheDocument());
     // No fired law/fact reasons beyond market_anchor/scarcity (both feed the verdict, never a
     // peer group), so there is nothing left to cap — the presence of the section header, with no
     // group rows, is the honest shape here.
     expect(screen.queryByText(/The full case/)).not.toBeInTheDocument();
+  });
+
+  it("states a real law group as a sentence in WhyGroups, capped at 5 with an expander for the rest", async () => {
+    const richReasons: PlayerSeasonBody["reasons"] = [
+      ...DOSSIER_REASONS,
+      { code: "law", lawId: "rb_age_curve", effect: -1.8, magnitude: 29 },
+      { code: "law", lawId: "rb_workload_cliff", effect: -0.9, magnitude: 320 },
+      { code: "changed_team", from: "SF", to: "MIA" },
+      { code: "availability", expectedGames: 14, floorGames: 10, ceilingGames: 17 },
+      { code: "rookie", overallPick: null, landingMultiplier: 1 },
+      { code: "new_play_caller", team: "MIA" },
+    ];
+    const bodies = new Map([[2026, dossierBody({ reasons: richReasons })]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText("Age 29 season.")).toBeInTheDocument());
+    expect(screen.getByText("Measured -1.8 points per game.")).toBeInTheDocument();
+    // 6 groups total, capped to 5 in the peek — the same cap Outlook used before this task.
+    expect(screen.getByText("The full case (6)")).toBeInTheDocument();
   });
 
   it("moves the bye week up beside the roster fact in the header", async () => {
