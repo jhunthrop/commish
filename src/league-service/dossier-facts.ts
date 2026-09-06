@@ -65,10 +65,15 @@ export interface PlayerDossierBasis {
  * field is a plain object, array, string, number, boolean or `null` (no `Map`/`Set`), so a real
  * `JSON.stringify`/`JSON.parse` round trip through the wire is lossless — pinned by this module's
  * own test. Everything here is a narrower READ than `PlayerFacts` (`evidence`/`numberLedger`/
- * `nameLedger`/`factsHash`/`identity`/`productSeason`/`byeWeek` are the capsule validator's own
- * vocabulary, not a client-facing fact — `PlayerSeasonBody`'s own `player`/`byeWeek`-adjacent
- * fields already answer those for the page), plus the two things `PlayerFacts` does not carry:
- * a per-GAME rate and its rank, and the basis both a rank and a rate need to be honest about.
+ * `nameLedger`/`factsHash`/`identity`/`productSeason` are the capsule validator's own vocabulary,
+ * not a client-facing fact), plus the two things `PlayerFacts` does not carry: a per-GAME rate
+ * and its rank, and the basis both a rank and a rate need to be honest about.
+ *
+ * `byeWeek` JOINED THIS SHAPE IN TASK 5: `PlayerSeasonBody` (`league-service/player.ts`) never
+ * carried a bye week at all — the original docblock here assumed it did and was wrong — and the
+ * dossier peek's own header needs one ("WR · NYG · Bye week 8 · …"). `facts.byeWeek` was already
+ * computed by Task 1's collector (from the board's own bye-week join, `board-store.ts`'s
+ * `byeWeeksByTeam`); this field is a straight pass-through, not a new read.
  */
 export interface PlayerDossierFacts {
   readonly market: PlayerFactsMarket;
@@ -84,6 +89,7 @@ export interface PlayerDossierFacts {
    *  to point a reader at. */
   readonly newsCount: number;
   readonly basis: PlayerDossierBasis;
+  readonly byeWeek: number | null;
 }
 
 /** Every board-ranked player's own points-per-game rate (`projectedPoints / expectedGames`,
@@ -149,5 +155,6 @@ export async function dossierFactsFor(db: Db, playerId: string, asOf: Date = new
     injury: facts.injury,
     newsCount: facts.news.length,
     basis: { boardGeneration, scoringLabel: describeScoring(PPR_SCORING) },
+    byeWeek: facts.byeWeek,
   };
 }

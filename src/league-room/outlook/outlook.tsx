@@ -46,16 +46,24 @@ export interface OutlookProps {
    * surfaces, rather than a second prop threading the identical decision twice.
    */
   readonly capsule?: PlayerCapsuleView | null;
+  /**
+   * Player Dossier plan, Task 5 — `false` for a consumer that already prints `verdictLine`'s own
+   * sentence somewhere else on the same screen (the dossier peek's `CallCard`, composed from the
+   * identical `reasons`/`position` this component would otherwise re-derive the same string
+   * from). `true` (the default) keeps every existing consumer's behavior byte-identical: the full
+   * page and any caller predating this task never pass it and never notice it exists.
+   */
+  readonly showVerdict?: boolean;
 }
 
-export function Outlook({ reasons, laws, position, capped = false, capsule }: OutlookProps) {
+export function Outlook({ reasons, laws, position, capped = false, capsule, showVerdict = true }: OutlookProps) {
   const [showFullCase, setShowFullCase] = useState(false);
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
 
   if (reasons.length === 0) return null;
 
   const groups = groupReasons(reasons, laws);
-  const verdict = verdictLine(reasons, position);
+  const verdict = showVerdict ? verdictLine(reasons, position) : null;
   const visible = capped && !showFullCase ? groups.slice(0, PEEK_GROUP_CAP) : groups;
   const hiddenCount = groups.length - visible.length;
 

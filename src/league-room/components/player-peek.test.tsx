@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Player } from "@/domain/player";
+import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import type { Law } from "@/projections/laws/types";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "../hooks/deps";
@@ -287,5 +288,198 @@ describe("PlayerPeekHost — the Outlook, grouped (2026-09-04 redesign)", () => 
     await waitFor(() => expect(screen.getByText(/together -2\.5 pts, Age 29 season · 2 laws/)).toBeInTheDocument());
     // Only ONE group rendered for the quantity — the stammer this fix closes.
     expect(screen.queryByText(/^-2\.5 pts, Age 29 season$/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * THE PEEK BECOMES THE DOSSIER (Task 5) — once `body.dossier` is real, the mock's own module
+ * order composes: `CallCard` full width, then the two-column grid (`RangeRail`/`RoleModule`,
+ * `ReadCard`/`BooksModule`, `SeasonStrip`/`StoryModule`+news), then the capped `Outlook` with its
+ * verdict suppressed (`CallCard` already stated it). `body.dossier` absent — `null` OR
+ * `undefined` alike — falls back to the pre-dossier composition every test above this block
+ * already pins byte-for-byte (`SourceStrip`, `Outlook` with its verdict, the season chart, news
+ * below the fold).
+ */
+describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
+  const DOSSIER_REASONS: PlayerSeasonBody["reasons"] = [
+    { code: "market_anchor", marketPoints: 200, delta: 14.2 },
+    { code: "scarcity", positionRank: 4, replacementLevel: 140 },
+  ];
+
+  const DOSSIER: PlayerDossierFacts = {
+    market: { adp: 24.3, positionAdp: "RB3", boardRank: 9, positionRank: 4, replacementLevel: 140, playersLeftInTier: null, dropToNextTier: null, marketAnchorPoints: 200, marketAnchorDelta: 14.2 },
+    projection: {
+      projectedPoints: 214.2, floorPoints: 150, medianPoints: 210, ceilingPoints: 280, typicalLow: 190, typicalHigh: 230,
+      perGamePoints: 15, perGamePositionRank: { value: 15, positionRank: 8, qualifierCount: 32 },
+    },
+    availability: { expectedGames: 15.4, floorGames: 10, ceilingGames: 17 },
+    usage: {
+      season: 2025, snapShare: 0.62, snapShareRank: { value: 0.62, positionRank: 4, qualifierCount: 32, namedNeighbor: null },
+      targetShare: null, targetShareRank: null, redZoneShare: null, redZoneShareRank: null,
+    },
+    trend: null,
+    books: { propsLines: [{ market: "player_rush_yds", medianLine: 70.5 }], teamVegasWinTotal: 9.5 },
+    lastSeasonStory: {
+      season: 2025, pointsRank: { value: 260, positionRank: 4, qualifierCount: 32, namedNeighbor: null }, pointsPerGame: 18.1, gamesPlayed: 15,
+      bestWeek: { week: 12, points: 34.6 }, weeksAboveMedian: 9, touchesRank: null,
+      receivingYardsRank: { value: 410, positionRank: 12, qualifierCount: 45, namedNeighbor: null },
+    },
+    injury: { state: "unknown" },
+    newsCount: 1,
+    basis: { boardGeneration: "2026-08-01T00:00:00.000Z", scoringLabel: "PPR" },
+    byeWeek: 8,
+  };
+
+  function dossierBody(overrides: Partial<PlayerSeasonBody> = {}): PlayerSeasonBody {
+    return {
+      ...bodyFor(2026, [2026]),
+      reasons: DOSSIER_REASONS,
+      dossier: DOSSIER,
+      capsule: { bodyCompact: "The compact read.", bodyFull: "The full read.", source: "llm" },
+      injuryDesignation: "Q",
+      news: [{ title: "Rashad Long: full practice", link: "https://example.com/1" }],
+      ...overrides,
+    };
+  }
+
+  it("composes the call card, the two-column grid modules, and the why slot, in the mock's own order", async () => {
+    const bodies = new Map([[2026, dossierBody()]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByLabelText("The call")).toBeInTheDocument());
+
+    const sheet = screen.getByRole("dialog");
+    const order = ["The call", "Role", "The read", "The books", "2025 season", "Story", "Outlook"]
+      .map((label) => sheet.querySelector(`[aria-label="${label}"], h3`))
+      .filter((el): el is Element => el !== null);
+    // Every named module is present at all (a missing one would make the order check vacuous).
+    expect(screen.getByLabelText("The call")).toBeInTheDocument();
+    expect(screen.getByLabelText("Season range")).toBeInTheDocument();
+    expect(screen.getByLabelText("Role")).toBeInTheDocument();
+    expect(screen.getByLabelText("The read")).toBeInTheDocument();
+    expect(screen.getByLabelText("The books")).toBeInTheDocument();
+    expect(screen.getByLabelText("2025 season")).toBeInTheDocument();
+    expect(screen.getByLabelText("Story")).toBeInTheDocument();
+    expect(screen.getByText("Outlook")).toBeInTheDocument();
+
+    // DOM order IS the mobile stacking order (no media query runs in jsdom): the call, then the
+    // grid's six cells in the mock's own row order, then the why slot.
+    const labelled = Array.from(sheet.querySelectorAll("[aria-label]")).map((el) => el.getAttribute("aria-label"));
+    const positions = ["The call", "Season range", "Role", "The read", "The books", "2025 season", "Story"].map((label) => labelled.indexOf(label));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(order.length).toBeGreaterThan(0);
+  });
+
+  it("prints the verdict exactly once, from the call card, never doubled by the Outlook", async () => {
+    const bodies = new Map([[2026, dossierBody()]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByLabelText("The call")).toBeInTheDocument());
+
+    // A single match — `getByText` throws on more than one, which is the whole point of this
+    // assertion: it fails loudly if the Outlook ever prints this sentence a second time.
+    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
+    expect(screen.getByLabelText("The call").textContent).toContain("The market is underpricing him");
+  });
+
+  it("still shows the grouped evidence and the capped expander in the why slot, minus the capsule prose it used to carry", async () => {
+    const bodies = new Map([[2026, dossierBody()]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText("Outlook")).toBeInTheDocument());
+    // No fired law/fact reasons beyond market_anchor/scarcity (both feed the verdict, never a
+    // peer group), so there is nothing left to cap — the presence of the section header, with no
+    // group rows, is the honest shape here.
+    expect(screen.queryByText(/The full case/)).not.toBeInTheDocument();
+  });
+
+  it("moves the bye week up beside the roster fact in the header", async () => {
+    const bodies = new Map([[2026, dossierBody()]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText(/Bye week 8/)).toBeInTheDocument());
+    expect(screen.getByText("Bye week 8 · Free agent in this league")).toBeInTheDocument();
+  });
+
+  it("keeps the header's own designation pill even though the story card carries its own", async () => {
+    const bodies = new Map([[2026, dossierBody({ injuryDesignation: "Q" })]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByLabelText("Story")).toBeInTheDocument());
+    expect(screen.getAllByText("Q")).toHaveLength(2);
+  });
+
+  it("relocates the news list beside the story module rather than duplicating it below the fold", async () => {
+    const bodies = new Map([[2026, dossierBody()]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText("News")).toBeInTheDocument());
+    expect(screen.getAllByText("Rashad Long: full practice")).toHaveLength(1);
+  });
+
+  it("falls back to today's layout — source strip, Outlook with its own verdict, no dossier modules — when the dossier is null", async () => {
+    const bodies = new Map([[2026, { ...bodyFor(2026, [2026]), reasons: DOSSIER_REASONS, dossier: null }]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText("Outlook")).toBeInTheDocument());
+
+    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Season range")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Role")).not.toBeInTheDocument();
+  });
+
+  it("falls back to today's layout when the dossier field is simply absent (a fixture predating this task)", async () => {
+    const legacyBody = bodyFor(2026, [2026]);
+    const bodies = new Map([[2026, legacyBody]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByText("2026 season")).toBeInTheDocument());
+    expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
+  });
+
+  it("follows the copy rules in every string this task added — no em-dash, no semicolon", async () => {
+    const bodies = new Map([[2026, dossierBody()]]);
+    const { container } = render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByLabelText("The call")).toBeInTheDocument());
+    expect(container.textContent).not.toMatch(/—/);
+    expect(container.textContent).not.toMatch(/;/);
   });
 });

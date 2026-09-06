@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
-import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
+import { nflGames, nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
+import { LEAGUE_CONFIG } from "@/league";
 import { statMetricName, STAT_LINE_SOURCE } from "@/projections/lines";
 import { NFLVERSE_SOURCE, PARTICIPATION_METRICS } from "@/projections/nflverse/map";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
@@ -8,6 +9,15 @@ import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { dossierFactsFor } from "./dossier-facts";
+
+/** SF plays every regular-season week except `byeWeek`; DAL plays every one — the same
+ *  "one hole in the schedule" shape `nfl-schedule.test.ts` seeds `byeWeeksByTeam` with. */
+async function seedByeWeek(db: Db, team: string, opponent: string, byeWeek: number): Promise<void> {
+  const games = Array.from({ length: LEAGUE_CONFIG.regularSeasonWeeks }, (_, index) => index + 1)
+    .filter((week) => week !== byeWeek)
+    .map((week) => ({ gameId: `w${week}_${team}@${opponent}`, week, homeNflTeam: team, awayNflTeam: opponent, status: "scheduled" as const }));
+  await db.insert(nflGames).values(games);
+}
 
 const PRIOR_SEASON = PRODUCT_SEASON - 1;
 const BOARD_ASOF = new Date("2026-08-01T00:00:00Z");
@@ -85,6 +95,15 @@ describe("dossierFactsFor", () => {
     const facts = await dossierFactsFor(db, "p1");
     expect(facts!.basis.boardGeneration).toBe(BOARD_ASOF.toISOString());
     expect(facts!.basis.scoringLabel).toBe("PPR");
+  });
+
+  it("states his team's real bye week, and null when the schedule store carries no hole for his team", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-8150001", name: "Rashad Long", position: "RB", team: "SF", points: 200, expectedGames: 16, rank: 1, adp: 10 });
+    await seedByeWeek(db, "SF", "DAL", 9);
+    expect((await dossierFactsFor(db, "p1"))!.byeWeek).toBe(9);
+
+    await seedPlayer(db, { id: "p2", nflId: "00-8150002", name: "No Bye Yet", position: "RB", team: "NYG", points: 180, expectedGames: 16, rank: 2, adp: 20 });
+    expect((await dossierFactsFor(db, "p2"))!.byeWeek).toBeNull();
   });
 
   it("carries a newsCount, not the headlines themselves", async () => {
