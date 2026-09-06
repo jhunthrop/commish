@@ -3,7 +3,7 @@ import type { Db } from "@/db/client";
 import { nflPlayers, playerStatLines, statWeeks } from "@/db/schema";
 import type { Position, StatLine } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
-import { boardRows, type BoardOptions, type BoardRow } from "@/draft-hq/board/service";
+import { boardRows, isProjectedRow, type BoardOptions, type ProjectedBoardRow } from "@/draft-hq/board/service";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { injurySnapshot, type InjurySnapshot } from "@/league-service/injuries";
 import { newsForPlayers, type NewsStory } from "@/league-service/news";
@@ -510,7 +510,7 @@ function lastSeasonStoryFor(gsisId: string | undefined, color: ColorFacts): Play
 }
 
 function factsInputFor(
-  row: BoardRow,
+  row: ProjectedBoardRow,
   season: PlayerFactsSeasonSummary | undefined,
   injuries: InjurySnapshot,
   news: ReadonlyMap<string, readonly NewsStory[]>,
@@ -577,5 +577,16 @@ export async function collectAllPlayerFacts(db: Db, asOf: Date = new Date()): Pr
     gsisIdByPlayerId,
   };
 
-  return rows.map((row) => buildPlayerFacts(factsInputFor(row, seasons.get(row.playerId), injuries, news, laws, color)));
+  return (
+    rows
+      // A ROW WITH NO PROJECTION IS NOT A CAPSULE SUBJECT (the 2026-09-05 kicker and team defence
+      // round). The board now carries market-order rows for a position the engine published nothing
+      // for, and `PlayerFactsInput.projection` is four numbers rather than four maybe-numbers on
+      // purpose: a capsule is written ABOUT a projection. Both positions are already outside
+      // `isSkillPosition`, so nothing reaches here in practice, and this is the type-level statement
+      // of the same rule: it drops the row rather than coercing an absence to a zero somebody would
+      // later read as a measurement.
+      .filter(isProjectedRow)
+      .map((row) => buildPlayerFacts(factsInputFor(row, seasons.get(row.playerId), injuries, news, laws, color)))
+  );
 }

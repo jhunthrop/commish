@@ -183,7 +183,7 @@ async function main(): Promise<void> {
     if (fellBack.length > 0) {
       console.log(
         `NOT SCORED HERE: ${fellBack.join(" and ")}. Both were built and judged once against preregistered gates ` +
-          `(docs/research/2026-09-05-kicker-defense-preregistration-results.md); ${fellBack
+          `(docs/research/2026-09-05-kicker-defense-preregistration-results.md). ${fellBack
             .map((position) => `${position} ships in ${KDEF_DECISION[position as "K" | "DEF"].replace("_", " ")}`)
             .join(", ")}, so the engine publishes no projection to score. Run \`npm run projections:kdef:judgment\` for that measurement.\n`,
       );

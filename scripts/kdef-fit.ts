@@ -156,6 +156,9 @@ async function main(): Promise<void> {
   console.log(`  extra point make rate             ${kicker.leagueExtraPointMakeRate.toFixed(4)}`);
   console.log(`  share of club games played        ${kicker.leagueGamesRate.toFixed(4)}`);
   console.log(`  recency decay (searched)          ${kicker.recencyDecay}`);
+  console.log(
+    `  projection error variance         ${kicker.projectionErrorVariance.toFixed(1)} (sd ${Math.sqrt(kicker.projectionErrorVariance).toFixed(1)} season points)`,
+  );
 
   console.log("\nTEAM DEFENCE LEAGUE MEANS, per game");
   for (const [component, value] of Object.entries(defence.leaguePerGame)) {
@@ -167,6 +170,9 @@ async function main(): Promise<void> {
   console.log(`  points allowed a game             ${mean(points).toFixed(4)} over ${points.length} games`);
   console.log(`  yards allowed a game              ${mean(yards).toFixed(4)}`);
   console.log(`  recency decay (searched)          ${defence.recencyDecay}`);
+  console.log(
+    `  projection error variance         ${defence.projectionErrorVariance.toFixed(1)} (sd ${Math.sqrt(defence.projectionErrorVariance).toFixed(1)} season points)`,
+  );
 
   console.log("\nPER-GAME VARIANCE (points squared)");
   for (const position of ["K", "DEF"] as const) {

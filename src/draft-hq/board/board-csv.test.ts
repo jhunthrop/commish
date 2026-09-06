@@ -18,6 +18,8 @@ function row(overrides: Partial<BoardRow>): BoardRow {
     team: "BUF",
     headshotUrl: null,
     rank: 1,
+    overallRank: 1,
+    marketOrderRank: null,
     projectedPoints: 20.5,
     floorPoints: 12.1,
     medianPoints: 19,
@@ -56,5 +58,42 @@ describe("boardCsvLines", () => {
   it("emits the header exactly once", () => {
     const lines = boardCsvLines([row({})], SHAPE);
     expect(lines.filter((line) => line.startsWith("Rank,")).length).toBe(1);
+  });
+
+  /**
+   * A MARKET-ORDER ROW CARRIES ITS ABSENCE INTO THE FILE (the 2026-09-05 kicker and team defence
+   * round). A downloaded CSV is read away from every explanation the board surface carries, so a
+   * fabricated `0.0` in it is the version that survives and gets believed.
+   */
+  it("writes empty cells, never zeros, for a row the engine published no projection for", () => {
+    const marketOrder = row({
+      playerId: "k1",
+      name: "A Kicker",
+      position: "K",
+      rank: null,
+      overallRank: null,
+      projectedPoints: null,
+      floorPoints: null,
+      medianPoints: null,
+      ceilingPoints: null,
+      valueOverReplacement: null,
+      valueRank: null,
+      positionRankInValue: null,
+      tier: null,
+      playersLeftInTier: null,
+      dropToNextTier: null,
+      marketOrderRank: 1,
+      marketAdp: 130.1,
+    });
+    const [, line] = boardCsvLines([marketOrder], SHAPE);
+    const cells = line!.split(",");
+    // Rank, Name, Position, Team, Bye, Projected, Floor, Ceiling, Market ADP, Vs market, Auction.
+    expect(cells[0]).toBe(""); // no overall rank: it is not on the value board
+    expect(cells[5]).toBe(""); // projected
+    expect(cells[6]).toBe(""); // floor
+    expect(cells[7]).toBe(""); // ceiling
+    expect(cells[8]).toBe("130.1"); // the one number it does carry
+    expect(cells[9]).toBe(""); // vs market: the ordering must not be compared with itself
+    expect(line).not.toMatch(/(^|,)0\.0(,|$)/);
   });
 });

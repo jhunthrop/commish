@@ -148,9 +148,16 @@ document was committed, and 2025 was not read by either.**
   `seasonPointsInterval` composed two sources of spread, both about OUTCOMES given a correct
   projection, and carried no term at all for how wrong the projection itself can be. Both fits now
   measure that residual variance directly, leave-one-season-out, squared about zero so an unfixed
-  bias widens the interval rather than being subtracted out of the model's own error estimate. It is
-  the dominant term: sd 37.3 points for a kicker against 15 from the outcome noise. Coverage moved
-  to 61.8% for kickers and 50.0% for defenses on 2024.
+  bias widens the interval rather than being subtracted out of the model's own error estimate. On
+  the 2013-2023 development fit it measured **1403.6 for a kicker and 1173.5 for a defense** (sd
+  37.5 and 34.3 points), which is the dominant term against roughly 15 points of outcome noise.
+  Coverage moved to 61.8% for kickers and 50.0% for defenses on 2024.
+
+  The SHIPPED values differ, because the shipped priors are fit on the full 2013 through 2024
+  window: **1387.9 for a kicker and 1180.6 for a defense** (the numbers in the Features section
+  above, and in `kdef-fitted.ts`). Both pairs are stated here because a reader comparing the
+  development check against the committed file would otherwise find two numbers for one name and no
+  explanation of which window produced which.
 
 Iteration stopped there. Kickers sit 1.8 percentage points past the 60% bar on a sample of 34, which
 is one player either way, and narrowing further would be tuning a band to a threshold rather than to

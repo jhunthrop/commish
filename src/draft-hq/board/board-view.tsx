@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import type { Player } from "@/domain/player";
+import type { Player, Position } from "@/domain/player";
 import { auctionValues, type AuctionShape } from "@/projections/auction/value";
 import { quartilesFromSeasonBand } from "@/projections/preseason/band-quartiles";
 import type { BoardReason } from "@/projections/preseason/board";
@@ -9,6 +9,7 @@ import { BottomSheet, Input, NOT_STARTED_DASH, PlayerFace, PositionBadge, Reason
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { Law } from "@/projections/laws/types";
 import { groupReasons } from "@/league-room/outlook/groups";
+import { marketOrderNoteFor } from "@/draft-room/lib/market-order-note";
 import { strongestEvidenceSentence, tierBandSentence, tierLetter, vsMarketLabel } from "./copy";
 import type { BoardRow } from "./service";
 
@@ -42,18 +43,27 @@ export function boardCsvLines(orderedRows: readonly BoardRow[], auctionShape: Au
   return [CSV_HEADER.map(csvField).join(","), ...orderedRows.map((row) => rowToCsv(row, values.get(row.playerId) ?? null))];
 }
 
+/** One number for the file, or an EMPTY CELL when the engine has none (the 2026-09-05 kicker and
+ *  team defence round). Never `0.0`: a downloaded file is read away from every explanation this
+ *  surface carries, so a fabricated zero in it is the version that survives. */
+function csvNumber(value: number | null, digits = 1): string {
+  return value === null ? "" : value.toFixed(digits);
+}
+
 function rowToCsv(row: BoardRow, dollarValue: number | null): string {
-  const edge = row.marketAdp === null ? "" : (row.marketAdp - row.overallRank).toFixed(1);
+  // A market-order row is ordered BY the market, so an edge against the market would be the
+  // ordering compared with itself. Blank, like every other cell the engine has no opinion behind.
+  const edge = row.marketAdp === null || row.overallRank === null ? "" : (row.marketAdp - row.overallRank).toFixed(1);
   return [
-    String(row.overallRank),
+    row.overallRank === null ? "" : String(row.overallRank),
     row.name,
     row.position,
     row.team,
     row.byeWeek === null ? "" : String(row.byeWeek),
-    row.projectedPoints.toFixed(1),
-    row.floorPoints.toFixed(1),
-    row.ceilingPoints.toFixed(1),
-    row.marketAdp === null ? "" : row.marketAdp.toFixed(1),
+    csvNumber(row.projectedPoints),
+    csvNumber(row.floorPoints),
+    csvNumber(row.ceilingPoints),
+    csvNumber(row.marketAdp),
     edge,
     dollarValue === null ? "" : `$${dollarValue}`,
   ]
@@ -170,6 +180,10 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
   // exactly one position is selected and the list is in its natural (non-dollar) rank order.
   const showTiers = position !== "ALL" && !dollarView;
 
+  // Only while a single position is selected: the note is about THAT position, and printing it over
+  // the mixed "Overall" list would attach a claim to rows it is not about.
+  const marketOrderNote = position === "ALL" ? null : marketOrderNoteFor(position as Position);
+
   let lastTier: number | null = null;
 
   return (
@@ -198,6 +212,16 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
           Export CSV
         </button>
       </div>
+
+      {/* A position the engine publishes no projection for says so, once, above its own table. The
+          rows below it are real players in the market's own order with honestly blank projection
+          cells, and without this sentence that reads as a bug rather than as a measurement that
+          came back negative. `null` on every tab whose position carries a projection. */}
+      {marketOrderNote === null ? null : (
+        <p data-testid="board-market-order-note" className="rounded-sm bg-surface-inset px-3 py-2 text-xs text-text-muted">
+          {marketOrderNote}
+        </p>
+      )}
 
       <div className="w-full overflow-x-auto">
         <table className="w-full max-w-full border-collapse text-sm">
@@ -257,14 +281,19 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                   </tr>
                 ) : null;
               if (showTiers) lastTier = row.tier;
-              const edge = row.marketAdp === null ? null : row.marketAdp - row.overallRank;
+              // A MARKET-ORDER ROW IS ORDERED BY THE MARKET, so an edge against the market would be
+              // the ordering compared with itself. `overallRank` is null on exactly those rows, so
+              // this reads null and the cell renders its own honest dash.
+              const edge = row.marketAdp === null || row.overallRank === null ? null : row.marketAdp - row.overallRank;
               const vsMarket = vsMarketLabel(edge);
               const dollarValue = dollarValues.get(row.playerId) ?? null;
               // Fix 1 (board persona review): on a position tab, positional rank leads and the
               // overall rank becomes the sub-fact — never a bare overall number on its own. On
               // "Overall" there is no single position context to lead with, so the overall rank
-              // stays the lead, unchanged.
-              const leadingRank = position === "ALL" ? row.overallRank : (row.positionRankInValue ?? row.overallRank);
+              // stays the lead, unchanged. A market-order row leads with its place in the MARKET's
+              // order, which is the only ordering it has.
+              const leadingRank =
+                row.marketOrderRank ?? (position === "ALL" ? row.overallRank : (row.positionRankInValue ?? row.overallRank));
               return (
                 <Fragment key={row.playerId}>
                   {tierRow}
@@ -272,7 +301,9 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                     <td className="px-2 py-2 tabular-nums text-text-faint">
                       <div className="flex flex-col">
                         <span className="font-medium text-text-primary">{leadingRank}</span>
-                        {position === "ALL" ? null : <span className="text-xs text-text-faint">{`#${row.overallRank} overall`}</span>}
+                        {position === "ALL" || row.overallRank === null ? null : (
+                          <span className="text-xs text-text-faint">{`#${row.overallRank} overall`}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-2 py-2">
@@ -287,18 +318,42 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                         <PositionBadge position={row.position} rank={row.positionRankInValue ?? undefined} size="sm" className="ml-1" />
                       </div>
                     </td>
-                    <td className="px-2 py-2 text-right tabular-nums font-medium text-text-primary">{row.projectedPoints.toFixed(1)}</td>
+                    <td className="px-2 py-2 text-right tabular-nums font-medium text-text-primary">
+                      {row.projectedPoints === null ? (
+                        <>
+                          <span aria-hidden="true" className="font-normal text-text-faint">
+                            {NOT_STARTED_DASH}
+                          </span>
+                          <span className="sr-only">No projection for this position</span>
+                        </>
+                      ) : (
+                        row.projectedPoints.toFixed(1)
+                      )}
+                    </td>
                     <td className="px-2 py-2 text-right tabular-nums text-text-muted">
                       {/* The everyday band leads (p25-p75, "most seasons"), the tail band rides
                           behind it in the accessible name and the faint sub-line — founder,
-                          2026-09-04: the honest p10-p90 stays measured, the TELLING gets kinder. */}
+                          2026-09-04: the honest p10-p90 stays measured, the TELLING gets kinder.
+                          A row with no projection has no band either, and says so. */}
                       {(() => {
+                        if (row.medianPoints === null || row.floorPoints === null || row.ceilingPoints === null) {
+                          return (
+                            <>
+                              <span aria-hidden="true" className="text-text-faint">
+                                {NOT_STARTED_DASH}
+                              </span>
+                              <span className="sr-only">No range for this position</span>
+                            </>
+                          );
+                        }
                         const { p25, p75 } = quartilesFromSeasonBand(row.medianPoints, row.floorPoints, row.ceilingPoints);
+                        const floor = row.floorPoints;
+                        const ceiling = row.ceilingPoints;
                         return (
-                          <span aria-label={`Most seasons ${p25.toFixed(0)} to ${p75.toFixed(0)} points; the full range with injury tails runs ${row.floorPoints.toFixed(0)} to ${row.ceilingPoints.toFixed(0)}.`}>
+                          <span aria-label={`Most seasons ${p25.toFixed(0)} to ${p75.toFixed(0)} points; the full range with injury tails runs ${floor.toFixed(0)} to ${ceiling.toFixed(0)}.`}>
                             <span className="text-text-primary">{p25.toFixed(0)}–{p75.toFixed(0)}</span>
                             <span aria-hidden="true" className="block text-xs text-text-faint">
-                              tails {row.floorPoints.toFixed(0)}–{row.ceilingPoints.toFixed(0)}
+                              tails {floor.toFixed(0)}–{ceiling.toFixed(0)}
                             </span>
                           </span>
                         );
