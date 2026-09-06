@@ -156,7 +156,7 @@ export interface BoardEntry extends ValuedPlayer {
    * their name; this is a documented change to what the numbers underneath them mean.
    */
   readonly outlook: ProjectionDistribution;
-  /** 0-based tier within his position, from `decide/tiers.ts` gap rule. See `overlapTiers`. */
+  /** 0-based tier within his position, from `decide/tiers.ts`' games-worth rule. See `overlapTiers`. */
   readonly tier: number;
   readonly playersLeftInTier: number;
   readonly dropToNextTier: number;
@@ -201,8 +201,8 @@ export function scaleStatLine(line: StatLine, games: number): StatLine {
  * That is an honest negative and it is reported rather than tuned away. The rule becomes usable the
  * day layer 3 emits a per-game distribution, because the interval will then be about how good he is
  * rather than only about how often he plays, and the comparison will have some information in it.
- * Until then the board ships `decide/tiers.ts`' gap rule, which compares a gap to the position's own
- * typical gap and is a stated comparison against a real population.
+ * Until then the board ships `decide/tiers.ts`' games-worth rule: a new tier where the next man gives
+ * up a full game's worth of production, and no tier wider than two points a game.
  */
 export function overlapTiers(values: readonly { readonly value: number; readonly outlook: ProjectionDistribution }[]): readonly number[] {
   if (values.length === 0) return [];
@@ -288,15 +288,16 @@ export function preseasonBoard(
   // order because the subtraction is a constant, so a tier is the same object under either default.
   // Computed on value over replacement, which is the quantity `dropToNextTier` is reported in.
   //
-  // The GAP rule, consumed from `decide/tiers.ts`. `overlapTiers` above implements the rule the spec
-  // actually wrote down and returns one tier per position on both held-out seasons; see its docblock
-  // for why, and the research document for the counts.
+  // The games-worth rule, consumed from `decide/tiers.ts` on PROJECTED POINTS (it is a share of the
+  // man above, so it needs the scale). `overlapTiers` above implements the rule the spec actually
+  // wrote down and returns one tier per position on both held-out seasons; see its docblock for
+  // why, and the research document for the counts.
   const standings = new Map<string, { tier: number; playersLeftInTier: number; dropToNextTier: number }>();
   const positions = new Set(valued.map((player) => player.position));
   for (const position of positions) {
     const pool = valued.filter((player) => player.position === position);
     const values = pool.map((player) => player.valueOverReplacement);
-    const tiers = tiersOf(values);
+    const tiers = tiersOf(pool.map((player) => player.projectedPoints));
     const withStandings = tierStandings(tiers, values);
     pool.forEach((player, index) => {
       standings.set(player.playerId, { tier: tiers[index]!, ...withStandings[index]! });

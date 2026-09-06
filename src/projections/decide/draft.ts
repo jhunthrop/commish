@@ -347,7 +347,7 @@ function reasonsFor(
   const pool = positionPool(board, candidate.position);
   const index = pool.findIndex((entry) => entry.playerId === candidate.playerId);
   const standing = tierStanding(
-    pool.map((entry) => entry.valueOverReplacement),
+    pool.map((entry) => entry.projectedPoints),
     index,
   );
   if (standing.dropToNextTier > 0 && standing.playersLeftInTier <= TIER_IS_THIN_AT) {
