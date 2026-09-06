@@ -10,6 +10,7 @@ import {
   findInFlightRun,
   getSimRun,
   hashSimConfig,
+  SIM_RULES_VERSION,
   listSimRunsForUser,
   markSimRunFailed,
   markSimRunRunning,
@@ -47,6 +48,16 @@ describe("sim_runs store", () => {
     const b = hashSimConfig({ ...CONFIG });
     expect(a).toBe(b);
     expect(hashSimConfig({ ...CONFIG, seed: 2 })).not.toBe(a);
+  });
+
+  it("invalidates its own cache when the simulation rules change, and only then", () => {
+    // The cache key is `(configHash, boardGeneration)`, and a change to what a run MEANS moves
+    // neither on its own. Folding the rules version in is what retires every stale row the day
+    // the rules change, rather than leaving yesterday's answer served under today's rules.
+    const current = hashSimConfig(CONFIG);
+    expect(hashSimConfig(CONFIG, SIM_RULES_VERSION)).toBe(current);
+    expect(hashSimConfig(CONFIG, SIM_RULES_VERSION + 1)).not.toBe(current);
+    expect(hashSimConfig({ ...CONFIG })).toBe(current);
   });
 
   it("round-trips a created run through pending, running, and succeeded", async () => {

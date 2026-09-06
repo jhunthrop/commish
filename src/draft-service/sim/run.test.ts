@@ -3,6 +3,7 @@ import type { DraftPoolEntry } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { totalRosterSlots } from "@/draft-engine";
+import { MOCK_CONFIG } from "@/mock-draft/config";
 import { runOneDraft } from "./run";
 
 const TEAM_IDS = Array.from({ length: 12 }, (_, i) => `seat_${i + 1}`);
@@ -47,9 +48,9 @@ describe("runOneDraft", () => {
   it("a seat with a board of its own picks from THAT board while the rest of the room picks from the room's", () => {
     // The target seat reads our board; every other seat reads the room's market order. Here the
     // two are exact opposites, so "which board did this seat use" is answerable from the pick
-    // alone: a bot samples within `MOCK_CONFIG.strategy.reachDepth` (8) of whatever board it
-    // reads, and the two boards' top eights are disjoint by construction.
-    const REACH_DEPTH = 8;
+    // alone: a bot samples within `MOCK_CONFIG.strategy.reachDepth` of whatever board it reads,
+    // and the two boards' windows of that depth are disjoint by construction.
+    const REACH_DEPTH = MOCK_CONFIG.strategy.reachDepth;
     const own = [...BOARD].reverse();
     const result = runOneDraft({
       teamIds: TEAM_IDS,

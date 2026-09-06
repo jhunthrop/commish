@@ -3,6 +3,7 @@ import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { valueOrderFor } from "@/draft-service/sim/value-order";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { boardRows } from "./service";
@@ -88,6 +89,34 @@ describe("boardRows", () => {
     const later = rows.find((row) => row.name === "Later Market Back");
     expect(earlier?.positionRankInValue).toBe(1);
     expect(later?.positionRankInValue).toBe(2);
+  });
+
+  it("hands the Simulator the identical order it serves, tie by the market included", async () => {
+    // The Board and the Simulator sit side by side on one screen, so they share ONE comparator
+    // (`compareBoardOrder`). Two backs identical to the hundredth in points, and therefore in
+    // value, with the earlier ADP belonging to the LATER player id: only the market can separate
+    // them, and both surfaces have to separate them the same way.
+    const SHAPE = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
+    const tied = [
+      { id: "s1", nflId: "00-0000021", name: "Later Market", points: 210.55, rank: 1, adp: 6.4 },
+      { id: "s2", nflId: "00-0000022", name: "Earlier Market", points: 210.55, rank: 2, adp: 3.1 },
+    ] as const;
+    for (const row of tied) {
+      await seedPlayer({ ...row, position: "RB", team: "ATL" });
+    }
+    await seedPlayer({ id: "s3", nflId: "00-0000023", name: "Best Back", position: "RB", team: "SF", points: 320, rank: 3, adp: 1.1 });
+
+    const rows = await boardRows(db, { shape: SHAPE, asOf: new Date("2026-09-04T00:00:00Z") });
+    const boardOrder = rows.map((row) => row.playerId);
+    expect(boardOrder).toEqual(["s3", "s2", "s1"]);
+
+    // The sim reads the same players out of `evidencePoolFor`'s own shape: points plus a market
+    // RANK rather than an ADP, which agrees with the ADP on order and is all a tiebreak reads.
+    const simOrder = valueOrderFor(
+      rows.map((row) => ({ playerId: row.playerId, position: row.position, projectedPoints: row.projectedPoints, marketRank: row.marketAdp })),
+      SHAPE,
+    ).map((entry) => entry.playerId);
+    expect(simOrder).toEqual(boardOrder);
   });
 
   it("drops a stored row whose player the crosswalk cannot resolve back to the product's own directory", async () => {

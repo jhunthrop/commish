@@ -16,10 +16,29 @@ import type { SimConfig, StoredSimSummary } from "./types";
  *  catch can never drift from the migration that actually creates it. */
 export const SIM_RUNS_INFLIGHT_INDEX = "sim_runs_inflight_idx";
 
-/** A stable hash of a `SimConfig` — key order never matters, since every field is spelled out
- *  explicitly rather than serialized from whatever order the caller built the object in. */
-export function hashSimConfig(config: SimConfig): string {
+/**
+ * WHAT A RUN MEANS, VERSIONED — bump this whenever `board-order.ts` or `value-order.ts` changes
+ * what a simulated draft actually is. It is folded into `hashSimConfig`, so a bump changes every
+ * config's hash and every cached `sim_runs` row computed under the old rules stops being found.
+ * The cache is keyed on `(configHash, boardGeneration)`, and a rules change moves NEITHER on its
+ * own: without this, a user who ran a sim this morning would keep being served this morning's
+ * answer under rules we have since corrected, until the board itself happened to refresh.
+ *
+ * 1: the original blend of our board and market ADP.
+ * 2: the room drafts market ADP, the target seat drafts our board by value over replacement
+ *    (founder ruling, 2026-09-05).
+ */
+export const SIM_RULES_VERSION = 2;
+
+/** A stable hash of a `SimConfig` and the rules it will be run under — key order never matters,
+ *  since every field is spelled out explicitly rather than serialized from whatever order the
+ *  caller built the object in.
+ *
+ *  `rulesVersion` is a parameter only so a test can prove a bump genuinely changes the hash.
+ *  Every production caller takes the default, which is the one version this build simulates. */
+export function hashSimConfig(config: SimConfig, rulesVersion: number = SIM_RULES_VERSION): string {
   const canonical = {
+    rulesVersion,
     teamCount: config.teamCount,
     rosterSlots: config.rosterSlots.map((slot) => ({ slot: slot.slot, count: slot.count, eligiblePositions: [...slot.eligiblePositions] })),
     slot: config.slot,

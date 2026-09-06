@@ -12,31 +12,41 @@
  * Pure, and shape-parameterized rather than shape-defaulted: a rank is only true under the league
  * it was measured in, so the caller hands in the shape it is simulating.
  */
+import { compareBoardOrder } from "@/projections/decide/board-order-compare";
 import { valueBoardIndexed, type LeagueShape } from "@/projections/decide/replacement";
 import type { SimPlayerEvidence } from "./types";
 
 /**
- * `pool`, best player first by value over replacement under `shape`.
+ * `pool`, in the Board's own served order under `shape` — `compareBoardOrder`, the exact
+ * comparator `boardRows` sorts by, so the Simulator and the Board cannot disagree about a player.
  *
  * Players at a position the shape never starts carry no value at all (`valueBoard` leaves them
- * out rather than valuing them at zero) and sink below every valued player, ordered by their own
- * projected points. They stay IN the returned order because the sim's draft pool must still hold
- * every player the room can legally roster, exactly as the Board still lists them at the bottom.
+ * out rather than valuing them at zero) and sink below every valued player. They stay IN the
+ * returned order because the sim's draft pool must still hold every player the room can legally
+ * roster, exactly as the Board still lists them at the bottom.
  */
 export function valueOrderFor(pool: readonly SimPlayerEvidence[], shape: LeagueShape): readonly SimPlayerEvidence[] {
   const { byPlayerId } = valueBoardIndexed(
     pool.map(({ playerId, position, projectedPoints }) => ({ playerId, position, projectedPoints })),
     shape,
   );
-  return [...pool].sort((a, b) => {
-    const aValued = byPlayerId.get(a.playerId);
-    const bValued = byPlayerId.get(b.playerId);
-    if (aValued === undefined || bValued === undefined) {
-      if (aValued !== undefined) return -1;
-      if (bValued !== undefined) return 1;
-      return b.projectedPoints - a.projectedPoints || a.playerId.localeCompare(b.playerId);
-    }
-    // The identical comparator `valueBoard` sorts by, so this order IS the Board's order.
-    return bValued.valueOverReplacement - aValued.valueOverReplacement || a.playerId.localeCompare(b.playerId);
-  });
+  // The board's own rank by projected points, which the sim's pool does not carry (a stored rank
+  // by points is what this whole module exists to stop being read as an order) but the shared
+  // comparator still needs as its last resort. Derived from the points themselves, so it IS that
+  // rank rather than a second opinion about it.
+  const byPoints = [...pool].sort((a, b) => b.projectedPoints - a.projectedPoints || a.playerId.localeCompare(b.playerId));
+  const pointsRank = new Map(byPoints.map((entry, index) => [entry.playerId, index] as const));
+
+  return pool
+    .map((entry) => ({
+      entry,
+      playerId: entry.playerId,
+      valueOverReplacement: byPlayerId.get(entry.playerId)?.valueOverReplacement ?? null,
+      // A market RANK where the Board reads an ADP. Only the order of two players is ever read,
+      // and the two agree on that.
+      marketAdp: entry.marketRank,
+      rank: pointsRank.get(entry.playerId)!,
+    }))
+    .sort(compareBoardOrder)
+    .map(({ entry }) => entry);
 }
