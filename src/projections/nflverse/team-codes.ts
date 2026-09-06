@@ -24,6 +24,15 @@ import { TANK01_CONFIG } from "@/stats/tank01/config";
  * for all of them, which is the check that would catch a relocation this file had not been told
  * about.
  *
+ * MEASURED, 2026-09-05: the `stats_team` and `stats_player` releases DO NOT USE the historical
+ * spellings at all. Both normalise a club to its current code in every row (the 2013 week 1 Rams
+ * row reads `LA`, while the `game_id` beside it still reads `2013_01_ARI_STL`), and the two
+ * ingested tables between them hold exactly the 32 current codes and nothing else. The historical
+ * branch below is therefore unused by THOSE two readers and is kept because `games.csv`
+ * (`schedule.ts`) and `weekly_rosters` (`roster-weeks.ts`) do carry `STL`, `SD` and `OAK`, and
+ * because a mapping that silently threw on a code the archive already holds would be worse than one
+ * branch nobody currently walks.
+ *
  * AND IT MINTS THE SYNTHETIC UNIVERSE ID. A team defense is not a person, so nflverse publishes no
  * row for one and `nfl_players` (whose id is a gsis id) has nowhere to hang one. Every projection
  * reader joins through `player_crosswalk` and `preseason_projections` has a foreign key into
