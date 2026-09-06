@@ -295,6 +295,14 @@ export interface PreseasonInputs {
 export const HISTORY_SEASONS = 3;
 
 /**
+ * The two positions this module's candidate builder deliberately does not emit (the 2026-09-05
+ * kicker and team defence round). They have their own builder, `preseason/kdef-candidates.ts`,
+ * because neither is composed from opportunity shares: a kicker has no targets and a team defence
+ * is not a person at all.
+ */
+const KDEF_POSITIONS: readonly Position[] = ["K", "DEF"];
+
+/**
  * THE FEEDS WHOSE FACTS PRECEDE THE GAMES THEY DESCRIBE, and which therefore cannot define the
  * preseason moment.
  *
@@ -1053,6 +1061,13 @@ export function preseasonCandidates(
     const position = inputs.positions.get(playerId);
     const roster = rosterByPlayer.get(playerId);
     if (position === undefined || roster === undefined) continue;
+    // THE TWO POSITIONS THIS BUILDER MUST NOT EMIT (the 2026-09-05 round). `projectedPosition` now
+    // admits `K`, so a kicker HAS a position here and would be composed out of target share, carry
+    // share and snap share — quantities a kicker does not have — and would then collide with the
+    // candidate `kdef-candidates.ts` builds for him properly. The guard is on the position rather
+    // than on his usage being empty, because "he has no usage rows yet" is a fact about a backfill
+    // and not a rule anyone should depend on.
+    if (KDEF_POSITIONS.includes(position)) continue;
     const reasons: BoardReason[] = [];
     const move = movesByPlayer.get(playerId);
     if (move !== undefined && move.from !== null && move.to !== null && move.from !== move.to) {
@@ -1076,6 +1091,11 @@ export function preseasonCandidates(
       if (opportunity.has(roster.playerId)) continue;
       const position = projectedPosition(roster.position) ?? inputs.positions.get(roster.playerId);
       if (position === undefined) continue;
+      // The same guard the veteran loop above carries, and it binds here first: `projectedPosition`
+      // now admits `K`, so a rookie kicker on the week-one roster would otherwise be handed to
+      // `rookieOpportunity` and given a draft-capital share curve fitted on skill players.
+      // `CURVE_POSITIONS` deliberately does not gain either position (spec §5 Phase C).
+      if (KDEF_POSITIONS.includes(position)) continue;
       const rookieInput = {
         playerId: roster.playerId,
         position,

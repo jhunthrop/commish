@@ -945,7 +945,14 @@ export async function shippedPreseasonCandidates(
   const { entries: market, droppedCount } = await marketBoard(db, inputs.season, inputs.moment);
   assertLiveMarketCoverage(inputs, candidates, market);
   if (droppedCount > 0) {
-    console.warn(`market/blend.ts: marketBoard for ${inputs.season} dropped ${droppedCount} ADP row(s) with an unresolved position.`);
+    // "No curve" and not "unresolved": since the 2026-09-05 round the market board legitimately
+    // carries kickers and team defences (43 of them for 2025), and `marketBoard` drops them because
+    // `isCurvePosition` has no fitted rank-to-points curve for either. That is deliberate, it is
+    // what keeps the skill blend untouched, and an operator reading "unresolved" every run would
+    // reasonably go looking for an identity bug that is not there.
+    console.warn(
+      `market/blend.ts: marketBoard for ${inputs.season} dropped ${droppedCount} ADP row(s) whose position has no fitted market curve.`,
+    );
   }
   return blendBoard(market, candidates, { season: inputs.season, constants, laws, propsAnchor });
 }

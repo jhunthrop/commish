@@ -100,10 +100,17 @@ describe("mapParticipation", () => {
     expect(participationFor(ALLEN, 1)?.asOf).toEqual(new Date("2024-09-10T00:00:00.000Z"));
   });
 
+  /**
+   * K JOINED THIS SET IN THE 2026-09-05 ROUND, as a direct consequence of `projectedPosition`
+   * learning the position: this mapper gates on `isProjectedCandidate`, so widening that gate widens
+   * this. A kicker's participation row is his special-teams work and nothing reads it, but it is a
+   * real row that a future backfill will now write, so the expectation says so rather than being
+   * loosened. DEF is absent and always will be: no nflverse row is a team defence.
+   */
   it("keeps only players the universe gives a projectable position", () => {
     const { participation } = mapParticipation({ snapCounts: SNAP_COUNTS, playerWeek: PLAYER_WEEK, universe });
     const positions = new Set(participation.map((row) => universe.byGsisId(row.playerId)!.position));
-    expect(positions).toEqual(new Set(["QB", "RB", "WR", "TE"]));
+    expect(positions).toEqual(new Set(["QB", "RB", "WR", "TE", "K"]));
     expect(new Set(participation.map((row) => row.playerId))).toContain(KINCAID);
   });
 
