@@ -15,7 +15,12 @@ vi.mock("@/league-service/join", () => ({ returnFromSignIn: vi.fn() }));
 // A-3's own read: the page asks whether this visitor already holds a team before offering them a
 // seat. A pure SELECT, mocked here the same way every other read on this page is.
 vi.mock("@/lib/leagues/membership", () => ({ resolveLeagueMembership: vi.fn() }));
-vi.mock("@/components/app-shell/shell-data", () => ({ shellData: vi.fn() }));
+// `createSheetDefaults` is pure config with no IO, so the real one stays; only the DB-backed
+// `shellData` read is stubbed.
+vi.mock("@/components/app-shell/shell-data", async (importActual) => ({
+  ...(await importActual<typeof import("@/components/app-shell/shell-data")>()),
+  shellData: vi.fn(),
+}));
 // `AppShell` itself (its `TopBar`, live notices and live scores) is tested on its own — this
 // file is about the seat-hold page's own wiring, not `AppShell`'s internals, so it is stubbed to
 // its children the same way a unit test stubs any collaborator it does not own.

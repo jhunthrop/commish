@@ -8,7 +8,12 @@ import { NoticesProvider } from "@/components/app-shell/notices-provider";
 // same discipline `admin/queue/page.test.tsx` uses for `withAdmin`'s own Server Component page.
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
-vi.mock("@/components/app-shell/shell-data", () => ({ shellData: vi.fn() }));
+// `createSheetDefaults` is pure config with no IO, so the real one stays; only the DB-backed
+// `shellData` read is stubbed.
+vi.mock("@/components/app-shell/shell-data", async (importActual) => ({
+  ...(await importActual<typeof import("@/components/app-shell/shell-data")>()),
+  shellData: vi.fn(),
+}));
 
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { shellData } from "@/components/app-shell/shell-data";
