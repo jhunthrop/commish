@@ -91,6 +91,27 @@ export const SCHEDULE_METRICS = {
    * already refuses for the season it is projecting.
    */
   gameResult: "game_result",
+  /**
+   * POINTS THIS TEAM ALLOWED IN THIS GAME (the 2026-09-05 kicker and team defence round). Emitted
+   * only for a game the file carries BOTH scores for, exactly like `gameResult` above, so an
+   * unplayed game contributes no row rather than a zero indistinguishable from a shutout.
+   *
+   * THE ONE INPUT A TEAM DEFENCE'S PROJECTION CANNOT GET ANYWHERE ELSE. `nflverse_team_defense_weeks`
+   * deliberately does not hold it (a second copy is a second number that can disagree with the
+   * first), and until this metric existed the store held only the RESULT of a game, never the
+   * scoreline: `mapSchedule` has parsed `pointsFor`/`pointsAgainst` since the beginning and
+   * `scheduleObservations` wrote neither. `gameResult`'s own docblock above says as much and stored
+   * the result instead, on the correct grounds that a win is a fact about a game and the scores were
+   * a bigger claim than any reader then needed. The points-allowed tier tables are a reader that
+   * needs it.
+   *
+   * A TEAM'S OWN POINTS ARE DELIBERATELY NOT STORED BESIDE THIS. They are its opponent's points
+   * allowed, one join away, and a second copy of a number is the thing this schema keeps refusing.
+   *
+   * `afterTheGame`-stamped under `SCHEDULE_SOURCE.kickoff`, the same class `gameResult` carries and
+   * the same class every preseason read already refuses for the season it is projecting.
+   */
+  pointsAllowed: "points_allowed",
 } as const;
 
 /**
@@ -388,6 +409,12 @@ export function scheduleObservations(games: readonly TeamGame[]): readonly TeamW
     if (game.windSpeed !== null) rows.push({ ...afterTheGame, metric: SCHEDULE_METRICS.windSpeed, value: game.windSpeed });
     const result = gameResultOf(game);
     if (result !== null) rows.push({ ...afterTheGame, metric: SCHEDULE_METRICS.gameResult, value: result });
+    // Gated on `pointsAgainst` alone and not on the pair, unlike the result above, which genuinely
+    // needs both to compare them. A file carrying one score and not the other is not a shape the
+    // real release has ever published, and this is the honest condition for the fact being emitted.
+    if (game.pointsAgainst !== null) {
+      rows.push({ ...afterTheGame, metric: SCHEDULE_METRICS.pointsAllowed, value: game.pointsAgainst });
+    }
     return rows;
   });
 }
@@ -411,4 +438,16 @@ function gameResultOf(game: TeamGame): number | null {
  */
 export function gameResultObservations(games: readonly TeamGame[]): readonly TeamWeekObservation[] {
   return scheduleObservations(games).filter((row) => row.metric === SCHEDULE_METRICS.gameResult);
+}
+
+/**
+ * The POINTS-ALLOWED rows alone, for the one-off ingestion that backfills this metric into a store
+ * already holding every other schedule fact (`nflverse/ingest.ts`'s `ingestPointsAllowed`).
+ *
+ * Narrowed for the identical reason `gameResultObservations` above is narrowed: writing the full
+ * `scheduleObservations` output would also insert any row the upstream file has GAINED since the
+ * last real ingestion, quietly moving data no task asked to move.
+ */
+export function pointsAllowedObservations(games: readonly TeamGame[]): readonly TeamWeekObservation[] {
+  return scheduleObservations(games).filter((row) => row.metric === SCHEDULE_METRICS.pointsAllowed);
 }

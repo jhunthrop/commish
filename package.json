@@ -75,6 +75,7 @@
     "projections:win-totals:validate": "dotenv -e .env.local -- tsx scripts/validate-win-totals.ts",
     "projections:vegas:ingest": "dotenv -e .env.local -- tsx scripts/vegas-win-totals-ingest.ts",
     "projections:schedule:results": "dotenv -e .env.local -- tsx scripts/schedule-results-ingest.ts",
+    "projections:schedule:points-allowed": "dotenv -e .env.local -- tsx scripts/schedule-points-allowed-ingest.ts",
     "projections:odds:snapshot": "dotenv -e .env.local -- tsx scripts/odds-props-snapshot.ts",
     "projections:odds:backfill": "dotenv -e .env.local -- tsx scripts/odds-props-backfill.ts",
     "projections:odds:resolve": "dotenv -e .env.local -- tsx scripts/odds-props-resolve.ts",

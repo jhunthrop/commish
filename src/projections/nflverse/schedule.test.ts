@@ -3,6 +3,7 @@ import type { CsvRow } from "./csv";
 import {
   kickoffAsOf,
   mapSchedule,
+  pointsAllowedObservations,
   schedulePublishedAsOf,
   scheduleObservations,
   weekAsOfFromSchedule,
@@ -123,6 +124,37 @@ describe("scheduleObservations — the two stamps that make the point-in-time cl
     expect(row.source).toBe(SCHEDULE_SOURCE.kickoff);
     // And, unlike `pointSpread`, it is there even though this game carries no line.
     expect(lineless.some((r) => r.team === "BUF" && r.metric === SCHEDULE_METRICS.pointSpread)).toBe(false);
+  });
+
+  /**
+   * POINTS ALLOWED (the 2026-09-05 kicker and team defence round) — the one input a team defence's
+   * tier points cannot get anywhere else. The store held only each game's RESULT before this.
+   */
+  it("records each team's points allowed from the OTHER team's score", () => {
+    expect(find(SCHEDULE_METRICS.pointsAllowed).value).toBe(17);
+    expect(rows.find((row) => row.team === "CLE" && row.metric === SCHEDULE_METRICS.pointsAllowed)!.value).toBe(31);
+  });
+
+  it("stamps points allowed after the game, the class every preseason read refuses", () => {
+    expect(find(SCHEDULE_METRICS.pointsAllowed).asOf).toEqual(kickoffAsOf("2024-10-13", 24));
+    expect(find(SCHEDULE_METRICS.pointsAllowed).source).toBe(SCHEDULE_SOURCE.kickoff);
+  });
+
+  it("emits no points-allowed row for an unplayed game, rather than a zero nobody can tell from a shutout", () => {
+    const unplayed = scheduleObservations(mapSchedule([game({ home_score: "", away_score: "" })], [2024]));
+    expect(unplayed.map((row) => row.metric)).not.toContain(SCHEDULE_METRICS.pointsAllowed);
+    expect(unplayed.map((row) => row.metric)).not.toContain(SCHEDULE_METRICS.gameResult);
+  });
+
+  it("records a real shutout as a zero, which is a fact and not an absence", () => {
+    const shutout = scheduleObservations(mapSchedule([game({ home_score: "24", away_score: "0" })], [2024]));
+    expect(shutout.find((row) => row.team === "BUF" && row.metric === SCHEDULE_METRICS.pointsAllowed)!.value).toBe(0);
+  });
+
+  it("narrows the backfill write to exactly the metric being added", () => {
+    const only = pointsAllowedObservations(mapSchedule([game()], [2024]));
+    expect(new Set(only.map((row) => row.metric))).toEqual(new Set([SCHEDULE_METRICS.pointsAllowed]));
+    expect(only).toHaveLength(2);
   });
 });
 

@@ -34,6 +34,7 @@ import { mapInjuries } from "../news/retrieve";
 import { buildPlayerUniverse, mapNflPlayers, nflPlayerRows, type PlayerUniverse } from "./players";
 import {
   gameResultObservations,
+  pointsAllowedObservations,
   kickoffAsOf,
   mapSchedule,
   scheduleObservations,
@@ -395,6 +396,20 @@ export async function ingestSchedule(db: Db, seasons: readonly number[], client 
 export async function ingestGameResults(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
   const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
   return await recordTeamObservations(db, gameResultObservations(mapSchedule(rows, seasons)));
+}
+
+/**
+ * The POINTS-ALLOWED rows only, for a store that already holds every other schedule fact (the
+ * 2026-09-05 kicker and team defence round).
+ *
+ * Exactly the shape `ingestGameResults` above takes, and for exactly the reason its own docblock
+ * gives: `ingestSchedule` writes this metric too now, so a store built from scratch never needs
+ * this, and re-running the full schedule ingestion to pick up one added metric would write every
+ * row the upstream file has gained since the last run. See `pointsAllowedObservations`.
+ */
+export async function ingestPointsAllowed(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
+  const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  return await recordTeamObservations(db, pointsAllowedObservations(mapSchedule(rows, seasons)));
 }
 
 /**
