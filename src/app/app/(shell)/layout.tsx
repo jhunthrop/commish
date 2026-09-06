@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { AppShell } from "@/components/app-shell/app-shell";
-import { shellData } from "@/components/app-shell/shell-data";
+import { createSheetDefaults, shellData } from "@/components/app-shell/shell-data";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,12 @@ export default async function ShellLayout({ children }: { readonly children: Rea
   const { rail, liveState } = await shellData(db, user);
 
   return (
-    <AppShell user={{ displayName: user.displayName, avatar: user.avatarUrl, isAdmin: user.isAdmin }} rail={rail} liveState={liveState}>
+    <AppShell
+      user={{ displayName: user.displayName, avatar: user.avatarUrl, isAdmin: user.isAdmin }}
+      rail={rail}
+      liveState={liveState}
+      createDefaults={createSheetDefaults()}
+    >
       {children}
     </AppShell>
   );

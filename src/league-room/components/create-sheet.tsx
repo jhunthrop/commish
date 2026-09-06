@@ -191,8 +191,12 @@ export function CreateSheet({
           {created.followUpError === null ? null : (
             <p role="alert" className="text-sm text-negative">{created.followUpError}</p>
           )}
-          {/* The one verb: into the room where the deep settings live. */}
-          <ButtonLink href={`/app/leagues/${created.leagueId}`} variant="verb" className="w-fit">
+          {/* The one verb: into the room where the deep settings live. `onClick={onClose}`
+              matters wherever this sheet's own state OUTLIVES the navigation — the shell's
+              `CreateLeagueSheetHost` (`./create-league-sheet.tsx`) persists across client-side
+              routing, so without this the sheet would still be open over the new league room.
+              A no-op for `CrewDoor`'s own front-door render, which unmounts on the trip away. */}
+          <ButtonLink href={`/app/leagues/${created.leagueId}`} variant="verb" className="w-fit" onClick={onClose}>
             Open your league room
           </ButtonLink>
         </div>
@@ -241,7 +245,7 @@ export function CreateSheet({
           label="Draft night"
           type="datetime-local"
           value={draftNight}
-          hint={`Your time. Leave it blank and the draft is scheduled ${defaults.draftDaysFromCreation} days out — change it any time in your league room.`}
+          hint={`Your time. Leave it blank and the draft is scheduled ${defaults.draftDaysFromCreation} days out. Change it any time in your league room.`}
           onChange={(event) => setDraftNight(event.target.value)}
         />
 

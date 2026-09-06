@@ -31,6 +31,7 @@ function baseProps(): AppShellProps {
     user: { displayName: "Ada Lovelace", avatar: null, isAdmin: false },
     rail: RAIL,
     liveState: null,
+    createDefaults: { teamCount: 12, scoringPreset: "half_ppr", draftDaysFromCreation: 7 },
     children: <p>League content</p>,
   };
 }

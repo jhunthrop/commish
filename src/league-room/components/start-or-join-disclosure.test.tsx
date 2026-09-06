@@ -1,18 +1,18 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { StartOrJoinDisclosure } from "./start-or-join-disclosure";
+import type { CreateSheetDefaults } from "./create-sheet";
+import { CreateLeagueSheetHost } from "./create-league-sheet";
 
-// `CreateLeaguePanel` and `JoinLeagueEntry`, both embedded here, navigate via `next/navigation`'s
-// `useRouter` — stubbed the same way `create-league-panel.test.tsx` does.
+// `JoinLeagueEntry`, embedded here, navigates via `next/navigation`'s `useRouter` — stubbed the
+// same way `create-league-panel.test.tsx` does.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
 
-afterEach(() => {
-  window.location.hash = "";
-});
+const SHEET_DEFAULTS: CreateSheetDefaults = { teamCount: 12, scoringPreset: "half_ppr", draftDaysFromCreation: 7 };
 
 function detailsElement(): HTMLDetailsElement {
   const summary = screen.getByText("Start or join another league");
@@ -34,68 +34,31 @@ describe("StartOrJoinDisclosure", () => {
     });
   });
 
-  it("opens on load when the URL fragment targets the create-league anchor", () => {
-    window.location.hash = "#create-league";
-    render(<StartOrJoinDisclosure experienceTier="beginner" />);
-    expect(detailsElement().open).toBe(true);
-  });
-
-  it("stays closed on load for any other, or no, fragment", () => {
-    window.location.hash = "#something-else";
-    render(<StartOrJoinDisclosure experienceTier="beginner" />);
-    expect(detailsElement().open).toBe(false);
-  });
-
-  it("opens when the fragment arrives AFTER load: the Create a league button's own click path", () => {
-    // Production incident, 2026-09-03: the /app button is a fragment link, and clicking it on
-    // an already-loaded page only fires hashchange. A mount-only read left the disclosure shut
-    // and the click doing nothing.
-    window.location.hash = "";
-    const scrolled = vi.fn();
-    Element.prototype.scrollIntoView = scrolled;
-    render(<StartOrJoinDisclosure experienceTier="beginner" />);
-    expect(detailsElement().open).toBe(false);
-    window.location.hash = "#create-league";
-    act(() => {
-      window.dispatchEvent(new HashChangeEvent("hashchange"));
-    });
-    expect(detailsElement().open).toBe(true);
-    // The viewport walks to the create section once it is out from behind the disclosure.
-    return new Promise<void>((resolve) =>
-      requestAnimationFrame(() => {
-        expect(scrolled).toHaveBeenCalled();
-        resolve();
-      }),
-    );
-  });
-
-  it("still resolves the #create-league anchor to a real, present section, because three other surfaces link to it", () => {
-    render(<StartOrJoinDisclosure experienceTier="beginner" />);
-    // `.getElementById` mirrors exactly what a browser fragment navigation resolves against —
-    // present regardless of the disclosure's open/closed state, which is what makes the anchor
-    // itself never a broken link even before the hash-driven open-on-load effect runs.
-    expect(document.getElementById("create-league")).not.toBeNull();
-  });
-
-  it("contains all three real, working paths: join, browse and create", () => {
+  it("contains all three real, working paths: join, browse and a create trigger", () => {
     render(<StartOrJoinDisclosure experienceTier="beginner" />);
     expect(screen.getByLabelText("Invite link or code")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Browse open leagues" })).toHaveAttribute("href", "/browse");
-    expect(screen.getByLabelText("League name")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start a league" })).toBeInTheDocument();
   });
 
   /**
-   * Phase 3.5, Task 9's promotion, proven through the SAME nesting a returning manager actually
-   * reaches it through: this outer disclosure wraps `CreateLeaguePanel`, which wraps
-   * `CreateLeagueForm`. Neither control needs the outer disclosure's own `<details>` marked
-   * `open` to be present in the DOM (`render` mounts it regardless, same as every other section
-   * here), and it needs no INNER "Advanced settings" disclosure opened at all — the property this
-   * whole task exists to prove.
+   * THE HASH STORY MOVED (2026-09-05): this disclosure no longer reads `#create-league` at all
+   * — `CreateLeagueSheetHost` (`./create-league-sheet.tsx`) does, and opens the sheet directly.
+   * Mounted here as a sibling the way `AppShell` mounts it for real, this proves the create
+   * TRIGGER inside the (still closed) disclosure reaches that same host.
    */
-  it("carries who-can-join and who-it's-for straight through into the create section, unopened", () => {
-    render(<StartOrJoinDisclosure experienceTier="beginner" />);
-    expect(screen.getByLabelText("Who can join")).toBeInTheDocument();
-    expect(screen.getByLabelText("Who it is for")).toBeInTheDocument();
+  it("opens the create-league sheet from the trigger row, without ever opening itself", () => {
+    render(
+      <>
+        <CreateLeagueSheetHost defaults={SHEET_DEFAULTS} />
+        <StartOrJoinDisclosure experienceTier="beginner" />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Start a league" }));
+    expect(screen.getByRole("dialog", { name: "Start a league" })).toBeInTheDocument();
+    // The outer disclosure is unrelated state — the sheet is an overlay, never something that
+    // needs this `<details>` expanded underneath it.
+    expect(detailsElement().open).toBe(false);
   });
 
   it("orders browse and join ahead of create for a beginner, the same rule firstRunPlan uses", () => {
@@ -110,23 +73,5 @@ describe("StartOrJoinDisclosure", () => {
     // inventing a second, possibly-contradicting opinion.
     render(<StartOrJoinDisclosure experienceTier="experienced" />);
     expect(sectionHeadingOrder()).toEqual(["Start a league", "Invited by a friend?", "No group to play with yet?"]);
-  });
-
-  it("keeps the #create-league anchor resolving to the create section in EITHER order", () => {
-    for (const experienceTier of ["beginner", "experienced"] as const) {
-      const { unmount } = render(<StartOrJoinDisclosure experienceTier={experienceTier} />);
-      const nameInput = screen.getByLabelText("League name");
-      expect(nameInput.closest("#create-league")).not.toBeNull();
-      unmount();
-    }
-  });
-
-  it("opens on the create-league fragment regardless of where create sits in the order", () => {
-    window.location.hash = "#create-league";
-    for (const experienceTier of ["beginner", "experienced"] as const) {
-      const { unmount } = render(<StartOrJoinDisclosure experienceTier={experienceTier} />);
-      expect(detailsElement().open).toBe(true);
-      unmount();
-    }
   });
 });

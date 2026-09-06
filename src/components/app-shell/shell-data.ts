@@ -1,7 +1,9 @@
 import type { Db } from "@/db/client";
 import type { Clock } from "@/domain/timing";
+import { LEAGUE_CONFIG } from "@/league";
 import { crossLeagueHome } from "@/league-service";
 import type { LiveState as HomeLiveState } from "@/league-room/contract";
+import type { CreateSheetDefaults } from "@/league-room/components/create-sheet";
 import { monogramsFor } from "@/components/ui/monogram";
 import {
   needsYouKindFor,
@@ -58,6 +60,23 @@ export type { HomeLiveState as LiveState };
 export interface ShellData {
   readonly rail: readonly RailLeague[];
   readonly liveState: HomeLiveState | null;
+}
+
+/**
+ * The create sheet's defaults ARE the service's own (`LEAGUE_CONFIG.defaults`) — every server
+ * page that mounts `AppShell` (and therefore its `CreateLeagueSheetHost`) reads them through
+ * this ONE function rather than re-typing the three-field literal, the front door's own
+ * `createDefaults` (`src/app/page.tsx`) included as the pattern this centralizes. Kept alongside
+ * `shellData` rather than in `@/league-room/components/create-league-sheet` itself: the client
+ * boundary bans a `@/league` value import from that directory, so the read has to live on the
+ * server side of the split, same reasoning as `shellData` itself.
+ */
+export function createSheetDefaults(): CreateSheetDefaults {
+  return {
+    teamCount: LEAGUE_CONFIG.defaults.teamCount,
+    scoringPreset: LEAGUE_CONFIG.defaults.scoringPreset,
+    draftDaysFromCreation: LEAGUE_CONFIG.defaults.draftDaysFromCreation,
+  };
 }
 
 /**

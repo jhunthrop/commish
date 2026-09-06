@@ -6,7 +6,7 @@ import { PageTitle } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { SeatMeter } from "@/components/ui/seat-meter";
 import { AppShell } from "@/components/app-shell/app-shell";
-import { shellData } from "@/components/app-shell/shell-data";
+import { createSheetDefaults, shellData } from "@/components/app-shell/shell-data";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
@@ -144,7 +144,7 @@ export default async function SeatHoldPage({ params }: PageProps) {
   if (membership.ok && membership.membership.teamId !== null) redirect(`/app/leagues/${leagueId}`);
 
   return (
-    <AppShell user={shellUser} rail={rail} liveState={liveState}>
+    <AppShell user={shellUser} rail={rail} liveState={liveState} createDefaults={createSheetDefaults()}>
       <main className="flex w-full flex-col gap-6 p-4">
         <SeatMasthead preview={preview} timing={null} />
         <SeatConfirmPanel
