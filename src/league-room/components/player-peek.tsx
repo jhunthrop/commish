@@ -123,7 +123,10 @@ function NewsList({ news }: { readonly news: PlayerSeasonBody["news"] }) {
  *  either way, never a `SeasonStrip` built from a story that does not exist. */
 function SeasonChartFallback({ body, switcher, played }: { readonly body: PlayerSeasonBody; readonly switcher: ReactNode; readonly played: boolean }) {
   return (
-    <div className="flex flex-col gap-3">
+    // `gap-6` matches the pre-Task-5 peek exactly: the label/switcher row and the chart below it
+    // used to be flat siblings under the peek's own `gap-6` column, and extracting them into this
+    // component must not shrink that spacing to whatever gap this wrapper happens to pick.
+    <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className={`${MICRO_LABEL} text-text-faint`}>{body.season} season</span>
         {switcher}
@@ -206,6 +209,11 @@ export function PlayerPeekHost() {
   // build the dossier composition from" state; the double-check idiom folds both into one.
   const dossier = body?.dossier ?? null;
   const switcher = body !== null && body.availableSeasons.length > 1 ? <SeasonSwitcher seasons={body.availableSeasons} season={season ?? body.season} onSelect={setSeason} /> : undefined;
+  // Whether the grid's `ReadCard`/story cells have anything to pair with `BooksModule`/`SeasonStrip`
+  // against — review fix: a missing partner spans its own row's full width instead of leaving the
+  // other column empty (see the grid's own inline docblock below for why this must be per-row).
+  const hasReadCard = body !== null && body.capsule !== null && body.capsule !== undefined;
+  const hasStoryCell = body !== null && (body.injuryDesignation !== null || body.news.length > 0);
 
   return (
     <BottomSheet label={target.name} onClose={() => setTarget(null)}>
@@ -257,23 +265,41 @@ export function PlayerPeekHost() {
                     field the dossier itself does not carry), the verdict composed once here. */}
                 <CallCard {...callCardPropsFor(body, dossier)} />
 
+                {/* THREE SEPARATE ROW GRIDS, NOT ONE SIX-ITEM GRID (review fix): a single flat
+                    `grid-cols-2` auto-places every child in DOM order, so a missing member (most
+                    commonly `ReadCard`, absent for the many players the capsule sweep has not
+                    written up yet — Task 4's own note) shifts every LATER pair across the seam,
+                    cascading `Books`/`SeasonStrip` into row two and stranding `Story`+news alone.
+                    One grid per row keeps a missing member's effect confined to its own row: the
+                    surviving member spans both columns rather than sitting alone on the left with
+                    the right column empty. */}
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <RangeRail projection={dossier.projection} availability={dossier.availability} />
                   <RoleModule position={body.player.position} usage={dossier.usage} trend={dossier.trend} />
+                </div>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <ReadCard capsule={body.capsule} />
-                  <BooksModule books={dossier.books} />
-                  {dossier.lastSeasonStory === null ? (
-                    <SeasonChartFallback body={body} switcher={switcher} played={played} />
-                  ) : (
-                    <SeasonStrip story={dossier.lastSeasonStory} weeks={weeksFor(body)} scoringLabel={dossier.basis.scoringLabel} switcher={switcher} />
-                  )}
-                  <div className="flex flex-col gap-4">
-                    {/* The season-ending story service wiring converges post-merge (ruling
-                        R-d1) — `story` stays `null` here for now, so this renders only the
-                        current designation pill, or nothing, honestly. */}
-                    <StoryModule story={null} designation={body.injuryDesignation} />
-                    <NewsList news={body.news} />
+                  <div className={hasReadCard ? undefined : "lg:col-span-2"}>
+                    <BooksModule books={dossier.books} />
                   </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <div className={hasStoryCell ? undefined : "lg:col-span-2"}>
+                    {dossier.lastSeasonStory === null ? (
+                      <SeasonChartFallback body={body} switcher={switcher} played={played} />
+                    ) : (
+                      <SeasonStrip story={dossier.lastSeasonStory} weeks={weeksFor(body)} scoringLabel={dossier.basis.scoringLabel} switcher={switcher} />
+                    )}
+                  </div>
+                  {!hasStoryCell ? null : (
+                    <div className="flex flex-col gap-4">
+                      {/* The season-ending story service wiring converges post-merge (ruling
+                          R-d1) — `story` stays `null` here for now, so this renders only the
+                          current designation pill, or nothing, honestly. */}
+                      <StoryModule story={null} designation={body.injuryDesignation} />
+                      <NewsList news={body.news} />
+                    </div>
+                  )}
                 </div>
 
                 {/* THE WHY, UNCHANGED IN SUBSTANCE (ruling R-d2) — the same capped, grouped

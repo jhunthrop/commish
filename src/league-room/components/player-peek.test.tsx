@@ -441,6 +441,34 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     expect(screen.getAllByText("Rashad Long: full practice")).toHaveLength(1);
   });
 
+  it("review fix: keeps Books paired in its own row's grid, and SeasonStrip paired with Story, when the capsule is absent", async () => {
+    // The capsule sweep has not reached most players yet (Task 4's own note) — this is the
+    // COMMON state, not an edge case, and it must never cascade the later rows out of their pairs.
+    const bodies = new Map([[2026, dossierBody({ capsule: null })]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByLabelText("The books")).toBeInTheDocument());
+
+    // No "The read" card at all — never a placeholder standing in for the missing capsule.
+    expect(screen.queryByLabelText("The read")).not.toBeInTheDocument();
+
+    // Books sits alone in ITS OWN row's grid (never shifted into the season/story row below it)
+    // and spans both columns rather than leaving the right column visibly empty.
+    const booksRow = screen.getByLabelText("The books").closest(".grid")!;
+    expect(booksRow.children).toHaveLength(1);
+    expect((booksRow.children[0] as HTMLElement).className).toContain("lg:col-span-2");
+
+    // SeasonStrip and the story cell are UNAFFECTED by Books' own missing partner — still two
+    // children, still paired, in their own row's grid.
+    const seasonRow = screen.getByLabelText("2025 season").closest(".grid")!;
+    expect(seasonRow.children).toHaveLength(2);
+    expect(screen.getByLabelText("Story")).toBeInTheDocument();
+  });
+
   it("falls back to today's layout — source strip, Outlook with its own verdict, no dossier modules — when the dossier is null", async () => {
     const bodies = new Map([[2026, { ...bodyFor(2026, [2026]), reasons: DOSSIER_REASONS, dossier: null }]]);
     render(
