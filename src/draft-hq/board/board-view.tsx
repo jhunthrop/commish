@@ -11,7 +11,7 @@ import type { Law } from "@/projections/laws/types";
 import { groupReasons } from "@/league-room/outlook/groups";
 import { marketOrderNoteFor } from "@/draft-room/lib/market-order-note";
 import { strongestEvidenceSentence, tierBandSentence, tierLetter, vsMarketLabel } from "./copy";
-import type { BoardRow } from "./service";
+import { BOARD_LAST_SEASON, type BoardRow } from "./service";
 
 const POSITION_TABS: readonly { readonly value: string; readonly label: string }[] = [
   { value: "ALL", label: "Overall" },
@@ -27,7 +27,27 @@ const POSITION_TABS: readonly { readonly value: string; readonly label: string }
  *  `rowToCsv` below writes, in the same order. "Strongest law" retired (board persona fix 3):
  *  the strongest-evidence sentence now lives in the why drawer's top line, not a column that was
  *  mostly blank and, when it did fire, a bare "+1.3 pts" figure nobody could place. */
-const CSV_HEADER = ["Rank", "Name", "Position", "Team", "Bye", "Projected pts", "Floor", "Ceiling", "Market ADP", "Vs market (picks)", "Auction value"];
+const CSV_HEADER = [
+  "Rank",
+  "Name",
+  "Position",
+  "Team",
+  "Bye",
+  "Projected pts",
+  "Floor",
+  "Ceiling",
+  "Market ADP",
+  "Vs market (picks)",
+  "Auction value",
+  // The four LAST SEASON columns (the 2026-09-06 kicker and team defense round). Their own
+  // columns and never folded into "Projected pts": a measured season and a projected one are
+  // different claims, and a file read away from this screen is exactly where that difference
+  // would be lost. Blank on every row that has no measured season.
+  "Last season",
+  "Last season pts",
+  "Last season games",
+  "Last season per game",
+];
 
 function csvField(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
@@ -66,6 +86,10 @@ function rowToCsv(row: BoardRow, dollarValue: number | null): string {
     csvNumber(row.marketAdp),
     edge,
     dollarValue === null ? "" : `$${dollarValue}`,
+    row.lastSeason === null ? "" : String(row.lastSeason.season),
+    csvNumber(row.lastSeason?.points ?? null),
+    row.lastSeason === null ? "" : String(row.lastSeason.games),
+    csvNumber(row.lastSeason?.pointsPerGame ?? null),
   ]
     .map(csvField)
     .join(",");
@@ -93,12 +117,38 @@ interface EvidenceDrawerState {
   readonly row: BoardRow;
 }
 
+/**
+ * WHAT THE DRAWER SAYS ABOUT A ROW THE ENGINE NEVER RANKED (the 2026-09-06 round).
+ *
+ * It used to say "No laws fired for this player. His number comes from the base model alone." on a
+ * row that has no number and no base model behind it — false twice over, and the exact sentence a
+ * manager would read as a broken screen. A market-order row instead gets the same sentence the tab
+ * above it carries (`marketOrderNoteFor`, one phrasing product-wide) followed by what he measurably
+ * did last season, if the archive holds it.
+ */
+function MarketOrderBody({ row }: { readonly row: BoardRow }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-text-muted">{marketOrderNoteFor(row.position)}</p>
+      <p className="text-sm text-text-primary">{lastSeasonSentence(row)}</p>
+    </div>
+  );
+}
+
+/** The measured season in one sentence, with the year and the basis named. Never a bare number. */
+function lastSeasonSentence(row: BoardRow): string {
+  const last = row.lastSeason;
+  if (last === null) return `We hold no ${row.position === "DEF" ? "team defense" : "kicker"} season for him to measure.`;
+  return `In ${last.season} he scored ${last.points.toFixed(1)} points over ${last.games} games, ${last.pointsPerGame.toFixed(1)} a game, under this league's scoring.`;
+}
+
 function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDrawerState; readonly laws: readonly Law[]; readonly onClose: () => void }) {
   // Fix 3 (board persona review, 2026-09-04): the retired "Strongest law" column's own sentence
   // opens the drawer instead, built from the SAME grouped-outlook machinery the Outlook already
   // renders (`groupReasons`/`lawGroupLabel`) — one voice product-wide, never a second phrasing.
   const groups = groupReasons(state.row.reasons, laws);
   const strongest = strongestEvidenceSentence(groups);
+  const isMarketOrder = state.row.marketOrderRank !== null;
 
   return (
     <BottomSheet label={`Why ${state.row.name} ranks here`} onClose={onClose}>
@@ -108,12 +158,17 @@ function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDraw
           <div className="flex flex-col">
             <span className="font-display text-xl font-semibold leading-display text-text-primary">{state.row.name}</span>
             <span className="text-sm text-text-muted">
-              {state.row.team} · bye {state.row.byeWeek ?? "?"} · rank {state.row.overallRank}
+              {/* A market-order row has no overall rank at all, so it names the only ordering it
+                  has rather than printing "rank" with nothing after it. */}
+              {state.row.team} · bye {state.row.byeWeek ?? "?"} ·{" "}
+              {state.row.marketOrderRank === null ? `rank ${state.row.overallRank}` : `${state.row.position}${state.row.marketOrderRank} by draft order`}
             </span>
           </div>
         </div>
         {strongest === null ? null : <p className="text-base font-medium text-text-primary">{strongest}</p>}
-        {state.row.reasons.length === 0 ? (
+        {isMarketOrder ? (
+          <MarketOrderBody row={state.row} />
+        ) : state.row.reasons.length === 0 ? (
           <p className="text-sm text-text-muted">No laws fired for this player. His number comes from the base model alone.</p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -126,6 +181,52 @@ function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDraw
         )}
       </div>
     </BottomSheet>
+  );
+}
+
+/** The dash a cell with nothing measured behind it prints, plus the reason, for a screen reader. */
+function NoLastSeason({ what }: { readonly what: string }) {
+  return (
+    <>
+      <span aria-hidden="true" className="font-normal text-text-faint">
+        {NOT_STARTED_DASH}
+      </span>
+      <span className="sr-only">{what}</span>
+    </>
+  );
+}
+
+/**
+ * "148.5 pts · 17 games" — a finished season's total with the games it was scored over, never one
+ * without the other. A total on its own invites a reader to compare a seventeen-game season with a
+ * nine-game one as though they were the same claim.
+ *
+ * The accessible name states the BASIS in words, because "148.5" beside a market ordering is
+ * exactly the number a manager would otherwise read as a projection.
+ */
+function LastSeasonTotalCell({ row }: { readonly row: BoardRow }) {
+  const last = row.lastSeason;
+  if (last === null) return <NoLastSeason what="No measured season on record for him" />;
+  return (
+    <span aria-label={`${last.points.toFixed(1)} points over ${last.games} games in ${last.season}, last season, under this league's scoring.`}>
+      <span aria-hidden="true">{last.points.toFixed(1)} pts</span>
+      <span aria-hidden="true" className="block text-xs font-normal text-text-faint">
+        {last.games} games
+      </span>
+    </span>
+  );
+}
+
+/** His rate over the games he actually played, on the same basis and named the same way. */
+function LastSeasonRateCell({ row }: { readonly row: BoardRow }) {
+  const last = row.lastSeason;
+  if (last === null) return <NoLastSeason what="No rate to state without a measured season" />;
+  return (
+    <span aria-label={`${last.pointsPerGame.toFixed(1)} points a game in ${last.season}, last season, under this league's scoring.`}>
+      <span aria-hidden="true" className="text-text-primary">
+        {last.pointsPerGame.toFixed(1)}
+      </span>
+    </span>
   );
 }
 
@@ -183,6 +284,11 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
   // Only while a single position is selected: the note is about THAT position, and printing it over
   // the mixed "Overall" list would attach a claim to rows it is not about.
   const marketOrderNote = position === "ALL" ? null : marketOrderNoteFor(position as Position);
+  // The same condition, named for what it does to the TABLE rather than to the note above it: on a
+  // market-order tab every row is a market-order row, so the two projection columns can carry last
+  // season instead. Never on "Overall", where projected and market-order rows sit in one list and a
+  // column that meant two things depending on the row would be unreadable.
+  const showLastSeason = marketOrderNote !== null;
 
   let lastTier: number | null = null;
 
@@ -234,11 +340,16 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
               <th scope="col" className="px-2 py-2">
                 Player
               </th>
+              {/* THE TWO COLUMNS THAT CHANGE MEANING PER TAB (the 2026-09-06 round). A position
+                  the engine projects gets the projection and its band. A position it does not gets
+                  the two things it CAN state honestly: what each player measurably scored last
+                  season under this league's rules, and his rate. Every other tab, and the mixed
+                  Overall list, is unchanged. */}
               <th scope="col" className="px-2 py-2 text-right">
-                Projected
+                {showLastSeason ? "Last season" : "Projected"}
               </th>
               <th scope="col" className="px-2 py-2 text-right">
-                Most seasons
+                {showLastSeason ? "Per game" : "Most seasons"}
               </th>
               <th scope="col" className="px-2 py-2 text-right">
                 Market ADP
@@ -319,7 +430,9 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                       </div>
                     </td>
                     <td className="px-2 py-2 text-right tabular-nums font-medium text-text-primary">
-                      {row.projectedPoints === null ? (
+                      {showLastSeason ? (
+                        <LastSeasonTotalCell row={row} />
+                      ) : row.projectedPoints === null ? (
                         <>
                           <span aria-hidden="true" className="font-normal text-text-faint">
                             {NOT_STARTED_DASH}
@@ -336,6 +449,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
                           2026-09-04: the honest p10-p90 stays measured, the TELLING gets kinder.
                           A row with no projection has no band either, and says so. */}
                       {(() => {
+                        if (showLastSeason) return <LastSeasonRateCell row={row} />;
                         if (row.medianPoints === null || row.floorPoints === null || row.ceilingPoints === null) {
                           return (
                             <>
@@ -393,11 +507,22 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
         </table>
       </div>
 
+      {/* The legend explains the columns actually on screen. On a market-order tab those two
+          columns are a measurement of a season that already happened, which is a different claim
+          from every sentence below it, so it gets its own. */}
+      {showLastSeason ? (
+        <p className="text-xs text-text-faint">
+          Last season is what he scored across the {BOARD_LAST_SEASON} regular season under the scoring selected above, with the games it was scored over
+          beside it, and per game is his rate across those same games. Both are records of games that were played, not forecasts of the season ahead. Why
+          opens the ordering these rows carry and the reason there is no projection beside them.
+        </p>
+      ) : (
       <p className="text-xs text-text-faint">
         Projected is his season point total under the scoring selected above, built from the evidence. Most seasons is where the middle half of his
         measured outcomes land; the faint tails line is the full range, injury seasons and smash seasons included. Both come from the same measured spread of games played and per-game scoring. Why opens the full evidence chain: every
         law that fired, its measured effect, and the seasons it was tested against. Nothing on this board is an opinion.
       </p>
+      )}
 
       {drawer === null ? null : <EvidenceDrawer state={drawer} laws={laws} onClose={() => setDrawer(null)} />}
     </div>

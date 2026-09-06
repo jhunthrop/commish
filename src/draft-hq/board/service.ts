@@ -1,7 +1,10 @@
 import { eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { players as playersTable, playerCrosswalk } from "@/db/schema";
+import { players as playersTable, playerCrosswalk, scoringSettings } from "@/db/schema";
 import type { Position } from "@/domain/player";
+import { PPR_SCORING } from "@/domain/scoring";
+import type { ScoringRules } from "@/scoring";
+import { kdefSeasonLines } from "@/projections/kdef/season-lines";
 import { compareBoardOrder } from "@/projections/decide/board-order-compare";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { valueBoardIndexed } from "@/projections/decide/replacement";
@@ -34,6 +37,14 @@ import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
  * `computeFantasyPoints` per format; that is real, undone engineering work, reported as deferred
  * rather than faked (see the report this task ships with).
  */
+/** A finished season, summed. See `BoardRow.lastSeason`. */
+export interface BoardLastSeason {
+  readonly season: number;
+  readonly points: number;
+  readonly games: number;
+  readonly pointsPerGame: number;
+}
+
 export interface BoardRow {
   readonly playerId: string;
   readonly nflPlayerId: string;
@@ -69,6 +80,17 @@ export interface BoardRow {
    * on which position a reader happened to be looking at.
    */
   readonly marketOrderRank: number | null;
+  /**
+   * WHAT HE ACTUALLY DID LAST SEASON, under the caller's own scoring — the one honest number a
+   * market-order row can carry (the 2026-09-06 kicker and team defense round).
+   *
+   * `null` on every projected row and on any market-order row the archive holds no week for. It is
+   * NOT a projection and no consumer may treat it as one: it is a record of games that were played,
+   * which is precisely the thing the preregistered gates left this product still able to say.
+   * `season` rides on the value so a surface can never print the figure without naming the year it
+   * belongs to.
+   */
+  readonly lastSeason: BoardLastSeason | null;
   /** Recomputed under the caller's `LeagueShape`. `null` for a position the shape never starts
    *  at all (`valueBoard` leaves it out rather than pricing it at zero) — an honest "no draft
    *  value in this format" rather than a fabricated number. */
@@ -117,6 +139,16 @@ export function isProjectedRow(row: BoardRow): row is ProjectedBoardRow {
 export interface BoardOptions {
   readonly shape: LeagueShape;
   readonly asOf?: Date;
+  /**
+   * Whose scoring rules `lastSeason` is measured under. Omitted means the same default every other
+   * league-free surface on this product falls back to (`PPR_SCORING`), which is what the generic
+   * board is: a real ruleset, named on screen, rather than a guess.
+   *
+   * Threaded as an id and read here rather than passed as a rules object, the way `rankedPlayers`
+   * (`@/draft-service/pool.ts`) already does it — a caller that had to fetch the rules first would
+   * be a second place that decides what a league without a `scoring_settings` row scores like.
+   */
+  readonly leagueId?: string;
 }
 
 /** The tier standing a `valueBoard` position pool implies — the same aggregate
@@ -140,7 +172,7 @@ function tierStandingsOf(valuesDescending: readonly number[]): readonly { readon
  *  for `options.shape`. A stored board row whose player the crosswalk cannot resolve back to a
  *  product `players` row is dropped — a defensive symmetry with `boardReasons`' own drop-and-warn
  *  posture, though in practice every crosswalked player resolves both directions by construction. */
-export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptions): Promise<readonly BoardRow[]> {
+export async function boardRows(db: Db, { shape, asOf = new Date(), leagueId }: BoardOptions): Promise<readonly BoardRow[]> {
   const stamp = { season: PRODUCT_SEASON, source: BOARD_SOURCE, asOf };
   const [projections, reasonsByNflId, byes] = await Promise.all([
     preseasonProjectionsAsOf(db, stamp),
@@ -149,7 +181,7 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
   ]);
   // Appended, never interleaved: a market-order position has no value rank, so it takes no part in
   // the value sort below and cannot perturb a single projected row. See `marketOrderRows`.
-  const marketOrder = await marketOrderRows(db, byes);
+  const marketOrder = await marketOrderRows(db, byes, leagueId);
   if (projections.length === 0) return marketOrder;
 
   const nflIds = projections.map((row) => row.playerId);
@@ -211,6 +243,9 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
         rank: row.rank,
         overallRank: 0, // assigned below, after the value sort — see the docblock on the field
         marketOrderRank: null, // a projected row leads with its value rank, never a market place
+        // A projected row's lead is what the engine EXPECTS, so a measured last season beside it
+        // would be a second number competing for the same cell. Null here, always.
+        lastSeason: null,
         projectedPoints: row.projectedPoints,
         floorPoints: row.floorPoints,
         medianPoints: row.medianPoints,
@@ -249,6 +284,29 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
     .concat(marketOrder);
 }
 
+/** The season `lastSeason` reports: the one before the season being drafted for. */
+export const BOARD_LAST_SEASON = PRODUCT_SEASON - 1;
+
+/**
+ * Last season's measured points for a set of market-order players, under one league's rules.
+ *
+ * The rules are read HERE from `scoring_settings`, falling back to `PPR_SCORING` for a league whose
+ * row has not been written and for the generic board that names no league at all — the same
+ * fallback `rankedPlayers` and `playerSeason` already make, so the three cannot disagree about what
+ * a ruleless league scores like.
+ */
+async function lastSeasonLines(db: Db, playerIds: readonly string[], leagueId: string | undefined): Promise<ReadonlyMap<string, BoardLastSeason>> {
+  const settingsRows = leagueId === undefined ? [] : await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, leagueId));
+  const rules: ScoringRules = settingsRows[0] ?? PPR_SCORING;
+  const lines = await kdefSeasonLines(db, { season: BOARD_LAST_SEASON, playerIds, rules });
+  return new Map(
+    [...lines].map(([playerId, line]) => [
+      playerId,
+      { season: line.season, points: line.points, games: line.games, pointsPerGame: line.pointsPerGame },
+    ]),
+  );
+}
+
 /**
  * THE ROWS FOR A POSITION THAT SHIPS IN MARKET ORDER (the 2026-09-05 kicker and team defence round).
  *
@@ -272,8 +330,15 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
  *
  * NOT PART OF THE VALUE SORT. These are concatenated after it, so they cannot perturb a single
  * projected row, which is the same guarantee gate G4 makes for the offline board.
+ *
+ * AND THEY CARRY LAST SEASON (the 2026-09-06 round). The engine has nothing to project for these
+ * positions and that stays true. It is not the same as having nothing to SAY about them: the
+ * archive holds thirteen seasons of weekly kicking and team-defense history, and `kdefSeasonLines`
+ * scores last season's out of it under this league's own rules. A drafter reading a tab of dashes
+ * learns nothing; a drafter reading what each of these kickers actually scored last year under his
+ * own scoring is reading a measurement, which is the only currency this product deals in.
  */
-async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>): Promise<readonly BoardRow[]> {
+async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>, leagueId: string | undefined): Promise<readonly BoardRow[]> {
   const positions = marketOrderPositions();
   if (positions.length === 0) return [];
 
@@ -290,6 +355,8 @@ async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>): Promi
     .from(playersTable)
     .where(inArray(playersTable.position, [...positions]));
 
+  const lastSeason = await lastSeasonLines(db, rows.map((row) => row.playerId), leagueId);
+
   const rankedByPosition = new Map<string, number>();
   return rows
     .flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]))
@@ -298,6 +365,7 @@ async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>): Promi
       const place = (rankedByPosition.get(row.position) ?? 0) + 1;
       rankedByPosition.set(row.position, place);
       return {
+        lastSeason: lastSeason.get(row.playerId) ?? null,
         playerId: row.playerId,
         // A market-order row is not joined through the crosswalk at all: its basis is the product's
         // own directory and the market's own order, neither of which needs a gsis id. The field is
