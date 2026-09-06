@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { players } from "@/db/schema";
 import {
+  CROSSWALK_METHOD,
   comparableName,
   crosswalkInputs,
   crosswalkRows,
@@ -9,9 +10,11 @@ import {
   nflPlayerIdsFor,
   recordCrosswalk,
   resolveCrosswalk,
+  seedTeamDefenseUniverse,
   type ProviderPlayer,
   type UniversePlayer,
 } from "./crosswalk";
+import { teamDefenseUniverseIds } from "./nflverse/team-codes";
 import { recordNflPlayers } from "./universe";
 import type { NflPlayerRow } from "./nflverse/players";
 
@@ -221,4 +224,98 @@ describe("the stored crosswalk", () => {
     await recordCrosswalk(db, crosswalkRows(resolution, RESOLVED_AT));
     return { matched: resolution.matched.length, unmatched: resolution.unmatched.length };
   }
+});
+
+/**
+ * TEAM DEFENCES (the 2026-09-05 K and DEF round). A defence is still not a person, and this is the
+ * table saying so DELIBERATELY rather than unconditionally: every club now has a synthetic universe
+ * row (`nflverse/team-codes.ts`) for the projection store's foreign key to point at, and these
+ * assert that the edge is drawn to the right one and refused where the row is absent.
+ */
+describe("team defences", () => {
+  const defenses = new Set(teamDefenseUniverseIds());
+
+  it("places a product defence on its synthetic universe row", () => {
+    const resolution = resolveCrosswalk(
+      [{ id: "DST-LAR", name: "Los Angeles Rams", position: "DEF" }],
+      [],
+      defenses,
+    );
+    expect(resolution.unmatched).toEqual([]);
+    expect(resolution.matched).toEqual([
+      {
+        playerId: "DST-LAR",
+        nflPlayerId: "team-def:LA",
+        method: CROSSWALK_METHOD.teamDefense,
+        nameAgrees: true,
+        providerName: "Los Angeles Rams",
+        universeName: "team-def:LA",
+      },
+    ]);
+  });
+
+  it("records a defence whose synthetic row has not been seeded, rather than claiming an edge", () => {
+    const resolution = resolveCrosswalk(
+      [{ id: "DST-LAR", name: "Los Angeles Rams", position: "DEF" }],
+      [],
+      new Set(),
+    );
+    expect(resolution.matched).toEqual([]);
+    expect(resolution.unmatched[0]?.reason).toBe("no_team_defense_row");
+  });
+
+  it("still records a defence id no team code answers to", () => {
+    const resolution = resolveCrosswalk([{ id: "DST-XXX", name: "Nowhere", position: "DEF" }], [], defenses);
+    expect(resolution.unmatched[0]?.reason).toBe("not_an_nfl_player");
+  });
+
+  it("counts a placed defence in the all-players rate and leaves the people rate alone", () => {
+    const resolution = resolveCrosswalk(
+      [
+        { id: "DST-LAR", name: "Los Angeles Rams", position: "DEF" },
+        { id: "9", name: "A Kicker", position: "K" },
+      ],
+      [{ id: "00-0000009", espnId: "9", name: "A Kicker" }],
+      defenses,
+    );
+    expect(resolution.matchRate).toBe(1);
+    expect(resolution.matchRateOfPeople).toBe(1);
+  });
+
+  it("places a kicker through the same espn id join every other person uses", () => {
+    const resolution = resolveCrosswalk(
+      [{ id: "3055899", name: "Justin Tucker", position: "K" }],
+      [{ id: "00-0029597", espnId: "3055899", name: "Justin Tucker" }],
+      defenses,
+    );
+    expect(resolution.matched[0]?.method).toBe(CROSSWALK_METHOD.espnId);
+  });
+});
+
+describe("seedTeamDefenseUniverse", () => {
+  beforeEach(async () => {
+    await truncateAll(db);
+  });
+
+  it("writes thirty two rows and is a no-op on a re-run", async () => {
+    expect(await seedTeamDefenseUniverse(db)).toBe(32);
+    expect(await seedTeamDefenseUniverse(db)).toBe(0);
+  });
+
+  it("makes every seeded row visible to the resolver's own inputs read", async () => {
+    await seedTeamDefenseUniverse(db);
+    const { teamDefenses } = await crosswalkInputs(db);
+    expect(teamDefenses.size).toBe(32);
+    expect(teamDefenses.has("team-def:LA")).toBe(true);
+    expect(teamDefenses.has("team-def:WAS")).toBe(true);
+  });
+
+  it("draws a real edge end to end, from a product defence to its universe row", async () => {
+    await seedTeamDefenseUniverse(db);
+    await db.insert(players).values({ id: "DST-LAR", name: "Los Angeles Rams", position: "DEF", nflTeam: "LAR" });
+    const { providers, universe, teamDefenses } = await crosswalkInputs(db);
+    const resolution = resolveCrosswalk(providers, universe, teamDefenses);
+    await recordCrosswalk(db, crosswalkRows(resolution, RESOLVED_AT));
+    expect(await nflPlayerIdFor(db, "DST-LAR")).toBe("team-def:LA");
+  });
 });
