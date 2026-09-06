@@ -13,12 +13,13 @@
  *    one (see `simulate.test.ts`'s own measured numbers) — the cost this engine actually carries
  *    is state transitions, not I/O, and a headless run pays for state transitions alone.
  *  - Every seat's pick, target slot included, is drawn from `chooseBotPick` (`@/mock-draft/bots`)
- *    against `board`, this run's own room-sharpness ordering (`board-order.ts`) — the identical
- *    sampler a practice mock draft's bots use, unmodified. The target seat is dealt an archetype
- *    from the SAME shuffled deck as every other seat (`assignArchetypes`): this sim does not
- *    invent a "neutral" persona for the slot being measured, because doing so would make "what
- *    wins from your slot" a claim about one hand-picked drafting style rather than about the
- *    genuine spread real people bring to a room.
+ *    — the identical sampler a practice mock draft's bots use, unmodified. The room reads
+ *    `board`, this run's own market ordering (`board-order.ts`); a seat named in `seatBoards`
+ *    reads that board instead. The target seat is dealt an archetype from the SAME shuffled deck
+ *    as every other seat (`assignArchetypes`): this sim does not invent a "neutral" persona for
+ *    the slot being measured, because doing so would make "what wins from your slot" a claim
+ *    about one hand-picked drafting style rather than about the genuine spread real people bring
+ *    to a room.
  *
  * PICK LEGALITY EQUIVALENCE IS BY CONSTRUCTION, not by a parallel proof: every accepted pick in
  * this file passed through `reduceDraft`, so a sim roster can never hold an illegal assignment
@@ -62,6 +63,16 @@ export interface RunOneDraftInput {
   /** This run's own seed — the same seed always deals the same archetypes and draws the same
    *  bot picks, so a sim's own numbers are exactly reproducible from `{config, seed}` alone. */
   readonly seed: number;
+  /**
+   * Seats that read a board of their OWN instead of the room's shared `board`, by team id.
+   *
+   * The founder ruling this exists for (2026-09-05): the room drafts against market ADP, and the
+   * seat being measured drafts with our board. Every value here must be a permutation of `board`
+   * — the same players in a different order — so pick legality and availability are untouched and
+   * only the seat's PREFERENCE changes. Its archetype, roster need and reach cap all still come
+   * from `chooseBotPick`, unmodified.
+   */
+  readonly seatBoards?: Readonly<Record<string, readonly DraftPoolEntry[]>>;
 }
 
 export interface RunOneDraftResult {
@@ -109,7 +120,11 @@ export function runOneDraft(input: RunOneDraftInput): RunOneDraftResult {
     if (teamId === null) break; // defensive: cannot occur in a snake sim with no owed picks
     const archetype = archetypes[teamId]!;
     const rng = rngFor(input.seed, `${teamId}:pick:${state.pickNumber}`);
-    const playerId = chooseBotPick(state, teamId, archetype, rng);
+    // A seat with a board of its own sees the identical draft state through its own preference
+    // order. `chooseBotPick` reads `state.pool` for exactly that, so a permutation swapped in
+    // here changes what this seat WANTS and nothing about what it may legally take.
+    const seatBoard = input.seatBoards?.[teamId];
+    const playerId = chooseBotPick(seatBoard === undefined ? state : { ...state, pool: seatBoard }, teamId, archetype, rng);
     if (playerId === null) break; // this seat's roster can legally take nothing left in the pool
     const action: MakePickAction = { v: 1, type: "MAKE_PICK", timestamp: SIM_INSTANT, teamId, playerId };
     state = submit(state, action);

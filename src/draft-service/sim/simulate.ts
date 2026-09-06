@@ -6,8 +6,10 @@
  * result byte-for-byte is `{config}` plus the pool it was called with, both already persisted
  * onto `sim_runs.config` by the caller (`persist.ts`).
  */
+import type { DraftPoolEntry } from "@/domain/draft";
 import { roundForPick, snakeTeamForPick, totalRosterSlots } from "@/draft-engine";
 import { simBoardOrder, type SimRankableEntry } from "./board-order";
+import { valueOrderFor } from "./value-order";
 import { BUILD_LABELS, classifyBuild, type BuildLabel, type ClassifiablePick } from "./classify";
 import { bestStartingLineupPoints } from "./lineup-score";
 import { rngFor } from "@/mock-draft/rng";
@@ -48,15 +50,22 @@ export function simulateDrafts(config: SingleSlotSimConfig, pool: readonly SimPl
     );
   }
 
+  // OUR BOARD, under THIS sim's league shape — the order the target seat drafts with and the one
+  // every "realistic best available", survival rate and fallback below is measured against. The
+  // room's own order is a separate thing entirely (`board-order.ts`: market ADP).
+  const ourBoard = valueOrderFor(pool, { teamCount: config.teamCount, rosterSlots: config.rosterSlots });
+  const evidenceOrder = ourBoard.map((entry) => entry.playerId);
+  const evidenceRankByPlayerId = new Map(ourBoard.map((entry, index) => [entry.playerId, index] as const));
+  const targetBoard: readonly DraftPoolEntry[] = ourBoard.map((entry) => ({ playerId: entry.playerId, position: entry.position }));
+
   const rankable: readonly SimRankableEntry[] = pool.map((entry) => ({
     playerId: entry.playerId,
     position: entry.position,
-    evidenceRank: entry.evidenceRank,
+    evidenceRank: evidenceRankByPlayerId.get(entry.playerId)!,
     marketRank: entry.marketRank,
   }));
   const positionByPlayerId = new Map(pool.map((entry) => [entry.playerId, entry.position] as const));
   const pointsByPlayerId = new Map(pool.map((entry) => [entry.playerId, entry.projectedPoints] as const));
-  const evidenceOrder = [...pool].sort((a, b) => a.evidenceRank - b.evidenceRank).map((entry) => entry.playerId);
 
   const lastPick = Math.min(config.rounds, totalRosterSlots(config.rosterSlots)) * config.teamCount;
   const pickNumbers = targetPickNumbers(teamIds, targetTeamId, lastPick);
@@ -65,15 +74,15 @@ export function simulateDrafts(config: SingleSlotSimConfig, pool: readonly SimPl
   const buildTop3Counts = new Map<BuildLabel, number>(BUILD_LABELS.map((label) => [label, 0] as const));
   const finishRanks: number[] = [];
   const exposureCounts = new Map<string, number>();
-  /** pickNumber → (playerId → how many runs he was the evidence board's own best undrafted
-   *  player at that exact pick). Exactly one entry gains a count per run per pick, so summing a
-   *  pick's whole map always equals `config.runs`. */
+  /** pickNumber → (playerId → how many runs he was OUR BOARD's best undrafted player at that
+   *  exact pick). Exactly one entry gains a count per run per pick, so summing a pick's whole map
+   *  always equals `config.runs`. */
   const bestAvailableCounts = new Map<number, Map<string, number>>(pickNumbers.map((n) => [n, new Map<string, number>()] as const));
 
   for (let i = 0; i < config.runs; i += 1) {
     const seed = config.seed + i;
     const board = simBoardOrder(rankable, config.sharpness, rngFor(seed, "board-order"));
-    const result = runOneDraft({ teamIds, board, rosterSlots: config.rosterSlots, rounds: config.rounds, seed });
+    const result = runOneDraft({ teamIds, board, rosterSlots: config.rosterSlots, rounds: config.rounds, seed, seatBoards: { [targetTeamId]: targetBoard } });
 
     const sortedPicks = [...result.picks].sort((a, b) => a.pickNumber - b.pickNumber);
     const drafted = new Set<string>();

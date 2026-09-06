@@ -12,10 +12,10 @@ const SHAPE: LeagueShape = {
 };
 
 const POOL: readonly SimPlayerEvidence[] = [
-  { playerId: "q1", position: "QB", evidenceRank: 0, marketRank: 0, projectedPoints: 300 },
-  { playerId: "q2", position: "QB", evidenceRank: 1, marketRank: 1, projectedPoints: 250 },
-  { playerId: "r1", position: "RB", evidenceRank: 2, marketRank: 2, projectedPoints: 200 },
-  { playerId: "r2", position: "RB", evidenceRank: 3, marketRank: 3, projectedPoints: 150 },
+  { playerId: "q1", position: "QB", marketRank: 0, projectedPoints: 300 },
+  { playerId: "q2", position: "QB", marketRank: 1, projectedPoints: 250 },
+  { playerId: "r1", position: "RB", marketRank: 2, projectedPoints: 200 },
+  { playerId: "r2", position: "RB", marketRank: 3, projectedPoints: 150 },
 ];
 
 describe("gradeEvidenceMaps", () => {

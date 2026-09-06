@@ -1,10 +1,14 @@
 /**
  * THE SIM'S EVIDENCE POOL, READ FROM REAL STORES — the one bridge between `simulateDrafts`'s pure
- * arithmetic (`simulate.ts`) and the two real facts it needs: the evidence board's own points and
- * rank (`preseasonProjectionsAsOf`, `BOARD_SOURCE` — the identical read
+ * arithmetic (`simulate.ts`) and the two real facts it needs: the evidence board's own projected
+ * points (`preseasonProjectionsAsOf`, `BOARD_SOURCE` — the identical read
  * `@/draft-hq/board/service.ts`'s `boardRows` already uses), and the market's own rank
  * (`players.adp`, the live feed `ingestAdp` writes, joined through `player_crosswalk` exactly the
  * way `boardRows` already joins it).
+ *
+ * NO BOARD RANK IS READ OR RETURNED. Our board's ORDER is value over replacement under a league's
+ * shape, derived by `value-order.ts` where that shape is known; the stored `rank` column is a
+ * rank by raw projected points and belongs to nothing here.
  *
  * `boardGeneration` is the evidence board's own `asOf` stamp, shared by every row under one
  * generation (`board-store.ts`'s `assertSingleGeneration` invariant) — the cache key's second
@@ -44,11 +48,12 @@ export async function evidencePoolFor(db: Db, asOf: Date = new Date()): Promise<
     .sort((a, b) => a.identity.adp! - b.identity.adp!);
   const marketRankByPlayerId = new Map(byAdpAscending.map(({ identity }, index) => [identity.playerId, index] as const));
 
-  const byEvidenceRank = [...withIdentity].sort((a, b) => a.row.rank - b.row.rank);
-  const pool: readonly SimPlayerEvidence[] = byEvidenceRank.map(({ row, identity }, index) => ({
+  // Read order only, carrying no meaning of its own: the stored board rank makes the returned
+  // array stable run to run, and every consumer sorts it into whichever order it actually needs.
+  const stable = [...withIdentity].sort((a, b) => a.row.rank - b.row.rank);
+  const pool: readonly SimPlayerEvidence[] = stable.map(({ row, identity }) => ({
     playerId: identity.playerId,
     position: identity.position,
-    evidenceRank: index,
     marketRank: marketRankByPlayerId.get(identity.playerId) ?? null,
     projectedPoints: row.projectedPoints,
   }));
