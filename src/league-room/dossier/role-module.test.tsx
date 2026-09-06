@@ -3,6 +3,7 @@ import { render } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import type { PlayerFactsTrend, PlayerFactsUsage } from "@/capsules/facts";
+import type { DefenseSeasonFacts, KdefSeasonLine, KickerSeasonFacts } from "@/projections/kdef/season-lines";
 import { RoleModule } from "./role-module";
 
 const USAGE: PlayerFactsUsage = {
@@ -32,6 +33,50 @@ const NON_MATERIAL: PlayerFactsTrend = {
   yardsPerOpportunity: null,
   targetShare: null,
 };
+
+/** The season line's own shell — `weeks` is empty because this module never reads it. */
+const LINE = { playerId: "k1", position: "K", season: 2025, weeks: [], points: 148.5, games: 16, pointsPerGame: 9.3, weeksMissingPointsAllowed: 0 } as const;
+
+const KICKER_FACTS: KickerSeasonFacts = {
+  kind: "K",
+  fieldGoalsMade: 24,
+  fieldGoalsAttempted: 28,
+  extraPointsMade: 38,
+  extraPointsAttempted: 40,
+  distanceBands: [
+    { label: "0 to 39", made: 12, attempted: 12 },
+    { label: "40 to 49", made: 7, attempted: 9 },
+    { label: "50 or more", made: 5, attempted: 7 },
+  ],
+  longestMadeBand: "50 or more",
+};
+
+const DEFENSE_FACTS: DefenseSeasonFacts = {
+  kind: "DEF",
+  sacks: 46.4,
+  interceptions: 14,
+  fumbleRecoveries: 10,
+  takeaways: 24,
+  defensiveTouchdowns: 3,
+  specialTeamsTouchdowns: 1,
+  safeties: 1,
+  yardsAllowed: 4960,
+  pointsAllowed: 296,
+  gamesWithPointsAllowed: 16,
+  pointsAllowedBandGames: [
+    { label: "0", games: 1 },
+    { label: "1 to 6", games: 3 },
+    { label: "18 to 27", games: 12 },
+  ],
+};
+
+function kickerLine(facts: Partial<KickerSeasonFacts> = {}): KdefSeasonLine {
+  return { ...LINE, position: "K", facts: { ...KICKER_FACTS, ...facts } };
+}
+
+function defenseLine(overrides: Partial<KdefSeasonLine> = {}): KdefSeasonLine {
+  return { ...LINE, playerId: "DST-BAL", position: "DEF", facts: DEFENSE_FACTS, ...overrides };
+}
 
 describe("RoleModule", () => {
   it("states each share as a percent and a position rank with its qualifier count", () => {
@@ -85,6 +130,80 @@ describe("RoleModule", () => {
 
   it("renders axe-clean in both themes", async () => {
     await renderSurface(<RoleModule position="WR" usage={USAGE} trend={MATERIAL_DECLINE} />, async ({ container }) => {
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+});
+
+/**
+ * THE TWO POSITIONS WITH NO OFFENSIVE ROLE (the 2026-09-06 round). Snap, target and red-zone share
+ * are questions about an offense, and a kicker and a team defense are not on one. The module states
+ * what each of them is actually judged on instead, out of the archive that holds it.
+ */
+describe("RoleModule, a kicker and a team defense", () => {
+  it("states a kicker's makes of attempts, banded by distance, with the make rate", () => {
+    const { container } = render(<RoleModule position="K" usage={null} trend={null} kdef={kickerLine()} />);
+    expect(container.textContent).toContain("24 of 28 · 86%");
+    expect(container.textContent).toContain("12 of 12 · 100%");
+    expect(container.textContent).toContain("7 of 9 · 78%");
+    expect(container.textContent).toContain("5 of 7 · 71%");
+    expect(container.textContent).toContain("38 of 40 · 95%");
+    expect(container.textContent).toContain("50 or more yards");
+    // The share bars are gone entirely, rather than printing three "not tracked for him" rows.
+    expect(container.querySelector("[data-role-share]")).toBeNull();
+  });
+
+  it("says he made none rather than naming a longest band he never reached", () => {
+    const line = kickerLine({
+      fieldGoalsMade: 0,
+      fieldGoalsAttempted: 2,
+      distanceBands: [
+        { label: "0 to 39", made: 0, attempted: 1 },
+        { label: "40 to 49", made: 0, attempted: 1 },
+        { label: "50 or more", made: 0, attempted: 0 },
+      ],
+      longestMadeBand: null,
+    });
+    const { container } = render(<RoleModule position="K" usage={null} trend={null} kdef={line} />);
+    expect(container.textContent).toContain("he made none");
+    // A band with no attempts states the count and no rate: a rate over nothing is not 0%.
+    expect(container.textContent).toContain("0 of 0");
+  });
+
+  it("states a team defense per game, with the points-allowed bracket mix", () => {
+    const { container } = render(<RoleModule position="DEF" usage={null} trend={null} kdef={defenseLine()} />);
+    expect(container.textContent).toContain("Sacks a game");
+    expect(container.textContent).toContain("2.9");
+    expect(container.textContent).toContain("Takeaways a game");
+    expect(container.textContent).toContain("1.5");
+    expect(container.textContent).toContain("Defensive touchdowns");
+    expect(container.textContent).toContain("Yards allowed a game");
+    expect(container.textContent).toContain("310");
+    expect(container.textContent).toContain("over 16 games");
+    expect(container.querySelector('[data-role="points-allowed-bands"]')?.textContent).toContain("1 to 6 in 3");
+  });
+
+  it("says how many of his games have no final score, rather than averaging them in as zero", () => {
+    const { container } = render(<RoleModule position="DEF" usage={null} trend={null} kdef={defenseLine({ weeksMissingPointsAllowed: 1 })} />);
+    expect(container.querySelector('[data-role="points-allowed-gap"]')?.textContent).toContain("1 of his games have no final score on record");
+  });
+
+  it("says plainly that points allowed was never recorded, rather than printing a zero", () => {
+    const facts = { ...DEFENSE_FACTS, pointsAllowed: null, gamesWithPointsAllowed: 0, pointsAllowedBandGames: [] };
+    const { container } = render(<RoleModule position="DEF" usage={null} trend={null} kdef={{ ...LINE, position: "DEF", facts }} />);
+    expect(container.textContent).toContain("not recorded for any of his games");
+    expect(container.querySelector('[data-role="points-allowed-bands"]')).toBeNull();
+  });
+
+  it("follows the copy rules on both variants — no em-dash, no semicolon", () => {
+    const kicker = render(<RoleModule position="K" usage={null} trend={null} kdef={kickerLine()} />);
+    expect(kicker.container.textContent).not.toMatch(/[—;]/);
+    const defense = render(<RoleModule position="DEF" usage={null} trend={null} kdef={defenseLine({ weeksMissingPointsAllowed: 2 })} />);
+    expect(defense.container.textContent).not.toMatch(/[—;]/);
+  });
+
+  it("renders axe-clean in both themes", async () => {
+    await renderSurface(<RoleModule position="DEF" usage={null} trend={null} kdef={defenseLine()} />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();
     });
   });

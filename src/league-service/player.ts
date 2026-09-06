@@ -7,6 +7,7 @@ import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG, seasonProgress } from "@/league";
 import { nflPlayerIdFor, nflPlayerIdsFor } from "@/projections/crosswalk";
+import { kdefSeasonLines, type KdefSeasonLine } from "@/projections/kdef/season-lines";
 import type { SeasonStatLine } from "@/projections/lines";
 import type { Law } from "@/projections/laws/types";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
@@ -256,9 +257,22 @@ export interface PlayerSeasonBody {
   /** His current designation from the harvested injuries feed ("Q", "O", "IR"), or `null` when
    *  the feed does not name him — absence means healthy as far as the source says. */
   readonly injuryDesignation: string | null;
-  /** Raw production per played week, newest first — the ESPN-depth game log. */
+  /** Raw production per played week, newest first — the ESPN-depth game log. Empty for a kicker
+   *  and a team defense, whose season is told by `kdefSeason` instead: every column in this log is
+   *  an offensive one, and a row of nine zeros beside a kicker's name is a worse answer than none. */
   readonly log: readonly PlayerGameLogRow[];
   readonly totals: PlayerSeasonTotals | null;
+  /**
+   * A KICKER'S OR A TEAM DEFENSE'S OWN SEASON (the 2026-09-06 round), from
+   * `@/projections/kdef/season-lines`, scored under this league's rules for whichever `season` this
+   * body answers for. `null` for every other position, and for a kicker or team defense the archive
+   * holds no week of that season for.
+   *
+   * IT IS A MEASUREMENT AND NOT A PROJECTION. Neither position ships one (`KDEF_DECISION`) and this
+   * changes nothing about that. It is the answer to "what did he do", which is the question the
+   * archive can answer and which no surface was asking before this.
+   */
+  readonly kdefSeason: KdefSeasonLine | null;
   /** Recent headlines that name him, newest first, from the harvested news feed. */
   readonly news: readonly { readonly title: string; readonly link: string }[];
   /**
@@ -399,6 +413,59 @@ interface PlayerSeasonStats {
   readonly pointsPerGamePercentile: number | null;
   readonly log: readonly PlayerGameLogRow[];
   readonly totals: PlayerSeasonTotals | null;
+  /** Set only on the kicker and team defense path — see `PlayerSeasonBody.kdefSeason`. */
+  readonly kdefSeason?: KdefSeasonLine;
+}
+
+/** Whether this position's history lives in the kicker/team-defense archive rather than in the
+ *  player observation store. One question, one spelling. */
+function readsKdefArchive(position: Position): boolean {
+  return position === "K" || position === "DEF";
+}
+
+/**
+ * A KICKER'S OR A TEAM DEFENSE'S SEASON, from the archive that actually holds it.
+ *
+ * WHY IT IS A THIRD PATH beside `currentSeasonStats` and `priorSeasonStats`. Neither of those can
+ * answer for these two positions: `player_stat_lines` is the current season only and carries no
+ * kicking or team-defense line before the league's own weeks start reporting, and the observation
+ * store behind `priorSeasonStats` is written from the per-player weekly file, which
+ * `nflverse/map.ts` deliberately refuses the kicking and team defensive columns of. The result was
+ * a kicker's card with an empty chart and a defense's with nothing at all, while two tables held
+ * thirteen seasons of both.
+ *
+ * NO PERCENTILE, DELIBERATELY. Every other percentile on this screen is measured against a
+ * population this function would have to build by reading every kicker's or every club's season,
+ * and a comparison this reader cannot back with a real population is one it should not draw. A
+ * `null` percentile renders as ordinary ink, which is `Stat`'s own "no comparison, no colour".
+ *
+ * NO GAME LOG, for the reason `PlayerSeasonBody.log` gives: its nine columns are offensive ones.
+ * The season is told by `kdefSeason` and the role module built from it instead.
+ */
+async function kdefSeasonStats(db: Db, playerId: string, season: number, rules: ScoringRules): Promise<PlayerSeasonStats> {
+  const line = (await kdefSeasonLines(db, { season, playerIds: [playerId], rules })).get(playerId);
+  const everyWeek = Array.from({ length: finalWeekOf(season) }, (_, index) => index + 1);
+  const pointsByWeek = new Map((line?.weeks ?? []).map((week) => [week.week, week.points] as const));
+  return {
+    weeks: everyWeek.map((week) => ({ week, points: pointsByWeek.get(week) ?? null, percentile: null })),
+    pointsPerGame: line?.pointsPerGame ?? null,
+    pointsPerGamePercentile: null,
+    log: [],
+    totals: null,
+    ...(line === undefined ? {} : { kdefSeason: line }),
+  };
+}
+
+/** Which of the recent seasons the kicker/team-defense archive actually holds a week of for him,
+ *  newest first — the `availableSeasons` question, asked of the archive rather than of the
+ *  observation store the other positions read. */
+async function kdefSeasonsWithData(db: Db, playerId: string, rules: ScoringRules): Promise<readonly number[]> {
+  const found: number[] = [];
+  for (let back = 1; back <= HISTORY_SEASONS; back += 1) {
+    const season = PRODUCT_SEASON - back;
+    if ((await kdefSeasonLines(db, { season, playerIds: [playerId], rules })).has(playerId)) found.push(season);
+  }
+  return found;
 }
 
 /**
@@ -509,6 +576,37 @@ async function priorSeasonStats(db: Db, gsisId: string, season: number, position
   }));
 
   return { weeks, pointsPerGame, pointsPerGamePercentile, log, totals: totalsFromLog(log) };
+}
+
+interface SeasonStatsInput {
+  readonly db: Db;
+  readonly playerId: string;
+  readonly player: Player;
+  readonly peerIds: readonly string[];
+  readonly played: readonly number[];
+  readonly rules: ScoringRules;
+  readonly season: number;
+  readonly gsisId: string | null;
+  readonly isKdef: boolean;
+  readonly now: Date;
+}
+
+/**
+ * WHICH OF THE THREE STAT PATHS ANSWERS FOR THIS BODY.
+ *
+ * A kicker and a team defense read their own archive for every season, current one included: the
+ * league's live table holds no kicking or team defensive line until its own weeks report, and the
+ * observation store never holds one at all. Everybody else keeps exactly the choice this function
+ * was extracted from — the live table for the current season, the observation store for a prior
+ * one, and the live table again for a player the crosswalk could not place (folded in so
+ * TypeScript, not just this file's logic, can see why `priorSeasonStats` never runs unplaced).
+ */
+async function seasonStats({ db, playerId, player, peerIds, played, rules, season, gsisId, isKdef, now }: SeasonStatsInput): Promise<PlayerSeasonStats> {
+  if (isKdef) return await kdefSeasonStats(db, playerId, season, rules);
+  if (season === PRODUCT_SEASON || gsisId === null) {
+    return await currentSeasonStats(db, playerId, player.position, peerIds, played, rules);
+  }
+  return await priorSeasonStats(db, gsisId, season, player.position, rules, now);
 }
 
 /**
@@ -654,10 +752,16 @@ export async function playerSeason(
   // SEASON AVAILABILITY. The current season counts once the league has played a week; a prior
   // season counts once the crosswalk places him AND the observation store has at least one
   // recorded week for him there — see `PlayerSeasonBody`'s own docblock for the full rule.
+  // A kicker and a team defense answer this question from their OWN archive: the observation store
+  // every other position reads carries no kicking or team defensive column at all. See
+  // `kdefSeasonStats`.
+  const isKdef = readsKdefArchive(player.position);
   const gsisId = (await nflPlayerIdsFor(db, [playerId])).get(playerId) ?? null;
   const priorCandidates = Array.from({ length: HISTORY_SEASONS }, (_, back) => PRODUCT_SEASON - (back + 1));
   const priorSeasonsWithData: number[] = [];
-  if (gsisId !== null) {
+  if (isKdef) {
+    priorSeasonsWithData.push(...(await kdefSeasonsWithData(db, playerId, rules)));
+  } else if (gsisId !== null) {
     for (const candidate of priorCandidates) {
       if (await priorSeasonHasData(db, gsisId, candidate, now)) priorSeasonsWithData.push(candidate);
     }
@@ -675,10 +779,7 @@ export async function playerSeason(
   // TypeScript, not just this file's own logic, can see why `priorSeasonStats` never runs unplaced:
   // a season only ever reaches `priorSeasonsWithData` — and so only ever becomes `season` — once
   // the crosswalk has already placed him.
-  const stats: PlayerSeasonStats =
-    season === PRODUCT_SEASON || gsisId === null
-      ? await currentSeasonStats(db, playerId, player.position, peerIds, played, rules)
-      : await priorSeasonStats(db, gsisId, season, player.position, rules, now);
+  const stats: PlayerSeasonStats = await seasonStats({ db, playerId, player, peerIds, played, rules, season, gsisId, isKdef, now });
 
   const preseason = await preseasonReadings(db, playerId, now);
 
@@ -703,6 +804,7 @@ export async function playerSeason(
     injuryDesignation,
     log: stats.log,
     totals: stats.totals,
+    kdefSeason: stats.kdefSeason ?? null,
     news,
     player,
     availableSeasons,
