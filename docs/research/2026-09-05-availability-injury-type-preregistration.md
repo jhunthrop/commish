@@ -51,3 +51,9 @@ Amended feature definitions (gates, fit window, judgment protocol all UNCHANGED)
 - All other features unchanged.
 
 No model has been fit and no held-out data touched at amendment time. The backfilled stores: injuries 2013-2025 (68,270 rows), roster weeks 2013-2025 (~520k rows).
+
+## Amendment 2 — 2026-09-05, before any fitting (data-access substitution, "same harness" impossible as written)
+
+This session's `DATABASE_URL` does not carry the historical player-week/roster data the August round's own harness (`loadPreseason` -> `preseasonCandidates`) needs for ANY season — verified by running `npm run projections:preseason:fit` against this exact connection string, which throws immediately for 2021 ("The store holds no game-derived observations for 2021"). `preseason_rosters` holds only season 2026 in this database; `player_week_observations` carries real game-log metrics only for 2023-2025. "Same harness, same interfaces" as literally written is therefore impossible for the 2018-2024 fit window.
+
+Resolution (full rationale and gate-by-gate accounting in the results doc's own Amendment 2): the FEATURE side is unaffected (`nflverse_injuries`/`nflverse_roster_weeks` are fully backfilled 2013-2025). For labels and role, this round fetches nflverse's own public `stats_player_week_{season}.csv` release directly (the identical upstream `nflverse_player_week` already ingests) for 2015-2024, plus `players.csv` for birth dates — real data, not synthesized. The fit window narrows from the pre-registered seven seasons to six (2018, 2020-2024; 2019 dropped, a genuine nflverse release gap for that one file, reconstructed only for HISTORY via a snap-counts+crosswalk fallback, not as a fit-window label). 2025 remains the single held-out judged season, untouched during fitting. Gates, hypothesis, and judgment protocol are otherwise UNCHANGED. No held-out data was touched before this amendment was written.
