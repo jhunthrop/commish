@@ -22,6 +22,7 @@ import type { LeagueShape } from "@/projections/decide/replacement";
 import { shippedPreseasonCandidates } from "@/projections/market/blend";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { overlapTiers, preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
+import { KDEF_DECISION, marketOrderPositions, shipsProjectedRows } from "@/projections/preseason/kdef-decision";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -52,10 +53,19 @@ const FINAL = new Date("9999-12-31T00:00:00.000Z");
  * The league the board is computed for: twelve teams, PPR, no kickers and no defences.
  *
  * Identical to `decision-report.ts`' shape on purpose, so a board measured here drops straight into
- * that harness and the two documents are talking about the same league. Kickers and defences are
- * excluded because Phase 2 projects neither and their slots would be guaranteed blanks.
+ * that harness and the two documents are talking about the same league.
+ *
+ * STILL WITHOUT KICKERS AND DEFENCES AFTER THE 2026-09-05 ROUND, and the reason is now a
+ * measurement rather than an absence. That round built both positions and judged them once against
+ * preregistered gates; both failed and ship in market order, so the engine publishes no projection
+ * for either and their slots here would be guaranteed blanks exactly as before. See
+ * `docs/research/2026-09-05-kicker-defense-preregistration-results.md` for the numbers, and
+ * `scripts/kdef-judgment.ts` for the harness that measures them. The day a later round's judgment
+ * passes, `KDEF_DECISION` flips and `SCORED` below widens with it.
  */
-const SCORED: readonly Position[] = ["QB", "RB", "WR", "TE"];
+const SCORED: readonly Position[] = (["QB", "RB", "WR", "TE", "K", "DEF"] as const).filter((position) =>
+  shipsProjectedRows(position),
+);
 const SLOTS: readonly RosterSlotConfig[] = STANDARD_ROSTER_SLOTS.filter(
   (slot) => slot.slot === BENCH_SLOT || slot.eligiblePositions.every((position) => SCORED.includes(position)),
 ).map((slot) => ({ ...slot, eligiblePositions: slot.eligiblePositions.filter((position) => SCORED.includes(position)) }));
@@ -166,6 +176,18 @@ async function main(): Promise<void> {
     console.log(`\n${"=".repeat(96)}`);
     console.log(`${season} PRESEASON BOARD, 12-team PPR, taken at ${inputs.moment.toISOString()}`);
     console.log(`${"=".repeat(96)}\n`);
+    // Said once per season rather than left to be inferred from four position blocks where six were
+    // expected. A reader who does not know the 2026-09-05 judgment happened should not have to
+    // notice an absence and go looking for the reason.
+    const fellBack = marketOrderPositions();
+    if (fellBack.length > 0) {
+      console.log(
+        `NOT SCORED HERE: ${fellBack.join(" and ")}. Both were built and judged once against preregistered gates ` +
+          `(docs/research/2026-09-05-kicker-defense-preregistration-results.md); ${fellBack
+            .map((position) => `${position} ships in ${KDEF_DECISION[position as "K" | "DEF"].replace("_", " ")}`)
+            .join(", ")}, so the engine publishes no projection to score. Run \`npm run projections:kdef:judgment\` for that measurement.\n`,
+      );
+    }
 
     const rawBoard = build(inputs, SHIPPED_PRESEASON_FEATURES);
     const board = await buildShipped(db, inputs);
