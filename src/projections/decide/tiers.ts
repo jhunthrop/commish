@@ -13,7 +13,10 @@
  *      (2026-09-05) is the fixture the rule was shaped against; see the tests.
  *   2. NO TIER STRETCHES more than `TIER_SPAN_POINTS_PER_GAME` points a game end to end. A long
  *      run of small steps (the middle of the receiver pool) would otherwise be one tier of thirty;
- *      it splits into the fewest tiers that fit, at its widest internal gaps.
+ *      it splits at its widest internal gaps, into as many tiers as that natural split needs to
+ *      fit under the cap. Deliberately NOT the fewest tiers that could fit: squeezing twelve
+ *      receivers into two tiers of thirty-four cuts between Jefferson and London, a three point
+ *      step, and a cut on a narrow gap made only to save a tier is not a break anyone would draw.
  *
  * Both constants are chosen, not fitted: there is no held-out measurement of "the tier a human
  * expert would draw", and quoting a fitted-looking number would be a claim we cannot support. The
@@ -55,9 +58,9 @@ function runStarts(pointsDescending: readonly number[]): readonly number[] {
 }
 
 /**
- * The contiguous split of a sorted run into `count` groups with the least within-group spread
- * (exact dynamic programme over prefix sums; runs are a few dozen players, so the cubic bound is
- * nothing). Returns the group index per player.
+ * The contiguous split of a sorted run into `count` groups with the least within-group spread,
+ * which places every cut on the run's widest gaps (exact dynamic programme over prefix sums; runs
+ * are a few dozen players, so the cubic bound is nothing). Returns the group index per player.
  */
 function leastSpreadSplit(run: readonly number[], count: number): readonly number[] {
   const size = run.length;
@@ -99,9 +102,15 @@ function widestGroupSpan(run: readonly number[], assignment: readonly number[]):
   return Math.max(...[...groups].map((group) => run[assignment.indexOf(group)]! - run[assignment.lastIndexOf(group)]!));
 }
 
-/** Rule 2: the fewest contiguous groups of one run such that none spans more than the cap. */
-function fewestGroupsWithinSpan(run: readonly number[]): readonly number[] {
-  for (let count = 1; count <= run.length; count += 1) {
+/**
+ * Rule 2: the least-spread split of one run into the smallest count at which every group fits
+ * under the cap. Because the split at each count is the natural one (cuts on the widest gaps), a
+ * count is accepted only when that natural split fits: a different split of the same count could
+ * sometimes fit by cutting a narrow gap, and the rule declines it on purpose (see the header).
+ * Singletons always fit, so the loop terminates by `count === run.length` at the latest.
+ */
+function naturalSplitWithinSpan(run: readonly number[]): readonly number[] {
+  for (let count = 1; count < run.length; count += 1) {
     const assignment = leastSpreadSplit(run, count);
     if (widestGroupSpan(run, assignment) <= TIER_SPAN_POINTS) return assignment;
   }
@@ -114,7 +123,7 @@ export function tiersOf(pointsDescending: readonly number[]): readonly number[] 
   return starts.reduce<{ readonly tiers: readonly number[]; readonly nextTier: number }>(
     (state, start, runIndex) => {
       const end = starts[runIndex + 1] ?? pointsDescending.length;
-      const groups = fewestGroupsWithinSpan(pointsDescending.slice(start, end));
+      const groups = naturalSplitWithinSpan(pointsDescending.slice(start, end));
       return {
         tiers: [...state.tiers, ...groups.map((group) => state.nextTier + group)],
         nextTier: state.nextTier + Math.max(-1, ...groups) + 1,

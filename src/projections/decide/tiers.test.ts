@@ -54,6 +54,14 @@ describe("tiersOf", () => {
     expect(Math.max(...tiers)).toBe(2);
   });
 
+  it("cuts a capped run on its widest gaps, never on a narrow one merely to save a tier", () => {
+    // Smith-Njigba through McMillan: no step is a game's worth, the run is 66 points wide. Two
+    // tiers COULD fit under the cap by cutting between Jefferson and London (a 2.9 point step);
+    // the rule cuts on the 13.7 after Lamb and the 10.5 after Brown instead, and takes three.
+    const run = [293.9, 278.6, 276.5, 262.9, 260.0, 257.9, 256.0, 246.5, 236.0, 235.1, 232.5, 227.8];
+    expect(tierSizes(tiersOf(run))).toEqual([3, 5, 4]);
+  });
+
   it("finds the break in a plateau, where the typical gap is nothing at all", () => {
     expect(tiersOf([70, 12, 12, 12, 12, 12])).toEqual([0, 1, 1, 1, 1, 1]);
   });
