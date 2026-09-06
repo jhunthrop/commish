@@ -5,7 +5,7 @@ import { valueBoard, type LeagueShape, type SeasonProjection, type ValuedPlayer 
 import { tiersOf } from "../decide/tiers";
 import type { GamesPlayedOutlook } from "./availability";
 import { SHIPPED_GAME_VARIANCE } from "./fitted-variance";
-import { seasonPointsBand, VARIANCE_POSITIONS, type GameVariancePriors, type PlayerClass, type VariancePosition } from "./game-variance";
+import { seasonPointsInterval, VARIANCE_POSITIONS, Z90, type GameVariancePriors, type PlayerClass, type VariancePosition } from "./game-variance";
 
 /**
  * THE PRESEASON BOARD — every player ranked before a ball is thrown, in one league's own scoring.
@@ -173,6 +173,18 @@ export interface BoardCandidate {
    * for the season figure) and both are unchanged when it is absent.
    */
   readonly perGameTierPoints?: number;
+  /**
+   * HOW WRONG THIS CANDIDATE'S OWN PROJECTION TYPICALLY IS, in season points squared (the 2026-09-05
+   * kicker and team defence round). Feeds `seasonPointsInterval`'s third variance term.
+   *
+   * ABSENT for every skill candidate, which is why adding it moved no existing row, and that absence
+   * is an honest "not measured yet" rather than a claim of zero: this round measured the quantity
+   * for the two positions it fitted and for no others. The band a skill player carries is therefore
+   * still outcome noise only, exactly as it was, and the two new positions carry the wider and more
+   * honest interval. A later round that measures it for the four skill positions closes the gap; see
+   * `seasonPointsInterval`'s own docblock for why an interval without this term understates itself.
+   */
+  readonly seasonProjectionErrorVariance?: number;
   /** Reasons discovered upstream, before scarcity and tiers are known. */
   readonly reasons: readonly BoardReason[];
 }
@@ -372,10 +384,18 @@ export function preseasonBoard(
     byPlayer.set(candidate.playerId, {
       candidate,
       seasonLine,
-      // BOTH SOURCES COMPOSED (Task 4): per-game performance variance and the games-played
-      // distribution. See `game-variance.ts`'s `seasonPointsBand` for the law-of-total-variance
-      // composition and `overlapTiers` for what the resulting interval is honest about and silent on.
-      outlook: seasonPointsBand(perGamePoints, candidate.games, gameVarianceFor(candidate, gameVariance)),
+      // THREE SOURCES COMPOSED where all three are measured: per-game performance variance, the
+      // games-played distribution, and (for the two positions the 2026-09-05 round fitted it) how
+      // wrong the projection itself typically is. See `game-variance.ts`'s `seasonPointsInterval`
+      // for the law-of-total-variance composition and for why the third term is not optional in
+      // principle, and `overlapTiers` for what the resulting interval is honest about and silent on.
+      outlook: seasonPointsInterval(
+        perGamePoints,
+        candidate.games,
+        gameVarianceFor(candidate, gameVariance),
+        Z90,
+        candidate.seasonProjectionErrorVariance ?? 0,
+      ),
     });
     projections.push({ playerId: candidate.playerId, position: candidate.position, projectedPoints });
   }

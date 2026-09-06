@@ -61,6 +61,25 @@ async function pointsAllowedByKey(
   return byKey;
 }
 
+/**
+ * How many prior seasons a kicker's and a defence's projection read, matching `HISTORY_SEASONS`
+ * (`source.ts`) so the two positions and the four skill positions look at the same window.
+ */
+export const KDEF_HISTORY_SEASONS = 3;
+
+/** The seasons strictly before `season` that a board for it may read. */
+export function kdefHistorySeasonsFor(season: number): readonly number[] {
+  return Array.from({ length: KDEF_HISTORY_SEASONS }, (_, index) => season - KDEF_HISTORY_SEASONS + index);
+}
+
+/**
+ * The nflverse position spelling a fantasy kicker carries on a week-one roster row. Read off the
+ * ROSTER's own column rather than through `projectedPosition`, deliberately: this module has to work
+ * both before and after that gate learns `K`, and a judgment whose population moved when an
+ * unrelated gate flipped would not be measuring what it claims to.
+ */
+export const KICKER_ROSTER_POSITION = "K";
+
 /** Both positions' history for the given seasons, read through one gate. */
 export async function loadKdefHistory(db: ReadonlyDb, seasons: readonly number[], asOf: Date): Promise<KdefHistory> {
   const kickingRows = await kickingWeekRowsForSeasons(db, seasons);

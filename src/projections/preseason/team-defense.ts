@@ -1,4 +1,5 @@
 import { STAT_FIELDS, type StatLine } from "@/domain/player";
+import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { finalWeekOf } from "../nflverse/team-eras";
 import { productTeamCode, teamDefenseUniverseId } from "../nflverse/team-codes";
@@ -141,6 +142,13 @@ export interface DefensePriors {
   readonly tierPriorGames: number;
   /** How much a club's most recent season outweighs the one before it. Searched over a small grid. */
   readonly recencyDecay: number;
+  /**
+   * HOW WRONG THIS MODEL'S OWN SEASON PROJECTION TYPICALLY IS, in season points squared, under
+   * `PPR_SCORING`. Feeds `seasonPointsInterval`'s third variance term — see its own docblock for why
+   * an interval without it is not a predictive interval, and `KickerPriors.projectionErrorVariance`
+   * for why measuring an error in points needs a preset while the composition itself does not.
+   */
+  readonly projectionErrorVariance: number;
 }
 
 export interface DefenseFitOptions {
@@ -255,10 +263,47 @@ export function fitDefensePriors(
     teamPriorGames: TEAM_PRIOR_GAMES,
     tierPriorGames: TIER_PRIOR_GAMES,
     recencyDecay: DEFAULT_RECENCY_DECAY_GRID[0],
+    projectionErrorVariance: 0,
   };
   const scored = recencyDecayGrid.map((decay) => ({ decay, error: scoreDecay(games, { ...base, recencyDecay: decay }) }));
   // Ties resolve to the FIRST entry of the caller's own grid, so the fit is reproducible.
-  return { ...base, recencyDecay: scored.reduce((chosen, entry) => (entry.error < chosen.error ? entry : chosen)).decay };
+  const chosen: DefensePriors = {
+    ...base,
+    recencyDecay: scored.reduce((best, entry) => (entry.error < best.error ? entry : best)).decay,
+  };
+  return { ...chosen, projectionErrorVariance: fitProjectionErrorVariance(games, chosen) };
+}
+
+/**
+ * THE VARIANCE OF THE MODEL'S OWN SEASON ERROR, measured leave-one-season-out over the fit window.
+ *
+ * For every club-season with at least one earlier season behind it, the model is asked for exactly
+ * the projection it would have made from what preceded it, and the residual against what that season
+ * actually scored is recorded. NOT MEAN-CENTRED, for the reason `kicker.ts`'s own version gives: an
+ * honest interval pays for a bias it has not fixed rather than subtracting it out of its own error
+ * estimate.
+ */
+function fitProjectionErrorVariance(games: readonly DefenseGame[], priors: DefensePriors): number {
+  const bySeasonTeam = new Map<string, DefenseGame[]>();
+  for (const game of games) {
+    const key = `${game.season}|${game.team}`;
+    bySeasonTeam.set(key, [...(bySeasonTeam.get(key) ?? []), game]);
+  }
+  const residuals: number[] = [];
+  for (const [key, seasonGames] of bySeasonTeam) {
+    const [seasonText, team] = key.split("|");
+    const season = Number(seasonText);
+    const prior = games.filter((game) => game.team === team && game.season < season);
+    if (prior.length === 0) continue;
+    const candidate = defenseCandidate({ team: team!, season, history: prior }, priors, PPR_SCORING);
+    const projected =
+      (computeFantasyPoints(candidate.perGame, "DEF", PPR_SCORING) + (candidate.perGameTierPoints ?? 0)) *
+      candidate.games.expected;
+    const actual = sum([...defenseWeeklyPoints(seasonGames, PPR_SCORING).values()].flatMap((points) => points));
+    residuals.push(projected - actual);
+  }
+  if (residuals.length < 2) return 0;
+  return sum(residuals.map((residual) => residual ** 2)) / residuals.length;
 }
 
 /**
@@ -382,6 +427,7 @@ export function defenseCandidate(
     perGame,
     perGameTierPoints: tierPoints,
     games: everyGame(teamGamesIn(input.season)),
+    seasonProjectionErrorVariance: priors.projectionErrorVariance,
     reasons: [
       ...(input.history.length === 0 ? ([{ code: "defense_no_history" }] as const) : []),
       {

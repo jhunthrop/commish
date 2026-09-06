@@ -28,7 +28,8 @@ export const FITTED_KICKER_PRIORS: KickerPriors = {
   "kickerPriorFieldGoalAttempts": 30,
   "kickerPriorExtraPointAttempts": 30,
   "kickerPriorGames": 16,
-  "recencyDecay": 0.6
+  "recencyDecay": 0.6,
+  "projectionErrorVariance": 1387.8881137170001
 };
 
 export const FITTED_DEFENSE_PRIORS: DefensePriors = {
@@ -36,6 +37,7 @@ export const FITTED_DEFENSE_PRIORS: DefensePriors = {
   "teamPriorGames": 16,
   "tierPriorGames": 16,
   "recencyDecay": 0.8,
+  "projectionErrorVariance": 1180.6197443816786,
   "leagueAllowed": [
     [27, 366],
     [23, 435],

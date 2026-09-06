@@ -267,10 +267,35 @@ export function seasonPointsInterval(
   games: GamesPlayedOutlook,
   perGameVariance: number,
   z: number,
+  /**
+   * HOW WRONG THE PROJECTION ITSELF TYPICALLY IS, in season points squared (the 2026-09-05 kicker
+   * and team defence round). Defaults to 0, which is byte-identical to every band this function
+   * produced before the parameter existed.
+   *
+   * THE THIRD SOURCE OF SPREAD, AND THE ONE THIS COMPOSITION WAS MISSING. The two terms above are
+   * both about OUTCOMES given a correct projection: how many games he plays, and how much his own
+   * weekly output varies around his own season mean. Neither says anything about how far the
+   * projected per-game rate is from his real one. That was found on a development check, not
+   * argued from theory: the 2013-2023 kicker fit scored on 2024 put only 23.5% of outcomes inside
+   * an interval meant to hold 50%, and the missing width is exactly parameter uncertainty. A
+   * kicker's projected volume is his club's shrunk attempt rate, and a club's real attempt rate
+   * moves season to season by far more than the model's certainty about it implied.
+   *
+   * MEASURED, NEVER CHOSEN: it is the variance of the residual between what the model projected for
+   * a season and what that season actually scored, taken leave-one-season-out over the fit window.
+   * See `fitKickerPriors` and `fitDefensePriors`.
+   *
+   * ADDED RATHER THAN COMPOUNDED, because the projection error and the outcome noise are different
+   * random quantities and a variance of a sum of independent terms is the sum of their variances.
+   * The independence is a documented simplification, the same class as the one the first two terms
+   * already make.
+   */
+  projectionErrorVariance = 0,
 ): { readonly floor: number; readonly median: number; readonly ceiling: number } {
   const meanSeason = perGamePoints * games.expected;
   const gamesVariance = games.probabilities.reduce((sum, probability, count) => sum + probability * (count - games.expected) ** 2, 0);
-  const seasonVariance = games.expected * perGameVariance + gamesVariance * perGamePoints ** 2;
+  const seasonVariance =
+    games.expected * perGameVariance + gamesVariance * perGamePoints ** 2 + Math.max(0, projectionErrorVariance);
   const sd = Math.sqrt(Math.max(0, seasonVariance));
   return {
     floor: Math.max(0, meanSeason - z * sd),

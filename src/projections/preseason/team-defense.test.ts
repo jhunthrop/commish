@@ -51,6 +51,7 @@ const PRIORS: DefensePriors = {
   teamPriorGames: 16,
   tierPriorGames: 16,
   recencyDecay: 0.8,
+  projectionErrorVariance: 0,
 };
 
 describe("defenseGamesFrom", () => {

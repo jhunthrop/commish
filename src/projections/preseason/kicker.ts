@@ -1,4 +1,5 @@
 import { STAT_FIELDS, type StatLine } from "@/domain/player";
+import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import type { KickingWeekRow } from "../nflverse/kicking-weeks";
 import { finalWeekOf } from "../nflverse/team-eras";
@@ -127,6 +128,19 @@ export interface KickerPriors {
   readonly kickerPriorGames: number;
   /** How much last season outweighs the one before it. Searched over a small grid. */
   readonly recencyDecay: number;
+  /**
+   * HOW WRONG THIS MODEL'S OWN SEASON PROJECTION TYPICALLY IS, in season points squared, under
+   * `PPR_SCORING`. Feeds `seasonPointsInterval`'s third variance term — see its own docblock for
+   * why an interval without it is not a predictive interval.
+   *
+   * MEASURED UNDER THE SHIPPED PRESET while the composition itself is always under the league's own
+   * rules, and that asymmetry is stated rather than hidden. A projection ERROR is a quantity in
+   * points, so measuring it needs a scoring preset; propagating per-component error variances
+   * through an arbitrary rules object instead would be more correct and is not what this round
+   * built. A league with unusual kicking weights therefore gets a band calibrated on the standard
+   * ones, which is a documented approximation and not a silent one.
+   */
+  readonly projectionErrorVariance: number;
 }
 
 export interface KickerFitOptions {
@@ -175,8 +189,19 @@ function weightedTotal(seasons: readonly KickerSeason[], decay: number, field: (
   return sum(ordered.map((entry, index) => field(entry) * weights[index]!));
 }
 
+/** The five directly-measured league means. Named explicitly rather than derived from `KickerPriors`
+ *  by `Omit`, so adding a fitted parameter there cannot silently make this function owe one. */
+type KickerLeagueMeans = Pick<
+  KickerPriors,
+  | "leagueFieldGoalAttemptsPerGame"
+  | "leagueExtraPointAttemptsPerGame"
+  | "leagueFieldGoalMakeRate"
+  | "leagueExtraPointMakeRate"
+  | "leagueGamesRate"
+>;
+
 /** The league means, measured directly. Nothing here is searched. */
-function leagueMeansOf(seasons: readonly KickerSeason[]): Omit<KickerPriors, "recencyDecay" | "teamPriorGames" | "kickerPriorFieldGoalAttempts" | "kickerPriorExtraPointAttempts" | "kickerPriorGames"> {
+function leagueMeansOf(seasons: readonly KickerSeason[]): KickerLeagueMeans {
   const games = sum(seasons.map((entry) => entry.games));
   const teamGames = sum(seasons.map((entry) => entry.teamGames));
   return {
@@ -202,7 +227,7 @@ interface Components {
 function predictComponents(
   ownPrior: readonly KickerSeason[],
   teamPrior: readonly KickerSeason[],
-  league: ReturnType<typeof leagueMeansOf>,
+  league: KickerLeagueMeans,
   decay: number,
 ): Components {
   const teamGamesSeen = weightedTotal(teamPrior, decay, (entry) => entry.games);
@@ -262,7 +287,7 @@ function observedComponents(entry: KickerSeason): Components | null {
  * comparable before they are summed, and so a make rate near 0.85 does not silently outweigh an
  * attempt count near 2.
  */
-function scoreDecay(seasons: readonly KickerSeason[], league: ReturnType<typeof leagueMeansOf>, decay: number): number {
+function scoreDecay(seasons: readonly KickerSeason[], league: KickerLeagueMeans, decay: number): number {
   const scale = [
     league.leagueFieldGoalAttemptsPerGame,
     league.leagueExtraPointAttemptsPerGame,
@@ -314,14 +339,65 @@ export function fitKickerPriors(seasons: readonly KickerSeason[], { heldOutSeaso
   const scored = recencyDecayGrid.map((decay) => ({ decay, error: scoreDecay(seasons, league, decay) }));
   // Ties resolve to the FIRST entry of the caller's own grid, so the fit is reproducible.
   const best = scored.reduce((chosen, entry) => (entry.error < chosen.error ? entry : chosen));
-  return {
+  const base: KickerPriors = {
     ...league,
     teamPriorGames: TEAM_PRIOR_GAMES,
     kickerPriorFieldGoalAttempts: KICKER_PRIOR_FIELD_GOAL_ATTEMPTS,
     kickerPriorExtraPointAttempts: KICKER_PRIOR_EXTRA_POINT_ATTEMPTS,
     kickerPriorGames: KICKER_PRIOR_GAMES,
     recencyDecay: best.decay,
+    projectionErrorVariance: 0,
   };
+  return { ...base, projectionErrorVariance: fitProjectionErrorVariance(seasons, base) };
+}
+
+/**
+ * THE VARIANCE OF THE MODEL'S OWN SEASON ERROR, measured leave-one-season-out over the fit window.
+ *
+ * For every kicker-season that has at least one earlier season behind it, the model is asked for
+ * exactly the projection it would have made from what preceded it, and the residual against what
+ * that season actually scored is recorded. The variance of those residuals is what a predictive
+ * interval owes on top of its outcome noise.
+ *
+ * NOT MEAN-CENTRED. The residuals are squared about ZERO rather than about their own mean, on
+ * purpose: a model with a systematic bias should have that bias widen its interval rather than be
+ * quietly subtracted out of its own error estimate. An honest interval pays for a bias it has not
+ * fixed.
+ */
+function fitProjectionErrorVariance(seasons: readonly KickerSeason[], priors: KickerPriors): number {
+  const residuals: number[] = [];
+  for (const entry of seasons) {
+    const ownPrior = seasons.filter((other) => other.playerId === entry.playerId && other.season < entry.season);
+    if (ownPrior.length === 0) continue;
+    const teamPrior = seasons.filter((other) => other.team === entry.team && other.season < entry.season);
+    const projected = projectedSeasonPoints(
+      { playerId: entry.playerId, team: entry.team, season: entry.season, ownHistory: ownPrior, teamHistory: teamPrior },
+      priors,
+    );
+    residuals.push(projected - actualSeasonPoints(entry));
+  }
+  if (residuals.length < 2) return 0;
+  return sum(residuals.map((residual) => residual ** 2)) / residuals.length;
+}
+
+/** What the model would have said this season would score, under the shipped preset. */
+function projectedSeasonPoints(input: KickerCandidateInput, priors: KickerPriors): number {
+  const candidate = kickerCandidate(input, priors);
+  return computeFantasyPoints(candidate.perGame, "K", PPR_SCORING) * candidate.games.expected;
+}
+
+/** What it actually scored, from the season's own totals. */
+function actualSeasonPoints(entry: KickerSeason): number {
+  const line: StatLine = {
+    playerId: entry.playerId,
+    week: 1,
+    ...(Object.fromEntries(STAT_FIELDS.map((field) => [field, 0])) as Omit<StatLine, "playerId" | "week">),
+    fieldGoalsMade: entry.fieldGoalsMade,
+    fieldGoalsMissed: entry.fieldGoalsAttempted - entry.fieldGoalsMade,
+    extraPointsMade: entry.extraPointsMade,
+    extraPointsMissed: entry.extraPointsAttempted - entry.extraPointsMade,
+  };
+  return computeFantasyPoints(line, "K", PPR_SCORING);
 }
 
 export interface KickerCandidateInput {
@@ -423,6 +499,7 @@ export function kickerCandidate(input: KickerCandidateInput, priors: KickerPrior
     team: input.team,
     perGame: kickerLine(input.playerId, components),
     games: gamesOutlook(gamesRate, teamGamesIn(input.season)),
+    seasonProjectionErrorVariance: priors.projectionErrorVariance,
     reasons: [
       ...(input.ownHistory.length === 0 ? ([{ code: "kicker_no_history" }] as const) : []),
       {

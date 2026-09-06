@@ -64,6 +64,7 @@
     "projections:kdef:backfill": "dotenv -e .env.local -- tsx scripts/kdef-backfill.ts",
     "projections:kdef:adp": "dotenv -e .env.local -- tsx scripts/kdef-adp-ingest.ts",
     "projections:kdef:fit": "dotenv -e .env.local -- tsx scripts/kdef-fit.ts",
+    "projections:kdef:judgment": "dotenv -e .env.local -- tsx scripts/kdef-judgment.ts",
     "projections:ecr:current": "dotenv -e .env.local -- tsx scripts/ingest-current-ecr.ts",
     "projections:preseason:persist": "dotenv -e .env.local -- tsx scripts/preseason-persist.ts",
     "projections:board:top": "dotenv -e .env.local -- tsx scripts/board-top.ts",
