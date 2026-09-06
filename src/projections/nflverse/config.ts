@@ -58,6 +58,29 @@ export const NFLVERSE_CONFIG = {
      * module for why a dedicated table beats reusing `preseason_rosters.draft_pick`.
      */
     draftPicks: "draft_picks",
+    /**
+     * PER-PLAYER WEEKLY LINES, the modern release (1999 to 2025). This adapter already reads
+     * `player_stats` for the four skill positions; this entry names the same family under its
+     * current asset spelling because the KICKING block (`fg_made`, the six made-by-distance
+     * buckets, the six missed-by-distance buckets, `pat_made`/`pat_att`/`pat_missed`/`pat_blocked`)
+     * is what a kicker's projection is composed from and no other file we hold carries it.
+     *
+     * Read by `kicking-weeks.ts`, which keeps ONLY rows whose `position` is `K` and only the
+     * kicking columns. That is not a second opinion about who is projectable competing with
+     * `projectedPosition` — it is a different STATISTIC about a different position, and the two
+     * readers never write the same table.
+     */
+    statsPlayer: "stats_player",
+    /**
+     * PER-TEAM WEEKLY LINES (1999 to 2025) — the only place a TEAM defense's own counting stats
+     * exist in the right shape. The per-player defensive columns `map.ts` deliberately refuses are
+     * refused for a good reason (a linebacker's sacks are a fact about him, not about a team); this
+     * release publishes the team's own totals directly, which is the quantity being projected.
+     *
+     * Read by `team-defense-weeks.ts`, which also uses each row's `passing_yards` and
+     * `rushing_yards` as its OPPONENT's yards allowed.
+     */
+    statsTeam: "stats_team",
   },
   /** Asset names. Only the ones covering the whole history are fixed; the rest carry a season. */
   files: {

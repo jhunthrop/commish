@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
-import { rankWeight, openStartingSlots, needMultiplier } from "./scoring";
+import { rankWeight, openStartingSlots, needMultiplier, deferredLateRoundPosition } from "./scoring";
 
 const SLOTS: readonly RosterSlotConfig[] = [
   { slot: "QB", count: 1, eligiblePositions: ["QB"] },
@@ -111,5 +111,89 @@ describe("needMultiplier's surplusDamp (the 2026-09-05 QB-stacking fix, correcte
 
   it("is a no-op at surplusDamp: 1 (compounding by 1 changes nothing)", () => {
     expect(needMultiplier("QB", oneFilledDedicated, SLOTS, { ...opts, surplusDamp: 1, rosteredAtPosition: 3 })).toBe(0.6);
+  });
+});
+
+/**
+ * THE LATE-ROUND DEFERRAL (the 2026-09-05 kicker and team defence round). Nobody drafts a kicker in
+ * round five, and a room that autopicked one for an absent manager would be visibly wrong to every
+ * other seat. These fix the three ways the deferral lifts and the three ways it never engages.
+ */
+describe("deferredLateRoundPosition", () => {
+  const FULL: readonly RosterSlotConfig[] = [
+    { slot: "QB", count: 1, eligiblePositions: ["QB"] },
+    { slot: "RB", count: 2, eligiblePositions: ["RB"] },
+    { slot: "WR", count: 2, eligiblePositions: ["WR"] },
+    { slot: "TE", count: 1, eligiblePositions: ["TE"] },
+    { slot: "FLEX", count: 1, eligiblePositions: ["RB", "WR", "TE"] },
+    { slot: "K", count: 1, eligiblePositions: ["K"] },
+    { slot: "DEF", count: 1, eligiblePositions: ["DEF"] },
+    { slot: "BENCH", count: 6, eligiblePositions: ["QB", "RB", "WR", "TE", "K", "DEF"] },
+  ];
+
+  /** `n` bodies on the bench and nothing else, so every dedicated starting slot reads open. */
+  function benchOnly(n: number): readonly RosterSlot[] {
+    return Array.from({ length: n }, (_, index) => ({ slot: "BENCH" as const, slotIndex: index, playerId: `p${index}` }));
+  }
+
+  /** Every skill starter filled, both late-round slots still open. */
+  const SKILL_FILLED: readonly RosterSlot[] = [
+    { slot: "QB", slotIndex: 0, playerId: "q" },
+    { slot: "RB", slotIndex: 0, playerId: "r1" },
+    { slot: "RB", slotIndex: 1, playerId: "r2" },
+    { slot: "WR", slotIndex: 0, playerId: "w1" },
+    { slot: "WR", slotIndex: 1, playerId: "w2" },
+    { slot: "TE", slotIndex: 0, playerId: "t" },
+    { slot: "FLEX", slotIndex: 0, playerId: "f" },
+  ];
+
+  it("is not deferred at all when the policy carries no rounds-from-the-end", () => {
+    expect(deferredLateRoundPosition("K", benchOnly(0), FULL, undefined)).toBe(false);
+    expect(deferredLateRoundPosition("DEF", benchOnly(3), FULL, undefined)).toBe(false);
+  });
+
+  it("defers both positions early, while another starting slot is still open", () => {
+    expect(deferredLateRoundPosition("K", benchOnly(0), FULL, 2)).toBe(true);
+    expect(deferredLateRoundPosition("DEF", benchOnly(5), FULL, 2)).toBe(true);
+  });
+
+  it("stops deferring once the team is inside the final rounds", () => {
+    // 15 slots, 2 rounds from the end: a roster of 13 or more has 2 or fewer picks left.
+    expect(deferredLateRoundPosition("K", benchOnly(12), FULL, 2)).toBe(true);
+    expect(deferredLateRoundPosition("K", benchOnly(13), FULL, 2)).toBe(false);
+    expect(deferredLateRoundPosition("DEF", benchOnly(14), FULL, 2)).toBe(false);
+  });
+
+  it("stops deferring the moment every other starting slot is filled, however early", () => {
+    expect(deferredLateRoundPosition("K", SKILL_FILLED, FULL, 2)).toBe(false);
+    expect(deferredLateRoundPosition("DEF", SKILL_FILLED, FULL, 2)).toBe(false);
+  });
+
+  it("counts a partly-filled starting slot as still open", () => {
+    const oneReceiverShort = SKILL_FILLED.filter((s) => s.playerId !== "w2");
+    expect(deferredLateRoundPosition("K", oneReceiverShort, FULL, 2)).toBe(true);
+  });
+
+  it("never defers a position that is not one of the two", () => {
+    expect(deferredLateRoundPosition("RB", benchOnly(0), FULL, 2)).toBe(false);
+    expect(deferredLateRoundPosition("QB", benchOnly(0), FULL, 2)).toBe(false);
+    expect(deferredLateRoundPosition("WR", benchOnly(0), FULL, 2)).toBe(false);
+  });
+
+  it("never lets one late-round position defer the other on account of its own open slot", () => {
+    // The exception reads "every OTHER starting slot", so K and DEF are excluded from the list
+    // each of them checks. Otherwise the two would deadlock each other forever.
+    expect(deferredLateRoundPosition("K", SKILL_FILLED, FULL, 2)).toBe(false);
+    expect(deferredLateRoundPosition("DEF", SKILL_FILLED, FULL, 2)).toBe(false);
+  });
+
+  it("never defers when the league starts no kicker and no defence at all", () => {
+    const noKdef = FULL.filter((s) => s.slot !== "K" && s.slot !== "DEF");
+    expect(deferredLateRoundPosition("K", benchOnly(0), noKdef, 2)).toBe(false);
+    expect(deferredLateRoundPosition("DEF", benchOnly(0), noKdef, 2)).toBe(false);
+  });
+
+  it("never defers under a zero-slot config, where nothing is ever legal anyway", () => {
+    expect(deferredLateRoundPosition("K", [], [], 2)).toBe(false);
   });
 });

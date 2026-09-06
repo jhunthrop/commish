@@ -6,6 +6,7 @@ import type { BoardReason } from "@/projections/preseason/board";
 import { Badge, Button, EmptyState, Movement, PositionBadge } from "@/components/ui";
 import { DRAFT_ROOM_CONFIG } from "../../state/config";
 import type { NeedFraction } from "../state/lens";
+import { marketOrderNoteFor } from "../../lib/market-order-note";
 import { formatAdp, positionRanks } from "../../lib/tiers";
 import { edgeSummary } from "./peek-sheet";
 import { DrawerRow } from "./drawer-row";
@@ -53,6 +54,9 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
       .filter(({ player }) => (position === ALL || player.position === position) && (needle === "" || player.name.toLowerCase().includes(needle)));
   }, [players, available, query, position]);
   const visible = rows.slice(0, DRAFT_ROOM_CONFIG.poolPageSize);
+  // Only while a single position is selected: the note is about THAT position, and printing it over
+  // the mixed ALL list would be attaching a claim to rows it is not about.
+  const marketOrderNote = position === ALL ? null : marketOrderNoteFor(position as Position);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -100,6 +104,15 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
           </div>
         )}
       </div>
+
+      {/* A position the engine publishes no projection for says so, once, above its own rows. A tab
+          of rows with no numbers and no sentence reads as a bug, and a manager who thinks the board
+          is broken trusts the rest of it less. `null` for every position that does carry one. */}
+      {marketOrderNote === null ? null : (
+        <p data-testid="market-order-note" className="rounded-sm bg-surface-inset px-3 py-2 text-xs text-text-muted">
+          {marketOrderNote}
+        </p>
+      )}
 
       {visible.length === 0 ? (
         <EmptyState

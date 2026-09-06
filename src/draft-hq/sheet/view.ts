@@ -3,7 +3,7 @@ import type { Db } from "@/db/client";
 import { players as playersTable } from "@/db/schema";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { boardRows, type BoardRow } from "@/draft-hq/board/service";
+import { boardRows, isProjectedRow, type BoardRow } from "@/draft-hq/board/service";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import type { SheetEntry, SheetWithEntries } from "./types";
 
@@ -78,6 +78,19 @@ export async function sheetEntryViews(
   return { entries, board };
 }
 
+/**
+ * PROJECTED ROWS ONLY (the 2026-09-05 kicker and team defence round). `BoardOption.rank` is the
+ * shipped board's own rank, and a market-order row has none, so it cannot be an option under this
+ * shape without inventing one.
+ *
+ * NOT A REGRESSION: before that round these two positions had no board rows at all, so they were
+ * never in this picker either. Letting a manager add one from here is a real feature and needs
+ * `BoardOption.rank` to become nullable along with every surface that renders it, which is a
+ * separate change from putting the positions on the board.
+ */
 export function boardOptionsFrom(board: readonly BoardRow[], limit: number = BOARD_OPTIONS_LIMIT): readonly BoardOption[] {
-  return board.slice(0, limit).map((row) => ({ playerId: row.playerId, name: row.name, position: row.position, team: row.team, rank: row.rank }));
+  return board
+    .filter(isProjectedRow)
+    .slice(0, limit)
+    .map((row) => ({ playerId: row.playerId, name: row.name, position: row.position, team: row.team, rank: row.rank }));
 }

@@ -43,7 +43,20 @@ import { LAST_POSSIBLE_WEEK } from "../store";
  * the identical reason `fit.ts`'s `fitRookieGameRate` gets one: this table is part of THIS
  * calibration effort, not a re-litigation of an existing fit nobody found wrong.
  */
-export const VARIANCE_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
+/**
+ * K AND DEF JOINED THIS LIST IN THE 2026-09-05 ROUND, and the two most volatile positions in the
+ * game finally band on their own measured spread rather than on availability alone. A kicker's week
+ * is three attempts or none, and a defence's is a pick six or a 400-yard afternoon; a games-only
+ * band understates both badly, which is exactly what `board.ts`'s `gameVarianceFor` used to do for
+ * them by returning zero.
+ *
+ * THEIR CELLS DO NOT COME FROM `fitGameVariance` BELOW. That function's own observation loader reads
+ * `player_week_observations`, which has never held a kicker row and can never hold a team-defence
+ * row, so asking it for those cells would produce a fabricated zero dressed as a measurement. See
+ * `GameVarianceFitOptions.positions` for the guard, and `kicker.ts`/`team-defense.ts` for where the
+ * two weekly-points series actually come from.
+ */
+export const VARIANCE_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"] as const;
 export type VariancePosition = (typeof VARIANCE_POSITIONS)[number];
 
 function isVariancePosition(position: Position): position is VariancePosition {
@@ -104,12 +117,32 @@ export async function loadGameVarianceObservations(db: ReadonlyDb, seasons: read
   return observations;
 }
 
-/** Pooled per-game points VARIANCE, per player class and position — points^2, the unit
- *  `seasonPointsBand` needs to compose with a games-count variance. */
-export type GameVariancePriors = Readonly<Record<PlayerClass, Readonly<Record<VariancePosition, number>>>>;
+/**
+ * Pooled per-game points VARIANCE, per player class and position — points^2, the unit
+ * `seasonPointsBand` needs to compose with a games-count variance.
+ *
+ * PARTIAL PER POSITION, and deliberately so (the 2026-09-05 round). A cell no fit has ever measured
+ * is ABSENT rather than zero, and `board.ts`'s `gameVarianceFor` reads `?? 0` — the games-only band
+ * every position had before the variance round. An absent cell and a measured zero are different
+ * claims, and a `Record` that could not tell them apart is how a fabricated number gets shipped.
+ */
+export type GameVariancePriors = Readonly<Record<PlayerClass, Partial<Readonly<Record<VariancePosition, number>>>>>;
+
+/** The four this function's own observation loader can actually measure. See
+ *  `GameVarianceFitOptions.positions`. */
+const OBSERVABLE_POSITIONS: readonly VariancePosition[] = ["QB", "RB", "WR", "TE"];
 
 export interface GameVarianceFitOptions {
   readonly heldOutSeasons: readonly number[];
+  /**
+   * Which cells to fit. Defaults to the four skill positions and NOT to all of
+   * `VARIANCE_POSITIONS`, because `loadGameVarianceObservations` reads `player_week_observations`,
+   * which holds no kicker row and no team-defence row: asking for those cells would pool an empty
+   * sample and write 0, a fabricated measurement indistinguishable from a real one. `kdef-fit.ts`
+   * passes `["K", "DEF"]` with observations built from the kicking and team-defence archives
+   * instead.
+   */
+  readonly positions?: readonly VariancePosition[];
 }
 
 /**
@@ -143,7 +176,10 @@ function pooledVariance(observations: readonly GameVarianceObservation[]): numbe
  */
 const MINIMUM_POOLED_PLAYER_SEASONS = 20;
 
-export function fitGameVariance(observations: readonly GameVarianceObservation[], { heldOutSeasons }: GameVarianceFitOptions): GameVariancePriors {
+export function fitGameVariance(
+  observations: readonly GameVarianceObservation[],
+  { heldOutSeasons, positions = OBSERVABLE_POSITIONS }: GameVarianceFitOptions,
+): GameVariancePriors {
   const forbidden = new Set(heldOutSeasons);
   for (const observation of observations) {
     if (forbidden.has(observation.season)) {
@@ -153,10 +189,10 @@ export function fitGameVariance(observations: readonly GameVarianceObservation[]
     }
   }
 
-  const result = {} as Record<PlayerClass, Record<VariancePosition, number>>;
+  const result = {} as Record<PlayerClass, Partial<Record<VariancePosition, number>>>;
   for (const playerClass of ["rookie", "veteran"] as const) {
-    result[playerClass] = {} as Record<VariancePosition, number>;
-    for (const position of VARIANCE_POSITIONS) {
+    result[playerClass] = {};
+    for (const position of positions) {
       const cell = observations.filter((o) => o.playerClass === playerClass && o.position === position);
       const eligible = cell.filter((o) => o.weeklyPoints.length >= 2);
       if (eligible.length >= MINIMUM_POOLED_PLAYER_SEASONS) {
@@ -204,14 +240,66 @@ export function seasonPointsBand(
   games: GamesPlayedOutlook,
   perGameVariance: number,
 ): { readonly floor: number; readonly median: number; readonly ceiling: number } {
+  return seasonPointsInterval(perGamePoints, games, perGameVariance, Z90);
+}
+
+/** The tenth and ninetieth percentiles, which is the band the board renders. */
+export const Z90 = 1.2815515655446004;
+
+/**
+ * The twenty-fifth and seventy-fifth percentiles — the "most seasons" interval the kicker and team
+ * defence preregistration's gate G3 is measured on (the 2026-09-05 round).
+ *
+ * A DELIBERATE DIFFERENCE FROM THE BAND THE BOARD RENDERS, and it is recorded rather than glossed:
+ * the spec names p25 to p75 for that gate and `seasonPointsBand` computes p10 to p90. Rather than
+ * measure the gate on a wider interval than the one the spec wrote down (which would make it easier
+ * to pass), the judgment computes the named interval from the same composed mean and variance. See
+ * the preregistration document for the amendment recording this.
+ */
+export const Z75 = 0.6744897501960817;
+
+/**
+ * The composed interval at an arbitrary z, which both percentile pairs above go through so the two
+ * can never be computed from different arithmetic.
+ */
+export function seasonPointsInterval(
+  perGamePoints: number,
+  games: GamesPlayedOutlook,
+  perGameVariance: number,
+  z: number,
+  /**
+   * HOW WRONG THE PROJECTION ITSELF TYPICALLY IS, in season points squared (the 2026-09-05 kicker
+   * and team defence round). Defaults to 0, which is byte-identical to every band this function
+   * produced before the parameter existed.
+   *
+   * THE THIRD SOURCE OF SPREAD, AND THE ONE THIS COMPOSITION WAS MISSING. The two terms above are
+   * both about OUTCOMES given a correct projection: how many games he plays, and how much his own
+   * weekly output varies around his own season mean. Neither says anything about how far the
+   * projected per-game rate is from his real one. That was found on a development check, not
+   * argued from theory: the 2013-2023 kicker fit scored on 2024 put only 23.5% of outcomes inside
+   * an interval meant to hold 50%, and the missing width is exactly parameter uncertainty. A
+   * kicker's projected volume is his club's shrunk attempt rate, and a club's real attempt rate
+   * moves season to season by far more than the model's certainty about it implied.
+   *
+   * MEASURED, NEVER CHOSEN: it is the variance of the residual between what the model projected for
+   * a season and what that season actually scored, taken leave-one-season-out over the fit window.
+   * See `fitKickerPriors` and `fitDefensePriors`.
+   *
+   * ADDED RATHER THAN COMPOUNDED, because the projection error and the outcome noise are different
+   * random quantities and a variance of a sum of independent terms is the sum of their variances.
+   * The independence is a documented simplification, the same class as the one the first two terms
+   * already make.
+   */
+  projectionErrorVariance = 0,
+): { readonly floor: number; readonly median: number; readonly ceiling: number } {
   const meanSeason = perGamePoints * games.expected;
   const gamesVariance = games.probabilities.reduce((sum, probability, count) => sum + probability * (count - games.expected) ** 2, 0);
-  const seasonVariance = games.expected * perGameVariance + gamesVariance * perGamePoints ** 2;
+  const seasonVariance =
+    games.expected * perGameVariance + gamesVariance * perGamePoints ** 2 + Math.max(0, projectionErrorVariance);
   const sd = Math.sqrt(Math.max(0, seasonVariance));
-  const Z90 = 1.2815515655446004;
   return {
-    floor: Math.max(0, meanSeason - Z90 * sd),
+    floor: Math.max(0, meanSeason - z * sd),
     median: meanSeason,
-    ceiling: meanSeason + Z90 * sd,
+    ceiling: meanSeason + z * sd,
   };
 }

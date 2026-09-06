@@ -9,6 +9,11 @@ import type { Law } from "../laws/types";
 import { spearman, type Observation } from "../metrics";
 import { scaleStatLine, type BoardCandidate, type BoardReason } from "../preseason/board";
 import { withAvailabilityRecency } from "../preseason/availability";
+import { kdefCandidates } from "../preseason/kdef-candidates";
+import { KDEF_POSITIONS, shipsProjectedRows } from "../preseason/kdef-decision";
+import { FITTED_DEFENSE_PRIORS, FITTED_KICKER_PRIORS } from "../preseason/kdef-fitted";
+import { kdefHistorySeasonsFor, loadKdefHistory } from "../preseason/kdef-history";
+import { preseasonRostersAsOf } from "../preseason/store";
 import { historicalRookieExpectedGames, rookieCurve, rookieCurveEvidenceN } from "../preseason/rookie-curve";
 import { shrinkTowardMarket } from "./thin-evidence-shrink";
 import {
@@ -945,9 +950,51 @@ export async function shippedPreseasonCandidates(
   const { entries: market, droppedCount } = await marketBoard(db, inputs.season, inputs.moment);
   assertLiveMarketCoverage(inputs, candidates, market);
   if (droppedCount > 0) {
-    console.warn(`market/blend.ts: marketBoard for ${inputs.season} dropped ${droppedCount} ADP row(s) with an unresolved position.`);
+    // "No curve" and not "unresolved": since the 2026-09-05 round the market board legitimately
+    // carries kickers and team defences (43 of them for 2025), and `marketBoard` drops them because
+    // `isCurvePosition` has no fitted rank-to-points curve for either. That is deliberate, it is
+    // what keeps the skill blend untouched, and an operator reading "unresolved" every run would
+    // reasonably go looking for an identity bug that is not there.
+    console.warn(
+      `market/blend.ts: marketBoard for ${inputs.season} dropped ${droppedCount} ADP row(s) whose position has no fitted market curve.`,
+    );
   }
-  return blendBoard(market, candidates, { season: inputs.season, constants, laws, propsAnchor });
+  const blended = blendBoard(market, candidates, { season: inputs.season, constants, laws, propsAnchor });
+  return [...blended, ...(await kdefCandidatesFor(db, inputs))];
+}
+
+/**
+ * THE TWO POSITIONS THE BLEND DOES NOT TOUCH (the 2026-09-05 kicker and team defence round).
+ *
+ * APPENDED AFTER `blendBoard`, NEVER THROUGH IT. `blendBoard` anchors a candidate to the market's
+ * own rank-to-points curve, and `market/curve.ts` fitted no curve for either position — which is
+ * exactly why `marketBoard` drops their rows and why the four skill positions' board did not move
+ * when the market benchmark learned to see them. Running them through a blend calibrated on skill
+ * players would be applying a correction measured on one population to another.
+ *
+ * AND FOR NOW IT RETURNS NOTHING AT ALL, because the single 2025 judgment failed both positions and
+ * `KDEF_DECISION` says so. That is the strong reading of the spec's own fallback, and it is
+ * deliberate: emitting rows carrying zero points so the position still appears would put a
+ * fabricated number in front of every reader and every consumer that sorts by points. A zero is not
+ * "no opinion", it is "we project nothing", which is a different and false claim. The board surface
+ * reads `KDEF_DECISION` and shows the market's own order instead.
+ *
+ * The builder is fully wired anyway, and that is the point: a later round whose judgment passes
+ * flips one constant in `kdef-decision.ts` and these rows appear, with no plumbing left to write.
+ */
+async function kdefCandidatesFor(db: ReadonlyDb, inputs: PreseasonInputs): Promise<readonly BoardCandidate[]> {
+  const shipping = KDEF_POSITIONS.filter((position) => shipsProjectedRows(position));
+  if (shipping.length === 0) return [];
+  const history = await loadKdefHistory(db, kdefHistorySeasonsFor(inputs.season), inputs.moment);
+  const roster = await preseasonRostersAsOf(db, { season: inputs.season, asOf: inputs.moment });
+  return kdefCandidates({
+    season: inputs.season,
+    roster,
+    history,
+    kicker: FITTED_KICKER_PRIORS,
+    defence: FITTED_DEFENSE_PRIORS,
+    rules: PPR_SCORING,
+  }).filter((candidate) => shipping.includes(candidate.position));
 }
 
 /**

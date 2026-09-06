@@ -9,6 +9,7 @@ import { tiersOf } from "@/projections/decide/tiers";
 import type { BoardReason } from "@/projections/preseason/board";
 import { BOARD_SOURCE, boardReasons, preseasonProjectionsAsOf } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { marketOrderPositions } from "@/projections/preseason/kdef-decision";
 import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 
 /**
@@ -41,16 +42,33 @@ export interface BoardRow {
   readonly team: string;
   readonly headshotUrl: string | null;
   /** The shipped board's own overall rank, by points — fixed, never recomputed per league.
-   *  A provenance fact, NOT the display order: the board displays `overallRank`. */
-  readonly rank: number;
+   *  A provenance fact, NOT the display order: the board displays `overallRank`.
+   *  `null` on a MARKET-ORDER row, which no stored board ever ranked. */
+  readonly rank: number | null;
   /** The board's served order: rank in VALUE under the caller's shape (points over replacement),
    *  with no-value positions last. This is what "overall rank" means to a drafter, and what the
-   *  Edge comparison against ADP (itself a value ordering) must use — founder ruling 2026-09-04. */
-  readonly overallRank: number;
-  readonly projectedPoints: number;
-  readonly floorPoints: number;
-  readonly medianPoints: number;
-  readonly ceilingPoints: number;
+   *  Edge comparison against ADP (itself a value ordering) must use — founder ruling 2026-09-04.
+   *  `null` on a MARKET-ORDER row: those rows are not on the value board at all. */
+  readonly overallRank: number | null;
+  /**
+   * THE FOUR PROJECTION FIELDS, NULL ON A MARKET-ORDER ROW (the 2026-09-05 kicker and team defence
+   * round). `null` and never `0`: the engine published nothing for that position, and a zero would
+   * be a fabricated number reaching every reader and every consumer that sorts by points. See
+   * `KDEF_DECISION` (`preseason/kdef-decision.ts`) and the results document it cites.
+   */
+  readonly projectedPoints: number | null;
+  readonly floorPoints: number | null;
+  readonly medianPoints: number | null;
+  readonly ceilingPoints: number | null;
+  /**
+   * The row's 1-based place in its own position's MARKET order, for a position that ships in market
+   * order. `null` on every projected row, where the honest lead is the value rank.
+   *
+   * A field of its own rather than borrowing `positionRankInValue`, because these rows have no
+   * value: reusing that field would make "rank in value order" mean two different things depending
+   * on which position a reader happened to be looking at.
+   */
+  readonly marketOrderRank: number | null;
   /** Recomputed under the caller's `LeagueShape`. `null` for a position the shape never starts
    *  at all (`valueBoard` leaves it out rather than pricing it at zero) — an honest "no draft
    *  value in this format" rather than a fabricated number. */
@@ -64,6 +82,36 @@ export interface BoardRow {
   readonly marketPositionAdp: string | null;
   readonly byeWeek: number | null;
   readonly reasons: readonly BoardReason[];
+}
+
+/**
+ * A board row the engine actually projected — every projection field a number rather than a
+ * maybe-number.
+ *
+ * The narrowing exists so a consumer that genuinely needs a projection (a capsule is written ABOUT
+ * one; the home preview ranks BY one) can say so in its types and filter once, rather than sprinkling
+ * non-null assertions or, worse, coercing an absence to a zero somebody later reads as a
+ * measurement. See `isProjectedRow`.
+ */
+export type ProjectedBoardRow = BoardRow & {
+  readonly rank: number;
+  readonly overallRank: number;
+  readonly projectedPoints: number;
+  readonly floorPoints: number;
+  readonly medianPoints: number;
+  readonly ceilingPoints: number;
+};
+
+/** Whether this row carries a projection at all. `false` for every market-order row. */
+export function isProjectedRow(row: BoardRow): row is ProjectedBoardRow {
+  return (
+    row.rank !== null &&
+    row.overallRank !== null &&
+    row.projectedPoints !== null &&
+    row.floorPoints !== null &&
+    row.medianPoints !== null &&
+    row.ceilingPoints !== null
+  );
 }
 
 export interface BoardOptions {
@@ -99,7 +147,10 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
     boardReasons(db, BOARD_SOURCE, PRODUCT_SEASON),
     byeWeeksByTeam(db),
   ]);
-  if (projections.length === 0) return [];
+  // Appended, never interleaved: a market-order position has no value rank, so it takes no part in
+  // the value sort below and cannot perturb a single projected row. See `marketOrderRows`.
+  const marketOrder = await marketOrderRows(db, byes);
+  if (projections.length === 0) return marketOrder;
 
   const nflIds = projections.map((row) => row.playerId);
   const crosswalkRows = await db
@@ -147,7 +198,7 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
   }
 
   return withPosition
-    .map(({ row, identity }): BoardRow => {
+    .map(({ row, identity }): ProjectedBoardRow => {
       const inValue = valuedByPlayer.get(row.playerId);
       const standing = standingsByPlayer.get(row.playerId);
       return {
@@ -159,6 +210,7 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
         headshotUrl: identity.headshotUrl,
         rank: row.rank,
         overallRank: 0, // assigned below, after the value sort — see the docblock on the field
+        marketOrderRank: null, // a projected row leads with its value rank, never a market place
         projectedPoints: row.projectedPoints,
         floorPoints: row.floorPoints,
         medianPoints: row.medianPoints,
@@ -193,5 +245,87 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
           return row.positionRankInValue === next ? row : { ...row, positionRankInValue: next };
         };
       })(),
-    );
+    )
+    .concat(marketOrder);
+}
+
+/**
+ * THE ROWS FOR A POSITION THAT SHIPS IN MARKET ORDER (the 2026-09-05 kicker and team defence round).
+ *
+ * Both the kicker and the team defence failed their preregistered gates on 2025
+ * (`docs/research/2026-09-05-kicker-defense-preregistration-results.md`), so `KDEF_DECISION` says
+ * the engine publishes no projection for either and `preseason_projections` holds not one row for
+ * them. Without this reader their tabs on the Draft HQ board read "No players match this filter",
+ * which is not what the spec's decision rule asks for and is not even true: the players exist and
+ * the market has an opinion about them. It is the ordering and the numbers the engine has nothing to
+ * say about.
+ *
+ * SO THE ROWS COME FROM THE PRODUCT'S OWN DIRECTORY AND CARRY THE MARKET'S OWN ORDER, and every
+ * projection field is `null`. Not zero, anywhere: `projectedPoints`, the three band figures,
+ * `valueOverReplacement`, `valueRank`, the tier triad, `rank` and `overallRank` are all absent,
+ * because absence is the honest rendering of "we did not measure this" and a zero is a claim.
+ *
+ * A PLAYER THE MARKET HAS NO OPINION ABOUT IS ABSENT ENTIRELY, rather than listed at the bottom with
+ * a blank ADP. The whole basis of the row is the market's order; without an ADP there is no basis
+ * and therefore no row. Measured on the 2025 board: 23 of the kickers and 9 of the defences with a
+ * real season carry no published average draft position at all.
+ *
+ * NOT PART OF THE VALUE SORT. These are concatenated after it, so they cannot perturb a single
+ * projected row, which is the same guarantee gate G4 makes for the offline board.
+ */
+async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>): Promise<readonly BoardRow[]> {
+  const positions = marketOrderPositions();
+  if (positions.length === 0) return [];
+
+  const rows = await db
+    .select({
+      playerId: playersTable.id,
+      name: playersTable.name,
+      position: playersTable.position,
+      team: playersTable.nflTeam,
+      headshotUrl: playersTable.headshotUrl,
+      adp: playersTable.adp,
+      posAdp: playersTable.posAdp,
+    })
+    .from(playersTable)
+    .where(inArray(playersTable.position, [...positions]));
+
+  const rankedByPosition = new Map<string, number>();
+  return rows
+    .flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]))
+    .sort((a, b) => a.adp - b.adp || a.playerId.localeCompare(b.playerId))
+    .map((row): BoardRow => {
+      const place = (rankedByPosition.get(row.position) ?? 0) + 1;
+      rankedByPosition.set(row.position, place);
+      return {
+        playerId: row.playerId,
+        // A market-order row is not joined through the crosswalk at all: its basis is the product's
+        // own directory and the market's own order, neither of which needs a gsis id. The field is
+        // the product id so nothing downstream can mistake it for an engine-keyed row.
+        nflPlayerId: row.playerId,
+        name: row.name,
+        position: row.position,
+        team: row.team,
+        headshotUrl: row.headshotUrl,
+        rank: null,
+        overallRank: null,
+        marketOrderRank: place,
+        projectedPoints: null,
+        floorPoints: null,
+        medianPoints: null,
+        ceilingPoints: null,
+        valueOverReplacement: null,
+        valueRank: null,
+        positionRankInValue: null,
+        tier: null,
+        playersLeftInTier: null,
+        dropToNextTier: null,
+        marketAdp: row.adp,
+        marketPositionAdp: row.posAdp,
+        byeWeek: byes.get(row.team) ?? null,
+        // No reasons: a reason explains a number this row does not carry. The surface says why the
+        // whole POSITION has none, once, above the table (`marketOrderNoteFor`).
+        reasons: [],
+      };
+    });
 }

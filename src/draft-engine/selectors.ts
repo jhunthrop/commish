@@ -5,7 +5,7 @@ import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
 import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
-import { needMultiplier, rankWeight } from "./scoring";
+import { deferredLateRoundPosition, needMultiplier, rankWeight } from "./scoring";
 import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type DraftAutopickPolicy, type PauseWindow } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 import { deadlineAfter, pausedUntil as pauseWindowEndAt } from "./pause";
@@ -256,6 +256,13 @@ export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEn
   const rosteredCounts = policy.surplusDamp === undefined ? null : rosteredCountsByPosition(roster, state.pool);
   let best: DraftPoolEntry | null = null;
   let bestScore = -Infinity;
+  /**
+   * The best candidate IGNORING the late-round deferral, kept so a legal board that is entirely
+   * kickers and defences still returns a pick rather than null. Deferring is a preference; refusing
+   * to pick never is, and a null here would stall a real room's clock.
+   */
+  let bestDeferred: DraftPoolEntry | null = null;
+  let bestDeferredScore = -Infinity;
   let legalIndex = 0;
   for (const entry of available) {
     if (!canFill(entry)) continue;
@@ -265,13 +272,23 @@ export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEn
     const score =
       rankWeight(legalIndex, policy.temperature) *
       needMultiplier(entry.position, roster, state.config.slotConfig, needOptions);
+    // `legalIndex` advances for EVERY legal candidate, deferred or not, so the board rank a
+    // candidate is scored at never depends on the deferral: a deferred kicker sitting at legal
+    // index 40 is still at 40 when the deferral lifts, and everyone below him is untouched.
+    legalIndex += 1;
+    if (deferredLateRoundPosition(entry.position, roster, state.config.slotConfig, policy.lateRoundOnlyRoundsFromEnd)) {
+      if (score > bestDeferredScore) {
+        bestDeferred = entry;
+        bestDeferredScore = score;
+      }
+      continue;
+    }
     if (score > bestScore) {
       best = entry;
       bestScore = score;
     }
-    legalIndex += 1;
   }
-  return best;
+  return best ?? bestDeferred;
 }
 
 /**

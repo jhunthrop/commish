@@ -116,6 +116,21 @@ export function projectedPosition(nflversePosition: string): Position | null {
       return "WR";
     case "TE":
       return "TE";
+    /**
+     * THE KICKER (the 2026-09-05 kicker and team defence round). One case and not two: nflverse
+     * spells him `K` in every row of every file checked, 2013 through 2025, and the stats provider's
+     * own `PK` is a different feed's spelling that never reaches this function. Admitting him here is
+     * what lets `isProjectedCandidate`, `allPositions` and every reader built on them see a kicker at
+     * all; that one gate is what has kept the position out of this engine since it was built.
+     *
+     * THERE IS NO `DEF` CASE AND THERE CANNOT BE ONE. A team defence is not a person, so no row in
+     * any nflverse file is one, so no file position could ever narrow to it. The 32 defences are
+     * built from the synthetic universe rows `crosswalk.ts`'s `seedTeamDefenseUniverse` writes, by
+     * their own candidate builder (`preseason/kdef-candidates.ts`), which is exactly why the spec
+     * calls for a separate builder rather than a wider gate that could never match anything.
+     */
+    case "K":
+      return "K";
     default:
       return null;
   }

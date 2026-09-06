@@ -547,6 +547,13 @@
       "when": 1788653341028,
       "tag": "0077_young_lockjaw",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1788664696395,
+      "tag": "0078_nostalgic_firestar",
+      "breakpoints": true
     }
   ]
 }

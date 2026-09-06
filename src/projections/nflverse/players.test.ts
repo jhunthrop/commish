@@ -53,6 +53,22 @@ describe("projectedPosition", () => {
     expect(projectedPosition("FB")).toBe("RB");
   });
 
+  it("recognizes a kicker, who is projected from the 2026-09-05 round on", () => {
+    expect(projectedPosition("K")).toBe("K");
+    // The stats provider's own spelling, which belongs to a different feed and never reaches here.
+    expect(projectedPosition("PK")).toBeNull();
+  });
+
+  /**
+   * A team defence is not a person, so no row in any nflverse file is one and no file position could
+   * ever narrow to it. The 32 defences are built from synthetic universe rows by their own candidate
+   * builder, which is why the spec calls for a separate builder rather than a wider gate.
+   */
+  it("still narrows a team defence to nothing, because no source row is one", () => {
+    expect(projectedPosition("DEF")).toBeNull();
+    expect(projectedPosition("DST")).toBeNull();
+  });
+
   it("returns null for a position the engine does not project", () => {
     expect(projectedPosition("C")).toBeNull();
     expect(projectedPosition("LB")).toBeNull();

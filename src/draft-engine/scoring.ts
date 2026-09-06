@@ -8,7 +8,7 @@
  * (`MOCK_CONFIG.strategy`) can never contaminate each other.
  */
 import type { Position } from "@/domain/player";
-import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
+import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig } from "@/domain/roster";
 
 /** `exp(-index / temperature)`: rank 0 weighs 1, each step down the board decays smoothly. */
 export function rankWeight(index: number, temperature: number): number {
@@ -111,4 +111,57 @@ export function needMultiplier(
   if (open > 0) return warmed;
   if (surplusDamp === undefined) return open === 0 ? filledDamp : warmed;
   return filledDamp * surplusDamp ** extraSurplusBodies(position, roster, slotConfig, rosteredAtPosition);
+}
+
+/**
+ * The two positions a real draft board takes last (the 2026-09-05 kicker and team defence round).
+ * Named here rather than inlined at the one call site so a format that starts two of either has one
+ * list to widen.
+ */
+export const LATE_ROUND_ONLY_POSITIONS: readonly Position[] = ["K", "DEF"];
+
+/**
+ * Whether a candidate at `position` should be passed over FOR NOW — see
+ * `DraftAutopickPolicy.lateRoundOnlyRoundsFromEnd` (`./config`) for the whole argument and for why
+ * this is a preference the caller can override rather than a legality rule.
+ *
+ * Five ways to be un-deferred, and a candidate needs only one: the policy carries no
+ * rounds-from-the-end at all (a pre-policy snapshot, which must replay byte for byte), the position
+ * is not one of the two, the league configures no dedicated starting slot for it, the team is inside
+ * the final rounds, or every OTHER dedicated starting slot is already filled.
+ *
+ * THE NO-SLOT CASE IS NOT AN EDGE, IT IS A WHOLE FORMAT. A league that starts no kicker can still
+ * ROSTER one, on the bench, because `STANDARD_ROSTER_SLOTS`-style bench slots take every position.
+ * There is nothing to save him for in that league, so deferring him would mean an autopick that
+ * never takes a kicker at all while a real manager in the same room freely can. Board order decides
+ * there, which is what it did before this policy existed.
+ *
+ * "Rounds left" is the team's own remaining picks — total configured slots minus what it already
+ * holds — never the global pick number, so a team redeeming owed picks is measured against its own
+ * progress exactly the way `needRamp` (`selectors.ts`) measures it.
+ *
+ * THE OTHER-SLOT TEST EXCLUDES BOTH LATE-ROUND POSITIONS, and it has to: each of them has an open
+ * dedicated slot for the whole draft, so a test that counted them would have K deferring on DEF's
+ * open slot and DEF deferring on K's, forever, and the deferral would never lift on that branch at
+ * all. BENCH is excluded because a bench spot is open until the very last pick and is not a
+ * statement of need. FLEX is INCLUDED, by slot label rather than by position: a team that has not
+ * filled its flex still needs a skill player more than it needs a kicker.
+ */
+export function deferredLateRoundPosition(
+  position: Position,
+  roster: readonly RosterSlot[],
+  slotConfig: readonly RosterSlotConfig[],
+  roundsFromEnd: number | undefined,
+): boolean {
+  if (roundsFromEnd === undefined) return false;
+  if (!LATE_ROUND_ONLY_POSITIONS.includes(position)) return false;
+  if (configuredDedicatedSlots(position, slotConfig) === 0) return false;
+  const totalSlots = slotConfig.reduce((sum, entry) => sum + entry.count, 0);
+  if (totalSlots - roster.length <= roundsFromEnd) return false;
+  return slotConfig.some(
+    (entry) =>
+      entry.slot !== BENCH_SLOT &&
+      !LATE_ROUND_ONLY_POSITIONS.includes(entry.slot as Position) &&
+      roster.filter((filled) => filled.slot === entry.slot).length < entry.count,
+  );
 }

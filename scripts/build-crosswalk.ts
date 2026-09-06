@@ -18,10 +18,12 @@ import { createDb } from "@/db/client";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ingestPlayerUniverse } from "@/projections/nflverse/ingest";
 import {
+  CROSSWALK_METHOD,
   crosswalkInputs,
   crosswalkRows,
   recordCrosswalk,
   resolveCrosswalk,
+  seedTeamDefenseUniverse,
   type CrosswalkMiss,
   type UnmatchedReason,
 } from "@/projections/crosswalk";
@@ -30,7 +32,8 @@ import {
 const NAMED_MISSES = 12;
 
 const REASON_MEANING: Readonly<Record<UnmatchedReason, string>> = {
-  not_an_nfl_player: "team defences, which have no person and never will",
+  not_an_nfl_player: "a defence id no team code answers to, or a seed row that was never a player",
+  no_team_defense_row: "a real defence whose synthetic universe row is missing; the seed step did not run",
   no_espn_id: "nobody in the universe carries this id — fringe, undrafted, or a fabricated seed row",
   ambiguous_espn_id: "two universe rows claim the id; refused rather than guessed at",
 };
@@ -63,8 +66,14 @@ async function main(): Promise<void> {
   console.log("refreshing the historical player universe (the release carries the bridging id)...");
   await ingestPlayerUniverse(db, createNflverseClient());
 
-  const { providers, universe } = await crosswalkInputs(db);
-  const resolution = resolveCrosswalk(providers, universe);
+  // The 32 synthetic team-defence rows, seeded BEFORE the resolve so the edges have somewhere to
+  // point. See `seedTeamDefenseUniverse`'s own docblock for why a synthetic row in a table of real
+  // people is the right shape here.
+  console.log("seeding the 32 synthetic team-defence universe rows...");
+  console.log(`  ${await seedTeamDefenseUniverse(db)} written (0 means they were already there)`);
+
+  const { providers, universe, teamDefenses } = await crosswalkInputs(db);
+  const resolution = resolveCrosswalk(providers, universe, teamDefenses);
   const written = await recordCrosswalk(db, crosswalkRows(resolution, new Date()));
 
   console.log(`\n${"=".repeat(88)}`);
@@ -76,6 +85,14 @@ async function main(): Promise<void> {
   console.log(`rows written                        ${written}`);
   console.log(`match rate, all league players      ${percent(resolution.matchRate)}`);
   console.log(`match rate, people only             ${percent(resolution.matchRateOfPeople)}`);
+
+  // The two populations this round exists for, counted separately, because "the rate went up" is
+  // not evidence that either of them landed.
+  const defenceEdges = resolution.matched.filter((match) => match.method === CROSSWALK_METHOD.teamDefense).length;
+  console.log(`team defences placed                ${defenceEdges} of 32`);
+  const kickers = new Set(providers.filter((provider) => provider.position === "K").map((provider) => provider.id));
+  const kickersPlaced = resolution.matched.filter((match) => kickers.has(match.playerId)).length;
+  console.log(`kickers placed                      ${kickersPlaced} of ${kickers.size}`);
 
   console.log("\nUNMATCHED, by reason. Recorded, never dropped.");
   for (const [reason, misses] of groupByReason(resolution.unmatched)) {

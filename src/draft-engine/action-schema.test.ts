@@ -75,6 +75,37 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
     expect(draftActionSchema.parse(row)).toEqual(row);
   });
 
+  it("accepts an autopick snapshot with lateRoundOnlyRoundsFromEnd absent — a pre-policy log, never today's tunable", () => {
+    const { lateRoundOnlyRoundsFromEnd: _omit, ...prePolicyAutopick } = AUTOPICK_CONFIG;
+    void _omit;
+    const row = {
+      v: 1,
+      type: "START_DRAFT", minBid: 1, autopick: prePolicyAutopick,
+      timestamp: "2026-09-01T00:00:00.000Z",
+      draftOrder: ["t1", "t2"],
+      pool: [{ playerId: "p1", position: "QB" }],
+    };
+    expect(draftActionSchema.parse(row)).toEqual(row);
+    expect(draftActionSchema.parse(row).type === "START_DRAFT" ? draftActionSchema.parse(row) : null)
+      .not.toHaveProperty("autopick.lateRoundOnlyRoundsFromEnd");
+  });
+
+  it("rejects a lateRoundOnlyRoundsFromEnd that is not a positive whole number of rounds", () => {
+    const baseRow = {
+      v: 1,
+      type: "START_DRAFT", minBid: 1,
+      timestamp: "2026-09-01T00:00:00.000Z",
+      draftOrder: ["t1", "t2"],
+      pool: [{ playerId: "p1", position: "QB" }],
+    };
+    // 0 is `undefined` with extra steps (defer until the final pick, then lift), and a fractional
+    // round is not a round at all.
+    expect(() => draftActionSchema.parse({ ...baseRow, autopick: { ...AUTOPICK_CONFIG, lateRoundOnlyRoundsFromEnd: 0 } })).toThrow();
+    expect(() => draftActionSchema.parse({ ...baseRow, autopick: { ...AUTOPICK_CONFIG, lateRoundOnlyRoundsFromEnd: 1.5 } })).toThrow();
+    expect(() => draftActionSchema.parse({ ...baseRow, autopick: { ...AUTOPICK_CONFIG, lateRoundOnlyRoundsFromEnd: -1 } })).toThrow();
+    expect(draftActionSchema.parse({ ...baseRow, autopick: { ...AUTOPICK_CONFIG, lateRoundOnlyRoundsFromEnd: 3 } }).type).toBe("START_DRAFT");
+  });
+
   it("rejects surplusDamp: 0 and anything above 1 — steep is fine, disqualifying or warming is not", () => {
     const baseRow = {
       v: 1,

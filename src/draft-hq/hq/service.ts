@@ -2,7 +2,7 @@ import type { Db } from "@/db/client";
 import type { Position } from "@/domain/player";
 import { plural } from "@/domain/duration";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
-import { boardRows } from "@/draft-hq/board/service";
+import { boardRows, isProjectedRow, type BoardRow } from "@/draft-hq/board/service";
 import { nextDraftingLeague as nextDraftingLeagueRow } from "@/draft-hq/league-context";
 import { defaultSheetFor } from "@/draft-hq/sheet/service";
 
@@ -96,12 +96,19 @@ async function nextDraftingLeagueContext(db: Db, userId: string): Promise<DraftH
 export async function draftHqBody(db: Db, userId: string): Promise<DraftHqBody> {
   const [nextDraft, board, sheet] = await Promise.all([
     nextDraftingLeagueContext(db, userId),
-    boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } }).catch(() => []),
+    boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } }).catch(
+      (): readonly BoardRow[] => [],
+    ),
     defaultSheetFor(db, userId, null),
   ]);
   return {
     nextDraft,
-    boardPreview: board.slice(0, HQ_BOARD_PREVIEW_ROWS).map((row) => ({
+    // PROJECTED ROWS ONLY (the 2026-09-05 kicker and team defence round): this preview is the top
+    // of the board BY PROJECTION, and the board now also carries market-order rows for positions
+    // the engine published nothing for. They sit after every projected row anyway, so the slice
+    // would not have reached them, and the filter is what makes that a rule rather than a
+    // coincidence of ordering.
+    boardPreview: board.filter(isProjectedRow).slice(0, HQ_BOARD_PREVIEW_ROWS).map((row) => ({
       playerId: row.playerId,
       name: row.name,
       position: row.position,

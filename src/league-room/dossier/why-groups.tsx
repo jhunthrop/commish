@@ -63,6 +63,22 @@ function factSentence(reason: FactReason): { readonly lead: string; readonly exp
       return { lead: "Rookie", explanation: reason.overallPick === null ? "Undrafted." : `Pick ${reason.overallPick}.` };
     case "market_unlisted":
       return { lead: "Not on the market", explanation: "The feed carries no ADP for him." };
+    // The kicker and team defence reasons (the 2026-09-05 round): components a reader can argue
+    // with, the same facts `reason-chip.tsx` states as one line, split into lead and explanation.
+    case "kicker_no_history":
+      return { lead: "No kicking record yet", explanation: "Uses his club's volume and the league's make rates." };
+    case "kicker_opportunity":
+      return {
+        lead: "Kicking opportunity",
+        explanation: `${reason.fieldGoalAttemptsPerGame.toFixed(1)} field goal and ${reason.extraPointAttemptsPerGame.toFixed(1)} extra point tries a game, ${Math.round(reason.fieldGoalMakeRate * 100)}% made.`,
+      };
+    case "defense_no_history":
+      return { lead: "No defensive record in these seasons", explanation: "Uses the league's own rates." };
+    case "defense_takeaways":
+      return {
+        lead: "Takeaways and pressure",
+        explanation: `${reason.sacksPerGame.toFixed(1)} sacks and ${reason.takeawaysPerGame.toFixed(1)} takeaways a game, ${signedPoints(reason.tierPointsPerGame)} points from what it allows.`,
+      };
     default: {
       // Exhaustiveness guard: a future `BoardReason` variant with no case above fails `tsc` here
       // rather than rendering silently wrong copy.

@@ -46,6 +46,8 @@
  * Should one feed ever reach further back than the other, this splits into two constants rather than
  * quietly becoming the minimum of them.
  */
+import { productTeamCode, sourceTeamCode, teamDefenseUniverseId } from "../nflverse/team-codes";
+
 export const BENCHMARK_BOARD_FLOOR = 2013;
 
 /** Where a published preseason ranking came from. Free text, matching the store's `source` column. */
@@ -113,15 +115,47 @@ export function normalizeName(name: string): string {
   return withoutSuffix.join(" ");
 }
 
-/** Both sides' position spellings reduced to the four groups a fantasy board actually distinguishes. */
+/** Both sides' position spellings reduced to the groups a fantasy board actually distinguishes. */
 function positionGroup(position: string): string {
   const upper = position.trim().toUpperCase();
   if (upper === "FB" || upper === "HB") return "RB";
+  // THE KICKER'S TWO SPELLINGS (the 2026-09-05 round). The market board publishes him as `PK` and
+  // the roster this resolver joins against spells him `K`, so every kicker on every published board
+  // failed the name-and-position key and landed in `unresolved`. Measured against the real 2025
+  // FFC board: 249 rows published, 205 resolved, and 20 of the 44 misses were kickers. The same
+  // class of translation `FB` gets on the line above, and the same reason: two feeds naming one
+  // position two ways is not a reason to lose the position.
+  if (upper === "PK") return "K";
+  // The market board's own spelling for a team defence. `DST` appears on other publishers' boards
+  // and is folded here so this resolver's DEF branch below sees one spelling.
+  if (upper === "DST" || upper === "D/ST" || upper === "DEF") return "DEF";
   return upper;
 }
 
 function keyOf(name: string, position: string): string {
   return `${normalizeName(name)}|${positionGroup(position)}`;
+}
+
+/** The position value the product uses for a team defence, which is never a person. */
+const TEAM_DEFENSE_POSITION = "DEF";
+
+/**
+ * The synthetic universe id a published defence row belongs to, or `null` for a row whose team code
+ * neither feed recognises (which the resolver records as unresolved rather than guessing at).
+ *
+ * `productTeamCode` then `sourceTeamCode` on purpose: the market's own list mixes the two spellings
+ * (`LAR` from the product's vocabulary, `WAS` from the source's), and running it through both in
+ * that order normalises either into the source spelling the universe id is minted from.
+ */
+function teamDefenseUniverseIdOf(team: string | null): string | null {
+  if (team === null) return null;
+  const code = team.trim().toUpperCase();
+  if (code === "") return null;
+  try {
+    return teamDefenseUniverseId(sourceTeamCode(productTeamCode(code)));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -170,6 +204,23 @@ export function resolveRankings(
   const unresolved: RankingCandidate[] = [];
   const taken = new Set<string>();
   for (const candidate of candidates) {
+    // A TEAM DEFENCE IS PLACED BY TEAM CODE, NEVER BY NAME (the 2026-09-05 round). It is not a
+    // person, so it has no row on the week-one roster this resolver joins against and could never
+    // resolve at all: every published defence on every board landed in `unresolved`, which is why
+    // the store held no market price for the position. Its published `team` is a code rather than a
+    // spelling of a name, so this is an id-ish join and strictly safer than the name join every
+    // person goes through. `team-codes.ts` absorbs the market's own mixed spelling — the real FFC
+    // board carries `LAR` (the product's) and `WAS` (the source's) in the same list.
+    if (positionGroup(candidate.position) === TEAM_DEFENSE_POSITION) {
+      const universeId = teamDefenseUniverseIdOf(candidate.team);
+      if (universeId === null || taken.has(universeId)) {
+        unresolved.push(candidate);
+        continue;
+      }
+      taken.add(universeId);
+      resolved.push({ playerId: universeId, rank: candidate.rank });
+      continue;
+    }
     const exact = byKey.get(keyOf(candidate.name, candidate.position)) ?? [];
     const loose = byLooseKey.get(looseKeyOf(candidate.name, candidate.position) ?? "") ?? [];
     const claimants = exact.length > 0 ? exact : loose.length === 1 ? loose : [];

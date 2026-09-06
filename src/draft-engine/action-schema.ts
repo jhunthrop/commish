@@ -61,6 +61,13 @@ const autopickPolicy = z
     // intends — steep, not disqualifying), and anything above 1 would warm a surplus instead of
     // cooling it.
     surplusDamp: z.number().gt(0).lte(1).optional(),
+    // The 2026-09-05 kicker and team defence round
+    // (`DraftAutopickPolicy.lateRoundOnlyRoundsFromEnd`, `./config`). Optional for the identical
+    // F3 reason every other field here is: a log written before this policy existed carries none,
+    // and absent must mean no deferral at all rather than today's tunable. A positive integer —
+    // it counts ROUNDS, and zero would be a policy that defers right up to a team's final pick and
+    // then lifts, which is `undefined` with extra steps.
+    lateRoundOnlyRoundsFromEnd: z.number().int().positive().optional(),
   })
   .optional();
 

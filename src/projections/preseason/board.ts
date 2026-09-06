@@ -4,8 +4,8 @@ import type { ProjectionDistribution } from "../decide/outlook";
 import { valueBoard, type LeagueShape, type SeasonProjection, type ValuedPlayer } from "../decide/replacement";
 import { tiersOf } from "../decide/tiers";
 import type { GamesPlayedOutlook } from "./availability";
-import { FITTED_GAME_VARIANCE } from "./game-variance-fitted";
-import { seasonPointsBand, VARIANCE_POSITIONS, type GameVariancePriors, type PlayerClass, type VariancePosition } from "./game-variance";
+import { SHIPPED_GAME_VARIANCE } from "./fitted-variance";
+import { seasonPointsInterval, VARIANCE_POSITIONS, Z90, type GameVariancePriors, type PlayerClass, type VariancePosition } from "./game-variance";
 
 /**
  * THE PRESEASON BOARD — every player ranked before a ball is thrown, in one league's own scoring.
@@ -107,7 +107,45 @@ export type BoardReason =
    * season value, per `discovery/templates.ts`'s `primaryQuantityIdOf`). Built by
    * `laws/board-reasons.ts`'s `lawReasonsFor`, the one place a candidate's facts become this variant.
    */
-  | { readonly code: "law"; readonly lawId: string; readonly effect: number; readonly magnitude: number };
+  | { readonly code: "law"; readonly lawId: string; readonly effect: number; readonly magnitude: number }
+  /**
+   * A kicker with no kicking history at all in the seasons this board reads — a rookie, or a man
+   * who has never held the job. His attempt volume comes from the club he signed with and his make
+   * rates are the league's own, and this reason is how the row SAYS SO rather than presenting a
+   * league mean as if it were a measurement of him.
+   */
+  | { readonly code: "kicker_no_history" }
+  /**
+   * What a kicker's projection is actually built from, and the three numbers a reader can argue
+   * with: his club's own field-goal and extra-point attempts a game (shrunk toward the league by
+   * how many games of that club this board has seen) and his own field-goal make rate (shrunk
+   * toward the league by his own attempt count). Attempts travel with the offence and make rates
+   * travel with the man, which is the whole reason this beats a last-season-points order.
+   */
+  | {
+      readonly code: "kicker_opportunity";
+      readonly fieldGoalAttemptsPerGame: number;
+      readonly extraPointAttemptsPerGame: number;
+      readonly fieldGoalMakeRate: number;
+    }
+  /**
+   * A team defence with no defensive history in the seasons this board reads — an expansion club, or
+   * a season the archive does not cover. Every component is the league's own, and this reason is how
+   * the row says so rather than presenting a league mean as a measurement of this club.
+   */
+  | { readonly code: "defense_no_history" }
+  /**
+   * What a team defence's projection is built from: sacks and takeaways a game (each shrunk toward
+   * the league by the club's own game count) and the points the tier tables award, AVERAGED over the
+   * club's own shrunk per-game distribution rather than read off its average. Those tables are step
+   * functions, and the expectation of a step function is not the step function of the expectation.
+   */
+  | {
+      readonly code: "defense_takeaways";
+      readonly sacksPerGame: number;
+      readonly takeawaysPerGame: number;
+      readonly tierPointsPerGame: number;
+    };
 
 /** One player as the board receives him: a per-game line, a games distribution, and his causes. */
 export interface BoardCandidate {
@@ -117,6 +155,36 @@ export interface BoardCandidate {
   /** Layer 3's predicted line for ONE game. `week` on it is not read. */
   readonly perGame: StatLine;
   readonly games: GamesPlayedOutlook;
+  /**
+   * THE NONLINEAR PART OF A TEAM DEFENCE'S SCORE, ALREADY AVERAGED, IN POINTS PER GAME (the
+   * 2026-09-05 kicker and team defence round).
+   *
+   * Points allowed and yards allowed are scored through step tables (`scoring/compute.ts`'s
+   * `POINTS_ALLOWED_TIERS` and `YARDS_ALLOWED_TIERS`), and the expectation of a step function is
+   * not the step function of the expectation. A defence that allows 13 one week and 27 the next
+   * averages 20 and scores 1 point on that average, while the two real weeks score 3 and 0 for an
+   * average of 1.5. So `team-defense.ts` averages the tier function over the team's own shrunk
+   * per-game distribution and hands the result here, and the `perGame` line it hands over carries
+   * NO `pointsAllowed` and NO `yardsAllowed` at all — which `computeFantasyPoints` already reads,
+   * correctly, as "not recorded".
+   *
+   * ABSENT for every other position and for every skill candidate, which is why adding it changed
+   * no existing board row. Both `perGamePoints` and `projectedPoints` add it (times the game count,
+   * for the season figure) and both are unchanged when it is absent.
+   */
+  readonly perGameTierPoints?: number;
+  /**
+   * HOW WRONG THIS CANDIDATE'S OWN PROJECTION TYPICALLY IS, in season points squared (the 2026-09-05
+   * kicker and team defence round). Feeds `seasonPointsInterval`'s third variance term.
+   *
+   * ABSENT for every skill candidate, which is why adding it moved no existing row, and that absence
+   * is an honest "not measured yet" rather than a claim of zero: this round measured the quantity
+   * for the two positions it fitted and for no others. The band a skill player carries is therefore
+   * still outcome noise only, exactly as it was, and the two new positions carry the wider and more
+   * honest interval. A later round that measures it for the four skill positions closes the gap; see
+   * `seasonPointsInterval`'s own docblock for why an interval without this term understates itself.
+   */
+  readonly seasonProjectionErrorVariance?: number;
   /** Reasons discovered upstream, before scarcity and tiers are known. */
   readonly reasons: readonly BoardReason[];
 }
@@ -129,7 +197,7 @@ export interface PreseasonBoardOptions {
   readonly shape: LeagueShape;
   /**
    * PER-GAME PERFORMANCE VARIANCE (calibration fix round, 2026-09-04, Task 4) — defaults to the
-   * committed `FITTED_GAME_VARIANCE`, exactly like `rules`/`shape` are the only things a caller
+   * committed `SHIPPED_GAME_VARIANCE` (`fitted-variance.ts`, the two generated halves composed), exactly like `rules`/`shape` are the only things a caller
    * normally has to supply at all. A test (or a future fit script) passes its own to drive the band
    * with different cells; see `game-variance.ts`'s own module docblock for what this measures and
    * why it is fit separately from the rest of the model.
@@ -163,14 +231,52 @@ export interface BoardEntry extends ValuedPlayer {
   readonly reasons: readonly BoardReason[];
 }
 
+/**
+ * THE SCORED FIELDS THAT ARE NOT IN `STAT_FIELDS` AND SCALE LINEARLY ANYWAY (the 2026-09-05 kicker
+ * and team defence round).
+ *
+ * `STAT_FIELDS` is the canonical list two OTHER readers walk (the per-tick digest and the provider
+ * contract suite, see `domain/player.ts`), and widening it would make every stats provider owe
+ * numbers it may not have. But `computeFantasyPoints` scores every field below, and a kicker's
+ * misses and a defence's fumble recoveries and safeties are per-game quantities that multiply by a
+ * game count exactly the way a reception does. Left out, a kicker's season line would carry his
+ * makes and not his misses, and a defence would forfeit every takeaway that was not an interception.
+ *
+ * SCALED ONLY WHERE PRESENT, which is what makes this change invisible to every board row that
+ * existed before it: `composeStatLine` (`model/compose.ts`) emits `STAT_FIELDS` and nothing else, so
+ * every QB, RB, WR and TE candidate carries `undefined` for all of these, and `undefined` stays
+ * `undefined`.
+ *
+ * `pointsAllowed` AND `yardsAllowed` ARE DELIBERATELY ABSENT FROM THIS LIST. They are scored through
+ * nonlinear tier tables (`scoring/compute.ts`), so seventeen games of points allowed is not a
+ * quantity those tables can read at all. A defence's expected tier points ride on
+ * `BoardCandidate.perGameTierPoints` instead.
+ */
+const SCALED_OPTIONAL_FIELDS = [
+  "twoPointConversions",
+  "fieldGoalsMissed",
+  "extraPointsMissed",
+  "kickReturnTouchdowns",
+  "puntReturnTouchdowns",
+  "defensiveFumblesRecovered",
+  "safeties",
+] as const satisfies readonly (keyof StatLine)[];
+
 /** Every component multiplied by a number of games. Scoring is applied after, never before. */
 export function scaleStatLine(line: StatLine, games: number): StatLine {
   if (!(games >= 0) || !Number.isFinite(games)) {
     throw new Error(`A season line is a per-game line times a finite number of games; got ${games}.`);
   }
+  const optional = Object.fromEntries(
+    SCALED_OPTIONAL_FIELDS.flatMap((field) => {
+      const value = line[field];
+      return value === undefined ? [] : [[field, value * games] as const];
+    }),
+  );
   return {
     ...line,
     ...(Object.fromEntries(STAT_FIELDS.map((field) => [field, line[field] * games])) as Omit<StatLine, "playerId" | "week">),
+    ...optional,
   };
 }
 
@@ -254,27 +360,42 @@ function gameVarianceFor(candidate: BoardCandidate, priors: GameVariancePriors):
   if (!(VARIANCE_POSITIONS as readonly Position[]).includes(candidate.position)) return 0;
   const position = candidate.position as VariancePosition;
   const playerClass: PlayerClass = isRookieCandidate(candidate) ? "rookie" : "veteran";
-  return priors[playerClass][position];
+  // `?? 0` and NEVER a borrowed number: a cell no fit has measured is ABSENT from the priors
+  // (`GameVariancePriors` is partial per position on purpose), and zero here is the games-only band
+  // every position carried before the variance round rather than a claim about this one.
+  return priors[playerClass][position] ?? 0;
 }
 
 export function preseasonBoard(
   candidates: readonly BoardCandidate[],
-  { rules, shape, gameVariance = FITTED_GAME_VARIANCE }: PreseasonBoardOptions,
+  { rules, shape, gameVariance = SHIPPED_GAME_VARIANCE }: PreseasonBoardOptions,
 ): readonly BoardEntry[] {
   const byPlayer = new Map<string, { candidate: BoardCandidate; seasonLine: StatLine; outlook: ProjectionDistribution }>();
   const projections: SeasonProjection[] = [];
 
   for (const candidate of candidates) {
+    // The nonlinear component, already averaged over the candidate's own per-game distribution, in
+    // points per game. Zero for every position but DEF — see `BoardCandidate.perGameTierPoints`.
+    const tierPoints = candidate.perGameTierPoints ?? 0;
     const seasonLine = scaleStatLine(candidate.perGame, candidate.games.expected);
-    const perGamePoints = computeFantasyPoints(candidate.perGame, candidate.position, rules);
-    const projectedPoints = computeFantasyPoints(seasonLine, candidate.position, rules);
+    const perGamePoints = computeFantasyPoints(candidate.perGame, candidate.position, rules) + tierPoints;
+    const projectedPoints =
+      computeFantasyPoints(seasonLine, candidate.position, rules) + tierPoints * candidate.games.expected;
     byPlayer.set(candidate.playerId, {
       candidate,
       seasonLine,
-      // BOTH SOURCES COMPOSED (Task 4): per-game performance variance and the games-played
-      // distribution. See `game-variance.ts`'s `seasonPointsBand` for the law-of-total-variance
-      // composition and `overlapTiers` for what the resulting interval is honest about and silent on.
-      outlook: seasonPointsBand(perGamePoints, candidate.games, gameVarianceFor(candidate, gameVariance)),
+      // THREE SOURCES COMPOSED where all three are measured: per-game performance variance, the
+      // games-played distribution, and (for the two positions the 2026-09-05 round fitted it) how
+      // wrong the projection itself typically is. See `game-variance.ts`'s `seasonPointsInterval`
+      // for the law-of-total-variance composition and for why the third term is not optional in
+      // principle, and `overlapTiers` for what the resulting interval is honest about and silent on.
+      outlook: seasonPointsInterval(
+        perGamePoints,
+        candidate.games,
+        gameVarianceFor(candidate, gameVariance),
+        Z90,
+        candidate.seasonProjectionErrorVariance ?? 0,
+      ),
     });
     projections.push({ playerId: candidate.playerId, position: candidate.position, projectedPoints });
   }
