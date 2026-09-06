@@ -47,7 +47,7 @@ function tierValue(pointsAllowed: number, yardsAllowed: number): number {
 
 const PRIORS: DefensePriors = {
   leaguePerGame: { sacks: 2.3, interceptions: 0.7, fumbleRecoveries: 0.5, defensiveTouchdowns: 0.1, safeties: 0.03 },
-  leagueAllowed: [{ pointsAllowed: 22, yardsAllowed: 340 }],
+  leagueAllowed: [[22, 340]],
   teamPriorGames: 16,
   tierPriorGames: 16,
   recencyDecay: 0.8,
@@ -164,7 +164,7 @@ describe("fitDefensePriors", () => {
     expect(priors.leaguePerGame.sacks).toBeCloseTo(2, 10);
     expect(priors.leaguePerGame.interceptions).toBeCloseTo(1, 10);
     // The whole vector, not its mean: a distribution shrinkage needs the games themselves.
-    expect(priors.leagueAllowed.map((entry) => entry.pointsAllowed).sort((a, b) => a - b)).toEqual([10, 30]);
+    expect(priors.leagueAllowed.map((entry) => entry[0]).sort((a, b) => a - b)).toEqual([10, 30]);
   });
 
   it("returns a recency decay from its own grid", () => {

@@ -65,12 +65,16 @@ export interface DefenseGame {
 const LINEAR_COMPONENTS = ["sacks", "interceptions", "fumbleRecoveries", "defensiveTouchdowns", "safeties"] as const;
 type LinearComponent = (typeof LINEAR_COMPONENTS)[number];
 
-/** One game's two allowed quantities, kept together because the tier function reads both at once and
- *  they are not independent of each other. */
-export interface AllowedGame {
-  readonly pointsAllowed: number;
-  readonly yardsAllowed: number;
-}
+/**
+ * One game's two allowed quantities, `[pointsAllowed, yardsAllowed]`, kept together because the tier
+ * function reads both at once and they are not independent of each other: a defence that allowed six
+ * points usually allowed few yards too, and pairing them by game is what preserves that.
+ *
+ * A TUPLE RATHER THAN AN OBJECT, for one reason. The committed priors carry one entry per fit game
+ * (6,270 of them across 2013 to 2024) because a distribution shrinkage needs the games themselves,
+ * and the object form renders a 25,000-line generated file that says nothing the tuple does not.
+ */
+export type AllowedGame = readonly [pointsAllowed: number, yardsAllowed: number];
 
 /**
  * THE ONE SPELLING OF THE POINTS-ALLOWED JOIN KEY, for both sides of it.
@@ -182,8 +186,8 @@ function tierPointsOf(allowed: AllowedGame, rules: ScoringRules): number {
     playerId: "team-defense",
     week: 1,
     ...(Object.fromEntries(STAT_FIELDS.map((field) => [field, 0])) as Omit<StatLine, "playerId" | "week">),
-    pointsAllowed: allowed.pointsAllowed,
-    yardsAllowed: allowed.yardsAllowed,
+    pointsAllowed: allowed[0],
+    yardsAllowed: allowed[1],
   };
   return computeFantasyPoints(line, "DEF", rules);
 }
@@ -210,7 +214,7 @@ export function expectedTierPoints(
   const ownExpectation =
     totalWeight === 0
       ? leagueExpectation
-      : sum(own.map((game, index) => tierPointsOf(game, rules) * weights[index]!)) / totalWeight;
+      : sum(own.map((game, index) => tierPointsOf([game.pointsAllowed, game.yardsAllowed], rules) * weights[index]!)) / totalWeight;
 
   // Mixed on the EXPECTATIONS of the two distributions, which is exactly a mixture of the
   // distributions themselves because expectation is linear in the mixing weight. The nonlinearity
@@ -243,7 +247,7 @@ export function fitDefensePriors(
   const leaguePerGame = Object.fromEntries(
     LINEAR_COMPONENTS.map((component) => [component, mean(games.map((game) => game[component]))]),
   ) as Record<LinearComponent, number>;
-  const leagueAllowed = games.map((game) => ({ pointsAllowed: game.pointsAllowed, yardsAllowed: game.yardsAllowed }));
+  const leagueAllowed: readonly AllowedGame[] = games.map((game) => [game.pointsAllowed, game.yardsAllowed] as const);
 
   const base: DefensePriors = {
     leaguePerGame,
@@ -273,8 +277,8 @@ function scoreDecay(games: readonly DefenseGame[], priors: DefensePriors): numbe
     const key = `${game.season}|${game.team}`;
     bySeasonTeam.set(key, [...(bySeasonTeam.get(key) ?? []), game]);
   }
-  const leaguePointsAllowed = mean(priors.leagueAllowed.map((allowed) => allowed.pointsAllowed));
-  const leagueYardsAllowed = mean(priors.leagueAllowed.map((allowed) => allowed.yardsAllowed));
+  const leaguePointsAllowed = mean(priors.leagueAllowed.map((allowed) => allowed[0]));
+  const leagueYardsAllowed = mean(priors.leagueAllowed.map((allowed) => allowed[1]));
 
   let total = 0;
   let counted = 0;
@@ -322,7 +326,7 @@ function predictedAllowedMean(
   const latest = latestSeasonOf(own);
   const weights = own.map((game) => recencyWeightOf(game, latest, priors.recencyDecay));
   const totalWeight = sum(weights);
-  const league = mean(priors.leagueAllowed.map((allowed) => allowed[field]));
+  const league = mean(priors.leagueAllowed.map((allowed) => (field === "pointsAllowed" ? allowed[0] : allowed[1])));
   const ownMean = totalWeight === 0 ? league : sum(own.map((game, index) => game[field] * weights[index]!)) / totalWeight;
   return shrink(ownMean, own.length, league, priors.tierPriorGames);
 }

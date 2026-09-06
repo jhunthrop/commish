@@ -83,11 +83,28 @@ import type { DefensePriors } from "./team-defense";
 `;
 }
 
+/**
+ * The defence priors, with `leagueAllowed` rendered as one compact `[points, yards]` pair per line.
+ *
+ * A pretty-printed nested array puts each tuple on four lines and turns a 6,270-game distribution
+ * into a 25,000-line file. The distribution itself is not negotiable — a distribution shrinkage needs
+ * the games themselves, and a summary of it would be exactly the "tier of the mean" error this whole
+ * module exists to avoid — so what gives is the rendering, not the data.
+ */
+function renderDefensePriors(defence: DefensePriors): string {
+  const { leagueAllowed, ...rest } = defence;
+  const body = Object.entries(rest)
+    .map(([key, value]) => `  ${JSON.stringify(key)}: ${JSON.stringify(value)},`)
+    .join("\n");
+  const allowed = leagueAllowed.map((pair) => `    [${pair[0]}, ${pair[1]}],`).join("\n");
+  return `{\n${body}\n  "leagueAllowed": [\n${allowed}\n  ],\n}`;
+}
+
 function render(kicker: KickerPriors, defence: DefensePriors, variance: GameVariancePriors): string {
   return `${header()}
 export const FITTED_KICKER_PRIORS: KickerPriors = ${JSON.stringify(kicker, null, 2)};
 
-export const FITTED_DEFENSE_PRIORS: DefensePriors = ${JSON.stringify(defence, null, 2)};
+export const FITTED_DEFENSE_PRIORS: DefensePriors = ${renderDefensePriors(defence)};
 
 export const FITTED_KDEF_GAME_VARIANCE: GameVariancePriors = ${JSON.stringify(variance, null, 2)};
 `;
@@ -144,8 +161,8 @@ async function main(): Promise<void> {
   for (const [component, value] of Object.entries(defence.leaguePerGame)) {
     console.log(`  ${component.padEnd(34)}${value.toFixed(4)}`);
   }
-  const points = defence.leagueAllowed.map((allowed) => allowed.pointsAllowed);
-  const yards = defence.leagueAllowed.map((allowed) => allowed.yardsAllowed);
+  const points = defence.leagueAllowed.map((allowed) => allowed[0]);
+  const yards = defence.leagueAllowed.map((allowed) => allowed[1]);
   const mean = (values: readonly number[]): number => values.reduce((total, value) => total + value, 0) / values.length;
   console.log(`  points allowed a game             ${mean(points).toFixed(4)} over ${points.length} games`);
   console.log(`  yards allowed a game              ${mean(yards).toFixed(4)}`);
