@@ -141,7 +141,7 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
     // texture into the pool distorts what a cliff means. Below-replacement rows carry no tier
     // and draw no band, which is itself the honest statement about them.
     const relevant = pool.filter((entry) => entry.valueOverReplacement > 0);
-    const standings = tierStandingsOf(relevant.map((entry) => entry.valueOverReplacement));
+    const standings = tierStandingsOf(relevant.map((entry) => entry.projectedPoints));
     relevant.forEach((entry, index) => standingsByPlayer.set(entry.playerId, standings[index]!));
   }
 

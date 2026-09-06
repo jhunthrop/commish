@@ -79,9 +79,9 @@ const DEMO_BYE_WEEKS: readonly (readonly [string, number])[] = DEMO_NFL_TEAM_COD
 
 /** A believable, purely synthetic points curve: each position peaks at a different level and
  *  decays exponentially with rank, which is what actually produces the occasional real tier
- *  cliff `tiersOf` finds (a smooth exponential's early gaps are several times its late ones,
- *  never a hand-placed break). The exact numbers are invented; the CLIFFS `tiersOf` finds in
- *  them, and every make-it-back percentage downstream, are not. */
+ *  break `tiersOf` finds (a smooth exponential's early steps are a game's worth of production,
+ *  its late ones are not; never a hand-placed break). The exact numbers are invented; the BREAKS
+ *  `tiersOf` finds in them, and every make-it-back percentage downstream, are not. */
 const PEAK_POINTS: Readonly<Record<Position, number>> = { QB: 380, RB: 340, WR: 320, TE: 250, K: 150, DEF: 155 };
 const DECAY_SCALE: Readonly<Record<Position, number>> = { QB: 10, RB: 16, WR: 18, TE: 8, K: 6, DEF: 6 };
 
@@ -154,7 +154,7 @@ function computeTierReasons(valuedById: ReadonlyMap<string, ValuedEntry>): reado
   const rows: DemoTierReason[] = [];
   for (const bucket of byPosition.values()) {
     bucket.sort((a, b) => b.valueOverReplacement - a.valueOverReplacement || a.playerId.localeCompare(b.playerId));
-    const values = bucket.map((entry) => entry.valueOverReplacement);
+    const values = bucket.map((entry) => entry.projectedPoints);
     bucket.forEach((entry, index) => {
       const standing = tierStanding(values, index);
       if (standing.dropToNextTier > 0) {

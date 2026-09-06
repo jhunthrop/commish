@@ -213,9 +213,21 @@ we can currently say about them, and the rule correctly says so. It becomes usab
 emits a per-game distribution, because the interval will then be about how good he is rather than
 only about how often he plays.
 
-The board therefore ships `decide/tiers.ts`' gap rule, which compares a gap to the position's own
-typical gap. Eighty-four tiers among two hundred and sixty-five receivers is too many to be useful
-either, and neither rule is yet a product.
+The board therefore shipped `decide/tiers.ts`' gap rule, which compared a gap to the position's own
+typical gap. Eighty-four tiers among two hundred and sixty-five receivers was too many to be useful
+either, and neither rule was yet a product.
+
+**Superseded 2026-09-05: the games-worth rule.** The gap rule fragmented the top of every position
+once the board was restricted to draft-relevant players: the flat tail set the position's median
+gap so low that ordinary spacing at the top read as one cliff per row (Achane, Taylor, Chase and
+Smith-Njigba each alone). The rule now in `decide/tiers.ts` is stated in units a manager already
+uses. A new tier starts where the next player projects at least a full game's worth of production
+(one seventeenth) less than the man above him, a share rather than a fixed gap because positions
+score on different scales; and no tier stretches more than two points a game end to end, splitting
+at its widest internal gaps when it would. On the 2026-09-05 live board that draws RB as 2, 8, 3,
+10 (Gibbs and Robinson; Achane through Walker; Hall, Love, Etienne), WR as 2, 3, 5, 4, 10, 11, QB
+as Allen alone and then the field, TE as 2, 2, 7. Both constants are chosen, not fitted, for the
+same reason the old multiple was; the founder's own tier sheet is the fixture in `tiers.test.ts`.
 
 ## What the measurement rests on
 

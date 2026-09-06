@@ -1,76 +1,127 @@
 /**
- * WHERE A POSITION FALLS OFF, measured rather than drawn.
+ * WHERE A POSITION FALLS OFF, in units a manager already thinks in.
  *
- * The engine spec's layer 6 says it plainly: "a cliff is where the gap exceeds the overlap, not
- * a hand-drawn line." We have no per-player overlap to compare against yet - nothing in the
- * model emits a distribution (see `outlook.ts`) - so the comparison set is the position's own
- * adjacent gaps. A cliff is a gap several times the typical gap between neighbours at that
- * position. That is a stated comparison against a real population, which is the bar the fun-pass
- * spec's magnitude rule sets for any judged number, and it is what a hand-placed tier line is
- * not.
+ * A tier is a run of players a drafter would be roughly indifferent between. Two rules draw them,
+ * both stated in games and points per game rather than in a fitted statistic:
+ *
+ *   1. A NEW TIER STARTS where the next player projects at least a full game's worth of production
+ *      less than the one above him (`TIER_BREAK_GAMES / GAMES_PER_SEASON` of the man above). The
+ *      break is a SHARE, not a fixed point gap, because positions score on different scales: the
+ *      seventeen points between Nacua and Chase are a smaller slice of a receiver's season than
+ *      the sixteen between Robinson and Achane are of a back's, and a fixed gap either split the
+ *      receivers into singletons or glued Achane to the top two. The founder's own tier sheet
+ *      (2026-09-05) is the fixture the rule was shaped against; see the tests.
+ *   2. NO TIER STRETCHES more than `TIER_SPAN_POINTS_PER_GAME` points a game end to end. A long
+ *      run of small steps (the middle of the receiver pool) would otherwise be one tier of thirty;
+ *      it splits into the fewest tiers that fit, at its widest internal gaps.
+ *
+ * Both constants are chosen, not fitted: there is no held-out measurement of "the tier a human
+ * expert would draw", and quoting a fitted-looking number would be a claim we cannot support. The
+ * previous rule compared each gap to the position's median gap, and the flat tail of every pool
+ * set that median so low that ordinary spacing at the top read as one cliff per row.
+ *
+ * The spec's own rule (a cliff is where the gap exceeds the players' overlap) stays shelved until
+ * the model emits a per-game distribution; `preseason/board.ts`'s `overlapTiers` explains why.
  *
  * Tiers are consumed by the draft recommendation, where the useful question is never "which tier
  * is he in" but "how many men are left before the drop, and how big is the drop".
  */
 
-/**
- * How many times the typical neighbour gap a gap must be before it counts as a cliff.
- *
- * Chosen, not fitted: below about two, ordinary lumpiness in any ranked list reads as a cliff and
- * every position ends up with eight tiers, which tells a manager nothing. There is no held-out
- * measurement that could fit this today, and quoting a fitted-looking number would be a claim we
- * cannot support.
- */
-export const CLIFF_MULTIPLE = 2.5;
+/** Regular-season games a player can play; the unit both tier constants are stated in. */
+export const GAMES_PER_SEASON = 17;
+
+/** A new tier starts where the next player gives up at least this many games' worth of production. */
+export const TIER_BREAK_GAMES = 1;
+
+/** No tier stretches more than this many points a game from its best player to its worst. */
+export const TIER_SPAN_POINTS_PER_GAME = 2;
+
+const TIER_SPAN_POINTS = TIER_SPAN_POINTS_PER_GAME * GAMES_PER_SEASON;
 
 /**
- * Below this many players a "typical gap" is not a population, it is two numbers. Short pools get
- * one tier and no cliffs, which is the honest answer rather than a confident one.
+ * Whether the step from `above` down to `below` is at least a game's worth of `above`. Written as a
+ * cross-multiplication so a non-positive projection above reads as "no break" rather than a
+ * division by nothing.
  */
-export const MIN_POOL_FOR_TIERS = 5;
+function isTierBreak(above: number, below: number): boolean {
+  return above > 0 && (above - below) * GAMES_PER_SEASON >= above * TIER_BREAK_GAMES;
+}
 
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
+/** Indices at which a new run starts under rule 1, always beginning with zero. */
+function runStarts(pointsDescending: readonly number[]): readonly number[] {
+  return pointsDescending.flatMap((points, index) =>
+    index === 0 || isTierBreak(pointsDescending[index - 1]!, points) ? [index] : [],
+  );
 }
 
 /**
- * Tier index per player, 0-based, for one position's values sorted DESCENDING.
- *
- * The typical gap is the MEDIAN of the adjacent gaps rather than the mean, because the cliffs
- * themselves are in the sample: a mean is dragged upward by the very gaps it is meant to
- * identify, and on a pool with one huge break the mean rules that break ordinary.
+ * The contiguous split of a sorted run into `count` groups with the least within-group spread
+ * (exact dynamic programme over prefix sums; runs are a few dozen players, so the cubic bound is
+ * nothing). Returns the group index per player.
  */
-export function tiersOf(valuesDescending: readonly number[]): readonly number[] {
-  if (valuesDescending.length < MIN_POOL_FOR_TIERS) return valuesDescending.map(() => 0);
-  const gaps = valuesDescending.slice(1).map((value, index) => valuesDescending[index]! - value);
-  // A PLATEAU WITH BREAKS IN IT, take two (founder board audit, 2026-09-04). The market curve is
-  // an isotonic fit, so whole runs of players legitimately share ONE fitted value: zero gaps are
-  // the pool's normal texture, not a sign the pool is degenerate. The first version read a zero
-  // median as "any gap separates tiers", and the moment plateaus dominated a position the board
-  // fragmented into singleton tiers on ordinary gaps. The typical gap is now the median of the
-  // POSITIVE gaps: plateaus contribute nothing to it, real spacing defines it, and a pool with
-  // no positive gap at all (identical the whole way down) correctly stays one tier.
-  const positiveGaps = gaps.filter((gap) => gap > 0);
-  // ...and the same median-over-mean argument, one step further: the LARGEST gap is the cliff
-  // candidate, so it does not get a vote on what "typical" means (with one real break in a flat
-  // field, letting it vote made it its own alibi). No positive gap at all: one tier. Exactly one:
-  // that gap IS the break. Otherwise: several times the typical of the rest.
-  const restDescending = [...positiveGaps].sort((a, b) => b - a).slice(1);
-  const threshold =
-    positiveGaps.length === 0
-      ? Number.POSITIVE_INFINITY
-      : positiveGaps.length === 1
-        ? positiveGaps[0]!
-        : CLIFF_MULTIPLE * median(restDescending);
-  let tier = 0;
-  const tiers = [0];
-  for (const gap of gaps) {
-    if (gap >= threshold) tier += 1;
-    tiers.push(tier);
+function leastSpreadSplit(run: readonly number[], count: number): readonly number[] {
+  const size = run.length;
+  const prefix = run.reduce<number[]>((sums, value) => [...sums, sums[sums.length - 1]! + value], [0]);
+  const prefixSquares = run.reduce<number[]>((sums, value) => [...sums, sums[sums.length - 1]! + value * value], [0]);
+  const spread = (from: number, to: number): number => {
+    const members = to - from + 1;
+    const sum = prefix[to + 1]! - prefix[from]!;
+    return prefixSquares[to + 1]! - prefixSquares[from]! - (sum * sum) / members;
+  };
+
+  const cost = Array.from({ length: count + 1 }, () => Array<number>(size).fill(Number.POSITIVE_INFINITY));
+  const firstOfLast = Array.from({ length: count + 1 }, () => Array<number>(size).fill(0));
+  for (let last = 0; last < size; last += 1) cost[1]![last] = spread(0, last);
+  for (let groups = 2; groups <= count; groups += 1) {
+    for (let last = groups - 1; last < size; last += 1) {
+      for (let first = groups - 1; first <= last; first += 1) {
+        const candidate = cost[groups - 1]![first - 1]! + spread(first, last);
+        if (candidate < cost[groups]![last]!) {
+          cost[groups]![last] = candidate;
+          firstOfLast[groups]![last] = first;
+        }
+      }
+    }
   }
-  return tiers;
+
+  const assignment = Array<number>(size).fill(0);
+  let end = size - 1;
+  for (let group = count; group >= 1; group -= 1) {
+    const start = group === 1 ? 0 : firstOfLast[group]![end]!;
+    for (let index = start; index <= end; index += 1) assignment[index] = group - 1;
+    end = start - 1;
+  }
+  return assignment;
+}
+
+function widestGroupSpan(run: readonly number[], assignment: readonly number[]): number {
+  const groups = new Set(assignment);
+  return Math.max(...[...groups].map((group) => run[assignment.indexOf(group)]! - run[assignment.lastIndexOf(group)]!));
+}
+
+/** Rule 2: the fewest contiguous groups of one run such that none spans more than the cap. */
+function fewestGroupsWithinSpan(run: readonly number[]): readonly number[] {
+  for (let count = 1; count <= run.length; count += 1) {
+    const assignment = leastSpreadSplit(run, count);
+    if (widestGroupSpan(run, assignment) <= TIER_SPAN_POINTS) return assignment;
+  }
+  return run.map((_, index) => index);
+}
+
+/** Tier index per player, 0-based, for one position's PROJECTED POINTS sorted DESCENDING. */
+export function tiersOf(pointsDescending: readonly number[]): readonly number[] {
+  const starts = runStarts(pointsDescending);
+  return starts.reduce<{ readonly tiers: readonly number[]; readonly nextTier: number }>(
+    (state, start, runIndex) => {
+      const end = starts[runIndex + 1] ?? pointsDescending.length;
+      const groups = fewestGroupsWithinSpan(pointsDescending.slice(start, end));
+      return {
+        tiers: [...state.tiers, ...groups.map((group) => state.nextTier + group)],
+        nextTier: state.nextTier + Math.max(-1, ...groups) + 1,
+      };
+    },
+    { tiers: [], nextTier: 0 },
+  ).tiers;
 }
 
 export interface TierStanding {
@@ -81,18 +132,22 @@ export interface TierStanding {
   readonly dropToNextTier: number;
 }
 
-/** Where one player stands in his position's tier structure, at the moment the board was taken. */
-export function tierStanding(valuesDescending: readonly number[], index: number): TierStanding {
-  const tiers = tiersOf(valuesDescending);
+/**
+ * Where one player stands in his position's tier structure, at the moment the board was taken.
+ * `pointsDescending` is projected points; within a position the drop between two players is the
+ * same in points and in value over replacement, so the drop reads correctly under either.
+ */
+export function tierStanding(pointsDescending: readonly number[], index: number): TierStanding {
+  const tiers = tiersOf(pointsDescending);
   const tier = tiers[index];
   if (tier === undefined) {
-    throw new Error(`No player sits at index ${index} in a pool of ${valuesDescending.length}.`);
+    throw new Error(`No player sits at index ${index} in a pool of ${pointsDescending.length}.`);
   }
   const lastOfTier = tiers.lastIndexOf(tier);
   const firstOfNext = tiers.indexOf(tier + 1);
   return {
     tier,
     playersLeftInTier: lastOfTier - index + 1,
-    dropToNextTier: firstOfNext === -1 ? 0 : valuesDescending[lastOfTier]! - valuesDescending[firstOfNext]!,
+    dropToNextTier: firstOfNext === -1 ? 0 : pointsDescending[lastOfTier]! - pointsDescending[firstOfNext]!,
   };
 }
