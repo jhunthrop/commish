@@ -8,6 +8,7 @@ import type { BoardReason } from "@/projections/preseason/board";
 import { Badge, Button, EmptyState, Input, Movement, PlayerRow, PositionBadge, ReasonChip, TierDivider, strongestLawReasons } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { queueButtonLabel } from "../lib/lookups";
+import { marketOrderNoteFor } from "../lib/market-order-note";
 import { formatAdp, poolTiers, positionRanks } from "../lib/tiers";
 import { verdictFor, verdictPopulation } from "../lib/verdict";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
@@ -182,6 +183,7 @@ export function PlayerPool({
   }, [players, available, preStart, query, position, showDrafted]);
   const rows = useMemo(() => filtered.slice(0, DRAFT_ROOM_CONFIG.poolPageSize), [filtered]);
   const truncated = filtered.length > DRAFT_ROOM_CONFIG.poolPageSize;
+  const marketOrderNote = position === ALL ? null : marketOrderNoteFor(position as Position);
   // TASK 7, THE VERDICT, in the pool: "if I took him at this slot, how would that compare to the
   // picks this room has already made?" Built once per render pass, never per row — sixty rows
   // each rebuilding it would be sixty scans of the same pick log.
@@ -238,6 +240,14 @@ export function PlayerPool({
             <span className={`${MICRO_LABEL} text-text-faint`}>left</span>
           </span>
         </div>
+        {/* A position the engine publishes no projection for says so, once, above its own rows.
+            Only while a single position is selected: the note is about THAT position, and printing
+            it over the mixed list would attach a claim to rows it is not about. */}
+        {marketOrderNote === null ? null : (
+          <p data-testid="market-order-note" className="rounded-sm bg-surface-inset px-3 py-2 text-xs text-text-muted">
+            {marketOrderNote}
+          </p>
+        )}
       </div>
 
       {rows.length === 0 ? (
