@@ -3,6 +3,7 @@ import type { DraftPoolEntry } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { totalRosterSlots } from "@/draft-engine";
+import { MOCK_CONFIG } from "@/mock-draft/config";
 import { runOneDraft } from "./run";
 
 const TEAM_IDS = Array.from({ length: 12 }, (_, i) => `seat_${i + 1}`);
@@ -42,6 +43,26 @@ describe("runOneDraft", () => {
     const a = runOneDraft({ teamIds: TEAM_IDS, board: BOARD, rosterSlots: STANDARD_ROSTER_SLOTS, rounds: 15, seed: 1 });
     const b = runOneDraft({ teamIds: TEAM_IDS, board: BOARD, rosterSlots: STANDARD_ROSTER_SLOTS, rounds: 15, seed: 2 });
     expect(a.picks).not.toEqual(b.picks);
+  });
+
+  it("a seat with a board of its own picks from THAT board while the rest of the room picks from the room's", () => {
+    // The target seat reads our board; every other seat reads the room's market order. Here the
+    // two are exact opposites, so "which board did this seat use" is answerable from the pick
+    // alone: a bot samples within `MOCK_CONFIG.strategy.reachDepth` of whatever board it reads,
+    // and the two boards' windows of that depth are disjoint by construction.
+    const REACH_DEPTH = MOCK_CONFIG.strategy.reachDepth;
+    const own = [...BOARD].reverse();
+    const result = runOneDraft({
+      teamIds: TEAM_IDS,
+      board: BOARD,
+      rosterSlots: STANDARD_ROSTER_SLOTS,
+      rounds: 1,
+      seed: 4,
+      seatBoards: { seat_1: own },
+    });
+    const pickOf = (teamId: string): string => result.picks.find((p) => p.teamId === teamId)!.playerId;
+    expect(own.slice(0, REACH_DEPTH).map((e) => e.playerId)).toContain(pickOf("seat_1"));
+    expect(BOARD.slice(0, REACH_DEPTH).map((e) => e.playerId)).toContain(pickOf("seat_2"));
   });
 
   it("rosters at least one DEF and one K per team, the engine's own starting-slot floor", () => {

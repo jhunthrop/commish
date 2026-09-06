@@ -10,8 +10,9 @@
  *  the service itself; this is the UI's own closed set. */
 export const SIM_RUN_OPTIONS = [100, 1_000, 10_000] as const;
 
-/** Room sharpness: 0 is a casual room (ADP-heavy, more jitter), 1 is a sharp room (board-heavy,
- *  little jitter). `"mixed"` is the midpoint, matching the mock's three-way segmented control. */
+/** Room sharpness: how tightly the room drafts to market ADP. 0 is a casual room that reaches
+ *  (full jitter around each player's ADP), 1 is a sharp room that takes the market in order (no
+ *  jitter at all). `"mixed"` is the midpoint, matching the mock's three-way segmented control. */
 export const SIM_SHARPNESS = { casual: 0, mixed: 0.5, sharp: 1 } as const;
 export type SimSharpnessName = keyof typeof SIM_SHARPNESS;
 
@@ -29,7 +30,7 @@ export const SIM_CONFIG = {
    *  a fairness ceiling, not a paywall (see the module docblock). */
   maxInFlightPerUser: 3,
   /**
-   * Jitter magnitude for the room-sharpness board order (`board-order.ts`), in RANK POSITIONS at
+   * Jitter magnitude for the room's own market order (`board-order.ts`), in ADP RANK POSITIONS at
    * the casual end (`sharpness = 0`) — scaled linearly to zero at the sharp end. THE HONEST
    * MODEL: this codebase has no measurable per-player ADP variance (the market feed this engine
    * reads, `fetchAverageDraftPosition`/`BENCHMARK_SOURCES.adp`, is Fantasy Football Calculator's

@@ -11,6 +11,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { leagues, nflPlayers, playerCrosswalk, players, preseasonProjections, users } from "@/db/schema";
+import { survivalProbabilities } from "@/projections/decide/survival";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
@@ -84,7 +85,7 @@ describe("assistantCall", () => {
     // `getDraftStore()`'s replay cache is process-wide and keyed by draft id alone — a truncate
     // between tests must invalidate every id this file reuses, or a later test could replay a
     // sequence number left over from an earlier test's now-deleted rows.
-    for (const draftId of ["draft_stranger", "draft_scheduled", "draft_commish", "draft_top3", "draft_last"]) {
+    for (const draftId of ["draft_stranger", "draft_scheduled", "draft_commish", "draft_top3", "draft_noadp", "draft_last"]) {
       getDraftStore().invalidate(draftId);
     }
   });
@@ -216,6 +217,77 @@ describe("assistantCall", () => {
 
       const view = await assistantCall(db, DRAFT_ID, onClockUserId);
       expect(view!.winningBuilds).toEqual(summary.builds);
+    });
+  });
+
+  describe("a board the market has never priced, quarterbacks on top of raw points", () => {
+    const DRAFT_ID = "draft_noadp";
+    const LEAGUE_ID = "league_noadp";
+
+    /**
+     * THE FOUNDER'S OWN BUG (2026-09-05) pointed at the Assistant. With no ADP anywhere, survival
+     * is priced off the fallback rank, and the fallback has to be the VALUE rank. Two teams
+     * starting one quarterback and one back:
+     *
+     *   QB replacement is qb2's 296, so qb1 is worth 4, qb2 0, qb3 -4.
+     *   RB replacement is rb2's 120, so rb1 is worth 160, rb2 0, rb3 -60.
+     *
+     * Value order: rb1, qb1, qb2, rb2, qb3, rb3. Raw points order: qb1, qb2, qb3, rb1, rb2, rb3.
+     * The two disagree about who leads the queue, which is the whole question.
+     */
+    async function seeded() {
+      const f = await seedDraftFixture(db, {
+        draftId: DRAFT_ID, leagueId: LEAGUE_ID, format: "snake", teamCount: 2,
+        slotConfig: TWO_ROUND_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+      });
+      await seedEvidence(db, {
+        QB: [
+          { id: "qb1", points: 300 },
+          { id: "qb2", points: 296 },
+          { id: "qb3", points: 292 },
+        ],
+        RB: [
+          { id: "rb1", points: 280 },
+          { id: "rb2", points: 120 },
+          { id: "rb3", points: 60 },
+        ],
+      });
+      const started = await getDraftStore().startDraft(DRAFT_ID);
+      if (!started.ok) throw new Error(started.reason);
+      return f.userIds[f.teamIds.indexOf(started.state.draftOrder[0]!)]!;
+    }
+
+    it("prices survival off the value rank, never off a rank by raw points", async () => {
+      const view = await assistantCall(db, DRAFT_ID, await seeded());
+      const survivalOf = (playerId: string): number | null => {
+        const reasons = view!.candidates.find((c) => c.playerId === playerId)?.reasons ?? [];
+        const reason = reasons.find((r) => r.code === "will_not_survive" || r.code === "safe_to_wait");
+        return reason === undefined ? null : reason.survivalProbability;
+      };
+
+      // `averageDraftPosition` falls back to each player's 0-based VALUE rank, so this is the
+      // exact board `survivalProbabilities` queues off. Reproduced here from the arithmetic in
+      // the docblock above rather than read back out of the code under test.
+      const expected = survivalProbabilities({
+        board: [
+          { playerId: "rb1", position: "RB", averageDraftPosition: 0 },
+          { playerId: "qb1", position: "QB", averageDraftPosition: 1 },
+          { playerId: "qb2", position: "QB", averageDraftPosition: 2 },
+          { playerId: "rb2", position: "RB", averageDraftPosition: 3 },
+          { playerId: "qb3", position: "QB", averageDraftPosition: 4 },
+          { playerId: "rb3", position: "RB", averageDraftPosition: 5 },
+        ],
+        fromPick: 1,
+        toPick: 4,
+      });
+
+      // rb1 leads our board, so HE is the one who will not last to pick 4. Ranked by raw points
+      // the top quarterback would have led the queue and worn this reason instead, which is the
+      // bug: he is the most points on the board and nowhere near the most value.
+      expect(survivalOf("rb1")).toBeCloseTo(expected.get("rb1")!, 10);
+      expect(view!.candidates.find((c) => c.playerId === "rb1")!.reasons.map((r) => r.code)).toContain("will_not_survive");
+      expect(view!.candidates.find((c) => c.playerId === "qb1")!.reasons.map((r) => r.code)).not.toContain("will_not_survive");
+      expect(survivalOf("qb1")).toBeNull(); // second in the queue: neither doomed nor safe to wait
     });
   });
 

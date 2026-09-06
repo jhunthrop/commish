@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { players as playersTable, playerCrosswalk } from "@/db/schema";
 import type { Position } from "@/domain/player";
+import { compareBoardOrder } from "@/projections/decide/board-order-compare";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { valueBoardIndexed } from "@/projections/decide/replacement";
 import { tiersOf } from "@/projections/decide/tiers";
@@ -174,29 +175,10 @@ export async function boardRows(db: Db, { shape, asOf = new Date() }: BoardOptio
         reasons: reasonsByNflId.get(row.playerId) ?? [],
       };
     })
-    .sort((a, b) => {
-      // THE BOARD ORDERS BY VALUE, NOT RAW POINTS (founder, 2026-09-04: "we have way too many
-      // QBs ranked too high"). Raw season points crown quarterbacks because everyone starts one
-      // and replacement-level QB scoring is high; draft VALUE is points over replacement under
-      // the league's shape, which the auction dollars and the tier bands already used. A row
-      // with no value rank (a position this shape never starts) sinks to the bottom, points as
-      // the tiebreak within it.
-      const aValue = a.valueRank ?? Number.POSITIVE_INFINITY;
-      const bValue = b.valueRank ?? Number.POSITIVE_INFINITY;
-      // TIES DEFER TO THE MARKET (founder audit, 2026-09-04: two RBs identical to the hundredth
-      // in points AND value were split RB1/RB2 by a sort artifact, against the market's order).
-      // When our own evidence cannot separate two players, the market's preference is
-      // information — the same doctrine as the thin-evidence shrinkage. Ceiling is deliberately
-      // NOT the tiebreak: at an equal mean a wider band is more variance, not more player, and
-      // risk preference belongs to the drafter's slot (the Simulator's question), never baked
-      // into the board's order.
-      if (a.valueOverReplacement !== null && a.valueOverReplacement === b.valueOverReplacement) {
-        const aAdp = a.marketAdp ?? Number.POSITIVE_INFINITY;
-        const bAdp = b.marketAdp ?? Number.POSITIVE_INFINITY;
-        if (aAdp !== bAdp) return aAdp - bAdp;
-      }
-      return aValue - bValue || a.rank - b.rank;
-    })
+    // ONE comparator, shared with the Simulator's own read of this same board
+    // (`@/draft-service/sim/value-order.ts`) — see its module docblock for why every rule in it
+    // is the rule. Two copies would be two boards, and the two surfaces sit side by side.
+    .sort(compareBoardOrder)
     .map((row, index) => ({ ...row, overallRank: index + 1 }))
     // The positional badge follows the SERVED order, so a tie the market just broke cannot
     // leave the badges contradicting the rows (RB2 listed above RB1). Only valued rows carry a

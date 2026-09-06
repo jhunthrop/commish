@@ -9,19 +9,35 @@ const POOL: readonly SimRankableEntry[] = [
   { playerId: "d", position: "TE", evidenceRank: 3, marketRank: null },
 ];
 
+/** `(0.5 - 0.5) * 2 * spread === 0` for any spread: the market order, undisturbed. */
+const zeroRng = { next: () => 0.5 };
+
 describe("simBoardOrder", () => {
-  it("at full sharpness (1), with jitter zeroed by a deterministic rng, reproduces the evidence order exactly", () => {
-    const zeroRng = { next: () => 0.5 }; // (0.5 - 0.5) * 2 * spread === 0 for any spread
-    const order = simBoardOrder(POOL, 1, zeroRng);
-    expect(order.map((e) => e.playerId)).toEqual(["a", "b", "c", "d"]);
+  it("drafts the market's order at every sharpness once jitter is zeroed", () => {
+    for (const sharpness of [0, 0.5, 1]) {
+      expect(simBoardOrder(POOL, sharpness, zeroRng).map((e) => e.playerId)).toEqual(["b", "c", "a", "d"]);
+    }
   });
 
-  it("at zero sharpness (0), with jitter zeroed, reproduces the market order exactly for ranked players", () => {
-    const zeroRng = { next: () => 0.5 };
-    const order = simBoardOrder(POOL, 0, zeroRng);
-    // Market order: b(0), c(1), a(2), then d — unranked by market, anchored to his own
-    // evidence rank (3), which keeps him last here regardless.
-    expect(order.map((e) => e.playerId)).toEqual(["b", "c", "a", "d"]);
+  it("ignores our board entirely for players the market ranks", () => {
+    // Same ADP, evidence order reversed: the room's board must not move a single position.
+    const reversed: readonly SimRankableEntry[] = POOL.map((entry) => ({ ...entry, evidenceRank: POOL.length - 1 - entry.evidenceRank }));
+    const asIs = simBoardOrder(POOL.filter((e) => e.marketRank !== null), 0, createSeededRng(11));
+    const flipped = simBoardOrder(reversed.filter((e) => e.marketRank !== null), 0, createSeededRng(11));
+    expect(flipped.map((e) => e.playerId)).toEqual(asIs.map((e) => e.playerId));
+  });
+
+  it("puts every player the market never ranked after every player it did, in our board's order among themselves", () => {
+    const deepBench: readonly SimRankableEntry[] = [
+      { playerId: "a", position: "RB", evidenceRank: 0, marketRank: 0 },
+      { playerId: "b", position: "WR", evidenceRank: 1, marketRank: 1 },
+      { playerId: "y", position: "TE", evidenceRank: 2, marketRank: null },
+      { playerId: "x", position: "K", evidenceRank: 3, marketRank: null },
+    ];
+    // Casual sharpness, real jitter: the unranked block still never jumps the ranked one.
+    const order = simBoardOrder(deepBench, 0, createSeededRng(3)).map((e) => e.playerId);
+    expect(new Set(order.slice(0, 2))).toEqual(new Set(["a", "b"]));
+    expect(order.slice(2)).toEqual(["y", "x"]);
   });
 
   it("is a pure function of its inputs: the same seed reproduces the identical order", () => {
@@ -32,9 +48,7 @@ describe("simBoardOrder", () => {
 
   it("two different seeds can produce different orders at casual sharpness", () => {
     const orderA = simBoardOrder(POOL, 0, createSeededRng(1));
-    const orderB = simBoardOrder(POOL, 0, createSeededRng(2));
-    // Not asserted to always differ (a coincidence is possible with only 4 players), but across
-    // these two fixed seeds the jitter is known to produce different orderings.
+    const orderB = simBoardOrder(POOL, 0, createSeededRng(8));
     expect(orderA.map((e) => e.playerId)).not.toEqual(orderB.map((e) => e.playerId));
   });
 

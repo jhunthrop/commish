@@ -2,14 +2,20 @@ import type { Position } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
 import type { BuildLabel } from "./classify";
 
-/** One player as the simulator needs to see them: the evidence board's own points and rank
- *  (`@/projections/preseason/board-store.ts`'s `PreseasonProjectionRow`, joined to the product's
- *  own player id the way `@/draft-hq/board/service.ts` already does), plus the market's own rank
- *  when the ADP feed carries one. `evidenceRank`/`marketRank` are 0-based, best player first. */
+/**
+ * One player as the simulator needs to see them: the evidence board's own projected points
+ * (`@/projections/preseason/board-store.ts`'s `PreseasonProjectionRow`, joined to the product's
+ * own player id the way `@/draft-hq/board/service.ts` already does), plus the market's own
+ * 0-based rank when the ADP feed carries one and null when it does not.
+ *
+ * DELIBERATELY CARRIES NO BOARD RANK. Our board's order is value over replacement under a
+ * LEAGUE'S OWN SHAPE (`value-order.ts`), not a property of the player, so it is derived where the
+ * shape is known rather than baked in here. A stored rank by raw points is exactly what put a
+ * quarterback at the top of every pick in the Simulator (founder, 2026-09-05).
+ */
 export interface SimPlayerEvidence {
   readonly playerId: string;
   readonly position: Position;
-  readonly evidenceRank: number;
   readonly marketRank: number | null;
   readonly projectedPoints: number;
 }
@@ -26,7 +32,8 @@ export interface SimConfig {
   readonly slot: number | "all";
   readonly rounds: number;
   readonly runs: number;
-  /** 0 (casual) to 1 (sharp) — `board-order.ts`'s own blend. */
+  /** How tightly the ROOM drafts to market ADP: 0 is a casual room that reaches, 1 is a room
+   *  that takes the market in order. `board-order.ts` owns the arithmetic. */
   readonly sharpness: number;
   readonly seed: number;
 }

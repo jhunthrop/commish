@@ -99,13 +99,18 @@ function seedFor(seedNamespace: string, pickNumber: number): number {
 /** Every evidence player, valued once under `shape` through the SAME `valueBoardIndexed` wiring
  *  `@/draft-hq/board/service.ts`'s `boardRows` reads its own valuation through — one shared helper
  *  rather than two hand-rolled `new Map(valueBoard(...).map(...))`s. `averageDraftPosition` is the
- *  market's own rank when the ADP feed carries one, falling back to the evidence board's own rank
- *  otherwise (the identical fallback `sim/board-order.ts`'s `baseBlendRank` already uses): "any
- *  consistent market will do" is `BoardEntry`'s own docblock, and a rank is a consistent market. */
+ *  market's own rank when the ADP feed carries one, falling back to this valuation's OWN rank
+ *  otherwise: "any consistent market will do" is `BoardEntry`'s own docblock, and a rank is a
+ *  consistent market. The fallback is deliberately the value rank rather than a rank by raw
+ *  points, which is the ordering that put quarterbacks on top of the Simulator (founder,
+ *  2026-09-05). */
 function valuedEvidence(pool: readonly SimPlayerEvidence[], shape: LeagueShape): ReadonlyMap<string, ValuedEntry> {
-  const { byPlayerId } = valueBoardIndexed(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
-  const marketByPlayerId = new Map(pool.map((entry) => [entry.playerId, entry.marketRank ?? entry.evidenceRank] as const));
-  return new Map([...byPlayerId].map(([playerId, entry]) => [playerId, { ...entry, averageDraftPosition: marketByPlayerId.get(playerId)! }]));
+  const { sorted, byPlayerId } = valueBoardIndexed(pool.map((entry) => ({ playerId: entry.playerId, position: entry.position, projectedPoints: entry.projectedPoints })), shape);
+  const valueRankByPlayerId = new Map(sorted.map((entry, index) => [entry.playerId, index] as const));
+  const marketByPlayerId = new Map(pool.map((entry) => [entry.playerId, entry.marketRank] as const));
+  return new Map(
+    [...byPlayerId].map(([playerId, entry]) => [playerId, { ...entry, averageDraftPosition: marketByPlayerId.get(playerId) ?? valueRankByPlayerId.get(playerId)! }]),
+  );
 }
 
 interface AskingWindow {

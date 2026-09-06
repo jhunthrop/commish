@@ -104,10 +104,10 @@ describe("summarizeCompletedMock — your grade (Task 11, plan ruling R-2)", () 
     ],
   };
   const GRADE_POOL: readonly SimPlayerEvidence[] = [
-    { playerId: "p1", position: "RB", evidenceRank: 0, marketRank: 0, projectedPoints: 200 },
-    { playerId: "p4", position: "RB", evidenceRank: 1, marketRank: 1, projectedPoints: 120 },
-    { playerId: "p5", position: "TE", evidenceRank: 2, marketRank: 2, projectedPoints: 90 },
-    { playerId: "p8", position: "TE", evidenceRank: 3, marketRank: 3, projectedPoints: 50 },
+    { playerId: "p1", position: "RB", marketRank: 0, projectedPoints: 200 },
+    { playerId: "p4", position: "RB", marketRank: 1, projectedPoints: 120 },
+    { playerId: "p5", position: "TE", marketRank: 2, projectedPoints: 90 },
+    { playerId: "p8", position: "TE", marketRank: 3, projectedPoints: 50 },
   ];
   const GRADE_EVIDENCE: MockGradeEvidence = { pool: GRADE_POOL, boardGeneration: "2026-08-25T00:00:00.000Z", byeWeeks: new Map() };
 
@@ -235,10 +235,10 @@ describe("completedMockDebriefs", () => {
     const seeded = await seedCompletedSolo("u_grade");
     const evidence: MockGradeEvidence = {
       pool: [
-        { playerId: "p1", position: "RB", evidenceRank: 0, marketRank: 0, projectedPoints: 200 },
-        { playerId: "p4", position: "RB", evidenceRank: 1, marketRank: 1, projectedPoints: 120 },
-        { playerId: "p5", position: "TE", evidenceRank: 2, marketRank: 2, projectedPoints: 90 },
-        { playerId: "p8", position: "TE", evidenceRank: 3, marketRank: 3, projectedPoints: 50 },
+        { playerId: "p1", position: "RB", marketRank: 0, projectedPoints: 200 },
+        { playerId: "p4", position: "RB", marketRank: 1, projectedPoints: 120 },
+        { playerId: "p5", position: "TE", marketRank: 2, projectedPoints: 90 },
+        { playerId: "p8", position: "TE", marketRank: 3, projectedPoints: 50 },
       ],
       boardGeneration: "2026-08-25T00:00:00.000Z",
       byeWeeks: new Map(),

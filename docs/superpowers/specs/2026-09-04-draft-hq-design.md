@@ -63,7 +63,7 @@ The persistent personal cheat sheet. Server-side, one per (user, league) plus a 
 Headless Monte Carlo over the real draft engine with need-aware bots, per league.
 
 **Configuration**
-- League (brings scoring/roster/team count), your slot (or "find my best slot" mode that runs all twelve), rounds, runs (100/1k/10k), room sharpness (bot policy mix: casual = ADP-heavy with noise, sharp = board-heavy; mixed interleaves), keeper pre-assignments for keeper leagues, snake or auction mode.
+- League (brings scoring/roster/team count), your slot (or "find my best slot" mode that runs all twelve), rounds, runs (100/1k/10k), room sharpness (how tightly the room drafts to market ADP: casual reaches, sharp takes the market in order, mixed sits between them; the room always drafts ADP and your own seat always drafts our board, founder ruling 2026-09-05), keeper pre-assignments for keeper leagues, snake or auction mode.
 
 **Outputs**
 - **What wins from your slot**: builds classified from the first six rounds (hero-RB, zero-RB, robust-RB, early-TE, late-QB, superflex-QBQB...), each with top-3 finish rate scoring every simmed roster under league rules with evidence projections. Baseline marked; confidence intervals shown at 100 runs, suppressed at 10k.
