@@ -1,32 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { BottomSheet, PlayerObject } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import type { ApiEnvelope } from "@/lib/api/respond";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import { DossierComposition } from "../dossier/dossier-composition";
-import { useLeagueRoomDeps } from "../hooks/deps";
+import { openPlayerPeek as openPlayerPeekImpl, usePeekLoad, type PeekTarget } from "./use-peek-load";
 import { SeasonSwitcher } from "./season-switcher";
 
-interface PeekTarget {
-  readonly leagueId: string;
-  readonly playerId: string;
-  readonly name: string;
-}
-
-/**
- * ONE listener, module scope: `PlayerName` triggers anywhere in the tree reach the single
- * `PlayerPeekHost` the page mounts, with no context threading through the server components
- * between them. A trigger pressed with no host mounted does nothing, quietly — the failure mode
- * is a dead click, never a crash.
- */
-let host: ((target: PeekTarget) => void) | null = null;
-
-export function openPlayerPeek(target: PeekTarget): void {
-  host?.(target);
-}
+/** Re-exported unchanged (fix round 2 moved the module-scope `host` listener itself into
+ *  `use-peek-load.ts`, alongside the hook that is its one real reader) — every existing caller
+ *  keeps importing this from `player-peek.tsx`. */
+export const openPlayerPeek = openPlayerPeekImpl;
 
 /**
  * A PLAYER'S NAME, PRESSABLE (founder, 2026-08-30: "we should be able to click the players name
@@ -73,56 +59,43 @@ function identityLine(body: PlayerSeasonBody): string {
 }
 
 /**
+ * THE SHEET'S OWN HEADER (fix round 2, extracted from `PlayerPeekHost` for the same under-fifty-
+ * line rule `dossier-composition.tsx`'s own extraction served): the name/position chips, the
+ * injury designation pill, the bye/roster identity line, and the link to the full page. No
+ * behavior change — byte-identical markup to what `PlayerPeekHost` used to render inline.
+ */
+function PeekHeader({ body, target, onClose }: { readonly body: PlayerSeasonBody; readonly target: PeekTarget; readonly onClose: () => void }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-3">
+          <PlayerObject player={body.player} />
+          {/* The designation, said in the verdict channel: "Q"/"O"/"IR" beside the name is the
+              one fact a manager checks before anything else. Absent = the feed does not name
+              him, and nothing prints. Unchanged by the dossier composition below —
+              `StoryModule`'s own pill covers the story card, this one covers the header, and
+              both may say the same thing at once on purpose. */}
+          {body.injuryDesignation === null ? null : (
+            <span className="rounded-sm bg-negative px-1.5 py-0.5 font-mono text-sm font-semibold text-negative-text">{body.injuryDesignation}</span>
+          )}
+        </div>
+        {identityLine(body) === "" ? null : <p className="text-sm text-text-muted">{identityLine(body)}</p>}
+      </div>
+      <Link className={`${MICRO_LABEL} pt-2 text-accent underline`} href={`/app/leagues/${target.leagueId}/players/${target.playerId}`} onClick={onClose}>
+        Full page
+      </Link>
+    </div>
+  );
+}
+
+/**
  * The one mounted receiver for `PlayerName` presses: fetches the player's season under this
- * league's rules (the same body the full page reads) and raises the sheet. Loading shows the
- * name immediately — the reader pressed a name, the sheet answers with it before the wire does.
+ * league's rules (the same body the full page reads, via `usePeekLoad`) and raises the sheet.
+ * Loading shows the name immediately — the reader pressed a name, the sheet answers with it
+ * before the wire does.
  */
 export function PlayerPeekHost() {
-  const { fetchJson } = useLeagueRoomDeps();
-  const [target, setTarget] = useState<PeekTarget | null>(null);
-  const [body, setBody] = useState<PlayerSeasonBody | null>(null);
-  const [failed, setFailed] = useState(false);
-  // `null` means "let the service pick" — its own default, the newest season with data for him.
-  // Set only once a manager presses a segment in the switcher below (2026-09-04 widening).
-  const [season, setSeason] = useState<number | null>(null);
-
-  useEffect(() => {
-    // Opening a new target resets any season a prior peek's manager had picked — his choice on
-    // one player's card has no business surviving onto the next name pressed.
-    const openTarget = (next: PeekTarget) => {
-      setSeason(null);
-      setTarget(next);
-    };
-    host = openTarget;
-    return () => {
-      if (host === openTarget) host = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (target === null) return;
-    setBody(null);
-    setFailed(false);
-    let alive = true;
-    void (async () => {
-      try {
-        const seasonParam = season === null ? "" : `&season=${season}`;
-        const response = await fetchJson(
-          `/api/leagues/${target.leagueId}/player-season?playerId=${encodeURIComponent(target.playerId)}${seasonParam}`,
-          { method: "GET" },
-        );
-        const envelope = (await response.json()) as ApiEnvelope<PlayerSeasonBody>;
-        if (!alive) return;
-        if (envelope.ok) setBody(envelope.data);
-        else setFailed(true);
-      } catch {
-        if (alive) setFailed(true);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [target, season, fetchJson]);
+  const { target, body, failed, season, setSeason, close } = usePeekLoad();
 
   if (target === null) return null;
   const played = body?.weeks.some((week) => week.points !== null) ?? false;
@@ -133,7 +106,7 @@ export function PlayerPeekHost() {
   const switcher = body !== null && body.availableSeasons.length > 1 ? <SeasonSwitcher seasons={body.availableSeasons} season={season ?? body.season} onSelect={setSeason} /> : undefined;
 
   return (
-    <BottomSheet label={target.name} onClose={() => setTarget(null)}>
+    <BottomSheet label={target.name} onClose={close}>
       <div className="flex flex-col gap-6">
         {body === null ? (
           <div className="flex flex-col gap-2">
@@ -142,29 +115,7 @@ export function PlayerPeekHost() {
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-3">
-                  <PlayerObject player={body.player} />
-                  {/* The designation, said in the verdict channel: "Q"/"O"/"IR" beside the name
-                      is the one fact a manager checks before anything else. Absent = the feed
-                      does not name him, and nothing prints. Unchanged by the dossier composition
-                      below — `StoryModule`'s own pill covers the story card, this one covers the
-                      header, and both may say the same thing at once on purpose. */}
-                  {body.injuryDesignation === null ? null : (
-                    <span className="rounded-sm bg-negative px-1.5 py-0.5 font-mono text-sm font-semibold text-negative-text">{body.injuryDesignation}</span>
-                  )}
-                </div>
-                {identityLine(body) === "" ? null : <p className="text-sm text-text-muted">{identityLine(body)}</p>}
-              </div>
-              <Link
-                className={`${MICRO_LABEL} pt-2 text-accent underline`}
-                href={`/app/leagues/${target.leagueId}/players/${target.playerId}`}
-                onClick={() => setTarget(null)}
-              >
-                Full page
-              </Link>
-            </div>
+            <PeekHeader body={body} target={target} onClose={close} />
 
             {/* THE SHARED DOSSIER COMPOSITION (fix round 1, IMPORTANT 4) — call card through
                 `WhyGroups`, plus the season totals/log and the dossier-null fallback, identical
