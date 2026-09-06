@@ -20,6 +20,12 @@ export interface CallCardOurBoard {
   readonly positionRank: number | null;
   readonly boardRank: number;
   readonly points: number;
+  /** The board's own scoring format (`dossier.basis.scoringLabel`, "PPR") — the both-bases Global
+   *  Constraint's own law, applied to the one number on this card that used to carry none:
+   *  `points` is our board's season projection, and a bare "225 pts" never named which rules
+   *  produced it. Stated in the SAME word `SeasonStrip`'s own per-game fact already uses for the
+   *  identical board, never a new label invented for this card alone. */
+  readonly scoringLabel: string;
   readonly perGameRank: number | null;
   readonly expectedGames: number | null;
 }
@@ -103,7 +109,7 @@ export function CallCard({ verdict, market, ourBoard, gap }: CallCardProps) {
         <span data-call="our-board" className="flex items-center gap-1.5">
           <PositionBadge position={ourBoard.position} rank={ourBoard.positionRank ?? undefined} size="sm" />
           <span>
-            · {ordinal(ourBoard.boardRank)} overall · {Math.round(ourBoard.points)} pts
+            · {ordinal(ourBoard.boardRank)} overall · {Math.round(ourBoard.points)} {ourBoard.scoringLabel} pts
           </span>
         </span>
         <span data-call="gap" className={tone}>

@@ -326,7 +326,7 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     },
     injury: { state: "unknown" },
     newsCount: 1,
-    basis: { boardGeneration: "2026-08-01T00:00:00.000Z", scoringLabel: "PPR" },
+    basis: { scoringLabel: "PPR" },
     byeWeek: 8,
   };
 
@@ -343,7 +343,11 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
   }
 
   it("composes the call card, the two-column grid modules, and the why slot, in the mock's own order", async () => {
-    const bodies = new Map([[2026, dossierBody()]]);
+    // `season: 2025` — matching `DOSSIER.lastSeasonStory.season` (fix round 1, CRITICAL 2: a
+    // mismatched pair renders the honest fallback instead of `SeasonStrip`; see the dedicated
+    // regression test below for that case). This test's own purpose is proving every module is
+    // present, `SeasonStrip` included, so it needs the season on screen to actually match.
+    const bodies = new Map([[2026, dossierBody({ season: 2025 })]]);
     render(
       <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
         <PlayerPeekHost />
@@ -368,6 +372,23 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     const labelled = Array.from(sheet.querySelectorAll("[aria-label]")).map((el) => el.getAttribute("aria-label"));
     const positions = ["The call", "Season range", "Role", "The read", "The books", "2025 season", "Story"].map((label) => labelled.indexOf(label));
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  it("fix round 1, CRITICAL 2: shows the honest season fallback, never a mismatched SeasonStrip, when the story's own season differs from the one on screen", async () => {
+    // The default `dossierBody()`'s own `season` is 2026 (the current season, already played);
+    // `DOSSIER.lastSeasonStory.season` is always 2025 (last season) — the realistic default
+    // mismatch this fix closes.
+    const bodies = new Map([[2026, dossierBody()]]);
+    render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+    await waitFor(() => expect(screen.getByLabelText("The call")).toBeInTheDocument());
+
+    expect(screen.queryByLabelText("2025 season")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Rashad Long, points by week")).toBeInTheDocument();
   });
 
   it("prints the verdict exactly once, from the call card, never doubled by WhyGroups", async () => {
@@ -463,7 +484,9 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
   it("review fix: keeps Books paired in its own row's grid, and SeasonStrip paired with Story, when the capsule is absent", async () => {
     // The capsule sweep has not reached most players yet (Task 4's own note) — this is the
     // COMMON state, not an edge case, and it must never cascade the later rows out of their pairs.
-    const bodies = new Map([[2026, dossierBody({ capsule: null })]]);
+    // `season: 2025` matches `DOSSIER.lastSeasonStory.season` so `SeasonStrip` itself renders
+    // (fix round 1, CRITICAL 2) — this test's own subject is the grid pairing, not the strip.
+    const bodies = new Map([[2026, dossierBody({ capsule: null, season: 2025 })]]);
     render(
       <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
         <PlayerPeekHost />

@@ -49,8 +49,10 @@ export function sourcesFor(body: PlayerSeasonBody): readonly SourceValue[] {
  *  (it lives on `PlayerSeasonBody` — the ECR-consensus read `dossier-facts.ts` never touches, see
  *  that module's own docblock); everything else comes straight off `dossier.market`/`.projection`/
  *  `.availability`. The verdict is composed here, once, from the SAME `reasons`/`position`
- *  `Outlook` would otherwise re-derive the identical sentence from — callers pass `showVerdict:
- *  false` to `Outlook` once they render this, so the sentence prints exactly once. */
+ *  `Outlook` would otherwise re-derive the identical sentence from — `Outlook` is only ever
+ *  rendered alongside `CallCard` in the fallback composition (no dossier facts at all), never
+ *  both at once for the same player, so there is no duplicate-verdict case for either component
+ *  to guard against. */
 export function callCardPropsFor(body: PlayerSeasonBody, dossier: PlayerDossierFacts): { readonly verdict: string | null; readonly market: CallCardMarket; readonly ourBoard: CallCardOurBoard; readonly gap: number | null } {
   return {
     verdict: verdictLine(body.reasons, body.player.position),
@@ -60,6 +62,7 @@ export function callCardPropsFor(body: PlayerSeasonBody, dossier: PlayerDossierF
       positionRank: dossier.market.positionRank,
       boardRank: dossier.market.boardRank,
       points: dossier.projection.projectedPoints,
+      scoringLabel: dossier.basis.scoringLabel,
       perGameRank: dossier.projection.perGamePositionRank?.positionRank ?? null,
       expectedGames: dossier.availability?.expectedGames ?? null,
     },

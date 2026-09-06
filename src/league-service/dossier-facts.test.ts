@@ -90,10 +90,9 @@ describe("dossierFactsFor", () => {
     expect(peer!.projection.perGamePositionRank).toEqual({ value: 10, positionRank: 2, qualifierCount: 2 });
   });
 
-  it("states the board's own generation stamp and the honest scoring label", async () => {
+  it("states the honest scoring label", async () => {
     await seedPlayer(db, { id: "p1", nflId: "00-8100001", name: "Rashad Long", position: "RB", team: "SF", points: 200, expectedGames: 16, rank: 1, adp: 10 });
     const facts = await dossierFactsFor(db, "p1");
-    expect(facts!.basis.boardGeneration).toBe(BOARD_ASOF.toISOString());
     expect(facts!.basis.scoringLabel).toBe("PPR");
   });
 

@@ -242,7 +242,7 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
     },
     injury: { state: "unknown" },
     newsCount: 1,
-    basis: { boardGeneration: "2026-08-01T00:00:00.000Z", scoringLabel: "PPR" },
+    basis: { scoringLabel: "PPR" },
     byeWeek: 8,
   };
 
@@ -261,7 +261,12 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
   }
 
   it("composes the call card and the full dossier grid when the dossier is real", async () => {
-    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    // `season: 2025` — matching `DOSSIER.lastSeasonStory.season` (fix round 1, CRITICAL 2: a
+    // mismatched pair renders the honest fallback instead of `SeasonStrip`; see the dedicated
+    // regression test below for that case). This test's own purpose is proving every module is
+    // present, `SeasonStrip` included, so it needs the season on screen to actually match the
+    // story.
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody({ season: 2025 }));
     await renderPage();
     expect(screen.getByLabelText("The call")).toBeInTheDocument();
     expect(screen.getByLabelText("Season range")).toBeInTheDocument();
@@ -271,6 +276,19 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
     expect(screen.getByLabelText("2025 season")).toBeInTheDocument();
     expect(screen.getByLabelText("Story")).toBeInTheDocument();
     expect(screen.getByText("Why")).toBeInTheDocument();
+  });
+
+  it("fix round 1, CRITICAL 2: shows the honest season fallback, never a mismatched SeasonStrip, when the story's own season differs from the one on screen", async () => {
+    // The default fixture's own `season` is 2026 (the current season, already played);
+    // `DOSSIER.lastSeasonStory.season` is always 2025 (last season) — the realistic default
+    // mismatch this fix closes. Before the fix, this rendered a "2025 season" card captioned
+    // over 2026's own weekly bars, with the switcher inside the card moving the bars but never
+    // the header; after it, the honest fallback (labeled with whichever season IS on screen)
+    // covers it instead.
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    await renderPage();
+    expect(screen.queryByLabelText("2025 season")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Rashad Long, points by week")).toBeInTheDocument();
   });
 
   it("states the FULL capsule read, never the compact one, when the capsule is a genuine LLM write-up", async () => {
@@ -296,11 +314,25 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
   });
 
   it("names both scoring bases — the dossier's own board basis and this league's own scoring", async () => {
-    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    // `season: 2025` — matching `DOSSIER.lastSeasonStory.season`, so `SeasonStrip` itself renders
+    // (fix round 1, CRITICAL 2: a mismatched pair shows the honest fallback instead, which never
+    // states the board's basis at all). Both bases still fully coexist here: `SeasonStrip`'s own
+    // basis and `SeasonTotalsAndLog`'s own league basis, for the SAME season now on screen.
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody({ season: 2025 }));
     await renderPage();
     // SeasonStrip's own "points per game" fact states the board's basis as its sub-note.
     expect(screen.getByText("PPR")).toBeInTheDocument();
     // SeasonTotalsAndLog names the OTHER basis, on both of its own headers.
+    expect(screen.getByText("2025 totals · under this league's scoring")).toBeInTheDocument();
+    expect(screen.getByText("2025 game log · under this league's scoring")).toBeInTheDocument();
+  });
+
+  it("also names the league's own scoring on the default (current-season) view, even though the board's basis has no honest place to render there", async () => {
+    // The realistic default: the board's own basis (`SeasonStrip`'s "PPR") only ever shows for
+    // the PRIOR season it actually describes; the CURRENT season's own totals/log still name
+    // their basis on every render, mismatch or not.
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    await renderPage();
     expect(screen.getByText("2026 totals · under this league's scoring")).toBeInTheDocument();
     expect(screen.getByText("2026 game log · under this league's scoring")).toBeInTheDocument();
   });

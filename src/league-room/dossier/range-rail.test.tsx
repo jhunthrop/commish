@@ -38,7 +38,7 @@ describe("RangeRail", () => {
     const withAvailability = render(
       <RangeRail projection={PROJECTION} availability={{ expectedGames: 15.6, floorGames: 10, ceilingGames: 17 }} />,
     );
-    expect(withAvailability.container.textContent).toContain("Expected 16 games, weeks 10 to 17");
+    expect(withAvailability.container.textContent).toContain("Expected 16 games, 10 to 17");
 
     const without = render(<RangeRail projection={PROJECTION} availability={null} />);
     expect(without.container.querySelector('[data-rail-chip="expected-games"]')).toBeNull();

@@ -79,7 +79,7 @@ function trendSentence(priorSeason: number, priorValue: number, recentSeason: nu
  */
 export function RoleModule({ position, usage, trend }: RoleModuleProps) {
   const pointsPerGame = trend?.pointsPerGame ?? null;
-  const showTrend = pointsPerGame !== null && pointsPerGame.material;
+  const trendMetric = pointsPerGame !== null && pointsPerGame.material ? pointsPerGame : null;
 
   return (
     <Card as="section" aria-label="Role" className="flex flex-col gap-4">
@@ -99,11 +99,10 @@ export function RoleModule({ position, usage, trend }: RoleModuleProps) {
           );
         })}
       </div>
-      {!showTrend ? null : (
+      {trendMetric === null ? null : (
         <p className="flex flex-wrap items-baseline gap-1 text-sm text-text-muted" data-role="trend">
           {(() => {
-            const metric = pointsPerGame!;
-            const { before, delta, percentile } = trendSentence(metric.priorSeason, metric.priorValue, metric.recentSeason, metric.recentValue, metric.delta);
+            const { before, delta, percentile } = trendSentence(trendMetric.priorSeason, trendMetric.priorValue, trendMetric.recentSeason, trendMetric.recentValue, trendMetric.delta);
             return (
               <>
                 <span>{before}</span>

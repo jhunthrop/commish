@@ -2,24 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { BottomSheet, PlayerObject, SourceStrip } from "@/components/ui";
+import { BottomSheet, PlayerObject } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { PlayerSeasonBody } from "@/league-service/player";
-import { BooksModule } from "../dossier/books-module";
-import { CallCard } from "../dossier/call-card";
-import { NewsList } from "../dossier/news-list";
-import { RangeRail } from "../dossier/range-rail";
-import { ReadCard } from "../dossier/read-card";
-import { RoleModule } from "../dossier/role-module";
-import { SeasonChartFallback } from "../dossier/season-chart-fallback";
-import { SeasonStrip } from "../dossier/season-strip";
-import { SeasonTotalsAndLog } from "../dossier/season-totals-and-log";
-import { StoryModule } from "../dossier/story-module";
-import { WhyGroups } from "../dossier/why-groups";
-import { callCardPropsFor, hasReadCardFor, hasStoryCellFor, sourcesFor, weeksFor } from "../lib/player-season-view";
+import { DossierComposition } from "../dossier/dossier-composition";
 import { useLeagueRoomDeps } from "../hooks/deps";
-import { Outlook } from "../outlook/outlook";
 import { SeasonSwitcher } from "./season-switcher";
 
 interface PeekTarget {
@@ -143,11 +131,6 @@ export function PlayerPeekHost() {
   // build the dossier composition from" state; the double-check idiom folds both into one.
   const dossier = body?.dossier ?? null;
   const switcher = body !== null && body.availableSeasons.length > 1 ? <SeasonSwitcher seasons={body.availableSeasons} season={season ?? body.season} onSelect={setSeason} /> : undefined;
-  // Whether the grid's `ReadCard`/story cells have anything to pair with `BooksModule`/`SeasonStrip`
-  // against — review fix: a missing partner spans its own row's full width instead of leaving the
-  // other column empty (see the grid's own inline docblock below for why this must be per-row).
-  const hasReadCard = body !== null && hasReadCardFor(body);
-  const hasStoryCell = body !== null && hasStoryCellFor(body);
 
   return (
     <BottomSheet label={target.name} onClose={() => setTarget(null)}>
@@ -183,79 +166,11 @@ export function PlayerPeekHost() {
               </Link>
             </div>
 
-            {dossier === null ? (
-              <>
-                {/* TODAY'S LAYOUT, UNCHANGED — the binding fallback (Task 5): a player without
-                    board facts still gets the source strip, the Outlook (verdict and capsule
-                    included, exactly as before this task), and his season. */}
-                <SourceStrip label={`Where ${body.player.name} is ranked, by source`} sources={sourcesFor(body)} />
-                <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} capsule={body.capsule} capped />
-                <SeasonChartFallback body={body} switcher={switcher} played={played} />
-              </>
-            ) : (
-              <>
-                {/* THE CALL, FIRST — `callCardPropsFor` is the adapter Task 3 disclosed as its own
-                    cost: `market`/`ourBoard` off the dossier, `expertRank` off the body (the one
-                    field the dossier itself does not carry), the verdict composed once here. */}
-                <CallCard {...callCardPropsFor(body, dossier)} />
-
-                {/* THREE SEPARATE ROW GRIDS, NOT ONE SIX-ITEM GRID (review fix): a single flat
-                    `grid-cols-2` auto-places every child in DOM order, so a missing member (most
-                    commonly `ReadCard`, absent for the many players the capsule sweep has not
-                    written up yet — Task 4's own note) shifts every LATER pair across the seam,
-                    cascading `Books`/`SeasonStrip` into row two and stranding `Story`+news alone.
-                    One grid per row keeps a missing member's effect confined to its own row: the
-                    surviving member spans both columns rather than sitting alone on the left with
-                    the right column empty. */}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <RangeRail projection={dossier.projection} availability={dossier.availability} />
-                  <RoleModule position={body.player.position} usage={dossier.usage} trend={dossier.trend} />
-                </div>
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <ReadCard capsule={body.capsule} variant="compact" />
-                  <div className={hasReadCard ? undefined : "lg:col-span-2"}>
-                    <BooksModule books={dossier.books} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <div className={hasStoryCell ? undefined : "lg:col-span-2"}>
-                    {dossier.lastSeasonStory === null ? (
-                      <SeasonChartFallback body={body} switcher={switcher} played={played} />
-                    ) : (
-                      <SeasonStrip story={dossier.lastSeasonStory} weeks={weeksFor(body)} scoringLabel={dossier.basis.scoringLabel} switcher={switcher} />
-                    )}
-                  </div>
-                  {!hasStoryCell ? null : (
-                    <div className="flex flex-col gap-4">
-                      {/* The season-ending story service wiring converges post-merge (ruling
-                          R-d1) — `story` stays `null` here for now, so this renders only the
-                          current designation pill, or nothing, honestly. */}
-                      <StoryModule story={null} designation={body.injuryDesignation} />
-                      <NewsList news={body.news} />
-                    </div>
-                  )}
-                </div>
-
-                {/* THE WHY, AS SENTENCES (ruling R-d2's completion, Task 6) — `WhyGroups` replaces
-                    the capped `Outlook` here: the same grouped evidence (`groupReasons`, reused
-                    unchanged), restyled as the mock's bold-lead-plus-explanation sentences, and
-                    printing no verdict of its own (`CallCard` above already states it from the
-                    identical `reasons`/`position`, and no capsule prose either — `ReadCard` above
-                    already states that). Capped at 5, the peek's own historical cap. */}
-                <WhyGroups reasons={body.reasons} laws={body.laws} position={body.player.position} cap={5} />
-              </>
-            )}
-
-            {/* SEASON TOTALS + GAME LOG (founder, 2026-08-30: ESPN-depth; Task 6 extracted this
-                into a shared component, `SeasonTotalsAndLog`, that also names its own scoring
-                basis — the "both bases" law the plan's Global Constraints state directly. Stays
-                below the fold in both compositions, exactly where it always was. */}
-            <SeasonTotalsAndLog body={body} />
-
-            {/* News stays below the fold ONLY in the fallback composition (no dossier) — the
-                dossier composition already rendered this same list once, beside `StoryModule`,
-                further up. Never both: see `NewsList`'s own docblock. */}
-            {dossier === null ? <NewsList news={body.news} /> : null}
+            {/* THE SHARED DOSSIER COMPOSITION (fix round 1, IMPORTANT 4) — call card through
+                `WhyGroups`, plus the season totals/log and the dossier-null fallback, identical
+                to the full page's own composition apart from what `depth`/`readVariant`/`whyCap`
+                state below. See `dossier-composition.tsx`'s own docblock. */}
+            <DossierComposition body={body} dossier={dossier} depth="peek" switcher={switcher} played={played} readVariant="compact" whyCap={5} />
           </>
         )}
       </div>

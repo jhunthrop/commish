@@ -5,7 +5,7 @@ import { renderSurface } from "@/components/ui/test-utils";
 import { CallCard, type CallCardMarket, type CallCardOurBoard } from "./call-card";
 
 const MARKET: CallCardMarket = { adp: 24.3, expertRank: 23 };
-const OUR_BOARD: CallCardOurBoard = { position: "WR", positionRank: 24, boardRank: 54, points: 197, perGameRank: 8, expectedGames: 15.4 };
+const OUR_BOARD: CallCardOurBoard = { position: "WR", positionRank: 24, boardRank: 54, points: 197, scoringLabel: "PPR", perGameRank: 8, expectedGames: 15.4 };
 
 function verdictEl(container: HTMLElement) {
   return container.querySelector('[data-call="verdict"]');
@@ -21,7 +21,7 @@ describe("CallCard", () => {
     expect(container.textContent).toContain("experts 23rd");
     expect(container.textContent).toContain("WR24");
     expect(container.textContent).toContain("54th overall");
-    expect(container.textContent).toContain("197 pts");
+    expect(container.textContent).toContain("197 PPR pts");
     expect(container.textContent).toContain("-20 points vs his price");
   });
 

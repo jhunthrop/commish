@@ -74,7 +74,7 @@ export function RangeRail({ projection, availability }: RangeRailProps) {
       </div>
       {availability === null ? null : (
         <p className="text-xs text-text-faint" data-rail-chip="expected-games">
-          Expected {Math.round(availability.expectedGames)} games, weeks {Math.round(availability.floorGames)} to {Math.round(availability.ceilingGames)}
+          Expected {Math.round(availability.expectedGames)} games, {Math.round(availability.floorGames)} to {Math.round(availability.ceilingGames)}
         </p>
       )}
     </Card>

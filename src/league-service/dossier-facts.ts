@@ -39,18 +39,14 @@ export interface PlayerDossierProjection extends PlayerFactsProjection {
   readonly perGamePositionRank: PlayerDossierRank | null;
 }
 
-/** Which generation of evidence, and which scoring format, every number on this object was
- *  computed under — so a client can label a rank or a rate with its own basis rather than let a
- *  reader assume today's board or a league's own house rules. */
+/** Which scoring format every number on this object was computed under — so a client can label a
+ *  rate with its own basis rather than let a reader assume a league's own house rules. Fix round
+ *  1: this used to also carry `boardGeneration` (the evidence board's own `asOf` stamp), computed
+ *  every call and rendered nowhere — dropped rather than kept "for later" (this codebase's own
+ *  "delete dead code completely" rule). `perGamePointsRanksFor`/`boardWidePerGameFacts` still read
+ *  the board's `asOf` internally to bound the query; they simply no longer thread the stamp itself
+ *  out to a client that never asked for it. */
 export interface PlayerDossierBasis {
-  /** The evidence board's own `asOf` stamp, shared by every row under one generation — the exact
-   *  value `draft-service/sim/evidence.ts`'s `evidencePoolFor` derives (`assertSingleGeneration`'s
-   *  own invariant: every row under a live source shares one `asOf`). Read here off the SAME
-   *  `preseasonProjectionsAsOf` pass this module already runs for the per-game rank below, rather
-   *  than calling `evidencePoolFor` itself, which would pay for a SECOND whole-board read (its own
-   *  crosswalk join and market-rank pass this dossier has no use for) just to get a string this
-   *  one already has in hand. Empty when the board has no rows at all. */
-  readonly boardGeneration: string;
   /** The honest name (`scoring/describe.ts`'s `describeScoring`) of the scoring rules the facts
    *  path actually computed under — `PPR_SCORING`, the same fixed format `collect.ts`'s own
    *  `currentSeasonSummaries` docblock names and the shipped board itself is composed under
@@ -120,14 +116,14 @@ function perGamePointsRanksFor(rows: readonly PreseasonProjectionRow[], position
   return out;
 }
 
-/** The whole-board read `perGamePointsRanksFor` needs, plus the generation stamp it shares with
- *  every row under it — bundled so `dossierFactsFor` runs it exactly once regardless of whether
- *  the target player himself ends up ranked. */
-async function boardWidePerGameFacts(db: Db, asOf: Date): Promise<{ readonly boardGeneration: string; readonly ranksByNflPlayerId: ReadonlyMap<string, PlayerDossierRank> }> {
+/** The whole-board read `perGamePointsRanksFor` needs — bundled into its own function so
+ *  `dossierFactsFor` runs it exactly once regardless of whether the target player himself ends up
+ *  ranked. */
+async function boardWidePerGameFacts(db: Db, asOf: Date): Promise<ReadonlyMap<string, PlayerDossierRank>> {
   const rows = await preseasonProjectionsAsOf(db, { season: PRODUCT_SEASON, source: BOARD_SOURCE, asOf });
-  if (rows.length === 0) return { boardGeneration: "", ranksByNflPlayerId: new Map() };
+  if (rows.length === 0) return new Map();
   const positions = await allPositions(db);
-  return { boardGeneration: rows[0]!.asOf.toISOString(), ranksByNflPlayerId: perGamePointsRanksFor(rows, positions) };
+  return perGamePointsRanksFor(rows, positions);
 }
 
 /**
@@ -141,7 +137,7 @@ export async function dossierFactsFor(db: Db, playerId: string, asOf: Date = new
   if (facts === null) return null;
 
   const nflPlayerId = await nflPlayerIdFor(db, playerId);
-  const { boardGeneration, ranksByNflPlayerId } = await boardWidePerGameFacts(db, asOf);
+  const ranksByNflPlayerId = await boardWidePerGameFacts(db, asOf);
   const perGamePositionRank = nflPlayerId === null ? null : (ranksByNflPlayerId.get(nflPlayerId) ?? null);
 
   return {
@@ -154,7 +150,7 @@ export async function dossierFactsFor(db: Db, playerId: string, asOf: Date = new
     lastSeasonStory: facts.lastSeasonStory,
     injury: facts.injury,
     newsCount: facts.news.length,
-    basis: { boardGeneration, scoringLabel: describeScoring(PPR_SCORING) },
+    basis: { scoringLabel: describeScoring(PPR_SCORING) },
     byeWeek: facts.byeWeek,
   };
 }
