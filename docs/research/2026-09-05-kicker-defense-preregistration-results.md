@@ -125,6 +125,39 @@ absence.
 and depends on none of it: a seat still finishes every draft with a kicker and a team defense filled,
 and still reaches for neither early. That was the spec's UX rider and it is why the rider exists.
 
+## Amendment, 2026-09-06: gate G4 re-measured against this round's true base commit
+
+The G4 baseline quoted above was emitted at `5dddeaa`, the commit immediately before
+`projectedPosition` learned `K`. That is the last point at which the four skill positions' board
+could have moved for the reason G4 is worried about, but it is NOT the base of the round: eight
+commits had already landed by then, including `scaleStatLine`'s present-only optional fields
+(`bc95d91`), the kicker and team defense modules, and the interval's third variance term
+(`63cd8c6`). A reviewer asked for the stronger measurement, which is the whole round against its own
+starting point.
+
+Taken by rendering the same skill rows at `4ebec77` (this round's base) and at HEAD, through an
+identical throwaway emitter that imports only modules present in both trees, so the ruler is the
+same length at both ends:
+
+```
+git worktree add --detach /tmp/kdef-g4-base 4ebec77
+# the same emitter file copied into both trees
+npx dotenv -e .env.local -- npx tsx scripts/_g4-emit.ts 2025 /tmp/g4-head.txt   # at HEAD
+npx dotenv -e .env.local -- npx tsx scripts/_g4-emit.ts 2025 /tmp/g4-base.txt   # at 4ebec77
+diff /tmp/g4-base.txt /tmp/g4-head.txt
+cmp  /tmp/g4-base.txt /tmp/g4-head.txt
+```
+
+**Result: byte-identical. 676 skill rows on both sides, `diff` silent, `cmp` silent.**
+
+This path returns before any actuals are read, so it touches nothing the single-judgment discipline
+governs: it renders a board and compares two renderings, and it scores nothing against 2025.
+
+Re-verified a third time after the Draft HQ board learned to list a market-order position
+(`f3d3e19`): those rows are concatenated after the value sort and carry no value rank, so they
+cannot enter it. The board service's own test builds the board with and without them and asserts the
+projected rows are unchanged.
+
 ## What a later round should try, and what it should not
 
 Not worth retrying as-is: more shrinkage tuning, a wider recency grid, or a fourth component. The
