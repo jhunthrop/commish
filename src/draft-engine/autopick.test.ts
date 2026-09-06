@@ -438,3 +438,73 @@ describe("history replays under the policy it was made with (the skipPolicy/F3 d
     expect(bestAvailableFor(state, "t1")?.playerId).toBe("rb5");
   });
 });
+
+/**
+ * THE LATE-ROUND DEFERRAL, AT THE SELECTOR (the 2026-09-05 kicker and team defence round). The
+ * predicate's own cases live in `scoring.test.ts`; these are the three things only `bestAvailableFor`
+ * can answer — that an absent field replays the pre-policy pick byte for byte, that the deferral
+ * actually changes which player is chosen, and that a board of nothing but deferred candidates still
+ * returns one rather than stalling the clock.
+ */
+describe("the late-round deferral (2026-09-05 kicker and team defence round)", () => {
+  /** t1 has every skill starter filled EXCEPT the tight end, and the board's best remaining
+   *  candidates are a kicker and a defence ahead of the tight end. Without the deferral the kicker
+   *  wins on board order; with it, the tight end does. */
+  const KDEF_FIRST_POOL: readonly DraftPoolEntry[] = [
+    ...players("QB", 1), ...players("RB", 3), ...players("WR", 2), // t1's own six
+    { playerId: "k1", position: "K" }, { playerId: "def1", position: "DEF" },
+    { playerId: "te1", position: "TE" },
+    ...players("RB", 8, 4), ...players("WR", 8, 3),
+  ];
+  const SIX_PICK_ROSTER = ["qb1", "rb1", "rb2", "rb3", "wr1", "wr2"];
+
+  /** The identical policy MINUS `lateRoundOnlyRoundsFromEnd` — a hand-built stand-in for a
+   *  persisted snapshot written before this round, the same discipline the `surplusDamp` block
+   *  above uses. */
+  const PRE_POLICY_AUTOPICK = {
+    temperature: AUTOPICK_CONFIG.temperature,
+    needPerOpenStartingSlot: AUTOPICK_CONFIG.needPerOpenStartingSlot,
+    startersFilledDamp: AUTOPICK_CONFIG.startersFilledDamp,
+    rampFullAtRosterFraction: AUTOPICK_CONFIG.rampFullAtRosterFraction,
+    surplusDamp: AUTOPICK_CONFIG.surplusDamp,
+  };
+
+  it("with the policy ABSENT from the snapshot, replays the pre-policy pick: the board-topping kicker wins", () => {
+    const legacyConfig: DraftConfig = { ...SNAKE_CONFIG, autopick: PRE_POLICY_AUTOPICK };
+    const state = midDraftState(legacyConfig, KDEF_FIRST_POOL, { t1: SIX_PICK_ROSTER, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("k1");
+  });
+
+  it("with the policy on the snapshot, passes both over for the tight end the roster still needs", () => {
+    const state = midDraftState(SNAKE_CONFIG, KDEF_FIRST_POOL, { t1: SIX_PICK_ROSTER, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("te1");
+  });
+
+  it("still returns a pick when every legal candidate is deferred, rather than stalling the clock", () => {
+    // The board holds nothing but a kicker and a defence, and t1's tight end slot is still open, so
+    // every candidate on it is deferred. The fallback returns the best of them instead of null,
+    // which would stall a real room's clock on a turn the engine is obliged to resolve.
+    const KDEF_ONLY_POOL: readonly DraftPoolEntry[] = [
+      ...players("QB", 1), ...players("RB", 3), ...players("WR", 2),
+      { playerId: "k1", position: "K" }, { playerId: "def1", position: "DEF" },
+    ];
+    const everySkillPlayerTaken = ["qb1", "rb1", "rb2", "rb3", "wr1", "wr2"];
+    const state = midDraftState(SNAKE_CONFIG, KDEF_ONLY_POOL, { t1: everySkillPlayerTaken, t2: [] });
+    expect(bestAvailableFor(state, "t1")?.playerId).toBe("k1");
+  });
+
+  it("takes the kicker once the team is inside the final rounds", () => {
+    // Twelve of fifteen slots filled leaves three picks, so the deferral still holds and the open
+    // tight end wins. Add a defence and thirteen are filled, two picks left, inside the final two:
+    // the deferral lifts and the board-topping kicker wins even though the tight end is still open.
+    const DEEP_POOL: readonly DraftPoolEntry[] = [
+      ...players("QB", 1), ...players("RB", 6), ...players("WR", 5),
+      { playerId: "k1", position: "K" }, { playerId: "def1", position: "DEF" },
+      { playerId: "te1", position: "TE" },
+    ];
+    const twelve = ["qb1", "rb1", "rb2", "rb3", "wr1", "wr2", "rb4", "rb5", "rb6", "wr3", "wr4", "wr5"];
+    const thirteen = [...twelve, "def1"];
+    expect(bestAvailableFor(midDraftState(SNAKE_CONFIG, DEEP_POOL, { t1: twelve, t2: [] }), "t1")?.playerId).toBe("te1");
+    expect(bestAvailableFor(midDraftState(SNAKE_CONFIG, DEEP_POOL, { t1: thirteen, t2: [] }), "t1")?.playerId).toBe("k1");
+  });
+});

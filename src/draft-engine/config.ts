@@ -142,6 +142,32 @@ export interface DraftAutopickPolicy {
    * without it.
    */
   readonly surplusDamp?: number;
+  /**
+   * HOW MANY ROUNDS FROM THE END a kicker or a team defence becomes takeable
+   * (`LATE_ROUND_ONLY_POSITIONS`, `scoring.ts`), unless every OTHER dedicated starting slot on the
+   * team is already filled.
+   *
+   * THE PROBLEM IT SOLVES. `needMultiplier` is position-blind about WHEN: an open starting slot is
+   * an open starting slot, so a kicker's `1 + needPerOpenStartingSlot` reads exactly like a second
+   * receiver's. Nothing in the scoring knows that a kicker is the pick every real manager makes
+   * last, and a room that autopicked one in round five for an absent manager would be visibly wrong
+   * to every other seat.
+   *
+   * AND IT NEVER STRANDS A SEAT WITHOUT ONE. Deferring is a preference and not a ban, in three
+   * ways. It lifts once the team is inside the final `lateRoundOnlyRoundsFromEnd` rounds, measured
+   * against the team's OWN roster length rather than the global pick number, so a team redeeming
+   * owed picks is judged on its own progress exactly the way `needRamp` judges it. It lifts
+   * immediately, at any point in the draft, once every other dedicated starting slot is filled. And
+   * `bestAvailableFor` keeps the best deferred candidate as a fallback, so a board that is nothing
+   * BUT kickers and defences still returns a pick rather than null. A league whose roster starts
+   * neither is unaffected: the deferral reads the slot config and finds nothing to defer for.
+   *
+   * OPTIONAL, AND ABSENT MEANS NO DEFERRAL AT ALL — the pre-policy behaviour, byte for byte, for
+   * the identical F3 reason `surplusDamp` and `skipPolicy` carry: this value rides the
+   * `START_DRAFT` snapshot (`StartDraftAction.autopick`), and a log written before this policy
+   * existed must keep replaying without it forever.
+   */
+  readonly lateRoundOnlyRoundsFromEnd?: number;
 }
 
 /**
@@ -177,12 +203,20 @@ export interface DraftAutopickPolicy {
  * Steep on purpose — a bench QB behind a 1-QB starter is close to dead weight, not merely a
  * worse RB3.
  */
+/**
+ * `lateRoundOnlyRoundsFromEnd: 2` — the last two rounds, which under `STANDARD_ROSTER_SLOTS` (15
+ * slots) means a kicker and a team defence become takeable at a team's 14th and 15th picks. TWO and
+ * not one because both positions have to fit, and a one-round window would force a seat to take one
+ * of them out of order on its very last pick. See `DraftAutopickPolicy.lateRoundOnlyRoundsFromEnd`
+ * for the whole argument and for the three ways the deferral lifts.
+ */
 export const AUTOPICK_CONFIG: DraftAutopickPolicy = {
   temperature: 3.0,
   needPerOpenStartingSlot: 0.4,
   startersFilledDamp: 0.6,
   rampFullAtRosterFraction: 0.5,
   surplusDamp: 0.25,
+  lateRoundOnlyRoundsFromEnd: 2,
 };
 
 export const AUCTION_CONFIG = {

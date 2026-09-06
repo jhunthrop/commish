@@ -3,7 +3,7 @@ import type { DraftPoolEntry, StartDraftAction } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { initialDraftState, totalRosterSlots, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY } from "./config";
+import { AUTOPICK_CONFIG, DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY } from "./config";
 import { snakeTeamForPick } from "./order";
 import { isComplete, remainingBudget } from "./selectors";
 import { expireAt, submitCommand } from "./test-support";
@@ -90,6 +90,100 @@ describe("a full 12-team, 15-round snake draft", () => {
       ok: false,
       reason: "That player has already been drafted.",
     });
+  });
+});
+
+/**
+ * THE LATE-ROUND POLICY, END TO END (the 2026-09-05 kicker and team defence round).
+ *
+ * The block above runs on a `START_DRAFT` with NO autopick snapshot at all, which is the
+ * pre-upgrade board-order path and the one every historical log replays down. This block runs the
+ * SAME draft with today's `AUTOPICK_CONFIG` on the snapshot, which is what a room started from here
+ * on actually gets, and asserts the two things the spec's UX rider demands: every seat finishes with
+ * both slots filled, and neither position is reached for early.
+ */
+describe("a full 12-team snake draft under today's autopick policy", () => {
+  const config: DraftConfig = {
+    draftId: "d_policy", leagueId: "l1", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",
+    auctionBudget: null, slotConfig: STANDARD_ROSTER_SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
+  };
+  const START_WITH_POLICY: StartDraftAction = { ...START, autopick: AUTOPICK_CONFIG };
+  const ROUNDS = totalRosterSlots(STANDARD_ROSTER_SLOTS);
+  const POSITION_OF = new Map(POOL.map((entry) => [entry.playerId, entry.position] as const));
+
+  /** One autopick, with the acting team's roster as it stood BEFORE the pick landed. The final
+   *  state cannot say what a roster looked like mid-draft, and the deferral's whole claim is about
+   *  what was open at the moment of the pick, so it is recorded as the draft runs. */
+  interface Made {
+    readonly round: number;
+    readonly position: Position | undefined;
+    readonly rosterBefore: readonly { readonly slot: string }[];
+  }
+
+  const { final, made } = (() => {
+    let state = apply(initialDraftState(config), START_WITH_POLICY);
+    const record: Made[] = [];
+    while (!isComplete(state)) {
+      const round = Math.ceil(state.pickNumber / TEAMS.length);
+      const teamId = snakeTeamForPick(TEAMS, state.pickNumber);
+      const rosterBefore = (state.rosters[teamId] ?? []).map((filled) => ({ slot: String(filled.slot) }));
+      const before = state.picks.length;
+      state = apply(state, expireAt(state));
+      const landed = state.picks[before];
+      if (landed !== undefined) record.push({ round, position: POSITION_OF.get(landed.playerId), rosterBefore });
+    }
+    return { final: state, made: record };
+  })();
+
+  it("finishes every seat with a kicker and a team defence", () => {
+    for (const teamId of TEAMS) {
+      const positions = (final.rosters[teamId] ?? []).map((filled) =>
+        filled.playerId === null ? null : POSITION_OF.get(filled.playerId),
+      );
+      expect(positions).toContain("K");
+      expect(positions).toContain("DEF");
+    }
+  });
+
+  /**
+   * The deferral's own claim, checked against every pick the draft actually made rather than
+   * against the predicate in isolation: a kicker or a team defence lands before the final rounds
+   * ONLY on a roster that already had every other dedicated starting slot filled, which is the
+   * exception the policy names.
+   */
+  it("takes neither position early unless every other starting slot was already filled", () => {
+    const early = made.filter(
+      (entry) =>
+        (entry.position === "K" || entry.position === "DEF") &&
+        entry.round <= ROUNDS - AUTOPICK_CONFIG.lateRoundOnlyRoundsFromEnd!,
+    );
+    const violations = early.filter((entry) =>
+      STANDARD_ROSTER_SLOTS.some(
+        (slotConfig) =>
+          slotConfig.slot !== "BENCH" && slotConfig.slot !== "K" && slotConfig.slot !== "DEF" &&
+          entry.rosterBefore.filter((filled) => filled.slot === slotConfig.slot).length < slotConfig.count,
+      ),
+    );
+    expect(violations.map((entry) => ({ round: entry.round, position: entry.position }))).toEqual([]);
+  });
+
+  /**
+   * THE NUMBER THE POLICY EXISTS TO MOVE, pinned so a retune cannot quietly undo it. Under the
+   * pre-policy board-order path the same pool put kickers and defences wherever their board rank
+   * fell; here the earliest either goes is round 9, and it only goes then to a seat that has
+   * genuinely nothing else to start. Nine and not five is the whole point.
+   */
+  it("reaches for neither position before round 9", () => {
+    const earliest = Math.min(
+      ...made.filter((entry) => entry.position === "K" || entry.position === "DEF").map((entry) => entry.round),
+    );
+    expect(earliest).toBeGreaterThanOrEqual(9);
+  });
+
+  it("still runs to completion with one pick per roster spot and no player twice", () => {
+    expect(final.picks).toHaveLength(TEAMS.length * ROUNDS);
+    expect(new Set(final.picks.map((p) => p.playerId)).size).toBe(final.picks.length);
+    expect(final.phase).toBe("complete");
   });
 });
 
