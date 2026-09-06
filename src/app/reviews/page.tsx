@@ -5,7 +5,7 @@ import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { ErrorState, PageTitle } from "@/components/ui";
 import { AppShell } from "@/components/app-shell/app-shell";
-import { shellData } from "@/components/app-shell/shell-data";
+import { createSheetDefaults, shellData } from "@/components/app-shell/shell-data";
 import { pageTitle } from "@/components/app-shell/page-metadata";
 import { PublicBar, STOREFRONT_NAV } from "@/components/app-shell/public-bar";
 import { ReadingMasthead } from "@/components/app-shell/reading-frame";
@@ -137,7 +137,12 @@ export default async function ReviewsPage() {
 
   const { rail, liveState } = await shellData(getDb(), user);
   return (
-    <AppShell user={{ displayName: user.displayName, avatar: user.avatarUrl, isAdmin: user.isAdmin }} rail={rail} liveState={liveState}>
+    <AppShell
+      user={{ displayName: user.displayName, avatar: user.avatarUrl, isAdmin: user.isAdmin }}
+      rail={rail}
+      liveState={liveState}
+      createDefaults={createSheetDefaults()}
+    >
       {content}
     </AppShell>
   );

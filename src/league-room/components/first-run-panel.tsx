@@ -72,11 +72,12 @@ function FirstRunPathAction({ path }: { readonly path: FirstRunPath }) {
  * three paths below are still real, immediately usable controls (guidance is ordering, never
  * removal, `first-run.ts`'s own existing rule).
  *
- * The `create` path carries `id="create-league"` because three other surfaces
- * (`/browse`'s intro line, `OpenLeagueShelf`'s empty state, and the returning-manager
- * disclosure this same task adds) link straight at that fragment. Nothing here is collapsed, so
- * unlike the returning-manager case there is no hash-driven open-on-load logic to write: the
- * anchor only needs somewhere real to land, and it already is one.
+ * The `create` path carries `id="create-league"` because `/browse`'s intro line and
+ * `OpenLeagueShelf`'s empty state still link straight at that fragment (the returning-manager
+ * `StartOrJoinDisclosure`, 2026-09-05, no longer does — its own create section is a button
+ * opening the shared sheet, and `CreateLeagueSheetHost`, not an anchor, is what a hash arrival
+ * opens there). Nothing here is collapsed, so this anchor only needs somewhere real to land, and
+ * it already is one — no hash-driven open-on-load logic of its own to write.
  */
 export function FirstRunPanel({ plan, profile }: { readonly plan: FirstRunPlan | null; readonly profile: ProfileBody }) {
   if (plan === null) return null;

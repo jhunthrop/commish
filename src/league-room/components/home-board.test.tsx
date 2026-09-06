@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { firstRunPlan } from "@/identity";
@@ -7,6 +7,8 @@ import { PROFILE } from "@/account-room/test-fixtures";
 import type { HomeBody } from "../contract";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
+import type { CreateSheetDefaults } from "./create-sheet";
+import { CreateLeagueSheetHost } from "./create-league-sheet";
 import { HomeBoard } from "./home-board";
 
 // `FirstRunPanel` embeds `CreateLeaguePanel` and `JoinLeagueEntry`, both of which navigate via
@@ -14,6 +16,8 @@ import { HomeBoard } from "./home-board";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
+
+const SHEET_DEFAULTS: CreateSheetDefaults = { teamCount: 12, scoringPreset: "half_ppr", draftDaysFromCreation: 7 };
 
 const SCHEDULED_CARD: HomeBody["leagues"][number] = {
   id: "l1",
@@ -114,6 +118,22 @@ describe("HomeBoard", () => {
     });
   });
 
+  // Founder ruling, 2026-09-05: "the same bottom sheet everywhere across the app when clicking
+  // create league anywhere". `CreateLeagueCta`'s button reaches `CreateLeagueSheetHost`
+  // (`./create-league-sheet.tsx`) — mounted here as a sibling the way `AppShell` mounts it for
+  // real — through the module-scope trigger, never a link or a state of its own.
+  it("opens the one create-league sheet from its own button, with a manager who already has leagues", () => {
+    renderInLeague(
+      <>
+        <CreateLeagueSheetHost defaults={SHEET_DEFAULTS} />
+        <HomeBoard initial={ONE_SCHEDULED} />
+      </>,
+      fixtureLeagueDeps({ ok: true, data: ONE_SCHEDULED }).deps,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create a league" }));
+    expect(screen.getByRole("dialog", { name: "Start a league" })).toBeInTheDocument();
+  });
+
   it("shows the first-run fork, not the plain empty state, when the caller has no leagues", async () => {
     await renderSurface(<HomeBoard initial={EMPTY} profile={PROFILE} />, async ({ container }) => {
       expect(screen.getByRole("heading", { name: FIRST_RUN.headline })).toBeInTheDocument();
@@ -126,7 +146,7 @@ describe("HomeBoard", () => {
   it("falls back to the plain empty state on the defensive path, if a caller ever hands it zero leagues with no plan", () => {
     renderInLeague(<HomeBoard initial={EMPTY_NO_FIRST_RUN} />, fixtureLeagueDeps({ ok: true, data: EMPTY_NO_FIRST_RUN }).deps);
     expect(screen.getByText("No leagues yet")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Jump to the form/ })).toHaveAttribute("href", "#create-league");
+    expect(screen.getByRole("button", { name: "Start a league" })).toBeInTheDocument();
   });
 
   // Task 17: `AppHome` only reads `profile` when `firstRun !== null`, so a `firstRun`-without-

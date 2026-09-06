@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import { ButtonLink, Crest, EmptyState, Meter, SeatMeter } from "@/components/ui";
+import { Button, Crest, EmptyState, Meter, SeatMeter } from "@/components/ui";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { RoomTour } from "@/draft-room/components/room-tour";
 import { actionLabelFor } from "@/draft-room/lib/lookups";
@@ -13,6 +13,7 @@ import type { HomeBody, HomeLeagueCard as HomeLeagueCardData } from "../contract
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { isHomeBody } from "../lib/home-body";
+import { openCreateLeagueSheet } from "./create-league-sheet";
 import { FirstRunPanel } from "./first-run-panel";
 import { LeagueRows } from "./league-rows";
 import { OpenSeatsPanel } from "./open-seats-panel";
@@ -21,21 +22,21 @@ import { checklistItems } from "./waiting-room";
 
 /**
  * Flow analysis C-08 (2026-08-27): "creation is a first-class action near the top of /app for a
- * member with leagues" — the create form itself stays where it is (`StartOrJoinDisclosure`,
- * `#create-league`), but the ONE thing that was actually broken is where a manager who already
- * has leagues has to go looking for the door to it: a collapsed `<details>` below the entire
- * board (measured at y=7,612 of a 7,390px document). `HomeBoard` renders first, directly under
- * `/app`'s own page title, in every non-empty shape it has — so a real, secondary-weight (never
- * competing with the view's one ink action, Sunday Standard rule 5) link at the TOP of whichever
- * shape renders is "near the top of /app" without moving the form itself or re-opening the
- * disclosure it already lives in. The `#create-league` fragment is the same anchor
- * `StartOrJoinDisclosure` already opens itself for on mount.
+ * member with leagues" — `HomeBoard` renders first, directly under `/app`'s own page title, in
+ * every non-empty shape it has, so a real, secondary-weight (never competing with the view's one
+ * ink action, Sunday Standard rule 5) button at the TOP of whichever shape renders is "near the
+ * top of /app" without moving anything else.
+ *
+ * OPENS THE SHEET DIRECTLY (founder ruling, 2026-09-05: "the same bottom sheet everywhere...
+ * when clicking create league anywhere") — `openCreateLeagueSheet()` (`./create-league-sheet.tsx`)
+ * reaches the one host `AppShell` mounts for the whole signed-in app, superseding the old
+ * `/app#create-league` fragment link into `StartOrJoinDisclosure`'s own inline form.
  */
 function CreateLeagueCta() {
   return (
-    <ButtonLink href="/app#create-league" variant="secondary" size="sm" className="self-start">
+    <Button variant="secondary" size="sm" className="self-start" onClick={() => openCreateLeagueSheet()}>
       Create a league
-    </ButtonLink>
+    </Button>
   );
 }
 
@@ -229,9 +230,13 @@ export function HomeBoard({
         description="Create one below, or open an invite link a commissioner sent you."
         icon="users"
         action={
-          <a href="#create-league" className="text-sm font-medium text-accent underline">
-            Jump to the form
-          </a>
+          <button
+            type="button"
+            onClick={() => openCreateLeagueSheet()}
+            className="text-sm font-medium text-accent underline"
+          >
+            Start a league
+          </button>
         }
       />
     );

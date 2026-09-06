@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState, type ReactElement } from "react";
+import type { ReactElement } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui";
 import type { ExperienceTier } from "@/domain/user";
 import { firstRunPathOrder, type TierOrderedPathKey } from "@/identity";
-import { CreateLeaguePanel } from "./create-league-panel";
+import { openCreateLeagueSheet } from "./create-league-sheet";
 import { JoinLeagueEntry } from "./join-league-entry";
-
-const CREATE_LEAGUE_HASH = "#create-league";
 
 /**
  * The three sections, keyed the same way `firstRunPlan`'s paths are, so `firstRunPathOrder`
@@ -31,10 +30,18 @@ const SECTIONS: Readonly<Record<TierOrderedPathKey, () => ReactElement>> = {
       </Link>
     </section>
   ),
+  // THE TRIGGER ROW (founder ruling, 2026-09-05: "the same bottom sheet everywhere across the
+  // app when clicking create league anywhere") — this section used to BE the create form
+  // (`CreateLeaguePanel`, wrapping `CreateLeagueForm`, at `id="create-league"`). It is now one
+  // button, calling `openCreateLeagueSheet()` (`./create-league-sheet.tsx`), which reaches the
+  // single sheet `AppShell` mounts for the whole signed-in app — the same sheet the front door's
+  // `CrewDoor` opens, the same sheet `HomeBoard`'s own CTA opens.
   create: () => (
-    <section key="create" id="create-league" className="flex flex-col gap-2">
+    <section key="create" aria-label="Start a league" className="flex flex-col gap-2">
       <h2 className="text-lg font-medium text-text-primary">Start a league</h2>
-      <CreateLeaguePanel />
+      <Button variant="secondary" className="self-start" onClick={() => openCreateLeagueSheet()}>
+        Start a league
+      </Button>
     </section>
   ),
 };
@@ -51,45 +58,19 @@ const SECTIONS: Readonly<Record<TierOrderedPathKey, () => ReactElement>> = {
  * zero-leagues manager — one rule, two consumers, rather than this component inventing its own
  * second opinion about the same manager.
  *
- * Closed by default, EXCEPT when the page was reached via the `#create-league` fragment: three
- * surfaces link straight at that id (`/browse`'s intro line, `OpenLeagueShelf`'s empty state,
- * and `HomeBoard`'s own defensive empty state) expecting the create form to be visible, not one
- * more click away behind a closed disclosure a fragment link cannot open on its own. Read on
- * mount rather than server-side, because `window.location.hash` does not exist on the server —
- * this is the one piece of Task 5 that genuinely needs a client component instead of a plain
- * server-rendered `<details open>`. That anchor keeps resolving in EITHER order, since the
- * `create` section always carries `id="create-league"` wherever it lands in the list.
- *
- * AND ON EVERY LATER CLICK, not just mount (production incident, 2026-09-03): the page's own
- * "Create a league" button is a fragment link to this hash, and a click on an ALREADY-LOADED
- * /app only changes the hash. With a mount-only read, nothing listened; and a browser neither
- * opens a closed `<details>` nor scrolls to an anchor hidden inside one — so the button did
- * exactly nothing. The `hashchange` listener opens the disclosure and walks the viewport to
- * the create section; a repeat click on the same hash scrolls natively once the section is
- * out from behind the closed disclosure.
+ * THE HASH STORY CHANGES (2026-09-05): this component used to be the one place `/app#create-
+ * league` landed — reading `window.location.hash` on mount and on every later `hashchange` to
+ * force itself open and scroll the anchor into view (the production incident, 2026-09-03, that
+ * comment used to recount). That entire mechanism moved to `CreateLeagueSheetHost` (`./create-
+ * league-sheet.tsx`), mounted once by `AppShell`: a hash arrival now opens the SHEET directly,
+ * an overlay that needs no scroll target and no disclosure held open underneath it. This
+ * component is closed by default, plainly, with nothing left to force it open — join and browse
+ * are the only two things a fragment link could ever need to reveal here, and neither one is
+ * ever the target of `#create-league`.
  */
 export function StartOrJoinDisclosure({ experienceTier }: { readonly experienceTier: ExperienceTier }) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    const openFromHash = () => {
-      if (window.location.hash !== CREATE_LEAGUE_HASH) return;
-      setOpen(true);
-      // After the open state paints: bring the create section into view. Instant, not smooth —
-      // an anchor jump, so no reduced-motion branch to carry.
-      requestAnimationFrame(() => document.getElementById("create-league")?.scrollIntoView());
-    };
-    openFromHash();
-    window.addEventListener("hashchange", openFromHash);
-    return () => window.removeEventListener("hashchange", openFromHash);
-  }, []);
-
   return (
-    <details
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
-      className="rounded-lg bg-surface-elevated shadow-card"
-    >
+    <details className="rounded-lg bg-surface-elevated shadow-card">
       <summary className="cursor-pointer select-none p-4 text-sm font-medium text-text-primary">
         Start or join another league
       </summary>
