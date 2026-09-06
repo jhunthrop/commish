@@ -325,4 +325,11 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
     await renderPage();
     expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
   });
+
+  it("follows the copy rules across the whole uncapped composition — no em-dash, no semicolon", async () => {
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody());
+    const { container } = await renderPage();
+    expect(container.textContent).not.toMatch(/—/);
+    expect(container.textContent).not.toMatch(/;/);
+  });
 });
