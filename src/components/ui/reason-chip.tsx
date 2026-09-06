@@ -186,6 +186,17 @@ function copyFor(reason: BoardReason, law: Law | undefined): string {
       return "No market ADP";
     case "market_anchor":
       return `Market ${reason.marketPoints.toFixed(1)} pts, ${signedPoints(reason.delta)} from evidence`;
+    // THE KICKER AND TEAM DEFENCE REASONS (the 2026-09-05 round). Both positions are composed from
+    // components rather than from shares, so the copy names the components a reader can argue with
+    // and never a number without its basis.
+    case "kicker_no_history":
+      return "No kicking record yet, so this uses his club's volume and the league's make rates";
+    case "kicker_opportunity":
+      return `${reason.fieldGoalAttemptsPerGame.toFixed(1)} field goal and ${reason.extraPointAttemptsPerGame.toFixed(1)} extra point tries a game, ${Math.round(reason.fieldGoalMakeRate * 100)}% made`;
+    case "defense_no_history":
+      return "No defensive record in the seasons this board reads, so this uses the league's own rates";
+    case "defense_takeaways":
+      return `${reason.sacksPerGame.toFixed(1)} sacks and ${reason.takeawaysPerGame.toFixed(1)} takeaways a game, ${signedPoints(reason.tierPointsPerGame)} pts from what it allows`;
     default: {
       // Exhaustiveness guard: a future `BoardReason` variant with no case above fails `tsc`
       // here rather than rendering silently wrong copy.

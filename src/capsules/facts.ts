@@ -409,6 +409,20 @@ function evidenceFrom(reasons: readonly BoardReason[], laws: readonly Law[]): re
       case "market_unlisted":
         items.push({ kind: "market_unlisted" });
         continue;
+      /**
+       * THE KICKER AND TEAM DEFENCE REASONS, DELIBERATELY UNTRANSLATED (the 2026-09-05 round). A
+       * capsule is only ever built for a skill player — `collect.ts` gates on `isSkillPosition`
+       * and that gate stays, per the spec's own non-goals — so these four can never actually
+       * reach this function. They are named rather than swept into the default so the
+       * exhaustiveness guard below keeps working for a reason code that IS meant to become a
+       * fact, and so this file records the decision instead of leaving the next reader to
+       * rediscover it. The written analysis a kicker deserves is a later round's question.
+       */
+      case "kicker_no_history":
+      case "kicker_opportunity":
+      case "defense_no_history":
+      case "defense_takeaways":
+        continue;
       default: {
         // Exhaustiveness guard: a future `FactReason` variant with no case above fails `tsc`.
         const exhaustive: never = reason;

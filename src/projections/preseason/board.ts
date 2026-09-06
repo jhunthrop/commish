@@ -107,7 +107,45 @@ export type BoardReason =
    * season value, per `discovery/templates.ts`'s `primaryQuantityIdOf`). Built by
    * `laws/board-reasons.ts`'s `lawReasonsFor`, the one place a candidate's facts become this variant.
    */
-  | { readonly code: "law"; readonly lawId: string; readonly effect: number; readonly magnitude: number };
+  | { readonly code: "law"; readonly lawId: string; readonly effect: number; readonly magnitude: number }
+  /**
+   * A kicker with no kicking history at all in the seasons this board reads — a rookie, or a man
+   * who has never held the job. His attempt volume comes from the club he signed with and his make
+   * rates are the league's own, and this reason is how the row SAYS SO rather than presenting a
+   * league mean as if it were a measurement of him.
+   */
+  | { readonly code: "kicker_no_history" }
+  /**
+   * What a kicker's projection is actually built from, and the three numbers a reader can argue
+   * with: his club's own field-goal and extra-point attempts a game (shrunk toward the league by
+   * how many games of that club this board has seen) and his own field-goal make rate (shrunk
+   * toward the league by his own attempt count). Attempts travel with the offence and make rates
+   * travel with the man, which is the whole reason this beats a last-season-points order.
+   */
+  | {
+      readonly code: "kicker_opportunity";
+      readonly fieldGoalAttemptsPerGame: number;
+      readonly extraPointAttemptsPerGame: number;
+      readonly fieldGoalMakeRate: number;
+    }
+  /**
+   * A team defence with no defensive history in the seasons this board reads — an expansion club, or
+   * a season the archive does not cover. Every component is the league's own, and this reason is how
+   * the row says so rather than presenting a league mean as a measurement of this club.
+   */
+  | { readonly code: "defense_no_history" }
+  /**
+   * What a team defence's projection is built from: sacks and takeaways a game (each shrunk toward
+   * the league by the club's own game count) and the points the tier tables award, AVERAGED over the
+   * club's own shrunk per-game distribution rather than read off its average. Those tables are step
+   * functions, and the expectation of a step function is not the step function of the expectation.
+   */
+  | {
+      readonly code: "defense_takeaways";
+      readonly sacksPerGame: number;
+      readonly takeawaysPerGame: number;
+      readonly tierPointsPerGame: number;
+    };
 
 /** One player as the board receives him: a per-game line, a games distribution, and his causes. */
 export interface BoardCandidate {
