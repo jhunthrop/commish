@@ -204,3 +204,57 @@ describe("overlapTiers", () => {
     expect(overlapTiers([])).toEqual([]);
   });
 });
+
+/**
+ * THE NONLINEAR COMPONENT AND THE OPTIONAL SCORED FIELDS (the 2026-09-05 kicker and team defence
+ * round). Both changes have to be invisible to every existing board row, which is what gate G4
+ * demands and what the last two cases here check directly.
+ */
+describe("a candidate whose score is not linear in games", () => {
+  const KDEF_SHAPE: LeagueShape = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
+  const OPTIONS = { season: 2025, asOf: new Date(0), rules: PPR_SCORING, shape: SHAPE } as const;
+
+  it("leaves an absent optional field absent when a line is scaled", () => {
+    const scaled = scaleStatLine(line("p1", {}), 17);
+    expect(scaled.fieldGoalsMissed).toBeUndefined();
+    expect(scaled.safeties).toBeUndefined();
+    expect(scaled.defensiveFumblesRecovered).toBeUndefined();
+    expect(scaled.pointsAllowed).toBeUndefined();
+  });
+
+  it("scales an optional scored field that is present", () => {
+    const scaled = scaleStatLine(
+      line("p1", { fieldGoalsMissed: 0.4, extraPointsMissed: 0.1, defensiveFumblesRecovered: 0.6, safeties: 0.05 }),
+      10,
+    );
+    expect(scaled.fieldGoalsMissed).toBeCloseTo(4, 10);
+    expect(scaled.extraPointsMissed).toBeCloseTo(1, 10);
+    expect(scaled.defensiveFumblesRecovered).toBeCloseTo(6, 10);
+    expect(scaled.safeties).toBeCloseTo(0.5, 10);
+  });
+
+  it("never scales points or yards allowed, which are not linear in games", () => {
+    const scaled = scaleStatLine(line("p1", { pointsAllowed: 21, yardsAllowed: 330 }), 17);
+    expect(scaled.pointsAllowed).toBe(21);
+    expect(scaled.yardsAllowed).toBe(330);
+  });
+
+  it("adds a candidate's per-game tier points to its season total", () => {
+    const defence: BoardCandidate = { ...candidate("DST-SF", "DEF", { sacks: 3 }), perGameTierPoints: 2.5 };
+    const [entry] = preseasonBoard([defence], { ...OPTIONS, shape: KDEF_SHAPE });
+    // Three sacks at a point each plus 2.5 tier points is 5.5 a game, over seventeen games.
+    expect(entry?.projectedPoints).toBeCloseTo(5.5 * 17, 6);
+  });
+
+  it("is byte-identical for a candidate with no per-game tier points", () => {
+    const plain = candidate("p1", "WR", { receivingYards: 60, receptions: 5 });
+    const withUndefinedField: BoardCandidate = { ...plain, perGameTierPoints: undefined };
+    expect(preseasonBoard([withUndefinedField], OPTIONS)).toEqual(preseasonBoard([plain], OPTIONS));
+  });
+
+  it("leaves the whole four-position board untouched, which is gate G4 in miniature", () => {
+    const before = preseasonBoard(pool(), OPTIONS);
+    const after = preseasonBoard(pool().map((entry) => ({ ...entry, perGameTierPoints: undefined })), OPTIONS);
+    expect(JSON.stringify(after)).toBe(JSON.stringify(before));
+  });
+});

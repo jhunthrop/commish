@@ -117,6 +117,24 @@ export interface BoardCandidate {
   /** Layer 3's predicted line for ONE game. `week` on it is not read. */
   readonly perGame: StatLine;
   readonly games: GamesPlayedOutlook;
+  /**
+   * THE NONLINEAR PART OF A TEAM DEFENCE'S SCORE, ALREADY AVERAGED, IN POINTS PER GAME (the
+   * 2026-09-05 kicker and team defence round).
+   *
+   * Points allowed and yards allowed are scored through step tables (`scoring/compute.ts`'s
+   * `POINTS_ALLOWED_TIERS` and `YARDS_ALLOWED_TIERS`), and the expectation of a step function is
+   * not the step function of the expectation. A defence that allows 13 one week and 27 the next
+   * averages 20 and scores 1 point on that average, while the two real weeks score 3 and 0 for an
+   * average of 1.5. So `team-defense.ts` averages the tier function over the team's own shrunk
+   * per-game distribution and hands the result here, and the `perGame` line it hands over carries
+   * NO `pointsAllowed` and NO `yardsAllowed` at all — which `computeFantasyPoints` already reads,
+   * correctly, as "not recorded".
+   *
+   * ABSENT for every other position and for every skill candidate, which is why adding it changed
+   * no existing board row. Both `perGamePoints` and `projectedPoints` add it (times the game count,
+   * for the season figure) and both are unchanged when it is absent.
+   */
+  readonly perGameTierPoints?: number;
   /** Reasons discovered upstream, before scarcity and tiers are known. */
   readonly reasons: readonly BoardReason[];
 }
@@ -163,14 +181,52 @@ export interface BoardEntry extends ValuedPlayer {
   readonly reasons: readonly BoardReason[];
 }
 
+/**
+ * THE SCORED FIELDS THAT ARE NOT IN `STAT_FIELDS` AND SCALE LINEARLY ANYWAY (the 2026-09-05 kicker
+ * and team defence round).
+ *
+ * `STAT_FIELDS` is the canonical list two OTHER readers walk (the per-tick digest and the provider
+ * contract suite, see `domain/player.ts`), and widening it would make every stats provider owe
+ * numbers it may not have. But `computeFantasyPoints` scores every field below, and a kicker's
+ * misses and a defence's fumble recoveries and safeties are per-game quantities that multiply by a
+ * game count exactly the way a reception does. Left out, a kicker's season line would carry his
+ * makes and not his misses, and a defence would forfeit every takeaway that was not an interception.
+ *
+ * SCALED ONLY WHERE PRESENT, which is what makes this change invisible to every board row that
+ * existed before it: `composeStatLine` (`model/compose.ts`) emits `STAT_FIELDS` and nothing else, so
+ * every QB, RB, WR and TE candidate carries `undefined` for all of these, and `undefined` stays
+ * `undefined`.
+ *
+ * `pointsAllowed` AND `yardsAllowed` ARE DELIBERATELY ABSENT FROM THIS LIST. They are scored through
+ * nonlinear tier tables (`scoring/compute.ts`), so seventeen games of points allowed is not a
+ * quantity those tables can read at all. A defence's expected tier points ride on
+ * `BoardCandidate.perGameTierPoints` instead.
+ */
+const SCALED_OPTIONAL_FIELDS = [
+  "twoPointConversions",
+  "fieldGoalsMissed",
+  "extraPointsMissed",
+  "kickReturnTouchdowns",
+  "puntReturnTouchdowns",
+  "defensiveFumblesRecovered",
+  "safeties",
+] as const satisfies readonly (keyof StatLine)[];
+
 /** Every component multiplied by a number of games. Scoring is applied after, never before. */
 export function scaleStatLine(line: StatLine, games: number): StatLine {
   if (!(games >= 0) || !Number.isFinite(games)) {
     throw new Error(`A season line is a per-game line times a finite number of games; got ${games}.`);
   }
+  const optional = Object.fromEntries(
+    SCALED_OPTIONAL_FIELDS.flatMap((field) => {
+      const value = line[field];
+      return value === undefined ? [] : [[field, value * games] as const];
+    }),
+  );
   return {
     ...line,
     ...(Object.fromEntries(STAT_FIELDS.map((field) => [field, line[field] * games])) as Omit<StatLine, "playerId" | "week">),
+    ...optional,
   };
 }
 
@@ -265,9 +321,13 @@ export function preseasonBoard(
   const projections: SeasonProjection[] = [];
 
   for (const candidate of candidates) {
+    // The nonlinear component, already averaged over the candidate's own per-game distribution, in
+    // points per game. Zero for every position but DEF — see `BoardCandidate.perGameTierPoints`.
+    const tierPoints = candidate.perGameTierPoints ?? 0;
     const seasonLine = scaleStatLine(candidate.perGame, candidate.games.expected);
-    const perGamePoints = computeFantasyPoints(candidate.perGame, candidate.position, rules);
-    const projectedPoints = computeFantasyPoints(seasonLine, candidate.position, rules);
+    const perGamePoints = computeFantasyPoints(candidate.perGame, candidate.position, rules) + tierPoints;
+    const projectedPoints =
+      computeFantasyPoints(seasonLine, candidate.position, rules) + tierPoints * candidate.games.expected;
     byPlayer.set(candidate.playerId, {
       candidate,
       seasonLine,
