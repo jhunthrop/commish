@@ -56,8 +56,17 @@ async function main(): Promise<void> {
   for (const playerClass of ["rookie", "veteran"] as const) {
     console.log(`\n  ${playerClass}`);
     for (const position of VARIANCE_POSITIONS) {
+      const variance = priors[playerClass][position];
+      // K and DEF joined `VARIANCE_POSITIONS` in the 2026-09-05 round and are fitted by
+      // `kdef-fit.ts` from the kicking and team-defence archives instead, because this script's own
+      // observation loader reads `player_week_observations`, which holds neither. An absent cell is
+      // reported as absent here rather than printed as a zero somebody would read as a measurement.
+      if (variance === undefined) {
+        console.log(`    ${position.padEnd(4)} not fitted here (see scripts/kdef-fit.ts)`);
+        continue;
+      }
       const n = observations.filter((o) => o.playerClass === playerClass && o.position === position && o.weeklyPoints.length >= 2).length;
-      console.log(`    ${position.padEnd(4)} variance ${priors[playerClass][position].toFixed(2)} (sd ${Math.sqrt(priors[playerClass][position]).toFixed(2)}, n=${n} player-seasons)`);
+      console.log(`    ${position.padEnd(4)} variance ${variance.toFixed(2)} (sd ${Math.sqrt(variance).toFixed(2)}, n=${n} player-seasons)`);
     }
   }
 

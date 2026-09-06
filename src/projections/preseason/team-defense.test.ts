@@ -9,6 +9,7 @@ import {
   defenseWeeklyPoints,
   expectedTierPoints,
   fitDefensePriors,
+  pointsAllowedKey,
   type DefenseGame,
   type DefensePriors,
 } from "./team-defense";
@@ -66,6 +67,26 @@ describe("defenseGamesFrom", () => {
 
   it("drops a row whose points allowed the store cannot supply, rather than inventing a shutout", () => {
     expect(defenseGamesFrom([archived({})], new Map())).toEqual([]);
+  });
+
+  /**
+   * THE 224-GAME JOIN DEFECT, PINNED. The `stats_team` archive normalises every club to its CURRENT
+   * code, and the schedule observations carrying the scores use the CONTEMPORARY one, so a raw-code
+   * join lost St. Louis, San Diego and Oakland entirely from a 2013-2023 fit: 224 real club-games,
+   * silently absent from the sample.
+   */
+  it("meets the schedule's contemporary team code against the archive's current one", () => {
+    const scores = new Map([[pointsAllowedKey(2014, 1, "STL"), 6]]);
+    const games = defenseGamesFrom([archived({ season: 2014, team: "LA", opponentTeam: "SEA" })], scores);
+    expect(games).toHaveLength(1);
+    expect(games[0]?.pointsAllowed).toBe(6);
+  });
+
+  it("keys the same club the same way whichever spelling it arrives under", () => {
+    expect(pointsAllowedKey(2014, 1, "STL")).toBe(pointsAllowedKey(2014, 1, "LA"));
+    expect(pointsAllowedKey(2015, 1, "SD")).toBe(pointsAllowedKey(2015, 1, "LAC"));
+    expect(pointsAllowedKey(2018, 1, "OAK")).toBe(pointsAllowedKey(2018, 1, "LV"));
+    expect(pointsAllowedKey(2024, 1, "SF")).not.toBe(pointsAllowedKey(2024, 1, "SEA"));
   });
 
   it("returns season, week, team order", () => {

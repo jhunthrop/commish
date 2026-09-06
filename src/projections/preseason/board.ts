@@ -4,7 +4,7 @@ import type { ProjectionDistribution } from "../decide/outlook";
 import { valueBoard, type LeagueShape, type SeasonProjection, type ValuedPlayer } from "../decide/replacement";
 import { tiersOf } from "../decide/tiers";
 import type { GamesPlayedOutlook } from "./availability";
-import { FITTED_GAME_VARIANCE } from "./game-variance-fitted";
+import { SHIPPED_GAME_VARIANCE } from "./fitted-variance";
 import { seasonPointsBand, VARIANCE_POSITIONS, type GameVariancePriors, type PlayerClass, type VariancePosition } from "./game-variance";
 
 /**
@@ -185,7 +185,7 @@ export interface PreseasonBoardOptions {
   readonly shape: LeagueShape;
   /**
    * PER-GAME PERFORMANCE VARIANCE (calibration fix round, 2026-09-04, Task 4) — defaults to the
-   * committed `FITTED_GAME_VARIANCE`, exactly like `rules`/`shape` are the only things a caller
+   * committed `SHIPPED_GAME_VARIANCE` (`fitted-variance.ts`, the two generated halves composed), exactly like `rules`/`shape` are the only things a caller
    * normally has to supply at all. A test (or a future fit script) passes its own to drive the band
    * with different cells; see `game-variance.ts`'s own module docblock for what this measures and
    * why it is fit separately from the rest of the model.
@@ -348,12 +348,15 @@ function gameVarianceFor(candidate: BoardCandidate, priors: GameVariancePriors):
   if (!(VARIANCE_POSITIONS as readonly Position[]).includes(candidate.position)) return 0;
   const position = candidate.position as VariancePosition;
   const playerClass: PlayerClass = isRookieCandidate(candidate) ? "rookie" : "veteran";
-  return priors[playerClass][position];
+  // `?? 0` and NEVER a borrowed number: a cell no fit has measured is ABSENT from the priors
+  // (`GameVariancePriors` is partial per position on purpose), and zero here is the games-only band
+  // every position carried before the variance round rather than a claim about this one.
+  return priors[playerClass][position] ?? 0;
 }
 
 export function preseasonBoard(
   candidates: readonly BoardCandidate[],
-  { rules, shape, gameVariance = FITTED_GAME_VARIANCE }: PreseasonBoardOptions,
+  { rules, shape, gameVariance = SHIPPED_GAME_VARIANCE }: PreseasonBoardOptions,
 ): readonly BoardEntry[] {
   const byPlayer = new Map<string, { candidate: BoardCandidate; seasonLine: StatLine; outlook: ProjectionDistribution }>();
   const projections: SeasonProjection[] = [];

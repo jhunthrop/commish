@@ -1,7 +1,7 @@
 import { STAT_FIELDS, type StatLine } from "@/domain/player";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { finalWeekOf } from "../nflverse/team-eras";
-import { teamDefenseUniverseId } from "../nflverse/team-codes";
+import { productTeamCode, teamDefenseUniverseId } from "../nflverse/team-codes";
 import type { TeamDefenseWeekRow } from "../nflverse/team-defense-weeks";
 import type { GamesPlayedOutlook } from "./availability";
 import type { BoardCandidate } from "./board";
@@ -73,13 +73,29 @@ export interface AllowedGame {
 }
 
 /**
+ * THE ONE SPELLING OF THE POINTS-ALLOWED JOIN KEY, for both sides of it.
+ *
+ * `productTeamCode` folds `STL`, `SD` and `OAK` onto the franchise's current code, and both feeds
+ * have to go through it or they do not meet. The `stats_team` release normalises every club to its
+ * CURRENT code (the 2013 Rams read `LA`), while `games.csv` — which the schedule observations that
+ * carry the scores are built from — uses the CONTEMPORARY code (the same club reads `STL`). Keying
+ * on the raw codes silently dropped exactly 224 club-games from a 2013-2023 fit: St. Louis's three
+ * seasons, San Diego's four and Oakland's seven, sixteen games each, every one a real defensive
+ * season that simply vanished from the sample. It was visible at all only because
+ * `defenseGamesFrom` COUNTS what it drops instead of swallowing it.
+ */
+export function pointsAllowedKey(season: number, week: number, team: string): string {
+  return `${season}|${week}|${productTeamCode(team)}`;
+}
+
+/**
  * Joins the archived defence rows to the points each club allowed, which lives in the schedule
  * observations the store already holds rather than in the defence archive (see
  * `nflverse_team_defense_weeks`' own docblock for why there is only one copy of that number).
  *
- * `pointsAllowedByKey` is keyed `"<season>|<week>|<team>"`. A row the map cannot answer for is
- * DROPPED, never defaulted: a fabricated zero here would be a shutout this function invented, which
- * is the single most flattering wrong number a defence board can carry.
+ * `pointsAllowedByKey` is keyed by `pointsAllowedKey` above, on BOTH sides. A row the map cannot
+ * answer for is DROPPED, never defaulted: a fabricated zero here would be a shutout this function
+ * invented, which is the single most flattering wrong number a defence board can carry.
  */
 export function defenseGamesFrom(
   rows: readonly TeamDefenseWeekRow[],
@@ -87,7 +103,7 @@ export function defenseGamesFrom(
 ): readonly DefenseGame[] {
   const games: DefenseGame[] = [];
   for (const row of rows) {
-    const pointsAllowed = pointsAllowedByKey.get(`${row.season}|${row.week}|${row.team}`);
+    const pointsAllowed = pointsAllowedByKey.get(pointsAllowedKey(row.season, row.week, row.team));
     if (pointsAllowed === undefined) continue;
     games.push({
       season: row.season,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GamesPlayedOutlook } from "./availability";
-import { fitGameVariance, seasonPointsBand, VARIANCE_POSITIONS, type GameVarianceObservation } from "./game-variance";
+import { fitGameVariance, seasonPointsBand, type GameVarianceObservation } from "./game-variance";
 
 function observation(overrides: Partial<GameVarianceObservation> = {}): GameVarianceObservation {
   return { season: 2023, playerId: "p", position: "RB", playerClass: "veteran", weeklyPoints: [10, 12, 8, 11], ...overrides };
@@ -21,12 +21,41 @@ describe("fitGameVariance", () => {
     );
     const priors = fitGameVariance(observations, { heldOutSeasons: [] });
     expect(priors.veteran.RB).toBeGreaterThan(0);
-    // Every position gets SOME cell, even one with no observations (falls back to zero via the
-    // combined-pool branch, which itself sees nothing).
-    for (const position of VARIANCE_POSITIONS) {
+    // Every position this fit was ASKED for gets a cell, even one with no observations (which falls
+    // back to zero via the combined-pool branch, itself seeing nothing). It used to be every entry
+    // of `VARIANCE_POSITIONS`; K and DEF joined that list in the 2026-09-05 round and are fitted
+    // elsewhere, from archives this function's own loader cannot read. See the next case.
+    for (const position of ["QB", "RB", "WR", "TE"] as const) {
       expect(priors.veteran[position]).toBeGreaterThanOrEqual(0);
       expect(priors.rookie[position]).toBeGreaterThanOrEqual(0);
     }
+  });
+
+  /**
+   * THE GUARD ADDED IN THE 2026-09-05 KICKER AND TEAM DEFENCE ROUND. This function's own observation
+   * loader reads `player_week_observations`, which has never held a kicker row and can never hold a
+   * team-defence row. Before the `positions` option it iterated `VARIANCE_POSITIONS` unconditionally,
+   * so adding K and DEF to that list would have pooled an empty sample and written 0 — a fabricated
+   * measurement no reader could tell from a real one.
+   */
+  it("never writes a cell it was not asked for, so an unmeasured position stays absent", () => {
+    const observations = Array.from({ length: 25 }, (_, index) =>
+      observation({ playerId: `v-${index}`, weeklyPoints: [10 + (index % 3), 8, 14, 9] }),
+    );
+    const priors = fitGameVariance(observations, { heldOutSeasons: [] });
+    expect(priors.veteran.K).toBeUndefined();
+    expect(priors.veteran.DEF).toBeUndefined();
+    expect(priors.rookie.K).toBeUndefined();
+    expect(priors.rookie.DEF).toBeUndefined();
+  });
+
+  it("fits only the positions it was asked for", () => {
+    const kickers = Array.from({ length: 25 }, (_, index) =>
+      observation({ position: "K", playerId: `k-${index}`, weeklyPoints: [3, 12, 6, 9] }),
+    );
+    const priors = fitGameVariance(kickers, { heldOutSeasons: [], positions: ["K"] });
+    expect(priors.veteran.K).toBeGreaterThan(0);
+    expect(priors.veteran.WR).toBeUndefined();
   });
 
   it("drops a single-week player-season from the estimate rather than treating it as zero spread", () => {

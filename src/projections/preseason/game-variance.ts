@@ -43,7 +43,20 @@ import { LAST_POSSIBLE_WEEK } from "../store";
  * the identical reason `fit.ts`'s `fitRookieGameRate` gets one: this table is part of THIS
  * calibration effort, not a re-litigation of an existing fit nobody found wrong.
  */
-export const VARIANCE_POSITIONS = ["QB", "RB", "WR", "TE"] as const;
+/**
+ * K AND DEF JOINED THIS LIST IN THE 2026-09-05 ROUND, and the two most volatile positions in the
+ * game finally band on their own measured spread rather than on availability alone. A kicker's week
+ * is three attempts or none, and a defence's is a pick six or a 400-yard afternoon; a games-only
+ * band understates both badly, which is exactly what `board.ts`'s `gameVarianceFor` used to do for
+ * them by returning zero.
+ *
+ * THEIR CELLS DO NOT COME FROM `fitGameVariance` BELOW. That function's own observation loader reads
+ * `player_week_observations`, which has never held a kicker row and can never hold a team-defence
+ * row, so asking it for those cells would produce a fabricated zero dressed as a measurement. See
+ * `GameVarianceFitOptions.positions` for the guard, and `kicker.ts`/`team-defense.ts` for where the
+ * two weekly-points series actually come from.
+ */
+export const VARIANCE_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"] as const;
 export type VariancePosition = (typeof VARIANCE_POSITIONS)[number];
 
 function isVariancePosition(position: Position): position is VariancePosition {
@@ -104,12 +117,32 @@ export async function loadGameVarianceObservations(db: ReadonlyDb, seasons: read
   return observations;
 }
 
-/** Pooled per-game points VARIANCE, per player class and position — points^2, the unit
- *  `seasonPointsBand` needs to compose with a games-count variance. */
-export type GameVariancePriors = Readonly<Record<PlayerClass, Readonly<Record<VariancePosition, number>>>>;
+/**
+ * Pooled per-game points VARIANCE, per player class and position — points^2, the unit
+ * `seasonPointsBand` needs to compose with a games-count variance.
+ *
+ * PARTIAL PER POSITION, and deliberately so (the 2026-09-05 round). A cell no fit has ever measured
+ * is ABSENT rather than zero, and `board.ts`'s `gameVarianceFor` reads `?? 0` — the games-only band
+ * every position had before the variance round. An absent cell and a measured zero are different
+ * claims, and a `Record` that could not tell them apart is how a fabricated number gets shipped.
+ */
+export type GameVariancePriors = Readonly<Record<PlayerClass, Partial<Readonly<Record<VariancePosition, number>>>>>;
+
+/** The four this function's own observation loader can actually measure. See
+ *  `GameVarianceFitOptions.positions`. */
+const OBSERVABLE_POSITIONS: readonly VariancePosition[] = ["QB", "RB", "WR", "TE"];
 
 export interface GameVarianceFitOptions {
   readonly heldOutSeasons: readonly number[];
+  /**
+   * Which cells to fit. Defaults to the four skill positions and NOT to all of
+   * `VARIANCE_POSITIONS`, because `loadGameVarianceObservations` reads `player_week_observations`,
+   * which holds no kicker row and no team-defence row: asking for those cells would pool an empty
+   * sample and write 0, a fabricated measurement indistinguishable from a real one. `kdef-fit.ts`
+   * passes `["K", "DEF"]` with observations built from the kicking and team-defence archives
+   * instead.
+   */
+  readonly positions?: readonly VariancePosition[];
 }
 
 /**
@@ -143,7 +176,10 @@ function pooledVariance(observations: readonly GameVarianceObservation[]): numbe
  */
 const MINIMUM_POOLED_PLAYER_SEASONS = 20;
 
-export function fitGameVariance(observations: readonly GameVarianceObservation[], { heldOutSeasons }: GameVarianceFitOptions): GameVariancePriors {
+export function fitGameVariance(
+  observations: readonly GameVarianceObservation[],
+  { heldOutSeasons, positions = OBSERVABLE_POSITIONS }: GameVarianceFitOptions,
+): GameVariancePriors {
   const forbidden = new Set(heldOutSeasons);
   for (const observation of observations) {
     if (forbidden.has(observation.season)) {
@@ -153,10 +189,10 @@ export function fitGameVariance(observations: readonly GameVarianceObservation[]
     }
   }
 
-  const result = {} as Record<PlayerClass, Record<VariancePosition, number>>;
+  const result = {} as Record<PlayerClass, Partial<Record<VariancePosition, number>>>;
   for (const playerClass of ["rookie", "veteran"] as const) {
-    result[playerClass] = {} as Record<VariancePosition, number>;
-    for (const position of VARIANCE_POSITIONS) {
+    result[playerClass] = {};
+    for (const position of positions) {
       const cell = observations.filter((o) => o.playerClass === playerClass && o.position === position);
       const eligible = cell.filter((o) => o.weeklyPoints.length >= 2);
       if (eligible.length >= MINIMUM_POOLED_PLAYER_SEASONS) {
