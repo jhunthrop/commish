@@ -540,6 +540,13 @@
       "when": 1788652251738,
       "tag": "0076_daily_leopardon",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1788653341028,
+      "tag": "0077_young_lockjaw",
+      "breakpoints": true
     }
   ]
 }

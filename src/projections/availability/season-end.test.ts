@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveSeasonEndingAbsence, type WeeklyInjuryReport } from "./season-end";
+import { deriveSeasonEnding, deriveSeasonEndFromStatus, deriveSeasonEndingAbsence, type WeeklyInjuryReport, type WeeklyRosterStatus } from "./season-end";
 
 function row(week: number, reportStatus: string, primaryInjury = ""): WeeklyInjuryReport {
   return { week, reportStatus, primaryInjury };
@@ -80,5 +80,99 @@ describe("deriveSeasonEndingAbsence", () => {
       reportStatus: "Injured Reserve",
       primaryInjury: "Pectoral",
     });
+  });
+});
+
+function statusRow(week: number, status: string): WeeklyRosterStatus {
+  return { week, status };
+}
+
+describe("deriveSeasonEndFromStatus", () => {
+  it("derives the real Malik Nabers 2025 shape: active through week 4, reserve from week 5 on", () => {
+    // The real, measured case (see `roster-weeks.ts`'s own docblock): weeks 5 and 18 both read
+    // RES, with no row filed for the weeks in between — a gap the roster census can leave, unlike
+    // the injury report, without it meaning anything.
+    const rows = [statusRow(5, "RES"), statusRow(18, "RES")];
+    expect(deriveSeasonEndFromStatus(rows, [1, 2, 3, 4])).toEqual({
+      lastPlayedWeek: 4,
+      firstMissedWeek: 5,
+      status: "RES",
+    });
+  });
+
+  it("returns null for a mid-season reserve stint the player came back from", () => {
+    const rows = [statusRow(5, "RES"), statusRow(6, "RES"), statusRow(7, "ACT")];
+    expect(deriveSeasonEndFromStatus(rows, [1, 2, 3, 4, 7, 8, 9])).toBeNull();
+  });
+
+  it("returns null when a later listed week reads back to something other than reserve", () => {
+    // The placement did not hold through every week the file actually carries a row for.
+    const rows = [statusRow(5, "RES"), statusRow(9, "CUT")];
+    expect(deriveSeasonEndFromStatus(rows, [1, 2, 3, 4])).toBeNull();
+  });
+
+  it("returns null for a player with no roster rows at all", () => {
+    expect(deriveSeasonEndFromStatus([], [1, 2, 3, 4])).toBeNull();
+  });
+
+  it("returns null when the anchor week is missing from the roster file entirely", () => {
+    // Absence of a row is not evidence of a reserve placement, exactly as it is not evidence of an
+    // injury for `deriveSeasonEndingAbsence`. Week 9 (firstMissedWeek) carries no row at all; a
+    // later RES row alone must not be read as covering it.
+    const rows = [statusRow(12, "RES")];
+    expect(deriveSeasonEndFromStatus(rows, [1, 2, 3, 4, 5, 6, 7, 8])).toBeNull();
+  });
+
+  it("treats ACT, INA, DEV, CUT, RET as insufficient to anchor a reserve placement", () => {
+    for (const status of ["ACT", "INA", "DEV", "CUT", "RET"]) {
+      expect(deriveSeasonEndFromStatus([statusRow(5, status)], [1, 2, 3, 4])).toBeNull();
+    }
+  });
+
+  it("handles a player who never played at all: week 1 itself must carry the qualifying status", () => {
+    expect(deriveSeasonEndFromStatus([statusRow(1, "RES")], [])).toEqual({
+      lastPlayedWeek: 0,
+      firstMissedWeek: 1,
+      status: "RES",
+    });
+  });
+});
+
+describe("deriveSeasonEnding", () => {
+  it("prefers the report anchor when both sources qualify, since it alone carries a body part", () => {
+    const injuryRows = [row(5, "Out", "Knee")];
+    const statusRows = [statusRow(5, "RES")];
+    expect(deriveSeasonEnding(injuryRows, statusRows, [1, 2, 3, 4])).toEqual({
+      source: "report",
+      lastPlayedWeek: 4,
+      firstMissedWeek: 5,
+      reportStatus: "Out",
+      primaryInjury: "Knee",
+    });
+  });
+
+  it("falls back to the status-based derivation when the report is silent — the Nabers gap", () => {
+    // No injury-report row at all past week 4: the report alone derives nothing (measured live
+    // against the real 2025 release), but the roster kept stating RES the whole time.
+    const statusRows = [statusRow(5, "RES"), statusRow(18, "RES")];
+    expect(deriveSeasonEnding([], statusRows, [1, 2, 3, 4])).toEqual({
+      source: "status",
+      lastPlayedWeek: 4,
+      firstMissedWeek: 5,
+      status: "RES",
+      primaryInjury: null,
+    });
+  });
+
+  it("returns null, never a guess, when neither source supports a season-ending claim", () => {
+    const injuryRows = [row(5, "Questionable", "Ankle")];
+    const statusRows = [statusRow(5, "ACT")];
+    expect(deriveSeasonEnding(injuryRows, statusRows, [1, 2, 3, 4, 5, 6])).toBeNull();
+  });
+
+  it("honest null: primaryInjury is never invented when only the status source answers", () => {
+    const statusRows = [statusRow(9, "RES")];
+    const result = deriveSeasonEnding([], statusRows, [1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(result?.primaryInjury).toBeNull();
   });
 });

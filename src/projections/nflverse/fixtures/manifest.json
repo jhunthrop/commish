@@ -44,6 +44,12 @@
       "release": "injuries",
       "asset": "injuries_2025.csv",
       "filtered": "season=2025, game_type=REG, week in 1..3, team=BUF. THE POST-2025 SCHEMA, captured byte-for-byte: `season_type` is now a published column and `date_modified` is gone entirely — nflverse stopped stamping a filing timestamp on this release starting with the 2025 season. Real rows: Tre'Davious White moving Doubtful -> Questionable week 1 to week 2, and several players (Elijah Moore, Khalil Shakir, Dawson Knox among them) carrying practice-only notes with a blank `report_status`, exactly as the 2013-2024 shape does — the only thing that changed is the columns, never the values."
+    },
+    {
+      "file": "roster_weekly_2025_nyg_w1-4-5-18.csv",
+      "release": "weekly_rosters",
+      "asset": "roster_weekly_2025.csv",
+      "filtered": "season=2025, game_type=REG, week in {1, 4, 5, 18}, team=NYG. THE REAL SEASON-ENDING-IR CASE THIS MODULE WAS BUILT TO CLOSE: Malik Nabers (gsis_id 00-0039337) reads `status=ACT` in weeks 1 and 4 and `status=RES` in weeks 5 and 18 — the real, measured shape of an ACL tear that ended his 2025 season with him vanishing from the weekly injury report but never from the roster. Four non-consecutive weeks (rather than a contiguous run) keep the slice small while still spanning the whole season: week 1 (active baseline), week 4 (his real last active week), week 5 (the first reserve week, the derivation's anchor), and week 18 (season's end, confirming the placement held). Every other NYG player on those four rosters is kept too, giving the full `status` spread a real file emits (ACT/RES/DEV/CUT/RET/INA and friends) rather than one hand-picked row."
     }
   ]
 }

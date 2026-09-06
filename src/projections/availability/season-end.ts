@@ -101,3 +101,133 @@ export function deriveSeasonEndingAbsence(
     primaryInjury: anchor.primaryInjury,
   };
 }
+
+/**
+ * THE STATUS-BASED DERIVATION — closes the gap the report-based one cannot: a player placed on a
+ * reserve list who then vanishes from the weekly injury report entirely (`nflverse/roster-weeks.ts`'s
+ * own docblock; measured live against the real 2025 release, Malik Nabers, gsis_id `00-0039337`,
+ * derives NOTHING from the injury report alone after his week-5 ACL tear — no anchor row exists —
+ * while the weekly roster keeps stating `RES` for him every week from 5 through 18).
+ *
+ * One archived roster-status row per week, restated narrowly exactly as `WeeklyInjuryReport` is:
+ * this module depends on two fields, not the whole `RosterWeekRow` ingestion shape.
+ */
+export interface WeeklyRosterStatus {
+  readonly week: number;
+  /** The league's own roster-status code, verbatim ("ACT", "RES", "INA", "CUT", "DEV", …). */
+  readonly status: string;
+}
+
+/** The sourced fact a STATUS-based derivation can support: a reserve-list placement, with no body
+ *  part to report (the roster never carries one) — never invented to fill the gap. */
+export interface SeasonEndingReserve {
+  readonly lastPlayedWeek: number;
+  readonly firstMissedWeek: number;
+  /** The roster's own status code at `firstMissedWeek`, verbatim ("RES") — never translated to a
+   *  human phrase here; that is a presentation concern for whichever caller prints this. */
+  readonly status: string;
+}
+
+/**
+ * Which roster-status codes count as a reserve-list placement strong enough to anchor a
+ * season-ending derivation, drawn from the REAL vocabulary `roster_weekly_2024.csv` and
+ * `roster_weekly_2025.csv` publish (see `schema.ts`'s `nflverseRosterWeeks` docblock for the full
+ * observed list: `ACT`, `INA`, `RES`, `DEV`, `CUT`, `RET`, `EXE`, `TRC`, `TRD`, `E01`).
+ *
+ * `RES` ONLY, DELIBERATELY NARROWER THAN `rosters.ts`'s OWN `rosterStatusOf`. That function's
+ * default case folds RES together with EXE, the numbered exemptions, and anything else it has
+ * never seen, because a week-1 cutdown-day board would rather over-count "will miss games" than
+ * under-count it. This derivation makes a much stronger, NAMED claim — "he was placed on a reserve
+ * list and it held for the rest of his season" — and `RES` is the only code in the observed
+ * vocabulary that unambiguously means that. `EXE` (measured: `status_description_abbr` `E02`, both
+ * seasons) is the commissioner-exempt list, granted for reasons that are not always an injury;
+ * `CUT` and `RET` mean he left the roster outright, a different fact than "still rostered, marked
+ * reserve"; `TRC`/`TRD` are transaction-window codes seen only a handful of times each season and
+ * never observed to persist across weeks the way a real IR placement does. Widening this set is a
+ * decision for whoever next measures one of those codes actually anchoring a real season-ender —
+ * not a guess made here to look more complete.
+ */
+const RESERVE_CLASS_STATUSES: ReadonlySet<string> = new Set(["RES"]);
+
+/**
+ * Derives a season-ending reserve placement from archived roster-status rows, or `null` when the
+ * evidence does not support one.
+ *
+ * MIRRORS `deriveSeasonEndingAbsence`'S OWN ANCHOR DISCIPLINE, on purpose: the roster is read as a
+ * census (every man, every week) rather than an injury report (only the men currently on it), so
+ * the risk this derivation actually guards against is different — a MISSING week is far rarer here
+ * than in the injury report — but the anchor rule stays identical for the same reason: only the
+ * week right after his last game (`firstMissedWeek`) needs to carry a qualifying status. Demanding
+ * every remaining week reserve-class would refuse a real case where a late-season row is missing
+ * for an unrelated reason (a bye week the roster file happens to skip, a late-season cut off a
+ * reserve list that this function is never told about), when the anchor week alone already answers
+ * the question this function exists to answer: was he placed on reserve the week he stopped
+ * playing, and did that placement hold through the rows this season's file actually carries.
+ *
+ * "HELD THROUGH THE ROWS THIS FILE CARRIES" IS DELIBERATELY NOT "HELD THROUGH EVERY WEEK OF THE
+ * SEASON". Every week from `firstMissedWeek` onward THAT THE FILE ACTUALLY LISTS must be
+ * reserve-class; a listed week that reads back to `ACT` (or anything else) is evidence of a real
+ * comeback and correctly refuses the derivation, exactly as `deriveSeasonEndingAbsence` refuses a
+ * mid-season absence a player returned from. A week the file simply does not carry a row for at
+ * all is not treated as evidence either way — the anchor week already carried the claim.
+ */
+export function deriveSeasonEndFromStatus(
+  statusRows: readonly WeeklyRosterStatus[],
+  gamesPlayedWeeks: readonly number[],
+): SeasonEndingReserve | null {
+  const lastPlayedWeek = gamesPlayedWeeks.length === 0 ? 0 : Math.max(...gamesPlayedWeeks);
+  const firstMissedWeek = lastPlayedWeek + 1;
+
+  const anchor = statusRows.find((row) => row.week === firstMissedWeek);
+  if (anchor === undefined || !RESERVE_CLASS_STATUSES.has(anchor.status)) return null;
+
+  const holds = statusRows.filter((row) => row.week >= firstMissedWeek).every((row) => RESERVE_CLASS_STATUSES.has(row.status));
+  if (!holds) return null;
+
+  return { lastPlayedWeek, firstMissedWeek, status: anchor.status };
+}
+
+/**
+ * THE COMBINER — one sourced answer to "why did his season end", preferring the report anchor
+ * (`deriveSeasonEndingAbsence`) when it can answer at all, because it alone carries `primaryInjury`
+ * (a body part, from the league's own words). Falls back to the status-based derivation
+ * (`deriveSeasonEndFromStatus`) only when the report is silent — the exact gap this whole module
+ * was built to close (see this file's own docblock and `nflverse/roster-weeks.ts`'s).
+ *
+ * `source` NAMES WHICH INPUT ANSWERED, so a caller printing this never has to re-derive which path
+ * fired from the shape of the result alone. `primaryInjury` is `null` on a `"status"`-sourced
+ * result — NEVER a guessed or borrowed body part — because the roster file carries no such column
+ * and inventing one would misattribute a specific injury the source never named.
+ */
+export type SeasonEnding =
+  | ({ readonly source: "report" } & SeasonEndingAbsence)
+  | {
+      readonly source: "status";
+      readonly lastPlayedWeek: number;
+      readonly firstMissedWeek: number;
+      readonly status: string;
+      readonly primaryInjury: null;
+    };
+
+/**
+ * Combines both derivations into one preference-ordered answer, or `null` when neither the report
+ * nor the roster supports a season-ending claim.
+ *
+ * REPORT FIRST, ALWAYS — never a "most recent anchor wins" or "most weeks covered" comparison
+ * between the two. A report anchor that qualifies is always the more specific, more sourced claim
+ * (it names a body part), so there is nothing to adjudicate once one exists; the status-based
+ * result is consulted only when `deriveSeasonEndingAbsence` itself returns `null`.
+ */
+export function deriveSeasonEnding(
+  injuryRows: readonly WeeklyInjuryReport[],
+  statusRows: readonly WeeklyRosterStatus[],
+  gamesPlayedWeeks: readonly number[],
+): SeasonEnding | null {
+  const fromReport = deriveSeasonEndingAbsence(injuryRows, gamesPlayedWeeks);
+  if (fromReport !== null) return { source: "report", ...fromReport };
+
+  const fromStatus = deriveSeasonEndFromStatus(statusRows, gamesPlayedWeeks);
+  if (fromStatus !== null) return { source: "status", ...fromStatus, primaryInjury: null };
+
+  return null;
+}

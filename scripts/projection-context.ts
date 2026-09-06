@@ -16,6 +16,7 @@ import { createDb } from "@/db/client";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ingestCoaches, ingestInjuryReports, ingestOpponentDefence, ingestPlayByPlay, ingestSchedule } from "@/projections/nflverse/ingest";
 import { ingestInjuries } from "@/projections/nflverse/injuries";
+import { ingestRosterWeeks } from "@/projections/nflverse/roster-weeks";
 
 const FIRST_SEASON = Number(process.argv[2] ?? 2020);
 const LAST_SEASON = Number(process.argv[3] ?? 2024);
@@ -75,6 +76,18 @@ async function main(): Promise<void> {
   for (const report of await ingestInjuries(db, client, seasons)) {
     console.log(
       `${report.season}: ${report.rowsRead} injury report rows archived -> ${report.written} new/changed rows` +
+        (report.unknownToUniverse === 0 ? "" : `, ${report.unknownToUniverse} listed players the universe does not hold`),
+    );
+  }
+
+  // A DIFFERENT WEEKLY RELEASE, archived verbatim — `nflverse_roster_weeks`, which stays explicit
+  // about a reserve-list placement even for the weeks a player has since vanished from the injury
+  // report entirely. See `roster-weeks.ts`'s own docblock for the real case (Malik Nabers, 2025)
+  // this closes and `availability/season-end.ts`'s `deriveSeasonEndFromStatus`/`deriveSeasonEnding`
+  // for the derivation it feeds.
+  for (const report of await ingestRosterWeeks(db, client, seasons)) {
+    console.log(
+      `${report.season}: ${report.rowsRead} weekly roster rows archived -> ${report.written} new/changed rows` +
         (report.unknownToUniverse === 0 ? "" : `, ${report.unknownToUniverse} listed players the universe does not hold`),
     );
   }

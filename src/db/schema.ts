@@ -2301,6 +2301,73 @@ export const nflverseInjuries = pgTable(
 );
 
 /**
+ * THE OFFICIAL WEEKLY ROSTER STATUS, ARCHIVED VERBATIM — one row per (season, week, gsis_id), the
+ * SECOND anchor `availability/season-end.ts` derives a season-ending absence from.
+ *
+ * WHY THIS EXISTS BESIDE `nflverse_injuries`. The weekly injury report only names a player while a
+ * team is still filing a designation for him — see `season-end.ts`'s own docblock: once a man is
+ * actually done for the year, teams routinely STOP filing him on the report at all, and he simply
+ * VANISHES from it. Measured live against the 2025 release: Malik Nabers (00-0039337, NYG) tore his
+ * ACL in week 5 and the injury report alone derives nothing for him past that gap — no row, no
+ * evidence, `deriveSeasonEndingAbsence` correctly refuses rather than guesses. The weekly ROSTER,
+ * unlike the injury report, is a census: nflverse's `weekly_rosters` release lists every man on
+ * every club's roster every week, healthy or not, so a reserve-list placement is explicit and
+ * durable for as long as the placement lasts — Nabers reads `RES` from week 5 through week 18 of
+ * the same file. This table is that census, kept exactly as published, so a gap in the injury
+ * report can be closed by a fact the roster never stopped stating.
+ *
+ * THE SAME RELEASE `preseason/rosters.ts` ALREADY READS, A DELIBERATELY DIFFERENT SLICE OF IT.
+ * `rosters.ts`'s `mapWeek1Rosters` keeps ONLY week 1, coarsens the status to four buckets
+ * (`RosterStatus`), and deliberately folds `INA` into `active` because a game-day inactive list is
+ * knowable ninety minutes before kickoff and would leak a Sunday fact into a claim about the
+ * cutdown. None of those choices belong here: this table archives EVERY week, VERBATIM, because a
+ * season-ending derivation needs to see a status change mid-season (week 4 `ACT` -> week 5 `RES`),
+ * not a snapshot of week 1 alone, and needs the league's own spelling rather than a bucket a later
+ * consumer cannot un-coarsen.
+ *
+ * VOCABULARY OBSERVED IN THE REAL RELEASE (`status` column, `roster_weekly_2024.csv` and
+ * `roster_weekly_2025.csv`, every row, both files): `ACT`, `INA`, `RES`, `DEV`, `CUT`, `RET`,
+ * `EXE`, `TRC`, `TRD`, and a single stray `E01` (2024, one row). See
+ * `availability/season-end.ts`'s `RESERVE_CLASS_STATUSES` for which of these count as a
+ * reserve-list placement for the derivation, and why the set is narrower than `rosters.ts`'s own
+ * `rosterStatusOf` default-case bucket.
+ */
+export const nflverseRosterWeeks = pgTable(
+  "nflverse_roster_weeks",
+  {
+    season: integer("season").notNull(),
+    week: integer("week").notNull(),
+    playerId: text("player_id")
+      .notNull()
+      .references(() => nflPlayers.id, { onDelete: "cascade" }),
+    /** The club this week's row lists him with. nflverse's own team code, unmapped. */
+    team: text("team").notNull(),
+    /** The league's own roster-status code, verbatim ("ACT", "RES", "INA", "CUT", "DEV", …) — never
+     *  coarsened, unlike `preseason_rosters`' `RosterStatus`. See the table docblock for the full
+     *  observed vocabulary. */
+    status: text("status").notNull(),
+    /** nflverse's own spelling, unnarrowed, exactly as `nfl_players.position` and
+     *  `nfl_draft_picks.position` are. */
+    position: text("position").notNull(),
+    /** Provenance: which release this row came from, matching every other `source` column's
+     *  convention in this schema. */
+    source: text("source").notNull().default("nflverse_roster_weeks"),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** The natural key IS the primary key, deliberately — not a surrogate id — for the identical
+     *  reason `nflverse_injuries` gives: this table's writer upserts on conflict
+     *  (`recordRosterWeekRows`, `db/upsert.ts`'s `excludedSetFor`/`changedRowWhere`), and a
+     *  surrogate rewritten on every re-ingested row would be worse than none. `ingested_at` is
+     *  excluded from the update set for the same reason: it names when this fact was FIRST written,
+     *  not when it was last confirmed. */
+    primaryKey({ columns: [t.season, t.week, t.playerId] }),
+    /** `season-end.ts`'s read: every row for one player, one season, in week order. */
+    index("nflverse_roster_weeks_player_season_idx").on(t.playerId, t.season, t.week),
+  ],
+);
+
+/**
  * THE ONE EDGE BETWEEN THE TWO ID SPACES THIS PRODUCT HOLDS (migration 0051).
  *
  * `nfl_players`' own docblock refused to guess at this link and said who should draw it: "mapping
