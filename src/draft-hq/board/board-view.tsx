@@ -135,10 +135,16 @@ function MarketOrderBody({ row }: { readonly row: BoardRow }) {
   );
 }
 
-/** The measured season in one sentence, with the year and the basis named. Never a bare number. */
+/**
+ * The measured season in one sentence, with the year and the basis named. Never a bare number.
+ *
+ * THE ABSENCE SENTENCE NAMES THE YEAR TOO, and that is not pedantry: a veteran who missed last
+ * season entirely has a real career and no 2025 in it, and "we hold no season for him" would be a
+ * claim about his whole record rather than about the one year this column reports.
+ */
 function lastSeasonSentence(row: BoardRow): string {
   const last = row.lastSeason;
-  if (last === null) return `We hold no ${row.position === "DEF" ? "team defense" : "kicker"} season for him to measure.`;
+  if (last === null) return `He has no ${BOARD_LAST_SEASON} season on record, so there is nothing here to measure.`;
   return `In ${last.season} he scored ${last.points.toFixed(1)} points over ${last.games} games, ${last.pointsPerGame.toFixed(1)} a game, under this league's scoring.`;
 }
 
@@ -206,7 +212,7 @@ function NoLastSeason({ what }: { readonly what: string }) {
  */
 function LastSeasonTotalCell({ row }: { readonly row: BoardRow }) {
   const last = row.lastSeason;
-  if (last === null) return <NoLastSeason what="No measured season on record for him" />;
+  if (last === null) return <NoLastSeason what={`No ${BOARD_LAST_SEASON} season on record for him`} />;
   return (
     <span aria-label={`${last.points.toFixed(1)} points over ${last.games} games in ${last.season}, last season, under this league's scoring.`}>
       <span aria-hidden="true">{last.points.toFixed(1)} pts</span>
@@ -220,7 +226,7 @@ function LastSeasonTotalCell({ row }: { readonly row: BoardRow }) {
 /** His rate over the games he actually played, on the same basis and named the same way. */
 function LastSeasonRateCell({ row }: { readonly row: BoardRow }) {
   const last = row.lastSeason;
-  if (last === null) return <NoLastSeason what="No rate to state without a measured season" />;
+  if (last === null) return <NoLastSeason what={`No rate to state without a ${BOARD_LAST_SEASON} season`} />;
   return (
     <span aria-label={`${last.pointsPerGame.toFixed(1)} points a game in ${last.season}, last season, under this league's scoring.`}>
       <span aria-hidden="true" className="text-text-primary">

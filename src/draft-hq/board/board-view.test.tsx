@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import type { BoardRow } from "./service";
+import { BOARD_LAST_SEASON, type BoardRow } from "./service";
 import { BoardView } from "./board-view";
 
 const SHAPE = { teamCount: 12, rosterSpots: 15, budget: 200 } as const;
@@ -106,8 +106,8 @@ describe("BoardView, a position with no projection", () => {
     mount([projected({}), marketOrder({})]);
     selectPosition("K");
     const cells = screen.getByText("A Kicker").closest("tr")!;
-    expect(within(cells).getByText("No measured season on record for him")).toBeInTheDocument();
-    expect(within(cells).getByText("No rate to state without a measured season")).toBeInTheDocument();
+    expect(within(cells).getByText(`No ${BOARD_LAST_SEASON} season on record for him`)).toBeInTheDocument();
+    expect(within(cells).getByText(`No rate to state without a ${BOARD_LAST_SEASON} season`)).toBeInTheDocument();
     // The ordering must not be compared against itself.
     expect(within(cells).getByText("No comparison against the market yet")).toBeInTheDocument();
     expect(cells.textContent).not.toMatch(/\b0\.0\b/);
@@ -189,7 +189,7 @@ describe("BoardView, a position with no projection", () => {
       fireEvent.click(within(screen.getByText("A Kicker").closest("tr")!).getByRole("button", { name: "why" }));
     });
     const drawer = screen.getByRole("dialog");
-    expect(within(drawer).getByText("We hold no kicker season for him to measure.")).toBeInTheDocument();
+    expect(within(drawer).getByText(`He has no ${BOARD_LAST_SEASON} season on record, so there is nothing here to measure.`)).toBeInTheDocument();
     expect(within(drawer).queryByText(/base model alone/)).not.toBeInTheDocument();
   });
 
