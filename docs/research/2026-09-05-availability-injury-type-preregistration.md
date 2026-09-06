@@ -40,3 +40,14 @@ Pass → model updates, factsHash moves the affected class, capsules regenerate 
 ## UX rider (ships regardless of gate outcome)
 
 The peek and full page state the decomposition plainly: per-game projection rank beside expected games ("Per game he projects like a top-12 receiver. The question is games: our model expects 11."). Talent and availability are separate claims and the card says both.
+
+## Amendment 1 — 2026-09-05, before any fitting (data-contact for feature definitions only)
+
+Live verification exposed that players placed on injured reserve VANISH from the weekly injury reports (measured: Malik Nabers 2025 — report rows stop after week 4; roster status reads ACT weeks 1-4, RES weeks 5-18). `absenceClass`'s `discrete_terminal` arm therefore CANNOT be derived from reports alone as §Features assumed; it would systematically miss the IR class this round exists to price.
+
+Amended feature definitions (gates, fit window, judgment protocol all UNCHANGED):
+- `absenceClass` derives from the COMBINER (`deriveSeasonEnding`: report anchor preferred, roster-status RES fallback) over `nflverse_injuries` + `nflverse_roster_weeks`.
+- `bodyPartClass` is `unknown` when the terminal absence is status-sourced (primaryInjury null) — a real level, never imputed.
+- All other features unchanged.
+
+No model has been fit and no held-out data touched at amendment time. The backfilled stores: injuries 2013-2025 (68,270 rows), roster weeks 2013-2025 (~520k rows).
