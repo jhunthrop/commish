@@ -99,3 +99,29 @@ describe("the injury designation history line", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, injuryHistory: [] })))).toBeNull();
   });
 });
+
+describe("the coaching line", () => {
+  it("names both men, marks the new one, and grounds both names", () => {
+    const facts = buildPlayerFacts(
+      depthInput({
+        ...EMPTY_DEPTH,
+        coaching: { season: 2026, headCoach: "John Harbaugh", headCoachIsNew: true, playCaller: "Matt Nagy", playCallerRole: "OC", playCallerIsNew: true },
+      }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- Coaching for 2026: head coach John Harbaugh, new this year. offensive play caller Matt Nagy, new this year.");
+    for (const name of ["John Harbaugh", "Harbaugh", "Matt Nagy", "Nagy"]) expect(facts.nameLedger).toContain(name);
+  });
+
+  it("makes no tenure claim at all when the table cannot tell", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, coaching: { season: 2026, headCoach: null, headCoachIsNew: null, playCaller: "Kyle Shanahan", playCallerRole: "HC", playCallerIsNew: null } }),
+    );
+    const rendered = renderDepthSection(facts);
+    expect(rendered).toBe("The record:\n- Coaching for 2026: the head coach calls the plays himself, Kyle Shanahan.");
+    expect(rendered!.includes("new this year")).toBe(false);
+  });
+
+  it("renders no coaching line when the curated table covers nothing", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, coaching: null })))).toBeNull();
+  });
+});

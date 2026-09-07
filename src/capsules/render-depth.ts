@@ -59,6 +59,28 @@ function injuryHistoryLine(depth: PlayerFactsDepth): string | null {
   return `Injury designations captured this season, oldest first: ${spells.join(". ")}.`;
 }
 
+/** "New this year" only where the flag is `true`. A `null` flag prints the name and no tenure
+ *  claim at all, because the table not covering the prior season is not evidence of continuity. */
+function tenureClause(isNew: boolean | null): string {
+  if (isNew === null) return "";
+  return isNew ? ", new this year" : ", continuing from last season";
+}
+
+/** WHO IS CALLING THE PLAYS, by name. Each half is dropped independently when the curated table
+ *  names nobody for it. */
+function coachingLine(depth: PlayerFactsDepth): string | null {
+  const coaching = depth.coaching;
+  if (coaching === null) return null;
+  const parts: string[] = [];
+  if (coaching.headCoach !== null) parts.push(`head coach ${coaching.headCoach}${tenureClause(coaching.headCoachIsNew)}`);
+  if (coaching.playCaller !== null) {
+    const role = coaching.playCallerRole === "HC" ? "the head coach calls the plays himself" : "offensive play caller";
+    const named = coaching.playCallerRole === "HC" ? `${role}, ${coaching.playCaller}` : `${role} ${coaching.playCaller}`;
+    parts.push(`${named}${tenureClause(coaching.playCallerIsNew)}`);
+  }
+  return parts.length === 0 ? null : `Coaching for ${coaching.season}: ${parts.join(". ")}.`;
+}
+
 /** Every line of the section, in `PlayerFactsDepth`'s own field order. */
 function depthLines(depth: PlayerFactsDepth): readonly string[] {
   return [
@@ -66,6 +88,7 @@ function depthLines(depth: PlayerFactsDepth): readonly string[] {
     ...seasonEndingLines(depth),
     gamesMissedLine(depth),
     injuryHistoryLine(depth),
+    coachingLine(depth),
   ].filter((line): line is string => line !== null && line !== "");
 }
 
