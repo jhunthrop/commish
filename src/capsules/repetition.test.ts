@@ -70,7 +70,9 @@ describe("sentencesToAvoid", () => {
   it("quotes the worst offenders first and caps the list", () => {
     const rows = [...rowsSaying(STOCK, 20), ...rowsSaying("Another stock line.", 10, 100), ...uniqueRows(70, 200)];
     const avoid = sentencesToAvoid(stockSentences(rows, 0.02));
-    expect(avoid[0]).toContain("he is a high floor");
+    // Quoted in the words a player actually carries, capital and full stop included, never in the
+    // normalized form the count is taken over (review, MINOR).
+    expect(avoid[0]).toBe(STOCK);
     expect(avoid.length).toBeLessThanOrEqual(8);
   });
 });

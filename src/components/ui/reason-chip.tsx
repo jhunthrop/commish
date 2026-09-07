@@ -2,6 +2,7 @@ import type { Law, PrimaryQuantityUnit } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
 import { Badge } from "./badge";
 import { signedPoints } from "./event-feed-row";
+import { formatTenth } from "./number-format";
 
 /**
  * ONE REASON, ONE CHIP — the board's own "why" made legible next to a player, everywhere a
@@ -167,7 +168,7 @@ function copyFor(reason: BoardReason, law: Law | undefined): string {
     case "law":
       // Said as a verb, never as a signed number in the lab register (dossier-voice round §3.7):
       // "measured -1.8 pts per game" is the exact sentence the founder read as a bot's.
-      return `${lawHeadline(reason.lawId, reason.magnitude, law)}: ${reason.effect < 0 ? "costs him" : "worth"} ${Math.abs(Number(reason.effect.toFixed(1)))} pts a game`;
+      return `${lawHeadline(reason.lawId, reason.magnitude, law)}: ${reason.effect < 0 ? "costs him" : "worth"} ${formatTenth(Math.abs(reason.effect))} pts a game`;
     case "availability":
       return `Expected ${Math.round(reason.expectedGames)} games, ${Math.round(reason.floorGames)} to ${Math.round(reason.ceilingGames)}`;
     case "offseason_share_gained":

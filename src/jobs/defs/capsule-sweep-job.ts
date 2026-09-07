@@ -9,6 +9,19 @@
 // runs for the whole board is exactly the pass a precomputed peek row needs, so the rows are written
 // from it here rather than by a second heavy job of its own.
 //
+// IT RUNS ACROSS TICKS, NOT INSIDE ONE (review C1, 2026-09-07). The runner caps a claimed job at
+// whatever is left of the TICK's budget (`JOBS_CONFIG.vercelTickBudgetMsDefault`, 50s), never at
+// this job's own `timeoutMs`, so a batch of 35 players at 5s pacing plus 7-20s of generation each
+// could never finish inside one attempt: the step was being cut off mid-batch every night and the
+// repetition check at the end never ran in production at all. The step now reads
+// `ctx.deadlineAt`, stops BEFORE the player that would cross it, and enqueues its own continuation
+// carrying the rest of tonight's budget. The 35 is still the per-night ceiling: the continuation's
+// payload is what is left of it, never a fresh 35.
+//
+// THE REPETITION CHECK RUNS ONLY ON THE RUN THAT FINISHES THE NIGHT'S WORK, because it is a
+// question about the whole board and a half-swept board would flag sentences the second half is
+// about to rewrite anyway.
+//
 // TERMINAL VS RETRYABLE: `generate.ts` never throws (the template is the permanent floor), so
 // nothing inside a single player's own attempt can fail this job — a gateway outage degrades every
 // eligible player to template this run and the summary says so plainly. What CAN throw is the
@@ -24,24 +37,35 @@ import { writeRefresh } from "@/capsules/peek-facts";
 import { playersSayingStock, sentencesToAvoid, stockSentences } from "@/capsules/repetition";
 import { getStoredCapsulesFor, queueCapsuleRegeneration, upsertCapsule, type StoredPlayerCapsule } from "@/capsules/store";
 import type { PlayerFacts } from "@/capsules/facts";
-import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
+import { defineJob, type AnyJobDefinition, type JobStepContext, type StepOutcome } from "../contract";
+import { enqueueJob } from "../store";
 import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
 
 export const CAPSULE_SWEEP_JOB_NAME = "capsule-sweep";
 
 export interface CapsuleSweepPayload {
   /** Overrides `CAPSULE_CONFIG.sweepGenerationBudget` for this run only — an operator's manual
-   *  rerun with a wider budget, mainly. Optional; the schedule's own fire never sets it. */
+   *  rerun with a wider budget, mainly, and the CONTINUATION's own remaining share of tonight's
+   *  cap (see the module docblock). Optional; the schedule's own fire never sets it. */
   readonly budget?: number;
+  /** Set only on a continuation this job enqueued for itself: the instant the night's first run
+   *  started, which keeps every continuation's idempotency key inside one chain and lets a reader
+   *  of the jobs table see one night's work as one sequence. */
+  readonly continuationOf?: string;
 }
 
 export function parseCapsuleSweepPayload(raw: JsonObject): CapsuleSweepPayload {
-  const budget = raw.budget;
-  if (budget === undefined) return {};
-  if (typeof budget !== "number" || !Number.isInteger(budget) || budget < 1) {
+  const { budget, continuationOf } = raw;
+  if (budget !== undefined && (typeof budget !== "number" || !Number.isInteger(budget) || budget < 1)) {
     throw new Error(`capsule-sweep payload: budget must be a positive integer, got ${JSON.stringify(budget)}.`);
   }
-  return { budget };
+  if (continuationOf !== undefined && (typeof continuationOf !== "string" || Number.isNaN(Date.parse(continuationOf)))) {
+    throw new Error(`capsule-sweep payload: continuationOf must be an ISO instant string, got ${JSON.stringify(continuationOf)}.`);
+  }
+  return {
+    ...(budget === undefined ? {} : { budget }),
+    ...(continuationOf === undefined ? {} : { continuationOf }),
+  };
 }
 
 function needsGeneration(facts: PlayerFacts, stored: StoredPlayerCapsule | undefined): boolean {
@@ -53,7 +77,24 @@ export interface CapsuleSweepDeps {
   readonly fetch?: typeof globalThis.fetch;
 }
 
-export async function runCapsuleSweepStep(db: Db, clock: Clock, deps: CapsuleSweepDeps, payload: CapsuleSweepPayload): Promise<StepOutcome> {
+/**
+ * How long one player can take, worst case, when the sweep decides whether it has room for one
+ * more: the pacing pause plus three gateway calls at the gateway's own timeout, each of which can
+ * be attempted twice. Deliberately the WORST case rather than the average — stopping one player
+ * early costs a player, and being cut off mid-write costs the run's own tail (the peek-document
+ * enqueue and the repetition check) every single night.
+ */
+function worstCaseMsPerPlayer(): number {
+  return CAPSULE_CONFIG.sweepPacingMs + 3 * 2 * CAPSULE_CONFIG.gateway.timeoutMs;
+}
+
+export async function runCapsuleSweepStep(
+  db: Db,
+  clock: Clock,
+  deps: CapsuleSweepDeps,
+  payload: CapsuleSweepPayload,
+  deadlineAt?: Date,
+): Promise<StepOutcome> {
   const asOf = new Date(clock.now());
   const pass = await collectBoardFacts(db, asOf);
   const facts = pass.facts;
@@ -79,14 +120,26 @@ export async function runCapsuleSweepStep(db: Db, clock: Clock, deps: CapsuleSwe
   let slotsRejected = 0;
   const detail: string[] = [];
 
+  const processed: string[] = [];
+  let stoppedForBudget = false;
   let first = true;
   for (const one of toProcess) {
+    // ROOM FOR ONE MORE? (review C1) — the runner will cut this attempt off at `deadlineAt`, so
+    // the sweep stops itself one player early and hands the rest to a continuation. With no
+    // deadline (the local runner, a test, an operator's own call) it processes the whole batch.
+    if (deadlineAt !== undefined && new Date(clock.now()).getTime() + worstCaseMsPerPlayer() > deadlineAt.getTime()) {
+      stoppedForBudget = true;
+      break;
+    }
     // Paced, not burst: see CAPSULE_CONFIG.sweepPacingMs. The pause sits BEFORE each player
     // after the first so a one-player run pays nothing.
     if (!first) await new Promise((resolve) => setTimeout(resolve, CAPSULE_CONFIG.sweepPacingMs));
     first = false;
     const result = await generateCapsule(one, { apiKey: deps.apiKey, fetch: deps.fetch }, avoid);
+    // Persisted per player as it goes, which is what makes a stop safe: a continuation re-reads
+    // the stored rows and finds this player no longer eligible.
     await upsertCapsule(db, one.identity.id, one.factsHash, result);
+    processed.push(one.identity.id);
     const cost = (result.compact.usage?.costUsd ?? 0) + (result.full.usage?.costUsd ?? 0) + (result.narrative.usage?.costUsd ?? 0);
     totalCostUsd += cost;
     slotsWritten += Object.keys(result.narrative.slots).length;
@@ -111,30 +164,56 @@ export async function runCapsuleSweepStep(db: Db, clock: Clock, deps: CapsuleSwe
   // for every scoring hash in use. Only the players this run actually wrote a capsule for are named.
   // The reason stamp is this pass's own instant, so a retried tick that reaches here twice with the
   // same clock coalesces into one build rather than two.
-  if (toProcess.length > 0) {
+  if (processed.length > 0) {
     await enqueuePeekDocumentRebuildsQuietly(db, clock, {
-      playerIds: toProcess.map((one) => one.identity.id),
+      playerIds: processed,
       reason: `capsule:${asOf.toISOString()}`,
     });
   }
 
-  // THE REPETITION CHECK, over the board as it now stands. Every player still saying a sentence
-  // more than `repetition.maxShare` of the board says has his cache key stamped stale, which is
-  // the one condition `needsGeneration` above already treats as "write this player again".
-  const afterRun = await getStoredCapsulesFor(db, facts.map((f) => f.identity.id));
-  const stock = stockSentences([...afterRun.values()]);
-  const queued = await queueCapsuleRegeneration(db, playersSayingStock(stock));
-  for (const finding of stock.slice(0, CAPSULE_CONFIG.repetition.maxQuotedSentences)) {
-    detail.push(`stock sentence on ${finding.playerIds.length} players (${(finding.share * 100).toFixed(1)}%): "${finding.sentence}"`);
+  // THE CONTINUATION (review C1) — tonight's cap minus what this run actually wrote, enqueued to
+  // run immediately so the next tick claims it. Only when the budget stopped us AND there is work
+  // and budget left, so a run that simply finished never chains, and a run that could not write a
+  // single player never spins.
+  const budgetLeft = budget - processed.length;
+  const continuationOf = payload.continuationOf ?? asOf.toISOString();
+  const willContinue = stoppedForBudget && budgetLeft > 0 && eligible.length > processed.length;
+  if (willContinue) {
+    await enqueueJob(db, clock, {
+      name: CAPSULE_SWEEP_JOB_NAME,
+      idempotencyKey: `capsule-sweep-continue@${continuationOf}#${budgetLeft}`,
+      payload: { budget: budgetLeft, continuationOf },
+      maxAttempts: 2,
+      runAt: new Date(clock.now()),
+    });
   }
 
-  const remaining = eligible.length - toProcess.length;
+  // THE REPETITION CHECK, over the board as it now stands, and ONLY on the run that finished the
+  // night's work: it is a question about the whole board, and a half-swept board would flag
+  // sentences the continuation is about to rewrite anyway. Every player still saying a sentence
+  // more than `repetition.maxShare` of the board says has his cache key stamped stale, which is
+  // the one condition `needsGeneration` above already treats as "write this player again".
+  let stockFound = 0;
+  let queued = 0;
+  if (!willContinue) {
+    const afterRun = await getStoredCapsulesFor(db, facts.map((f) => f.identity.id));
+    const stock = stockSentences([...afterRun.values()]);
+    stockFound = stock.length;
+    queued = await queueCapsuleRegeneration(db, playersSayingStock(stock));
+    for (const finding of stock.slice(0, CAPSULE_CONFIG.repetition.maxQuotedSentences)) {
+      detail.push(`stock sentence on ${finding.playerIds.length} players (${(finding.share * 100).toFixed(1)}%): "${finding.example}"`);
+    }
+  }
+
+  const remaining = eligible.length - processed.length;
   const summary =
     `capsule-sweep: ${facts.length} board players, ${eligible.length} needed a fresh generation, ` +
-    `${toProcess.length} processed (${llmCount} llm, ${templateCount} template, $${totalCostUsd.toFixed(6)} spent)` +
+    `${processed.length} processed (${llmCount} llm, ${templateCount} template, $${totalCostUsd.toFixed(6)} spent)` +
     (remaining > 0 ? `, ${remaining} left for the next sweep` : "") +
+    (willContinue ? `, continuing this tick's remainder in a follow-up run of ${budgetLeft}` : "") +
     `. Peek facts: ${peekFacts.players} rows built, ${peekFacts.changed} changed, ${peekFacts.withTouchesRank} with a touches rank` +
-    `. Narrative: ${slotsWritten} slots written, ${slotsRejected} rejected, ${stock.length} stock sentence(s) found, ${queued} player(s) queued for regeneration`;
+    `. Narrative: ${slotsWritten} slots written, ${slotsRejected} rejected` +
+    (willContinue ? ", repetition check deferred to the run that finishes the batch" : `, ${stockFound} stock sentence(s) found, ${queued} player(s) queued for regeneration`);
 
   return { summary, detail };
 }
@@ -151,7 +230,8 @@ export const capsuleSweepJob: AnyJobDefinition = defineJob<CapsuleSweepPayload>(
   steps: [
     {
       name: "sweep",
-      run: (ctx, payload) => runCapsuleSweepStep(ctx.db, ctx.clock, { apiKey: process.env[CAPSULE_CONFIG.gateway.envVars.apiKey] ?? "" }, payload),
+      run: (ctx: JobStepContext, payload) =>
+        runCapsuleSweepStep(ctx.db, ctx.clock, { apiKey: process.env[CAPSULE_CONFIG.gateway.envVars.apiKey] ?? "" }, payload, ctx.deadlineAt),
     },
   ],
 });

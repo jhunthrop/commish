@@ -104,11 +104,17 @@ export function normalizeSentence(text: string): string {
     .trim();
 }
 
+/** One slot's text split into sentences, exactly as written. The one splitter both readers use,
+ *  so a verbatim sentence and its normalized form are always the same sentence at the same index. */
+export function sentencesVerbatim(text: string): readonly string[] {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => normalizeSentence(sentence) !== "");
+}
+
 /** Every sentence in one slot's text, normalized. A slot may hold two sentences; the repetition
  *  check counts SENTENCES, because a stock second sentence is just as dead as a stock first one. */
 export function sentencesOf(text: string): readonly string[] {
-  return text
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => normalizeSentence(sentence))
-    .filter((sentence) => sentence !== "");
+  return sentencesVerbatim(text).map((sentence) => normalizeSentence(sentence));
 }

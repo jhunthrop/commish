@@ -150,10 +150,13 @@ export async function executeClaimedJob(
   }, deps.heartbeatIntervalMs ?? JOBS_CONFIG.heartbeatIntervalMs);
 
   const timeoutMs = Math.max(1, Math.min(definition.timeoutMs, options.timeoutCapMs ?? Number.POSITIVE_INFINITY));
+  // The same deadline `raceTimeout` below enforces, handed to the steps so one that can stop
+  // cleanly does (see `JobStepContext.deadlineAt`).
+  const deadlineAt = new Date(new Date(deps.clock.now()).getTime() + timeoutMs);
   try {
     const completed = await completedStepsFor(deps.db, claimed.jobId);
     await raceTimeout(
-      definition.runRemainingSteps({ db: deps.db, clock: deps.clock }, claimed.payload, completed, async (step, outcome) => {
+      definition.runRemainingSteps({ db: deps.db, clock: deps.clock, deadlineAt }, claimed.payload, completed, async (step, outcome) => {
         await recordStepCompletion(deps.db, deps.clock, claimed, step, {
           summary: scrubSecrets(outcome.summary),
           detail: outcome.detail.map((line) => scrubSecrets(line)),

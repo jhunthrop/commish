@@ -84,11 +84,14 @@ export const CAPSULE_CONFIG = {
    *  that lets a full board's first run clear the free-tier throttle across several nightly
    *  sweeps rather than exhausting it in one run. Generous, per the base-product ruling (spec
    *  §15.1): no paywall gates capsule coverage, only pacing against the gateway. */
-  // 35 A NIGHT (dossier-voice round §3.2: "raise the batch so the board never drifts back to
-  // templates"). The arithmetic against the sweep job's own 480s timeout, at the pacing below:
-  // 34 pauses of 5s is 170s, and three gateway calls a player (two reads plus the narrative)
-  // measured at about 7s a player is 245s, for 415s with real headroom. It was 25 at 15s pacing,
-  // which spent 360s of its own budget waiting.
+  // 35 A NIGHT, ACROSS AS MANY TICKS AS IT TAKES (dossier-voice round §3.2, corrected by the
+  // review's C1). The number that binds is NOT the sweep job's own 480s `timeoutMs`: the runner
+  // caps a claimed attempt at whatever is left of the TICK budget
+  // (`JOBS_CONFIG.vercelTickBudgetMsDefault`, 50 seconds), so no single attempt was ever going to
+  // write 35 players at 5s pacing plus 7-20s of generation each. The sweep stops before the
+  // deadline it is handed and enqueues a continuation carrying the rest of this number, so 35 is
+  // the per-NIGHT ceiling rather than a per-attempt promise, and a tick writes the two or three
+  // players it has room for.
   //
   // THE COST, STATED: about $0.0022 a player for the two reads (the measured rate behind the
   // spec's "roughly a dollar" for 460 players) and about a third again for the narrative call, so

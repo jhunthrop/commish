@@ -148,8 +148,13 @@ export function WhyGroups({ reasons, laws, cap, capsule = null }: WhyGroupsProps
           const { lead, explanation } = sentenceFor(group);
           const written = narrativeSlot(capsule, whyGroupSlotKey(group.key));
           return (
+            // THE FIGURE STAYS STATED (review I4) — the bold lead is the quantity, the plain
+            // explanation is what it does to him in points, and the written sentence follows both
+            // rather than standing in for the number. A page that drops a measured effect the
+            // moment a writer has something to say about it is a page that says less.
             <p key={group.key} className="text-sm" data-why-group={group.key}>
-              <span className="font-semibold text-text-primary">{lead}.</span> <span className="text-text-muted">{written ?? explanation}</span>
+              <span className="font-semibold text-text-primary">{lead}.</span> <span className="text-text-muted">{explanation}</span>
+              {written === null ? null : <span className="text-text-muted" data-why-written={group.key}> {written}</span>}
             </p>
           );
         })}

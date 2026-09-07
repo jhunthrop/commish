@@ -78,7 +78,7 @@ export function narrativeRequestsFor(facts: PlayerFacts): readonly NarrativeSlot
     requests.push({
       key: NARRATIVE_KEYS.perGame,
       maxWords: NARRATIVE_WORD_CAPS.module,
-      brief: "The games question, beside the per-game figure the page already shows: what his expected games mean for what he is worth. Never restate the rank itself.",
+      brief: "The games question, beside the per-game figure the page already shows. Say what his expected games mean for what he is worth, and never restate the rank itself.",
     });
   }
 
@@ -86,7 +86,7 @@ export function narrativeRequestsFor(facts: PlayerFacts): readonly NarrativeSlot
     requests.push({
       key: NARRATIVE_KEYS.trend,
       maxWords: NARRATIVE_WORD_CAPS.module,
-      brief: "What his year-over-year move actually was, and whether it changes your read. The page prints the two seasons and the delta; say what they mean.",
+      brief: "What his year-over-year move actually was, and whether it changes your read. The page prints the two seasons and the delta, so say what they mean.",
     });
   }
 
@@ -104,7 +104,10 @@ export function narrativeRequestsFor(facts: PlayerFacts): readonly NarrativeSlot
     });
   }
 
-  if (booksNumbers.propsLines.length > 0 || booksNumbers.teamVegasWinTotal !== null) {
+  // Gated on a PROPS line rather than on any books number at all (review I6): the absence note is
+  // rendered in the props row, so a player with a win total and no props needs the note, not the
+  // sentence. The win total is still his to mention in the books sentence when he has both.
+  if (booksNumbers.propsLines.length > 0) {
     requests.push({
       key: NARRATIVE_KEYS.books,
       maxWords: NARRATIVE_WORD_CAPS.module,
@@ -166,7 +169,7 @@ function briefLabelOf(item: PlayerFacts["evidence"][number]): string {
 
 /**
  * THE VOICE, FOR SENTENCES RATHER THAN PARAGRAPHS. `write.ts`'s own `VOICE_RULES` govern a whole
- * note; these govern one line at a time, where the failure mode is different: a sentence that could
+ * note. These govern one line at a time, where the failure mode is different: a sentence that could
  * have been written about any player at that position. The two exemplars are voice ONLY, and the
  * prompt says so in the same breath it gives them, because a model handed an example with numbers
  * in it will reach for those numbers.

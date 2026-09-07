@@ -319,7 +319,7 @@ function sumPublishedParticipation(rows: readonly PlayerWeekObservation[]): Map<
  * A PUBLISHED ROW ALWAYS WINS, the same rule `statLinesAsOfForLiveSurface` keeps: only a player the
  * published read did not place at all takes the substitution.
  *
- * Exported for `populations.test.ts`, which fixtures three receivers on one team and asserts each
+ * Exported for `participation-fill.test.ts`, which fixtures three receivers on one team and asserts each
  * share and that the three sum to one — a property no database round trip makes any clearer.
  */
 export function fillFromPlayByPlay(

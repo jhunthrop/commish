@@ -1,5 +1,5 @@
 import { CAPSULE_CONFIG } from "./config";
-import { sentencesOf, type NarrativeSlots } from "./narrative-slots";
+import { sentencesOf, sentencesVerbatim, type NarrativeSlots } from "./narrative-slots";
 
 /**
  * ALIVE, NOT STOCK (founder amendment 2026-09-07) — the check that keeps the narrative from
@@ -27,8 +27,16 @@ export interface NarrativeRow {
 }
 
 export interface StockSentence {
-  /** The normalized form, which is what the count is over and what the prompt quotes. */
+  /** The normalized form, which is what the COUNT is over: two sentences differing only in a
+   *  comma are the same stock sentence to a reader. */
   readonly sentence: string;
+  /**
+   * One player's own words for it, verbatim (review, MINOR). The prompt quotes THIS, because
+   * "do not write: he is the engine of that offense every single week" — lowercase, unpunctuated —
+   * reads to a model as an approximation it can dance around, where its own sentence handed back
+   * with its capital and its full stop is unmistakable.
+   */
+  readonly example: string;
   /** Every player currently saying it, in the order the rows were read. */
   readonly playerIds: readonly string[];
   readonly share: number;
@@ -37,12 +45,16 @@ export interface StockSentence {
 /** Every sentence in one player's narrative, deduplicated: a player who says the same thing in two
  *  slots counts once toward the board's share (that repetition is a per-player problem the prompt
  *  already forbids, not evidence of a stock sentence). */
-function sentencesForPlayer(narrative: NarrativeSlots | null): ReadonlySet<string> {
-  const out = new Set<string>();
+function sentencesForPlayer(narrative: NarrativeSlots | null): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
   if (narrative === null) return out;
   for (const value of Object.values(narrative)) {
     if (typeof value !== "string") continue;
-    for (const sentence of sentencesOf(value)) out.add(sentence);
+    const normalized = sentencesOf(value);
+    const verbatim = sentencesVerbatim(value);
+    normalized.forEach((sentence, index) => {
+      if (!out.has(sentence)) out.set(sentence, verbatim[index] ?? sentence);
+    });
   }
   return out;
 }
@@ -56,8 +68,10 @@ export function stockSentences(rows: readonly NarrativeRow[], maxShare: number =
   if (withNarrative.length === 0) return [];
 
   const players = new Map<string, string[]>();
+  const examples = new Map<string, string>();
   for (const row of withNarrative) {
-    for (const sentence of sentencesForPlayer(row.narrative)) {
+    for (const [sentence, verbatim] of sentencesForPlayer(row.narrative)) {
+      if (!examples.has(sentence)) examples.set(sentence, verbatim);
       const list = players.get(sentence);
       if (list === undefined) players.set(sentence, [row.playerId]);
       else list.push(row.playerId);
@@ -68,7 +82,7 @@ export function stockSentences(rows: readonly NarrativeRow[], maxShare: number =
   for (const [sentence, playerIds] of players) {
     const share = playerIds.length / withNarrative.length;
     // Strictly greater: a sentence exactly at the share is at the line, not over it.
-    if (share > maxShare && playerIds.length > 1) findings.push({ sentence, playerIds, share });
+    if (share > maxShare && playerIds.length > 1) findings.push({ sentence, example: examples.get(sentence) ?? sentence, playerIds, share });
   }
   return findings.sort((a, b) => b.playerIds.length - a.playerIds.length || a.sentence.localeCompare(b.sentence));
 }
@@ -78,7 +92,8 @@ export function playersSayingStock(findings: readonly StockSentence[]): readonly
   return [...new Set(findings.flatMap((finding) => finding.playerIds))];
 }
 
-/** The sentences the next run's prompt quotes as ones not to write, worst first and capped. */
+/** The sentences the next run's prompt quotes as ones not to write, worst first and capped, in
+ *  the words a player actually carries rather than in the normalized form the count uses. */
 export function sentencesToAvoid(findings: readonly StockSentence[]): readonly string[] {
-  return findings.slice(0, CAPSULE_CONFIG.repetition.maxQuotedSentences).map((finding) => finding.sentence);
+  return findings.slice(0, CAPSULE_CONFIG.repetition.maxQuotedSentences).map((finding) => finding.example);
 }

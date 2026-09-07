@@ -227,11 +227,7 @@ export function RoleModule({ position, usage, trend, kdef = null, writtenTrend =
           {absenceSentence}
         </p>
       )}
-      {writtenTrend !== null ? (
-        <p className="text-sm text-text-muted" data-role="trend">
-          {writtenTrend}
-        </p>
-      ) : trendMetric === null ? null : (
+      {trendMetric === null ? null : (
         <p className="flex flex-wrap items-baseline gap-1 text-sm text-text-muted" data-role="trend">
           {(() => {
             const { before, delta, percentile } = trendSentence(trendMetric.priorSeason, trendMetric.priorValue, trendMetric.recentSeason, trendMetric.recentValue, trendMetric.delta);
@@ -257,6 +253,16 @@ export function RoleModule({ position, usage, trend, kdef = null, writtenTrend =
               </>
             );
           })()}
+        </p>
+      )}
+      {/* THE WRITER ACCOMPANIES THE STAT (review I3) — the two seasons, the delta and its tinted
+          `Stat` stay exactly where they are, and the written line sits beneath them, the same
+          shape `SeasonStrip` and the Books module already use. Rendered only where there is a
+          measured trend to accompany: a sentence about a move the page is not showing would be a
+          claim with nothing under it. */}
+      {writtenTrend === null || trendMetric === null ? null : (
+        <p className="text-sm text-text-muted" data-role="trend-written">
+          {writtenTrend}
         </p>
       )}
     </Card>

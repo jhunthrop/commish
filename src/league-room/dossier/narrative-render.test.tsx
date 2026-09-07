@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
 import type { PlayerFactsBooksNumbers, PlayerFactsLastSeasonStory, PlayerFactsTrend, PlayerFactsUsage } from "@/capsules/facts";
+import type { PlayerSeasonBody } from "@/league-service/player";
 import { BooksModule } from "./books-module";
 import { CallCard } from "./call-card";
 import { RoleModule } from "./role-module";
+import { SeasonChartFallback } from "./season-chart-fallback";
 import { SeasonStrip } from "./season-strip";
 import { WhyGroups } from "./why-groups";
 
@@ -54,10 +56,26 @@ describe("the narrative's render choice", () => {
     const written = render(<RoleModule position="RB" usage={USAGE} trend={TREND} writtenTrend="He gave back nearly four points a game and the tape says the line is the reason." />);
     const text = written.container.textContent ?? "";
     expect(text).toContain("He gave back nearly four points a game");
-    expect(text).not.toContain("A real move, not noise.");
+    // THE FIGURES SURVIVE (review I3): the writer accompanies a stat, it never replaces one, so
+    // the two seasons, the delta and its tinted Stat are all still on the page beneath it.
+    expect(text).toContain("18.1 a game in 2024 fell to 14.3 in 2025,");
+    expect(written.container.querySelector('[data-trend="delta"]')).not.toBeNull();
+    expect(written.container.querySelector('[data-role="trend-written"]')?.textContent).toContain("He gave back nearly four points");
     // The stat rows are the engine's, and they are untouched.
     expect(text).toContain("24%");
     expect(text).toContain("62%");
+  });
+
+  it("RoleModule: no written trend line where there is no measured trend to accompany", () => {
+    const immaterial: PlayerFactsTrend = {
+      pointsPerGame: { priorSeason: 2024, priorValue: 12, recentSeason: 2025, recentValue: 12.4, delta: 0.4, material: false },
+      yardsPerOpportunity: null,
+      targetShare: null,
+    };
+    for (const trend of [null, immaterial]) {
+      const written = render(<RoleModule position="RB" usage={USAGE} trend={trend} writtenTrend="A sentence about a move this page is not showing." />);
+      expect(written.container.querySelector('[data-role="trend-written"]')).toBeNull();
+    }
   });
 
   it("RoleModule: an absence note is said in a voice, with the rows still showing the shape of what is missing", () => {
@@ -83,7 +101,7 @@ describe("the narrative's render choice", () => {
     const templated = render(<BooksModule books={empty} />);
     expect(templated.container.textContent).toContain("No props line posted for him yet.");
 
-    const written = render(<BooksModule books={empty} sentence="No book has posted a number on him, which says nothing about him at all." />);
+    const written = render(<BooksModule books={empty} absence="No book has posted a number on him, which says nothing about him at all." />);
     const text = written.container.textContent ?? "";
     expect(text).toContain("No book has posted a number on him");
     expect(text).not.toContain("No props line posted for him yet.");
@@ -131,8 +149,102 @@ describe("the narrative's render choice", () => {
     );
     const text = written.container.textContent ?? "";
     expect(text).toContain("He is in a new building with a new play sheet");
-    expect(text).not.toContain("SF to MIA.");
-    // The bold lead is the group's own stated headline and stays the engine's.
+    // THE STATED FIGURE SURVIVES (review I4): the writer follows the fact rather than standing in
+    // for it, so the group still says what it is and what it does.
+    expect(text).toContain("SF to MIA.");
     expect(text).toContain("Changed team.");
+  });
+
+  it("WhyGroups: a law group keeps its net effect and adds the sentence after it", () => {
+    const reasons = [{ code: "law", lawId: "rb_age_curve", effect: -1.8, magnitude: 29 } as const];
+    const written = render(
+      <WhyGroups
+        reasons={reasons}
+        laws={[]}
+        position="RB"
+        capsule={{ narrative: { "whyGroup:age": "Backs his age fall off a shelf, and the tape agrees this time." } }}
+      />,
+    );
+    const text = written.container.textContent ?? "";
+    expect(text).toContain("Costs him 1.8 points a game.");
+    expect(text).toContain("Backs his age fall off a shelf");
+  });
+});
+
+/** The narrowest body `SeasonChartFallback` reads: it looks at `isRookie`, `availableSeasons`,
+ *  `season`, `player` and `weeks`, and nothing else on the shape. */
+function fallbackBody(over: Partial<PlayerSeasonBody> = {}): PlayerSeasonBody {
+  return {
+    player: { id: "rb1", name: "Rashad Long", position: "RB", nflTeam: "SF", headshotUrl: null, adp: 12.5 },
+    availableSeasons: [],
+    season: 2026,
+    isRookie: true,
+    positionRank: null,
+    adpPercentile: null,
+    expertRank: null,
+    modelRank: null,
+    pointsPerGame: null,
+    pointsPerGamePercentile: null,
+    weeks: [],
+    ownedBy: null,
+    isMockLeague: false,
+    injuryDesignation: null,
+    log: [],
+    totals: null,
+    kdefSeason: null,
+    news: [],
+    reasons: [],
+    laws: [],
+    ...over,
+  } as PlayerSeasonBody;
+}
+
+describe("the written absence for a season nobody has (review I2)", () => {
+  it("replaces the rookie sentence when the capsule wrote one", () => {
+    const templated = render(<SeasonChartFallback body={fallbackBody()} switcher={undefined} played={false} />);
+    expect(templated.container.textContent).toContain("His first NFL season.");
+
+    const written = render(
+      <SeasonChartFallback body={fallbackBody()} switcher={undefined} played={false} absence="No NFL snap on his record yet, so August is the whole of what you know." />,
+    );
+    const text = written.container.textContent ?? "";
+    expect(text).toContain("No NFL snap on his record yet");
+    expect(text).not.toContain("His first NFL season.");
+  });
+
+  it("replaces the no-record sentence for a veteran the store has nothing for", () => {
+    const body = fallbackBody({ isRookie: false });
+    expect(render(<SeasonChartFallback body={body} switcher={undefined} played={false} />).container.textContent).toContain("No prior seasons on record.");
+
+    const written = render(<SeasonChartFallback body={body} switcher={undefined} played={false} absence="Nothing of his is on file, which says more about our records than about him." />);
+    expect(written.container.textContent).toContain("Nothing of his is on file");
+    expect(written.container.textContent).not.toContain("No prior seasons on record.");
+  });
+
+  it("never replaces a real chart, which is a stat", () => {
+    const body = fallbackBody({ isRookie: false, availableSeasons: [2026], weeks: [{ week: 1, points: 12.5, percentile: 0.7 }] });
+    const written = render(<SeasonChartFallback body={body} switcher={undefined} played absence="An absence note nobody should see here." />);
+    expect(written.container.textContent).not.toContain("An absence note nobody should see here.");
+  });
+});
+
+/** I6 — the books sentence and the books ABSENCE are two slots, and the absence line is the only
+ *  one that stands in for the templated "no props line" sentence. */
+describe("the books module's two slots (review I6)", () => {
+  it("keeps a player's books sentence out of the props-absence line", () => {
+    const winTotalOnly: PlayerFactsBooksNumbers = { propsLines: [], teamVegasWinTotal: 9.5 };
+    const written = render(<BooksModule books={winTotalOnly} sentence="The books hang nine and a half wins on that team." />);
+    const text = written.container.textContent ?? "";
+    expect(text).toContain("No props line posted for him yet.");
+    expect(text).not.toContain("The books hang nine and a half wins");
+  });
+
+  it("uses the absence slot for that line when there is one", () => {
+    const winTotalOnly: PlayerFactsBooksNumbers = { propsLines: [], teamVegasWinTotal: 9.5 };
+    const written = render(<BooksModule books={winTotalOnly} absence="No book has posted a number on him, which says nothing about him." />);
+    const text = written.container.textContent ?? "";
+    expect(text).toContain("No book has posted a number on him");
+    expect(text).not.toContain("No props line posted for him yet.");
+    expect(text).toContain("Team win total: 9.5 wins.");
   });
 });

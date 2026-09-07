@@ -99,6 +99,10 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
   // closes: `null` unless the story's own season is the one currently on screen.
   const matchingStory = dossier !== null && dossier.lastSeasonStory !== null && dossier.lastSeasonStory.season === body.season ? dossier.lastSeasonStory : null;
 
+  // The written "nothing here yet" line for his season, resolved once for both branches (review
+  // I2): the peek and the page render the same absence in the same voice.
+  const storyAbsence = narrativeSlot(body.capsule, absenceSlotKey(ABSENCE_MODULES.story));
+
   return (
     <>
       {dossier === null ? (
@@ -124,7 +128,7 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
           {body.kdefSeason === null ? null : (
             <RoleModule position={body.player.position} usage={null} trend={null} kdef={body.kdefSeason} />
           )}
-          <SeasonChartFallback body={body} switcher={switcher} played={played} />
+          <SeasonChartFallback body={body} switcher={switcher} played={played} absence={storyAbsence} />
         </>
       ) : (
         <>
@@ -153,14 +157,15 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
             <div className={hasReadCard ? undefined : "lg:col-span-2"}>
               <BooksModule
                 books={dossier.books}
-                sentence={narrativeSlot(body.capsule, NARRATIVE_KEYS.books) ?? narrativeSlot(body.capsule, absenceSlotKey(ABSENCE_MODULES.books))}
+                sentence={narrativeSlot(body.capsule, NARRATIVE_KEYS.books)}
+                absence={narrativeSlot(body.capsule, absenceSlotKey(ABSENCE_MODULES.books))}
               />
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className={hasStoryCell ? undefined : "lg:col-span-2"}>
               {matchingStory === null ? (
-                <SeasonChartFallback body={body} switcher={switcher} played={played} />
+                <SeasonChartFallback body={body} switcher={switcher} played={played} absence={storyAbsence} />
               ) : (
                 <SeasonStrip
                   story={matchingStory}

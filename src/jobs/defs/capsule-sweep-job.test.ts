@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { nflPlayers, playerCrosswalk, playerPeekFacts, players, preseasonProjections } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { getStoredCapsule } from "@/capsules/store";
+import { jobs } from "@/db/schema";
+import { getStoredCapsule, REGENERATE_FACTS_HASH } from "@/capsules/store";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { runCapsuleSweepStep } from "./capsule-sweep-job";
@@ -176,5 +177,141 @@ describe("runCapsuleSweepStep", () => {
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingFetch }, {});
     expect(outcome.summary).toContain("Peek facts: 1 rows built, 1 changed");
     expect(await db.select().from(playerPeekFacts)).toHaveLength(1);
+  });
+});
+
+/**
+ * RESUMABILITY (review C1) — the runner caps a claimed attempt at what is left of the TICK budget,
+ * not at this job's own `timeoutMs`, so a 35-player batch was being cut off mid-run every night and
+ * the repetition check at the end never ran at all. The step now stops before the deadline it is
+ * handed and enqueues its own continuation.
+ */
+describe("runCapsuleSweepStep — across ticks", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  /** A clock that advances by `stepMs` on every read, so a loop that reads it per player walks
+   *  toward the deadline without any real time passing. */
+  function advancingClock(startIso: string, stepMs: number) {
+    let now = new Date(startIso).getTime();
+    return {
+      now: () => {
+        const iso = new Date(now).toISOString();
+        now += stepMs;
+        return iso;
+      },
+    };
+  }
+
+  it("stops before the deadline, writes what it wrote, and enqueues a continuation for the rest", async () => {
+    for (const index of [1, 2, 3]) {
+      await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 250 - index });
+    }
+    // The step reserves a worst case of 125s a player (5s pacing plus three gateway calls at 20s,
+    // twice each). The clock advances a minute on every read, so the first check sits at 60s and
+    // fits inside the 200s deadline, and the second sits at 120s and does not.
+    const clock = advancingClock("2026-09-04T12:00:00.000Z", 60_000);
+    const deadlineAt = new Date("2026-09-04T12:03:20.000Z");
+
+    const outcome = await runCapsuleSweepStep(db, clock, { apiKey: "test-key", fetch: sizeAwareFetch() }, { budget: 3 }, deadlineAt);
+
+    expect(outcome.summary).toContain("continuing this tick's remainder in a follow-up run");
+    expect(outcome.summary).toContain("repetition check deferred");
+    const queued = await db.select().from(jobs);
+    expect(queued).toHaveLength(1);
+    expect(queued[0]!.name).toBe("capsule-sweep");
+    expect(queued[0]!.payload).toMatchObject({ budget: 2 });
+    // What it did write is written: a stop is safe because progress is persisted per player.
+    expect((await getStoredCapsule(db, "p1"))?.source).toBe("llm");
+    expect(await getStoredCapsule(db, "p2")).toBeNull();
+  });
+
+  it("finishes the batch on the continuation, and runs the repetition check exactly once", async () => {
+    for (const index of [1, 2]) {
+      await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 250 - index });
+    }
+    const clock = advancingClock("2026-09-04T12:00:00.000Z", 60_000);
+    const first = await runCapsuleSweepStep(db, clock, { apiKey: "test-key", fetch: sizeAwareFetch() }, { budget: 2 }, new Date("2026-09-04T12:03:20.000Z"));
+    expect(first.summary).toContain("repetition check deferred");
+
+    // The continuation: no deadline pressure this time, so it finishes the batch and the
+    // repetition check runs, once, on the run that finished the night's work.
+    const second = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, { budget: 1, continuationOf: "2026-09-04T12:00:00.000Z" });
+
+    expect(second.summary).not.toContain("repetition check deferred");
+    expect(second.summary).toMatch(/stock sentence\(s\) found/);
+    expect((await getStoredCapsule(db, "p2"))?.source).toBe("llm");
+  });
+
+  it("processes the whole batch when nothing is holding a deadline over it", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+    expect(outcome.summary).not.toContain("continuing this tick's remainder");
+    expect(await db.select().from(jobs)).toHaveLength(0);
+  });
+});
+
+/**
+ * THE REPETITION WIRING (review I5) — the check, the queue and the avoid list are three pieces and
+ * only the whole chain is worth anything: a stock sentence has to be written, counted, stamped for
+ * regeneration, and then quoted into the NEXT run's own prompt.
+ */
+describe("runCapsuleSweepStep — the repetition chain", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  /** No numbers and no names, so it grounds for any player: the sweep will write it verbatim onto
+   *  every player it touches, which is exactly the stock sentence the check exists to catch. */
+  const STOCK = "He is the engine of that offense every single week.";
+
+  /** The size-aware fixture plus a narrative answer, so the run actually stores a narrative. */
+  function narrativeFetch(prompts: string[] = []): typeof globalThis.fetch {
+    return (async (_url: unknown, init: unknown) => {
+      const { messages } = JSON.parse((init as RequestInit).body as string) as { messages: { content: string }[] };
+      const prompt = messages[1]!.content;
+      prompts.push(prompt);
+      if (prompt.includes("Return ONE JSON object")) return okResponse(JSON.stringify({ call: STOCK }));
+      return okResponse(prompt.includes("(1) the volume or role case") ? GOOD_FULL : GOOD_COMPACT);
+    }) as typeof globalThis.fetch;
+  }
+
+  async function seedTwo(): Promise<void> {
+    for (const index of [1, 2]) {
+      await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 250 - index });
+    }
+  }
+
+  it("flags a sentence the whole board is saying and stamps both players for regeneration", async () => {
+    await seedTwo();
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch() }, {});
+
+    expect(outcome.summary).toContain("1 stock sentence(s) found, 2 player(s) queued");
+    expect((await getStoredCapsule(db, "p1"))?.narrative).toEqual({ call: STOCK });
+    expect((await getStoredCapsule(db, "p1"))?.factsHash).toBe(REGENERATE_FACTS_HASH);
+    expect((await getStoredCapsule(db, "p2"))?.factsHash).toBe(REGENERATE_FACTS_HASH);
+  });
+
+  it("quotes the flagged sentence into the next run's own prompt", async () => {
+    await seedTwo();
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch() }, {});
+
+    // The stamped hash makes both players eligible again, and this run's avoid list is computed
+    // from what the board is still saying, so the flagged sentence reaches the prompt verbatim.
+    const prompts: string[] = [];
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch(prompts) }, {});
+
+    const narrativePrompt = prompts.find((prompt) => prompt.includes("Return ONE JSON object"));
+    expect(narrativePrompt).toBeDefined();
+    expect(narrativePrompt).toContain("Do not write them");
+    expect(narrativePrompt).toContain(STOCK);
   });
 });

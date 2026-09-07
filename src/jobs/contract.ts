@@ -40,6 +40,18 @@ export interface StepOutcome {
 export interface JobStepContext {
   readonly db: Db;
   readonly clock: Clock;
+  /**
+   * THE MOMENT THIS ATTEMPT WILL BE CUT OFF (capsule acceptance round review, C1) — the executor's
+   * own `min(definition.timeoutMs, timeoutCapMs)` deadline as an instant, where `timeoutCapMs` is
+   * whatever is left of the TICK's budget (`JOBS_CONFIG.vercelTickBudgetMsDefault`, 50s by
+   * default), not the job's own generous `timeoutMs`.
+   *
+   * A step that does bounded work per item reads this and stops one item early rather than being
+   * killed mid-batch: the capsule sweep processes players until one more would cross it, then
+   * enqueues its own continuation. A step that ignores it behaves exactly as it always did, which
+   * is why this is optional rather than a contract every step must now honour.
+   */
+  readonly deadlineAt?: Date;
 }
 
 /**

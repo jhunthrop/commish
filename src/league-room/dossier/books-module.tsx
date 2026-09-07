@@ -6,12 +6,19 @@ import { formatLine } from "../lib/format";
 export interface BooksModuleProps {
   readonly books: PlayerFactsBooksNumbers;
   /**
-   * THE WRITTEN LINE (`narrativeSlot(capsule, "books")`, or `"absence:books"` when the books have
-   * posted nothing on him). It ACCOMPANIES the numbers rather than replacing them: the chips and
-   * the win total are stats, and a stat is stated by the engine. What it does replace is the
-   * templated "No props line posted for him yet.", which is a sentence and therefore the writer's.
+   * THE WRITTEN LINE (`narrativeSlot(capsule, "books")`) — what the books are saying about him. It
+   * ACCOMPANIES the numbers rather than replacing them: the chips and the win total are stats, and
+   * a stat is stated by the engine.
    */
   readonly sentence?: string | null;
+  /**
+   * THE WRITTEN ABSENCE (`narrativeSlot(capsule, "absence:books")`), a SEPARATE slot from the one
+   * above (review I6). Folding the two together put the books sentence into the props-absence line
+   * for a player who has a win total but no props line, which is a sentence about numbers that
+   * are not there. This one replaces the templated "No props line posted for him yet.", and only
+   * that.
+   */
+  readonly absence?: string | null;
 }
 
 /**
@@ -29,12 +36,12 @@ export interface BooksModuleProps {
  * holds real multi-day depth for the player (a later task's own honest gate), and an explanatory
  * sentence in its place would be exactly the placeholder this product's honesty rule forbids.
  */
-export function BooksModule({ books, sentence = null }: BooksModuleProps) {
+export function BooksModule({ books, sentence = null, absence = null }: BooksModuleProps) {
   return (
     <Card as="section" aria-label="The books" className="flex flex-col gap-3">
       {books.propsLines.length === 0 ? (
         <p className="text-sm text-text-faint" data-books="props-empty">
-          {sentence ?? "No props line posted for him yet."}
+          {absence ?? "No props line posted for him yet."}
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">
