@@ -1,5 +1,5 @@
 {
-  "id": "73969257-de55-4dde-8edf-0e29f49290c6",
+  "id": "a2e5a0fa-c421-4575-b07e-19cb72d97c1d",
   "prevId": "214609b3-c359-413d-b61e-3dd2f5c88277",
   "version": "7",
   "dialect": "postgresql",
@@ -2412,6 +2412,12 @@
           "notNull": true,
           "default": false
         },
+        "scoring_hash": {
+          "name": "scoring_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -4354,12 +4360,6 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
-        },
-        "narrative": {
-          "name": "narrative",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
         },
         "model": {
           "name": "model",

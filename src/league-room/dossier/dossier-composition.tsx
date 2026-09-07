@@ -8,6 +8,7 @@ import { callCardPropsFor, hasReadCardFor, hasStoryCellFor, sourcesFor, weeksFor
 import { Outlook } from "../outlook/outlook";
 import { BooksModule } from "./books-module";
 import { CallCard } from "./call-card";
+import { FactsAsOf } from "./facts-as-of";
 import { NewsList } from "./news-list";
 import { RangeRail } from "./range-rail";
 import { ReadCard } from "./read-card";
@@ -195,6 +196,8 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
           composition already rendered this same list once, beside `StoryModule`, further up.
           Never both: see `NewsList`'s own docblock. */}
       {dossier === null ? <NewsList news={body.news} /> : null}
+
+      <FactsAsOf asOf={body.asOf} />
     </>
   );
 }

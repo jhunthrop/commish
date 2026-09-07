@@ -6,6 +6,7 @@
 // assumed America/New_York — the brief's own "check what it assumed" — and the schedules keep the
 // installed reality rather than re-deciding the wall clock; see the spec's judgment calls.
 import type { JsonObject } from "@/domain/audit";
+import { HARVEST_CONFIG } from "@/projections/harvest-config";
 import { parseCronExpression, type CronExpression } from "./cron";
 
 export interface ScheduleDefinition {
@@ -70,13 +71,17 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
     catchUpMs: 5 * 60_000,
   }),
   schedule({
-    name: "capture-harvest-nightly",
-    cron: "0 2 * * *",
-    timezone: "America/New_York",
+    // THE CADENCE LIVES IN `HARVEST_CONFIG` (peek document design §3.4), with the provider's own
+    // daily request budget stated beside it. This feed is polled rather than event-driven because
+    // the provider offers no push, and the rate is what decides how long an injury designation can
+    // sit stale on a player card.
+    name: "capture-harvest-hourly",
+    cron: HARVEST_CONFIG.cron,
+    timezone: HARVEST_CONFIG.timezone,
     job: "capture-harvest",
     payload: {},
     description:
-      "Nightly 02:00 ET capture of injuries, news, depth charts, inactives and betting odds into the append-only capture_snapshots archive that player cards and capsules read facts from. Ahead of the 03:00/03:30/04:00 ET passes below so their inputs are fresh.",
+      `Hourly through the waking hours, plus the 02:00 ET pre-dawn fire the 03:00/03:30/04:00 ET passes depend on: captures injuries, news, depth charts, inactives and betting odds into the append-only capture_snapshots archive that player cards and capsules read facts from, and enqueues a peek-document rebuild for every player whose designation or headlines moved. ${HARVEST_CONFIG.requestsPerDay} upstream requests a day at the worst case.`,
   }),
   schedule({
     name: "adp-snapshot-nightly",

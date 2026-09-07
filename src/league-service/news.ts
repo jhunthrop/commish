@@ -12,15 +12,21 @@ export interface NewsStory {
   readonly publishedAt: string | null;
 }
 
-async function latestNewsSnapshotBody(db: Db): Promise<readonly unknown[]> {
+/** One read of the news feed, as both the stories and the stamp that produced them. */
+export interface NewsSnapshot {
+  readonly capturedAt: Date | null;
+  readonly byName: ReadonlyMap<string, readonly NewsStory[]>;
+}
+
+async function latestNewsSnapshot(db: Db): Promise<{ readonly capturedAt: Date | null; readonly body: readonly unknown[] }> {
   const [snapshot] = await db
-    .select({ payload: captureSnapshots.payload })
+    .select({ payload: captureSnapshots.payload, capturedAt: captureSnapshots.capturedAt })
     .from(captureSnapshots)
     .where(eq(captureSnapshots.source, "tank01_news"))
     .orderBy(desc(captureSnapshots.capturedAt))
     .limit(1);
   const body = snapshot?.payload;
-  return Array.isArray(body) ? body : [];
+  return { capturedAt: snapshot?.capturedAt ?? null, body: Array.isArray(body) ? body : [] };
 }
 
 function storyFrom(raw: unknown): { readonly title: string; readonly link: string; readonly publishedAt: string | null } | null {
@@ -45,10 +51,18 @@ function storyFrom(raw: unknown): { readonly title: string; readonly link: strin
  * newest-first order as the feed itself lists them.
  */
 export async function newsForPlayers(db: Db, names: readonly string[]): Promise<ReadonlyMap<string, readonly NewsStory[]>> {
-  const byName = new Map<string, NewsStory[]>(names.map((name) => [name, []]));
-  if (names.length === 0) return byName;
+  return (await newsSnapshotForPlayers(db, names)).byName;
+}
 
-  const body = await latestNewsSnapshotBody(db);
+/** What one news feed says about a list of names, WITH the capture instant that produced it — the
+ *  same single read, plus the stamp a stored document's basis has to carry so a reader can see how
+ *  old its headlines are (peek document design §3.1). `capturedAt` is `null` when the archive holds
+ *  no news capture at all, which is exactly when every name's list is empty. */
+export async function newsSnapshotForPlayers(db: Db, names: readonly string[]): Promise<NewsSnapshot> {
+  const byName = new Map<string, NewsStory[]>(names.map((name) => [name, []]));
+  if (names.length === 0) return { capturedAt: null, byName };
+
+  const { capturedAt, body } = await latestNewsSnapshot(db);
   for (const raw of body) {
     const story = storyFrom(raw);
     if (story === null) continue;
@@ -59,7 +73,7 @@ export async function newsForPlayers(db: Db, names: readonly string[]): Promise<
     if (bucket === undefined || bucket.length >= 3) continue;
     bucket.push(story);
   }
-  return byName;
+  return { capturedAt, byName };
 }
 
 /** One player's own headlines — the single-name convenience `player.ts` keeps using. */

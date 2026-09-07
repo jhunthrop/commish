@@ -1,4 +1,4 @@
-import { and, desc, eq, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, lte } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { playerPeekFacts } from "@/db/schema";
 import { changedRowWhere, excludedSetFor } from "@/db/upsert";
@@ -10,6 +10,7 @@ import { PBP_PLAYER_SOURCE } from "@/projections/nflverse/pbp-players";
 import { finalWeekOf } from "@/projections/nflverse/team-eras";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
 import { collectBoardFacts, type BoardFactsPass } from "./collect";
 import type { PlayerFacts } from "./facts";
 import { PEEK_FACTS_SOURCE, PEEK_HISTORY_SEASONS, type PeekFactsBasis, type PeekFactsRow, type PeekLastSeasonLine } from "./peek-facts-row";
@@ -189,13 +190,17 @@ export async function peekFactsRowsFor(db: Db, pass: BoardFactsPass): Promise<re
 }
 
 /**
- * Upserts on the natural key and returns how many rows ACTUALLY changed — `changedRowWhere`'s own
- * row-value `IS DISTINCT FROM` over every non-key column, the same discipline every ingester here
- * keeps. Re-running the writer at the same moment over unchanged inputs writes nothing at all
+ * Upserts on the natural key and returns WHICH players' rows actually changed — `changedRowWhere`'s
+ * own row-value `IS DISTINCT FROM` over every non-key column, the same discipline every ingester
+ * here keeps. Re-running the writer at the same moment over unchanged inputs writes nothing at all
  * rather than being labelled a no-op after the fact.
+ *
+ * The ids rather than a count (peek document round, 2026-09-07): they are exactly the scope of the
+ * document rebuild this write triggers, and a count would force the caller to rebuild everybody to
+ * be safe.
  */
-export async function writePeekFacts(db: Db, rows: readonly PeekFactsRow[]): Promise<number> {
-  if (rows.length === 0) return 0;
+export async function writePeekFacts(db: Db, rows: readonly PeekFactsRow[]): Promise<readonly string[]> {
+  if (rows.length === 0) return [];
   const values = rows.map((row) => ({
     playerId: row.playerId,
     season: row.season,
@@ -217,7 +222,7 @@ export async function writePeekFacts(db: Db, rows: readonly PeekFactsRow[]): Pro
       where: changedRowWhere(playerPeekFacts, NATURAL_KEYS),
     })
     .returning({ playerId: playerPeekFacts.playerId });
-  return written.length;
+  return written.map((row) => row.playerId);
 }
 
 /** What one refresh did, for a job step's own summary line. */
@@ -238,7 +243,48 @@ export async function refreshPeekFacts(db: Db, asOf: Date): Promise<PeekFactsRef
 export async function writeRefresh(db: Db, pass: BoardFactsPass): Promise<PeekFactsRefresh> {
   const rows = await peekFactsRowsFor(db, pass);
   const changed = await writePeekFacts(db, rows);
-  return { players: rows.length, changed, withTouchesRank: rows.filter((row) => row.touchesRank !== null).length };
+  // THE EVENT (peek document design §3.4, row three): a written facts row is a changed document
+  // input, for every scoring hash in use. Only the players whose rows actually MOVED are named, and
+  // a refresh that changed nothing enqueues nothing at all. The reason stamp is the pass instant, so
+  // two writers reaching the same pass (the nightly sweep and a retried tick) coalesce into one build.
+  if (changed.length > 0) {
+    await enqueuePeekDocumentRebuildsQuietly(db, { now: () => pass.asOf.toISOString() }, {
+      playerIds: changed,
+      reason: `facts:${pass.asOf.toISOString()}`,
+    });
+  }
+  return { players: rows.length, changed: changed.length, withTouchesRank: rows.filter((row) => row.touchesRank !== null).length };
+}
+
+/**
+ * THE BATCHED READ — the latest row per player at or before `asOf`, for a whole build's worth of
+ * players in ONE statement (peek document design §3.3). `DISTINCT ON (player_id)` with the same
+ * `as_of <=` gate and the same descending order the single-player read uses, so the two can never
+ * disagree about which generation is current. A player with no row is honestly absent from the map.
+ */
+export async function readPeekFactsFor(db: ReadonlyDb, playerIds: readonly string[], season: number, asOf: Date): Promise<ReadonlyMap<string, PeekFactsRow>> {
+  if (playerIds.length === 0) return new Map();
+  const rows = await db
+    .selectDistinctOn([playerPeekFacts.playerId])
+    .from(playerPeekFacts)
+    .where(and(inArray(playerPeekFacts.playerId, [...playerIds]), eq(playerPeekFacts.season, season), lte(playerPeekFacts.asOf, asOf)))
+    .orderBy(playerPeekFacts.playerId, desc(playerPeekFacts.asOf));
+  return new Map(rows.map((row) => [row.playerId, toPeekFactsRow(row)] as const));
+}
+
+/** One stored row as the shape every reader here passes around. */
+function toPeekFactsRow(row: typeof playerPeekFacts.$inferSelect): PeekFactsRow {
+  return {
+    playerId: row.playerId,
+    season: row.season,
+    dossier: row.dossier,
+    touchesRank: row.touchesRank,
+    touchesQualifierCount: row.touchesQualifierCount,
+    priorSeasonsHeld: row.priorSeasonsHeld,
+    lastSeasonLine: row.lastSeasonLine,
+    basis: row.basis,
+    asOf: row.asOf,
+  };
 }
 
 /**
@@ -253,16 +299,5 @@ export async function readPeekFacts(db: ReadonlyDb, playerId: string, season: nu
     .where(and(eq(playerPeekFacts.playerId, playerId), eq(playerPeekFacts.season, season), lte(playerPeekFacts.asOf, asOf)))
     .orderBy(desc(playerPeekFacts.asOf))
     .limit(1);
-  if (row === undefined) return null;
-  return {
-    playerId: row.playerId,
-    season: row.season,
-    dossier: row.dossier,
-    touchesRank: row.touchesRank,
-    touchesQualifierCount: row.touchesQualifierCount,
-    priorSeasonsHeld: row.priorSeasonsHeld,
-    lastSeasonLine: row.lastSeasonLine,
-    basis: row.basis,
-    asOf: row.asOf,
-  };
+  return row === undefined ? null : toPeekFactsRow(row);
 }

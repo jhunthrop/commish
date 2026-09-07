@@ -1,0 +1,1 @@
+ALTER TABLE "leagues" ADD COLUMN "scoring_hash" text;
