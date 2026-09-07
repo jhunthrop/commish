@@ -2,7 +2,7 @@
 // checkpoints. Schedule cursors live with the scheduler (`schedule.ts`), admin reads with the
 // admin surface (`admin-view.ts`) — this file is the one place a `jobs` row's status ever moves.
 import { and, asc, eq, lt, lte } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { unwrapCauseChain } from "@/db/errors";
 import { jobRunSteps, jobRuns, jobs } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
@@ -28,7 +28,7 @@ export interface EnqueueResult {
   readonly jobId: number | null;
 }
 
-export async function enqueueJob(db: Db, clock: Clock, request: EnqueueRequest): Promise<EnqueueResult> {
+export async function enqueueJob(db: Db | DbTx, clock: Clock, request: EnqueueRequest): Promise<EnqueueResult> {
   const inserted = await db
     .insert(jobs)
     .values({

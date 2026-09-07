@@ -51,7 +51,7 @@ beforeEach(async () => {
 });
 
 describe("the season-week job", () => {
-  it("runs the six cadence steps against an empty season and succeeds with six checkpoints", async () => {
+  it("runs the seven cadence steps against an empty season and succeeds with seven checkpoints", async () => {
     const definition = seasonWeekJobWith(cannedNetwork);
     const claimed = await enqueueAndClaim();
 
@@ -60,10 +60,11 @@ describe("the season-week job", () => {
     expect(report.outcome).toBe("succeeded");
     // Grade and freeze SKIP on an empty store (nothing gradable, no ingested kickoff) — the
     // honest preseason outcome, exactly as the crontab cadence reported it. `peek-facts` (the
-    // peek-facts round, 2026-09-07) runs last and writes nothing when the board is empty, which is
-    // the same honest zero its own summary reports.
+    // peek-facts round, 2026-09-07) writes nothing when the board is empty, which is the same
+    // honest zero its own summary reports, and `peek-documents` (the peek document round, the
+    // same day) enqueues one rebuild per scoring hash in use, which on an empty store is none.
     expect(await completedStepsFor(db, claimed.jobId)).toEqual(
-      new Set(["stats-ingest", "props-snapshot", "grade", "freeze", "scoreboard", "peek-facts"]),
+      new Set(["stats-ingest", "props-snapshot", "grade", "freeze", "scoreboard", "peek-facts", "peek-documents"]),
     );
   });
 

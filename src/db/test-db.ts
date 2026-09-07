@@ -39,6 +39,14 @@ export function createTestDb(): Db {
  * every truncate until it was named. The pair is listed together so the two halves of the same
  * archive cannot drift apart again.
  */
+/**
+ * THE QUEUE JOINED THE LIST (peek document round, 2026-09-07). `jobs` has no foreign key into any
+ * of the tables above it, so nothing cascaded it: a job enqueued by one test file outlived every
+ * truncate and was still sitting there when the next file counted rows. It is named with its two
+ * history tables and the schedule cursor, in child-before-parent order, so the append-only history
+ * and the queue it belongs to cannot drift apart again. The append-only triggers do not block
+ * TRUNCATE, by migration 0069's own note.
+ */
 export async function truncateAll(db: Db): Promise<void> {
   await db.execute(sql`
     TRUNCATE TABLE
@@ -56,7 +64,8 @@ export async function truncateAll(db: Db): Promise<void> {
       nfl_players, player_stat_lines, players, stat_weeks, nfl_games, capture_snapshots,
       matchups, weeks, draft_grades, draft_picks, draft_nudges, draft_slot_preferences, draft_actions, drafts,
       lineup_slots, roster_slots, league_invites,
-      scoring_settings, trade_proposals, teams, leagues, user_preferences, member_notices, users
+      scoring_settings, trade_proposals, teams, leagues, user_preferences, member_notices, users,
+      job_run_steps, job_runs, jobs, schedule_cursors
     RESTART IDENTITY CASCADE
   `);
   // `rankedPlayers` (src/draft-service/pool.ts) memoizes per league id across calls — safe in

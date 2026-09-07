@@ -288,7 +288,7 @@ export async function writeLeagueInTx(
 
   // THE SETTINGS ROW AND `leagues.scoring_hash` TOGETHER (peek document design §3.2) — one write
   // path, so a league is never committed carrying weights its stored hash does not describe.
-  await writeLeagueScoring(tx, { leagueId: ids.leagueId, rules: SCORING_PRESETS[input.scoringPreset] });
+  await writeLeagueScoring(tx, clock, { leagueId: ids.leagueId, rules: SCORING_PRESETS[input.scoringPreset] });
   if (input.owner.kind === "member") {
     await tx.insert(teams).values({ id: ids.teamId!, leagueId: ids.leagueId, userId: input.owner.userId, name: input.owner.teamName });
   }

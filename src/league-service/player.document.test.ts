@@ -210,9 +210,10 @@ describe("the peek is one statement over a stored document", () => {
       const body = await playerSeason(db, leagueId, "rb1", clock);
       expect(body!.player.name).toBe("Volume Back");
 
-      const [job] = await db.select().from(jobs).where(eq(jobs.name, PEEK_DOCUMENT_JOB_NAME));
-      expect(job!.payload).toMatchObject({ scoringHash: PPR_HASH, playerIds: null });
-      expect(job!.idempotencyKey).toBe(`peek-document:${PPR_HASH}:miss:${PPR_HASH}`);
+      // The facts writer already enqueued its own rebuild in the seed above, so the miss job is
+      // found by its key rather than by being the only one.
+      const [job] = await db.select().from(jobs).where(eq(jobs.idempotencyKey, `peek-document:${PPR_HASH}:miss:${PPR_HASH}`));
+      expect(job!.payload).toMatchObject({ scoringHash: PPR_HASH, playerIds: null, reason: `miss:${PPR_HASH}` });
     });
 
     it("says exactly what a stored document would have said", async () => {

@@ -73,7 +73,7 @@ function groupByHash(rows: readonly { readonly id: string; readonly stored: stri
 /** Every scoring hash a league is currently using — the "every hash" of the design's event table
  *  (§3.4). One read, and a league whose hash has never been computed is honestly absent from it
  *  rather than counted under someone else's rules. */
-export async function scoringHashesInUse(db: Db): Promise<readonly string[]> {
+export async function scoringHashesInUse(db: Db | DbTx): Promise<readonly string[]> {
   const rows = await db.selectDistinct({ hash: leagues.scoringHash }).from(leagues);
   return rows.flatMap((row) => (row.hash === null ? [] : [row.hash]));
 }

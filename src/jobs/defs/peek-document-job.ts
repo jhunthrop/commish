@@ -17,7 +17,7 @@
 // TERMINAL VS RETRYABLE: a payload that does not parse dead-letters through the contract's own
 // terminal path, since no retry makes a malformed row parse. Everything the build itself can throw
 // is ordinary database weather and retries, exactly like every other data job here.
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { writePeekDocuments } from "@/capsules/peek-document-store";
 import type { JsonObject } from "@/domain/audit";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
@@ -141,7 +141,7 @@ export interface PeekRebuildScope {
  * Returns how many jobs were actually created, which is zero when every one of them coalesced into
  * an enqueue that was already waiting.
  */
-export async function enqueuePeekDocumentRebuildsQuietly(db: Db, clock: Clock, scope: PeekRebuildScope): Promise<number> {
+export async function enqueuePeekDocumentRebuildsQuietly(db: Db | DbTx, clock: Clock, scope: PeekRebuildScope): Promise<number> {
   try {
     const hashes = scope.scoringHashes ?? (await scoringHashesInUse(db));
     let enqueued = 0;

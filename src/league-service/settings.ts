@@ -4,6 +4,8 @@
 // "one write module per concern" shape `draft-schedule.ts` and `invites.ts` each hold.
 import { eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
+import type { Clock } from "@/domain/timing";
+import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
 import { leagues, scoringSettings } from "@/db/schema";
 import { excludedSetFor } from "@/db/upsert";
 import type { ScoringRules } from "@/scoring";
@@ -49,10 +51,25 @@ export interface WriteLeagueScoringResult {
  * which a manager is shown weekly points scored under somebody else's rules, which is the single
  * failure the whole document design cannot survive. One function, one write, one commit.
  */
-export async function writeLeagueScoring(db: Db | DbTx, input: WriteLeagueScoringInput): Promise<WriteLeagueScoringResult> {
+export async function writeLeagueScoring(db: Db | DbTx, clock: Clock, input: WriteLeagueScoringInput): Promise<WriteLeagueScoringResult> {
   await db
     .insert(scoringSettings)
     .values({ leagueId: input.leagueId, ...input.rules })
     .onConflictDoUpdate({ target: scoringSettings.leagueId, set: excludedSetFor(scoringSettings, ["leagueId"]) });
-  return await writeLeagueScoringHash(db, input.leagueId, input.rules);
+  const result = await writeLeagueScoringHash(db, input.leagueId, input.rules);
+
+  // THE EVENT (peek document design §3.4, row five): a scoring CHANGE, and only a change. The new
+  // hash gets a build of every player, since no document has ever been scored under it; a hash still
+  // in use by other leagues is untouched, because their documents did not move. A league learning
+  // its own hash for the first time (`previous === null`, which is every newly created league)
+  // enqueues nothing at all: it has changed no rule set, and its first peek takes the miss path if
+  // its hash is genuinely novel.
+  if (result.previous !== null && result.previous !== result.hash) {
+    await enqueuePeekDocumentRebuildsQuietly(db, clock, {
+      playerIds: null,
+      scoringHashes: [result.hash],
+      reason: `settings:${input.leagueId}:${result.hash}`,
+    });
+  }
+  return result;
 }

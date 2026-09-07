@@ -54,7 +54,7 @@ describe("a league's stored scoring hash", () => {
 
   it("moves with the settings, in the one write path", async () => {
     const leagueId = await league("Sunday Money", "ppr");
-    const result = await writeLeagueScoring(db, { leagueId, rules: HALF_PPR_SCORING });
+    const result = await writeLeagueScoring(db, clock, { leagueId, rules: HALF_PPR_SCORING });
     expect(result.previous).toBe(scoringHashOf(PPR_SCORING));
     expect(result.hash).toBe(scoringHashOf(HALF_PPR_SCORING));
     expect(await storedHash(leagueId)).toBe(scoringHashOf(HALF_PPR_SCORING));

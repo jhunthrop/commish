@@ -24,6 +24,7 @@ import { writeRefresh } from "@/capsules/peek-facts";
 import { getStoredCapsulesFor, upsertCapsule, type StoredPlayerCapsule } from "@/capsules/store";
 import type { PlayerFacts } from "@/capsules/facts";
 import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
+import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
 
 export const CAPSULE_SWEEP_JOB_NAME = "capsule-sweep";
 
@@ -91,6 +92,17 @@ export async function runCapsuleSweepStep(db: Db, clock: Clock, deps: CapsuleSwe
       // detail lines needs to tell the two apart at a glance.
       detail.push(`${one.identity.name}: ${describeCapsuleFallback(result.compact, result.full)}`);
     }
+  }
+
+  // THE EVENT (peek document design §3.4, row two): a written capsule is a changed document input,
+  // for every scoring hash in use. Only the players this run actually wrote a capsule for are named.
+  // The reason stamp is this pass's own instant, so a retried tick that reaches here twice with the
+  // same clock coalesces into one build rather than two.
+  if (toProcess.length > 0) {
+    await enqueuePeekDocumentRebuildsQuietly(db, clock, {
+      playerIds: toProcess.map((one) => one.identity.id),
+      reason: `capsule:${asOf.toISOString()}`,
+    });
   }
 
   const remaining = eligible.length - toProcess.length;
