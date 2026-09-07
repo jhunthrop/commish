@@ -52,6 +52,28 @@ export const CAPSULE_CONFIG = {
       maxTokens: 1600,
     },
   },
+  /**
+   * THE NARRATIVE CALL (founder amendment 2026-09-07) — one call per player for the whole object
+   * of slots. Sized generously above the prose it returns for the same reason the two reads are:
+   * `glm-5.3-flash` spends completion tokens thinking, and a tight cap returns an empty body while
+   * still billing. A dozen slots of at most forty words is roughly 400 words of JSON.
+   */
+  narrative: {
+    maxTokens: 2000,
+  },
+  /**
+   * A SENTENCE ON MORE THAN THIS SHARE OF THE BOARD IS STOCK, not voice (founder amendment
+   * 2026-09-07: "alive, not stock"). Two percent of a 659 player board is thirteen players saying
+   * the same thing, which is the point at which a reader who opens two pages sees the seam. The
+   * sweep flags every sentence over it, queues those players for regeneration, and quotes the
+   * sentence into the next run's prompt as one not to write again.
+   */
+  repetition: {
+    maxShare: 0.02,
+    /** How many flagged sentences the prompt quotes. A prompt that lists fifty sentences not to
+     *  write is a prompt about sentences not to write; the worst offenders carry the signal. */
+    maxQuotedSentences: 8,
+  },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
    *  below it is noise a capsule need not dwell on. The mandated-tension check (`validate.ts`)
    *  requires the STRONGEST such group's own number be cited before the call, on every capsule

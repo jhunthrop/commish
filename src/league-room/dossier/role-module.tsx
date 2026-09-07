@@ -23,6 +23,15 @@ export interface RoleModuleProps {
    * and neither of these two positions has one. `null`, and the module is exactly what it was.
    */
   readonly kdef?: KdefSeasonLine | null;
+  /** THE WRITTEN TREND LINE (`narrativeSlot(capsule, "trend")`) — the writer's own sentence about
+   *  the year-over-year move, rendered INSTEAD of the templated one below when the sweep produced
+   *  and validated one. The two seasons and the delta are still shown by the template's own
+   *  figures when there is no written line; a stat is never replaced by prose, only stated once. */
+  readonly writtenTrend?: string | null;
+  /** THE WRITTEN ABSENCE NOTE (`narrativeSlot(capsule, "absence:usage")`) — for a player the usage
+   *  store carries nothing about at all. Absence said in a human voice instead of three rows of
+   *  "not tracked for him". The rows stay: they are the shape of what is missing. */
+  readonly absenceSentence?: string | null;
 }
 
 interface ShareRow {
@@ -183,7 +192,7 @@ function KdefRows({ line }: { readonly line: KdefSeasonLine }) {
  * happen to exist. The trend line is genuinely absent (no row at all) when there is nothing
  * material to say, matching every other "nothing to say" surface on this product.
  */
-export function RoleModule({ position, usage, trend, kdef = null }: RoleModuleProps) {
+export function RoleModule({ position, usage, trend, kdef = null, writtenTrend = null, absenceSentence = null }: RoleModuleProps) {
   const pointsPerGame = trend?.pointsPerGame ?? null;
   const trendMetric = pointsPerGame !== null && pointsPerGame.material ? pointsPerGame : null;
 
@@ -213,7 +222,16 @@ export function RoleModule({ position, usage, trend, kdef = null }: RoleModulePr
           );
         })}
       </div>
-      {trendMetric === null ? null : (
+      {usage !== null || absenceSentence === null ? null : (
+        <p className="text-sm text-text-muted" data-role="usage-absence">
+          {absenceSentence}
+        </p>
+      )}
+      {writtenTrend !== null ? (
+        <p className="text-sm text-text-muted" data-role="trend">
+          {writtenTrend}
+        </p>
+      ) : trendMetric === null ? null : (
         <p className="flex flex-wrap items-baseline gap-1 text-sm text-text-muted" data-role="trend">
           {(() => {
             const { before, delta, percentile } = trendSentence(trendMetric.priorSeason, trendMetric.priorValue, trendMetric.recentSeason, trendMetric.recentValue, trendMetric.delta);

@@ -36,13 +36,13 @@ import type { TrendMetric } from "./trend";
  *  and `market_anchor`/`scarcity`/`tier_cliff` never reach here at all (they feed `market`, below,
  *  the same "verdict-only" split `groups.ts` already draws). */
 export type PlayerFactsEvidenceItem =
-  | { readonly kind: "law"; readonly headline: string; readonly netEffectPoints: number; readonly lawCount: number }
-  | { readonly kind: "offseason_share_gained"; readonly targetShareChange: number; readonly carryShareChange: number }
-  | { readonly kind: "offseason_share_lost"; readonly targetShareChange: number; readonly carryShareChange: number }
-  | { readonly kind: "changed_team"; readonly from: string; readonly to: string }
-  | { readonly kind: "new_play_caller"; readonly team: string }
-  | { readonly kind: "rookie"; readonly overallPick: number | null }
-  | { readonly kind: "market_unlisted" };
+  | { readonly kind: "law"; readonly groupKey: string; readonly headline: string; readonly netEffectPoints: number; readonly lawCount: number }
+  | { readonly kind: "offseason_share_gained"; readonly groupKey: string; readonly targetShareChange: number; readonly carryShareChange: number }
+  | { readonly kind: "offseason_share_lost"; readonly groupKey: string; readonly targetShareChange: number; readonly carryShareChange: number }
+  | { readonly kind: "changed_team"; readonly groupKey: string; readonly from: string; readonly to: string }
+  | { readonly kind: "new_play_caller"; readonly groupKey: string; readonly team: string }
+  | { readonly kind: "rookie"; readonly groupKey: string; readonly overallPick: number | null }
+  | { readonly kind: "market_unlisted"; readonly groupKey: string };
 
 export interface PlayerFactsAvailability {
   readonly expectedGames: number;
@@ -384,7 +384,7 @@ function evidenceFrom(reasons: readonly BoardReason[], laws: readonly Law[]): re
   const items: PlayerFactsEvidenceItem[] = [];
   for (const group of groups) {
     if (group.kind === "law") {
-      items.push({ kind: "law", headline: group.headline, netEffectPoints: group.netEffect, lawCount: group.members.length });
+      items.push({ kind: "law", groupKey: group.key, headline: group.headline, netEffectPoints: group.netEffect, lawCount: group.members.length });
       continue;
     }
     const reason = group.reason;
@@ -392,22 +392,22 @@ function evidenceFrom(reasons: readonly BoardReason[], laws: readonly Law[]): re
       case "availability":
         continue;
       case "offseason_share_gained":
-        items.push({ kind: "offseason_share_gained", targetShareChange: reason.targetShare, carryShareChange: reason.carryShare });
+        items.push({ kind: "offseason_share_gained", groupKey: group.key, targetShareChange: reason.targetShare, carryShareChange: reason.carryShare });
         continue;
       case "offseason_share_lost":
-        items.push({ kind: "offseason_share_lost", targetShareChange: reason.targetShare, carryShareChange: reason.carryShare });
+        items.push({ kind: "offseason_share_lost", groupKey: group.key, targetShareChange: reason.targetShare, carryShareChange: reason.carryShare });
         continue;
       case "changed_team":
-        items.push({ kind: "changed_team", from: reason.from, to: reason.to });
+        items.push({ kind: "changed_team", groupKey: group.key, from: reason.from, to: reason.to });
         continue;
       case "new_play_caller":
-        items.push({ kind: "new_play_caller", team: reason.team });
+        items.push({ kind: "new_play_caller", groupKey: group.key, team: reason.team });
         continue;
       case "rookie":
-        items.push({ kind: "rookie", overallPick: reason.overallPick });
+        items.push({ kind: "rookie", groupKey: group.key, overallPick: reason.overallPick });
         continue;
       case "market_unlisted":
-        items.push({ kind: "market_unlisted" });
+        items.push({ kind: "market_unlisted", groupKey: group.key });
         continue;
       /**
        * THE KICKER AND TEAM DEFENCE REASONS, DELIBERATELY UNTRANSLATED (the 2026-09-05 round). A

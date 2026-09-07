@@ -5,8 +5,8 @@ import { renderSurface } from "@/components/ui/test-utils";
 import type { PlayerCapsuleView } from "@/capsules/store";
 import { ReadCard } from "./read-card";
 
-const LLM: PlayerCapsuleView = { bodyCompact: "The short version.", bodyFull: "The long, uncapped version.", source: "llm" };
-const TEMPLATE: PlayerCapsuleView = { bodyCompact: "The template's own sentence.", bodyFull: "The template's own sentence.", source: "template" };
+const LLM: PlayerCapsuleView = { bodyCompact: "The short version.", bodyFull: "The long, uncapped version.", source: "llm", narrative: null };
+const TEMPLATE: PlayerCapsuleView = { bodyCompact: "The template's own sentence.", bodyFull: "The template's own sentence.", source: "template", narrative: null };
 
 describe("ReadCard", () => {
   it("renders nothing when the sweep has not reached him at all", () => {

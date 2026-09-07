@@ -59,6 +59,11 @@ export function addGatewayUsage(accumulated: GatewayUsage | null, next: GatewayU
   };
 }
 
+/** Under this many words, a completion is a reasoning model's own empty exhaust rather than the
+ *  artifact that was asked for — the two long reads' floor. The narrative call passes its own,
+ *  much lower floor: a JSON object of short sentences is legitimately short. */
+export const DEGENERATE_COMPLETION_WORDS = 20;
+
 export interface CapsuleWriterDeps {
   readonly apiKey: string;
   readonly fetch?: typeof globalThis.fetch;
@@ -174,10 +179,11 @@ function parseGatewayResponse(raw: string): { readonly content: string; readonly
  * simplification, not an oversight: tracking two independent retry counters for a failure mode
  * this rare would be real complexity bought for a case that barely occurs in practice.
  */
-async function postChatCompletion(
+export async function postChatCompletion(
   messages: readonly { readonly role: string; readonly content: string }[],
   maxTokens: number,
   deps: CapsuleWriterDeps,
+  minUsableWords: number = DEGENERATE_COMPLETION_WORDS,
 ): Promise<{ readonly content: string; readonly usage: GatewayUsage }> {
   const doFetch = deps.fetch ?? globalThis.fetch;
   const { baseUrl, timeoutMs, retry } = CAPSULE_CONFIG.gateway;
@@ -222,13 +228,13 @@ async function postChatCompletion(
 
       const raw = await response.text();
       const { content, usage } = parseGatewayResponse(raw);
-      if (content.trim().split(/\s+/).filter(Boolean).length < 20) {
+      if (content.trim().split(/\s+/).filter(Boolean).length < minUsableWords) {
         // A REASONING model can spend its whole completion budget thinking and return empty
         // OR NEAR-EMPTY prose while still billing (live-fire 2026-09-05: a one-word "full"
         // completion slipped past the exact-empty check and read as a validation failure).
-        // Anything under twenty words cannot be a capsule of either size, so it is transport
-        // weather, retried, never returned for the validator to mistake for prose. The gateway
-        // billed it all the same — that usage rides along, never dropped.
+        // Anything under `minUsableWords` cannot be the artifact that was asked for, so it is
+        // transport weather, retried, never returned for the validator to mistake for prose. The
+        // gateway billed it all the same — that usage rides along, never dropped.
         billedUsage = addGatewayUsage(billedUsage, usage);
         if (attempt < retry.maxAttempts) {
           await new Promise((resolve) => setTimeout(resolve, retry.baseDelayMs * attempt));

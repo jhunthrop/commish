@@ -9,6 +9,7 @@ function llmResult(overrides: Partial<CapsuleGenerationResult> = {}): CapsuleGen
   return {
     compact: { text: "Compact body.", source: "llm", usage: null, fallbackReason: null },
     full: { text: "Full body.", source: "llm", usage: null, fallbackReason: null },
+    narrative: { slots: {}, usage: null, model: null, rejected: [], failure: null },
     source: "llm",
     model: "zai/glm-5.3-flash",
     ...overrides,
@@ -35,7 +36,7 @@ describe("capsule store", () => {
     expect(stored).toMatchObject({ playerId: "p1", factsHash: "hash-1", bodyCompact: "Compact body.", bodyFull: "Full body.", source: "llm", model: "zai/glm-5.3-flash" });
 
     const view = await getPlayerCapsule(db, "p1");
-    expect(view).toEqual({ bodyCompact: "Compact body.", bodyFull: "Full body.", source: "llm" });
+    expect(view).toEqual({ bodyCompact: "Compact body.", bodyFull: "Full body.", source: "llm", narrative: null });
   });
 
   it("stores a template-sourced capsule with a null model", async () => {

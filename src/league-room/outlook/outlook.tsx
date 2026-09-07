@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge, ReasonChip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import { narrativeSlot, NARRATIVE_KEYS } from "@/capsules/narrative-slots";
 import type { PlayerCapsuleView } from "@/capsules/store";
 import type { Position } from "@/domain/player";
 import type { Law } from "@/projections/laws/types";
@@ -55,7 +56,12 @@ export function Outlook({ reasons, laws, position, capped = false, capsule }: Ou
   if (reasons.length === 0) return null;
 
   const groups = groupReasons(reasons, laws);
-  const verdict = verdictLine(reasons, position);
+  // THE WRITTEN VERDICT (dossier-voice round §3.5) — the capsule's own call sentence when the sweep
+  // wrote and validated one, with the measured market gap and tier clause still stated under it.
+  const verdict = verdictLine(reasons, position, {
+    call: narrativeSlot(capsule, NARRATIVE_KEYS.call),
+    tier: narrativeSlot(capsule, NARRATIVE_KEYS.tier),
+  });
   const visible = capped && !showFullCase ? groups.slice(0, PEEK_GROUP_CAP) : groups;
   const hiddenCount = groups.length - visible.length;
 

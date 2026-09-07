@@ -1,3 +1,4 @@
+import { absenceSlotKey, ABSENCE_MODULES, narrativeSlot, NARRATIVE_KEYS } from "@/capsules/narrative-slots";
 import { EdgeCell, SourceStrip } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { PlayerDossierFacts } from "@/league-service/dossier-facts";
@@ -128,7 +129,7 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
         <>
           {/* THE CALL, FIRST — the identical adapter both surfaces use (`callCardPropsFor`,
               `league-room/lib/player-season-view.ts`). */}
-          <CallCard {...callCardPropsFor(body, dossier)} />
+          <CallCard {...callCardPropsFor(body, dossier)} perGameSentence={narrativeSlot(body.capsule, NARRATIVE_KEYS.perGame)} />
 
           {/* THREE SEPARATE ROW GRIDS, NOT ONE SIX-ITEM GRID (the peek's own review fix, kept
               identical on both surfaces): a single flat `grid-cols-2` auto-places every child in
@@ -138,12 +139,21 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
               columns rather than sitting alone on the left with the right column empty. */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <RangeRail projection={dossier.projection} availability={dossier.availability} />
-            <RoleModule position={body.player.position} usage={dossier.usage} trend={dossier.trend} />
+            <RoleModule
+              position={body.player.position}
+              usage={dossier.usage}
+              trend={dossier.trend}
+              writtenTrend={narrativeSlot(body.capsule, NARRATIVE_KEYS.trend)}
+              absenceSentence={narrativeSlot(body.capsule, absenceSlotKey(ABSENCE_MODULES.usage))}
+            />
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <ReadCard capsule={body.capsule} variant={readVariant} />
             <div className={hasReadCard ? undefined : "lg:col-span-2"}>
-              <BooksModule books={dossier.books} />
+              <BooksModule
+                books={dossier.books}
+                sentence={narrativeSlot(body.capsule, NARRATIVE_KEYS.books) ?? narrativeSlot(body.capsule, absenceSlotKey(ABSENCE_MODULES.books))}
+              />
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -151,7 +161,13 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
               {matchingStory === null ? (
                 <SeasonChartFallback body={body} switcher={switcher} played={played} />
               ) : (
-                <SeasonStrip story={matchingStory} weeks={weeksFor(body)} scoringLabel={dossier.basis.scoringLabel} switcher={switcher} />
+                <SeasonStrip
+                  story={matchingStory}
+                  weeks={weeksFor(body)}
+                  scoringLabel={dossier.basis.scoringLabel}
+                  switcher={switcher}
+                  sentence={narrativeSlot(body.capsule, NARRATIVE_KEYS.story)}
+                />
               )}
             </div>
             {!hasStoryCell ? null : (
@@ -167,7 +183,7 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
 
           {/* THE WHY — `whyCap` is the peek's own historical `5` or the full page's `undefined`
               ("show every group, no expander"). */}
-          <WhyGroups reasons={body.reasons} laws={body.laws} position={body.player.position} cap={whyCap} />
+          <WhyGroups reasons={body.reasons} laws={body.laws} position={body.player.position} cap={whyCap} capsule={body.capsule} />
         </>
       )}
 

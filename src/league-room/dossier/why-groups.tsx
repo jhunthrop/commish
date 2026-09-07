@@ -6,6 +6,7 @@ import { signedPoints } from "@/components/ui/event-feed-row";
 import type { Position } from "@/domain/player";
 import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
+import { narrativeSlot, whyGroupSlotKey, type NarrativeCarrier } from "@/capsules/narrative-slots";
 import { groupReasons, type EvidenceGroup, type FactReason } from "../outlook/groups";
 
 export interface WhyGroupsProps {
@@ -22,6 +23,14 @@ export interface WhyGroupsProps {
    *  rest, the identical cap/expander UX `Outlook` used before this task, parameterized rather
    *  than a fixed five. */
   readonly cap?: number;
+  /**
+   * THE WRITTEN EVIDENCE LINES (dossier-voice round §3.5) — the capsule, read one slot per group
+   * through `narrativeSlot(capsule, whyGroupSlotKey(group.key))`. The bold LEAD stays the group's
+   * own headline (a stated quantity, which is the engine's to state); the EXPLANATION is the
+   * writer's sentence when he wrote a valid one for that group, and the deterministic sentence
+   * below otherwise. Never both.
+   */
+  readonly capsule?: NarrativeCarrier | null;
 }
 
 /** A fraction as a signed whole-number percent: "+4%", "-12%" — the same shape
@@ -109,7 +118,7 @@ function sentenceFor(group: EvidenceGroup): { readonly lead: string; readonly ex
  * a number renders the strongest that many, with a "The full case (N)" expander for the rest —
  * the peek passes `5`, unchanged from `Outlook`'s own prior fixed cap.
  */
-export function WhyGroups({ reasons, laws, cap }: WhyGroupsProps) {
+export function WhyGroups({ reasons, laws, cap, capsule = null }: WhyGroupsProps) {
   const [showFullCase, setShowFullCase] = useState(false);
 
   if (reasons.length === 0) return null;
@@ -124,9 +133,10 @@ export function WhyGroups({ reasons, laws, cap }: WhyGroupsProps) {
       <div className="flex flex-col gap-1.5">
         {visible.map((group) => {
           const { lead, explanation } = sentenceFor(group);
+          const written = narrativeSlot(capsule, whyGroupSlotKey(group.key));
           return (
-            <p key={group.key} className="text-sm">
-              <span className="font-semibold text-text-primary">{lead}.</span> <span className="text-text-muted">{explanation}</span>
+            <p key={group.key} className="text-sm" data-why-group={group.key}>
+              <span className="font-semibold text-text-primary">{lead}.</span> <span className="text-text-muted">{written ?? explanation}</span>
             </p>
           );
         })}

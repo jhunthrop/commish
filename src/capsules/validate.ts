@@ -1,5 +1,6 @@
 import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, EM_DASH, SEMICOLON } from "./config";
 import type { PlayerFacts } from "./facts";
+import { NARRATIVE_MIN_WORDS } from "./narrative-slots";
 
 export type CapsuleSize = "compact" | "full";
 
@@ -372,14 +373,27 @@ function citesTensionNumber(text: string, requiredTension: number): boolean {
   return splitSentences(text).some((sentence) => COST_CUE_PATTERN.test(sentence) && extractNumbers(sentence).some(({ value }) => isDerivedFromLedger(Math.abs(value), [magnitude])));
 }
 
+/** What one piece of generated text is held to. The two long reads require the tension citation;
+ *  a narrative slot does not — see `validateNarrativeSlot`. */
+interface GroundingBand {
+  readonly minWords: number;
+  readonly maxWords: number;
+  readonly requireTension: boolean;
+}
+
 /**
  * THE VALIDATOR — the law's own enforcement arm (spec's hard rule: "honest data absolute; the
  * validator is the law's enforcement arm"). Every number and every multi-word proper name in
- * `body` must trace to `facts`; the copy rules bind (no em-dash, no competitor name, the size's
- * own word band); and mixed evidence must carry its own tension before the call. `size` picks
- * which word band applies (`CAPSULE_CONFIG.sizes`).
+ * `body` must trace to `facts`; the copy rules bind (no em-dash, no competitor name, the band's
+ * own word range); and mixed evidence must carry its own tension before the call where the band
+ * asks for it.
+ *
+ * ONE SET OF RULES, TWO CALLERS (dossier-voice round §3.5): the two long reads
+ * (`validateCapsule`) and every narrative slot (`validateNarrativeSlot`) are graded by this one
+ * function, so a sentence a module renders is held to exactly what a read is held to. A second
+ * grounding implementation for the slots would be a second place for a fabricated number to get in.
  */
-export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleSize): ValidationResult {
+function validateGrounded(body: string, facts: PlayerFacts, band: GroundingBand): ValidationResult {
   const violations: string[] = [];
   const trimmed = body.trim();
 
@@ -387,7 +401,7 @@ export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleS
     return { ok: false, violations: ["The completion was empty."] };
   }
 
-  const { minWords, maxWords } = CAPSULE_CONFIG.sizes[size];
+  const { minWords, maxWords } = band;
   const words = wordCount(trimmed);
   if (words < minWords || words > maxWords) {
     violations.push(`Word count ${words} is outside the required ${minWords}-${maxWords} word band.`);
@@ -427,10 +441,27 @@ export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleS
     }
   }
 
-  const requiredTension = strongestNegativeLawEffect(facts);
+  const requiredTension = band.requireTension ? strongestNegativeLawEffect(facts) : null;
   if (requiredTension !== null && !citesTensionNumber(trimmed, requiredTension)) {
     violations.push(`Mixed evidence: the strongest downside (${requiredTension} pts/game) must be cited as an honest hesitation before the call.`);
   }
 
   return { ok: violations.length === 0, violations };
+}
+
+/** One whole read, at its own size's word band, with the mandated-tension check that a note long
+ *  enough to make a case must carry its strongest downside. */
+export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleSize): ValidationResult {
+  return validateGrounded(body, facts, { ...CAPSULE_CONFIG.sizes[size], requireTension: true });
+}
+
+/**
+ * ONE NARRATIVE SLOT (dossier-voice round §3.5). The same grounding, the same copy rules, a
+ * tighter word band, and NO tension mandate: a thirty-word call cannot be asked to state the
+ * strongest downside AND the call, and the modules that display the downside are on the same
+ * screen either way. The reads above still carry the mandate, so nothing about the page as a whole
+ * gets to be one-sided on mixed evidence.
+ */
+export function validateNarrativeSlot(body: string, facts: PlayerFacts, maxWords: number): ValidationResult {
+  return validateGrounded(body, facts, { minWords: NARRATIVE_MIN_WORDS, maxWords, requireTension: false });
 }

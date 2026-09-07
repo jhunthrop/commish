@@ -95,18 +95,35 @@ function noMarketSentence(position: Position, scarcity: ScarcityReason | undefin
 }
 
 /**
+ * The written sentences this player's own capsule carries for the verdict, when the sweep produced
+ * and validated them (`capsules/narrative-slots.ts`). Both optional and both independently absent:
+ * a validated call with no tier sentence still leads, and the deterministic tier clause follows it.
+ */
+export interface WrittenVerdict {
+  readonly call?: string | null;
+  readonly tier?: string | null;
+}
+
+/**
  * The Outlook's own opening line — see this module's docblock for the full account of each
  * branch. `null` exactly when `reasons` is empty (the board never ranked this player at all).
+ *
+ * THE WRITTEN CALL LEADS WHEN THERE IS ONE (founder amendment 2026-09-07: every sentence on the
+ * peek is written). `written.call` replaces the templated market sentence as the LEAD, and the
+ * measured facts stay exactly where they were underneath it: the market gap is still stated, and
+ * the tier clause still follows, so nothing measured leaves the page in exchange for voice.
  */
-export function verdictLine(reasons: readonly BoardReason[], position: Position): string | null {
+export function verdictLine(reasons: readonly BoardReason[], position: Position, written: WrittenVerdict = {}): string | null {
   if (reasons.length === 0) return null;
 
   const marketAnchor = findReason(reasons, "market_anchor");
   const scarcity = findReason(reasons, "scarcity");
   const tierCliff = findReason(reasons, "tier_cliff");
-  const supporting = tierClause(tierCliff);
+  const supporting = tierCliff === undefined ? null : (written.tier ?? tierClause(tierCliff));
 
-  const base = marketAnchor === undefined ? noMarketSentence(position, scarcity) : marketGapSentence(marketAnchor);
+  const stated = marketAnchor === undefined ? noMarketSentence(position, scarcity) : marketGapSentence(marketAnchor);
+  const call = written.call ?? null;
+  const base = call === null ? stated : `${call} ${stated}`;
 
   if (supporting !== null) return `${base} ${supporting}`;
   // No tier cliff: a priced player still gets his position rank stated, once, as the supporting

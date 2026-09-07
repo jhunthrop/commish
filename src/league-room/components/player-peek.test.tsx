@@ -337,7 +337,7 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
       ...bodyFor(2026, [2026]),
       reasons: DOSSIER_REASONS,
       dossier: DOSSIER,
-      capsule: { bodyCompact: "The compact read.", bodyFull: "The full read.", source: "llm" },
+      capsule: { bodyCompact: "The compact read.", bodyFull: "The full read.", source: "llm", narrative: null },
       injuryDesignation: "Q",
       news: [{ title: "Rashad Long: full practice", link: "https://example.com/1" }],
       ...overrides,

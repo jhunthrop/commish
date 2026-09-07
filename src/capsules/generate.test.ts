@@ -25,6 +25,17 @@ function okResponse(content: string): Response {
   return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 300, completion_tokens: 80, total_tokens: 380, cost: 0.00005 } }), { status: 200 });
 }
 
+/** The narrative call is a THIRD request per player alongside the two reads, and it is the only
+ *  one whose user message asks for a JSON object — every mock below routes on that, so a test
+ *  counting a size's own attempts never counts the narrative's. */
+function isNarrativeRequest(init: RequestInit): boolean {
+  const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
+  return payload.messages[1]!.content.includes("Return ONE JSON object");
+}
+
+/** A grounded narrative: one slot, every number and name off the fact sheet. */
+const NARRATIVE_JSON = JSON.stringify({ call: "He is the engine of that SF offense and the price has not caught up." });
+
 /** Twenty-plus words (the degenerate-completion guard retries anything shorter as transport
  *  weather) that still FAIL validation: "999" traces to no supplied fact. */
 const BAD_COMPLETION =
@@ -39,6 +50,7 @@ describe("generateCapsule", () => {
   it("returns llm text and provenance for both sizes on a clean generation", async () => {
     const facts = buildPlayerFacts(baseInput());
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
       const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       return okResponse(isFull ? GOOD_FULL : GOOD_COMPACT);
@@ -51,12 +63,29 @@ describe("generateCapsule", () => {
     expect(result.full.source).toBe("llm");
     expect(result.compact.text).toBe(GOOD_COMPACT);
     expect(result.full.text).toBe(GOOD_FULL);
+    expect(result.narrative.slots.call).toBe("He is the engine of that SF offense and the price has not caught up.");
+    expect(result.narrative.rejected).toEqual([]);
+  });
+
+  it("keeps the narrative independent of the reads: a failed narrative never flips a good pair to template", async () => {
+    const facts = buildPlayerFacts(baseInput());
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse("I am afraid I cannot write that for you today, sorry about this one.");
+      const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
+      return okResponse(payload.messages[1]!.content.includes("(1) the volume or role case") ? GOOD_FULL : GOOD_COMPACT);
+    });
+
+    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+    expect(result.source).toBe("llm");
+    expect(result.narrative.slots).toEqual({});
+    expect(result.narrative.failure).toBe("the narrative completion was not a JSON object");
   });
 
   it("regenerates once on a validation failure, then succeeds", async () => {
     const facts = buildPlayerFacts(baseInput());
     let compactCalls = 0;
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
       const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       if (isFull) return okResponse(GOOD_FULL);
@@ -114,6 +143,7 @@ describe("generateCapsule", () => {
   it("marks the whole capsule template-sourced when only one size falls back, never claiming a mixed llm provenance", async () => {
     const facts = buildPlayerFacts(baseInput());
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
       const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       return isFull ? okResponse(BAD_COMPLETION) : okResponse(GOOD_COMPACT);

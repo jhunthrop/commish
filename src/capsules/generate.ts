@@ -1,5 +1,6 @@
 import { CAPSULE_MODEL } from "./config";
 import type { PlayerFacts } from "./facts";
+import { generateNarrative, type NarrativeResult } from "./narrative";
 import { renderTemplateCapsule } from "./template";
 import { validateCapsule, type CapsuleSize } from "./validate";
 import { addGatewayUsage, CapsuleGenerationError, generateCapsuleBody, type CapsuleWriterDeps, type GatewayUsage } from "./write";
@@ -34,6 +35,14 @@ export interface CapsuleSizeResult {
 export interface CapsuleGenerationResult {
   readonly compact: CapsuleSizeResult;
   readonly full: CapsuleSizeResult;
+  /**
+   * THE PER-MODULE SENTENCES (founder amendment 2026-09-07). Written by its own gateway call,
+   * alongside the two reads and from the same facts, and deliberately NOT folded into `source`
+   * below: a narrative that fails is a page of template sentences, which is what every one of
+   * those modules rendered before it existed, where a read that fails is a read nobody wrote.
+   * Always present; `slots` is empty when nothing survived validation.
+   */
+  readonly narrative: NarrativeResult;
   /** `"llm"` only when BOTH sizes were freshly written and validated this run; `"template"`
    *  whenever either fell back — a conservative, single provenance flag rather than two, so a
    *  consumer never has to reconcile two different answers to "can I trust this text" (see
@@ -105,9 +114,14 @@ export function describeCapsuleFallback(compact: CapsuleSizeResult, full: Capsul
 }
 
 /** Both sizes, from the same facts. See `CapsuleGenerationResult`'s own docblock for the
- *  provenance rule. */
-export async function generateCapsule(facts: PlayerFacts, deps: CapsuleWriterDeps): Promise<CapsuleGenerationResult> {
-  const [compact, full] = await Promise.all([generateOneSize(facts, "compact", deps), generateOneSize(facts, "full", deps)]);
+ *  provenance rule, and `narrative`'s own field for why the narrative sits outside it. `avoid` is
+ *  the board's current stock-sentence list, quoted into the narrative prompt. */
+export async function generateCapsule(facts: PlayerFacts, deps: CapsuleWriterDeps, avoid: readonly string[] = []): Promise<CapsuleGenerationResult> {
+  const [compact, full, narrative] = await Promise.all([
+    generateOneSize(facts, "compact", deps),
+    generateOneSize(facts, "full", deps),
+    generateNarrative(facts, deps, avoid),
+  ]);
   const bothLlm = compact.source === "llm" && full.source === "llm";
-  return { compact, full, source: bothLlm ? "llm" : "template", model: bothLlm ? CAPSULE_MODEL : null };
+  return { compact, full, narrative, source: bothLlm ? "llm" : "template", model: bothLlm ? CAPSULE_MODEL : null };
 }

@@ -43,6 +43,14 @@ export interface CallCardProps {
    *  .marketAnchorDelta`) — the ONE number on this card that carries the verdict channel's
    *  color, by its own sign. `null` when the board never anchored him to a market entry at all. */
   readonly gap: number | null;
+  /**
+   * THE WRITTEN PER-GAME SENTENCE (`narrativeSlot(capsule, "perGame")`, dossier-voice round §3.5)
+   * — the writer's own line about what his games mean, when the sweep produced and validated one.
+   * `null`/absent renders the deterministic `talentVsGamesSentence` below instead. Never both: a
+   * module states one sentence about one thing, and the template is the floor under the writer,
+   * not a second voice beside him.
+   */
+  readonly perGameSentence?: string | null;
 }
 
 /** Verdict-channel tone by `gap`'s own sign — `text-positive` (money) above zero, `text-negative`
@@ -89,10 +97,10 @@ function talentVsGamesSentence(position: Position, perGameRank: number | null, e
  * (prose, then number) — never to the market or our-board columns, which are quiet ink regardless
  * of value, exactly as `EdgeCell`'s own docblock keeps for a leaderboard's non-comparison cells.
  */
-export function CallCard({ verdict, market, ourBoard, gap }: CallCardProps) {
+export function CallCard({ verdict, market, ourBoard, gap, perGameSentence = null }: CallCardProps) {
   const roundedGap = gap === null ? null : Math.round(gap);
   const tone = toneClassFor(roundedGap);
-  const talentSentence = talentVsGamesSentence(ourBoard.position, ourBoard.perGameRank, ourBoard.expectedGames);
+  const talentSentence = perGameSentence ?? talentVsGamesSentence(ourBoard.position, ourBoard.perGameRank, ourBoard.expectedGames);
 
   return (
     <Card as="section" aria-label="The call" className="flex flex-col gap-3">

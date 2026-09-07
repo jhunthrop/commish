@@ -253,7 +253,7 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
       ...bodyFor(2026, [2026]),
       reasons: DOSSIER_REASONS,
       dossier: DOSSIER,
-      capsule: { bodyCompact: "The compact read.", bodyFull: "The full, uncapped read.", source: "llm" },
+      capsule: { bodyCompact: "The compact read.", bodyFull: "The full, uncapped read.", source: "llm", narrative: null },
       injuryDesignation: "Q",
       news: [{ title: "Rashad Long: full practice", link: "https://example.com/1" }],
       totals: { games: 1, carries: 15, rushingYards: 80, targets: 3, receptions: 2, receivingYards: 20, passingYards: 0, touchdowns: 1, fantasyPoints: 12.5 },
@@ -301,7 +301,7 @@ describe("PlayerPage — the dossier composition (Task 6)", () => {
   });
 
   it("falls back to the compact read, labeled honestly, when the capsule is template-sourced (full is not a genuine longer write-up)", async () => {
-    vi.mocked(playerSeason).mockResolvedValue(dossierBody({ capsule: { bodyCompact: "The template's own sentence.", bodyFull: "The template's own sentence.", source: "template" } }));
+    vi.mocked(playerSeason).mockResolvedValue(dossierBody({ capsule: { bodyCompact: "The template's own sentence.", bodyFull: "The template's own sentence.", source: "template", narrative: null } }));
     await renderPage();
     expect(screen.getByText("The template's own sentence.")).toBeInTheDocument();
     expect(screen.getByText("A summary from the numbers. The written read is on its way.")).toBeInTheDocument();
