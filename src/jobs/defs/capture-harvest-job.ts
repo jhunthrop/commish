@@ -38,10 +38,14 @@
 // `captureOnce` itself never throws for a single feed's own network failure — that lands as a
 // `"failed"` outcome in the summary instead, which is `capture.ts`'s own honest-data design (a
 // failed feed is a logged detail line, never a fabricated row) and this job does not fight it.
+import { desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
+import { captureSnapshots, players } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import { envOrUndefined } from "@/lib/env";
+import { harvestDesignationDiff, harvestNewsDiff, type HarvestCapture } from "@/projections/harvest-diff";
+import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
 import { captureOnce, type CaptureBudget, type CaptureFeedOutcome, type CaptureResult } from "@/projections/capture";
 import { CAPTURE_FEEDS, NFL_TEAM_ABBREVIATIONS, type CaptureFeed } from "@/projections/capture-feeds";
 import { currentNflWeek } from "@/stats-pipeline";
@@ -53,9 +57,15 @@ export const CAPTURE_HARVEST_JOB_NAME = "capture-harvest";
 
 /** See the module docblock's FEED SELECTION section for why each of these five, and why not the
  *  rest of `CAPTURE_FEEDS`. */
+/** The two feeds a peek document actually reads. Named because the player-level diff below compares
+ *  exactly these two captures and nothing else: a depth chart or a betting line moving is real news
+ *  for other surfaces, but it is not a field on this document. */
+const INJURY_SOURCE = "tank01_injuries_by_date";
+const NEWS_SOURCE = "tank01_news";
+
 const HARVEST_FEED_SOURCES: ReadonlySet<string> = new Set([
-  "tank01_injuries_by_date",
-  "tank01_news",
+  INJURY_SOURCE,
+  NEWS_SOURCE,
   "tank01_depth_charts",
   "tank01_inactives",
   "tank01_betting_odds",
@@ -136,6 +146,38 @@ function summarize(result: CaptureResult): StepOutcome {
   return { summary, detail: result.feeds.map(describeFeed) };
 }
 
+/** The two most recent captures of one feed, newest first — what the player-level diff compares.
+ *  Fewer than two means there is nothing to compare against, and the diff says so by naming nobody. */
+async function lastTwoCaptures(db: Db, source: string): Promise<{ readonly next: HarvestCapture | null; readonly previous: HarvestCapture | null }> {
+  const rows = await db
+    .select({ payload: captureSnapshots.payload })
+    .from(captureSnapshots)
+    .where(eq(captureSnapshots.source, source))
+    .orderBy(desc(captureSnapshots.capturedAt))
+    .limit(2);
+  return { next: rows[0] ?? null, previous: rows[1] ?? null };
+}
+
+/**
+ * WHICH PLAYERS THIS HARVEST MOVED, as product player ids.
+ *
+ * The injuries feed carries the product's own player id already. The news feed carries only the name
+ * in front of its title's colon, the same join `news.ts` makes, so those names are resolved through
+ * one read of `players`. A name the product does not carry resolves to nothing and is dropped rather
+ * than guessed at.
+ */
+async function movedPlayerIds(db: Db): Promise<readonly string[]> {
+  const [injuries, news] = await Promise.all([lastTwoCaptures(db, INJURY_SOURCE), lastTwoCaptures(db, NEWS_SOURCE)]);
+  const moved = new Set<string>(injuries.next === null ? [] : harvestDesignationDiff(injuries.previous, injuries.next));
+
+  const names = news.next === null ? [] : harvestNewsDiff(news.previous, news.next);
+  if (names.length > 0) {
+    const rows = await db.select({ id: players.id }).from(players).where(inArray(players.name, [...names]));
+    for (const row of rows) moved.add(row.id);
+  }
+  return [...moved].sort();
+}
+
 export async function runCaptureHarvestStep(db: Db, clock: Clock, payload: CaptureHarvestPayload, deps: CaptureHarvestDeps = {}): Promise<StepOutcome> {
   const apiKey = deps.apiKey ?? envOrUndefined(TANK01_CONFIG.envVars.apiKey);
   if (apiKey === undefined) {
@@ -163,7 +205,21 @@ export async function runCaptureHarvestStep(db: Db, clock: Clock, payload: Captu
     feeds: deps.feeds ?? harvestFeeds(CAPTURE_FEEDS),
   });
 
-  return summarize(result);
+  // THE EVENT (peek document design §3.4, row four). The harvest already knew whether a FEED
+  // changed; this is the part that knows WHO changed inside it, which is what keeps the rebuild
+  // targeted at a handful of players rather than the whole board. The capture instant is the reason
+  // stamp, so a retried attempt that captured nothing new coalesces onto the same job.
+  const moved = await movedPlayerIds(db);
+  const enqueued =
+    moved.length === 0
+      ? 0
+      : await enqueuePeekDocumentRebuildsQuietly(db, clock, { playerIds: moved, reason: `harvest:${capturedNow}` });
+
+  const outcome = summarize(result);
+  return {
+    summary: `${outcome.summary}. Peek documents: ${moved.length} player${moved.length === 1 ? "" : "s"} moved, ${enqueued} rebuild${enqueued === 1 ? "" : "s"} enqueued`,
+    detail: outcome.detail,
+  };
 }
 
 export const captureHarvestJob: AnyJobDefinition = defineJob<CaptureHarvestPayload>({
