@@ -33,6 +33,7 @@ import {
 } from "../season-week/steps";
 import { realIngestStats, realSnapshotProps } from "../season-week/deps";
 import { refreshPeekFacts } from "@/capsules/peek-facts";
+import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
 import type { Db } from "@/db/client";
 import type { JsonObject } from "@/domain/audit";
 import { JOBS_CONFIG } from "../config";
@@ -166,6 +167,34 @@ export function seasonWeekJobWith(network: SeasonWeekNetwork): AnyJobDefinition 
             summary: `[OK] peek facts: ${refresh.players} rows built, ${refresh.changed} changed, ${refresh.withTouchesRank} with a touches rank`,
             detail: [],
           };
+        },
+      },
+      {
+        // THE PEEK-DOCUMENT REBUILD (peek document design §3.4, row one) — the finalize event. It
+        // runs after `peek-facts` for the same reason that step runs last: this is the moment the
+        // current season's numbers have actually moved.
+        //
+        // IT REBUILDS EVERY PLAYER FOR EVERY HASH, deliberately, where the other events name a
+        // handful. A finalized week is not one player's news: a new week appears on every chart, and
+        // the percentile population every week and every points-per-game is judged against is the
+        // whole position's season, which the new week just changed for everybody at that position.
+        // Naming "the players with a changed week" would rebuild the men who played and leave every
+        // one of their peers holding a percentile taken over last week's population.
+        //
+        // WHAT A WHOLE-HASH REBUILD ACTUALLY COSTS, stated honestly (fix round, 2026-09-07): `as_of`
+        // is part of the document's key, so a build INSERTS a generation for every player rather
+        // than updating one in place. That is roughly 1,719 rows and about 7 MB per scoring hash on
+        // today's player universe, whatever the changed-row count reports. The changed-row count is
+        // about the CONTENT, not the row count, and the three-generation prune
+        // (`prunePeekDocuments`) is what keeps the store from growing with every event.
+        name: "peek-documents",
+        run: async (ctx, payload) => {
+          const season = payload.season ?? defaultSeason(new Date(ctx.clock.now()));
+          const enqueued = await enqueuePeekDocumentRebuildsQuietly(ctx.db, ctx.clock, {
+            playerIds: null,
+            reason: `finalize:${season}:${ctx.clock.now()}`,
+          });
+          return { summary: `[OK] peek documents: ${enqueued} rebuild${enqueued === 1 ? "" : "s"} enqueued, one per scoring hash in use`, detail: [] };
         },
       },
     ],

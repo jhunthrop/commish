@@ -7,6 +7,7 @@ import { capsuleSweepJob } from "./defs/capsule-sweep-job";
 import { captureHarvestJob } from "./defs/capture-harvest-job";
 import { draftGradesJob } from "./defs/draft-grades-job";
 import { draftSweepJob } from "./defs/draft-sweep-job";
+import { peekDocumentJob } from "./defs/peek-document-job";
 import { propsPreseasonSnapshotJob } from "./defs/props-preseason-snapshot-job";
 import { seasonWeekJob } from "./defs/season-week-job";
 import { simJob } from "./defs/sim-job";
@@ -20,6 +21,7 @@ const ALL_DEFINITIONS: readonly AnyJobDefinition[] = [
   capsuleSweepJob,
   draftGradesJob,
   captureHarvestJob,
+  peekDocumentJob,
 ];
 
 export const JOB_DEFINITIONS: ReadonlyMap<string, AnyJobDefinition> = new Map(

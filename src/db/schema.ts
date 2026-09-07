@@ -26,6 +26,7 @@ import type { MoneyPostingDirection } from "@/money/posting";
 import type { PrizeTable } from "@/money/prize-table";
 import type { TransferIntent } from "@/payments-provider/contract";
 import type { PeekFactsRow } from "@/capsules/peek-facts-row";
+import type { PeekDocument, PeekDocumentBasis } from "@/capsules/peek-document-row";
 import type { TradeAsset } from "@/trades/assets";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
@@ -264,6 +265,23 @@ export const leagues = pgTable(
      * worth", and `describeScoring` derives its label from exactly those, unaffected by this.
      */
     medianGame: boolean("median_game").notNull().default(false),
+    /**
+     * THE IDENTITY OF THIS LEAGUE'S RULE SET (peek document design §3.2, 2026-09-07):
+     * `scoringHashOf(its scoring_settings row)`, stored here so the peek's one statement can join
+     * straight to `player_peek_documents` without reading the settings table and recomputing a
+     * digest on the request path.
+     *
+     * IT IS A CACHE OF `scoring_settings`, NOT A SECOND SOURCE OF TRUTH. The settings write path
+     * rewrites it in the same transaction that moves a weight, and `backfillLeagueScoringHashes`
+     * (`@/league-service/scoring-hash`) recomputes every league's from its own row and writes only
+     * the ones that disagree.
+     *
+     * NULLABLE, and null means exactly one thing: nobody has computed it for this league yet (a row
+     * written before this column existed, or a fresh restore). The peek reads a null hash as a MISS
+     * and takes the miss path, which is the pre-round cost and never a wrong answer. It is not
+     * defaulted to a preset's hash, because a default would be a claim about a rule set nobody read.
+     */
+    scoringHash: text("scoring_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /**
      * Stamped ONCE, by `stampSeasonCompleteInTx` (`@/league-service/participation`), inside the
@@ -3401,5 +3419,57 @@ export const playerPeekFacts = pgTable(
      * never be chosen over this one.
      */
     uniqueIndex("player_peek_facts_fact_idx").on(t.playerId, t.season, t.asOf),
+  ],
+);
+
+/**
+ * THE FINISHED PEEK DOCUMENT (peek document design §3.1, 2026-09-07) — one row per (season,
+ * scoring hash, player, `as_of`), holding everything a player peek and the full player page draw
+ * except the facts one league contributes live.
+ *
+ * WHY IT IS KEYED ON A SCORING HASH AND NOT ON A LEAGUE. A fantasy point is a property of a player
+ * inside a rule set, so the only league-specific thing about these numbers is the rules that scored
+ * them. Most leagues run one of a few presets, so a document keyed by `scoringHashOf(rules)` serves
+ * every league that shares them: one shared build instead of one copy per league per player.
+ *
+ * WHAT IS DELIBERATELY NOT IN HERE, because it is joined at read time: the roster holder (a trade
+ * changes no document), whether the room is a mock, and the league's own schedule length. The
+ * reader's one statement applies all three.
+ */
+export const playerPeekDocuments = pgTable(
+  "player_peek_documents",
+  {
+    playerId: text("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** The product season this document is FOR. It carries EVERY season it can answer for inside
+     *  `document.seasons`, so a season switch in the peek is a client-side flip with no fetch. */
+    season: integer("season").notNull(),
+    /** `scoringHashOf(the league's rules)` — see `leagues.scoring_hash`, which is what the peek's
+     *  one statement joins on. */
+    scoringHash: text("scoring_hash").notNull(),
+    /** The complete body minus the live league facts. See `PeekDocument`. */
+    document: jsonb("document").$type<PeekDocument>().notNull(),
+    /** Which inputs and which of their stamps produced this document, promoted out of the blob so
+     *  an operator can ask the table what a generation was built from without opening every row.
+     *  Both halves are written by one function. Never nullable. */
+    basis: jsonb("basis").$type<PeekDocumentBasis>().notNull(),
+    /** THE STAMP: the moment these facts were knowable. Never `defaultNow()`, for the reason every
+     *  other stamp in this engine is not. The peek reads the latest row with `as_of <= now`. */
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    /** When the build ran. Operational only, never a filter. */
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+    /** `PEEK_DOCUMENT_SOURCE`. A later document shape writes under a new one rather than
+     *  overwriting rows a reader is already serving. */
+    source: text("source").notNull(),
+  },
+  (t) => [
+    /**
+     * Identity of the document, and ALSO the read index, exactly as `player_peek_facts` has it. The
+     * peek's own query equals on the first three columns and takes the newest `as_of` at or before
+     * now, whose leading columns are this key's in this order, so a second non-unique index beside
+     * it would be a duplicate structure maintained on every write and never chosen over this one.
+     */
+    uniqueIndex("player_peek_documents_document_idx").on(t.season, t.scoringHash, t.playerId, t.asOf),
   ],
 );

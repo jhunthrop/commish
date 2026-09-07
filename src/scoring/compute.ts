@@ -26,6 +26,18 @@ const YARDS_ALLOWED_TIERS: readonly (readonly [number, number])[] = [
   [99, 5], [199, 3], [299, 2], [349, 0], [399, -1], [449, -3], [499, -5], [549, -6], [Infinity, -7],
 ];
 
+/**
+ * BOTH FIXED TABLES UNDER ONE NAME, for the one caller that needs to see the whole shape of a
+ * rule set rather than score a line with it: `scoringHashOf` (`./hash`), which hashes the tier
+ * tables alongside the tunable weights because a change to either changes what every stored
+ * fantasy point means. Kept here, beside the tables themselves, so there is never a second copy
+ * of these boundaries to fall out of step.
+ */
+export const SCORING_TIER_TABLES: Readonly<Record<string, readonly (readonly [number, number])[]>> = {
+  pointsAllowed: POINTS_ALLOWED_TIERS,
+  yardsAllowed: YARDS_ALLOWED_TIERS,
+};
+
 function tierPoints(value: number, tiers: readonly (readonly [number, number])[]): number {
   for (const [ceiling, points] of tiers) if (value <= ceiling) return points;
   return 0;
