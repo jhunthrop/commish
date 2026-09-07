@@ -1,6 +1,7 @@
 import type { PlayerFactsBooksNumbers } from "@/capsules/facts";
 import { PROP_MARKET_LABELS } from "@/capsules/prop-market-labels";
 import { Card } from "@/components/ui";
+import { formatLine } from "../lib/format";
 
 export interface BooksModuleProps {
   readonly books: PlayerFactsBooksNumbers;
@@ -32,13 +33,13 @@ export function BooksModule({ books }: BooksModuleProps) {
         <div className="flex flex-wrap gap-2">
           {books.propsLines.map((line) => (
             <span key={line.market} className="rounded-pill bg-surface-inset px-3 py-1 text-sm tabular-nums text-text-primary" data-books-chip={line.market}>
-              {line.medianLine} {PROP_MARKET_LABELS[line.market]} a game
+              {formatLine(line.medianLine)} {PROP_MARKET_LABELS[line.market]} a game
             </span>
           ))}
         </div>
       )}
       <p className="text-sm text-text-muted" data-books="win-total">
-        {books.teamVegasWinTotal === null ? "Team win total: not posted yet." : `Team win total: ${books.teamVegasWinTotal} wins.`}
+        {books.teamVegasWinTotal === null ? "Team win total: not posted yet." : `Team win total: ${formatLine(books.teamVegasWinTotal)} wins.`}
       </p>
     </Card>
   );

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { PlayerFactsLastSeasonStory } from "@/capsules/facts";
 import { Card, SeasonBars, type SeasonWeek } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { ordinal } from "../lib/format";
+import { formatTenth, formatWhole, ordinal } from "../lib/format";
 
 export interface SeasonStripProps {
   readonly story: PlayerFactsLastSeasonStory;
@@ -33,9 +33,9 @@ function factsFor(story: PlayerFactsLastSeasonStory, scoringLabel: string): read
   return [
     { label: "Games", value: String(story.gamesPlayed) },
     { label: "Finish", value: ordinal(story.pointsRank.positionRank), sub: `of ${story.pointsRank.qualifierCount}` },
-    { label: "Points per game", value: `${story.pointsPerGame.toFixed(1)} a game`, sub: scoringLabel },
-    { label: "Best week", value: story.bestWeek.points.toFixed(1), sub: `week ${story.bestWeek.week}` },
-    { label: "Receiving yards", value: `${story.receivingYardsRank.value}`, sub: `${ordinal(story.receivingYardsRank.positionRank)} of ${story.receivingYardsRank.qualifierCount}` },
+    { label: "Points per game", value: `${formatTenth(story.pointsPerGame)} a game`, sub: scoringLabel },
+    { label: "Best week", value: formatTenth(story.bestWeek.points), sub: `week ${story.bestWeek.week}` },
+    { label: "Receiving yards", value: formatWhole(story.receivingYardsRank.value), sub: `${ordinal(story.receivingYardsRank.positionRank)} of ${story.receivingYardsRank.qualifierCount}` },
   ];
 }
 

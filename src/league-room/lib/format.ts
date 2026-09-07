@@ -7,6 +7,32 @@ export function formatPoints(points: number): string {
   return points.toFixed(2);
 }
 
+/**
+ * ONE DECIMAL, ALWAYS (dossier-voice round §3.4, founder: "up 12.440000000000001").
+ *
+ * A number that reaches a sentence through a subtraction carries the whole of binary floating
+ * point with it, and a module that interpolates it raw prints all seventeen digits of it. Every
+ * per-game figure and every delta on a dossier module goes through this: "12.4", "3.0", "-1.8".
+ */
+export function formatTenth(value: number): string {
+  return value.toFixed(1);
+}
+
+/**
+ * A BOOK'S OWN LINE — one decimal, with a bare `.0` trimmed: a win total of 9.5 is 9.5 and a win
+ * total of 10 is 10, never "10.0". The books post halves, so the half has to survive, and a whole
+ * number nobody hung a half on should not grow a decimal it never had.
+ */
+export function formatLine(value: number): string {
+  const rounded = Number(value.toFixed(1));
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+/** A counted quantity a person says whole: yards, snaps, attempts. */
+export function formatWhole(value: number): string {
+  return String(Math.round(value));
+}
+
 export function formatWeek(weekNumber: number): string {
   return `Week ${weekNumber}`;
 }
