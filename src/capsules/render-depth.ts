@@ -81,6 +81,42 @@ function coachingLine(depth: PlayerFactsDepth): string | null {
   return parts.length === 0 ? null : `Coaching for ${coaching.season}: ${parts.join(". ")}.`;
 }
 
+/** English for how many seasons he has already played. Past ten, the number reads better than the
+ *  word, which is where every style guide draws the same line. */
+const SEASON_WORDS = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"] as const;
+
+function seasonOrdinal(seasonsPlayed: number): string {
+  const word = SEASON_WORDS[seasonsPlayed];
+  return word === undefined ? `season number ${seasonsPlayed + 1}` : `${word} season`;
+}
+
+/** AGE, EXPERIENCE AND PEDIGREE. Every clause is dropped on its own when its value is absent, so a
+ *  player the roster archive has a birth date for but no draft row still gets his age. */
+function pedigreeLine(depth: PlayerFactsDepth): string | null {
+  const pedigree = depth.pedigree;
+  if (pedigree === null) return null;
+  const parts: string[] = [];
+  if (pedigree.ageOnOpeningDay !== null) parts.push(`Age ${pedigree.ageOnOpeningDay.toFixed(1)} on opening day`);
+  if (pedigree.seasonsPlayed !== null) parts.push(`entering his ${seasonOrdinal(pedigree.seasonsPlayed)}`);
+  if (pedigree.college !== null) parts.push(`out of ${pedigree.college}`);
+  const draft = draftClause(depth);
+  if (draft !== null) parts.push(draft);
+  return parts.length === 0 ? null : `${parts.join(", ")}.`;
+}
+
+/** The draft half of the pedigree, or `null` when the archive holds nothing about his draft. */
+function draftClause(depth: PlayerFactsDepth): string | null {
+  const pedigree = depth.pedigree;
+  if (pedigree === null || pedigree.draftYear === null) return null;
+  if (pedigree.undrafted === true) return `undrafted out of the ${pedigree.draftYear} class`;
+  const where = [
+    pedigree.draftRound === null ? null : `round ${pedigree.draftRound}`,
+    pedigree.draftPick === null ? null : `pick ${pedigree.draftPick}`,
+  ].filter((part): part is string => part !== null);
+  const by = pedigree.draftClub === null ? "" : ` by ${pedigree.draftClub}`;
+  return where.length === 0 ? `drafted in ${pedigree.draftYear}${by}` : `drafted in ${pedigree.draftYear} at ${where.join(", ")}${by}`;
+}
+
 /** Every line of the section, in `PlayerFactsDepth`'s own field order. */
 function depthLines(depth: PlayerFactsDepth): readonly string[] {
   return [
@@ -89,6 +125,7 @@ function depthLines(depth: PlayerFactsDepth): readonly string[] {
     gamesMissedLine(depth),
     injuryHistoryLine(depth),
     coachingLine(depth),
+    pedigreeLine(depth),
   ].filter((line): line is string => line !== null && line !== "");
 }
 

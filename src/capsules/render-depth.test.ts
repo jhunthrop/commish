@@ -125,3 +125,35 @@ describe("the coaching line", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, coaching: null })))).toBeNull();
   });
 });
+
+describe("the pedigree line", () => {
+  it("states age, experience, college and the whole draft, and grounds every number and the drafting club", () => {
+    const facts = buildPlayerFacts(
+      depthInput({
+        ...EMPTY_DEPTH,
+        pedigree: { ageOnOpeningDay: 25.2, college: "LSU", seasonsPlayed: 3, draftYear: 2023, draftRound: 1, draftPick: 22, draftClub: "NYG", undrafted: false },
+      }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- Age 25.2 on opening day, entering his fourth season, out of LSU, drafted in 2023 at round 1, pick 22 by NYG.");
+    for (const value of [25.2, 3, 2023, 1, 22]) expect(facts.numberLedger).toContain(value);
+    for (const name of ["NYG", "New York", "Giants"]) expect(facts.nameLedger).toContain(name);
+  });
+
+  it("drops each absent clause on its own rather than the whole line", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, pedigree: { ageOnOpeningDay: 22.1, college: null, seasonsPlayed: 0, draftYear: null, draftRound: null, draftPick: null, draftClub: null, undrafted: null } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- Age 22.1 on opening day, entering his first season.");
+  });
+
+  it("says undrafted only where the archive said so", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, pedigree: { ageOnOpeningDay: null, college: null, seasonsPlayed: null, draftYear: 2023, draftRound: null, draftPick: null, draftClub: null, undrafted: true } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- undrafted out of the 2023 class.");
+  });
+
+  it("renders no pedigree line when no field has a row behind it", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, pedigree: null })))).toBeNull();
+  });
+});

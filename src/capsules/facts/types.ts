@@ -73,10 +73,12 @@ export interface PlayerFactsCoaching {
 }
 
 /** AGE, EXPERIENCE AND PEDIGREE. Age comes from a stored birth date against a stored kickoff
- *  instant, never from a clock. There is no college field: no table in this store carries one, and
- *  inventing the column would invite a later reader to fill it from memory. */
+ *  instant, never from a clock. */
 export interface PlayerFactsPedigree {
   readonly ageOnOpeningDay: number | null;
+  /** The harvest roster sweep's own `school` field. `null` when no sweep has been captured yet,
+   *  which is production's state today. No relational table in this store carries a college. */
+  readonly college: string | null;
   readonly seasonsPlayed: number | null;
   readonly draftYear: number | null;
   /** Only `nfl_draft_picks` carries a round, and production holds none of those rows — `null` there
