@@ -11,7 +11,7 @@ import type { PeekDocumentRequest } from "@/capsules/peek-document-inputs";
 import type { Db } from "@/db/client";
 import * as schema from "@/db/schema";
 import { jobs, nflPlayers, playerCrosswalk, players, playerPeekDocuments, preseasonProjections, users } from "@/db/schema";
-import { PEEK_DOCUMENT_JOB_NAME, runPeekDocumentStep } from "@/jobs/defs/peek-document-job";
+import { runPeekDocumentStep } from "@/jobs/defs/peek-document-job";
 import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
 import { PPR_SCORING } from "@/domain/scoring";
 import { statMetricName } from "@/projections/lines";

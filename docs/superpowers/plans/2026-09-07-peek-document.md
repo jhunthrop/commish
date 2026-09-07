@@ -55,6 +55,20 @@ account-room/*, admin-room/*, chat-room/*, integrity/*, and
 | Brandon Aubrey (K) | cold | 17 | 19 |
 | Brandon Aubrey (K) | warm | 16 | 19 |
 
+## After (same command, same dev database, after one whole build of every hash in use)
+
+| player | pass | ms | queries |
+|---|---|---|---|
+| Ja'Marr Chase (WR) | cold | 15 | 1 |
+| Ja'Marr Chase (WR) | warm | 7 | 1 |
+| Jahmyr Gibbs (RB) | cold | 7 | 1 |
+| Jahmyr Gibbs (RB) | warm | 6 | 1 |
+| Brandon Aubrey (K) | cold | 6 | 1 |
+| Brandon Aubrey (K) | warm | 7 | 1 |
+
+The build itself: three scoring hashes in use on the dev database, 1719 documents each, under three
+seconds per hash. The store is 16 MB for all three, at about 7 KB a document.
+
 ---
 
 ## Task 1 — `scoringHashOf` and `leagues.scoring_hash`
