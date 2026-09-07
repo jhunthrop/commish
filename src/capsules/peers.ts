@@ -1,6 +1,5 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { playerWeekObservations, preseasonProjections } from "@/db/schema";
 import type { Position } from "@/domain/player";
 import { allPositions } from "@/projections/backtest";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
@@ -38,18 +37,21 @@ import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 export async function activePeersFor(db: Db, positions: readonly Position[], season: number): Promise<ReadonlyMap<string, Position>> {
   if (positions.length === 0) return new Map();
   const wanted = new Set(positions);
-  const [universe, boardIds, statIds] = await Promise.all([
-    allPositions(db),
-    db
-      .selectDistinct({ id: preseasonProjections.playerId })
-      .from(preseasonProjections)
-      .where(and(eq(preseasonProjections.season, season), eq(preseasonProjections.source, BOARD_SOURCE))),
-    db
-      .selectDistinct({ id: playerWeekObservations.playerId })
-      .from(playerWeekObservations)
-      .where(inArray(playerWeekObservations.season, [season, season - 1])),
-  ]);
-
-  const active = new Set<string>([...boardIds.map((row) => row.id), ...statIds.map((row) => row.id)]);
+  // TWO ROUND TRIPS, NOT THREE. The position map and the active-id set are genuinely different
+  // reads, but the two halves of "active" are one `UNION` rather than two statements: this function
+  // sits on the peek's own request path now, where a saved round trip is a saved round trip.
+  const [universe, active] = await Promise.all([allPositions(db), activeIdsFor(db, season)]);
   return new Map([...universe].filter(([id, position]) => wanted.has(position) && active.has(id)));
+}
+
+/** Every nflverse id the board ranks for `season` or the observation store holds a week for in
+ *  `season` or the one before it, as one set. `UNION` (not `UNION ALL`) so the database does the
+ *  de-duplication rather than shipping both id lists over the wire to be merged here. */
+async function activeIdsFor(db: Db, season: number): Promise<ReadonlySet<string>> {
+  const rows = await db.execute<{ id: string }>(sql`
+    SELECT player_id AS id FROM preseason_projections WHERE season = ${season} AND source = ${BOARD_SOURCE}
+    UNION
+    SELECT player_id AS id FROM player_week_observations WHERE season IN (${season}, ${season - 1})
+  `);
+  return new Set([...rows].map((row) => row.id));
 }

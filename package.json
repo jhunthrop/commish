@@ -68,6 +68,7 @@
     "projections:ecr:current": "dotenv -e .env.local -- tsx scripts/ingest-current-ecr.ts",
     "projections:preseason:persist": "dotenv -e .env.local -- tsx scripts/preseason-persist.ts",
     "peek:timing": "dotenv -e .env.local -- tsx scripts/peek-timing.ts",
+    "peek:facts:refresh": "dotenv -e .env.local -- tsx scripts/peek-facts-refresh.ts",
     "projections:board:top": "dotenv -e .env.local -- tsx scripts/board-top.ts",
     "projections:register:freeze": "dotenv -e .env.local -- tsx scripts/register-freeze.ts",
     "projections:register:grade": "dotenv -e .env.local -- tsx scripts/register-grade.ts",
