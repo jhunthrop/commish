@@ -327,11 +327,13 @@ function fillFromPlayByPlay(published: Map<string, SeasonParticipation>, pbpRows
  *  with NO row here has no participation evidence at all, distinct from a player whose row sums to
  *  zero — callers must keep that distinction (see `factsForSeason`'s `touches`/`targetShare`).
  *  A season `admitsDerivedForLiveSurface` admits takes the play-by-play fill above, which is the
- *  difference between a real touches rank and an empty one for a gap season. */
-async function seasonParticipation(db: ReadonlyDb, season: number, asOf: Date): Promise<Map<string, SeasonParticipation>> {
+ *  difference between a real touches rank and an empty one for a gap season, and ONLY when the
+ *  caller admits derived lines at all (`admitDerived`, the same flag `seasonScoring` honours): a
+ *  replay board that reads published lines must never mix play-by-play carries into them. */
+async function seasonParticipation(db: ReadonlyDb, season: number, asOf: Date, admitDerived: boolean): Promise<Map<string, SeasonParticipation>> {
   const span = { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf } as const;
   const published = sumPublishedParticipation(await observationsAsOf(db, { ...span, source: STAT_LINE_SOURCE }));
-  if (!admitsDerivedForLiveSurface(season)) return published;
+  if (!admitDerived || !admitsDerivedForLiveSurface(season)) return published;
   return fillFromPlayByPlay(published, await observationsAsOf(db, { ...span, source: PBP_PLAYER_SOURCE }));
 }
 
@@ -479,7 +481,7 @@ export async function seasonContext(
   admitDerived: boolean,
 ): Promise<SeasonContext> {
   const scoring = await seasonScoring(db, season, asOf, positions, rules, admitDerived);
-  const participation = await seasonParticipation(db, season, asOf);
+  const participation = await seasonParticipation(db, season, asOf, admitDerived);
   const teams = await seasonTeams(db, season, asOf);
   const roster = await preseasonRostersAsOf(db, { season, asOf });
   const coachFacts = await incomingCoachFactsByTeam(db, season + 1, asOf);

@@ -706,8 +706,10 @@ interface PriorSeasonsInput {
  */
 async function priorSeasonsWithDataFor({ db, playerId, gsisId, isKdef, peek, now }: PriorSeasonsInput): Promise<readonly number[]> {
   const candidates = priorSeasonCandidates();
-  if (peek !== null) return peek.priorSeasonsHeld.filter((season) => candidates.includes(season));
+  // A kicker or a team defense answers from its own archive first: the peek pass writes rows for
+  // projected board players only, and a row for one of these two would still not know the archive.
   if (isKdef) return await kdefSeasonsWithData(db, playerId, candidates);
+  if (peek !== null) return peek.priorSeasonsHeld.filter((season) => candidates.includes(season));
   if (gsisId === null) return [];
   const held: number[] = [];
   for (const candidate of candidates) {
