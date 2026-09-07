@@ -25,6 +25,7 @@ import { MONEY_ACCOUNT_KINDS } from "@/money/accounts";
 import type { MoneyPostingDirection } from "@/money/posting";
 import type { PrizeTable } from "@/money/prize-table";
 import type { TransferIntent } from "@/payments-provider/contract";
+import type { PeekFactsRow } from "@/capsules/peek-facts-row";
 import type { TradeAsset } from "@/trades/assets";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
@@ -3328,3 +3329,77 @@ export const playerCapsules = pgTable("player_capsules", {
   model: text("model"),
   generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * THE PRECOMPUTED PEEK ROW (peek-facts design, 2026-09-07) — everything a player peek needs about a
+ * player's position peers, stored once by the job that already computes it rather than recomputed
+ * on every click.
+ *
+ * WHY A STORED ANSWER AND NOT A VIEW. A view is a saved query, and the population aggregation would
+ * still run per open. The facts that cost the time are about LAST season (immutable once it ended)
+ * and about THIS season's played weeks (they move once a week, when stats finalize). Those are the
+ * two moments the job system already fires on, so the answer is computed by a job and stored, with
+ * the `as_of`/`computed_at` stamps the point-in-time discipline needs and a materialized refresh
+ * could not carry per row.
+ *
+ * WHAT IT COST BEFORE. Measured on production 2026-09-07 with the exact server function the peek
+ * calls: 13.8 s and 73 queries for a receiver, 15.7 s and 69 for a back, because the peer population
+ * handed to the color reads was the whole historical universe (3,293 receivers back to 1999) and the
+ * reads under it were chunked `IN` lists over `player_week_observations`.
+ *
+ * ABSENCE IS A REAL ANSWER. A player with no row here (a new signing, or a fresh deploy before the
+ * first sweep) renders his dossier as ABSENT, exactly as a player the board never ranked already
+ * does. Nothing on this table is ever a stale or guessed stand-in for a fact that has not been
+ * computed yet.
+ *
+ * KEYED ON THE PRODUCT PLAYER ID, not the nflverse one: the peek asks in the product's own id space
+ * and this table is a product surface's cache, not an engine store. The crosswalk join stays where
+ * it already is, inside the writer.
+ */
+export const playerPeekFacts = pgTable(
+  "player_peek_facts",
+  {
+    playerId: text("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** The product season these facts are FOR. The color facts inside describe the season before it,
+     *  which `basis.priorSeason` states rather than leaves to arithmetic. */
+    season: integer("season").notNull(),
+    /** Everything the peek's dossier renders. See `PeekFactsRow.dossier` for why it is one blob. */
+    dossier: jsonb("dossier").$type<PeekFactsRow["dossier"]>().notNull(),
+    /** A PROJECTION of `dossier.lastSeasonStory.touchesRank`, promoted so an operator can ask this
+     *  table how many players actually have a touches rank without opening every blob. Both halves
+     *  are written by one function and pinned to agree by a test. `null` is the refusal: no touches
+     *  evidence for him, or a population the writer would have had to invent to rank him against. */
+    touchesRank: integer("touches_rank"),
+    touchesQualifierCount: integer("touches_qualifier_count"),
+    /** Which of the recent seasons the store holds at least one week of for him, newest first —
+     *  what replaced the peek's three serial "does a prior season exist" round trips. */
+    priorSeasonsHeld: integer("prior_seasons_held").array().notNull(),
+    lastSeasonLine: jsonb("last_season_line").$type<PeekFactsRow["lastSeasonLine"]>(),
+    /** Source keys, peer population size and every refusal, so no number on this row is a figure a
+     *  reader has to take on faith. Never nullable. */
+    basis: jsonb("basis").$type<PeekFactsRow["basis"]>().notNull(),
+    /** THE STAMP: the moment these facts were knowable. Never `defaultNow()`, for the reason every
+     *  other stamp in this engine is not. The peek reads the latest row with `as_of <= now`. */
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    /** When the pass ran. Operational only, never a filter. */
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+    /** `PEEK_FACTS_SOURCE`. A later shape writes under a new one rather than overwriting rows a
+     *  reader is already serving. */
+    source: text("source").notNull(),
+  },
+  (t) => [
+    /**
+     * Identity of the fact: this player's peek facts for this season, as computed at this moment.
+     * Re-running the writer at the same moment is a no-op rather than a duplicate.
+     *
+     * IT IS ALSO THE READ INDEX, deliberately, and there is no second one beside it. The peek's own
+     * query is "this player, this season, newest `as_of` at or before now, limit one", whose
+     * leading columns are exactly this key's — a separate non-unique index on the same three
+     * columns in the same order would be a duplicate structure to maintain on every write and would
+     * never be chosen over this one.
+     */
+    uniqueIndex("player_peek_facts_fact_idx").on(t.playerId, t.season, t.asOf),
+  ],
+);
