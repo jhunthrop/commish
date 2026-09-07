@@ -304,7 +304,10 @@ export async function collectPeekDocumentInputs(db: Db, request: PeekDocumentReq
       injuryDesignation: reads.injuries.designations.get(player.id) ?? null,
       news: reads.news.byName.get(player.name) ?? [],
       reasons: gsisId === null ? [] : (reads.reasons.get(gsisId) ?? []),
-      capsule: capsule === undefined ? null : { bodyCompact: capsule.bodyCompact, bodyFull: capsule.bodyFull, source: capsule.source },
+      capsule:
+        capsule === undefined
+          ? null
+          : { bodyCompact: capsule.bodyCompact, bodyFull: capsule.bodyFull, source: capsule.source, narrative: capsule.narrative ?? null },
       dossier: facts?.dossier ?? null,
       seasons,
       asOf: request.asOf,

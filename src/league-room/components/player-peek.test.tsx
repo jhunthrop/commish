@@ -252,9 +252,9 @@ describe("PlayerPeekHost — the Outlook, grouped (2026-09-04 redesign)", () => 
 
     await waitFor(() => expect(screen.getByText(/Age 29 season/)).toBeInTheDocument());
     // The receipt sentence is not visible until the group is pressed open.
-    expect(screen.queryByText(/measured -1\.8 pts per game/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/costs him 1\.8 pts a game/)).not.toBeInTheDocument();
     await user.click(screen.getByText(/Age 29 season/));
-    expect(screen.getByText(/Age 29 season: measured -1\.8 pts per game/)).toBeInTheDocument();
+    expect(screen.getByText(/Age 29 season: costs him 1\.8 pts a game/)).toBeInTheDocument();
   });
 
   it("labels a single-law group plainly, with no 'together' prefix", async () => {
@@ -337,7 +337,7 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
       ...bodyFor(2026, [2026]),
       reasons: DOSSIER_REASONS,
       dossier: DOSSIER,
-      capsule: { bodyCompact: "The compact read.", bodyFull: "The full read.", source: "llm" },
+      capsule: { bodyCompact: "The compact read.", bodyFull: "The full read.", source: "llm", narrative: null },
       injuryDesignation: "Q",
       news: [{ title: "Rashad Long: full practice", link: "https://example.com/1" }],
       ...overrides,
@@ -442,7 +442,7 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     );
     openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
     await waitFor(() => expect(screen.getByText("Age 29 season.")).toBeInTheDocument());
-    expect(screen.getByText("Measured -1.8 points per game.")).toBeInTheDocument();
+    expect(screen.getByText("Costs him 1.8 points a game.")).toBeInTheDocument();
     // 6 groups total, capped to 5 in the peek — the same cap Outlook used before this task.
     expect(screen.getByText("The full case (6)")).toBeInTheDocument();
   });
@@ -468,7 +468,9 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     );
     openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
     await waitFor(() => expect(screen.getByLabelText("Story")).toBeInTheDocument());
-    expect(screen.getAllByText("Q")).toHaveLength(2);
+    // The header keeps the compact feed code; the story card says the word (dossier-voice §3.7).
+    expect(screen.getAllByText("Q")).toHaveLength(1);
+    expect(screen.getByText("Questionable")).toBeInTheDocument();
   });
 
   it("relocates the news list beside the story module rather than duplicating it below the fold", async () => {
@@ -629,5 +631,70 @@ describe("PlayerPeekHost, a kicker", () => {
   it("follows the copy rules on the kicker surface too", async () => {
     const { container } = await openKicker();
     expect(container.textContent).not.toMatch(/[—;]/);
+  });
+});
+
+/**
+ * THE LOADING STATE (founder, 2026-09-07, on a screenshot of the sheet mid-load) — the header
+ * renders from the row that was pressed and the body used to be empty dark for five to fifteen
+ * seconds on a cold start or an off-board player.
+ */
+describe("PlayerPeekHost — while the wire is still out", () => {
+  /** A `fetchJson` that never resolves, which is exactly the state under test. */
+  function pendingDeps(): LeagueRoomDeps {
+    return {
+      fetchJson: () => new Promise<Response>(() => {}),
+      openEventSource: () => ({ addEventListener: () => undefined, close: () => undefined }),
+    };
+  }
+
+  it("renders the module frame and one line of copy, and no composition at all", async () => {
+    const { container } = mount(pendingDeps());
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText("Pulling his numbers.")).toBeInTheDocument());
+    expect(container.querySelector('[data-peek="pending"]')).not.toBeNull();
+    expect(container.querySelectorAll('[aria-busy="true"]').length).toBeGreaterThan(0);
+    // The name the manager pressed is already on screen; nothing else claims to be.
+    expect(screen.getByText("Rashad Long")).toBeInTheDocument();
+    expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
+    // The old bare "Loading…" line is gone from the copy. The `Skeleton` primitive keeps its own
+    // screen-reader-only "Loading…", which is its accessible label rather than visible chatter.
+    const visible = [...container.querySelectorAll("p")].map((node) => node.textContent);
+    expect(visible).toContain("Pulling his numbers.");
+    expect(visible).not.toContain("Loading…");
+  });
+
+  it("follows the copy rules: no em-dash, no semicolon, no spinner chatter", async () => {
+    const { container } = mount(pendingDeps());
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText("Pulling his numbers.")).toBeInTheDocument());
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/—/);
+    expect(text).not.toMatch(/;/);
+    expect(text).not.toMatch(/please wait/i);
+  });
+
+  it("drops the frame the moment the body lands, and renders the composition", async () => {
+    const bodies = new Map([[2026, bodyFor(2026, [2026])]]);
+    const { container } = mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText("2026 season")).toBeInTheDocument());
+    expect(container.querySelector('[data-peek="pending"]')).toBeNull();
+    expect(screen.queryByText("Pulling his numbers.")).not.toBeInTheDocument();
+  });
+
+  it("says the honest failure instead of the frame when the load fails", async () => {
+    const failing: LeagueRoomDeps = {
+      fetchJson: () => Promise.resolve(new Response(JSON.stringify({ ok: false, error: "nope" }))),
+      openEventSource: () => ({ addEventListener: () => undefined, close: () => undefined }),
+    };
+    const { container } = mount(failing);
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText("We could not load him. Close this and try again.")).toBeInTheDocument());
+    expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(0);
   });
 });

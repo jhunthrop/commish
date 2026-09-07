@@ -252,7 +252,8 @@ export async function actualPointsPerGame(
   return out;
 }
 
-interface SeasonParticipation {
+/** Exported alongside `fillFromPlayByPlay`, which a test builds one of these by hand for. */
+export interface SeasonParticipation {
   readonly targets: number;
   readonly teamTargets: number;
   readonly carries: number;
@@ -299,28 +300,79 @@ function sumPublishedParticipation(rows: readonly PlayerWeekObservation[]): Map<
  * one of these numbers carries its source key beside it (`capsules/peek-facts.ts`'s own `basis`), so
  * no reader can mistake which definition produced it.
  *
- * NO TEAM TARGETS. The play-by-play carries no team-target denominator, so `teamTargets` stays zero
- * and `targetShareOf` keeps returning `null` for a gap season, exactly as it does today. A share
- * this function cannot back with a real denominator is not one it invents.
+ * TEAM TARGETS ARE DERIVED, NOT MISSING (dossier-voice round, 2026-09-07). The published feed's
+ * `team_targets` column is the sum of that team's own players' targets in that week, and the
+ * play-by-play stream carries every one of those player-week target rows, so the denominator is
+ * derivable from the rows this function already reads: group the week's target rows by the team
+ * `player_week_teams` places each player on THAT WEEK (`teamByPlayerWeek`, the same week-by-week
+ * join `bestTeammateTargetShares` makes, and for the same reason — a traded player's early targets
+ * belong to his old team's denominator and his late ones to his new team's). Before this, the fill
+ * left the denominator at zero and `targetShareOf` returned `null` for every player of a gap
+ * season, which is why the whole 2025 board read "Target share: not tracked for him".
+ *
+ * THE NUMERATOR AND THE DENOMINATOR ARE THE SAME WEEKS. A target row whose week has no team edge
+ * contributes to NEITHER: counting his targets while skipping his team's would publish his targets
+ * over somebody else's denominator, a number no feed ever measured. A team-week with no targets at
+ * all adds nothing, and a player whose whole denominator comes out zero keeps a `null` share rather
+ * than a divide.
  *
  * A PUBLISHED ROW ALWAYS WINS, the same rule `statLinesAsOfForLiveSurface` keeps: only a player the
  * published read did not place at all takes the substitution.
+ *
+ * Exported for `participation-fill.test.ts`, which fixtures three receivers on one team and asserts each
+ * share and that the three sum to one — a property no database round trip makes any clearer.
  */
-function fillFromPlayByPlay(published: Map<string, SeasonParticipation>, pbpRows: readonly PlayerWeekObservation[]): Map<string, SeasonParticipation> {
+export function fillFromPlayByPlay(
+  published: Map<string, SeasonParticipation>,
+  pbpRows: readonly PlayerWeekObservation[],
+  teamByPlayerWeek: ReadonlyMap<string, string>,
+): Map<string, SeasonParticipation> {
+  const teamWeekTargets = teamWeekTargetTotals(pbpRows, teamByPlayerWeek);
   const filled = new Map(published);
+  // One team-week's denominator counts ONCE per player, however many target rows he has in it.
+  const denominatorCounted = new Map<string, Set<string>>();
+
   for (const row of pbpRows) {
     if (published.has(row.playerId)) continue;
     const isCarry = row.metric === PBP_PLAYER_METRICS.carries;
     const isTarget = row.metric === PBP_PLAYER_METRICS.targets;
     if (!isCarry && !isTarget) continue;
+
+    const teamWeek = isTarget ? teamWeekOf(row, teamByPlayerWeek) : null;
+    if (isTarget && teamWeek === null) continue;
+    const counted = denominatorCounted.get(row.playerId) ?? new Set<string>();
+    const firstRowOfTeamWeek = teamWeek !== null && !counted.has(teamWeek);
+    if (teamWeek !== null) counted.add(teamWeek);
+    denominatorCounted.set(row.playerId, counted);
+
     const existing = filled.get(row.playerId) ?? EMPTY_PARTICIPATION;
     filled.set(row.playerId, {
       targets: existing.targets + (isTarget ? row.value : 0),
-      teamTargets: existing.teamTargets,
+      teamTargets: existing.teamTargets + (firstRowOfTeamWeek ? (teamWeekTargets.get(teamWeek) ?? 0) : 0),
       carries: existing.carries + (isCarry ? row.value : 0),
     });
   }
   return filled;
+}
+
+/** `${week}|${team}` for a target row whose player has a team edge that week, `null` otherwise. */
+function teamWeekOf(row: PlayerWeekObservation, teamByPlayerWeek: ReadonlyMap<string, string>): string | null {
+  const team = teamByPlayerWeek.get(`${row.playerId}|${row.week}`);
+  return team === undefined ? null : `${row.week}|${team}`;
+}
+
+/** Every team-week's own target total: the sum of that week's play-by-play target rows across the
+ *  players `player_week_teams` places on that team, which is the definition the published feed's
+ *  `team_targets` column carries. A row with no team edge is not counted anywhere. */
+function teamWeekTargetTotals(pbpRows: readonly PlayerWeekObservation[], teamByPlayerWeek: ReadonlyMap<string, string>): ReadonlyMap<string, number> {
+  const totals = new Map<string, number>();
+  for (const row of pbpRows) {
+    if (row.metric !== PBP_PLAYER_METRICS.targets) continue;
+    const teamWeek = teamWeekOf(row, teamByPlayerWeek);
+    if (teamWeek === null) continue;
+    totals.set(teamWeek, (totals.get(teamWeek) ?? 0) + row.value);
+  }
+  return totals;
 }
 
 /** Targets, team targets and carries per player, summed over one season as of one moment. A player
@@ -334,7 +386,12 @@ async function seasonParticipation(db: ReadonlyDb, season: number, asOf: Date, a
   const span = { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf } as const;
   const published = sumPublishedParticipation(await observationsAsOf(db, { ...span, source: STAT_LINE_SOURCE }));
   if (!admitDerived || !admitsDerivedForLiveSurface(season)) return published;
-  return fillFromPlayByPlay(published, await observationsAsOf(db, { ...span, source: PBP_PLAYER_SOURCE }));
+  const [pbpRows, teamRows] = await Promise.all([
+    observationsAsOf(db, { ...span, source: PBP_PLAYER_SOURCE }),
+    playerTeamsAsOf(db, span),
+  ]);
+  const teamByPlayerWeek = new Map(teamRows.map((row) => [`${row.playerId}|${row.week}`, row.team] as const));
+  return fillFromPlayByPlay(published, pbpRows, teamByPlayerWeek);
 }
 
 /** A player's own season target share: his own targets over his own team_targets, summed across

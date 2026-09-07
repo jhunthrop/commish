@@ -11,7 +11,7 @@ import { recordPreseasonRankings, recordPreseasonRosters } from "@/projections/p
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
 import { recordTeamObservations } from "@/projections/team-store";
 import { recordNflPlayers } from "@/projections/universe";
-import { persistSeason } from "./preseason-persist";
+import { diffReasons, persistSeason } from "./preseason-persist";
 
 /**
  * I5 (Task 4 fix round 2) — THE ORDERING GUARANTEE ITSELF, proven end to end against a real
@@ -214,5 +214,38 @@ describe("persistSeason — the props-anchor warning fires on a LIVE board with 
     } finally {
       warnSpy.mockRestore();
     }
+  });
+});
+
+/**
+ * --diff-reasons (dossier-voice round, task 7) — the counting itself, pure, so the coordinator can
+ * trust the number the script prints before running a re-persist against production.
+ */
+describe("diffReasons", () => {
+  const cliff = (playersLeftInTier: number, dropToNextTier: number) =>
+    [{ code: "tier_cliff", playersLeftInTier, dropToNextTier } as const];
+
+  it("counts a payload that moved as changed, not as an add and a drop", () => {
+    const stored = new Map([["p1", cliff(1, 3.2)]]);
+    const fresh = new Map([["p1", cliff(4, 3.2)]]);
+    expect(diffReasons(stored, fresh)).toEqual([{ code: "tier_cliff", added: 0, removed: 0, changed: 1, unchanged: 0 }]);
+  });
+
+  it("counts a reason the new rule no longer fires as removed", () => {
+    const stored = new Map([["p1", cliff(1, 3.2)], ["p2", cliff(2, 20.9)]]);
+    const fresh = new Map([["p1", []], ["p2", cliff(2, 20.9)]]);
+    expect(diffReasons(stored, fresh)).toEqual([{ code: "tier_cliff", added: 0, removed: 1, changed: 0, unchanged: 1 }]);
+  });
+
+  it("counts a player the stored board never carried at all as an add", () => {
+    const stored = new Map<string, readonly { readonly code: string }[]>();
+    const fresh = new Map([["p1", cliff(2, 20.9)]]);
+    expect(diffReasons(stored as never, fresh)).toEqual([{ code: "tier_cliff", added: 1, removed: 0, changed: 0, unchanged: 0 }]);
+  });
+
+  it("reports one row per code, sorted, over both boards' codes", () => {
+    const stored = new Map([["p1", [{ code: "scarcity", positionRank: 4, replacementLevel: 140 } as const]]]);
+    const fresh = new Map([["p1", [{ code: "scarcity", positionRank: 4, replacementLevel: 140 } as const, ...cliff(2, 20.9)]]]);
+    expect(diffReasons(stored, fresh).map((diff) => diff.code)).toEqual(["scarcity", "tier_cliff"]);
   });
 });

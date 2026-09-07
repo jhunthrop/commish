@@ -1,5 +1,6 @@
 import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, EM_DASH, SEMICOLON } from "./config";
 import type { PlayerFacts } from "./facts";
+import { NARRATIVE_MIN_WORDS } from "./narrative-slots";
 
 export type CapsuleSize = "compact" | "full";
 
@@ -8,6 +9,14 @@ export interface ValidationResult {
   /** Human-readable, quoted verbatim into the one regeneration retry's own prompt — see
    *  `write.ts`'s `generateCapsuleBody`. Empty when `ok`. */
   readonly violations: readonly string[];
+  /**
+   * SET EXACTLY WHEN THE ONLY THING WRONG IS THE LENGTH (capsule acceptance round, 2026-09-07).
+   * Nine of a thirty-player sample failed on the word band alone, most of them by a handful of
+   * words, and the retry threw the whole text away and asked for a fresh one, which then failed on
+   * something else. A length failure has a cheaper and far more reliable answer: hand the text
+   * back and ask for the same text at the right length. `generate.ts` reads this to choose.
+   */
+  readonly bandFailure: { readonly words: number; readonly minWords: number; readonly maxWords: number } | null;
 }
 
 function wordCount(text: string): number {
@@ -53,18 +62,40 @@ function extractNumbers(text: string): readonly { readonly raw: string; readonly
   return [...digitNumbers, ...cardinalNumbers, ...ordinalNumbers];
 }
 
-/** `value` is an honest reading of some entry in `ledger` when it equals that entry, or a
- *  plain rounding of it, at any of a few common precisions — "a fabricated number is caught; a
- *  rounded one passes" is the explicit bar this function exists to clear. */
+/**
+ * Half-away-from-zero rounding to `decimals` places — what a person means by "rounded", and what
+ * `toFixed` does NOT reliably do: `(2.55).toFixed(1)` is "2.5", because 2.55 is not 2.55 in binary.
+ * That single discrepancy was rejecting honest capsules (measured 2026-09-07: "2.6" against a
+ * ledgered 2.55 read as a fabricated number).
+ */
+function roundHalfUp(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return (Math.sign(value) * Math.round(Math.abs(value) * factor + Number.EPSILON * factor)) / factor;
+}
+
+/**
+ * `value` is an honest reading of some entry in `ledger` when it equals that entry, or a plain
+ * rounding of it, or the whole-percent form of a fraction on it — "a fabricated number is caught;
+ * a rounded one passes" is the explicit bar this function exists to clear.
+ *
+ * ROUNDED AT ANY OF THE THREE PRECISIONS A PERSON WRITES (capsule acceptance round, 2026-09-07,
+ * after a measured one-in-ten pass rate whose top rejection category was a rounded ledger value):
+ * zero, one or two decimals, half away from zero. A written number that matches the entry at ANY
+ * of the three is an honest reading of it, which is how "2.6", "2.55" and "3" are all honest
+ * readings of a ledgered 2.55 while "3.4" is a reading of nothing.
+ *
+ * THE PERCENT FORM of a fraction is grounded too: a share of 0.2476 on the ledger grounds "24.8%",
+ * "25%" and "24.76%" alike. Bounded to |entry| <= 1 so this can only ever turn a FRACTION into a
+ * percentage, never license an arbitrary hundred-fold restatement of a points total.
+ */
 function isDerivedFromLedger(value: number, ledger: readonly number[]): boolean {
   for (const entry of ledger) {
     if (value === entry) return true;
-    if (Math.round(entry) === value) return true;
-    if (Math.trunc(entry) === value) return true;
-    if (Math.ceil(entry) === value) return true;
-    if (Math.floor(entry) === value) return true;
-    if (Number(entry.toFixed(1)) === value) return true;
-    if (Number(entry.toFixed(2)) === value) return true;
+    if (Math.trunc(entry) === value || Math.ceil(entry) === value || Math.floor(entry) === value) return true;
+    for (const candidate of Math.abs(entry) <= 1 ? [entry, entry * 100] : [entry]) {
+      if (candidate === value) return true;
+      if (roundHalfUp(candidate, 0) === value || roundHalfUp(candidate, 1) === value || roundHalfUp(candidate, 2) === value) return true;
+    }
   }
   return false;
 }
@@ -117,6 +148,21 @@ function isPunctuationPeriod(word: string): boolean {
   return !isInNameAbbreviation(word.slice(0, -1));
 }
 
+/**
+ * POSITION AND SLOT CODES ARE WORDS, NOT NAME PARTS (capsule acceptance round, 2026-09-07). "He's
+ * QB" was read as the two-word proper name "He QB" once the contraction was split, and failed
+ * grounding as a fabricated person. A code in this set breaks a Titlecase run exactly the way a
+ * comma does, so it can never join the word beside it into a name.
+ */
+const POSITION_CODES: ReadonlySet<string> = new Set(["QB", "RB", "WR", "TE", "K", "DEF", "DST", "FLEX", "IR", "ADP", "PPR", "NFL", "TD", "TDS"]);
+
+/** The possessive or contraction a Titlecase token may carry ("Herbert's", "He's", "Mahomes’"),
+ *  stripped before the token is considered as part of a name — the apostrophe inside a genuine
+ *  name ("Ja'Marr", "De'Von") is untouched, since it is never at the end. */
+function stripTrailingClitic(word: string): string {
+  return word.replace(/[’']s$/i, "").replace(/[’']$/, "");
+}
+
 /** Sequences of two-or-more consecutive Titlecase words — the shape a genuine proper name takes
  *  ("Justin Jefferson", "Kansas City"). A LONE capitalized word is left alone: ordinary sentence
  *  capitalization, a position abbreviation (`RB`) or a stray "Age 29" reads as a false positive
@@ -143,15 +189,23 @@ function isPunctuationPeriod(word: string): boolean {
  * abbreviation's own period in the rendered candidate (`isPunctuationPeriod` only ever strips a
  * TRUE sentence-ending period, never an abbreviation's). */
 function extractProperNamePhrases(text: string): readonly string[] {
-  const wordPattern = /\b[A-Z][a-zA-Z'.-]*/g;
+  const wordPattern = /\b[A-Z][a-zA-Z'’.-]*/g;
   const words: { readonly text: string; readonly start: number; readonly end: number }[] = [];
-  for (const match of text.matchAll(wordPattern)) words.push({ text: match[0], start: match.index, end: match.index + match[0].length });
+  for (const match of text.matchAll(wordPattern)) {
+    // The contraction goes before the run is built, and a position code never joins a run at all
+    // (see `POSITION_CODES` and `stripTrailingClitic`).
+    const bare = stripTrailingClitic(match[0]);
+    if (bare === "" || POSITION_CODES.has(bare.toUpperCase().replace(/\.$/, ""))) continue;
+    words.push({ text: bare, start: match.index, end: match.index + match[0].length });
+  }
 
   const phrases = new Set<string>();
   let i = 0;
   while (i < words.length) {
     const run = [words[i]!];
     let j = i;
+    // `text.slice(...)` between two kept tokens contains the dropped code when one sat between
+    // them, so the whitespace-only test below also enforces "nothing was dropped in between".
     while (j + 1 < words.length && /^\s+$/.test(text.slice(words[j]!.end, words[j + 1]!.start)) && !isRunBreak(words[j]!.text, words[j + 1]!.text)) {
       run.push(words[j + 1]!);
       j += 1;
@@ -261,6 +315,14 @@ function isLoneWordSurnameOf(word: string, nameLedger: readonly string[]): boole
   });
 }
 
+/** True when `word` alone IS a ledger entry — the ledger decomposes every name and team form it
+ *  carries into its own words (`facts.ts`'s `buildNameLedger`), so "Giants" is an entry in its own
+ *  right for a player whose team is the Giants. Used only by the determiner exit below. */
+function isLedgeredWord(word: string, nameLedger: readonly string[]): boolean {
+  const lower = word.toLowerCase();
+  return nameLedger.some((name) => name.toLowerCase() === lower);
+}
+
 /**
  * Sentence-initial capitalized verbs merge into a name's capitalized run ("Buy Jahmyr Gibbs",
  * "Draft St. Brown" — first live sweep, 2026-09-05), so a failed multi-word candidate sheds its
@@ -291,6 +353,13 @@ function isNameGroundedWithShedding(phrase: string, nameLedger: readonly string[
     // ("Marcus Long" must never pass by shedding to "Long").
     if (words.length <= 2) {
       if (words.length === 2 && SENTENCE_VERB_WORDS.has(words[0]!) && isLoneWordSurnameOf(words[1]!, nameLedger)) return true;
+      // DETERMINER + LEDGERED WORD (capsule acceptance round, 2026-09-07) — "The Giants lean on
+      // him" merged a sentence-initial determiner into the team nickname the fact sheet had just
+      // given the writer, and failed as a fabricated two-word name. The exit is as narrow as the
+      // verb one above and safe for the same reason: `COMMON_SENTENCE_STARTERS` holds determiners
+      // and pronouns, never a given name, and the SECOND word must still be a whole ledger entry
+      // in its own right, so "The Herbert" grounds nothing.
+      if (words.length === 2 && COMMON_SENTENCE_STARTERS.has(words[0]!) && isLedgeredWord(words[1]!, nameLedger)) return true;
       return false;
     }
     candidate = words.slice(1).join(" ");
@@ -372,25 +441,46 @@ function citesTensionNumber(text: string, requiredTension: number): boolean {
   return splitSentences(text).some((sentence) => COST_CUE_PATTERN.test(sentence) && extractNumbers(sentence).some(({ value }) => isDerivedFromLedger(Math.abs(value), [magnitude])));
 }
 
+/** What one piece of generated text is held to. The two long reads require the tension citation;
+ *  a narrative slot does not — see `validateNarrativeSlot`. */
+interface GroundingBand {
+  readonly minWords: number;
+  readonly maxWords: number;
+  readonly requireTension: boolean;
+}
+
 /**
  * THE VALIDATOR — the law's own enforcement arm (spec's hard rule: "honest data absolute; the
  * validator is the law's enforcement arm"). Every number and every multi-word proper name in
- * `body` must trace to `facts`; the copy rules bind (no em-dash, no competitor name, the size's
- * own word band); and mixed evidence must carry its own tension before the call. `size` picks
- * which word band applies (`CAPSULE_CONFIG.sizes`).
+ * `body` must trace to `facts`; the copy rules bind (no em-dash, no competitor name, the band's
+ * own word range); and mixed evidence must carry its own tension before the call where the band
+ * asks for it.
+ *
+ * ONE SET OF RULES, TWO CALLERS (dossier-voice round §3.5): the two long reads
+ * (`validateCapsule`) and every narrative slot (`validateNarrativeSlot`) are graded by this one
+ * function, so a sentence a module renders is held to exactly what a read is held to. A second
+ * grounding implementation for the slots would be a second place for a fabricated number to get in.
  */
-export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleSize): ValidationResult {
+function validateGrounded(body: string, facts: PlayerFacts, band: GroundingBand): ValidationResult {
   const violations: string[] = [];
   const trimmed = body.trim();
 
   if (trimmed === "") {
-    return { ok: false, violations: ["The completion was empty."] };
+    return { ok: false, violations: ["The completion was empty."], bandFailure: null };
   }
 
-  const { minWords, maxWords } = CAPSULE_CONFIG.sizes[size];
+  // THE BAND IS GRADED FIRST, AND ALONE (capsule acceptance round). A text of the wrong length is
+  // returned with that one violation and nothing else, so the caller can ask for a length
+  // correction rather than a whole new attempt. Grounding is graded on the corrected text, which
+  // is the text that would actually ship.
+  const { minWords, maxWords } = band;
   const words = wordCount(trimmed);
   if (words < minWords || words > maxWords) {
-    violations.push(`Word count ${words} is outside the required ${minWords}-${maxWords} word band.`);
+    return {
+      ok: false,
+      violations: [`Word count ${words} is outside the required ${minWords}-${maxWords} word band.`],
+      bandFailure: { words, minWords, maxWords },
+    };
   }
 
   if (trimmed.includes(EM_DASH)) {
@@ -427,10 +517,29 @@ export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleS
     }
   }
 
-  const requiredTension = strongestNegativeLawEffect(facts);
+  const requiredTension = band.requireTension ? strongestNegativeLawEffect(facts) : null;
   if (requiredTension !== null && !citesTensionNumber(trimmed, requiredTension)) {
-    violations.push(`Mixed evidence: the strongest downside (${requiredTension} pts/game) must be cited as an honest hesitation before the call.`);
+    violations.push(
+      `Mixed evidence: the strongest downside (${roundHalfUp(requiredTension, 1)} pts/game) must be cited as an honest hesitation before the call.`,
+    );
   }
 
-  return { ok: violations.length === 0, violations };
+  return { ok: violations.length === 0, violations, bandFailure: null };
+}
+
+/** One whole read, at its own size's word band, with the mandated-tension check that a note long
+ *  enough to make a case must carry its strongest downside. */
+export function validateCapsule(body: string, facts: PlayerFacts, size: CapsuleSize): ValidationResult {
+  return validateGrounded(body, facts, { ...CAPSULE_CONFIG.sizes[size], requireTension: true });
+}
+
+/**
+ * ONE NARRATIVE SLOT (dossier-voice round §3.5). The same grounding, the same copy rules, a
+ * tighter word band, and NO tension mandate: a thirty-word call cannot be asked to state the
+ * strongest downside AND the call, and the modules that display the downside are on the same
+ * screen either way. The reads above still carry the mandate, so nothing about the page as a whole
+ * gets to be one-sided on mixed evidence.
+ */
+export function validateNarrativeSlot(body: string, facts: PlayerFacts, maxWords: number): ValidationResult {
+  return validateGrounded(body, facts, { minWords: NARRATIVE_MIN_WORDS, maxWords, requireTension: false });
 }

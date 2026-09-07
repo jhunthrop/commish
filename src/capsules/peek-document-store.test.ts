@@ -78,6 +78,7 @@ describe("writePeekDocuments", () => {
       model: null,
       compact: { text: "A newly written capsule.", usage: null, source: "template", fallbackReason: null },
       full: { text: "A newly written capsule, at length.", usage: null, source: "template", fallbackReason: null },
+      narrative: { slots: {}, usage: null, model: null, rejected: [], failure: null },
     });
 
     expect((await writePeekDocuments(db, request)).changed).toBe(1);

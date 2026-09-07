@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Db } from "@/db/client";
 import { parseCsv } from "../nflverse/csv";
+import { nflTeamsBySeason } from "../nflverse/team-eras";
 import { recordTeamObservations, teamObservationsAsOf, type TeamWeekObservation } from "../team-store";
 
 /**
@@ -126,6 +127,95 @@ export function winTotalObservations(rows: readonly WinTotalRow[]): readonly Tea
   return observations;
 }
 
+/**
+ * THE PUBLISHER'S OWN FILE (dossier-voice round §3.6) — where the committed CSV came from, read
+ * live so a new season's lines land without a human fetching them ([[pfr-account-for-model-inputs]]
+ * rules out a recurring manual pull). Provenance and license reasoning: `data/win-totals/README.md`.
+ *
+ * The committed CSV stays the VALIDATED SEED: `scripts/validate-win-totals.ts` checks it row by row
+ * against the store's own schedule, and `ingestVegasWinTotals` still reads it. This fetch only ever
+ * adds a season the committed file does not carry yet.
+ */
+export const PUBLISHED_WIN_TOTALS_URL = "https://raw.githubusercontent.com/greerreNFL/nfelosrs/main/nfelosrs/Manual%20Data/win_totals.csv";
+
+/** The publisher's own column names, which differ from the curated file's (`line` rather than
+ *  `win_total`, `over_odds`/`under_odds` rather than the `_price` pair). Stated here rather than
+ *  guessed at read time, so a publisher rename fails loudly with the column it wanted. */
+const PUBLISHED_COLUMNS = ["season", "team", "line", "over_odds", "under_odds", "source", "source_date"] as const;
+
+/**
+ * The two team-code divergences `data/win-totals/README.md` documents, applied to a fetched row so
+ * a live read lands in the same spelling the curated file was normalized to (and the same one
+ * `nflTeamsBySeason` asserts): the publisher's `LAR` is nflverse's `LA`, and the publisher keeps
+ * stamping `OAK` for seasons the Raiders have been `LV` since 2020.
+ */
+export function normalizePublishedTeam(team: string, season: number): string {
+  if (team === "LAR") return "LA";
+  if (team === "OAK" && season >= 2020) return "LV";
+  return team;
+}
+
+export interface PublishedWinTotals {
+  /** `false` when the publisher carries no rows for the season, or carries fewer than a full
+   *  league. Either way the caller writes nothing and the product keeps saying "not posted yet",
+   *  which is then true. */
+  readonly posted: boolean;
+  readonly rows: readonly WinTotalRow[];
+  /** How many distinct teams the publisher has posted for this season. */
+  readonly teamsPosted: number;
+}
+
+/**
+ * One season's rows from the publisher, or an honest "not posted".
+ *
+ * THE SHAPE IS ASSERTED, NOT ASSUMED. A file missing any column this reader needs throws, naming
+ * the column: a silently renamed column would otherwise read as a season nobody has posted, and a
+ * gap that looks like an ordinary preseason state is exactly the failure this project keeps
+ * catching late. An unreadable number throws through `requiredNumber`, the same way the committed
+ * file's own parse does.
+ *
+ * A PARTIAL POST IS NOT A POST. Fewer than the season's own full league (`nflTeamsBySeason`) means
+ * the publisher is mid-update, and half a league of win totals stored is a board where some teams
+ * carry a market and some do not, for no reason a reader could see.
+ */
+export async function fetchPublishedWinTotals(
+  season: number,
+  deps: { readonly fetch?: typeof globalThis.fetch } = {},
+): Promise<PublishedWinTotals> {
+  const doFetch = deps.fetch ?? globalThis.fetch;
+  const response = await doFetch(PUBLISHED_WIN_TOTALS_URL);
+  if (!response.ok) {
+    throw new Error(`win-totals publisher returned HTTP ${response.status} for ${PUBLISHED_WIN_TOTALS_URL}.`);
+  }
+  const parsed = parseCsv(await response.text());
+  const first = parsed[0];
+  if (first === undefined) throw new Error("win-totals publisher returned a file with no rows.");
+  for (const column of PUBLISHED_COLUMNS) {
+    if (!(column in first)) {
+      throw new Error(`win-totals publisher file has no "${column}" column; it carries ${Object.keys(first).join(", ")}.`);
+    }
+  }
+
+  const rows = parsed
+    .filter((row) => Number(row.season) === season)
+    .map((row) => {
+      const team = normalizePublishedTeam((row.team ?? "").trim(), season);
+      return {
+        season,
+        team,
+        winTotal: requiredNumber(row.line ?? "", "line", String(season), team),
+        overPrice: requiredNumber(row.over_odds ?? "", "over_odds", String(season), team),
+        underPrice: requiredNumber(row.under_odds ?? "", "under_odds", String(season), team),
+        actualWins: null,
+        source: (row.source ?? "").trim(),
+        sourceDate: (row.source_date ?? "").trim(),
+      } satisfies WinTotalRow;
+    });
+
+  const teamsPosted = new Set(rows.map((row) => row.team)).size;
+  return { posted: teamsPosted >= nflTeamsBySeason(season).length, rows, teamsPosted };
+}
+
 export interface VegasIngestReport {
   readonly rowsRead: number;
   readonly seasons: readonly number[];
@@ -151,8 +241,16 @@ export interface VegasIngestReport {
  * store underneath it.
  */
 export async function ingestVegasWinTotals(db: Db, csvPath: string = WIN_TOTALS_CSV_PATH): Promise<VegasIngestReport> {
-  const text = readFileSync(csvPath, "utf8");
-  const rows = parseWinTotalsCsv(text);
+  return writeVerifiedWinTotals(db, parseWinTotalsCsv(readFileSync(csvPath, "utf8")));
+}
+
+/**
+ * The write itself, and its own read-back verification, over rows from EITHER source — the
+ * committed CSV (`ingestVegasWinTotals` above) or the publisher's live file (the win-totals job).
+ * One writer, so a fetched season lands under exactly the same provenance stamp, the same
+ * week-one convention and the same value-by-value verification a committed season does.
+ */
+export async function writeVerifiedWinTotals(db: Db, rows: readonly WinTotalRow[]): Promise<VegasIngestReport> {
   const observations = winTotalObservations(rows);
   const observationsWritten = await recordTeamObservations(db, observations);
 

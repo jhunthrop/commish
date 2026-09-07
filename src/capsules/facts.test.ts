@@ -83,8 +83,8 @@ describe("buildPlayerFacts", () => {
       { code: "changed_team", from: "SF", to: "MIA" },
     ];
     const facts = buildPlayerFacts(baseInput({ reasons }));
-    expect(facts.evidence[0]).toEqual({ kind: "law", headline: "Age 29 season", netEffectPoints: -1.8, lawCount: 1 });
-    expect(facts.evidence[1]).toEqual({ kind: "changed_team", from: "SF", to: "MIA" });
+    expect(facts.evidence[0]).toEqual({ kind: "law", groupKey: "age", headline: "Age 29 season", netEffectPoints: -1.8, lawCount: 1 });
+    expect(facts.evidence[1]).toEqual({ kind: "changed_team", groupKey: "changed_team", from: "SF", to: "MIA" });
   });
 
   it("carries the season summary through untouched when a played season exists", () => {

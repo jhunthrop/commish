@@ -20,14 +20,16 @@
 import { and, desc, eq, lte, sql } from "drizzle-orm";
 import { peekDocumentRowsFor } from "@/capsules/peek-document-store";
 import type { PeekDocumentRequest } from "@/capsules/peek-document-inputs";
-import { hydratePeekDocument } from "@/capsules/peek-document";
+import { buildPeekDocument, hydratePeekDocument } from "@/capsules/peek-document";
 import type { PeekDocument } from "@/capsules/peek-document-row";
 import type { Db } from "@/db/client";
-import { leagues, matchups, playerPeekDocuments, rosterSlots, scoringSettings, teams } from "@/db/schema";
+import { leagues, matchups, playerCrosswalk, playerPeekDocuments, players, preseasonProjections, rosterSlots, scoringSettings, teams } from "@/db/schema";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
 import { LEAGUE_CONFIG } from "@/league";
+import type { Player } from "@/domain/player";
+import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { type ScoringRules } from "@/scoring";
 import { scoringHashOf } from "@/scoring/hash";
@@ -219,18 +221,102 @@ async function leagueFactsFor(db: Db, leagueId: string, playerId: string): Promi
   };
 }
 
+/** Whether this hash has ANY documents for the season — the difference between "a scoring
+ *  combination nobody has ever used" and "a league we have built, asked about a player we have
+ *  not". Counted rather than fetched: the answer is one bit and the rows are large. */
+async function hashHasDocuments(db: Db, scoringHash: string): Promise<boolean> {
+  const [row] = await db
+    .select({ playerId: playerPeekDocuments.playerId })
+    .from(playerPeekDocuments)
+    .where(and(eq(playerPeekDocuments.season, PRODUCT_SEASON), eq(playerPeekDocuments.scoringHash, scoringHash)))
+    .limit(1);
+  return row !== undefined;
+}
+
 /**
- * THE MISS PATH (design §3.5).
+ * Is he on the board at all? A player with no projected row is one this engine has nothing to say
+ * about beyond his name and position: no rank, no dossier, no capsule, no reasons. Reading one
+ * crosswalk row and one projection row is the whole question, and it is a great deal cheaper than
+ * the assembly that would answer it by producing nothing.
+ */
+async function isOnTheBoard(db: Db, playerId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ playerId: preseasonProjections.playerId })
+    .from(preseasonProjections)
+    .innerJoin(playerCrosswalk, eq(playerCrosswalk.nflPlayerId, preseasonProjections.playerId))
+    .where(
+      and(
+        eq(playerCrosswalk.playerId, playerId),
+        eq(preseasonProjections.season, PRODUCT_SEASON),
+        eq(preseasonProjections.source, BOARD_SOURCE),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
+/**
+ * THE OFF-BOARD ABSENCE BODY (review, addition B) — his name, his position, and the absence copy
+ * every module already renders for a player nothing has been measured about.
  *
- * Three things happen here and they are deliberately in this order. The league's own rules are read
- * and its `scoring_hash` written, so the very next open can join; ONE player's document is built
- * through the writer's own builder, so nothing on the screen is assembled by code the stored
- * documents were not; and the whole-hash build is enqueued, so every other player in this league is
- * one statement from now on.
+ * IT IS NOT A SECOND ASSEMBLY, the rule this module's own header sets: it goes through
+ * `buildPeekDocument`, the same pure builder every stored document is made by, handed empty inputs
+ * because empty is what the stores actually hold for him. What it skips is the READING
+ * (`collectPeekDocumentInputs`), which for an off-board player is a board join, a facts read, a
+ * capsule read and three seasons of stat lines, all to discover there is nothing there. That was
+ * five to fifteen seconds of a manager's time to be told a name and a position.
+ */
+function offBoardBody(player: Player, facts: LeagueFacts, now: Date, requestedSeason: number | undefined): PlayerSeasonBody {
+  const document = buildPeekDocument({
+    player,
+    isRookie: false,
+    positionRank: null,
+    adpPercentile: null,
+    expertRank: null,
+    modelRank: null,
+    injuryDesignation: null,
+    news: [],
+    reasons: [],
+    capsule: null,
+    dossier: null,
+    seasons: [],
+    asOf: now,
+    basis: {
+      scoringHash: facts.scoringHash,
+      factsAsOf: null,
+      capsuleGeneratedAt: null,
+      capsuleFactsHash: null,
+      injuryCapturedAt: null,
+      newsCapturedAt: null,
+      lastFinalizedWeek: null,
+      sourceKeys: [],
+    },
+  });
+  return hydratePeekDocument(document, {
+    ownedBy: facts.ownedBy,
+    isMockLeague: facts.isMockLeague,
+    seasonWeeks: facts.seasonWeeks,
+    requestedSeason,
+  });
+}
+
+/**
+ * THE MISS PATH (design §3.5, narrowed by the review's addition B).
  *
- * IT IS SLOW ON PURPOSE AND ONLY ONCE. A novel scoring hash is a combination nobody has used before,
- * a fresh restore, or a player signed after the last build. Serving it live is the honest answer to
- * "we do not have this yet"; inventing one from a neighbouring rule set would not be.
+ * The league's own rules are read and its `scoring_hash` written, so the very next open can join,
+ * and the whole-hash build is enqueued, so every other player in this league is one statement from
+ * now on. What happens in between depends on WHY this was a miss:
+ *
+ * A NOVEL SCORING HASH (nothing has ever been built for it) still builds this one player
+ * synchronously, through the writer's own builder. It is slow on purpose and only once: serving it
+ * live is the honest answer to "we do not have this yet", and inventing one from a neighbouring
+ * rule set would not be.
+ *
+ * A PLAYER THIS BUILT HASH SIMPLY HAS NO ROW FOR is answered immediately. If he is not on the
+ * board, the synchronous build can only ever produce the absence body `offBoardBody` returns
+ * directly, so paying for it is paying to be told nothing slowly (the founder's own screenshot: a
+ * blank sheet for five to fifteen seconds). If he IS on the board, the build is worth its cost and
+ * still runs: he has a rank, a dossier and a capsule to state.
  */
 async function playerSeasonOnMiss(
   db: Db,
@@ -244,6 +330,23 @@ async function playerSeasonOnMiss(
   if (facts === null) return null;
   await writeLeagueScoringHash(db, leagueId, facts.rules);
 
+  // The rebuild is enqueued whichever branch answers below: this league's hash needs its documents
+  // either way, and a coalescing key means a second miss the same day costs nothing.
+  await enqueuePeekDocumentRebuildsQuietly(db, clock, {
+    playerIds: null,
+    scoringHashes: [facts.scoringHash],
+    reason: `miss:${dayKeyOf(now)}`,
+  });
+
+  if (await hashHasDocuments(db, facts.scoringHash)) {
+    const [player] = await db.select().from(players).where(eq(players.id, playerId));
+    // No such player in `players` at all — the one case that is a 404 rather than a body of absence.
+    if (player === undefined) return null;
+    if (!(await isOnTheBoard(db, playerId))) {
+      return offBoardBody({ ...player, headshotUrl: player.headshotUrl ?? null, adp: player.adp ?? null }, facts, now, requestedSeason);
+    }
+  }
+
   const request: PeekDocumentRequest = {
     season: PRODUCT_SEASON,
     scoringHash: facts.scoringHash,
@@ -255,12 +358,6 @@ async function playerSeasonOnMiss(
   // No row means no such player in `players` at all — the one case that is a 404 rather than a body
   // full of absence.
   if (row === undefined) return null;
-
-  await enqueuePeekDocumentRebuildsQuietly(db, clock, {
-    playerIds: null,
-    scoringHashes: [facts.scoringHash],
-    reason: `miss:${dayKeyOf(now)}`,
-  });
 
   return hydratePeekDocument(row.document, {
     ownedBy: facts.ownedBy,

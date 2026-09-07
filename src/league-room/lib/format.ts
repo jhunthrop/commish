@@ -7,6 +7,14 @@ export function formatPoints(points: number): string {
   return points.toFixed(2);
 }
 
+/**
+ * THE NUMBER FORMATTERS LIVE IN THE UI LAYER (review, MINOR) and are re-exported here: the shared
+ * primitives under `components/ui` need them too (a reason chip states a law's effect to one
+ * decimal), and they may not import from a feature folder. One definition, both layers, and every
+ * existing `../lib/format` import keeps working.
+ */
+export { countWord, countWordCapitalized, formatLine, formatTenth, formatWhole } from "@/components/ui/number-format";
+
 export function formatWeek(weekNumber: number): string {
   return `Week ${weekNumber}`;
 }

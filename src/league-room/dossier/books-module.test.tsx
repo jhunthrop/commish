@@ -25,6 +25,20 @@ describe("BooksModule", () => {
     expect(container.textContent).toContain("Team win total: 9.5 wins.");
   });
 
+  it("writes a book's number the way a book writes it: the half survives, a whole number grows no decimal", () => {
+    const { container } = render(
+      <BooksModule
+        books={{
+          propsLines: [{ market: "player_rush_yds", medianLine: 70.50000000000001 }],
+          teamVegasWinTotal: 10,
+        }}
+      />,
+    );
+    expect(container.textContent).toContain("70.5 rush yards a game");
+    expect(container.textContent).toContain("Team win total: 10 wins.");
+    expect(container.textContent).not.toContain("10.0");
+  });
+
   it("says an honest 'not posted yet' when the archive holds no win total", () => {
     const { container } = render(<BooksModule books={{ ...BOOKS, teamVegasWinTotal: null }} />);
     expect(container.textContent).toContain("Team win total: not posted yet.");

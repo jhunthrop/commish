@@ -2,6 +2,7 @@ import type { PlayerFactsRankedStat, PlayerFactsTrend, PlayerFactsUsage } from "
 import type { Position } from "@/domain/player";
 import { Card, Stat } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import { formatTenth, formatWhole } from "../lib/format";
 import type { DefenseSeasonFacts, KdefSeasonLine, KickerSeasonFacts } from "@/projections/kdef/season-lines";
 
 export interface RoleModuleProps {
@@ -22,6 +23,15 @@ export interface RoleModuleProps {
    * and neither of these two positions has one. `null`, and the module is exactly what it was.
    */
   readonly kdef?: KdefSeasonLine | null;
+  /** THE WRITTEN TREND LINE (`narrativeSlot(capsule, "trend")`) — the writer's own sentence about
+   *  the year-over-year move, rendered INSTEAD of the templated one below when the sweep produced
+   *  and validated one. The two seasons and the delta are still shown by the template's own
+   *  figures when there is no written line; a stat is never replaced by prose, only stated once. */
+  readonly writtenTrend?: string | null;
+  /** THE WRITTEN ABSENCE NOTE (`narrativeSlot(capsule, "absence:usage")`) — for a player the usage
+   *  store carries nothing about at all. Absence said in a human voice instead of three rows of
+   *  "not tracked for him". The rows stay: they are the shape of what is missing. */
+  readonly absenceSentence?: string | null;
 }
 
 interface ShareRow {
@@ -69,8 +79,8 @@ function trendSentence(priorSeason: number, priorValue: number, recentSeason: nu
     // non-neutral value, and splitting the word from its number would put that caret between
     // "down" and "3.8" in the rendered text, breaking the phrase a reader (or a screen reader)
     // sees as one unit.
-    before: `${priorValue} a game in ${priorSeason} ${verb} to ${recentValue} in ${recentSeason},`,
-    delta: `${direction} ${Math.abs(delta)}`,
+    before: `${formatTenth(priorValue)} a game in ${priorSeason} ${verb} to ${formatTenth(recentValue)} in ${recentSeason},`,
+    delta: `${direction} ${formatTenth(Math.abs(delta))}`,
     percentile: rising ? 0.75 : 0.25,
   };
 }
@@ -87,7 +97,7 @@ function madeOf(made: number, attempted: number): string {
 }
 
 function perGame(total: number, games: number): string {
-  return games === 0 ? "no games on record" : (total / games).toFixed(1);
+  return games === 0 ? "no games on record" : formatTenth(total / games);
 }
 
 /**
@@ -122,7 +132,7 @@ function defenseRows(facts: DefenseSeasonFacts, games: number): readonly FactRow
     { label: "Defensive touchdowns", value: String(facts.defensiveTouchdowns) },
     {
       label: "Yards allowed a game",
-      value: facts.gamesWithYardsAllowed === 0 ? "not recorded for these games" : String(Math.round(facts.yardsAllowed / facts.gamesWithYardsAllowed)),
+      value: facts.gamesWithYardsAllowed === 0 ? "not recorded for these games" : formatWhole(facts.yardsAllowed / facts.gamesWithYardsAllowed),
     },
     {
       label: "Points allowed a game",
@@ -182,7 +192,7 @@ function KdefRows({ line }: { readonly line: KdefSeasonLine }) {
  * happen to exist. The trend line is genuinely absent (no row at all) when there is nothing
  * material to say, matching every other "nothing to say" surface on this product.
  */
-export function RoleModule({ position, usage, trend, kdef = null }: RoleModuleProps) {
+export function RoleModule({ position, usage, trend, kdef = null, writtenTrend = null, absenceSentence = null }: RoleModuleProps) {
   const pointsPerGame = trend?.pointsPerGame ?? null;
   const trendMetric = pointsPerGame !== null && pointsPerGame.material ? pointsPerGame : null;
 
@@ -212,6 +222,11 @@ export function RoleModule({ position, usage, trend, kdef = null }: RoleModulePr
           );
         })}
       </div>
+      {usage !== null || absenceSentence === null ? null : (
+        <p className="text-sm text-text-muted" data-role="usage-absence">
+          {absenceSentence}
+        </p>
+      )}
       {trendMetric === null ? null : (
         <p className="flex flex-wrap items-baseline gap-1 text-sm text-text-muted" data-role="trend">
           {(() => {
@@ -219,18 +234,35 @@ export function RoleModule({ position, usage, trend, kdef = null }: RoleModulePr
             return (
               <>
                 <span>{before}</span>
-                <Stat
-                  label="Year-over-year change"
-                  srOnlyLabel
-                  value={delta}
-                  orientation="inline"
-                  size="sm"
-                  comparison={{ percentile, population: "the position's own year-over-year spread" }}
-                />
-                <span>. A real move, not noise.</span>
+                {/* THE SENTENCE ENDS ON THE NUMBER (dossier-voice round §3.4). The delta and its
+                    full stop sit in one gapless inline box, so the period hugs "3.8" instead of
+                    riding the row's own `gap-1` into ". A real move" with a space in front of it.
+                    The closing clause is then an ordinary next word, one space along. */}
+                <span className="inline-flex items-baseline" data-trend="delta">
+                  <Stat
+                    label="Year-over-year change"
+                    srOnlyLabel
+                    value={delta}
+                    orientation="inline"
+                    size="sm"
+                    comparison={{ percentile, population: "the position's own year-over-year spread" }}
+                  />
+                  <span>.</span>
+                </span>
+                <span data-trend="close">A real move, not noise.</span>
               </>
             );
           })()}
+        </p>
+      )}
+      {/* THE WRITER ACCOMPANIES THE STAT (review I3) — the two seasons, the delta and its tinted
+          `Stat` stay exactly where they are, and the written line sits beneath them, the same
+          shape `SeasonStrip` and the Books module already use. Rendered only where there is a
+          measured trend to accompany: a sentence about a move the page is not showing would be a
+          claim with nothing under it. */}
+      {writtenTrend === null || trendMetric === null ? null : (
+        <p className="text-sm text-text-muted" data-role="trend-written">
+          {writtenTrend}
         </p>
       )}
     </Card>

@@ -1,0 +1,1 @@
+ALTER TABLE "player_capsules" ADD COLUMN "narrative" jsonb;

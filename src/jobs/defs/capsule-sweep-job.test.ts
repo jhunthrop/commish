@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { nflPlayers, playerCrosswalk, playerPeekFacts, players, preseasonProjections } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { getStoredCapsule } from "@/capsules/store";
+import { jobs } from "@/db/schema";
+import { getStoredCapsule, REGENERATE_FACTS_HASH } from "@/capsules/store";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { runCapsuleSweepStep } from "./capsule-sweep-job";
@@ -111,7 +112,9 @@ describe("runCapsuleSweepStep", () => {
     await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
     const failingFetch = async () => new Response("bad request", { status: 401 });
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingFetch }, {});
-    expect(outcome.detail).toEqual(["Rashad Long: template (throttled)"]);
+    // The narrative is a third call on the same dead gateway and reports its own failure line;
+    // the size label is what this test is about and it still reads "throttled".
+    expect(outcome.detail).toContain("Rashad Long: template (throttled)");
   });
 
   it("labels a detail line \"template (failed validation: ...)\" quoting the first violation when the gateway talks but the content fails the validator", async () => {
@@ -120,9 +123,9 @@ describe("runCapsuleSweepStep", () => {
     const fabricatedBody = "He will score 999 touchdowns this year for this offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and the market simply cannot price a season like that.";
     const fabricatingFetch = async () => okResponse(fabricatedBody);
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
-    expect(outcome.detail).toHaveLength(1);
-    expect(outcome.detail[0]).toMatch(/^Rashad Long: template \(failed validation: .+\)$/);
-    expect(outcome.detail[0]).not.toContain("throttled");
+    const sizeLabel = outcome.detail.find((line) => line.startsWith("Rashad Long: template"))!;
+    expect(sizeLabel).toMatch(/^Rashad Long: template \(failed validation: .+\)$/);
+    expect(sizeLabel).not.toContain("throttled");
   });
 
   it("bounds a run to its own generation budget, leaving the rest for the next sweep", async () => {
@@ -174,5 +177,171 @@ describe("runCapsuleSweepStep", () => {
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingFetch }, {});
     expect(outcome.summary).toContain("Peek facts: 1 rows built, 1 changed");
     expect(await db.select().from(playerPeekFacts)).toHaveLength(1);
+  });
+});
+
+/**
+ * RESUMABILITY (review C1) — the runner caps a claimed attempt at what is left of the TICK budget,
+ * not at this job's own `timeoutMs`, so a 35-player batch was being cut off mid-run every night and
+ * the repetition check at the end never ran at all. The step now stops before the deadline it is
+ * handed and enqueues its own continuation.
+ */
+describe("runCapsuleSweepStep — across ticks", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  /** A clock that advances by `stepMs` on every read, so a loop that reads it per player walks
+   *  toward the deadline without any real time passing. */
+  function advancingClock(startIso: string, stepMs: number) {
+    let now = new Date(startIso).getTime();
+    return {
+      now: () => {
+        const iso = new Date(now).toISOString();
+        now += stepMs;
+        return iso;
+      },
+    };
+  }
+
+  it("a 50 second tick writes one player and hands the rest to a continuation", async () => {
+    for (const index of [1, 2, 3]) {
+      await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 250 - index });
+    }
+    // Production geometry: the step reserves 25s a player (5s pacing plus one gateway round at its
+    // own 20s timeout). One clock read is spent on the pass's own `asOf`, so with a 20s step the
+    // first loop check sits at 20s and fits inside a 50s window, and the second sits at 40s and
+    // does not. `pacingMs: 0` only stops the test sleeping; the reserve is the production one.
+    const clock = advancingClock("2026-09-04T12:00:00.000Z", 20_000);
+    const outcome = await runCapsuleSweepStep(
+      db,
+      clock,
+      { apiKey: "test-key", fetch: sizeAwareFetch(), pacingMs: 0 },
+      { budget: 3 },
+      new Date("2026-09-04T12:00:50.000Z"),
+    );
+
+    expect(outcome.summary).toContain("1 processed");
+    expect(outcome.summary).toContain("continuing this tick's remainder in a follow-up run of 2");
+    expect(outcome.summary).toContain("repetition check deferred");
+    const queued = await db.select().from(jobs);
+    expect(queued).toHaveLength(1);
+    expect(queued[0]!.name).toBe("capsule-sweep");
+    expect(queued[0]!.payload).toMatchObject({ budget: 2 });
+    // What it wrote is written: a stop is safe because progress is persisted per player.
+    expect((await getStoredCapsule(db, "p1"))?.source).toBe("llm");
+    expect(await getStoredCapsule(db, "p2")).toBeNull();
+  });
+
+  it("a 280 second tick writes about ten", async () => {
+    for (const index of Array.from({ length: 12 }, (_, i) => i + 1)) {
+      await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 300 - index });
+    }
+    // The budget production runs at (JOBS_TICK_BUDGET_MS=280000). At a 25s reserve and a clock
+    // that walks 25s a read, the run fits ten players and stops before the eleventh.
+    const clock = advancingClock("2026-09-04T12:00:00.000Z", 25_000);
+    const outcome = await runCapsuleSweepStep(
+      db,
+      clock,
+      { apiKey: "test-key", fetch: sizeAwareFetch(), pacingMs: 0 },
+      { budget: 12 },
+      new Date("2026-09-04T12:04:40.000Z"),
+    );
+
+    expect(outcome.summary).toContain("10 processed");
+    expect(outcome.summary).toContain("continuing this tick's remainder in a follow-up run of 2");
+    expect((await getStoredCapsule(db, "p10"))?.source).toBe("llm");
+    expect(await getStoredCapsule(db, "p11")).toBeNull();
+  });
+
+  it("a tick with no room for even one player enqueues nothing and says why", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
+    // A deadline ten seconds out, against a 25s reserve: the guard fires on the first iteration.
+    const outcome = await runCapsuleSweepStep(
+      db,
+      CLOCK,
+      { apiKey: "test-key", fetch: sizeAwareFetch() },
+      {},
+      new Date("2026-09-04T12:00:10.000Z"),
+    );
+
+    expect(outcome.summary).toContain("0 processed");
+    expect(outcome.summary).toContain("WROTE NOTHING: the tick budget was too small for one player");
+    expect(outcome.detail.join(" ")).toContain("JOBS_TICK_BUDGET_MS");
+    // No continuation: a zero-progress chain would carry the same budget under the same key and
+    // either dedupe into nothing or spin.
+    expect(await db.select().from(jobs)).toHaveLength(0);
+    expect(await getStoredCapsule(db, "p1")).toBeNull();
+  });
+
+  it("processes the whole batch when nothing is holding a deadline over it", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+    expect(outcome.summary).not.toContain("continuing this tick's remainder");
+    expect(await db.select().from(jobs)).toHaveLength(0);
+  });
+});
+
+/**
+ * THE REPETITION WIRING (review I5) — the check, the queue and the avoid list are three pieces and
+ * only the whole chain is worth anything: a stock sentence has to be written, counted, stamped for
+ * regeneration, and then quoted into the NEXT run's own prompt.
+ */
+describe("runCapsuleSweepStep — the repetition chain", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  /** No numbers and no names, so it grounds for any player: the sweep will write it verbatim onto
+   *  every player it touches, which is exactly the stock sentence the check exists to catch. */
+  const STOCK = "He is the engine of that offense every single week.";
+
+  /** The size-aware fixture plus a narrative answer, so the run actually stores a narrative. */
+  function narrativeFetch(prompts: string[] = []): typeof globalThis.fetch {
+    return (async (_url: unknown, init: unknown) => {
+      const { messages } = JSON.parse((init as RequestInit).body as string) as { messages: { content: string }[] };
+      const prompt = messages[1]!.content;
+      prompts.push(prompt);
+      if (prompt.includes("Return ONE JSON object")) return okResponse(JSON.stringify({ call: STOCK }));
+      return okResponse(prompt.includes("(1) the volume or role case") ? GOOD_FULL : GOOD_COMPACT);
+    }) as typeof globalThis.fetch;
+  }
+
+  async function seedTwo(): Promise<void> {
+    for (const index of [1, 2]) {
+      await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 250 - index });
+    }
+  }
+
+  it("flags a sentence the whole board is saying and stamps both players for regeneration", async () => {
+    await seedTwo();
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch() }, {});
+
+    expect(outcome.summary).toContain("1 stock sentence(s) found, 2 player(s) queued");
+    expect((await getStoredCapsule(db, "p1"))?.narrative).toEqual({ call: STOCK });
+    expect((await getStoredCapsule(db, "p1"))?.factsHash).toBe(REGENERATE_FACTS_HASH);
+    expect((await getStoredCapsule(db, "p2"))?.factsHash).toBe(REGENERATE_FACTS_HASH);
+  });
+
+  it("quotes the flagged sentence into the next run's own prompt", async () => {
+    await seedTwo();
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch() }, {});
+
+    // The stamped hash makes both players eligible again, and this run's avoid list is computed
+    // from what the board is still saying, so the flagged sentence reaches the prompt verbatim.
+    const prompts: string[] = [];
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: narrativeFetch(prompts) }, {});
+
+    const narrativePrompt = prompts.find((prompt) => prompt.includes("Return ONE JSON object"));
+    expect(narrativePrompt).toBeDefined();
+    expect(narrativePrompt).toContain("Do not write them");
+    expect(narrativePrompt).toContain(STOCK);
   });
 });

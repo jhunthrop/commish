@@ -117,6 +117,23 @@ describe("recommendPick", () => {
     expect(cliff).toMatchObject({ code: "tier_cliff", position: "TE" });
   });
 
+  it("NO CLIFF ON A WITHIN-TIER STEP: a span split is a boundary, not a warning (dossier-voice round)", () => {
+    // Eight tight ends five points apart (240 down to 205). No step is a game's worth of the man
+    // above, so rule 1 draws no break; the run is 35 points end to end, so the SPAN rule splits it
+    // in two. The man at the split's own edge is "the last man in his tier" with a five point drop
+    // behind him, which is exactly the sentence the founder read on a player nobody should avoid.
+    const board = [
+      ...Array.from({ length: 8 }, (_, index) => candidate(`te-${index}`, "TE", 40 - index * 5, 10 + index)),
+      ...filler("WR", 40, 40, 20),
+    ];
+
+    const shortlist = recommendPick({ board, roster: [], shape: SHAPE, pickNumber: 1, nextPickNumber: 24 });
+
+    for (const entry of shortlist) {
+      expect(codesOf(entry.reasons)).not.toContain("tier_cliff");
+    }
+  });
+
   it("ROSTER SATURATION: a fifth back ranks below a first tight end at the same value", () => {
     // Four backs already better than the fifth: every slot a back can start in is held.
     const roster: readonly RosteredPlayer[] = Array.from({ length: 4 }, (_, index) => ({

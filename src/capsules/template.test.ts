@@ -63,7 +63,9 @@ describe("renderTemplateCapsule", () => {
     expect(text).toContain("Rashad Long (RB, SF)");
     expect(text).toContain("248 points");
     expect(text).toContain("Age 29 season");
-    expect(text).toContain("-1.8 points a game");
+    expect(text).toContain("Age 29 season costs him 1.8 points a game");
+    // The direction is a verb, never a bare minus sign a reader has to decode.
+    expect(text).not.toContain("-1.8");
     expect(text).toContain("bye is week 9");
     // The rail above carries rank and ADP; the evidence chips below carry expected games. The
     // floor repeats none of them, and season points round to a whole number.
@@ -74,6 +76,17 @@ describe("renderTemplateCapsule", () => {
     // THE TRI-STATE (fix round 1, CRITICAL 2): the fixture's default injury state is "unknown"
     // (no snapshot has ever run) — this must NEVER read as a healthy claim.
     expect(text).toContain("We have not checked an injury feed for him yet.");
+  });
+
+  it("says a positive law effect as a verb too, never a plus sign standing on its own", () => {
+    const input = baseInput();
+    const facts = buildPlayerFacts({
+      ...input,
+      reasons: [{ code: "law", lawId: "rb_age_curve", effect: 2.4, magnitude: 24 }, { code: "availability", expectedGames: 15, floorGames: 11, ceilingGames: 17 }],
+    });
+    const text = renderTemplateCapsule(facts);
+    expect(text).toMatch(/adds 2\.4 points a game to what we expect from him\./);
+    expect(text).not.toContain("+2.4");
   });
 
   it("keeps the unpriced-market sentence: the one market fact no other surface states", () => {

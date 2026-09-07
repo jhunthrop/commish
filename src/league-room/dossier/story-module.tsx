@@ -44,14 +44,34 @@ function lowercaseSensibly(text: string): string {
  * all only when BOTH are absent; each half renders independently of the other otherwise, since a
  * current designation and a past season-ending story are different facts about different moments.
  */
+/**
+ * THE DESIGNATION, IN WORDS (dossier-voice round §3.7) — the pill printed the feed's own code and
+ * a page that shows a reader a bare "Q" has asked him to decode it. The codes are the league's own
+ * report statuses; anything the feed sends that is not one of them prints as it came, since
+ * inventing an expansion for a code this product does not know would be worse than the code.
+ */
+const DESIGNATION_WORDS: Readonly<Record<string, string>> = {
+  Q: "Questionable",
+  D: "Doubtful",
+  O: "Out",
+  IR: "Injured reserve",
+  PUP: "Physically unable to perform",
+  NFI: "Non-football injury",
+  SUSP: "Suspended",
+};
+
+function designationWord(designation: string): string {
+  return DESIGNATION_WORDS[designation.toUpperCase()] ?? designation;
+}
+
 export function StoryModule({ story, designation = null }: StoryModuleProps) {
   if (story === null && designation === null) return null;
 
   return (
     <Card as="section" aria-label="Story" className="flex flex-col gap-2">
       {designation === null ? null : (
-        <span className="w-fit rounded-sm bg-negative px-1.5 py-0.5 font-mono text-sm font-semibold text-negative-text" data-story="designation">
-          {designation}
+        <span className="w-fit rounded-sm bg-negative px-1.5 py-0.5 text-sm font-semibold text-negative-text" data-story="designation">
+          {designationWord(designation)}
         </span>
       )}
       {story === null ? null : (

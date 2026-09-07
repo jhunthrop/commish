@@ -271,6 +271,49 @@ describe("the peek is one statement over a stored document", () => {
       expect(await playerSeason(db, "no_such_league", "rb1", clock)).toBeNull();
     });
 
+    /**
+     * ADDITION B (review, 2026-09-07) — the two miss branches are not the same miss. A hash with no
+     * documents at all is a novel scoring combination and still builds live; a BUILT hash asked
+     * about an off-board player has nothing to build, and the founder screenshotted the five to
+     * fifteen seconds of blank sheet that discovery used to cost.
+     */
+    it("answers an off-board player from a built hash without the synchronous build", async () => {
+      if (RECORDING) return;
+      // The hash HAS documents (the seeded build above), and this player is on no board.
+      await writePeekDocuments(db, request);
+      await db.insert(players).values({ id: "off_board", name: "Practice Squad", position: "WR", nflTeam: "SF", adp: null });
+
+      counting.reset();
+      const body = await playerSeason(counting.db, leagueId, "off_board", clock);
+
+      expect(body!.player.name).toBe("Practice Squad");
+      expect(body!.dossier).toBeNull();
+      expect(body!.capsule).toBeNull();
+      expect(body!.availableSeasons).toEqual([]);
+      expect(body!.reasons).toEqual([]);
+      // The whole point: no board join, no facts read, no capsule read, no stat lines. A handful of
+      // small statements, nowhere near the assembly a build runs.
+      expect(counting.statements().length).toBeLessThan(12);
+      // And the hash is still asked to be rebuilt, so he joins the documents on the next build.
+      const [job] = await db.select().from(jobs).where(eq(jobs.idempotencyKey, `peek-document:${PPR_HASH}:miss:2026-09-07`));
+      expect(job).toBeDefined();
+    });
+
+    it("still builds synchronously for a board player the built hash has no row for", async () => {
+      if (RECORDING) return;
+      await writePeekDocuments(db, request);
+      // rb2 IS on the board (the seed gives him a projection row); his document is deleted, so the
+      // hash has documents but not his.
+      await db.delete(playerPeekDocuments).where(eq(playerPeekDocuments.playerId, "rb2"));
+
+      const body = await playerSeason(db, leagueId, "rb2", clock);
+
+      expect(body).not.toBeNull();
+      // The build ran: his board rank is on the body, where the off-board branch would have
+      // returned a null rank and nothing else.
+      expect(body!.positionRank).not.toBeNull();
+    });
+
     it("renders absence for a real player nothing has been computed for", async () => {
       if (RECORDING) return;
       await db.insert(players).values({ id: "signed_in_october", name: "Late Signing", position: "WR", nflTeam: "SF", adp: null });

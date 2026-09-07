@@ -61,7 +61,7 @@ describe("discoveredHeadline", () => {
     expect(discoveredHeadline(182, law)).toBeUndefined();
   });
 
-  it("rephrases the pointsPerGame quantity rather than repeating \"points per game\" against copyFor's own \"pts per game\" (founder, 2026-09-04 — the circular '9.9 points per game: measured +1.2 pts per game' phrasing)", () => {
+  it("rephrases the pointsPerGame quantity rather than repeating \"points per game\" against copyFor's own \"pts per game\" (founder, 2026-09-04 — the circular '9.9 points per game: worth 1.2 pts a game' phrasing)", () => {
     const law = discoveredLawFixture({
       id: "delta:RB:pointsPerGame:q30:rose_into",
       primaryQuantityId: "pointsPerGame",
@@ -71,7 +71,7 @@ describe("discoveredHeadline", () => {
     expect(discoveredHeadline(9.87, law)).toBe("averaging 9.9 a game last season");
     const reason: BoardReason = { code: "law", lawId: law.id, effect: 1.2, magnitude: 9.87 };
     render(<ReasonChip reason={reason} registry={[law]} />);
-    expect(screen.getByText(/averaging 9\.9 a game last season: measured \+1\.2 pts per game/)).toBeInTheDocument();
+    expect(screen.getByText(/averaging 9\.9 a game last season: worth 1\.2 pts a game/)).toBeInTheDocument();
     expect(screen.queryByText(/9\.9 points per game/)).not.toBeInTheDocument();
   });
 
@@ -113,13 +113,13 @@ describe("ReasonChip — a discovered law's reason", () => {
     });
     const reason: BoardReason = { code: "law", lawId: law.id, effect: -1.4, magnitude: 0.235 };
     render(<ReasonChip reason={reason} registry={[law]} />);
-    expect(screen.getByText(/23\.5% touchdown-points share: measured -1\.4 pts per game/)).toBeInTheDocument();
+    expect(screen.getByText(/23\.5% touchdown-points share: costs him 1\.4 pts a game/)).toBeInTheDocument();
   });
 
   it("falls back to the mechanical fallback headline for an id with no matching registry entry", () => {
     const reason: BoardReason = { code: "law", lawId: "not_a_real_candidate_id", effect: -1.4, magnitude: 182 };
     render(<ReasonChip reason={reason} registry={[]} />);
-    expect(screen.getByText(/Not a real candidate id: measured -1\.4 pts per game/)).toBeInTheDocument();
+    expect(screen.getByText(/Not a real candidate id: costs him 1\.4 pts a game/)).toBeInTheDocument();
   });
 
   it("compact leads with the effect alone and moves the whole sentence to the screen reader", () => {
@@ -135,7 +135,7 @@ describe("ReasonChip — a discovered law's reason", () => {
     const { container } = render(<ReasonChip reason={reason} registry={[law]} compact />);
     expect(screen.getByText(/^-1\.4 pts$/)).toBeInTheDocument();
     const srOnly = container.querySelector(".sr-only");
-    expect(srOnly?.textContent).toContain("23.5% touchdown-points share: measured -1.4 pts per game");
+    expect(srOnly?.textContent).toContain("23.5% touchdown-points share: costs him 1.4 pts a game");
     expect(srOnly?.textContent).toContain(law.claim);
   });
 });

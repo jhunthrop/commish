@@ -97,6 +97,15 @@ describe("scheduleStatuses", () => {
       parsePayload: () => ({}),
       steps: [{ name: "harvest", run: async () => ({ summary: "noop", detail: [] }) }],
     });
+    // The real SCHEDULES now also fire "win-totals" weekly (the publisher read).
+    const cannedWinTotals = defineJob({
+      name: "win-totals",
+      maxAttempts: 3,
+      timeoutMs: 5_000,
+      backoff: { baseMs: 60_000, maxMs: 600_000 },
+      parsePayload: () => ({}),
+      steps: [{ name: "fetch", run: async () => ({ summary: "noop", detail: [] }) }],
+    });
     const definitions = new Map([
       ["season-week", canned],
       ["draft-sweep", cannedSweep],
@@ -104,6 +113,7 @@ describe("scheduleStatuses", () => {
       ["props-preseason-snapshot", cannedPropsPreseasonSnapshot],
       ["capsule-sweep", cannedCapsuleSweep],
       ["capture-harvest", cannedCaptureHarvest],
+      ["win-totals", cannedWinTotals],
     ]);
 
     // Bootstrap, then rewind the Tuesday cursor so the second tick enqueues the 12:00Z fire.

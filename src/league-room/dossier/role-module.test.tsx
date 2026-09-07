@@ -113,6 +113,26 @@ describe("RoleModule", () => {
     expect(absent.container.querySelector('[data-role="trend"]')).toBeNull();
   });
 
+  it("prints the trend to one decimal, and ends the sentence on the number rather than a floating period", () => {
+    // The founder's own read: "up 12.440000000000001" and ". A real move" (dossier-voice §3.4).
+    const floatArtifact: PlayerFactsTrend = {
+      pointsPerGame: { priorSeason: 2024, priorValue: 10.56, recentSeason: 2025, recentValue: 23.000000000000004, delta: 12.440000000000001, material: true },
+      yardsPerOpportunity: null,
+      targetShare: null,
+    };
+    const trend = render(<RoleModule position="WR" usage={USAGE} trend={floatArtifact} />);
+    const text = trend.container.querySelector('[data-role="trend"]')!.textContent ?? "";
+
+    expect(text).toContain("up 12.4");
+    expect(text).not.toContain("12.440000000000001");
+    expect(text).toContain("10.6 a game in 2024 rose to 23.0 in 2025,");
+    // The closing clause is its own word, not a span that opens with a full stop: the period
+    // belongs to the delta's own box, so nothing renders as " . A real move".
+    const close = trend.container.querySelector('[data-trend="close"]')!;
+    expect(close.textContent).toBe("A real move, not noise.");
+    expect(trend.container.querySelector('[data-trend="delta"]')!.textContent).toMatch(/\.$/);
+  });
+
   it("colors the trend delta in the magnitude channel, weak for a decline and good for a rise", () => {
     const decline = render(<RoleModule position="WR" usage={USAGE} trend={MATERIAL_DECLINE} />);
     const declineStat = decline.container.querySelector('[data-magnitude]');

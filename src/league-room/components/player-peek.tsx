@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BottomSheet, PlayerObject } from "@/components/ui";
+import { BottomSheet, Card, PlayerObject, Skeleton } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import type { PlayerSeasonBody } from "@/league-service/player";
 import { DossierComposition } from "../dossier/dossier-composition";
@@ -94,6 +94,33 @@ function PeekHeader({ body, target, onClose }: { readonly body: PlayerSeasonBody
  * Loading shows the name immediately — the reader pressed a name, the sheet answers with it
  * before the wire does.
  */
+/**
+ * THE PEEK'S OWN BODY, WHILE THE WIRE IS STILL OUT (founder, 2026-09-07, on a screenshot of the
+ * sheet mid-load) — the header renders from the row the manager just pressed, and everything under
+ * it used to be five to fifteen seconds of empty dark on a cold start or an off-board player.
+ *
+ * THE FRAME, NOT A SPINNER. Three module-shaped cards carrying the design system's own `Skeleton`,
+ * so the sheet has the SHAPE of the answer while it waits and the modules land in place rather
+ * than shoving a spinner out of the way. One line of copy says what is happening and stops there.
+ */
+function PeekBodySkeleton() {
+  return (
+    <div className="flex flex-col gap-4" aria-hidden="false">
+      <Card as="section" aria-label="Loading his call">
+        <Skeleton lines={2} />
+      </Card>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card as="section" aria-label="Loading his range">
+          <Skeleton lines={3} />
+        </Card>
+        <Card as="section" aria-label="Loading his role">
+          <Skeleton lines={3} />
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export function PlayerPeekHost() {
   const { target, body, failed, season, setSeason, close } = usePeekLoad();
 
@@ -109,9 +136,12 @@ export function PlayerPeekHost() {
     <BottomSheet label={target.name} onClose={close}>
       <div className="flex flex-col gap-6">
         {body === null ? (
-          <div className="flex flex-col gap-2">
-            <p className="font-display text-2xl font-bold text-text-primary">{target.name}</p>
-            <p className="text-sm text-text-muted">{failed ? "We could not load him. Close this and try again." : "Loading…"}</p>
+          <div className="flex flex-col gap-4" data-peek="pending">
+            <div className="flex flex-col gap-2">
+              <p className="font-display text-2xl font-bold text-text-primary">{target.name}</p>
+              <p className="text-sm text-text-muted">{failed ? "We could not load him. Close this and try again." : "Pulling his numbers."}</p>
+            </div>
+            {failed ? null : <PeekBodySkeleton />}
           </div>
         ) : (
           <>

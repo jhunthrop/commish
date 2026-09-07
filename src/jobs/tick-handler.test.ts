@@ -81,6 +81,16 @@ const cannedCaptureHarvest: AnyJobDefinition = defineJob({
   steps: [{ name: "harvest", run: async () => ({ summary: "canned", detail: [] }) }],
 });
 
+/** Same reason: the real SCHEDULES now also fire "win-totals" weekly (the publisher read). */
+const cannedWinTotals: AnyJobDefinition = defineJob({
+  name: "win-totals",
+  maxAttempts: 3,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 60_000, maxMs: 600_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "fetch", run: async () => ({ summary: "canned", detail: [] }) }],
+});
+
 function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET: SECRET }): TickHandlerDeps {
   return {
     db,
@@ -92,6 +102,7 @@ function deps(env: Readonly<Record<string, string | undefined>> = { CRON_SECRET:
       ["props-preseason-snapshot", cannedPropsPreseasonSnapshot],
       ["capsule-sweep", cannedCapsuleSweep],
       ["capture-harvest", cannedCaptureHarvest],
+      ["win-totals", cannedWinTotals],
     ]),
     env,
     workerId: "tick-test",

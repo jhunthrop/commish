@@ -23,10 +23,11 @@ describe("WhyGroups", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("states a law group as a bold lead plus a plain explanation of its measured effect", () => {
+  it("states a law group as a bold lead plus what it does to him, in words", () => {
     render(<WhyGroups reasons={REASONS} laws={[]} position="RB" />);
     expect(screen.getByText("Age 29 season.")).toBeInTheDocument();
-    expect(screen.getByText("Measured -1.8 points per game.")).toBeInTheDocument();
+    // The direction is the verb and the magnitude is unsigned, never "Measured -1.8" (§3.7).
+    expect(screen.getByText("Costs him 1.8 points a game.")).toBeInTheDocument();
   });
 
   it("states a non-law fact as its own bold lead plus explanation", () => {

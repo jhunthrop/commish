@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { PlayerFactsLastSeasonStory } from "@/capsules/facts";
 import { Card, SeasonBars, type SeasonWeek } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
-import { ordinal } from "../lib/format";
+import { formatTenth, formatWhole, ordinal } from "../lib/format";
 
 export interface SeasonStripProps {
   readonly story: PlayerFactsLastSeasonStory;
@@ -18,6 +18,10 @@ export interface SeasonStripProps {
    * renders nothing, exactly like the peek's own switcher already does for a single-season player.
    */
   readonly switcher?: ReactNode;
+  /** THE WRITTEN LAST-SEASON LINE (`narrativeSlot(capsule, "story")`) — one sentence about the
+   *  shape of the season, under the five stated facts. The facts are stats and stay exactly as
+   *  they are; this only ever adds the sentence a person would say about them. */
+  readonly sentence?: string | null;
 }
 
 interface SeasonFact {
@@ -33,9 +37,9 @@ function factsFor(story: PlayerFactsLastSeasonStory, scoringLabel: string): read
   return [
     { label: "Games", value: String(story.gamesPlayed) },
     { label: "Finish", value: ordinal(story.pointsRank.positionRank), sub: `of ${story.pointsRank.qualifierCount}` },
-    { label: "Points per game", value: `${story.pointsPerGame.toFixed(1)} a game`, sub: scoringLabel },
-    { label: "Best week", value: story.bestWeek.points.toFixed(1), sub: `week ${story.bestWeek.week}` },
-    { label: "Receiving yards", value: `${story.receivingYardsRank.value}`, sub: `${ordinal(story.receivingYardsRank.positionRank)} of ${story.receivingYardsRank.qualifierCount}` },
+    { label: "Points per game", value: `${formatTenth(story.pointsPerGame)} a game`, sub: scoringLabel },
+    { label: "Best week", value: formatTenth(story.bestWeek.points), sub: `week ${story.bestWeek.week}` },
+    { label: "Receiving yards", value: formatWhole(story.receivingYardsRank.value), sub: `${ordinal(story.receivingYardsRank.positionRank)} of ${story.receivingYardsRank.qualifierCount}` },
   ];
 }
 
@@ -45,7 +49,7 @@ function factsFor(story: PlayerFactsLastSeasonStory, scoringLabel: string): read
  * scaled to the max, missed weeks a flat hole, every column from week one). This module composes
  * `SeasonBars` rather than drawing its own bars — one chart renderer, not two that could drift.
  */
-export function SeasonStrip({ story, weeks, scoringLabel, switcher }: SeasonStripProps) {
+export function SeasonStrip({ story, weeks, scoringLabel, switcher, sentence = null }: SeasonStripProps) {
   const facts = factsFor(story, scoringLabel);
   return (
     <Card as="section" aria-label={`${story.season} season`} className="flex flex-col gap-4">
@@ -59,6 +63,11 @@ export function SeasonStrip({ story, weeks, scoringLabel, switcher }: SeasonStri
           </div>
         ))}
       </div>
+      {sentence === null ? null : (
+        <p className="text-sm text-text-muted" data-season="written">
+          {sentence}
+        </p>
+      )}
       <SeasonBars label={`His ${story.season} season, points by week`} weeks={weeks} />
     </Card>
   );

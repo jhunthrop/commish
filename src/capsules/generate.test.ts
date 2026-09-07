@@ -25,6 +25,17 @@ function okResponse(content: string): Response {
   return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 300, completion_tokens: 80, total_tokens: 380, cost: 0.00005 } }), { status: 200 });
 }
 
+/** The narrative call is a THIRD request per player alongside the two reads, and it is the only
+ *  one whose user message asks for a JSON object — every mock below routes on that, so a test
+ *  counting a size's own attempts never counts the narrative's. */
+function isNarrativeRequest(init: RequestInit): boolean {
+  const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
+  return payload.messages[1]!.content.includes("Return ONE JSON object");
+}
+
+/** A grounded narrative: one slot, every number and name off the fact sheet. */
+const NARRATIVE_JSON = JSON.stringify({ call: "He is the engine of that SF offense and the price has not caught up." });
+
 /** Twenty-plus words (the degenerate-completion guard retries anything shorter as transport
  *  weather) that still FAIL validation: "999" traces to no supplied fact. */
 const BAD_COMPLETION =
@@ -39,6 +50,7 @@ describe("generateCapsule", () => {
   it("returns llm text and provenance for both sizes on a clean generation", async () => {
     const facts = buildPlayerFacts(baseInput());
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
       const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       return okResponse(isFull ? GOOD_FULL : GOOD_COMPACT);
@@ -51,12 +63,29 @@ describe("generateCapsule", () => {
     expect(result.full.source).toBe("llm");
     expect(result.compact.text).toBe(GOOD_COMPACT);
     expect(result.full.text).toBe(GOOD_FULL);
+    expect(result.narrative.slots.call).toBe("He is the engine of that SF offense and the price has not caught up.");
+    expect(result.narrative.rejected).toEqual([]);
+  });
+
+  it("keeps the narrative independent of the reads: a failed narrative never flips a good pair to template", async () => {
+    const facts = buildPlayerFacts(baseInput());
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse("I am afraid I cannot write that for you today, sorry about this one.");
+      const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
+      return okResponse(payload.messages[1]!.content.includes("(1) the volume or role case") ? GOOD_FULL : GOOD_COMPACT);
+    });
+
+    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+    expect(result.source).toBe("llm");
+    expect(result.narrative.slots).toEqual({});
+    expect(result.narrative.failure).toBe("the narrative completion was not a JSON object");
   });
 
   it("regenerates once on a validation failure, then succeeds", async () => {
     const facts = buildPlayerFacts(baseInput());
     let compactCalls = 0;
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
       const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       if (isFull) return okResponse(GOOD_FULL);
@@ -71,6 +100,61 @@ describe("generateCapsule", () => {
     // Fix round 1, MEDIUM c: usage accumulates across BOTH attempts (the failed one billed too),
     // never just the winning one.
     expect(result.compact.usage?.costUsd).toBeCloseTo(0.0001, 10);
+  });
+
+  it("answers a word-band failure with a LENGTH CORRECTION, not a fresh attempt (capsule acceptance round)", async () => {
+    const facts = buildPlayerFacts(baseInput());
+    // Forty-two words, the shortest compact the coordinator's live sample actually produced: above
+    // `write.ts`'s twenty-word degenerate floor, so it reaches the validator as a real band failure
+    // rather than as transport weather.
+    const tooShort = `He is a clear buy at this price and nothing else about him needs saying today. ${Array.from({ length: 25 }, () => "plainly").join(" ")}.`;
+    const compactPrompts: string[] = [];
+    let compactCalls = 0;
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
+      const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
+      if (payload.messages[1]!.content.includes("(1) the volume or role case")) return okResponse(GOOD_FULL);
+      compactCalls += 1;
+      compactPrompts.push(payload.messages[1]!.content);
+      return okResponse(compactCalls === 1 ? tooShort : GOOD_COMPACT);
+    });
+
+    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+
+    expect(result.compact.source).toBe("llm");
+    expect(result.compact.text).toBe(GOOD_COMPACT);
+    // The retry hands the SAME text back with a length instruction and no violation list at all:
+    // prose that was already grounded and already in voice is corrected, never thrown away.
+    expect(compactPrompts[1]).toContain("Rewrite it to between 60 and 110 words, changing nothing else");
+    expect(compactPrompts[1]).toContain(tooShort);
+    expect(compactPrompts[1]).not.toContain("violated these rules");
+  });
+
+  it("waits out a 429 rather than falling to the template on the first throttle of a sweep", async () => {
+    vi.useFakeTimers();
+    try {
+      const facts = buildPlayerFacts(baseInput());
+      const throttledOnce = new Map<string, number>();
+      const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+        const kind = isNarrativeRequest(init) ? "narrative" : JSON.parse(init.body as string).messages[1].content.includes("(1) the volume or role case") ? "full" : "compact";
+        const seen = throttledOnce.get(kind) ?? 0;
+        throttledOnce.set(kind, seen + 1);
+        if (seen === 0) return new Response("rate limited", { status: 429 });
+        return okResponse(kind === "narrative" ? NARRATIVE_JSON : kind === "full" ? GOOD_FULL : GOOD_COMPACT);
+      });
+
+      const promise = generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+      await vi.advanceTimersByTimeAsync(20_000);
+      const result = await promise;
+
+      // The throttle cost one backoff wait, not a template: `write.ts`'s 429 track owns the wait
+      // and `generate.ts` never sees a failure at all.
+      expect(result.source).toBe("llm");
+      expect(result.compact.fallbackReason).toBeNull();
+      expect(result.full.fallbackReason).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("falls back to the deterministic template after two failed attempts, and never blanks the capsule", async () => {
@@ -114,6 +198,7 @@ describe("generateCapsule", () => {
   it("marks the whole capsule template-sourced when only one size falls back, never claiming a mixed llm provenance", async () => {
     const facts = buildPlayerFacts(baseInput());
     const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
       const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
       const isFull = payload.messages[1]!.content.includes("(1) the volume or role case");
       return isFull ? okResponse(BAD_COMPLETION) : okResponse(GOOD_COMPACT);

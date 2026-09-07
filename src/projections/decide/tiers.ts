@@ -50,6 +50,28 @@ function isTierBreak(above: number, below: number): boolean {
   return above > 0 && (above - below) * GAMES_PER_SEASON >= above * TIER_BREAK_GAMES;
 }
 
+/**
+ * WHETHER THE DROP BELOW A PLAYER IS A CLIFF WORTH NAMING (dossier-voice round §3.3, from the
+ * founder's own McCaffrey read: "for every player we say 'last man in his tier', that doesn't mean
+ * they shouldn't be drafted").
+ *
+ * A tier boundary is not automatically a cliff. Rule 2 above splits a long run of small steps at
+ * its widest internal gaps to hold a tier under the span cap, so a perfectly ordinary 3.2 point
+ * step can end a tier — and a reason that fires on any positive drop turns that step into a
+ * warning nobody would give out loud. This is the SAME games-worth share rule 1 uses, applied to
+ * the player's own projection: the drop behind him has to be worth at least a game of what he
+ * himself is projected for. Written as a cross-multiplication for the same reason `isTierBreak`
+ * is: a non-positive projection reads as "no cliff", never as a division by nothing.
+ *
+ * BOTH EMITTERS ASK THIS ONE FUNCTION — the draft recommendation's own pick reason
+ * (`decide/draft.ts`, which keeps `TIER_IS_THIN_AT` on top of it) and the stored board reason
+ * (`preseason/board.ts`, which is the one the player peek's verdict actually reads back). A
+ * threshold that lived in only one of the two would be a rule the product does not keep.
+ */
+export function isRealTierCliff(ownProjectedPoints: number, dropToNextTier: number): boolean {
+  return ownProjectedPoints > 0 && dropToNextTier * GAMES_PER_SEASON >= ownProjectedPoints * TIER_BREAK_GAMES;
+}
+
 /** Indices at which a new run starts under rule 1, always beginning with zero. */
 function runStarts(pointsDescending: readonly number[]): readonly number[] {
   return pointsDescending.flatMap((points, index) =>

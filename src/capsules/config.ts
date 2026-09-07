@@ -52,6 +52,28 @@ export const CAPSULE_CONFIG = {
       maxTokens: 1600,
     },
   },
+  /**
+   * THE NARRATIVE CALL (founder amendment 2026-09-07) — one call per player for the whole object
+   * of slots. Sized generously above the prose it returns for the same reason the two reads are:
+   * `glm-5.3-flash` spends completion tokens thinking, and a tight cap returns an empty body while
+   * still billing. A dozen slots of at most forty words is roughly 400 words of JSON.
+   */
+  narrative: {
+    maxTokens: 2000,
+  },
+  /**
+   * A SENTENCE ON MORE THAN THIS SHARE OF THE BOARD IS STOCK, not voice (founder amendment
+   * 2026-09-07: "alive, not stock"). Two percent of a 659 player board is thirteen players saying
+   * the same thing, which is the point at which a reader who opens two pages sees the seam. The
+   * sweep flags every sentence over it, queues those players for regeneration, and quotes the
+   * sentence into the next run's prompt as one not to write again.
+   */
+  repetition: {
+    maxShare: 0.02,
+    /** How many flagged sentences the prompt quotes. A prompt that lists fifty sentences not to
+     *  write is a prompt about sentences not to write; the worst offenders carry the signal. */
+    maxQuotedSentences: 8,
+  },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
    *  below it is noise a capsule need not dwell on. The mandated-tension check (`validate.ts`)
    *  requires the STRONGEST such group's own number be cited before the call, on every capsule
@@ -62,10 +84,21 @@ export const CAPSULE_CONFIG = {
    *  that lets a full board's first run clear the free-tier throttle across several nightly
    *  sweeps rather than exhausting it in one run. Generous, per the base-product ruling (spec
    *  §15.1): no paywall gates capsule coverage, only pacing against the gateway. */
-  // 25 players a night, not 40: at 15s pacing plus two generations each, 40 players cannot
-  // finish inside the job's own 480s timeout. 25 fits with headroom, and the sweep's
-  // "left for the next sweep" carryover makes the smaller bite harmless.
-  sweepGenerationBudget: 25,
+  // 35 A NIGHT, ACROSS AS MANY TICKS AS IT TAKES (dossier-voice round §3.2, corrected by the
+  // review's C1). The number that binds is NOT the sweep job's own 480s `timeoutMs`: the runner
+  // caps a claimed attempt at whatever is left of the TICK budget
+  // (`JOBS_CONFIG.vercelTickBudgetMsDefault`, 50 seconds), so no single attempt was ever going to
+  // write 35 players at 5s pacing plus 7-20s of generation each. The sweep stops before the
+  // deadline it is handed and enqueues a continuation carrying the rest of this number, so 35 is
+  // the per-NIGHT ceiling rather than a per-attempt promise, and a tick writes the two or three
+  // players it has room for.
+  //
+  // THE COST, STATED: about $0.0022 a player for the two reads (the measured rate behind the
+  // spec's "roughly a dollar" for 460 players) and about a third again for the narrative call, so
+  // roughly $0.0033 a player and about 12 cents a night at this batch, under $4 a month. The
+  // one-time backlog regeneration the spec calls for is a separate, larger spend the coordinator
+  // runs deliberately; this constant only has to keep the board from drifting back.
+  sweepGenerationBudget: 35,
   /** Pause between players inside one sweep. The gateway rate-limits per minute, and the first
    *  live sweep proved a burst (two calls per player, back to back) throttles everything after
    *  the first player into the template floor (2026-09-05). Fifteen seconds a player was the
@@ -75,7 +108,13 @@ export const CAPSULE_CONFIG = {
    *  retries. */
   // Back to 15s (2026-09-05): prepaid credits lifted the free-tier throttle, and the 429
   // backoff track handles the rare residual limit. 45s was the throttled-era setting.
-  sweepPacingMs: 15_000,
+  //
+  // 5s (dossier-voice round): the raised batch above has to fit the same job timeout, and pacing
+  // is the half of that budget that buys nothing once the throttle is gone. The 429 track (three
+  // backoff retries doubling from twenty seconds) is what actually handles a live rate limit, and
+  // it is untouched — if a night starts throttling again, that track absorbs it and the sweep's
+  // own carryover finishes the board on the next run.
+  sweepPacingMs: 5_000,
 } as const;
 
 /**

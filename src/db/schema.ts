@@ -3342,6 +3342,19 @@ export const playerCapsules = pgTable("player_capsules", {
   bodyCompact: text("body_compact").notNull(),
   bodyFull: text("body_full").notNull(),
   source: capsuleSourceEnum("source").notNull(),
+  /**
+   * THE NARRATIVE (founder amendment 2026-09-07, "every peek sentence is written") — one JSON
+   * object of named slots, each a validated short sentence a module renders in place of its own
+   * template sentence (`capsules/narrative-slots.ts` holds the keys and the one accessor). Written
+   * by the SAME sweep and keyed by the SAME `factsHash` as the two reads above, so it can never
+   * describe a player from facts the reads no longer hold.
+   *
+   * NULLABLE, AND INDEPENDENT OF `source`. The narrative is a separate gateway call: it can fail
+   * while both reads succeed, and a page with no narrative is a page of template sentences, which
+   * is exactly what every one of those modules rendered before this column existed. Folding its
+   * failure into `source` would flip two good reads to "template" over a sentence.
+   */
+  narrative: jsonb("narrative").$type<Record<string, string>>(),
   /** `CAPSULE_MODEL` at generation time, or `null` for a `"template"`-sourced row — a template
    *  was never asked of any model. */
   model: text("model"),

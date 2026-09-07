@@ -2,6 +2,7 @@ import type { Law, PrimaryQuantityUnit } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
 import { Badge } from "./badge";
 import { signedPoints } from "./event-feed-row";
+import { formatTenth } from "./number-format";
 
 /**
  * ONE REASON, ONE CHIP — the board's own "why" made legible next to a player, everywhere a
@@ -26,9 +27,9 @@ import { signedPoints } from "./event-feed-row";
  * `sr-only` claim below, and needs nothing else. `board-reasons.ts` (a server-only module) keeps
  * importing `discovery/templates.ts` directly, which is fine — it never ships to the browser.
  *
- * A "law" reason renders `{headline}: measured {signed effect} pts per game` — the pattern the
- * task itself specifies ("Age 29 season: measured -1.8 pts per game", "Crowded target room:
- * measured -0.8 pts per game") — and carries the law's own plain-words `claim`
+ * A "law" reason renders `{headline}: {costs him|worth} {effect} pts a game` — the verb form the
+ * dossier-voice round (§3.7) replaced the original "measured -1.8 pts per game" with, after the
+ * founder read that phrasing as a bot's — and carries the law's own plain-words `claim`
  * (`registry`, looked up by `lawId`) as an `sr-only` elaboration, the same "visible headline,
  * spoken sentence" split `Stat`'s own `comparisonSentence` already uses for a comparison. Every
  * other `BoardReason` code renders its own short, structured sentence so a surface with room for
@@ -43,7 +44,7 @@ import { signedPoints } from "./event-feed-row";
  * `laws/board-reasons.ts`'s `magnitudeForLaw` documents for that law id. `wr_target_competition`
  * and `play_caller_fingerprint` render a fixed qualitative headline rather than a raw share —
  * "crowded" and "new" already say what the number would, and the task's own worked example
- * ("Crowded target room: measured -0.8 pts per game") states this exact headline.
+ * ("Crowded target room: costs him 0.8 pts a game") states this exact headline.
  */
 const LAW_HEADLINES: Readonly<Record<string, (magnitude: number) => string>> = {
   rb_workload_cliff: (magnitude) => `${Math.round(magnitude)} touches last season`,
@@ -120,7 +121,7 @@ function wordOrderFor(unit: PrimaryQuantityUnit): "value-first" | "noun-first" {
  * ONE NAMED EXCEPTION TO THE GENERIC RULE ABOVE (founder, 2026-09-04, Outlook redesign) — the
  * `"pointsPerGame"` quantity (`discovery/templates.ts`'s own `noun: "points per game that
  * season"`) is the one primary quantity whose noun is also the unit `copyFor`'s "law" case always
- * appends: `"{value} points per game: measured {effect} pts per game"` says "per game" twice and
+ * appends: `"{value} points per game: costs him {effect} pts a game"` says "per game" twice and
  * reads as the law re-stating its own effect back at the reader rather than a fact about the
  * player. Every other quantity's noun (a share, an age, a touch count, ...) is a DIFFERENT unit
  * from the effect it precedes, so the sentence states two distinct facts; this is the only one
@@ -165,7 +166,9 @@ function signedPercent(fraction: number): string {
 function copyFor(reason: BoardReason, law: Law | undefined): string {
   switch (reason.code) {
     case "law":
-      return `${lawHeadline(reason.lawId, reason.magnitude, law)}: measured ${signedPoints(reason.effect)} pts per game`;
+      // Said as a verb, never as a signed number in the lab register (dossier-voice round §3.7):
+      // "measured -1.8 pts per game" is the exact sentence the founder read as a bot's.
+      return `${lawHeadline(reason.lawId, reason.magnitude, law)}: ${reason.effect < 0 ? "costs him" : "worth"} ${formatTenth(Math.abs(reason.effect))} pts a game`;
     case "availability":
       return `Expected ${Math.round(reason.expectedGames)} games, ${Math.round(reason.floorGames)} to ${Math.round(reason.ceilingGames)}`;
     case "offseason_share_gained":
