@@ -1,5 +1,6 @@
 import type { Position } from "@/domain/player";
 import type { BoardReason } from "@/projections/preseason/board";
+import { countWordCapitalized } from "../lib/format";
 
 /**
  * THE VERDICT LINE (founder, 2026-09-04, Outlook redesign) — one deterministic sentence opening
@@ -42,16 +43,6 @@ function findReason<T extends BoardReason["code"]>(reasons: readonly BoardReason
   return reasons.find((reason): reason is Extract<BoardReason, { code: T }> => reason.code === code);
 }
 
-/** Counts a sentence spells rather than digits. Past twelve a figure reads as a figure again, and
- *  a tier that deep is not a cliff anyone is about to reach. */
-const COUNT_WORDS: readonly string[] = [
-  "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve",
-];
-
-function countWord(count: number): string {
-  return COUNT_WORDS[count] ?? String(count);
-}
-
 /**
  * The tier clause, when the board found a real cliff below him — never built from `scarcity`
  * alone, which `marketGapClause`/the no-market branch already state on their own.
@@ -67,7 +58,7 @@ function tierClause(tierCliff: TierCliffReason | undefined): string | null {
   const count = tierCliff.playersLeftInTier;
   const drop = tierCliff.dropToNextTier.toFixed(1);
   if (count === 1) return `He is the last man in his tier, with a ${drop} point drop behind him.`;
-  return `${countWord(count)} left in his tier before a ${drop} point drop.`;
+  return `${countWordCapitalized(count)} left in his tier before a ${drop} point drop.`;
 }
 
 function positionRankLabel(position: Position, scarcity: ScarcityReason): string {

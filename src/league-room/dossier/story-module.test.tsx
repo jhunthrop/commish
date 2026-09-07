@@ -21,13 +21,15 @@ describe("StoryModule", () => {
 
   it("renders the current designation pill independently of any season-ending story", () => {
     const { container } = render(<StoryModule story={null} designation="Q" />);
-    expect(container.querySelector('[data-story="designation"]')!.textContent).toBe("Q");
+    // The pill says the word (dossier-voice round §3.7): a page that prints "Q" has asked a
+    // first-timer to decode a feed code.
+    expect(container.querySelector('[data-story="designation"]')!.textContent).toBe("Questionable");
     expect(container.querySelector('[data-story="season-ending"]')).toBeNull();
   });
 
   it("renders both the pill and the story together when both are real", () => {
     const { container } = render(<StoryModule story={STORY} designation="IR" />);
-    expect(container.querySelector('[data-story="designation"]')!.textContent).toBe("IR");
+    expect(container.querySelector('[data-story="designation"]')!.textContent).toBe("Injured reserve");
     expect(container.querySelector('[data-story="season-ending"]')).not.toBeNull();
   });
 
@@ -46,5 +48,12 @@ describe("StoryModule", () => {
     await renderSurface(<StoryModule story={STORY} designation="Q" />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+});
+
+describe("StoryModule — the designation in words", () => {
+  it("prints a code this product does not know exactly as the feed sent it, never a guessed expansion", () => {
+    const { container } = render(<StoryModule story={null} designation="XYZ" />);
+    expect(container.querySelector('[data-story="designation"]')!.textContent).toBe("XYZ");
   });
 });

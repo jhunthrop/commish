@@ -144,3 +144,22 @@ export function formatWeekdayClock(iso: string): string {
   if (Number.isNaN(instant.getTime())) return "";
   return `${WEEKDAY_FORMAT.format(instant)}, ${CLOCK_FORMAT.format(instant)} UTC`;
 }
+
+/**
+ * A COUNT A SENTENCE SPEAKS RATHER THAN DIGITS — "Two left in his tier", "Ten laws together".
+ * Past twelve a figure reads as a figure again, and the counts these sentences carry are small by
+ * construction. One list, because the verdict line and the evidence lines are the same voice.
+ */
+const COUNT_WORDS: readonly string[] = [
+  "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+];
+
+export function countWord(count: number): string {
+  return COUNT_WORDS[count] ?? String(count);
+}
+
+/** `countWord` with its first letter capitalized, for a count that opens a sentence. */
+export function countWordCapitalized(count: number): string {
+  const word = countWord(count);
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}

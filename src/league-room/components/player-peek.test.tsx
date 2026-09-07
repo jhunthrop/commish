@@ -252,9 +252,9 @@ describe("PlayerPeekHost — the Outlook, grouped (2026-09-04 redesign)", () => 
 
     await waitFor(() => expect(screen.getByText(/Age 29 season/)).toBeInTheDocument());
     // The receipt sentence is not visible until the group is pressed open.
-    expect(screen.queryByText(/measured -1\.8 pts per game/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/costs him 1\.8 pts a game/)).not.toBeInTheDocument();
     await user.click(screen.getByText(/Age 29 season/));
-    expect(screen.getByText(/Age 29 season: measured -1\.8 pts per game/)).toBeInTheDocument();
+    expect(screen.getByText(/Age 29 season: costs him 1\.8 pts a game/)).toBeInTheDocument();
   });
 
   it("labels a single-law group plainly, with no 'together' prefix", async () => {
@@ -442,7 +442,7 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     );
     openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
     await waitFor(() => expect(screen.getByText("Age 29 season.")).toBeInTheDocument());
-    expect(screen.getByText("Measured -1.8 points per game.")).toBeInTheDocument();
+    expect(screen.getByText("Costs him 1.8 points a game.")).toBeInTheDocument();
     // 6 groups total, capped to 5 in the peek — the same cap Outlook used before this task.
     expect(screen.getByText("The full case (6)")).toBeInTheDocument();
   });
@@ -468,7 +468,9 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     );
     openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
     await waitFor(() => expect(screen.getByLabelText("Story")).toBeInTheDocument());
-    expect(screen.getAllByText("Q")).toHaveLength(2);
+    // The header keeps the compact feed code; the story card says the word (dossier-voice §3.7).
+    expect(screen.getAllByText("Q")).toHaveLength(1);
+    expect(screen.getByText("Questionable")).toBeInTheDocument();
   });
 
   it("relocates the news list beside the story module rather than duplicating it below the fold", async () => {
