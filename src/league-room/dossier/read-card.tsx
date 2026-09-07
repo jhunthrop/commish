@@ -31,7 +31,7 @@ export function ReadCard({ capsule, variant }: ReadCardProps) {
     <Card as="section" aria-label="The read" className="flex flex-col gap-1">
       <h3 className={`${MICRO_LABEL} text-text-faint`}>The read</h3>
       <p className="text-sm text-text-primary">{body}</p>
-      {capsule.source === "template" ? <p className="text-xs text-text-faint">The short version while we write him up.</p> : null}
+      {capsule.source === "template" ? <p className="text-xs text-text-faint">A summary from the numbers. The written read is on its way.</p> : null}
     </Card>
   );
 }

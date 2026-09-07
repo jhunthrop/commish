@@ -62,10 +62,18 @@ export const CAPSULE_CONFIG = {
    *  that lets a full board's first run clear the free-tier throttle across several nightly
    *  sweeps rather than exhausting it in one run. Generous, per the base-product ruling (spec
    *  §15.1): no paywall gates capsule coverage, only pacing against the gateway. */
-  // 25 players a night, not 40: at 15s pacing plus two generations each, 40 players cannot
-  // finish inside the job's own 480s timeout. 25 fits with headroom, and the sweep's
-  // "left for the next sweep" carryover makes the smaller bite harmless.
-  sweepGenerationBudget: 25,
+  // 35 A NIGHT (dossier-voice round §3.2: "raise the batch so the board never drifts back to
+  // templates"). The arithmetic against the sweep job's own 480s timeout, at the pacing below:
+  // 34 pauses of 5s is 170s, and three gateway calls a player (two reads plus the narrative)
+  // measured at about 7s a player is 245s, for 415s with real headroom. It was 25 at 15s pacing,
+  // which spent 360s of its own budget waiting.
+  //
+  // THE COST, STATED: about $0.0022 a player for the two reads (the measured rate behind the
+  // spec's "roughly a dollar" for 460 players) and about a third again for the narrative call, so
+  // roughly $0.0033 a player and about 12 cents a night at this batch, under $4 a month. The
+  // one-time backlog regeneration the spec calls for is a separate, larger spend the coordinator
+  // runs deliberately; this constant only has to keep the board from drifting back.
+  sweepGenerationBudget: 35,
   /** Pause between players inside one sweep. The gateway rate-limits per minute, and the first
    *  live sweep proved a burst (two calls per player, back to back) throttles everything after
    *  the first player into the template floor (2026-09-05). Fifteen seconds a player was the
@@ -75,7 +83,13 @@ export const CAPSULE_CONFIG = {
    *  retries. */
   // Back to 15s (2026-09-05): prepaid credits lifted the free-tier throttle, and the 429
   // backoff track handles the rare residual limit. 45s was the throttled-era setting.
-  sweepPacingMs: 15_000,
+  //
+  // 5s (dossier-voice round): the raised batch above has to fit the same job timeout, and pacing
+  // is the half of that budget that buys nothing once the throttle is gone. The 429 track (three
+  // backoff retries doubling from twenty seconds) is what actually handles a live rate limit, and
+  // it is untouched — if a night starts throttling again, that track absorbs it and the sweep's
+  // own carryover finishes the board on the next run.
+  sweepPacingMs: 5_000,
 } as const;
 
 /**

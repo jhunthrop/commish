@@ -31,12 +31,12 @@ describe("ReadCard", () => {
   it("falls back to the compact body for the full variant when the source is template, labeled honestly", () => {
     const { container } = render(<ReadCard capsule={TEMPLATE} variant="full" />);
     expect(container.textContent).toContain("The template's own sentence.");
-    expect(container.textContent).toContain("The short version while we write him up.");
+    expect(container.textContent).toContain("A summary from the numbers. The written read is on its way.");
   });
 
   it("prints no honest-fallback note for a genuine llm capsule", () => {
     const { container } = render(<ReadCard capsule={LLM} variant="full" />);
-    expect(container.textContent).not.toContain("The short version while we write him up.");
+    expect(container.textContent).not.toContain("A summary from the numbers. The written read is on its way.");
   });
 
   it("renders axe-clean in both themes", async () => {

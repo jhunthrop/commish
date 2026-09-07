@@ -75,10 +75,10 @@ export function Outlook({ reasons, laws, position, capped = false, capsule }: Ou
       {capsule === null || capsule === undefined ? null : (
         <div className="flex flex-col gap-1">
           <p className="text-sm text-text-primary">{capped ? capsule.bodyCompact : capsule.bodyFull}</p>
-          {/* The quiet, honest provenance line (spec §9 AMENDED): "the short version while we
-              write him up" class of honesty — a plain sentence, no apology — whenever the
-              gateway has not yet cleared this player's own capsule. */}
-          {capsule.source === "template" ? <p className="text-xs text-text-faint">The short version while we write him up.</p> : null}
+          {/* The quiet, honest provenance line (spec §9 AMENDED, reworded in the dossier-voice
+              round): it states what the text IS rather than promising a write-up, because a
+              promise a reader has been shown for months reads as a broken one. */}
+          {capsule.source === "template" ? <p className="text-xs text-text-faint">A summary from the numbers. The written read is on its way.</p> : null}
         </div>
       )}
       <div className="flex flex-col gap-1.5">

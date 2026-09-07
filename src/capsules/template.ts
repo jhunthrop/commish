@@ -20,6 +20,21 @@ import type { PlayerFacts } from "./facts";
  * without turning a fallback into a second capsule: never the props lines, the Vegas win total, or
  * the usage shares, which stay the writer's own material.
  */
+/**
+ * THE LAW SENTENCE, SAID OUT LOUD (dossier-voice round §3.2, founder: "this needs to feel like a
+ * human made it"). It used to read "22.7% red-zone touch share is worth -6.4 points a game to his
+ * outlook" — a signed number with the direction hidden inside its own minus sign and no statement
+ * of what the number does to him. The direction is now a verb, the magnitude is unsigned because
+ * the verb already carries the sign, and the sentence says whose outlook it moves. Nothing about
+ * the fact changes: the same headline, the same figure, to the same one decimal.
+ */
+function lawSentence(headline: string, netEffectPoints: number): string {
+  const magnitude = Math.abs(netEffectPoints).toFixed(1);
+  return netEffectPoints >= 0
+    ? `${headline} adds ${magnitude} points a game to what we expect from him.`
+    : `${headline} costs him ${magnitude} points a game against what we would otherwise expect.`;
+}
+
 export function renderTemplateCapsule(facts: PlayerFacts): string {
   const { identity, market, projection, season, byeWeek, injury, lastSeasonStory } = facts;
   const sentences: string[] = [
@@ -39,7 +54,7 @@ export function renderTemplateCapsule(facts: PlayerFacts): string {
 
   const strongestLaw = [...facts.evidence].filter((item) => item.kind === "law").sort((a, b) => Math.abs(b.netEffectPoints) - Math.abs(a.netEffectPoints))[0];
   if (strongestLaw !== undefined && strongestLaw.kind === "law") {
-    sentences.push(`${strongestLaw.headline} is worth ${strongestLaw.netEffectPoints >= 0 ? "+" : ""}${strongestLaw.netEffectPoints.toFixed(1)} points a game to his outlook.`);
+    sentences.push(lawSentence(strongestLaw.headline, strongestLaw.netEffectPoints));
   }
 
   if (season !== null) {
