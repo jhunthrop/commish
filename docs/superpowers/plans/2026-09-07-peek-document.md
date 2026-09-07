@@ -748,3 +748,26 @@ it("returns nothing for a first capture", () => {
    over every touched test file plus `player.test.ts`, `player.peek-facts.test.ts`,
    `registry.test.ts` and the job definition tests.
 4. `git commit -m "docs(peek-document): before and after harness numbers, gate counts"`
+
+---
+
+## Task 8 — Pruning (added during execution)
+
+Spec §3.1 names a pruning rule and the plan's first draft had no task for it. It is not optional:
+every event stamps a new `as_of` generation and the harvest alone fires eighteen times a day, so at
+about 7 KB a document across every player and every scoring hash the store would be gigabytes within
+a week of rows nothing will ever read again.
+
+**Files**
+- `src/capsules/peek-document-store.ts` (`prunePeekDocuments`, called at the end of `writePeekDocuments`)
+- `src/capsules/peek-document-store.test.ts`
+- `src/jobs/defs/peek-document-job.ts` (the count in the step's own summary)
+
+**Steps**
+1. RED: three generations survive per (season, hash, player) and the fourth build drops the oldest;
+   a build inside the window prunes nothing; one hash's build never prunes another hash's rows.
+2. GREEN: a single `delete ... using (select ctid, row_number() over (partition by season,
+   scoring_hash, player_id order by as_of desc)) ... where generation > 3`.
+3. Verify against the dev database: three builds prune nothing, the fourth prunes one generation per
+   player per hash, and the store stays flat.
+4. `git commit -m "feat(peek): keep three document generations, drop the rest"`
