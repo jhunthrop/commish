@@ -38,9 +38,21 @@ Regenerate the capsule for every board player still on the template, once, now (
 
 The trend delta is one decimal. The closing sentence joins its predecessor with a space, not a leading period. A sweep across the dossier modules for any `${number}` interpolation without a formatter, each fixed at the source with a test that renders a value like 12.440000000000001 and asserts one decimal.
 
-### 3.5 The lead in the player's own words
+### 3.5 Every sentence is written, every number is stated
 
-The capsule engine already writes a grounded compact and full read with a validator that rejects ungrounded names and numbers. It gains a third, one-sentence artifact: the call. The prompt hands it the same facts plus the market gap and the tier standing, asks for one sentence a sharp analyst would open with for THIS player, and the validator holds it to the same grounding rules and a 30-word band. The verdict renders the call when a validated one exists and the template sentence otherwise. The market gap and tier clause stay as the sub-line facts under it, so nothing measured leaves the page. The call is regenerated whenever the capsule is (same sweep, same events).
+**Founder amendment 2026-09-07:** "We should use the LLM to make every part of the player peek feel dynamic and alive like a real person is writing it. Unless it's simply displaying a stat."
+
+The rule: a module that displays a statistic (a rank, a share, a range, a per-game figure, a game log) states it from the engine, formatted like a person would. A module that says something in a sentence gets that sentence from the writer. Today those sentences are templates with branches: the verdict lead, the per-game line ("Per game he projects like a RB8. The question is games"), the trend sentence, the why-group explanations, the story module, the books line, the tier clause, the absence notes. Each one becomes a named narrative slot.
+
+**The narrative.** The capsule engine (`src/capsules/`) generates, per player, one structured artifact alongside the compact and full reads: a JSON object of named slots, each a short sentence or two: `call` (the lead), `perGame`, `trend`, `whyGroups` (one per evidence group, keyed by group id), `story` (last season, when a story exists), `books` (market and win total), `tier` (when a real break exists), and `absence` notes for the modules that have nothing (a rookie's missing history, a kicker's missing capsule) so even absence is said in a human voice. One prompt, one gateway call per player, the same facts ledger the reads use plus the market gap, tier standing, trend deltas and group effects the modules already compute.
+
+**The validator holds every slot** to the rules the reads already obey: every name and number must appear in the facts (no invention), a word band per slot (the call at most 30 words, module sentences at most 40), no banned vocabulary, no em-dashes, no semicolons, no competitor names, no tips. A slot that fails validation is absent, and the module falls back to the templated sentence for that slot only. The template sentences stay as the honest floor; they are never shown when a validated slot exists.
+
+**Alive, not stock.** A repetition check runs over the whole board after each sweep: any sentence (normalized) that appears on more than a configured share of players (`CAPSULE_CONFIG.repetition.maxShare`, start at 2%) is flagged, the offending players' narratives are queued for regeneration with the flagged sentence named in the prompt as one not to reuse, and the count is reported by the sweep. The prompt is instructed to write from the player's specific situation (the new play caller, the injury he is returning from, the tier he sits in, the market's disagreement) rather than a generic frame, and it is given two exemplars of the voice from the persona pass.
+
+**Storage and events.** The narrative is stored with the capsule (one JSONB column, generated migration) with its `factsHash`, so it regenerates exactly when the reads do (the nightly sweep, the capsule-written event, the facts-written event) and the peek document round's writers pick it up as one more input. Modules read the slot through one accessor, `narrativeSlot(capsule, key)`, which returns the validated sentence or null; no module reaches into the JSON itself.
+
+**Rendering.** Each module renders the slot when present, its template otherwise, and never both. The numbers a module displays stay exactly where they are; the writer never replaces a stat, it accompanies it.
 
 ### 3.6 Win totals for 2026
 
@@ -57,7 +69,7 @@ Before merge, five players read end to end by the four personas (veteran, casual
 
 ## 5. Testing
 
-Target share fixture (3.1); the tier reason threshold and count copy (3.3); the formatter sweep (3.4); the call's validator (grounding, word band, rejection of an ungrounded number) and the render choice (3.5); the win-totals fetch shape assertion and the "not posted" path (3.6); the board re-persist diff recorded (3.3). Gates: tsc, eslint, targeted vitest, design guards, the copy rules on every new string.
+Target share fixture (3.1); the tier reason threshold and count copy (3.3); the formatter sweep (3.4); the narrative validator per slot (grounding, word band, banned vocabulary, rejection of an ungrounded number), the per-slot fallback, the repetition check flagging a sentence over the share and queueing regeneration, and the render choice for every module (3.5); the win-totals fetch shape assertion and the "not posted" path (3.6); the board re-persist diff recorded (3.3). Gates: tsc, eslint, targeted vitest, design guards, the copy rules on every new string.
 
 ## 6. Rollout
 
