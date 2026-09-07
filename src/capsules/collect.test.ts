@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { captureSnapshots, nflPlayers, playerCrosswalk, players, playerStatLines, preseasonProjections, statWeeks } from "@/db/schema";
 import { statMetricName, STAT_LINE_SOURCE } from "@/projections/lines";
+import { DERIVED_STAT_LINE_SOURCE } from "@/projections/nflverse/derived-stat-lines";
 import { PARTICIPATION_METRICS, NFLVERSE_SOURCE } from "@/projections/nflverse/map";
 import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "@/projections/nflverse/pbp-players";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
@@ -396,5 +397,75 @@ describe("collectAllPlayerFacts — the books' own numbers", () => {
 
     const facts = await collectAllPlayerFacts(db);
     expect(facts[0]!.booksNumbers).toEqual({ propsLines: [], teamVegasWinTotal: null });
+  });
+});
+
+/**
+ * THE GAP SEASON (peek-facts round, 2026-09-07). Every other test in this file seeds the published
+ * weekly feed (`STAT_LINE_SOURCE`) for the prior season. PRODUCTION HAS NO SUCH FEED for it:
+ * nflverse never published a weekly stats file for 2025, so `player_week_observations` holds zero
+ * `nflverse_player_week` rows there and the store answers from the play-by-play pair instead
+ * (`nflverse_pbp_derived` for the scoring line, `nflverse_pbp_player` for the participation counts).
+ * These tests seed exactly that shape, which is the shape that made the touches rank come back
+ * empty on production while usage and trend came back populated.
+ */
+function derivedWeek(gsisId: string, weekNumber: number, stats: Readonly<Record<string, number>>): readonly PlayerWeekObservation[] {
+  const asOf = new Date(Date.UTC(PRIOR_SEASON, 10, 1));
+  return Object.entries(stats).map(([field, value]) => ({
+    season: PRIOR_SEASON, week: weekNumber, playerId: gsisId, source: DERIVED_STAT_LINE_SOURCE, metric: statMetricName(field), value, asOf,
+  }));
+}
+
+describe("collectAllPlayerFacts — a gap season the published weekly feed never covered", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  it("ranks touches from the play-by-play participation feed when no published week exists", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-4000001", name: "Volume Back", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await seedPlayer(db, { id: "p2", nflId: "00-4000002", name: "Committee Back", position: "RB", team: "DAL", points: 150, rank: 2, adp: 40 });
+    await recordObservations(db, [
+      ...derivedWeek("00-4000001", 1, { rushingYards: 100, receptions: 5, receivingYards: 40 }),
+      ...derivedWeek("00-4000002", 1, { rushingYards: 30, receptions: 1, receivingYards: 10 }),
+      participationRow("00-4000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.carries, 20),
+      participationRow("00-4000001", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.targets, 6),
+      participationRow("00-4000002", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.carries, 6),
+      participationRow("00-4000002", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.targets, 2),
+    ]);
+
+    const facts = await collectAllPlayerFacts(db);
+    const volume = facts.find((f) => f.identity.id === "p1")!.lastSeasonStory!;
+    const committee = facts.find((f) => f.identity.id === "p2")!.lastSeasonStory!;
+
+    // Touches are the play-by-play carries plus the derived line's own receptions: 20 + 5, and 6 + 1.
+    expect(volume.touchesRank).toEqual({ value: 25, positionRank: 1, qualifierCount: 2, namedNeighbor: null });
+    expect(committee.touchesRank).toEqual({ value: 7, positionRank: 2, qualifierCount: 2, namedNeighbor: "Volume Back" });
+  });
+
+  it("still refuses a target share it has no team denominator for", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-4000003", name: "Volume Back", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await recordObservations(db, [
+      ...derivedWeek("00-4000003", 1, { rushingYards: 100, receptions: 5 }),
+      participationRow("00-4000003", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.carries, 20),
+      participationRow("00-4000003", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.targets, 6),
+    ]);
+
+    // The play-by-play carries no team-target total, so a share of it would be a number with no
+    // denominator. Absence, never an invented one.
+    expect((await collectAllPlayerFacts(db))[0]!.usage!.targetShare).toBeNull();
+  });
+
+  it("lets a published week win over the play-by-play count for the same player", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-4000004", name: "Published Back", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
+    await recordObservations(db, [
+      ...priorSeasonWeek("00-4000004", 1, { rushingYards: 100, carries: 11, receptions: 4 }),
+      participationRow("00-4000004", 1, PBP_PLAYER_SOURCE, PBP_PLAYER_METRICS.carries, 99),
+    ]);
+
+    // Eleven published carries plus four receptions, never the play-by-play's ninety-nine.
+    expect((await collectAllPlayerFacts(db))[0]!.lastSeasonStory!.touchesRank?.value).toBe(15);
   });
 });

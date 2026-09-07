@@ -7,7 +7,6 @@ import { boardRows, isProjectedRow, type BoardOptions, type ProjectedBoardRow } 
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { injurySnapshot, type InjurySnapshot } from "@/league-service/injuries";
 import { newsForPlayers, type NewsStory } from "@/league-service/news";
-import { allPositions } from "@/projections/backtest";
 import { nflPlayerIdsFor } from "@/projections/crosswalk";
 import { discoveryFactsForSeason, type DiscoveryFacts, type DiscoveryQuantityValues } from "@/projections/laws/discovery-facts";
 import { isSkillPosition } from "@/projections/laws/populations";
@@ -36,6 +35,7 @@ import {
   type PlayerFactsTrend,
   type PlayerFactsUsage,
 } from "./facts";
+import { activePeersFor } from "./peers";
 import { rankWithinGroups, type RankableStat } from "./rank";
 import { buildTrendMetric } from "./trend";
 
@@ -562,11 +562,17 @@ export async function collectAllPlayerFacts(db: Db, asOf: Date = new Date()): Pr
   const laws = chipEligibleLaws(registry());
   const positionOf = new Map(rows.map((row) => [row.playerId, row.position] as const));
   const priorSeason = PRODUCT_SEASON - 1;
+  // THE ACTIVE POPULATION, NOT THE HISTORICAL UNIVERSE (peek-facts design §3.3). This used to be
+  // `allPositions(db)` — every person nflverse has ever placed, 3,293 receivers back to 1999 — which
+  // the color reads below then turned into chunked `IN` lists over the observation store. The ranks
+  // themselves do not move: a peer with no week in the prior season never entered a ranked
+  // population in the first place, and `activePeersFor`'s own membership test (a board row, or a
+  // week in this season or the prior one) is a superset of that. What moves is the query cost.
   const [injuries, news, seasons, positions, gsisIdByPlayerId] = await Promise.all([
     injurySnapshot(db),
     newsForPlayers(db, rows.map((row) => row.name)),
     currentSeasonSummaries(db, rows.map((row) => row.playerId), positionOf),
-    allPositions(db),
+    activePeersFor(db, [...new Set(rows.map((row) => row.position))], PRODUCT_SEASON),
     nflPlayerIdsFor(db, rows.map((row) => row.playerId)),
   ]);
 

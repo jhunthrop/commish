@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { players as playersTable } from "@/db/schema";
 import type { Position } from "@/domain/player";
-import { allPositions } from "@/projections/backtest";
 import { nflPlayerIdsFor } from "@/projections/crosswalk";
 import { injurySnapshot } from "@/league-service/injuries";
 import { newsForPlayers } from "@/league-service/news";
@@ -10,6 +9,7 @@ import { byeWeeksByTeam } from "@/league-service/nfl-schedule";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
 import { BOARD_SOURCE, boardReasons, preseasonProjectionsFor, type BoardStamp, type PreseasonProjectionRow } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
+import { activePeersFor } from "./peers";
 import {
   currentSeasonSummaries,
   factsInputFor,
@@ -116,7 +116,7 @@ async function resolvePlayerBoardMembership(db: Db, playerId: string, stamp: Boa
  * NARROWED TO ONE POSITION, NOT ONE PLAYER, FOR `lastSeasonStoriesFor` ONLY (still correct, not a
  * fallback, and a genuine DB-level narrowing): its own `statLinesAsOfForLiveSurface` call accepts
  * a `playerIds` list, so restricting the `positions` map passed in to just the target's own
- * position peers (rather than every position `allPositions` names) shrinks that query's actual
+ * position peers (rather than every position the universe names) shrinks that query's actual
  * `WHERE … IN (…)` list. This is safe for the RANKS it computes (`pointsRank`, `receivingYardsRank`,
  * `touchesRank`) because `rankWithinGroups` buckets by position internally — the other positions'
  * rows were never going to enter this player's bucket either way, narrowed or not.
@@ -140,9 +140,12 @@ async function resolvePlayerBoardMembership(db: Db, playerId: string, stamp: Boa
  *
  * REMAINING WIDE READS, each with no player- or position-scoped query anywhere in the store, kept
  * exactly as `collect.ts` runs them for the whole board:
- *   - `allPositions(db)` — every `nfl_players` id-to-position row. Unavoidable even for the
- *     position-narrowing above: finding "who else plays his position" requires knowing every
- *     player's position first. Small table (the league's own player universe), not a stat read.
+ *   - `activePeersFor(db, [position], PRODUCT_SEASON)` (`peers.ts`) — the `nfl_players`
+ *     id-to-position map plus two distinct-id reads that say who is ACTIVE. Finding "who else plays
+ *     his position" requires knowing every player's position first, so the position map itself is
+ *     unavoidable; it is a small table, not a stat read. What this call CLOSED (peek-facts round,
+ *     2026-09-07) is the population it hands downstream: `allPositions(db)`' whole historical
+ *     universe became the players a board row or a recent week actually names.
  *   - `usageTouchesAndTrendFactsFor`'s own `discoveryFactsForSeason` reads — see above.
  *   - `boardReasons(db, BOARD_SOURCE, PRODUCT_SEASON)` — every stored board-reason row for the
  *     season; the store has no player-scoped variant, so the whole map is read and then indexed
@@ -165,9 +168,10 @@ export async function collectPlayerFacts(db: Db, playerId: string, asOf: Date = 
   if (membership === null) return null;
   const { identity, nflPlayerId, projection } = membership;
 
-  const allPos = await allPositions(db);
-  const targetPosition = allPos.get(nflPlayerId);
-  const peerPositions = new Map<string, Position>([...allPos].filter(([, position]) => position === targetPosition));
+  // THE ACTIVE POPULATION AT HIS POSITION (peek-facts design §3.3) — a board row, or a week in this
+  // season or the prior one. This used to filter `allPositions(db)`, the whole historical universe,
+  // down to his position and hand thousands of long-retired ids to the stat reads below.
+  const peerPositions = await activePeersFor(db, [identity.position], PRODUCT_SEASON);
 
   const laws = chipEligibleLaws(registry());
   const priorSeason = PRODUCT_SEASON - 1;
