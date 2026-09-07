@@ -37,6 +37,7 @@ import { writeRefresh } from "@/capsules/peek-facts";
 import { playersSayingStock, sentencesToAvoid, stockSentences } from "@/capsules/repetition";
 import { getStoredCapsulesFor, queueCapsuleRegeneration, upsertCapsule, type StoredPlayerCapsule } from "@/capsules/store";
 import type { PlayerFacts } from "@/capsules/facts";
+import { JOBS_CONFIG } from "../config";
 import { defineJob, type AnyJobDefinition, type JobStepContext, type StepOutcome } from "../contract";
 import { enqueueJob } from "../store";
 import { enqueuePeekDocumentRebuildsQuietly } from "./peek-document-job";
@@ -75,17 +76,36 @@ function needsGeneration(facts: PlayerFacts, stored: StoredPlayerCapsule | undef
 export interface CapsuleSweepDeps {
   readonly apiKey: string;
   readonly fetch?: typeof globalThis.fetch;
+  /**
+   * The pause between players, `CAPSULE_CONFIG.sweepPacingMs` by default. Injectable ONLY so a
+   * test that asserts the budget geometry over ten players does not sleep for fifty real seconds;
+   * production never sets it. `reservedMsPerPlayer` deliberately keeps reading the config rather
+   * than this, because the reserve is a statement about what a player costs in production, and a
+   * test that shortened the reserve along with the sleep would no longer be testing the geometry
+   * it claims to.
+   */
+  readonly pacingMs?: number;
 }
 
 /**
- * How long one player can take, worst case, when the sweep decides whether it has room for one
- * more: the pacing pause plus three gateway calls at the gateway's own timeout, each of which can
- * be attempted twice. Deliberately the WORST case rather than the average — stopping one player
- * early costs a player, and being cut off mid-write costs the run's own tail (the peek-document
- * enqueue and the repetition check) every single night.
+ * WHAT THE SWEEP RESERVES FOR ONE MORE PLAYER — the pacing pause plus ONE gateway round at the
+ * gateway's own timeout (5s + 20s = 25s).
+ *
+ * IT IS THE REALISTIC RESERVE, NOT THE ABSOLUTE WORST CASE (review, blocker). The first version
+ * reserved every retry of every one of the three calls (125s) against a window that is at most the
+ * TICK budget (`JOBS_CONFIG.vercelTickBudgetMsDefault` is 50s, and `tick-handler.ts` caps even a
+ * raised `JOBS_TICK_BUDGET_MS` at 280s). A reserve larger than the whole window fires on the first
+ * iteration every time: nothing is ever written, the repetition check never runs, and the
+ * zero-progress continuation dies on its own idempotency key. A guard that can never pass is worse
+ * than no guard, because it looks like one.
+ *
+ * THE RUNNER'S OWN CUT IS THE BACKSTOP for the player who overruns this reserve. That is safe here
+ * and nowhere else in this job: every player is committed as he is written (`upsertCapsule`
+ * inside the loop), so an attempt killed mid-player loses that one player's gateway spend and
+ * nothing else, and the next tick finds him still eligible.
  */
-function worstCaseMsPerPlayer(): number {
-  return CAPSULE_CONFIG.sweepPacingMs + 3 * 2 * CAPSULE_CONFIG.gateway.timeoutMs;
+function reservedMsPerPlayer(): number {
+  return CAPSULE_CONFIG.sweepPacingMs + CAPSULE_CONFIG.gateway.timeoutMs;
 }
 
 export async function runCapsuleSweepStep(
@@ -127,13 +147,14 @@ export async function runCapsuleSweepStep(
     // ROOM FOR ONE MORE? (review C1) — the runner will cut this attempt off at `deadlineAt`, so
     // the sweep stops itself one player early and hands the rest to a continuation. With no
     // deadline (the local runner, a test, an operator's own call) it processes the whole batch.
-    if (deadlineAt !== undefined && new Date(clock.now()).getTime() + worstCaseMsPerPlayer() > deadlineAt.getTime()) {
+    if (deadlineAt !== undefined && new Date(clock.now()).getTime() + reservedMsPerPlayer() > deadlineAt.getTime()) {
       stoppedForBudget = true;
       break;
     }
     // Paced, not burst: see CAPSULE_CONFIG.sweepPacingMs. The pause sits BEFORE each player
     // after the first so a one-player run pays nothing.
-    if (!first) await new Promise((resolve) => setTimeout(resolve, CAPSULE_CONFIG.sweepPacingMs));
+    const pacingMs = deps.pacingMs ?? CAPSULE_CONFIG.sweepPacingMs;
+    if (!first && pacingMs > 0) await new Promise((resolve) => setTimeout(resolve, pacingMs));
     first = false;
     const result = await generateCapsule(one, { apiKey: deps.apiKey, fetch: deps.fetch }, avoid);
     // Persisted per player as it goes, which is what makes a stop safe: a continuation re-reads
@@ -173,11 +194,23 @@ export async function runCapsuleSweepStep(
 
   // THE CONTINUATION (review C1) — tonight's cap minus what this run actually wrote, enqueued to
   // run immediately so the next tick claims it. Only when the budget stopped us AND there is work
-  // and budget left, so a run that simply finished never chains, and a run that could not write a
-  // single player never spins.
+  // and budget left, so a run that simply finished never chains.
   const budgetLeft = budget - processed.length;
   const continuationOf = payload.continuationOf ?? asOf.toISOString();
-  const willContinue = stoppedForBudget && budgetLeft > 0 && eligible.length > processed.length;
+  // A RUN THAT WROTE NOTHING NEVER CHAINS (review, blocker). A continuation from a zero-progress
+  // run would carry the identical budget and the identical key, so it would either dedupe into
+  // nothing or spin forever, and either way the night would look busy and write no capsules. The
+  // condition that causes it is a budget geometry problem an operator can fix in one environment
+  // variable, so it is said out loud in the summary rather than left to be inferred from a board
+  // that never changes.
+  const wroteNothingInTime = stoppedForBudget && processed.length === 0;
+  const willContinue = stoppedForBudget && processed.length > 0 && budgetLeft > 0 && eligible.length > processed.length;
+  if (wroteNothingInTime) {
+    detail.push(
+      `budget: this attempt had less than the ${reservedMsPerPlayer() / 1000}s one player needs, so nothing was written. ` +
+        `The tick budget (JOBS_TICK_BUDGET_MS, default ${JOBS_CONFIG.vercelTickBudgetMsDefault / 1000}s) is what caps an attempt, never this job's own timeout.`,
+    );
+  }
   if (willContinue) {
     await enqueueJob(db, clock, {
       name: CAPSULE_SWEEP_JOB_NAME,
@@ -211,6 +244,7 @@ export async function runCapsuleSweepStep(
     `${processed.length} processed (${llmCount} llm, ${templateCount} template, $${totalCostUsd.toFixed(6)} spent)` +
     (remaining > 0 ? `, ${remaining} left for the next sweep` : "") +
     (willContinue ? `, continuing this tick's remainder in a follow-up run of ${budgetLeft}` : "") +
+    (wroteNothingInTime ? ", WROTE NOTHING: the tick budget was too small for one player, see the detail line" : "") +
     `. Peek facts: ${peekFacts.players} rows built, ${peekFacts.changed} changed, ${peekFacts.withTouchesRank} with a touches rank` +
     `. Narrative: ${slotsWritten} slots written, ${slotsRejected} rejected` +
     (willContinue ? ", repetition check deferred to the run that finishes the batch" : `, ${stockFound} stock sentence(s) found, ${queued} player(s) queued for regeneration`);

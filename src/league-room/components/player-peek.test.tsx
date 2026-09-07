@@ -633,3 +633,68 @@ describe("PlayerPeekHost, a kicker", () => {
     expect(container.textContent).not.toMatch(/[—;]/);
   });
 });
+
+/**
+ * THE LOADING STATE (founder, 2026-09-07, on a screenshot of the sheet mid-load) — the header
+ * renders from the row that was pressed and the body used to be empty dark for five to fifteen
+ * seconds on a cold start or an off-board player.
+ */
+describe("PlayerPeekHost — while the wire is still out", () => {
+  /** A `fetchJson` that never resolves, which is exactly the state under test. */
+  function pendingDeps(): LeagueRoomDeps {
+    return {
+      fetchJson: () => new Promise<Response>(() => {}),
+      openEventSource: () => ({ addEventListener: () => undefined, close: () => undefined }),
+    };
+  }
+
+  it("renders the module frame and one line of copy, and no composition at all", async () => {
+    const { container } = mount(pendingDeps());
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText("Pulling his numbers.")).toBeInTheDocument());
+    expect(container.querySelector('[data-peek="pending"]')).not.toBeNull();
+    expect(container.querySelectorAll('[aria-busy="true"]').length).toBeGreaterThan(0);
+    // The name the manager pressed is already on screen; nothing else claims to be.
+    expect(screen.getByText("Rashad Long")).toBeInTheDocument();
+    expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
+    // The old bare "Loading…" line is gone from the copy. The `Skeleton` primitive keeps its own
+    // screen-reader-only "Loading…", which is its accessible label rather than visible chatter.
+    const visible = [...container.querySelectorAll("p")].map((node) => node.textContent);
+    expect(visible).toContain("Pulling his numbers.");
+    expect(visible).not.toContain("Loading…");
+  });
+
+  it("follows the copy rules: no em-dash, no semicolon, no spinner chatter", async () => {
+    const { container } = mount(pendingDeps());
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText("Pulling his numbers.")).toBeInTheDocument());
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/—/);
+    expect(text).not.toMatch(/;/);
+    expect(text).not.toMatch(/please wait/i);
+  });
+
+  it("drops the frame the moment the body lands, and renders the composition", async () => {
+    const bodies = new Map([[2026, bodyFor(2026, [2026])]]);
+    const { container } = mount(fixtureDeps(bodies, 2026));
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText("2026 season")).toBeInTheDocument());
+    expect(container.querySelector('[data-peek="pending"]')).toBeNull();
+    expect(screen.queryByText("Pulling his numbers.")).not.toBeInTheDocument();
+  });
+
+  it("says the honest failure instead of the frame when the load fails", async () => {
+    const failing: LeagueRoomDeps = {
+      fetchJson: () => Promise.resolve(new Response(JSON.stringify({ ok: false, error: "nope" }))),
+      openEventSource: () => ({ addEventListener: () => undefined, close: () => undefined }),
+    };
+    const { container } = mount(failing);
+    openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
+
+    await waitFor(() => expect(screen.getByText("We could not load him. Close this and try again.")).toBeInTheDocument());
+    expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(0);
+  });
+});

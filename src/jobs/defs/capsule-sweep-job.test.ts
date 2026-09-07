@@ -207,44 +207,74 @@ describe("runCapsuleSweepStep — across ticks", () => {
     };
   }
 
-  it("stops before the deadline, writes what it wrote, and enqueues a continuation for the rest", async () => {
+  it("a 50 second tick writes one player and hands the rest to a continuation", async () => {
     for (const index of [1, 2, 3]) {
       await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 250 - index });
     }
-    // The step reserves a worst case of 125s a player (5s pacing plus three gateway calls at 20s,
-    // twice each). The clock advances a minute on every read, so the first check sits at 60s and
-    // fits inside the 200s deadline, and the second sits at 120s and does not.
-    const clock = advancingClock("2026-09-04T12:00:00.000Z", 60_000);
-    const deadlineAt = new Date("2026-09-04T12:03:20.000Z");
+    // Production geometry: the step reserves 25s a player (5s pacing plus one gateway round at its
+    // own 20s timeout). One clock read is spent on the pass's own `asOf`, so with a 20s step the
+    // first loop check sits at 20s and fits inside a 50s window, and the second sits at 40s and
+    // does not. `pacingMs: 0` only stops the test sleeping; the reserve is the production one.
+    const clock = advancingClock("2026-09-04T12:00:00.000Z", 20_000);
+    const outcome = await runCapsuleSweepStep(
+      db,
+      clock,
+      { apiKey: "test-key", fetch: sizeAwareFetch(), pacingMs: 0 },
+      { budget: 3 },
+      new Date("2026-09-04T12:00:50.000Z"),
+    );
 
-    const outcome = await runCapsuleSweepStep(db, clock, { apiKey: "test-key", fetch: sizeAwareFetch() }, { budget: 3 }, deadlineAt);
-
-    expect(outcome.summary).toContain("continuing this tick's remainder in a follow-up run");
+    expect(outcome.summary).toContain("1 processed");
+    expect(outcome.summary).toContain("continuing this tick's remainder in a follow-up run of 2");
     expect(outcome.summary).toContain("repetition check deferred");
     const queued = await db.select().from(jobs);
     expect(queued).toHaveLength(1);
     expect(queued[0]!.name).toBe("capsule-sweep");
     expect(queued[0]!.payload).toMatchObject({ budget: 2 });
-    // What it did write is written: a stop is safe because progress is persisted per player.
+    // What it wrote is written: a stop is safe because progress is persisted per player.
     expect((await getStoredCapsule(db, "p1"))?.source).toBe("llm");
     expect(await getStoredCapsule(db, "p2")).toBeNull();
   });
 
-  it("finishes the batch on the continuation, and runs the repetition check exactly once", async () => {
-    for (const index of [1, 2]) {
-      await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 250 - index });
+  it("a 280 second tick writes about ten", async () => {
+    for (const index of Array.from({ length: 12 }, (_, i) => i + 1)) {
+      await seedPlayer(db, { id: `p${index}`, nflId: `00-${index}`, name: `Player ${index}`, rank: index, points: 300 - index });
     }
-    const clock = advancingClock("2026-09-04T12:00:00.000Z", 60_000);
-    const first = await runCapsuleSweepStep(db, clock, { apiKey: "test-key", fetch: sizeAwareFetch() }, { budget: 2 }, new Date("2026-09-04T12:03:20.000Z"));
-    expect(first.summary).toContain("repetition check deferred");
+    // The budget production runs at (JOBS_TICK_BUDGET_MS=280000). At a 25s reserve and a clock
+    // that walks 25s a read, the run fits ten players and stops before the eleventh.
+    const clock = advancingClock("2026-09-04T12:00:00.000Z", 25_000);
+    const outcome = await runCapsuleSweepStep(
+      db,
+      clock,
+      { apiKey: "test-key", fetch: sizeAwareFetch(), pacingMs: 0 },
+      { budget: 12 },
+      new Date("2026-09-04T12:04:40.000Z"),
+    );
 
-    // The continuation: no deadline pressure this time, so it finishes the batch and the
-    // repetition check runs, once, on the run that finished the night's work.
-    const second = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, { budget: 1, continuationOf: "2026-09-04T12:00:00.000Z" });
+    expect(outcome.summary).toContain("10 processed");
+    expect(outcome.summary).toContain("continuing this tick's remainder in a follow-up run of 2");
+    expect((await getStoredCapsule(db, "p10"))?.source).toBe("llm");
+    expect(await getStoredCapsule(db, "p11")).toBeNull();
+  });
 
-    expect(second.summary).not.toContain("repetition check deferred");
-    expect(second.summary).toMatch(/stock sentence\(s\) found/);
-    expect((await getStoredCapsule(db, "p2"))?.source).toBe("llm");
+  it("a tick with no room for even one player enqueues nothing and says why", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
+    // A deadline ten seconds out, against a 25s reserve: the guard fires on the first iteration.
+    const outcome = await runCapsuleSweepStep(
+      db,
+      CLOCK,
+      { apiKey: "test-key", fetch: sizeAwareFetch() },
+      {},
+      new Date("2026-09-04T12:00:10.000Z"),
+    );
+
+    expect(outcome.summary).toContain("0 processed");
+    expect(outcome.summary).toContain("WROTE NOTHING: the tick budget was too small for one player");
+    expect(outcome.detail.join(" ")).toContain("JOBS_TICK_BUDGET_MS");
+    // No continuation: a zero-progress chain would carry the same budget under the same key and
+    // either dedupe into nothing or spin.
+    expect(await db.select().from(jobs)).toHaveLength(0);
+    expect(await getStoredCapsule(db, "p1")).toBeNull();
   });
 
   it("processes the whole batch when nothing is holding a deadline over it", async () => {
