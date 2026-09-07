@@ -74,6 +74,14 @@ export interface CapsuleWriterDeps {
 export interface PriorAttempt {
   readonly body: string;
   readonly violations: readonly string[];
+  /**
+   * A LENGTH CORRECTION, NOT A REWRITE (capsule acceptance round, 2026-09-07). Set when the ONLY
+   * thing wrong with `body` was its word count: nine of a thirty-player sample failed on the band
+   * alone, most by a handful of words, and asking for a whole fresh attempt threw away prose that
+   * was already grounded and already in voice, which then failed on something else. When this is
+   * set the retry asks for the SAME text at the right length and nothing more.
+   */
+  readonly lengthCorrection?: { readonly words: number; readonly minWords: number; readonly maxWords: number };
 }
 
 /**
@@ -97,6 +105,7 @@ const VOICE_RULES = `You are a fantasy football analyst writing a short scouting
 
 Hard rules, no exceptions:
 - Use ONLY the numbers and names in the fact sheet below. Never invent a stat, an injury, a teammate, a coach, or any other name or figure not printed there.
+- Quote a number as the sheet gives it, or as a plain rounding of it. NEVER subtract, add, divide or otherwise combine two figures into a third one the sheet does not print: if you want to say how far our number is from his price, use the gap the sheet already states rather than working it out yourself.
 - Never state that a risk, an injury, or a competitive threat is ABSENT unless the fact sheet says so explicitly. If the fact sheet is silent on something, stay silent on it too. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim ("best ever", "in NFL history", "all-time"). This engine holds no such data.
 - Never write an em-dash and never write a semicolon. Use a period, a comma, or "and" instead. Two short sentences always beat one stitched one.
@@ -115,7 +124,12 @@ const SIZE_INSTRUCTIONS: Record<CapsuleSize, string> = {
 
 function userMessageFor(facts: PlayerFacts, size: CapsuleSize, prior?: PriorAttempt): string {
   const sections = [`Fact sheet:\n${renderFactsForModel(facts)}`, SIZE_INSTRUCTIONS[size]];
-  if (prior !== undefined) {
+  if (prior?.lengthCorrection !== undefined) {
+    const { words, minWords, maxWords } = prior.lengthCorrection;
+    sections.push(
+      `Here is your previous attempt:\n"""${prior.body}"""\n\nThis is ${words} words. Rewrite it to between ${minWords} and ${maxWords} words, changing nothing else: keep the same facts, the same numbers, the same order and the same voice. ${words > maxWords ? "Cut the least useful clauses." : "Add one more beat from the fact sheet rather than padding a sentence you already wrote."}`,
+    );
+  } else if (prior !== undefined) {
     sections.push(
       `Your previous attempt violated these rules:\n${prior.violations.map((v) => `- ${v}`).join("\n")}\n\nYour previous attempt was:\n"""${prior.body}"""\n\nRewrite the whole capsule from scratch, fixing every violation above.`,
     );

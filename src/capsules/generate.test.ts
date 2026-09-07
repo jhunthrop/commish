@@ -102,6 +102,61 @@ describe("generateCapsule", () => {
     expect(result.compact.usage?.costUsd).toBeCloseTo(0.0001, 10);
   });
 
+  it("answers a word-band failure with a LENGTH CORRECTION, not a fresh attempt (capsule acceptance round)", async () => {
+    const facts = buildPlayerFacts(baseInput());
+    // Forty-two words, the shortest compact the coordinator's live sample actually produced: above
+    // `write.ts`'s twenty-word degenerate floor, so it reaches the validator as a real band failure
+    // rather than as transport weather.
+    const tooShort = `He is a clear buy at this price and nothing else about him needs saying today. ${Array.from({ length: 25 }, () => "plainly").join(" ")}.`;
+    const compactPrompts: string[] = [];
+    let compactCalls = 0;
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      if (isNarrativeRequest(init)) return okResponse(NARRATIVE_JSON);
+      const payload = JSON.parse(init.body as string) as { messages: { content: string }[] };
+      if (payload.messages[1]!.content.includes("(1) the volume or role case")) return okResponse(GOOD_FULL);
+      compactCalls += 1;
+      compactPrompts.push(payload.messages[1]!.content);
+      return okResponse(compactCalls === 1 ? tooShort : GOOD_COMPACT);
+    });
+
+    const result = await generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+
+    expect(result.compact.source).toBe("llm");
+    expect(result.compact.text).toBe(GOOD_COMPACT);
+    // The retry hands the SAME text back with a length instruction and no violation list at all:
+    // prose that was already grounded and already in voice is corrected, never thrown away.
+    expect(compactPrompts[1]).toContain("Rewrite it to between 60 and 110 words, changing nothing else");
+    expect(compactPrompts[1]).toContain(tooShort);
+    expect(compactPrompts[1]).not.toContain("violated these rules");
+  });
+
+  it("waits out a 429 rather than falling to the template on the first throttle of a sweep", async () => {
+    vi.useFakeTimers();
+    try {
+      const facts = buildPlayerFacts(baseInput());
+      const throttledOnce = new Map<string, number>();
+      const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+        const kind = isNarrativeRequest(init) ? "narrative" : JSON.parse(init.body as string).messages[1].content.includes("(1) the volume or role case") ? "full" : "compact";
+        const seen = throttledOnce.get(kind) ?? 0;
+        throttledOnce.set(kind, seen + 1);
+        if (seen === 0) return new Response("rate limited", { status: 429 });
+        return okResponse(kind === "narrative" ? NARRATIVE_JSON : kind === "full" ? GOOD_FULL : GOOD_COMPACT);
+      });
+
+      const promise = generateCapsule(facts, { apiKey: "test-key", fetch: fetchMock });
+      await vi.advanceTimersByTimeAsync(20_000);
+      const result = await promise;
+
+      // The throttle cost one backoff wait, not a template: `write.ts`'s 429 track owns the wait
+      // and `generate.ts` never sees a failure at all.
+      expect(result.source).toBe("llm");
+      expect(result.compact.fallbackReason).toBeNull();
+      expect(result.full.fallbackReason).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("falls back to the deterministic template after two failed attempts, and never blanks the capsule", async () => {
     const facts = buildPlayerFacts(baseInput());
     // A fresh Response per call — reusing one `Response` instance across attempts would throw on

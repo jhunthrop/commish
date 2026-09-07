@@ -175,6 +175,7 @@ const NARRATIVE_RULES = `You are a fantasy football analyst writing the sentence
 
 Hard rules, no exceptions:
 - Use ONLY the numbers and names in the fact sheet. Never invent a stat, an injury, a teammate, a coach, or any other figure or name not printed there.
+- Quote a number as the sheet gives it, or as a plain rounding of it. Never subtract, add or divide two figures into a third one the sheet does not print.
 - Never say a risk, an injury or a competitor is ABSENT unless the fact sheet says so. Silence in the fact sheet means silence from you.
 - Never write an em-dash and never write a semicolon. Two short sentences beat one stitched one.
 - Never name a rival fantasy product.
