@@ -77,3 +77,25 @@ describe("the season-ending and games-missed lines", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, gamesMissed: [] })))).toBeNull();
   });
 });
+
+describe("the injury designation history line", () => {
+  it("states a run's two ends and its count, and a single capture as one date", () => {
+    const facts = buildPlayerFacts(
+      depthInput({
+        ...EMPTY_DEPTH,
+        injuryHistory: [
+          { designation: "Q", description: "Hamstring", firstSeenAt: "2026-08-25", lastSeenAt: "2026-09-01", captureCount: 3 },
+          { designation: "O", description: null, firstSeenAt: "2026-09-05", lastSeenAt: "2026-09-05", captureCount: 1 },
+        ],
+      }),
+    );
+    expect(renderDepthSection(facts)).toBe(
+      "The record:\n- Injury designations captured this season, oldest first: Q from 2026-08-25 to 2026-09-01 across 3 captures, hamstring. O on 2026-09-05.",
+    );
+    for (const value of [3, 2026, 8, 25, 9, 1, 5]) expect(facts.numberLedger).toContain(value);
+  });
+
+  it("renders no line at all when no capture ever named him", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, injuryHistory: [] })))).toBeNull();
+  });
+});

@@ -43,12 +43,29 @@ function gamesMissedLine(depth: PlayerFactsDepth): string | null {
   return `Games missed, counted over the weeks a roster actually carried him: ${parts.join(", ")}.`;
 }
 
+/** THIS SEASON'S DESIGNATION HISTORY, one clause per run. A run over a single capture states that
+ *  one date; a run over several states both ends and the count, which is what makes "for three
+ *  straight weeks" a fact rather than an impression. */
+function injuryHistoryLine(depth: PlayerFactsDepth): string | null {
+  if (depth.injuryHistory.length === 0) return null;
+  const spells = depth.injuryHistory.map((spell) => {
+    const body = spell.description === null ? "" : `, ${spell.description.toLowerCase()}`;
+    const when =
+      spell.firstSeenAt === spell.lastSeenAt
+        ? `on ${spell.firstSeenAt}`
+        : `from ${spell.firstSeenAt} to ${spell.lastSeenAt} across ${spell.captureCount} captures`;
+    return `${spell.designation} ${when}${body}`;
+  });
+  return `Injury designations captured this season, oldest first: ${spells.join(". ")}.`;
+}
+
 /** Every line of the section, in `PlayerFactsDepth`'s own field order. */
 function depthLines(depth: PlayerFactsDepth): readonly string[] {
   return [
     // Each fact's own renderer is added here as it is wired, in the spec's own fact order.
     ...seasonEndingLines(depth),
     gamesMissedLine(depth),
+    injuryHistoryLine(depth),
   ].filter((line): line is string => line !== null && line !== "");
 }
 
