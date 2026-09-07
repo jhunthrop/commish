@@ -129,6 +129,38 @@ describe("writePeekDocuments", () => {
     expect(row!.document.seasons.map((season) => season.season)).toEqual([PRIOR_SEASON]);
   });
 
+  it("keeps three generations per player and drops the rest", async () => {
+    for (let day = 0; day < 5; day += 1) {
+      await writePeekDocuments(db, { ...request, asOf: new Date(NOW.getTime() + day * 86_400_000) });
+    }
+
+    const rows = await db.select({ asOf: playerPeekDocuments.asOf }).from(playerPeekDocuments).where(eq(playerPeekDocuments.playerId, "rb1"));
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.asOf.toISOString()).sort()).toEqual([
+      new Date(NOW.getTime() + 2 * 86_400_000).toISOString(),
+      new Date(NOW.getTime() + 3 * 86_400_000).toISOString(),
+      new Date(NOW.getTime() + 4 * 86_400_000).toISOString(),
+    ]);
+  });
+
+  it("reports what it pruned, and prunes nothing inside the window", async () => {
+    expect((await writePeekDocuments(db, request)).pruned).toBe(0);
+    expect((await writePeekDocuments(db, { ...request, asOf: new Date(NOW.getTime() + 86_400_000) })).pruned).toBe(0);
+    expect((await writePeekDocuments(db, { ...request, asOf: new Date(NOW.getTime() + 2 * 86_400_000) })).pruned).toBe(0);
+    // The fourth generation is the first one that pushes a generation out, for both players.
+    expect((await writePeekDocuments(db, { ...request, asOf: new Date(NOW.getTime() + 3 * 86_400_000) })).pruned).toBe(2);
+  });
+
+  it("never prunes another hash's generations", async () => {
+    for (let day = 0; day < 4; day += 1) {
+      await writePeekDocuments(db, { ...request, asOf: new Date(NOW.getTime() + day * 86_400_000) });
+    }
+    await writePeekDocuments(db, { ...request, scoringHash: STANDARD_HASH, rules: STANDARD_SCORING });
+
+    const standard = await db.select().from(playerPeekDocuments).where(eq(playerPeekDocuments.scoringHash, STANDARD_HASH));
+    expect(standard).toHaveLength(2);
+  });
+
   it("carries the dossier the precomputed facts row holds", async () => {
     await writePeekDocuments(db, request);
     const [row] = await db.select().from(playerPeekDocuments).where(eq(playerPeekDocuments.playerId, "rb1"));

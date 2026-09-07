@@ -95,7 +95,7 @@ export async function runPeekDocumentStep(db: Db, clock: Clock, payload: PeekDoc
   return {
     summary:
       `peek-document ${payload.scoringHash.slice(0, 12)} (${payload.reason}): ${written.players} document${written.players === 1 ? "" : "s"} built for ${scope}, ` +
-      `${written.changed} changed` +
+      `${written.changed} changed, ${written.pruned} old generation${written.pruned === 1 ? "" : "s"} pruned` +
       (healed > 0 ? `, ${healed} league scoring hash${healed === 1 ? "" : "es"} backfilled` : ""),
     detail: [],
   };

@@ -5,6 +5,7 @@
 // puts the result in a table and counts what actually moved. The peek's own request-time miss path
 // calls the exact same two functions for one player, so there is one builder in this codebase and
 // no chance of a stored document and a freshly built one disagreeing.
+import { sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { playerPeekDocuments } from "@/db/schema";
 import { changedRowWhere, excludedSetFor } from "@/db/upsert";
@@ -26,6 +27,8 @@ const NATURAL_KEYS: readonly string[] = ["playerId", "season", "scoringHash", "a
 export interface PeekDocumentWrite {
   readonly players: number;
   readonly changed: number;
+  /** How many generations past the retention window this build dropped. */
+  readonly pruned: number;
 }
 
 /** Every document one request asks for, built from one batch of reads. Exported so the request
@@ -88,8 +91,48 @@ function batches<T>(rows: readonly T[], size: number): readonly (readonly T[])[]
   return out;
 }
 
-/** The whole build: read once, assemble, write, count. */
+/**
+ * HOW MANY GENERATIONS OF A DOCUMENT SURVIVE (design §3.1's pruning rule).
+ *
+ * THREE, and the number is not arbitrary. One is the generation being served. The second is what a
+ * reader standing slightly in the past is entitled to, which is the whole point of an `as_of <=`
+ * store and is what a replay or an operator investigating "what did the card say an hour ago" reads.
+ * The third is headroom for an event that fires while a build is in flight.
+ *
+ * WHY THERE HAS TO BE A NUMBER AT ALL. Every event stamps a new generation, and the harvest alone
+ * fires eighteen times a day (`HARVEST_CONFIG`). At a few kilobytes a document across every player
+ * and every scoring hash in use, an unpruned store would be gigabytes within a week, all of it rows
+ * nothing will ever read again.
+ */
+const KEEP_GENERATIONS = 3;
+
+/**
+ * Drops every generation past the newest `KEEP_GENERATIONS` for each (season, hash, player), and
+ * returns how many rows went. Ranked per player rather than per build, because a targeted rebuild
+ * writes a new generation for a handful of players and leaves everyone else on an older one.
+ *
+ * IT CANNOT DELETE WHAT A READER IS SERVING: the peek always reads the newest generation at or
+ * before its own moment, which is rank one, and nothing below rank three is reachable by any reader
+ * that is not looking three generations into the past.
+ */
+export async function prunePeekDocuments(db: Db, season: number, scoringHash: string): Promise<number> {
+  const deleted = await db.execute<{ readonly player_id: string }>(sql`
+    delete from ${playerPeekDocuments} target
+    using (
+      select ctid, row_number() over (partition by season, scoring_hash, player_id order by as_of desc) as generation
+      from ${playerPeekDocuments}
+      where season = ${season} and scoring_hash = ${scoringHash}
+    ) ranked
+    where target.ctid = ranked.ctid and ranked.generation > ${KEEP_GENERATIONS}
+    returning target.player_id
+  `);
+  return deleted.length;
+}
+
+/** The whole build: read once, assemble, write, count, then drop the generations nothing can read. */
 export async function writePeekDocuments(db: Db, request: PeekDocumentRequest): Promise<PeekDocumentWrite> {
   const rows = await peekDocumentRowsFor(db, request);
-  return { players: rows.length, changed: await writePeekDocumentRows(db, rows) };
+  const changed = await writePeekDocumentRows(db, rows);
+  const pruned = await prunePeekDocuments(db, request.season, request.scoringHash);
+  return { players: rows.length, changed, pruned };
 }
