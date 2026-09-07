@@ -147,8 +147,12 @@ export interface PlayerSeasonBody {
    * document's own `as_of`, as an ISO instant, surfaced so the screen can say what it is looking at
    * rather than implying everything on it is live. The two league facts beside it (`ownedBy`,
    * `isMockLeague`) are joined at read time and are therefore newer than this stamp by construction.
+   *
+   * Optional on the type for the reason `capsule` and `dossier` are (see their own docblocks): the
+   * many existing fixtures that build a body by hand need not all learn about the stamp at once.
+   * Every real read through `playerSeason` sets it.
    */
-  readonly asOf: string;
+  readonly asOf?: string;
   /**
    * The auto-written capsule — LLM voice over verified facts, the SAME facts the sweep job computes
    * off the board (`src/capsules/collect.ts`), mechanically validated before it is ever stored.

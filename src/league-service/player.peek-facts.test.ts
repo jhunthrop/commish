@@ -1,12 +1,9 @@
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { collectBoardFacts } from "@/capsules/collect";
 import { writeRefresh } from "@/capsules/peek-facts";
 import type { Db } from "@/db/client";
-import * as schema from "@/db/schema";
 import { nflPlayers, playerCrosswalk, players, preseasonProjections, users } from "@/db/schema";
-import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
+import { createTestDb, truncateAll } from "@/db/test-db";
 import { statMetricName } from "@/projections/lines";
 import { DERIVED_STAT_LINE_SOURCE } from "@/projections/nflverse/derived-stat-lines";
 import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "@/projections/nflverse/pbp-players";
@@ -18,33 +15,21 @@ import { dossierFactsFor } from "./dossier-facts";
 import { playerSeason } from "./player";
 
 /**
- * WHAT THE PEEK COSTS, ASSERTED (peek-facts design §3.5, 2026-09-07).
+ * WHAT THE PRECOMPUTED FACTS ROW ACTUALLY PUTS ON THE CARD (peek-facts design §3.5, 2026-09-07).
  *
- * The production measurement this round started from was 73 queries and 13.8 s for a receiver, of
- * which `collectPlayerFacts` alone was 43 queries. A number that big cannot be defended by reading
- * the code, so it is pinned here with a real counting client — the same `postgres` `debug` hook
- * `scripts/peek-timing.ts` uses against the dev database, so the harness and the test are counting
- * the same thing.
+ * THE QUERY COUNT MOVED OUT OF THIS FILE (peek document round, 2026-09-07). This file used to pin a
+ * ceiling of twenty-two statements for one peek, and a ceiling was the honest shape for a number
+ * made of a dozen different questions of a dozen different tables. The peek is now ONE statement
+ * over a stored document, which is an equality rather than a ceiling, and it is asserted in
+ * `player.document.test.ts` beside the writer that produces the document. What this file keeps is
+ * what it was really about: that the stored dossier, the touches rank and the prior-season list
+ * reach the screen unchanged.
  *
- * THE CEILING IS A CEILING, not an equality. A test that pinned an exact count would fail on any
- * honest change (a new field, a narrowed read) without anything having got worse, and would train
- * a future round to update the number rather than ask why it moved.
- *
- * WHAT THE REMAINING QUERIES ARE, and why the design's "at most eight" was not reached. Twelve of
- * them are one wave with no dependency between any two: the player row, the league row, the
- * fixtures, the played weeks, the scoring settings, the product player universe, the crosswalk, the
- * precomputed row, the roster holder, the injuries snapshot, the news snapshot and the capsule. The
- * rest are the prior season's own chart (the position's peers plus the point-in-time stat lines,
- * which a gap season reads twice by design) and the four draft-outlook reads (the loud
- * single-generation guard, expert consensus, our own board row, the board's stored reasons). Each
- * one answers a different question of a different table for a different part of the screen; getting
- * to eight would mean either dropping something the screen shows or inventing a joined reader whose
- * only purpose is to make this number smaller. What the round actually removed is the forty-three
- * queries `collectPlayerFacts` was running at request time, the duplicate board-reasons and
- * injuries reads, the two whole-universe position reads and the three serial prior-season checks.
+ * IT EXERCISES THE MISS PATH ON PURPOSE. No peek documents are written by this seed, so every read
+ * below goes through `playerSeason`'s own miss path, which builds one player's document through the
+ * writer's own builder. A body that came out different depending on which of the two paths served it
+ * would be the failure this design cannot survive, and these assertions are where it would show.
  */
-const QUERY_CEILING = 22;
-
 const PRIOR_SEASON = PRODUCT_SEASON - 1;
 const NOW = new Date("2026-09-07T12:00:00.000Z");
 const clock = { now: () => NOW.toISOString() };
@@ -54,17 +39,6 @@ const SLOTS = [
   { slot: "RB" as const, count: 1, eligiblePositions: ["RB" as const] },
   { slot: "BENCH" as const, count: 1, eligiblePositions: ["RB" as const] },
 ];
-
-/** A drizzle handle over a client whose every statement bumps a counter. */
-function countingDb(): { readonly db: Db; count(): number; reset(): void; close(): Promise<void> } {
-  let queries = 0;
-  const client = postgres(TEST_DATABASE_URL, { max: 2, prepare: false, debug: () => { queries += 1; } });
-  const db = drizzle(client, { schema }) as unknown as Db;
-  return { db, count: () => queries, reset: () => { queries = 0; }, close: () => client.end() };
-}
-
-const counting = countingDb();
-afterAll(async () => { await counting.close(); });
 
 function week(gsisId: string, season: number, source: string, stats: Readonly<Record<string, number>>): readonly PlayerWeekObservation[] {
   const asOf = new Date(Date.UTC(season, 10, 1));
@@ -100,7 +74,7 @@ async function seedBack(db: Db, input: { readonly id: string; readonly nflId: st
   });
 }
 
-describe("what a peek costs once the facts are precomputed", () => {
+describe("what the precomputed facts row puts on the card", () => {
   let db: Db;
   let leagueId: string;
 
@@ -126,13 +100,11 @@ describe("what a peek costs once the facts are precomputed", () => {
     await writeRefresh(db, await collectBoardFacts(db, NOW));
   });
 
-  it("stays under the query ceiling for a skill player", async () => {
-    counting.reset();
-    const body = await playerSeason(counting.db, leagueId, "rb1", clock);
+  it("puts the precomputed dossier on the card", async () => {
+    const body = await playerSeason(db, leagueId, "rb1", clock);
 
     expect(body).not.toBeNull();
     expect(body!.dossier).not.toBeNull();
-    expect(counting.count()).toBeLessThanOrEqual(QUERY_CEILING);
   });
 
   it("renders the same dossier the live computation produces for the same player", async () => {
