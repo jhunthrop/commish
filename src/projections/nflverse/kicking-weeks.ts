@@ -322,11 +322,17 @@ export async function kickingWeekRowsFor(
 export async function kickingWeekRowsForSeasons(
   db: ReadonlyDb,
   seasons: readonly number[],
+  /** gsis ids, narrowing to a few kickers on the (player, season, week) index. */
+  playerIds?: readonly string[],
 ): Promise<readonly KickingWeekRow[]> {
-  if (seasons.length === 0) return [];
+  if (seasons.length === 0 || playerIds?.length === 0) return [];
   return db
     .select(SELECTION)
     .from(nflverseKickingWeeks)
-    .where(inArray(nflverseKickingWeeks.season, [...seasons]))
+    .where(
+      playerIds === undefined
+        ? inArray(nflverseKickingWeeks.season, [...seasons])
+        : and(inArray(nflverseKickingWeeks.season, [...seasons]), inArray(nflverseKickingWeeks.playerId, [...playerIds])),
+    )
     .orderBy(asc(nflverseKickingWeeks.season), asc(nflverseKickingWeeks.week), asc(nflverseKickingWeeks.playerId));
 }

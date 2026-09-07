@@ -18,7 +18,7 @@ function defenseWeekRow(overrides: Partial<TeamDefenseWeekRow>): TeamDefenseWeek
     season: BOARD_LAST_SEASON, week: 1, team: "LA", opponentTeam: "SF",
     sacks: 0, interceptions: 0, fumbleRecoveries: 0, defensiveTouchdowns: 0, safeties: 0,
     puntBlocks: 0, extraPointBlocks: 0, fieldGoalBlocks: 0, specialTeamsTouchdowns: 0,
-    passingYardsAllowed: 0, rushingYardsAllowed: 0, pointsAllowed: null,
+    passingYardsAllowed: 0, rushingYardsAllowed: 0, sackYardsLostAllowed: 0, pointsAllowed: null,
     source: "nflverse_team_defense_weeks",
     ...overrides,
   };

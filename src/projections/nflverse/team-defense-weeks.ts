@@ -1,4 +1,4 @@
-import { asc, inArray } from "drizzle-orm";
+import { and, asc, inArray } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { nflverseTeamDefenseWeeks } from "@/db/schema";
 import { changedRowWhere, excludedSetFor } from "@/db/upsert";
@@ -6,7 +6,7 @@ import type { NflverseClient } from "./client";
 import { NFLVERSE_CONFIG } from "./config";
 import type { CsvRow } from "./csv";
 import { mapSchedule, SCHEDULE_SOURCE_CONFIG, type TeamGame } from "./schedule";
-import { productTeamCode } from "./team-codes";
+import { teamWeekKey } from "./team-codes";
 
 /**
  * THE HISTORICAL TEAM-DEFENSE RECORD, ARCHIVED IN THE DEFENSE'S OWN FRAME.
@@ -61,6 +61,9 @@ export interface TeamDefenseWeekRow {
   readonly passingYardsAllowed: number;
   /** THE OPPONENT's rushing yards in this game. */
   readonly rushingYardsAllowed: number;
+  /** THE OPPONENT's yards lost to sacks in this game, the term that nets `passingYardsAllowed`
+   *  the way a box score does. `null` only on a row written before the column existed. */
+  readonly sackYardsLostAllowed: number | null;
   /** THE OPPONENT's final score, from the schedule file, or `null` when it carried no scoreline
    *  for this pairing. Never 0 for an unknown game — see the module docblock. */
   readonly pointsAllowed: number | null;
@@ -76,9 +79,8 @@ export interface TeamDefenseWeekRow {
  * through `productTeamCode` is what makes a relocated franchise's season join at all, instead of
  * silently missing every one of its weeks.
  */
-export function teamWeekKey(season: number, week: number, sourceTeam: string): string {
-  return `${season}|${week}|${productTeamCode(sourceTeam)}`;
-}
+/** Re-exported for the tests and callers that learned the key here first. */
+export { teamWeekKey };
 
 /**
  * Every team-week's points allowed, from the schedule file's own rows, keyed by `teamWeekKey`.
@@ -111,7 +113,11 @@ const OWN_COLUMNS = {
 type OwnField = keyof typeof OWN_COLUMNS;
 
 /** The two fields read off the OPPONENT's row. See the module docblock. */
-const OPPONENT_COLUMNS = { passingYardsAllowed: "passing_yards", rushingYardsAllowed: "rushing_yards" } as const;
+const OPPONENT_COLUMNS = {
+  passingYardsAllowed: "passing_yards",
+  rushingYardsAllowed: "rushing_yards",
+  sackYardsLostAllowed: "sack_yards_lost",
+} as const;
 
 /**
  * Every column this module reads, checked against the file's own header before a single row is
@@ -216,6 +222,7 @@ export function mapTeamDefenseWeekRows(rows: readonly CsvRow[], pointsAllowed: R
       ...own,
       passingYardsAllowed: count(opponent.row, OPPONENT_COLUMNS.passingYardsAllowed),
       rushingYardsAllowed: count(opponent.row, OPPONENT_COLUMNS.rushingYardsAllowed),
+      sackYardsLostAllowed: count(opponent.row, OPPONENT_COLUMNS.sackYardsLostAllowed),
       pointsAllowed: pointsAllowed.get(teamWeekKey(entry.season, entry.week, entry.team)) ?? null,
     });
   }
@@ -320,8 +327,10 @@ export async function ingestTeamDefenseWeeks(
 export async function teamDefenseWeekRowsForSeasons(
   db: ReadonlyDb,
   seasons: readonly number[],
+  /** SOURCE team codes (`sourceTeamCode`), narrowing to a few clubs on the (team, season, week) index. */
+  teams?: readonly string[],
 ): Promise<readonly TeamDefenseWeekRow[]> {
-  if (seasons.length === 0) return [];
+  if (seasons.length === 0 || teams?.length === 0) return [];
   return db
     .select({
       season: nflverseTeamDefenseWeeks.season,
@@ -339,10 +348,15 @@ export async function teamDefenseWeekRowsForSeasons(
       specialTeamsTouchdowns: nflverseTeamDefenseWeeks.specialTeamsTouchdowns,
       passingYardsAllowed: nflverseTeamDefenseWeeks.passingYardsAllowed,
       rushingYardsAllowed: nflverseTeamDefenseWeeks.rushingYardsAllowed,
+      sackYardsLostAllowed: nflverseTeamDefenseWeeks.sackYardsLostAllowed,
       pointsAllowed: nflverseTeamDefenseWeeks.pointsAllowed,
     })
     .from(nflverseTeamDefenseWeeks)
-    .where(inArray(nflverseTeamDefenseWeeks.season, [...seasons]))
+    .where(
+      teams === undefined
+        ? inArray(nflverseTeamDefenseWeeks.season, [...seasons])
+        : and(inArray(nflverseTeamDefenseWeeks.season, [...seasons]), inArray(nflverseTeamDefenseWeeks.team, [...teams])),
+    )
     .orderBy(
       asc(nflverseTeamDefenseWeeks.season),
       asc(nflverseTeamDefenseWeeks.week),

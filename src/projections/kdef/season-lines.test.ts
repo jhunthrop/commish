@@ -39,7 +39,7 @@ function defenseWeek(overrides: Partial<TeamDefenseWeekRow> = {}): TeamDefenseWe
     season: SEASON, week: 1, team: "LA", opponentTeam: "SF",
     sacks: 0, interceptions: 0, fumbleRecoveries: 0, defensiveTouchdowns: 0, safeties: 0,
     puntBlocks: 0, extraPointBlocks: 0, fieldGoalBlocks: 0, specialTeamsTouchdowns: 0,
-    passingYardsAllowed: 0, rushingYardsAllowed: 0, pointsAllowed: null,
+    passingYardsAllowed: 0, rushingYardsAllowed: 0, sackYardsLostAllowed: 0, pointsAllowed: null,
     ...overrides,
   };
 }
@@ -152,6 +152,23 @@ describe("kdefSeasonLines, a team defense", () => {
     expect(line.yardsAllowed).toBe(210);
     expect(line.pointsAllowed).toBe(3);
     expect(mine!.weeks[0]!.points).toBe(computeFantasyPoints(line, "DEF", PPR_SCORING));
+  });
+
+  it("states yards allowed NET, the way a box score does: gross passing minus sack yardage, plus rushing", async () => {
+    await recordTeamDefenseWeekRows(db, [defenseWeek({ week: 1, passingYardsAllowed: 200, rushingYardsAllowed: 100, sackYardsLostAllowed: 15 })]);
+
+    const mine = (await kdefSeasonLines(db, { season: SEASON, playerIds: ["DST-LAR"], rules: PPR_SCORING })).get("DST-LAR");
+    expect(mine?.weeks[0]?.line.yardsAllowed).toBe(285);
+    expect(mine?.facts.kind === "DEF" ? mine.facts.yardsAllowed : null).toBe(285);
+    expect(mine?.facts.kind === "DEF" ? mine.facts.gamesWithYardsAllowed : null).toBe(1);
+  });
+
+  it("leaves yards allowed OFF a week whose sack term the archive never carried, never a gross figure", async () => {
+    await recordTeamDefenseWeekRows(db, [defenseWeek({ week: 1, passingYardsAllowed: 200, rushingYardsAllowed: 100, sackYardsLostAllowed: null })]);
+
+    const mine = (await kdefSeasonLines(db, { season: SEASON, playerIds: ["DST-LAR"], rules: PPR_SCORING })).get("DST-LAR");
+    expect(mine?.weeks[0]?.line.yardsAllowed).toBeUndefined();
+    expect(mine?.facts.kind === "DEF" ? mine.facts.gamesWithYardsAllowed : null).toBe(0);
   });
 
   it("scores a week with no points allowed WITHOUT the points-allowed tier, and counts it", async () => {

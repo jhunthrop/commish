@@ -4,7 +4,7 @@ import { computeFantasyPoints, pointsAllowedBandIndex, pointsAllowedBands, round
 import { TANK01_CONFIG } from "@/stats/tank01/config";
 import { nflPlayerIdsFor } from "@/projections/crosswalk";
 import { kickingWeekRowsForSeasons, type KickingWeekRow } from "@/projections/nflverse/kicking-weeks";
-import { productTeamCode } from "@/projections/nflverse/team-codes";
+import { productTeamCode, sourceTeamCode } from "@/projections/nflverse/team-codes";
 import { teamDefenseWeekRowsForSeasons, type TeamDefenseWeekRow } from "@/projections/nflverse/team-defense-weeks";
 
 /**
@@ -89,7 +89,10 @@ export interface DefenseSeasonFacts {
   readonly defensiveTouchdowns: number;
   readonly specialTeamsTouchdowns: number;
   readonly safeties: number;
+  /** NET yards allowed (the opponent's passing yards minus their sack yardage, plus rushing), summed
+   *  over the weeks that carry the sack-yardage term; `gamesWithYardsAllowed` says how many. */
   readonly yardsAllowed: number;
+  readonly gamesWithYardsAllowed: number;
   /** Summed over the weeks that HAVE a points-allowed figure, and `null` when none do. */
   readonly pointsAllowed: number | null;
   readonly gamesWithPointsAllowed: number;
@@ -186,9 +189,22 @@ function kickerLine(playerId: string, row: KickingWeekRow): StatLine {
  * `StatLine` carries a kick-return and a punt-return field. The rules weight the two identically
  * (`pointsPerReturnTouchdown` multiplies their sum), so the combined figure rides on the kick-return
  * field and the punt-return field stays 0. The SUM, which is the only thing scoring reads, is exact;
- * the split, which nothing reads, is not claimed.
+ * the split, which nothing reads, is not claimed. Known asymmetry, on the record: the in-season
+ * box-score mapper (`stats/tank01/map.ts`) writes no return-touchdown field for a team defense at
+ * all, so the same event scores here and not in a live week until that mapper learns it.
+ *
+ * YARDS ALLOWED IS NET, the way a box score states it: the opponent's gross passing yards minus the
+ * yards they lost to sacks, plus their rushing yards. A row written before the archive carried the
+ * sack term (`sackYardsLostAllowed` null) OMITS the field, so the yards-allowed tier goes unscored
+ * rather than scored off a gross figure that lands a bracket too high.
  */
+function netYardsAllowed(row: TeamDefenseWeekRow): number | null {
+  if (row.sackYardsLostAllowed === null) return null;
+  return row.passingYardsAllowed - row.sackYardsLostAllowed + row.rushingYardsAllowed;
+}
+
 function defenseLine(playerId: string, row: TeamDefenseWeekRow): StatLine {
+  const yardsAllowed = netYardsAllowed(row);
   return {
     ...emptyLine(playerId, row.week),
     sacks: row.sacks,
@@ -197,7 +213,7 @@ function defenseLine(playerId: string, row: TeamDefenseWeekRow): StatLine {
     defensiveTouchdowns: row.defensiveTouchdowns,
     safeties: row.safeties,
     kickReturnTouchdowns: row.specialTeamsTouchdowns,
-    yardsAllowed: row.passingYardsAllowed + row.rushingYardsAllowed,
+    ...(yardsAllowed === null ? {} : { yardsAllowed }),
     ...(row.pointsAllowed === null ? {} : { pointsAllowed: row.pointsAllowed }),
   };
 }
@@ -236,7 +252,8 @@ function defenseFacts(rows: readonly TeamDefenseWeekRow[]): DefenseSeasonFacts {
     defensiveTouchdowns: sumOf(rows, (row) => row.defensiveTouchdowns),
     specialTeamsTouchdowns: sumOf(rows, (row) => row.specialTeamsTouchdowns),
     safeties: sumOf(rows, (row) => row.safeties),
-    yardsAllowed: sumOf(rows, (row) => row.passingYardsAllowed + row.rushingYardsAllowed),
+    yardsAllowed: sumOf(rows, (row) => netYardsAllowed(row) ?? 0),
+    gamesWithYardsAllowed: rows.filter((row) => netYardsAllowed(row) !== null).length,
     pointsAllowed: scored.length === 0 ? null : scored.reduce((total, points) => total + points, 0),
     gamesWithPointsAllowed: scored.length,
     pointsAllowedBandGames: scored.length === 0 ? [] : bands.map((band, index) => ({ label: band.label, games: counts[index]! })),
@@ -283,7 +300,7 @@ async function kickerSeasonLines(db: ReadonlyDb, { season, playerIds, rules }: K
   const wanted = new Map([...gsisByProductId].map(([productId, gsisId]) => [gsisId, productId] as const));
 
   const rowsByProductId = new Map<string, KickingWeekRow[]>();
-  for (const row of await kickingWeekRowsForSeasons(db, [season])) {
+  for (const row of await kickingWeekRowsForSeasons(db, [season], [...wanted.keys()])) {
     const productId = wanted.get(row.playerId);
     if (productId === undefined) continue;
     const list = rowsByProductId.get(productId);
@@ -307,7 +324,8 @@ async function defenseSeasonLines(db: ReadonlyDb, { season, playerIds, rules }: 
   if (wanted.size === 0) return [];
 
   const rowsByProductId = new Map<string, TeamDefenseWeekRow[]>();
-  for (const row of await teamDefenseWeekRowsForSeasons(db, [season])) {
+  const sourceCodes = [...wanted].map((productId) => sourceTeamCode(productId.slice(prefix.length)));
+  for (const row of await teamDefenseWeekRowsForSeasons(db, [season], sourceCodes)) {
     const productId = `${prefix}${productTeamCode(row.team)}`;
     if (!wanted.has(productId)) continue;
     const list = rowsByProductId.get(productId);
@@ -323,6 +341,24 @@ async function defenseSeasonLines(db: ReadonlyDb, { season, playerIds, rules }: 
     const missing = rows.filter((row) => row.pointsAllowed === null).length;
     return seasonLineOf(productId, "DEF", season, weeks, missing, defenseFacts(rows));
   });
+}
+
+/**
+ * Which of `seasons` the archive holds at least one week of for ONE kicker or team defense, newest
+ * first. One narrow, index-backed read per table rather than one whole-season scan per candidate
+ * season, which is what the player page asks on every open.
+ */
+export async function kdefSeasonsHeld(db: ReadonlyDb, playerId: string, seasons: readonly number[]): Promise<readonly number[]> {
+  const prefix = TANK01_CONFIG.defensePlayerIdPrefix;
+  const rows = playerId.startsWith(prefix)
+    ? await teamDefenseWeekRowsForSeasons(db, seasons, [sourceTeamCode(playerId.slice(prefix.length))])
+    : await kickerRowsFor(db, playerId, seasons);
+  return [...new Set(rows.map((row) => row.season))].sort((a, b) => b - a);
+}
+
+async function kickerRowsFor(db: ReadonlyDb, playerId: string, seasons: readonly number[]): Promise<readonly KickingWeekRow[]> {
+  const gsisId = (await kickerGsisIds(db, [playerId])).get(playerId);
+  return gsisId === undefined ? [] : kickingWeekRowsForSeasons(db, seasons, [gsisId]);
 }
 
 /**

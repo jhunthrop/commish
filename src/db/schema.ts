@@ -2491,6 +2491,13 @@ export const nflverseTeamDefenseWeeks = pgTable(
     /** THE OPPONENT's rushing yards in this game. */
     rushingYardsAllowed: integer("rushing_yards_allowed").notNull(),
     /**
+     * THE OPPONENT's yards lost to sacks in this game, so yards allowed can be stated NET the way
+     * a box score states it (gross passing minus sack yardage, plus rushing). NULLABLE for rows
+     * written before the column existed: a null leaves the yards-allowed tier unscored rather than
+     * scored off a gross figure that lands a bracket too high. The next backfill fills it.
+     */
+    sackYardsLostAllowed: integer("sack_yards_lost_allowed"),
+    /**
      * THE OPPONENT's final score in this game, from the schedule file, or NULL when that file had
      * no scoreline for the pairing.
      *

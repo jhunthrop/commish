@@ -12,7 +12,7 @@ function mapWithoutScores(rows: readonly CsvRow[]) {
 const COLUMNS = [
   "def_sacks", "def_interceptions", "fumble_recovery_opp", "def_tds", "def_safeties",
   "def_punt_blocks", "def_pat_blocks", "def_fg_blocks", "special_teams_tds",
-  "passing_yards", "rushing_yards",
+  "passing_yards", "rushing_yards", "sack_yards_lost",
 ] as const;
 
 function row(overrides: Record<string, string> = {}): CsvRow {
@@ -26,14 +26,17 @@ function row(overrides: Record<string, string> = {}): CsvRow {
 describe("mapTeamDefenseWeekRows", () => {
   it("writes each team's yards allowed from its OPPONENT's own offense row", () => {
     const mapped = mapWithoutScores([
-      row({ team: "ARI", opponent_team: "BUF", passing_yards: "162", rushing_yards: "124", def_sacks: "2" }),
-      row({ team: "BUF", opponent_team: "ARI", passing_yards: "232", rushing_yards: "88", def_sacks: "4" }),
+      row({ team: "ARI", opponent_team: "BUF", passing_yards: "162", rushing_yards: "124", def_sacks: "2", sack_yards_lost: "31" }),
+      row({ team: "BUF", opponent_team: "ARI", passing_yards: "232", rushing_yards: "88", def_sacks: "4", sack_yards_lost: "12" }),
     ]);
     const arizona = mapped.find((r) => r.team === "ARI");
     const buffalo = mapped.find((r) => r.team === "BUF");
     expect(arizona?.passingYardsAllowed).toBe(232);
     expect(arizona?.rushingYardsAllowed).toBe(88);
     expect(arizona?.sacks).toBe(2);
+    // The sack yardage the OPPONENT lost, which is what nets Arizona's yards allowed.
+    expect(arizona?.sackYardsLostAllowed).toBe(12);
+    expect(buffalo?.sackYardsLostAllowed).toBe(31);
     expect(buffalo?.passingYardsAllowed).toBe(162);
     expect(buffalo?.rushingYardsAllowed).toBe(124);
     expect(buffalo?.sacks).toBe(4);
@@ -52,7 +55,7 @@ describe("mapTeamDefenseWeekRows", () => {
       season: 2024, week: 1, team: "ARI", opponentTeam: "BUF",
       sacks: 3.5, interceptions: 2, fumbleRecoveries: 1, defensiveTouchdowns: 1, safeties: 1,
       puntBlocks: 1, extraPointBlocks: 1, fieldGoalBlocks: 1, specialTeamsTouchdowns: 1,
-      passingYardsAllowed: 0, rushingYardsAllowed: 0, pointsAllowed: null,
+      passingYardsAllowed: 0, rushingYardsAllowed: 0, pointsAllowed: null, sackYardsLostAllowed: 0,
     });
   });
 
