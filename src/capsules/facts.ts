@@ -9,6 +9,11 @@ import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { RankedStat } from "./rank";
 import type { TrendMetric } from "./trend";
+import { depthNames, depthNumbers, depthTeamCodes } from "./facts/ledger";
+import { EMPTY_DEPTH, type PlayerFactsDepth } from "./facts/types";
+
+export { EMPTY_DEPTH } from "./facts/types";
+export type * from "./facts/types";
 
 /**
  * THE PLAYER CAPSULE'S FACT SHEET (spec §9 AMENDED 2026-09-04, Task 1) — every number and name a
@@ -289,6 +294,12 @@ export interface PlayerFacts {
    *  product season for him at all (his own prior two seasons do not both exist). See
    *  `PlayerFactsTrend`'s own docblock. */
   readonly trend: PlayerFactsTrend | null;
+  /** THE DEPTH FACTS (spec `2026-09-07-fact-sheet-depth-design.md`) — every verified fact this
+   *  store holds that an expert would cite and the sections above did not carry: why a prior
+   *  season ended, who is calling the plays, how the role moved inside a season, what the schedule
+   *  and the market say. One group rather than fourteen fields, and `EMPTY_DEPTH` is the honest
+   *  value for a player the depth stores hold nothing for. See `facts/types.ts`. */
+  readonly depth: PlayerFactsDepth;
   /** Every number the validator will accept in a capsule's own prose, in this object's own
    *  declaration order. A fraction-valued fact (a share change) contributes BOTH its raw fraction
    *  and its whole-percent form, since prose almost always states the latter ("+4%") and the
@@ -334,6 +345,13 @@ export interface PlayerFactsInput {
   readonly booksNumbers: PlayerFactsBooksNumbers;
   readonly usage: PlayerFactsUsage | null;
   readonly trend: PlayerFactsTrend | null;
+  /** Already fully computed by `facts/collect-depth.ts` — copied straight across exactly as
+   *  `usage`/`trend` are. OPTIONAL, and the omission means `EMPTY_DEPTH`: a caller with no depth
+   *  reads (a fixture, a surface that never ran the depth collector) is stating "nothing was
+   *  found", which is the identical honest value the collector itself yields for a player the
+   *  depth stores hold no row for. There is no third state to tell apart, so there is no reason to
+   *  make every existing caller spell out an empty object. */
+  readonly depth?: PlayerFactsDepth;
 }
 
 function findReason<T extends BoardReason["code"]>(reasons: readonly BoardReason[], code: T): Extract<BoardReason, { code: T }> | undefined {
@@ -608,6 +626,7 @@ function buildNumberLedger(facts: Omit<PlayerFacts, "numberLedger" | "nameLedger
   }
   if (byeWeek !== null) numbers.push(byeWeek);
   numbers.push(...colorNumbers(facts.lastSeasonStory, facts.booksNumbers, facts.usage, facts.trend));
+  numbers.push(...depthNumbers(facts.depth));
   numbers.push(...derivedNumbers(facts), ...printedTextNumbers(facts));
   return numbers;
 }
@@ -654,6 +673,11 @@ function buildNameLedger(facts: Omit<PlayerFacts, "numberLedger" | "nameLedger" 
     addRankedStatNeighbor(facts.usage.targetShareRank);
     addRankedStatNeighbor(facts.usage.redZoneShareRank);
   }
+  // THE DEPTH GROUP'S OWN NAMES — coaches, the men listed around him on the depth chart, his
+  // team's target leaders. Team codes come back separately so they get the same city/nickname
+  // expansion every other team on this ledger already gets, and a PERSON never does.
+  for (const name of depthNames(facts.depth)) addName(name);
+  for (const code of depthTeamCodes(facts.depth)) addTeam(code);
   return [...names];
 }
 
@@ -676,6 +700,7 @@ function computeFactsHash(content: Omit<PlayerFacts, "numberLedger" | "nameLedge
     booksNumbers: content.booksNumbers,
     usage: content.usage,
     trend: content.trend,
+    depth: content.depth,
   };
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
@@ -700,6 +725,7 @@ export function buildPlayerFacts(input: PlayerFactsInput): PlayerFacts {
     booksNumbers: input.booksNumbers,
     usage: input.usage,
     trend: input.trend,
+    depth: input.depth ?? EMPTY_DEPTH,
   };
   return {
     ...content,

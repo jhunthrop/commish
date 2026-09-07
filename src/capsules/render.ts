@@ -1,6 +1,7 @@
 import type { Position } from "@/domain/player";
 import { POSITION_PLURAL } from "@/league-room/lib/player-season-view";
 import { PROP_MARKET_LABELS } from "./prop-market-labels";
+import { renderDepthSection } from "./render-depth";
 import type { PlayerFacts, PlayerFactsRankedStat, PlayerFactsTrendMetric } from "./facts";
 
 /**
@@ -271,5 +272,11 @@ export function renderFactsForModel(facts: PlayerFacts): string {
   sections.push(byeLine(facts));
   sections.push(injuryLine(facts));
   sections.push(`Recent news:\n${newsLines(facts).map((line) => `- ${line}`).join("\n")}`);
+  // THE DEPTH SECTION, LAST AND UNDER ONE HEADING (spec 2026-09-07, §5) — appended rather than
+  // interleaved so every section above stays byte-identical and the cacheable prefix of the prompt
+  // is not invalidated by the sheet growing. `null` when the depth stores held nothing for him,
+  // which renders no heading at all rather than an empty one.
+  const depth = renderDepthSection(facts);
+  if (depth !== null) sections.push(depth);
   return sections.join("\n\n");
 }
