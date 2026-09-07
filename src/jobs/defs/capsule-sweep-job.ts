@@ -5,17 +5,22 @@
 // forever). Scheduled nightly (`schedules.ts`); also runnable on demand through the job system's
 // own manual-enqueue/rerun tooling.
 //
+// IT IS ALSO THE PEEK-FACTS WRITER (peek-facts design §3.2, 2026-09-07). The pass this job already
+// runs for the whole board is exactly the pass a precomputed peek row needs, so the rows are written
+// from it here rather than by a second heavy job of its own.
+//
 // TERMINAL VS RETRYABLE: `generate.ts` never throws (the template is the permanent floor), so
 // nothing inside a single player's own attempt can fail this job — a gateway outage degrades every
 // eligible player to template this run and the summary says so plainly. What CAN throw is the
-// database work around it (`collectAllPlayerFacts`, `getStoredCapsulesFor`, `upsertCapsule`), and
-// that is ordinary retryable weather like every other job's own DB step.
+// database work around it (`collectBoardFacts`, `writeRefresh`, `getStoredCapsulesFor`,
+// `upsertCapsule`), and that is ordinary retryable weather like every other job's own DB step.
 import type { Db } from "@/db/client";
 import type { JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import { CAPSULE_CONFIG } from "@/capsules/config";
-import { collectAllPlayerFacts } from "@/capsules/collect";
+import { collectBoardFacts } from "@/capsules/collect";
 import { describeCapsuleFallback, generateCapsule } from "@/capsules/generate";
+import { writeRefresh } from "@/capsules/peek-facts";
 import { getStoredCapsulesFor, upsertCapsule, type StoredPlayerCapsule } from "@/capsules/store";
 import type { PlayerFacts } from "@/capsules/facts";
 import { defineJob, type AnyJobDefinition, type StepOutcome } from "../contract";
@@ -48,7 +53,12 @@ export interface CapsuleSweepDeps {
 
 export async function runCapsuleSweepStep(db: Db, clock: Clock, deps: CapsuleSweepDeps, payload: CapsuleSweepPayload): Promise<StepOutcome> {
   const asOf = new Date(clock.now());
-  const facts = await collectAllPlayerFacts(db, asOf);
+  const pass = await collectBoardFacts(db, asOf);
+  const facts = pass.facts;
+  // THE PRECOMPUTED PEEK ROWS (peek-facts design §3.2) ride on the pass that just ran, before any
+  // gateway call: a throttled or slow capsule generation must not be what decides whether a peek
+  // opens fast, and the facts are already in hand either way.
+  const peekFacts = await writeRefresh(db, pass);
   const stored = await getStoredCapsulesFor(db, facts.map((f) => f.identity.id));
   const eligible = facts.filter((f) => needsGeneration(f, stored.get(f.identity.id)));
   const budget = payload.budget ?? CAPSULE_CONFIG.sweepGenerationBudget;
@@ -87,7 +97,8 @@ export async function runCapsuleSweepStep(db: Db, clock: Clock, deps: CapsuleSwe
   const summary =
     `capsule-sweep: ${facts.length} board players, ${eligible.length} needed a fresh generation, ` +
     `${toProcess.length} processed (${llmCount} llm, ${templateCount} template, $${totalCostUsd.toFixed(6)} spent)` +
-    (remaining > 0 ? `, ${remaining} left for the next sweep` : "");
+    (remaining > 0 ? `, ${remaining} left for the next sweep` : "") +
+    `. Peek facts: ${peekFacts.players} rows built, ${peekFacts.changed} changed, ${peekFacts.withTouchesRank} with a touches rank`;
 
   return { summary, detail };
 }

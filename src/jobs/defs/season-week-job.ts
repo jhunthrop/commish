@@ -1,7 +1,12 @@
 // THE SEASON-WEEK JOB — the three crontab fires' one payload, rebuilt on the job contract. Five
 // checkpointed steps mapping one-to-one onto `src/jobs/season-week/steps.ts`'s exported step
 // functions (that file is the wall-exempt home of everything that touches the register; this
-// module calls THROUGH it and never imports `src/projections/register` itself).
+// module calls THROUGH it and never imports `src/projections/register` itself), plus a sixth of
+// this module's own (see just below).
+//
+// A SIXTH STEP JOINED THE FIVE (peek-facts design §3.2, 2026-09-07): `peek-facts` refreshes the
+// precomputed player-peek rows once the week's stats are in, which is the second of that design's
+// two triggers. It is idempotent and ordinary retryable weather.
 //
 // THE CADENCE'S OWN LAWS SURVIVE THE MIGRATION:
 //   - A props-snapshot failure is RECORDED, never fatal (the crontab-era rule that a dead
@@ -27,6 +32,7 @@ import {
   type StepResult,
 } from "../season-week/steps";
 import { realIngestStats, realSnapshotProps } from "../season-week/deps";
+import { refreshPeekFacts } from "@/capsules/peek-facts";
 import type { Db } from "@/db/client";
 import type { JsonObject } from "@/domain/audit";
 import { JOBS_CONFIG } from "../config";
@@ -141,6 +147,25 @@ export function seasonWeekJobWith(network: SeasonWeekNetwork): AnyJobDefinition 
         run: async (ctx, payload) => {
           const { deps, options } = cadence(ctx, payload, network);
           return toOutcome(await scoreboardStep(deps, options));
+        },
+      },
+      {
+        // THE PEEK-FACTS REFRESH (peek-facts design §3.2, 2026-09-07) — the second of the two
+        // triggers, the nightly capsule sweep being the first. It runs LAST, after the week's stats
+        // have been ingested and the register has had its say, because that is when the current
+        // season's facts have actually moved. It writes the CURRENT product season's rows and no
+        // other: `PRODUCT_SEASON` is the only season a peek asks about.
+        //
+        // ORDINARY RETRYABLE WEATHER, like every other database step here. It is also idempotent by
+        // construction (`writePeekFacts`' changed-row counting), so a retried tick that reaches it
+        // twice with the same clock writes nothing the second time.
+        name: "peek-facts",
+        run: async (ctx) => {
+          const refresh = await refreshPeekFacts(ctx.db, new Date(ctx.clock.now()));
+          return {
+            summary: `[OK] peek facts: ${refresh.players} rows built, ${refresh.changed} changed, ${refresh.withTouchesRank} with a touches rank`,
+            detail: [],
+          };
         },
       },
     ],

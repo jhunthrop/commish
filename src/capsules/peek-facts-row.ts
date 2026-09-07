@@ -37,9 +37,10 @@ export interface PeekFactsBasis {
   /** How many ACTIVE peers at his position the ranks in this row were taken over
    *  (`capsules/peers.ts`'s own membership rule), never the historical universe's count. */
   readonly peerPopulation: number;
-  /** How many prior-season stat lines the whole population read produced. Zero is the state the
-   *  touches refusal below exists for. */
-  readonly priorSeasonLineCount: number;
+  /** How many players the prior-season stat-line read produced a story for, across every position.
+   *  ZERO is the state the touches refusal exists for: a rank taken over an empty line set is not
+   *  a rank, it is a number with nothing behind it. */
+  readonly priorSeasonPlayerCount: number;
   /** Why a fact on this row is absent, one sentence each. Empty when nothing was refused. */
   readonly refusals: readonly string[];
   /** The scoring format `lastSeasonLine` and every rate on the dossier were computed under. */

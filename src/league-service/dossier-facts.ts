@@ -1,6 +1,7 @@
 import { collectPlayerFacts } from "@/capsules/collect-one";
 import { rankWithinGroups, type RankableStat } from "@/capsules/rank";
 import type {
+  PlayerFacts,
   PlayerFactsAvailability,
   PlayerFactsBooksNumbers,
   PlayerFactsInjuryStatus,
@@ -118,8 +119,9 @@ function perGamePointsRanksFor(rows: readonly PreseasonProjectionRow[], position
 
 /** The whole-board read `perGamePointsRanksFor` needs — bundled into its own function so
  *  `dossierFactsFor` runs it exactly once regardless of whether the target player himself ends up
- *  ranked. */
-async function boardWidePerGameFacts(db: Db, asOf: Date): Promise<ReadonlyMap<string, PlayerDossierRank>> {
+ *  ranked. Exported for the precompute writer (`capsules/peek-facts.ts`), which needs the same map
+ *  ONCE for a whole sweep rather than once per player. */
+export async function boardWidePerGameFacts(db: Db, asOf: Date): Promise<ReadonlyMap<string, PlayerDossierRank>> {
   const rows = await preseasonProjectionsAsOf(db, { season: PRODUCT_SEASON, source: BOARD_SOURCE, asOf });
   if (rows.length === 0) return new Map();
   const positions = await allPositions(db);
@@ -127,19 +129,13 @@ async function boardWidePerGameFacts(db: Db, asOf: Date): Promise<ReadonlyMap<st
 }
 
 /**
- * `PlayerSeasonBody.dossier` — `null` for exactly the players `collectPlayerFacts` (Task 1)
- * returns `null` for: the board never ranked him. Everything else is a reshape of that same call
- * plus one whole-board read for the per-game rank (`boardWidePerGameFacts`, run unconditionally
- * once `facts` resolves, never twice — see that function's own docblock).
+ * THE SHAPE, WITH NO READS OF ITS OWN — `PlayerFacts` plus the one rank that is not on it, reshaped
+ * for the client. Pure on purpose (peek-facts round, 2026-09-07): it has TWO callers now and they
+ * must produce byte-identical objects or the precomputed row and the live computation would render
+ * differently for the same player. `dossierFactsFor` below is the live one, `capsules/peek-facts.ts`
+ * the precompute one, and neither has a copy of this mapping.
  */
-export async function dossierFactsFor(db: Db, playerId: string, asOf: Date = new Date()): Promise<PlayerDossierFacts | null> {
-  const facts = await collectPlayerFacts(db, playerId, asOf);
-  if (facts === null) return null;
-
-  const nflPlayerId = await nflPlayerIdFor(db, playerId);
-  const ranksByNflPlayerId = await boardWidePerGameFacts(db, asOf);
-  const perGamePositionRank = nflPlayerId === null ? null : (ranksByNflPlayerId.get(nflPlayerId) ?? null);
-
+export function dossierFactsFrom(facts: PlayerFacts, perGamePositionRank: PlayerDossierRank | null): PlayerDossierFacts {
   return {
     market: facts.market,
     projection: { ...facts.projection, perGamePoints: perGamePositionRank?.value ?? null, perGamePositionRank },
@@ -153,4 +149,23 @@ export async function dossierFactsFor(db: Db, playerId: string, asOf: Date = new
     basis: { scoringLabel: describeScoring(PPR_SCORING) },
     byeWeek: facts.byeWeek,
   };
+}
+
+/**
+ * `PlayerSeasonBody.dossier` — `null` for exactly the players `collectPlayerFacts` (Task 1)
+ * returns `null` for: the board never ranked him. Everything else is a reshape of that same call
+ * plus one whole-board read for the per-game rank (`boardWidePerGameFacts`, run unconditionally
+ * once `facts` resolves, never twice — see that function's own docblock).
+ *
+ * THE PEEK NO LONGER CALLS THIS AT REQUEST TIME (peek-facts round, 2026-09-07): `playerSeason` reads
+ * the precomputed `player_peek_facts` row instead, and this stays as the live computation the
+ * precompute writer itself is built from and the parity test measures against.
+ */
+export async function dossierFactsFor(db: Db, playerId: string, asOf: Date = new Date()): Promise<PlayerDossierFacts | null> {
+  const facts = await collectPlayerFacts(db, playerId, asOf);
+  if (facts === null) return null;
+
+  const nflPlayerId = await nflPlayerIdFor(db, playerId);
+  const ranksByNflPlayerId = await boardWidePerGameFacts(db, asOf);
+  return dossierFactsFrom(facts, nflPlayerId === null ? null : (ranksByNflPlayerId.get(nflPlayerId) ?? null));
 }

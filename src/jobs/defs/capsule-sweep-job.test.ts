@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
-import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
+import { nflPlayers, playerCrosswalk, playerPeekFacts, players, preseasonProjections } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { getStoredCapsule } from "@/capsules/store";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
@@ -142,5 +142,37 @@ describe("runCapsuleSweepStep", () => {
   it("returns an honest zero-player summary when the board is empty", async () => {
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key" }, {});
     expect(outcome.summary).toContain("0 board players");
+  });
+
+  /** THE SWEEP IS ALSO THE PEEK-FACTS WRITER (peek-facts design §3.2) — one pass, two products. */
+  it("writes one precomputed peek row per board player from the same pass", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
+    await seedPlayer(db, { id: "p2", nflId: "00-2", name: "Player Two", rank: 2, points: 220 });
+
+    // A budget of one, deliberately: the peek rows come off the PASS, so every board player gets
+    // one whatever the capsule generation budget happens to be that night.
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, { budget: 1 });
+    expect(outcome.summary).toContain("Peek facts: 2 rows built, 2 changed");
+
+    const rows = await db.select().from(playerPeekFacts);
+    expect(rows.map((row) => row.playerId).sort()).toEqual(["p1", "p2"]);
+  });
+
+  it("changes no peek row on a second sweep at the same moment", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+
+    const second = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+    expect(second.summary).toContain("Peek facts: 1 rows built, 0 changed");
+    expect(await db.select().from(playerPeekFacts)).toHaveLength(1);
+  });
+
+  it("writes the peek rows even when every capsule generation is throttled", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
+    const failingFetch = async () => new Response("bad request", { status: 401 });
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingFetch }, {});
+    expect(outcome.summary).toContain("Peek facts: 1 rows built, 1 changed");
+    expect(await db.select().from(playerPeekFacts)).toHaveLength(1);
   });
 });
