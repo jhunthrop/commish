@@ -66,6 +66,15 @@ const captureHarvestNoop = defineJob({
   parsePayload: () => ({}),
   steps: [{ name: "harvest", run: async () => ({ summary: "noop", detail: [] }) }],
 });
+/** The real SCHEDULES now also fire "win-totals" weekly (dossier-voice round, the publisher read). */
+const winTotalsNoop = defineJob({
+  name: "win-totals",
+  maxAttempts: 3,
+  timeoutMs: 5_000,
+  backoff: { baseMs: 60_000, maxMs: 600_000 },
+  parsePayload: () => ({}),
+  steps: [{ name: "fetch", run: async () => ({ summary: "noop", detail: [] }) }],
+});
 const definitions: ReadonlyMap<string, AnyJobDefinition> = new Map([
   ["season-week", noopDefinition],
   ["draft-sweep", sweepNoop],
@@ -73,6 +82,7 @@ const definitions: ReadonlyMap<string, AnyJobDefinition> = new Map([
   ["props-preseason-snapshot", propsPreseasonSnapshotNoop],
   ["capsule-sweep", capsuleSweepNoop],
   ["capture-harvest", captureHarvestNoop],
+  ["win-totals", winTotalsNoop],
 ]);
 
 /** Just the Tuesday schedule, so fire counts in tests are one schedule's worth. */

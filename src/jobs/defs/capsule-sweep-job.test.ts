@@ -111,7 +111,9 @@ describe("runCapsuleSweepStep", () => {
     await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
     const failingFetch = async () => new Response("bad request", { status: 401 });
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingFetch }, {});
-    expect(outcome.detail).toEqual(["Rashad Long: template (throttled)"]);
+    // The narrative is a third call on the same dead gateway and reports its own failure line;
+    // the size label is what this test is about and it still reads "throttled".
+    expect(outcome.detail).toContain("Rashad Long: template (throttled)");
   });
 
   it("labels a detail line \"template (failed validation: ...)\" quoting the first violation when the gateway talks but the content fails the validator", async () => {
@@ -120,9 +122,9 @@ describe("runCapsuleSweepStep", () => {
     const fabricatedBody = "He will score 999 touchdowns this year for this offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and the market simply cannot price a season like that.";
     const fabricatingFetch = async () => okResponse(fabricatedBody);
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
-    expect(outcome.detail).toHaveLength(1);
-    expect(outcome.detail[0]).toMatch(/^Rashad Long: template \(failed validation: .+\)$/);
-    expect(outcome.detail[0]).not.toContain("throttled");
+    const sizeLabel = outcome.detail.find((line) => line.startsWith("Rashad Long: template"))!;
+    expect(sizeLabel).toMatch(/^Rashad Long: template \(failed validation: .+\)$/);
+    expect(sizeLabel).not.toContain("throttled");
   });
 
   it("bounds a run to its own generation budget, leaving the rest for the next sweep", async () => {

@@ -5,7 +5,9 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { recordTeamObservations, teamObservationsAsOf } from "../team-store";
 import {
+  fetchPublishedWinTotals,
   ingestVegasWinTotals,
+  normalizePublishedTeam,
   parseWinTotalsCsv,
   VEGAS_METRICS,
   VEGAS_SOURCE,
@@ -137,4 +139,76 @@ describe("ingestVegasWinTotals — the real file-to-store path", () => {
 
 afterAll(async () => {
   await truncateAll(db);
+});
+
+/**
+ * THE PUBLISHER READ (dossier-voice round §3.6) — a fixture `fetch`, never the network: the round's
+ * rule is that no test reaches out, and the behaviour under test is the shape assertion, the team
+ * normalization and the "not posted" path, none of which needs a live publisher.
+ */
+describe("fetchPublishedWinTotals", () => {
+  const PUBLISHED_HEADER = "season,team,line,over_odds,under_odds,source,source_date";
+
+  function publishedCsv(lines: readonly string[]): string {
+    return [PUBLISHED_HEADER, ...lines].join("\n");
+  }
+
+  function fetchReturning(body: string, status = 200): typeof globalThis.fetch {
+    return (async () => new Response(body, { status })) as unknown as typeof globalThis.fetch;
+  }
+
+  /** A full league for one season, so `posted` is true. */
+  function fullSeason(season: number, teams: readonly string[]): readonly string[] {
+    return teams.map((team, index) => `${season},${team},${8 + (index % 3)}.5,-110,-110,draftkings,${season}-07-04`);
+  }
+
+  const TEAMS_2026 = [
+    "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
+    "LA", "LAC", "LV", "MIA", "MIN", "NE", "NO", "NYG", "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WAS",
+  ];
+
+  it("reads one season's rows and reports a full league as posted", async () => {
+    const fetchMock = fetchReturning(publishedCsv([...fullSeason(2026, TEAMS_2026), "2025,BUF,11.5,-120,100,draftkings,2025-07-04"]));
+    const published = await fetchPublishedWinTotals(2026, { fetch: fetchMock });
+
+    expect(published.posted).toBe(true);
+    expect(published.teamsPosted).toBe(32);
+    expect(published.rows).toHaveLength(32);
+    expect(published.rows.every((row) => row.season === 2026)).toBe(true);
+    expect(published.rows[0]).toMatchObject({ team: "ARI", overPrice: -110, underPrice: -110, actualWins: null });
+  });
+
+  it("says a season nobody has posted is not posted, and writes nothing to say it with", async () => {
+    const fetchMock = fetchReturning(publishedCsv(fullSeason(2025, TEAMS_2026)));
+    const published = await fetchPublishedWinTotals(2026, { fetch: fetchMock });
+
+    expect(published.posted).toBe(false);
+    expect(published.teamsPosted).toBe(0);
+    expect(published.rows).toEqual([]);
+  });
+
+  it("treats a half-posted season as not posted, never as a board where some teams have a market", async () => {
+    const fetchMock = fetchReturning(publishedCsv(fullSeason(2026, TEAMS_2026.slice(0, 12))));
+    const published = await fetchPublishedWinTotals(2026, { fetch: fetchMock });
+
+    expect(published.posted).toBe(false);
+    expect(published.teamsPosted).toBe(12);
+  });
+
+  it("refuses a file whose shape has changed, naming the column it wanted", async () => {
+    const fetchMock = fetchReturning("season,team,win_total\n2026,BUF,10.5");
+    await expect(fetchPublishedWinTotals(2026, { fetch: fetchMock })).rejects.toThrow(/no "line" column/);
+  });
+
+  it("refuses an empty file and a refused request rather than reading them as a quiet preseason", async () => {
+    await expect(fetchPublishedWinTotals(2026, { fetch: fetchReturning(PUBLISHED_HEADER) })).rejects.toThrow(/no rows/);
+    await expect(fetchPublishedWinTotals(2026, { fetch: fetchReturning("nope", 500) })).rejects.toThrow(/HTTP 500/);
+  });
+
+  it("normalizes the two team codes the publisher spells differently", () => {
+    expect(normalizePublishedTeam("LAR", 2026)).toBe("LA");
+    expect(normalizePublishedTeam("OAK", 2026)).toBe("LV");
+    expect(normalizePublishedTeam("OAK", 2019)).toBe("OAK");
+    expect(normalizePublishedTeam("BUF", 2026)).toBe("BUF");
+  });
 });

@@ -96,6 +96,15 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
       "Daily 03:30 ET capture of pre-kickoff player props into the archive the props anchor's leakage gate reads from. Self-disables (no network call, no credit spend) once the product season's own first kickoff has passed.",
   }),
   schedule({
+    name: "win-totals-weekly",
+    cron: "0 5 * * 3",
+    timezone: "America/New_York",
+    job: "win-totals",
+    payload: {},
+    description:
+      "Wednesday 05:00 ET read of the win-totals publisher for the product season. Year-round on purpose: the job itself skips once that season has kicked off (no fetch, no write), so the season-open post is caught the week it lands without a schedule edited by hand every August.",
+  }),
+  schedule({
     name: "capsule-sweep-nightly",
     cron: "0 4 * * *",
     timezone: "America/New_York",
