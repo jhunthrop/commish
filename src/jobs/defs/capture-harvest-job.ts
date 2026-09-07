@@ -3,7 +3,11 @@
 // process nothing in production keeps alive) or from an operator's ad-hoc `scripts/capture-once.ts`.
 // Without a row, a player card has never checked an injury feed and a capsule has no news to cite.
 // This job is what actually lands injury designations, headlines and depth-chart moves in the
-// archive every night, on the schedule the job system owns (`schedules.ts`).
+// archive, on the schedule the job system owns (`schedules.ts`).
+//
+// IT ALSO DRIVES THE PEEK DOCUMENT (peek document design §3.4, row four, 2026-09-07): after each
+// capture it diffs the feeds a card actually reads against their previous rows and enqueues a
+// document rebuild naming exactly the players whose designation or headlines moved.
 //
 // FEED SELECTION — a DELIBERATE SUBSET, not `CAPTURE_FEEDS` whole. `HARVEST_FEED_SOURCES` below
 // keeps the cheap, single-request, daily-value feeds a player card or capsule actually reads:
@@ -16,20 +20,27 @@
 // list itself is a hardcoded constant (`NFL_TEAM_ABBREVIATIONS`) rather than a daily fetch — so
 // this job does not invent one.
 //
-// THE BUDGET. Every feed in `HARVEST_FEED_SOURCES` is single-request regardless of cadence
-// (`CAPTURE_FEEDS`'s own `requests()`), so the worst case — every cadence due the same day, which
-// only happens Thursday-through-Monday when the game-day feeds also fire — costs 5 upstream
-// requests. `CAPTURE_HARVEST_REQUEST_BUDGET` below is a deliberately small, SELF-CONTAINED ceiling
-// (not the ingestion worker's shared `dailyRequestBudget`, `stats-pipeline/config.ts`): this job
-// runs pre-dawn, nowhere near live scoring's own draw on that shared ledger, and its own feed list
-// is fixed and small enough that a private ceiling is honest rather than a workaround.
+// THE BUDGET, AS THE CADENCE ACTUALLY STANDS (restated for the hourly schedule, 2026-09-07). Every
+// feed in `HARVEST_FEED_SOURCES` is single-request regardless of cadence (`CAPTURE_FEEDS`'s own
+// `requests()`), so one fire costs at most 5 upstream requests, which happens Thursday through
+// Monday when the game-day feeds are due alongside the daily ones. `HARVEST_CONFIG`
+// (`@/projections/harvest-config`) fires this 18 times a day (the 02:00 ET pass the nightly jobs
+// depend on, plus hourly from 07:00 through 23:00), so the worst case is 90 upstream requests a day
+// and about 2,550 a month. That is the whole draw of this job and it is stated beside the cadence
+// itself, in `HARVEST_CONFIG`, rather than only here.
+//
+// `CAPTURE_HARVEST_REQUEST_BUDGET` below is a per-RUN ceiling, deliberately small and
+// SELF-CONTAINED (not the ingestion worker's shared `dailyRequestBudget`,
+// `stats-pipeline/config.ts`): this job's feed list is fixed and small enough that a private
+// ceiling is honest rather than a workaround.
 //
 // FRESHNESS. `captureOnce`'s `isFresh`/`markFresh` exist to stop the ingestion worker's own
-// multiple-times-an-hour tick from re-polling a feed inside its cadence window. A job that fires
-// once a night on its OWN schedule is already at that cadence, so this job answers `isFresh` with a
-// constant `false` rather than standing up a Redis-backed key — the digest check inside
-// `captureOnce` (`digestOf`/`latestDigest`) is what actually stops an unchanged feed from writing a
-// duplicate row, and that guard is unconditional regardless of freshness.
+// multiple-times-an-hour tick from re-polling a feed inside its cadence window. This job fires on
+// its OWN schedule and never more than hourly, so it answers `isFresh` with a constant `false`
+// rather than standing up a Redis-backed key — the digest check inside `captureOnce`
+// (`digestOf`/`latestDigest`) is what actually stops an unchanged feed from writing a duplicate
+// row, and that guard is unconditional regardless of freshness. It is also what the rebuild event
+// below keys off: no row written means nobody moved.
 //
 // TERMINAL VS RETRYABLE: a missing `TANK01_API_KEY` cannot resolve itself on a retry — the same
 // key is read on every attempt — so it is the one terminal case, checked before `captureOnce` ever
@@ -55,14 +66,14 @@ import { defineJob, TerminalJobError, type AnyJobDefinition, type StepOutcome } 
 
 export const CAPTURE_HARVEST_JOB_NAME = "capture-harvest";
 
-/** See the module docblock's FEED SELECTION section for why each of these five, and why not the
- *  rest of `CAPTURE_FEEDS`. */
 /** The two feeds a peek document actually reads. Named because the player-level diff below compares
  *  exactly these two captures and nothing else: a depth chart or a betting line moving is real news
  *  for other surfaces, but it is not a field on this document. */
 const INJURY_SOURCE = "tank01_injuries_by_date";
 const NEWS_SOURCE = "tank01_news";
 
+/** See the module docblock's FEED SELECTION section for why each of these five, and why not the
+ *  rest of `CAPTURE_FEEDS`. */
 const HARVEST_FEED_SOURCES: ReadonlySet<string> = new Set([
   INJURY_SOURCE,
   NEWS_SOURCE,
@@ -159,15 +170,29 @@ async function lastTwoCaptures(db: Db, source: string): Promise<{ readonly next:
 }
 
 /**
- * WHICH PLAYERS THIS HARVEST MOVED, as product player ids.
+ * WHICH PLAYERS THIS RUN MOVED, as product player ids.
+ *
+ * IT DIFFS ONLY A FEED THIS RUN ACTUALLY WROTE A ROW FOR (fix round, 2026-09-07). The archive's two
+ * newest rows for a feed do not change when a fire captures nothing, so diffing them unconditionally
+ * kept reporting the SAME players every hour after any one designation moved, each time under a
+ * fresh `harvest:<now>` key that could not coalesce with the last. Seventeen spurious generations a
+ * day per scoring hash, every one of them a rebuild of documents that had not moved since the last.
+ * `captureOnce`'s own per-feed outcome already says which feeds wrote: a feed that came back
+ * `unchanged`, `skipped` or `failed` wrote no row and therefore moved nobody.
  *
  * The injuries feed carries the product's own player id already. The news feed carries only the name
  * in front of its title's colon, the same join `news.ts` makes, so those names are resolved through
  * one read of `players`. A name the product does not carry resolves to nothing and is dropped rather
  * than guessed at.
  */
-async function movedPlayerIds(db: Db): Promise<readonly string[]> {
-  const [injuries, news] = await Promise.all([lastTwoCaptures(db, INJURY_SOURCE), lastTwoCaptures(db, NEWS_SOURCE)]);
+async function movedPlayerIds(db: Db, result: CaptureResult): Promise<readonly string[]> {
+  const captured = new Set(result.feeds.filter((feed) => feed.status === "captured").map((feed) => feed.source));
+  if (!captured.has(INJURY_SOURCE) && !captured.has(NEWS_SOURCE)) return [];
+
+  const [injuries, news] = await Promise.all([
+    captured.has(INJURY_SOURCE) ? lastTwoCaptures(db, INJURY_SOURCE) : NOTHING_CAPTURED,
+    captured.has(NEWS_SOURCE) ? lastTwoCaptures(db, NEWS_SOURCE) : NOTHING_CAPTURED,
+  ]);
   const moved = new Set<string>(injuries.next === null ? [] : harvestDesignationDiff(injuries.previous, injuries.next));
 
   const names = news.next === null ? [] : harvestNewsDiff(news.previous, news.next);
@@ -177,6 +202,10 @@ async function movedPlayerIds(db: Db): Promise<readonly string[]> {
   }
   return [...moved].sort();
 }
+
+/** A feed this run did not write a row for. Not "no rows exist" — "nothing to compare for this
+ *  fire", which the diff below reads as nobody moved. */
+const NOTHING_CAPTURED = { next: null, previous: null } as const;
 
 export async function runCaptureHarvestStep(db: Db, clock: Clock, payload: CaptureHarvestPayload, deps: CaptureHarvestDeps = {}): Promise<StepOutcome> {
   const apiKey = deps.apiKey ?? envOrUndefined(TANK01_CONFIG.envVars.apiKey);
@@ -209,7 +238,7 @@ export async function runCaptureHarvestStep(db: Db, clock: Clock, payload: Captu
   // changed; this is the part that knows WHO changed inside it, which is what keeps the rebuild
   // targeted at a handful of players rather than the whole board. The capture instant is the reason
   // stamp, so a retried attempt that captured nothing new coalesces onto the same job.
-  const moved = await movedPlayerIds(db);
+  const moved = await movedPlayerIds(db, result);
   const enqueued =
     moved.length === 0
       ? 0

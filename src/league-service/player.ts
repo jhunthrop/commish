@@ -171,6 +171,24 @@ export async function playerSeason(
   return await playerSeasonOnMiss(db, leagueId, playerId, now, clock, requestedSeason);
 }
 
+/**
+ * THE MISS'S OWN GENERATION STAMP (fix round, 2026-09-07) — the UTC calendar day.
+ *
+ * WHY A MISS NEEDS ONE AT ALL. `enqueueJob` dedupes on the idempotency key across every status a
+ * job can be in, forever: a key that has already been used is refused whether that job succeeded,
+ * is still pending, or DEAD-LETTERED. A miss keyed on the hash alone would therefore mean that if
+ * the very first build for a novel scoring hash failed its attempts, no later open of any peek in
+ * any league sharing that hash could ever ask for it again, and every one of them would pay the miss
+ * path forever with no queued work to fix it.
+ *
+ * A DAY, not an instant: every miss inside one day still coalesces into a single build, which is the
+ * whole point of the key (a league opening thirty peeks in a row must not enqueue thirty whole-hash
+ * builds), while the next day is a fresh chance for a build that never landed.
+ */
+function dayKeyOf(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
 /** What the miss path has to read for itself, because there was no document row to carry it. */
 interface LeagueFacts {
   readonly rules: ScoringRules;
@@ -240,7 +258,7 @@ async function playerSeasonOnMiss(
   await enqueuePeekDocumentRebuildsQuietly(db, clock, {
     playerIds: null,
     scoringHashes: [facts.scoringHash],
-    reason: `miss:${facts.scoringHash}`,
+    reason: `miss:${dayKeyOf(now)}`,
   });
 
   return hydratePeekDocument(row.document, {

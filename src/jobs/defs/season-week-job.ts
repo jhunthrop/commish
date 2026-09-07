@@ -181,8 +181,12 @@ export function seasonWeekJobWith(network: SeasonWeekNetwork): AnyJobDefinition 
         // Naming "the players with a changed week" would rebuild the men who played and leave every
         // one of their peers holding a percentile taken over last week's population.
         //
-        // The unchanged documents cost nothing to rebuild: `writePeekDocuments` compares every
-        // non-key column and writes only the rows that moved.
+        // WHAT A WHOLE-HASH REBUILD ACTUALLY COSTS, stated honestly (fix round, 2026-09-07): `as_of`
+        // is part of the document's key, so a build INSERTS a generation for every player rather
+        // than updating one in place. That is roughly 1,719 rows and about 7 MB per scoring hash on
+        // today's player universe, whatever the changed-row count reports. The changed-row count is
+        // about the CONTENT, not the row count, and the three-generation prune
+        // (`prunePeekDocuments`) is what keeps the store from growing with every event.
         name: "peek-documents",
         run: async (ctx, payload) => {
           const season = payload.season ?? defaultSeason(new Date(ctx.clock.now()));

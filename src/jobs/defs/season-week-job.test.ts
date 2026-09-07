@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { preseasonProjections } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { jobs, players, preseasonProjections, users } from "@/db/schema";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll, truncateJobTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
+import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { PPR_SCORING, STANDARD_SCORING } from "@/domain/scoring";
+import { createLeague } from "@/league-service/creation";
+import { scoringHashOf } from "@/scoring";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
 import type { BoardEntry } from "@/projections/preseason/board";
 import { BOARD_SOURCE, projectionRows, recordPreseasonProjections } from "@/projections/preseason/board-store";
@@ -13,6 +18,8 @@ import { executeClaimedJob, type ExecutorDeps } from "../execute";
 import { RegisterRefusalError } from "../season-week/steps";
 import { claimNextJob, completedStepsFor, enqueueJob } from "../store";
 import { classifyFreezeError, parseSeasonWeekPayload, seasonWeekJobWith, SEASON_WEEK_JOB_NAME } from "./season-week-job";
+import { PEEK_DOCUMENT_JOB_NAME } from "./peek-document-job";
+import { defaultSeason } from "../season-week/steps";
 
 const db = createTestDb();
 
@@ -66,6 +73,53 @@ describe("the season-week job", () => {
     expect(await completedStepsFor(db, claimed.jobId)).toEqual(
       new Set(["stats-ingest", "props-snapshot", "grade", "freeze", "scoreboard", "peek-facts", "peek-documents"]),
     );
+  });
+
+  /**
+   * THE FINALIZE ROW OF THE PEEK DOCUMENT DESIGN'S EVENT TABLE (§3.4, row one), asserted by SCOPE
+   * rather than only by the step having run.
+   *
+   * It rebuilds EVERY player (`playerIds: null`) for EVERY scoring hash a league is currently using,
+   * which is the one event that deliberately does not narrow: a finalized week adds a column to every
+   * chart and moves the percentile population every week and every points-per-game is judged
+   * against, for the whole position. See the step's own docblock.
+   */
+  it("enqueues one whole-player rebuild per scoring hash in use, naming the finalized season", async () => {
+    await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "Manager 1" });
+    const ppr = await createLeague({ db, clock, newId: () => "league_ppr" }, {
+      name: "Sunday Money", format: "snake", teamCount: 12, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Team One" },
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
+    });
+    const standard = await createLeague({ db, clock, newId: () => "league_standard" }, {
+      name: "Old School", format: "snake", teamCount: 12, scoringPreset: "standard", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Team Two" },
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
+    });
+    if (!ppr.ok || !standard.ok) throw new Error("league creation failed");
+    await db.insert(players).values({ id: "rb1", name: "Volume Back", position: "RB", nflTeam: "SF", adp: 11 });
+
+    const definition = seasonWeekJobWith(cannedNetwork);
+    const claimed = await enqueueAndClaim();
+    const report = await executeClaimedJob(deps, new Map([[definition.name, definition]]), claimed);
+    expect(report.outcome).toBe("succeeded");
+
+    const enqueued = await db.select().from(jobs).where(eq(jobs.name, PEEK_DOCUMENT_JOB_NAME));
+    expect(enqueued).toHaveLength(2);
+    expect(new Set(enqueued.map((job) => String((job.payload as { readonly scoringHash: string }).scoringHash)))).toEqual(
+      new Set([scoringHashOf(PPR_SCORING), scoringHashOf(STANDARD_SCORING)]),
+    );
+    for (const job of enqueued) {
+      expect(job.payload).toMatchObject({ playerIds: null, reason: `finalize:${defaultSeason(new Date(T0))}:${T0}` });
+    }
+  });
+
+  it("enqueues no rebuild when no league carries a scoring hash yet", async () => {
+    const definition = seasonWeekJobWith(cannedNetwork);
+    const claimed = await enqueueAndClaim();
+    await executeClaimedJob(deps, new Map([[definition.name, definition]]), claimed);
+
+    expect(await db.select().from(jobs).where(eq(jobs.name, PEEK_DOCUMENT_JOB_NAME))).toEqual([]);
   });
 
   it("records a props-snapshot failure without failing the job, and freeze still runs", async () => {

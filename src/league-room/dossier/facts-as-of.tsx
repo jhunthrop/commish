@@ -1,3 +1,5 @@
+"use client";
+
 import { MICRO_LABEL } from "@/components/ui/config";
 
 /**
@@ -6,6 +8,13 @@ import { MICRO_LABEL } from "@/components/ui/config";
  * directory is under), and a stamp printed in UTC would make a manager in a September evening do
  * time-zone arithmetic to learn whether "as of" means an hour ago or yesterday. Module-level, the
  * same shape `waiting-room.tsx` uses, so a formatter is built once rather than on every render.
+ *
+ * WHY THIS FILE IS `"use client"` AND THE ONE ABOVE IT IS NOT (fix round, 2026-09-07). `Intl` with a
+ * `undefined` locale resolves against whatever machine runs it, so the same instant renders in the
+ * SERVER's zone inside the full player page (a React Server Component) and in the VIEWER's zone
+ * inside the peek (already client, under `PlayerPeekHost`). One card would say 12:00 and the other
+ * 08:00 for the same document, which is exactly the confusion a stamp exists to remove. The
+ * directive pins both surfaces to the viewer's machine.
  */
 const STAMP_FORMAT = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
 

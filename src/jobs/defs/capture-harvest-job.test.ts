@@ -214,6 +214,45 @@ describe("the harvest's peek-document event", () => {
     expect(outcome.summary).toContain("0 players moved, 0 rebuilds enqueued");
     expect(await harvestJobs(db)).toEqual([]);
   });
+
+  /**
+   * THE BUG THIS PINS (fix round, 2026-09-07). The diff used to compare the archive's two newest
+   * rows on every fire, and those rows do not change when a fire captures nothing. So after ONE
+   * designation moved, every hourly fire for the rest of the day re-reported the same player under a
+   * fresh `harvest:<now>` key that could never coalesce with the last: seventeen spurious
+   * generations a day per scoring hash, each one a full rebuild of documents nothing had moved.
+   */
+  it("does not re-enqueue the same move on the next unchanged fire", async () => {
+    const db = await seeded();
+    await runCaptureHarvestStep(db, FIRST, {}, { apiKey: "test-key", fetch: injuryFetch({ rb1: "Q" }) });
+    await runCaptureHarvestStep(db, LATER, {}, { apiKey: "test-key", fetch: injuryFetch({ rb1: "O" }) });
+    expect(await harvestJobs(db)).toHaveLength(1);
+
+    const later = { now: () => "2026-09-02T14:00:00.000Z" };
+    const outcome = await runCaptureHarvestStep(db, later, {}, { apiKey: "test-key", fetch: injuryFetch({ rb1: "O" }) });
+
+    expect(outcome.summary).toContain("0 players moved, 0 rebuilds enqueued");
+    expect(await harvestJobs(db)).toHaveLength(1);
+  });
+
+  it("names nobody when only a feed no document reads was captured", async () => {
+    const db = await seeded();
+    await runCaptureHarvestStep(db, FIRST, {}, { apiKey: "test-key", fetch: injuryFetch({ rb1: "Q" }) });
+
+    // The injuries feed answers identically (so it writes no row) while the depth-chart feed's own
+    // body moves, which captures a row for a feed the peek document does not read at all.
+    const depthMoved: typeof globalThis.fetch = (async (url: unknown) => {
+      const parsed = new URL(url as string);
+      if (parsed.pathname.toLowerCase().includes("injur")) {
+        return new Response(JSON.stringify({ body: { injList: [{ playerID: "rb1", designation: "Q" }] } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ body: { path: parsed.pathname, moved: true } }), { status: 200 });
+    }) as typeof globalThis.fetch;
+    const outcome = await runCaptureHarvestStep(db, LATER, {}, { apiKey: "test-key", fetch: depthMoved });
+
+    expect(outcome.summary).toContain("0 players moved, 0 rebuilds enqueued");
+    expect(await harvestJobs(db)).toEqual([]);
+  });
 });
 
 describe("parseCaptureHarvestPayload", () => {

@@ -11,7 +11,7 @@ import type { PeekDocumentRequest } from "@/capsules/peek-document-inputs";
 import type { Db } from "@/db/client";
 import * as schema from "@/db/schema";
 import { jobs, nflPlayers, playerCrosswalk, players, playerPeekDocuments, preseasonProjections, users } from "@/db/schema";
-import { runPeekDocumentStep } from "@/jobs/defs/peek-document-job";
+import { PEEK_DOCUMENT_JOB_NAME, runPeekDocumentStep } from "@/jobs/defs/peek-document-job";
 import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
 import { PPR_SCORING } from "@/domain/scoring";
 import { statMetricName } from "@/projections/lines";
@@ -212,8 +212,33 @@ describe("the peek is one statement over a stored document", () => {
 
       // The facts writer already enqueued its own rebuild in the seed above, so the miss job is
       // found by its key rather than by being the only one.
-      const [job] = await db.select().from(jobs).where(eq(jobs.idempotencyKey, `peek-document:${PPR_HASH}:miss:${PPR_HASH}`));
-      expect(job!.payload).toMatchObject({ scoringHash: PPR_HASH, playerIds: null, reason: `miss:${PPR_HASH}` });
+      const [job] = await db.select().from(jobs).where(eq(jobs.idempotencyKey, `peek-document:${PPR_HASH}:miss:2026-09-07`));
+      expect(job!.payload).toMatchObject({ scoringHash: PPR_HASH, playerIds: null, reason: "miss:2026-09-07" });
+    });
+
+    it("coalesces every miss inside one day into a single build", async () => {
+      if (RECORDING) return;
+      await playerSeason(db, leagueId, "rb1", clock);
+      await playerSeason(db, leagueId, "rb2", clock);
+
+      const misses = (await db.select().from(jobs).where(eq(jobs.name, PEEK_DOCUMENT_JOB_NAME)))
+        .filter((job) => String((job.payload as { readonly reason: string }).reason).startsWith("miss:"));
+      expect(misses).toHaveLength(1);
+    });
+
+    /**
+     * `enqueueJob` refuses a key it has already seen whatever became of that job, dead-lettered
+     * included. Without a generation stamp a novel hash whose FIRST build failed its attempts could
+     * never be asked for again, and every league on that hash would pay the miss path forever.
+     */
+    it("asks again on a later day, so a build that never landed gets another chance", async () => {
+      if (RECORDING) return;
+      await playerSeason(db, leagueId, "rb1", clock);
+      await playerSeason(db, leagueId, "rb1", { now: () => "2026-09-08T09:00:00.000Z" });
+
+      const misses = (await db.select().from(jobs).where(eq(jobs.name, PEEK_DOCUMENT_JOB_NAME)))
+        .filter((job) => String((job.payload as { readonly reason: string }).reason).startsWith("miss:"));
+      expect(misses.map((job) => (job.payload as { readonly reason: string }).reason).sort()).toEqual(["miss:2026-09-07", "miss:2026-09-08"]);
     });
 
     it("says exactly what a stored document would have said", async () => {
