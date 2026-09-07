@@ -7,7 +7,6 @@ import { boardRows, isProjectedRow, type BoardOptions, type ProjectedBoardRow } 
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { injurySnapshot, type InjurySnapshot } from "@/league-service/injuries";
 import { newsForPlayers, type NewsStory } from "@/league-service/news";
-import { allPositions } from "@/projections/backtest";
 import { nflPlayerIdsFor } from "@/projections/crosswalk";
 import { discoveryFactsForSeason, type DiscoveryFacts, type DiscoveryQuantityValues } from "@/projections/laws/discovery-facts";
 import { isSkillPosition } from "@/projections/laws/populations";
@@ -36,6 +35,7 @@ import {
   type PlayerFactsTrend,
   type PlayerFactsUsage,
 } from "./facts";
+import { activePeersFor } from "./peers";
 import { rankWithinGroups, type RankableStat } from "./rank";
 import { buildTrendMetric } from "./trend";
 
@@ -547,6 +547,31 @@ export function factsInputFor(
   };
 }
 
+/**
+ * ONE PASS'S WHOLE RESULT — the facts themselves plus the three things a SECOND consumer of the same
+ * pass needs and `PlayerFacts` does not carry (peek-facts round, 2026-09-07).
+ *
+ * The precompute writer (`capsules/peek-facts.ts`) rides on this pass rather than running a second
+ * heavy one of its own, which is the design's "no second heavy job" rule. What it needs beyond the
+ * facts is the crosswalk map (to look a player's per-game rank up by nflverse id) and the two
+ * numbers a stored fact's BASIS has to state: how many peers a rank was taken over, and whether the
+ * prior-season read produced any players at all.
+ */
+export interface BoardFactsPass {
+  readonly facts: readonly PlayerFacts[];
+  /** Product player id to nflverse id, for every board player. */
+  readonly gsisIdByPlayerId: ReadonlyMap<string, string>;
+  /** How many ACTIVE peers each position's ranks were taken over — the qualifier a stored rank
+   *  states in its basis. */
+  readonly peerCountByPosition: ReadonlyMap<Position, number>;
+  /** The season the color facts describe. */
+  readonly priorSeason: number;
+  /** How many players the prior-season read produced a story for. ZERO is the state the touches
+   *  refusal exists for: a rank taken over an empty line set is not a rank. */
+  readonly priorSeasonPlayerCount: number;
+  readonly asOf: Date;
+}
+
 /** Every board-ranked player's facts, in one bounded pass: one `boardRows` read, one injury
  *  snapshot read, one news-snapshot read (serving every name at once,
  *  `newsForPlayers`), one season-stat-lines read, the law registry read once off disk, and the
@@ -554,19 +579,27 @@ export function factsInputFor(
  *  `usageTouchesAndTrendFactsFor`/`propsLinesByPlayer`/`vegasWinTotalsByTeam`, this module's own
  *  docblock), each batched once for the whole board rather than once per player. The sweep job
  *  calls this once per run and diffs each player's own `factsHash` against the stored row
- *  (`store.ts`) to decide who actually needs a fresh generation. */
-export async function collectAllPlayerFacts(db: Db, asOf: Date = new Date()): Promise<readonly PlayerFacts[]> {
+ *  (`store.ts`) to decide who actually needs a fresh generation, then hands the SAME pass to the
+ *  peek-facts writer rather than paying for it twice. */
+export async function collectBoardFacts(db: Db, asOf: Date = new Date()): Promise<BoardFactsPass> {
+  const priorSeason = PRODUCT_SEASON - 1;
+  const empty: BoardFactsPass = { facts: [], gsisIdByPlayerId: new Map(), peerCountByPosition: new Map(), priorSeason, priorSeasonPlayerCount: 0, asOf };
   const rows = await boardRows(db, { shape: GENERIC_BOARD_SHAPE, asOf });
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return empty;
 
   const laws = chipEligibleLaws(registry());
   const positionOf = new Map(rows.map((row) => [row.playerId, row.position] as const));
-  const priorSeason = PRODUCT_SEASON - 1;
+  // THE ACTIVE POPULATION, NOT THE HISTORICAL UNIVERSE (peek-facts design §3.3). This used to be
+  // `allPositions(db)` — every person nflverse has ever placed, 3,293 receivers back to 1999 — which
+  // the color reads below then turned into chunked `IN` lists over the observation store. The ranks
+  // themselves do not move: a peer with no week in the prior season never entered a ranked
+  // population in the first place, and `activePeersFor`'s own membership test (a board row, or a
+  // week in this season or the prior one) is a superset of that. What moves is the query cost.
   const [injuries, news, seasons, positions, gsisIdByPlayerId] = await Promise.all([
     injurySnapshot(db),
     newsForPlayers(db, rows.map((row) => row.name)),
     currentSeasonSummaries(db, rows.map((row) => row.playerId), positionOf),
-    allPositions(db),
+    activePeersFor(db, [...new Set(rows.map((row) => row.position))], PRODUCT_SEASON),
     nflPlayerIdsFor(db, rows.map((row) => row.playerId)),
   ]);
 
@@ -586,16 +619,25 @@ export async function collectAllPlayerFacts(db: Db, asOf: Date = new Date()): Pr
     gsisIdByPlayerId,
   };
 
-  return (
-    rows
-      // A ROW WITH NO PROJECTION IS NOT A CAPSULE SUBJECT (the 2026-09-05 kicker and team defence
-      // round). The board now carries market-order rows for a position the engine published nothing
-      // for, and `PlayerFactsInput.projection` is four numbers rather than four maybe-numbers on
-      // purpose: a capsule is written ABOUT a projection. Both positions are already outside
-      // `isSkillPosition`, so nothing reaches here in practice, and this is the type-level statement
-      // of the same rule: it drops the row rather than coercing an absence to a zero somebody would
-      // later read as a measurement.
-      .filter(isProjectedRow)
-      .map((row) => buildPlayerFacts(factsInputFor(row, seasons.get(row.playerId), injuries, news, laws, color)))
-  );
+  const peerCountByPosition = new Map<Position, number>();
+  for (const position of positions.values()) peerCountByPosition.set(position, (peerCountByPosition.get(position) ?? 0) + 1);
+
+  const facts = rows
+    // A ROW WITH NO PROJECTION IS NOT A CAPSULE SUBJECT (the 2026-09-05 kicker and team defence
+    // round). The board now carries market-order rows for a position the engine published nothing
+    // for, and `PlayerFactsInput.projection` is four numbers rather than four maybe-numbers on
+    // purpose: a capsule is written ABOUT a projection. Both positions are already outside
+    // `isSkillPosition`, so nothing reaches here in practice, and this is the type-level statement
+    // of the same rule: it drops the row rather than coercing an absence to a zero somebody would
+    // later read as a measurement.
+    .filter(isProjectedRow)
+    .map((row) => buildPlayerFacts(factsInputFor(row, seasons.get(row.playerId), injuries, news, laws, color)));
+
+  return { facts, gsisIdByPlayerId, peerCountByPosition, priorSeason, priorSeasonPlayerCount: lastSeasonStoryByGsisId.size, asOf };
+}
+
+/** The facts alone, for every caller that wants nothing else off the pass. A thin wrapper over
+ *  `collectBoardFacts` rather than a second implementation of it. */
+export async function collectAllPlayerFacts(db: Db, asOf: Date = new Date()): Promise<readonly PlayerFacts[]> {
+  return (await collectBoardFacts(db, asOf)).facts;
 }

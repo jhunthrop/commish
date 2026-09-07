@@ -1,5 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { collectBoardFacts } from "@/capsules/collect";
+import { writeRefresh } from "@/capsules/peek-facts";
 import { upsertCapsule } from "@/capsules/store";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { matchups, players, playerStatLines, scoringSettings, statWeeks, teams, users } from "@/db/schema";
@@ -311,6 +313,10 @@ describe("playerSeason's dossier", () => {
         tier: 0, asOf: LAST_WEEK, momentKind: "live" },
     ]);
 
+    // THE DOSSIER IS READ, NOT COMPUTED (peek-facts round, 2026-09-07). The precompute pass has to
+    // have run for there to be one, exactly as production requires a sweep before a peek opens.
+    await writeRefresh(db, await collectBoardFacts(db, NOW));
+
     const body = (await playerSeason(db, leagueId, "rb1", clock))!;
     expect(body.dossier).not.toBeNull();
     expect(body.dossier!.projection.perGamePositionRank).toEqual({ value: 15, positionRank: 1, qualifierCount: 2 });
@@ -318,8 +324,40 @@ describe("playerSeason's dossier", () => {
 
   it("answers a null dossier for a player the board never ranked, exactly as collectPlayerFacts does", async () => {
     const leagueId = await league();
+    await writeRefresh(db, await collectBoardFacts(db, NOW));
     const body = (await playerSeason(db, leagueId, "rb1", clock))!;
     expect(body.dossier).toBeNull();
+  });
+
+  /** ABSENCE, NEVER A STALE OR GUESSED STAND-IN (peek-facts design §3.5) — a board-ranked player
+   *  the precompute has not reached yet (a new signing, or a fresh deploy before the first sweep)
+   *  renders his dossier as absent and every other field on the body unchanged. */
+  it("answers a null dossier for a board-ranked player no pass has written a row for yet", async () => {
+    const leagueId = await crossOverBoth(await league());
+    await recordPreseasonProjections(db, [
+      { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: CHASE, rank: 1, positionRank: 1, projectedPoints: 240,
+        valueOverReplacement: 96.4, valueRank: 1, expectedGames: 16, floorPoints: 200, medianPoints: 240, ceilingPoints: 280,
+        tier: 0, asOf: LAST_WEEK, momentKind: "live" },
+    ]);
+
+    const body = (await playerSeason(db, leagueId, "rb1", clock))!;
+    expect(body.dossier).toBeNull();
+    expect(body.player.name).toBe("Rashad Long");
+    expect(body.modelRank).toBe(1);
+  });
+
+  /** The row is point-in-time like every other read here: one written after the moment being asked
+   *  about is not visible to it. */
+  it("never reads a row stamped after the moment the caller is standing at", async () => {
+    const leagueId = await crossOverBoth(await league());
+    await recordPreseasonProjections(db, [
+      { season: PRODUCT_SEASON, source: BOARD_SOURCE, playerId: CHASE, rank: 1, positionRank: 1, projectedPoints: 240,
+        valueOverReplacement: 96.4, valueRank: 1, expectedGames: 16, floorPoints: 200, medianPoints: 240, ceilingPoints: 280,
+        tier: 0, asOf: LAST_WEEK, momentKind: "live" },
+    ]);
+    await writeRefresh(db, await collectBoardFacts(db, new Date(NOW.getTime() + 86_400_000)));
+
+    expect((await playerSeason(db, leagueId, "rb1", clock))!.dossier).toBeNull();
   });
 });
 

@@ -1,4 +1,6 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { priorSeasonCandidates, readPeekFacts } from "@/capsules/peek-facts";
+import type { PeekFactsRow } from "@/capsules/peek-facts-row";
 import { getPlayerCapsule, type PlayerCapsuleView } from "@/capsules/store";
 import type { Db } from "@/db/client";
 import { captureSnapshots, leagues, matchups, nflPlayers, players, playerStatLines, rosterSlots, scoringSettings, statWeeks, teams } from "@/db/schema";
@@ -6,7 +8,7 @@ import type { Player, Position, StatLine } from "@/domain/player";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG, seasonProgress } from "@/league";
-import { nflPlayerIdFor, nflPlayerIdsFor } from "@/projections/crosswalk";
+import { nflPlayerIdsFor } from "@/projections/crosswalk";
 import { kdefSeasonLines, kdefSeasonsHeld, type KdefSeasonLine } from "@/projections/kdef/season-lines";
 import type { SeasonStatLine } from "@/projections/lines";
 import type { Law } from "@/projections/laws/types";
@@ -19,24 +21,28 @@ import { BOARD_SOURCE, assertSingleGeneration, boardReasons, preseasonProjection
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { preseasonRankingsFor } from "@/projections/preseason/store";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
-import { dossierFactsFor, type PlayerDossierFacts } from "./dossier-facts";
+import type { PlayerDossierFacts } from "./dossier-facts";
 import { newsFor } from "./news";
 
 /**
- * How many finished seasons before `PRODUCT_SEASON` a player card will offer, at most — the same
- * three seasons the draft room's own peek card looks back over (`draft-service/player-history.ts`'s
- * `HISTORY_SEASONS`). Kept as this file's own constant rather than importing that one: the two
- * screens share a number today by coincidence of product taste, not by a rule that binds them
- * together, and a founder narrowing one is not a reason to narrow the other.
+ * HOW FAR BACK THIS CARD LOOKS is `PEEK_HISTORY_SEASONS` (`capsules/peek-facts-row.ts`), and it is
+ * imported rather than restated (peek-facts round, 2026-09-07). This file kept its own private
+ * `HISTORY_SEASONS = 3` until the precompute writer gave the number a SECOND reader: the writer
+ * stores `prior_seasons_held` as the subset of those candidate seasons the store actually holds,
+ * and this file builds `availableSeasons` from that array. Two copies of the number would let the
+ * reader and the writer disagree with nothing in the data to say which was right.
+ *
+ * The old constant's own note still holds for the OTHER screen: `draft-service/player-history.ts`'s
+ * `HISTORY_SEASONS` shares this number today by coincidence of product taste rather than by a rule
+ * binding the two screens, and a founder narrowing one is not a reason to narrow the other.
  */
-const HISTORY_SEASONS = 3;
 
 /** The outermost edge is the only place a wall clock is allowed, exactly as every other service
  *  in this directory has it. */
 const systemClock: Clock = { now: () => new Date().toISOString() };
 
 /** The earliest season this product will ever entertain as a real request — nowhere near
- *  `HISTORY_SEASONS`' own three-year lookback, just a sanity floor against garbage input. */
+ *  `PEEK_HISTORY_SEASONS`' own three-year lookback, just a sanity floor against garbage input. */
 const EARLIEST_PLAUSIBLE_SEASON = 2000;
 
 /**
@@ -296,14 +302,22 @@ export interface PlayerSeasonBody {
    */
   readonly capsule?: PlayerCapsuleView | null;
   /**
-   * Player Dossier plan, Task 2 — the same fact sheet the capsule sweep computes
-   * (`capsules/collect-one.ts`'s single-player sibling of `collect.ts`), reshaped for the client
-   * (`league-service/dossier-facts.ts`'s `dossierFactsFor`). `null` for exactly the players
-   * `collectPlayerFacts` itself answers `null` for — the board never ranked him — never a
-   * placeholder standing in for that absence. Unlike `capsule` (LLM prose over these same facts),
-   * this is the raw, structured numbers themselves: market, projection (with the per-game rate
-   * and its position rank added), availability, usage, trend, books, last season's story, injury
-   * and a news count, plus which board generation and scoring format they were computed under.
+   * Player Dossier plan, Task 2 — the same fact sheet the capsule sweep computes, reshaped for the
+   * client (`league-service/dossier-facts.ts`'s `dossierFactsFrom`). Unlike `capsule` (LLM prose
+   * over these same facts), this is the raw, structured numbers themselves: market, projection
+   * (with the per-game rate and its position rank added), availability, usage, trend, books, last
+   * season's story, injury and a news count, plus which scoring format they were computed under.
+   *
+   * IT IS READ, NOT COMPUTED (peek-facts round, 2026-09-07). `playerSeason` used to build it at
+   * request time through `dossierFactsFor`, which cost 43 queries and most of the peek's wall clock
+   * because it handed every color read the whole historical player universe as a peer population.
+   * The nightly capsule sweep and the post-finalize `season-week` step now store it, and this field
+   * is `player_peek_facts.dossier` for the latest row stamped at or before the caller's moment.
+   *
+   * `null` MEANS THE ROW IS NOT THERE, which happens for two honest reasons and neither is a
+   * placeholder: the board never ranked him (a kicker, a team defense, an unranked name), or the
+   * precompute has not reached him yet (a new signing, or a fresh deploy before the first sweep).
+   * The screen renders absence in both cases, never a stale or guessed dossier.
    *
    * Optional on the type, the SAME reason `capsule` is (see that field's own docblock): the many
    * existing fixtures that build a `PlayerSeasonBody` by hand need not all learn about the
@@ -616,7 +630,10 @@ async function seasonStats({ db, playerId, player, peerIds, played, rules, seaso
  * ONE CROSSWALK LOOKUP GATES BOTH. A league player the crosswalk could not place has no gsis id,
  * and both stores are keyed on one, so there is nothing to look up and the honest answer to both
  * questions is `null`. There is no fallback by name here and there must never be one: the only
- * thing worse than a dash on a player's screen is another man's number on it.
+ * thing worse than a dash on a player's screen is another man's number on it. The lookup is the
+ * CALLER's now (peek-facts round, 2026-09-07): `playerSeason` already reads the crosswalk for its
+ * own season-availability question, and this function was reading it a second time for the same
+ * player in the same request.
  *
  * `asOf` is the caller's `now` and it is passed to both reads. That is the same `as_of <=` gate a
  * backtest uses, standing in the present rather than in 2023, which is what lets one store serve
@@ -625,9 +642,9 @@ async function seasonStats({ db, playerId, player, peerIds, played, rules, seaso
 async function preseasonReadings(
   db: Db,
   playerId: string,
+  nflPlayerId: string | null,
   asOf: Date,
 ): Promise<{ readonly expertRank: number | null; readonly modelRank: number | null; readonly reasons: readonly BoardReason[] }> {
-  const nflPlayerId = await nflPlayerIdFor(db, playerId);
   if (nflPlayerId === null) return { expertRank: null, modelRank: null, reasons: [] };
 
   const season = PRODUCT_SEASON;
@@ -664,6 +681,43 @@ async function injuryDesignationFor(db: Db, playerId: string): Promise<string | 
   return null;
 }
 
+interface PriorSeasonsInput {
+  readonly db: Db;
+  readonly playerId: string;
+  readonly gsisId: string | null;
+  readonly isKdef: boolean;
+  readonly peek: PeekFactsRow | null;
+  readonly now: Date;
+}
+
+/**
+ * WHICH PRIOR SEASONS THIS SCREEN CAN ACTUALLY DRAW, newest first.
+ *
+ * THE PRECOMPUTED ANSWER FIRST (peek-facts design §3.5). `player_peek_facts.prior_seasons_held` is
+ * exactly this question, asked once a night for the whole board by the same reader this function
+ * would use (`statLinesAsOfForLiveSurface`, through `capsules/peek-facts.ts`'s own
+ * `priorSeasonsHeldFor`), so a player with a row costs nothing here at all. The peek used to run
+ * THREE serial round trips per open to rebuild it.
+ *
+ * THE LIVE FALLBACK IS NOT A LESSER ANSWER, it is the same one computed on the spot: a kicker or a
+ * team defense, whose facts the projected-board pass never writes a row for, and any player a sweep
+ * has not reached yet. Absence of a row is never allowed to become absence of a season the store
+ * plainly holds.
+ */
+async function priorSeasonsWithDataFor({ db, playerId, gsisId, isKdef, peek, now }: PriorSeasonsInput): Promise<readonly number[]> {
+  const candidates = priorSeasonCandidates();
+  // A kicker or a team defense answers from its own archive first: the peek pass writes rows for
+  // projected board players only, and a row for one of these two would still not know the archive.
+  if (isKdef) return await kdefSeasonsWithData(db, playerId, candidates);
+  if (peek !== null) return peek.priorSeasonsHeld.filter((season) => candidates.includes(season));
+  if (gsisId === null) return [];
+  const held: number[] = [];
+  for (const candidate of candidates) {
+    if (await priorSeasonHasData(db, gsisId, candidate, now)) held.push(candidate);
+  }
+  return held;
+}
+
 /**
  * A player's whole season on one screen, read under one league's scoring rules.
  *
@@ -693,8 +747,10 @@ async function injuryDesignationFor(db: Db, playerId: string): Promise<string | 
  * hundred receivers, never sixteen hundred players) crossed with the played weeks, and BOTH
  * populations — every week at his position, and every peer's points per game — are folded out of
  * that single result rather than queried twice. A prior season pays the same shape of cost against
- * the observation store instead (`priorSeasonStats`), plus one cheap presence check per candidate
- * season while building `availableSeasons` (`priorSeasonHasData`, a single-id-bounded read).
+ * the observation store instead (`priorSeasonStats`). Building `availableSeasons` costs NOTHING for
+ * a player the precompute has a row for: `prior_seasons_held` is the same question answered once a
+ * night for the whole board, and only a player with no row falls back to the per-candidate presence
+ * checks (`priorSeasonHasData`, single-id-bounded reads) this function used to run every open.
  *
  * THE RANKING READS ARE BOUNDED TO ONE MAN BY CONSTRUCTION: the crosswalk is a primary-key
  * lookup and both `preseasonRankingsFor`/`preseasonProjectionsFor` reads take his single gsis id,
@@ -705,11 +761,15 @@ async function injuryDesignationFor(db: Db, playerId: string): Promise<string | 
  * yet, so it reads every reason the season's board stored and this function keeps only his own —
  * see `preseasonReadings`'s own inline note.
  *
- * `dossier` (Player Dossier plan, Task 2) is its own read, `dossierFactsFor`
- * (`league-service/dossier-facts.ts`), run alongside the others in the same `Promise.all` below:
- * mostly row-scoped (it wraps Task 1's `collectPlayerFacts`) plus one whole-board pass of its own
- * for the per-game points rank — see that module's own docblock for exactly what stays wide and
- * why.
+ * `dossier` IS ONE ROW READ (peek-facts round, 2026-09-07) — `readPeekFacts`, in the same wave as
+ * everything else below. It used to be `dossierFactsFor`, which wrapped `collectPlayerFacts` and
+ * cost 43 queries and most of this function's wall clock, because every color read inside it was
+ * handed the whole historical player universe as a peer population. See `PlayerSeasonBody.dossier`
+ * for what a missing row means and why it is absence rather than a fallback computation.
+ *
+ * THE READS BELOW ARE ONE WAVE, NOT A CHAIN. Every read in the first `Promise.all` depends on
+ * nothing but the player, the league and the moment, so they were being serialized purely by the
+ * order they happened to be written in.
  */
 export async function playerSeason(
   db: Db,
@@ -730,43 +790,46 @@ export async function playerSeason(
   };
   const adp = player.adp;
   const now = new Date(clock.now());
+  const isKdef = readsKdefArchive(player.position);
+
+  // ONE WAVE, NOT ELEVEN ROUND TRIPS IN A ROW (peek-facts round, 2026-09-07). Every read here
+  // depends on nothing but `playerId`, `leagueId` and `now`, so they were being serialized purely
+  // by the order they happened to be written in. `peek` is the precomputed row that replaced the
+  // request-time `dossierFactsFor` call, which alone was 43 queries and most of the wall clock.
+  const [leagueRows, fixtures, weekRows, settingsRows, everyone, gsisIds, peek, holders, injuryDesignation, news, capsule] = await Promise.all([
+    db.select({ isMock: leagues.isMock }).from(leagues).where(eq(leagues.id, leagueId)),
+    db.select().from(matchups).where(eq(matchups.leagueId, leagueId)),
+    db.select({ week: statWeeks.week }).from(statWeeks).where(ne(statWeeks.status, "scheduled")),
+    db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, leagueId)),
+    db.select({ id: players.id, position: players.position, adp: players.adp }).from(players),
+    nflPlayerIdsFor(db, [playerId]),
+    readPeekFacts(db, playerId, PRODUCT_SEASON, now),
+    db
+      .select({ teamName: teams.name })
+      .from(rosterSlots)
+      .innerJoin(teams, eq(teams.id, rosterSlots.teamId))
+      .where(and(eq(teams.leagueId, leagueId), eq(rosterSlots.playerId, playerId)))
+      .limit(1),
+    injuryDesignationFor(db, playerId),
+    newsFor(db, player.name),
+    getPlayerCapsule(db, playerId),
+  ]);
 
   // Task 4 (context honesty): one cheap primary-key-bounded read, alongside every other
   // per-league fact this function already reads (`scoringSettings`, `matchups`).
-  const [leagueRow] = await db.select({ isMock: leagues.isMock }).from(leagues).where(eq(leagues.id, leagueId));
-  const isMockLeague = leagueRow?.isMock ?? false;
-
-  const fixtures = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
+  const isMockLeague = leagueRows[0]?.isMock ?? false;
   const { totalWeeks } = seasonProgress(fixtures, LEAGUE_CONFIG.regularSeasonWeeks);
-  const weekRows = await db.select({ week: statWeeks.week }).from(statWeeks).where(ne(statWeeks.status, "scheduled"));
   const played = weekRows.map((week) => week.week).filter((week) => week <= totalWeeks).sort((a, b) => a - b);
-
-  const [settingsRow] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, leagueId));
-  const settings: ScoringSettings = settingsRow ?? { leagueId, ...PPR_SCORING };
+  const settings: ScoringSettings = settingsRows[0] ?? { leagueId, ...PPR_SCORING };
   const rules: ScoringRules = settings;
+  const holder = holders[0];
 
-  const everyone = await db.select({ id: players.id, position: players.position, adp: players.adp }).from(players);
   const peers = everyone.filter((other) => other.position === player.position);
   const rankedAll = everyone.flatMap((other) => (other.adp === null ? [] : [other.adp]));
   const peerIds = peers.map((peer) => peer.id);
+  const gsisId = gsisIds.get(playerId) ?? null;
 
-  // SEASON AVAILABILITY. The current season counts once the league has played a week; a prior
-  // season counts once the crosswalk places him AND the observation store has at least one
-  // recorded week for him there — see `PlayerSeasonBody`'s own docblock for the full rule.
-  // A kicker and a team defense answer this question from their OWN archive: the observation store
-  // every other position reads carries no kicking or team defensive column at all. See
-  // `kdefSeasonStats`.
-  const isKdef = readsKdefArchive(player.position);
-  const gsisId = (await nflPlayerIdsFor(db, [playerId])).get(playerId) ?? null;
-  const priorCandidates = Array.from({ length: HISTORY_SEASONS }, (_, back) => PRODUCT_SEASON - (back + 1));
-  const priorSeasonsWithData: number[] = [];
-  if (isKdef) {
-    priorSeasonsWithData.push(...(await kdefSeasonsWithData(db, playerId, priorCandidates)));
-  } else if (gsisId !== null) {
-    for (const candidate of priorCandidates) {
-      if (await priorSeasonHasData(db, gsisId, candidate, now)) priorSeasonsWithData.push(candidate);
-    }
-  }
+  const priorSeasonsWithData = await priorSeasonsWithDataFor({ db, playerId, gsisId, isKdef, peek, now });
   const availableSeasons = [...(played.length > 0 ? [PRODUCT_SEASON] : []), ...priorSeasonsWithData];
   // `isRookie` is TRUE ROOKIE STATUS, not "nothing to show" — see `isConfirmedRookie`'s own
   // docblock. Only asked when there is nothing to show in the first place: a rookie who has
@@ -780,22 +843,11 @@ export async function playerSeason(
   // TypeScript, not just this file's own logic, can see why `priorSeasonStats` never runs unplaced:
   // a season only ever reaches `priorSeasonsWithData` — and so only ever becomes `season` — once
   // the crosswalk has already placed him.
-  const stats: PlayerSeasonStats = await seasonStats({ db, playerId, player, peerIds, played, rules, season, gsisId, isKdef, now });
-
-  const preseason = await preseasonReadings(db, playerId, now);
-
-  const [holder] = await db
-    .select({ teamName: teams.name })
-    .from(rosterSlots)
-    .innerJoin(teams, eq(teams.id, rosterSlots.teamId))
-    .where(and(eq(teams.leagueId, leagueId), eq(rosterSlots.playerId, playerId)))
-    .limit(1);
-  const [injuryDesignation, news, capsule, dossier] = await Promise.all([
-    injuryDesignationFor(db, playerId),
-    newsFor(db, player.name),
-    getPlayerCapsule(db, playerId),
-    dossierFactsFor(db, playerId, now),
+  const [stats, preseason] = await Promise.all([
+    seasonStats({ db, playerId, player, peerIds, played, rules, season, gsisId, isKdef, now }),
+    preseasonReadings(db, playerId, gsisId, now),
   ]);
+  const dossier = peek?.dossier ?? null;
 
   return {
     capsule,

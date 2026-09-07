@@ -4,13 +4,14 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring/compute";
 import { allPositions } from "../backtest";
 import { statLinesAsOf, STAT_LINE_SOURCE } from "../lines";
-import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
+import { admitsDerivedForLiveSurface, statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
 import { PARTICIPATION_METRICS } from "../nflverse/map";
+import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "../nflverse/pbp-players";
 import { COACH_METRICS } from "../nflverse/coaches";
 import { schedulePublishedAsOf, SCHEDULE_SOURCE } from "../nflverse/schedule";
 import { ageAtSeason } from "../preseason/availability";
 import { preseasonRostersAsOf, type PreseasonRosterRow } from "../preseason/store";
-import { LAST_POSSIBLE_WEEK, observationsAsOf } from "../store";
+import { LAST_POSSIBLE_WEEK, observationsAsOf, type PlayerWeekObservation } from "../store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "../team-store";
 import type { Law, PlayerSeasonPoint } from "./types";
 
@@ -264,11 +265,9 @@ const PARTICIPATION_SEASON_METRICS: ReadonlySet<string> = new Set([
   PARTICIPATION_METRICS.carries,
 ]);
 
-/** Targets, team targets and carries per player, summed over one season as of one moment. A player
- *  with NO row here has no participation evidence at all, distinct from a player whose row sums to
- *  zero — callers must keep that distinction (see `factsForSeason`'s `touches`/`targetShare`). */
-async function seasonParticipation(db: ReadonlyDb, season: number, asOf: Date): Promise<Map<string, SeasonParticipation>> {
-  const rows = await observationsAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf, source: STAT_LINE_SOURCE });
+/** The published participation feed, summed per player. Split out from `seasonParticipation` so the
+ *  gap-season fill below reads as one substitution rather than a second copy of this loop. */
+function sumPublishedParticipation(rows: readonly PlayerWeekObservation[]): Map<string, SeasonParticipation> {
   const out = new Map<string, SeasonParticipation>();
   for (const row of rows) {
     if (!PARTICIPATION_SEASON_METRICS.has(row.metric)) continue;
@@ -280,6 +279,62 @@ async function seasonParticipation(db: ReadonlyDb, season: number, asOf: Date): 
     });
   }
   return out;
+}
+
+/**
+ * THE GAP-SEASON PARTICIPATION FILL (peek-facts round, 2026-09-07) — carries and targets from the
+ * play-by-play stream, for exactly the seasons `admitsDerivedForLiveSurface` admits.
+ *
+ * WHY IT IS THE PLAY-BY-PLAY FEED AND NOT A DERIVED STAT LINE. `statLinesAsOfForLiveSurface` already
+ * substitutes derived rows for a gap season's SCORING half, which is why `receptions` survives 2025.
+ * It cannot do the same for `carries`: a carry count is one of the "harvest block" fields
+ * `STAT_FIELDS` deliberately excludes (`domain/player.ts`), so `derivedStatLineObservations` writes
+ * none and there is no derived carry to read. What the store DOES hold for a gap season is
+ * `PBP_PLAYER_METRICS.carries` and `.targets`, ingested from the same play-by-play stream the derived
+ * lines come from, which is a measured count rather than an estimate.
+ *
+ * THE DEFINITION DIFFERS AND THE BASIS SAYS SO. `pbp-players.ts` counts a DESIGNED carry (no
+ * scrambles) where the published weekly file counts every rushing attempt, so a scrambling
+ * quarterback's gap-season touches read low against a published season's. Every surface that stores
+ * one of these numbers carries its source key beside it (`capsules/peek-facts.ts`'s own `basis`), so
+ * no reader can mistake which definition produced it.
+ *
+ * NO TEAM TARGETS. The play-by-play carries no team-target denominator, so `teamTargets` stays zero
+ * and `targetShareOf` keeps returning `null` for a gap season, exactly as it does today. A share
+ * this function cannot back with a real denominator is not one it invents.
+ *
+ * A PUBLISHED ROW ALWAYS WINS, the same rule `statLinesAsOfForLiveSurface` keeps: only a player the
+ * published read did not place at all takes the substitution.
+ */
+function fillFromPlayByPlay(published: Map<string, SeasonParticipation>, pbpRows: readonly PlayerWeekObservation[]): Map<string, SeasonParticipation> {
+  const filled = new Map(published);
+  for (const row of pbpRows) {
+    if (published.has(row.playerId)) continue;
+    const isCarry = row.metric === PBP_PLAYER_METRICS.carries;
+    const isTarget = row.metric === PBP_PLAYER_METRICS.targets;
+    if (!isCarry && !isTarget) continue;
+    const existing = filled.get(row.playerId) ?? EMPTY_PARTICIPATION;
+    filled.set(row.playerId, {
+      targets: existing.targets + (isTarget ? row.value : 0),
+      teamTargets: existing.teamTargets,
+      carries: existing.carries + (isCarry ? row.value : 0),
+    });
+  }
+  return filled;
+}
+
+/** Targets, team targets and carries per player, summed over one season as of one moment. A player
+ *  with NO row here has no participation evidence at all, distinct from a player whose row sums to
+ *  zero — callers must keep that distinction (see `factsForSeason`'s `touches`/`targetShare`).
+ *  A season `admitsDerivedForLiveSurface` admits takes the play-by-play fill above, which is the
+ *  difference between a real touches rank and an empty one for a gap season, and ONLY when the
+ *  caller admits derived lines at all (`admitDerived`, the same flag `seasonScoring` honours): a
+ *  replay board that reads published lines must never mix play-by-play carries into them. */
+async function seasonParticipation(db: ReadonlyDb, season: number, asOf: Date, admitDerived: boolean): Promise<Map<string, SeasonParticipation>> {
+  const span = { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf } as const;
+  const published = sumPublishedParticipation(await observationsAsOf(db, { ...span, source: STAT_LINE_SOURCE }));
+  if (!admitDerived || !admitsDerivedForLiveSurface(season)) return published;
+  return fillFromPlayByPlay(published, await observationsAsOf(db, { ...span, source: PBP_PLAYER_SOURCE }));
 }
 
 /** A player's own season target share: his own targets over his own team_targets, summed across
@@ -426,7 +481,7 @@ export async function seasonContext(
   admitDerived: boolean,
 ): Promise<SeasonContext> {
   const scoring = await seasonScoring(db, season, asOf, positions, rules, admitDerived);
-  const participation = await seasonParticipation(db, season, asOf);
+  const participation = await seasonParticipation(db, season, asOf, admitDerived);
   const teams = await seasonTeams(db, season, asOf);
   const roster = await preseasonRostersAsOf(db, { season, asOf });
   const coachFacts = await incomingCoachFactsByTeam(db, season + 1, asOf);

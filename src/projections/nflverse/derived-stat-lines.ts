@@ -374,6 +374,21 @@ export async function statLinesAsOfForMeasurement(
 }
 
 /**
+ * THE LIVE-SURFACE ADMISSION PREDICATE, IN ONE PLACE — a gap season nflverse never published
+ * (`STAT_LINE_GAPS`) narrowed by the allowlist a PRODUCT surface is permitted to read derived rows
+ * for (`LIVE_ADMITTED_DERIVED_SEASONS`). 2019 fails it, 2025 passes it.
+ *
+ * Extracted so the two readers that must agree cannot drift: `statLinesAsOfForLiveSurface` just
+ * below, and `laws/populations.ts`'s `seasonParticipation`, which had no substitution at all until
+ * the peek-facts round (2026-09-07) and so returned an empty participation map for 2025, which made
+ * `touches` null for every player and the touches rank empty on every product surface that shows
+ * one. Both now ask this one function rather than each spelling the same two-list condition out.
+ */
+export function admitsDerivedForLiveSurface(season: number): boolean {
+  return STAT_LINE_GAPS.includes(season) && LIVE_ADMITTED_DERIVED_SEASONS.includes(season);
+}
+
+/**
  * THE LIVE-PRODUCT-SURFACE READ — a prior season's stat lines for a screen a manager actually
  * opens, never a backtest. `statLinesAsOfForMeasurement`'s admission (`STAT_LINE_GAPS`, unscoped)
  * exists for the laws harness, which is allowed to read ANY season it has validated a derivation
@@ -392,7 +407,7 @@ export async function statLinesAsOfForLiveSurface(
   query: Omit<ObservationQuery, "source">,
 ): Promise<readonly SeasonStatLine[]> {
   const published = await statLinesAsOf(db, query, STAT_LINE_SOURCE);
-  if (!STAT_LINE_GAPS.includes(query.season) || !LIVE_ADMITTED_DERIVED_SEASONS.includes(query.season)) return published;
+  if (!admitsDerivedForLiveSurface(query.season)) return published;
   const derived = await statLinesAsOf(db, query, DERIVED_STAT_LINE_SOURCE);
   const publishedKeys = new Set(published.map((row) => `${row.line.week}|${row.line.playerId}`));
   return [...published, ...derived.filter((row) => !publishedKeys.has(`${row.line.week}|${row.line.playerId}`))];
