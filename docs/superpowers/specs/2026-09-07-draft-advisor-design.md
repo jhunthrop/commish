@@ -23,6 +23,15 @@ Computed from the simulator the room already has (`continueDraft` over the live 
 - For each of your next three picks: the position the plan targets (from roster need under the league's shape plus the value curve), two or three named targets with their make-it-back odds at that pick, and the fallback if they go.
 - The plan is a single object (`DraftPlan`) with a `computedAtPick` stamp. The card shows "as of pick 4.07" and a "changed since 4.03" line when a target's odds moved more than a stated band or a target went off the board.
 
+### 3.1a Availability odds across turns, and the opponent model (founder amendment 2026-09-07)
+
+Founder: "include a calculation of likeliness that they're still there if we're doing multiple round projections. We should look at the other teams' rosters and needs to determine what players will most likely be available."
+
+- **Survival per turn.** Today the continuation stops at the asking seat's next turn, so odds exist for one horizon. The continuation gains a horizon: stop at the asking seat's Nth upcoming turn (N = 1, 2, 3), and one run tallies survival for every target at every horizon it passes through. Each target on the plan rail shows "still there at your turn" as the run fraction for that column, with the run count stated. A target whose odds at a later turn are below a stated floor is shown as a reach for that turn and the plan moves it earlier or drops it.
+- **Opponents drafted from their own rosters and picks.** The bot brain already weighs each seat's real roster against the league's slot shape (the need term). What it does not do is learn the seat's tendencies: archetypes are assigned by seed. In the advisor's continuations, each opponent's archetype is inferred from that seat's own picks so far (the archetype under which the observed picks were most likely, given the board at each of their turns, with the neutral archetype as the prior until a seat has made enough picks to separate them) and that inference is what drives the seat in every run. A seat on autopick is driven by the autopick policy itself, since that is exactly what it will do. A seat that has not picked yet stays on the neutral prior.
+- **What the manager sees.** For each seat between now and your next pick: the position they are most likely to take and the player they took most often across the runs, with the frequency. The "ahead of you" signal in 3.3 is read from these runs, not from a separate heuristic.
+- **Honesty.** Odds name the run count and the horizon. A tendency read says it comes from that seat's picks so far and never claims to know their plan. When a seat has fewer picks than the inference needs, the card says the read is the neutral prior.
+
 ### 3.2 Now: the picks for this turn
 
 The existing candidates, re-ranked and re-explained:
