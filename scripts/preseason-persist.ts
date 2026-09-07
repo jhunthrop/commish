@@ -4,6 +4,14 @@
 // halves of Task 11's own scorecard comparison stay addressable and CURRENT.
 // Run: npm run projections:preseason:persist [season ...]   (defaults to every ingested season)
 //      npm run projections:preseason:persist -- --unfreeze   (overrides FROZEN_BOARD_SOURCES, 2027 round)
+//      npm run projections:preseason:persist -- --diff-reasons  (prints what would change, writes nothing)
+//
+// --diff-reasons (dossier-voice round, task 7) — BEFORE a re-persist, how many stored reasons per
+// code this run would add, drop, or change the payload of. The board has not been re-persisted
+// since the games-worth tier rule shipped, so its stored reasons describe tiers the board no
+// longer draws, and the peek quotes them; whoever runs the re-persist against production needs to
+// see the size of that change before it lands, and record it. This mode builds exactly the board a
+// persist would build and writes nothing at all.
 //
 // NEITHER SOURCE THIS SCRIPT WRITES IS FROZEN ANY MORE (Round D, the serve-v9 ruling). Both were,
 // while the served rows were v7's and this tree's fitted files were v9's — a write then would have
@@ -44,8 +52,9 @@ import { FITTED_BLEND_CONSTANTS } from "@/projections/market/blend-fitted";
 import { marketBoard } from "@/projections/market/curve";
 import { propsAnchorForSeason } from "@/projections/market/props-anchor";
 import { FITTED_PROPS_ANCHOR_WEIGHT } from "@/projections/market/props-anchor-fitted";
-import { preseasonBoard, type BoardEntry } from "@/projections/preseason/board";
+import { preseasonBoard, type BoardEntry, type BoardReason } from "@/projections/preseason/board";
 import {
+  boardReasons,
   BOARD_SOURCE,
   BOARD_SOURCE_V1_RAW,
   writePreseasonBoard,
@@ -84,6 +93,7 @@ import {
 const INGESTED_SEASONS = [2021, 2022, 2023, 2024];
 const ARGUMENTS = process.argv.slice(2);
 const UNFREEZE = ARGUMENTS.includes("--unfreeze");
+const DIFF_REASONS = ARGUMENTS.includes("--diff-reasons");
 const SEASONS = ARGUMENTS.filter((argument) => !argument.startsWith("--")).map(Number);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : INGESTED_SEASONS;
 
@@ -175,6 +185,85 @@ function requireEnv(name: string): string {
  * merged `BLENDED_CONSTANTS` — omitted entirely for the raw (v1) call, which does not read
  * `BlendConstants` at all (`shippedPreseasonCandidates`'s own `raw: true` early return).
  */
+/** The board a persist would write, built and not stored — the one place both the write path below
+ *  and `--diff-reasons` get their candidates, so a diff can never describe a board a persist would
+ *  not actually produce. */
+async function buildBoard(
+  db: Db,
+  inputs: PreseasonInputs,
+  raw: boolean,
+  blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
+): Promise<readonly BoardEntry[]> {
+  const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, {
+    raw,
+    ...(blendEvidence !== undefined ? { constants: blendEvidence.constants, propsAnchor: blendEvidence.propsAnchor } : {}),
+  });
+  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
+}
+
+/** One reason code's own before-and-after count, over the players the board holds. */
+export interface ReasonDiff {
+  readonly code: string;
+  /** Players who would GAIN this reason (the stored board has none for them). */
+  readonly added: number;
+  /** Players who would LOSE it (stored has one, the fresh board does not). */
+  readonly removed: number;
+  /** Players who keep it with a DIFFERENT payload (a moved tier count, a new drop). */
+  readonly changed: number;
+  readonly unchanged: number;
+}
+
+function reasonsByCode(reasons: readonly BoardReason[]): ReadonlyMap<string, BoardReason> {
+  return new Map(reasons.map((reason) => [reason.code, reason] as const));
+}
+
+/**
+ * How the stored reasons and a freshly built board's reasons differ, per code. Payload equality is
+ * a JSON comparison of the reason object, which is exactly what the store round-trips, so "changed"
+ * means a reader would see a different sentence.
+ *
+ * Exported and pure so `preseason-persist.test.ts` pins the counting without a board build.
+ */
+export function diffReasons(
+  stored: ReadonlyMap<string, readonly BoardReason[]>,
+  fresh: ReadonlyMap<string, readonly BoardReason[]>,
+): readonly ReasonDiff[] {
+  const codes = new Set<string>();
+  for (const reasons of [...stored.values(), ...fresh.values()]) for (const reason of reasons) codes.add(reason.code);
+  const playerIds = new Set<string>([...stored.keys(), ...fresh.keys()]);
+
+  const diffs: ReasonDiff[] = [];
+  for (const code of [...codes].sort()) {
+    let added = 0;
+    let removed = 0;
+    let changed = 0;
+    let unchanged = 0;
+    for (const playerId of playerIds) {
+      const before = reasonsByCode(stored.get(playerId) ?? []).get(code);
+      const after = reasonsByCode(fresh.get(playerId) ?? []).get(code);
+      if (before === undefined && after === undefined) continue;
+      if (before === undefined) added += 1;
+      else if (after === undefined) removed += 1;
+      else if (JSON.stringify(before) !== JSON.stringify(after)) changed += 1;
+      else unchanged += 1;
+    }
+    diffs.push({ code, added, removed, changed, unchanged });
+  }
+  return diffs;
+}
+
+function printReasonDiff(season: number, source: string, diffs: readonly ReasonDiff[]): void {
+  console.log(`${season}  [${source}] stored reasons that would change:`);
+  for (const diff of diffs) {
+    console.log(
+      `      ${diff.code.padEnd(24)} +${String(diff.added).padStart(4)} added  -${String(diff.removed).padStart(4)} removed  ` +
+        `~${String(diff.changed).padStart(4)} changed  =${String(diff.unchanged).padStart(4)} unchanged`,
+    );
+  }
+  const moved = diffs.reduce((sum, diff) => sum + diff.added + diff.removed + diff.changed, 0);
+  console.log(`      TOTAL reasons that would change: ${moved}`);
+}
+
 async function persistBoard(
   db: Db,
   inputs: PreseasonInputs,
@@ -183,11 +272,7 @@ async function persistBoard(
   unfrozen: boolean,
   blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
 ): Promise<{ readonly board: readonly BoardEntry[]; readonly write: BoardWriteCounts }> {
-  const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, {
-    raw,
-    ...(blendEvidence !== undefined ? { constants: blendEvidence.constants, propsAnchor: blendEvidence.propsAnchor } : {}),
-  });
-  const board = preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
+  const board = await buildBoard(db, inputs, raw, blendEvidence);
   const write = await writePreseasonBoard(
     db,
     { season: inputs.season, source, asOf: inputs.moment, momentKind: inputs.momentKind },
@@ -259,6 +344,18 @@ export async function persistSeason(
     console.warn(`props anchor: 0 players anchored for ${season} — resolve has not run or the archive is empty`);
   }
 
+  if (DIFF_REASONS) {
+    for (const [source, raw, evidence] of [
+      [BOARD_SOURCE, false, { constants: BLENDED_CONSTANTS, propsAnchor }],
+      [BOARD_SOURCE_V1_RAW, true, undefined],
+    ] as const) {
+      const fresh = await buildBoard(db, inputs, raw, evidence);
+      const stored = await boardReasons(db, source, season);
+      printReasonDiff(season, source, diffReasons(stored, new Map(fresh.map((entry) => [entry.playerId, entry.reasons] as const))));
+    }
+    return;
+  }
+
   const blended = await persistBoard(db, inputs, BOARD_SOURCE, false, unfrozen, { constants: BLENDED_CONSTANTS, propsAnchor });
   console.log(
     `${season}  [blend, ${BOARD_SOURCE}]  ${String(blended.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
@@ -287,6 +384,9 @@ async function main(): Promise<void> {
         "serves and may rewrite an archive's stored reasons. See board-store.ts's FROZEN_BOARD_SOURCES for " +
         "the ruling this lifts, and be sure BOARD_SOURCE is the name you mean to write under.",
     );
+  }
+  if (DIFF_REASONS) {
+    console.log("--diff-reasons: building each board and printing what its stored reasons would become. NOTHING is written.");
   }
   const db = createDb(requireEnv("DATABASE_URL"));
   const names = new Map(
