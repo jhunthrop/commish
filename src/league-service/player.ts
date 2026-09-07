@@ -302,14 +302,22 @@ export interface PlayerSeasonBody {
    */
   readonly capsule?: PlayerCapsuleView | null;
   /**
-   * Player Dossier plan, Task 2 — the same fact sheet the capsule sweep computes
-   * (`capsules/collect-one.ts`'s single-player sibling of `collect.ts`), reshaped for the client
-   * (`league-service/dossier-facts.ts`'s `dossierFactsFor`). `null` for exactly the players
-   * `collectPlayerFacts` itself answers `null` for — the board never ranked him — never a
-   * placeholder standing in for that absence. Unlike `capsule` (LLM prose over these same facts),
-   * this is the raw, structured numbers themselves: market, projection (with the per-game rate
-   * and its position rank added), availability, usage, trend, books, last season's story, injury
-   * and a news count, plus which board generation and scoring format they were computed under.
+   * Player Dossier plan, Task 2 — the same fact sheet the capsule sweep computes, reshaped for the
+   * client (`league-service/dossier-facts.ts`'s `dossierFactsFrom`). Unlike `capsule` (LLM prose
+   * over these same facts), this is the raw, structured numbers themselves: market, projection
+   * (with the per-game rate and its position rank added), availability, usage, trend, books, last
+   * season's story, injury and a news count, plus which scoring format they were computed under.
+   *
+   * IT IS READ, NOT COMPUTED (peek-facts round, 2026-09-07). `playerSeason` used to build it at
+   * request time through `dossierFactsFor`, which cost 43 queries and most of the peek's wall clock
+   * because it handed every color read the whole historical player universe as a peer population.
+   * The nightly capsule sweep and the post-finalize `season-week` step now store it, and this field
+   * is `player_peek_facts.dossier` for the latest row stamped at or before the caller's moment.
+   *
+   * `null` MEANS THE ROW IS NOT THERE, which happens for two honest reasons and neither is a
+   * placeholder: the board never ranked him (a kicker, a team defense, an unranked name), or the
+   * precompute has not reached him yet (a new signing, or a fresh deploy before the first sweep).
+   * The screen renders absence in both cases, never a stale or guessed dossier.
    *
    * Optional on the type, the SAME reason `capsule` is (see that field's own docblock): the many
    * existing fixtures that build a `PlayerSeasonBody` by hand need not all learn about the
@@ -737,8 +745,10 @@ async function priorSeasonsWithDataFor({ db, playerId, gsisId, isKdef, peek, now
  * hundred receivers, never sixteen hundred players) crossed with the played weeks, and BOTH
  * populations — every week at his position, and every peer's points per game — are folded out of
  * that single result rather than queried twice. A prior season pays the same shape of cost against
- * the observation store instead (`priorSeasonStats`), plus one cheap presence check per candidate
- * season while building `availableSeasons` (`priorSeasonHasData`, a single-id-bounded read).
+ * the observation store instead (`priorSeasonStats`). Building `availableSeasons` costs NOTHING for
+ * a player the precompute has a row for: `prior_seasons_held` is the same question answered once a
+ * night for the whole board, and only a player with no row falls back to the per-candidate presence
+ * checks (`priorSeasonHasData`, single-id-bounded reads) this function used to run every open.
  *
  * THE RANKING READS ARE BOUNDED TO ONE MAN BY CONSTRUCTION: the crosswalk is a primary-key
  * lookup and both `preseasonRankingsFor`/`preseasonProjectionsFor` reads take his single gsis id,
@@ -749,11 +759,15 @@ async function priorSeasonsWithDataFor({ db, playerId, gsisId, isKdef, peek, now
  * yet, so it reads every reason the season's board stored and this function keeps only his own —
  * see `preseasonReadings`'s own inline note.
  *
- * `dossier` (Player Dossier plan, Task 2) is its own read, `dossierFactsFor`
- * (`league-service/dossier-facts.ts`), run alongside the others in the same `Promise.all` below:
- * mostly row-scoped (it wraps Task 1's `collectPlayerFacts`) plus one whole-board pass of its own
- * for the per-game points rank — see that module's own docblock for exactly what stays wide and
- * why.
+ * `dossier` IS ONE ROW READ (peek-facts round, 2026-09-07) — `readPeekFacts`, in the same wave as
+ * everything else below. It used to be `dossierFactsFor`, which wrapped `collectPlayerFacts` and
+ * cost 43 queries and most of this function's wall clock, because every color read inside it was
+ * handed the whole historical player universe as a peer population. See `PlayerSeasonBody.dossier`
+ * for what a missing row means and why it is absence rather than a fallback computation.
+ *
+ * THE READS BELOW ARE ONE WAVE, NOT A CHAIN. Every read in the first `Promise.all` depends on
+ * nothing but the player, the league and the moment, so they were being serialized purely by the
+ * order they happened to be written in.
  */
 export async function playerSeason(
   db: Db,
