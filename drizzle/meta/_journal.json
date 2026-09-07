@@ -582,6 +582,13 @@
       "when": 1788812030138,
       "tag": "0082_special_phantom_reporter",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1788812618371,
+      "tag": "0083_curly_peter_parker",
+      "breakpoints": true
     }
   ]
 }

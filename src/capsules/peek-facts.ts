@@ -1,4 +1,4 @@
-import { and, desc, eq, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, lte } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { playerPeekFacts } from "@/db/schema";
 import { changedRowWhere, excludedSetFor } from "@/db/upsert";
@@ -242,18 +242,23 @@ export async function writeRefresh(db: Db, pass: BoardFactsPass): Promise<PeekFa
 }
 
 /**
- * THE PEEK'S OWN READ — the latest row for this player and season stamped at or before `asOf`, the
- * same `as_of <=` gate every reader in this engine uses. `null` when no row has been written for
- * him yet, which the peek renders as absence rather than as a stale or guessed dossier.
+ * THE BATCHED READ — the latest row per player at or before `asOf`, for a whole build's worth of
+ * players in ONE statement (peek document design §3.3). `DISTINCT ON (player_id)` with the same
+ * `as_of <=` gate and the same descending order the single-player read uses, so the two can never
+ * disagree about which generation is current. A player with no row is honestly absent from the map.
  */
-export async function readPeekFacts(db: ReadonlyDb, playerId: string, season: number, asOf: Date): Promise<PeekFactsRow | null> {
-  const [row] = await db
-    .select()
+export async function readPeekFactsFor(db: ReadonlyDb, playerIds: readonly string[], season: number, asOf: Date): Promise<ReadonlyMap<string, PeekFactsRow>> {
+  if (playerIds.length === 0) return new Map();
+  const rows = await db
+    .selectDistinctOn([playerPeekFacts.playerId])
     .from(playerPeekFacts)
-    .where(and(eq(playerPeekFacts.playerId, playerId), eq(playerPeekFacts.season, season), lte(playerPeekFacts.asOf, asOf)))
-    .orderBy(desc(playerPeekFacts.asOf))
-    .limit(1);
-  if (row === undefined) return null;
+    .where(and(inArray(playerPeekFacts.playerId, [...playerIds]), eq(playerPeekFacts.season, season), lte(playerPeekFacts.asOf, asOf)))
+    .orderBy(playerPeekFacts.playerId, desc(playerPeekFacts.asOf));
+  return new Map(rows.map((row) => [row.playerId, toPeekFactsRow(row)] as const));
+}
+
+/** One stored row as the shape every reader here passes around. */
+function toPeekFactsRow(row: typeof playerPeekFacts.$inferSelect): PeekFactsRow {
   return {
     playerId: row.playerId,
     season: row.season,
@@ -265,4 +270,19 @@ export async function readPeekFacts(db: ReadonlyDb, playerId: string, season: nu
     basis: row.basis,
     asOf: row.asOf,
   };
+}
+
+/**
+ * THE PEEK'S OWN READ — the latest row for this player and season stamped at or before `asOf`, the
+ * same `as_of <=` gate every reader in this engine uses. `null` when no row has been written for
+ * him yet, which the peek renders as absence rather than as a stale or guessed dossier.
+ */
+export async function readPeekFacts(db: ReadonlyDb, playerId: string, season: number, asOf: Date): Promise<PeekFactsRow | null> {
+  const [row] = await db
+    .select()
+    .from(playerPeekFacts)
+    .where(and(eq(playerPeekFacts.playerId, playerId), eq(playerPeekFacts.season, season), lte(playerPeekFacts.asOf, asOf)))
+    .orderBy(desc(playerPeekFacts.asOf))
+    .limit(1);
+  return row === undefined ? null : toPeekFactsRow(row);
 }
