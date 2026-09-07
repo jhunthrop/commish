@@ -17,15 +17,9 @@ export interface SeasonEndingStory {
 
 export interface StoryModuleProps {
   /** `null` — the board carries no season-ending absence for him (the common case: most players
-   *  finish their own season) — renders no season-ending sentence at all. */
+   *  finish their own season) — renders nothing at all. The current injury designation lives in
+   *  the peek header's own pill and is deliberately NOT repeated here. */
   readonly story: SeasonEndingStory | null;
-  /** His CURRENT injury designation ("Q", "O", "IR"), the same feed `player-peek.tsx` already
-   *  reads (`PlayerSeasonBody.injuryDesignation`) — a separate, present-tense fact from the
-   *  season-ending story above, and rendered independently of it: a player can carry a current
-   *  designation with no season-ending story (he is merely questionable this week) or a
-   *  season-ending story from last year with no current designation (healthy now). `null` or
-   *  omitted prints no pill. */
-  readonly designation?: string | null;
 }
 
 /** Lowercases a phrase for mid-sentence use WITHOUT flattening an acronym — "Torn ACL" reads as
@@ -40,48 +34,20 @@ function lowercaseSensibly(text: string): string {
 
 /**
  * THE STORY MODULE (dossier plan, Task 4) — the season-ending absence sentence, when the board
- * has one, and the current injury designation pill, when the feed names one. Renders nothing at
- * all only when BOTH are absent; each half renders independently of the other otherwise, since a
- * current designation and a past season-ending story are different facts about different moments.
+ * has one. Renders nothing at all otherwise. It used to also carry the current designation pill;
+ * that duplicated the header's own pill and, with the story service not yet wired, produced a
+ * card whose whole content was the word "Questionable".
  */
-/**
- * THE DESIGNATION, IN WORDS (dossier-voice round §3.7) — the pill printed the feed's own code and
- * a page that shows a reader a bare "Q" has asked him to decode it. The codes are the league's own
- * report statuses; anything the feed sends that is not one of them prints as it came, since
- * inventing an expansion for a code this product does not know would be worse than the code.
- */
-const DESIGNATION_WORDS: Readonly<Record<string, string>> = {
-  Q: "Questionable",
-  D: "Doubtful",
-  O: "Out",
-  IR: "Injured reserve",
-  PUP: "Physically unable to perform",
-  NFI: "Non-football injury",
-  SUSP: "Suspended",
-};
-
-function designationWord(designation: string): string {
-  return DESIGNATION_WORDS[designation.toUpperCase()] ?? designation;
-}
-
-export function StoryModule({ story, designation = null }: StoryModuleProps) {
-  if (story === null && designation === null) return null;
-
+export function StoryModule({ story }: StoryModuleProps) {
+  if (story === null) return null;
   return (
     <Card as="section" aria-label="Story" className="flex flex-col gap-2">
-      {designation === null ? null : (
-        <span className="w-fit rounded-sm bg-negative px-1.5 py-0.5 text-sm font-semibold text-negative-text" data-story="designation">
-          {designationWord(designation)}
-        </span>
-      )}
-      {story === null ? null : (
-        <div className="flex flex-col gap-1" data-story="season-ending">
-          <p className="text-sm text-text-primary">
-            His {story.season} season ended after week {story.lastPlayedWeek}. The report said {lowercaseSensibly(story.primaryInjury)}.
-          </p>
-          <p className="text-xs text-text-faint">Source: official weekly injury reports.</p>
-        </div>
-      )}
+      <div className="flex flex-col gap-1" data-story="season-ending">
+        <p className="text-sm text-text-primary">
+          His {story.season} season ended after week {story.lastPlayedWeek}. The report said {lowercaseSensibly(story.primaryInjury)}.
+        </p>
+        <p className="text-xs text-text-faint">Source: official weekly injury reports.</p>
+      </div>
     </Card>
   );
 }

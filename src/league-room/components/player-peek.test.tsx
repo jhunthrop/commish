@@ -366,13 +366,15 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     expect(screen.getByLabelText("The read")).toBeInTheDocument();
     expect(screen.getByLabelText("The books")).toBeInTheDocument();
     expect(screen.getByLabelText("2025 season")).toBeInTheDocument();
-    expect(screen.getByLabelText("Story")).toBeInTheDocument();
+    // No Story card: the fixture carries a designation but no season-ending story and no news,
+    // and the header already wears the pill (founder, 2026-09-07).
+    expect(screen.queryByLabelText("Story")).toBeNull();
     expect(screen.getByText("Why")).toBeInTheDocument();
 
     // DOM order IS the mobile stacking order (no media query runs in jsdom): the call, then the
     // grid's six cells in the mock's own row order, then the why slot.
     const labelled = Array.from(sheet.querySelectorAll("[aria-label]")).map((el) => el.getAttribute("aria-label"));
-    const positions = ["The call", "Season range", "Role", "The read", "The books", "2025 season", "Story"].map((label) => labelled.indexOf(label));
+    const positions = ["The call", "Season range", "Role", "The read", "The books", "2025 season"].map((label) => labelled.indexOf(label));
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
@@ -459,7 +461,7 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     expect(screen.getByText("Bye week 8 · Free agent in this league")).toBeInTheDocument();
   });
 
-  it("keeps the header's own designation pill even though the story card carries its own", async () => {
+  it("wears the designation once, in the header, and draws no story card just to repeat it", async () => {
     const bodies = new Map([[2026, dossierBody({ injuryDesignation: "Q" })]]);
     render(
       <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2026)}>
@@ -467,10 +469,11 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
       </LeagueRoomDepsProvider>,
     );
     openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
-    await waitFor(() => expect(screen.getByLabelText("Story")).toBeInTheDocument());
-    // The header keeps the compact feed code; the story card says the word (dossier-voice §3.7).
-    expect(screen.getAllByText("Q")).toHaveLength(1);
-    expect(screen.getByText("Questionable")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Q")).toBeInTheDocument());
+    // A card whose whole content was the word "Questionable" said nothing the header had not
+    // (founder, 2026-09-07); the story cell exists only for a season-ending story or news.
+    expect(screen.queryByLabelText("Story")).toBeNull();
+    expect(screen.queryByText("Questionable")).toBeNull();
   });
 
   it("relocates the news list beside the story module rather than duplicating it below the fold", async () => {
@@ -485,7 +488,7 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     expect(screen.getAllByText("Rashad Long: full practice")).toHaveLength(1);
   });
 
-  it("review fix: keeps Books paired in its own row's grid, and SeasonStrip paired with Story, when the capsule is absent", async () => {
+  it("review fix: keeps Books paired in its own row's grid, and the season strip full width, when the capsule is absent", async () => {
     // The capsule sweep has not reached most players yet (Task 4's own note) — this is the
     // COMMON state, not an edge case, and it must never cascade the later rows out of their pairs.
     // `season: 2025` matches `DOSSIER.lastSeasonStory.season` so `SeasonStrip` itself renders
@@ -508,11 +511,14 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     expect(booksRow.children).toHaveLength(1);
     expect((booksRow.children[0] as HTMLElement).className).toContain("lg:col-span-2");
 
-    // SeasonStrip and the story cell are UNAFFECTED by Books' own missing partner — still two
-    // children, still paired, in their own row's grid.
+    // The season strip spans its whole row on its own: a finished season is eighteen columns and
+    // never shares the row (founder, 2026-09-07). With no news there is no cell beneath it.
     const seasonRow = screen.getByLabelText("2025 season").closest(".grid")!;
-    expect(seasonRow.children).toHaveLength(2);
-    expect(screen.getByLabelText("Story")).toBeInTheDocument();
+    // Never side by side: whatever sits in this row (the strip, then the news cell when there is
+    // news) spans the whole row.
+    expect(seasonRow.children.length).toBeGreaterThanOrEqual(1);
+    for (const child of Array.from(seasonRow.children)) expect((child as HTMLElement).className).toContain("lg:col-span-2");
+    expect(screen.queryByLabelText("Story")).toBeNull();
   });
 
   it("falls back to today's layout — source strip, Outlook with its own verdict, no dossier modules — when the dossier is null", async () => {

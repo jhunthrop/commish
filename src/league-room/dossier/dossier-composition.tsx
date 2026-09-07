@@ -162,8 +162,12 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
               />
             </div>
           </div>
+          {/* THE SEASON, FULL WIDTH ALWAYS. A finished season is eighteen columns, and in a half-width
+              card ten of them scrolled off behind an invisible scrollbar (founder, 2026-09-07: a
+              seventeen-game season showing eight bars). The news cell, when there is one, sits
+              below the strip rather than beside it. */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className={hasStoryCell ? undefined : "lg:col-span-2"}>
+            <div className="lg:col-span-2">
               {matchingStory === null ? (
                 <SeasonChartFallback body={body} switcher={switcher} played={played} absence={storyAbsence} />
               ) : (
@@ -177,11 +181,11 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
               )}
             </div>
             {!hasStoryCell ? null : (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 lg:col-span-2">
                 {/* The season-ending story service wiring converges post-merge (ruling R-d1) —
-                    `story` stays `null` here for now, so this renders only the current
-                    designation pill, or nothing, honestly. */}
-                <StoryModule story={null} designation={body.injuryDesignation} />
+                    `story` stays `null` here for now, so this renders nothing, honestly; the cell
+                    exists for the news list. */}
+                <StoryModule story={null} />
                 <NewsList news={body.news} />
               </div>
             )}
