@@ -3,6 +3,7 @@ import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { computeFantasyPoints } from "@/scoring/compute";
+import { isRealTierCliff } from "../decide/tiers";
 import type { LeagueShape } from "../decide/replacement";
 import type { GamesPlayedOutlook } from "./availability";
 import { byValueOverReplacement, overlapTiers, preseasonBoard, scaleStatLine, type BoardCandidate } from "./board";
@@ -176,8 +177,17 @@ describe("preseasonBoard", () => {
     expect(cliffs.length).toBeGreaterThan(0);
     for (const entry of cliffs) {
       expect(entry.playersLeftInTier).toBeGreaterThanOrEqual(1);
-      expect(entry.reasons.some((reason) => reason.code === "tier_cliff")).toBe(true);
     }
+  });
+
+  it("names a cliff only where the drop is worth a game of his own projection", () => {
+    // The dossier-voice round (§3.3): a tier boundary drawn by the span rule is not a cliff, and
+    // the founder read one as "he is the last man in his tier" on a step nobody would warn about.
+    for (const entry of board) {
+      const named = entry.reasons.some((reason) => reason.code === "tier_cliff");
+      expect(named).toBe(isRealTierCliff(entry.projectedPoints, entry.dropToNextTier));
+    }
+    expect(board.some((entry) => entry.dropToNextTier > 0 && !entry.reasons.some((reason) => reason.code === "tier_cliff"))).toBe(true);
   });
 });
 

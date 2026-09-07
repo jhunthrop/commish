@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GAMES_PER_SEASON, TIER_BREAK_GAMES, TIER_SPAN_POINTS_PER_GAME, tierStanding, tiersOf } from "./tiers";
+import { GAMES_PER_SEASON, isRealTierCliff, TIER_BREAK_GAMES, TIER_SPAN_POINTS_PER_GAME, tierStanding, tiersOf } from "./tiers";
 
 /** The live board on 2026-09-05 (12-team standard shape), the values the founder shaped the rule against. */
 const RB_2026 = [262.1, 261.4, 245.4, 235.7, 224.2, 221.0, 217.7, 214.4, 213.3, 212.4, 191.5, 187.4, 183.1, 167.6, 166.3, 164.1, 163.2, 157.3, 154.7, 147.9, 139.8, 137.9, 136.6];
@@ -95,5 +95,35 @@ describe("tierStanding", () => {
 
   it("refuses an index nobody occupies", () => {
     expect(() => tierStanding(pool, 9)).toThrow(/9/);
+  });
+});
+
+describe("isRealTierCliff", () => {
+  it("calls a drop of a full game's worth of his own projection a cliff", () => {
+    // 238 projected, a game's worth is 14.0.
+    expect(isRealTierCliff(238, 14)).toBe(true);
+    expect(isRealTierCliff(238, 20.9)).toBe(true);
+  });
+
+  it("declines a within-tier-sized step, however real the tier boundary above it", () => {
+    // The founder's own case: a 3.2 point step behind a 238 point back is not a cliff.
+    expect(isRealTierCliff(238, 3.2)).toBe(false);
+    expect(isRealTierCliff(238, 13.9)).toBe(false);
+  });
+
+  it("declines a non-positive projection rather than dividing by nothing", () => {
+    expect(isRealTierCliff(0, 40)).toBe(false);
+    expect(isRealTierCliff(-3, 40)).toBe(false);
+  });
+
+  it("declines the last tier, which has no drop at all", () => {
+    expect(isRealTierCliff(238, 0)).toBe(false);
+  });
+
+  it("is the same share the tier rule itself is drawn with", () => {
+    const points = 170;
+    const gamesWorth = (points * TIER_BREAK_GAMES) / GAMES_PER_SEASON;
+    expect(isRealTierCliff(points, gamesWorth)).toBe(true);
+    expect(isRealTierCliff(points, gamesWorth - 0.01)).toBe(false);
   });
 });

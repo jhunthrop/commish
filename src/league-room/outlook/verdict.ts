@@ -18,7 +18,7 @@ import type { BoardReason } from "@/projections/preseason/board";
  * MISSING MARKET DATA gets a verdict from the evidence alone, never a blank: a player the board
  * ranked but the market never listed still has a position rank (`scarcity`) to state — "the
  * evidence makes him WR21. The market has not priced him" — and a player with neither gets the
- * honest last resort, "the evidence stands alone."
+ * honest last resort, "The evidence stands alone."
  *
  * NO REASONS AT ALL — the board never ranked him (a crosswalk miss, or no board this season) —
  * returns `null` rather than inventing a sentence from nothing; the caller renders no verdict line,
@@ -42,15 +42,32 @@ function findReason<T extends BoardReason["code"]>(reasons: readonly BoardReason
   return reasons.find((reason): reason is Extract<BoardReason, { code: T }> => reason.code === code);
 }
 
-/** The tier clause, when the board found a real cliff below him — never built from `scarcity`
- *  alone, which `marketGapClause`/the no-market branch already state on their own. */
+/** Counts a sentence spells rather than digits. Past twelve a figure reads as a figure again, and
+ *  a tier that deep is not a cliff anyone is about to reach. */
+const COUNT_WORDS: readonly string[] = [
+  "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve",
+];
+
+function countWord(count: number): string {
+  return COUNT_WORDS[count] ?? String(count);
+}
+
+/**
+ * The tier clause, when the board found a real cliff below him — never built from `scarcity`
+ * alone, which `marketGapClause`/the no-market branch already state on their own.
+ *
+ * IT STATES THE COUNT IT HAS (dossier-voice round §3.3, founder: "for every player we say 'last
+ * man in his tier', that doesn't mean they shouldn't be drafted"). "Last man" is reserved for a
+ * count of exactly one; every other count is spoken ("Two left in his tier before a 20.9 point
+ * drop."). The clause is a SUPPORTING one in every branch below — `verdictLine` always leads with
+ * the market call or the evidence's own rank and appends this after it, never the reverse.
+ */
 function tierClause(tierCliff: TierCliffReason | undefined): string | null {
   if (tierCliff === undefined) return null;
   const count = tierCliff.playersLeftInTier;
   const drop = tierCliff.dropToNextTier.toFixed(1);
-  return count === 1
-    ? `He is the last man in his tier, with a ${drop} point drop behind him.`
-    : `${count} left in his tier before a ${drop} point drop.`;
+  if (count === 1) return `He is the last man in his tier, with a ${drop} point drop behind him.`;
+  return `${countWord(count)} left in his tier before a ${drop} point drop.`;
 }
 
 function positionRankLabel(position: Position, scarcity: ScarcityReason): string {
@@ -73,7 +90,7 @@ function marketGapSentence(marketAnchor: MarketAnchorReason): string {
 /** The one sentence for a player the market never priced at all — the evidence's own position
  *  rank (`scarcity`) when the board has one, otherwise the honest last resort. */
 function noMarketSentence(position: Position, scarcity: ScarcityReason | undefined): string {
-  if (scarcity === undefined) return "The market has not priced him; the evidence stands alone.";
+  if (scarcity === undefined) return "The market has not priced him. The evidence stands alone.";
   return `The evidence makes him ${positionRankLabel(position, scarcity)}. The market has not priced him.`;
 }
 

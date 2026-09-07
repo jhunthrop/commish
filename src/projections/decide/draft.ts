@@ -4,7 +4,7 @@ import { assignSlot } from "@/draft-engine";
 import { bestStartingTotal } from "./slots";
 import type { LeagueShape, ValuedPlayer } from "./replacement";
 import { survivalProbabilities, type RoomTendency } from "./survival";
-import { tierStanding } from "./tiers";
+import { isRealTierCliff, tierStanding } from "./tiers";
 
 /**
  * THE RECOMMENDATION. Not "highest value over replacement" - that is still a list.
@@ -346,11 +346,13 @@ function reasonsFor(
 
   const pool = positionPool(board, candidate.position);
   const index = pool.findIndex((entry) => entry.playerId === candidate.playerId);
-  const standing = tierStanding(
-    pool.map((entry) => entry.projectedPoints),
-    index,
-  );
-  if (standing.dropToNextTier > 0 && standing.playersLeftInTier <= TIER_IS_THIN_AT) {
+  const pointsDescending = pool.map((entry) => entry.projectedPoints);
+  const standing = tierStanding(pointsDescending, index);
+  // TWO CONDITIONS, BOTH REQUIRED (dossier-voice round §3.3). The tier has to be THIN
+  // (`TIER_IS_THIN_AT`, unchanged: a cliff nobody is about to reach is not a reason to move) AND
+  // the drop has to be a REAL cliff rather than the tail of a span split — `isRealTierCliff`, the
+  // same games-worth share the tier rule itself is drawn with.
+  if (isRealTierCliff(pointsDescending[index] ?? 0, standing.dropToNextTier) && standing.playersLeftInTier <= TIER_IS_THIN_AT) {
     reasons.push({
       code: "tier_cliff",
       position: candidate.position,

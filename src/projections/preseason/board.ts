@@ -2,7 +2,7 @@ import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import type { ProjectionDistribution } from "../decide/outlook";
 import { valueBoard, type LeagueShape, type SeasonProjection, type ValuedPlayer } from "../decide/replacement";
-import { tiersOf } from "../decide/tiers";
+import { isRealTierCliff, tiersOf } from "../decide/tiers";
 import type { GamesPlayedOutlook } from "./availability";
 import { SHIPPED_GAME_VARIANCE } from "./fitted-variance";
 import { seasonPointsInterval, VARIANCE_POSITIONS, Z90, type GameVariancePriors, type PlayerClass, type VariancePosition } from "./game-variance";
@@ -440,7 +440,14 @@ export function preseasonBoard(
         replacementLevel: player.replacementLevel,
       },
     ];
-    if (standing.dropToNextTier > 0) {
+    // A REAL CLIFF, NOT EVERY TIER BOUNDARY (dossier-voice round §3.3, from the founder's own
+    // McCaffrey read). This fired on any positive drop, which is why a within-tier-sized step
+    // reached the peek as a warning; `isRealTierCliff` holds it to a game's worth of his own
+    // projection, the same share the tier rule itself is drawn with. Rule 2's span splits are
+    // exactly the boundaries this now declines to call cliffs. The drop reads the same in points
+    // as in value over replacement (see the standings note above), so comparing it against his
+    // PROJECTED POINTS is comparing like with like.
+    if (isRealTierCliff(player.projectedPoints, standing.dropToNextTier)) {
       reasons.push({
         code: "tier_cliff",
         playersLeftInTier: standing.playersLeftInTier,

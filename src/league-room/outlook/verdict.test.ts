@@ -46,20 +46,20 @@ describe("verdictLine", () => {
 
   it("no-market, with nothing else on record either: the honest last resort", () => {
     const reasons: readonly BoardReason[] = [{ code: "rookie", overallPick: 42, landingMultiplier: 1 }];
-    expect(verdictLine(reasons, "RB")).toBe("The market has not priced him; the evidence stands alone.");
+    expect(verdictLine(reasons, "RB")).toBe("The market has not priced him. The evidence stands alone.");
   });
 
   it("a tier cliff supersedes the plain position-rank supporting clause", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_anchor", marketPoints: 200, delta: 14.2 }, SCARCITY, TIER_CLIFF];
     const line = verdictLine(reasons, "WR");
-    expect(line).toContain("3 left in his tier before a 4.2 point drop.");
+    expect(line).toContain("Three left in his tier before a 4.2 point drop.");
     expect(line).not.toContain("He sits WR21");
   });
 
   it("a tier cliff also supports the no-market branch", () => {
     const reasons: readonly BoardReason[] = [{ code: "market_unlisted" }, SCARCITY, TIER_CLIFF];
     const line = verdictLine(reasons, "WR");
-    expect(line).toBe("The evidence makes him WR21. The market has not priced him. 3 left in his tier before a 4.2 point drop.");
+    expect(line).toBe("The evidence makes him WR21. The market has not priced him. Three left in his tier before a 4.2 point drop.");
   });
 
   it("never renders an em-dash", () => {
