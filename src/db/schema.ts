@@ -264,6 +264,23 @@ export const leagues = pgTable(
      * worth", and `describeScoring` derives its label from exactly those, unaffected by this.
      */
     medianGame: boolean("median_game").notNull().default(false),
+    /**
+     * THE IDENTITY OF THIS LEAGUE'S RULE SET (peek document design §3.2, 2026-09-07):
+     * `scoringHashOf(its scoring_settings row)`, stored here so the peek's one statement can join
+     * straight to `player_peek_documents` without reading the settings table and recomputing a
+     * digest on the request path.
+     *
+     * IT IS A CACHE OF `scoring_settings`, NOT A SECOND SOURCE OF TRUTH. The settings write path
+     * rewrites it in the same transaction that moves a weight, and `backfillLeagueScoringHashes`
+     * (`@/league-service/scoring-hash`) recomputes every league's from its own row and writes only
+     * the ones that disagree.
+     *
+     * NULLABLE, and null means exactly one thing: nobody has computed it for this league yet (a row
+     * written before this column existed, or a fresh restore). The peek reads a null hash as a MISS
+     * and takes the miss path, which is the pre-round cost and never a wrong answer. It is not
+     * defaulted to a preset's hash, because a default would be a claim about a rule set nobody read.
+     */
+    scoringHash: text("scoring_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /**
      * Stamped ONCE, by `stampSeasonCompleteInTx` (`@/league-service/participation`), inside the

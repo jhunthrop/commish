@@ -1,5 +1,5 @@
 import type { Db, DbTx } from "@/db/client";
-import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
+import { drafts, leagues, teams } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
 import type { RosterShapeName, RosterSlotConfig } from "@/domain/roster";
 import { SCORING_PRESETS, type ScoringPresetName } from "@/domain/scoring";
@@ -14,6 +14,7 @@ import { moneyIsLive } from "@/money/states";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MS_PER_DAY } from "./config";
 import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
+import { writeLeagueScoring } from "./settings";
 
 /**
  * Who a league answers to. Phase 3.5 addendum, Task 13: a member league is commissioned by the
@@ -285,7 +286,9 @@ export async function writeLeagueInTx(
     .returning({ id: leagues.id });
   if (insertedLeague === undefined) return { claimed: false };
 
-  await tx.insert(scoringSettings).values({ leagueId: ids.leagueId, ...SCORING_PRESETS[input.scoringPreset] });
+  // THE SETTINGS ROW AND `leagues.scoring_hash` TOGETHER (peek document design §3.2) — one write
+  // path, so a league is never committed carrying weights its stored hash does not describe.
+  await writeLeagueScoring(tx, { leagueId: ids.leagueId, rules: SCORING_PRESETS[input.scoringPreset] });
   if (input.owner.kind === "member") {
     await tx.insert(teams).values({ id: ids.teamId!, leagueId: ids.leagueId, userId: input.owner.userId, name: input.owner.teamName });
   }
