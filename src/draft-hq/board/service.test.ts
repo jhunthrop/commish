@@ -1,12 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { nflPlayers, playerCrosswalk, players, preseasonProjections } from "@/db/schema";
+import { leagues, nflPlayers, nflverseTeamDefenseWeeks, playerCrosswalk, players, preseasonProjections, scoringSettings, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { PPR_SCORING } from "@/domain/scoring";
+import { roundPoints } from "@/scoring";
 import { valueOrderFor } from "@/draft-service/sim/value-order";
+import type { TeamDefenseWeekRow } from "@/projections/nflverse/team-defense-weeks";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { boardRows, isProjectedRow } from "./service";
+import { BOARD_LAST_SEASON, boardRows, isProjectedRow } from "./service";
+
+/** One archived defense week for the Rams, in the archive's OWN spelling (`LA`) — the fold onto
+ *  the product's `DST-LAR` is the reader's job, and this fixture must not do it for it. */
+function defenseWeekRow(overrides: Partial<TeamDefenseWeekRow>): TeamDefenseWeekRow & { readonly source: string } {
+  return {
+    season: BOARD_LAST_SEASON, week: 1, team: "LA", opponentTeam: "SF",
+    sacks: 0, interceptions: 0, fumbleRecoveries: 0, defensiveTouchdowns: 0, safeties: 0,
+    puntBlocks: 0, extraPointBlocks: 0, fieldGoalBlocks: 0, specialTeamsTouchdowns: 0,
+    passingYardsAllowed: 0, rushingYardsAllowed: 0, sackYardsLostAllowed: 0, pointsAllowed: null,
+    source: "nflverse_team_defense_weeks",
+    ...overrides,
+  };
+}
 
 /**
  * `boardRows` is the one place the stored evidence board (keyed on `nfl_players.id`) is joined
@@ -212,6 +228,52 @@ describe("boardRows", () => {
       expect(withMarketRows.filter((row) => row.position !== "K" && row.position !== "DEF")).toEqual(withoutMarketRows);
       // And they land AFTER every projected row rather than interleaved into the value order.
       expect(withMarketRows.slice(0, withoutMarketRows.length)).toEqual(withoutMarketRows);
+    });
+
+    /**
+     * LAST SEASON IS THE ONE NUMBER THESE ROWS CAN CARRY (the 2026-09-06 round). The engine
+     * projects nothing for either position and that is unchanged. The archive holds what they
+     * actually did, and `kdefSeasonLines` scores it under this league's own rules.
+     */
+    it("carries last season's measured points, games and rate on a market-order row", async () => {
+      await seedMarketOnly({ id: "DST-LAR", position: "DEF", team: "LAR", adp: 120.0 });
+      await db.insert(nflverseTeamDefenseWeeks).values([
+        defenseWeekRow({ week: 1, sacks: 3, interceptions: 2, pointsAllowed: 10, passingYardsAllowed: 180, rushingYardsAllowed: 90 }),
+        defenseWeekRow({ week: 2, sacks: 1, interceptions: 0, pointsAllowed: 24, passingYardsAllowed: 250, rushingYardsAllowed: 120 }),
+      ]);
+
+      const [row] = await boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } });
+      expect(row?.lastSeason?.season).toBe(BOARD_LAST_SEASON);
+      expect(row?.lastSeason?.games).toBe(2);
+      expect(row?.lastSeason?.points).toBeGreaterThan(0);
+      expect(row?.lastSeason?.pointsPerGame).toBe(roundPoints(row!.lastSeason!.points / 2));
+      // Still no projection. The two facts sit side by side without either becoming the other.
+      expect(row?.projectedPoints).toBeNull();
+    });
+
+    it("leaves lastSeason null on a market-order row the archive holds nothing for", async () => {
+      await seedMarketOnly({ id: "DST-LAR", position: "DEF", team: "LAR", adp: 120.0 });
+      const [row] = await boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } });
+      expect(row?.lastSeason).toBeNull();
+    });
+
+    it("leaves lastSeason null on every projected row, whatever the archive holds", async () => {
+      await seedPlayer({ id: "p1", nflId: "00-0000001", name: "Top Back", position: "RB", team: "SF", points: 300, rank: 1, adp: 1.2 });
+      const rows = await boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } });
+      expect(rows.map((row) => row.lastSeason)).toEqual([null]);
+    });
+
+    it("measures last season under the LEAGUE's own scoring when one is named", async () => {
+      await db.insert(users).values({ id: "u1", email: "one@example.com", displayName: "One" });
+      await db.insert(leagues).values({ id: "l1", name: "Sack Heavy", format: "snake", teamCount: 12, commissionerUserId: "u1" });
+      await db.insert(scoringSettings).values({ leagueId: "l1", ...PPR_SCORING, pointsPerSack: 10 });
+      await seedMarketOnly({ id: "DST-LAR", position: "DEF", team: "LAR", adp: 120.0 });
+      await db.insert(nflverseTeamDefenseWeeks).values([defenseWeekRow({ week: 1, sacks: 4, pointsAllowed: 10 })]);
+
+      const shape = { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS };
+      const [generic] = await boardRows(db, { shape });
+      const [league] = await boardRows(db, { shape, leagueId: "l1" });
+      expect(league!.lastSeason!.points - generic!.lastSeason!.points).toBe(4 * (10 - PPR_SCORING.pointsPerSack));
     });
   });
 });

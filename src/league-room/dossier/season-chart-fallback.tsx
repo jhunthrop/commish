@@ -30,7 +30,19 @@ export function SeasonChartFallback({ body, switcher, played }: { readonly body:
         // rookie sentence, which would assert a biography fact this state lacks.
         <p className="text-sm text-text-muted">No prior seasons on record.</p>
       ) : played ? (
-        <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
+        <div className="flex flex-col gap-2">
+          <SeasonBars label={`${body.player.name}, points by week`} weeks={weeksFor(body)} />
+          {/* NAME THE BASIS (the 2026-09-06 round). A kicker's and a team defense's bars are read
+              out of their own archive rather than out of this league's live table, and the whole
+              point of drawing them is that they are a record of games that were played. A chart
+              beside a position the engine publishes no projection for must say which of the two it
+              is, or a reader will supply the wrong answer. */}
+          {body.kdefSeason === null ? null : (
+            <p className="text-xs text-text-faint" data-testid="season-basis">
+              {`Every ${body.season} game he played, scored under this league's rules. A record of games that were played, not a forecast.`}
+            </p>
+          )}
+        </div>
       ) : (
         <p className="text-sm text-text-muted">No scored week for him in the {body.season} season.</p>
       )}

@@ -1,10 +1,12 @@
-import { asc, inArray } from "drizzle-orm";
+import { and, asc, inArray } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { nflverseTeamDefenseWeeks } from "@/db/schema";
 import { changedRowWhere, excludedSetFor } from "@/db/upsert";
 import type { NflverseClient } from "./client";
 import { NFLVERSE_CONFIG } from "./config";
 import type { CsvRow } from "./csv";
+import { mapSchedule, SCHEDULE_SOURCE_CONFIG, type TeamGame } from "./schedule";
+import { teamWeekKey } from "./team-codes";
 
 /**
  * THE HISTORICAL TEAM-DEFENSE RECORD, ARCHIVED IN THE DEFENSE'S OWN FRAME.
@@ -26,9 +28,16 @@ import type { CsvRow } from "./csv";
  * impossible. Measured against the real 2013 through 2025 files every regular-season row pairs; the
  * branch exists so a future partial file degrades to a MISSING row rather than to a flattering one.
  *
- * POINTS ALLOWED IS DELIBERATELY ABSENT. `schedule.ts` already stores every game's score as team
- * observations, so a defense's points allowed is a join away from a fact this store already holds. A
- * second copy is a second number that can disagree with the first.
+ * POINTS ALLOWED NOW RIDES ON THE ROW, NULLABLE (migration 0079). It used to be left out on the
+ * argument that `schedule.ts` already stores every game's score as team observations, so a second
+ * copy would be a second number that can disagree with the first. That argument holds for the FIT
+ * path, which still reads the observation store and is untouched here. It does not hold for a
+ * product surface: the observation store carries only the season in play, so a finished season's
+ * defense weeks join to nothing there and a team defense's whole history stops at the database
+ * boundary. Both copies are filled from the same `games.csv`, through `pointsAllowedByTeamWeek`
+ * below, so they have one origin rather than two opinions — and a week the schedule has no
+ * scoreline for is written NULL, never zero, because a shutout this module invented is the single
+ * most flattering fabricated number a defense row can carry.
  */
 
 /** One club's one defensive week, in the frame a fantasy defense is scored in. */
@@ -52,6 +61,40 @@ export interface TeamDefenseWeekRow {
   readonly passingYardsAllowed: number;
   /** THE OPPONENT's rushing yards in this game. */
   readonly rushingYardsAllowed: number;
+  /** THE OPPONENT's yards lost to sacks in this game, the term that nets `passingYardsAllowed`
+   *  the way a box score does. `null` only on a row written before the column existed. */
+  readonly sackYardsLostAllowed: number | null;
+  /** THE OPPONENT's final score, from the schedule file, or `null` when it carried no scoreline
+   *  for this pairing. Never 0 for an unknown game — see the module docblock. */
+  readonly pointsAllowed: number | null;
+}
+
+/**
+ * The key both sides of the points-allowed join are folded onto: season, week, and the club in the
+ * PRODUCT's spelling.
+ *
+ * The product's spelling and not either feed's, because the two feeds disagree with each other and
+ * with themselves. `stats_team` normalises a club to its current code in every row (a 2014 Rams row
+ * reads `LA`), while `games.csv` keeps the contemporary one (`STL` for the same game). Folding both
+ * through `productTeamCode` is what makes a relocated franchise's season join at all, instead of
+ * silently missing every one of its weeks.
+ */
+/** Re-exported for the tests and callers that learned the key here first. */
+export { teamWeekKey };
+
+/**
+ * Every team-week's points allowed, from the schedule file's own rows, keyed by `teamWeekKey`.
+ *
+ * A game with no scoreline yet contributes NO ENTRY rather than an entry of zero, so an unplayed or
+ * unpublished game is distinguishable from a shutout at every later step.
+ */
+export function pointsAllowedByTeamWeek(games: readonly TeamGame[]): ReadonlyMap<string, number> {
+  const byKey = new Map<string, number>();
+  for (const game of games) {
+    if (game.pointsAgainst === null) continue;
+    byKey.set(teamWeekKey(game.season, game.week, game.team), game.pointsAgainst);
+  }
+  return byKey;
 }
 
 /** The fields read off the DEFENSE's own row, against the file's own column name for each. */
@@ -70,7 +113,11 @@ const OWN_COLUMNS = {
 type OwnField = keyof typeof OWN_COLUMNS;
 
 /** The two fields read off the OPPONENT's row. See the module docblock. */
-const OPPONENT_COLUMNS = { passingYardsAllowed: "passing_yards", rushingYardsAllowed: "rushing_yards" } as const;
+const OPPONENT_COLUMNS = {
+  passingYardsAllowed: "passing_yards",
+  rushingYardsAllowed: "rushing_yards",
+  sackYardsLostAllowed: "sack_yards_lost",
+} as const;
 
 /**
  * Every column this module reads, checked against the file's own header before a single row is
@@ -148,9 +195,14 @@ function parse(rows: readonly CsvRow[]): readonly ParsedRow[] {
 
 /**
  * Reads one season's `stats_team_week_YYYY.csv` into one row per (season, week, team), regular
- * season only, with each team's yards allowed taken from its opponent's own row.
+ * season only, with each team's yards allowed taken from its opponent's own row and its points
+ * allowed from `pointsAllowed` (build it with `pointsAllowedByTeamWeek`).
+ *
+ * `pointsAllowed` is a REQUIRED parameter and not a defaulted one: a caller that forgot it would
+ * write a whole season of nulls, which reads downstream as "the schedule had no scoreline" — a
+ * quiet, plausible lie. An empty map is a caller SAYING that, in one visible word.
  */
-export function mapTeamDefenseWeekRows(rows: readonly CsvRow[]): readonly TeamDefenseWeekRow[] {
+export function mapTeamDefenseWeekRows(rows: readonly CsvRow[], pointsAllowed: ReadonlyMap<string, number>): readonly TeamDefenseWeekRow[] {
   assertShape(rows);
   const parsed = parse(rows);
   const byKey = new Map(parsed.map((entry) => [`${entry.season}|${entry.week}|${entry.team}`, entry] as const));
@@ -170,6 +222,8 @@ export function mapTeamDefenseWeekRows(rows: readonly CsvRow[]): readonly TeamDe
       ...own,
       passingYardsAllowed: count(opponent.row, OPPONENT_COLUMNS.passingYardsAllowed),
       rushingYardsAllowed: count(opponent.row, OPPONENT_COLUMNS.rushingYardsAllowed),
+      sackYardsLostAllowed: count(opponent.row, OPPONENT_COLUMNS.sackYardsLostAllowed),
+      pointsAllowed: pointsAllowed.get(teamWeekKey(entry.season, entry.week, entry.team)) ?? null,
     });
   }
   return mapped.sort((a, b) => a.season - b.season || a.week - b.week || a.team.localeCompare(b.team));
@@ -182,6 +236,17 @@ const NATURAL_KEYS: readonly string[] = ["season", "week", "team", "ingestedAt"]
 
 /** Provenance tag for every row this module writes. */
 export const TEAM_DEFENSE_WEEK_SOURCE = "nflverse_team_defense_weeks";
+
+/**
+ * The one column an incoming null must not erase (migration 0079's own rule).
+ *
+ * `points_allowed` was added to a table that already held thirteen seasons of rows, and a re-run
+ * that cannot resolve a scoreline for some week must leave whatever is already stored rather than
+ * blanking it. `excludedSetFor`/`changedRowWhere` write it as
+ * `COALESCE(excluded.points_allowed, stored)` and compare against the same expression, so a re-run
+ * that FILLS the column counts as a changed row and one that changes nothing counts as none.
+ */
+const COALESCED_COLUMNS: readonly string[] = ["pointsAllowed"];
 
 /** Upserts on the natural key, for the reason `recordKickingWeekRows` gives: nflverse republishes a
  *  corrected week, and freezing whichever backfill ran first would make the archive a record of an
@@ -197,8 +262,8 @@ export async function recordTeamDefenseWeekRows(db: Db, rows: readonly TeamDefen
       .values(chunk)
       .onConflictDoUpdate({
         target: [nflverseTeamDefenseWeeks.season, nflverseTeamDefenseWeeks.week, nflverseTeamDefenseWeeks.team],
-        set: excludedSetFor(nflverseTeamDefenseWeeks, NATURAL_KEYS),
-        where: changedRowWhere(nflverseTeamDefenseWeeks, NATURAL_KEYS),
+        set: excludedSetFor(nflverseTeamDefenseWeeks, NATURAL_KEYS, COALESCED_COLUMNS),
+        where: changedRowWhere(nflverseTeamDefenseWeeks, NATURAL_KEYS, COALESCED_COLUMNS),
       })
       .returning({ season: nflverseTeamDefenseWeeks.season });
     written += result.length;
@@ -213,22 +278,46 @@ export interface TeamDefenseWeekIngestReport {
   readonly written: number;
   /** Regular-season rows whose opponent had no row in the same file. Reported, never zeroed. */
   readonly unpaired: number;
+  /** Written rows the schedule file had no scoreline for. Reported so an operator can see how much
+   *  of a season's points allowed is genuinely unknown rather than assuming the column filled. */
+  readonly withoutPointsAllowed: number;
 }
 
+/**
+ * One season's team-defense weeks, archived, with points allowed joined in from the schedule.
+ *
+ * TWO CLIENTS, because the two files live on different hosts: the release assets carry
+ * `stats_team_week_YYYY.csv` and the schedule repository carries `games.csv` (`schedule.ts`). They
+ * are separate parameters rather than one client with a branch inside it so a caller cannot pass a
+ * client that can only reach one of them and get a silent half-ingestion.
+ *
+ * The schedule file covers every season at once, so it is fetched ONCE for the whole run rather
+ * than per season.
+ */
 export async function ingestTeamDefenseWeeks(
   db: Db,
   client: NflverseClient,
   seasons: readonly number[],
+  scheduleClient: NflverseClient,
 ): Promise<readonly TeamDefenseWeekIngestReport[]> {
+  const scheduleRows = await scheduleClient.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
+  const pointsAllowed = pointsAllowedByTeamWeek(mapSchedule(scheduleRows, seasons));
+
   const reports: TeamDefenseWeekIngestReport[] = [];
   for (const season of seasons) {
     const rows = await client.getCsv(NFLVERSE_CONFIG.releases.statsTeam, `stats_team_week_${season}.csv`);
-    const mapped = mapTeamDefenseWeekRows(rows);
+    const mapped = mapTeamDefenseWeekRows(rows, pointsAllowed);
     const regularSeasonRows = rows.filter(
       (row) => (row.season_type ?? "").trim() === NFLVERSE_CONFIG.seasonType,
     ).length;
     const written = await recordTeamDefenseWeekRows(db, mapped);
-    reports.push({ season, rowsRead: rows.length, written, unpaired: regularSeasonRows - mapped.length });
+    reports.push({
+      season,
+      rowsRead: rows.length,
+      written,
+      unpaired: regularSeasonRows - mapped.length,
+      withoutPointsAllowed: mapped.filter((row) => row.pointsAllowed === null).length,
+    });
   }
   return reports;
 }
@@ -238,8 +327,10 @@ export async function ingestTeamDefenseWeeks(
 export async function teamDefenseWeekRowsForSeasons(
   db: ReadonlyDb,
   seasons: readonly number[],
+  /** SOURCE team codes (`sourceTeamCode`), narrowing to a few clubs on the (team, season, week) index. */
+  teams?: readonly string[],
 ): Promise<readonly TeamDefenseWeekRow[]> {
-  if (seasons.length === 0) return [];
+  if (seasons.length === 0 || teams?.length === 0) return [];
   return db
     .select({
       season: nflverseTeamDefenseWeeks.season,
@@ -257,9 +348,15 @@ export async function teamDefenseWeekRowsForSeasons(
       specialTeamsTouchdowns: nflverseTeamDefenseWeeks.specialTeamsTouchdowns,
       passingYardsAllowed: nflverseTeamDefenseWeeks.passingYardsAllowed,
       rushingYardsAllowed: nflverseTeamDefenseWeeks.rushingYardsAllowed,
+      sackYardsLostAllowed: nflverseTeamDefenseWeeks.sackYardsLostAllowed,
+      pointsAllowed: nflverseTeamDefenseWeeks.pointsAllowed,
     })
     .from(nflverseTeamDefenseWeeks)
-    .where(inArray(nflverseTeamDefenseWeeks.season, [...seasons]))
+    .where(
+      teams === undefined
+        ? inArray(nflverseTeamDefenseWeeks.season, [...seasons])
+        : and(inArray(nflverseTeamDefenseWeeks.season, [...seasons]), inArray(nflverseTeamDefenseWeeks.team, [...teams])),
+    )
     .orderBy(
       asc(nflverseTeamDefenseWeeks.season),
       asc(nflverseTeamDefenseWeeks.week),

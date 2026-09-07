@@ -39,6 +39,7 @@ function bodyFor(season: number, availableSeasons: readonly number[]): PlayerSea
       games: 1, carries: season === 2026 ? 15 : null, rushingYards: 80, targets: season === 2026 ? 3 : null,
       receptions: 2, receivingYards: 20, passingYards: 0, touchdowns: 1, fantasyPoints: 12.5,
     },
+    kdefSeason: null,
     news: [],
     reasons: [],
     laws: [],
@@ -62,6 +63,7 @@ const ROOKIE_BODY: PlayerSeasonBody = {
   injuryDesignation: null,
   log: [],
   totals: null,
+  kdefSeason: null,
   news: [],
   reasons: [],
   laws: [],
@@ -551,5 +553,81 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     await waitFor(() => expect(screen.getByLabelText("The call")).toBeInTheDocument());
     expect(container.textContent).not.toMatch(/—/);
     expect(container.textContent).not.toMatch(/;/);
+  });
+});
+
+/**
+ * THE KICKER PEEK (founder, 2026-09-06: "none of the kicker stats are showing and same for
+ * defense"). The board ranks neither position, so a kicker's peek has always taken the fallback
+ * composition, which was a source strip of dashes over an empty chart. It now draws the season the
+ * archive holds, names its basis, and carries a role module built from his actual kicks.
+ */
+describe("PlayerPeekHost, a kicker", () => {
+  const KICKER_BODY: PlayerSeasonBody = {
+    ...bodyFor(2025, [2025]),
+    player: { id: "k1", name: "A Kicker", position: "K", nflTeam: "BAL", headshotUrl: null, adp: 140.2 },
+    log: [],
+    totals: null,
+    weeks: [
+      { week: 1, points: 11, percentile: null },
+      { week: 2, points: null, percentile: null },
+      { week: 3, points: 8, percentile: null },
+    ],
+    pointsPerGame: 9.5,
+    pointsPerGamePercentile: null,
+    kdefSeason: {
+      playerId: "k1",
+      position: "K",
+      season: 2025,
+      weeks: [],
+      points: 148.5,
+      games: 16,
+      pointsPerGame: 9.3,
+      weeksMissingPointsAllowed: 0,
+      facts: {
+        kind: "K",
+        fieldGoalsMade: 24,
+        fieldGoalsAttempted: 28,
+        extraPointsMade: 38,
+        extraPointsAttempted: 40,
+        distanceBands: [
+          { label: "0 to 39", made: 12, attempted: 12 },
+          { label: "40 to 49", made: 7, attempted: 9 },
+          { label: "50 or more", made: 5, attempted: 7 },
+        ],
+        longestMadeBand: "50 or more",
+      },
+    },
+  };
+
+  async function openKicker() {
+    const bodies = new Map([[2025, KICKER_BODY]]);
+    const rendered = render(
+      <LeagueRoomDepsProvider deps={fixtureDeps(bodies, 2025)}>
+        <PlayerPeekHost />
+      </LeagueRoomDepsProvider>,
+    );
+    openPlayerPeek({ leagueId: "lg1", playerId: "k1", name: "A Kicker" });
+    await waitFor(() => expect(screen.getByText("2025 season")).toBeInTheDocument());
+    return rendered;
+  }
+
+  it("draws his points by week and names the basis under the chart", async () => {
+    await openKicker();
+    expect(screen.getByRole("group", { name: "A Kicker, points by week" })).toBeInTheDocument();
+    expect(screen.getByTestId("season-basis").textContent).toContain("A record of games that were played, not a forecast.");
+  });
+
+  it("carries his kicking numbers instead of three offensive share bars", async () => {
+    const { container } = await openKicker();
+    const role = screen.getByRole("region", { name: "Role" });
+    expect(role.textContent).toContain("24 of 28 · 86%");
+    expect(role.textContent).toContain("40 to 49 yards");
+    expect(container.querySelector("[data-role-share]")).toBeNull();
+  });
+
+  it("follows the copy rules on the kicker surface too", async () => {
+    const { container } = await openKicker();
+    expect(container.textContent).not.toMatch(/[—;]/);
   });
 });

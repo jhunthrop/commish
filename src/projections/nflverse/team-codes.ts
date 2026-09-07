@@ -81,6 +81,17 @@ export function sourceTeamCode(productCode: string): string {
 
 /** The product's spelling for one source team code, historical spellings included. Throws on
  *  anything neither feed uses, for the same reason `sourceTeamCode` does. */
+/**
+ * The key both sides of a team-week join are folded onto: season, week, and the club in the
+ * PRODUCT's spelling. Folding through `productTeamCode` is what makes a relocated franchise's
+ * season join at all (the schedule file says `STL`, the team stats say `LA`, both are `LAR` here)
+ * instead of silently missing every one of its weeks. One definition, used by the archive's
+ * ingest and by the fit's join alike.
+ */
+export function teamWeekKey(season: number, week: number, sourceTeam: string): string {
+  return `${season}|${week}|${productTeamCode(sourceTeam)}`;
+}
+
 export function productTeamCode(sourceCode: string): string {
   const mapped = SOURCE_TO_PRODUCT[sourceCode];
   if (mapped !== undefined) return mapped;

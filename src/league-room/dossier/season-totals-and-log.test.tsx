@@ -26,6 +26,7 @@ function bodyFor(overrides: Partial<PlayerSeasonBody> = {}): PlayerSeasonBody {
     injuryDesignation: null,
     log: [{ week: 1, points: 12.5, carries: 15, rushingYards: 80, targets: 3, receptions: 2, receivingYards: 20, passingYards: 0, touchdowns: 1 }],
     totals: { games: 1, carries: 15, rushingYards: 80, targets: 3, receptions: 2, receivingYards: 20, passingYards: 0, touchdowns: 1, fantasyPoints: 12.5 },
+    kdefSeason: null,
     news: [],
     reasons: [],
     laws: [],

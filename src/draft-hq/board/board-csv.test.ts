@@ -20,6 +20,7 @@ function row(overrides: Partial<BoardRow>): BoardRow {
     rank: 1,
     overallRank: 1,
     marketOrderRank: null,
+    lastSeason: null,
     projectedPoints: 20.5,
     floorPoints: 12.1,
     medianPoints: 19,
@@ -37,22 +38,56 @@ function row(overrides: Partial<BoardRow>): BoardRow {
   } as BoardRow;
 }
 
+/** One cell of a line, found by the header's own name rather than by a counted position. */
+function cellOf(header: string, line: string, column: string): string {
+  const index = header.split(",").indexOf(column);
+  if (index === -1) throw new Error(`The export has no "${column}" column.`);
+  return line.split(",")[index] ?? "";
+}
+
+function auctionCell(header: string, line: string): string {
+  return cellOf(header, line, "Auction value");
+}
+
 describe("boardCsvLines", () => {
   it("always carries a real auction value for a priced row, with no view state in sight", () => {
     const rows = [row({ playerId: "p1", valueOverReplacement: 80 }), row({ playerId: "p2", name: "Second Man", rank: 2, valueOverReplacement: 40 })];
     const lines = boardCsvLines(rows, SHAPE);
     expect(lines[0]).toContain("Auction value");
-    // Both priced rows end in a dollar figure — the exact amounts are auctionValues' own
-    // tested business; here we pin only that the column is populated.
-    expect(lines[1]).toMatch(/\$\d+$/);
-    expect(lines[2]).toMatch(/\$\d+$/);
+    // Both priced rows carry a dollar figure in the auction column — the exact amounts are
+    // auctionValues' own tested business; here we pin only that the column is populated. Read by
+    // COLUMN and not by "last cell in the line": the last-season columns now sit after it, and a
+    // positional assumption is how a passing test stops meaning what it says.
+    expect(auctionCell(lines[0]!, lines[1]!)).toMatch(/^\$\d+$/);
+    expect(auctionCell(lines[0]!, lines[2]!)).toMatch(/^\$\d+$/);
   });
 
   it("prices a row with no value in this format at the documented one-dollar floor", () => {
     // `auctionValues`' own contract (value.ts): every player prices at the $1 floor, never $0 —
     // an auction seat costs a dollar even for a player the format never starts.
     const lines = boardCsvLines([row({ valueOverReplacement: null })], SHAPE);
-    expect(lines[1]).toMatch(/\$1$/);
+    expect(auctionCell(lines[0]!, lines[1]!)).toBe("$1");
+  });
+
+  /**
+   * THE MEASURED SEASON IS ITS OWN FOUR COLUMNS (the 2026-09-06 kicker and team defense round),
+   * never folded into "Projected pts": a season that happened and a season that is forecast are
+   * different claims, and a file read away from the board is exactly where that difference is lost.
+   */
+  it("writes the last-season columns for a market-order row, and blanks for every other row", () => {
+    const lines = boardCsvLines(
+      [
+        row({ playerId: "p1" }),
+        row({ playerId: "k1", name: "A Kicker", position: "K", marketOrderRank: 1, lastSeason: { season: 2025, points: 148.5, games: 17, pointsPerGame: 8.7 } }),
+      ],
+      SHAPE,
+    );
+    expect(cellOf(lines[0]!, lines[1]!, "Last season")).toBe("");
+    expect(cellOf(lines[0]!, lines[1]!, "Last season pts")).toBe("");
+    expect(cellOf(lines[0]!, lines[2]!, "Last season")).toBe("2025");
+    expect(cellOf(lines[0]!, lines[2]!, "Last season pts")).toBe("148.5");
+    expect(cellOf(lines[0]!, lines[2]!, "Last season games")).toBe("17");
+    expect(cellOf(lines[0]!, lines[2]!, "Last season per game")).toBe("8.7");
   });
 
   it("emits the header exactly once", () => {

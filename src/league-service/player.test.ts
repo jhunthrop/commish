@@ -6,6 +6,8 @@ import { matchups, players, playerStatLines, scoringSettings, statWeeks, teams, 
 import type { StatLine } from "@/domain/player";
 import { crosswalkRows, recordCrosswalk, resolveCrosswalk } from "@/projections/crosswalk";
 import { statMetricName, STAT_LINE_SOURCE } from "@/projections/lines";
+import { recordKickingWeekRows, type KickingWeekRow } from "@/projections/nflverse/kicking-weeks";
+import { recordTeamDefenseWeekRows } from "@/projections/nflverse/team-defense-weeks";
 import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { BOARD_SOURCE, recordPreseasonProjections } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
@@ -535,6 +537,130 @@ describe("playerSeason's season history", () => {
     });
     const withCapsule = (await playerSeason(db, leagueId, "rb1", clock))!;
     expect(withCapsule.capsule).toEqual({ bodyCompact: "Compact body.", bodyFull: "Full body.", source: "llm" });
+  });
+});
+
+/**
+ * A KICKER AND A TEAM DEFENSE READ THEIR OWN ARCHIVE (founder, 2026-09-06: "none of the kicker
+ * stats are showing and same for defense").
+ *
+ * Neither position has a line in `player_stat_lines` before the league's own weeks report, and the
+ * observation store behind every other prior season carries no kicking or team defensive column at
+ * all (`nflverse/map.ts` refuses them on purpose). Both cards were therefore empty while two tables
+ * held thirteen seasons of exactly the facts they needed.
+ */
+describe("playerSeason, a kicker and a team defense", () => {
+  const LAST_SEASON = PRODUCT_SEASON - 1;
+
+  async function seedKickingWeek(week: number, overrides: Partial<KickingWeekRow> = {}): Promise<void> {
+    await recordKickingWeekRows(db, [
+      {
+        season: LAST_SEASON, week, playerId: "00-0033111", team: "BAL",
+        fieldGoalsMade: 3, fieldGoalsAttempted: 4, fieldGoalsMissed: 1, fieldGoalsBlocked: 0,
+        fieldGoalsMade0To19: 0, fieldGoalsMade20To29: 1, fieldGoalsMade30To39: 1,
+        fieldGoalsMade40To49: 1, fieldGoalsMade50To59: 0, fieldGoalsMade60Plus: 0,
+        fieldGoalsMissed0To19: 0, fieldGoalsMissed20To29: 0, fieldGoalsMissed30To39: 0,
+        fieldGoalsMissed40To49: 0, fieldGoalsMissed50To59: 1, fieldGoalsMissed60Plus: 0,
+        extraPointsMade: 2, extraPointsAttempted: 2, extraPointsMissed: 0, extraPointsBlocked: 0,
+        ...overrides,
+      },
+    ]);
+  }
+
+  async function seedKicker(leagueId: string): Promise<void> {
+    await db.insert(players).values({ id: "k1", name: "A Kicker", position: "K", nflTeam: "BAL", headshotUrl: null, adp: 140.2 });
+    await recordNflPlayers(db, [{ id: "00-0033111", pfrId: null, espnId: "3051909", name: "A Kicker", position: "K", latestTeam: "BAL", rookieSeason: 2012, lastSeason: LAST_SEASON }]);
+    await recordCrosswalk(db, [{ playerId: "k1", nflPlayerId: "00-0033111", method: "espn_id", unmatchedReason: null, resolvedAt: new Date() }]);
+    // Named so the fixture's own league argument is used rather than silently ignored.
+    expect(leagueId).not.toBe("");
+  }
+
+  it("offers last season and charts his weeks, out of the kicking archive", async () => {
+    const leagueId = await league({ played: false });
+    await seedKicker(leagueId);
+    await seedKickingWeek(1);
+    await seedKickingWeek(4);
+
+    const body = await playerSeason(db, leagueId, "k1", clock);
+    expect(body?.availableSeasons).toEqual([LAST_SEASON]);
+    expect(body?.season).toBe(LAST_SEASON);
+    expect(body?.weeks.filter((week) => week.points !== null).map((week) => week.week)).toEqual([1, 4]);
+    expect(body?.kdefSeason?.games).toBe(2);
+    expect(body?.kdefSeason?.facts.kind).toBe("K");
+    expect(body?.pointsPerGame).toBe(body!.kdefSeason!.pointsPerGame);
+  });
+
+  it("keeps the season in play on the league's live table and offers last season from the archive", async () => {
+    // The archive ends at last season by design, so mid-season the live table must still answer:
+    // routing the current season to the archive told a manager "no scored week" while his kicks
+    // were landing in `player_stat_lines` every Sunday night.
+    const leagueId = await league({ played: true });
+    await seedKicker(leagueId);
+    await seedKickingWeek(1);
+    await db.insert(playerStatLines).values([{ ...EMPTY_LINE, playerId: "k1", week: 1, fieldGoalsMade: 3, extraPointsMade: 2 }]);
+
+    const body = await playerSeason(db, leagueId, "k1", clock);
+    expect(body?.availableSeasons).toEqual([PRODUCT_SEASON, LAST_SEASON]);
+    expect(body?.season).toBe(PRODUCT_SEASON);
+    const weekOne = body?.weeks.find((week) => week.week === 1);
+    expect(weekOne?.points).not.toBeNull();
+    expect(weekOne?.points ?? 0).toBeGreaterThan(0);
+  });
+
+  it("leaves a week he did not play absent, never a zero", async () => {
+    const leagueId = await league({ played: false });
+    await seedKicker(leagueId);
+    await seedKickingWeek(1);
+
+    const body = await playerSeason(db, leagueId, "k1", clock);
+    expect(body?.weeks.find((week) => week.week === 2)?.points).toBeNull();
+  });
+
+  it("shows no game log or totals for him, whose columns are all offensive ones", async () => {
+    const leagueId = await league({ played: false });
+    await seedKicker(leagueId);
+    await seedKickingWeek(1);
+
+    const body = await playerSeason(db, leagueId, "k1", clock);
+    expect(body?.log).toEqual([]);
+    expect(body?.totals).toBeNull();
+  });
+
+  it("answers the third honest state for a kicker the archive holds nothing for", async () => {
+    const leagueId = await league({ played: false });
+    await seedKicker(leagueId);
+
+    const body = await playerSeason(db, leagueId, "k1", clock);
+    expect(body?.availableSeasons).toEqual([]);
+    expect(body?.kdefSeason).toBeNull();
+    expect(body?.isRookie).toBe(false);
+  });
+
+  it("reads a team defense with no crosswalk edge at all, by its team code", async () => {
+    const leagueId = await league({ played: false });
+    await db.insert(players).values({ id: "DST-LAR", name: "Los Angeles Rams", position: "DEF", nflTeam: "LAR", headshotUrl: null, adp: 155 });
+    await recordTeamDefenseWeekRows(db, [
+      {
+        season: LAST_SEASON, week: 1, team: "LA", opponentTeam: "SF",
+        sacks: 4, interceptions: 2, fumbleRecoveries: 1, defensiveTouchdowns: 1, safeties: 0,
+        puntBlocks: 0, extraPointBlocks: 0, fieldGoalBlocks: 0, specialTeamsTouchdowns: 0,
+        passingYardsAllowed: 200, rushingYardsAllowed: 90, sackYardsLostAllowed: 0, pointsAllowed: 13,
+      },
+    ]);
+
+    const body = await playerSeason(db, leagueId, "DST-LAR", clock);
+    expect(body?.season).toBe(LAST_SEASON);
+    expect(body?.kdefSeason?.facts.kind).toBe("DEF");
+    expect(body?.kdefSeason?.games).toBe(1);
+    expect(body?.weeks.find((week) => week.week === 1)?.points).not.toBeNull();
+  });
+
+  it("leaves every other position's path exactly as it was", async () => {
+    const leagueId = await league();
+    const body = await playerSeason(db, leagueId, "rb1", clock);
+    expect(body?.kdefSeason).toBeNull();
+    expect(body?.log.length).toBeGreaterThan(0);
+    expect(body?.totals).not.toBeNull();
   });
 });
 

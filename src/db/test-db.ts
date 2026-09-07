@@ -32,6 +32,13 @@ export function createTestDb(): Db {
   return db;
 }
 
+/**
+ * `nflverse_kicking_weeks` cascades from `nfl_players`, but naming it below is not redundant:
+ * `nflverse_team_defense_weeks` beside it has NO foreign key at all (a team code is not an
+ * `nfl_players.id`), so nothing cascades to it and a defense week written by one test outlived
+ * every truncate until it was named. The pair is listed together so the two halves of the same
+ * archive cannot drift apart again.
+ */
 export async function truncateAll(db: Db): Promise<void> {
   await db.execute(sql`
     TRUNCATE TABLE
@@ -43,6 +50,7 @@ export async function truncateAll(db: Db): Promise<void> {
       preseason_rosters, preseason_rankings, preseason_projections, preseason_board_reasons, player_crosswalk,
       register_freeze_rows, register_grade_rows,
       nfl_draft_picks, nflverse_injuries, nflverse_roster_weeks,
+      nflverse_kicking_weeks, nflverse_team_defense_weeks,
       draft_sheet_entries, draft_sheets,
       sim_runs, adp_snapshots, player_capsules,
       nfl_players, player_stat_lines, players, stat_weeks, nfl_games, capture_snapshots,

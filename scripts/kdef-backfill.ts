@@ -14,6 +14,7 @@ import { createDb } from "@/db/client";
 import { seedTeamDefenseUniverse } from "@/projections/crosswalk";
 import { createNflverseClient } from "@/projections/nflverse/client";
 import { ingestKickingWeeks } from "@/projections/nflverse/kicking-weeks";
+import { SCHEDULE_SOURCE_CONFIG } from "@/projections/nflverse/schedule";
 import { ingestTeamDefenseWeeks } from "@/projections/nflverse/team-defense-weeks";
 
 /** The first season the model reads. Earlier seasons exist in the release and are deliberately not
@@ -67,10 +68,13 @@ async function main(): Promise<void> {
   console.log(`\n${"=".repeat(88)}`);
   console.log(`TEAM DEFENCE WEEKS, ${SEASONS[0]} to ${SEASONS[SEASONS.length - 1]}`);
   console.log(`${"=".repeat(88)}`);
-  for (const report of await ingestTeamDefenseWeeks(db, client, SEASONS)) {
+  // The schedule file lives on a different host from the release assets, so it needs its own
+  // client — see `ingestTeamDefenseWeeks`. It is what fills `points_allowed`.
+  const scheduleClient = createNflverseClient({ baseUrl: SCHEDULE_SOURCE_CONFIG.baseUrl });
+  for (const report of await ingestTeamDefenseWeeks(db, client, SEASONS, scheduleClient)) {
     console.log(
       `  ${report.season}  file ${String(report.rowsRead).padStart(6)} rows   written ${String(report.written).padStart(4)}   ` +
-        `unpaired (dropped, never zeroed) ${report.unpaired}`,
+        `unpaired (dropped, never zeroed) ${report.unpaired}   no points allowed ${report.withoutPointsAllowed}`,
     );
   }
 

@@ -2,6 +2,7 @@ import type { PlayerFactsRankedStat, PlayerFactsTrend, PlayerFactsUsage } from "
 import type { Position } from "@/domain/player";
 import { Card, Stat } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import type { DefenseSeasonFacts, KdefSeasonLine, KickerSeasonFacts } from "@/projections/kdef/season-lines";
 
 export interface RoleModuleProps {
   /** Not part of the dossier plan's own two-prop shorthand, but required by the format it binds
@@ -14,6 +15,13 @@ export interface RoleModuleProps {
    *  absent share already prints. */
   readonly usage: PlayerFactsUsage | null;
   readonly trend: PlayerFactsTrend | null;
+  /**
+   * A KICKER'S OR A TEAM DEFENSE'S MEASURED SEASON (the 2026-09-06 round), when this is one of
+   * those two positions and the archive holds a season for him. It REPLACES the share rows rather
+   * than joining them: snap, target and red-zone share are all questions about an offensive role,
+   * and neither of these two positions has one. `null`, and the module is exactly what it was.
+   */
+  readonly kdef?: KdefSeasonLine | null;
 }
 
 interface ShareRow {
@@ -67,6 +75,103 @@ function trendSentence(priorSeason: number, priorValue: number, recentSeason: nu
   };
 }
 
+/** One labelled figure, the shape every kicker and team defense row below takes. */
+interface FactRow {
+  readonly label: string;
+  readonly value: string;
+}
+
+/** `24 of 28 · 86%`, or `0 of 0` with no rate at all, because a rate over no attempts is not 0%. */
+function madeOf(made: number, attempted: number): string {
+  return attempted === 0 ? `${made} of ${attempted}` : `${made} of ${attempted} · ${Math.round((made / attempted) * 100)}%`;
+}
+
+function perGame(total: number, games: number): string {
+  return games === 0 ? "no games on record" : (total / games).toFixed(1);
+}
+
+/**
+ * A KICKER'S SEASON, in the terms a kicker is judged in: how many he made of how many he tried,
+ * banded by distance, and his extra points.
+ *
+ * THE LONGEST ROW NAMES A BAND AND NOT A DISTANCE. The published file records makes and misses in
+ * brackets, never the yardage of any one kick, so "his longest was 56" is a number this product
+ * does not hold. The band it can back is the band it states.
+ */
+function kickerRows(facts: KickerSeasonFacts): readonly FactRow[] {
+  return [
+    { label: "Field goals", value: madeOf(facts.fieldGoalsMade, facts.fieldGoalsAttempted) },
+    ...facts.distanceBands.map((band) => ({ label: `${band.label} yards`, value: madeOf(band.made, band.attempted) })),
+    { label: "Extra points", value: madeOf(facts.extraPointsMade, facts.extraPointsAttempted) },
+    { label: "Longest make", value: facts.longestMadeBand === null ? "he made none" : `${facts.longestMadeBand} yards` },
+  ];
+}
+
+/**
+ * A TEAM DEFENSE'S SEASON, per game, because a defense that played fourteen weeks and one that
+ * played seventeen are not comparable on totals.
+ *
+ * POINTS ALLOWED IS STATED OVER THE GAMES THAT CARRY IT, and the row says how many that was. A
+ * defense week the archive has no scoreline for is scored without the points-allowed bracket at
+ * all, so averaging it in as a zero would flatter it twice over.
+ */
+function defenseRows(facts: DefenseSeasonFacts, games: number): readonly FactRow[] {
+  return [
+    { label: "Sacks a game", value: perGame(facts.sacks, games) },
+    { label: "Takeaways a game", value: perGame(facts.takeaways, games) },
+    { label: "Defensive touchdowns", value: String(facts.defensiveTouchdowns) },
+    {
+      label: "Yards allowed a game",
+      value: facts.gamesWithYardsAllowed === 0 ? "not recorded for these games" : String(Math.round(facts.yardsAllowed / facts.gamesWithYardsAllowed)),
+    },
+    {
+      label: "Points allowed a game",
+      value:
+        facts.pointsAllowed === null
+          ? "not recorded for any of these games"
+          : `${perGame(facts.pointsAllowed, facts.gamesWithPointsAllowed)} over ${facts.gamesWithPointsAllowed} games`,
+    },
+  ];
+}
+
+/** How many of his games landed in each scoring bracket, the brackets the engine itself scores
+ *  (`pointsAllowedBands`). Only the brackets he actually reached, so the row is a shape rather
+ *  than a table of zeros. */
+function BandMix({ facts }: { readonly facts: DefenseSeasonFacts }) {
+  const reached = facts.pointsAllowedBandGames.filter((band) => band.games > 0);
+  if (reached.length === 0) return null;
+  return (
+    <p className="text-sm text-text-muted" data-role="points-allowed-bands">
+      <span className={`${MICRO_LABEL} text-text-faint`}>Points allowed, by bracket</span>{" "}
+      {reached.map((band) => `${band.label} in ${band.games}`).join(", ")}
+    </p>
+  );
+}
+
+/** The measured season's own rows, whichever of the two positions this is. */
+function KdefRows({ line }: { readonly line: KdefSeasonLine }) {
+  const rows = line.facts.kind === "K" ? kickerRows(line.facts) : defenseRows(line.facts, line.games);
+  return (
+    <div className="flex flex-col gap-3">
+      <p className={`${MICRO_LABEL} text-text-faint`}>
+        {line.facts.kind === "K" ? "Kicker" : "Team defense"}, {line.season}, {line.games} games
+      </p>
+      {rows.map((row) => (
+        <div key={row.label} className="flex items-baseline justify-between gap-2 text-sm" data-role-fact={row.label}>
+          <span className={`${MICRO_LABEL} text-text-faint`}>{row.label}</span>
+          <span className="tabular-nums text-text-muted">{row.value}</span>
+        </div>
+      ))}
+      {line.facts.kind === "DEF" ? <BandMix facts={line.facts} /> : null}
+      {line.weeksMissingPointsAllowed === 0 ? null : (
+        <p className="text-sm text-text-muted" data-role="points-allowed-gap">
+          {line.weeksMissingPointsAllowed} of these games have no final score on record, and are scored without the points-allowed bracket.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * THE ROLE MODULE (dossier plan, Task 4) — last season's usage, plain: a share bar per metric,
  * each stating its own percentage and position rank with the rank's own qualifier count, and the
@@ -77,9 +182,17 @@ function trendSentence(priorSeason: number, priorValue: number, recentSeason: nu
  * happen to exist. The trend line is genuinely absent (no row at all) when there is nothing
  * material to say, matching every other "nothing to say" surface on this product.
  */
-export function RoleModule({ position, usage, trend }: RoleModuleProps) {
+export function RoleModule({ position, usage, trend, kdef = null }: RoleModuleProps) {
   const pointsPerGame = trend?.pointsPerGame ?? null;
   const trendMetric = pointsPerGame !== null && pointsPerGame.material ? pointsPerGame : null;
+
+  if (kdef !== null) {
+    return (
+      <Card as="section" aria-label="Role" className="flex flex-col gap-4">
+        <KdefRows line={kdef} />
+      </Card>
+    );
+  }
 
   return (
     <Card as="section" aria-label="Role" className="flex flex-col gap-4">

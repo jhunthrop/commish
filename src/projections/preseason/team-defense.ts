@@ -2,7 +2,7 @@ import { STAT_FIELDS, type StatLine } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring/compute";
 import { finalWeekOf } from "../nflverse/team-eras";
-import { productTeamCode, teamDefenseUniverseId } from "../nflverse/team-codes";
+import { teamDefenseUniverseId, teamWeekKey } from "../nflverse/team-codes";
 import type { TeamDefenseWeekRow } from "../nflverse/team-defense-weeks";
 import type { GamesPlayedOutlook } from "./availability";
 import type { BoardCandidate } from "./board";
@@ -89,9 +89,7 @@ export type AllowedGame = readonly [pointsAllowed: number, yardsAllowed: number]
  * season that simply vanished from the sample. It was visible at all only because
  * `defenseGamesFrom` COUNTS what it drops instead of swallowing it.
  */
-export function pointsAllowedKey(season: number, week: number, team: string): string {
-  return `${season}|${week}|${productTeamCode(team)}`;
-}
+export const pointsAllowedKey = teamWeekKey;
 
 /**
  * Joins the archived defence rows to the points each club allowed, which lives in the schedule

@@ -114,6 +114,14 @@ export function DossierComposition({ body, dossier, depth, switcher, played, rea
             </div>
           )}
           <Outlook reasons={body.reasons} laws={body.laws} position={body.player.position} capsule={body.capsule} capped={depth === "peek"} />
+          {/* A KICKER AND A TEAM DEFENSE LAND HERE, ALWAYS (the 2026-09-06 round): the board
+              ranks neither, so `dossier` is null for both and this fallback is their whole page.
+              It used to be a source strip of dashes over an empty chart. The role module now
+              carries what the archive measurably holds about them, and the chart below it draws
+              the season those same weeks came from. */}
+          {body.kdefSeason === null ? null : (
+            <RoleModule position={body.player.position} usage={null} trend={null} kdef={body.kdefSeason} />
+          )}
           <SeasonChartFallback body={body} switcher={switcher} played={played} />
         </>
       ) : (

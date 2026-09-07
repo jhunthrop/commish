@@ -26,6 +26,7 @@ function bodyFor(overrides: Partial<PlayerSeasonBody> = {}): PlayerSeasonBody {
     injuryDesignation: null,
     log: [],
     totals: null,
+    kdefSeason: null,
     news: [],
     reasons: [],
     laws: [],
@@ -64,5 +65,36 @@ describe("SeasonChartFallback", () => {
     await renderSurface(<SeasonChartFallback body={bodyFor()} switcher={undefined} played />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  /**
+   * A KICKER'S CHART NAMES ITS BASIS (the 2026-09-06 round). His bars come out of the kicking
+   * archive rather than out of this league's live table, and the whole reason they can be drawn is
+   * that they are a record of games that were played. A reader who is not told that will supply an
+   * answer, and the wrong one is "this is what the model expects".
+   */
+  it("names the basis under a kicker's or a team defense's chart", () => {
+    render(
+      <SeasonChartFallback
+        body={bodyFor({
+          player: { id: "k1", name: "A Kicker", position: "K", nflTeam: "BAL", headshotUrl: null, adp: 140.2 },
+          season: 2025,
+          availableSeasons: [2025],
+          weeks: [{ week: 1, points: 11, percentile: null }],
+          kdefSeason: { playerId: "k1", position: "K", season: 2025, weeks: [], points: 148.5, games: 16, pointsPerGame: 9.3, weeksMissingPointsAllowed: 0, facts: { kind: "K", fieldGoalsMade: 24, fieldGoalsAttempted: 28, extraPointsMade: 38, extraPointsAttempted: 40, distanceBands: [], longestMadeBand: null } },
+        })}
+        switcher={undefined}
+        played
+      />,
+    );
+    const basis = screen.getByTestId("season-basis");
+    expect(basis.textContent).toContain("Every 2025 game he played, scored under this league's rules.");
+    expect(basis.textContent).toContain("not a forecast");
+    expect(basis.textContent).not.toMatch(/[—;]/);
+  });
+
+  it("prints no basis line for a position that carries a projection", () => {
+    render(<SeasonChartFallback body={bodyFor()} switcher={undefined} played />);
+    expect(screen.queryByTestId("season-basis")).not.toBeInTheDocument();
   });
 });

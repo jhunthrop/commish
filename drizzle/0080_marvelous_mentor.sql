@@ -1,0 +1,1 @@
+ALTER TABLE "nflverse_team_defense_weeks" ADD COLUMN "sack_yards_lost_allowed" integer;

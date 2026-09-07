@@ -70,7 +70,9 @@ export default async function BoardPage({ searchParams }: PageProps) {
   const shape = selected === null ? { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } : { teamCount: selected.teamCount, rosterSlots: selected.rosterSlots };
 
   const [rows, auctionBudget] = await Promise.all([
-    boardRows(db, { shape }),
+    // `leagueId` is what the LAST SEASON column is measured under for the kicker and team defense
+    // tabs — the generic board names none and falls back to PPR, exactly as its own banner says.
+    boardRows(db, { shape, leagueId: selected?.leagueId }),
     selected === null
       ? Promise.resolve(null)
       : db
