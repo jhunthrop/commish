@@ -590,6 +590,23 @@ describe("playerSeason, a kicker and a team defense", () => {
     expect(body?.pointsPerGame).toBe(body!.kdefSeason!.pointsPerGame);
   });
 
+  it("keeps the season in play on the league's live table and offers last season from the archive", async () => {
+    // The archive ends at last season by design, so mid-season the live table must still answer:
+    // routing the current season to the archive told a manager "no scored week" while his kicks
+    // were landing in `player_stat_lines` every Sunday night.
+    const leagueId = await league({ played: true });
+    await seedKicker(leagueId);
+    await seedKickingWeek(1);
+    await db.insert(playerStatLines).values([{ ...EMPTY_LINE, playerId: "k1", week: 1, fieldGoalsMade: 3, extraPointsMade: 2 }]);
+
+    const body = await playerSeason(db, leagueId, "k1", clock);
+    expect(body?.availableSeasons).toEqual([PRODUCT_SEASON, LAST_SEASON]);
+    expect(body?.season).toBe(PRODUCT_SEASON);
+    const weekOne = body?.weeks.find((week) => week.week === 1);
+    expect(weekOne?.points).not.toBeNull();
+    expect(weekOne?.points ?? 0).toBeGreaterThan(0);
+  });
+
   it("leaves a week he did not play absent, never a zero", async () => {
     const leagueId = await league({ played: false });
     await seedKicker(leagueId);
@@ -627,7 +644,7 @@ describe("playerSeason, a kicker and a team defense", () => {
         season: LAST_SEASON, week: 1, team: "LA", opponentTeam: "SF",
         sacks: 4, interceptions: 2, fumbleRecoveries: 1, defensiveTouchdowns: 1, safeties: 0,
         puntBlocks: 0, extraPointBlocks: 0, fieldGoalBlocks: 0, specialTeamsTouchdowns: 0,
-        passingYardsAllowed: 200, rushingYardsAllowed: 90, pointsAllowed: 13,
+        passingYardsAllowed: 200, rushingYardsAllowed: 90, sackYardsLostAllowed: 0, pointsAllowed: 13,
       },
     ]);
 

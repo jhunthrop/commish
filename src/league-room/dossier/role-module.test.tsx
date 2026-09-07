@@ -61,6 +61,7 @@ const DEFENSE_FACTS: DefenseSeasonFacts = {
   specialTeamsTouchdowns: 1,
   safeties: 1,
   yardsAllowed: 4960,
+  gamesWithYardsAllowed: 16,
   pointsAllowed: 296,
   gamesWithPointsAllowed: 16,
   pointsAllowedBandGames: [
@@ -183,15 +184,15 @@ describe("RoleModule, a kicker and a team defense", () => {
     expect(container.querySelector('[data-role="points-allowed-bands"]')?.textContent).toContain("1 to 6 in 3");
   });
 
-  it("says how many of his games have no final score, rather than averaging them in as zero", () => {
+  it("says how many of these games have no final score, rather than averaging them in as zero", () => {
     const { container } = render(<RoleModule position="DEF" usage={null} trend={null} kdef={defenseLine({ weeksMissingPointsAllowed: 1 })} />);
-    expect(container.querySelector('[data-role="points-allowed-gap"]')?.textContent).toContain("1 of his games have no final score on record");
+    expect(container.querySelector('[data-role="points-allowed-gap"]')?.textContent).toContain("1 of these games have no final score on record");
   });
 
   it("says plainly that points allowed was never recorded, rather than printing a zero", () => {
     const facts = { ...DEFENSE_FACTS, pointsAllowed: null, gamesWithPointsAllowed: 0, pointsAllowedBandGames: [] };
     const { container } = render(<RoleModule position="DEF" usage={null} trend={null} kdef={{ ...LINE, position: "DEF", facts }} />);
-    expect(container.textContent).toContain("not recorded for any of his games");
+    expect(container.textContent).toContain("not recorded for any of these games");
     expect(container.querySelector('[data-role="points-allowed-bands"]')).toBeNull();
   });
 

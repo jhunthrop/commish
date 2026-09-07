@@ -144,8 +144,12 @@ function MarketOrderBody({ row }: { readonly row: BoardRow }) {
  */
 function lastSeasonSentence(row: BoardRow): string {
   const last = row.lastSeason;
-  if (last === null) return `He has no ${BOARD_LAST_SEASON} season on record, so there is nothing here to measure.`;
-  return `In ${last.season} he scored ${last.points.toFixed(1)} points over ${last.games} games, ${last.pointsPerGame.toFixed(1)} a game, under this league's scoring.`;
+  // A team defense is a club, not a "he".
+  const subject = row.position === "DEF" ? "this defense" : "he";
+  if (last === null) {
+    return `${row.position === "DEF" ? "This defense" : "He"} has no ${BOARD_LAST_SEASON} season on record, so there is nothing here to measure.`;
+  }
+  return `In ${last.season} ${subject} scored ${last.points.toFixed(1)} points over ${last.games} games, ${last.pointsPerGame.toFixed(1)} a game, under this league's scoring.`;
 }
 
 function EvidenceDrawer({ state, laws, onClose }: { readonly state: EvidenceDrawerState; readonly laws: readonly Law[]; readonly onClose: () => void }) {

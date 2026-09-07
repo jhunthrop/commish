@@ -355,11 +355,13 @@ async function marketOrderRows(db: Db, byes: ReadonlyMap<string, number>, league
     .from(playersTable)
     .where(inArray(playersTable.position, [...positions]));
 
-  const lastSeason = await lastSeasonLines(db, rows.map((row) => row.playerId), leagueId);
+  // Only a PRICED player becomes a row (see the docblock), so only priced players are worth a
+  // read of the archive.
+  const priced = rows.flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]));
+  const lastSeason = await lastSeasonLines(db, priced.map((row) => row.playerId), leagueId);
 
   const rankedByPosition = new Map<string, number>();
-  return rows
-    .flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]))
+  return priced
     .sort((a, b) => a.adp - b.adp || a.playerId.localeCompare(b.playerId))
     .map((row): BoardRow => {
       const place = (rankedByPosition.get(row.position) ?? 0) + 1;

@@ -289,6 +289,10 @@ export function mapBoxScoreToStatLines(
       ...emptyStats(defenseId, week),
       sacks: num(entry.sacks),
       defensiveInterceptions: num(entry.defensiveInterceptions),
+      // Return touchdowns are NOT mapped here: the DST block carries no field this mapper has
+      // verified for them, and inventing one from `defTD` would double count. The kicker and team
+      // defense archive (`projections/kdef/season-lines.ts`) does score them from the published
+      // `special_teams_tds`, so the two paths disagree on that one event until this block learns it.
       defensiveTouchdowns: num(entry.defTD),
       // The harvest + scoring-vocabulary blocks (2026-08-30): the DST side carries the tier
       // inputs and the counting categories directly.

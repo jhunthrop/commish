@@ -120,12 +120,15 @@ function defenseRows(facts: DefenseSeasonFacts, games: number): readonly FactRow
     { label: "Sacks a game", value: perGame(facts.sacks, games) },
     { label: "Takeaways a game", value: perGame(facts.takeaways, games) },
     { label: "Defensive touchdowns", value: String(facts.defensiveTouchdowns) },
-    { label: "Yards allowed a game", value: games === 0 ? "no games on record" : String(Math.round(facts.yardsAllowed / games)) },
+    {
+      label: "Yards allowed a game",
+      value: facts.gamesWithYardsAllowed === 0 ? "not recorded for these games" : String(Math.round(facts.yardsAllowed / facts.gamesWithYardsAllowed)),
+    },
     {
       label: "Points allowed a game",
       value:
         facts.pointsAllowed === null
-          ? "not recorded for any of his games"
+          ? "not recorded for any of these games"
           : `${perGame(facts.pointsAllowed, facts.gamesWithPointsAllowed)} over ${facts.gamesWithPointsAllowed} games`,
     },
   ];
@@ -162,7 +165,7 @@ function KdefRows({ line }: { readonly line: KdefSeasonLine }) {
       {line.facts.kind === "DEF" ? <BandMix facts={line.facts} /> : null}
       {line.weeksMissingPointsAllowed === 0 ? null : (
         <p className="text-sm text-text-muted" data-role="points-allowed-gap">
-          {line.weeksMissingPointsAllowed} of his games have no final score on record, and are scored without the points-allowed bracket.
+          {line.weeksMissingPointsAllowed} of these games have no final score on record, and are scored without the points-allowed bracket.
         </p>
       )}
     </div>

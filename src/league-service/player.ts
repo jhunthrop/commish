@@ -7,7 +7,7 @@ import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG, seasonProgress } from "@/league";
 import { nflPlayerIdFor, nflPlayerIdsFor } from "@/projections/crosswalk";
-import { kdefSeasonLines, type KdefSeasonLine } from "@/projections/kdef/season-lines";
+import { kdefSeasonLines, kdefSeasonsHeld, type KdefSeasonLine } from "@/projections/kdef/season-lines";
 import type { SeasonStatLine } from "@/projections/lines";
 import type { Law } from "@/projections/laws/types";
 import { chipEligibleLaws, registry } from "@/projections/laws/registry";
@@ -459,13 +459,8 @@ async function kdefSeasonStats(db: Db, playerId: string, season: number, rules: 
 /** Which of the recent seasons the kicker/team-defense archive actually holds a week of for him,
  *  newest first — the `availableSeasons` question, asked of the archive rather than of the
  *  observation store the other positions read. */
-async function kdefSeasonsWithData(db: Db, playerId: string, rules: ScoringRules): Promise<readonly number[]> {
-  const found: number[] = [];
-  for (let back = 1; back <= HISTORY_SEASONS; back += 1) {
-    const season = PRODUCT_SEASON - back;
-    if ((await kdefSeasonLines(db, { season, playerIds: [playerId], rules })).has(playerId)) found.push(season);
-  }
-  return found;
+async function kdefSeasonsWithData(db: Db, playerId: string, priorCandidates: readonly number[]): Promise<readonly number[]> {
+  return kdefSeasonsHeld(db, playerId, priorCandidates);
 }
 
 /**
@@ -594,15 +589,21 @@ interface SeasonStatsInput {
 /**
  * WHICH OF THE THREE STAT PATHS ANSWERS FOR THIS BODY.
  *
- * A kicker and a team defense read their own archive for every season, current one included: the
- * league's live table holds no kicking or team defensive line until its own weeks report, and the
- * observation store never holds one at all. Everybody else keeps exactly the choice this function
+ * A kicker and a team defense read their own archive for every FINISHED season: the observation
+ * store every other position reads never holds a kicking or team defensive line. The current
+ * season stays on the league's live table for them too, which carries their lines every Sunday
+ * night (see the first branch below). Everybody else keeps exactly the choice this function
  * was extracted from — the live table for the current season, the observation store for a prior
  * one, and the live table again for a player the crosswalk could not place (folded in so
  * TypeScript, not just this file's logic, can see why `priorSeasonStats` never runs unplaced).
  */
 async function seasonStats({ db, playerId, player, peerIds, played, rules, season, gsisId, isKdef, now }: SeasonStatsInput): Promise<PlayerSeasonStats> {
-  if (isKdef) return await kdefSeasonStats(db, playerId, season, rules);
+  // THE ARCHIVE ANSWERS FINISHED SEASONS ONLY. It ends at the last completed season by design
+  // (`scripts/kdef-backfill.ts` refuses the data year), so routing the CURRENT season to it would
+  // tell a manager mid-October "no scored week for him in this season" while `player_stat_lines`
+  // is carrying his kicking and DST lines every Sunday night. The live table keeps the season in
+  // play for these two positions exactly as it does for every other.
+  if (isKdef && season !== PRODUCT_SEASON) return await kdefSeasonStats(db, playerId, season, rules);
   if (season === PRODUCT_SEASON || gsisId === null) {
     return await currentSeasonStats(db, playerId, player.position, peerIds, played, rules);
   }
@@ -760,7 +761,7 @@ export async function playerSeason(
   const priorCandidates = Array.from({ length: HISTORY_SEASONS }, (_, back) => PRODUCT_SEASON - (back + 1));
   const priorSeasonsWithData: number[] = [];
   if (isKdef) {
-    priorSeasonsWithData.push(...(await kdefSeasonsWithData(db, playerId, rules)));
+    priorSeasonsWithData.push(...(await kdefSeasonsWithData(db, playerId, priorCandidates)));
   } else if (gsisId !== null) {
     for (const candidate of priorCandidates) {
       if (await priorSeasonHasData(db, gsisId, candidate, now)) priorSeasonsWithData.push(candidate);
