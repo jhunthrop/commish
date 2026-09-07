@@ -29,7 +29,8 @@ import type { Clock } from "@/domain/timing";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
 import { LEAGUE_CONFIG } from "@/league";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
-import { scoringHashOf, type ScoringRules } from "@/scoring";
+import { type ScoringRules } from "@/scoring";
+import { scoringHashOf } from "@/scoring/hash";
 import type { PlayerSeasonBody } from "./player-body";
 import { writeLeagueScoringHash } from "./scoring-hash";
 

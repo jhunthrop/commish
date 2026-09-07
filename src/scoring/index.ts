@@ -13,5 +13,4 @@ export {
   type LineupScore,
 } from "./compute";
 export * from "./presets";
-export { scoringHashOf } from "./hash";
 export { describeScoring } from "./describe";

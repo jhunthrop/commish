@@ -20,7 +20,7 @@ import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "@/projections/nflverse/pb
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
-import { scoringHashOf } from "@/scoring";
+import { scoringHashOf } from "@/scoring/hash";
 import { createLeague } from "./creation";
 import { playerSeason } from "./player";
 

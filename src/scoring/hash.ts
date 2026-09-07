@@ -1,3 +1,7 @@
+// SERVER ONLY: `node:crypto` cannot be bundled for the browser. This module is deliberately NOT
+// re-exported from `@/scoring`'s barrel, because that barrel is value-imported by client code
+// (the Draft HQ board view reaches it through the kicker and defense season lines), and the
+// 2026-09-07 deploy failed on exactly that path. Import it as `@/scoring/hash` from server code only.
 import { createHash } from "node:crypto";
 import { STANDARD_SCORING, type ScoringSettings } from "@/domain/scoring";
 import { SCORING_TIER_TABLES, type ScoringRules } from "./compute";

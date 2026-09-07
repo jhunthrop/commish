@@ -6,7 +6,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
 import { createLeague } from "@/league-service/creation";
-import { scoringHashOf } from "@/scoring";
+import { scoringHashOf } from "@/scoring/hash";
 import { TANK01_CONFIG } from "@/stats/tank01/config";
 import { TerminalJobError } from "../contract";
 import { JOB_DEFINITIONS } from "../registry";

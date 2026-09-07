@@ -4,7 +4,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { leagues, users } from "@/db/schema";
 import { HALF_PPR_SCORING, PPR_SCORING, STANDARD_SCORING } from "@/domain/scoring";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { scoringHashOf } from "@/scoring";
+import { scoringHashOf } from "@/scoring/hash";
 import { createLeague } from "./creation";
 import { backfillLeagueScoringHashes, scoringHashesInUse } from "./scoring-hash";
 import { writeLeagueScoring } from "./settings";

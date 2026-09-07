@@ -9,7 +9,7 @@ import { DERIVED_STAT_LINE_SOURCE } from "@/projections/nflverse/derived-stat-li
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
-import { scoringHashOf } from "@/scoring";
+import { scoringHashOf } from "@/scoring/hash";
 import { collectBoardFacts } from "./collect";
 import { writeRefresh } from "./peek-facts";
 import { writePeekDocuments } from "./peek-document-store";

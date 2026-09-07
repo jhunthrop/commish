@@ -14,7 +14,7 @@ import { DERIVED_STAT_LINE_SOURCE } from "@/projections/nflverse/derived-stat-li
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { recordObservations, type PlayerWeekObservation } from "@/projections/store";
-import { scoringHashOf } from "@/scoring";
+import { scoringHashOf } from "@/scoring/hash";
 import { runCapsuleSweepStep } from "./capsule-sweep-job";
 import {
   enqueuePeekDocumentRebuildsQuietly,

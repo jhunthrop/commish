@@ -6,7 +6,8 @@ import { eq, inArray } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { leagues, scoringSettings } from "@/db/schema";
 import { PPR_SCORING } from "@/domain/scoring";
-import { scoringHashOf, type ScoringRules } from "@/scoring";
+import { type ScoringRules } from "@/scoring";
+import { scoringHashOf } from "@/scoring/hash";
 
 /** One league's rules as stored, or the same `PPR_SCORING` fallback `playerSeason` has always used
  *  for a league whose settings row was never written. */

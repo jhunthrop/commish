@@ -7,7 +7,7 @@ import type { Clock } from "@/domain/timing";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { PPR_SCORING, STANDARD_SCORING } from "@/domain/scoring";
 import { createLeague } from "@/league-service/creation";
-import { scoringHashOf } from "@/scoring";
+import { scoringHashOf } from "@/scoring/hash";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
 import type { BoardEntry } from "@/projections/preseason/board";
 import { BOARD_SOURCE, projectionRows, recordPreseasonProjections } from "@/projections/preseason/board-store";
