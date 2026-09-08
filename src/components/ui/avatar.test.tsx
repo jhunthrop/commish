@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Avatar } from "./avatar";
 import { renderSurface } from "./test-utils";
@@ -30,6 +30,15 @@ describe("Avatar", () => {
     const img = container.querySelector("img");
     expect(img).toHaveAttribute("src", "https://workoscdn.com/u/a.png");
     expect(img).toHaveAttribute("alt", "");
+  });
+
+  it("falls back to the initials when the remote image fails to load, and tries again for a new ref", () => {
+    const view = render(<Avatar name="Dana Whitfield" avatar="https://workoscdn.com/u/a.png" />);
+    fireEvent.error(view.container.querySelector("img")!);
+    expect(view.container.querySelector("img")).toBeNull();
+    expect(screen.getByText("DW")).toBeInTheDocument();
+    view.rerender(<Avatar name="Dana Whitfield" avatar="https://workoscdn.com/u/b.png" />);
+    expect(view.container.querySelector("img")).toHaveAttribute("src", "https://workoscdn.com/u/b.png");
   });
 
   it("becomes an accessible image when labelled", async () => {

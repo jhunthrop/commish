@@ -3,6 +3,7 @@ import type { Db, DbTx, ReadonlyDb } from "@/db/client";
 import { preseasonBoardReasons, preseasonProjections } from "@/db/schema";
 import { changedRowWhere, excludedSetFor } from "@/db/upsert";
 import type { JsonObject } from "@/domain/audit";
+import { BOARD_MEMO_GROUP, invalidateTtlMemoGroup } from "@/lib/cache/ttl-memo";
 import type { BoardEntry, BoardReason } from "./board";
 import type { BoardMoment } from "./source";
 
@@ -640,7 +641,7 @@ export async function writePreseasonBoard(
   if (stamp.momentKind === "replay") {
     const written = await recordPreseasonProjections(db, rows);
     const reasonsWritten = await recordPreseasonBoardReasons(db, reasons);
-    return { mode: "append", written, reasonsWritten, retiredProjections: 0, retiredReasons: 0 };
+    return boardWritten({ mode: "append", written, reasonsWritten, retiredProjections: 0, retiredReasons: 0 });
   }
 
   if (board.length === 0) {
@@ -649,7 +650,7 @@ export async function writePreseasonBoard(
     );
   }
 
-  return db.transaction(async (tx) => {
+  const counts = await db.transaction(async (tx): Promise<BoardWriteCounts> => {
     const retired = await deletePreseasonBoard(tx, stamp);
     const written = await recordPreseasonProjections(tx, rows);
     const reasonsWritten = await recordPreseasonBoardReasons(tx, reasons);
@@ -661,6 +662,20 @@ export async function writePreseasonBoard(
       retiredReasons: retired.reasons,
     };
   });
+  return boardWritten(counts);
+}
+
+/**
+ * THE WRITE'S ONE SIDE EFFECT ON THIS INSTANCE (site search fix round, 2026-09-08): every memo
+ * built on the served board (`BOARD_MEMO_GROUP`: the generic board, its reasons, the search index,
+ * the team pages) is dropped the moment the board is written, so a re-persist is visible to the
+ * next request here rather than within the memos' hour. Called AFTER the transaction has committed,
+ * never inside it, so a rolled-back write leaves the memos serving the board that still stands.
+ * Other instances learn of the write by expiry, the process-local trade `createTtlMemo` states.
+ */
+function boardWritten(counts: BoardWriteCounts): BoardWriteCounts {
+  invalidateTtlMemoGroup(BOARD_MEMO_GROUP);
+  return counts;
 }
 
 const SELECTED = {

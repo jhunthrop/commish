@@ -37,16 +37,48 @@ const systemClock: Clock = { now: () => new Date().toISOString() };
  *  (`truncateAll` in `src/db/test-db.ts`) the way it already resets `rankedPlayers`' cache. */
 const registry = new Set<TtlMemo<unknown>>();
 
+/**
+ * MEMOS BY THE SOURCE THEY CACHE (site search fix round, 2026-09-08). A TTL bounds how stale a
+ * memo may be on an instance that saw no write; it cannot see a write. A memo that names its
+ * source's group is dropped the moment that source is written on THIS instance
+ * (`invalidateTtlMemoGroup`), so a board re-persist reaches the search index and the team pages
+ * at once rather than within the hour. Other instances still learn of the write by expiry, the
+ * cross-instance trade the module docblock already states.
+ */
+const groups = new Map<string, Set<TtlMemo<unknown>>>();
+
+/** The group every memo built on the served board joins: the generic board, its reasons, the
+ *  search index, the team pages. `writePreseasonBoard` clears it. */
+export const BOARD_MEMO_GROUP = "board";
+
+export interface TtlMemoOptions {
+  /** The source this memo caches, for write-triggered invalidation. */
+  readonly group?: string;
+}
+
 /** Test-only escape hatch: drops every entry of every memo in this process. */
 export function invalidateAllTtlMemosForTests(): void {
   for (const memo of registry) memo.invalidate();
 }
 
-export function createTtlMemo<T>(ttlMs: number, clock: Clock = systemClock): TtlMemo<T> {
+/** Drops every entry of every memo in `group`; answers how many memos were cleared. */
+export function invalidateTtlMemoGroup(group: string): number {
+  const members = groups.get(group);
+  if (members === undefined) return 0;
+  for (const memo of members) memo.invalidate();
+  return members.size;
+}
+
+export function createTtlMemo<T>(ttlMs: number, clock: Clock = systemClock, options: TtlMemoOptions = {}): TtlMemo<T> {
   if (!(ttlMs > 0)) throw new Error(`createTtlMemo: ttlMs must be positive, got ${ttlMs}.`);
   const entries = new Map<string, Entry<T>>();
   const memo = build<T>(ttlMs, clock, entries);
   registry.add(memo as TtlMemo<unknown>);
+  if (options.group !== undefined) {
+    const members = groups.get(options.group) ?? new Set<TtlMemo<unknown>>();
+    members.add(memo as TtlMemo<unknown>);
+    groups.set(options.group, members);
+  }
   return memo;
 }
 

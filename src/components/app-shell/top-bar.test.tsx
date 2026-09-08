@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
@@ -6,6 +6,15 @@ import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 import { NoticesProvider } from "./notices-provider";
 import { TopBar } from "./top-bar";
+
+// `SiteSearch` (site search round) reads `usePathname()` for the league its player links belong
+// to and `useRouter()` to open a chosen result — both throw outside a mounted App Router, so
+// they are stubbed the same way `app-shell.test.tsx` stubs them. `site-search.test.tsx` is where
+// the search itself is exercised; this file only proves the header carries it.
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/app/wallet",
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
 
 // `TopBar` renders `NoticeInbox` (Task 10), a `"use client"` component whose `useNotices()`
 // (Plan D Task 9) requires a `NoticesProvider` ancestor — it throws without one, no silent
@@ -113,5 +122,13 @@ describe("TopBar", () => {
     // Task 13, Step 1c: icon-only at every width — the sentence lives in an `sr-only` sibling,
     // never as visible text (`LiveStatePill`'s own test covers the glyph/count rendering).
     expect(screen.getByText("Sunday · 7 games live")).toBeInTheDocument();
+  });
+
+  it("carries the one site search field on every render, ahead of the live pill (site search round)", () => {
+    renderTopBar("Ada Lovelace", null);
+    const search = screen.getByRole("button", { name: "Search players and teams" });
+    const inbox = screen.getByRole("button", { name: "Notices" });
+    expect(search.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

@@ -10,8 +10,11 @@ import type { RailLeague } from "./shell-data";
 // `LeagueRail` reads `usePathname()` directly (ruling 8, as amended) — same mock shape
 // `league-rail.test.tsx` uses.
 let pathname = "/app";
+// `useRouter` because the header's `SiteSearch` navigates to a chosen result (site search
+// round); nothing in this file presses one, so a stub router is enough.
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
 function mockPathname(next: string): void {

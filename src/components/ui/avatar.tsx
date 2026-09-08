@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { parseAvatarRef, type AvatarTone } from "@/identity/avatars";
 import { Icon } from "./icon";
 
@@ -65,9 +68,22 @@ export function initialsFor(name: string): string {
 /**
  * Decorative by default — an avatar almost always sits beside the same person's name, and
  * announcing it twice is noise. Pass `label` when the avatar stands alone.
+ *
+ * A REMOTE IMAGE THAT FAILS TO LOAD FALLS BACK TO THE INITIALS (site search fix round,
+ * 2026-09-08). An `<img>` that errors renders nothing, so a headshot the CDN no longer serves left
+ * a blank ring where a face or two letters should be. The failure flips one piece of state to the
+ * initials branch, keyed on the url so a new ref gets its own chance. That one state is why this is
+ * a `"use client"` component now; the server components that render it (the top bar, a roster
+ * row) still may.
  */
 export function Avatar({ name, avatar, size = "md", label, className = "" }: AvatarProps) {
   const ref = parseAvatarRef(avatar ?? null);
+  const remoteUrl = ref.kind === "remote" ? ref.url : null;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setFailedUrl(null);
+  }, [remoteUrl]);
+  const showImage = remoteUrl !== null && failedUrl !== remoteUrl;
   const a11y = label === undefined ? { "aria-hidden": true as const } : { role: "img", "aria-label": label };
   return (
     <span
@@ -81,9 +97,9 @@ export function Avatar({ name, avatar, size = "md", label, className = "" }: Ava
         <span className={`flex size-full items-center justify-center ${AVATAR_TONE_CLASS[ref.preset.tone]}`}>
           <Icon name={ref.preset.icon} size={ICON_SIZE[size]} />
         </span>
-      ) : ref.kind === "remote" ? (
+      ) : showImage ? (
         // eslint-disable-next-line @next/next/no-img-element -- parseAvatarRef already enforces the https-only allowlist; next/image is still not used because that would need a per-host allowlist we do not have
-        <img src={ref.url} alt="" className="size-full object-cover" />
+        <img src={remoteUrl} alt="" className="size-full object-cover" onError={() => setFailedUrl(remoteUrl)} />
       ) : (
         <span>{initialsFor(name)}</span>
       )}

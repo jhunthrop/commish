@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icon";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
 import { LiveStatePill } from "@/league-room/components/live-state-pill";
 import { SessionNotice } from "./session-notice";
+import { SiteSearch } from "./site-search";
 import type { LiveState } from "./shell-data";
 
 export interface TopBarProps {
@@ -100,6 +101,12 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
             genuinely present at every width instead of hidden below `sm`) is the second squeeze,
             and `mobile-360.spec.ts`'s own 360px battery is what caught it needing one. */}
         <div className="flex items-center gap-1">
+          {/* THE ONE SEARCH FIELD (site search round, 2026-09-08): first in the right-hand group so
+              it reads as the row's field at `sm` and up and as one more icon-only control below,
+              the discipline this header's own fix-round-1 history requires of a seventh control.
+              `SiteSearch` is a `"use client"` component with no prop from the page: it reads its
+              deps and the rail from context, exactly as `NoticeInbox` does. */}
+          <SiteSearch />
           {/* Task 10, Step 3: the top bar's one live fact — `LiveStatePill` itself renders
               nothing when `liveState` is `null` (ruling 12), so this slot is silent outside a
               real game window with no branch needed here.

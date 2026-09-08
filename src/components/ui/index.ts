@@ -43,6 +43,9 @@ export { percentileWithin, comparisonWithin, type HeatDirection } from "./magnit
  *  union, `TierGrade`'s home is `@/design/tokens` so it is NOT re-exported here. */
 export { PlayerFace } from "./player-face";
 export { PlayerRow } from "./player-row";
+/** A club in the player row's own treatment (site search round): the search overlay's team
+ *  result and, later, any list that seats a team beside players. */
+export { TeamRow } from "./team-row";
 
 /** THE PLAYER SCREEN (2026-08-28). The player as an object at the size of his own screen, and
  *  the sources side by side beneath him. `SourceValue` rides the barrel with the strip because

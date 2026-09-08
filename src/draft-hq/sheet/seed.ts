@@ -1,5 +1,5 @@
 import type { Db } from "@/db/client";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { GENERIC_BOARD_SHAPE } from "@/draft-hq/board/generic-board";
 import { boardRows } from "@/draft-hq/board/service";
 import { seedOrderFrom } from "@/draft-room/quilt/state/sheet-seed";
 import { completedMockRoomsQuery, mockDebriefDeps } from "@/mock-draft-service/debrief";
@@ -19,7 +19,7 @@ const DEFAULT_BOARD_SEED_LIMIT = 200;
  *  by calling `boardRows` directly with that shape instead when one is available; this helper is
  *  the no-league-context default. */
 export async function seedFromBoard(db: Db, limit: number = DEFAULT_BOARD_SEED_LIMIT): Promise<readonly SheetEntryInput[]> {
-  const rows = await boardRows(db, { shape: { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } });
+  const rows = await boardRows(db, { shape: GENERIC_BOARD_SHAPE });
   return rows.slice(0, limit).map((row) => ({ playerId: row.playerId }));
 }
 
