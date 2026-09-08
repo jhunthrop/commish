@@ -413,6 +413,21 @@ export const COMPETITOR_NAMES: readonly string[] = [
   "rtsports",
 ];
 
+/**
+ * THE COMPETITORS WHOSE NAMES ARE ENGLISH WORDS (written rate round, 2026-09-08). "A sleeper" is
+ * the fantasy noun the founder's own ruling asked the writer to use, and the substring check was
+ * rejecting it on seven production players. Each name here is matched only as a PRODUCT reference
+ * (`validate.ts`): capitalised anywhere but the start of a sentence, followed by one of
+ * `COMPETITOR_PRODUCT_CUES`, or preceded by "on". The lowercase noun and adjective pass. Every entry
+ * must also be on `COMPETITOR_NAMES`; `validate.test.ts` pins that.
+ */
+export const COMPETITOR_NAMES_THAT_ARE_WORDS: readonly string[] = ["sleeper", "underdog"];
+
+/** The word after a word-competitor's name that makes it the product whatever its case: "sleeper
+ *  league", "underdog draft", "sleeper ADP". Matched whole, case-insensitively, after an optional
+ *  possessive. */
+export const COMPETITOR_PRODUCT_CUES: readonly string[] = ["app", "league", "leagues", "draft", "drafts", "adp", "rankings", "ranking"];
+
 export const EM_DASH = "—";
 /** Founder law, 2026-09-05, extending the em-dash rule: a semicolon never appears in analysis
  *  prose. People do not talk in semicolons. Two sentences beat one stitched one. */

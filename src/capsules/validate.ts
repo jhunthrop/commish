@@ -1,4 +1,4 @@
-import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, EM_DASH, SEMICOLON, TRADING_REPLACEMENTS } from "./config";
+import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, COMPETITOR_NAMES_THAT_ARE_WORDS, COMPETITOR_PRODUCT_CUES, EM_DASH, SEMICOLON, TRADING_REPLACEMENTS } from "./config";
 import type { PlayerFacts } from "./facts";
 import { NARRATIVE_MIN_WORDS } from "./narrative-slots";
 import { renderFactsForModel } from "./render";
@@ -422,9 +422,44 @@ function bannedTermViolation(term: string): string {
   return `The text uses the banned term "${term}". ${remedy}`;
 }
 
+const PRODUCT_CUE_AFTER = new RegExp(`^(?:['’]s)?\\s+(?:${COMPETITOR_PRODUCT_CUES.join("|")})\\b`, "i");
+const ON_BEFORE = /\bon\s+$/i;
+/** Opening quotes and brackets that sit between a sentence's end and its first word. */
+const SENTENCE_OPENERS = /[\s"'“‘(]+$/;
+
+/** True when the text before `index` ends a sentence (or is the start of the text), so the word at
+ *  `index` is capitalised because every sentence's first word is. */
+function atSentenceStart(text: string, index: number): boolean {
+  const before = text.slice(0, index).replace(SENTENCE_OPENERS, "");
+  return before === "" || /[.!?]$/.test(before);
+}
+
+/**
+ * "SLEEPER" THE WORD VERSUS SLEEPER THE APP (written rate round, 2026-09-08). A competitor whose
+ * name is an English word (`COMPETITOR_NAMES_THAT_ARE_WORDS`) is the product only when the prose
+ * treats it as one: capitalised anywhere but a sentence start, followed by a product cue ("sleeper
+ * league", "Sleeper's ADP"), or preceded by "on" ("on sleeper"). "A sleeper" and "an underdog" are
+ * the fantasy words the writer is asked for and pass.
+ */
+function isProductReference(text: string, name: string): boolean {
+  const pattern = new RegExp(`\\b${name}\\b`, "gi");
+  for (const match of text.matchAll(pattern)) {
+    const index = match.index;
+    const capitalised = /^[A-Z]/.test(match[0]);
+    if (capitalised && !atSentenceStart(text, index)) return true;
+    if (PRODUCT_CUE_AFTER.test(text.slice(index + match[0].length))) return true;
+    if (ON_BEFORE.test(text.slice(0, index))) return true;
+  }
+  return false;
+}
+
 function containsCompetitorName(text: string): string | null {
   const lower = text.toLowerCase();
-  for (const name of COMPETITOR_NAMES) if (lower.includes(name)) return name;
+  for (const name of COMPETITOR_NAMES) {
+    if (COMPETITOR_NAMES_THAT_ARE_WORDS.includes(name)) {
+      if (isProductReference(text, name)) return name;
+    } else if (lower.includes(name)) return name;
+  }
   return null;
 }
 
