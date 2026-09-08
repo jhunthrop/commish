@@ -117,7 +117,7 @@ export interface TeamDefenseSummary {
   readonly games: number;
   readonly pointsPerGame: number;
   readonly facts: DefenseSeasonFacts;
-  /** Its place in the market's order among defenses on the board, or `null` when unpriced. */
+  /** Its place in the ADP order among defenses on the board, or `null` when unpriced. */
   readonly adpRank: number | null;
   readonly scoringLabel: string;
 }

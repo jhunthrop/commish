@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tradingVocabularyViolations } from "./copy-rules";
 import { candidateCopyIn, sourceFilesIn } from "./test-support";
@@ -27,7 +27,18 @@ import { candidateCopyIn, sourceFilesIn } from "./test-support";
  * that renders to a manager without the writer, and the sheet and prompt modules are what the model
  * quotes back to one (refrains round, 2026-09-07). The rest of `src/capsules` is machinery.
  */
-const MANAGER_DIRS = ["src/components", "src/app", "src/league-room", "src/draft-room", "src/draft-hq", "src/chat-room", "src/account-room", "src/admin-room", "src/help"];
+const MANAGER_DIRS = ["src/components", "src/app", "src/league-room", "src/draft-room", "src/draft-hq", "src/chat-room", "src/account-room", "src/admin-room", "src/help", "src/teams", "src/search"];
+
+/**
+ * THE DIRECTORIES THAT RENDER A COMPONENT AND ARE DELIBERATELY NOT SWEPT, each with its reason.
+ * The site search fix round (2026-09-08) found `src/teams` rendering "Market order" for a day
+ * because a new directory of components was never added to `MANAGER_DIRS`; the completeness
+ * test below walks `src` and fails on any directory holding a non-test `.tsx` that is in neither
+ * list, so the next new directory is a decision somebody records rather than a gap nobody sees.
+ */
+const EXCLUDED_COMPONENT_DIRS: Readonly<Record<string, string>> = {
+  "src/design": "the theme provider and the token layer: a context wrapper that renders no copy of its own",
+};
 
 /**
  * The capsule modules whose strings a manager reads or a model quotes back to one: the template
@@ -65,10 +76,29 @@ describe("every manager-facing surface speaks fantasy football, never trading", 
     expect(files.some((file) => file.startsWith("src/account-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/admin-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/help"))).toBe(true);
+    expect(files.some((file) => file.startsWith("src/teams"))).toBe(true);
+    expect(files.some((file) => file.startsWith("src/search"))).toBe(true);
     expect(files).toContain("src/capsules/template.ts");
     expect(files).toContain("src/capsules/render.ts");
     expect(files).toContain("src/capsules/prompt.ts");
     expect(files.some((file) => file.includes(".test."))).toBe(false);
+  });
+
+  /** COMPLETENESS: every top-level directory under `src` that renders a component is either swept
+   *  or excluded by name with a reason. A directory in both lists is a contradiction and fails too. */
+  it("sweeps, or names and excuses, every directory under src that renders a component", () => {
+    const topLevelDirs = readdirSync(join(REPO_ROOT, "src"), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => `src/${entry.name}`);
+    const rendering = topLevelDirs.filter((dir) => sourceFilesIn([dir], ".tsx").length > 0);
+    expect(rendering.length).toBeGreaterThanOrEqual(10);
+    const unaccounted = rendering.filter((dir) => !MANAGER_DIRS.includes(dir) && EXCLUDED_COMPONENT_DIRS[dir] === undefined);
+    expect(unaccounted, "a directory rendering components must be in MANAGER_DIRS or EXCLUDED_COMPONENT_DIRS with a reason").toEqual([]);
+    expect(Object.keys(EXCLUDED_COMPONENT_DIRS).filter((dir) => MANAGER_DIRS.includes(dir))).toEqual([]);
+    for (const [dir, reason] of Object.entries(EXCLUDED_COMPONENT_DIRS)) {
+      expect(rendering, `${dir} is excused but renders nothing; drop the exclusion`).toContain(dir);
+      expect(reason.trim().length).toBeGreaterThan(0);
+    }
   });
 
   it.each(files)("%s says nothing in a trader's words", (file) => {

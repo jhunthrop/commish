@@ -54,8 +54,9 @@ describe("TeamPageView", () => {
         expect(screen.getByText("@ PIT · vs MIN · @ CHI")).toBeInTheDocument();
         expect(screen.getByText("9 home · 8 road")).toBeInTheDocument();
         expect(screen.getByText("7.4")).toBeInTheDocument();
-        // Once on the defense row's sticker in the roster, once as the market order figure.
+        // Once on the defense row's sticker in the roster, once as the ADP order figure.
         expect(screen.getAllByText("DEF4")).toHaveLength(2);
+        expect(screen.getByText("ADP order")).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );

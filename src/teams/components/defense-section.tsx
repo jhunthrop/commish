@@ -21,13 +21,13 @@ export function defenseFigures(defense: TeamDefenseSummary): readonly DefenseFig
     { label: "Touchdowns", value: String(defense.facts.defensiveTouchdowns + defense.facts.specialTeamsTouchdowns) },
   ];
   if (defense.facts.pointsAllowed !== null) figures.push({ label: `Points allowed, ${defense.facts.gamesWithPointsAllowed} games`, value: String(defense.facts.pointsAllowed) });
-  if (defense.adpRank !== null) figures.push({ label: "Market order", value: `DEF${defense.adpRank}` });
+  if (defense.adpRank !== null) figures.push({ label: "ADP order", value: `DEF${defense.adpRank}` });
   return figures;
 }
 
 /**
  * THE TEAM DEFENSE (coordinator's section 8): last season's line under the named scoring, the
- * facts behind it, its place in the market's order among defenses, and the link to the defense
+ * facts behind it, its place in the ADP order among defenses, and the link to the defense
  * row's own analysis page in the reader's league.
  */
 export function DefenseSection({ defense }: { readonly defense: TeamDefenseSummary | null }) {
