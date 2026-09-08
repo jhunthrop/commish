@@ -6,7 +6,7 @@ import { Button } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { formatAdp } from "../../lib/tiers";
 import type { SurvivalOdds } from "@/draft-service/assistant/view";
-import { OddsPercent } from "../../advisor/components/odds-percent";
+import { OddsGlance } from "../../advisor/components/odds-glance";
 import { DrawerRow } from "./drawer-row";
 import type { RoomActs } from "./room-acts";
 
@@ -64,7 +64,7 @@ export function DrawerByesTab({ leagueId, players, available, byeWeeks, canDraft
                       {adp === null ? "" : ` · ${adp}`}
                     </>
                   }
-                  verdict={odds === null ? null : <OddsPercent odds={odds} playerId={player.id} />}
+                  verdict={odds === null ? null : <OddsGlance odds={odds} playerId={player.id} />}
                   actions={
                     canDraft ? (
                       <Button size="sm" variant="verb" disabled={submitting} onClick={() => onDraft(player.id)}>

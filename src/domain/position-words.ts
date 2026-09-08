@@ -1,0 +1,21 @@
+/**
+ * THE PLAIN WORDS FOR A POSITION — "back", "receivers", never a tier letter or the engine's
+ * vocabulary. Named once in the domain so the server that writes the why (`draft-service/
+ * assistant/why.ts`) and the client that writes the strip's chips (`draft-room/advisor/format.ts`)
+ * say the same word for the same position: a client component may not value-import
+ * `@/draft-service/**`, and a word that lived only on one side would drift.
+ */
+import type { Position } from "./player";
+
+const POSITION_WORDS: Readonly<Record<Position, readonly [string, string]>> = {
+  QB: ["quarterback", "quarterbacks"],
+  RB: ["back", "backs"],
+  WR: ["receiver", "receivers"],
+  TE: ["tight end", "tight ends"],
+  K: ["kicker", "kickers"],
+  DEF: ["defense", "defenses"],
+};
+
+export function positionWord(position: Position, plural: boolean): string {
+  return POSITION_WORDS[position][plural ? 1 : 0];
+}

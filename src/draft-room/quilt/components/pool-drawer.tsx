@@ -112,7 +112,6 @@ export function PoolDrawer(props: PoolDrawerProps) {
           />
         ) : tab === "assistant" ? (
           <DrawerAssistantTab
-            view={view}
             myTeamId={props.myTeamId}
             advisor={advisor}
             playersById={props.playersById}

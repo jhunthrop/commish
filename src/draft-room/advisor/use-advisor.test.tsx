@@ -5,7 +5,7 @@ import type { AdvisorView } from "@/draft-service/assistant/view";
 import { DraftRoomDepsProvider, type DraftRoomDeps } from "../hooks/deps";
 import { resetAdvisorMemoryForTests } from "./advisor-memory";
 import { advisorView } from "./test-view";
-import { advisorRoomKey, foldLandedView, useAdvisor } from "./use-advisor";
+import { advisorRoomKey, useAdvisor } from "./use-advisor";
 
 function jsonOf(body: unknown): Response {
   return { json: async () => body } as unknown as Response;
@@ -21,20 +21,6 @@ const wrapper = (deps: DraftRoomDeps) =>
   };
 
 const noopSource = () => ({ addEventListener: () => {}, close: () => {} });
-
-describe("foldLandedView", () => {
-  it("latches the on-clock view only when the room moved", () => {
-    const empty = { view: null, prePickView: null };
-    const first = foldLandedView(empty, view(4, true));
-    expect(first.prePickView).toBeNull();
-    const repeat = foldLandedView(first, view(4, true));
-    expect(repeat.prePickView).toBeNull();
-    const moved = foldLandedView(repeat, view(5, false));
-    expect(moved.prePickView?.stamp.computedAtPick).toBe(4);
-    const later = foldLandedView(moved, view(6, false));
-    expect(later.prePickView?.stamp.computedAtPick).toBe(4);
-  });
-});
 
 describe("useAdvisor", () => {
   beforeEach(() => resetAdvisorMemoryForTests());
@@ -108,7 +94,7 @@ describe("useAdvisor", () => {
     expect(fetchJson).toHaveBeenCalledTimes(2);
   });
 
-  it("survives a remount through the module memory, latch included", async () => {
+  it("survives a remount through the module memory: the last view renders before the refetch lands", async () => {
     const bodies = [view(1, true), view(2, false)];
     let index = 0;
     const fetchJson = vi.fn(async () => jsonOf({ ok: true, data: bodies[Math.min(index++, 1)] }));
@@ -116,11 +102,10 @@ describe("useAdvisor", () => {
     const first = renderHook(({ key }) => useAdvisor("d1", key, "t1"), { wrapper: wrapper(deps), initialProps: { key: "0:1" } });
     await waitFor(() => expect(first.result.current.view?.stamp.computedAtPick).toBe(1));
     first.rerender({ key: "1:2" });
-    await waitFor(() => expect(first.result.current.prePickView?.stamp.computedAtPick).toBe(1));
+    await waitFor(() => expect(first.result.current.view?.stamp.computedAtPick).toBe(2));
     first.unmount();
 
     const second = renderHook(() => useAdvisor("d1", "1:2", "t1"), { wrapper: wrapper(deps) });
-    expect(second.result.current.prePickView?.stamp.computedAtPick).toBe(1);
     expect(second.result.current.view?.stamp.computedAtPick).toBe(2);
   });
 

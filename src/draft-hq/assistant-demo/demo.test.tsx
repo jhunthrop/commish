@@ -77,10 +77,13 @@ describe("AssistantDemo", () => {
     expect(screen.getByTestId("demo-step-label")).toHaveTextContent(`Pick ${firstOnClockStep + 1} of`);
   });
 
-  it("renders a post-pick beat once the point-of-view seat's own pick has landed", async () => {
+  it("carries the pick-count selector and the candidate rows under the card, the same panel the room's tab renders", async () => {
+    const user = userEvent.setup();
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
-    await stepTo(firstOnClockStep + 1);
-    expect(screen.getByTestId("assistant-beat")).toBeInTheDocument();
+    expect(screen.getAllByTestId("advisor-candidate")).toHaveLength(4);
+    await user.click(within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "10" }));
+    expect(screen.getAllByTestId("advisor-candidate")).toHaveLength(9);
+    expect(screen.queryByTestId("assistant-beat")).toBeNull();
   });
 
   it("disables Forward at the last step", async () => {

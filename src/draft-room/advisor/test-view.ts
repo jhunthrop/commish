@@ -1,6 +1,30 @@
 /** A complete `AdvisorView` for the room's own tests, overridable field by field. Not a test
  *  file itself (no `.test.`), so several suites can share it. */
+import type { Player } from "@/domain/player";
 import type { AdvisorView, Candidate, NextPick } from "@/draft-service/assistant/view";
+
+const CANDIDATE_NAMES: Readonly<Record<string, readonly [string, string]>> = {
+  rb1: ["Marcus Reed", "KC"],
+  wr1: ["Andre Salas", "DAL"],
+  te1: ["Cole Whitfield", "SF"],
+  rb2: ["Devon Marsh", "PHI"],
+  wr2: ["Tariq Bell", "MIA"],
+  qb1: ["Eli Vance", "BUF"],
+  rb3: ["Jalen Cross", "DET"],
+  wr3: ["Noah Pruitt", "SEA"],
+  te2: ["Grant Oyelaran", "BAL"],
+  rb4: ["Reese Calder", "GB"],
+};
+
+/** The room's own player facts for every candidate above, keyed by id. */
+export function candidatePlayers(): ReadonlyMap<string, Player> {
+  return new Map(
+    CANDIDATES.map((candidate) => {
+      const [name, nflTeam] = CANDIDATE_NAMES[candidate.playerId]!;
+      return [candidate.playerId, { id: candidate.playerId, name, position: candidate.position, nflTeam, headshotUrl: null, adp: null }] as const;
+    }),
+  );
+}
 
 /** Ten candidates, the card's pick (`rb1`) first, then a mix the odds table below covers. */
 export const CANDIDATES: readonly Candidate[] = [

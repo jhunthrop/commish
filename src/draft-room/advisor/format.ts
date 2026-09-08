@@ -5,13 +5,19 @@
  * row prints carries the runs in its tooltip. No em-dash, no semicolon, second person, plain.
  */
 import { pickLabel } from "@/domain/pick-label";
-import type { AdvisorView, OddsCell } from "@/draft-service/assistant/view";
+import { positionWord } from "@/domain/position-words";
+import type { AdvisorView, OddsCell, PositionRun, TierCollapse } from "@/draft-service/assistant/view";
 
 export { pickLabel };
 
+/** "57 of 200": a survived count over the runs it is out of. */
+export function runsOverRuns(survived: number, runs: number): string {
+  return `${survived} of ${runs}`;
+}
+
 /** "92 of 200 runs". */
 export function runsText(odds: OddsCell): string {
-  return `${Math.round(odds.survival * odds.runs)} of ${odds.runs} runs`;
+  return `${runsOverRuns(Math.round(odds.survival * odds.runs), odds.runs)} runs`;
 }
 
 /** "46%" for a row's own glance; the runs text stays the number the decision rests on. */
@@ -21,7 +27,23 @@ export function percentText(survival: number): string {
 
 /** The card's big number, as runs over runs: "92 of 200". */
 export function bigOddsText(odds: OddsCell): string {
-  return `${Math.round(odds.survival * odds.runs)} of ${odds.runs}`;
+  return runsOverRuns(Math.round(odds.survival * odds.runs), odds.runs);
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The strip's run chip: "Backs are going, 3 of the last 4 picks". */
+export function runText(run: PositionRun): string {
+  return `${capitalize(positionWord(run.position, true))} are going, ${run.count} of the last ${run.window} picks`;
+}
+
+/** The strip's collapse chip: "2 receivers left before a 14.3 point drop", "Last back before a 20.6 point drop". */
+export function collapseText(row: TierCollapse): string {
+  const drop = `before a ${row.dropToNextTier.toFixed(1)} point drop`;
+  if (row.playersLeftInTier === 1) return `Last ${positionWord(row.position, false)} ${drop}`;
+  return `${row.playersLeftInTier} ${positionWord(row.position, true)} left ${drop}`;
 }
 
 /** The pool row's tooltip and screen-reader line. */
