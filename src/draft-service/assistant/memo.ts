@@ -1,19 +1,26 @@
 /**
- * THE ROOM TABLE MEMO — one odds table per room state, remembered so twelve viewers of one room
- * cost one simulation and a room nobody has open costs nothing (the founder's cost ruling,
- * simplification round). Keyed by draft id: a request for a NEWER sequence of the same draft
- * replaces the room's entry (the old state can never be asked for again), and the least-recently
- * computed room is evicted past `ADVISOR_CONFIG.memoRooms`.
+ * THE ROOM FACTS MEMO — everything about one room state that no seat owns (the odds table and
+ * the tier standings), remembered so twelve viewers of one room cost one simulation and a room
+ * nobody has open costs nothing (the founder's cost ruling, simplification round). Keyed by
+ * draft id: a request for a NEWER sequence of the same draft replaces the room's entry (the old
+ * state can never be asked for again), and the least-recently computed room is evicted past
+ * `ADVISOR_CONFIG.memoRooms`.
  *
  * A bounded, per-instance cache BY DESIGN (the immutability rule's one sanctioned shape): the
- * table must outlive the request that computed it. A miss is a recompute, never a wrong answer.
+ * facts must outlive the request that computed them. A miss is a recompute, never a wrong answer.
  */
 import type { RoomOddsTable } from "../sim/room-odds";
 import { ADVISOR_CONFIG } from "./config";
+import type { TierStandingView } from "./view";
+
+export interface RoomFacts {
+  readonly table: RoomOddsTable;
+  readonly tiers: Readonly<Record<string, TierStandingView>>;
+}
 
 interface Entry {
   readonly sequence: number;
-  readonly table: RoomOddsTable;
+  readonly facts: RoomFacts;
 }
 
 const rooms = new Map<string, Entry>();
@@ -28,16 +35,16 @@ function remember(draftId: string, entry: Entry): void {
   }
 }
 
-/** The table for `draftId` at `sequence`, computed through `compute` only when it is not held. */
-export function roomTableFor(draftId: string, sequence: number, compute: () => RoomOddsTable): RoomOddsTable {
+/** The facts for `draftId` at `sequence`, computed through `compute` only when they are not held. */
+export function roomFactsFor(draftId: string, sequence: number, compute: () => RoomFacts): RoomFacts {
   const held = rooms.get(draftId);
   if (held !== undefined && held.sequence === sequence) {
     remember(draftId, held);
-    return held.table;
+    return held.facts;
   }
-  const table = compute();
-  remember(draftId, { sequence, table });
-  return table;
+  const facts = compute();
+  remember(draftId, { sequence, facts });
+  return facts;
 }
 
 /** Test seam only. */

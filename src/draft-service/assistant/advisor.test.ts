@@ -6,6 +6,7 @@ import { inferSeatDrivers } from "../sim/seat-model";
 import { advisorCore, seedFor } from "./advisor";
 import { onClockShortlist } from "./recommend";
 import { FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureStart, fixtureValued } from "./test-fixture";
+import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
 
 const ASKING = FIXTURE_TEAM_IDS[3]!; // seat 4 of 10: picks 4, 17, 24, 37, ...
@@ -16,7 +17,7 @@ function viewAfter(picks: number, askingTeamId = ASKING): AdvisorView {
   const state = fixtureAdvance(fixtureStart(), picks);
   const valued = fixtureValued();
   const table = simulateRoomOdds({ state, seed: seedFor("advisor-test", state.sequence), runs: RUNS, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, FIXTURE_SHAPE) });
-  const view = advisorCore({ state, askingTeamId, valued, shape: FIXTURE_SHAPE, table });
+  const view = advisorCore({ state, askingTeamId, valued, shape: FIXTURE_SHAPE, table, tiers: tierStandings(state, valued) });
   if (view === null) throw new Error("expected a view");
   return view;
 }
@@ -106,8 +107,9 @@ describe("advisorCore", () => {
     const state = fixtureAdvance(fixtureStart(), 149); // pick 150 of 150 is up; seat 4 finished earlier
     const valued = fixtureValued();
     const table = simulateRoomOdds({ state, seed: 1, runs: 5, excludeFromOnClockSeat: new Set() });
-    expect(advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table })).toBeNull();
-    const last = advisorCore({ state, askingTeamId: teamOnClock(state)!, valued, shape: FIXTURE_SHAPE, table });
+    const tiers = tierStandings(state, valued);
+    expect(advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table, tiers })).toBeNull();
+    const last = advisorCore({ state, askingTeamId: teamOnClock(state)!, valued, shape: FIXTURE_SHAPE, table, tiers });
     expect(last!.odds).toBeNull();
     expect(last!.pick === null || last!.pick.makeItBack === null).toBe(true);
   });

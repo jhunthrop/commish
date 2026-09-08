@@ -8,12 +8,9 @@ import { MobileRoom } from "./mobile-room";
 
 // The tab bar is the only thing under test here (finding 4: the six-tab row's own fit at
 // 390px) — every tab's content beyond POOL (the default) needs its own deps this suite has no
-// reason to build, so `useAdvisor` is mocked to the same "nothing loaded yet" shape every other
+// reason to build, so the room's advisor is the "nothing loaded yet" shape every other
 // advisor-tab test starts from, and every act is a no-op.
-vi.mock("../../advisor/use-advisor", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../advisor/use-advisor")>()),
-  useAdvisor: () => ({ view: null, previousPlan: null, prePickView: null, recomputing: false, error: null }),
-}));
+const NO_ADVISOR = { view: null, prePickView: null, recomputing: false, error: null };
 
 function room(over: Partial<DraftRoomState> = {}): DraftRoomState {
   return {
@@ -80,6 +77,7 @@ function renderMobileRoom(over: Partial<DraftRoomState> = {}) {
       hasServerSheet={false}
       onStartServerSheet={vi.fn()}
       historyCache={new Map()}
+      advisor={NO_ADVISOR}
     />,
   );
 }

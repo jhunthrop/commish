@@ -14,8 +14,9 @@ import { simulateRoomOdds, type RoomOddsInput, type RoomOddsTable } from "../sim
 import { inferSeatDrivers } from "../sim/seat-model";
 import { advisorCore, seedFor } from "./advisor";
 import { ADVISOR_CONFIG } from "./config";
-import { roomTableFor } from "./memo";
+import { roomFactsFor } from "./memo";
 import { askingWindow, onClockShortlist, valuedEvidence } from "./recommend";
+import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
 
 export interface AdvisorServiceDeps {
@@ -41,8 +42,9 @@ export async function advisorFor(db: Db, draftId: string, userId: string, deps: 
   const shape: LeagueShape = { teamCount: state.draftOrder.length, rosterSlots: state.config.slotConfig };
   const { pool } = await evidencePoolFor(db);
   const valued = valuedEvidence(pool, shape);
-  const table = roomTableFor(draftId, state.sequence, () =>
-    simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),
-  );
-  return advisorCore({ state, askingTeamId: teamId, valued, shape, table });
+  const { table, tiers } = roomFactsFor(draftId, state.sequence, () => ({
+    table: simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),
+    tiers: tierStandings(state, valued),
+  }));
+  return advisorCore({ state, askingTeamId: teamId, valued, shape, table, tiers });
 }

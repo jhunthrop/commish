@@ -5,10 +5,14 @@ import type { Player } from "@/domain/player";
 import { Button } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
 import { formatAdp } from "../../lib/tiers";
+import type { SurvivalOdds } from "@/draft-service/assistant/view";
+import { OddsPercent } from "../../advisor/components/odds-percent";
 import { DrawerRow } from "./drawer-row";
 import type { RoomActs } from "./room-acts";
 
 export interface DrawerByesTabProps extends Pick<RoomActs, "canDraft" | "submitting" | "onDraft" | "onPeek"> {
+  /** The advisor's next-turn odds; `null` prints none. */
+  readonly odds?: SurvivalOdds | null;
   readonly leagueId: string;
   /** Server-ranked, best first. */
   readonly players: readonly Player[];
@@ -21,7 +25,7 @@ export interface DrawerByesTabProps extends Pick<RoomActs, "canDraft" | "submitt
  * band in board order. A player whose team the schedule cannot claim a bye for sits under "No
  * bye on record" at the end rather than being invented into a week (law 7).
  */
-export function DrawerByesTab({ leagueId, players, available, byeWeeks, canDraft, submitting, onDraft, onPeek }: DrawerByesTabProps) {
+export function DrawerByesTab({ leagueId, players, available, byeWeeks, canDraft, submitting, onDraft, onPeek, odds = null }: DrawerByesTabProps) {
   const bands = useMemo(() => {
     const byWeek = new Map<number | null, Player[]>();
     for (const player of players) {
@@ -60,6 +64,7 @@ export function DrawerByesTab({ leagueId, players, available, byeWeeks, canDraft
                       {adp === null ? "" : ` · ${adp}`}
                     </>
                   }
+                  verdict={odds === null ? null : <OddsPercent odds={odds} playerId={player.id} />}
                   actions={
                     canDraft ? (
                       <Button size="sm" variant="verb" disabled={submitting} onClick={() => onDraft(player.id)}>

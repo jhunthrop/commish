@@ -42,6 +42,12 @@ describe("buildWhy", () => {
     expect(buildWhy({ ...BASE, ahead: [] }, 0).text).toBe("He is the No. 4 back on our board, and he fills your RB slot. Nobody picks between now and your next turn.");
   });
 
+  it("never argues a drop for a market-order position", () => {
+    const why = buildWhy({ ...BASE, position: "K", positionRank: 2, fillsSlot: "K", reasons: [{ code: "tier_cliff", position: "K", dropToNextTier: 12, playersLeftInTier: 1 }] }, 0);
+    expect(why.shape).toBe("value:0");
+    expect(why.text).not.toMatch(/drop/);
+  });
+
   it("rotates three shapes per family by the pick it was computed at, never a tier letter or a model word, no banned punctuation", () => {
     const cliff: WhyFacts = { ...BASE, reasons: [{ code: "tier_cliff", position: "WR", dropToNextTier: 9, playersLeftInTier: 3 }], position: "WR" };
     const shapes = [0, 1, 2, 3].map((variant) => buildWhy(cliff, variant));

@@ -1,11 +1,11 @@
 /**
  * THE POST-PICK BEAT — one honest line rendered right after your own pick lands, judging that
- * pick against the board the advisor was showing at the moment you were on the clock
+ * pick against the card the advisor was showing at the moment you were on the clock
  * (`prePickView`, `use-advisor.ts`'s own latch of exactly that moment).
  *
- * THREE BRANCHES, NEVER A FOURTH. You took the board's own top candidate: "Best available." You
- * passed on him: a second sentence exists ONLY when he carried live make-it-back odds, stated as
- * the simulator's own runs. No candidates at all has nothing to reference, so the beat is null.
+ * THREE BRANCHES, NEVER A FOURTH. You took the card's pick: "Best available." You passed on him:
+ * a second sentence exists ONLY when he carried live make-it-back odds, stated as the simulator's
+ * own runs. No pick on the card has nothing to reference, so the beat is null.
  */
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { runsText } from "./format";
@@ -18,7 +18,7 @@ export interface BeatInput {
 }
 
 export function postPickBeat({ pickedPlayerId, prePickView, playerName }: BeatInput): string | null {
-  const top = prePickView.now[0] ?? null;
+  const top = prePickView.pick;
   if (top === null) return null;
   if (top.playerId === pickedPlayerId) return "Best available.";
   const first = `Our board had ${playerName(top.playerId)} first.`;

@@ -14,6 +14,7 @@
 import type { Position } from "@/domain/player";
 import { BENCH_SLOT, type RosterSlotType } from "@/domain/roster";
 import type { PickReason } from "@/projections/decide/draft";
+import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
 import type { SeatTendency } from "../sim/room-odds";
 import type { PositionRun } from "./signals";
 
@@ -60,7 +61,10 @@ function slotClause(slot: RosterSlotType | null): string {
 
 type Cliff = Extract<PickReason, { code: "tier_cliff" }>;
 
-function cliffOf(reasons: readonly PickReason[]): Cliff | undefined {
+/** A market-order position (the kicker and team defence decision) never argues a drop: a number
+ *  for it would be one nobody measured. */
+function cliffOf(position: Position, reasons: readonly PickReason[]): Cliff | undefined {
+  if (!shipsProjectedRows(position)) return undefined;
   return reasons.find((reason): reason is Cliff => reason.code === "tier_cliff");
 }
 
@@ -116,7 +120,7 @@ function roomSentence(facts: WhyFacts): string {
 /** Two sentences at most. `variant` is the pick the card was computed at, so shapes rotate. */
 export function buildWhy(facts: WhyFacts, variant: number): WhySentence {
   const him: HimFacts = { one: positionWord(facts.position, false), many: positionWord(facts.position, true), slot: slotClause(facts.fillsSlot), rank: facts.positionRank };
-  const cliff = cliffOf(facts.reasons);
+  const cliff = cliffOf(facts.position, facts.reasons);
   const shapes = cliff === undefined ? VALUE_SHAPES : CLIFF_SHAPES;
   const index = ((variant % shapes.length) + shapes.length) % shapes.length;
   const first = cliff === undefined ? VALUE_SHAPES[index]!(him) : CLIFF_SHAPES[index]!(him, cliff);

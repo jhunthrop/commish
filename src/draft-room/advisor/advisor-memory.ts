@@ -1,18 +1,15 @@
-import type { AdvisorView, DraftPlan } from "@/draft-service/assistant/view";
+import type { AdvisorView } from "@/draft-service/assistant/view";
 import { ADVISOR_ROOM_CONFIG } from "./config";
 
 export interface AdvisorMemoryEntry {
   readonly lastView: AdvisorView | null;
   readonly prePickView: AdvisorView | null;
-  readonly previousPlan: DraftPlan | null;
 }
 
 /**
  * THE ADVISOR'S MODULE-SCOPE MEMORY (the founder's architecture ruling, 2026-09-05, carried over
- * from the assistant tab): the tab fetches only while mounted, and picking a player on the Pool
- * tab unmounts it. A plain `useState` latch would die with that unmount, so a bounded map keyed
- * by `draftId` is what lets a remount pick up exactly where the last instance left off: the last
- * view, the post-pick beat's latch, and the plan the manager last saw for the changed-since line.
+ * from the assistant tab): a remount picks up exactly where the last instance left off: the last
+ * view and the post-pick beat's latch. A bounded map keyed by `draftId`.
  */
 const memory = new Map<string, AdvisorMemoryEntry>();
 
