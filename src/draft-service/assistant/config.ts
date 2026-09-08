@@ -6,8 +6,11 @@ export const ADVISOR_CONFIG = {
   plan: {
     /** Turns ahead the plan covers (spec 3.1: "your next three turns"). */
     horizon: 3,
-    /** Seeded continuations behind the plan's odds. Measured 2026-09-07 on a 12-team, 15-round
-     *  board at pick 41: 200 runs through turn 3 with 40 targets in 176 ms. */
+    /** Seeded continuations behind the plan's odds. Measured 2026-09-07, 200 runs through turn 3
+     *  with 40 targets: 176 ms on a 12-team, 15-round board at pick 41, and 348 ms (median of 5,
+     *  range 345-384) at the worst case a room can pose, 14 teams, 16 rounds, seat 1 asking at
+     *  pick 1 (the longest gap to its third turn). Inference of the seat drivers is 6 ms on top.
+     *  Under half a second per recompute is the budget this constant is held to. */
     runs: 200,
     /** How deep into the undrafted board (by value order) the plan draws its target pool from. */
     candidatePoolSize: 40,
