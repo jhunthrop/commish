@@ -73,6 +73,19 @@ function fetchAnswering(bundle: () => string, correction: (kind: "compact" | "fu
   });
 }
 
+/** `text` padded with filler to exactly `words` words: a read whose ONLY fault is its length, since
+ *  the validator grades the band first and alone. */
+function paddedTo(text: string, words: number): string {
+  const padded = `${text} ${Array.from({ length: words - wordCount(text) }, () => "plainly").join(" ")}.`;
+  expect(wordCount(padded)).toBe(words);
+  return padded;
+}
+
+/** Every user message a fixture answered, in order, so a test can read what each call asked. */
+function askedOf(fetchMock: ReturnType<typeof vi.fn>): string[] {
+  return fetchMock.mock.calls.map((call) => userMessageOf(call[1] as RequestInit));
+}
+
 describe("the fixtures", () => {
   it("validate on their own facts, so every test below is about the orchestration", () => {
     expect(validateCapsule(GOOD_COMPACT, FACTS, "compact")).toMatchObject({ ok: true });
@@ -192,16 +205,14 @@ describe("generateCapsule", () => {
     expect(result.full.attempts).toEqual([{ stage: "draft", words: wordCount(GOOD_FULL), body: GOOD_FULL, violations: [] }]);
   });
 
-  it("names the correction's kind: a small overrun is a trim, a trading word is soft, a fabrication is a rewrite, a left-out read is missing", async () => {
-    // Two words over the 120 cap: inside the five-word trim allowance.
-    const overrun = `${GOOD_COMPACT} ${Array.from({ length: 122 - wordCount(GOOD_COMPACT) }, () => "plainly").join(" ")}.`;
-    expect(wordCount(overrun)).toBe(122);
+  it("names the correction's kind: an overrun of any size is a length correction, a trading word is soft, a fabrication is a rewrite, a left-out read is missing", async () => {
+    const overrun = paddedTo(GOOD_COMPACT, 122);
     const priced = GOOD_COMPACT.replace("drafters are taking him around pick 13", "the price is pick 13");
     const stagesOf = async (bundle: string) => {
       const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchAnswering(() => bundle, (kind) => (kind === "compact" ? GOOD_COMPACT : GOOD_FULL)) });
       return { compact: result.compact.attempts.map((attempt) => attempt.stage), full: result.full.attempts.map((attempt) => attempt.stage) };
     };
-    expect((await stagesOf(bundleJson({ compact: overrun }))).compact).toEqual(["draft", "trim"]);
+    expect((await stagesOf(bundleJson({ compact: overrun }))).compact).toEqual(["draft", "length"]);
     expect((await stagesOf(bundleJson({ compact: priced }))).compact).toEqual(["draft", "soft"]);
     // A fabrication inside the band: "999" traces to nothing, so the whole note is rewritten.
     expect((await stagesOf(bundleJson({ compact: GOOD_COMPACT.replace("248", "999") }))).compact).toEqual(["draft", "rewrite"]);
@@ -230,6 +241,110 @@ describe("generateCapsule", () => {
     expect(corrections[0]).toContain("had no long note");
     expect(result.full).toMatchObject({ source: "llm", text: GOOD_FULL });
     expect(result.source).toBe("llm");
+  });
+
+  /**
+   * OVERRUNS GET A REWRITE BEFORE THE TEMPLATE (overruns round, 2026-09-08). A production
+   * regeneration returned Derrick Henry's short note at 133 words against 75 to 120, the length
+   * correction failed, and a player who had a written read fell to the template on a fixable length
+   * miss. Any band failure now gets the count-to-hit correction; a second band failure gets one
+   * fresh draft at that count; the template comes after that.
+   */
+  describe("a read that misses its band", () => {
+    const HENRY_LENGTH = 133;
+    const STILL_OVER = 127;
+
+    it("answers an overrun with the same count-to-hit correction an underrun gets, never a trim", async () => {
+      const over = paddedTo(GOOD_COMPACT, HENRY_LENGTH);
+      const fetchMock = fetchAnswering(() => bundleJson({ compact: over }), () => GOOD_COMPACT);
+
+      const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+      expect(result.compact).toMatchObject({ source: "llm", text: GOOD_COMPACT });
+      expect(result.compact.attempts.map((attempt) => attempt.stage)).toEqual(["draft", "length"]);
+      const correction = askedOf(fetchMock)[1];
+      expect(correction).toContain(`It is ${HENRY_LENGTH} words. Bring it to 98 words: cut the sentences that carry the least (about 35 words)`);
+      expect(correction).not.toContain("one sentence taken off the end");
+    });
+
+    it("gives a read that missed its band twice one fresh draft at the count to hit, and the read is saved", async () => {
+      const answers = [bundleJson({ compact: paddedTo(GOOD_COMPACT, HENRY_LENGTH) }), paddedTo(GOOD_COMPACT, STILL_OVER), GOOD_COMPACT];
+      const fetchMock = vi.fn().mockImplementation(async () => okResponse(answers.shift() ?? GOOD_COMPACT));
+
+      const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(result.source).toBe("llm");
+      expect(result.compact).toMatchObject({ source: "llm", text: GOOD_COMPACT });
+      expect(result.compact.attempts.map((attempt) => [attempt.stage, attempt.words])).toEqual([
+        ["draft", HENRY_LENGTH],
+        ["length", STILL_OVER],
+        ["fresh", wordCount(GOOD_COMPACT)],
+      ]);
+      const fresh = askedOf(fetchMock)[2]!;
+      expect(fresh).toContain(`missed its length twice, at ${HENRY_LENGTH} and then ${STILL_OVER} words against 75 to 120`);
+      expect(fresh).toContain("from scratch at 98 words");
+      expect(fresh).not.toContain('"""');
+      // The player's ledger carries all three calls.
+      expect(result.usage?.costUsd).toBeCloseTo(0.00015, 10);
+    });
+
+    it("falls to the template only after the fresh draft misses too, with every attempt on the log", async () => {
+      const under = paddedTo("He is a clear steal at this ADP and nothing else about him needs saying today.", 60);
+      const answers = [bundleJson({ compact: paddedTo(GOOD_COMPACT, HENRY_LENGTH) }), paddedTo(GOOD_COMPACT, STILL_OVER), under];
+      const fetchMock = vi.fn().mockImplementation(async () => okResponse(answers.shift() ?? GOOD_COMPACT));
+
+      const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(result.compact.source).toBe("template");
+      expect(result.compact.fallbackReason).toEqual({ kind: "failed_validation", firstViolation: "Word count 60 is outside the required 75-120 word band." });
+      expect(result.compact.attempts.map((attempt) => attempt.stage)).toEqual(["draft", "length", "fresh"]);
+    });
+
+    it("holds a player to four gateway calls: when both reads miss twice, the compact gets the fresh draft and the full falls to the template", async () => {
+      const kinds: RequestKind[] = [];
+      const compactAnswers = [paddedTo(GOOD_COMPACT, STILL_OVER), GOOD_COMPACT];
+      const fullAnswers = [paddedTo(GOOD_FULL, 305), GOOD_FULL];
+      const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+        const kind = requestKind(init);
+        kinds.push(kind);
+        if (kind === "bundle") return okResponse(bundleJson({ compact: paddedTo(GOOD_COMPACT, HENRY_LENGTH), full: paddedTo(GOOD_FULL, 310) }));
+        return okResponse((kind === "compact" ? compactAnswers : fullAnswers).shift() ?? "");
+      });
+
+      const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+      // The compact is settled first with one call held back for the full read's own correction,
+      // so it spends the correction and the one fresh draft; the full gets its correction and no more.
+      expect(kinds).toEqual(["bundle", "compact", "compact", "full"]);
+      expect(result.compact).toMatchObject({ source: "llm", text: GOOD_COMPACT });
+      expect(result.full.source).toBe("template");
+      expect(result.full.attempts.map((attempt) => attempt.stage)).toEqual(["draft", "length"]);
+    });
+
+    it("spends the fresh draft's slot on the parse retry when the first bundle did not parse and both reads need their correction, never starving the full read's own", async () => {
+      const kinds: RequestKind[] = [];
+      const compactAnswers = [paddedTo(GOOD_COMPACT, STILL_OVER), GOOD_COMPACT];
+      const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+        const kind = requestKind(init);
+        kinds.push(kind);
+        if (kind === "bundle") {
+          const firstBundle = kinds.filter((seen) => seen === "bundle").length === 1;
+          return okResponse(firstBundle ? "Not an object at all, just a refusal with enough words in it to clear the degenerate completion floor today." : bundleJson({ compact: paddedTo(GOOD_COMPACT, HENRY_LENGTH), full: BAD_COMPLETION }));
+        }
+        return okResponse(kind === "compact" ? (compactAnswers.shift() ?? "") : GOOD_FULL);
+      });
+
+      const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
+
+      // Two bundle calls, one correction each: the ceiling is met with no room for a fresh draft,
+      // and the full read's one correction is never spent on the compact's extras.
+      expect(kinds).toEqual(["bundle", "bundle", "compact", "full"]);
+      expect(result.full).toMatchObject({ source: "llm", text: GOOD_FULL });
+      expect(result.compact.source).toBe("template");
+      expect(result.compact.attempts.map((attempt) => attempt.stage)).toEqual(["draft", "length"]);
+    });
   });
 
   it("waits out a 429 rather than falling to the template on the first throttle of a sweep", async () => {
@@ -282,7 +397,10 @@ describe("generateCapsule", () => {
   });
 
   it("marks the whole capsule template-sourced when one read fails its correction too, never claiming a mixed provenance", async () => {
-    const fetchMock = fetchAnswering(() => bundleJson({ full: BAD_COMPLETION }), () => BAD_COMPLETION);
+    // A fabrication inside the band: the read's one rewrite comes back fabricated too, and a
+    // content failure after a correction is the template, with no further call.
+    const fabricatedFull = GOOD_FULL.replace("248", "999");
+    const fetchMock = fetchAnswering(() => bundleJson({ full: fabricatedFull }), () => fabricatedFull);
 
     const result = await generateCapsule(FACTS, { apiKey: "test-key", fetch: fetchMock });
 

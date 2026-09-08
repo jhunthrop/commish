@@ -49,6 +49,10 @@ export interface PriorAttempt {
   /** Set when the ONLY thing wrong with `body` was its word count (acceptance round, 2026-09-07):
    *  the retry asks for the same text at the right length and nothing more. */
   readonly lengthCorrection?: { readonly words: number; readonly minWords: number; readonly maxWords: number };
+  /** Set when this read has missed its band twice, the draft and then its length correction
+   *  (overruns round, 2026-09-08): every count it came back at, in order, with the band. The retry
+   *  is a fresh draft at the count to hit, never a third edit of the same text. */
+  readonly freshDraft?: { readonly words: readonly number[]; readonly minWords: number; readonly maxWords: number };
   /** Set when every violation was about HOW something was said (the unframed floor, the uncited
    *  downside): the retry keeps the prose and fixes the point. */
   readonly softCorrections?: readonly string[];
@@ -151,18 +155,13 @@ function sentencesFor(deficit: number): string {
 }
 
 /**
- * The length correction. A small overrun (`CAPSULE_CONFIG.lengthCorrection.trimOverrunWords` or
- * fewer over the cap) asks for the same text minus one sentence at the end, the smallest edit that
- * lands inside the band; anything else states the middle of the band as the count to hit, with the
- * ask sized to the distance (`sentencesFor`): a fixed "two or three sentences" took a 237-word note
- * to 302 (written rate round, 2026-09-08).
+ * The length correction, over or under (overruns round, 2026-09-08): the middle of the band as the
+ * count to hit, with the ask sized to the distance (`sentencesFor`): a fixed "two or three
+ * sentences" took a 237-word note to 302 (written rate round, 2026-09-08). A second miss is
+ * answered by `freshDraftInstruction`, never a third edit.
  */
 function lengthInstruction(size: CapsuleSize, quoted: string, correction: NonNullable<PriorAttempt["lengthCorrection"]>): string {
-  const { words, maxWords } = correction;
-  const overrun = words - maxWords;
-  if (isTrimOverrun(correction)) {
-    return `${quoted}\n\nIt is ${words} words, ${overrun} over the ${maxWords} word cap. Return the same text with one sentence taken off the end, and ${SAME_TEXT_OTHERWISE}`;
-  }
+  const { words } = correction;
   const target = targetOf(size);
   const distance = Math.abs(target - words);
   // The added sentences name their own register (written rate round, 2026-09-08): one length
@@ -178,19 +177,30 @@ function capReminder(size: CapsuleSize, body: string): string {
   return `It is ${wordCount(body)} words now and the cap is ${maxWords}, so it must not grow past ${maxWords} words.`;
 }
 
+/**
+ * THE FRESH DRAFT (overruns round, 2026-09-08): a read that missed its band twice is written again
+ * from nothing, at the count to hit. The failed text is deliberately NOT quoted: an edit of it came
+ * back the wrong length once already, and quoting it anchors the next answer to its shape. The
+ * count is also stated as a sentence count, the unit the writer actually produces.
+ */
+function freshDraftInstruction(size: CapsuleSize, fresh: NonNullable<PriorAttempt["freshDraft"]>, shape: string): string {
+  const target = targetOf(size);
+  const sentences = Math.round(target / CAPSULE_CONFIG.lengthCorrection.wordsPerSentence);
+  return (
+    `Your ${READ_LABEL[size]} for this player has missed its length twice, at ${fresh.words.join(" and then ")} words against ${fresh.minWords} to ${fresh.maxWords}. ` +
+    `Write it again from scratch at ${target} words, ${shape}, about ${sentences} sentences, built on the two or three facts that decide his case. Stop when you reach the count.`
+  );
+}
+
 /** The five things a correction call can ask for, decided from the prior attempt alone. Named
  *  here, where the prompt is chosen, and recorded on the read's own attempt log (`generate.ts`) so
  *  the acceptance script can say which correction a failed read was given. */
-export type CorrectionKind = "missing" | "trim" | "length" | "soft" | "rewrite";
-
-function isTrimOverrun(correction: NonNullable<PriorAttempt["lengthCorrection"]>): boolean {
-  const overrun = correction.words - correction.maxWords;
-  return overrun > 0 && overrun <= CAPSULE_CONFIG.lengthCorrection.trimOverrunWords;
-}
+export type CorrectionKind = "missing" | "length" | "fresh" | "soft" | "rewrite";
 
 export function correctionKindOf(prior: PriorAttempt): CorrectionKind {
   if (prior.missing === true) return "missing";
-  if (prior.lengthCorrection !== undefined) return isTrimOverrun(prior.lengthCorrection) ? "trim" : "length";
+  if (prior.freshDraft !== undefined) return "fresh";
+  if (prior.lengthCorrection !== undefined) return "length";
   if (prior.softCorrections !== undefined && prior.softCorrections.length > 0) return "soft";
   return "rewrite";
 }
@@ -202,7 +212,8 @@ function correctionInstruction(size: CapsuleSize, prior: PriorAttempt): string {
   switch (correctionKindOf(prior)) {
     case "missing":
       return `Your previous answer had no ${label} for this player. Write it now: ${lengthOf(size)}, ${shape}, built on the two or three facts that decide his case.`;
-    case "trim":
+    case "fresh":
+      return freshDraftInstruction(size, prior.freshDraft!, shape);
     case "length":
       return lengthInstruction(size, quoted, prior.lengthCorrection!);
     case "soft":

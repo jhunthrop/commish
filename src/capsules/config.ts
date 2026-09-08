@@ -111,16 +111,25 @@ export const CAPSULE_CONFIG = {
     },
   },
   /**
-   * A READ ONE OR TWO WORDS OVER THE CAP IS HONEST PROSE LOST TO THE CAP (production follow-up,
-   * 2026-09-08: ten full reads fell to the template at 301 or 302 words against the 240-300 band,
-   * and the correction that asked the writer to "cut the sentences that carry the least" and aim
-   * for the middle came back over again). An overrun of this many words or fewer is answered by
-   * asking for the same text with one sentence taken off the end, which is the smallest edit that
-   * lands inside the band; a second overrun still falls to the template. The band itself is not
-   * widened: it is where the model lands, and a wider cap only moves the line the outliers cross.
+   * THE CEILING ON WHAT ONE PLAYER MAY COST IN GATEWAY CALLS (overruns round, 2026-09-08). The
+   * bundle call, its one parse retry when the first answer held no object, and the calls the two
+   * reads spend after it: each read's one correction (length, soft or rewrite), then a fresh draft
+   * for a read that missed its band twice. A parsed first bundle never needs the retry slot, so
+   * that slot is the fresh draft's; when the retry was spent and both reads needed their
+   * correction, no fresh draft is made. Never more than this many, whatever happens. The sweep's
+   * per-player time reserve (`capsule-sweep-job.ts`) is built on it.
+   */
+  maxGatewayCallsPerPlayer: 4,
+  /**
+   * A BAND FAILURE IS ANSWERED WITH THE COUNT TO HIT, OVER OR UNDER (overruns round, 2026-09-08). A
+   * production regeneration returned a short note at 133 words against 75 to 120, and the read fell
+   * to the template on a length miss a rewrite would have fixed. The correction states the middle
+   * of the band as the count to hit and sizes the ask to the distance; a second miss gets one fresh
+   * draft at that count (`generate.ts`). The band itself is not widened: it is where the model
+   * lands, and a wider cap only moves the line the outliers cross. (An overrun of five words or
+   * fewer used to be answered by a one-sentence trim; the fresh draft replaces it.)
    */
   lengthCorrection: {
-    trimOverrunWords: 5,
     /**
      * THE ASK IS SIZED TO THE DEFICIT (written rate round, 2026-09-08). A long note under its
      * floor was told to "add two or three more sentences" whatever the deficit, and a 237-word

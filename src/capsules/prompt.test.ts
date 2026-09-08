@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BANNED_VOCABULARY, CAPSULE_CONFIG, DRAFTING_SENTENCES } from "./config";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { narrativeRequestsFor } from "./narrative";
-import { bundlePromptFor, correctionPromptFor, NO_WORN_PHRASES, WRITER_RULES } from "./prompt";
+import { bundlePromptFor, correctionKindOf, correctionPromptFor, NO_WORN_PHRASES, WRITER_RULES } from "./prompt";
 import { containsStem } from "./sameness";
 
 /**
@@ -214,23 +214,29 @@ describe("correctionPromptFor", () => {
     expect(prompt).toContain("It is 105 words now and the cap is 120, so it must not grow past 120 words.");
   });
 
-  it("trims a small overrun by one sentence off the end, the same text otherwise (production follow-up, 2026-09-08: ten full reads lost at 301 or 302 words)", () => {
+  it("answers an overrun of any size with the count to hit, the same text otherwise (overruns round, 2026-09-08: a trim by one sentence was the old answer to a small one)", () => {
     const { minWords, maxWords } = CAPSULE_CONFIG.sizes.full;
-    const { trimOverrunWords } = CAPSULE_CONFIG.lengthCorrection;
-    const at = (words: number) => correctionPromptFor(FACTS, "full", { body: "Two over.", violations: ["x"], lengthCorrection: { words, minWords, maxWords } });
-    for (const words of [maxWords + 1, maxWords + 2, maxWords + trimOverrunWords]) {
-      const prompt = at(words);
-      expect(prompt).toContain(`It is ${words} words, ${words - maxWords} over the ${maxWords} word cap.`);
-      expect(prompt).toContain("the same text with one sentence taken off the end");
+    const target = Math.round((minWords + maxWords) / 2);
+    for (const words of [maxWords + 1, maxWords + 2, maxWords + 33]) {
+      const prompt = correctionPromptFor(FACTS, "full", { body: "Over.", violations: ["x"], lengthCorrection: { words, minWords, maxWords } });
+      expect(prompt).toContain(`It is ${words} words. Bring it to ${target} words: cut the sentences that carry the least (about ${words - target} words)`);
       expect(prompt).toContain("change nothing else");
-      expect(prompt).not.toContain("Bring it to");
-      expect(prompt).not.toContain("cut the sentences that carry the least");
+      expect(prompt).not.toContain("one sentence taken off the end");
     }
-    const past = at(maxWords + trimOverrunWords + 1);
-    expect(past).toContain("cut the sentences that carry the least");
-    expect(past).toContain(`Bring it to ${Math.round((minWords + maxWords) / 2)} words`);
-    expect(past).not.toContain("one sentence taken off the end");
-    expect(maxWords).toBe(300);
+    expect(correctionKindOf({ body: "Over.", violations: ["x"], lengthCorrection: { words: maxWords + 1, minWords, maxWords } })).toBe("length");
+  });
+
+  it("asks for a fresh draft at the count to hit, naming both misses and never quoting the text, when a read has missed its band twice", () => {
+    const { minWords, maxWords } = CAPSULE_CONFIG.sizes.compact;
+    const prior = { body: "Still over.", violations: ["x"], freshDraft: { words: [133, 127], minWords, maxWords } };
+    const prompt = correctionPromptFor(FACTS, "compact", prior);
+    expect(correctionKindOf(prior)).toBe("fresh");
+    expect(prompt).toContain("Your short note for this player has missed its length twice, at 133 and then 127 words against 75 to 120.");
+    expect(prompt).toContain("Write it again from scratch at 98 words, one paragraph");
+    expect(prompt).toContain("about 5 sentences");
+    expect(prompt).not.toContain("Still over.");
+    expect(prompt).not.toContain('"""');
+    expect(prompt).toContain("Return only the corrected short note");
   });
 
   it("hands a soft correction back as points to fix in the writer's own words", () => {
