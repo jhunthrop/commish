@@ -1,0 +1,121 @@
+import { describe, expect, it } from "vitest";
+import {
+  DOUBTFUL_REPORT_STATUS,
+  UNAVAILABLE_REPORT_STATUSES,
+  UNAVAILABLE_ROSTER_STATUSES,
+  classifySeasonWeeks,
+  classifyWeek,
+  isUnavailableRosterStatus,
+  type RosteredWeek,
+} from "./week-classification";
+
+function week(overrides: Partial<RosteredWeek> = {}): RosteredWeek {
+  return { week: 5, rosterStatus: "ACT", reportStatus: null, played: false, ...overrides };
+}
+
+describe("classifyWeek", () => {
+  it("calls a week he played 'played' whatever the roster or the report said that week", () => {
+    expect(classifyWeek(week({ played: true }))).toBe("played");
+    expect(classifyWeek(week({ played: true, rosterStatus: "RES" }))).toBe("played");
+    expect(classifyWeek(week({ played: true, reportStatus: "Out" }))).toBe("played");
+    expect(classifyWeek(week({ played: true, rosterStatus: "INA", reportStatus: "Doubtful" }))).toBe("played");
+  });
+
+  it.each([...UNAVAILABLE_REPORT_STATUSES])("calls an unplayed week with an '%s' report unavailable", (reportStatus) => {
+    expect(classifyWeek(week({ reportStatus }))).toBe("unavailable");
+    expect(classifyWeek(week({ reportStatus, rosterStatus: "INA" }))).toBe("unavailable");
+  });
+
+  it("calls Doubtful-and-did-not-play unavailable", () => {
+    expect(classifyWeek(week({ reportStatus: DOUBTFUL_REPORT_STATUS }))).toBe("unavailable");
+  });
+
+  it.each([...UNAVAILABLE_ROSTER_STATUSES])("calls an unplayed week on the %s list unavailable, report or no report", (rosterStatus) => {
+    expect(classifyWeek(week({ rosterStatus }))).toBe("unavailable");
+    expect(classifyWeek(week({ rosterStatus, reportStatus: "" }))).toBe("unavailable");
+  });
+
+  it("calls a numbered exemption unavailable without listing every number", () => {
+    expect(isUnavailableRosterStatus("E01")).toBe(true);
+    expect(isUnavailableRosterStatus("E14")).toBe(true);
+    expect(classifyWeek(week({ rosterStatus: "E14" }))).toBe("unavailable");
+  });
+
+  it("reads the codes case-insensitively and trimmed, the way the release sometimes spells them", () => {
+    expect(isUnavailableRosterStatus(" res ")).toBe(true);
+    expect(classifyWeek(week({ reportStatus: "out" }))).toBe("unavailable");
+  });
+
+  it.each(["ACT", "INA", "DEV", "CUT", "RET", "TRC", "TRD", "TRT", "RSN", "NWT", "RSR", "UFA", "RFA", "UDF"])(
+    "calls an unplayed %s week with no designation a did-not-play week: a role fact, never an absence",
+    (rosterStatus) => {
+      expect(classifyWeek(week({ rosterStatus }))).toBe("did_not_play");
+      expect(classifyWeek(week({ rosterStatus, reportStatus: "" }))).toBe("did_not_play");
+    },
+  );
+
+  it.each(["Questionable", "Probable", "", "Note"])("does not call an unplayed week with a '%s' report an absence", (reportStatus) => {
+    expect(classifyWeek(week({ reportStatus }))).toBe("did_not_play");
+  });
+});
+
+describe("classifySeasonWeeks", () => {
+  const rosterRows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18].map((week) => ({ week, status: "ACT" }));
+
+  it("splits a healthy backup's season into played weeks and did-not-play weeks, with nothing unavailable", () => {
+    const classes = classifySeasonWeeks({
+      rosterRows,
+      injuryRows: [{ week: 16, reportStatus: "", primaryInjury: "" }],
+      gamesPlayedWeeks: [3, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18],
+    });
+    expect(classes).toEqual({
+      playedWeeks: [3, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18],
+      unavailableWeeks: [],
+      didNotPlayWeeks: [1, 2, 4, 5, 6, 7],
+    });
+  });
+
+  it("dates every unavailable week from the report and the roster together", () => {
+    const classes = classifySeasonWeeks({
+      rosterRows: [
+        { week: 1, status: "ACT" },
+        { week: 2, status: "ACT" },
+        { week: 3, status: "INA" },
+        { week: 4, status: "RES" },
+        { week: 5, status: "RES" },
+        { week: 6, status: "ACT" },
+      ],
+      injuryRows: [
+        { week: 3, reportStatus: "Out", primaryInjury: "Knee" },
+        { week: 6, reportStatus: "Questionable", primaryInjury: "Knee" },
+      ],
+      gamesPlayedWeeks: [1, 2],
+    });
+    expect(classes).toEqual({ playedWeeks: [1, 2], unavailableWeeks: [3, 4, 5], didNotPlayWeeks: [6] });
+  });
+
+  it("counts a played week the roster file never listed, and never invents a week neither source holds", () => {
+    const classes = classifySeasonWeeks({ rosterRows: [{ week: 2, status: "ACT" }], injuryRows: [], gamesPlayedWeeks: [1, 2] });
+    expect(classes).toEqual({ playedWeeks: [1, 2], unavailableWeeks: [], didNotPlayWeeks: [] });
+  });
+
+  it("does not turn a bare injury row into a rostered week", () => {
+    // A report row with no roster row and no played week is a designation about a week the census
+    // never carried him for: nothing to classify.
+    const classes = classifySeasonWeeks({ rosterRows: [], injuryRows: [{ week: 4, reportStatus: "Out", primaryInjury: "" }], gamesPlayedWeeks: [] });
+    expect(classes).toEqual({ playedWeeks: [], unavailableWeeks: [], didNotPlayWeeks: [] });
+  });
+
+  it("returns weeks in ascending order whatever order the rows arrived in", () => {
+    const classes = classifySeasonWeeks({
+      rosterRows: [
+        { week: 9, status: "RES" },
+        { week: 1, status: "ACT" },
+        { week: 4, status: "PUP" },
+      ],
+      injuryRows: [],
+      gamesPlayedWeeks: [1],
+    });
+    expect(classes.unavailableWeeks).toEqual([4, 9]);
+  });
+});
