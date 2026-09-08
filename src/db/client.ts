@@ -41,12 +41,24 @@ export interface DbOptions {
   readonly max?: number;
   /** Seconds an idle connection may sit before the pool closes it. Unset = no timeout. */
   readonly idleTimeoutSeconds?: number;
+  /** Seconds to wait for a connection to establish. Unset = the driver's default. */
+  readonly connectTimeoutSeconds?: number;
+  /** Seconds a connection may live before the pool recycles it. Unset = the driver's default. */
+  readonly maxLifetimeSeconds?: number;
+}
+
+/** The pool a Vercel function instance opens — see `DB_POOL_CONFIG.vercel`. */
+export function vercelPoolOptions(): DbOptions {
+  const { maxConnections, idleTimeoutSeconds, connectTimeoutSeconds, maxLifetimeSeconds } = DB_POOL_CONFIG.vercel;
+  return { max: maxConnections, idleTimeoutSeconds, connectTimeoutSeconds, maxLifetimeSeconds };
 }
 
 export function createDb(connectionString: string = requireDatabaseUrl(), options: DbOptions = {}) {
   const client = postgres(connectionString, {
     max: options.max ?? DB_POOL_CONFIG.defaultMaxConnections,
     idle_timeout: options.idleTimeoutSeconds,
+    connect_timeout: options.connectTimeoutSeconds,
+    max_lifetime: options.maxLifetimeSeconds,
     /**
      * UNCONDITIONAL, whether this connection string points at Postgres or at PgBouncer.
      *
@@ -75,8 +87,10 @@ export function createDb(connectionString: string = requireDatabaseUrl(), option
  */
 const globalDb = globalThis as { __commishDb?: Db };
 
-/** Process-wide default connection. Tests should use createDb(TEST_DATABASE_URL) instead. */
+/** Process-wide default connection. Tests should use createDb(TEST_DATABASE_URL) instead.
+ *  On Vercel (the platform's own marker, set on every build and function) the pool is the small,
+ *  short-lived serverless one; everywhere else the long-lived formula applies. */
 export function getDb(): Db {
-  globalDb.__commishDb ??= createDb();
+  globalDb.__commishDb ??= createDb(undefined, process.env.VERCEL === undefined ? {} : vercelPoolOptions());
   return globalDb.__commishDb;
 }

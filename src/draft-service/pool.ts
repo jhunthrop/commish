@@ -1,11 +1,12 @@
-import { eq, lte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
-import { players, playerStatLines, scoringSettings } from "@/db/schema";
+import { players, scoringSettings } from "@/db/schema";
 import type { DraftPoolEntry } from "@/domain/draft";
 import type { Player } from "@/domain/player";
 import { PPR_SCORING } from "@/domain/scoring";
 import { LEAGUE_CONFIG } from "@/league";
 import { computeFantasyPoints } from "@/scoring";
+import { seasonStatTotalsByPlayer } from "./season-totals";
 
 /**
  * Cross-call cache for `rankedPlayers`, keyed by league id.
@@ -53,21 +54,22 @@ export async function rankedPlayers(db: Db | DbTx, leagueId: string): Promise<re
   const cached = cache.get(leagueId);
   if (cached !== undefined) return cached;
 
-  const [settingsRows, roster, lines] = await Promise.all([
+  const [settingsRows, roster, totals] = await Promise.all([
     db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, leagueId)),
     db.select().from(players),
     // A season projection never needs a week beyond the longest a league can run — bounds the
-    // read against a dataset that grows beyond one season's worth of stat lines.
-    db.select().from(playerStatLines).where(lte(playerStatLines.week, LEAGUE_CONFIG.maxWeeks)),
+    // read against a dataset that grows beyond one season's worth of stat lines. Summed in
+    // Postgres (Neon cost audit finding 6): one short row per player instead of every game line.
+    seasonStatTotalsByPlayer(db, LEAGUE_CONFIG.maxWeeks),
   ]);
   const rules = settingsRows[0] ?? PPR_SCORING;
   const positionById = new Map(roster.map((player) => [player.id, player.position]));
 
   const projected = new Map<string, number>();
-  for (const line of lines) {
-    const position = positionById.get(line.playerId);
+  for (const [playerId, season] of totals) {
+    const position = positionById.get(playerId);
     if (position === undefined) continue;
-    projected.set(line.playerId, (projected.get(line.playerId) ?? 0) + computeFantasyPoints(line, position, rules));
+    projected.set(playerId, computeFantasyPoints(season.line, position, rules) + season.defenseTierPoints);
   }
 
   const ranked = [...roster].sort((a, b) => {

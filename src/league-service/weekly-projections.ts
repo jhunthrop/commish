@@ -1,8 +1,14 @@
 import { desc, eq } from "drizzle-orm";
 import type { getDb } from "@/db/client";
 import { captureSnapshots } from "@/db/schema";
+import { createTtlMemo } from "@/lib/cache/ttl-memo";
+import { REFERENCE_MEMO_CONFIG } from "./config";
 
 type Db = ReturnType<typeof getDb>;
+
+/** Memoized per process (Neon cost audit finding 7): the newest capture's whole jsonb payload
+ *  (35 KB and up) was read on every league room render. See `REFERENCE_MEMO_CONFIG`. */
+const projectionsMemo = createTtlMemo<ReadonlyMap<string, number>>(REFERENCE_MEMO_CONFIG.weeklyProjectionsTtlMs);
 
 /**
  * PPR projections for one week, keyed by our player id, read from the latest
@@ -14,7 +20,11 @@ type Db = ReturnType<typeof getDb>;
  * week answers with an empty map — a stale projection shown as this week's is an invented
  * number, and the column's dash is the honest alternative.
  */
-export async function weeklyProjectionsByPlayerId(db: Db, week: number): Promise<ReadonlyMap<string, number>> {
+export function weeklyProjectionsByPlayerId(db: Db, week: number): Promise<ReadonlyMap<string, number>> {
+  return projectionsMemo.get(`week:${week}`, () => readWeeklyProjectionsByPlayerId(db, week));
+}
+
+async function readWeeklyProjectionsByPlayerId(db: Db, week: number): Promise<ReadonlyMap<string, number>> {
   const [snapshot] = await db
     .select({ payload: captureSnapshots.payload })
     .from(captureSnapshots)

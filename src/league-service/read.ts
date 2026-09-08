@@ -185,8 +185,11 @@ export function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyM
  * answers `compositionCategory` for `RoomRoster`'s coarse composition line (ruling 19). Both are
  * cheap, indexed, single reads over a league's own bounded team list — never a per-team round
  * trip.
+ *
+ * Neon cost audit 2026-09-07, finding 7: one fewer. `leagueStandings` used to re-select the
+ * league's whole `matchups` table this function had already read; it now receives those rows.
  */
-export const BASELINE_LEAGUE_HOME_QUERIES = 12;
+export const BASELINE_LEAGUE_HOME_QUERIES = 11;
 
 /**
  * Everything the league home page renders, assembled once on the server. `listTeamCards` is
@@ -329,7 +332,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     authority,
     myTeamId,
     teams: members,
-    standings: await leagueStandings(db, leagueId, teamCards, league.medianGame),
+    standings: await leagueStandings(db, leagueId, teamCards, league.medianGame, matchupRows),
     medianGame: league.medianGame,
     terms,
     currentWeek,
