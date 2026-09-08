@@ -131,6 +131,59 @@ export const CAPSULE_CONFIG = {
     /** How many flagged sentences the prompt quotes. A prompt that lists fifty sentences not to
      *  write is a prompt about sentences not to write; the worst offenders carry the signal. */
     maxQuotedSentences: 8,
+    /**
+     * THE BOARD-LEVEL SAMENESS MEASURE (refrains round, 2026-09-07). The founder read the
+     * production peeks and said almost every write-up read the same: "Buy X, the price is wrong.
+     * The stat that sells me is this. The honest worry is availability. Draft him with a plan
+     * behind him." The whole-sentence check above cannot see that, because a refrain with a
+     * different name or number in it is a different sentence to it. `sameness.ts` measures three
+     * things the reader actually notices, each as a share of the llm-written board:
+     *
+     *   (a) OPENER FAMILIES: the first `openerWords` words of a read with names and numbers
+     *       masked. Two of three reads from the 2026-09-07 regeneration opened "Let's talk about
+     *       X, because", so the line is a tenth of the board: past that, a reader opening two
+     *       peeks in a row hears the same voice clear its throat twice.
+     *   (b) REFRAINS: `refrainStems`, counted as the share of capsules carrying each anywhere in
+     *       the compact read, the full read or a narrative slot. Same line, same reason.
+     *   (c) SHEET-TOURING: the share of reads citing all three usage shares with their ranks. A
+     *       quarter, not a tenth, because a genuine three-down back's case sometimes IS all three
+     *       shares, and the rule is "cite what decides the case", not "never cite usage".
+     *
+     * MEASURED BEFORE THE CHANGE (40 players on dev, the prior prompt, three calls a player):
+     * see `.superpowers/sdd/dossier-voice/progress.md`, "Refrains and one call", for the baseline
+     * and the after; the stems below were kept only where that baseline showed them.
+     */
+    openerWords: 4,
+    maxOpenerFamilyShare: 0.1,
+    maxRefrainShare: 0.1,
+    maxSheetTouringShare: 0.25,
+    /**
+     * THE STOCK STEMS. The first group is the founder's own reading of the production peeks and
+     * the three reads the coordinator quoted from the 2026-09-07 regeneration. The second group is
+     * the trading register the same night's ruling banned outright ("it's a fantasy football app,
+     * not a stock trading app"): measured here so the board's share of it is a number, and banned
+     * in `BANNED_VOCABULARY` so the validator refuses a new one. Compared after `sameness.ts`'s
+     * own normalisation (case folded, punctuation dropped), so an apostrophe or a comma never
+     * hides a stem.
+     */
+    refrainStems: [
+      "here's the honest worry",
+      "the honest worry",
+      "the band says",
+      "let's talk about",
+      "the volume case",
+      "so the call",
+      "so my call",
+      "the price is wrong",
+      "the stat that sells me",
+      "with a plan behind him",
+      "not a talent read",
+      "most seasons land between",
+      "the market",
+      "at his price",
+      "he's a buy",
+      "he is a buy",
+    ],
   },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
    *  below it is noise a capsule need not dwell on. The mandated-tension check (`validate.ts`)
