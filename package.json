@@ -68,6 +68,7 @@
     "projections:ecr:current": "dotenv -e .env.local -- tsx scripts/ingest-current-ecr.ts",
     "projections:preseason:persist": "dotenv -e .env.local -- tsx scripts/preseason-persist.ts",
     "capsules:acceptance": "dotenv -e .env.local -- tsx scripts/capsule-acceptance.ts",
+    "capsules:regenerate": "dotenv -e .env.local -- tsx scripts/capsule-regenerate.ts",
     "peek:timing": "dotenv -e .env.local -- tsx scripts/peek-timing.ts",
     "peek:facts:refresh": "dotenv -e .env.local -- tsx scripts/peek-facts-refresh.ts",
     "peek:documents:build": "dotenv -e .env.local -- tsx scripts/peek-documents-build.ts",
