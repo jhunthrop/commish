@@ -202,6 +202,7 @@ export function QuiltRoom({ room, playersById }: QuiltRoomProps) {
           onSeedQueue={seedQueue}
           hasServerSheet={hasServerSheet}
           onStartServerSheet={startServerSheet}
+          queue={room.queue}
           {...acts}
         />
       </div>

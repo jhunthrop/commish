@@ -1,75 +1,83 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AssistantDemo } from "./demo";
 import { ASSISTANT_DEMO_FIXTURE } from "./fixture";
 
+const firstOnClockStep = ASSISTANT_DEMO_FIXTURE.advisor.findIndex((view) => view.onTheClock);
+
+async function stepTo(step: number): Promise<void> {
+  const user = userEvent.setup();
+  const forward = screen.getByRole("button", { name: "Forward" });
+  for (let i = 0; i < step; i += 1) await user.click(forward);
+}
+
 describe("AssistantDemo", () => {
-  it("states the replay label honestly, up front", () => {
+  it("states the replay label honestly, up front, runs included", () => {
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
     expect(screen.getByTestId("demo-replay-label")).toHaveTextContent("A replayed room, seeded and reproducible");
+    expect(screen.getByTestId("demo-replay-label")).toHaveTextContent(`${ASSISTANT_DEMO_FIXTURE.runs} runs`);
   });
 
-  it("starts before pick 1, with Back disabled", () => {
+  it("starts before pick 1 with Back disabled, showing all three bands", () => {
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
     expect(screen.getByTestId("demo-step-label")).toHaveTextContent("Before pick 1");
     expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
-    expect(screen.queryByTestId("demo-latest-pick")).not.toBeInTheDocument();
+    expect(screen.getByTestId("advisor-signals")).toBeInTheDocument();
+    expect(screen.getByTestId("advisor-plan")).toBeInTheDocument();
+    expect(screen.getByTestId("advisor-now")).toBeInTheDocument();
+    expect(screen.getAllByTestId("advisor-plan-turn")).toHaveLength(3);
+    expect(screen.getByTestId("advisor-stamp")).toHaveTextContent(`As of 1.01 · ${ASSISTANT_DEMO_FIXTURE.runs} runs`);
   });
 
-  it("steps forward one pick at a time, updating the step label and the latest-pick line", async () => {
-    const user = userEvent.setup();
+  it("every sentence is the template floor, and says so", () => {
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
+    expect(screen.getByTestId("advisor-strategy")).toHaveAttribute("data-voice", "template");
+    for (const reason of screen.getAllByTestId("advisor-reason")) expect(reason).toHaveAttribute("data-voice", "template");
+  });
 
-    await user.click(screen.getByRole("button", { name: "Forward" }));
-    expect(screen.getByTestId("demo-step-label")).toHaveTextContent(`Pick 1 of ${ASSISTANT_DEMO_FIXTURE.picks.length}`);
-    const firstPick = ASSISTANT_DEMO_FIXTURE.picks[0]!;
-    expect(screen.getByTestId("demo-latest-pick")).toHaveTextContent(firstPick.teamLabel);
-
-    await user.click(screen.getByRole("button", { name: "Forward" }));
+  it("steps forward one pick at a time and the stamp moves with the room", async () => {
+    render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
+    await stepTo(2);
     expect(screen.getByTestId("demo-step-label")).toHaveTextContent(`Pick 2 of ${ASSISTANT_DEMO_FIXTURE.picks.length}`);
-    const secondPick = ASSISTANT_DEMO_FIXTURE.picks[1]!;
-    expect(screen.getByTestId("demo-latest-pick")).toHaveTextContent(secondPick.teamLabel);
+    expect(screen.getByTestId("demo-latest-pick")).toHaveTextContent(ASSISTANT_DEMO_FIXTURE.picks[1]!.teamLabel);
+    expect(screen.getByTestId("advisor-stamp")).toHaveTextContent("As of 1.03");
   });
 
-  it("steps back, and the candidate pane changes between steps that carry different calls", async () => {
+  it("queues a target off the clock and shows its queue order on the row", async () => {
     const user = userEvent.setup();
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
-
-    await user.click(screen.getByRole("button", { name: "Forward" }));
-    await user.click(screen.getByRole("button", { name: "Forward" }));
-    expect(screen.getByTestId("demo-step-label")).toHaveTextContent("Pick 2");
-
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByTestId("demo-step-label")).toHaveTextContent("Pick 1");
+    const rows = screen.getAllByTestId("advisor-now-row");
+    await user.click(within(rows[0]!).getByRole("button", { name: "Queue" }));
+    expect(within(rows[0]!).getByRole("button", { name: "Queued 1" })).toBeInTheDocument();
+    await user.click(within(rows[1]!).getByRole("button", { name: "Queue" }));
+    expect(within(rows[1]!).getByRole("button", { name: "Queued 2" })).toBeInTheDocument();
+    await user.click(within(rows[0]!).getByRole("button", { name: "Queued 1" }));
+    expect(within(rows[1]!).getByRole("button", { name: "Queued 1" })).toBeInTheDocument();
   });
 
-  it("disables Forward once the replay reaches its last step", async () => {
+  it("drafts from the now card on the clock through a confirmation, then steps the replay and says what the replay did", async () => {
     const user = userEvent.setup();
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
-    const forward = screen.getByRole("button", { name: "Forward" });
-    for (let i = 0; i < ASSISTANT_DEMO_FIXTURE.picks.length; i++) {
-      await user.click(forward);
-    }
-    expect(forward).toBeDisabled();
-    expect(screen.getByTestId("demo-step-label")).toHaveTextContent(`Pick ${ASSISTANT_DEMO_FIXTURE.picks.length} of ${ASSISTANT_DEMO_FIXTURE.picks.length}`);
-  });
-
-  it("shows the assistant's own candidates for the point-of-view seat's upcoming turn", () => {
-    render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
-    expect(screen.getByTestId("assistant-candidates").querySelectorAll("li").length).toBeGreaterThan(0);
+    await stepTo(firstOnClockStep);
+    expect(screen.getByTestId("advisor-now")).toHaveAttribute("data-on-clock", "true");
+    const rows = screen.getAllByTestId("advisor-now-row");
+    expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
+    await user.click(within(rows[0]!).getByRole("button", { name: "Draft" }));
+    await user.click(screen.getByRole("button", { name: "Confirm pick" }));
+    expect(screen.getByTestId("demo-draft-note")).toHaveTextContent(/You took/);
+    expect(screen.getByTestId("demo-step-label")).toHaveTextContent(`Pick ${firstOnClockStep + 1} of`);
   });
 
   it("renders a post-pick beat once the point-of-view seat's own pick has landed", async () => {
-    const user = userEvent.setup();
     render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
-    const yourFirstPickIndex = ASSISTANT_DEMO_FIXTURE.picks.findIndex((pick) => pick.teamId === ASSISTANT_DEMO_FIXTURE.povTeamId);
-    expect(yourFirstPickIndex).toBeGreaterThanOrEqual(0);
-
-    const forward = screen.getByRole("button", { name: "Forward" });
-    for (let i = 0; i <= yourFirstPickIndex; i++) {
-      await user.click(forward);
-    }
+    await stepTo(firstOnClockStep + 1);
     expect(screen.getByTestId("assistant-beat")).toBeInTheDocument();
+  });
+
+  it("disables Forward at the last step", async () => {
+    render(<AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />);
+    await stepTo(ASSISTANT_DEMO_FIXTURE.picks.length);
+    expect(screen.getByRole("button", { name: "Forward" })).toBeDisabled();
   });
 });

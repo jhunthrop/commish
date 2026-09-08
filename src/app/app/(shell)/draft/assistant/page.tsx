@@ -27,8 +27,8 @@ export default function DraftAssistantPage() {
       <div className="flex flex-col gap-1">
         <PageTitle>Assistant</PageTitle>
         <p className="max-w-prose text-sm text-text-muted">
-          The assistant argues for your seat, one pick at a time. It never drafts for you. Step through a replayed room below to see how it reads a run, a
-          tier break and a bye collision, and how it grades your own pick the moment it lands.
+          The advisor reads the room after every pick: the plan for your next three turns, what the seats ahead of you are likely to take, and the
+          picks for right now, each one a Draft or a Queue away. Step through a replayed room below and try both.
         </p>
       </div>
       <AssistantDemo fixture={ASSISTANT_DEMO_FIXTURE} />

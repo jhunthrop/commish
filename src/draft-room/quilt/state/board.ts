@@ -33,7 +33,9 @@ export interface QuiltRow {
 /** "2.05" — the sport's own round.pick grammar, zero-padded like every mock prints it. One
  *  spelling for the whole product (`@/domain/pick-label`), re-exported under the name this
  *  module's callers already import. */
-export { pickLabelOf as pickLabel } from "@/domain/pick-label";
+import { pickLabelOf } from "@/domain/pick-label";
+
+export const pickLabel = pickLabelOf;
 
 /** The seat (1-based) a team picks at in a snake round. */
 function snakeSeat(draftOrder: readonly string[], teamId: string, round: number): number | null {
