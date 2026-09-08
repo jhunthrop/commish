@@ -111,6 +111,18 @@ export const CAPSULE_CONFIG = {
     },
   },
   /**
+   * A READ ONE OR TWO WORDS OVER THE CAP IS HONEST PROSE LOST TO THE CAP (production follow-up,
+   * 2026-09-08: ten full reads fell to the template at 301 or 302 words against the 240-300 band,
+   * and the correction that asked the writer to "cut the sentences that carry the least" and aim
+   * for the middle came back over again). An overrun of this many words or fewer is answered by
+   * asking for the same text with one sentence taken off the end, which is the smallest edit that
+   * lands inside the band; a second overrun still falls to the template. The band itself is not
+   * widened: it is where the model lands, and a wider cap only moves the line the outliers cross.
+   */
+  lengthCorrection: {
+    trimOverrunWords: 5,
+  },
+  /**
    * THE ONE CALL PER PLAYER (refrains round, 2026-09-07) — the compact read, the full read and the
    * narrative slots in one JSON object (`bundle.ts`). The prose itself is about 120 plus 300 plus
    * 400 words, roughly 1,100 tokens with the JSON around it; the cap sits well above that for the

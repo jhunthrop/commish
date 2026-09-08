@@ -147,6 +147,25 @@ describe("correctionPromptFor", () => {
     expect(prompt).not.toContain("broke these rules");
   });
 
+  it("trims a small overrun by one sentence off the end, the same text otherwise (production follow-up, 2026-09-08: ten full reads lost at 301 or 302 words)", () => {
+    const { minWords, maxWords } = CAPSULE_CONFIG.sizes.full;
+    const { trimOverrunWords } = CAPSULE_CONFIG.lengthCorrection;
+    const at = (words: number) => correctionPromptFor(FACTS, "full", { body: "Two over.", violations: ["x"], lengthCorrection: { words, minWords, maxWords } });
+    for (const words of [maxWords + 1, maxWords + 2, maxWords + trimOverrunWords]) {
+      const prompt = at(words);
+      expect(prompt).toContain(`It is ${words} words, ${words - maxWords} over the ${maxWords} word cap.`);
+      expect(prompt).toContain("the same text with one sentence taken off the end");
+      expect(prompt).toContain("change nothing else");
+      expect(prompt).not.toContain("aim for about");
+      expect(prompt).not.toContain("Cut the sentences that carry the least");
+    }
+    const past = at(maxWords + trimOverrunWords + 1);
+    expect(past).toContain("Cut the sentences that carry the least");
+    expect(past).toContain(`aim for about ${Math.round((minWords + maxWords) / 2)}`);
+    expect(past).not.toContain("one sentence taken off the end");
+    expect(maxWords).toBe(300);
+  });
+
   it("hands a soft correction back as points to fix in the writer's own words", () => {
     const prompt = correctionPromptFor(FACTS, "full", { body: "Nearly right.", violations: ["x"], softCorrections: ["Fix the floor sentence."] });
     expect(prompt).toContain("Nearly right.");

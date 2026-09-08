@@ -131,6 +131,23 @@ export function bundlePromptFor(facts: PlayerFacts, requests: readonly Narrative
   return sections.filter((section): section is string => section !== null).join("\n\n");
 }
 
+const SAME_TEXT_OTHERWISE = "change nothing else: the same facts, the same numbers, the same order, the same voice.";
+
+/**
+ * The length correction. A small overrun (`CAPSULE_CONFIG.lengthCorrection.trimOverrunWords` or
+ * fewer over the cap) asks for the same text minus one sentence at the end, the smallest edit that
+ * lands inside the band; anything else asks for the middle of the band, cutting or adding.
+ */
+function lengthInstruction(size: CapsuleSize, quoted: string, correction: NonNullable<PriorAttempt["lengthCorrection"]>): string {
+  const { words, minWords, maxWords } = correction;
+  const overrun = words - maxWords;
+  if (overrun > 0 && overrun <= CAPSULE_CONFIG.lengthCorrection.trimOverrunWords) {
+    return `${quoted}\n\nIt is ${words} words, ${overrun} over the ${maxWords} word cap. Return the same text with one sentence taken off the end, and ${SAME_TEXT_OTHERWISE}`;
+  }
+  const move = overrun > 0 ? "Cut the sentences that carry the least" : "Add two or three more sentences of fact from the sheet that sharpen the case";
+  return `${quoted}\n\nIt is ${words} words. It has to be between ${minWords} and ${maxWords} words, so aim for about ${targetOf(size)}. ${move}, and ${SAME_TEXT_OTHERWISE}`;
+}
+
 function correctionInstruction(size: CapsuleSize, prior: PriorAttempt): string {
   const label = READ_LABEL[size];
   const shape = size === "compact" ? "one paragraph" : "up to three paragraphs";
@@ -138,11 +155,7 @@ function correctionInstruction(size: CapsuleSize, prior: PriorAttempt): string {
     return `Your previous answer had no ${label} for this player. Write it now: ${lengthOf(size)}, ${shape}, built on the two or three facts that decide his case.`;
   }
   const quoted = `You wrote this ${label}:\n"""${prior.body}"""`;
-  if (prior.lengthCorrection !== undefined) {
-    const { words, minWords, maxWords } = prior.lengthCorrection;
-    const move = words > maxWords ? "Cut the sentences that carry the least" : "Add two or three more sentences of fact from the sheet that sharpen the case";
-    return `${quoted}\n\nIt is ${words} words. It has to be between ${minWords} and ${maxWords} words, so aim for about ${targetOf(size)}. ${move}, and change nothing else: the same facts, the same numbers, the same order, the same voice.`;
-  }
+  if (prior.lengthCorrection !== undefined) return lengthInstruction(size, quoted, prior.lengthCorrection);
   if (prior.softCorrections !== undefined && prior.softCorrections.length > 0) {
     return `${quoted}\n\nIt is nearly right. Fix exactly these points, in your own words, and change nothing else:\n${prior.softCorrections.map((point) => `- ${point}`).join("\n")}`;
   }
