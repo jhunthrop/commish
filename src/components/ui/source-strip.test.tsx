@@ -6,7 +6,7 @@ import { SourceStrip, type SourceValue } from "./source-strip";
 
 const SOURCES: readonly SourceValue[] = [
   { label: "RB", value: "3" },
-  { label: "Market", value: "4.0" },
+  { label: "ADP", value: "4.0" },
   { label: "Experts", value: null },
   { label: "Model", value: null },
   { label: "PPG", value: "18.2", comparison: { percentile: 0.92, population: "running backs this season" } },
@@ -20,7 +20,7 @@ describe("SourceStrip", () => {
       // The source names ARE the legend. A heading above this row would be the product
       // explaining a row that explains itself.
       expect(queryByRole("heading")).not.toBeInTheDocument();
-      for (const label of ["RB", "Market", "Experts", "Model", "PPG"]) {
+      for (const label of ["RB", "ADP", "Experts", "Model", "PPG"]) {
         expect(strip).toHaveTextContent(label);
       }
     });

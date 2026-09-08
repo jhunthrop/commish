@@ -55,7 +55,7 @@ describe("reachSentence", () => {
     return { candidateAdp: null, currentPick: 1, makeItBack: null, ...overrides };
   }
 
-  it("returns null when the candidate has no market ADP", () => {
+  it("returns null when the candidate has no ADP", () => {
     expect(reachSentence(input({ candidateAdp: null, currentPick: 10 }))).toBeNull();
   });
 
@@ -66,24 +66,24 @@ describe("reachSentence", () => {
 
   it("fires at exactly REACH_THRESHOLD_PICKS", () => {
     const result = reachSentence(input({ candidateAdp: 10 + REACH_THRESHOLD_PICKS, currentPick: 10, makeItBack: null }));
-    expect(result).toBe("The market has him going about 12 picks from now.");
+    expect(result).toBe("Drafters are taking him about 12 picks from now.");
   });
 
   it("omits the odds sentence when make-it-back odds are unknown, never estimating inline", () => {
     const result = reachSentence(input({ candidateAdp: 40, currentPick: 20, makeItBack: null }));
-    expect(result).toBe("The market has him going about 20 picks from now.");
+    expect(result).toBe("Drafters are taking him about 20 picks from now.");
   });
 
   it("appends the odds sentence, in the product's one shared quarter-phrasing, when odds are known", () => {
     const result = reachSentence(input({ candidateAdp: 40, currentPick: 20, makeItBack: 0.624 }));
     expect(result).toBe(
-      "The market has him going about 20 picks from now. Our sims make it about 1 in 2 he is still here at your next turn.",
+      "Drafters are taking him about 20 picks from now. Our sims make it about 1 in 2 he is still here at your next turn.",
     );
   });
 
   it("rounds the pick gap to a whole number", () => {
     const result = reachSentence(input({ candidateAdp: 32.4, currentPick: 18, makeItBack: null }));
-    expect(result).toBe("The market has him going about 14 picks from now.");
+    expect(result).toBe("Drafters are taking him about 14 picks from now.");
   });
 
   it("speaks certain odds through the shared phrasing, never a raw percent", () => {

@@ -232,7 +232,7 @@ describe("PlayerPeekHost — the Outlook, grouped (2026-09-04 redesign)", () => 
     openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
 
     await waitFor(() => expect(screen.getByText("Outlook")).toBeInTheDocument());
-    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
+    expect(screen.getByText(/He is going later than he should/)).toBeInTheDocument();
     // 6 groups total (2 law groups + 4 fact groups: changed_team, availability, rookie,
     // new_play_caller — market_anchor/scarcity feed the verdict, never a peer chip) capped to 5,
     // the weakest (last-listed) fact group hidden behind the expander.
@@ -407,8 +407,8 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
 
     // A single match — `getByText` throws on more than one, which is the whole point of this
     // assertion: it fails loudly if the Outlook ever prints this sentence a second time.
-    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
-    expect(screen.getByLabelText("The call").textContent).toContain("The market is underpricing him");
+    expect(screen.getByText(/He is going later than he should/)).toBeInTheDocument();
+    expect(screen.getByLabelText("The call").textContent).toContain("He is going later than he should");
   });
 
   it("still shows the grouped evidence and the capped expander in the why slot, minus the capsule prose it used to carry", async () => {
@@ -531,7 +531,7 @@ describe("PlayerPeekHost — the dossier composition (Task 5)", () => {
     openPlayerPeek({ leagueId: "lg1", playerId: "rb1", name: "Rashad Long" });
     await waitFor(() => expect(screen.getByText("Outlook")).toBeInTheDocument());
 
-    expect(screen.getByText(/The market is underpricing him/)).toBeInTheDocument();
+    expect(screen.getByText(/He is going later than he should/)).toBeInTheDocument();
     expect(screen.queryByLabelText("The call")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Season range")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Role")).not.toBeInTheDocument();

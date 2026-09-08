@@ -245,7 +245,7 @@ export function TradeSheet({ leagueId, trade, context, math, onClose, onCounter,
           }}
         />
       ) : assessment.state === "loading" ? (
-        <p className="text-xs text-text-faint">Pricing both sides…</p>
+        <p className="text-xs text-text-faint">Valuing both sides…</p>
       ) : null}
 
       <div className="flex flex-col gap-2 rounded-md bg-surface-inset p-3">

@@ -11,7 +11,7 @@ describe("marketOrderNoteFor", () => {
   it("names the ordering and the reason for a position that fell back", () => {
     const kicker = marketOrderNoteFor("K");
     expect(kicker).toContain("Kickers");
-    expect(kicker).toContain("usually drafted");
+    expect(kicker).toContain("ranked by ADP because we do not project this position");
     expect(marketOrderNoteFor("DEF")).toContain("Team defenses");
   });
 

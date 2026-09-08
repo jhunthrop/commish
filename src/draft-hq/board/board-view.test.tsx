@@ -85,7 +85,7 @@ describe("BoardView, a position with no projection", () => {
     selectPosition("K");
     const note = screen.getByTestId("board-market-order-note");
     expect(note.textContent).toContain("Kickers");
-    expect(note.textContent).toContain("usually drafted");
+    expect(note.textContent).toContain("ranked by ADP");
     expect(note.textContent).not.toMatch(/[—–;]/);
   });
 
@@ -109,7 +109,7 @@ describe("BoardView, a position with no projection", () => {
     expect(within(cells).getByText(`No ${BOARD_LAST_SEASON} season on record for him`)).toBeInTheDocument();
     expect(within(cells).getByText(`No rate to state without a ${BOARD_LAST_SEASON} season`)).toBeInTheDocument();
     // The ordering must not be compared against itself.
-    expect(within(cells).getByText("No comparison against the market yet")).toBeInTheDocument();
+    expect(within(cells).getByText("No comparison against ADP yet")).toBeInTheDocument();
     expect(cells.textContent).not.toMatch(/\b0\.0\b/);
   });
 
@@ -157,7 +157,7 @@ describe("BoardView, a position with no projection", () => {
     expect(cells.textContent).not.toContain("overall");
   });
 
-  it("still shows the market ADP, which is the one number the row does carry", () => {
+  it("still shows the ADP, which is the one number the row does carry", () => {
     mount([projected({}), marketOrder({})]);
     selectPosition("K");
     const cells = screen.getByText("A Kicker").closest("tr")!;
@@ -177,7 +177,7 @@ describe("BoardView, a position with no projection", () => {
       fireEvent.click(within(screen.getByText("A Kicker").closest("tr")!).getByRole("button", { name: "why" }));
     });
     const drawer = screen.getByRole("dialog");
-    expect(within(drawer).getByText(/usually drafted/)).toBeInTheDocument();
+    expect(within(drawer).getByText(/ranked by ADP/)).toBeInTheDocument();
     expect(within(drawer).getByText(/In 2025 he scored 148.5 points over 17 games, 8.7 a game, under this league's scoring./)).toBeInTheDocument();
     expect(within(drawer).queryByText(/base model alone/)).not.toBeInTheDocument();
   });

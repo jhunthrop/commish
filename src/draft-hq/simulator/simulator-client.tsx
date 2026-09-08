@@ -93,7 +93,7 @@ export function SimulatorClient({ leagueId, leagueLabel, teamCount, rounds }: Si
         <p className="text-xs text-text-muted">
           {runs === SIM_RUN_OPTIONS[SIM_RUN_OPTIONS.length - 1]
             ? "10,000 runs computes as a background job. This page checks back on its own; you can leave and come back."
-            : "The room drafts market ADP under this league's roster rules, reaching as far off it as the sharpness you set. Your seat drafts our board."}
+            : "The room drafts by ADP under this league's roster rules, reaching as far off it as the sharpness you set. Your seat drafts our board."}
         </p>
       </Card>
 

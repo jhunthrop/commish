@@ -60,7 +60,7 @@ describe("WhyGroups", () => {
 
   it("prints no verdict sentence of its own — that stays the call card's, ruling R-d2", () => {
     render(<WhyGroups reasons={REASONS} laws={[]} position="RB" />);
-    expect(screen.queryByText(/underpricing|overpricing|market has not priced|evidence stands alone/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/going later than he should|a reach where he is going|he has no adp\.|evidence stands alone/i)).not.toBeInTheDocument();
   });
 
   it("follows the copy rules — no em-dash, no semicolon", () => {
