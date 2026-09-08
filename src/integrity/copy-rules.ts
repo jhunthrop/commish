@@ -44,7 +44,7 @@ import { INTEGRITY_CONFIG } from "./config";
  * it, not just go red.
  */
 export interface CopyViolation {
-  readonly rule: "dash" | "accusatory" | "passive" | "contraction" | "forbiddenVocabulary";
+  readonly rule: "dash" | "accusatory" | "passive" | "contraction" | "forbiddenVocabulary" | "tradingVocabulary";
   readonly found: string;
 }
 
@@ -96,6 +96,57 @@ const FORBIDDEN_VOCABULARY: readonly string[] = [
   "learns from",
   "machine learning",
 ];
+
+/**
+ * THE TRADING-VOCABULARY BAN (founder, 2026-09-07: "we say market everywhere like this is a stock
+ * trading app, it's a fantasy football app"). Every word a manager reads is fantasy football's
+ * own: ADP, a reach, a steal, "drafters take him later", "he is going later than he should".
+ * Market, price, buy, sell, fade, undervalued, overvalued, discount, dividend and "trade at" are a
+ * trader's words and never render.
+ *
+ * ITS OWN FUNCTION, NOT A SIXTH CLAUSE OF `copyViolations`, on purpose: the script sweep
+ * (`script-copy.source.test.ts`) applies `copyViolations` to what an OPERATOR reads on a
+ * terminal, and the fitting scripts honestly print "market curve" about the ADP model they fit.
+ * The ruling is about what a manager reads, so `fantasy-words.source.test.ts` applies this to the
+ * manager-facing directories and the operator sweep is left alone.
+ *
+ * Stems rather than exact phrases, word-bounded, because the ban is on the vocabulary and not on
+ * one sentence: "underpricing", "overpriced" and "prices" fail the same way "price" does.
+ */
+const TRADING_VOCABULARY =
+  /\b(?:markets?|prices?|priced|pricing|underpric\w*|overpric\w*|buys?|buying|bought|sells?|selling|sold|fades?|fading|undervalued|overvalued|premium|discounts?|discounted|dividends?)\b|\btrades? at\b|\bthe price is wrong\b|\bour number (?:versus|vs\.?) the market\b/gi;
+
+/**
+ * The phrases the trading sweep never flags, subtracted (case-insensitively) before the scan:
+ *
+ *  - "buy-in": fantasy's own word for the entry fee. The ban is on the trader's verb.
+ *  - "TE premium" (and its `te_premium`/`te-premium` keys): a scoring format, never a price.
+ *  - "premium research": the product term (`docs/research/2026-09-07-premium-research-tier-legal-questions.md`).
+ *  - "sell personal information": the privacy page's legal sentence, not draft advice.
+ *  - `market_anchor`, `market_unlisted`, `market-order-note`: internal identifiers a source scan
+ *    sees as string literals (a `BoardReason` code in a `case`, a `data-testid`). They render
+ *    nothing, and renaming a reason code is a projections-engine change, not a copy one.
+ */
+const TRADING_ALLOWLIST: readonly string[] = [
+  "buy-in",
+  "TE premium",
+  "te_premium",
+  "te-premium",
+  "premium research",
+  "sell personal information",
+  "market_anchor",
+  "market_unlisted",
+  "market-order-note",
+];
+
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function tradingVocabularyViolations(text: string): readonly CopyViolation[] {
+  const withoutAllowlisted = TRADING_ALLOWLIST.reduce((acc, phrase) => acc.replace(new RegExp(escapeRegExp(phrase), "gi"), " "), text);
+  return [...withoutAllowlisted.matchAll(TRADING_VOCABULARY)].map((match): CopyViolation => ({ rule: "tradingVocabulary", found: match[0] }));
+}
 
 export function copyViolations(text: string): readonly CopyViolation[] {
   const lower = text.toLowerCase();

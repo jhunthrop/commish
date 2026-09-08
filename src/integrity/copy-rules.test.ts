@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { INTEGRITY_CONFIG } from "./config";
-import { copyViolations } from "./copy-rules";
+import { copyViolations, tradingVocabularyViolations } from "./copy-rules";
 
 describe("copyViolations", () => {
   it("passes copy that breaks nothing", () => {
@@ -48,5 +48,49 @@ describe("copyViolations", () => {
 
   it("passes the mock draft's own honest bot copy", () => {
     expect(copyViolations("Coach Parker is a practice opponent, seeded for this room only.")).toEqual([]);
+  });
+});
+
+describe("tradingVocabularyViolations", () => {
+  it("passes copy written in fantasy football's own words", () => {
+    expect(tradingVocabularyViolations("Drafters take him 25 picks later. He is a steal at ADP 99.7.")).toEqual([]);
+    expect(tradingVocabularyViolations("Kickers are ranked by ADP because we do not project this position.")).toEqual([]);
+  });
+
+  it("catches the trader's words, whatever their casing or inflection", () => {
+    expect(tradingVocabularyViolations("The market has him at 99.7.")).toEqual([{ rule: "tradingVocabulary", found: "market" }]);
+    expect(tradingVocabularyViolations("Priced 17 picks early.")).toEqual([{ rule: "tradingVocabulary", found: "Priced" }]);
+    expect(tradingVocabularyViolations("The market is underpricing him.").map((v) => v.found)).toEqual(["market", "underpricing"]);
+    for (const word of ["buy", "sell", "fade", "undervalued", "overvalued", "discount", "dividend", "premium"]) {
+      expect(tradingVocabularyViolations(`A ${word} at this pick.`)).toContainEqual({ rule: "tradingVocabulary", found: word });
+    }
+  });
+
+  it("catches the two-word phrases the ruling named", () => {
+    expect(tradingVocabularyViolations("He should trade at a second-round pick.")).toContainEqual({ rule: "tradingVocabulary", found: "trade at" });
+    expect(tradingVocabularyViolations("The price is wrong.")).not.toEqual([]);
+    expect(tradingVocabularyViolations("Our number vs the market.")).not.toEqual([]);
+  });
+
+  it("leaves fantasy's own words alone: trade, value, points over replacement, reach, steal", () => {
+    expect(tradingVocabularyViolations("Propose a trade. His value over replacement is 40 points. A reach, not a steal.")).toEqual([]);
+  });
+
+  it("keeps the allowlist: the buy-in, the TE premium format, the premium research product and the privacy sentence", () => {
+    expect(tradingVocabularyViolations("Your buy-in sits in your wallet until the draft fires.")).toEqual([]);
+    expect(tradingVocabularyViolations("PPR with a TE premium")).toEqual([]);
+    expect(tradingVocabularyViolations("Premium research, labeled as research")).toEqual([]);
+    expect(tradingVocabularyViolations("This platform does not sell personal information to anyone.")).toEqual([]);
+  });
+
+  it("ignores the internal identifiers a source scan reads as literals", () => {
+    expect(tradingVocabularyViolations("market_anchor")).toEqual([]);
+    expect(tradingVocabularyViolations("market_unlisted")).toEqual([]);
+    expect(tradingVocabularyViolations("board-market-order-note")).toEqual([]);
+  });
+
+  it("is stateless across calls", () => {
+    const text = "The market price.";
+    expect(tradingVocabularyViolations(text)).toEqual(tradingVocabularyViolations(text));
   });
 });

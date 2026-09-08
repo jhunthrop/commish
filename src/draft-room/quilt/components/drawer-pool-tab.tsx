@@ -188,7 +188,7 @@ export function DrawerPoolTab({ leagueId, players, available, byeWeeks, reasons,
                           <Badge tone="neutral">{edges.split(" · ")[0]}</Badge>
                         </span>
                       )}
-                      {gap === 0 ? null : <Movement places={gap} against="the market" />}
+                      {gap === 0 ? null : <Movement places={gap} against="ADP" />}
                       {odds === null ? null : <OddsPercent odds={odds} playerId={player.id} />}
                     </>
                   }

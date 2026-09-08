@@ -16,10 +16,14 @@ import { countWordCapitalized } from "../lib/format";
  * curve costs -1.2 pts the market ignores") — plain, declarative, cites the number rather than
  * describing it.
  *
- * MISSING MARKET DATA gets a verdict from the evidence alone, never a blank: a player the board
- * ranked but the market never listed still has a position rank (`scarcity`) to state — "the
- * evidence makes him WR21. The market has not priced him" — and a player with neither gets the
- * honest last resort, "The evidence stands alone."
+ * MISSING ADP gets a verdict from the evidence alone, never a blank: a player the board ranked
+ * but no ADP feed ever listed still has a position rank (`scarcity`) to state — "the evidence
+ * makes him WR21. He has no ADP" — and a player with neither gets the honest last resort, "The
+ * evidence stands alone."
+ *
+ * FANTASY WORDS, NOT TRADING WORDS (founder, 2026-09-07): every rendered sentence below says
+ * drafters, ADP, a reach, "going later than he should". "The market", "underpricing", "his
+ * price" are a trader's words and `fantasy-words.source.test.ts` fails this file if they return.
  *
  * NO REASONS AT ALL — the board never ranked him (a crosswalk miss, or no board this season) —
  * returns `null` rather than inventing a sentence from nothing; the caller renders no verdict line,
@@ -65,24 +69,26 @@ function positionRankLabel(position: Position, scarcity: ScarcityReason): string
   return `${position}${scarcity.positionRank}`;
 }
 
-/** The one sentence for a player the market DID price: fair, under, or over, by `delta` — the
- *  evidence's own season-points gap off `marketPoints`. */
+/** The one sentence for a player who HAS an ADP: about right, going later than he should, or a
+ *  reach, by `delta` — the evidence's own season-points gap off `marketPoints`. Drafters and where
+ *  he is being drafted, never "the market" or "his price": fantasy words, not trading words
+ *  (founder, 2026-09-07). */
 function marketGapSentence(marketAnchor: MarketAnchorReason): string {
   const { delta } = marketAnchor;
   if (Math.abs(delta) < FAIR_PRICE_BAND_POINTS) {
-    return `The market has him about right, within ${FAIR_PRICE_BAND_POINTS} points of the evidence.`;
+    return `Drafters have him about right, within ${FAIR_PRICE_BAND_POINTS} points of the evidence.`;
   }
   const rounded = Math.abs(Math.round(delta));
   return delta > 0
-    ? `The market is underpricing him. Our number says he is worth about ${rounded} more points than where he is going.`
-    : `The market is overpricing him. Our number sits about ${rounded} points under his price, so let someone else pay it.`;
+    ? `He is going later than he should. Our projection says he is worth about ${rounded} more points than where he is being drafted.`
+    : `He is a reach where he is going. Our projection sits about ${rounded} points under his draft slot, so let someone else take him there.`;
 }
 
-/** The one sentence for a player the market never priced at all — the evidence's own position
- *  rank (`scarcity`) when the board has one, otherwise the honest last resort. */
+/** The one sentence for a player with no ADP at all — the evidence's own position rank
+ *  (`scarcity`) when the board has one, otherwise the honest last resort. */
 function noMarketSentence(position: Position, scarcity: ScarcityReason | undefined): string {
-  if (scarcity === undefined) return "The market has not priced him. The evidence stands alone.";
-  return `The evidence makes him ${positionRankLabel(position, scarcity)}. The market has not priced him.`;
+  if (scarcity === undefined) return "He has no ADP. The evidence stands alone.";
+  return `The evidence makes him ${positionRankLabel(position, scarcity)}. He has no ADP.`;
 }
 
 /**

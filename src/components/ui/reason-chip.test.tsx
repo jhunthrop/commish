@@ -144,13 +144,13 @@ describe("ReasonChip — market_anchor and market_unlisted (I6/M8 fix round)", (
   it("renders market_anchor's own marketPoints and signed delta", () => {
     const reason: BoardReason = { code: "market_anchor", marketPoints: 210.4, delta: -3.2 };
     render(<ReasonChip reason={reason} registry={[]} />);
-    expect(screen.getByText(/Market 210\.4 pts, -3\.2 from evidence/)).toBeInTheDocument();
+    expect(screen.getByText(/ADP slot averages 210\.4 pts, -3\.2 from evidence/)).toBeInTheDocument();
   });
 
   it("renders market_unlisted's own neutral copy (fix round 3, IMPORTANT 2: the old copy claimed model-only pricing, which is no longer true under min(raw, tail))", () => {
     const reason: BoardReason = { code: "market_unlisted" };
     render(<ReasonChip reason={reason} registry={[]} />);
-    expect(screen.getByText(/^No market ADP$/)).toBeInTheDocument();
+    expect(screen.getByText(/^No ADP$/)).toBeInTheDocument();
   });
 });
 

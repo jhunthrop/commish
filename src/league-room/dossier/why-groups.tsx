@@ -84,7 +84,7 @@ function factSentence(reason: FactReason): { readonly lead: string; readonly exp
     case "rookie":
       return { lead: "Rookie", explanation: reason.overallPick === null ? "Undrafted." : `Pick ${reason.overallPick}.` };
     case "market_unlisted":
-      return { lead: "Not on the market", explanation: "The feed carries no ADP for him." };
+      return { lead: "No ADP", explanation: "The feed carries no ADP for him." };
     // The kicker and team defence reasons (the 2026-09-05 round): components a reader can argue
     // with, the same facts `reason-chip.tsx` states as one line, split into lead and explanation.
     case "kicker_no_history":

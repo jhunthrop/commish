@@ -186,9 +186,11 @@ function copyFor(reason: BoardReason, law: Law | undefined): string {
     case "tier_cliff":
       return `${reason.playersLeftInTier} left in tier, ${reason.dropToNextTier.toFixed(1)} pt drop to the next`;
     case "market_unlisted":
-      return "No market ADP";
+      return "No ADP";
     case "market_anchor":
-      return `Market ${reason.marketPoints.toFixed(1)} pts, ${signedPoints(reason.delta)} from evidence`;
+      // What players drafted at his ADP slot have averaged, against our evidence. Never "the
+      // market": fantasy words, not trading words (founder, 2026-09-07).
+      return `ADP slot averages ${reason.marketPoints.toFixed(1)} pts, ${signedPoints(reason.delta)} from evidence`;
     // THE KICKER AND TEAM DEFENCE REASONS (the 2026-09-05 round). Both positions are composed from
     // components rather than from shares, so the copy names the components a reader can argue with
     // and never a number without its basis.

@@ -47,9 +47,10 @@ export function renderTemplateCapsule(facts: PlayerFacts): string {
   }
 
   if (market.adp === null) {
-    // The one market sentence the floor keeps: an UNPRICED player is a fact no other surface
-    // states. A priced player's ADP already sits in the rail above this card.
-    sentences.push("The market has not priced him.");
+    // The one ADP sentence the floor keeps: a player with NO ADP is a fact no other surface
+    // states. A player who has one already shows it in the rail above this card. "He has no ADP",
+    // never "the market has not priced him": fantasy words, not trading words (founder 2026-09-07).
+    sentences.push("He has no ADP.");
   }
 
   const strongestLaw = [...facts.evidence].filter((item) => item.kind === "law").sort((a, b) => Math.abs(b.netEffectPoints) - Math.abs(a.netEffectPoints))[0];

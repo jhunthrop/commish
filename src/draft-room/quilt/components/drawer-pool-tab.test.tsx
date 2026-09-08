@@ -88,7 +88,7 @@ describe("DrawerPoolTab — a position with no projection says so", () => {
     });
     const note = screen.getByTestId("market-order-note");
     expect(note.textContent).toContain("Kickers");
-    expect(note.textContent).toContain("usually drafted");
+    expect(note.textContent).toContain("ranked by ADP");
   });
 
   it("shows nothing when a projected position's filter is on", () => {
