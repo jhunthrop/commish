@@ -31,7 +31,7 @@ describe("NextPickCard", () => {
     expect(screen.getByTestId("advisor-facts")).toHaveTextContent("RB 3, KC, bye 10");
     expect(screen.getByTestId("advisor-facts")).toHaveAttribute("title", "41.2 points over replacement on our board");
     expect(screen.getByTestId("advisor-odds")).toHaveTextContent("92 of 200");
-    expect(screen.getByText("still there at your next pick, 2.10")).toBeInTheDocument();
+    expect(screen.getByText("still there at your next pick, 2.10, if you pass on him")).toBeInTheDocument();
     expect(screen.getByTestId("advisor-why")).toHaveTextContent(/20.6 point drop/);
     expect(screen.getByTestId("advisor-stamp")).toHaveTextContent("As of 1.01 · 200 runs");
     expect(screen.queryByText(/value over replacement/)).toBeNull();
@@ -66,6 +66,7 @@ describe("NextPickCard", () => {
       acts: { canDraft: false, submitting: false, queueOrder: new Map([["rb1", 2]]), onDraft: vi.fn(), onQueueToggle },
     });
     expect(screen.getByTestId("advisor-header")).toHaveTextContent("Your next pick is 2.07, 11 picks away");
+    expect(screen.getByText("still there at your next pick, 2.10")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Draft" })).toBeNull();
     const queued = screen.getByRole("button", { name: "Queued 2" });
     expect(queued).toHaveAttribute("aria-pressed", "true");

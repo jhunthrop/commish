@@ -10,7 +10,7 @@ export function nextPick(over: Partial<NextPick> = {}): NextPick {
     valueOverReplacement: 41.2,
     fillsSlot: "RB",
     makeItBack: { survival: 0.46, runs: 200 },
-    why: "He is the last back before a 20.6 point drop, and he fills your RB slot. 2 of the 3 seats before you lean back in our 200 runs.",
+    why: "He is the last back before a 20.6 point drop, and he fills your RB slot. 2 of the 3 seats before you take a back most often in our 200 runs.",
     whyShape: "cliff:0",
     ...over,
   };

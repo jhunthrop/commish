@@ -21,24 +21,24 @@ const BASE: WhyFacts = {
 describe("buildWhy", () => {
   it("argues the tier he closes in plain words, then the seats ahead with their basis", () => {
     const why = buildWhy({ ...BASE, reasons: [{ code: "tier_cliff", position: "RB", dropToNextTier: 20.55, playersLeftInTier: 1 }] }, 0);
-    expect(why.text).toBe("He is the last back before a 20.6 point drop, and he fills your RB slot. 2 of the 3 seats before you lean back in our 200 runs.");
+    expect(why.text).toBe("He is the last back before a 20.6 point drop, and he fills your RB slot. 2 of the 3 seats before you take a back most often in our 200 runs.");
     expect(why.shape).toBe("cliff:0");
   });
 
   it("names a run at his position ahead of the lean", () => {
     const why = buildWhy({ ...BASE, run: { position: "RB", count: 3, window: 4 }, ahead: [seat(5, "RB"), seat(6, "RB")] }, 1);
-    expect(why.text).toBe("He fills your RB slot, and he is the No. 4 back on our board. Backs are going, 3 of the last 4 picks, and all 2 seats before you lean back in our 200 runs.");
+    expect(why.text).toBe("He fills your RB slot, and he is the No. 4 back on our board. Backs are going, 3 of the last 4 picks, and all 2 seats before you take a back most often in our 200 runs.");
     expect(why.shape).toBe("value:1");
   });
 
   it("ignores a run at another position, and says when no seat leans his way", () => {
     const why = buildWhy({ ...BASE, positionRank: 1, run: { position: "WR", count: 3, window: 4 }, ahead: [seat(5, "WR"), seat(6, "QB")] }, 2);
-    expect(why.text).toBe("The best back on our board: he fills your RB slot. None of the 2 seats before you leans back in our 200 runs.");
+    expect(why.text).toBe("The best back on our board: he fills your RB slot. None of the 2 seats before you takes a back most often in our 200 runs.");
   });
 
   it("handles one seat ahead, a bench spot, a full roster and no seats at all", () => {
-    expect(buildWhy({ ...BASE, fillsSlot: "BENCH", ahead: [seat(5, "RB")] }, 0).text).toBe("He is the No. 4 back on our board, and he takes a bench spot. The seat before you leans back in our 200 runs.");
-    expect(buildWhy({ ...BASE, fillsSlot: null, ahead: [seat(5, "WR")] }, 0).text).toBe("He is the No. 4 back on our board, and he has no open slot on your roster. The seat before you does not lean back in our 200 runs.");
+    expect(buildWhy({ ...BASE, fillsSlot: "BENCH", ahead: [seat(5, "RB")] }, 0).text).toBe("He is the No. 4 back on our board, and he takes a bench spot. The seat before you takes a back most often in our 200 runs.");
+    expect(buildWhy({ ...BASE, fillsSlot: null, ahead: [seat(5, "WR")] }, 0).text).toBe("He is the No. 4 back on our board, and he has no open slot on your roster. The seat before you most often takes something other than a back in our 200 runs.");
     expect(buildWhy({ ...BASE, ahead: [] }, 0).text).toBe("He is the No. 4 back on our board, and he fills your RB slot. Nobody picks between now and your next turn.");
   });
 

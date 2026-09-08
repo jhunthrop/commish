@@ -96,15 +96,16 @@ const VALUE_SHAPES: readonly ((him: HimFacts) => string)[] = [
   (him) => `${capitalize(rankClause(him))}: he ${him.slot}.`,
 ];
 
-/** How many of the seats ahead took his position most often, in plain words with the basis. */
+/** How many of the seats ahead took his position most often, in plain words with the basis.
+ *  "Take a back most often", never "lean back": the persona pass read the short form as posture. */
 function leanClause(facts: WhyFacts, one: string): string {
   const n = facts.ahead.length;
   const k = facts.ahead.filter((seat) => seat.topPosition?.value === facts.position).length;
   const basis = `in our ${facts.runs} runs`;
-  if (n === 1) return k === 1 ? `the seat before you leans ${one} ${basis}` : `the seat before you does not lean ${one} ${basis}`;
-  if (k === 0) return `none of the ${n} seats before you leans ${one} ${basis}`;
-  if (k === n) return `all ${n} seats before you lean ${one} ${basis}`;
-  return `${k} of the ${n} seats before you lean ${one} ${basis}`;
+  if (n === 1) return k === 1 ? `the seat before you takes a ${one} most often ${basis}` : `the seat before you most often takes something other than a ${one} ${basis}`;
+  if (k === 0) return `none of the ${n} seats before you takes a ${one} most often ${basis}`;
+  if (k === n) return `all ${n} seats before you take a ${one} most often ${basis}`;
+  return `${k} of the ${n} seats before you take a ${one} most often ${basis}`;
 }
 
 /** The room sentence: the run at his position when there is one, then the seats ahead. */

@@ -46,7 +46,10 @@ function BigOdds({ view }: { readonly view: AdvisorView }) {
       <p data-testid="advisor-odds" data-band={safe ? "safe" : "plain"} className={`font-display text-display-lg leading-display tabular-nums ${safe ? "text-positive" : "text-text-primary"}`}>
         {bigOddsText(odds)}
       </p>
-      <p className="text-xs text-text-muted">still there at your next pick, {pickLabel(view.odds.pickNumber, view.teamCount)}</p>
+      <p className="text-xs text-text-muted">
+        still there at your next pick, {pickLabel(view.odds.pickNumber, view.teamCount)}
+        {view.onTheClock ? ", if you pass on him" : ""}
+      </p>
     </div>
   );
 }

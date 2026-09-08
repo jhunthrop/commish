@@ -7,6 +7,7 @@
  * Pure, so the Draft HQ demo computes REAL advisor views over its replayed room the same way a
  * live room does — one function, never a second implementation of "what the advisor says".
  */
+import { SURVIVAL_BANDS } from "@/domain/draft-odds";
 import { assignSlot, rosterFor, teamOnClock, type DraftState } from "@/draft-engine";
 import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
@@ -59,16 +60,31 @@ function nextPickFor(input: AdvisorCoreInput, top: Recommendation, survival: Sea
   };
 }
 
+/**
+ * THE PICK THE CARD NAMES. On the clock, the shortlist's first: the odds beside him say what
+ * passing costs. Off the clock, the first of the shortlist the runs leave on the board at your
+ * turn more often than the reach floor, because a pick you cannot make is not one you should
+ * make (persona pass, simplification round: the card kept naming a man at 2 of 100). When every
+ * one of them is a reach, the first stands and the number says so.
+ */
+function pickToName(recommendations: readonly Recommendation[], onTheClock: boolean, survival: SeatSurvival | null): Recommendation | null {
+  const first = recommendations[0] ?? null;
+  if (first === null || onTheClock || survival === null || survival.runsReached === 0) return first;
+  const reachable = recommendations.find((rec) => (survival.survived.get(rec.playerId) ?? 0) / survival.runsReached >= SURVIVAL_BANDS.reach);
+  return reachable ?? first;
+}
+
 /** `null` only when the asking seat has no further turn to advise. */
 export function advisorCore(input: AdvisorCoreInput): AdvisorView | null {
   const { state, askingTeamId, table, tiers } = input;
   const window = askingWindow(state, askingTeamId);
   if (window === null) return null;
-  const top = recommendNow(input)[0] ?? null;
+  const onTheClock = teamOnClock(state) === askingTeamId;
   const survival = survivalFor(table, state, askingTeamId);
+  const top = pickToName(recommendNow(input), onTheClock, survival);
   return {
     pickNumber: window.pickNumber,
-    onTheClock: teamOnClock(state) === askingTeamId,
+    onTheClock,
     picksUntilYourTurn: Math.max(0, window.pickNumber - state.pickNumber),
     teamCount: state.draftOrder.length,
     stamp: { computedAtPick: state.pickNumber, sequence: state.sequence },

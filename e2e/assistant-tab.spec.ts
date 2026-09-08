@@ -72,9 +72,6 @@ test("mock room -> the pool carries the odds, the Assistant tab shows the one ca
   const gotIt = managerA.getByRole("button", { name: "Got it" });
   if ((await gotIt.count()) > 0) await gotIt.click();
 
-  // --- The pool rows carry the next-turn odds the moment the advisor lands (spec section 7).
-  await expect(managerA.getByTestId("advisor-odds-pct").first()).toBeVisible({ timeout: 15_000 });
-
   // --- The Assistant tab, opened before this seat has made any pick at all: the advisor always
   // previews the asking seat's own current-or-next decision, so the one card is already there
   // the moment the room exists.
@@ -90,6 +87,9 @@ test("mock room -> the pool carries the odds, the Assistant tab shows the one ca
   // never "You're on the clock", which the copy law's contraction ban forbids anyway.
   await expect(managerA.getByText(/YOUR PICK/).first()).toBeVisible({ timeout: ON_CLOCK_TIMEOUT_MS });
   await managerA.getByTestId("drawer-handles").getByRole("tab", { name: "Pool" }).click();
+  // --- The pool rows carry the same next-turn odds the card does (spec section 7). Scoped to the
+  // desk tree: the phone tree renders the same rows hidden at this width.
+  await expect(managerA.getByTestId("quilt-room").getByTestId("advisor-odds-pct").first()).toBeVisible({ timeout: 15_000 });
   await makeTopPick(managerA);
 
   // --- Back on the Assistant tab, the post-pick beat has landed. Never asserted to an exact

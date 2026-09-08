@@ -4,7 +4,8 @@ import { availablePool, teamOnClock } from "@/draft-engine";
 import { simulateRoomOdds } from "../sim/room-odds";
 import { inferSeatDrivers } from "../sim/seat-model";
 import { advisorCore, seedFor } from "./advisor";
-import { onClockShortlist } from "./recommend";
+import { SURVIVAL_BANDS } from "@/domain/draft-odds";
+import { onClockShortlist, recommendNow } from "./recommend";
 import { FIXTURE_SHAPE, FIXTURE_TEAM_IDS, fixtureAdvance, fixtureStart, fixtureValued } from "./test-fixture";
 import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
@@ -92,6 +93,19 @@ describe("advisorCore", () => {
         expect(standing!.left).toBeLessThanOrEqual(standing!.size);
       }
     }
+  });
+
+  it("off the clock, names the first shortlisted player the runs leave on the board past the reach floor", () => {
+    const state = fixtureAdvance(fixtureStart(), 4); // seat 4 just picked; its next turn is 17
+    const valued = fixtureValued();
+    const table = simulateRoomOdds({ state, seed: seedFor("advisor-test", state.sequence), runs: RUNS, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, FIXTURE_SHAPE) });
+    const view = advisorCore({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE, table, tiers: tierStandings(state, valued) })!;
+    const shortlist = recommendNow({ state, askingTeamId: ASKING, valued, shape: FIXTURE_SHAPE });
+    const survivalOf = (id: string) => (view.odds!.survived[id] ?? 0) / view.odds!.runs;
+    const reachable = shortlist.find((rec) => survivalOf(rec.playerId) >= SURVIVAL_BANDS.reach);
+    expect(view.onTheClock).toBe(false);
+    expect(view.pick!.playerId).toBe((reachable ?? shortlist[0])!.playerId);
+    expect(survivalOf(view.pick!.playerId)).toBeGreaterThanOrEqual(SURVIVAL_BANDS.reach);
   });
 
   it("is reproducible for the same room state, and moves with the room on a new pick", () => {
