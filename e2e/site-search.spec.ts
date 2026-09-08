@@ -36,6 +36,15 @@ async function openWithSlash(page: Page): Promise<Locator> {
   return field;
 }
 
+/** Waits until every headshot in the open palette has finished loading (or failed and fallen back
+ *  to initials), so a photograph shows faces rather than the rings a fresh request leaves. */
+async function headshotsSettled(page: Page): Promise<void> {
+  await expect
+    .poll(async () => page.locator("[role=option] img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)), { timeout: 15_000 })
+    .toBe(true);
+  expect(await page.locator("[role=option] img").count()).toBeGreaterThan(0);
+}
+
 test("opens with /, lists a partial name, arrows down and lands on the player's page on Enter", async ({ managerA }) => {
   await managerA.goto("/app");
   const field = await openWithSlash(managerA);
@@ -57,6 +66,7 @@ test("finds the Lions by nickname, lands on the team page, and follows a roster 
   const first = managerA.getByRole("option").first();
   await expect(first).toContainText("Detroit Lions");
   await expect(first).toContainText("Team");
+  await headshotsSettled(managerA);
   await managerA.screenshot({ path: `${OUT_DIR}/search-desktop.png` });
   await managerA.keyboard.press("Enter");
   await expect(managerA).toHaveURL(/\/app\/teams\/DET$/);
@@ -93,6 +103,7 @@ test("on a phone the header's icon opens a full-screen search and the team page 
     const dialog = page.getByRole("dialog", { name: "Search" });
     const box = await dialog.boundingBox();
     expect(box?.width).toBe(360);
+    await headshotsSettled(page);
     await page.screenshot({ path: `${OUT_DIR}/search-phone.png` });
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/app\/teams\/DET$/);
