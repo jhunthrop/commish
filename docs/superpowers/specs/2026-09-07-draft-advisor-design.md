@@ -81,3 +81,16 @@ Plan computation on a fixture draft (targets, odds, fallback, stamp, changed-sin
 ## 6. Rollout
 
 Behind the writer and fact-sheet rounds (it consumes the narrative slot machinery). Deploy, open the assistant demo page on the seeded fixture, verify the three bands and a Draft from the card.
+
+## 7. Simplification (founder direction, 2026-09-07, after using the live advisor)
+
+"I like it but it's too slow. We can take out all of the LLM generated content to make it faster. Also we should simplify it just to be the next pick they should make and why in a single card."
+
+This section supersedes 3.1, 3.2, 3.5 and 3.6 above. What stays is the engine underneath; what changes is that the manager sees one card and no written prose.
+
+- **No model calls in the draft room.** The voice layer (strategy note, per-candidate reasons, the gateway call, its budget, memo and polling for late text) is removed, not disabled. Every sentence on the card is a template over measured facts, with the shape rotation from fix round 1 so consecutive turns do not read alike.
+- **One card.** The next pick the manager should make: name, position and rank, team and bye, value over replacement, the odds he is still there at the manager's next turn stated as runs over runs, and one "why" of at most two sentences built from the signals the engine already computes (a run in progress, the tier he closes and the drop behind him, what the seats ahead of you most often took in the runs, the roster slot he fills). Draft on the clock, Queue off it, the same actions as before. The stamp ("as of pick 4.07, 200 runs") stays, small.
+- **Horizon one.** The three-turn plan, the plan rail, the changed-since line and the horizon-3 continuation go. Survival odds are computed for the next turn only, which is a third of the simulation cost per recompute. The seat-tendency inference and the signals stay, because the "why" reads from them.
+- **Speed is measured, not assumed.** The round records, on the demo fixture and on a real room in dev, the time from a pick event to the updated card in the tab, before and after, and states the server compute per recompute at the worst case (14 teams, 16 rounds, pick 1). If the measured lag is dominated by something other than the removed work (the poll interval, the memo, the client render), that is fixed in the same round and named in the report.
+- **Dead code goes.** Plan rail, changed-since, voice module, voice config, their tests, the demo page's plan band and the Playwright steps that walked it. The demo shows the one card stepping through the replayed room.
+- **Honesty rules are unchanged.** Every number names its basis; a target without odds shows none; tier collapse never renders for a market-order position.
