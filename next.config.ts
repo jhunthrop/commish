@@ -103,16 +103,6 @@ const nextConfig: NextConfig = {
   // is untouched) lets `playwright.config.ts` point its build/start at an isolated `.next-e2e`.
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   /**
-   * The curated coaches file is read from disk at request time (`src/capsules/facts/depth-reads.ts`)
-   * by the team page and by the capsule sweep the job tick runs. Nothing imports it, so the
-   * serverless bundle's file tracing left it out and production threw ENOENT on both
-   * (2026-09-08, /app/teams/DEN). Named for every route rather than the two known readers, so the
-   * next surface that reads it does not repeat the outage.
-   */
-  outputFileTracingIncludes: {
-    "/**/*": ["./data/play-callers/**/*"],
-  },
-  /**
    * Applied to EVERY response, including `/reviews` and `/browse` — the two unauthenticated
    * pages, which are exactly the ones a stranger reaches first. `Referrer-Policy` matters here
    * specifically: `/reviews` renders third-party avatar images, and without it the viewer's page
