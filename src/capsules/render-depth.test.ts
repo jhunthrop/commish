@@ -177,3 +177,44 @@ describe("the depth chart line", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, depthChart: null })))).toBeNull();
   });
 });
+
+describe("the role trend and target competition lines", () => {
+  it("names both windows and states both ends, and grounds every share and week", () => {
+    const facts = buildPlayerFacts(
+      depthInput({
+        ...EMPTY_DEPTH,
+        roleTrend: { season: 2025, earlyWeeks: [1, 2, 3, 4], lateWeeks: [14, 15, 16, 17], snapShare: { early: 0.41, late: 0.78 }, targetShare: null },
+      }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- Inside 2025, from weeks 1 to 4 to weeks 14 to 17: snap share 41% to 78%.");
+    for (const value of [2025, 1, 4, 14, 17, 0.41, 41, 0.78, 78]) expect(facts.numberLedger).toContain(value);
+  });
+
+  it("renders no role trend line when the season carried too few readings to split", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, roleTrend: null })))).toBeNull();
+  });
+
+  it("names the two biggest earners with their shares and grounds both names", () => {
+    const facts = buildPlayerFacts(
+      depthInput({
+        ...EMPTY_DEPTH,
+        targetCompetition: {
+          season: 2025,
+          team: "CIN",
+          leaders: [
+            { name: "Ja'Marr Chase", share: 0.3 },
+            { name: "Tee Higgins", share: 0.22 },
+          ],
+          combinedShare: 0.52,
+        },
+      }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- Target competition on CIN in 2025: Ja'Marr Chase took 30% and Tee Higgins took 22%, 52% between them.");
+    for (const name of ["Ja'Marr Chase", "Higgins", "CIN", "Cincinnati", "Bengals"]) expect(facts.nameLedger).toContain(name);
+    for (const value of [0.3, 30, 0.22, 22, 0.52, 52]) expect(facts.numberLedger).toContain(value);
+  });
+
+  it("renders no target competition line when the team had fewer than two real earners", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, targetCompetition: null })))).toBeNull();
+  });
+});

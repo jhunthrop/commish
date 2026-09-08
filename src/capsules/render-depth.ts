@@ -135,6 +135,40 @@ function depthChartLine(facts: PlayerFacts): string | null {
   return `Depth chart as of ${chart.asOf}: listed ${slotWord(chart.slot)} among ${facts.identity.team} ${facts.identity.position}s. ${around}.`;
 }
 
+function percent(fraction: number): string {
+  return `${Math.round(fraction * 100)}%`;
+}
+
+/** A window of weeks as a manager reads it: "weeks 1 to 4", or the bare week when there is one. */
+function weekSpan(weeks: readonly number[]): string {
+  const first = weeks[0];
+  const last = weeks[weeks.length - 1];
+  if (first === undefined || last === undefined) return "no weeks";
+  return first === last ? `week ${first}` : `weeks ${first} to ${last}`;
+}
+
+/** HOW THE ROLE MOVED INSIDE THE SEASON, with both windows named. No verdict: "went from 25% to
+ *  65%" is the fact, and whether that is a breakout is the writer's call to argue, not this
+ *  module's to assert. */
+function roleTrendLine(depth: PlayerFactsDepth): string | null {
+  const trend = depth.roleTrend;
+  if (trend === null) return null;
+  const clauses = [
+    trend.snapShare === null ? null : `snap share ${percent(trend.snapShare.early)} to ${percent(trend.snapShare.late)}`,
+    trend.targetShare === null ? null : `target share ${percent(trend.targetShare.early)} to ${percent(trend.targetShare.late)}`,
+  ].filter((clause): clause is string => clause !== null);
+  if (clauses.length === 0) return null;
+  return `Inside ${trend.season}, from ${weekSpan(trend.earlyWeeks)} to ${weekSpan(trend.lateWeeks)}: ${clauses.join(", ")}.`;
+}
+
+/** WHO ELSE ATE. Names and shares only. */
+function targetCompetitionLine(depth: PlayerFactsDepth): string | null {
+  const competition = depth.targetCompetition;
+  if (competition === null) return null;
+  const named = competition.leaders.map((leader) => `${leader.name} took ${percent(leader.share)}`).join(" and ");
+  return `Target competition on ${competition.team} in ${competition.season}: ${named}, ${percent(competition.combinedShare)} between them.`;
+}
+
 /** Every line of the section, in `PlayerFactsDepth`'s own field order. Takes the whole `PlayerFacts`
  *  rather than the depth group alone because a few of these sentences name his own team and
  *  position, which live on `identity` and must never be restated inside the depth group itself. */
@@ -148,6 +182,8 @@ function depthLines(facts: PlayerFacts): readonly string[] {
     coachingLine(depth),
     pedigreeLine(depth),
     depthChartLine(facts),
+    roleTrendLine(depth),
+    targetCompetitionLine(depth),
   ].filter((line): line is string => line !== null && line !== "");
 }
 
