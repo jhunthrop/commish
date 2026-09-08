@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StatLine } from "@/domain/player";
+import { HALF_PPR_SCORING, PPR_SCORING, STANDARD_SCORING } from "@/domain/scoring";
 import type { Law } from "../laws/types";
 import type { BoardCandidate, BoardReason } from "../preseason/board";
 import { historicalRookieExpectedGames, rookieCurve, rookieCurveEvidenceN } from "../preseason/rookie-curve";
@@ -230,6 +231,36 @@ describe("blendBoard", () => {
     // product's own two-decimal rule.
     expect(seasonPointsOf(blended!)).toBeCloseTo(expectedPoints, 2);
     expect(blended!.reasons).toContainEqual({ code: "market_anchor", marketPoints: 999, delta: expectedPoints - 999 });
+  });
+
+  it("SCORING FORMAT: an unlisted candidate's fallback is his raw points under the board's own rules, not PPR's (the scoring-formats round)", () => {
+    const raw = candidate({ perGame: line({ receivingYards: 50, receptions: 4 }) });
+    const [half] = blendBoard([], [raw], { season: SEASON, constants: CONSTANTS, laws: [], rules: HALF_PPR_SCORING });
+    const [std] = blendBoard([], [raw], { season: SEASON, constants: CONSTANTS, laws: [], rules: STANDARD_SCORING });
+    // The blended line is points-only (`pointsOnlyPerGame`), so reading it under ANY preset gives
+    // the same number: the format entered at the fallback, exactly once.
+    expect(seasonPointsOf(half!)).toBeCloseTo(seasonPointsOf(raw, HALF_PPR_SCORING), 6);
+    expect(seasonPointsOf(std!)).toBeCloseTo(seasonPointsOf(raw, STANDARD_SCORING), 6);
+    expect(seasonPointsOf(half!)).toBeLessThan(seasonPointsOf(raw));
+    expect(seasonPointsOf(std!)).toBeLessThan(seasonPointsOf(half!));
+  });
+
+  it("SCORING FORMAT: the rookie prior is the PPR curve rescaled by the rookie's own stat mix, and the identity under PPR", () => {
+    const rookie = candidate({
+      position: "WR",
+      perGame: line({ receivingYards: 60, receptions: 5 }),
+      reasons: [{ code: "rookie", overallPick: 5, landingMultiplier: 1 }],
+    });
+    const [ppr] = blendBoard([market({ marketPoints: 999 })], [rookie], { season: SEASON, constants: CONSTANTS, laws: [], rules: PPR_SCORING });
+    const [pprDefault] = blendBoard([market({ marketPoints: 999 })], [rookie], { season: SEASON, constants: CONSTANTS, laws: [] });
+    const [std] = blendBoard([market({ marketPoints: 999 })], [rookie], { season: SEASON, constants: CONSTANTS, laws: [], rules: STANDARD_SCORING });
+    expect(seasonPointsOf(ppr!)).toBe(seasonPointsOf(pprDefault!));
+
+    const ratio = seasonPointsOf(rookie, STANDARD_SCORING) / seasonPointsOf(rookie, PPR_SCORING);
+    const modelPoints = (rookieCurve("WR", 5) / historicalRookieExpectedGames("WR", 5, SEASON)) * IMPLIED_GAMES * ratio;
+    const expectedPoints = shrinkTowardMarket(modelPoints, 999, rookieCurveEvidenceN("WR", 5));
+    expect(seasonPointsOf(std!)).toBeCloseTo(expectedPoints, 2);
+    expect(seasonPointsOf(std!)).toBeLessThan(seasonPointsOf(ppr!));
   });
 
   it("a rookie with no draft pick on record (overallPick null) is NOT substituted — falls through to the market/evidence path", () => {

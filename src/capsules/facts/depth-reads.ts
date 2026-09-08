@@ -1,4 +1,4 @@
-import { and, desc, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { adpSnapshots, nflDraftPicks, nflGames, nflPlayers, nflverseInjuries, nflverseRosterWeeks, preseasonRosters } from "@/db/schema";
 import type { Position } from "@/domain/player";
@@ -8,6 +8,7 @@ import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "@/projections/nflverse/pb
 import { NFLVERSE_SOURCE } from "@/projections/nflverse/map";
 import { finalWeekOf } from "@/projections/nflverse/team-eras";
 import { statLinesAsOfForLiveSurface } from "@/projections/nflverse/derived-stat-lines";
+import { BENCHMARK_SOURCES } from "@/projections/preseason/benchmarks";
 import { DEPTH_METRIC, DEPTH_SOURCE } from "@/projections/preseason/depth";
 import { LAST_POSSIBLE_WEEK, observationsAsOf } from "@/projections/store";
 import { playerTeamsAsOf, teamObservationsAsOf } from "@/projections/team-store";
@@ -261,14 +262,20 @@ export async function scheduledGamesFor(db: ReadonlyDb): Promise<readonly Schedu
   return rows;
 }
 
-/** Every archived ADP capture at or after `since`, per player. */
+/**
+ * Every archived PPR ADP capture at or after `since`, per player. PPR EXPLICITLY (the
+ * scoring-formats round, 2026-09-08): the nightly capture now writes three formats a fire, each
+ * under its own source, and the movement line is a PPR fact on a PPR fact sheet. Without the filter
+ * a player's "history" would hold three rows a night and the movement would compare a standard
+ * capture against a PPR one.
+ */
 export async function adpHistoryFor(db: ReadonlyDb, playerIds: readonly string[], since: Date): Promise<ReadonlyMap<string, readonly AdpCapture[]>> {
   const out = new Map<string, AdpCapture[]>();
   if (playerIds.length === 0) return out;
   const rows = await db
     .select({ playerId: adpSnapshots.playerId, adp: adpSnapshots.adp, capturedAt: adpSnapshots.capturedAt })
     .from(adpSnapshots)
-    .where(and(inArray(adpSnapshots.playerId, [...playerIds]), gte(adpSnapshots.capturedAt, since)));
+    .where(and(inArray(adpSnapshots.playerId, [...playerIds]), eq(adpSnapshots.source, BENCHMARK_SOURCES.adp), gte(adpSnapshots.capturedAt, since)));
   for (const row of rows) push(out, row.playerId, { adp: row.adp, capturedAt: row.capturedAt });
   return out;
 }

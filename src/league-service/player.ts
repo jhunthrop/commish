@@ -29,7 +29,7 @@ import type { Clock } from "@/domain/timing";
 import { enqueuePeekDocumentRebuildsQuietly } from "@/jobs/defs/peek-document-job";
 import { LEAGUE_CONFIG } from "@/league";
 import type { Player } from "@/domain/player";
-import { BOARD_SOURCE } from "@/projections/preseason/board-store";
+import { boardFormatForRules, boardSourceFor } from "@/projections/preseason/board-formats";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { type ScoringRules } from "@/scoring";
 import { scoringHashOf } from "@/scoring/hash";
@@ -239,7 +239,9 @@ async function hashHasDocuments(db: Db, scoringHash: string): Promise<boolean> {
  * crosswalk row and one projection row is the whole question, and it is a great deal cheaper than
  * the assembly that would answer it by producing nothing.
  */
-async function isOnTheBoard(db: Db, playerId: string): Promise<boolean> {
+async function isOnTheBoard(db: Db, playerId: string, rules: ScoringRules): Promise<boolean> {
+  // The league's own board (the scoring-formats round): the source follows its scoring row.
+  const source = boardSourceFor(boardFormatForRules(rules).format);
   const [row] = await db
     .select({ playerId: preseasonProjections.playerId })
     .from(preseasonProjections)
@@ -248,7 +250,7 @@ async function isOnTheBoard(db: Db, playerId: string): Promise<boolean> {
       and(
         eq(playerCrosswalk.playerId, playerId),
         eq(preseasonProjections.season, PRODUCT_SEASON),
-        eq(preseasonProjections.source, BOARD_SOURCE),
+        eq(preseasonProjections.source, source),
       ),
     )
     .limit(1);
@@ -342,7 +344,7 @@ async function playerSeasonOnMiss(
     const [player] = await db.select().from(players).where(eq(players.id, playerId));
     // No such player in `players` at all — the one case that is a 404 rather than a body of absence.
     if (player === undefined) return null;
-    if (!(await isOnTheBoard(db, playerId))) {
+    if (!(await isOnTheBoard(db, playerId, facts.rules))) {
       return offBoardBody({ ...player, headshotUrl: player.headshotUrl ?? null, adp: player.adp ?? null }, facts, now, requestedSeason);
     }
   }

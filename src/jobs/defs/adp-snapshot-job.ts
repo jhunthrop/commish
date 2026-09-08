@@ -1,6 +1,8 @@
 // THE NIGHTLY ADP SNAPSHOT JOB (Draft HQ phase 2 Task 6) — fires once a night
-// (`schedules.ts`'s own cron entry) and captures the current market ADP feed into the
-// append-only `adp_snapshots` archive (`@/projections/market/adp-snapshot.ts`).
+// (`schedules.ts`'s own cron entry) and captures the current ADP feed, in all three scoring
+// formats (`ADP_SNAPSHOT_REQUESTS_PER_FIRE` upstream requests a night, three, since the
+// scoring-formats round), into the append-only `adp_snapshots` archive
+// (`@/projections/market/adp-snapshot.ts`).
 //
 // TERMINAL VS RETRYABLE: everything this job can throw is either the feed's own network/HTTP
 // weather (`fetchAverageDraftPosition`'s fetch call) or the feed publishing no board at all for
@@ -8,6 +10,8 @@
 // one tomorrow night, and `maxAttempts` covers a same-night blip), so nothing here is classified
 // terminal. A season with genuinely nothing published yet dead-letters after its attempts and
 // tries again on the next night's fire, which is the correct behavior for "not yet, not never."
+// Only the PPR capture's failure throws (`ingestAdpSnapshot`'s own docblock); a secondary format
+// that fails is named in the detail lines and the fire still lands its PPR rows.
 import type { Db } from "@/db/client";
 import type { JsonObject } from "@/domain/audit";
 import { ingestAdpSnapshot } from "@/projections/market/adp-snapshot";
@@ -35,21 +39,36 @@ export function parseAdpSnapshotPayload(raw: JsonObject): AdpSnapshotPayload {
   return { firedAt };
 }
 
+function ratePercent(rate: number | null): string {
+  return rate === null ? "n/a" : `${(rate * 100).toFixed(1)}%`;
+}
+
 export async function runAdpSnapshotStep(db: Db, clock: { readonly now: () => string }, payload: AdpSnapshotPayload): Promise<StepOutcome> {
   const now = payload.firedAt !== undefined ? () => new Date(payload.firedAt!) : () => new Date(clock.now());
   const result = await ingestAdpSnapshot(db, { now });
-  const ratePct = result.resolutionRate === null ? "n/a" : `${(result.resolutionRate * 100).toFixed(1)}%`;
+  const ratePct = ratePercent(result.resolutionRate);
+  // One line per format (the scoring-formats round): a night where the half-PPR feed came back
+  // empty and the PPR feed did not is visible here, not folded into one pooled count.
+  const perFormat = result.byFormat.map((entry) =>
+    entry.error === null
+      ? `${entry.format}: ${entry.candidatesRead} published, ${entry.written} written (${ratePercent(entry.resolutionRate)})`
+      : `${entry.format}: FAILED (${entry.error})`,
+  );
+  const landed = result.byFormat.filter((entry) => entry.error === null).map((entry) => entry.format);
+  const failed = result.byFormat.filter((entry) => entry.error !== null).map((entry) => entry.format);
   return {
-    summary: `adp-snapshot: ${result.candidatesRead} published, ${result.written} rows written (${ratePct} resolved)`,
-    detail: result.written === 0 ? [`no rows written this capture (resolution ${ratePct})`] : [],
+    summary:
+      `adp-snapshot: ${result.candidatesRead} published, ${result.written} rows written (${ratePct} resolved); ` +
+      `landed ${landed.join(", ") || "none"}${failed.length > 0 ? `, failed ${failed.join(", ")}` : ""}`,
+    detail: [...perFormat, ...(result.written === 0 ? [`no rows written this capture (resolution ${ratePct})`] : [])],
   };
 }
 
 export const adpSnapshotJob: AnyJobDefinition = defineJob<AdpSnapshotPayload>({
   name: ADP_SNAPSHOT_JOB_NAME,
   maxAttempts: 3,
-  // A single HTTP fetch plus one batched insert — comfortably short, but generous against a slow
-  // upstream night, matching the season-week job's own network-step budget.
+  // Three HTTP fetches (one per format) plus one batched insert each — comfortably short, but
+  // generous against a slow upstream night, matching the season-week job's own network-step budget.
   timeoutMs: 60_000,
   backoff: { baseMs: 60_000, maxMs: 10 * 60_000 },
   parsePayload: parseAdpSnapshotPayload,

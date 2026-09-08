@@ -7,6 +7,7 @@
 // installed reality rather than re-deciding the wall clock; see the spec's judgment calls.
 import type { JsonObject } from "@/domain/audit";
 import { HARVEST_CONFIG } from "@/projections/harvest-config";
+import { ADP_SNAPSHOT_CAPTURES } from "@/projections/market/adp-snapshot";
 import { parseCronExpression, type CronExpression } from "./cron";
 
 export interface ScheduleDefinition {
@@ -102,7 +103,7 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
     timezone: "America/New_York",
     job: "adp-snapshot",
     payload: {},
-    description: "Nightly 03:00 ET capture of the market ADP feed into the append-only trend archive (Draft HQ phase 4's data, started early).",
+    description: `Nightly 03:00 ET capture of the ADP feed in all ${ADP_SNAPSHOT_CAPTURES.length} scoring formats (PPR, half PPR, standard; one upstream request each) into the append-only trend archive (Draft HQ phase 4's data, started early).`,
   }),
   schedule({
     name: "props-preseason-snapshot-daily",

@@ -7,8 +7,10 @@ import { pageTitle } from "@/components/app-shell/page-metadata";
 import { Card, PageTitle, type SegmentOption } from "@/components/ui";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { registry } from "@/projections/laws/registry";
-import { boardRows } from "@/draft-hq/board/service";
+import { DEFAULT_BOARD_FORMAT, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
+import { boardRows, resolveBoardFormat } from "@/draft-hq/board/service";
 import { BoardView } from "@/draft-hq/board/board-view";
+import { BOARD_FORMAT_QUERY_KEY, ScoringFormatPicker } from "@/draft-hq/board/scoring-format-picker";
 import { LeaguePicker } from "@/draft-hq/league-picker";
 import { myDraftLeagues, nextDraftingLeague, type DraftLeagueRow } from "@/draft-hq/league-context";
 import { DraftSubnav } from "@/draft-hq/subnav";
@@ -29,8 +31,17 @@ function leaguePickerOptions(leagues: readonly DraftLeagueRow[]): readonly Segme
   const options: SegmentOption[] = [];
   if (leagues.length > 0) options.push({ value: "next", label: "Next draft" });
   for (const league of leagues) options.push({ value: league.leagueId, label: league.leagueName });
-  options.push({ value: "generic", label: "Generic (PPR, 12-team)" });
+  options.push({ value: "generic", label: "Generic (12-team)" });
   return options;
+}
+
+/** `?format=` on a league-free board: the named format, or the default with `explicit: false` so
+ *  the picker may apply the browser's remembered choice. A value that is not one of the three
+ *  reads as the default rather than a 404. */
+function requestedFormat(params: Record<string, string | readonly string[] | undefined>): { readonly format: BoardFormat; readonly explicit: boolean } {
+  const raw = params[BOARD_FORMAT_QUERY_KEY];
+  if (typeof raw === "string" && isBoardFormat(raw)) return { format: raw, explicit: true };
+  return { format: DEFAULT_BOARD_FORMAT, explicit: false };
 }
 
 interface PageProps {
@@ -46,6 +57,10 @@ interface PageProps {
  * RECOMPUTED value-over-replacement/tier numbers (`boardRows`'s own docblock) — position tabs,
  * search, the rookie filter and the $ toggle are client state over rows already in hand
  * (`BoardView`), since none of them change what was computed, only what is shown.
+ *
+ * SCORING FORMAT IS A SERVER RE-RENDER TOO (`?format=`, the scoring-formats round, 2026-09-08),
+ * and only on the league-free board: it changes WHICH stored board is read. Inside a league the
+ * league's own rules decide and there is no selector; the basis card says which board and why.
  */
 export default async function BoardPage({ searchParams }: PageProps) {
   const user = await requireCurrentUser();
@@ -69,10 +84,13 @@ export default async function BoardPage({ searchParams }: PageProps) {
 
   const shape = selected === null ? { teamCount: 12, rosterSlots: STANDARD_ROSTER_SLOTS } : { teamCount: selected.teamCount, rosterSlots: selected.rosterSlots };
 
-  const [rows, auctionBudget] = await Promise.all([
-    // `leagueId` is what the LAST SEASON column is measured under for the kicker and team defense
-    // tabs — the generic board names none and falls back to PPR, exactly as its own banner says.
-    boardRows(db, { shape, leagueId: selected?.leagueId }),
+  const requested = requestedFormat(params);
+  const boardOptions = { leagueId: selected?.leagueId, format: isGeneric ? requested.format : undefined };
+  const [rows, resolved, auctionBudget] = await Promise.all([
+    // `leagueId` decides the board and the LAST SEASON column's rules; the generic board reads the
+    // format the selector names, exactly as its own basis card says.
+    boardRows(db, { shape, ...boardOptions }),
+    resolveBoardFormat(db, boardOptions),
     selected === null
       ? Promise.resolve(null)
       : db
@@ -101,16 +119,23 @@ export default async function BoardPage({ searchParams }: PageProps) {
       <LeaguePicker options={leaguePickerOptions(leagues)} value={isGeneric ? "generic" : leagueParam !== undefined ? (selected?.leagueId ?? "next") : "next"} basePath="/app/draft/board" />
 
       {isGeneric ? (
-        <Card className="text-sm text-text-muted">
-          {"This is the default board: PPR scoring, a 12-team standard roster. Pick a league above to see it computed under that league's exact rules."}
+        <Card className="flex flex-col gap-3 text-sm text-text-muted">
+          <ScoringFormatPicker value={requested.format} explicit={requested.explicit} basePath="/app/draft/board" extraQuery={{ league: "generic" }} />
+          <p>{`${resolved.basisLine}, a 12-team standard roster. Pick a league above to see it computed under that league's exact rules.`}</p>
         </Card>
       ) : selected !== null ? (
         <Card className="text-sm text-text-muted">
-          {`Computed under ${selected.leagueName}'s rules: ${selected.teamCount} teams, its own roster shape.`}
+          {`Computed under ${selected.leagueName}'s rules: ${selected.teamCount} teams, its own roster shape. ${resolved.basisLine}.${resolved.note === null ? "" : ` ${resolved.note}`}`}
         </Card>
       ) : null}
 
-      <BoardView rows={rows} laws={laws} auctionShape={auctionShape} exportFilename={`board-${selected?.leagueId ?? "generic"}.csv`} />
+      <BoardView
+        rows={rows}
+        laws={laws}
+        auctionShape={auctionShape}
+        scoringLabel={resolved.label}
+        exportFilename={`board-${selected?.leagueId ?? `generic-${resolved.format}`}.csv`}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BENCHMARK_BOARD_FLOOR, normalizeName, resolveRankings, type RankingCandidate, type RosterIdentity } from "./benchmarks";
-import { parseAverageDraftPosition, parseExpertConsensus, type FfcResponse } from "./publishers";
+import { ffcAdpUrl, parseAverageDraftPosition, parseExpertConsensus, type FfcResponse } from "./publishers";
 import { HISTORICAL_ROSTER_FLOOR } from "../nflverse/rosters";
 
 /**
@@ -247,6 +247,12 @@ describe("parseAverageDraftPosition", () => {
     meta: { end_date: "2024-08-27" },
     players: [{ name: "CeeDee Lamb", position: "WR", team: "DAL", adp: 1.4 }],
     ...overrides,
+  });
+
+  it("addresses each format's own board by the feed's own path segment (the scoring-formats round)", () => {
+    expect(ffcAdpUrl(2024, "ppr")).toBe("https://fantasyfootballcalculator.com/api/v1/adp/ppr?year=2024&teams=12&position=all");
+    expect(ffcAdpUrl(2024, "half-ppr")).toContain("/adp/half-ppr?year=2024");
+    expect(ffcAdpUrl(2024, "standard")).toContain("/adp/standard?year=2024");
   });
 
   it("reads the board out of the feed's own JSON body", () => {

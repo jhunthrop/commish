@@ -18,6 +18,7 @@ import type { DraftState } from "@/draft-engine";
 import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { getDraftStore, resolveDraftActor } from "@/draft-service";
+import { leagueBoardFormat } from "@/league-service/board-format";
 import { evidencePoolFor } from "../sim/evidence";
 import { simulateRoomOdds, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
 import { inferSeatDrivers } from "../sim/seat-model";
@@ -43,10 +44,16 @@ interface ValuedRoom {
 }
 
 /** The evidence board valued under this room's shape, and the room's facts for exactly this
- *  state — from the memo when held, computed (and remembered) otherwise. */
+ *  state — from the memo when held, computed (and remembered) otherwise.
+ *
+ *  THE LEAGUE'S OWN BOARD (the scoring-formats round, 2026-09-08): the pool is the board the
+ *  league's scoring row resolves to (`leagueBoardFormat`; a half-PPR room values the half board),
+ *  read here so the warm and the request path value the same board, and no memo ever holds facts
+ *  computed on one format and served for another. */
 async function roomFactsForState(db: Db, draftId: string, state: DraftState, simulate: (input: RoomOddsInput) => RoomOddsTable): Promise<ValuedRoom> {
   const shape: LeagueShape = { teamCount: state.draftOrder.length, rosterSlots: state.config.slotConfig };
-  const { pool } = await evidencePoolFor(db);
+  const board = await leagueBoardFormat(db, state.config.leagueId);
+  const { pool } = await evidencePoolFor(db, new Date(), board.source);
   const valued = valuedEvidence(pool, shape);
   const facts = roomFactsFor(draftId, state.sequence, () => ({
     table: simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),

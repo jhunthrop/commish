@@ -1,10 +1,17 @@
 // Builds the shipped preseason board for one or more seasons and WRITES IT DOWN — the market-blended
-// board, under BOARD_SOURCE (see board-store.ts's own docblock for its current value and the
-// source-bump history behind it), AND the raw model board, under BOARD_SOURCE_V1_RAW (v1), so both
-// halves of Task 11's own scorecard comparison stay addressable and CURRENT.
+// board, under each scoring format's own source (`boardSourceFor`: `commish_board_v9_ppr_12`,
+// `_half_12`, `_std_12`; see board-store.ts's own docblock for the version history behind the
+// name), AND the raw model board, under BOARD_SOURCE_V1_RAW (v1, PPR), so both halves of Task 11's
+// own scorecard comparison stay addressable and CURRENT.
 // Run: npm run projections:preseason:persist [season ...]   (defaults to every ingested season)
 //      npm run projections:preseason:persist -- --unfreeze   (overrides FROZEN_BOARD_SOURCES, 2027 round)
 //      npm run projections:preseason:persist -- --diff-reasons  (prints what would change, writes nothing)
+//      npm run projections:preseason:persist -- --formats=half,std  (a subset of the three blended boards)
+//
+// THREE BLENDED BOARDS A RUN (the scoring-formats round, 2026-09-08). One `loadPreseason`, one
+// props anchor, then the blend three times: each format anchors to its own ADP feed through its own
+// fitted curve and is scored under its own preset (`market/format-anchor.ts`), and lands under its
+// own source. The PPR leg is byte-for-byte the board this script wrote before the round.
 //
 // --diff-reasons (dossier-voice round, task 7) — BEFORE a re-persist, how many stored reasons per
 // code this run would add, drop, or change the payload of. The board has not been re-persisted
@@ -42,6 +49,7 @@
 // reasons written for real, for the first time.
 import { createDb, type Db } from "@/db/client";
 import { PPR_SCORING } from "@/domain/scoring";
+import { BOARD_FORMAT_SPECS, BOARD_FORMATS, boardSourceFor, isBoardFormat, type BoardFormat } from "@/projections/preseason/board-formats";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import type { Position } from "@/domain/player";
 import type { Clock } from "@/domain/timing";
@@ -53,13 +61,7 @@ import { marketBoard } from "@/projections/market/curve";
 import { propsAnchorForSeason } from "@/projections/market/props-anchor";
 import { FITTED_PROPS_ANCHOR_WEIGHT } from "@/projections/market/props-anchor-fitted";
 import { preseasonBoard, type BoardEntry, type BoardReason } from "@/projections/preseason/board";
-import {
-  boardReasons,
-  BOARD_SOURCE,
-  BOARD_SOURCE_V1_RAW,
-  writePreseasonBoard,
-  type BoardWriteCounts,
-} from "@/projections/preseason/board-store";
+import { boardReasons, BOARD_SOURCE_V1_RAW, writePreseasonBoard, type BoardWriteCounts } from "@/projections/preseason/board-store";
 import {
   FITTED_AVAILABILITY_PRIORS,
   FITTED_CAREER_PRIORS,
@@ -96,6 +98,21 @@ const UNFREEZE = ARGUMENTS.includes("--unfreeze");
 const DIFF_REASONS = ARGUMENTS.includes("--diff-reasons");
 const SEASONS = ARGUMENTS.filter((argument) => !argument.startsWith("--")).map(Number);
 const TARGET_SEASONS = SEASONS.length > 0 ? SEASONS : INGESTED_SEASONS;
+
+/** `--formats=half,std` narrows the blended legs; the default is all three. The raw v1 leg is
+ *  format-free and always runs. */
+function parseFormats(argv: readonly string[]): readonly BoardFormat[] {
+  const flag = argv.find((argument) => argument.startsWith("--formats="));
+  if (flag === undefined) return BOARD_FORMATS;
+  return flag
+    .slice("--formats=".length)
+    .split(",")
+    .map((value) => {
+      if (!isBoardFormat(value)) throw new Error(`"${value}" is not a board format (${BOARD_FORMATS.join(", ")}).`);
+      return value;
+    });
+}
+const TARGET_FORMATS = parseFormats(ARGUMENTS);
 
 const SYSTEM_CLOCK: Clock = { now: () => new Date().toISOString() };
 
@@ -188,17 +205,33 @@ function requireEnv(name: string): string {
 /** The board a persist would write, built and not stored — the one place both the write path below
  *  and `--diff-reasons` get their candidates, so a diff can never describe a board a persist would
  *  not actually produce. */
+/** One blended leg: which format, and therefore which source it lands under. `null` is the raw
+ *  v1 leg, which is PPR and format-free. */
+interface BoardLeg {
+  readonly format: BoardFormat | null;
+  readonly source: string;
+}
+
+const RAW_LEG: BoardLeg = { format: null, source: BOARD_SOURCE_V1_RAW };
+
+function blendedLeg(format: BoardFormat): BoardLeg {
+  return { format, source: boardSourceFor(format) };
+}
+
 async function buildBoard(
   db: Db,
   inputs: PreseasonInputs,
-  raw: boolean,
+  leg: BoardLeg,
   blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
 ): Promise<readonly BoardEntry[]> {
+  const raw = leg.format === null;
   const candidates = await shippedPreseasonCandidates(db, inputs, PRIORS, {
     raw,
+    ...(leg.format === null ? {} : { format: leg.format }),
     ...(blendEvidence !== undefined ? { constants: blendEvidence.constants, propsAnchor: blendEvidence.propsAnchor } : {}),
   });
-  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules: PPR_SCORING, shape: SHAPE });
+  const rules = leg.format === null ? PPR_SCORING : BOARD_FORMAT_SPECS[leg.format].rules;
+  return preseasonBoard(candidates, { season: inputs.season, asOf: inputs.moment, rules, shape: SHAPE });
 }
 
 /** One reason code's own before-and-after count, over the players the board holds. */
@@ -267,19 +300,37 @@ function printReasonDiff(season: number, source: string, diffs: readonly ReasonD
 async function persistBoard(
   db: Db,
   inputs: PreseasonInputs,
-  source: string,
-  raw: boolean,
+  leg: BoardLeg,
   unfrozen: boolean,
   blendEvidence?: { readonly constants: BlendConstants; readonly propsAnchor: ReadonlyMap<string, number> },
 ): Promise<{ readonly board: readonly BoardEntry[]; readonly write: BoardWriteCounts }> {
-  const board = await buildBoard(db, inputs, raw, blendEvidence);
+  const board = await buildBoard(db, inputs, leg, blendEvidence);
   const write = await writePreseasonBoard(
     db,
-    { season: inputs.season, source, asOf: inputs.moment, momentKind: inputs.momentKind },
+    { season: inputs.season, source: leg.source, asOf: inputs.moment, momentKind: inputs.momentKind },
     board,
     { unfrozen },
   );
   return { board, write };
+}
+
+function printBoardWrite(season: number, label: string, leg: BoardLeg, result: { readonly board: readonly BoardEntry[]; readonly write: BoardWriteCounts }): void {
+  console.log(
+    `${season}  [${label}, ${leg.source}]  ${String(result.board.length).padStart(4)} players  ` +
+      `${String(result.write.written).padStart(4)} new projection rows  ${String(result.write.reasonsWritten).padStart(4)} reason rows written` +
+      describeRetirement(result.write),
+  );
+}
+
+const TOP_ROWS_PRINTED = 5;
+
+function printTopRows(board: readonly BoardEntry[], names: ReadonlyMap<string, string>): void {
+  for (const entry of board.slice(0, TOP_ROWS_PRINTED)) {
+    console.log(
+      `      ${String(entry.rank).padStart(3)} ${entry.position} ${(names.get(entry.playerId) ?? entry.playerId).padEnd(22)}` +
+        `proj ${entry.projectedPoints.toFixed(0).padStart(4)}  ${entry.position}${entry.positionRank}`,
+    );
+  }
 }
 
 /** What a board write retired, printed only when it retired something. A replay persist prints
@@ -290,9 +341,9 @@ function describeRetirement(write: BoardWriteCounts): string {
 }
 
 /**
- * ONE SEASON, BOTH BOARDS — extracted out of `main`'s loop body (Task 4 fix round 2, I5) so the
- * ORDERING GUARANTEE below is a unit anyone can call and test, not an implicit property of two
- * lines sitting in a particular order inside a `for` loop.
+ * ONE SEASON, EVERY BOARD (three blended formats, then the raw v1) — extracted out of `main`'s loop
+ * body (Task 4 fix round 2, I5) so the ORDERING GUARANTEE below is a unit anyone can call and test,
+ * not an implicit property of two lines sitting in a particular order inside a `for` loop.
  *
  * THE BLENDED BOARD IS BUILT AND WRITTEN FIRST, DELIBERATELY — the review's own finding: the
  * degeneracy guard (`market/blend.ts`'s `assertLiveMarketCoverage`) lives inside
@@ -311,6 +362,7 @@ export async function persistSeason(
   clock: Clock,
   names: ReadonlyMap<string, string>,
   unfrozen = false,
+  formats: readonly BoardFormat[] = TARGET_FORMATS,
 ): Promise<void> {
   const boardMoment = await boardMomentFor(db, season, clock);
   const inputs = await loadPreseason(db, season, { boardMoment });
@@ -344,37 +396,29 @@ export async function persistSeason(
     console.warn(`props anchor: 0 players anchored for ${season} — resolve has not run or the archive is empty`);
   }
 
+  const blendEvidence = { constants: BLENDED_CONSTANTS, propsAnchor };
+  const legs: readonly (readonly [BoardLeg, typeof blendEvidence | undefined])[] = [
+    ...formats.map((format) => [blendedLeg(format), blendEvidence] as const),
+    [RAW_LEG, undefined] as const,
+  ];
+
   if (DIFF_REASONS) {
-    for (const [source, raw, evidence] of [
-      [BOARD_SOURCE, false, { constants: BLENDED_CONSTANTS, propsAnchor }],
-      [BOARD_SOURCE_V1_RAW, true, undefined],
-    ] as const) {
-      const fresh = await buildBoard(db, inputs, raw, evidence);
-      const stored = await boardReasons(db, source, season);
-      printReasonDiff(season, source, diffReasons(stored, new Map(fresh.map((entry) => [entry.playerId, entry.reasons] as const))));
+    for (const [leg, evidence] of legs) {
+      const fresh = await buildBoard(db, inputs, leg, evidence);
+      const stored = await boardReasons(db, leg.source, season);
+      printReasonDiff(season, leg.source, diffReasons(stored, new Map(fresh.map((entry) => [entry.playerId, entry.reasons] as const))));
     }
     return;
   }
 
-  const blended = await persistBoard(db, inputs, BOARD_SOURCE, false, unfrozen, { constants: BLENDED_CONSTANTS, propsAnchor });
-  console.log(
-    `${season}  [blend, ${BOARD_SOURCE}]  ${String(blended.board.length).padStart(4)} players  taken at ${inputs.moment.toISOString()}  ` +
-      `${String(blended.write.written).padStart(4)} new projection rows  ${String(blended.write.reasonsWritten).padStart(4)} reason rows written` +
-      describeRetirement(blended.write),
-  );
-  for (const entry of blended.board.slice(0, 5)) {
-    console.log(
-      `      ${String(entry.rank).padStart(3)} ${entry.position} ${(names.get(entry.playerId) ?? entry.playerId).padEnd(22)}` +
-        `proj ${entry.projectedPoints.toFixed(0).padStart(4)}  ${entry.position}${entry.positionRank}`,
-    );
+  // THE BLENDED LEGS FIRST, THE RAW LEG LAST: the degeneracy guard lives inside the blended path
+  // (see the docblock above), so a thin live market throws out of the first blended leg before a
+  // raw row could land.
+  for (const [leg, evidence] of legs) {
+    const result = await persistBoard(db, inputs, leg, unfrozen, evidence);
+    printBoardWrite(season, leg.format === null ? "v1 raw" : `blend ${BOARD_FORMAT_SPECS[leg.format].label}`, leg, result);
+    if (leg.format !== null) printTopRows(result.board, names);
   }
-
-  const v1 = await persistBoard(db, inputs, BOARD_SOURCE_V1_RAW, true, unfrozen);
-  console.log(
-    `${season}  [v1 raw, ${BOARD_SOURCE_V1_RAW}]  ${String(v1.board.length).padStart(4)} players  ` +
-      `${String(v1.write.written).padStart(4)} new projection rows  ${String(v1.write.reasonsWritten).padStart(4)} reason rows written` +
-      describeRetirement(v1.write),
-  );
 }
 
 async function main(): Promise<void> {

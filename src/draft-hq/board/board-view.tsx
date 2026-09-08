@@ -33,6 +33,9 @@ const CSV_HEADER = [
   "Position",
   "Team",
   "Bye",
+  // Which scoring the projection is under (the scoring-formats round): a file read away from
+  // this screen is exactly where "Projected pts" would otherwise lose its basis.
+  "Scoring",
   "Projected pts",
   "Floor",
   "Ceiling",
@@ -58,9 +61,9 @@ function csvField(value: string): string {
  * the rows themselves — never threaded from view state, so no on-screen toggle can blank a
  * column of a downloaded file (re-review round 2's regression, pinned by board-csv.test.ts).
  */
-export function boardCsvLines(orderedRows: readonly BoardRow[], auctionShape: AuctionShape): readonly string[] {
+export function boardCsvLines(orderedRows: readonly BoardRow[], auctionShape: AuctionShape, scoringLabel: string): readonly string[] {
   const values = auctionValues(orderedRows.map((row) => ({ playerId: row.playerId, valueOverReplacement: row.valueOverReplacement })), auctionShape);
-  return [CSV_HEADER.map(csvField).join(","), ...orderedRows.map((row) => rowToCsv(row, values.get(row.playerId) ?? null))];
+  return [CSV_HEADER.map(csvField).join(","), ...orderedRows.map((row) => rowToCsv(row, values.get(row.playerId) ?? null, scoringLabel))];
 }
 
 /** One number for the file, or an EMPTY CELL when the engine has none (the 2026-09-05 kicker and
@@ -70,7 +73,7 @@ function csvNumber(value: number | null, digits = 1): string {
   return value === null ? "" : value.toFixed(digits);
 }
 
-function rowToCsv(row: BoardRow, dollarValue: number | null): string {
+function rowToCsv(row: BoardRow, dollarValue: number | null, scoringLabel: string): string {
   // A market-order row is ordered BY the market, so an edge against the market would be the
   // ordering compared with itself. Blank, like every other cell the engine has no opinion behind.
   const edge = row.marketAdp === null || row.overallRank === null ? "" : (row.marketAdp - row.overallRank).toFixed(1);
@@ -80,6 +83,7 @@ function rowToCsv(row: BoardRow, dollarValue: number | null): string {
     row.position,
     row.team,
     row.byeWeek === null ? "" : String(row.byeWeek),
+    scoringLabel,
     csvNumber(row.projectedPoints),
     csvNumber(row.floorPoints),
     csvNumber(row.ceilingPoints),
@@ -247,6 +251,9 @@ export interface BoardViewProps {
    *  toggle works with or without a real league selected. */
   readonly auctionShape: { readonly teamCount: number; readonly rosterSpots: number; readonly budget: number };
   readonly exportFilename: string;
+  /** "PPR", "Half PPR" or "Standard": the scoring every projected number on these rows is under,
+   *  named in the export's own column (the scoring-formats round). */
+  readonly scoringLabel: string;
 }
 
 /**
@@ -256,7 +263,7 @@ export interface BoardViewProps {
  * `?league=`, since that is what changes the recomputed value/tier numbers). CSV export reads the
  * exact rows on screen.
  */
-export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardViewProps) {
+export function BoardView({ rows, laws, auctionShape, exportFilename, scoringLabel }: BoardViewProps) {
   const [position, setPosition] = useState("ALL");
   const [search, setSearch] = useState("");
   const [rookiesOnly, setRookiesOnly] = useState(false);
@@ -322,7 +329,7 @@ export function BoardView({ rows, laws, auctionShape, exportFilename }: BoardVie
           // The export always carries real auction values, whatever the on-screen toggle says
           // (re-review finding: a CSV column silently blanking on an unrelated view toggle is a
           // silent data drop). Computed at click time, so the render path still skips the pass.
-          onClick={() => downloadCsv(exportFilename, boardCsvLines(ordered, auctionShape))}
+          onClick={() => downloadCsv(exportFilename, boardCsvLines(ordered, auctionShape, scoringLabel))}
           className="ml-auto rounded-md bg-surface-elevated px-3 py-2 text-sm font-medium text-text-muted hover:text-text-primary"
         >
           Export CSV

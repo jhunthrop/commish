@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STAT_FIELDS, type Position, type StatLine } from "@/domain/player";
-import { PPR_SCORING } from "@/domain/scoring";
+import { HALF_PPR_SCORING, PPR_SCORING, STANDARD_SCORING } from "@/domain/scoring";
 import { BENCH_SLOT, STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { computeFantasyPoints } from "@/scoring/compute";
 import { isRealTierCliff } from "../decide/tiers";
@@ -96,6 +96,21 @@ describe("scaleStatLine", () => {
 
 describe("preseasonBoard", () => {
   const board = preseasonBoard(pool(), OPTIONS);
+
+  it("SCORING PASS EQUALITY (the scoring-formats round): the same line, scored under each of the three presets, is exactly computeFantasyPoints of the season line", () => {
+    const perGame = { receivingYards: 70, receptions: 6, receivingTouchdowns: 0.4, rushingYards: 8 };
+    const one = [candidate("wr-x", "WR", perGame, 15)];
+    const seasonLine = scaleStatLine(line("wr-x", perGame), 15);
+    const points = { ppr: 0, half: 0, std: 0 };
+    for (const [format, rules] of [["ppr", PPR_SCORING], ["half", HALF_PPR_SCORING], ["std", STANDARD_SCORING]] as const) {
+      const [entry] = preseasonBoard(one, { ...OPTIONS, rules });
+      expect(entry!.projectedPoints).toBe(computeFantasyPoints(seasonLine, "WR", rules));
+      points[format] = entry!.projectedPoints;
+    }
+    // Six catches a game for fifteen games is ninety receptions: a point apiece, half a point, none.
+    expect(points.ppr - points.half).toBeCloseTo(45, 6);
+    expect(points.half - points.std).toBeCloseTo(45, 6);
+  });
 
   it("composes season points as expected games times the per-game line, through the league's rules", () => {
     const entry = board.find((row) => row.playerId === "wr-00")!;

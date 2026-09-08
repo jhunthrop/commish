@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { nflPlayers } from "@/db/schema";
+import { HALF_PPR_SCORING } from "@/domain/scoring";
 import { STAT_LINE_SOURCE } from "../lines";
 import { DERIVED_STAT_LINE_SOURCE } from "../nflverse/derived-stat-lines";
 import { BENCHMARK_SOURCES } from "../preseason/benchmarks";
@@ -296,6 +297,20 @@ describe("loadMarketCurveObservations and marketBoard", () => {
       expect(observations).toEqual([{ season: 2020, position: "RB", adpRank: 3, points: 15, gamesPlayed: 2 }]);
     });
 
+    it("scores the season under the caller's own rules and reads the caller's own ADP source (the scoring-formats round)", async () => {
+      await recordPreseasonRankings(db, [ranking({ source: BENCHMARK_SOURCES.adpHalf, rank: 7 })]);
+      await recordPreseasonRosters(db, [roster()]);
+      await recordObservations(db, [
+        statLine({ season: 2020, week: 1, playerId: PLAYER_A, metric: "receptions", value: 10 }),
+        statLine({ season: 2020, week: 1, playerId: PLAYER_A, value: 100 }),
+      ]);
+      // The PPR read sees no half-PPR board at all: an empty season, never the other format's rows.
+      expect(await loadMarketCurveObservations(db, [2020])).toEqual([]);
+      const half = await loadMarketCurveObservations(db, [2020], { adpSource: BENCHMARK_SOURCES.adpHalf, rules: HALF_PPR_SCORING });
+      // 100 rushing yards at 0.1 plus 10 receptions at 0.5 under half PPR.
+      expect(half).toEqual([{ season: 2020, position: "RB", adpRank: 7, points: 15, gamesPlayed: 1 }]);
+    });
+
     it("rounds a fractional published ADP rank to the nearest whole slot for the fit bucket", async () => {
       await recordPreseasonRankings(db, [ranking({ rank: 12.6 })]);
       await recordPreseasonRosters(db, [roster()]);
@@ -353,6 +368,14 @@ describe("loadMarketCurveObservations and marketBoard", () => {
       expect(entries).toHaveLength(1);
       expect(entries[0]!.playerId).toBe(PLAYER_A);
       expect(droppedCount).toBe(1);
+    });
+
+    it("reads the caller's own ADP source, so a half-PPR board never anchors to the PPR feed", async () => {
+      await recordPreseasonRankings(db, [ranking({ rank: 3.4 }), ranking({ source: BENCHMARK_SOURCES.adpHalf, rank: 9 })]);
+      await recordPreseasonRosters(db, [roster()]);
+      const priors: MarketCurvePriors = { QB: [], RB: [{ adpRank: 3, points: 300 }, { adpRank: 10, points: 200 }], WR: [], TE: [] };
+      const { entries } = await marketBoard(db, 2020, GAME_DERIVED_STAMP(2020), priors, BENCHMARK_SOURCES.adpHalf);
+      expect(entries).toEqual([{ playerId: PLAYER_A, position: "RB", adpRank: 9, marketPoints: marketCurve("RB", 9, priors) }]);
     });
 
     it("answers empty, with a zero dropped count, when the store holds no ADP board for the season, never a guess", async () => {

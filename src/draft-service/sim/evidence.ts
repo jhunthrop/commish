@@ -26,8 +26,13 @@ export interface EvidencePool {
   readonly boardGeneration: string;
 }
 
-export async function evidencePoolFor(db: Db, asOf: Date = new Date()): Promise<EvidencePool> {
-  const projections = await preseasonProjectionsAsOf(db, { season: PRODUCT_SEASON, source: BOARD_SOURCE, asOf });
+/**
+ * `source` (the scoring-formats round, 2026-09-08) is which format's board the pool reads:
+ * `BOARD_SOURCE` (PPR) for a league-free surface, or the league's own
+ * (`league-service/board-format.ts`'s `leagueBoardFormat`) where the caller stands in a league.
+ */
+export async function evidencePoolFor(db: Db, asOf: Date = new Date(), source: string = BOARD_SOURCE): Promise<EvidencePool> {
+  const projections = await preseasonProjectionsAsOf(db, { season: PRODUCT_SEASON, source, asOf });
   if (projections.length === 0) return { pool: [], boardGeneration: "" };
 
   const nflIds = projections.map((row) => row.playerId);

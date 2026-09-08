@@ -3,8 +3,9 @@ import Link from "next/link";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { pageTitle } from "@/components/app-shell/page-metadata";
-import { ButtonLink, Card, PageTitle, PositionBadge } from "@/components/ui";
+import { ButtonLink, Card, PageTitle } from "@/components/ui";
 import { MICRO_LABEL } from "@/components/ui/config";
+import { BoardPreviewCard } from "@/draft-hq/hq/board-preview-card";
 import { countdownLabel, draftHqBody } from "@/draft-hq/hq/service";
 import { DraftSubnav } from "@/draft-hq/subnav";
 
@@ -72,28 +73,7 @@ export default async function DraftHqPage() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Card as="article" className="flex flex-col gap-2">
-          <span className={`${MICRO_LABEL} text-text-faint`}>The Board</span>
-          <h2 className="font-display text-lg font-semibold leading-display text-text-primary">Evidence rankings, receipts on every row</h2>
-          {body.boardPreview.length === 0 ? (
-            <p className="text-sm text-text-muted">The board has not been built for this season yet.</p>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {body.boardPreview.map((row, index) => (
-                <li key={row.playerId} className="flex items-center gap-2 border-b border-line/50 py-1 text-sm last:border-b-0">
-                  <span className="w-4 tabular-nums text-text-faint">{index + 1}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium text-text-primary">{row.name}</span>
-                  <span className="tabular-nums text-text-muted">{row.projectedPoints.toFixed(1)}</span>
-                  <PositionBadge position={row.position} rank={row.positionRankInValue ?? undefined} size="sm" />
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="text-sm text-text-muted">Tiers, floors and ceilings, risk flags, and the evidence behind every rank. Nothing on it is an opinion.</p>
-          <Link href="/app/draft/board" className="text-sm font-medium text-accent hover:underline">
-            Open the board
-          </Link>
-        </Card>
+        <BoardPreviewCard previews={body.boardPreviews} />
 
         <Card as="article" className="flex flex-col gap-2">
           <span className={`${MICRO_LABEL} text-text-faint`}>My Sheet</span>
