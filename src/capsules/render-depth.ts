@@ -1,6 +1,6 @@
 import { POSITION_PLURAL } from "@/league-room/lib/player-season-view";
 import type { PlayerFacts, PlayerFactsRankedStat } from "./facts";
-import type { PlayerFactsDepth } from "./facts/types";
+import type { PlayerFactsDepth, PlayerFactsFixture } from "./facts/types";
 
 /**
  * THE DEPTH SECTION — `PlayerFacts.depth` turned into the same plain, dated, sourced sentences
@@ -218,6 +218,24 @@ function teamContextLine(facts: PlayerFacts): string | null {
   return sentences.length === 0 ? null : sentences.join(" ");
 }
 
+function fixturePhrase(fixture: PlayerFactsFixture): string {
+  return `${fixture.home ? "at home against" : "away at"} ${fixture.opponent} in week ${fixture.week}`;
+}
+
+/** THE PUBLISHED SCHEDULE. Fixtures and counts only, and never a word about how hard any of it is. */
+function scheduleLine(depth: PlayerFactsDepth): string | null {
+  const schedule = depth.schedule;
+  if (schedule === null) return null;
+  const sentences = [
+    schedule.weekOneOpponent === null ? "The published schedule holds no week one game for his team." : `Opens ${fixturePhrase(schedule.weekOneOpponent)}.`,
+    `${schedule.homeGames} home and ${schedule.roadGames} away on the published schedule${schedule.indoorGames === null ? ", with no roof reading on file" : `, ${schedule.indoorGames} of them indoors`}.`,
+    schedule.playoffWeeks.length === 0
+      ? "The schedule holds none of weeks 15 to 17 for his team yet."
+      : `Weeks 15 to 17: ${schedule.playoffWeeks.map(fixturePhrase).join(", ")}.`,
+  ];
+  return `Schedule: ${sentences.join(" ")}`;
+}
+
 /** Every line of the section, in `PlayerFactsDepth`'s own field order. Takes the whole `PlayerFacts`
  *  rather than the depth group alone because a few of these sentences name his own team and
  *  position, which live on `identity` and must never be restated inside the depth group itself. */
@@ -235,6 +253,7 @@ function depthLines(facts: PlayerFacts): readonly string[] {
     targetCompetitionLine(depth),
     scoringUsageLine(facts),
     teamContextLine(facts),
+    scheduleLine(depth),
   ].filter((line): line is string => line !== null && line !== "");
 }
 

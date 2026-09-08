@@ -276,3 +276,31 @@ describe("the team context line", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, teamContext: null })))).toBeNull();
   });
 });
+
+describe("the schedule line", () => {
+  const schedule = {
+    weekOneOpponent: { week: 1, opponent: "DAL", home: true },
+    homeGames: 9,
+    roadGames: 8,
+    indoorGames: 2,
+    playoffWeeks: [{ week: 15, opponent: "PHI", home: false }],
+  } as const;
+
+  it("names fixtures and counts with no strength judgment, and grounds every opponent spelling", () => {
+    const facts = buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, schedule }));
+    expect(renderDepthSection(facts)).toBe(
+      "The record:\n- Schedule: Opens at home against DAL in week 1. 9 home and 8 away on the published schedule, 2 of them indoors. Weeks 15 to 17: away at PHI in week 15.",
+    );
+    for (const name of ["DAL", "Dallas", "Cowboys", "PHI", "Philadelphia", "Eagles"]) expect(facts.nameLedger).toContain(name);
+    for (const value of [9, 8, 2, 1, 15]) expect(facts.numberLedger).toContain(value);
+  });
+
+  it("says there is no roof reading rather than calling an unmeasured schedule outdoors", () => {
+    const facts = buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, schedule: { ...schedule, indoorGames: null } }));
+    expect(renderDepthSection(facts)).toContain("with no roof reading on file");
+  });
+
+  it("renders no schedule line when the store holds no game for his team", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, schedule: null })))).toBeNull();
+  });
+});
