@@ -105,7 +105,7 @@ export function voicePromptFor(view: AdvisorView): string {
   const clock = view.onTheClock ? "You are on the clock." : `${view.picksUntilYourTurn} picks until your turn, at ${pickLabel(view.pickNumber, view.teamCount)}.`;
   const slots = [
     `- "${STRATEGY_SLOT}" (at most ${ADVISOR_CONFIG.voice.strategyMaxWords} words, two sentences at most): what the room is doing and what that means for your next pick.`,
-    ...view.now.map((candidate) => `- "${reasonSlotKey(candidate.playerId)}" (at most ${ADVISOR_CONFIG.voice.reasonMaxWords} words, one sentence): why ${view.names[candidate.playerId] ?? candidate.playerId} is or is not the pick right now, about him in this room.`),
+    ...view.now.map((candidate) => `- "${reasonSlotKey(candidate.playerId)}" (one sentence, under ${ADVISOR_CONFIG.voice.reasonWordsAsked} words): why ${view.names[candidate.playerId] ?? candidate.playerId} is or is not the pick right now, about him in this room.`),
   ];
   return [
     `Turn sheet. ${clock} Pick ${pickLabel(view.stamp.computedAtPick, view.teamCount)} is up in a ${view.teamCount} team room.`,

@@ -36,9 +36,16 @@ export const ADVISOR_CONFIG = {
     writeWithinPicks: 2,
     /** The writer's own budget inside one advisor request; late text lands on the next poll. */
     budgetMs: 2_000,
-    /** Word caps per slot, held by the same validator the player peek's slots are. */
+    /** Word caps per slot, held by the same validator the player peek's slots are. The reason
+     *  cap is set from measurement the way the peek's bands were: two live fires on the demo
+     *  fixture (2026-09-07, glm-5.3-flash) wrote reasons of 30 to 38 words against a prompt
+     *  asking for at most 28, and every one was grounded prose lost to the cap alone. The prompt
+     *  asks for one sentence under 30; the validator holds the line at 40, the peek's own
+     *  module cap. */
     strategyMaxWords: 45,
-    reasonMaxWords: 28,
+    reasonMaxWords: 40,
+    /** What the prompt asks the writer for; the cap above is what the validator enforces. */
+    reasonWordsAsked: 30,
     /** Sized like the peek's narrative call: a reasoning model spends tokens thinking first. */
     maxTokens: 1_200,
   },
