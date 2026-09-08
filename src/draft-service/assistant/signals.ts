@@ -14,6 +14,7 @@ import type { Position } from "@/domain/player";
 import type { DraftState } from "@/draft-engine";
 import { draftedPlayerIds } from "@/draft-engine";
 import { isRealTierCliff, tierStanding } from "@/projections/decide/tiers";
+import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
 import type { HorizonOddsResult } from "../sim/horizon-odds";
 import type { SeatDriver, SeatDrivers } from "../sim/seat-model";
 import type { ValuedEntry } from "./call";
@@ -42,12 +43,18 @@ function tierLabelOf(index: number): string {
   return TIER_LETTERS[index] ?? `T${index + 1}`;
 }
 
-/** One row per position whose best remaining player sits at a real cliff. */
+/**
+ * One row per position whose best remaining player sits at a real cliff. A position the board
+ * ships in market order (`shipsProjectedRows` false: the kicker and team defence decision) has
+ * no projected points to draw a tier from, so it never gets a row: a drop stated for it would be
+ * a number nobody measured. The sim's own valued map cannot carry such a position from a real
+ * store today, but a synthetic board can, and the gate is the honest one either way.
+ */
 export function tierCollapses(state: DraftState, valued: ReadonlyMap<string, ValuedEntry>): readonly TierCollapse[] {
   const drafted = draftedPlayerIds(state);
   const byPosition = new Map<Position, ValuedEntry[]>();
   for (const entry of valued.values()) {
-    if (drafted.has(entry.playerId)) continue;
+    if (drafted.has(entry.playerId) || !shipsProjectedRows(entry.position)) continue;
     byPosition.set(entry.position, [...(byPosition.get(entry.position) ?? []), entry]);
   }
   const rows: TierCollapse[] = [];

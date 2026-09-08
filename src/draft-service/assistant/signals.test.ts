@@ -3,6 +3,7 @@ import type { MakePickAction } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { availablePool, teamOnClock, type DraftState } from "@/draft-engine";
 import { isRealTierCliff, tierStanding } from "@/projections/decide/tiers";
+import { shipsProjectedRows } from "@/projections/preseason/kdef-decision";
 import { horizonOdds } from "../sim/horizon-odds";
 import { SIM_INSTANT, submit } from "../sim/run";
 import { inferSeatDrivers } from "../sim/seat-model";
@@ -43,6 +44,14 @@ describe("detectRun", () => {
 });
 
 describe("tierCollapses", () => {
+  it("never names a collapse for a position the board ships in market order, even when the fixture carries points for it", () => {
+    const valued = fixtureValued();
+    const marketOrder = [...valued.values()].filter((entry) => !shipsProjectedRows(entry.position));
+    expect(marketOrder.length).toBeGreaterThan(0); // the synthetic fixture carries K and DEF rows a real store never would
+    for (const row of tierCollapses(fixtureStart(), valued)) expect(shipsProjectedRows(row.position)).toBe(true);
+    expect(tierCollapses(fixtureStart(), valued).some((row) => row.position === "K" || row.position === "DEF")).toBe(false);
+  });
+
   it("names each position whose best undrafted player is at a real cliff, with the board's own drop and the tier letter", () => {
     const state = fixtureAdvance(fixtureStart(), 9);
     const valued = fixtureValued();
@@ -56,10 +65,10 @@ describe("tierCollapses", () => {
       expect(isRealTierCliff(undrafted[0]!.projectedPoints, row.dropToNextTier)).toBe(true);
       expect(row.tierLabel).toBe("A");
     }
-    // Every position NOT listed is honestly not at a cliff for its best remaining player.
+    // Every projected position NOT listed is honestly not at a cliff for its best remaining player.
     const listed = new Set(rows.map((row) => row.position));
     for (const position of ["QB", "RB", "WR", "TE"] as const) {
-      if (listed.has(position)) continue;
+      if (listed.has(position) || !shipsProjectedRows(position)) continue;
       const undrafted = FIXTURE_POOL.filter((entry) => entry.position === position && !drafted.has(entry.playerId)).sort((a, b) => b.projectedPoints - a.projectedPoints);
       const standing = tierStanding(undrafted.map((entry) => entry.projectedPoints), 0);
       expect(isRealTierCliff(undrafted[0]!.projectedPoints, standing.dropToNextTier)).toBe(false);
