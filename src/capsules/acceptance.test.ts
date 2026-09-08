@@ -113,7 +113,9 @@ describe("cause 1: an ungrounded NUMBER that was never ungrounded", () => {
    * quantity out of one.
    */
   describe("derived by construction from two printed facts", () => {
-    const totals = { carries: 215, rushingYards: 1081, targets: 70, receptions: 56, receivingYards: 602, passingYards: 0, touchdowns: 7, fantasyPoints: 264.3 };
+    // 258.1, not 264.3: 20.3 a game times the 13 games played is 263.9, and a season total that
+    // rounds to the same 264 would ground the cross-season product below as a printed fact.
+    const totals = { carries: 215, rushingYards: 1081, targets: 70, receptions: 56, receivingYards: 602, passingYards: 0, touchdowns: 7, fantasyPoints: 258.1 };
     const law = (id: string, effect: number) => ({
       id,
       position: "RB" as const,
@@ -135,25 +137,33 @@ describe("cause 1: an ungrounded NUMBER that was never ungrounded", () => {
           { code: "availability", expectedGames: 16, floorGames: 12, ceilingGames: 17 },
           { code: "law", lawId: "snap_share", effect: 2.9, magnitude: 78 },
           { code: "law", lawId: "air_yards", effect: 2.7, magnitude: 36 },
+          { code: "law", lawId: "age", effect: 2.1, magnitude: 22 },
         ],
-        laws: [law("snap_share", 2.9), law("air_yards", 2.7)],
+        laws: [law("snap_share", 2.9), law("air_yards", 2.7), law("age", 2.1)],
       }),
     );
 
-    it("grounds a per-game rate times a games figure on the sheet", () => {
-      // 20.3 a game times the 13 games played is 263.9; times the 12-game low is 243.6.
-      expect(slotResult("At 20.3 a game, a 13-game season is 264 points and even the 12-game low is 244.", facts).ok).toBe(true);
+    /**
+     * SAME-SEASON PAIRINGS ONLY (fix round, 2026-09-08, HIGH): this season's rate times this
+     * season's expected games, last season's rate times last season's games played. A rate times
+     * a full season, a tail of the games range, or the other season's games is coincidence space,
+     * and the raw product is pushed once (the validator already reads it at three roundings).
+     */
+    it("grounds this season's per-game rate times this season's expected games", () => {
+      // 20.3 a game times the 16 games expected is 324.8.
+      expect(slotResult("At 20.3 a game, the 16 games we expect come to 325 points, and that is the case.", facts).ok).toBe(true);
     });
 
-    it("grounds a rate times games stated to the ten, the way a person says a season total (\"roughly 140\" for 10.7 times 13)", () => {
-      // 20.3 a game times 13 games is 263.9: "roughly 260" is that product to the ten; 290 is no
-      // product, no printed figure and no loose reading of one.
-      expect(slotResult("At 20.3 a game a 13-game season is roughly 260 points, and that is the whole case.", facts).ok).toBe(true);
-      expect(slotResult("At 20.3 a game a 13-game season is roughly 290 points, and that is the whole case.", facts).ok).toBe(false);
+    it("no longer grounds a cross-season product, a rate times a tail of the games range, or the product stated to the ten", () => {
+      // 20.3 times the 13 games played (263.9), times the 12-game low (243.6), and 324.8 to the ten.
+      expect(slotResult("At 20.3 a game, a 13-game season is 264 points, and that is the whole case.", facts).ok).toBe(false);
+      expect(slotResult("At 20.3 a game, even the 12-game low is 244 points, and that is the whole case.", facts).ok).toBe(false);
+      expect(slotResult("At 20.3 a game a 16-game season is roughly 320 points, and that is the whole case.", facts).ok).toBe(false);
     });
 
-    it("grounds the sum of two law effects, and the total of all of them", () => {
-      expect(slotResult("The snap share and the air yards are worth a combined 5.6 a game to our number.", facts).ok).toBe(true);
+    it("grounds the total of all the law effects, never a pairwise sum", () => {
+      expect(slotResult("The three factors are worth a combined 7.7 a game to our number, and that is the case.", facts).ok).toBe(true);
+      expect(slotResult("The snap share and the air yards are worth a combined 5.6 a game to our number.", facts).ok).toBe(false);
     });
 
     it("grounds a difference between two headline points figures", () => {

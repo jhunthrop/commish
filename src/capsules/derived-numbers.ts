@@ -16,17 +16,6 @@ export type FactsContent = Omit<PlayerFacts, "numberLedger" | "nameLedger" | "fa
  *  posture toward the projection engine; the two are the same seventeen and always will be. */
 const GAMES_IN_A_SEASON = 17;
 
-/** A season total is stated to the ten from a hundred up. */
-const STATED_TO_THE_TEN_FROM = 100;
-const TEN = 10;
-
-/** A value with the two ways a person states it to the ten (down and nearest), when it is large
- *  enough to be stated that way; the value alone otherwise. */
-function statedToTheTen(value: number): readonly number[] {
-  if (Math.abs(value) < STATED_TO_THE_TEN_FROM) return [value];
-  return [value, Math.floor(value / TEN) * TEN, Math.round(value / TEN) * TEN];
-}
-
 /**
  * EVERY NUMBER THE FACT SHEET PRINTS THAT IS NOT A MEASURED QUANTITY (capsule acceptance round) —
  * the dated stamp on the injury line and the figures inside the headlines `render.ts` quotes
@@ -69,6 +58,11 @@ export function printedTextNumbers(facts: FactsContent): readonly number[] {
  * sum of two law effects ("worth a combined 5.6 a game"), and headline figures read against each
  * other. Every pair below is two printed facts and one operation; the fabrications the same run
  * held ("300-touch legs", a pick the writer chose) trace to none of them and still fail.
+ *
+ * AND KEPT SMALL (fix round, 2026-09-08, HIGH): coincidence space is the size of this list, so a
+ * rate meets only its own season's games, the law effects give one total, and the differences are
+ * anchored on our number. A player with five law effects, availability, a played season and a
+ * prior season carries 23 derived values.
  */
 export function derivedNumbers(facts: FactsContent): readonly number[] {
   const { market, projection, availability, season, lastSeasonStory } = facts;
@@ -91,19 +85,12 @@ export function derivedNumbers(facts: FactsContent): readonly number[] {
   // The width of each band, which is how a reader says "a ninety point spread".
   numbers.push(projection.typicalHigh - projection.typicalLow, projection.ceilingPoints - projection.floorPoints);
 
-  // THE GAMES FIGURES THE SHEET PRINTS, and every per-game rate on it times each of them: a full
-  // season, the games this engine expects, the low and high of that range, the games he has played.
-  const games = [
-    GAMES_IN_A_SEASON,
-    ...(availability === null ? [] : [availability.expectedGames, availability.floorGames, availability.ceilingGames]),
-    ...(season === null ? [] : [season.gamesPlayed]),
-    ...(lastSeasonStory === null ? [] : [lastSeasonStory.gamesPlayed]),
-  ];
-  // A person states the product to the ten ("roughly 140" for 10.7 times 13, "clears 280" for
-  // 21.7 times 13), so each product carries its floor and nearest ten beside it. Here, by
-  // construction on these few products, never as a validator tolerance over every derived value.
-  const rates = [...(season === null ? [] : [season.pointsPerGame]), ...(lastSeasonStory === null ? [] : [lastSeasonStory.pointsPerGame])];
-  for (const rate of rates) for (const played of games) numbers.push(...statedToTheTen(rate * played));
+  // A RATE TIMES GAMES, SAME-SEASON PAIRINGS ONLY (fix round, 2026-09-08, HIGH): this season's
+  // per-game rate times the games this engine expects of him, last season's rate times the games
+  // he played that season. Every rate times every games figure was coincidence space, and the raw
+  // product is pushed once: the validator already reads it at three roundings.
+  if (season !== null && availability !== null) numbers.push(season.pointsPerGame * availability.expectedGames);
+  if (lastSeasonStory !== null) numbers.push(lastSeasonStory.pointsPerGame * lastSeasonStory.gamesPlayed);
 
   // Per game, both ways a person computes it: over a full season, and over the games this engine
   // actually expects him to play, plus the games that expectation leaves on the table.
@@ -112,10 +99,10 @@ export function derivedNumbers(facts: FactsContent): readonly number[] {
     numbers.push(projection.projectedPoints / availability.expectedGames, GAMES_IN_A_SEASON - availability.expectedGames);
   }
 
-  // THE LAW EFFECTS COMBINED: any two of them, and all of them ("a combined 5.6 a game").
+  // THE LAW EFFECTS COMBINED: the grand total of all of them, never a pairwise sum (fix round,
+  // 2026-09-08: five effects make ten pairs, and ten small numbers is coincidence space).
   const effects = facts.evidence.flatMap((item) => (item.kind === "law" ? [item.netEffectPoints] : []));
-  for (let i = 0; i < effects.length; i += 1) for (let j = i + 1; j < effects.length; j += 1) numbers.push(effects[i]! + effects[j]!);
-  if (effects.length > 2) numbers.push(effects.reduce((total, effect) => total + effect, 0));
+  if (effects.length > 1) numbers.push(effects.reduce((total, effect) => total + effect, 0));
 
   // A SEASON TOTAL AS THE SUM OF ITS LISTED PARTS: yards from scrimmage, all yards, touches.
   if (season !== null) {
