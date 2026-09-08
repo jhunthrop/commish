@@ -82,8 +82,12 @@ export function hasReadCardFor(body: PlayerSeasonBody): boolean {
  *  the read/books row, kept alongside it for the identical reason. `StoryModule`'s own `story`
  *  prop is always `null` today (ruling R-d1: the service wiring converges post-merge), so its own
  *  visibility reduces to whether a current designation exists. */
+/** The right-hand story cell exists only when it has something to SAY: a season-ending story or a
+ *  news item. The current injury designation is not a reason on its own, since the header already
+ *  wears that pill and a card that only repeats it is a module that says nothing (founder,
+ *  2026-09-07: "do we need a whole section just to say questionable"). */
 export function hasStoryCellFor(body: PlayerSeasonBody): boolean {
-  return body.injuryDesignation !== null || body.news.length > 0;
+  return body.news.length > 0;
 }
 
 /** Each played week, judged against every week played at his position this season. */
