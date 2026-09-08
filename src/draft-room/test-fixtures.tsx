@@ -195,7 +195,13 @@ export function fixtureDeps(view: DraftStateView = SNAKE_VIEW): FixtureDeps {
     deps: {
       fetchJson: async (url, init) => {
         fixture.calls.push(`${init?.method ?? "GET"} ${url}`);
-        const body = url.endsWith("/players")
+        // The advisor route answers with ITS refusal shape here, never the snapshot body: the
+        // hook renders whatever `data` it is handed as an `AdvisorView`, and a body without a
+        // `pick` field is a shape the wire type forbids. Room tests that want a card render one
+        // through `advisor/test-view.ts` instead.
+        const body = url.endsWith("/assistant")
+          ? { ok: false, error: "The advisor has nothing to call right now." }
+          : url.endsWith("/players")
           ? { ok: true, data: { players: PLAYERS } }
           : url.endsWith("/queue")
             ? init?.method === "POST"
