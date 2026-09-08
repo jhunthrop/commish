@@ -74,10 +74,15 @@ describe("WRITER_RULES", () => {
   });
 
   it("names every lab-report word the validator bans", () => {
-    for (const term of ["percentile", "projection", "evidence", "measured", "coefficient", "effect size", "standard deviation", "p10", "p90", "implying", "implied"]) {
+    for (const term of ["percentile", "evidence", "measured", "coefficient", "effect size", "standard deviation", "p10", "p90", "implying", "implied"]) {
       expect(BANNED_VOCABULARY).toContain(term);
       expect(WRITER_RULES).toContain(term);
     }
+  });
+
+  it('treats "projection" as a fantasy word (production follow-up, 2026-09-08): never banned, and used naturally in the rules', () => {
+    expect(BANNED_VOCABULARY).not.toContain("projection");
+    expect(WRITER_RULES).toContain("we project him for 136 points");
   });
 });
 

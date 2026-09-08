@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
-import { validateCapsule } from "./validate";
+import { bannedTermIn, validateCapsule } from "./validate";
 
 function baseInput(overrides: Partial<PlayerFactsInput> = {}): PlayerFactsInput {
   return {
@@ -169,6 +169,12 @@ describe("validateCapsule", () => {
     const withHesitation = compactWords("Rashad Long anchors the SF offense at board rank 14 overall, our number of 248 season points, though the age curve costs him -1.8 a game, still a steal this season.");
     const withHesitationResult = validateCapsule(withHesitation, facts, "compact");
     expect(withHesitationResult.violations.some((v) => v.includes("Mixed evidence"))).toBe(false);
+  });
+
+  it('lets a read say "projection" (production follow-up, 2026-09-08): it is how fantasy people talk, never lab-report register', () => {
+    expect(bannedTermIn("Our projection has him at 248, a round clear of his ADP.")).toBeNull();
+    expect(bannedTermIn("We project him for 248 points.")).toBeNull();
+    expect(bannedTermIn("His p90 season is 275.")).toBe("p90");
   });
 
   it("reports an empty completion as a failure rather than an empty capsule", () => {

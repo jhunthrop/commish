@@ -256,10 +256,14 @@ export const CAPSULE_CONFIG = {
  * WORDS A CAPSULE MAY NEVER USE. Two families, both from founder live-fire review of real
  * gateway output:
  *
- * - LAB-REPORT REGISTER ("p10 to p90 range", "evidence projection", "measured young-age edge")
+ * - LAB-REPORT REGISTER ("p10 to p90 range", "the evidence", "measured young-age edge")
  *   leaking straight from this engine's own internal fact vocabulary into fan-facing prose —
  *   `render.ts` exists specifically so the model never sees these words in the first place, and
  *   this list is the mechanical backstop for the rare paraphrase that reintroduces one anyway.
+ *   NOT "projection" (production follow-up, 2026-09-08: six players fell to the template on it in
+ *   one night). "Projection" and "we project him for" are how fantasy people talk, and the app's
+ *   own copy says "our projection versus ADP"; the ruling bans the TRADING register below, and the
+ *   measurement jargon here, never the fantasy word.
  * - "implying"/"implied" for a market-anchor number specifically: `marketPoints` is the FITTED
  *   REALIZATION curve — what players taken at that draft slot HISTORICALLY RETURNED, busts and
  *   injuries pooled (`src/projections/market/curve.ts`) — never what drafters expect, so a
@@ -275,7 +279,6 @@ export const LAB_REPORT_TERMS: readonly string[] = [
   "p10",
   "p90",
   "percentile",
-  "projection",
   "evidence",
   "measured",
   "effect size",

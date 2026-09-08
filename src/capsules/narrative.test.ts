@@ -93,7 +93,7 @@ describe("validateNarrativeSlot", () => {
     expect(validateNarrativeSlot("Justin Herbert throws him the ball every week now.", groundingOf(facts), 40).ok).toBe(false);
     expect(validateNarrativeSlot("He is a steal — the ADP is wrong.", groundingOf(facts), 40).ok).toBe(false);
     expect(validateNarrativeSlot("He is a steal; the ADP is wrong.", groundingOf(facts), 40).ok).toBe(false);
-    expect(validateNarrativeSlot("His projection sits above his ADP.", groundingOf(facts), 40).ok).toBe(false);
+    expect(validateNarrativeSlot("His percentile sits above his ADP.", groundingOf(facts), 40).ok).toBe(false);
   });
 
   it("does not demand the tension citation a whole read has to carry", () => {
