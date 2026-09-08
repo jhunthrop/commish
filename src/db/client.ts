@@ -1,6 +1,7 @@
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { DB_POOL_CONFIG } from "./config";
+import { assertDeploymentDatabase } from "./deployment";
 import * as schema from "./schema";
 
 function requireDatabaseUrl(): string {
@@ -8,6 +9,8 @@ function requireDatabaseUrl(): string {
   if (url === undefined || url.length === 0) {
     throw new Error("DATABASE_URL is not set. Copy .env.example to .env.local and run `docker compose up -d`.");
   }
+  // A Preview deployment must never boot against the production database (finding 5).
+  assertDeploymentDatabase(process.env);
   return url;
 }
 
