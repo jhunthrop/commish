@@ -121,7 +121,23 @@ export const CAPSULE_CONFIG = {
    */
   lengthCorrection: {
     trimOverrunWords: 5,
+    /**
+     * THE ASK IS SIZED TO THE DEFICIT (written rate round, 2026-09-08). A long note under its
+     * floor was told to "add two or three more sentences" whatever the deficit, and a 237-word
+     * note came back at 302: three sentences is sixty words, and the note needed thirty. The
+     * correction now states the count to hit and asks for as many sentences as the deficit is
+     * worth at this many words each, one at the least and three at the most.
+     */
+    wordsPerSentence: 20,
+    maxSentencesAdded: 3,
   },
+  /**
+   * A SLOT AIMS UNDER ITS CAP (written rate round, 2026-09-08). Told "at most 30 words", the call
+   * came back at 31 to 33 on three players of forty; the cap read as the target. The prompt states
+   * this share of the cap as the count to aim for, with the cap beside it, and the validator's own
+   * cap is unchanged.
+   */
+  narrativeTargetShareOfCap: 0.75,
   /**
    * THE ONE CALL PER PLAYER (refrains round, 2026-09-07) — the compact read, the full read and the
    * narrative slots in one JSON object (`bundle.ts`). The prose itself is about 120 plus 300 plus
@@ -218,6 +234,10 @@ export const CAPSULE_CONFIG = {
       // THE PRODUCTION REGENERATION (2026-09-07, 659 players, 420 written, measured 2026-09-08):
       "the depth chart is", // the top opener family, 16.2% (68 players) against the 10% line
       "it says nothing about whether he can play", // the top stock sentence, 2.3% (15 players), the no-props note's old brief read back
+      // THE SECOND PRODUCTION REGENERATION (2026-09-08, 659 players, 401 written): the one flag.
+      "nobody is drafting", // the opener on 49 players, 12.2%, the unlisted player's own sheet line read back
+      // THE WRITTEN RATE ROUND'S DEV RUNS (2026-09-08, 40 players each): over the opener line twice.
+      "the number that decides", // the opener on 4 then 5 written players, 13% and 16%
     ],
   },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
@@ -412,6 +432,21 @@ export const COMPETITOR_NAMES: readonly string[] = [
   "apex fantasy",
   "rtsports",
 ];
+
+/**
+ * THE COMPETITORS WHOSE NAMES ARE ENGLISH WORDS (written rate round, 2026-09-08). "A sleeper" is
+ * the fantasy noun the founder's own ruling asked the writer to use, and the substring check was
+ * rejecting it on seven production players. Each name here is matched only as a PRODUCT reference
+ * (`validate.ts`): capitalised anywhere but the start of a sentence, followed by one of
+ * `COMPETITOR_PRODUCT_CUES`, or preceded by "on". The lowercase noun and adjective pass. Every entry
+ * must also be on `COMPETITOR_NAMES`; `validate.test.ts` pins that.
+ */
+export const COMPETITOR_NAMES_THAT_ARE_WORDS: readonly string[] = ["sleeper", "underdog"];
+
+/** The word after a word-competitor's name that makes it the product whatever its case: "sleeper
+ *  league", "underdog draft", "sleeper ADP". Matched whole, case-insensitively, after an optional
+ *  possessive. */
+export const COMPETITOR_PRODUCT_CUES: readonly string[] = ["app", "league", "leagues", "draft", "drafts", "adp", "rankings", "ranking"];
 
 export const EM_DASH = "—";
 /** Founder law, 2026-09-05, extending the em-dash rule: a semicolon never appears in analysis

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAPSULE_CONFIG, TRADING_REPLACEMENTS, TRADING_TERMS } from "./config";
+import { CAPSULE_CONFIG, COMPETITOR_NAMES, COMPETITOR_NAMES_THAT_ARE_WORDS, TRADING_REPLACEMENTS, TRADING_TERMS } from "./config";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { bannedTermIn, softCorrectionFor, validateCapsule } from "./validate";
 
@@ -216,6 +216,50 @@ describe("validateCapsule", () => {
 });
 
 /**
+ * "SLEEPER" THE WORD VERSUS SLEEPER THE APP (written rate round, 2026-09-08). The founder's ruling
+ * asked the writer for "a sleeper", and the competitor check was rejecting the noun on seven
+ * production players. A competitor whose name is also an English word is matched only as a product
+ * reference: capitalised mid-sentence, followed by a product cue ("app", "league", "ADP"...), or
+ * preceded by "on". The lowercase noun and adjective pass.
+ */
+describe("a competitor name that is also an English word is matched only as a product reference", () => {
+  const facts = buildPlayerFacts(baseInput());
+  const competitorViolation = (body: string) => validateCapsule(compactWords(body), facts, "compact").violations.find((v) => v.includes("competitor"));
+
+  it("names the word-competitors on the competitor list, so the two lists cannot drift apart", () => {
+    expect(COMPETITOR_NAMES_THAT_ARE_WORDS).toContain("sleeper");
+    expect(COMPETITOR_NAMES_THAT_ARE_WORDS).toContain("underdog");
+    for (const name of COMPETITOR_NAMES_THAT_ARE_WORDS) expect(COMPETITOR_NAMES).toContain(name);
+  });
+
+  it("passes the fantasy noun and adjective the ruling asked for", () => {
+    expect(competitorViolation("Rashad Long is a sleeper for the SF offense at his ADP, our number of 248 season points and board rank 14 overall say so this season.")).toBeUndefined();
+    expect(competitorViolation("Rashad Long is a sleeper pick and an underdog story for the SF offense, our number of 248 season points and board rank 14 overall say so.")).toBeUndefined();
+  });
+
+  it("passes the capitalised word at the start of a sentence, where every word is capitalised", () => {
+    expect(competitorViolation("Sleeper is the word for Rashad Long in the SF offense, our number of 248 season points and board rank 14 overall say so this season.")).toBeUndefined();
+    expect(competitorViolation('Rashad Long is going late for SF. Underdog is the frame here, our number of 248 season points and board rank 14 overall say so.')).toBeUndefined();
+  });
+
+  it("catches the product: capitalised mid-sentence", () => {
+    expect(competitorViolation("Rashad Long is going at pick 12 on Sleeper for the SF offense, our number of 248 season points and board rank 14 overall say so.")).toContain('"sleeper"');
+    expect(competitorViolation("His Underdog rank has Rashad Long far too low for the SF offense, our number of 248 season points and board rank 14 overall say so.")).toContain('"underdog"');
+  });
+
+  it("catches the product in any case when a product cue follows it or 'on' precedes it", () => {
+    expect(competitorViolation("Rashad Long in a sleeper league is a steal for the SF offense, our number of 248 season points and board rank 14 overall say so.")).toContain('"sleeper"');
+    expect(competitorViolation("The sleeper ADP on Rashad Long is off for the SF offense, our number of 248 season points and board rank 14 overall say so this season.")).toContain('"sleeper"');
+    expect(competitorViolation("Rashad Long is going at pick 12 on sleeper for the SF offense, our number of 248 season points and board rank 14 overall say so.")).toContain('"sleeper"');
+    expect(competitorViolation("Sleeper drafts have Rashad Long at pick 12 for the SF offense, our number of 248 season points and board rank 14 overall say so this season.")).toContain('"sleeper"');
+  });
+
+  it("still catches a competitor that is not a word, anywhere and in any case", () => {
+    expect(competitorViolation("Rashad Long ranks RB6 on yahoo and our own number backs it up at 248 season points, board rank 14 overall for the SF offense this season.")).toContain('"yahoo"');
+  });
+});
+
+/**
  * A BANNED TRADING WORD IS HANDED BACK WITH ITS DRAFTING REPLACEMENT (production follow-up,
  * 2026-09-08). "Rewrite without it" left the writer to guess the replacement, and fourteen players
  * fell to the template on "price" in one night; the correction now names the phrase for the word
@@ -239,6 +283,21 @@ describe("a banned trading word is corrected with its drafting replacement", () 
     expect(correction).toContain('"price"');
     expect(correction).toContain("a reach at his ADP");
     expect(correction).toContain("leave everything else as it is");
+  });
+
+  /**
+   * THE OFFENDING SENTENCE IS QUOTED (written rate round, 2026-09-08). One soft correction of seven
+   * in the dev run fixed its floor point and returned "the wrinkle nobody can price yet" word for
+   * word: told only that the text used "price", the writer did not find it. The violation now
+   * carries the sentence, and the correction points at it.
+   */
+  it("quotes the sentence carrying the trading word in the violation and in its correction", () => {
+    const body = compactWords("Rashad Long is the back for the SF offense. The new play caller is the wrinkle nobody can price yet. Our number of 248 season points and board rank 14 overall say so.");
+    const violation = validateCapsule(body, facts, "compact").violations.find((v) => v.includes('banned term "price"'));
+    expect(violation).toContain('in the sentence "The new play caller is the wrinkle nobody can price yet."');
+    const correction = softCorrectionFor(violation!);
+    expect(correction).toContain('Rewrite this sentence: "The new play caller is the wrinkle nobody can price yet."');
+    expect(correction).toContain("a reach at his ADP");
   });
 
   it("still asks for a rewrite, with no soft correction, on a lab-report word", () => {

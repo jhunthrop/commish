@@ -3,7 +3,7 @@ import { CAPSULE_CONFIG, DRAFTING_SENTENCES, LAB_REPORT_TERMS, TRADING_TERMS } f
 import type { PlayerFacts } from "./facts";
 import type { NarrativeSlotRequest } from "./narrative";
 import { renderFactsForModel } from "./render";
-import type { CapsuleSize } from "./validate";
+import { wordCount, type CapsuleSize } from "./validate";
 
 /**
  * THE WRITER'S INSTRUCTIONS (refrains round, 2026-09-07).
@@ -67,11 +67,11 @@ HOW A NOTE IS BUILT
 - There is no fixed order and no fixed shape. If the worry is the story, start there. If the role is the story, start there. Two notes on this board should not walk the same path.
 - Never tour the usage numbers. At most one usage share appears in a note, and only when it decides the case. Never list snap share, target share and red-zone share together, and never chain three ranks in one breath.
 - A rank reads as something a person would say out loud, never as a code read off a table.
-- End on your call, in this player's own terms: the round or the pick where you would take him, what you would need to see first, who you would take instead, what he does to a roster. Never a sentence that announces a verdict by formula.
+- End on your call, in this player's own terms: whether you take him at his ADP, earlier or later, what you would need to see first, who you would take instead, what he does to a roster. Never a sentence that announces a verdict by formula.
 - Never quote or paraphrase these instructions, the fact sheet's own sentences, or a correction you were given. If a sentence of yours would fit a style guide or a stat table, cut it.
 
 WORDS
-- Fantasy football words, never trading words. Talk about ADP, picks and rounds: "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement. Never these words: ${nameTerms(TRADING_TERMS)}. "Upside" and "downside" only when tied to a fantasy outcome (a top-five finish, a lost month), never as bare nouns.
+- Fantasy football words, never trading words. Talk about ADP, picks and rounds: "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement. Never these words: ${nameTerms(TRADING_TERMS)}. "Upside" and "downside" only when tied to a fantasy outcome (a finish near the top of his position, a lost month), never as bare nouns.
 - The three sentences to catch yourself on: ${DRAFTING_SENTENCES.map((pair) => `not "${pair.insteadOf}" but "${pair.write}"`).join(", ")}.
 - Phrases this board has worn out, never to be written or paraphrased: ${CAPSULE_CONFIG.repetition.refrainStems.map((stem) => `"${stem}"`).join(", ")}.
 - Never these words either: ${nameTerms(LAB_REPORT_TERMS)}. Say "our number", "our projection", "we project him for 136 points", "the case", "costs him", "is worth". "Our number" takes a plain verb (has him at, puts him at, is), never "says".
@@ -82,6 +82,7 @@ WORDS
 HONESTY, NO EXCEPTIONS
 - Use ONLY the numbers and names on the fact sheet. Never invent a stat, an injury, a teammate, a coach, or any other name or figure not printed there.
 - Quote a number as the sheet gives it, or as a plain rounding of it. Never combine two figures into a third the sheet does not print. If you want the gap between our number and where drafters take him, use the gap the sheet states.
+- The only pick numbers you may write are the sheet's own: his ADP and the rounded pick beside it. Your call goes against that number in words (a round earlier than that, a few picks after his ADP, wait on him), never a pick you chose and never a threshold you made up for games or points. A rank is the sheet's rank, never a round-number tier of your own.
 - Never say a risk, an injury or a competitor is ABSENT unless the sheet says so. Silence on the sheet is silence from you. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim. This engine holds no such data.
 - If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it with its own number before your call. Never a one-sided rave on mixed facts.
@@ -89,10 +90,6 @@ HONESTY, NO EXCEPTIONS
 - A sportsbook line or a win total is the books' number, something they posted, never a claim you or this engine make. Say they posted it, or where their line sits, never that they set it.`;
 
 const READ_LABEL: Record<CapsuleSize, string> = { compact: "short note", full: "long note" };
-
-function bandOf(size: CapsuleSize): string {
-  return `${CAPSULE_CONFIG.sizes[size].minWords} to ${CAPSULE_CONFIG.sizes[size].maxWords} words`;
-}
 
 /** The middle of a band, the number the writer is told to aim for: asked for a range, the model
  *  lands at its bottom and under it (the first one-call run rejected five long notes at 222 to 238
@@ -102,12 +99,20 @@ function targetOf(size: CapsuleSize): number {
   return Math.round((minWords + maxWords) / 2);
 }
 
+/** ONE COUNT TO HIT, NEVER A RANGE (written rate round, 2026-09-08). "About 270 words (240 to 300
+ *  words)" put 15 of 40 long notes under the floor at 201 to 239 words: the range's bottom read as
+ *  the target. The band stays in the validator; the writer hears one number. */
 function lengthOf(size: CapsuleSize): string {
-  return `about ${targetOf(size)} words (${bandOf(size)})`;
+  return `${targetOf(size)} words`;
+}
+
+/** A slot's count to aim for, under its cap: see `CAPSULE_CONFIG.narrativeTargetShareOfCap`. */
+function slotLengthOf(maxWords: number): string {
+  return `about ${Math.round(maxWords * CAPSULE_CONFIG.narrativeTargetShareOfCap)} words, never more than ${maxWords}`;
 }
 
 function slotSpecFor(requests: readonly NarrativeSlotRequest[]): string {
-  return requests.map((request) => `  - "${request.key}" (at most ${request.maxWords} words): ${request.brief}`).join("\n");
+  return requests.map((request) => `  - "${request.key}" (${slotLengthOf(request.maxWords)}): ${request.brief}`).join("\n");
 }
 
 function partsSpecFor(facts: PlayerFacts, requests: readonly NarrativeSlotRequest[]): string {
@@ -115,7 +120,9 @@ function partsSpecFor(facts: PlayerFacts, requests: readonly NarrativeSlotReques
     `Write three parts for ${facts.identity.name}. Return ONE JSON object with exactly the keys "${BUNDLE_KEYS.compact}", "${BUNDLE_KEYS.full}" and "${BUNDLE_KEYS.narrative}", and nothing else: no code fence, no text before or after it. Each note is one JSON string. A paragraph break inside the long note is written as the two characters \\n\\n, never a raw line break.`,
     `"${BUNDLE_KEYS.compact}": the short note for his card, ${lengthOf("compact")}, one paragraph. Two or three facts that decide his case, the real downside if the sheet carries one, and the call in his own terms at the end.`,
     `"${BUNDLE_KEYS.full}": the long note for his page, ${lengthOf("full")}, up to three paragraphs in no fixed order. The same facts as the short note plus the one or two that deepen it, the role behind the numbers, the real downside with its number, and the call. Do not reuse the short note's sentences.`,
-    `"${BUNDLE_KEYS.narrative}": an object holding one sentence per key below. Each sits on his page beside a number a module already prints, so say what the number means rather than restating it. No two sentences alike, and none that repeats a sentence from the notes above.\n${slotSpecFor(requests)}`,
+    // The register restated beside the slots (written rate round, 2026-09-08): a slot has no
+    // correction, and four of forty players lost one to "buy-low", "we price it at", "discount".
+    `"${BUNDLE_KEYS.narrative}": an object holding one sentence per key below. Each sits on his page beside a number a module already prints, so say what the number means rather than restating it. No two sentences alike, and none that repeats a sentence from the notes above. Every sentence keeps the same words as the notes: drafting words, never a trading word, never "floor".\n${slotSpecFor(requests)}`,
   ].join("\n\n");
 }
 
@@ -133,33 +140,76 @@ export function bundlePromptFor(facts: PlayerFacts, requests: readonly Narrative
 
 const SAME_TEXT_OTHERWISE = "change nothing else: the same facts, the same numbers, the same order, the same voice.";
 
+const SENTENCE_COUNT_WORDS = ["one", "two", "three"] as const;
+
+/** How many sentences a deficit is worth: one at the least, `maxSentencesAdded` at the most. */
+function sentencesFor(deficit: number): string {
+  const { wordsPerSentence, maxSentencesAdded } = CAPSULE_CONFIG.lengthCorrection;
+  const count = Math.min(maxSentencesAdded, Math.max(1, Math.round(deficit / wordsPerSentence)));
+  const word = SENTENCE_COUNT_WORDS[count - 1] ?? String(count);
+  return count === 1 ? `${word} sentence of fact from the sheet that sharpens the case` : `${word} sentences of fact from the sheet that sharpen the case`;
+}
+
 /**
  * The length correction. A small overrun (`CAPSULE_CONFIG.lengthCorrection.trimOverrunWords` or
  * fewer over the cap) asks for the same text minus one sentence at the end, the smallest edit that
- * lands inside the band; anything else asks for the middle of the band, cutting or adding.
+ * lands inside the band; anything else states the middle of the band as the count to hit, with the
+ * ask sized to the distance (`sentencesFor`): a fixed "two or three sentences" took a 237-word note
+ * to 302 (written rate round, 2026-09-08).
  */
 function lengthInstruction(size: CapsuleSize, quoted: string, correction: NonNullable<PriorAttempt["lengthCorrection"]>): string {
-  const { words, minWords, maxWords } = correction;
+  const { words, maxWords } = correction;
   const overrun = words - maxWords;
-  if (overrun > 0 && overrun <= CAPSULE_CONFIG.lengthCorrection.trimOverrunWords) {
+  if (isTrimOverrun(correction)) {
     return `${quoted}\n\nIt is ${words} words, ${overrun} over the ${maxWords} word cap. Return the same text with one sentence taken off the end, and ${SAME_TEXT_OTHERWISE}`;
   }
-  const move = overrun > 0 ? "Cut the sentences that carry the least" : "Add two or three more sentences of fact from the sheet that sharpen the case";
-  return `${quoted}\n\nIt is ${words} words. It has to be between ${minWords} and ${maxWords} words, so aim for about ${targetOf(size)}. ${move}, and ${SAME_TEXT_OTHERWISE}`;
+  const target = targetOf(size);
+  const distance = Math.abs(target - words);
+  // The added sentences name their own register (written rate round, 2026-09-08): one length
+  // correction added "you paid WR1 prices" to a clean note, another added a bare floor claim.
+  const move = words > target ? `cut the sentences that carry the least (about ${distance} words)` : `add ${sentencesFor(distance)} (about ${distance} more words, with no trading word and no "floor" in them)`;
+  return `${quoted}\n\nIt is ${words} words. Bring it to ${target} words: ${move}, and ${SAME_TEXT_OTHERWISE}`;
+}
+
+/** The cap, stated on a soft correction: one compact read went 105 to 121 words fixing a single
+ *  sentence (written rate round, 2026-09-08), and "change nothing else" said nothing about length. */
+function capReminder(size: CapsuleSize, body: string): string {
+  const { maxWords } = CAPSULE_CONFIG.sizes[size];
+  return `It is ${wordCount(body)} words now and the cap is ${maxWords}, so it must not grow past ${maxWords} words.`;
+}
+
+/** The five things a correction call can ask for, decided from the prior attempt alone. Named
+ *  here, where the prompt is chosen, and recorded on the read's own attempt log (`generate.ts`) so
+ *  the acceptance script can say which correction a failed read was given. */
+export type CorrectionKind = "missing" | "trim" | "length" | "soft" | "rewrite";
+
+function isTrimOverrun(correction: NonNullable<PriorAttempt["lengthCorrection"]>): boolean {
+  const overrun = correction.words - correction.maxWords;
+  return overrun > 0 && overrun <= CAPSULE_CONFIG.lengthCorrection.trimOverrunWords;
+}
+
+export function correctionKindOf(prior: PriorAttempt): CorrectionKind {
+  if (prior.missing === true) return "missing";
+  if (prior.lengthCorrection !== undefined) return isTrimOverrun(prior.lengthCorrection) ? "trim" : "length";
+  if (prior.softCorrections !== undefined && prior.softCorrections.length > 0) return "soft";
+  return "rewrite";
 }
 
 function correctionInstruction(size: CapsuleSize, prior: PriorAttempt): string {
   const label = READ_LABEL[size];
   const shape = size === "compact" ? "one paragraph" : "up to three paragraphs";
-  if (prior.missing === true) {
-    return `Your previous answer had no ${label} for this player. Write it now: ${lengthOf(size)}, ${shape}, built on the two or three facts that decide his case.`;
-  }
   const quoted = `You wrote this ${label}:\n"""${prior.body}"""`;
-  if (prior.lengthCorrection !== undefined) return lengthInstruction(size, quoted, prior.lengthCorrection);
-  if (prior.softCorrections !== undefined && prior.softCorrections.length > 0) {
-    return `${quoted}\n\nIt is nearly right. Fix exactly these points, in your own words, and change nothing else:\n${prior.softCorrections.map((point) => `- ${point}`).join("\n")}`;
+  switch (correctionKindOf(prior)) {
+    case "missing":
+      return `Your previous answer had no ${label} for this player. Write it now: ${lengthOf(size)}, ${shape}, built on the two or three facts that decide his case.`;
+    case "trim":
+    case "length":
+      return lengthInstruction(size, quoted, prior.lengthCorrection!);
+    case "soft":
+      return `${quoted}\n\nIt is nearly right. Fix exactly these points, in your own words, and change nothing else:\n${prior.softCorrections!.map((point) => `- ${point}`).join("\n")}\n\n${capReminder(size, prior.body)}`;
+    case "rewrite":
+      return `${quoted}\n\nIt broke these rules:\n${prior.violations.map((violation) => `- ${violation}`).join("\n")}\n\nWrite the ${label} again from scratch, ${lengthOf(size)}, ${shape}, fixing every point above.`;
   }
-  return `${quoted}\n\nIt broke these rules:\n${prior.violations.map((violation) => `- ${violation}`).join("\n")}\n\nWrite the ${label} again from scratch, ${lengthOf(size)}, ${shape}, fixing every point above.`;
 }
 
 /** The user message of a per-part correction: the fact sheet, the prior attempt, what to fix, and

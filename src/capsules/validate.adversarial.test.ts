@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
-import { validateCapsule } from "./validate";
+import { groundingOf, validateCapsule, validateNarrativeSlot } from "./validate";
 
 /**
  * ADVERSARIAL REGRESSION SUITE (fix round 1, code review 2026-09-05) — pins the exact bypasses an
@@ -53,6 +53,90 @@ describe("probe check — CRITICAL 1 name grounding", () => {
   it("the subject's own full name still passes", () => {
     const r = validateCapsule(pad("Rashad Long anchors the SF offense, our number of 248 season points and board rank 14 overall this season."), facts, "compact");
     expect(r.violations.some((v) => v.toLowerCase().includes("name"))).toBe(false);
+  });
+});
+
+/**
+ * THE DERIVED LEDGER'S COINCIDENCE SPACE (fix round, 2026-09-08, HIGH on honesty). A fixture with
+ * everything the ledger can derive from (a played season, availability, a prior season, three law
+ * effects) is swept with every one-decimal number in the season-total neighbourhood (150.0 to
+ * 349.9) and the per-game neighbourhood (10.0 to 24.9). A number that is not a printed figure, an
+ * honest rounding of one, or one of the actual derivations must fail, and the share that passes
+ * is pinned so the ledger cannot quietly grow back: the cross-season product, the range-tail
+ * product and the pairwise law sum the review named are each asserted rejected by name.
+ */
+describe("the derived ledger's coincidence space stays small", () => {
+  const law = (id: string, effect: number) => ({
+    id,
+    position: "RB" as const,
+    claim: "A claim.",
+    measured: { effect, ci: [effect - 0.5, effect + 0.5] as [number, number], sample: 120, seasons: "2018-2024" },
+    trainEffect: effect,
+    verdict: "confirmed" as const,
+    modelPath: null,
+    hasFoldEvidence: true,
+    origin: "tribal" as const,
+    primaryQuantityId: null,
+    primaryQuantityNoun: null,
+    primaryQuantityUnit: null,
+  });
+  const rank = (value: number, positionRank: number) => ({ value, positionRank, qualifierCount: 60, namedNeighbor: null });
+  const facts = buildPlayerFacts({
+    ...RASHAD_LONG,
+    reasons: [
+      { code: "scarcity", positionRank: 4, replacementLevel: 228 },
+      { code: "availability", expectedGames: 16, floorGames: 12, ceilingGames: 17 },
+      { code: "law", lawId: "snap_share", effect: 2.9, magnitude: 78 },
+      { code: "law", lawId: "air_yards", effect: 2.7, magnitude: 36 },
+      { code: "law", lawId: "age", effect: 2.1, magnitude: 22 },
+    ],
+    laws: [law("snap_share", 2.9), law("air_yards", 2.7), law("age", 2.1)],
+    season: { season: 2026, gamesPlayed: 13, pointsPerGame: 20.3, totals: { carries: 215, rushingYards: 1081, targets: 70, receptions: 56, receivingYards: 602, passingYards: 0, touchdowns: 7, fantasyPoints: 258.1 } },
+    lastSeasonStory: {
+      season: 2025,
+      pointsRank: rank(301.4, 5),
+      pointsPerGame: 17.7,
+      gamesPlayed: 17,
+      bestWeek: { week: 4, points: 33.4 },
+      weeksAboveMedian: 12,
+      touchesRank: rank(280, 8),
+      receivingYardsRank: rank(412, 20),
+    },
+  });
+  const passes = (value: string): boolean => validateNarrativeSlot(`The figure here is ${value} and that settles the whole case for me.`, groundingOf(facts), 40).ok;
+  const sweep = (from: number, to: number): readonly string[] => {
+    const values: string[] = [];
+    for (let tenths = from * 10; tenths < to * 10; tenths += 1) values.push((tenths / 10).toFixed(1));
+    return values;
+  };
+
+  it("passes at most two in a hundred of the one-decimal numbers between 150 and 350 (measured: 31 of 2,000, every one a printed figure, its rounding, a loose ten, or a derivation)", () => {
+    const passing = sweep(150, 350).filter(passes);
+    expect(passing.length).toBeLessThanOrEqual(40);
+    // The actual derivations pass: this season's rate times the games we expect (324.8), the
+    // ceiling above our number stated from the other side is under 150, last season's rate times
+    // its games (300.9), yards from scrimmage is over 350.
+    expect(passing).toContain("324.8");
+    expect(passing).toContain("300.9");
+  });
+
+  it("passes at most one in six of the one-decimal numbers between 10 and 25 (measured: 17 of 150)", () => {
+    const passing = sweep(10, 25).filter(passes);
+    expect(passing.length).toBeLessThanOrEqual(25);
+    expect(passing).toContain("20.3");
+    expect(passing).toContain("15.5");
+  });
+
+  it("rejects a cross-season product, a range-tail product, a pairwise law sum, and a number near a real one", () => {
+    // 20.3 times the 13 games played, 20.3 times the 12-game low, 17.7 times the 16 expected.
+    expect(passes("263.9")).toBe(false);
+    expect(passes("243.6")).toBe(false);
+    expect(passes("283.2")).toBe(false);
+    // Two of the three law effects.
+    expect(passes("5.6")).toBe(false);
+    // A tenth off the honest 324.8 and a tenth off the honest 20.3.
+    expect(passes("324.6")).toBe(false);
+    expect(passes("20.4")).toBe(false);
   });
 });
 

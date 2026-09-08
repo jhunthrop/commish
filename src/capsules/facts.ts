@@ -9,6 +9,7 @@ import type { Law } from "@/projections/laws/types";
 import type { BoardReason } from "@/projections/preseason/board";
 import type { RankedStat } from "./rank";
 import type { TrendMetric } from "./trend";
+import { derivedNumbers, printedTextNumbers } from "./derived-numbers";
 import { depthNames, depthNumbers, depthTeamCodes } from "./facts/ledger";
 import { EMPTY_DEPTH, type PlayerFactsDepth } from "./facts/types";
 
@@ -535,70 +536,6 @@ function colorNumbers(lastSeasonStory: PlayerFactsLastSeasonStory | null, booksN
     if (usage.redZoneShareRank !== null) numbers.push(...rankedStatNumbers(usage.redZoneShareRank));
   }
   numbers.push(...trendNumbers(trend));
-  return numbers;
-}
-
-/** Regular-season games, the divisor a per-game rate off a season projection uses. Stated here
- *  rather than imported from `decide/tiers.ts` so this pure fact module keeps its own no-imports
- *  posture toward the projection engine; the two are the same seventeen and always will be. */
-const GAMES_IN_A_SEASON = 17;
-
-/**
- * EVERY NUMBER THE FACT SHEET PRINTS THAT IS NOT A MEASURED QUANTITY (capsule acceptance round) —
- * the dated stamp on the injury line and the figures inside the headlines `render.ts` quotes
- * verbatim. The rule the acceptance measurement settled on is "every number the prompt SHOWS the
- * model is grounded", and both of these are on the page in front of it: a capsule saying "as of
- * September 1" or quoting a headline's own draft pick is reading, not inventing.
- *
- * NAMES INSIDE A HEADLINE ARE DELIBERATELY NOT LEDGERED. A number in a headline is a fact the
- * sheet states; a PERSON in a headline is a teammate this engine has measured nothing about, and
- * naming him is exactly the fabrication the name check exists to stop.
- */
-function printedTextNumbers(facts: Omit<PlayerFacts, "numberLedger" | "nameLedger" | "factsHash">): readonly number[] {
-  const numbers: number[] = [];
-  if (facts.injury.state !== "unknown") {
-    for (const part of facts.injury.asOf.slice(0, 10).split("-")) numbers.push(Number(part));
-  }
-  for (const story of facts.news) {
-    for (const raw of `${story.title} ${story.publishedAt?.slice(0, 10) ?? ""}`.match(/\d+(?:\.\d+)?/g) ?? []) numbers.push(Number(raw));
-  }
-  return numbers.filter((value) => Number.isFinite(value));
-}
-
-/**
- * THE DERIVED FIGURES (capsule acceptance round, 2026-09-07) — every number a reader gets by
- * SUBTRACTING or DIVIDING two figures the fact sheet already shows him.
- *
- * The measured failure this closes: the top rejection category was an ungrounded number, and the
- * examples were not fabrications at all. "20" was the projection minus the replacement level, a
- * subtraction of two printed facts; a per-game figure was the season total over seventeen. The
- * validator was right that the model computed them and wrong that they were invented, and the fix
- * belongs in the ledger rather than in a looser check: these are the arithmetic a MODULE on the
- * same page already performs and displays, so the writer may state them too.
- *
- * A DERIVATION IS ONLY LISTED WHEN BOTH ITS INPUTS ARE ON THE SHEET. Nothing here invents a third
- * quantity out of one, and a number that is neither on the sheet nor one of these still fails.
- */
-function derivedNumbers(facts: Omit<PlayerFacts, "numberLedger" | "nameLedger" | "factsHash">): readonly number[] {
-  const { market, projection, availability } = facts;
-  const numbers: number[] = [];
-
-  // What he is worth over the replacement the sheet names ("our number is 20 clear of the man
-  // you would otherwise start"), and the market gap read from either side.
-  if (market.replacementLevel !== null) numbers.push(projection.projectedPoints - market.replacementLevel);
-  if (market.marketAnchorPoints !== null) {
-    numbers.push(projection.projectedPoints - market.marketAnchorPoints, market.marketAnchorPoints - projection.projectedPoints);
-  }
-
-  // Per game, both ways a person computes it: over a full season, and over the games this engine
-  // actually expects him to play.
-  numbers.push(projection.projectedPoints / GAMES_IN_A_SEASON);
-  if (availability !== null && availability.expectedGames > 0) {
-    numbers.push(projection.projectedPoints / availability.expectedGames, GAMES_IN_A_SEASON - availability.expectedGames);
-  }
-
-  // The width of each band, which is how a reader says "a ninety point spread".
-  numbers.push(projection.typicalHigh - projection.typicalLow, projection.ceilingPoints - projection.floorPoints);
   return numbers;
 }
 

@@ -2,9 +2,9 @@ import { parseBundle, type CapsuleBundle } from "./bundle";
 import { CAPSULE_CONFIG, CAPSULE_MODEL } from "./config";
 import type { PlayerFacts } from "./facts";
 import { failedNarrative, narrativeRequestsFor, settleNarrative, type NarrativeResult, type NarrativeSlotRequest } from "./narrative";
-import { bundlePromptFor, correctionPromptFor, NO_WORN_PHRASES, WRITER_RULES, type PriorAttempt, type WornPhrases } from "./prompt";
+import { bundlePromptFor, correctionKindOf, correctionPromptFor, NO_WORN_PHRASES, WRITER_RULES, type CorrectionKind, type PriorAttempt, type WornPhrases } from "./prompt";
 import { renderTemplateCapsule } from "./template";
-import { softCorrectionFor, validateCapsule, type CapsuleSize, type ValidationResult } from "./validate";
+import { softCorrectionFor, validateCapsule, wordCount, type CapsuleSize, type ValidationResult } from "./validate";
 import { addGatewayUsage, CapsuleGenerationError, postChatCompletion, type CapsuleWriterDeps, type GatewayUsage } from "./write";
 
 /**
@@ -32,6 +32,20 @@ export type CapsuleFallbackReason =
   | { readonly kind: "throttled" }
   | { readonly kind: "failed_validation"; readonly firstViolation: string };
 
+/**
+ * ONE ATTEMPT AT ONE READ (written rate round, 2026-09-08): the bundle's draft, then the one
+ * correction by its kind. Seventy-four production reads fell on the word band and the tally logged
+ * only the deciding violation, so whether the correction was ignored or the draft was further out
+ * could not be known. The acceptance script prints these; the sweep never reads them.
+ */
+export interface ReadAttempt {
+  readonly stage: "draft" | CorrectionKind;
+  readonly words: number;
+  readonly body: string;
+  /** Empty when this attempt validated. */
+  readonly violations: readonly string[];
+}
+
 /** One size's own outcome. `usage` is what THIS part's own correction call billed, when one was
  *  made; the bundle call that wrote every part at once is on `CapsuleGenerationResult.usage`. */
 export interface CapsuleSizeResult {
@@ -40,6 +54,8 @@ export interface CapsuleSizeResult {
   readonly usage: GatewayUsage | null;
   /** `null` when `source` is `"llm"`. See `CapsuleFallbackReason`. */
   readonly fallbackReason: CapsuleFallbackReason | null;
+  /** Every attempt at this read, in order. Empty when the bundle itself never came back. */
+  readonly attempts: readonly ReadAttempt[];
 }
 
 export interface CapsuleGenerationResult {
@@ -101,16 +117,21 @@ function priorAttemptFrom(body: string, result: ValidationResult): PriorAttempt 
   return { body, violations: result.violations, lengthCorrection: result.bandFailure ?? undefined, softCorrections };
 }
 
-function llmRead(text: string, usage: GatewayUsage | null): CapsuleSizeResult {
-  return { text, source: "llm", usage, fallbackReason: null };
+function llmRead(text: string, usage: GatewayUsage | null, attempts: readonly ReadAttempt[]): CapsuleSizeResult {
+  return { text, source: "llm", usage, fallbackReason: null, attempts };
 }
 
-function templateRead(facts: PlayerFacts, usage: GatewayUsage | null, fallbackReason: CapsuleFallbackReason): CapsuleSizeResult {
-  return { text: renderTemplateCapsule(facts), source: "template", usage, fallbackReason };
+function templateRead(facts: PlayerFacts, usage: GatewayUsage | null, fallbackReason: CapsuleFallbackReason, attempts: readonly ReadAttempt[] = []): CapsuleSizeResult {
+  return { text: renderTemplateCapsule(facts), source: "template", usage, fallbackReason, attempts };
 }
 
-/** One correction call for one read, graded exactly as the draft was. */
-async function correctRead(facts: PlayerFacts, size: CapsuleSize, prior: PriorAttempt, deps: CapsuleWriterDeps): Promise<CapsuleSizeResult> {
+function attemptOf(stage: ReadAttempt["stage"], body: string, result: ValidationResult): ReadAttempt {
+  return { stage, words: wordCount(body), body, violations: result.violations };
+}
+
+/** One correction call for one read, graded exactly as the draft was. `attempts` is the log so
+ *  far, the draft's own; the correction's attempt is appended whatever its outcome. */
+async function correctRead(facts: PlayerFacts, size: CapsuleSize, prior: PriorAttempt, attempts: readonly ReadAttempt[], deps: CapsuleWriterDeps): Promise<CapsuleSizeResult> {
   const messages = [
     { role: "system", content: WRITER_RULES },
     { role: "user", content: correctionPromptFor(facts, size, prior) },
@@ -119,21 +140,23 @@ async function correctRead(facts: PlayerFacts, size: CapsuleSize, prior: PriorAt
     const { content, usage } = await postChatCompletion(messages, CAPSULE_CONFIG.sizes[size].maxTokens, deps);
     const text = content.trim();
     const result = validateCapsule(text, facts, size);
-    if (result.ok) return llmRead(text, usage);
-    return templateRead(facts, usage, { kind: "failed_validation", firstViolation: result.violations[0] ?? "unknown violation" });
+    const log = [...attempts, attemptOf(correctionKindOf(prior), text, result)];
+    if (result.ok) return llmRead(text, usage, log);
+    return templateRead(facts, usage, { kind: "failed_validation", firstViolation: result.violations[0] ?? "unknown violation" }, log);
   } catch (error: unknown) {
     const usage = error instanceof CapsuleGenerationError ? error.billedUsage : null;
-    return templateRead(facts, usage, { kind: "throttled" });
+    return templateRead(facts, usage, { kind: "throttled" }, attempts);
   }
 }
 
 /** One read out of the bundle: kept when it validates, corrected once when it does not, written
  *  outright when the bundle left it out. */
 async function settleRead(facts: PlayerFacts, size: CapsuleSize, drafted: string | null, deps: CapsuleWriterDeps): Promise<CapsuleSizeResult> {
-  if (drafted === null) return correctRead(facts, size, { body: "", violations: [], missing: true }, deps);
+  if (drafted === null) return correctRead(facts, size, { body: "", violations: [], missing: true }, [], deps);
   const result = validateCapsule(drafted, facts, size);
-  if (result.ok) return llmRead(drafted, null);
-  return correctRead(facts, size, priorAttemptFrom(drafted, result), deps);
+  const draft = attemptOf("draft", drafted, result);
+  if (result.ok) return llmRead(drafted, null, [draft]);
+  return correctRead(facts, size, priorAttemptFrom(drafted, result), [draft], deps);
 }
 
 function sumUsage(...parts: readonly (GatewayUsage | null)[]): GatewayUsage | null {

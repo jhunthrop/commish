@@ -1,6 +1,7 @@
-import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, EM_DASH, SEMICOLON, TRADING_REPLACEMENTS } from "./config";
+import { BANNED_VOCABULARY, CAPSULE_CONFIG, COMPETITOR_NAMES, COMPETITOR_NAMES_THAT_ARE_WORDS, COMPETITOR_PRODUCT_CUES, EM_DASH, SEMICOLON, TRADING_REPLACEMENTS } from "./config";
 import type { PlayerFacts } from "./facts";
 import { NARRATIVE_MIN_WORDS } from "./narrative-slots";
+import { extractNumbers, isDerivedFromLedger, isLooseReadingOf, promptNumbers, roundHalfUp } from "./number-grounding";
 import { renderFactsForModel } from "./render";
 
 export type CapsuleSize = "compact" | "full";
@@ -20,92 +21,9 @@ export interface ValidationResult {
   readonly bandFailure: { readonly words: number; readonly minWords: number; readonly maxWords: number } | null;
 }
 
-function wordCount(text: string): number {
+/** The one word count every band, attempt log and acceptance tally is measured by. */
+export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter((word) => word.length > 0).length;
-}
-
-/** `(?<![A-Za-z0-9])`/`(?![A-Za-z])` keep this from pulling the "6" out of "RB6" or the "12" out
- *  of "Q12" — a position/market-rank compound token is not a bare number, and validating its
- *  digits against the ledger would demand a `positionAdp`-style string be represented numerically
- *  too. The lookbehind ALSO excludes a preceding DIGIT (fix round 1, MEDIUM d) so the leading `-`
- *  in a range or a year span ("20-25 touches", "2023-2024") is never consumed as a sign: at the
- *  position right after "20", the previous character is a digit, so a match cannot START there,
- *  and the regex engine instead starts fresh at the digit right after the hyphen — "25", positive,
- *  never "-25". A genuine negative ("-1.8 a game") is untouched: the character before its `-` is
- *  a space, not alphanumeric, so the sign is still consumed normally. */
-const NUMBER_TOKEN_PATTERN = /(?<![A-Za-z0-9])-?\d[\d,]*(?:\.\d+)?%?(?![A-Za-z])/g;
-
-/** Spelled-out cardinals one through twenty (fix round 1, HIGH) — "he caught seven passes" is
- *  otherwise invisible to `extractNumbers`, which reads digits only. Capped at twenty: past that,
- *  analyst prose overwhelmingly reverts to digits ("he ran for 340 yards"), so there is no real
- *  coverage gap above it worth the false-positive risk of matching an ordinary sentence's stray
- *  number word in a longer list. */
-const CARDINAL_WORDS: Readonly<Record<string, number>> = {
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
-};
-const CARDINAL_WORD_PATTERN = new RegExp(`\\b(${Object.keys(CARDINAL_WORDS).join("|")})\\b`, "gi");
-
-/** Ordinals 1st through 30th (fix round 1, HIGH) — "his 3rd season", "in his 21st start". The
- *  leading `\b` already excludes a compound token ("RB21st" has no boundary between "B" and "2"),
- *  so this needs no separate digit-only guard the way `NUMBER_TOKEN_PATTERN` does. */
-const ORDINAL_PATTERN = /\b([1-9]|1[0-9]|2[0-9]|30)(st|nd|rd|th)\b/gi;
-
-function extractNumbers(text: string): readonly { readonly raw: string; readonly value: number }[] {
-  const digitMatches = text.match(NUMBER_TOKEN_PATTERN) ?? [];
-  const digitNumbers = digitMatches
-    .map((raw) => ({ raw, value: Number(raw.replace(/,/g, "").replace(/%$/, "")) }))
-    .filter((n) => Number.isFinite(n.value));
-
-  const cardinalNumbers = [...text.matchAll(CARDINAL_WORD_PATTERN)].map((match) => ({ raw: match[0], value: CARDINAL_WORDS[match[1]!.toLowerCase()]! }));
-  const ordinalNumbers = [...text.matchAll(ORDINAL_PATTERN)].map((match) => ({ raw: match[0], value: Number(match[1]) }));
-
-  return [...digitNumbers, ...cardinalNumbers, ...ordinalNumbers];
-}
-
-/**
- * Half-away-from-zero rounding to `decimals` places — what a person means by "rounded", and what
- * `toFixed` does NOT reliably do: `(2.55).toFixed(1)` is "2.5", because 2.55 is not 2.55 in binary.
- * That single discrepancy was rejecting honest capsules (measured 2026-09-07: "2.6" against a
- * ledgered 2.55 read as a fabricated number).
- */
-function roundHalfUp(value: number, decimals: number): number {
-  const factor = 10 ** decimals;
-  return (Math.sign(value) * Math.round(Math.abs(value) * factor + Number.EPSILON * factor)) / factor;
-}
-
-/**
- * `value` is an honest reading of some entry in `ledger` when it equals that entry, or a plain
- * rounding of it, or the whole-percent form of a fraction on it — "a fabricated number is caught;
- * a rounded one passes" is the explicit bar this function exists to clear.
- *
- * ROUNDED AT ANY OF THE THREE PRECISIONS A PERSON WRITES (capsule acceptance round, 2026-09-07,
- * after a measured one-in-ten pass rate whose top rejection category was a rounded ledger value):
- * zero, one or two decimals, half away from zero. A written number that matches the entry at ANY
- * of the three is an honest reading of it, which is how "2.6", "2.55" and "3" are all honest
- * readings of a ledgered 2.55 while "3.4" is a reading of nothing.
- *
- * THE PERCENT FORM of a fraction is grounded too: a share of 0.2476 on the ledger grounds "24.8%",
- * "25%" and "24.76%" alike. Bounded to |entry| <= 1 so this can only ever turn a FRACTION into a
- * percentage, never license an arbitrary hundred-fold restatement of a points total.
- */
-function isDerivedFromLedger(value: number, ledger: readonly number[], allowMagnitude = true): boolean {
-  for (const entry of ledger) {
-    if (value === entry) return true;
-    if (Math.trunc(entry) === value || Math.ceil(entry) === value || Math.floor(entry) === value) return true;
-    // THE MAGNITUDE OF A SIGNED FACT (acceptance round, task 10): a law worth -10.9 a game is
-    // stated by this product's own template as "costs him 10.9 points a game", and the writer is
-    // told to use that verb too. The sign lives in the sentence, so an unsigned 10.9 is a reading
-    // of -10.9, not a different number. (`citesTensionNumber` already granted exactly this for the
-    // one mandated citation; it belongs to every number.)
-    const magnitudes = allowMagnitude ? [Math.abs(entry)] : [];
-    const percents = Math.abs(entry) <= 1 ? [entry * 100, ...magnitudes.map((m) => m * 100)] : [];
-    for (const candidate of [entry, ...percents, ...magnitudes]) {
-      if (candidate === value) return true;
-      if (roundHalfUp(candidate, 0) === value || roundHalfUp(candidate, 1) === value || roundHalfUp(candidate, 2) === value) return true;
-    }
-  }
-  return false;
 }
 
 /** In-name abbreviations that end in a period WITHOUT ending the candidate name (fix round 2,
@@ -132,7 +50,15 @@ const COMMON_SENTENCE_STARTERS = new Set([
   // The subordinating openers (acceptance round, task 10: "When Atlanta" failed as a person).
   // None of these is ever a given name, which is the property the whole list turns on.
   "When", "Where", "While", "If", "After", "Before", "Once", "Since", "Because", "Until", "Whenever",
+  // The determiners and question words a call opens on (written rate round, 2026-09-08: "Every
+  // Walker" and "What I" failed as people).
+  "Every", "Each", "What", "Which", "Whether",
 ]);
+
+/** THE FIRST PERSON (written rate round, 2026-09-08): "What I", "If I" and "What I'd" were failing
+ *  as two-word people. "I", in any contraction, is a word a writer says about himself and is never
+ *  half a name, so it breaks a Titlecase run the way a position code does. */
+const FIRST_PERSON_PATTERN = /^I(?:['’][a-z]+)?$/;
 
 function isInNameAbbreviation(bareWord: string): boolean {
   return IN_NAME_ABBREVIATIONS.has(bareWord) || INITIALS_PATTERN.test(bareWord);
@@ -173,6 +99,13 @@ const POSITION_CODES: ReadonlySet<string> = new Set([
   "Q", "O", "D", "IR", "PUP", "NFI", "SUSP", "DNP", "LP", "FP",
 ]);
 
+/** A code, or its plural ("WRs", "RBs" — written rate round, 2026-09-08: "Past WRs" failed as a
+ *  person), with any trailing period stripped. */
+function isPositionCode(bare: string): boolean {
+  const code = bare.toUpperCase().replace(/\.$/, "");
+  return POSITION_CODES.has(code) || (code.endsWith("S") && POSITION_CODES.has(code.slice(0, -1)));
+}
+
 /** The possessive or contraction a Titlecase token may carry ("Herbert's", "He's", "Mahomes’"),
  *  stripped before the token is considered as part of a name — the apostrophe inside a genuine
  *  name ("Ja'Marr", "De'Von") is untouched, since it is never at the end. */
@@ -212,7 +145,7 @@ function extractProperNamePhrases(text: string): readonly string[] {
     // The contraction goes before the run is built, and a position code never joins a run at all
     // (see `POSITION_CODES` and `stripTrailingClitic`).
     const bare = stripTrailingClitic(match[0]);
-    if (bare === "" || POSITION_CODES.has(bare.toUpperCase().replace(/\.$/, ""))) continue;
+    if (bare === "" || isPositionCode(bare) || FIRST_PERSON_PATTERN.test(bare)) continue;
     words.push({ text: bare, start: match.index, end: match.index + match[0].length });
   }
 
@@ -326,9 +259,12 @@ const SENTENCE_VERB_WORDS = new Set([
  *  bypass (a bare decomposed surname passing on its own). */
 function isLoneWordSurnameOf(word: string, nameLedger: readonly string[]): boolean {
   const lowerWord = word.toLowerCase();
+  // ANY WORD AFTER THE FIRST, not only the last (written rate round, 2026-09-08): "Take Cook" was
+  // failing against "James Cook III", whose last word is the suffix. Still gated on the verb in
+  // front, so a given name in that slot never reaches this test.
   return nameLedger.some((name) => {
     const nameWords = splitWords(name.toLowerCase());
-    return nameWords.length >= 2 && nameWords[nameWords.length - 1] === lowerWord;
+    return nameWords.length >= 2 && nameWords.slice(1).includes(lowerWord);
   });
 }
 
@@ -388,14 +324,24 @@ function isNameGroundedWithShedding(phrase: string, nameLedger: readonly string[
  *  nothing follows "goat" at all. Deliberately narrow (s/d/ed/ing) rather than a general stemmer:
  *  wide enough to catch the realistic case, not so wide it starts matching an unrelated word that
  *  merely shares a prefix. */
+function escapeForPattern(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** A single word is matched whole with its plain inflections; a phrase is matched as written. */
+function bannedTermPattern(term: string): RegExp {
+  return /^[a-z]+$/.test(term) ? new RegExp(`\\b${term}(?:s|d|ed|ing)?\\b`, "i") : new RegExp(escapeForPattern(term), "i");
+}
+
 export function bannedTermIn(text: string): string | null {
-  const lower = text.toLowerCase();
-  for (const term of BANNED_VOCABULARY) {
-    const pattern = /^[a-z]+$/.test(term) ? new RegExp(`\\b${term}(?:s|d|ed|ing)?\\b`, "i") : null;
-    const hit = pattern !== null ? pattern.test(text) : lower.includes(term.toLowerCase());
-    if (hit) return term;
-  }
+  for (const term of BANNED_VOCABULARY) if (bannedTermPattern(term).test(text)) return term;
   return null;
+}
+
+/** The first sentence of `text` carrying `term`, for the violation to quote. */
+function sentenceCarrying(text: string, term: string): string {
+  const pattern = bannedTermPattern(term);
+  return splitSentences(text).find((sentence) => pattern.test(sentence)) ?? text;
 }
 
 /** The drafting phrases a trading word is corrected to, or `null` for a banned word that is not a
@@ -408,23 +354,65 @@ function quoted(phrases: readonly string[]): string {
   return phrases.map((phrase) => `"${phrase}"`).join(", ");
 }
 
-const BANNED_TERM_VIOLATION_PATTERN = /^The text uses the banned term "([^"]+)"/;
+/** The violation's own shape, read back by `tradingWordCorrectionFor`: the term, then the
+ *  sentence it sits in (quoted, up to the remedy that follows the closing quote). */
+const BANNED_TERM_VIOLATION_PATTERN = /^The text uses the banned term "([^"]+)" in the sentence "(.+)"\. (?:Rewrite without it\.|Say it in drafting words instead)/;
 
 /**
  * THE REPLACEMENT RIDES WITH THE VIOLATION (production follow-up, 2026-09-08). "Rewrite without it"
  * is the rule; a trading word's violation also names the drafting phrase for the word it found, so
  * both correction paths (the soft one below and a from-scratch rewrite quoting the violations) hand
  * the writer the words to use rather than only the word not to.
+ *
+ * AND THE SENTENCE RIDES WITH IT TOO (written rate round, 2026-09-08). One soft correction of seven
+ * in the dev run fixed its other point and returned "the wrinkle nobody can price yet" unchanged:
+ * told only that the text used "price", the writer did not find it. The violation quotes the
+ * sentence, so both correction paths point at it.
  */
-function bannedTermViolation(term: string): string {
+function bannedTermViolation(term: string, text: string): string {
   const replacement = tradingReplacementFor(term);
   const remedy = replacement === null ? "Rewrite without it." : `Say it in drafting words instead: ${quoted(replacement)}.`;
-  return `The text uses the banned term "${term}". ${remedy}`;
+  return `The text uses the banned term "${term}" in the sentence "${sentenceCarrying(text, term)}". ${remedy}`;
+}
+
+const PRODUCT_CUE_AFTER = new RegExp(`^(?:['’]s)?\\s+(?:${COMPETITOR_PRODUCT_CUES.join("|")})\\b`, "i");
+const ON_BEFORE = /\bon\s+$/i;
+/** Opening quotes and brackets that sit between a sentence's end and its first word. */
+const SENTENCE_OPENERS = /[\s"'“‘(]+$/;
+
+/** True when the text before `index` ends a sentence (or is the start of the text), so the word at
+ *  `index` is capitalised because every sentence's first word is. */
+function atSentenceStart(text: string, index: number): boolean {
+  const before = text.slice(0, index).replace(SENTENCE_OPENERS, "");
+  return before === "" || /[.!?]$/.test(before);
+}
+
+/**
+ * "SLEEPER" THE WORD VERSUS SLEEPER THE APP (written rate round, 2026-09-08). A competitor whose
+ * name is an English word (`COMPETITOR_NAMES_THAT_ARE_WORDS`) is the product only when the prose
+ * treats it as one: capitalised anywhere but a sentence start, followed by a product cue ("sleeper
+ * league", "Sleeper's ADP"), or preceded by "on" ("on sleeper"). "A sleeper" and "an underdog" are
+ * the fantasy words the writer is asked for and pass.
+ */
+function isProductReference(text: string, name: string): boolean {
+  const pattern = new RegExp(`\\b${name}\\b`, "gi");
+  for (const match of text.matchAll(pattern)) {
+    const index = match.index;
+    const capitalised = /^[A-Z]/.test(match[0]);
+    if (capitalised && !atSentenceStart(text, index)) return true;
+    if (PRODUCT_CUE_AFTER.test(text.slice(index + match[0].length))) return true;
+    if (ON_BEFORE.test(text.slice(0, index))) return true;
+  }
+  return false;
 }
 
 function containsCompetitorName(text: string): string | null {
   const lower = text.toLowerCase();
-  for (const name of COMPETITOR_NAMES) if (lower.includes(name)) return name;
+  for (const name of COMPETITOR_NAMES) {
+    if (COMPETITOR_NAMES_THAT_ARE_WORDS.includes(name)) {
+      if (isProductReference(text, name)) return name;
+    } else if (lower.includes(name)) return name;
+  }
   return null;
 }
 
@@ -511,29 +499,6 @@ function citesTensionNumber(text: string, requiredTension: number): boolean {
 }
 
 /**
- * THE NUMBERS THE PROMPT ACTUALLY SHOWED HIM (acceptance round, task 10) — every numeric token in
- * the rendered fact sheet, in the exact forms it was rendered in.
- *
- * THE MEASUREMENT THAT FORCED IT: 125 of the rejections in a 100-player live run were ungrounded
- * numbers, and the examples were figures the sheet had printed. `render.ts` states a share as
- * "34.5%" while the ledger carried the fraction, states a rank as "RB4 of 32" while the ledger
- * carried the components, and rounds a season total for readability. Every one of those is the
- * model reading its own fact sheet back, which is the opposite of a fabrication.
- *
- * GROUNDING BY CONSTRUCTION. Anything the prompt renders is quotable; anything else still has to
- * trace to the structured ledger or to an honest rounding of it. This cannot license an invented
- * number, because the prompt is built from the same facts by a pure function
- * (`renderFactsForModel`) that invents nothing either.
- *
- * Recomputed per validation rather than stored on `PlayerFacts`: the fact sheet is a few hundred
- * bytes of string building, and putting it on the facts object would make `facts.ts` depend on the
- * renderer that already depends on it.
- */
-function promptNumbers(promptText: string): readonly number[] {
-  return extractNumbers(promptText).map((token) => token.value);
-}
-
-/**
  * WHAT A TEXT IS GRADED AGAINST — the seam any writer grounds through. A capsule read is grounded
  * on a player's facts (`groundingOf`); a second writer hands the same shape in (its own number and
  * name ledgers plus the sheet it was prompted with), so "anything the prompt renders is quotable"
@@ -593,11 +558,12 @@ const TENSION_NUMBER_PATTERN = /\((-?\d+(?:\.\d+)?) pts\/game\)/;
  *  2026-09-08): the prose is kept and the sentence carrying the word is rewritten with the drafting
  *  phrase named. A lab-report or all-time term has no soft form and still costs a rewrite. */
 function tradingWordCorrectionFor(violation: string): string | null {
-  const term = BANNED_TERM_VIOLATION_PATTERN.exec(violation)?.[1];
-  if (term === undefined) return null;
-  const replacement = tradingReplacementFor(term);
+  const match = BANNED_TERM_VIOLATION_PATTERN.exec(violation);
+  if (match === null) return null;
+  const [, term, sentence] = match;
+  const replacement = tradingReplacementFor(term!);
   if (replacement === null) return null;
-  return `Your text uses the trading word "${term}". Rewrite the sentence carrying it, in your own words, with drafting words instead: ${quoted(replacement)}. Then leave everything else as it is.`;
+  return `Your text uses the trading word "${term}". Rewrite this sentence: "${sentence}". Say it in your own words, with drafting words instead: ${quoted(replacement)}. Then leave everything else as it is.`;
 }
 
 /** True for a violation that is a framing note, not a fabrication — see `SOFT_CORRECTIONS`. */
@@ -665,7 +631,7 @@ function validateGrounded(body: string, source: GroundingSource, band: Grounding
 
   const bannedTerm = bannedTermIn(trimmed);
   if (bannedTerm !== null) {
-    violations.push(bannedTermViolation(bannedTerm));
+    violations.push(bannedTermViolation(bannedTerm, trimmed));
   }
 
   const competitor = containsCompetitorName(trimmed);
@@ -677,9 +643,13 @@ function validateGrounded(body: string, source: GroundingSource, band: Grounding
     violations.push(UNFRAMED_FLOOR_VIOLATION);
   }
 
-  const ledger = [...source.numberLedger, ...promptNumbers(source.promptText)];
+  const printed = promptNumbers(source.promptText);
+  const ledger = [...source.numberLedger, ...printed];
   for (const { raw, value } of extractNumbers(trimmed)) {
-    if (!isDerivedFromLedger(value, ledger)) {
+    // THE TEN AND THE HUNDRED (written rate round, 2026-09-08): "1400-plus receiving yards"
+    // against a printed 1429, "360-point seasons" against 362.9, were roundings the tolerance
+    // missed, not fabrications. Of PRINTED figures only: see `LOOSE_READING_UNITS`.
+    if (!isDerivedFromLedger(value, ledger) && !isLooseReadingOf(value, printed)) {
       violations.push(`The number "${raw}" does not trace to any supplied fact.`);
     }
   }

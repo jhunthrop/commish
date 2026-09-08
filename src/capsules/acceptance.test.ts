@@ -88,6 +88,122 @@ describe("cause 1: an ungrounded NUMBER that was never ungrounded", () => {
     }
   });
 
+  /**
+   * A LARGE TOTAL STATED TO THE HUNDRED (written rate round, 2026-09-08). "1400-plus yards" against
+   * a ledgered 1429 was the one rejection of eleven in a 40-player dev run that was a rounding the
+   * tolerance missed: a person states a yardage total to the hundred, down ("1400-plus") or to the
+   * nearest. Bounded to entries of a thousand or more, so a small number never gets a loose reading.
+   */
+  it("grounds a four-figure total stated to the hundred, down or nearest, and nothing smaller", () => {
+    const totals = { carries: 12, rushingYards: 143, targets: 114, receptions: 78, receivingYards: 1429, passingYards: 0, touchdowns: 8, fantasyPoints: 245.9 };
+    const facts = buildPlayerFacts(baseInput({ season: { season: 2026, gamesPlayed: 13, pointsPerGame: 18.9, totals } }));
+    expect(slotResult("He put up 1400-plus receiving yards last year and the role has not changed.", facts).ok).toBe(true);
+    expect(slotResult("He put up 1,400 receiving yards last year and the role has not changed.", facts).ok).toBe(true);
+    expect(slotResult("He put up 1500 receiving yards last year and the role has not changed.", facts).ok).toBe(false);
+    // 143 rush yards is never "100 rush yards": the loose reading is for four figures only.
+    expect(slotResult("He added 100 rush yards on the ground, which is the whole story.", facts).ok).toBe(false);
+  });
+
+  /**
+   * THE DERIVATIONS THE SECOND DEV RUN SHOWED (written rate round, 2026-09-08), on the ledger by
+   * construction the way the replacement-level gap already is: a per-game rate times a games figure
+   * the sheet prints ("21.7 a game over a 13-game season clears 282"), the sum of two law effects
+   * ("worth a combined 5.6 a game"), a difference between two headline points figures, and a season
+   * total as the sum of its listed parts. Each is arithmetic on two printed facts, never a third
+   * quantity out of one.
+   */
+  describe("derived by construction from two printed facts", () => {
+    // 258.1, not 264.3: 20.3 a game times the 13 games played is 263.9, and a season total that
+    // rounds to the same 264 would ground the cross-season product below as a printed fact.
+    const totals = { carries: 215, rushingYards: 1081, targets: 70, receptions: 56, receivingYards: 602, passingYards: 0, touchdowns: 7, fantasyPoints: 258.1 };
+    const law = (id: string, effect: number) => ({
+      id,
+      position: "RB" as const,
+      claim: "A claim.",
+      measured: { effect, ci: [effect - 0.5, effect + 0.5] as [number, number], sample: 120, seasons: "2018-2024" },
+      trainEffect: effect,
+      verdict: "confirmed" as const,
+      modelPath: null,
+      hasFoldEvidence: true,
+      origin: "tribal" as const,
+      primaryQuantityId: null,
+      primaryQuantityNoun: null,
+      primaryQuantityUnit: null,
+    });
+    const facts = buildPlayerFacts(
+      baseInput({
+        season: { season: 2026, gamesPlayed: 13, pointsPerGame: 20.3, totals },
+        reasons: [
+          { code: "availability", expectedGames: 16, floorGames: 12, ceilingGames: 17 },
+          { code: "law", lawId: "snap_share", effect: 2.9, magnitude: 78 },
+          { code: "law", lawId: "air_yards", effect: 2.7, magnitude: 36 },
+          { code: "law", lawId: "age", effect: 2.1, magnitude: 22 },
+        ],
+        laws: [law("snap_share", 2.9), law("air_yards", 2.7), law("age", 2.1)],
+      }),
+    );
+
+    /**
+     * SAME-SEASON PAIRINGS ONLY (fix round, 2026-09-08, HIGH): this season's rate times this
+     * season's expected games, last season's rate times last season's games played. A rate times
+     * a full season, a tail of the games range, or the other season's games is coincidence space,
+     * and the raw product is pushed once (the validator already reads it at three roundings).
+     */
+    it("grounds this season's per-game rate times this season's expected games", () => {
+      // 20.3 a game times the 16 games expected is 324.8.
+      expect(slotResult("At 20.3 a game, the 16 games we expect come to 325 points, and that is the case.", facts).ok).toBe(true);
+    });
+
+    it("no longer grounds a cross-season product, a rate times a tail of the games range, or the product stated to the ten", () => {
+      // 20.3 times the 13 games played (263.9), times the 12-game low (243.6), and 324.8 to the ten.
+      expect(slotResult("At 20.3 a game, a 13-game season is 264 points, and that is the whole case.", facts).ok).toBe(false);
+      expect(slotResult("At 20.3 a game, even the 12-game low is 244 points, and that is the whole case.", facts).ok).toBe(false);
+      expect(slotResult("At 20.3 a game a 16-game season is roughly 320 points, and that is the whole case.", facts).ok).toBe(false);
+    });
+
+    it("grounds the total of all the law effects, never a pairwise sum", () => {
+      expect(slotResult("The three factors are worth a combined 7.7 a game to our number, and that is the case.", facts).ok).toBe(true);
+      expect(slotResult("The snap share and the air yards are worth a combined 5.6 a game to our number.", facts).ok).toBe(false);
+    });
+
+    it("grounds a difference between two headline points figures", () => {
+      // 248 projected against a 228 replacement level was already grounded; 275 ceiling minus 248 is new.
+      expect(slotResult("The ceiling sits 27 points above our number, which is the whole upside case.", facts).ok).toBe(true);
+    });
+
+    it("grounds a season total as the sum of its listed parts", () => {
+      // 1081 rush plus 602 receiving is 1683 total yards; 215 carries plus 56 catches is 271 touches.
+      expect(slotResult("That is 1683 yards from scrimmage on 271 touches, and the split is the point.", facts).ok).toBe(true);
+    });
+
+    it("still fails a number that is arithmetic on nothing the sheet prints", () => {
+      expect(slotResult("He is a 300-touch back and the legs are the story.", facts).ok).toBe(false);
+    });
+  });
+
+  /**
+   * A THREE-FIGURE TOTAL STATED TO THE TEN (written rate round, 2026-09-08): "360-point seasons"
+   * from a ledgered 362.9, "clears 280" from a derived 282.1, "near 300" from 302.4. The same
+   * reading the hundred rule gives four figures, one order down, and nothing under a hundred.
+   */
+  it("grounds a three-figure entry stated to the ten, down or nearest, and nothing under a hundred", () => {
+    const facts = buildPlayerFacts(baseInput({ projection: { projectedPoints: 362.9, floorPoints: 178, medianPoints: 240, ceilingPoints: 275 } }));
+    expect(slotResult("A 360-point season is what our number has him at, and that is the pick.", facts).ok).toBe(true);
+    expect(slotResult("A 370-point season is a stretch but our number is not far off it.", facts).ok).toBe(false);
+    // 12.5 ADP is never "pick 10": the loose reading starts at a hundred.
+    expect(slotResult("Drafters are taking him around pick 10, which is a round too early.", facts).ok).toBe(false);
+  });
+
+  /** "Twenty-eight is the front edge of receiver decline" was read as the number 20 (written rate
+   *  round, 2026-09-08): a compound cardinal is one number, never its first word. */
+  it("reads a compound cardinal as one number, and grounds it against the sheet", () => {
+    const facts = buildPlayerFacts(baseInput({ market: { adp: 12.5, positionAdp: "RB6", boardRank: 28 } }));
+    expect(slotResult("Twenty-eight overall on our board is where he sits, and that is fair.", facts).ok).toBe(true);
+    const wrong = slotResult("Thirty-one overall on our board is where he sits, and that is fair.", facts);
+    expect(wrong.ok).toBe(false);
+    expect(wrong.violations[0]).toContain("Thirty-one");
+  });
+
   it("still fails a number that traces to nothing at all", () => {
     const result = slotResult("He caught 137 passes last season and nobody could cover him.");
     expect(result.ok).toBe(false);
@@ -149,6 +265,34 @@ describe("cause 3: name false positives", () => {
 
   it("grounds a possessive of the subject's own name", () => {
     expect(slotResult("Rashad Long's role is the whole case, and the ADP has not caught up.").ok).toBe(true);
+  });
+
+  /**
+   * THE FIRST PERSON AND A DETERMINER (written rate round, 2026-09-08): "What I", "If I" and
+   * "Every Walker" were three of the 40-player dev run's rejections, a sentence-initial word
+   * merging into the pronoun "I" or into the subject's own ledgered surname. "I" is never half a
+   * name, in any contraction, and "Every" is a determiner like "The".
+   */
+  it("reads the first-person pronoun as a word, never as half a name, in any contraction", () => {
+    expect(slotResult("What I want to see is the early-down work, and the sheet says it is his.").ok).toBe(true);
+    expect(slotResult("If I had to pick a back in this range, it is him.").ok).toBe(true);
+    expect(slotResult("What I'd need first is a healthy August, and then he is the pick.").ok).toBe(true);
+  });
+
+  it("grounds a verb before the surname of a name that ends in a suffix (\"Take Cook\" failed against James Cook III)", () => {
+    const facts = buildPlayerFacts(baseInput({ identity: { id: "p2", name: "James Cook III", position: "RB", team: "BUF" } }));
+    expect(slotResult("Take Cook at his ADP and never think about it again.", facts).ok).toBe(true);
+    // The exit is still gated on the verb: a given name in that slot is a person the sheet never named.
+    expect(slotResult("Marcus Cook is the man to take, and never think about it again.", facts).ok).toBe(false);
+  });
+
+  it("reads a plural position code as a word, never as half a name (\"Past WRs\" failed as a person)", () => {
+    expect(slotResult("Past WRs drafted around his pick have busted often, and the sheet says so.").ok).toBe(true);
+    expect(slotResult("Most RBs in this range are committee backs, and he is not.").ok).toBe(true);
+  });
+
+  it("grounds a sentence-initial determiner before the subject's own surname", () => {
+    expect(slotResult("Every Long season has started the same way, and this year should too.").ok).toBe(true);
   });
 
   it("still fails a fabricated two-word name", () => {
