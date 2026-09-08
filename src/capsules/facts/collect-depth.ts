@@ -1,5 +1,7 @@
+import { coachRows } from "@/coaches/store";
 import type { Db } from "@/db/client";
 import type { Position } from "@/domain/player";
+import type { PlayCallerRow } from "@/projections/nflverse/play-callers";
 import { regularSeasonGamesPerTeam } from "@/projections/nflverse/schedule";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
 import { productTeamCode, sourceTeamCode } from "@/projections/nflverse/team-codes";
@@ -17,7 +19,6 @@ import {
   injuryReportsFor,
   namesFor,
   pedigreeRowsFor,
-  readPlayCallerTable,
   rosterStatusesFor,
   scheduledGamesFor,
   scoringTalliesFor,
@@ -143,7 +144,7 @@ interface DepthPassData {
   readonly weeklyShares: Awaited<ReturnType<typeof weeklySharesFor>>;
   readonly targetCompetitionByTeam: ReadonlyMap<string, ReturnType<typeof targetCompetitionFor>>;
   readonly scoringUsage: ReturnType<typeof scoringUsageFor>;
-  readonly playCallers: ReturnType<typeof readPlayCallerTable>;
+  readonly playCallers: readonly PlayCallerRow[];
   readonly priorTeamRows: Awaited<ReturnType<typeof teamMetricRowsFor>>;
   readonly weekOneTeamRows: Awaited<ReturnType<typeof teamMetricRowsFor>>;
   readonly games: Awaited<ReturnType<typeof scheduledGamesFor>>;
@@ -274,7 +275,7 @@ export async function collectDepthFacts(db: Db, options: DepthCollectOptions): P
     firstKickoffFor(db, productSeason),
   ]);
 
-  const [depthSlots, weeklyShares, targets, tallies, priorTeamRows, weekOneTeamRows, scheduleTeamRows, games, adpHistory] = await Promise.all([
+  const [depthSlots, weeklyShares, targets, tallies, priorTeamRows, weekOneTeamRows, scheduleTeamRows, games, adpHistory, playCallers] = await Promise.all([
     depthSlotsFor(db, productSeason, asOf),
     priorSeason === undefined ? Promise.resolve(new Map()) : weeklySharesFor(db, priorSeason, subjectIds, asOf),
     priorSeason === undefined ? Promise.resolve({ targets: new Map(), teamOf: new Map() }) : seasonTargetsFor(db, priorSeason, populationIds, asOf),
@@ -284,6 +285,7 @@ export async function collectDepthFacts(db: Db, options: DepthCollectOptions): P
     teamMetricRowsFor(db, productSeason, { from: 1, to: LAST_POSSIBLE_WEEK }, asOf, SCHEDULE_SOURCE.schedule),
     scheduledGamesFor(db),
     adpHistoryFor(db, subjectIds, daysBefore(asOf, ADP_WINDOW_DAYS)),
+    coachRows(db),
   ]);
 
   const injuryHistoryByPlayerId = new Map(subjectIds.map((playerId) => [playerId, injuryHistoryFor(playerId, captures)] as const));
@@ -312,7 +314,7 @@ export async function collectDepthFacts(db: Db, options: DepthCollectOptions): P
     weeklyShares,
     targetCompetitionByTeam: competitionByTeam(priorSeason, targets, names),
     scoringUsage: priorSeason === undefined ? new Map() : scoringUsageFor(priorSeason, tallies, options.positions, names),
-    playCallers: readPlayCallerTable(),
+    playCallers,
     priorTeamRows,
     weekOneTeamRows,
     games,

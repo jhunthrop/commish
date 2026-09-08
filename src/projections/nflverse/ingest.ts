@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import type { Db } from "@/db/client";
 import type { SeasonStatLine } from "../lines";
 import { deleteObservationsBySource, recordObservations } from "../store";
@@ -6,7 +5,8 @@ import { recordPlayerTeams, recordTeamObservations, teamObservationsAsOf, type T
 import { indexTeamMetrics } from "../team-context";
 import { LAST_POSSIBLE_WEEK } from "../store";
 import { coachObservations, seasonMeans } from "./coaches";
-import { parsePlayCallers, playCallerLookup } from "./play-callers";
+import { readCoachRows } from "@/coaches/store";
+import { playCallerLookup } from "./play-callers";
 import { DEFENCE_METRICS, opponentDefenceObservations, type DefenceWeek } from "../features/context";
 import { recordNflPlayers } from "../universe";
 import { createNflverseClient, NflverseError, type NflverseClient } from "./client";
@@ -551,9 +551,6 @@ export async function ingestDerivedStatLines(db: Db, client: NflverseClient, sea
   };
 }
 
-/** The committed play-caller table, relative to the process's working directory (the repo root). */
-const PLAY_CALLERS_CSV_PATH = "data/play-callers/play-callers.csv";
-
 /**
  * The play-caller table: tenure, and an incoming play-caller's own pace and pass-rate history.
  *
@@ -563,21 +560,23 @@ const PLAY_CALLERS_CSV_PATH = "data/play-callers/play-callers.csv";
  * nulls and nothing downstream would complain — the scheme prior would simply fall back to the
  * league for every coaching change, which is exactly the case the feature exists to handle.
  *
- * Reads the committed play-caller CSV straight off disk rather than over the network — it ships in
- * the repo, checked in beside the code that reads it. A missing file is a broken checkout, not a
- * degraded feature, so this THROWS rather than falling back to head-coach-only silently: an operator
- * who deleted or renamed the file should see the ingestion fail, not a report that looks clean but
- * quietly lost the coordinator-level attribution for every team-season.
+ * Reads the play-caller table from the `coaches` TABLE (`npm run coaches:ingest` writes it from the
+ * committed CSV), never from disk: this module is bundled into the job tick, and a request-path
+ * file read is what threw ENOENT in production on 2026-09-08. An EMPTY table is a missing ingest,
+ * not a degraded feature, so this THROWS before fetching anything rather than falling back to
+ * head-coach-only silently: an operator who skipped the ingest should see this fail, not a report
+ * that looks clean but quietly lost the coordinator-level attribution for every team-season.
  */
 export async function ingestCoaches(db: Db, seasons: readonly number[], client = createScheduleClient()): Promise<number> {
+  const coachTable = await readCoachRows(db);
+  if (coachTable.length === 0) throw new Error("The coaches table is empty. Run `npm run coaches:ingest` before the coach observations.");
+  const playCallers = playCallerLookup(coachTable);
   const rows = await client.getCsv(SCHEDULE_SOURCE_CONFIG.release, SCHEDULE_SOURCE_CONFIG.file);
   // Every season back to the earliest the store could hold, so a coach hired in 2024 is credited
   // with the offences he ran in 2016 rather than looking like a first-time head coach.
   const earliest = Math.min(...seasons);
   const history = Array.from({ length: Math.max(...seasons) - earliest + 1 }, (_, index) => earliest + index);
   const games = mapSchedule(rows, history);
-
-  const playCallers = playCallerLookup(parsePlayCallers(readFileSync(PLAY_CALLERS_CSV_PATH, "utf8")));
 
   const all: TeamWeekObservation[] = [];
   for (const season of history) {

@@ -1,4 +1,3 @@
-import { readFileSync, statSync } from "node:fs";
 import { and, desc, gte, inArray } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { adpSnapshots, nflDraftPicks, nflGames, nflPlayers, nflverseInjuries, nflverseRosterWeeks, preseasonRosters } from "@/db/schema";
@@ -7,7 +6,6 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { PARTICIPATION_METRICS } from "@/projections/nflverse/map";
 import { PBP_PLAYER_METRICS, PBP_PLAYER_SOURCE } from "@/projections/nflverse/pbp-players";
 import { NFLVERSE_SOURCE } from "@/projections/nflverse/map";
-import { parsePlayCallers, type PlayCallerRow } from "@/projections/nflverse/play-callers";
 import { finalWeekOf } from "@/projections/nflverse/team-eras";
 import { statLinesAsOfForLiveSurface } from "@/projections/nflverse/derived-stat-lines";
 import { DEPTH_METRIC, DEPTH_SOURCE } from "@/projections/preseason/depth";
@@ -33,35 +31,11 @@ import type { ScheduledGame } from "./schedule";
  * NOTHING HERE READS A CLOCK. Every point-in-time read takes the caller's own `asOf`, so a replay
  * sees exactly what was knowable at that instant, the same guarantee `observationsAsOf` gives every
  * other consumer in this engine.
- */
-
-/** The committed play-caller table, relative to the repo root, exactly as `nflverse/ingest.ts`
- *  reads it. A missing file is a broken checkout rather than a degraded feature, so this throws. */
-const PLAY_CALLERS_CSV_PATH = "data/play-callers/play-callers.csv";
-
-/**
- * PARSED ONCE PER PROCESS, keyed by path and by the file's own modification time.
  *
- * The table ships in the repository and cannot change under a running server, so re-reading and
- * re-parsing 944 rows on every board sweep and every single-player peek was pure waste: a peek is a
- * request-path call, and synchronous filesystem work on a request path blocks the event loop for
- * every other request in flight. The mtime is in the key rather than assumed away so a developer
- * editing the CSV between two calls in one long-lived dev process still sees his edit, which is the
- * only case a bare "read it once" memo would get wrong.
- *
- * `statSync` still throws for a missing file, so the loud failure this function has always had for
- * a broken checkout is unchanged.
+ * NOTHING HERE READS A FILE. The play-caller table used to be parsed off disk from this module and
+ * threw ENOENT in the serverless bundle (2026-09-08); it is the `coaches` table now, read through
+ * `src/coaches/store.ts`, and `depth-reads.test.ts` pins this module to no `node:fs` import.
  */
-const playCallerCache = new Map<string, readonly PlayCallerRow[]>();
-
-export function readPlayCallerTable(path: string = PLAY_CALLERS_CSV_PATH): readonly PlayCallerRow[] {
-  const key = `${path}|${statSync(path).mtimeMs}`;
-  const cached = playCallerCache.get(key);
-  if (cached !== undefined) return cached;
-  const rows = parsePlayCallers(readFileSync(path, "utf8"));
-  playCallerCache.set(key, rows);
-  return rows;
-}
 
 /** Display names for a set of nflverse ids. A player the universe has no row for is simply absent,
  *  and every caller falls back to the bare id rather than dropping him. */
