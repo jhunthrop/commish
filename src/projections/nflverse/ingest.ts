@@ -644,6 +644,9 @@ export interface NewsIngestReport {
   readonly reportRows: number;
   readonly observationsWritten: number;
   readonly unknownPlayers: number;
+  /** Rows for a projected player with no filing timestamp at all — skipped, never stored, never
+   *  fabricated. Nonzero for `injuries_2025.csv` onward; see `mapInjuries` in `news/retrieve.ts`. */
+  readonly unstamped: number;
 }
 
 export async function ingestInjuryReports(
@@ -661,6 +664,7 @@ export async function ingestInjuryReports(
       reportRows: rows.length,
       observationsWritten: await recordObservations(db, mapped.observations),
       unknownPlayers: mapped.unknownPlayers.length,
+      unstamped: mapped.unstamped,
     });
   }
   return reports;

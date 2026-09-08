@@ -380,6 +380,24 @@ describe("collectAllPlayerFacts — the books' own numbers", () => {
     expect(books.teamVegasWinTotal).toBe(9.5);
   });
 
+  /**
+   * THE TWO FRANCHISES THE TWO FEEDS SPELL DIFFERENTLY (`nflverse/team-codes.ts`). The product
+   * spells the Rams `LAR` and Washington `WSH`; `team_week_observations` spells them `LA` and
+   * `WAS`. Looking the win total up by the board's own code returned nothing for exactly those two,
+   * which read on the sheet as the books having posted no line for the Rams rather than as the bug
+   * it was.
+   */
+  it("finds a Rams win total the store keyed under LA from a board row that says LAR", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-3000009", name: "Rashad Long", position: "RB", team: "LAR", points: 248, rank: 1, adp: 12.5 });
+    await recordTeamObservations(db, [
+      kickoffFact({ team: "LA" }),
+      { season: PRODUCT_SEASON, week: 1, team: "LA", source: VEGAS_SOURCE, metric: VEGAS_METRICS.winTotal, value: 11.5, asOf: BEFORE_KICKOFF },
+    ]);
+
+    const facts = await collectAllPlayerFacts(db);
+    expect(facts[0]!.booksNumbers.teamVegasWinTotal).toBe(11.5);
+  });
+
   it("never admits a props line fetched at or after kickoff — the leakage gate holds in the collector too", async () => {
     await seedPlayer(db, { id: "p1", nflId: "00-3000002", name: "Rashad Long", position: "RB", team: "SF", points: 248, rank: 1, adp: 12.5 });
     await recordTeamObservations(db, [kickoffFact()]);

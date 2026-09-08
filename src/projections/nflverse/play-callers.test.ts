@@ -9,8 +9,20 @@ describe("parsePlayCallers", () => {
   it("parses a well-formed row", () => {
     const rows = parsePlayCallers(row("2024,DET,Ben Johnson,OC,1,18,both,"));
     expect(rows).toEqual([
-      { season: 2024, team: "DET", name: "Ben Johnson", role: "OC", startWeek: 1, endWeek: 18, source: "both", note: "" },
+      { season: 2024, team: "DET", name: "Ben Johnson", role: "OC", startWeek: 1, endWeek: 18, source: "both", note: "", headCoach: "", headCoachFirstSeason: null },
     ]);
+  });
+  it("parses the head-coach pair when the row carries it", () => {
+    const rows = parsePlayCallers(`${HEADER},head_coach,head_coach_first_season\n2026,SF,Kyle Shanahan,HC,1,18,wikipedia,,Kyle Shanahan,2017\n`);
+    expect(rows[0]).toMatchObject({ headCoach: "Kyle Shanahan", headCoachFirstSeason: 2017 });
+  });
+  it("refuses a head coach with no first season beside him", () => {
+    expect(() => parsePlayCallers(`${HEADER},head_coach,head_coach_first_season\n2026,SF,Kyle Shanahan,HC,1,18,wikipedia,,Kyle Shanahan,\n`)).toThrow(/line 2/);
+  });
+  it("names the team-season whose head coach the covered window is missing", () => {
+    const rows = parsePlayCallers(row("2026,SF,Kyle Shanahan,HC,1,18,wikipedia,"));
+    expect(validatePlayCallers(rows, [2026], () => ["SF"], () => 18, [2026])).toEqual(["SF 2026: empty head_coach."]);
+    expect(validatePlayCallers(rows, [2026], () => ["SF"], () => 18)).toEqual([]);
   });
   it("throws with the line number on a malformed role", () => {
     expect(() => parsePlayCallers(row("2024,DET,Ben Johnson,QB,1,18,both,"))).toThrow(/line 2/);
