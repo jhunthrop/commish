@@ -130,11 +130,14 @@ describe("measureSameness", () => {
 describe("the refrains the 2026-09-07 production regeneration measured (production follow-up, 2026-09-08)", () => {
   it("are on the list the measure counts and the prompt forbids", () => {
     for (const stem of ["the depth chart is", "the books set", "it says nothing about whether he can play"]) expect(CAPSULE_CONFIG.repetition.refrainStems).toContain(stem);
+    // The 2026-09-08 regeneration's one flag: the unlisted opener on 49 of 401 written (12.2%).
+    expect(CAPSULE_CONFIG.repetition.refrainStems).toContain("nobody is drafting");
   });
 
   it("are found however the read cases or punctuates them", () => {
     expect(containsStem("The depth chart is the whole story here.", "the depth chart is")).toBe(true);
     expect(containsStem("It says nothing about whether he can play, only that nobody has posted a line.", "it says nothing about whether he can play")).toBe(true);
+    expect(containsStem("Nobody is drafting Rashad Long, and that is the whole case.", "nobody is drafting")).toBe(true);
   });
 });
 

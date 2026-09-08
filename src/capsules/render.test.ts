@@ -72,9 +72,11 @@ describe("renderFactsForModel", () => {
     expect(rendered).not.toMatch(/\bmarket\b/i);
   });
 
-  it("states a missing ADP as nobody drafting him, never as an unpriced market", () => {
-    const rendered = renderFactsForModel(buildPlayerFacts(baseInput({ market: { adp: null, positionAdp: null, boardRank: 14 } })));
-    expect(rendered).toContain("No ADP on file: drafters are not taking him.");
+  it("states a missing ADP as the fact alone, never as a sentence the writer reads back, and never as an unpriced market (written rate round, 2026-09-08: 'Nobody is drafting [name]' opened 12% of the board)", () => {
+    const rendered = renderFactsForModel(buildPlayerFacts(baseInput({ market: { adp: null, positionAdp: null, boardRank: 14 }, reasons: [{ code: "market_unlisted" }] })));
+    expect(rendered).toContain("ADP: none on file.");
+    expect(rendered).toContain("No ADP on file for him.");
+    expect(rendered).not.toMatch(/nobody is drafting|drafters are not taking/i);
     expect(rendered).not.toMatch(/\bmarket\b|\bpriced?\b/i);
   });
 

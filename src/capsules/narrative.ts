@@ -178,8 +178,9 @@ function briefLabelOf(item: PlayerFacts["evidence"][number]): string {
       return `a new play caller at ${item.team}`;
     case "rookie":
       return "he is a rookie";
+    // The fact, not the opener the board wore out (written rate round, 2026-09-08).
     case "market_unlisted":
-      return "nobody is drafting him yet";
+      return "he has no ADP on file";
   }
 }
 

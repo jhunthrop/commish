@@ -62,6 +62,14 @@ describe("narrativeRequestsFor", () => {
     expect(brief).not.toContain("which is nothing about his talent");
   });
 
+  it("briefs the unlisted player's evidence line as the fact, never as the sentence the board wore out (written rate round, 2026-09-08: 'Nobody is drafting [name]' on 49 players)", () => {
+    const facts = buildPlayerFacts(baseInput({ market: { adp: null, positionAdp: null, boardRank: 14 }, reasons: [{ code: "market_unlisted" }] }));
+    const unlisted = facts.evidence.find((item) => item.kind === "market_unlisted")!;
+    const brief = narrativeRequestsFor(facts).find((request) => request.key === whyGroupSlotKey(unlisted.groupKey))!.brief;
+    expect(brief).toContain("no ADP on file");
+    expect(brief).not.toMatch(/nobody is drafting/i);
+  });
+
   it("asks for one slot per evidence group, keyed the way the module renders it", () => {
     const facts = buildPlayerFacts(baseInput());
     const keys = narrativeRequestsFor(facts).map((request) => request.key);

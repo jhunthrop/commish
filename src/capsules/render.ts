@@ -74,7 +74,9 @@ function signedPercentOf(fraction: number): string {
  */
 function adpLine(facts: PlayerFacts): string {
   const { market } = facts;
-  if (market.adp === null) return "No ADP on file: drafters are not taking him.";
+  // The fact, never the sentence (written rate round, 2026-09-08): "drafters are not taking him"
+  // and the evidence line's "nobody is drafting him yet" came back as the opener on 49 players.
+  if (market.adp === null) return "ADP: none on file.";
   const byAdp = market.positionAdp === null ? "" : `, ${market.positionAdp} by ADP`;
   return `ADP ${market.adp} (drafters take him around pick ${Math.round(market.adp)}${byAdp}).`;
 }
@@ -134,8 +136,10 @@ function evidenceLines(facts: PlayerFacts): readonly string[] {
         return `New play caller at ${item.team}. A new play caller is the honest concern.`;
       case "rookie":
         return item.overallPick === null ? "A rookie, went undrafted." : `A rookie, drafted at pick ${item.overallPick}.`;
+      // Not "nobody is drafting him yet" (written rate round, 2026-09-08): a sheet that hands the
+      // writer a sentence gets it back, and this one opened 12.2% of the written board.
       case "market_unlisted":
-        return "No ADP at all: nobody is drafting him yet.";
+        return "No ADP on file for him.";
     }
   });
 }

@@ -218,6 +218,8 @@ export const CAPSULE_CONFIG = {
       // THE PRODUCTION REGENERATION (2026-09-07, 659 players, 420 written, measured 2026-09-08):
       "the depth chart is", // the top opener family, 16.2% (68 players) against the 10% line
       "it says nothing about whether he can play", // the top stock sentence, 2.3% (15 players), the no-props note's old brief read back
+      // THE SECOND PRODUCTION REGENERATION (2026-09-08, 659 players, 401 written): the one flag.
+      "nobody is drafting", // the opener on 49 players, 12.2%, the unlisted player's own sheet line read back
     ],
   },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
