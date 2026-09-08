@@ -9,8 +9,8 @@
  * target under `reachFloor` at a turn is a REACH there: the plan places him at the earliest turn
  * he clears it, or leaves him out. A turn beyond the draft's end does not exist.
  *
- * `planDelta` is the "changed since" line: what moved between the plan the manager last saw and
- * this one, by a stated band.
+ * The "changed since" line is the room's own (`@/draft-room/advisor/plan-delta`): only the client
+ * knows which plan the manager last looked at.
  */
 import type { Position } from "@/domain/player";
 import type { RosterSlot } from "@/domain/roster";
@@ -168,31 +168,4 @@ export function computePlan(input: PlanInput): PlanResult {
   }
 
   return { plan: { computedAtPick: state.pickNumber, runs, horizon, reachFloor, turns }, odds };
-}
-
-export type PlanChange =
-  | { readonly kind: "odds_moved"; readonly playerId: string; readonly turn: number; readonly from: number; readonly to: number }
-  | { readonly kind: "left_plan"; readonly playerId: string; readonly turn: number };
-
-function targetsByTurn(plan: DraftPlan): ReadonlyMap<string, { readonly turn: number; readonly target: PlanTarget }> {
-  return new Map(plan.turns.flatMap((turn) => turn.targets.map((target) => [target.playerId, { turn: turn.turn, target }] as const)));
-}
-
-/** What changed between the plan the manager last saw and the current one: a named target
- *  whose odds at his own turn moved by more than the band, or one no longer on the plan. */
-export function planDelta(previous: DraftPlan, current: DraftPlan): readonly PlanChange[] {
-  const band = ADVISOR_CONFIG.plan.changedOddsBand;
-  const now = targetsByTurn(current);
-  const changes: PlanChange[] = [];
-  for (const [playerId, { turn, target }] of targetsByTurn(previous)) {
-    const latest = now.get(playerId);
-    if (latest === undefined) {
-      changes.push({ kind: "left_plan", playerId, turn });
-      continue;
-    }
-    const from = target.oddsByTurn[turn - 1]?.survival;
-    const to = latest.target.oddsByTurn[latest.turn - 1]?.survival;
-    if (from !== undefined && to !== undefined && Math.abs(to - from) > band) changes.push({ kind: "odds_moved", playerId, turn: latest.turn, from, to });
-  }
-  return changes;
 }

@@ -18,9 +18,6 @@ export const ADVISOR_CONFIG = {
     reachFloor: 0.25,
     /** A fallback is the best player at the turn's position who clears this at that turn. */
     fallbackFloor: 0.7,
-    /** "Changed since": a target's odds moving by more than this band, or leaving the board,
-     *  is called out against the plan the manager last saw. */
-    changedOddsBand: 0.15,
   },
   now: {
     /** Rows on the now card (spec 3.2: "top five by the existing score"). */
@@ -36,8 +33,6 @@ export const ADVISOR_CONFIG = {
     writeWithinPicks: 2,
     /** The writer's own budget inside one advisor request; late text lands on the next poll. */
     budgetMs: 2_000,
-    /** How soon the client asks again while the writer is still pending. */
-    pollMs: 2_500,
     /** Word caps per slot, held by the same validator the player peek's slots are. */
     strategyMaxWords: 45,
     reasonMaxWords: 28,

@@ -30,10 +30,10 @@ export interface QuiltRow {
   readonly cells: readonly QuiltCell[];
 }
 
-/** "2.05" — the sport's own round.pick grammar, zero-padded like every mock prints it. */
-export function pickLabel(round: number, seat: number): string {
-  return `${round}.${String(seat).padStart(2, "0")}`;
-}
+/** "2.05" — the sport's own round.pick grammar, zero-padded like every mock prints it. One
+ *  spelling for the whole product (`@/domain/pick-label`), re-exported under the name this
+ *  module's callers already import. */
+export { pickLabelOf as pickLabel } from "@/domain/pick-label";
 
 /** The seat (1-based) a team picks at in a snake round. */
 function snakeSeat(draftOrder: readonly string[], teamId: string, round: number): number | null {

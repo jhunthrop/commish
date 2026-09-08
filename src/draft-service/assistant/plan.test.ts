@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { teamOnClock } from "@/draft-engine";
 import { upcomingTurnsFor } from "../sim/horizon-odds";
 import { ADVISOR_CONFIG } from "./config";
-import { computePlan, planDelta } from "./plan";
+import { computePlan } from "./plan";
 import { FIXTURE_TEAM_IDS, fixtureAdvance, fixtureStart, fixtureValued } from "./test-fixture";
 
 const ASKING = FIXTURE_TEAM_IDS[3]!; // seat 4 of 10: picks 4, 17, 24, 37, ...
@@ -72,23 +72,5 @@ describe("computePlan", () => {
     expect(teamOnClock(state)).not.toBe(ASKING);
     const { plan } = computePlan({ state, askingTeamId: ASKING, valued: fixtureValued(), seed: 1, runs: 5 });
     expect(plan.turns).toEqual([]);
-  });
-});
-
-describe("planDelta", () => {
-  it("reports nothing when the plan is unchanged", () => {
-    const { plan } = planAfter(3).result;
-    expect(planDelta(plan, plan)).toEqual([]);
-  });
-
-  it("names a target whose odds moved past the band, and one who left the plan", () => {
-    const before = planAfter(3).result.plan;
-    const first = before.turns[0]!;
-    const moved = { ...first.targets[0]!, oddsByTurn: first.targets[0]!.oddsByTurn.map((cell) => (cell === null ? null : { ...cell, survival: Math.max(0, cell.survival - 0.5) })) };
-    const after = { ...before, computedAtPick: before.computedAtPick + 1, turns: [{ ...first, targets: [moved] }, ...before.turns.slice(1)] };
-    const delta = planDelta(before, after);
-    expect(delta.some((change) => change.kind === "odds_moved" && change.playerId === moved.playerId)).toBe(true);
-    const gone = first.targets.slice(1).map((target) => target.playerId);
-    for (const id of gone) expect(delta.some((change) => change.kind === "left_plan" && change.playerId === id)).toBe(true);
   });
 });
