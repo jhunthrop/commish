@@ -13,6 +13,7 @@ import { getDraftStore } from "@/draft-service";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { simulateRoomOdds } from "../sim/room-odds";
 import { resetAdvisorMemoForTests } from "./memo";
+import { recommendNow } from "./recommend";
 import { advisorFor } from "./service";
 
 const db = createTestDb();
@@ -47,12 +48,18 @@ beforeEach(async () => {
 });
 
 describe("advisorFor", () => {
-  it("simulates one room state once and serves a second viewer from the same table", async () => {
+  it("simulates one room state once, serves a second viewer from the same table, and recommends once per viewer per state", async () => {
     const { onClockUser, waitingUser } = await fixture();
     const simulate = vi.fn(simulateRoomOdds);
-    const first = await advisorFor(db, DRAFT_ID, onClockUser, { simulate });
-    const second = await advisorFor(db, DRAFT_ID, waitingUser, { simulate });
+    const recommend = vi.fn(recommendNow);
+    const first = await advisorFor(db, DRAFT_ID, onClockUser, { simulate, recommend });
+    const second = await advisorFor(db, DRAFT_ID, waitingUser, { simulate, recommend });
+    const again = await advisorFor(db, DRAFT_ID, waitingUser, { simulate, recommend });
     expect(simulate).toHaveBeenCalledTimes(1);
+    // The on-clock seat's own shortlist is computed once for the R-3 exclusion inside the room
+    // facts and once as its card; the waiting seat once, its second request served from memory.
+    expect(recommend).toHaveBeenCalledTimes(2);
+    expect(again).toEqual(second);
     expect(first!.onTheClock).toBe(true);
     expect(second!.onTheClock).toBe(false);
     expect(second!.pickNumber).toBe(2);

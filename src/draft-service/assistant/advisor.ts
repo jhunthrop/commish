@@ -27,6 +27,14 @@ export interface AdvisorCoreInput {
   readonly table: RoomOddsTable;
   /** The room's tier standings for exactly this `state` (`tiers.ts`), computed once per state. */
   readonly tiers: Readonly<Record<string, TierStandingView>>;
+  /** The seat's shortlist, `shortlistSizeFor` deep, when the caller holds it (the service memoises
+   *  it per seat and state); absent, computed here. */
+  readonly shortlist?: readonly Recommendation[];
+}
+
+/** How deep the card looks: the on-clock shortlist, or the deeper off-clock one (see `pickToName`). */
+export function shortlistSizeFor(state: DraftState, askingTeamId: string): number {
+  return teamOnClock(state) === askingTeamId ? ADVISOR_CONFIG.shortlistSize : ADVISOR_CONFIG.offClockShortlistSize;
 }
 
 function oddsCellFor(survival: SeatSurvival | null, playerId: string): OddsCell | null {
@@ -82,7 +90,7 @@ export function advisorCore(input: AdvisorCoreInput): AdvisorView | null {
   if (window === null) return null;
   const onTheClock = teamOnClock(state) === askingTeamId;
   const survival = survivalFor(table, state, askingTeamId);
-  const shortlist = recommendNow({ ...input, shortlistSize: onTheClock ? ADVISOR_CONFIG.shortlistSize : ADVISOR_CONFIG.offClockShortlistSize });
+  const shortlist = input.shortlist ?? recommendNow({ ...input, shortlistSize: shortlistSizeFor(state, askingTeamId) });
   const top = pickToName(shortlist, onTheClock, survival);
   return {
     pickNumber: window.pickNumber,

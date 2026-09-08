@@ -7,21 +7,24 @@
  * `teamId === null`, and there is nothing to advise.
  */
 import type { Db } from "@/db/client";
+import type { Recommendation } from "@/projections/decide/draft";
 import type { LeagueShape } from "@/projections/decide/replacement";
 import { getDraftStore, resolveDraftActor } from "@/draft-service";
 import { evidencePoolFor } from "../sim/evidence";
 import { simulateRoomOdds, type RoomOddsInput, type RoomOddsTable } from "../sim/room-odds";
 import { inferSeatDrivers } from "../sim/seat-model";
-import { advisorCore, seedFor } from "./advisor";
+import { advisorCore, seedFor, shortlistSizeFor } from "./advisor";
 import { ADVISOR_CONFIG } from "./config";
-import { roomFactsFor } from "./memo";
-import { askingWindow, onClockShortlist, valuedEvidence } from "./recommend";
+import { roomFactsFor, seatShortlistFor } from "./memo";
+import { askingWindow, onClockShortlist, recommendNow, valuedEvidence, type RecommendInput } from "./recommend";
 import { tierStandings } from "./tiers";
 import type { AdvisorView } from "./view";
 
 export interface AdvisorServiceDeps {
   /** The sim entry point, injectable so a test can count how often a room state simulates. */
   readonly simulate?: (input: RoomOddsInput) => RoomOddsTable;
+  /** The recommendation entry point, injectable for the same reason. */
+  readonly recommend?: (input: RecommendInput) => readonly Recommendation[];
 }
 
 /**
@@ -30,6 +33,7 @@ export interface AdvisorServiceDeps {
  */
 export async function advisorFor(db: Db, draftId: string, userId: string, deps: AdvisorServiceDeps = {}): Promise<AdvisorView | null> {
   const simulate = deps.simulate ?? simulateRoomOdds;
+  const recommend = deps.recommend ?? recommendNow;
   const actorResult = await resolveDraftActor(db, draftId, userId);
   if (!actorResult.ok) return null;
   const teamId = actorResult.actor.teamId;
@@ -46,5 +50,6 @@ export async function advisorFor(db: Db, draftId: string, userId: string, deps: 
     table: simulate({ state, seed: seedFor(draftId, state.sequence), runs: ADVISOR_CONFIG.runs, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) }),
     tiers: tierStandings(state, valued),
   }));
-  return advisorCore({ state, askingTeamId: teamId, valued, shape, table, tiers });
+  const shortlist = seatShortlistFor(draftId, state.sequence, teamId, () => recommend({ state, askingTeamId: teamId, valued, shape, shortlistSize: shortlistSizeFor(state, teamId) }));
+  return advisorCore({ state, askingTeamId: teamId, valued, shape, table, tiers, shortlist });
 }

@@ -9,6 +9,7 @@
  * A bounded, per-instance cache BY DESIGN (the immutability rule's one sanctioned shape): the
  * facts must outlive the request that computed them. A miss is a recompute, never a wrong answer.
  */
+import type { Recommendation } from "@/projections/decide/draft";
 import type { RoomOddsTable } from "../sim/room-odds";
 import { ADVISOR_CONFIG } from "./config";
 import type { TierStandingView } from "./view";
@@ -21,6 +22,11 @@ export interface RoomFacts {
 interface Entry {
   readonly sequence: number;
   readonly facts: RoomFacts;
+  /** Each seat's own shortlist for this state, filled on that seat's first request (fix round:
+   *  `recommendPick` measured 37 to 87 ms per viewer on the real board, and a viewer's
+   *  recommendation changes only when the room state or the viewer's roster does, both of which
+   *  are inside the sequence). */
+  readonly shortlists: Map<string, readonly Recommendation[]>;
 }
 
 const rooms = new Map<string, Entry>();
@@ -43,8 +49,20 @@ export function roomFactsFor(draftId: string, sequence: number, compute: () => R
     return held.facts;
   }
   const facts = compute();
-  remember(draftId, { sequence, facts });
+  remember(draftId, { sequence, facts, shortlists: new Map() });
   return facts;
+}
+
+/** One seat's shortlist for `draftId` at `sequence`, computed once per seat per room state. Asks
+ *  for a state the room does not hold (the facts must be asked for first) compute every time. */
+export function seatShortlistFor(draftId: string, sequence: number, teamId: string, compute: () => readonly Recommendation[]): readonly Recommendation[] {
+  const held = rooms.get(draftId);
+  if (held === undefined || held.sequence !== sequence) return compute();
+  const known = held.shortlists.get(teamId);
+  if (known !== undefined) return known;
+  const shortlist = compute();
+  held.shortlists.set(teamId, shortlist);
+  return shortlist;
 }
 
 /** Test seam only. */

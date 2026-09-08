@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ADVISOR_CONFIG } from "./config";
-import { resetAdvisorMemoForTests, roomFactsFor, type RoomFacts } from "./memo";
+import { resetAdvisorMemoForTests, roomFactsFor, seatShortlistFor, type RoomFacts } from "./memo";
 
 function facts(fromPick: number): RoomFacts {
   return { table: { runs: 1, fromPick, throughPick: fromPick, played: [] }, tiers: {} };
@@ -24,6 +24,22 @@ describe("roomFactsFor", () => {
     const again = vi.fn(() => facts(4));
     roomFactsFor("d1", 4, again);
     expect(again).toHaveBeenCalledTimes(1);
+  });
+
+  it("computes a seat's shortlist once per room state, per seat, beside the room facts", () => {
+    roomFactsFor("d1", 4, () => facts(4));
+    const compute = vi.fn(() => []);
+    seatShortlistFor("d1", 4, "t1", compute);
+    seatShortlistFor("d1", 4, "t1", compute);
+    seatShortlistFor("d1", 4, "t2", compute);
+    expect(compute).toHaveBeenCalledTimes(2);
+    roomFactsFor("d1", 5, () => facts(5));
+    seatShortlistFor("d1", 5, "t1", compute);
+    expect(compute).toHaveBeenCalledTimes(3);
+    // A state the room does not hold is computed every time, never remembered against the wrong one.
+    seatShortlistFor("d1", 4, "t1", compute);
+    seatShortlistFor("d1", 4, "t1", compute);
+    expect(compute).toHaveBeenCalledTimes(5);
   });
 
   it("evicts the least recently computed room past the bound", () => {
