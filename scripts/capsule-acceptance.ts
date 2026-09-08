@@ -23,6 +23,7 @@ import { collectBoardFacts } from "@/capsules/collect";
 import { CAPSULE_CONFIG, CAPSULE_MODEL } from "@/capsules/config";
 import type { PlayerFacts } from "@/capsules/facts";
 import { generateCapsule, type CapsuleFallbackReason } from "@/capsules/generate";
+import type { GatewayResponseInfo } from "@/capsules/write";
 import { getStoredCapsulesFor } from "@/capsules/store";
 
 const ARGUMENTS = process.argv.slice(2);
@@ -169,6 +170,14 @@ async function main(): Promise<void> {
   const texts: string[] = [];
 
   const tally = new Tally();
+  // THE THROTTLE'S OWN WORDS (founder, 2026-09-07) — every 429 verbatim, and one success to
+  // compare its headers against.
+  const throttleReports: GatewayResponseInfo[] = [];
+  const successSamples: GatewayResponseInfo[] = [];
+  const onGatewayResponse = (info: GatewayResponseInfo): void => {
+    if (info.status === 429) throttleReports.push(info);
+    else if (successSamples.length === 0 && info.status < 400) successSamples.push(info);
+  };
   let first = true;
   for (const facts of sample) {
     if (!first) await new Promise((resolve) => setTimeout(resolve, CAPSULE_CONFIG.sweepPacingMs));
@@ -179,6 +188,7 @@ async function main(): Promise<void> {
       ...(MODEL === undefined ? {} : { model: MODEL }),
       ...(THINKING ? { thinking: true } : {}),
       onCallLatency: (ms) => tally.latencies.push(ms),
+      onGatewayResponse,
     });
     const written = result.source === "llm";
     const throttled = [result.compact, result.full].some((size) => size.fallbackReason?.kind === "throttled");
@@ -207,6 +217,14 @@ async function main(): Promise<void> {
   }
 
   tally.print();
+  console.log("");
+  console.log(`Pacing in force: ${CAPSULE_CONFIG.gateway.callsPerMinute} calls a minute. Reasoning: ${THINKING ? "on" : "off"}.`);
+  console.log(`One successful response's limit headers: ${JSON.stringify(successSamples[0]?.limitHeaders ?? null)}`);
+  console.log(`429s seen: ${throttleReports.length}`);
+  for (const report of throttleReports.slice(0, 5)) {
+    console.log(`  status ${report.status} "${report.statusText}" headers ${JSON.stringify(report.limitHeaders)}`);
+    console.log(`  body ${JSON.stringify(report.body ?? "")}`);
+  }
   if (TEXTS_PATH !== undefined) writeFileSync(TEXTS_PATH, texts.join("\n"));
   await db.$client.end();
 }

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
+import { EMPTY_DEPTH, type PlayerFactsDepth } from "./facts/types";
 import { NARRATIVE_WORD_CAPS } from "./narrative-slots";
+import { depthNumbers } from "./facts/ledger";
 import { renderFactsForModel } from "./render";
+import { renderDepthSection } from "./render-depth";
 import { softCorrectionFor, UNFRAMED_FLOOR_VIOLATION, validateCapsule, validateNarrativeSlot } from "./validate";
 
 /**
@@ -256,5 +259,43 @@ describe("the soft rules are corrected before they are refused", () => {
     const result = slotResult("His floor is 178 and that is the number to plan a season around.", facts);
     expect(result.ok).toBe(false);
     expect(result.violations).toContain(UNFRAMED_FLOOR_VIOLATION);
+  });
+});
+
+/**
+ * THE DEPTH SECTION IS GROUNDED TOO (fact-sheet depth merge, 2026-09-07). The sheet grew by about
+ * sixty percent, and the rule this round turned on is "what the prompt shows is quotable". That
+ * rule is only as good as the ledger behind the new lines, so this asserts the property directly
+ * rather than trusting the merge: every number the depth section PRINTS is a number the depth
+ * LEDGER carries, and every number the whole sheet prints grounds through the validator.
+ */
+describe("the depth section, grounded", () => {
+  /** Populated group by group from the depth suite's own shapes: only the groups that carry
+   *  numbers need to be here, since a group with no number cannot break a number rule. */
+  const depth = {
+    ...EMPTY_DEPTH,
+    gamesMissed: [{ season: 2025, missed: 3, of: 17 }],
+    priorSeasons: [{ season: 2024, games: 16, points: 289.6, pointsPerGame: 18.1 }],
+  } as unknown as PlayerFactsDepth;
+
+  const facts = buildPlayerFacts({ ...baseInput(), depth } as PlayerFactsInput);
+
+  it("prints no number the depth ledger does not carry", () => {
+    const section = renderDepthSection(facts);
+    if (section === null) return;
+    const printed = (section.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+    const ledgered = new Set(depthNumbers(facts.depth).map((value) => Number(value)));
+    for (const value of printed) {
+      // Either the exact figure, or a figure the section rounded for readability, which the
+      // validator's own rounding tolerance then accepts.
+      const grounded = ledgered.has(value) || [...ledgered].some((entry) => Math.abs(entry - value) <= 0.5);
+      expect({ value, grounded }).toEqual({ value, grounded: true });
+    }
+  });
+
+  it("still grounds every number the whole rendered sheet shows, depth included", () => {
+    for (const number of renderFactsForModel(facts).match(/\d+(?:\.\d+)?/g) ?? []) {
+      expect(slotResult(`The sheet says ${number} and that is what it says about him.`, facts).ok).toBe(true);
+    }
   });
 });

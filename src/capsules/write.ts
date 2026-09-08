@@ -28,6 +28,15 @@ export class CapsuleGenerationError extends Error {
   }
 }
 
+export interface GatewayResponseInfo {
+  readonly status: number;
+  readonly statusText: string;
+  /** Only the headers that talk about limits, by name — `ratelimit`, `retry` or `limit`. */
+  readonly limitHeaders: Readonly<Record<string, string>>;
+  /** The body, for a 429 only: whose limit it was is usually stated there and nowhere else. */
+  readonly body?: string;
+}
+
 export interface GatewayUsage {
   readonly promptTokens: number | null;
   readonly completionTokens: number | null;
@@ -88,6 +97,13 @@ export interface CapsuleWriterDeps {
   /** Per-call round-trip time, for a comparison that has to report latency as well as quality.
    *  Called once per HTTP attempt, whatever its outcome. */
   readonly onCallLatency?: (ms: number) => void;
+  /**
+   * EVERY RESPONSE'S OWN RATE-LIMIT STORY (founder, 2026-09-07: "which limit are we throttling
+   * on?"). Called with the status, the status text, any header whose name mentions a rate limit or
+   * a retry, and the body of a 429. A diagnostic seam: the acceptance script sets it, production
+   * does not, and nothing here decides anything from what it reports.
+   */
+  readonly onGatewayResponse?: (info: GatewayResponseInfo) => void;
   /**
    * Whether the model may think before it writes. Defaults to `CAPSULE_CONFIG.gateway.thinking`,
    * which the task 11 measurement set to `false` — see that constant for the numbers. Sent as the
@@ -309,6 +325,19 @@ export async function postChatCompletion(
       });
       deps.onCallLatency?.(Date.now() - startedAt);
       clearTimeout(timer);
+      if (deps.onGatewayResponse !== undefined) {
+        const limitHeaders: Record<string, string> = {};
+        response.headers.forEach((value, name) => {
+          if (/ratelimit|retry|limit/i.test(name)) limitHeaders[name] = value;
+        });
+        deps.onGatewayResponse({
+          status: response.status,
+          statusText: response.statusText,
+          limitHeaders,
+          // `clone()` so reading the 429's body cannot consume the stream the branches below read.
+          ...(response.status === 429 ? { body: await response.clone().text() } : {}),
+        });
+      }
 
       if (response.status === 429) {
         const backoffMs = attempt <= retry.rateLimitBackoffMs.length ? retry.rateLimitBackoffMs[attempt - 1] : undefined;
