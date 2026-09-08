@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
+import { CAPSULE_MODEL } from "./config";
 import { CapsuleGenerationError, generateCapsuleBody, postChatCompletion } from "./write";
 
 function baseInput(): PlayerFactsInput {
@@ -304,5 +305,43 @@ describe("Retry-After", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * WHAT ACTUALLY GOES ON THE WIRE (fix round) — the reasoning setting and the model are the two
+ * things task 11 measured, and both are invisible from the outside: they live in the request body.
+ * These read the body the fixture was handed, so a refactor that stopped sending either one fails
+ * here rather than in a live run three weeks later.
+ */
+describe("the request body", () => {
+  const MESSAGES = [{ role: "user", content: "anything" }];
+
+  /** The parsed body of the one call a fixture received. */
+  async function bodyOf(deps: Parameters<typeof postChatCompletion>[2]): Promise<Record<string, unknown>> {
+    const seen: string[] = [];
+    const fetchMock = (async (_url: unknown, init: unknown) => {
+      seen.push((init as RequestInit).body as string);
+      return okResponse({ choices: [{ message: { content: LONG_BODY } }] });
+    }) as unknown as typeof globalThis.fetch;
+    await postChatCompletion(MESSAGES, 200, { ...deps, fetch: fetchMock });
+    return JSON.parse(seen[0]!) as Record<string, unknown>;
+  }
+
+  it("disables thinking by default, in both shapes the GLM family reads", async () => {
+    const body = await bodyOf({ apiKey: "test-key" });
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.reasoning_effort).toBe("none");
+  });
+
+  it("sends neither field when a caller asks for thinking back", async () => {
+    const body = await bodyOf({ apiKey: "test-key", thinking: true });
+    expect(body).not.toHaveProperty("thinking");
+    expect(body).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("carries CAPSULE_MODEL unless a caller names another", async () => {
+    expect((await bodyOf({ apiKey: "test-key" })).model).toBe(CAPSULE_MODEL);
+    expect((await bodyOf({ apiKey: "test-key", model: "zai/glm-5.2-fast" })).model).toBe("zai/glm-5.2-fast");
   });
 });
