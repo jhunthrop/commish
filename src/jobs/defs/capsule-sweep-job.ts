@@ -37,7 +37,7 @@ import { writeRefresh } from "@/capsules/peek-facts";
 import type { WornPhrases } from "@/capsules/prompt";
 import { playersSayingStock, sentencesToAvoid, stockSentences } from "@/capsules/repetition";
 import { measureSameness, phrasesToAvoid, playersToRegenerateForSameness, samenessOverThreshold, type SamenessRow } from "@/capsules/sameness";
-import { getStoredCapsulesFor, queueCapsuleRegeneration, upsertCapsule, type StoredPlayerCapsule } from "@/capsules/store";
+import { getStoredCapsulesFor, queueCapsuleRegeneration, RETRY_FIRST_FACTS_HASH, upsertCapsule, type StoredPlayerCapsule } from "@/capsules/store";
 import type { PlayerFacts } from "@/capsules/facts";
 import { BOARD_MEMO_GROUP, invalidateTtlMemoGroup } from "@/lib/cache/ttl-memo";
 import { JOBS_CONFIG } from "../config";
@@ -74,6 +74,27 @@ export function parseCapsuleSweepPayload(raw: JsonObject): CapsuleSweepPayload {
 
 function needsGeneration(facts: PlayerFacts, stored: StoredPlayerCapsule | undefined): boolean {
   return stored === undefined || stored.factsHash !== facts.factsHash || stored.source === "template";
+}
+
+/**
+ * THE ORDER OF THE RUN (overruns round, 2026-09-08): players demoted from a written read on a
+ * previous run (`RETRY_FIRST_FACTS_HASH`) first, then the board order the pass came in. A
+ * continuation is a run too, so a player demoted in one tick is retried in the next.
+ */
+function retryFirstThenBoardOrder(eligible: readonly PlayerFacts[], stored: ReadonlyMap<string, StoredPlayerCapsule>): readonly PlayerFacts[] {
+  const demoted = (facts: PlayerFacts): boolean => stored.get(facts.identity.id)?.factsHash === RETRY_FIRST_FACTS_HASH;
+  return [...eligible.filter(demoted), ...eligible.filter((facts) => !demoted(facts))];
+}
+
+/**
+ * A WRITTEN PLAYER IS NOT DEMOTED SILENTLY (overruns round, 2026-09-08). When a player whose stored
+ * read was written falls to the template, his old read cannot be kept (his facts moved, or the
+ * repetition check queued him), but the demotion is said in his detail line and his row is stamped
+ * to go first next run. The hash the row is written under is the stamp in that case, the real
+ * hash otherwise.
+ */
+function demotedFromWritten(stored: StoredPlayerCapsule | undefined, source: "llm" | "template"): boolean {
+  return stored?.source === "llm" && source === "template";
 }
 
 /** The stored board as the sameness measure reads it, each row carrying its player's name so his
@@ -174,7 +195,10 @@ export async function runCapsuleSweepStep(
   // opens fast, and the facts are already in hand either way.
   const peekFacts = await writeRefresh(db, pass);
   const stored = await getStoredCapsulesFor(db, facts.map((f) => f.identity.id));
-  const eligible = facts.filter((f) => needsGeneration(f, stored.get(f.identity.id)));
+  const eligible = retryFirstThenBoardOrder(
+    facts.filter((f) => needsGeneration(f, stored.get(f.identity.id))),
+    stored,
+  );
   const budget = payload.budget ?? CAPSULE_CONFIG.sweepGenerationBudget;
   const toProcess = eligible.slice(0, budget);
   // THE WORN-LANGUAGE LIST (dossier-voice round §3.5, widened in the refrains round) — computed
@@ -186,6 +210,7 @@ export async function runCapsuleSweepStep(
 
   let llmCount = 0;
   let templateCount = 0;
+  let demotedCount = 0;
   let totalCostUsd = 0;
   let slotsWritten = 0;
   let slotsRejected = 0;
@@ -208,9 +233,10 @@ export async function runCapsuleSweepStep(
     if (!first && pacingMs > 0) await new Promise((resolve) => setTimeout(resolve, pacingMs));
     first = false;
     const result = await generateCapsule(one, { apiKey: deps.apiKey, fetch: deps.fetch }, worn);
+    const demoted = demotedFromWritten(stored.get(one.identity.id), result.source);
     // Persisted per player as it goes, which is what makes a stop safe: a continuation re-reads
-    // the stored rows and finds this player no longer eligible.
-    await upsertCapsule(db, one.identity.id, one.factsHash, result);
+    // the stored rows and finds this player no longer eligible (or, demoted, first in line).
+    await upsertCapsule(db, one.identity.id, demoted ? RETRY_FIRST_FACTS_HASH : one.factsHash, result);
     processed.push(one.identity.id);
     const cost = result.usage?.costUsd ?? 0;
     totalCostUsd += cost;
@@ -227,8 +253,10 @@ export async function runCapsuleSweepStep(
       // gave either size a usable response, even after write.ts's own 429 backoff) reads as a
       // wholly different operational condition from "failed validation" (the gateway talked, the
       // model kept writing something the validator rejected), and an operator scanning a run's own
-      // detail lines needs to tell the two apart at a glance.
-      detail.push(`${one.identity.name}: ${describeCapsuleFallback(result.compact, result.full)}`);
+      // detail lines needs to tell the two apart at a glance. A demotion from a written read is
+      // named on the same line (see `demotedFromWritten`).
+      if (demoted) demotedCount += 1;
+      detail.push(`${one.identity.name}: ${describeCapsuleFallback(result.compact, result.full)}${demoted ? ", kept nothing, was written" : ""}`);
     }
   }
 
@@ -289,6 +317,7 @@ export async function runCapsuleSweepStep(
   const summary =
     `capsule-sweep: ${facts.length} board players, ${eligible.length} needed a fresh generation, ` +
     `${processed.length} processed (${llmCount} llm, ${templateCount} template, $${totalCostUsd.toFixed(6)} spent)` +
+    (demotedCount > 0 ? `, ${demotedCount} written player(s) fell to the template and go first next run` : "") +
     (remaining > 0 ? `, ${remaining} left for the next sweep` : "") +
     (willContinue ? `, continuing this tick's remainder in a follow-up run of ${budgetLeft}` : "") +
     (wroteNothingInTime ? ", WROTE NOTHING: the tick budget was too small for one player, see the detail line" : "") +

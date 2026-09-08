@@ -1,9 +1,10 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { nflPlayers, playerCrosswalk, playerPeekFacts, players, preseasonProjections } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { jobs } from "@/db/schema";
-import { getStoredCapsule, REGENERATE_FACTS_HASH } from "@/capsules/store";
+import { getStoredCapsule, REGENERATE_FACTS_HASH, RETRY_FIRST_FACTS_HASH } from "@/capsules/store";
 import { BOARD_SOURCE } from "@/projections/preseason/board-store";
 import { PRODUCT_SEASON } from "@/projections/preseason/current";
 import { runCapsuleSweepStep } from "./capsule-sweep-job";
@@ -181,6 +182,87 @@ describe("runCapsuleSweepStep", () => {
     const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingFetch }, {});
     expect(outcome.summary).toContain("Peek facts: 1 rows built, 1 changed");
     expect(await db.select().from(playerPeekFacts)).toHaveLength(1);
+  });
+});
+
+/**
+ * A WRITTEN PLAYER IS NOT DEMOTED SILENTLY (overruns round, 2026-09-08). Derrick Henry had a written
+ * read; a regeneration after his facts moved failed validation, the template replaced it, and the
+ * detail line read like any other template fallback. The old read cannot be kept (its facts are
+ * gone), but the sweep now says what happened and puts him at the front of the next run.
+ */
+describe("runCapsuleSweepStep — a written player whose regeneration fails", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    await truncateAll(db);
+  });
+
+  /** Twenty-plus words that fail grounding: "999" traces to no fact. */
+  const FABRICATED = "He will score 999 touchdowns this year for this offense, an absurd fabricated number that nobody on the fact sheet has ever hit, and drafters simply cannot rank a season like that.";
+  const fabricatingFetch = (async () => okResponse(JSON.stringify({ compact: FABRICATED, full: FABRICATED, narrative: {} }))) as typeof globalThis.fetch;
+
+  async function moveFactsOf(nflId: string, points: number): Promise<void> {
+    await db.update(preseasonProjections).set({ projectedPoints: points, medianPoints: points }).where(eq(preseasonProjections.playerId, nflId));
+  }
+
+  it('says "kept nothing, was written" in the detail line and stamps him to go first next run', async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+    expect((await getStoredCapsule(db, "p1"))?.source).toBe("llm");
+    await moveFactsOf("00-1", 200);
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
+
+    const line = outcome.detail.find((entry) => entry.startsWith("Rashad Long: template"))!;
+    expect(line).toMatch(/^Rashad Long: template \(failed validation: .+\), kept nothing, was written$/);
+    expect(outcome.summary).toContain("1 written player(s) fell to the template and go first next run");
+    const stored = await getStoredCapsule(db, "p1");
+    expect(stored?.source).toBe("template");
+    expect(stored?.factsHash).toBe(RETRY_FIRST_FACTS_HASH);
+  });
+
+  it("retries him at the front of the next run, ahead of the board order", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Player One", rank: 1, points: 248 });
+    await seedPlayer(db, { id: "p2", nflId: "00-2", name: "Player Two", rank: 2, points: 220 });
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+    // Player Two's facts move and his regeneration fails (the fixture fabricates for him alone:
+    // the first run's sameness check queues both players, since they share one read); then Player
+    // One's facts move too, so both are eligible and board order alone would put Player One first.
+    await moveFactsOf("00-2", 180);
+    const failingPlayerTwo = (async (url: unknown, init: unknown) => {
+      const { messages } = JSON.parse((init as RequestInit).body as string) as { messages: { content: string }[] };
+      return messages[1]!.content.includes("Player Two") ? fabricatingFetch(url as never, init as never) : sizeAwareFetch()(url as never, init as never);
+    }) as typeof globalThis.fetch;
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: failingPlayerTwo }, {});
+    expect((await getStoredCapsule(db, "p2"))?.factsHash).toBe(RETRY_FIRST_FACTS_HASH);
+    expect((await getStoredCapsule(db, "p1"))?.factsHash).not.toBe(RETRY_FIRST_FACTS_HASH);
+    await moveFactsOf("00-1", 230);
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, { budget: 1 });
+
+    expect(outcome.summary).toContain("2 needed a fresh generation");
+    expect(outcome.detail).toContain("Player Two: llm, $0.000050");
+    expect((await getStoredCapsule(db, "p2"))?.source).toBe("llm");
+    expect((await getStoredCapsule(db, "p2"))?.factsHash).not.toBe(RETRY_FIRST_FACTS_HASH);
+    expect(outcome.summary).toContain("1 left for the next sweep");
+  });
+
+  it("gives the front of the line once: a player who fails again from the template is an ordinary template row", async () => {
+    await seedPlayer(db, { id: "p1", nflId: "00-1", name: "Rashad Long", rank: 1, points: 248 });
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: sizeAwareFetch() }, {});
+    await moveFactsOf("00-1", 200);
+    await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
+
+    const outcome = await runCapsuleSweepStep(db, CLOCK, { apiKey: "test-key", fetch: fabricatingFetch }, {});
+
+    const line = outcome.detail.find((entry) => entry.startsWith("Rashad Long: template"))!;
+    expect(line).not.toContain("kept nothing");
+    expect(outcome.summary).not.toContain("fell to the template and go first");
+    const stored = await getStoredCapsule(db, "p1");
+    expect(stored?.source).toBe("template");
+    expect(stored?.factsHash).not.toBe(RETRY_FIRST_FACTS_HASH);
   });
 });
 
