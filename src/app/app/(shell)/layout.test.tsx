@@ -8,6 +8,12 @@ import { NoticesProvider } from "@/components/app-shell/notices-provider";
 // same discipline `admin/queue/page.test.tsx` uses for `withAdmin`'s own Server Component page.
 vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+// The header's `SiteSearch` (site search round) reads the path and the router, which throw
+// outside a mounted App Router — stubbed the way `app-shell.test.tsx` stubs them.
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/app/wallet",
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
 // `createSheetDefaults` is pure config with no IO, so the real one stays; only the DB-backed
 // `shellData` read is stubbed.
 vi.mock("@/components/app-shell/shell-data", async (importActual) => ({

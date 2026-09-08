@@ -60,6 +60,20 @@ const SKIN: Readonly<Record<"plain" | "highlight", string>> = {
 };
 
 /**
+ * THE ROW'S SHELL, SHARED (site search round, 2026-09-08): the outer box `PlayerRow` draws, spelled
+ * once so `TeamRow` (`./team-row.tsx`) is the same object at the same size with the same highlight
+ * rather than a second box that drifts. The name and meta classes ride with it for the same
+ * reason: a team's name in a result list must weigh exactly what a player's does.
+ */
+export function rowShellClass(highlight: boolean, className = ""): string {
+  return `flex items-center gap-3 rounded-lg border py-2 pl-2 pr-3 ${SKIN[highlight ? "highlight" : "plain"]} ${className}`;
+}
+
+export const ROW_NAME_CLASS = "truncate text-md font-semibold leading-tight text-text-primary";
+
+export const ROW_META_CLASS = "flex min-w-0 items-center gap-1.5 font-mono text-xs text-text-muted";
+
+/**
  * A player, drawn as a thing you act on — law 3 ("a player is an object") and law 5 ("the verb is
  * obvious") in one atom, and the unit the draft board, the pool and the queue are all made of.
  *
@@ -92,10 +106,7 @@ const SKIN: Readonly<Record<"plain" | "highlight", string>> = {
  */
 export function PlayerRow({ player, positionRank, meta, chips, verdict, action, highlight = false, className = "" }: PlayerRowProps) {
   return (
-    <div
-      data-highlight={highlight ? "true" : undefined}
-      className={`flex items-center gap-3 rounded-lg border py-2 pl-2 pr-3 ${SKIN[highlight ? "highlight" : "plain"]} ${className}`}
-    >
+    <div data-highlight={highlight ? "true" : undefined} className={rowShellClass(highlight, className)}>
       {/* `md` (44px) is the approved composition's own face size, not a default taken on trust —
           the mock sets `.face { width: 2.75rem }` and the row's whole left edge is built around
           it. It is the one measurement here that law 4 does NOT get to tighten: law 3 says a
@@ -112,13 +123,13 @@ export function PlayerRow({ player, positionRank, meta, chips, verdict, action, 
         {/* `pool-player-name` is a TEST CONTRACT (e2e makeTopPick helpers read the picked name
             through it, never through DOM adjacency — see mock-draft.spec.ts's own docblock). A
             room refactor silently dropped it once and both draft e2e specs went dark. */}
-        <span data-testid="pool-player-name" className="truncate text-md font-semibold leading-tight text-text-primary">{player.name}</span>
+        <span data-testid="pool-player-name" className={ROW_NAME_CLASS}>{player.name}</span>
         {/* Law 3's third attribute rides here rather than beside the face: the sticker is a fact
             about the player and belongs with the other facts, and putting it on the tile would
             cover the club colour that is the tile's only job. Mono because this line is data —
             a team code, a bye week, a positional rank — and mono keeps those columns aligned as
             the eye runs down sixty rows. */}
-        <span className="flex min-w-0 items-center gap-1.5 font-mono text-xs text-text-muted">
+        <span className={ROW_META_CLASS}>
           <PositionBadge position={player.position} rank={positionRank} size="sm" />
           {meta === undefined ? null : <span className="truncate">{meta}</span>}
           {/* THE VERDICT RIDES THE DATA LINE (founder, 2026-08-28: "you cant see the players

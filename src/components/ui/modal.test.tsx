@@ -114,4 +114,35 @@ describe("Modal", () => {
     expect(focusSpy).toHaveBeenCalled();
     focusSpy.mockRestore();
   });
+
+  it("keeps its centred, md, footered default", () => {
+    const { container } = render(<Modal open title="Notice" onClose={() => {}}>body</Modal>);
+    const scrim = container.firstElementChild!;
+    expect(scrim.className).toContain("items-end");
+    expect(scrim.className).toContain("sm:items-center");
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.className).toContain("max-w-md");
+    expect(dialog.className).toContain("rounded-xl");
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+  });
+
+  it("anchors a top-placed, lg panel near the top, full-screen below sm, with no footer when asked", async () => {
+    await renderSurface(
+      <Modal open title="Search" onClose={() => {}} placement="top" size="lg" titleHidden footer={null}>
+        <input aria-label="Search players and teams" />
+      </Modal>,
+      async ({ container }) => {
+        const scrim = container.firstElementChild!;
+        expect(scrim.className).toContain("items-stretch");
+        expect(scrim.className).toContain("sm:items-start");
+        const dialog = screen.getByRole("dialog", { name: "Search" });
+        expect(dialog.className).toContain("max-w-2xl");
+        expect(dialog.className).toContain("rounded-none");
+        expect(dialog.className).toContain("sm:rounded-xl");
+        expect(screen.getByRole("heading", { name: "Search" }).className).toContain("sr-only");
+        expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
 });
