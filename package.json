@@ -73,6 +73,7 @@
     "peek:facts:refresh": "dotenv -e .env.local -- tsx scripts/peek-facts-refresh.ts",
     "peek:documents:build": "dotenv -e .env.local -- tsx scripts/peek-documents-build.ts",
     "projections:board:top": "dotenv -e .env.local -- tsx scripts/board-top.ts",
+    "rankings:export": "dotenv -e .env.local -- tsx scripts/rankings-export.ts",
     "projections:register:freeze": "dotenv -e .env.local -- tsx scripts/register-freeze.ts",
     "projections:register:grade": "dotenv -e .env.local -- tsx scripts/register-grade.ts",
     "projections:market-edge:scorecard": "dotenv -e .env.local -- tsx scripts/market-edge-scorecard.ts",
