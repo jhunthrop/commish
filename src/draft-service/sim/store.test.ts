@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
@@ -35,12 +36,17 @@ const SUMMARY: SimSummary = {
 
 describe("sim_runs store", () => {
   let db: Db;
-  const USER = "user-1";
+  // A user of this file's OWN, unique per test (fix round 1 of the draft advisor round): under a
+  // full-directory run on the shared 5433 lane, "finds a cached succeeded run" failed the
+  // `sim_runs.user_id` FK once and passed alone, an ordering dependency on a row another file's
+  // fixture happened to leave. A fresh id inserted right before each test cannot depend on it.
+  let USER = "";
 
   beforeEach(async () => {
     db = createTestDb();
     await truncateAll(db);
-    await db.insert(users).values({ id: USER, displayName: "A", email: "a@example.com" });
+    USER = `sim-store-user-${randomUUID()}`;
+    await db.insert(users).values({ id: USER, displayName: "A", email: `${USER}@example.com` }).onConflictDoNothing();
   });
 
   it("hashes a config stably, ignoring nothing about its own shape but insensitive to object identity", () => {
