@@ -117,8 +117,29 @@ function draftClause(depth: PlayerFactsDepth): string | null {
   return where.length === 0 ? `drafted in ${pedigree.draftYear}${by}` : `drafted in ${pedigree.draftYear} at ${where.join(", ")}${by}`;
 }
 
-/** Every line of the section, in `PlayerFactsDepth`'s own field order. */
-function depthLines(depth: PlayerFactsDepth): readonly string[] {
+/** Slot numbers as a manager says them. Past fifth the number reads better than the word. */
+const SLOT_WORDS = ["first", "second", "third", "fourth", "fifth"] as const;
+
+function slotWord(slot: number): string {
+  return SLOT_WORDS[slot - 1] ?? `number ${slot}`;
+}
+
+/** HIS DATED DEPTH CHART SLOT, and the men listed around him at his own position. */
+function depthChartLine(facts: PlayerFacts): string | null {
+  const chart = facts.depth.depthChart;
+  if (chart === null) return null;
+  const around =
+    chart.aroundHim.length === 0
+      ? "No other player at his position is listed on that release"
+      : `Listed with him: ${chart.aroundHim.map((peer) => `${peer.name} ${slotWord(peer.slot)}`).join(", ")}`;
+  return `Depth chart as of ${chart.asOf}: listed ${slotWord(chart.slot)} among ${facts.identity.team} ${facts.identity.position}s. ${around}.`;
+}
+
+/** Every line of the section, in `PlayerFactsDepth`'s own field order. Takes the whole `PlayerFacts`
+ *  rather than the depth group alone because a few of these sentences name his own team and
+ *  position, which live on `identity` and must never be restated inside the depth group itself. */
+function depthLines(facts: PlayerFacts): readonly string[] {
+  const depth = facts.depth;
   return [
     // Each fact's own renderer is added here as it is wired, in the spec's own fact order.
     ...seasonEndingLines(depth),
@@ -126,12 +147,13 @@ function depthLines(depth: PlayerFactsDepth): readonly string[] {
     injuryHistoryLine(depth),
     coachingLine(depth),
     pedigreeLine(depth),
+    depthChartLine(facts),
   ].filter((line): line is string => line !== null && line !== "");
 }
 
 /** The whole section, or `null` when the store held nothing worth a line. */
 export function renderDepthSection(facts: PlayerFacts): string | null {
-  const lines = depthLines(facts.depth);
+  const lines = depthLines(facts);
   if (lines.length === 0) return null;
   return `The record:\n${lines.map((line) => `- ${line}`).join("\n")}`;
 }

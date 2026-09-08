@@ -157,3 +157,23 @@ describe("the pedigree line", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, pedigree: null })))).toBeNull();
   });
 });
+
+describe("the depth chart line", () => {
+  it("dates the release, names his slot and grounds every neighbour", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, depthChart: { season: 2026, asOf: "2026-09-01", slot: 1, aroundHim: [{ name: "Isaac Guerendo", slot: 2 }] } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- Depth chart as of 2026-09-01: listed first among SF RBs. Listed with him: Isaac Guerendo second.");
+    for (const value of [2026, 9, 1]) expect(facts.numberLedger).toContain(value);
+    expect(facts.nameLedger).toContain("Isaac Guerendo");
+  });
+
+  it("says the release lists nobody else rather than implying an empty room", () => {
+    const facts = buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, depthChart: { season: 2026, asOf: "2026-09-01", slot: 3, aroundHim: [] } }));
+    expect(renderDepthSection(facts)).toContain("No other player at his position is listed on that release");
+  });
+
+  it("renders no depth chart line when the release never named him", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, depthChart: null })))).toBeNull();
+  });
+});
