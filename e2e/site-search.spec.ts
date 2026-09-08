@@ -75,7 +75,15 @@ test("finds the Lions by nickname, lands on the team page, and follows a roster 
     await expect(managerA.getByRole("heading", { level: 2, name: title })).toBeVisible();
   }
   await managerA.screenshot({ path: `${OUT_DIR}/team-page-desktop.png`, fullPage: true });
-  await managerA.getByRole("list", { name: "Fantasy players" }).getByRole("link", { name: "Jahmyr Gibbs" }).click();
+  // A plain click on a roster row opens his peek in place (player-links fix round); the peek's own
+  // "Full page" link is the way to his page, and it is the same href the anchor carried.
+  const rosterLink = managerA.getByRole("list", { name: "Fantasy players" }).getByRole("link", { name: "Jahmyr Gibbs" });
+  await expect(rosterLink).toHaveAttribute("href", new RegExp(`/app/leagues/[^/]+/players/${GIBBS_ID}$`));
+  await rosterLink.click();
+  const peek = managerA.getByRole("dialog", { name: "Jahmyr Gibbs" });
+  await expect(peek).toBeVisible();
+  await expect(managerA).toHaveURL(/\/app\/teams\/DET$/);
+  await peek.getByRole("link", { name: "Full page" }).click({ timeout: PLAYER_PAGE_TIMEOUT_MS });
   await expect(managerA).toHaveURL(new RegExp(`/app/leagues/[^/]+/players/${GIBBS_ID}$`), { timeout: PLAYER_PAGE_TIMEOUT_MS });
 });
 
