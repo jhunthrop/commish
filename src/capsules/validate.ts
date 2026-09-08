@@ -90,10 +90,25 @@ function roundHalfUp(value: number, decimals: number): number {
  * "25%" and "24.76%" alike. Bounded to |entry| <= 1 so this can only ever turn a FRACTION into a
  * percentage, never license an arbitrary hundred-fold restatement of a points total.
  */
+/** A total this large is stated to the hundred by a person ("1400-plus yards" for 1429), so its
+ *  floor and its nearest hundred are readings of it. Never below this: 143 is never "100". */
+const STATED_TO_THE_HUNDRED_FROM = 1000;
+const HUNDRED = 100;
+
+/** The hundred-rounded readings of a four-figure entry, none for a smaller one. */
+function hundredReadings(entry: number): readonly number[] {
+  if (Math.abs(entry) < STATED_TO_THE_HUNDRED_FROM) return [];
+  const magnitude = Math.abs(entry);
+  return [Math.floor(magnitude / HUNDRED) * HUNDRED, Math.round(magnitude / HUNDRED) * HUNDRED];
+}
+
 function isDerivedFromLedger(value: number, ledger: readonly number[], allowMagnitude = true): boolean {
   for (const entry of ledger) {
     if (value === entry) return true;
     if (Math.trunc(entry) === value || Math.ceil(entry) === value || Math.floor(entry) === value) return true;
+    // THE HUNDRED (written rate round, 2026-09-08): "1400-plus receiving yards" against a ledgered
+    // 1429 was a rounding the tolerance missed, not a fabrication. Bounded to four figures.
+    if (hundredReadings(entry).includes(Math.abs(value))) return true;
     // THE MAGNITUDE OF A SIGNED FACT (acceptance round, task 10): a law worth -10.9 a game is
     // stated by this product's own template as "costs him 10.9 points a game", and the writer is
     // told to use that verb too. The sign lives in the sentence, so an unsigned 10.9 is a reading

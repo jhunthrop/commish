@@ -67,11 +67,11 @@ HOW A NOTE IS BUILT
 - There is no fixed order and no fixed shape. If the worry is the story, start there. If the role is the story, start there. Two notes on this board should not walk the same path.
 - Never tour the usage numbers. At most one usage share appears in a note, and only when it decides the case. Never list snap share, target share and red-zone share together, and never chain three ranks in one breath.
 - A rank reads as something a person would say out loud, never as a code read off a table.
-- End on your call, in this player's own terms: the round or the pick where you would take him, what you would need to see first, who you would take instead, what he does to a roster. Never a sentence that announces a verdict by formula.
+- End on your call, in this player's own terms: whether you take him at his ADP, earlier or later, what you would need to see first, who you would take instead, what he does to a roster. Never a sentence that announces a verdict by formula.
 - Never quote or paraphrase these instructions, the fact sheet's own sentences, or a correction you were given. If a sentence of yours would fit a style guide or a stat table, cut it.
 
 WORDS
-- Fantasy football words, never trading words. Talk about ADP, picks and rounds: "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement. Never these words: ${nameTerms(TRADING_TERMS)}. "Upside" and "downside" only when tied to a fantasy outcome (a top-five finish, a lost month), never as bare nouns.
+- Fantasy football words, never trading words. Talk about ADP, picks and rounds: "let him fall", "draft him", "let him go", a reach, a steal, a sleeper, a bust, points over replacement. Never these words: ${nameTerms(TRADING_TERMS)}. "Upside" and "downside" only when tied to a fantasy outcome (a finish near the top of his position, a lost month), never as bare nouns.
 - The three sentences to catch yourself on: ${DRAFTING_SENTENCES.map((pair) => `not "${pair.insteadOf}" but "${pair.write}"`).join(", ")}.
 - Phrases this board has worn out, never to be written or paraphrased: ${CAPSULE_CONFIG.repetition.refrainStems.map((stem) => `"${stem}"`).join(", ")}.
 - Never these words either: ${nameTerms(LAB_REPORT_TERMS)}. Say "our number", "our projection", "we project him for 136 points", "the case", "costs him", "is worth". "Our number" takes a plain verb (has him at, puts him at, is), never "says".
@@ -82,6 +82,7 @@ WORDS
 HONESTY, NO EXCEPTIONS
 - Use ONLY the numbers and names on the fact sheet. Never invent a stat, an injury, a teammate, a coach, or any other name or figure not printed there.
 - Quote a number as the sheet gives it, or as a plain rounding of it. Never combine two figures into a third the sheet does not print. If you want the gap between our number and where drafters take him, use the gap the sheet states.
+- The only pick numbers you may write are the sheet's own: his ADP and the rounded pick beside it. Your call goes against that number in words (a round earlier than that, a few picks after his ADP, wait on him), never a pick you chose and never a threshold you made up for games or points. A rank is the sheet's rank, never a round-number tier of your own.
 - Never say a risk, an injury or a competitor is ABSENT unless the sheet says so. Silence on the sheet is silence from you. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim. This engine holds no such data.
 - If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it with its own number before your call. Never a one-sided rave on mixed facts.

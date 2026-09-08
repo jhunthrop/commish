@@ -84,6 +84,21 @@ describe("WRITER_RULES", () => {
     expect(WRITER_RULES).toContain("Never name a rival fantasy product");
   });
 
+  /**
+   * THE PICK IS THE SHEET'S (written rate round, 2026-09-08). Nine of eleven ungrounded numbers in
+   * a 40-player dev run were picks and tiers the writer chose for his call ("if he slides past 30",
+   * "past pick 45", "a top-40 player", "12-plus games"), which the rules had invited with "the
+   * round or the pick where you would take him", and the rules' own "a top-five finish" example is
+   * a cardinal the validator reads. The call goes against the sheet's pick in words.
+   */
+  it("tells the writer the only pick and rank numbers are the sheet's own, and carries no made-up tier in its own examples", () => {
+    expect(WRITER_RULES).toContain("The only pick numbers you may write are the sheet's own");
+    expect(WRITER_RULES).toContain("never a pick you chose");
+    expect(WRITER_RULES).toContain("never a round-number tier of your own");
+    expect(WRITER_RULES).not.toContain("the round or the pick where you would take him");
+    expect(WRITER_RULES).not.toMatch(/top-five|top five|12-plus/i);
+  });
+
   it("names every lab-report word the validator bans", () => {
     for (const term of ["percentile", "evidence", "measured", "coefficient", "effect size", "standard deviation", "p10", "p90", "implying", "implied"]) {
       expect(BANNED_VOCABULARY).toContain(term);

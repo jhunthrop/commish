@@ -88,6 +88,22 @@ describe("cause 1: an ungrounded NUMBER that was never ungrounded", () => {
     }
   });
 
+  /**
+   * A LARGE TOTAL STATED TO THE HUNDRED (written rate round, 2026-09-08). "1400-plus yards" against
+   * a ledgered 1429 was the one rejection of eleven in a 40-player dev run that was a rounding the
+   * tolerance missed: a person states a yardage total to the hundred, down ("1400-plus") or to the
+   * nearest. Bounded to entries of a thousand or more, so a small number never gets a loose reading.
+   */
+  it("grounds a four-figure total stated to the hundred, down or nearest, and nothing smaller", () => {
+    const totals = { carries: 12, rushingYards: 143, targets: 114, receptions: 78, receivingYards: 1429, passingYards: 0, touchdowns: 8, fantasyPoints: 245.9 };
+    const facts = buildPlayerFacts(baseInput({ season: { season: 2026, gamesPlayed: 13, pointsPerGame: 18.9, totals } }));
+    expect(slotResult("He put up 1400-plus receiving yards last year and the role has not changed.", facts).ok).toBe(true);
+    expect(slotResult("He put up 1,400 receiving yards last year and the role has not changed.", facts).ok).toBe(true);
+    expect(slotResult("He put up 1500 receiving yards last year and the role has not changed.", facts).ok).toBe(false);
+    // 143 rush yards is never "100 rush yards": the loose reading is for four figures only.
+    expect(slotResult("He added 100 rush yards on the ground, which is the whole story.", facts).ok).toBe(false);
+  });
+
   it("still fails a number that traces to nothing at all", () => {
     const result = slotResult("He caught 137 passes last season and nobody could cover him.");
     expect(result.ok).toBe(false);
