@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { and, desc, gte, inArray } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
 import { adpSnapshots, nflDraftPicks, nflGames, nflPlayers, nflverseInjuries, nflverseRosterWeeks, preseasonRosters } from "@/db/schema";
@@ -39,8 +39,28 @@ import type { ScheduledGame } from "./schedule";
  *  reads it. A missing file is a broken checkout rather than a degraded feature, so this throws. */
 const PLAY_CALLERS_CSV_PATH = "data/play-callers/play-callers.csv";
 
+/**
+ * PARSED ONCE PER PROCESS, keyed by path and by the file's own modification time.
+ *
+ * The table ships in the repository and cannot change under a running server, so re-reading and
+ * re-parsing 944 rows on every board sweep and every single-player peek was pure waste: a peek is a
+ * request-path call, and synchronous filesystem work on a request path blocks the event loop for
+ * every other request in flight. The mtime is in the key rather than assumed away so a developer
+ * editing the CSV between two calls in one long-lived dev process still sees his edit, which is the
+ * only case a bare "read it once" memo would get wrong.
+ *
+ * `statSync` still throws for a missing file, so the loud failure this function has always had for
+ * a broken checkout is unchanged.
+ */
+const playCallerCache = new Map<string, readonly PlayCallerRow[]>();
+
 export function readPlayCallerTable(path: string = PLAY_CALLERS_CSV_PATH): readonly PlayCallerRow[] {
-  return parsePlayCallers(readFileSync(path, "utf8"));
+  const key = `${path}|${statSync(path).mtimeMs}`;
+  const cached = playCallerCache.get(key);
+  if (cached !== undefined) return cached;
+  const rows = parsePlayCallers(readFileSync(path, "utf8"));
+  playCallerCache.set(key, rows);
+  return rows;
 }
 
 /** Display names for a set of nflverse ids. A player the universe has no row for is simply absent,
