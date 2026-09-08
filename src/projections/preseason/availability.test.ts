@@ -9,11 +9,14 @@ import {
   seventeenGamesForEveryone,
   teamGamesIn,
   withAvailabilityRecency,
+  shrunkAvailability,
   shrunkAvailabilityRate,
+  shrunkRole,
   type AvailabilityInput,
   type AvailabilityPriors,
   type SeasonAvailability,
 } from "./availability";
+import { AGE_MULTIPLIER_BOUND } from "./fit";
 import { FITTED_AVAILABILITY_PRIORS } from "./fitted";
 
 /**
@@ -26,11 +29,14 @@ import { FITTED_AVAILABILITY_PRIORS } from "./fitted";
 /** Deliberately flat priors, so a test asserting one input moved the answer is asserting only that. */
 const FLAT_ROLE = { bench: 0.8, rotation: 0.8, committee: 0.8, featured: 0.8 } as const;
 const FLAT_AGE = { under25: 1, "25to27": 1, "28to30": 1, over30: 1 } as const;
+const FLAT_AVAILABILITY = 0.9;
 const FLAT: AvailabilityPriors = {
   baseline: { QB: FLAT_ROLE, RB: FLAT_ROLE, WR: FLAT_ROLE, TE: FLAT_ROLE, K: FLAT_ROLE, DEF: FLAT_ROLE },
+  availabilityBaseline: { QB: FLAT_AVAILABILITY, RB: FLAT_AVAILABILITY, WR: FLAT_AVAILABILITY, TE: FLAT_AVAILABILITY, K: FLAT_AVAILABILITY, DEF: FLAT_AVAILABILITY },
   ageMultiplier: { QB: FLAT_AGE, RB: FLAT_AGE, WR: FLAT_AGE, TE: FLAT_AGE, K: FLAT_AGE, DEF: FLAT_AGE },
   statusMultiplier: { active: 1, reserve: 0.5, practice_squad: 0.3, off_roster: 0.1 },
   priorGames: 30,
+  availabilityPriorGames: 60,
   recencyDecay: 0.7,
   historySeasons: 3,
   concentration: 6,
@@ -163,10 +169,21 @@ describe("expectedGamesPlayed", () => {
     }
   });
 
-  it("weighs age: the same back is available no more at thirty-two than at twenty-three", () => {
+  it("weighs age as a bounded correction on the residual, never as a second role table", () => {
+    // The direction of the age term is measured, not pinned: on the fit seasons the residual after
+    // role and the player's own record is within a few percent of one for every cell, and the sign
+    // of a thin over-thirty cell has flipped between two states of the same store. What the fit
+    // does enforce is the bound, so a thin cell can never fade a real starter off a board.
+    for (const position of ["QB", "RB", "WR", "TE"] as const) {
+      for (const bracket of AGE_BRACKETS) {
+        const multiplier = FITTED_AVAILABILITY_PRIORS.ageMultiplier[position][bracket];
+        expect(multiplier).toBeGreaterThanOrEqual(AGE_MULTIPLIER_BOUND.min);
+        expect(multiplier).toBeLessThanOrEqual(AGE_MULTIPLIER_BOUND.max);
+      }
+    }
     const old = expectedGamesPlayed(player({ age: 32 }), at2024);
     const young = expectedGamesPlayed(player({ age: 23 }), at2024);
-    expect(old.expected).toBeLessThanOrEqual(young.expected);
+    expect(Math.abs(old.expected - young.expected)).toBeLessThan(1);
   });
 
   it("REGRESSES HARD: one lost season moves the projection by a fraction of the games it lost", () => {
@@ -231,40 +248,62 @@ describe("expectedGamesPlayed", () => {
 
   describe("what a season of record is evidence OF (founder report 2026-09-08: backup weeks counted as missed games)", () => {
     const flat = { season: 2024, priors: FLAT } as const;
-    const baseline = FLAT.baseline.RB.committee;
+    const rolePrior = FLAT.baseline.RB.committee;
+    const record = (gamesPlayed: number, gamesUnavailable: number | null): AvailabilityInput =>
+      player({ history: [{ season: 2023, gamesPlayed, teamGames: 17, gamesUnavailable }] });
+    const shrink = (prior: number, priorGames: number, numerator: number, denominator: number): number => (priorGames * prior + numerator) / (priorGames + denominator);
 
-    it("does not charge a healthy backup for the weeks he dressed and did not play", () => {
+    it("reads a healthy backup's did-not-play weeks as ROLE, never as absences: his availability is a starter's", () => {
       // Eleven games, six healthy active-roster weeks, no designation all season.
-      const backup = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 11, teamGames: 17, gamesUnavailable: 0 }] }), FLAT);
-      const hurt = shrunkAvailabilityRate(player({ history: [absent(2023, 11, 17)] }), FLAT);
-      expect(backup).toBeGreaterThan(baseline);
-      expect(hurt).toBeLessThan(baseline);
+      const backup = record(11, 0);
+      const starter = record(17, 0);
+      expect(shrunkAvailability(backup, FLAT)).toBe(shrunkAvailability(starter, FLAT));
+      expect(shrunkAvailability(backup, FLAT)).toBeCloseTo(shrink(FLAT_AVAILABILITY, FLAT.availabilityPriorGames, 17, 17), 10);
+      expect(shrunkRole(backup, FLAT)).toBeLessThan(rolePrior);
+      expect(shrunkRole(starter, FLAT)).toBeGreaterThan(rolePrior);
     });
 
-    it("weighs the record by the weeks that speak to availability, so a small role is weak evidence rather than bad evidence", () => {
-      const backup = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 3, teamGames: 17, gamesUnavailable: 0 }] }), FLAT);
-      const starter = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0 }] }), FLAT);
-      expect(backup).toBeGreaterThan(baseline);
-      expect(backup).toBeLessThan(starter);
+    it("reads the same eleven games as a full role and a lost availability when the store says the six weeks were absences", () => {
+      const hurt = record(11, 6);
+      expect(shrunkRole(hurt, FLAT)).toBeCloseTo(shrink(rolePrior, FLAT.priorGames, 11, 11), 10);
+      expect(shrunkAvailability(hurt, FLAT)).toBeCloseTo(shrink(FLAT_AVAILABILITY, FLAT.availabilityPriorGames, 11, 17), 10);
+      expect(shrunkAvailability(hurt, FLAT)).toBeLessThan(FLAT_AVAILABILITY);
+    });
+
+    it("is the product of the two halves", () => {
+      const input = record(9, 4);
+      expect(shrunkAvailabilityRate(input, FLAT)).toBeCloseTo(shrunkRole(input, FLAT) * shrunkAvailability(input, FLAT), 10);
     });
 
     it("hears a man who spent the whole season on a reserve list, who never played and used to leave no record at all", () => {
-      const lost = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 0, teamGames: 17, gamesUnavailable: 17 }] }), FLAT);
-      expect(lost).toBeLessThan(baseline);
-      expect(lost).toBeCloseTo((FLAT.priorGames * baseline) / (FLAT.priorGames + 17), 10);
+      const lost = record(0, 17);
+      // No available game, so no role evidence: he sits on his bracket's cell. Every game unavailable.
+      expect(shrunkRole(lost, FLAT)).toBe(rolePrior);
+      expect(shrunkAvailability(lost, FLAT)).toBeCloseTo(shrink(FLAT_AVAILABILITY, FLAT.availabilityPriorGames, 0, 17), 10);
+      expect(shrunkAvailabilityRate(lost, FLAT)).toBeLessThan(rolePrior * FLAT_AVAILABILITY);
     });
 
     it("reads a season the designation stores do not cover as no evidence, never as a clean season and never as a lost one", () => {
-      const uncovered = player({ history: [{ season: 2023, gamesPlayed: 11, teamGames: 17, gamesUnavailable: null }] });
-      expect(shrunkAvailabilityRate(uncovered, FLAT)).toBe(baseline);
+      const uncovered = record(11, null);
+      expect(shrunkRole(uncovered, FLAT)).toBe(rolePrior);
+      expect(shrunkAvailability(uncovered, FLAT)).toBe(FLAT_AVAILABILITY);
       // It still counts as a season of record for the spread, because the games he played are real.
       expect(expectedGamesPlayed(uncovered, flat).probabilities).not.toEqual(expectedGamesPlayed(player(), flat).probabilities);
     });
 
-    it("never lets played plus unavailable exceed the games his team played", () => {
-      const glitch = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 12, teamGames: 17, gamesUnavailable: 9 }] }), FLAT);
-      const capped = shrunkAvailabilityRate(player({ history: [{ season: 2023, gamesPlayed: 12, teamGames: 17, gamesUnavailable: 5 }] }), FLAT);
-      expect(glitch).toBeCloseTo(capped, 10);
+    it("caps the unavailable count at the games his team played and the played count at the games he was available for", () => {
+      expect(shrunkAvailabilityRate(record(0, 20), FLAT)).toBeCloseTo(shrunkAvailabilityRate(record(0, 17), FLAT), 10);
+      expect(shrunkRole(record(15, 6), FLAT)).toBeCloseTo(shrunkRole(record(11, 6), FLAT), 10);
+    });
+
+    it("never exceeds one, however clean and long the record", () => {
+      const spotless = Array.from({ length: 3 }, (_, index) => ({ season: 2023 - index, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0 }));
+      const generous: AvailabilityPriors = { ...FLAT, baseline: { ...FLAT.baseline, RB: { bench: 0.99, rotation: 0.99, committee: 0.99, featured: 0.99 } } };
+      expect(shrunkAvailabilityRate(player({ history: spotless }), generous)).toBeLessThanOrEqual(1);
+    });
+
+    it("leaves a rookie's draft-capital baseline exactly where it was: he has no record to scale it by", () => {
+      expect(shrunkAvailabilityRate(player({ baselineRate: 0.62 }), FLAT)).toBe(0.62);
     });
   });
 

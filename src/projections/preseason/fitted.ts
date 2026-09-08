@@ -14,83 +14,94 @@ import type { RookiePriors } from "./rookies";
  * Fitted on 2021 and 2022 and on nothing else. 2023 and 2024 are held out and
  * `fitAvailabilityPriors` throws if it is handed either.
  *
- * ONE EXCEPTION: `FITTED_ROOKIE_PRIORS.gameRate` — the rookie DURABILITY prior — is fitted on 2023
- * and 2024 instead (calibration fix round, 2026-09-04, Task 1), with 2025 and 2026 held out. Every
- * other field of `FITTED_ROOKIE_PRIORS` (`byBucket`, `typicalIncumbentClaim`, ...) is still fitted
- * on 2021 and 2022, UNCHANGED from the prior committed fit — this round's re-run of the full
- * `npm run projections:preseason:fit` pipeline also picked up incidental drift in every OTHER table
- * here (a handful of stat-line corrections ingested since the last run moved `priorGames`,
- * `recencyDecay` and a few availability cells by a few hundredths), and that drift is deliberately
- * NOT shipped in this round: it is unrelated to the diagnosed defect, unreviewed, and belongs to
- * whichever change actually re-runs the full fit on purpose. Only `gameRate`'s six-cell-per-position
- * table was hand-spliced in from a narrow, `gameRate`-only re-fit; everything else below is
- * byte-for-byte what the previous committed fit produced. See `fit.ts`'s `fitRookieGameRate`
- * docblock for why the durability prior gets its own window at all.
+ * ONE EXCEPTION: `FITTED_ROOKIE_PRIORS.gameRate` — the rookie DURABILITY prior — is fitted on
+ * `2023 and 2024` instead (calibration fix round, 2026-09-04, Task 1),
+ * with `2025 and 2026` held out. Every other field of
+ * `FITTED_ROOKIE_PRIORS` (`byBucket`, `typicalIncumbentClaim`, ...) is still fitted on
+ * 2021 and 2022. See `fit.ts`'s `fitRookieGameRate` docblock for why.
+ *
+ * ROOKIE AND DEPTH TABLES SPLICED FROM THE PREVIOUS COMMITTED FIT (availability-semantics round,
+ * 2026-09-08): this round re-fitted the availability model (whose structure changed) and, because
+ * the career curve is fitted against it, the career curve. A full re-run on today's dev store also
+ * moved the rookie and depth tables for reasons unrelated to the diagnosed defect; those are kept
+ * byte-for-byte from the previous committed fit, as that fit's own docblock did before.
  */
 
 export const FITTED_AVAILABILITY_PRIORS: AvailabilityPriors = {
   "baseline": {
     "QB": {
-      "featured": 0.5633832231117298,
-      "committee": 0.39757301522007404,
-      "rotation": 0.39757301522007404,
-      "bench": 0.39757301522007404
+      "bench": 0.3103141126072332,
+      "rotation": 0.3103141126072332,
+      "committee": 0.31105742296918765,
+      "featured": 0.8843669910931238
     },
     "RB": {
-      "featured": 0.7199431445440626,
-      "committee": 0.7097384492830586,
-      "rotation": 0.657114190526418,
-      "bench": 0.6122514950703084
+      "bench": 0.8143208420614835,
+      "rotation": 0.8499409087644381,
+      "committee": 0.9150818694549343,
+      "featured": 0.9438022557507848
     },
     "WR": {
-      "featured": 0.8078741881720327,
-      "committee": 0.7219307012000765,
-      "rotation": 0.7219307012000765,
-      "bench": 0.7216420257942745
+      "bench": 0.7850148844963087,
+      "rotation": 0.8609403907898302,
+      "committee": 0.8609403907898302,
+      "featured": 0.9599470294539495
     },
     "TE": {
-      "featured": 0.8337328722451377,
-      "committee": 0.7836518264505599,
-      "rotation": 0.7836518264505599,
-      "bench": 0.7312318649432863
+      "bench": 0.8316533593494376,
+      "rotation": 0.8728129713423832,
+      "committee": 0.9015925675003728,
+      "featured": 0.974702797202797
     },
     "K": {
-      "featured": 0.6971336479797405,
-      "committee": 0.6971336479797405,
-      "rotation": 0.6971336479797405,
-      "bench": 0.6971336479797405
+      "bench": 0.8295091833390518,
+      "rotation": 0.8295091833390518,
+      "committee": 0.8295091833390518,
+      "featured": 0.8295091833390518
     },
     "DEF": {
-      "featured": 0.6971336479797405,
-      "committee": 0.6971336479797405,
-      "rotation": 0.6971336479797405,
-      "bench": 0.6971336479797405
+      "bench": 0.8295091833390518,
+      "rotation": 0.8295091833390518,
+      "committee": 0.8295091833390518,
+      "featured": 0.8295091833390518
     }
   },
+  "availabilityBaseline": {
+    "QB": 0.9166666666666663,
+    "RB": 0.8795101683796186,
+    "WR": 0.8658383139351985,
+    "TE": 0.8868372461092053,
+    "K": 0.8817773684816407,
+    "DEF": 0.8817773684816407
+  },
+  "priorGames": 34,
+  "availabilityPriorGames": 102,
+  "recencyDecay": 0.5,
+  "historySeasons": 3,
   "ageMultiplier": {
     "QB": {
-      "under25": 0.9978430002412695,
-      "25to27": 0.8836474845344497,
-      "28to30": 1.040964292145889,
-      "over30": 0.9888422579924734
+      "under25": 1.0100160888603562,
+      "25to27": 0.9032281397395447,
+      "28to30": 1.0385866386332436,
+      "over30": 0.979405568085106
     },
     "RB": {
-      "under25": 1.0360686937396408,
-      "25to27": 0.9913224883974984,
-      "28to30": 0.900708322724914,
-      "over30": 0.9955018049043335
+      "under25": 0.9871549954839559,
+      "25to27": 1.0062758932701943,
+      "28to30": 0.9818977398194311,
+      "over30": 1.0291055813966286
     },
     "WR": {
-      "under25": 0.9777437250747509,
-      "25to27": 1.0309394135567467,
-      "28to30": 0.9767142271088366,
-      "over30": 0.9817851656011154
+      "under25": 0.986194929202772,
+      "25to27": 1.0364449762360723,
+      "28to30": 0.9723909836847495,
+      "over30": 0.9818648848587795
     },
     "TE": {
-      "under25": 1.0176394418440982,
-      "25to27": 1.021907965780076,
-      "28to30": 1.0026701634380117,
-      "over30": 0.9905992502475507
+      "under25": 1.0282631190308598,
+      "25to27": 1.013122702615119,
+      "28to30": 0.9920726690462772,
+      "over30": 0.9878518185974657
     },
     "K": {
       "under25": 1,
@@ -107,14 +118,11 @@ export const FITTED_AVAILABILITY_PRIORS: AvailabilityPriors = {
   },
   "statusMultiplier": {
     "active": 1,
-    "reserve": 0.20700769217643455,
-    "practice_squad": 0.23418862478962155,
-    "off_roster": 0.058012434990280505
+    "reserve": 0.21506910675016322,
+    "practice_squad": 0.24015239361886545,
+    "off_roster": 0.05835606821117323
   },
-  "priorGames": 25,
-  "recencyDecay": 0.7,
-  "historySeasons": 3,
-  "concentration": 1.938315267549189,
+  "concentration": 2.2900050375441143,
   "concentrationPerSeason": 0
 };
 
@@ -460,32 +468,32 @@ export const FITTED_DEPTH_PRIORS: DepthPriors = {
 export const FITTED_CAREER_PRIORS: CareerPriors = {
   "byExperience": {
     "QB": {
-      "year1": 0.9656447010780852,
-      "year2": 1.0371963947832357,
-      "year3": 0.9819819585188347,
-      "year4to6": 1.0036649974636638,
-      "year7plus": 0.9961849461587898
+      "year1": 1.016675393068603,
+      "year2": 1.012699658871655,
+      "year3": 0.9889029108600957,
+      "year4to6": 0.992299271075575,
+      "year7plus": 0.9983828006847024
     },
     "RB": {
-      "year1": 1.607751956333812,
-      "year2": 0.9371617859640574,
-      "year3": 0.9376662440003217,
-      "year4to6": 0.9805470652845814,
-      "year7plus": 0.9328821246318038
+      "year1": 1.5614380188904455,
+      "year2": 0.9607697657516506,
+      "year3": 0.9647047132276519,
+      "year4to6": 0.9703375895239844,
+      "year7plus": 0.918968558319947
     },
     "WR": {
-      "year1": 1.4496353300520466,
-      "year2": 1.1274483691779347,
-      "year3": 1.001757717371134,
-      "year4to6": 0.9484996338276397,
-      "year7plus": 0.8994823177652965
+      "year1": 1.2754533938852897,
+      "year2": 1.1317665111072017,
+      "year3": 1.0074529798339924,
+      "year4to6": 0.9566807852374175,
+      "year7plus": 0.9106106681803934
     },
     "TE": {
-      "year1": 1.6020785457348117,
-      "year2": 1.0411345176006348,
-      "year3": 1.0397725253099304,
-      "year4to6": 0.991116548800593,
-      "year7plus": 0.8760349418530686
+      "year1": 1.409361143490373,
+      "year2": 1.0363395406093308,
+      "year3": 1.0464321958564842,
+      "year4to6": 1.0060440168374103,
+      "year7plus": 0.876423286463017
     },
     "K": {
       "year1": 1,

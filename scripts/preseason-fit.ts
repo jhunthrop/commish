@@ -25,6 +25,7 @@ import {
   ROOKIE_DURABILITY_TRAIN_SEASONS,
 } from "@/projections/preseason/fit";
 import { DEPTH_RANKS, depthMultiplier } from "@/projections/preseason/depth";
+import { FITTED_DEPTH_PRIORS } from "@/projections/preseason/fitted";
 import { EXPERIENCE_BANDS, careerMultiplier } from "@/projections/preseason/career";
 import { DRAFT_BUCKETS, draftBucketFor } from "@/projections/preseason/rookies";
 import {
@@ -74,7 +75,9 @@ import type { RookiePriors } from "./rookies";
 async function main(): Promise<void> {
   const db = createDb(requireEnv("DATABASE_URL"));
 
-  const availabilityObservations = await loadAvailabilityObservations(db, FIT_SEASONS);
+  // Bracketed on the board's own snap share, which needs the committed depth priors (the depth fit
+  // below runs after this one, the same standing `FITTED_MODEL` has throughout this script).
+  const availabilityObservations = await loadAvailabilityObservations(db, FIT_SEASONS, { model: FITTED_MODEL, depth: FITTED_DEPTH_PRIORS });
   const availability = fitAvailabilityPriors(availabilityObservations, { heldOutSeasons: HELD_OUT_SEASONS });
   const rookieObservations = await loadRookieObservations(db, FIT_SEASONS, FITTED_MODEL);
   const rookiesWithSharesWindowGameRate = fitRookiePriors(rookieObservations, {
@@ -108,13 +111,15 @@ async function main(): Promise<void> {
   const career = fitCareerPriors(careerObservations, { heldOutSeasons: HELD_OUT_SEASONS });
 
   console.log(`AVAILABILITY, fitted on ${availabilityObservations.length} player-seasons\n`);
-  console.log(`  share of the season played, by ROLE`);
+  console.log(`  games played per game AVAILABLE, by ROLE`);
   console.log(`  ${"".padEnd(4)} ${ROLE_BRACKETS.map((bracket) => bracket.padStart(10)).join(" ")}`);
   for (const position of POSITIONS) {
     console.log(
       `  ${position.padEnd(4)} ${ROLE_BRACKETS.map((bracket) => availability.baseline[position][bracket].toFixed(3).padStart(10)).join(" ")}`,
     );
   }
+  console.log(`\n  share of the season AVAILABLE (the record is read against this), by position`);
+  console.log(`  ${POSITIONS.map((position) => `${position} ${availability.availabilityBaseline[position].toFixed(3)}`).join("  ")}`);
   console.log(`\n  multiplied by AGE`);
   console.log(`  ${"".padEnd(4)} ${AGE_BRACKETS.map((bracket) => bracket.padStart(10)).join(" ")}`);
   for (const position of POSITIONS) {
@@ -128,8 +133,8 @@ async function main(): Promise<void> {
       .join("  ")}`,
   );
   console.log(
-    `  shrinkage ${availability.priorGames} team-games of prior, recency decay ${availability.recencyDecay}, ` +
-      `history ${availability.historySeasons} seasons`,
+    `  shrinkage ${availability.priorGames} games of prior on role, ${availability.availabilityPriorGames} on availability, ` +
+      `recency decay ${availability.recencyDecay}, history ${availability.historySeasons} seasons`,
   );
   console.log(
     `  spread: concentration ${availability.concentration.toFixed(2)} plus ${availability.concentrationPerSeason.toFixed(2)} per season of record`,

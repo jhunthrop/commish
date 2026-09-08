@@ -134,20 +134,29 @@ export interface SeasonAvailability {
   readonly gamesUnavailable: number | null;
 }
 
+/** One covered season of record, split into the two facts it carries. */
+export interface SeasonEvidence {
+  /** Games he played, never more than he was available for. */
+  readonly played: number;
+  /** Games he was available for: his team's games less the weeks the store says he was unavailable.
+   *  A healthy week he did not play counts as available, because it was. */
+  readonly available: number;
+  /** Games his team played. */
+  readonly games: number;
+}
+
 /**
- * What one season of record says about availability, and how loudly.
- *
- * The evidence is the games he played over the games he played OR was unavailable for, weighted by
- * that same count: a starter with a full season speaks with seventeen games, a backup who dressed
- * three times and was never hurt speaks with three, and a man who spent the year on injured reserve
- * speaks with seventeen games of zero. `null` where the season carries no such evidence at all: the
- * designation stores did not cover it, or he was neither played nor unavailable in any week.
+ * What one season of record says, in the two halves the model reads separately: `played` over
+ * `available` is ROLE evidence (how much of the football he could have played he did play);
+ * `available` over `games` is AVAILABILITY evidence (how much of the season he could have played at
+ * all). `null` where the designation stores do not cover the season, which is silence rather than a
+ * clean year.
  */
-export function availabilityEvidence(entry: SeasonAvailability): { readonly played: number; readonly games: number } | null {
+export function availabilityEvidence(entry: SeasonAvailability): SeasonEvidence | null {
   if (entry.gamesUnavailable === null || entry.teamGames <= 0) return null;
-  const played = Math.min(Math.max(0, entry.gamesPlayed), entry.teamGames);
-  const games = Math.min(played + Math.max(0, entry.gamesUnavailable), entry.teamGames);
-  return games > 0 ? { played, games } : null;
+  const unavailable = Math.min(Math.max(0, entry.gamesUnavailable), entry.teamGames);
+  const available = entry.teamGames - unavailable;
+  return { played: Math.min(Math.max(0, entry.gamesPlayed), available), available, games: entry.teamGames };
 }
 
 /** Everything the model is allowed to know about one player before a season. */
@@ -188,10 +197,18 @@ export interface AvailabilityInput {
 
 export interface AvailabilityPriors {
   /**
-   * THE PRIMARY TABLE: expected share of his team's games, per position and ROLE, on the fit
-   * seasons. Sixteen cells, every one a mean of real player-seasons.
+   * THE ROLE TABLE: games played per game AVAILABLE, per position and ROLE, on the fit seasons.
+   * Sixteen cells, every one a weighted mean of real player-seasons, monotone in role (a smaller
+   * role can never mean more football when healthy). What a player in that bracket does with the
+   * weeks he could play; availability is the other table's business.
    */
   readonly baseline: Readonly<Record<Position, Readonly<Record<RoleBracket, number>>>>;
+  /**
+   * THE AVAILABILITY PRIOR: the share of his team's games an active player at each position was
+   * AVAILABLE for on the fit seasons (not unavailable through the injury report or a reserve list),
+   * whatever he then played. Four numbers, each over hundreds of player-seasons.
+   */
+  readonly availabilityBaseline: Readonly<Record<Position, number>>;
   /**
    * Age as a multiplier ON THE SHRUNK RATE rather than a second table.
    *
@@ -232,6 +249,13 @@ export interface AvailabilityPriors {
    * docblock.
    */
   readonly priorGames: number;
+  /**
+   * HOW HARD THE AVAILABILITY HALF REGRESSES, in team-games of prior, searched separately from
+   * `priorGames` because the two halves of a record are not equally predictive: last season's role
+   * says a great deal about this season's, and last season's injuries say much less about this
+   * season's (the fit seasons put it at two to three times `priorGames`).
+   */
+  readonly availabilityPriorGames: number;
   /** How much a season of history counts relative to the one after it. Below 1: older is weaker. */
   readonly recencyDecay: number;
   /** How many prior seasons are read at all. */
@@ -338,8 +362,66 @@ function recentHistory(history: readonly SeasonAvailability[], seasons: number):
   return [...history].sort((a, b) => b.season - a.season).slice(0, seasons);
 }
 
+function clampShare(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+/** One half of the record, shrunk toward its prior in proportion to the games it covers. */
+function shrunkTerm(
+  input: AvailabilityInput,
+  priors: AvailabilityPriors,
+  prior: number,
+  priorGames: number,
+  read: (evidence: SeasonEvidence) => { readonly numerator: number; readonly denominator: number },
+): number {
+  let denominator = 0;
+  let numerator = 0;
+  recentHistory(input.history, priors.historySeasons).forEach((entry, index) => {
+    const evidence = availabilityEvidence(entry);
+    if (evidence === null) return;
+    const weight = priors.recencyDecay ** index;
+    const term = read(evidence);
+    denominator += weight * term.denominator;
+    numerator += weight * term.numerator;
+  });
+  return denominator > 0 ? (priorGames * prior + numerator) / (priorGames + denominator) : prior;
+}
+
+/** The role prior a player is read against: his bracket's cell. */
+function rolePriorFor(input: AvailabilityInput, priors: AvailabilityPriors): number {
+  return clampShare(priors.baseline[input.position][roleBracketFor(input.projectedSnapShare)]);
+}
+
 /**
- * THE RATE BEFORE THE TWO CORRECTIONS: a role prior blended with the player's own record.
+ * THE ROLE HALF: games played per game available, the player's own record shrunk toward his
+ * bracket's cell. A man who played every week he was healthy reads above his cell; a backup who
+ * dressed for eleven of seventeen healthy weeks reads below it, as a role fact.
+ */
+export function shrunkRole(input: AvailabilityInput, priors: AvailabilityPriors): number {
+  return shrunkTerm(input, priors, rolePriorFor(input, priors), priors.priorGames, (evidence) => ({ numerator: evidence.played, denominator: evidence.available }));
+}
+
+/**
+ * THE AVAILABILITY HALF: games available per team game, the player's own record shrunk toward the
+ * position's prior. A healthy did-not-play week counts as available, so a backup and a starter with
+ * clean seasons carry the same availability; only the weeks the store says he could not play move
+ * this number, and a man who lost a season to the reserve list, who used to leave no record at all,
+ * now reads as one.
+ */
+export function shrunkAvailability(input: AvailabilityInput, priors: AvailabilityPriors): number {
+  const prior = clampShare(priors.availabilityBaseline[input.position]);
+  return shrunkTerm(input, priors, prior, priors.availabilityPriorGames, (evidence) => ({ numerator: evidence.available, denominator: evidence.games }));
+}
+
+/**
+ * THE RATE BEFORE THE TWO CORRECTIONS: role times availability, each half of the record read only
+ * as evidence of the fact it carries (founder report 2026-09-08). Before this the record was one
+ * number, games played over team games, so a healthy backup's weeks on the bench read as absences
+ * and a rookie promoted mid-season was faded for the weeks he spent behind the starter.
+ *
+ * A rookie's draft-capital baseline (`AvailabilityInput.baselineRate`) is a whole-rate prior, role
+ * and availability together; it replaces the product of the two priors and is scaled by the same
+ * two ratios, which for his empty record are both exactly one.
  *
  * Exported because the FIT has to see it. Both multipliers below are ratios of what a group
  * actually played to what the model told it to expect, and a ratio is only a correction if the
@@ -347,27 +429,14 @@ function recentHistory(history: readonly SeasonAvailability[], seasons: number):
  * another is how the reserve cell came to be three games wrong on four consecutive seasons.
  */
 export function shrunkAvailabilityRate(input: AvailabilityInput, priors: AvailabilityPriors): number {
-  // Role adjusts the PRIOR, never the evidence. A player's own record already reflects the role he
-  // held; applying the role table to it as well would count the same fact twice.
-  const baseline =
-    input.baselineRate !== null
-      ? Math.min(1, Math.max(0, input.baselineRate))
-      : Math.min(1, Math.max(0, priors.baseline[input.position][roleBracketFor(input.projectedSnapShare)]));
-  const history = recentHistory(input.history, priors.historySeasons);
-
-  let evidenceGames = 0;
-  let evidencePlayed = 0;
-  history.forEach((entry, index) => {
-    const evidence = availabilityEvidence(entry);
-    if (evidence === null) return;
-    const weight = priors.recencyDecay ** index;
-    evidenceGames += weight * evidence.games;
-    evidencePlayed += weight * evidence.played;
-  });
-
-  return evidenceGames > 0
-    ? (priors.priorGames * baseline + evidencePlayed) / (priors.priorGames + evidenceGames)
-    : baseline;
+  const rolePrior = rolePriorFor(input, priors);
+  const availabilityPrior = clampShare(priors.availabilityBaseline[input.position]);
+  const role = shrunkRole(input, priors);
+  const availability = shrunkAvailability(input, priors);
+  if (input.baselineRate === null) return clampShare(role * availability);
+  const roleRatio = rolePrior > 0 ? role / rolePrior : 1;
+  const availabilityRatio = availabilityPrior > 0 ? availability / availabilityPrior : 1;
+  return clampShare(clampShare(input.baselineRate) * roleRatio * availabilityRatio);
 }
 
 /**

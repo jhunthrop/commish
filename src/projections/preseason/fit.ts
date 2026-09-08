@@ -60,7 +60,7 @@ const CELL_PRIOR_SEASONS = 40;
  * weight let through. It is a guard against a thin cell rather than a tuned parameter, and it binds
  * on none of the cells this fit produces — `preseason-fit.ts` prints every one of them.
  */
-const AGE_MULTIPLIER_BOUND = { min: 0.6, max: 1.35 } as const;
+export const AGE_MULTIPLIER_BOUND = { min: 0.6, max: 1.35 } as const;
 
 /** What one player-season contributes to the fit. */
 export interface AvailabilityObservation {
@@ -82,16 +82,23 @@ export interface AvailabilityObservation {
   readonly baselineRate: null;
   /** What actually happened: games he appeared in. THE LABEL. */
   readonly gamesPlayed: number;
+  /** Games the designation archives say he was unavailable for THAT season, the quantity the
+   *  availability prior is a mean of. `null` where the archives do not cover the season. */
+  readonly gamesUnavailable: number | null;
 }
 
 export interface AvailabilityFitOptions {
   /** Seasons this fit is forbidden to read. It throws rather than filtering them out quietly. */
   readonly heldOutSeasons: readonly number[];
   readonly priorGamesGrid?: readonly number[];
+  readonly availabilityPriorGamesGrid?: readonly number[];
   readonly recencyDecayGrid?: readonly number[];
 }
 
 const DEFAULT_PRIOR_GAMES_GRID = [10, 17, 25, 34, 51, 68] as const;
+/** Wider at the top than the role grid: the availability half of a record is the weaker signal,
+ *  and the first fit under the split ran to the old grid's edge. */
+const DEFAULT_AVAILABILITY_PRIOR_GAMES_GRID = [17, 34, 51, 68, 102, 136, 204] as const;
 const DEFAULT_RECENCY_DECAY_GRID = [0.5, 0.6, 0.7, 0.8, 0.9, 1] as const;
 
 function rateOf(observation: AvailabilityObservation): number {
@@ -103,44 +110,86 @@ function mean(values: readonly number[]): number | null {
   return values.length === 0 ? null : values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+/** Games played per game available for one observation, or `null` where the archives do not cover
+ *  the season or he was available for nothing. */
+function playedPerAvailableOf(observation: AvailabilityObservation): number | null {
+  if (observation.gamesUnavailable === null) return null;
+  const available = teamGamesIn(observation.season) - Math.min(observation.gamesUnavailable, teamGamesIn(observation.season));
+  return available > 0 ? Math.min(1, observation.gamesPlayed / available) : null;
+}
+
 /**
- * THE PRIMARY TABLE: expected share of the season an ACTIVE player at each position and role plays.
+ * THE ROLE TABLE: games played per game AVAILABLE by an ACTIVE player at each position and role.
  *
  * Estimated over active players only, which is what makes `statusMultiplier.active` exactly one
  * rather than a fitted number that happens to be near it. Mixing a practice-squad body into the
  * baseline would drag every cell down and then the status multipliers would have to undo it.
+ *
+ * A WEIGHTED ISOTONIC FIT ACROSS THE BRACKETS, NOT A SHRINKAGE TOWARD THE POSITION MEAN (founder
+ * report 2026-09-08). The first version of this table pulled every cell toward the position's own
+ * mean with forty pseudo-seasons, and at quarterback that mean is the truth about a randomly
+ * chosen rostered quarterback: three per club, one of whom plays. The featured cell, sixty-two
+ * real player-seasons at 0.88 played per available game on the fit seasons, came out at 0.65, and
+ * a proven starter's own record then had to drag him back up. The brackets exist precisely
+ * because the position mean is the wrong centre, so each cell is now its own weighted mean and the
+ * only regularisation is the one the brackets' meaning demands: monotone in role (pool-adjacent-
+ * violators over the four brackets, weighted by their counts), the same algorithm the rookie and
+ * market curves are fitted with. A cell the fit seasons hold nobody in takes the position's mean.
  */
 function fitBaseline(observations: readonly AvailabilityObservation[]): AvailabilityPriors["baseline"] {
-  const active = observations.filter((observation) => observation.status === "active");
-  const leagueMean = mean(active.map(rateOf)) ?? 0.8;
+  const active = observations
+    .filter((observation) => observation.status === "active")
+    .map((observation) => ({ position: observation.position, bracket: roleBracketFor(observation.projectedSnapShare), rate: playedPerAvailableOf(observation) }))
+    .filter((row): row is { position: Position; bracket: RoleBracket; rate: number } => row.rate !== null);
+  const leagueMean = mean(active.map((row) => row.rate));
+  if (leagueMean === null) throw new Error(ARCHIVES_REQUIRED);
   const table = {} as Record<Position, Record<RoleBracket, number>>;
   for (const position of ALL_POSITIONS) {
-    const atPosition = active.filter((observation) => observation.position === position);
-    const positionMean = mean(atPosition.map(rateOf)) ?? leagueMean;
-    const cells = {} as Record<RoleBracket, number>;
-    for (const bracket of ROLE_BRACKETS) {
-      const inCell = atPosition.filter((observation) => roleBracketFor(observation.projectedSnapShare) === bracket);
-      const cellMean = mean(inCell.map(rateOf)) ?? positionMean;
-      cells[bracket] =
-        (CELL_PRIOR_SEASONS * positionMean + inCell.length * cellMean) / (CELL_PRIOR_SEASONS + inCell.length);
-    }
-    // Monotone in role, downward from the featured cell, for the same reason the rookie table is
-    // monotone in draft capital: a thin cell saying rotation players outlast featured ones is
-    // telling us about those forty players rather than about football.
-    table[position] = enforceRoleOrdering(cells);
+    const atPosition = active.filter((row) => row.position === position);
+    const positionMean = mean(atPosition.map((row) => row.rate)) ?? leagueMean;
+    const cells = ROLE_BRACKETS.map((bracket) => atPosition.filter((row) => row.bracket === bracket).map((row) => row.rate));
+    // Non-decreasing in role: `isotonicNonIncreasing` over the brackets in REVERSE order.
+    const fitted = [
+      ...isotonicNonIncreasing(
+        [...cells].reverse().map((values) => mean(values) ?? positionMean),
+        [...cells].reverse().map((values) => Math.max(1, values.length)),
+      ),
+    ].reverse();
+    table[position] = Object.fromEntries(ROLE_BRACKETS.map((bracket, index) => [bracket, fitted[index]!])) as Record<RoleBracket, number>;
   }
   return table;
 }
 
-/** Caps each role bracket at the one above it, so less of a role can never mean more of a season. */
-function enforceRoleOrdering(cells: Record<RoleBracket, number>): Record<RoleBracket, number> {
-  const ordered = {} as Record<RoleBracket, number>;
-  let ceiling = Infinity;
-  for (const bracket of [...ROLE_BRACKETS].reverse()) {
-    ordered[bracket] = Math.min(cells[bracket], ceiling);
-    ceiling = ordered[bracket];
+const ARCHIVES_REQUIRED =
+  "The availability fit needs the injury report and weekly roster archives (nflverse_injuries, nflverse_roster_weeks) for the fit seasons; run `npm run projections:context` first.";
+
+/** The share of the season an observation was available for, or `null` where the archives do not
+ *  cover it. */
+function availableShareOf(observation: AvailabilityObservation): number | null {
+  if (observation.gamesUnavailable === null) return null;
+  const teamGames = teamGamesIn(observation.season);
+  return Math.min(1, Math.max(0, (teamGames - observation.gamesUnavailable) / teamGames));
+}
+
+/**
+ * THE AVAILABILITY PRIOR: the share of the season an ACTIVE player at each position was available
+ * for, whatever he then played. A direct mean, four numbers, each over hundreds of player-seasons.
+ * A position the fit does not project (K, DEF) takes the league mean.
+ *
+ * REFUSES A FIT WITHOUT THE ARCHIVES. A prior of "available every week" estimated from seasons the
+ * injury report and the weekly roster never covered would be a number nobody measured, and every
+ * player's record would then be read against it.
+ */
+function fitAvailabilityBaseline(observations: readonly AvailabilityObservation[]): AvailabilityPriors["availabilityBaseline"] {
+  const active = observations.filter((observation) => observation.status === "active");
+  const shares = active.map((observation) => [observation.position, availableShareOf(observation)] as const).filter((pair): pair is readonly [Position, number] => pair[1] !== null);
+  const leagueMean = mean(shares.map(([, share]) => share));
+  if (leagueMean === null) throw new Error(ARCHIVES_REQUIRED);
+  const table = {} as Record<Position, number>;
+  for (const position of ALL_POSITIONS) {
+    table[position] = mean(shares.filter(([at]) => at === position).map(([, share]) => share)) ?? leagueMean;
   }
-  return ordered;
+  return table;
 }
 
 /**
@@ -158,17 +207,18 @@ function shrunkFor(
 }
 
 /** A neutral parameter set: the shrinkage as it stands, with both multipliers switched off. */
+/** The searched half of the priors: one cell of the grid. */
+type Shrinkage = Pick<AvailabilityPriors, "priorGames" | "availabilityPriorGames" | "recencyDecay" | "historySeasons">;
+
 function withoutMultipliers(
-  baseline: AvailabilityPriors["baseline"],
-  priorGames: number,
-  recencyDecay: number,
-  historySeasons: number,
+  tables: Pick<AvailabilityPriors, "baseline" | "availabilityBaseline">,
+  shrinkage: Shrinkage,
 ): Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason"> {
   const ones = Object.fromEntries(
     ALL_POSITIONS.map((position) => [position, Object.fromEntries(AGE_BRACKETS.map((bracket) => [bracket, 1]))]),
   ) as AvailabilityPriors["ageMultiplier"];
   const flat = Object.fromEntries(ROSTER_STATUSES.map((status) => [status, 1])) as AvailabilityPriors["statusMultiplier"];
-  return { baseline, ageMultiplier: ones, statusMultiplier: flat, priorGames, recencyDecay, historySeasons };
+  return { ...tables, ...shrinkage, ageMultiplier: ones, statusMultiplier: flat };
 }
 
 /**
@@ -331,7 +381,12 @@ function rootMeanSquare(observations: readonly AvailabilityObservation[], priors
  */
 export function fitAvailabilityPriors(
   observations: readonly AvailabilityObservation[],
-  { heldOutSeasons, priorGamesGrid = DEFAULT_PRIOR_GAMES_GRID, recencyDecayGrid = DEFAULT_RECENCY_DECAY_GRID }: AvailabilityFitOptions,
+  {
+    heldOutSeasons,
+    priorGamesGrid = DEFAULT_PRIOR_GAMES_GRID,
+    availabilityPriorGamesGrid = DEFAULT_AVAILABILITY_PRIOR_GAMES_GRID,
+    recencyDecayGrid = DEFAULT_RECENCY_DECAY_GRID,
+  }: AvailabilityFitOptions,
 ): AvailabilityPriors {
   const forbidden = new Set(heldOutSeasons);
   for (const observation of observations) {
@@ -346,7 +401,7 @@ export function fitAvailabilityPriors(
     throw new Error(`The availability fit needs a population; got ${fittable.length} player-seasons.`);
   }
 
-  const baseline = fitBaseline(fittable);
+  const tables = { baseline: fitBaseline(fittable), availabilityBaseline: fitAvailabilityBaseline(fittable) };
   const historySeasons = 3;
 
   // BOTH MULTIPLIERS ARE REFITTED INSIDE THE GRID, and they have to be. Each is a ratio against the
@@ -355,17 +410,20 @@ export function fitAvailabilityPriors(
   // the same self-consistency the apply side now has, on the fit side.
   let best: Omit<AvailabilityPriors, "concentration" | "concentrationPerSeason"> | null = null;
   let bestError = Infinity;
-  for (const priorGames of priorGamesGrid) {
-    for (const recencyDecay of recencyDecayGrid) {
-      const bare = withoutMultipliers(baseline, priorGames, recencyDecay, historySeasons);
-      const ageMultiplier = fitAgeMultipliers(fittable, bare);
-      const statusMultiplier = fitStatusMultipliers(fittable, { ...bare, ageMultiplier });
-      const candidate = { baseline, ageMultiplier, statusMultiplier, priorGames, recencyDecay, historySeasons };
-      const error = rootMeanSquare(fittable, { ...candidate, concentration: 1, concentrationPerSeason: 0 });
-      if (error < bestError) {
-        bestError = error;
-        best = candidate;
-      }
+  const grid: readonly Shrinkage[] = priorGamesGrid.flatMap((priorGames) =>
+    availabilityPriorGamesGrid.flatMap((availabilityPriorGames) =>
+      recencyDecayGrid.map((recencyDecay) => ({ priorGames, availabilityPriorGames, recencyDecay, historySeasons })),
+    ),
+  );
+  for (const shrinkage of grid) {
+    const bare = withoutMultipliers(tables, shrinkage);
+    const ageMultiplier = fitAgeMultipliers(fittable, bare);
+    const statusMultiplier = fitStatusMultipliers(fittable, { ...bare, ageMultiplier });
+    const candidate = { ...bare, ageMultiplier, statusMultiplier };
+    const error = rootMeanSquare(fittable, { ...candidate, concentration: 1, concentrationPerSeason: 0 });
+    if (error < bestError) {
+      bestError = error;
+      best = candidate;
     }
   }
   if (best === null) throw new Error("The availability grid was empty; there is nothing to fit.");
