@@ -262,6 +262,35 @@ function parseGatewayResponse(raw: string): { readonly content: string; readonly
   return { content, usage };
 }
 
+/** Any header whose NAME talks about a rate limit or a retry. The gateway documents none of them,
+ *  so this reads what it actually sends rather than a list of expected names. */
+function limitHeadersOf(response: Response): Readonly<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, name) => {
+    if (/ratelimit|retry|limit/i.test(name)) headers[name] = value;
+  });
+  return headers;
+}
+
+/**
+ * Hands one response to the diagnostic hook, if a caller set one. Extracted from
+ * `postChatCompletion` (fix round) so the transport function keeps its own shape: the retry tracks
+ * are the thing that is hard to read there, and a header-gathering block in the middle of them was
+ * making it harder.
+ *
+ * A 429's BODY comes through `clone()`: the branch below this call reads the response too, and
+ * consuming the stream here would leave it nothing.
+ */
+async function reportGatewayResponse(response: Response, deps: CapsuleWriterDeps): Promise<void> {
+  if (deps.onGatewayResponse === undefined) return;
+  deps.onGatewayResponse({
+    status: response.status,
+    statusText: response.statusText,
+    limitHeaders: limitHeadersOf(response),
+    ...(response.status === 429 ? { body: await response.clone().text() } : {}),
+  });
+}
+
 /**
  * `Retry-After`, in milliseconds, when the gateway sent one this reader can trust: seconds (the
  * common form) or an HTTP date. `null` for a missing, unparseable, negative or absurd header, and
@@ -325,19 +354,7 @@ export async function postChatCompletion(
       });
       deps.onCallLatency?.(Date.now() - startedAt);
       clearTimeout(timer);
-      if (deps.onGatewayResponse !== undefined) {
-        const limitHeaders: Record<string, string> = {};
-        response.headers.forEach((value, name) => {
-          if (/ratelimit|retry|limit/i.test(name)) limitHeaders[name] = value;
-        });
-        deps.onGatewayResponse({
-          status: response.status,
-          statusText: response.statusText,
-          limitHeaders,
-          // `clone()` so reading the 429's body cannot consume the stream the branches below read.
-          ...(response.status === 429 ? { body: await response.clone().text() } : {}),
-        });
-      }
+      await reportGatewayResponse(response, deps);
 
       if (response.status === 429) {
         const backoffMs = attempt <= retry.rateLimitBackoffMs.length ? retry.rateLimitBackoffMs[attempt - 1] : undefined;
