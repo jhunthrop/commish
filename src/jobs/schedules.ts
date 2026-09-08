@@ -28,6 +28,16 @@ export interface ScheduleDefinition {
    * the week scale. Omit for the cadence jobs, which keep the global window.
    */
   readonly catchUpMs?: number;
+  /**
+   * The wake gate this schedule fires behind (Neon cost audit 2026-09-07, finding 1). A gated
+   * schedule is LEVEL-TRIGGERED by definition: its fire is held back while the wake set
+   * (`wake.ts`) says its reason is not due, and when the gate opens only the latest due instant
+   * is enqueued, because one run does the work of every skipped minute. `"draft-attention"` opens
+   * whenever a draft registered a wake instant that has passed, the earliest scheduled kickoff
+   * has passed, the safety marker is due, or the wake set cannot be read. Omit for the cadence
+   * jobs, which always fire.
+   */
+  readonly gate?: "draft-attention";
 }
 
 function schedule(definition: Omit<ScheduleDefinition, "expression">): ScheduleDefinition {
@@ -69,6 +79,9 @@ export const SCHEDULES: readonly ScheduleDefinition[] = [
     // Level-triggered, so one caught-up sweep does the work of every missed one; replaying a
     // slept-through hour would be sixty queued no-ops (see `ScheduleDefinition.catchUpMs`).
     catchUpMs: 5 * 60_000,
+    // The minute cadence stays (Vercel's floor); the wake gate is what keeps an idle minute from
+    // touching Postgres at all — see `ScheduleDefinition.gate`.
+    gate: "draft-attention",
   }),
   schedule({
     // THE CADENCE LIVES IN `HARVEST_CONFIG` (peek document design §3.4), with the provider's own

@@ -7,8 +7,10 @@ import { createDraftAdvancer } from "@/draft-service/advance";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { createMockBotDriver } from "@/mock-draft-service/driver";
+import { JOBS_CONFIG } from "../config";
 import { JOB_DEFINITIONS } from "../registry";
 import { SCHEDULES } from "../schedules";
+import { createMemoryWakeSet, WAKE_MEMBERS, wakeMember } from "../wake";
 import { DRAFT_SWEEP_JOB_NAME, draftSweepJob, sweepDrafts } from "./draft-sweep-job";
 
 const db = createTestDb();
@@ -62,6 +64,75 @@ describe("the draft-sweep job (driver 3 — the backstop for rooms nobody is wat
     // Level-triggered: a slept-through backlog must never replay as a queue of no-ops.
     expect(schedule!.catchUpMs).toBeDefined();
     expect(schedule!.catchUpMs!).toBeLessThanOrEqual(10 * 60_000);
+    // Neon cost audit finding 1: the minute fire is held behind the wake gate.
+    expect(schedule!.gate).toBe("draft-attention");
+  });
+
+  it("writes what it learned into the wake set: each live draft's next deadline, the earliest future kickoff, the safety marker", async () => {
+    const live = await seedDraftFixture(db, {
+      draftId: "draft_sw_wake",
+      leagueId: "league_sw_wake",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + 24 * 60 * 60 * 1000),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 0,
+      mockPickSeconds: 60,
+    });
+    await seedDraftFixture(db, {
+      draftId: "draft_sw_future",
+      leagueId: "league_sw_future",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + 2 * 60 * 60_000),
+      auctionBudget: null,
+    });
+    await seedSprintPlayers();
+    const store = testStore();
+    await store.startDraft(live.draftId); // first 60s clock runs from BASE_NOW
+
+    now = new Date(Date.parse(BASE_NOW) + 30_000).toISOString();
+    const wake = createMemoryWakeSet();
+    await sweepDrafts({ ...sweepContext(store), wake });
+
+    const membersAt = async (offsetMs: number) => (await wake.due(Date.parse(BASE_NOW) + offsetMs)).members;
+    expect(await membersAt(59_999)).toEqual([]);
+    expect(await membersAt(60_000)).toEqual([wakeMember.draft(live.draftId)]);
+    // The 24h mock kickoff is the same row's own kickoff; the real league's 2h kickoff is earliest.
+    expect(await membersAt(2 * 60 * 60_000)).toContain(WAKE_MEMBERS.scheduledDrafts);
+    expect(await membersAt(2 * 60 * 60_000 - 1)).not.toContain(WAKE_MEMBERS.scheduledDrafts);
+    expect(await membersAt(30_000 + JOBS_CONFIG.sweepMaxQuietMs)).toContain(WAKE_MEMBERS.sweepSafety);
+    expect(await membersAt(30_000 + JOBS_CONFIG.sweepMaxQuietMs - 1)).not.toContain(WAKE_MEMBERS.sweepSafety);
+  });
+
+  it("forgets a finished draft and names no kickoff once nothing is scheduled", async () => {
+    const fixture = await seedDraftFixture(db, {
+      draftId: "draft_sw_forget",
+      leagueId: "league_sw_forget",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + 24 * 60 * 60 * 1000),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 0,
+      mockPickSeconds: 60,
+    });
+    await seedSprintPlayers();
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    const wake = createMemoryWakeSet();
+    await wake.add(wakeMember.draft(fixture.draftId), Date.parse(BASE_NOW));
+    await wake.add(WAKE_MEMBERS.scheduledDrafts, Date.parse(BASE_NOW));
+
+    now = new Date(Date.parse(BASE_NOW) + 10 * 60_000).toISOString();
+    await sweepDrafts({ ...sweepContext(store), wake });
+    expect((await store.getDraftState(fixture.draftId))!.phase).toBe("complete");
+    const farFuture = await wake.due(Date.parse(BASE_NOW) + 365 * 24 * 60 * 60_000);
+    expect(farFuture.members).toEqual([WAKE_MEMBERS.sweepSafety]);
   });
 
   it("one sweep starts a due mock room AND advances an abandoned in-progress draft to completion", async () => {

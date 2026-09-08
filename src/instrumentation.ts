@@ -32,6 +32,18 @@
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // THE WAKE GATE'S INSTALL (Neon cost audit 2026-09-07, finding 1): every Node process that
+    // enqueues a job or applies a draft action registers the instant that work becomes due in
+    // one Redis sorted set, and the minute cron reads that set instead of Postgres. Installed
+    // here — once per server instance, on Vercel and locally alike — because `register()` runs
+    // before the first request on every instance, so no route can enqueue into an uninstalled
+    // (and therefore ungated, fail-open) process. Skipped when there is no Redis to install
+    // over: `wakeSet()` then stays ungated, which is the tick exactly as it was.
+    if (process.env.REDIS_URL !== undefined && process.env.REDIS_URL !== "") {
+      const { createRedisWakeSet, installWakeSet } = await import("@/jobs/wake");
+      const { getSharedRedis } = await import("@/lib/realtime/redis");
+      installWakeSet(createRedisWakeSet(getSharedRedis()));
+    }
     if (process.env.VERCEL === undefined) {
       const { getDraftTicker } = await import("@/draft-service");
       getDraftTicker().start();

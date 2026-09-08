@@ -197,10 +197,54 @@ describe("catch-up chaining (the decided timestamp semantics)", () => {
     now = atMs(30_000); // half the first 60s clock
     const outcome = await testAdvancer(store).advance(fixture.draftId, now);
     expect(outcome).toMatchObject({ applied: 0, exhausted: false });
+    // Neon cost audit finding 2: the drivers sleep until the clock's own deadline, never poll.
+    expect(outcome.nextDueAt).toBe(atMs(60_000));
     expect(await actionLog(fixture.draftId)).toHaveLength(1);
 
     const missing = await testAdvancer(store).advance("draft_never_existed", now);
     expect(missing).toMatchObject({ applied: 0 });
+  });
+});
+
+describe("the next due instant (Neon cost audit finding 2: sleep until it, never poll)", () => {
+  it("a bot on the clock prices the wake at its seeded think-delay, earlier than the clock's deadline", async () => {
+    const fixture = await seedAbandonedMock("botdue", { botTeams: 2, pickSeconds: 30 });
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    now = atMs(1_000);
+    const outcome = await testAdvancer(store).advance(fixture.draftId, now);
+    expect(outcome.applied).toBe(0);
+    const dueMs = Date.parse(outcome.nextDueAt!);
+    expect(dueMs).toBeGreaterThan(Date.parse(now));
+    expect(dueMs).toBeLessThan(Date.parse(atMs(30_000)));
+  });
+
+  it("a scheduled mock room names its start instant; a scheduled real draft names its kickoff", async () => {
+    const mock = await seedAbandonedMock("schedmock", { startsAtMs: Date.parse(BASE_NOW) + 5 * 60_000 });
+    expect((await testAdvancer(testStore()).advance(mock.draftId, now)).nextDueAt).toBe(atMs(5 * 60_000));
+
+    const real = await seedDraftFixture(db, {
+      draftId: "draft_schedreal",
+      leagueId: "league_schedreal",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + 3 * 60 * 60_000),
+      auctionBudget: null,
+    });
+    expect((await testAdvancer(testStore()).advance(real.draftId, now)).nextDueAt).toBe(atMs(3 * 60 * 60_000));
+  });
+
+  it("a complete draft, a missing draft and an exhausted call answer null, null and now", async () => {
+    const fixture = await seedAbandonedMock("nextdone");
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    now = atMs(10 * 60_000);
+    const bounded = await testAdvancer(store, { maxActionsPerAdvance: 2 }).advance(fixture.draftId, now);
+    expect(bounded).toMatchObject({ exhausted: true, nextDueAt: now });
+    const finished = await testAdvancer(store).advance(fixture.draftId, now);
+    expect(finished).toMatchObject({ phase: "complete", nextDueAt: null });
+    expect((await testAdvancer(store).advance("draft_never_existed", now)).nextDueAt).toBeNull();
   });
 });
 
@@ -456,8 +500,8 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
       const phases: ("in_progress" | "complete")[] = ["in_progress", "complete"];
       const advance = vi.fn(async (draftId: string) => {
         const kind = script.shift() ?? "ok";
-        if (kind === "error") return { draftId, applied: 0, exhausted: false, phase: null, outcome: "error" as const, wedged: false };
-        return { draftId, applied: 1, exhausted: false, phase: phases.shift() ?? ("complete" as const), outcome: "ok" as const, wedged: false };
+        if (kind === "error") return { draftId, applied: 0, exhausted: false, phase: null, outcome: "error" as const, wedged: false, nextDueAt: null };
+        return { draftId, applied: 1, exhausted: false, phase: phases.shift() ?? ("complete" as const), outcome: "ok" as const, wedged: false, nextDueAt: null };
       });
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_flaky_loop", controller.signal, { advance, clock, intervalMs: 1_000 });
@@ -483,7 +527,7 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
         exhausted: false,
         phase: null,
         outcome: "not_found" as const,
-        wedged: false,
+        wedged: false, nextDueAt: null,
       }));
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_vanished", controller.signal, { advance, clock, intervalMs: 1_000 });
@@ -503,7 +547,7 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
         calls.push(draftId);
         // The first call blocks until released — interval fires during it must be skipped.
         if (calls.length === 1) await new Promise<void>((resolve) => (release = resolve));
-        return { draftId, applied: 0, exhausted: false, phase: "in_progress" as const, outcome: "ok" as const, wedged: false };
+        return { draftId, applied: 0, exhausted: false, phase: "in_progress" as const, outcome: "ok" as const, wedged: false, nextDueAt: null };
       });
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_loop", controller.signal, { advance, clock, intervalMs: 1_000 });
@@ -533,7 +577,7 @@ describe("runDraftAdvanceLoop (the SSE watcher's tick)", () => {
         exhausted: false,
         phase: phases.shift() ?? "complete",
         outcome: "ok" as const,
-        wedged: false,
+        wedged: false, nextDueAt: null,
       }));
       const controller = new AbortController();
       runDraftAdvanceLoop("draft_done", controller.signal, { advance, clock, intervalMs: 1_000 });
