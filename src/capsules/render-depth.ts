@@ -1,4 +1,5 @@
-import type { PlayerFacts } from "./facts";
+import { POSITION_PLURAL } from "@/league-room/lib/player-season-view";
+import type { PlayerFacts, PlayerFactsRankedStat } from "./facts";
 import type { PlayerFactsDepth } from "./facts/types";
 
 /**
@@ -169,6 +170,32 @@ function targetCompetitionLine(depth: PlayerFactsDepth): string | null {
   return `Target competition on ${competition.team} in ${competition.season}: ${named}, ${percent(competition.combinedShare)} between them.`;
 }
 
+/** One ranked quantity as a clause with its honest qualifier count, in the same shape `render.ts`'s
+ *  own `rankedStatClause` already speaks: the value, the finish, and the real N behind it. Kept
+ *  here rather than imported so the depth section stays additive against a file a parallel round
+ *  is editing. */
+function rankedClause(facts: PlayerFacts, label: string, rank: PlayerFactsRankedStat, formatValue: (value: number) => string): string {
+  const position = facts.identity.position;
+  const where = `${position}${rank.positionRank} among ${rank.qualifierCount} qualifying ${POSITION_PLURAL[position]}`;
+  if (rank.positionRank === 1) return `${label} ${formatValue(rank.value)}, ${where}, best at the position`;
+  if (rank.namedNeighbor !== null) return `${label} ${formatValue(rank.value)}, ${where}, one spot behind ${rank.namedNeighbor}`;
+  return `${label} ${formatValue(rank.value)}, ${where}`;
+}
+
+/** SCORING-RANGE USAGE, in counts rather than shares. Each clause is dropped on its own when the
+ *  play-by-play holds no real reading of it. */
+function scoringUsageLine(facts: PlayerFacts): string | null {
+  const usage = facts.depth.scoringUsage;
+  if (usage === null) return null;
+  const whole = (value: number): string => `${Math.round(value)}`;
+  const clauses = [
+    usage.redZoneTouches === null ? null : rankedClause(facts, "red-zone touches", usage.redZoneTouches, whole),
+    usage.insideTenTouches === null ? null : rankedClause(facts, "touches inside the ten", usage.insideTenTouches, whole),
+    usage.targetDepth === null ? null : rankedClause(facts, "average depth of target", usage.targetDepth, (value) => `${value.toFixed(1)} yards`),
+  ].filter((clause): clause is string => clause !== null);
+  return clauses.length === 0 ? null : `Scoring-range usage (${usage.season}): ${clauses.join(". ")}.`;
+}
+
 /** Every line of the section, in `PlayerFactsDepth`'s own field order. Takes the whole `PlayerFacts`
  *  rather than the depth group alone because a few of these sentences name his own team and
  *  position, which live on `identity` and must never be restated inside the depth group itself. */
@@ -184,6 +211,7 @@ function depthLines(facts: PlayerFacts): readonly string[] {
     depthChartLine(facts),
     roleTrendLine(depth),
     targetCompetitionLine(depth),
+    scoringUsageLine(facts),
   ].filter((line): line is string => line !== null && line !== "");
 }
 

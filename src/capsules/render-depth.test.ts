@@ -218,3 +218,35 @@ describe("the role trend and target competition lines", () => {
     expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, targetCompetition: null })))).toBeNull();
   });
 });
+
+describe("the scoring-range usage line", () => {
+  it("states counts with their honest qualifier counts and grounds every number and neighbour", () => {
+    const facts = buildPlayerFacts(
+      depthInput({
+        ...EMPTY_DEPTH,
+        scoringUsage: {
+          season: 2025,
+          redZoneTouches: { value: 36, positionRank: 1, qualifierCount: 48, namedNeighbor: null },
+          insideTenTouches: { value: 14, positionRank: 2, qualifierCount: 48, namedNeighbor: "Bijan Robinson" },
+          targetDepth: null,
+        },
+      }),
+    );
+    expect(renderDepthSection(facts)).toBe(
+      "The record:\n- Scoring-range usage (2025): red-zone touches 36, RB1 among 48 qualifying running backs, best at the position. touches inside the ten 14, RB2 among 48 qualifying running backs, one spot behind Bijan Robinson.",
+    );
+    for (const value of [2025, 36, 1, 48, 14, 2]) expect(facts.numberLedger).toContain(value);
+    expect(facts.nameLedger).toContain("Bijan Robinson");
+  });
+
+  it("drops a depth of target the play-by-play had no readable target for", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, scoringUsage: { season: 2025, redZoneTouches: null, insideTenTouches: null, targetDepth: { value: 8.4, positionRank: 3, qualifierCount: 60, namedNeighbor: null } } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- Scoring-range usage (2025): average depth of target 8.4 yards, RB3 among 60 qualifying running backs.");
+  });
+
+  it("renders no scoring-range line when the play-by-play never placed him", () => {
+    expect(renderDepthSection(buildPlayerFacts(depthInput({ ...EMPTY_DEPTH, scoringUsage: null })))).toBeNull();
+  });
+});
