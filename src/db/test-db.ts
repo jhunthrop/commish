@@ -61,7 +61,7 @@ export async function truncateAll(db: Db): Promise<void> {
       nfl_draft_picks, nflverse_injuries, nflverse_roster_weeks,
       nflverse_kicking_weeks, nflverse_team_defense_weeks,
       draft_sheet_entries, draft_sheets,
-      sim_runs, adp_snapshots, player_capsules, player_peek_facts,
+      sim_runs, adp_snapshots, player_capsules, player_peek_facts, coaches,
       nfl_players, player_stat_lines, players, stat_weeks, nfl_games, capture_snapshots,
       matchups, weeks, draft_grades, draft_picks, draft_nudges, draft_slot_preferences, draft_actions, drafts,
       lineup_slots, roster_slots, league_invites,

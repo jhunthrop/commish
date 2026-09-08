@@ -3486,3 +3486,50 @@ export const playerPeekDocuments = pgTable(
     uniqueIndex("player_peek_documents_document_idx").on(t.season, t.scoringHash, t.playerId, t.asOf),
   ],
 );
+
+/**
+ * THE COACHES TABLE (coaches-table round, 2026-09-08): the curated play-caller file,
+ * `data/play-callers/play-callers.csv`, as the server actually reads it.
+ *
+ * THE CSV STAYS THE SOURCE OF TRUTH. It is reviewed in the repo, every row cites its source, and
+ * `scripts/validate-play-callers.ts` checks it. What changed is WHO reads it at request time:
+ * nobody. The serverless bundle traces imported modules, not data files, and a request-path
+ * `readFileSync` of the CSV threw ENOENT in production on the team page and the capsule sweep.
+ * `npm run coaches:ingest` validates the file and upserts it here; the team page and the fact
+ * sheet read this table through `src/coaches/store.ts`.
+ *
+ * One row per contiguous tenure, exactly as the CSV encodes it: `role` is the CSV's own
+ * HC-or-OC claim about the man NAMED in `name`, and `team` is the CSV's own spelling for that
+ * season (nflverse's, folded by every reader with `sourceTeamCode` as before). The head-coach
+ * pair is NULL wherever the file is blank, which is every season nobody has sourced yet; a null
+ * here is an honest absence, never a default.
+ */
+export const coaches = pgTable(
+  "coaches",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season: integer("season").notNull(),
+    team: text("team").notNull(),
+    /** `HC` or `OC`: whether the person named called the plays as head coach or coordinator. */
+    role: text("role").notNull(),
+    name: text("name").notNull(),
+    startWeek: integer("start_week").notNull(),
+    endWeek: integer("end_week").notNull(),
+    /** `wikipedia`, `pfr` or `both`, the citation the CSV carries for this row. */
+    source: text("source").notNull(),
+    note: text("note").notNull(),
+    headCoach: text("head_coach"),
+    headCoachFirstSeason: integer("head_coach_first_season"),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /** The natural key: one tenure per role per team-season starting a given week. A re-ingest
+     *  updates the row in place rather than duplicating it. */
+    uniqueIndex("coaches_tenure_idx").on(t.season, t.team, t.role, t.startWeek),
+    check("coaches_role_ck", sql`${t.role} IN ('HC', 'OC')`),
+    check("coaches_source_ck", sql`${t.source} IN ('wikipedia', 'pfr', 'both')`),
+    check("coaches_weeks_ck", sql`${t.startWeek} >= 1 AND ${t.startWeek} <= ${t.endWeek}`),
+    /** The head-coach pair is filled together or blank together, the CSV parser's own rule. */
+    check("coaches_head_coach_pair_ck", sql`(${t.headCoach} IS NULL) = (${t.headCoachFirstSeason} IS NULL)`),
+  ],
+);
