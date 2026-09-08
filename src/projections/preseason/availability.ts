@@ -25,13 +25,14 @@ import type { RosterStatus } from "../nflverse/rosters";
  * rather than approximated by a normal that puts mass on nineteen games and on minus two.
  *
  * WHAT A SEASON OF RECORD IS EVIDENCE OF (founder report 2026-09-08). The first version of this
- * model read a player's record as games played over team games, so a healthy backup who dressed
- * for eleven of seventeen was charged six missed games and a rookie promoted mid-season was faded
- * for the weeks he spent behind the starter. The record is now evidence of AVAILABILITY only: the
- * weeks he played against the weeks the store says he was unavailable (`SeasonAvailability`, the
- * classification in `availability/week-classification.ts`). A week he was rostered and healthy and
- * did not play is a ROLE fact, and role is the baseline's job through the role bracket; such a week
- * contributes nothing either way. What this still does NOT do is read a game-day inactive list for
+ * model read a player's record as one number, games played over team games, so a healthy backup
+ * who dressed for eleven of seventeen was charged six missed games and a rookie promoted mid-season
+ * was faded for the weeks he spent behind the starter. The record carries two facts and is now read
+ * as both: games played per game AVAILABLE is role evidence, games available per team game is
+ * availability evidence (`SeasonAvailability`, classified week by week in
+ * `availability/week-classification.ts` from the injury report and the weekly roster). A week he
+ * was rostered and healthy and did not play counts as available and as a game he did not play in,
+ * which is exactly what it was. What this still does NOT do is read a game-day inactive list for
  * the season being projected: `rosters.ts` folds INA into `active` precisely so that a Sunday fact
  * cannot reach a stamp claiming late August.
  */
