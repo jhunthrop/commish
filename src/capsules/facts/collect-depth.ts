@@ -2,6 +2,7 @@ import type { Db } from "@/db/client";
 import type { Position } from "@/domain/player";
 import { regularSeasonGamesPerTeam } from "@/projections/nflverse/schedule";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
+import { productTeamCode, sourceTeamCode } from "@/projections/nflverse/team-codes";
 import { firstKickoffFor } from "@/projections/team-store";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import { rankWithinGroups, type RankableStat } from "../rank";
@@ -172,26 +173,39 @@ function careerFactsFor(playerId: string, data: DepthPassData): Pick<PlayerFacts
   };
 }
 
-/** One player's whole depth group, assembled from the pass. Pure. */
+/**
+ * One player's whole depth group, assembled from the pass. Pure.
+ *
+ * TWO SPELLINGS OF HIS TEAM, AND BOTH ARE LOAD-BEARING (`nflverse/team-codes.ts` documents the
+ * split). The product spells the Rams `LAR` and Washington `WSH`; nflverse spells them `LA` and
+ * `WAS`, and so do the play-caller table, `team_week_observations` and `player_week_teams`. Looking
+ * an nflverse-keyed store up by a product code silently returns nothing for exactly two franchises,
+ * which reads on the page as "the store holds nothing about the Rams" rather than as the bug it is.
+ * `sourceTeamCode` normalizes toward nflverse for those stores, `productTeamCode` back toward the
+ * product for `nfl_games` and the depth chart, and the round trip also folds the `WAS`/`WSH` split
+ * the product's own `players.nfl_team` column still carries.
+ */
 function depthFactsFor(playerId: string, team: string, data: DepthPassData): PlayerFactsDepth {
   const { options } = data;
   const position = options.positions.get(playerId);
   const [priorSeason] = options.priorSeasons;
   const pedigreeRow = data.pedigree.get(playerId);
+  const sourceTeam = sourceTeamCode(team);
+  const productTeam = productTeamCode(sourceTeam);
   return {
     ...availabilityFactsFor(playerId, data),
     injuryHistory: data.injuryHistoryByPlayerId.get(playerId) ?? [],
-    coaching: coachingFor(team, options.productSeason, data.playCallers),
+    coaching: coachingFor(sourceTeam, options.productSeason, data.playCallers),
     pedigree:
       pedigreeRow === undefined
         ? null
         : pedigreeFor({ ...pedigreeRow, openingDay: data.openingDay, productSeason: options.productSeason, college: data.colleges.get(playerId)?.college ?? null }),
-    depthChart: position === undefined ? null : depthChartFor(playerId, team, position, data.depthRows, data.names),
+    depthChart: position === undefined ? null : depthChartFor(playerId, productTeam, position, data.depthRows, data.names),
     roleTrend: priorSeason === undefined ? null : roleTrendFor(priorSeason, data.weeklyShares.get(playerId) ?? []),
-    targetCompetition: data.targetCompetitionByTeam.get(team) ?? null,
+    targetCompetition: data.targetCompetitionByTeam.get(sourceTeam) ?? null,
     scoringUsage: data.scoringUsage.get(playerId) ?? null,
-    teamContext: priorSeason === undefined ? null : teamContextFor(priorSeason, data.priorTeamRows.get(team) ?? [], data.weekOneTeamRows.get(team) ?? []),
-    schedule: scheduleFor(team, data.games, data.indoorsByWeekByTeam.get(team) ?? new Map()),
+    teamContext: priorSeason === undefined ? null : teamContextFor(priorSeason, data.priorTeamRows.get(sourceTeam) ?? [], data.weekOneTeamRows.get(sourceTeam) ?? []),
+    schedule: scheduleFor(productTeam, data.games, data.indoorsByWeekByTeam.get(sourceTeam) ?? new Map()),
     marketMovement: marketMovementFor(data.adpHistory.get(playerId) ?? []),
     ...careerFactsFor(playerId, data),
   };
@@ -268,10 +282,14 @@ export async function collectDepthFacts(db: Db, options: DepthCollectOptions): P
   ]);
 
   const injuryHistoryByPlayerId = new Map(subjectIds.map((playerId) => [playerId, injuryHistoryFor(playerId, captures)] as const));
+  // Every depth-chart row is stamped with the PRODUCT spelling of its team, the same spelling
+  // `depthFactsFor` looks it up by, so the two franchises the two feeds spell differently group
+  // together rather than splitting into two half-empty position rooms.
   const depthRows: readonly DepthRow[] = [...depthSlots].flatMap(([playerId, slot]) => {
     const position = options.positions.get(playerId);
     const team = options.teamByPlayerId.get(playerId) ?? targets.teamOf.get(playerId);
-    return position === undefined || team === undefined ? [] : [{ playerId, team, position, slot: slot.slot, season: productSeason, asOf: slot.asOf }];
+    if (position === undefined || team === undefined) return [];
+    return [{ playerId, team: productTeamCode(sourceTeamCode(team)), position, slot: slot.slot, season: productSeason, asOf: slot.asOf }];
   });
 
   const data: DepthPassData = {

@@ -108,7 +108,7 @@ describe("the coaching line", () => {
         coaching: { season: 2026, headCoach: "John Harbaugh", headCoachIsNew: true, playCaller: "Matt Nagy", playCallerRole: "OC", playCallerIsNew: true },
       }),
     );
-    expect(renderDepthSection(facts)).toBe("The record:\n- Coaching for 2026: head coach John Harbaugh, new this year. offensive play caller Matt Nagy, new this year.");
+    expect(renderDepthSection(facts)).toBe("The record:\n- Coaching for 2026: head coach John Harbaugh, new this year, offensive play caller Matt Nagy, new this year.");
     for (const name of ["John Harbaugh", "Harbaugh", "Matt Nagy", "Nagy"]) expect(facts.nameLedger).toContain(name);
   });
 
@@ -117,8 +117,15 @@ describe("the coaching line", () => {
       depthInput({ ...EMPTY_DEPTH, coaching: { season: 2026, headCoach: null, headCoachIsNew: null, playCaller: "Kyle Shanahan", playCallerRole: "HC", playCallerIsNew: null } }),
     );
     const rendered = renderDepthSection(facts);
-    expect(rendered).toBe("The record:\n- Coaching for 2026: the head coach calls the plays himself, Kyle Shanahan.");
+    expect(rendered).toBe("The record:\n- Coaching for 2026: head coach Kyle Shanahan, and he calls the plays himself.");
     expect(rendered!.includes("new this year")).toBe(false);
+  });
+
+  it("gives one man holding both jobs one clause rather than his name twice", () => {
+    const facts = buildPlayerFacts(
+      depthInput({ ...EMPTY_DEPTH, coaching: { season: 2026, headCoach: "Ben Johnson", headCoachIsNew: false, playCaller: "Ben Johnson", playCallerRole: "HC", playCallerIsNew: false } }),
+    );
+    expect(renderDepthSection(facts)).toBe("The record:\n- Coaching for 2026: head coach Ben Johnson, continuing from last season, and he calls the plays himself.");
   });
 
   it("renders no coaching line when the curated table covers nothing", () => {
@@ -186,7 +193,7 @@ describe("the role trend and target competition lines", () => {
         roleTrend: { season: 2025, earlyWeeks: [1, 2, 3, 4], lateWeeks: [14, 15, 16, 17], snapShare: { early: 0.41, late: 0.78 }, targetShare: null },
       }),
     );
-    expect(renderDepthSection(facts)).toBe("The record:\n- Inside 2025, from weeks 1 to 4 to weeks 14 to 17: snap share 41% to 78%.");
+    expect(renderDepthSection(facts)).toBe("The record:\n- Inside 2025, weeks 1 to 4 against weeks 14 to 17: snap share 41% to 78%.");
     for (const value of [2025, 1, 4, 14, 17, 0.41, 41, 0.78, 78]) expect(facts.numberLedger).toContain(value);
   });
 
@@ -233,7 +240,7 @@ describe("the scoring-range usage line", () => {
       }),
     );
     expect(renderDepthSection(facts)).toBe(
-      "The record:\n- Scoring-range usage (2025): red-zone touches 36, RB1 among 48 qualifying running backs, best at the position. touches inside the ten 14, RB2 among 48 qualifying running backs, one spot behind Bijan Robinson.",
+      "The record:\n- Scoring-range usage (2025): Red-zone touches 36, RB1 among 48 qualifying running backs, best at the position. Touches inside the ten 14, RB2 among 48 qualifying running backs, one spot behind Bijan Robinson.",
     );
     for (const value of [2025, 36, 1, 48, 14, 2]) expect(facts.numberLedger).toContain(value);
     expect(facts.nameLedger).toContain("Bijan Robinson");
@@ -243,7 +250,7 @@ describe("the scoring-range usage line", () => {
     const facts = buildPlayerFacts(
       depthInput({ ...EMPTY_DEPTH, scoringUsage: { season: 2025, redZoneTouches: null, insideTenTouches: null, targetDepth: { value: 8.4, positionRank: 3, qualifierCount: 60, namedNeighbor: null } } }),
     );
-    expect(renderDepthSection(facts)).toBe("The record:\n- Scoring-range usage (2025): average depth of target 8.4 yards, RB3 among 60 qualifying running backs.");
+    expect(renderDepthSection(facts)).toBe("The record:\n- Scoring-range usage (2025): Average depth of target 8.4 yards, RB3 among 60 qualifying running backs.");
   });
 
   it("renders no scoring-range line when the play-by-play never placed him", () => {

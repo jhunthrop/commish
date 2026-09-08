@@ -67,19 +67,24 @@ function tenureClause(isNew: boolean | null): string {
   return isNew ? ", new this year" : ", continuing from last season";
 }
 
-/** WHO IS CALLING THE PLAYS, by name. Each half is dropped independently when the curated table
- *  names nobody for it. */
+/**
+ * WHO IS CALLING THE PLAYS, by name. Each half is dropped independently when the curated table
+ * names nobody for it.
+ *
+ * ONE MAN HOLDING BOTH JOBS GETS ONE CLAUSE, not the same name twice. Where the table's `role` says
+ * the head coach calls the plays himself, printing "head coach X" and then "play caller X" would
+ * read to the model as two facts about two people rather than one fact about one.
+ */
 function coachingLine(depth: PlayerFactsDepth): string | null {
   const coaching = depth.coaching;
   if (coaching === null) return null;
+  if (coaching.playCallerRole === "HC" && coaching.playCaller !== null && (coaching.headCoach === null || coaching.headCoach === coaching.playCaller)) {
+    return `Coaching for ${coaching.season}: head coach ${coaching.playCaller}${tenureClause(coaching.headCoachIsNew ?? coaching.playCallerIsNew)}, and he calls the plays himself.`;
+  }
   const parts: string[] = [];
   if (coaching.headCoach !== null) parts.push(`head coach ${coaching.headCoach}${tenureClause(coaching.headCoachIsNew)}`);
-  if (coaching.playCaller !== null) {
-    const role = coaching.playCallerRole === "HC" ? "the head coach calls the plays himself" : "offensive play caller";
-    const named = coaching.playCallerRole === "HC" ? `${role}, ${coaching.playCaller}` : `${role} ${coaching.playCaller}`;
-    parts.push(`${named}${tenureClause(coaching.playCallerIsNew)}`);
-  }
-  return parts.length === 0 ? null : `Coaching for ${coaching.season}: ${parts.join(". ")}.`;
+  if (coaching.playCaller !== null) parts.push(`offensive play caller ${coaching.playCaller}${tenureClause(coaching.playCallerIsNew)}`);
+  return parts.length === 0 ? null : `Coaching for ${coaching.season}: ${parts.join(", ")}.`;
 }
 
 /** English for how many seasons he has already played. Past ten, the number reads better than the
@@ -159,7 +164,7 @@ function roleTrendLine(depth: PlayerFactsDepth): string | null {
     trend.targetShare === null ? null : `target share ${percent(trend.targetShare.early)} to ${percent(trend.targetShare.late)}`,
   ].filter((clause): clause is string => clause !== null);
   if (clauses.length === 0) return null;
-  return `Inside ${trend.season}, from ${weekSpan(trend.earlyWeeks)} to ${weekSpan(trend.lateWeeks)}: ${clauses.join(", ")}.`;
+  return `Inside ${trend.season}, ${weekSpan(trend.earlyWeeks)} against ${weekSpan(trend.lateWeeks)}: ${clauses.join(", ")}.`;
 }
 
 /** WHO ELSE ATE. Names and shares only. */
@@ -188,10 +193,12 @@ function scoringUsageLine(facts: PlayerFacts): string | null {
   const usage = facts.depth.scoringUsage;
   if (usage === null) return null;
   const whole = (value: number): string => `${Math.round(value)}`;
+  // Each clause is its own sentence, so each label leads with a capital: a full stop followed by a
+  // lower-case word reads as a typo to a model trained on prose, and this sheet is prose it reads.
   const clauses = [
-    usage.redZoneTouches === null ? null : rankedClause(facts, "red-zone touches", usage.redZoneTouches, whole),
-    usage.insideTenTouches === null ? null : rankedClause(facts, "touches inside the ten", usage.insideTenTouches, whole),
-    usage.targetDepth === null ? null : rankedClause(facts, "average depth of target", usage.targetDepth, (value) => `${value.toFixed(1)} yards`),
+    usage.redZoneTouches === null ? null : rankedClause(facts, "Red-zone touches", usage.redZoneTouches, whole),
+    usage.insideTenTouches === null ? null : rankedClause(facts, "Touches inside the ten", usage.insideTenTouches, whole),
+    usage.targetDepth === null ? null : rankedClause(facts, "Average depth of target", usage.targetDepth, (value) => `${value.toFixed(1)} yards`),
   ].filter((clause): clause is string => clause !== null);
   return clauses.length === 0 ? null : `Scoring-range usage (${usage.season}): ${clauses.join(". ")}.`;
 }
