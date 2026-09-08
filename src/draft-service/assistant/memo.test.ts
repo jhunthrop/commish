@@ -3,7 +3,7 @@ import { ADVISOR_CONFIG } from "./config";
 import { resetAdvisorMemoForTests, roomFactsFor, seatShortlistFor, type RoomFacts } from "./memo";
 
 function facts(fromPick: number): RoomFacts {
-  return { table: { runs: 1, fromPick, throughPick: fromPick, played: [] }, tiers: {} };
+  return { table: { runs: 1, fromPick, throughPick: fromPick, played: [] }, tiers: {}, collapses: [] };
 }
 
 describe("roomFactsFor", () => {

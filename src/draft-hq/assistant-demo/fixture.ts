@@ -21,6 +21,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "@/draft-engine";
 import { advisorCore, seedFor } from "@/draft-service/assistant/advisor";
 import { onClockShortlist, type ValuedEntry } from "@/draft-service/assistant/recommend";
+import { tierCollapses } from "@/draft-service/assistant/signals";
 import { tierStandings } from "@/draft-service/assistant/tiers";
 import type { AdvisorView } from "@/draft-service/assistant/view";
 import { simulateRoomOdds } from "@/draft-service/sim/room-odds";
@@ -130,7 +131,7 @@ function buildDraftConfig(): DraftConfig {
 
 function advisorAt(state: DraftState, valued: ReadonlyMap<string, ValuedEntry>, shape: LeagueShape, previous: AdvisorView | null): AdvisorView {
   const table = simulateRoomOdds({ state, seed: seedFor(DEMO_SEED_NAMESPACE, state.sequence), runs: DEMO_RUNS, drivers: inferSeatDrivers(state), excludeFromOnClockSeat: onClockShortlist(state, valued, shape) });
-  const view = advisorCore({ state, askingTeamId: DEMO_POV_TEAM_ID, valued, shape, table, tiers: tierStandings(state, valued) });
+  const view = advisorCore({ state, askingTeamId: DEMO_POV_TEAM_ID, valued, shape, table, tiers: tierStandings(state, valued), collapses: tierCollapses(state, valued) });
   if (view !== null) return view;
   // Defensive only: an in-progress snake draft always owes every seat one more pick while
   // `DEMO_ROUNDS < totalRosterSlots`. Should it ever not, the last honest view stands.

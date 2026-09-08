@@ -54,6 +54,37 @@ export interface TierStandingView {
   readonly size: number;
 }
 
+/** One of the shortlist the tab can show: the card's pick is `candidates[0]`, the rows the rest.
+ *  His odds come from `AdvisorView.odds` by id, so the wire states each fact once. */
+export interface Candidate {
+  readonly playerId: string;
+  readonly position: Position;
+  readonly positionRank: number;
+  readonly valueOverReplacement: number;
+}
+
+/** A run: `count` of the last `window` picks went to one position. */
+export interface PositionRun {
+  readonly position: Position;
+  readonly count: number;
+  readonly window: number;
+}
+
+/** A position whose best man left sits at a real cliff: how many are left before the drop, and
+ *  how far the position falls after them. */
+export interface TierCollapse {
+  readonly position: Position;
+  readonly playersLeftInTier: number;
+  readonly dropToNextTier: number;
+}
+
+/** What the strip above the card reports. Both empty is the ordinary case, and then the strip
+ *  renders nothing. */
+export interface RoomSignals {
+  readonly run: PositionRun | null;
+  readonly collapses: readonly TierCollapse[];
+}
+
 export interface AdvisorStamp {
   readonly computedAtPick: number;
   readonly sequence: number;
@@ -71,6 +102,10 @@ export interface AdvisorView {
   readonly runs: number;
   /** `null` when nothing on the board fits your roster. */
   readonly pick: NextPick | null;
+  /** The shortlist behind the card, `ADVISOR_CONFIG.shortlistSize` deep at most, `pick` first.
+   *  Empty exactly when `pick` is null. */
+  readonly candidates: readonly Candidate[];
+  readonly signals: RoomSignals;
   /** `null` when you have no next turn: the draft ends first. */
   readonly odds: SurvivalOdds | null;
   /** Undrafted players at positions our board projects; a market-order position has no entry. */

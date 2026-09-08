@@ -108,8 +108,11 @@ export function continueRoom(input: ContinueRoomInput): ContinueRoomResult {
     const teamId = teamOnClock(state);
     if (teamId === null) break; // defensive: cannot occur in a snake continuation with no owed picks
     const isOnClockPick = state.pickNumber === onClockPick;
+    // A seat cannot sit out its pick: when the exclusion covers everything it may legally take
+    // (a pool the shortlist exhausts), the pick plays from the whole board instead of ending the
+    // run with no odds for anyone.
     const next = isOnClockPick
-      ? playPick(state, teamId, NEUTRAL_DRIVER, seed, excludeFromOnClockSeat)
+      ? (playPick(state, teamId, NEUTRAL_DRIVER, seed, excludeFromOnClockSeat) ?? playPick(state, teamId, NEUTRAL_DRIVER, seed, NO_EXCLUSIONS))
       : playPick(state, teamId, driverFor(drivers, dealt, teamId), seed, NO_EXCLUSIONS);
     if (next === null) break;
     state = next.state;

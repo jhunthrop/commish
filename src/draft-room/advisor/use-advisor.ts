@@ -8,10 +8,6 @@ import { forgetAdvisor, recallAdvisor, rememberAdvisor } from "./advisor-memory"
 
 export interface UseAdvisorResult {
   readonly view: AdvisorView | null;
-  /** The view that was live during this seat's most recently resolved turn (the post-pick beat's
-   *  latch): set the moment a view for a LATER pick lands over one that had `onTheClock`, kept
-   *  through every other seat's picks until this seat's next pick resolves. */
-  readonly prePickView: AdvisorView | null;
   /** True while a recompute is in flight. The previous view keeps rendering; never a blank. */
   readonly recomputing: boolean;
   readonly error: string | null;
@@ -25,27 +21,8 @@ export function advisorRoomKey(picksCount: number, pickNumber: number): string {
   return `${picksCount}:${pickNumber}`;
 }
 
-interface Held {
-  readonly view: AdvisorView | null;
-  readonly prePickView: AdvisorView | null;
-}
-
-const EMPTY: Held = { view: null, prePickView: null };
-
-/** The next held state after a view lands: the latch moves only when the room itself moved (a
- *  later pick), never on a repeat of the same state. */
-export function foldLandedView(held: Held, landed: AdvisorView): Held {
-  const previous = held.view;
-  const roomMoved = previous === null || landed.stamp.computedAtPick !== previous.stamp.computedAtPick;
-  return {
-    view: landed,
-    prePickView: roomMoved && previous !== null && previous.onTheClock ? previous : held.prePickView,
-  };
-}
-
-function hydrate(draftId: string): Held {
-  const remembered = recallAdvisor(draftId);
-  return { view: remembered?.lastView ?? null, prePickView: remembered?.prePickView ?? null };
+function hydrate(draftId: string): AdvisorView | null {
+  return recallAdvisor(draftId)?.lastView ?? null;
 }
 
 /**
@@ -61,10 +38,9 @@ function hydrate(draftId: string): Held {
  */
 export function useAdvisor(draftId: string, roomKey: string, myTeamId: string | null): UseAdvisorResult {
   const deps = useDraftRoomDeps();
-  const [held, setHeld] = useState<Held>(() => hydrate(draftId));
+  const [view, setView] = useState<AdvisorView | null>(() => hydrate(draftId));
   const [recomputing, setRecomputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const heldRef = useRef<Held>(held);
   const draftIdRef = useRef<string>(draftId);
   const aliveRef = useRef(true);
   const inFlightRef = useRef(false);
@@ -79,10 +55,9 @@ export function useAdvisor(draftId: string, roomKey: string, myTeamId: string | 
         setError(body.error);
         return;
       }
-      heldRef.current = foldLandedView(heldRef.current, body.data);
-      setHeld(heldRef.current);
+      setView(body.data);
       setError(null);
-      rememberAdvisor(draftId, { lastView: heldRef.current.view, prePickView: heldRef.current.prePickView });
+      rememberAdvisor(draftId, { lastView: body.data });
     } catch {
       if (aliveRef.current) setError(NETWORK_ERROR);
     }
@@ -116,12 +91,10 @@ export function useAdvisor(draftId: string, roomKey: string, myTeamId: string | 
     if (draftIdRef.current !== draftId) {
       forgetAdvisor(draftIdRef.current);
       draftIdRef.current = draftId;
-      heldRef.current = hydrate(draftId);
-      setHeld(heldRef.current);
+      setView(hydrate(draftId));
     }
     if (myTeamId === null) {
-      heldRef.current = EMPTY;
-      setHeld(EMPTY);
+      setView(null);
       setError(null);
       forgetAdvisor(draftId);
       return;
@@ -129,5 +102,5 @@ export function useAdvisor(draftId: string, roomKey: string, myTeamId: string | 
     recompute();
   }, [draftId, roomKey, myTeamId, recompute]);
 
-  return { view: held.view, prePickView: held.prePickView, recomputing, error };
+  return { view, recomputing, error };
 }
