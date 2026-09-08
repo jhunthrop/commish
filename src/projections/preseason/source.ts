@@ -33,6 +33,7 @@ import { registry } from "../laws/registry";
 import type { Law } from "../laws/types";
 import { LIVE_ADMITTED_DERIVED_SEASONS } from "../nflverse/stat-lines";
 import { statLinesAsOfForMeasurement } from "../nflverse/derived-stat-lines";
+import { availabilityStoreCoverage, injuryReportsBySeason, rosterWeeksBySeason, seasonAvailabilityRecords } from "../availability/season-record";
 import {
   ageAtSeason,
   expectedGamesPlayed,
@@ -265,8 +266,13 @@ export interface PreseasonInputs {
   readonly usage: readonly PlayerWeekUsage[];
   readonly priorPlayerTeams: readonly PlayerWeekTeam[];
   readonly teamObservations: readonly TeamWeekObservation[];
-  /** Games appeared in, per prior season, per player. The availability model's evidence. */
-  readonly gamesPlayed: ReadonlyMap<number, ReadonlyMap<string, number>>;
+  /**
+   * The availability model's evidence: per prior season, per player, the games he played and the
+   * games the designation archives say he was unavailable for (`availability/season-record.ts`).
+   * A player-season with neither has no entry; a season neither archive covers carries
+   * `gamesUnavailable: null` and contributes no availability evidence at all.
+   */
+  readonly availability: ReadonlyMap<number, ReadonlyMap<string, SeasonAvailability>>;
   /** Where each club put each man on its published week-one depth chart. Empty before ingestion. */
   readonly depthChart: DepthChart;
   /** The registry every "law" reason (`preseasonCandidates`) is drawn against — only its CONFIRMED
@@ -555,18 +561,47 @@ async function assertNoGameDerivedObservationOfTheLiveSeasonIsVisible(db: Readon
   }
 }
 
-/** How many games each player appeared in, per season, from the store's own opportunity rows. */
-async function gamesPlayedBySeason(
+/** The weeks each player appeared in, one season, from the store's own opportunity rows. */
+async function playedWeeksFor(db: ReadonlyDb, season: number, asOf: Date): Promise<ReadonlyMap<string, readonly number[]>> {
+  const rows = await usageAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
+  const weeks = new Map<string, number[]>();
+  for (const row of rows) {
+    const list = weeks.get(row.playerId) ?? [];
+    list.push(row.week);
+    weeks.set(row.playerId, list);
+  }
+  return weeks;
+}
+
+/**
+ * Each player's availability record, per season: the weeks he played through the caller's own
+ * gated read, the weeks he was unavailable through the designation archives (a completed prior
+ * season's retrospective fact, so no gate; `season-record.ts`'s own docblock). Nothing here ever
+ * reads the season being projected: every caller passes prior seasons only.
+ */
+async function availabilityBySeason(
   db: ReadonlyDb,
   seasons: readonly number[],
   asOf: Date,
-): Promise<ReadonlyMap<number, ReadonlyMap<string, number>>> {
-  const bySeason = new Map<number, Map<string, number>>();
+): Promise<ReadonlyMap<number, ReadonlyMap<string, SeasonAvailability>>> {
+  const [covered, rosterRows, injuryRows] = await Promise.all([
+    availabilityStoreCoverage(db, seasons),
+    rosterWeeksBySeason(db, seasons),
+    injuryReportsBySeason(db, seasons),
+  ]);
+  const bySeason = new Map<number, ReadonlyMap<string, SeasonAvailability>>();
   for (const season of seasons) {
-    const rows = await usageAsOf(db, { season, week: { from: 1, to: LAST_POSSIBLE_WEEK }, asOf });
-    const counts = new Map<string, number>();
-    for (const row of rows) counts.set(row.playerId, (counts.get(row.playerId) ?? 0) + 1);
-    bySeason.set(season, counts);
+    bySeason.set(
+      season,
+      seasonAvailabilityRecords({
+        season,
+        teamGames: teamGamesIn(season),
+        covered: covered.has(season),
+        playedWeeks: await playedWeeksFor(db, season, asOf),
+        rosterRows: rosterRows.get(season) ?? new Map(),
+        injuryRows: injuryRows.get(season) ?? new Map(),
+      }),
+    );
   }
   return bySeason;
 }
@@ -754,7 +789,7 @@ export async function loadPreseason(
     usage,
     priorPlayerTeams,
     teamObservations,
-    gamesPlayed: await gamesPlayedBySeason(db, priorSeasons, moment),
+    availability: await availabilityBySeason(db, priorSeasons, moment),
     depthChart: await depthChartAsOf(db, season, moment),
     laws,
     lawFacts,
@@ -982,15 +1017,11 @@ export function preseasonCandidates(
   const newPlayCaller = (team: string): boolean =>
     metrics(team, { season: inputs.season, week }, COACH_METRICS.tenureSeasons) === 0;
 
-  const historyFor = (playerId: string): readonly SeasonAvailability[] => {
-    const seasons: SeasonAvailability[] = [];
-    for (const [season, counts] of inputs.gamesPlayed) {
-      const played = counts.get(playerId);
-      if (played === undefined) continue;
-      seasons.push({ season, gamesPlayed: played, teamGames: teamGamesIn(season) });
-    }
-    return seasons;
-  };
+  const historyFor = (playerId: string): readonly SeasonAvailability[] =>
+    [...inputs.availability.values()].flatMap((records) => {
+      const record = records.get(playerId);
+      return record === undefined ? [] : [record];
+    });
 
   const candidates: BoardCandidate[] = [];
   const claims = incumbentClaims(inputs, opportunity);
@@ -1182,7 +1213,7 @@ export async function loadAvailabilityObservations(
   const earliest = Math.min(...seasons) - HISTORY_SEASONS;
   const latest = Math.max(...seasons);
   const spanSeasons = Array.from({ length: latest - earliest + 1 }, (_, index) => earliest + index);
-  const gamesPlayed = await gamesPlayedBySeason(db, spanSeasons, FINAL_OUTCOME);
+  const availability = await availabilityBySeason(db, spanSeasons, FINAL_OUTCOME);
 
   const observations: AvailabilityObservation[] = [];
   for (const season of seasons) {
@@ -1197,9 +1228,8 @@ export async function loadAvailabilityObservations(
       if (position === undefined) continue;
       const history: SeasonAvailability[] = [];
       for (let prior = season - HISTORY_SEASONS; prior <= season - 1; prior += 1) {
-        const played = gamesPlayed.get(prior)?.get(row.playerId);
-        if (played === undefined) continue;
-        history.push({ season: prior, gamesPlayed: played, teamGames: teamGamesIn(prior) });
+        const record = availability.get(prior)?.get(row.playerId);
+        if (record !== undefined) history.push(record);
       }
       observations.push({
         season,
@@ -1210,7 +1240,9 @@ export async function loadAvailabilityObservations(
         projectedSnapShare: opportunity.get(row.playerId)?.snapShare ?? 0,
         history,
         baselineRate: null,
-        gamesPlayed: gamesPlayed.get(season)?.get(row.playerId) ?? 0,
+        // THE LABEL is still games played: the model predicts games, and a healthy scratch scores
+        // nothing that week whatever his availability was.
+        gamesPlayed: availability.get(season)?.get(row.playerId)?.gamesPlayed ?? 0,
       });
     }
   }

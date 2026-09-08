@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import { nflverseInjuries, nflverseRosterWeeks } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { recordNflPlayers } from "../universe";
 import { PARTICIPATION_METRICS, NFLVERSE_SOURCE } from "../nflverse/map";
@@ -179,6 +180,24 @@ describe("loadPreseason", () => {
   it("reads the week-one roster, which is the one fact about the season it IS allowed to see", async () => {
     const inputs = await loadPreseason(db, 2024);
     expect(inputs.roster.map((row) => row.playerId).sort()).toEqual([VETERAN, ROOKIE].sort());
+  });
+
+  it("reads the prior season's availability record through the designation archives, and says nothing where they are silent", async () => {
+    // The fixture seeds no roster weeks and no injury rows, so 2023 is an uncovered season: the
+    // veteran's seventeen played games are real and his availability is unclaimed.
+    const silent = await loadPreseason(db, 2024);
+    expect(silent.availability.get(2023)?.get(VETERAN)).toEqual({ season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: null });
+
+    // Cover 2023: the veteran is active every week; the rookie (no played row) sits on reserve.
+    await db.insert(nflverseRosterWeeks).values([
+      ...Array.from({ length: 17 }, (_, index) => ({ season: 2023, week: index + 1, playerId: VETERAN, team: "BUF", status: "ACT", position: "WR" })),
+      ...Array.from({ length: 17 }, (_, index) => ({ season: 2023, week: index + 1, playerId: ROOKIE, team: "BUF", status: "RES", position: "WR" })),
+    ]);
+    await db.insert(nflverseInjuries).values({ season: 2023, week: 3, playerId: VETERAN, reportStatus: "Questionable", primaryInjury: "Ankle", practiceStatus: "" });
+    const covered = await loadPreseason(db, 2024);
+    expect(covered.availability.get(2023)?.get(VETERAN)).toEqual({ season: 2023, gamesPlayed: 17, teamGames: 17, gamesUnavailable: 0 });
+    expect(covered.availability.get(2023)?.get(ROOKIE)).toEqual({ season: 2023, gamesPlayed: 0, teamGames: 17, gamesUnavailable: 17 });
+    expect(covered.availability.has(2024)).toBe(false);
   });
 
   it("refuses a season with no week-one roster rather than building half a board", async () => {
