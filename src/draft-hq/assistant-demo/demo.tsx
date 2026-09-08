@@ -10,7 +10,7 @@ import { planDelta } from "@/draft-room/advisor/plan-delta";
 import { foldLandedView } from "@/draft-room/advisor/use-advisor";
 import { byeCollisionFor } from "@/draft-room/assistant/roster-fit";
 import { addToQueue, removeFromQueue } from "@/draft-room/state/queue";
-import { demoTeamLabel, type AssistantDemoFixture } from "./fixture";
+import type { AssistantDemoFixture } from "./fixture";
 
 export interface AssistantDemoProps {
   readonly fixture: AssistantDemoFixture;
@@ -130,7 +130,7 @@ export function AssistantDemo({ fixture }: AssistantDemoProps) {
           onQueueToggle: (playerId) => setQueue((current) => (current.includes(playerId) ? removeFromQueue(current, playerId) : addToQueue(current, playerId))),
         }}
         renderName={(_, name) => <span>{name}</span>}
-        seatLabel={(seat: SeatAhead) => demoTeamLabel(seat.teamId)}
+        seatLabel={(seat: SeatAhead) => fixture.teamLabels[seat.teamId] ?? `Seat ${seat.seat}`}
         changedSince={changedSince}
         changedSincePick={previous?.plan.computedAtPick ?? null}
         recomputing={false}

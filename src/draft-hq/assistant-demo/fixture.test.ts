@@ -61,12 +61,14 @@ describe("ASSISTANT_DEMO_FIXTURE", () => {
     expect(inferred.length + prior.length).toBeGreaterThan(0);
   });
 
-  it("every player referenced by a pick is resolvable in the players list and the names map", () => {
-    const ids = new Set(ASSISTANT_DEMO_FIXTURE.players.map((p) => p.playerId));
-    for (const pick of ASSISTANT_DEMO_FIXTURE.picks) {
-      expect(ids.has(pick.playerId)).toBe(true);
-      expect(ASSISTANT_DEMO_FIXTURE.advisor[0]!.names[pick.playerId]).toMatch(/^[A-Z]+ \d+$/);
+  it("every player referenced by a pick is in the players list, and every view carries a name for each id it shows", () => {
+    const names = new Map(ASSISTANT_DEMO_FIXTURE.players.map((p) => [p.playerId, p.displayName]));
+    for (const pick of ASSISTANT_DEMO_FIXTURE.picks) expect(names.get(pick.playerId)).toMatch(/^[A-Z]+ \d+$/);
+    for (const view of ASSISTANT_DEMO_FIXTURE.advisor) {
+      const shown = [...view.now.map((c) => c.playerId), ...view.plan.turns.flatMap((turn) => turn.targets.map((t) => t.playerId))];
+      for (const id of shown) expect(view.names[id]).toBe(names.get(id));
     }
+    for (const label of Object.values(ASSISTANT_DEMO_FIXTURE.teamLabels)) expect(label).toMatch(/^(You|Team \d+)$/);
   });
 
   it("is seeded and reproducible", () => {

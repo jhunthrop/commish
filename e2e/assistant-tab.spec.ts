@@ -55,7 +55,7 @@ async function makeTopPick(page: import("@playwright/test").Page): Promise<void>
   }).toPass({ timeout: 20_000 });
 }
 
-test("mock room -> the Assistant tab shows three candidates before your pick, and a beat line after it", async ({ managerA }) => {
+test("mock room -> the Assistant tab shows the advisor's now card before your pick, and a beat line after it", async ({ managerA }) => {
   test.setTimeout(180_000);
 
   await managerA.goto("/");
@@ -72,21 +72,15 @@ test("mock room -> the Assistant tab shows three candidates before your pick, an
   const gotIt = managerA.getByRole("button", { name: "Got it" });
   if ((await gotIt.count()) > 0) await gotIt.click();
 
-  // --- The Assistant tab, opened before this seat has made any pick at all: `assistantCall`
-  // always previews the asking seat's own current-or-next decision, so three real candidates
-  // are already there the moment the room exists, not just once the host is literally on the
-  // clock (see `call.ts`'s own module docblock).
+  // --- The Assistant tab, opened before this seat has made any pick at all: the advisor always
+  // previews the asking seat's own current-or-next decision, so the now card, the plan rail and
+  // the signals strip are already there the moment the room exists (draft advisor round).
   await managerA.getByTestId("drawer-handles").getByRole("tab", { name: "Assistant" }).click();
-  const callList = managerA.locator('[aria-label="The assistant\'s call"]');
-  // `getByRole("listitem")` would ALSO match every candidate's own nested reason `<li>`s
-  // (`DrawerAssistantTab` renders each `PickReason` as a further `<li>` inside a `<ul>` nested
-  // inside each candidate's own `<li>`) — every candidate carries at least one reason, so that
-  // locator's count could never land on exactly 3. Scoped to DIRECT children of the candidate
-  // `<ol>` instead: the reason `<li>`s sit inside a `<ul>`, never directly under the `<ol>`, so
-  // this count is immune to how many reasons any one candidate happens to carry.
-  const candidates = callList.locator("ol > li");
-  await expect(candidates.first()).toBeVisible({ timeout: 15_000 });
-  await expect(candidates).toHaveCount(3);
+  const rows = managerA.getByTestId("advisor-now-row");
+  await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+  await expect(rows).toHaveCount(5);
+  await expect(managerA.getByTestId("advisor-plan")).toBeVisible();
+  await expect(managerA.getByTestId("advisor-signals")).toBeVisible();
 
   // --- The human's own real turn, then a real pick through the Pool tab -----------------------
   // The room's real on-clock copy is the clock strip's "YOUR PICK · {place}" (clock-strip.tsx) —

@@ -42,7 +42,7 @@ const TEAM_IDS: readonly string[] = Array.from({ length: DEMO_TEAM_COUNT }, (_, 
 /** Seat 4 of 10 — neither first nor last, so the demo shows an ordinary snake turn. */
 export const DEMO_POV_TEAM_ID = TEAM_IDS[3]!;
 
-export function demoTeamLabel(teamId: string): string {
+function demoTeamLabel(teamId: string): string {
   return teamId === DEMO_POV_TEAM_ID ? "You" : `Team ${TEAM_IDS.indexOf(teamId) + 1}`;
 }
 
@@ -112,6 +112,8 @@ export interface AssistantDemoFixture {
   readonly rounds: number;
   readonly seed: number;
   readonly runs: number;
+  /** Team id -> "You" or "Team N", as data: the client component imports only this type. */
+  readonly teamLabels: Readonly<Record<string, string>>;
   readonly players: readonly DemoPlayer[];
   readonly byeWeeksByTeam: readonly (readonly [string, number])[];
   /** In pick-number order, length `teamCount * rounds`. */
@@ -125,9 +127,21 @@ function buildDraftConfig(): DraftConfig {
   return { draftId: `assistant_demo_${DEMO_SEED}`, leagueId: "assistant_demo", format: "snake", kickoffAt: SIM_INSTANT, auctionBudget: null, slotConfig: STANDARD_ROSTER_SLOTS, clockSchedule: [] };
 }
 
+/** Every player id one view names, so the wire carries only those names rather than the whole
+ *  board forty-one times over. The ledger is the writer's, and the writer never runs here. */
+function slimForWire(view: AdvisorView): AdvisorView {
+  const referenced = new Set<string>([
+    ...view.now.map((candidate) => candidate.playerId),
+    ...view.plan.turns.flatMap((turn) => [...turn.targets.map((target) => target.playerId), ...(turn.fallback === null ? [] : [turn.fallback.playerId])]),
+    ...view.signals.ahead.flatMap((seat) => (seat.topPlayer === null ? [] : [seat.topPlayer.playerId])),
+  ]);
+  const names = Object.fromEntries(Object.entries(view.names).filter(([playerId]) => referenced.has(playerId)));
+  return { ...view, names, ledger: { numbers: [], names: [] } };
+}
+
 function advisorAt(state: DraftState, valued: ReadonlyMap<string, ValuedEntry>, shape: LeagueShape, names: Readonly<Record<string, string>>, previous: AdvisorView | null): AdvisorView {
   const view = advisorCore({ state, askingTeamId: DEMO_POV_TEAM_ID, valued, shape, seedNamespace: DEMO_SEED_NAMESPACE, winningBuilds: null, computedBasis: DEMO_COMPUTED_BASIS, names, runs: DEMO_RUNS });
-  if (view !== null) return view;
+  if (view !== null) return slimForWire(view);
   // Defensive only: an in-progress snake draft always owes every seat one more pick while
   // `DEMO_ROUNDS < totalRosterSlots`. Should it ever not, the last honest view stands.
   if (previous === null) throw new Error("assistant demo: the point-of-view seat has no turn to advise at all");
@@ -162,6 +176,7 @@ function buildFixture(): AssistantDemoFixture {
     rounds: DEMO_ROUNDS,
     seed: DEMO_SEED,
     runs: DEMO_RUNS,
+    teamLabels: Object.fromEntries(TEAM_IDS.map((teamId) => [teamId, demoTeamLabel(teamId)])),
     players: pool.map(({ playerId, displayName, position, nflTeam }) => ({ playerId, displayName, position, nflTeam })),
     byeWeeksByTeam: DEMO_BYE_WEEKS,
     picks,
