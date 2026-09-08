@@ -17,6 +17,28 @@ function row(over: Partial<Record<string, string>> = {}): CsvRow {
   };
 }
 
+/**
+ * The 2025+ shape, measured against the live `injuries_2025.csv`: `season_type` added,
+ * `date_modified` dropped from the header entirely — not blank on the row, genuinely absent from
+ * the file's own columns. `mapInjuries` tells the two shapes apart the same way `mapInjuryRows`
+ * (`nflverse/injuries.ts`) does: `"date_modified" in row`, decided once from the file rather than
+ * per row.
+ */
+function row2025(over: Partial<Record<string, string>> = {}): CsvRow {
+  return {
+    season: "2025",
+    season_type: "REG",
+    game_type: "REG",
+    team: "ARI",
+    week: "1",
+    gsis_id: "00-0000001",
+    position: "WR",
+    report_status: "Out",
+    practice_status: "Did Not Participate In Practice",
+    ...over,
+  };
+}
+
 const PROJECTED = new Set(["00-0000001"]);
 
 describe("reportFiledAt", () => {
@@ -79,5 +101,28 @@ describe("mapInjuries", () => {
 
   it("ignores a season type this product does not score", () => {
     expect(mapInjuries([row({ game_type: "POST" })], PROJECTED).observations).toEqual([]);
+  });
+
+  it("skips a row from a file with no date_modified column at all, and counts it as unstamped rather than storing or throwing", () => {
+    // nflverse dropped `date_modified` outright starting with `injuries_2025.csv` (measured against
+    // the live file). An unstamped fact cannot be replayed, so the row is skipped, never given a
+    // fabricated or "now" timestamp, and never silently lost — it is counted.
+    const { observations, unstamped } = mapInjuries([row2025()], PROJECTED);
+    expect(observations).toEqual([]);
+    expect(unstamped).toBe(1);
+  });
+
+  it("does not count a row toward unstamped when it was already dropped as unprojected", () => {
+    const { unstamped, unknownPlayers } = mapInjuries([row2025({ gsis_id: "00-0000999" })], PROJECTED);
+    expect(unknownPlayers).toEqual(["00-0000999"]);
+    expect(unstamped).toBe(0);
+  });
+
+  it("still stamps every row normally when the file's own header carries date_modified", () => {
+    const { observations, unstamped } = mapInjuries([row()], PROJECTED);
+    expect(unstamped).toBe(0);
+    expect(observations.find((o) => o.metric === INJURY_METRICS.reportStatus)!.asOf.toISOString()).toBe(
+      "2024-09-20T19:05:30.000Z",
+    );
   });
 });

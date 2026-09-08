@@ -65,7 +65,8 @@ async function main(): Promise<void> {
   for (const report of await ingestInjuryReports(db, client, seasons)) {
     console.log(
       `${report.season}: ${report.reportRows} injury report rows -> ${report.observationsWritten} new observations` +
-        (report.unknownPlayers === 0 ? "" : `, ${report.unknownPlayers} listed players the universe does not project`),
+        (report.unknownPlayers === 0 ? "" : `, ${report.unknownPlayers} listed players the universe does not project`) +
+        (report.unstamped === 0 ? "" : `, ${report.unstamped} rows with no filing timestamp skipped (unstamped, not stored)`),
     );
   }
 
