@@ -4,8 +4,8 @@
 // Run: npm run capsules:acceptance -- [sample size] [--cap=0.60] [--texts=out.json]   (default 30)
 //      npm run capsules:acceptance -- 100 --templates-only
 //
-// THIS SPENDS GATEWAY MONEY. One `generateCapsule` per sampled player is three calls (the two
-// reads plus the narrative), and a run of 100 is roughly a third of a dollar at the measured rate.
+// THIS SPENDS GATEWAY MONEY. One `generateCapsule` per sampled player is one gateway call (plus a
+// correction call for a part that failed), and a run of 100 is a few cents at the measured rate.
 // It is a diagnostic an operator runs deliberately, never part of a test run or a job.
 //
 // WHY IT EXISTS. 446 of 659 players sat on the template and the assumption was a throttled
@@ -262,7 +262,7 @@ async function main(): Promise<void> {
     tally.players += 1;
     if (written) tally.written += 1;
     if (throttled) tally.throttled += 1;
-    tally.costUsd += (result.compact.usage?.costUsd ?? 0) + (result.full.usage?.costUsd ?? 0) + (result.narrative.usage?.costUsd ?? 0);
+    tally.costUsd += result.usage?.costUsd ?? 0;
 
     for (const [name, size] of [["compact", result.compact], ["full", result.full]] as const) {
       const violation = decidingViolation(size.fallbackReason);

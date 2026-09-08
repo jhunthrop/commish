@@ -111,13 +111,15 @@ export const CAPSULE_CONFIG = {
     },
   },
   /**
-   * THE NARRATIVE CALL (founder amendment 2026-09-07) — one call per player for the whole object
-   * of slots. Sized generously above the prose it returns for the same reason the two reads are:
-   * `glm-5.3-flash` spends completion tokens thinking, and a tight cap returns an empty body while
-   * still billing. A dozen slots of at most forty words is roughly 400 words of JSON.
+   * THE ONE CALL PER PLAYER (refrains round, 2026-09-07) — the compact read, the full read and the
+   * narrative slots in one JSON object (`bundle.ts`). The prose itself is about 120 plus 300 plus
+   * 400 words, roughly 1,100 tokens with the JSON around it; the cap sits well above that for the
+   * same reason the per-size caps below do: a reasoning model that runs out of budget returns an
+   * empty body and bills for it. The per-size `maxTokens` above still govern a part's own
+   * correction call, which returns that one part as plain text.
    */
-  narrative: {
-    maxTokens: 2000,
+  bundle: {
+    maxTokens: 3000,
   },
   /**
    * A SENTENCE ON MORE THAN THIS SHARE OF THE BOARD IS STOCK, not voice (founder amendment
@@ -158,31 +160,45 @@ export const CAPSULE_CONFIG = {
     maxRefrainShare: 0.1,
     maxSheetTouringShare: 0.25,
     /**
-     * THE STOCK STEMS. The first group is the founder's own reading of the production peeks and
-     * the three reads the coordinator quoted from the 2026-09-07 regeneration. The second group is
-     * the trading register the same night's ruling banned outright ("it's a fantasy football app,
-     * not a stock trading app"): measured here so the board's share of it is a number, and banned
-     * in `BANNED_VOCABULARY` so the validator refuses a new one. Compared after `sameness.ts`'s
-     * own normalisation (case folded, punctuation dropped), so an apostrophe or a comma never
-     * hides a stem.
+     * THE STOCK STEMS, DERIVED FROM THE BOARD. Compared after `sameness.ts`'s own normalisation
+     * (case folded, punctuation dropped), so an apostrophe or a comma never hides a stem.
+     *
+     * The first group is the founder's own reading of the production peeks ("Buy X, the price is
+     * wrong ... The stat that sells me ... Draft him with a plan behind him") and the three reads
+     * quoted from the 2026-09-07 regeneration ("Let's talk about X", "So the call is a fade"). The
+     * second group is what a 3-to-5 word scan of the 40-player baseline on dev (the prior prompt,
+     * 25 written) found on more than a tenth of the board and is a FRAME rather than a fact: the
+     * share it carried is beside each. Sheet echoes that are the fact itself ("weekly median in",
+     * "one spot behind") are deliberately not here: a read has to cite facts, and the sheet-touring
+     * measure is the check on citing too many. The third group is the trading register the same
+     * night's ruling banned outright, kept here so the board's share of it stays a number.
      */
     refrainStems: [
-      "here's the honest worry",
-      "the honest worry",
-      "the band says",
-      "let's talk about",
-      "the volume case",
-      "so the call",
-      "so my call",
       "the price is wrong",
       "the stat that sells me",
+      "the honest worry",
       "with a plan behind him",
+      "let's talk about",
+      "so the call",
+      "so my call",
+      "the band says",
+      "the volume case",
       "not a talent read",
-      "most seasons land between",
+      // From the baseline scan (share of the 25 written):
+      "the books hang", // 80%, the sheet's own props sentence read back
+      "at the bottom he's", // 72%, the two-outcomes close the old instructions asked for
+      "have historically", // 68%, the sheet's own anchor sentence read back
+      "our number says", // 64%
+      "the honest hesitation", // 60%, the validator's own rule wording read back
+      "at the top he's", // 60%
+      "the engine of", // 56%, the old instructions' own example verb
+      "makes the case", // 44%
+      "most seasons land", // 44%, the sheet's own band sentence read back
+      "the books set", // 36%
+      // The trading register (founder ruling, 2026-09-07), 84%, 44% and 40% on the baseline:
       "the market",
-      "at his price",
+      "i'm buying",
       "he's a buy",
-      "he is a buy",
     ],
   },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —
@@ -250,7 +266,8 @@ export const CAPSULE_CONFIG = {
  *
  * Checked case-insensitively, whole-word (or whole-phrase) in `validate.ts`.
  */
-export const BANNED_VOCABULARY: readonly string[] = [
+/** The lab-report register, plus "implying"/"implied" (see above). The prompt names these too. */
+export const LAB_REPORT_TERMS: readonly string[] = [
   "p10",
   "p90",
   "percentile",
@@ -262,9 +279,12 @@ export const BANNED_VOCABULARY: readonly string[] = [
   "standard deviation",
   "implying",
   "implied",
-  // NOT A BARE "ever" (acceptance round, iteration 3): the guard exists for an all-time CLAIM, and
-  // a bare word caught "if he ever gets the goal-line work", which claims nothing at all. The
-  // superlative shapes are what the ruling is about.
+];
+
+/** NOT A BARE "ever" (acceptance round, iteration 3): the guard exists for an all-time CLAIM, and
+ *  a bare word caught "if he ever gets the goal-line work", which claims nothing at all. The
+ *  superlative shapes are what the ruling is about. */
+export const ALL_TIME_TERMS: readonly string[] = [
   "best ever",
   "greatest ever",
   "ever seen",
@@ -275,13 +295,21 @@ export const BANNED_VOCABULARY: readonly string[] = [
   "in nfl history",
   "greatest of all time",
   "goat",
-  // THE TRADING REGISTER (founder ruling, 2026-09-07: "we say market everywhere like this is a
-  // stock trading app, it's a fantasy football app"). A capsule talks about ADP, picks and rounds,
-  // reaches and steals, sleepers and busts, letting a player fall or drafting him. `render.ts`
-  // states the sheet's own ADP facts in those words for the same reason it never says "p10", and
-  // this list refuses the paraphrase that brings the trading floor back. Single words are matched
-  // whole with their plain inflections ("priced", "selling", "fading"); "upside"/"downside" are
-  // not here because they are fantasy words too when tied to an outcome, which the prompt asks for.
+];
+
+/**
+ * THE TRADING REGISTER (founder ruling, 2026-09-07: "we say market everywhere like this is a stock
+ * trading app, it's a fantasy football app"). A capsule talks about ADP, picks and rounds, reaches
+ * and steals, sleepers and busts, letting a player fall or drafting him. `render.ts` states the
+ * sheet's own ADP facts in those words for the same reason it never says "p10", the prompt teaches
+ * the fantasy words and names these as never to write, and this list refuses the paraphrase that
+ * brings the trading floor back. Single words are matched whole with their plain inflections
+ * ("priced", "selling", "fading"); "upside"/"downside" are not here because they are fantasy words
+ * too when tied to an outcome, which the prompt asks for. Held in its own constant so the prompt
+ * can name the group without carrying the words as literals of its own (the repo's source guard,
+ * `src/integrity/copy-rules.ts`, sweeps the prompt module for exactly these words).
+ */
+export const TRADING_TERMS: readonly string[] = [
   "market",
   "price",
   "priced",
@@ -298,6 +326,8 @@ export const BANNED_VOCABULARY: readonly string[] = [
   "dividend",
   "return on",
 ];
+
+export const BANNED_VOCABULARY: readonly string[] = [...LAB_REPORT_TERMS, ...ALL_TIME_TERMS, ...TRADING_TERMS];
 
 /** Rival fantasy products — a capsule voices this product's own case, never a comparison to
  *  where else a manager could be reading it. Checked case-insensitively, substring. */

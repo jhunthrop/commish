@@ -58,8 +58,10 @@ describe("renderFactsForModel", () => {
   it("phrases the ADP anchor as what players drafted there historically scored, never an implication", () => {
     const facts = buildPlayerFacts(baseInput());
     const rendered = renderFactsForModel(facts);
-    expect(rendered).toContain("RBs drafted around his ADP have historically scored about 227 points a season");
+    expect(rendered).toContain("Past seasons of RBs drafted around his ADP: about 227 points, busts and injuries pooled in.");
     expect(rendered).not.toMatch(/impl(y|ying|ied)/i);
+    // The prior sentence ("have historically returned") came back on 68% of the baseline's reads.
+    expect(rendered).not.toMatch(/historically/i);
   });
 
   it("states the ADP in drafting words, with the rounded pick and the position rank by ADP (founder ruling, 2026-09-07)", () => {
@@ -162,8 +164,9 @@ describe("renderFactsForModel — the color", () => {
       baseInput({ booksNumbers: { propsLines: [{ market: "player_reception_yds", medianLine: 1150.5 }, { market: "player_pass_tds", medianLine: 28.5 }], teamVegasWinTotal: 9.5 } }),
     );
     const rendered = renderFactsForModel(facts);
-    expect(rendered).toContain("receiving yards 1150.5");
-    expect(rendered).toContain("pass touchdowns 28.5");
+    expect(rendered).toContain("Pre-kickoff lines the books have posted on him this season: receiving yards 1150.5, pass touchdowns 28.5.");
+    // "The books hang" came back on 80% of the baseline's reads (refrains round).
+    expect(rendered).not.toContain("books hang");
     expect(rendered).not.toContain("player_reception_yds");
     expect(rendered).not.toContain("player_pass_tds");
     expect(rendered).toContain("His team's own Vegas win total for this season is 9.5");

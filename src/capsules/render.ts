@@ -98,8 +98,11 @@ function boardLine(facts: PlayerFacts): string {
   const line = `Our number: ${Math.round(projection.projectedPoints)} season points. ${rangesLine(facts)} ${rankBits.join(", ")}.`;
   const adpBits: string[] = [adpLine(facts)];
   if (market.marketAnchorPoints !== null) {
+    // Stated as data, not as a sentence: "have historically returned" came back on 68% of the
+    // baseline's reads (refrains round). The founder's framing stands, this is what players drafted
+    // there RETURNED, busts and injuries pooled, never what drafters expect.
     adpBits.push(
-      `${facts.identity.position}s drafted around his ADP have historically scored about ${market.marketAnchorPoints} points a season, busts and injuries pooled in. Our number is ${signed(market.marketAnchorDelta ?? 0)} points from that.`,
+      `Past seasons of ${facts.identity.position}s drafted around his ADP: about ${market.marketAnchorPoints} points, busts and injuries pooled in. Our number is ${signed(market.marketAnchorDelta ?? 0)} points from that.`,
     );
   }
   if (market.playersLeftInTier !== null && market.dropToNextTier !== null) {
@@ -229,7 +232,9 @@ function booksNumbersLine(facts: PlayerFacts): string | null {
   const sentences: string[] = [];
   if (propsLines.length > 0) {
     const named = propsLines.map((line) => `${PROP_MARKET_LABELS[line.market]} ${line.medianLine}`).join(", ");
-    sentences.push(`The books hang these pre-kickoff lines on him this season: ${named}. That is what they returned, not this engine's own claim.`);
+    // "The books hang" came back on 80% of the baseline's reads (refrains round): a label now,
+    // with the ownership of the number stated after it rather than as a sentence to reuse.
+    sentences.push(`Pre-kickoff lines the books have posted on him this season: ${named}. Their numbers, not this engine's own claim.`);
   }
   if (teamVegasWinTotal !== null) {
     sentences.push(`His team's own Vegas win total for this season is ${teamVegasWinTotal}.`);

@@ -1,123 +1,153 @@
-import { CAPSULE_MODEL } from "./config";
+import { parseBundle, type CapsuleBundle } from "./bundle";
+import { CAPSULE_CONFIG, CAPSULE_MODEL } from "./config";
 import type { PlayerFacts } from "./facts";
-import { generateNarrative, type NarrativeResult } from "./narrative";
+import { failedNarrative, narrativeRequestsFor, settleNarrative, type NarrativeResult, type NarrativeSlotRequest } from "./narrative";
+import { bundlePromptFor, correctionPromptFor, NO_WORN_PHRASES, WRITER_RULES, type PriorAttempt, type WornPhrases } from "./prompt";
 import { renderTemplateCapsule } from "./template";
-import { softCorrectionFor, validateCapsule, type CapsuleSize } from "./validate";
-import { addGatewayUsage, CapsuleGenerationError, generateCapsuleBody, type CapsuleWriterDeps, type GatewayUsage, type PriorAttempt } from "./write";
+import { softCorrectionFor, validateCapsule, type CapsuleSize, type ValidationResult } from "./validate";
+import { addGatewayUsage, CapsuleGenerationError, postChatCompletion, type CapsuleWriterDeps, type GatewayUsage } from "./write";
 
 /**
- * WHY a size fell back to its template (sweep resilience, color v2, Task 4) — an operator scanning
- * the sweep's own detail lines needs to tell "the gateway would not talk to us" apart from "the
- * gateway talked, but the model kept writing something the validator rejected", since the two
- * point at completely different problems (a throttle to wait out, versus a prompt or a fact sheet
- * that needs a human look). Classified from the LAST of the two attempts `generateOneSize` makes:
- * whichever one actually decided the fallback.
+ * ONE CALL PER PLAYER (refrains round, 2026-09-07). A player used to be three gateway calls, one
+ * each for the compact read, the full read and the narrative, each paying for the same fact sheet
+ * and each written blind to the other two. He is one call now (`bundle.ts`), and every part is
+ * still validated on its own exactly as before: the two reads against their word bands, grounding
+ * and the tension mandate, every narrative slot against its cap and grounding.
+ *
+ * A PART THAT FAILS COSTS ONE MORE CALL FOR THAT PART ALONE. A read whose only fault is its length
+ * gets a length correction, a read framed wrongly gets its soft corrections, a read that fabricated
+ * gets a fresh write, a read the bundle left out gets written outright; the other parts are kept
+ * as they were. A narrative slot that fails is dropped, never retried, as before: the module behind
+ * it renders its template sentence. The whole bundle failing (a throttle that outlasts `write.ts`'s
+ * own backoff, a body with no object in it) is given one more whole attempt, the spec's own "one
+ * regeneration", and then both reads fall to the template and the narrative is empty.
+ *
+ * Never throws — the template is the permanent floor because this function always has an answer.
  */
+
+/** WHY a size fell back to its template — an operator scanning the sweep's own detail lines needs
+ *  to tell "the gateway would not talk to us" apart from "the gateway talked, but the model kept
+ *  writing something the validator rejected". Classified from the LAST attempt at that part. */
 export type CapsuleFallbackReason =
   | { readonly kind: "throttled" }
   | { readonly kind: "failed_validation"; readonly firstViolation: string };
 
-/** One size's own outcome — which source actually won, its text, and the usage SUMMED ACROSS
- *  EVERY BILLED ATTEMPT (fix round 1, MEDIUM c) — not just the winning one. A validation failure
- *  still means the gateway was called and billed; discarding that attempt's `usage` when the
- *  capsule ultimately falls back to template was undercounting the sweep's own real spend. `null`
- *  only when no attempt ever got back a billable response at all (every attempt was a pure
- *  transport failure — a timeout, a network error, an unparseable body). */
+/** One size's own outcome. `usage` is what THIS part's own correction call billed, when one was
+ *  made; the bundle call that wrote every part at once is on `CapsuleGenerationResult.usage`. */
 export interface CapsuleSizeResult {
   readonly text: string;
   readonly source: "llm" | "template";
   readonly usage: GatewayUsage | null;
-  /** `null` when `source` is `"llm"` — nothing to explain. Set exactly once, when `source` is
-   *  `"template"`; see `CapsuleFallbackReason`'s own docblock. */
+  /** `null` when `source` is `"llm"`. See `CapsuleFallbackReason`. */
   readonly fallbackReason: CapsuleFallbackReason | null;
 }
 
 export interface CapsuleGenerationResult {
   readonly compact: CapsuleSizeResult;
   readonly full: CapsuleSizeResult;
-  /**
-   * THE PER-MODULE SENTENCES (founder amendment 2026-09-07). Written by its own gateway call,
-   * alongside the two reads and from the same facts, and deliberately NOT folded into `source`
-   * below: a narrative that fails is a page of template sentences, which is what every one of
-   * those modules rendered before it existed, where a read that fails is a read nobody wrote.
-   * Always present; `slots` is empty when nothing survived validation.
-   */
+  /** The validated per-module sentences. Deliberately outside `source`: a narrative that fails is a
+   *  page of template sentences, which every module rendered before it existed, where a read that
+   *  fails is a read nobody wrote. */
   readonly narrative: NarrativeResult;
-  /** `"llm"` only when BOTH sizes were freshly written and validated this run; `"template"`
-   *  whenever either fell back — a conservative, single provenance flag rather than two, so a
-   *  consumer never has to reconcile two different answers to "can I trust this text" (see
-   *  `store.ts`'s own docblock for where this lands). */
+  /** `"llm"` only when BOTH reads were freshly written and validated this run; `"template"`
+   *  whenever either fell back — one conservative provenance flag, never two to reconcile. */
   readonly source: "llm" | "template";
   readonly model: string | null;
+  /** Everything the gateway billed for this player: the bundle call, its retry if it had one, and
+   *  every part's own correction call. `null` when no attempt ever got a billable response. */
+  readonly usage: GatewayUsage | null;
 }
 
-/**
- * ONE SIZE, WRITE THEN VALIDATE THEN (ON FAILURE) ONE REGENERATION, THEN THE TEMPLATE — the
- * spec's own AMENDED paragraph, verbatim: "One regeneration on failure, then the deterministic
- * template." A transport failure (`write.ts`'s own retry already exhausted) is treated exactly
- * like a validation failure here: one more attempt, then the floor. Never throws — the template
- * is the permanent floor precisely because this function always has an answer.
- */
-async function generateOneSize(facts: PlayerFacts, size: CapsuleSize, deps: CapsuleWriterDeps): Promise<CapsuleSizeResult> {
-  let priorBody = "";
-  let violations: readonly string[] = [];
-  // Set when the previous attempt was wrong ONLY in its length, so the retry is a correction of
-  // that text rather than a fresh attempt (capsule acceptance round, 2026-09-07 — see
-  // `PriorAttempt.lengthCorrection`).
-  let lengthCorrection: PriorAttempt["lengthCorrection"];
-  // Set when every violation was a FRAMING note (the unframed floor claim, the uncited downside):
-  // the retry keeps the prose and fixes the clause, rather than throwing away a capsule that was
-  // honest and in voice for the sake of one sentence (acceptance round, task 10).
-  let softCorrections: readonly string[] | undefined;
-  let usage: GatewayUsage | null = null;
-  // Classifies the FALLBACK, not every attempt along the way: only the last attempt's own outcome
-  // decides whether the eventual template read is labeled "throttled" or "failed validation" (see
-  // `CapsuleFallbackReason`'s own docblock).
-  let lastAttemptWasTransportFailure = false;
+/** A whole-bundle attempt's own outcome: the parsed parts, or why there are none. */
+interface BundleOutcome {
+  readonly bundle: CapsuleBundle | null;
+  readonly usage: GatewayUsage | null;
+  readonly failure: CapsuleFallbackReason | null;
+}
 
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    try {
-      const generated = await generateCapsuleBody(facts, size, deps, attempt === 1 ? undefined : { body: priorBody, violations, lengthCorrection, softCorrections });
-      usage = addGatewayUsage(usage, generated.usage);
-      const result = validateCapsule(generated.text, facts, size);
-      if (result.ok) return { text: generated.text, source: "llm", usage, fallbackReason: null };
-      priorBody = generated.text;
-      violations = result.violations;
-      lengthCorrection = result.bandFailure ?? undefined;
-      const corrections = result.violations.map((violation) => softCorrectionFor(violation));
-      softCorrections = corrections.every((correction) => correction !== null) ? (corrections as readonly string[]) : undefined;
-      lastAttemptWasTransportFailure = false;
-    } catch (error: unknown) {
-      // A transport failure that survived `write.ts`'s own retry (which, for a 429 specifically,
-      // already spent up to three backoff retries of its own — see `write.ts`'s own docblock).
-      // One more whole attempt (the "one regeneration" the spec promises) before the template,
-      // same as a validation failure. A PURE transport failure never got back a response and
-      // bills nothing, but a degenerate (near-empty) completion inside `write.ts`'s own retry
-      // loop was billed — the error carries that spend out, and it lands in the ledger here.
-      if (error instanceof CapsuleGenerationError && error.billedUsage !== null) {
-        usage = addGatewayUsage(usage, error.billedUsage);
-      }
-      priorBody = "";
-      violations = [`The previous attempt failed to generate at all (${error instanceof Error ? error.message : String(error)}). Try again.`];
-      lengthCorrection = undefined;
-      softCorrections = undefined;
-      lastAttemptWasTransportFailure = true;
-    }
+const NOT_AN_OBJECT = "The answer was not a single JSON object.";
+
+async function requestBundleOnce(facts: PlayerFacts, requests: readonly NarrativeSlotRequest[], deps: CapsuleWriterDeps, worn: WornPhrases, retryNote: string | null): Promise<BundleOutcome> {
+  const user = retryNote === null ? bundlePromptFor(facts, requests, worn) : `${bundlePromptFor(facts, requests, worn)}\n\n${retryNote}`;
+  const messages = [
+    { role: "system", content: WRITER_RULES },
+    { role: "user", content: user },
+  ];
+  try {
+    const { content, usage } = await postChatCompletion(messages, CAPSULE_CONFIG.bundle.maxTokens, deps);
+    const bundle = parseBundle(content);
+    return bundle === null ? { bundle: null, usage, failure: { kind: "failed_validation", firstViolation: NOT_AN_OBJECT } } : { bundle, usage, failure: null };
+  } catch (error: unknown) {
+    const usage = error instanceof CapsuleGenerationError ? error.billedUsage : null;
+    return { bundle: null, usage, failure: { kind: "throttled" } };
   }
-  const fallbackReason: CapsuleFallbackReason = lastAttemptWasTransportFailure
-    ? { kind: "throttled" }
-    : { kind: "failed_validation", firstViolation: violations[0] ?? "unknown violation" };
+}
+
+/** The bundle, with the one whole retry the spec allows: a second attempt only when the first
+ *  produced no object at all, its note naming which of the two things went wrong. */
+async function requestBundle(facts: PlayerFacts, requests: readonly NarrativeSlotRequest[], deps: CapsuleWriterDeps, worn: WornPhrases): Promise<BundleOutcome> {
+  const first = await requestBundleOnce(facts, requests, deps, worn, null);
+  if (first.bundle !== null) return first;
+  const note = first.failure?.kind === "throttled" ? "Your previous attempt did not complete. Answer again in full." : `Your previous answer was not a single JSON object. Return exactly one JSON object with the three keys and nothing around it.`;
+  const second = await requestBundleOnce(facts, requests, deps, worn, note);
+  return { ...second, usage: second.usage === null ? first.usage : addGatewayUsage(first.usage, second.usage) };
+}
+
+/** What a failed validation hands back for correction: the length alone, the soft points alone,
+ *  or the violations for a fresh write. */
+function priorAttemptFrom(body: string, result: ValidationResult): PriorAttempt {
+  const corrections = result.violations.map((violation) => softCorrectionFor(violation));
+  const softCorrections = corrections.every((correction): correction is string => correction !== null) ? corrections : undefined;
+  return { body, violations: result.violations, lengthCorrection: result.bandFailure ?? undefined, softCorrections };
+}
+
+function llmRead(text: string, usage: GatewayUsage | null): CapsuleSizeResult {
+  return { text, source: "llm", usage, fallbackReason: null };
+}
+
+function templateRead(facts: PlayerFacts, usage: GatewayUsage | null, fallbackReason: CapsuleFallbackReason): CapsuleSizeResult {
   return { text: renderTemplateCapsule(facts), source: "template", usage, fallbackReason };
 }
 
-/** One player's own fallback reason, in words a sweep operator can scan in a log line (sweep
- *  resilience, color v2, Task 4) — `"template (throttled)"` when the gateway never gave either
- *  size a usable response, `"template (failed validation: …)"`, quoting the FIRST violation from
- *  whichever size actually failed validation, otherwise. When the two sizes disagree (one
- *  throttled, one failed validation), throttling wins the label: it is the systemic condition an
- *  operator scanning a run most needs to know about, since it usually means every OTHER player in
- *  the same run hit it too, where a single size's validation failure is a one-player, one-fact-sheet
- *  question. */
+/** One correction call for one read, graded exactly as the draft was. */
+async function correctRead(facts: PlayerFacts, size: CapsuleSize, prior: PriorAttempt, deps: CapsuleWriterDeps): Promise<CapsuleSizeResult> {
+  const messages = [
+    { role: "system", content: WRITER_RULES },
+    { role: "user", content: correctionPromptFor(facts, size, prior) },
+  ];
+  try {
+    const { content, usage } = await postChatCompletion(messages, CAPSULE_CONFIG.sizes[size].maxTokens, deps);
+    const text = content.trim();
+    const result = validateCapsule(text, facts, size);
+    if (result.ok) return llmRead(text, usage);
+    return templateRead(facts, usage, { kind: "failed_validation", firstViolation: result.violations[0] ?? "unknown violation" });
+  } catch (error: unknown) {
+    const usage = error instanceof CapsuleGenerationError ? error.billedUsage : null;
+    return templateRead(facts, usage, { kind: "throttled" });
+  }
+}
+
+/** One read out of the bundle: kept when it validates, corrected once when it does not, written
+ *  outright when the bundle left it out. */
+async function settleRead(facts: PlayerFacts, size: CapsuleSize, drafted: string | null, deps: CapsuleWriterDeps): Promise<CapsuleSizeResult> {
+  if (drafted === null) return correctRead(facts, size, { body: "", violations: [], missing: true }, deps);
+  const result = validateCapsule(drafted, facts, size);
+  if (result.ok) return llmRead(drafted, null);
+  return correctRead(facts, size, priorAttemptFrom(drafted, result), deps);
+}
+
+function sumUsage(...parts: readonly (GatewayUsage | null)[]): GatewayUsage | null {
+  return parts.reduce<GatewayUsage | null>((total, part) => (part === null ? total : addGatewayUsage(total, part)), null);
+}
+
+function assemble(compact: CapsuleSizeResult, full: CapsuleSizeResult, narrative: NarrativeResult, bundleUsage: GatewayUsage | null, model: string): CapsuleGenerationResult {
+  const bothLlm = compact.source === "llm" && full.source === "llm";
+  return { compact, full, narrative, source: bothLlm ? "llm" : "template", model: bothLlm ? model : null, usage: sumUsage(bundleUsage, compact.usage, full.usage) };
+}
+
+/** One player's own fallback reason, in words a sweep operator can scan in a log line. When the
+ *  two sizes disagree, throttling wins the label: it is the systemic condition an operator most
+ *  needs to know about, where a single size's validation failure is a one-player question. */
 export function describeCapsuleFallback(compact: CapsuleSizeResult, full: CapsuleSizeResult): string {
   const reasons = [compact.fallbackReason, full.fallbackReason].filter((reason): reason is CapsuleFallbackReason => reason !== null);
   if (reasons.length === 0) return "llm";
@@ -126,15 +156,18 @@ export function describeCapsuleFallback(compact: CapsuleSizeResult, full: Capsul
   return validationReason === undefined ? "template (fell back)" : `template (failed validation: ${validationReason.firstViolation})`;
 }
 
-/** Both sizes, from the same facts. See `CapsuleGenerationResult`'s own docblock for the
- *  provenance rule, and `narrative`'s own field for why the narrative sits outside it. `avoid` is
- *  the board's current stock-sentence list, quoted into the narrative prompt. */
-export async function generateCapsule(facts: PlayerFacts, deps: CapsuleWriterDeps, avoid: readonly string[] = []): Promise<CapsuleGenerationResult> {
-  const [compact, full, narrative] = await Promise.all([
-    generateOneSize(facts, "compact", deps),
-    generateOneSize(facts, "full", deps),
-    generateNarrative(facts, deps, avoid),
-  ]);
-  const bothLlm = compact.source === "llm" && full.source === "llm";
-  return { compact, full, narrative, source: bothLlm ? "llm" : "template", model: bothLlm ? CAPSULE_MODEL : null };
+/** Both reads and the narrative, from one call and the same facts. `worn` is the board's current
+ *  worn-out language, quoted into the prompt (see `WornPhrases`). */
+export async function generateCapsule(facts: PlayerFacts, deps: CapsuleWriterDeps, worn: WornPhrases = NO_WORN_PHRASES): Promise<CapsuleGenerationResult> {
+  const model = deps.model ?? CAPSULE_MODEL;
+  const requests = narrativeRequestsFor(facts);
+  const outcome = await requestBundle(facts, requests, deps, worn);
+  if (outcome.bundle === null) {
+    const failure = outcome.failure ?? { kind: "throttled" };
+    const narrative = failedNarrative(failure.kind === "throttled" ? "the gateway never returned a usable answer" : NOT_AN_OBJECT);
+    return assemble(templateRead(facts, null, failure), templateRead(facts, null, failure), narrative, outcome.usage, model);
+  }
+  const { bundle } = outcome;
+  const [compact, full] = await Promise.all([settleRead(facts, "compact", bundle.compact, deps), settleRead(facts, "full", bundle.full, deps)]);
+  return assemble(compact, full, settleNarrative(bundle.narrative, facts, requests, model), outcome.usage, model);
 }
