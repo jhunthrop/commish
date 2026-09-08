@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { EMPTY_DEPTH, type PlayerFactsDepth } from "./facts/types";
+import { CAPSULE_CONFIG } from "./config";
 import { NARRATIVE_WORD_CAPS } from "./narrative-slots";
 import { depthNumbers } from "./facts/ledger";
 import { renderFactsForModel } from "./render";
@@ -297,5 +298,40 @@ describe("the depth section, grounded", () => {
     for (const number of renderFactsForModel(facts).match(/\d+(?:\.\d+)?/g) ?? []) {
       expect(slotResult(`The sheet says ${number} and that is what it says about him.`, facts).ok).toBe(true);
     }
+  });
+});
+
+/**
+ * THE BAND'S OWN EDGES (fix round) — the bands were set from a measured distribution, so the one
+ * thing a test must pin is that the numbers in `config.ts` ARE the numbers enforced, at the exact
+ * word where each side turns over. Asserted against the constants rather than against literals, so
+ * a future re-measure moves the band and these tests follow it.
+ */
+describe("the word bands are exactly the configured ones", () => {
+  const facts = buildPlayerFacts(baseInput());
+
+  /** `count` words with no digit and no capitalised token, so only the LENGTH is under test. */
+  function words(count: number): string {
+    return Array.from({ length: count }, (_, index) => (index === 0 ? "he" : "runs")).join(" ");
+  }
+
+  for (const size of ["compact", "full"] as const) {
+    const { minWords, maxWords } = CAPSULE_CONFIG.sizes[size];
+
+    it(`${size}: ${minWords - 1} words fails and ${minWords} passes`, () => {
+      expect(validateCapsule(words(minWords - 1), facts, size).bandFailure).toEqual({ words: minWords - 1, minWords, maxWords });
+      expect(validateCapsule(words(minWords), facts, size).bandFailure).toBeNull();
+    });
+
+    it(`${size}: ${maxWords} words passes and ${maxWords + 1} fails`, () => {
+      expect(validateCapsule(words(maxWords), facts, size).bandFailure).toBeNull();
+      expect(validateCapsule(words(maxWords + 1), facts, size).bandFailure).toEqual({ words: maxWords + 1, minWords, maxWords });
+    });
+  }
+
+  it("holds the bands the acceptance round measured", () => {
+    // Stated once, so a change to the constants is a deliberate act with a failing test beside it.
+    expect(CAPSULE_CONFIG.sizes.compact).toMatchObject({ minWords: 75, maxWords: 120 });
+    expect(CAPSULE_CONFIG.sizes.full).toMatchObject({ minWords: 240, maxWords: 300 });
   });
 });
