@@ -55,7 +55,9 @@ describe("collectDepthFacts", () => {
     expect(depth.seasonEndings).toEqual([
       { season: PRIOR_SEASON, lastPlayedWeek: 0, firstMissedWeek: 1, source: "status", reportStatus: null, rosterStatus: "RES", primaryInjury: null },
     ]);
-    expect(depth.gamesMissed).toEqual([{ season: PRIOR_SEASON, missed: 6, teamGames: 17 }]);
+    expect(depth.gamesMissed).toEqual([
+      { season: PRIOR_SEASON, teamGames: 17, gamesPlayed: 0, firstPlayedWeek: null, unavailableWeeks: [1, 2, 3, 4, 5, 6], healthyDidNotPlay: 0 },
+    ]);
   });
 
   it("reads the published schedule and the roster archive's own pedigree", async () => {

@@ -3,6 +3,7 @@ import type { Position } from "@/domain/player";
 import { regularSeasonGamesPerTeam } from "@/projections/nflverse/schedule";
 import { SCHEDULE_METRICS, SCHEDULE_SOURCE } from "@/projections/nflverse/schedule";
 import { productTeamCode, sourceTeamCode } from "@/projections/nflverse/team-codes";
+import { availabilityStoreCoverage } from "@/projections/availability/season-record";
 import { firstKickoffFor } from "@/projections/team-store";
 import { LAST_POSSIBLE_WEEK } from "@/projections/store";
 import { rankWithinGroups, type RankableStat } from "../rank";
@@ -130,6 +131,8 @@ interface DepthPassData {
   readonly names: ReadonlyMap<string, string>;
   readonly injuryReports: ReadonlyMap<string, readonly { readonly week: number; readonly reportStatus: string; readonly primaryInjury: string }[]>;
   readonly rosterStatuses: ReadonlyMap<string, readonly { readonly week: number; readonly status: string }[]>;
+  /** The prior seasons BOTH designation archives hold rows for (`availabilityStoreCoverage`). */
+  readonly coveredSeasons: ReadonlySet<number>;
   readonly weekScoresBySeason: ReadonlyMap<number, ReadonlyMap<string, readonly { readonly week: number; readonly points: number }[]>>;
   readonly headlinesBySeason: ReadonlyMap<number, ReadonlyMap<string, SeasonHeadline>>;
   readonly injuryHistoryByPlayerId: ReadonlyMap<string, ReturnType<typeof injuryHistoryFor>>;
@@ -154,10 +157,11 @@ function availabilityFactsFor(playerId: string, data: DepthPassData): Pick<Playe
   const missedInputs: GamesMissedInput[] = [];
   for (const season of data.options.priorSeasons) {
     const key = seasonKey(playerId, season);
-    const statuses = data.rosterStatuses.get(key) ?? [];
+    const rosterRows = data.rosterStatuses.get(key) ?? [];
+    const injuryRows = data.injuryReports.get(key) ?? [];
     const gamesPlayedWeeks = (data.weekScoresBySeason.get(season)?.get(playerId) ?? []).map((week) => week.week);
-    endingInputs.push({ season, injuryRows: data.injuryReports.get(key) ?? [], statusRows: statuses, gamesPlayedWeeks });
-    missedInputs.push({ season, teamGames: regularSeasonGamesPerTeam(season), rosteredWeeks: statuses.map((row) => row.week), gamesPlayedWeeks });
+    endingInputs.push({ season, injuryRows, statusRows: rosterRows, gamesPlayedWeeks });
+    missedInputs.push({ season, teamGames: regularSeasonGamesPerTeam(season), covered: data.coveredSeasons.has(season), rosterRows, injuryRows, gamesPlayedWeeks });
   }
   return { seasonEndings: seasonEndingsFor(endingInputs), gamesMissed: gamesMissedFor(missedInputs) };
 }
@@ -259,9 +263,10 @@ export async function collectDepthFacts(db: Db, options: DepthCollectOptions): P
   const { productSeason, asOf } = options;
 
   const names = await namesFor(db, [...new Set([...populationIds, ...subjectIds])]);
-  const [injuryReports, rosterStatuses, seasonPasses, captures, colleges, pedigree, openingDay] = await Promise.all([
+  const [injuryReports, rosterStatuses, coveredSeasons, seasonPasses, captures, colleges, pedigree, openingDay] = await Promise.all([
     injuryReportsFor(db, subjectIds, options.priorSeasons),
     rosterStatusesFor(db, subjectIds, options.priorSeasons),
+    availabilityStoreCoverage(db, options.priorSeasons),
     seasonPassesFor(db, options, names),
     injuryCapturesFor(db, seasonCaptureFloor(productSeason), INJURY_CAPTURE_LIMIT),
     latestRosterBios(db),
@@ -297,6 +302,7 @@ export async function collectDepthFacts(db: Db, options: DepthCollectOptions): P
     names,
     injuryReports,
     rosterStatuses,
+    coveredSeasons,
     ...seasonPasses,
     injuryHistoryByPlayerId,
     pedigree,
