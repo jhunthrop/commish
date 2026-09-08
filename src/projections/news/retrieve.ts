@@ -120,6 +120,28 @@ export interface MapInjuriesResult {
   readonly observations: readonly PlayerWeekObservation[];
   /** Report rows naming a player the universe does not project. Reported, never silently dropped. */
   readonly unknownPlayers: readonly string[];
+  /**
+   * Rows for a projected player that carried no filing timestamp at all, and so were skipped rather
+   * than stored. Reported, never silently lost — see `hasDateModifiedColumn`'s docblock for why this
+   * is not zero once `injuries_2025.csv` is in the seasons being ingested.
+   */
+  readonly unstamped: number;
+}
+
+/**
+ * Whether THIS FILE's own header carries `date_modified` at all — decided once, from the first row,
+ * rather than per row: a CSV's columns are a property of the file, not of any one line in it.
+ *
+ * nflverse dropped `date_modified` outright starting with `injuries_2025.csv` (measured against the
+ * live file: `injuries_2024.csv` still carries it, stamped, on every row; `injuries_2025.csv`'s own
+ * header has no such column, not merely blank values). `nflverse/injuries.ts`'s `mapInjuryRows`
+ * reads the identical release and makes the identical check for the identical reason; it is kept as
+ * its own two-line function here rather than a shared import to avoid a circular dependency (that
+ * module already imports `reportFiledAt` from this one) — the same call `injuries.ts`'s own
+ * `knownPlayerIds` docblock makes for a different pair of near-duplicate two-liners.
+ */
+function hasDateModifiedColumn(rows: readonly CsvRow[]): boolean {
+  return rows.length > 0 && "date_modified" in rows[0]!;
 }
 
 /**
@@ -133,16 +155,27 @@ export interface MapInjuriesResult {
  * Both designations are emitted for every row, zeros included. A player who practised in full is on
  * the report and is a different fact from a player who is not on it, and only a stored zero can say
  * so — an absent row is how "nothing was published about him" is spelled.
+ *
+ * A row from a file with no `date_modified` column at all (`hasDateModifiedColumn`) is skipped and
+ * counted in `unstamped` rather than stamped with a fabricated or "now" timestamp: the rule this
+ * engine holds everywhere else applies here too — an unstamped fact cannot be replayed, so it is not
+ * stored.
  */
 export function mapInjuries(rows: readonly CsvRow[], projected: ReadonlySet<string>): MapInjuriesResult {
   const observations: PlayerWeekObservation[] = [];
   const unknown = new Set<string>();
+  const stamped = hasDateModifiedColumn(rows);
+  let unstamped = 0;
   for (const row of rows) {
     if (row.game_type !== NFLVERSE_CONFIG.seasonType) continue;
     const playerId = (row.gsis_id ?? "").trim();
     if (playerId === "") continue;
     if (!projected.has(playerId)) {
       unknown.add(playerId);
+      continue;
+    }
+    if (!stamped) {
+      unstamped += 1;
       continue;
     }
     const season = Number(row.season);
@@ -162,5 +195,5 @@ export function mapInjuries(rows: readonly CsvRow[], projected: ReadonlySet<stri
       value: ordinal(row.practice_status, PRACTICE_STATUS_BY_NAME, "practice_status"),
     });
   }
-  return { observations, unknownPlayers: [...unknown].sort() };
+  return { observations, unknownPlayers: [...unknown].sort(), unstamped };
 }

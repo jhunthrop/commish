@@ -24,9 +24,31 @@ export interface PlayCallerRow {
   readonly endWeek: number;
   readonly source: "wikipedia" | "pfr" | "both";
   readonly note: string;
+  /**
+   * THE HEAD COACH FOR THIS TEAM-SEASON (fact-sheet depth round, 2026-09-07), which the table did
+   * not carry: `role` only ever said whether the man NAMED here was the head coach or the
+   * coordinator, so a season whose coordinator called the plays left the head coach unnamed.
+   *
+   * `""` WHERE THE COLUMN IS UNFILLED, and that is an absence rather than a defect. Filling
+   * twenty-seven seasons of head coaches from memory would be typing unverifiable claims under a
+   * `source` column that exists precisely to make each row's claim checkable, so the column is
+   * filled only for the seasons somebody actually sourced it for, `validatePlayCallers` is told
+   * which those are, and every other row stays honestly blank.
+   */
+  readonly headCoach: string;
+  /** His FIRST season with this team, from the same source. `null` where unfilled. This is what
+   *  makes "new this year" a sourced fact rather than a diff of two curated rows, which would read
+   *  "new" whenever the prior season's row simply had not been filled in. */
+  readonly headCoachFirstSeason: number | null;
 }
 
 const COLUMNS = ["season", "team", "name", "role", "start_week", "end_week", "source", "note"] as const;
+
+/** The two columns the head-coach pass added. Optional as a PAIR: a row carries both or neither,
+ *  because a name with no first season cannot answer "is he new" and a first season with no name
+ *  is not a claim about anybody. */
+const HEAD_COACH_COLUMNS = ["head_coach", "head_coach_first_season"] as const;
+const WITH_HEAD_COACH = COLUMNS.length + HEAD_COACH_COLUMNS.length;
 const ROLES: ReadonlySet<string> = new Set(["HC", "OC"]);
 const SOURCES: ReadonlySet<string> = new Set(["wikipedia", "pfr", "both"]);
 
@@ -61,8 +83,8 @@ export function parsePlayCallers(csv: string): readonly PlayCallerRow[] {
     if (raw.trim() === "") continue;
     const lineNumber = i + 1;
     const fields = raw.split(",");
-    if (fields.length !== COLUMNS.length) {
-      fail(lineNumber, `expected ${COLUMNS.length} columns (${COLUMNS.join(",")}), got ${fields.length}.`);
+    if (fields.length !== COLUMNS.length && fields.length !== WITH_HEAD_COACH) {
+      fail(lineNumber, `expected ${COLUMNS.length} or ${WITH_HEAD_COACH} columns (${[...COLUMNS, ...HEAD_COACH_COLUMNS].join(",")}), got ${fields.length}.`);
     }
     const [seasonRaw, team, name, role, startRaw, endRaw, source, note] = fields as [
       string,
@@ -74,6 +96,15 @@ export function parsePlayCallers(csv: string): readonly PlayCallerRow[] {
       string,
       string,
     ];
+    const headCoach = (fields[8] ?? "").trim();
+    const firstSeasonRaw = (fields[9] ?? "").trim();
+    if ((headCoach === "") !== (firstSeasonRaw === "")) {
+      fail(lineNumber, "head_coach and head_coach_first_season must be filled together or left blank together.");
+    }
+    const headCoachFirstSeason = firstSeasonRaw === "" ? null : Number(firstSeasonRaw);
+    if (headCoachFirstSeason !== null && (!Number.isFinite(headCoachFirstSeason) || !Number.isInteger(headCoachFirstSeason))) {
+      fail(lineNumber, `head_coach_first_season must be an integer season (got ${JSON.stringify(firstSeasonRaw)}).`);
+    }
 
     const season = Number(seasonRaw);
     if (seasonRaw.trim() === "" || !Number.isFinite(season) || !Number.isInteger(season)) {
@@ -97,6 +128,8 @@ export function parsePlayCallers(csv: string): readonly PlayCallerRow[] {
       endWeek,
       source: source as PlayCallerRow["source"],
       note,
+      headCoach,
+      headCoachFirstSeason,
     });
   }
   return rows;
@@ -115,11 +148,19 @@ function rowsFor(rows: readonly PlayCallerRow[], season: number, team: string): 
  * import will usually have several unrelated problems (a missing team here, an overlap there) and a
  * maintainer fixing the CSV by hand wants the whole list at once, not one exception per run.
  */
+/**
+ * `headCoachSeasons`, OPTIONAL: the seasons whose `head_coach` column somebody has actually
+ * sourced, and which must therefore be complete. Every team in one of those seasons must name a
+ * head coach and his first season, and they must agree across that team-season's own rows. Every
+ * season NOT in the list is left alone entirely, because a blank there is a documented absence
+ * rather than a gap to be filled from memory (see `PlayCallerRow.headCoach`'s own docblock).
+ */
 export function validatePlayCallers(
   rows: readonly PlayCallerRow[],
   seasons: readonly number[],
   teamsBySeason: (season: number) => readonly string[],
   finalWeekOf: (season: number) => number,
+  headCoachSeasons: readonly number[] = [],
 ): readonly string[] {
   const problems: string[] = [];
 
@@ -156,6 +197,30 @@ export function validatePlayCallers(
     }
   }
 
+  problems.push(...headCoachProblems(rows, headCoachSeasons, teamsBySeason));
+  return problems;
+}
+
+/** The head-coach column's own completeness check, over exactly the seasons it is claimed for. */
+function headCoachProblems(
+  rows: readonly PlayCallerRow[],
+  headCoachSeasons: readonly number[],
+  teamsBySeason: (season: number) => readonly string[],
+): readonly string[] {
+  const problems: string[] = [];
+  for (const season of headCoachSeasons) {
+    for (const team of teamsBySeason(season)) {
+      const named = rowsFor(rows, season, team).filter((row) => row.headCoach !== "");
+      if (named.length === 0) {
+        problems.push(`${team} ${season}: empty head_coach.`);
+        continue;
+      }
+      const distinct = new Set(named.map((row) => `${row.headCoach}|${row.headCoachFirstSeason ?? ""}`));
+      if (distinct.size > 1) {
+        problems.push(`${team} ${season}: rows disagree about the head coach (${[...distinct].join(" and ")}).`);
+      }
+    }
+  }
   return problems;
 }
 
@@ -183,4 +248,23 @@ export function playCallerLookup(
     const match = teamRows.find((r) => r.startWeek <= week && week <= r.endWeek);
     return match?.name ?? null;
   };
+}
+
+/** One team-season's head coach and his first season with that team, or `null` where the column is
+ *  unfilled. Season-keyed rather than week-keyed: the column names the man who held the job that
+ *  year, and the table carries no in-season head-coach change. */
+export interface HeadCoachTenure {
+  readonly name: string;
+  readonly firstSeason: number | null;
+}
+
+/** Builds a team-season head-coach lookup over the same flat `team|season` key `playCallerLookup`
+ *  uses, for the same "this table is small enough that a flat map beats a nested one" reason. */
+export function headCoachLookup(rows: readonly PlayCallerRow[]): (team: string, season: number) => HeadCoachTenure | null {
+  const byTeamSeason = new Map<string, HeadCoachTenure>();
+  for (const row of rows) {
+    if (row.headCoach === "") continue;
+    byTeamSeason.set(`${row.team}|${row.season}`, { name: row.headCoach, firstSeason: row.headCoachFirstSeason });
+  }
+  return (team, season) => byTeamSeason.get(`${team}|${season}`) ?? null;
 }

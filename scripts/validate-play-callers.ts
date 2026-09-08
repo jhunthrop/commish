@@ -12,6 +12,17 @@ import { FACT_SEASONS, finalWeekOf, nflTeamsBySeason } from "@/projections/nflve
 
 const CSV_PATH = "data/play-callers/play-callers.csv";
 
+/**
+ * THE SEASONS WHOSE `head_coach` COLUMN IS CLAIMED COMPLETE (fact-sheet depth round, 2026-09-07).
+ *
+ * Only the product season is filled today, from a live Wikipedia fetch cited in each of those
+ * rows' own `note`. The other twenty-seven seasons are honestly blank rather than typed from
+ * memory, so they are deliberately NOT listed here: this constant is a claim about what has been
+ * sourced, and widening it without doing the sourcing would turn the validator from a check into a
+ * rubber stamp. Add a season here in the same commit that fills its rows.
+ */
+const HEAD_COACH_SEASONS: readonly number[] = [2026];
+
 function readCsv(path: string): string {
   try {
     return readFileSync(path, "utf8");
@@ -23,9 +34,11 @@ function readCsv(path: string): string {
 
 const csv = readCsv(CSV_PATH);
 const rows = parsePlayCallers(csv);
-const problems = validatePlayCallers(rows, FACT_SEASONS, nflTeamsBySeason, finalWeekOf);
+const problems = validatePlayCallers(rows, FACT_SEASONS, nflTeamsBySeason, finalWeekOf, HEAD_COACH_SEASONS);
 if (problems.length > 0) {
   for (const problem of problems) console.error(problem);
   process.exit(1);
 }
-console.log(`${CSV_PATH}: ${rows.length} rows, every team-season ${FACT_SEASONS[0]}-${FACT_SEASONS[FACT_SEASONS.length - 1]} covered`);
+console.log(
+  `${CSV_PATH}: ${rows.length} rows, every team-season ${FACT_SEASONS[0]}-${FACT_SEASONS[FACT_SEASONS.length - 1]} covered, head coaches complete for ${HEAD_COACH_SEASONS.join(", ")}`,
+);
