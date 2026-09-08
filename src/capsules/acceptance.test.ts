@@ -167,7 +167,9 @@ describe("cause 3: name false positives", () => {
 describe("cause 4: the mixed-evidence violation reads like a number a person wrote", () => {
   it("states the downside to one decimal, never as a raw float", () => {
     const facts = buildPlayerFacts(
-      baseInput({ reasons: [{ code: "law", lawId: "rb_age_curve", effect: -0.9372183908045988, magnitude: 29 }] }),
+      // Above the one-point line the mandate starts at (production follow-up, 2026-09-08); the
+      // test is about the decimals, not the threshold.
+      baseInput({ reasons: [{ code: "law", lawId: "rb_age_curve", effect: -1.9372183908045988, magnitude: 29 }] }),
     );
     const filler = Array.from({ length: 45 }, () => "plainly").join(" ");
     const body = validateCapsule(
@@ -177,8 +179,8 @@ describe("cause 4: the mixed-evidence violation reads like a number a person wro
     );
     expect(body.bandFailure).toBeNull();
     const tension = body.violations.find((violation) => violation.startsWith("Mixed evidence"));
-    expect(tension).toContain("-0.9 pts/game");
-    expect(tension).not.toContain("0.9372183908045988");
+    expect(tension).toContain("-1.9 pts/game");
+    expect(tension).not.toContain("1.9372183908045988");
   });
 });
 

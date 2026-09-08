@@ -224,8 +224,14 @@ export const CAPSULE_CONFIG = {
    *  below it is noise a capsule need not dwell on. The mandated-tension check (`validate.ts`)
    *  requires the STRONGEST such group's own number be cited before the call, on every capsule
    *  whose facts carry one — a one-sided rave on genuinely mixed evidence is a validation
-   *  failure, not a style choice. */
-  tensionThresholdPoints: 0.5,
+   *  failure, not a style choice.
+   *
+   *  ONE POINT A GAME, NOT HALF (production follow-up, 2026-09-08). At 0.5 the mandate rejected ten
+   *  or more honest reads in one production night for never citing a downside of a few tenths of a
+   *  point a game, a number a person talking to a friend would not mention. A point a game is
+   *  seventeen points a season, the size at which the downside changes the call and a reader would
+   *  want it said before it. Under that, the read may still cite it; it is no longer failed for not. */
+  tensionThresholdPoints: 1.0,
   /** Per-sweep-run cap on fresh generations (two gateway calls each) — the spreading mechanism
    *  that lets a full board's first run clear the free-tier throttle across several nightly
    *  sweeps rather than exhausting it in one run. Generous, per the base-product ruling (spec

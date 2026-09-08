@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TRADING_REPLACEMENTS, TRADING_TERMS } from "./config";
+import { CAPSULE_CONFIG, TRADING_REPLACEMENTS, TRADING_TERMS } from "./config";
 import { buildPlayerFacts, type PlayerFactsInput } from "./facts";
 import { bannedTermIn, softCorrectionFor, validateCapsule } from "./validate";
 
@@ -170,6 +170,35 @@ describe("validateCapsule", () => {
     const withHesitation = compactWords("Rashad Long anchors the SF offense at board rank 14 overall, our number of 248 season points, though the age curve costs him -1.8 a game, still a steal this season.");
     const withHesitationResult = validateCapsule(withHesitation, facts, "compact");
     expect(withHesitationResult.violations.some((v) => v.includes("Mixed evidence"))).toBe(false);
+  });
+
+  it("mandates the citation only from 1.0 points a game (production follow-up, 2026-09-08): a 0.9 downside is a number a person would not mention", () => {
+    const withDownside = (effect: number) =>
+      buildPlayerFacts(
+        baseInput({
+          reasons: [{ code: "law", lawId: "rb_age_curve", effect, magnitude: 29 }],
+          laws: [
+            {
+              id: "rb_age_curve",
+              position: "RB",
+              claim: "Running backs decline sharply after 28.",
+              measured: { effect, ci: [effect - 0.6, effect + 0.6], sample: 120, seasons: "2018-2024" },
+              trainEffect: effect,
+              verdict: "confirmed",
+              modelPath: null,
+              hasFoldEvidence: true,
+              origin: "tribal",
+              primaryQuantityId: null,
+              primaryQuantityNoun: null,
+              primaryQuantityUnit: null,
+            },
+          ],
+        }),
+      );
+    const oneSided = compactWords("Rashad Long is a clear steal for the SF offense, our number of 248 season points and board rank 14 overall make him a lock this season.");
+    expect(CAPSULE_CONFIG.tensionThresholdPoints).toBe(1);
+    expect(validateCapsule(oneSided, withDownside(-0.9), "compact").violations.some((v) => v.includes("Mixed evidence"))).toBe(false);
+    expect(validateCapsule(oneSided, withDownside(-1), "compact").violations.some((v) => v.includes("Mixed evidence"))).toBe(true);
   });
 
   it('lets a read say "projection" (production follow-up, 2026-09-08): it is how fantasy people talk, never lab-report register', () => {
