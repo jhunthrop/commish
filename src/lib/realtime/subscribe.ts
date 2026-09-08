@@ -11,6 +11,13 @@ interface SubscribeInput {
    */
   readonly streamKey: string;
   /**
+   * Further keys read on the SAME blocking XREAD (Neon cost audit finding 3): a league
+   * connection also carries the caller's own user stream, so one tab holds one socket. Every key
+   * starts from the same cursor — stream ids are millisecond-based, so one `Last-Event-ID` is a
+   * valid position on all of them — and each advances independently as its entries arrive.
+   */
+  readonly extraStreamKeys?: readonly string[];
+  /**
    * Resume cursor. "$" = only events published from now on (fresh connection);
    * a stream entry id = replay everything after it (a reconnecting client's Last-Event-ID).
    */
@@ -67,19 +74,20 @@ function abortPromise(signal: AbortSignal): Promise<typeof ABORTED> {
   });
 }
 
-export async function* subscribe({ redis, streamKey, afterId = "$", signal }: SubscribeInput): AsyncGenerator<RealtimeEvent> {
+export async function* subscribe({ redis, streamKey, extraStreamKeys = [], afterId = "$", signal }: SubscribeInput): AsyncGenerator<RealtimeEvent> {
   const aborted = abortPromise(signal);
-  let cursor = afterId;
+  const keys = [streamKey, ...extraStreamKeys];
+  const cursors = new Map(keys.map((key) => [key, afterId]));
   while (!signal.aborted) {
     // Race the blocking read against abort so a disconnected client releases immediately,
     // rather than only after the current BLOCK window (up to blockMs) expires.
-    const read = redis.xread("BLOCK", REALTIME_CONFIG.blockMs, "STREAMS", streamKey, cursor) as Promise<XReadReply>;
+    const read = redis.xread("BLOCK", REALTIME_CONFIG.blockMs, "STREAMS", ...keys, ...keys.map((key) => cursors.get(key)!)) as Promise<XReadReply>;
     const outcome = await Promise.race([read, aborted]);
     if (outcome === ABORTED) return;
     if (outcome === null) continue;
-    for (const [, entries] of outcome) {
+    for (const [key, entries] of outcome) {
       for (const [id, fields] of entries) {
-        cursor = id;
+        cursors.set(key, id);
         const event = toEvent(id, fields);
         if (event !== null) yield event;
       }

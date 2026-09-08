@@ -19,33 +19,44 @@ export const REALTIME_CONFIG = {
   /** SSE keepalive comment interval (ms) — keeps proxies from closing an idle stream. */
   keepaliveMs: 15_000,
   /**
+   * THE PLANNED CLOSE (Neon cost audit 2026-09-07, finding 3). Every stream route declares
+   * `maxDuration = 300`, and a stream left open to that cap is killed by the platform: an error
+   * log line per connection every five minutes, and a reconnect the client did not plan. The
+   * server now ends every stream itself this long after it opened — cleanly, with the body
+   * closed — so the browser's own reconnect (after `retryHintMs`) is the ordinary path, and the
+   * catch-up window below makes it lossless. Twenty seconds under the cap is the margin for a
+   * slow last frame and the function's own teardown.
+   */
+  plannedCloseMs: 280_000,
+  /** The `retry:` field sent in every stream's opening bytes: how long the browser waits before
+   *  reconnecting after a planned close. Short, because the close is planned and lossless. */
+  retryHintMs: 250,
+  /**
    * Live SSE connections one user may hold open on a single instance. Each one pins a
    * dedicated Redis socket (XREAD BLOCK holds it) and an fd, so this is the blast-radius bound
    * that stops one member of one league from starving every league on the box.
    *
-   * THE PER-TAB ARITHMETIC, which is what this number actually has to be derived from. It was 8
-   * when a tab cost one connection: `league-stream.ts` exists specifically so a draft room, its
-   * chat and its board share ONE league stream. Phase 3 Plan A mounted `NoticeInbox` inside
-   * `TopBar`, which every signed-in page renders, and `useNotices` opens
-   * `/api/notices/stream` on mount — correctly sharing this same ceiling (`sse.ts`), because a
-   * per-user stream costs exactly what a league stream costs. So a league page now costs TWO
-   * connections, and the old 8 silently became an effective four-tab budget, with the fifth tab
-   * reading "You have too many live connections open."
+   * THE PER-TAB ARITHMETIC, which is what this number actually has to be derived from. A league
+   * tab used to cost TWO connections: the league stream plus the header's per-user notice stream
+   * (`NoticeInbox` in `TopBar`). Finding 3 of the Neon cost audit collapsed that to one: the
+   * league stream now also carries the caller's own notice frames (`createLeagueEventStream`
+   * reads both Redis keys), and the browser manager (`@/event-stream/league-stream`) attaches the
+   * notice subscribers to the league connection whenever one is open. A hidden tab closes its
+   * connection after `EVENT_STREAM_CONFIG.hiddenCloseMs`, so background tabs hold nothing.
    *
-   * 10 restores a four-tab league budget (4 x 2 = 8) with two spare for a reconnect in flight,
-   * which is the honest case this bound was always sized for: a room, a TV board, a spare tab,
-   * and the old connection not yet reaped after a network blip. It is not a licence for a third
-   * stream type — a plan that adds one moves this number and writes down why, or the cap goes
-   * back to meaning nothing. `realtime.test.ts` pins the arithmetic so raising the per-tab cost
-   * again cannot pass silently.
+   * Six is four visible tabs (a room, a TV board, a spare tab, one more) at one connection each,
+   * plus two for connections a network blip left behind that the server has not reaped yet. It
+   * is not a licence for a second stream type per tab — a plan that adds one moves this number
+   * and writes down why, or the cap goes back to meaning nothing. `sse.test.ts` pins the
+   * arithmetic so raising the per-tab cost again cannot pass silently.
    */
-  maxStreamsPerUser: 10,
+  maxStreamsPerUser: 6,
   /**
-   * How many live connections ONE signed-in tab on a league page opens: the league stream plus
-   * the header's per-user notice stream. Named rather than left implicit so `maxStreamsPerUser`
+   * How many live connections ONE signed-in tab on a league page opens. One: the league stream,
+   * which carries the notice frames too. Named rather than left implicit so `maxStreamsPerUser`
    * above can be checked against it by a test instead of by memory.
    */
-  streamsPerLeagueTab: 2,
+  streamsPerLeagueTab: 1,
   /**
    * How far back a client-supplied `Last-Event-ID` may resume (ms). Older cursors fall back to
    * live-only: replaying a long tail per connection is cheap amplification, and a client that

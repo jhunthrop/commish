@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { EVENT_STREAM_CONFIG } from "./config";
 import { subscribeLeagueStream } from "./league-stream";
 
 type Listener = (event: MessageEvent) => void;
@@ -175,5 +176,122 @@ describe("subscribeLeagueStream", () => {
     handle.addEventListener("chat.message", () => seen.push("late"));
     source.emit("chat.message");
     expect(seen).toEqual([]);
+  });
+});
+
+describe("one socket per tab (Neon cost audit finding 3): the notice stream rides an open league connection", () => {
+  const notices = EVENT_STREAM_CONFIG.noticesStreamUrl;
+
+  it("attaches a notice subscriber to the league socket that is already open, so no second socket exists", () => {
+    const league = nextUrl();
+    const room = subscribeLeagueStream(league);
+    const inbox = subscribeLeagueStream(notices);
+    expect(FakeEventSource.instances).toHaveLength(1);
+
+    const seen: string[] = [];
+    inbox.addEventListener("notice.created", () => seen.push("notice"));
+    FakeEventSource.instances[0]!.emit("notice.created");
+    expect(seen).toEqual(["notice"]);
+    room.close();
+    inbox.close();
+  });
+
+  it("moves an existing notice subscriber onto a league socket when one opens, and back to its own when the league leaves", () => {
+    const inbox = subscribeLeagueStream(notices);
+    const seen: string[] = [];
+    inbox.addEventListener("notice.created", () => seen.push("notice"));
+    const standalone = FakeEventSource.instances[0]!;
+    expect(standalone.url).toBe(notices);
+
+    const league = nextUrl();
+    const room = subscribeLeagueStream(league);
+    expect(standalone.closed).toBe(true);
+    expect(FakeEventSource.instances).toHaveLength(2);
+    const carrier = FakeEventSource.instances[1]!;
+    expect(carrier.url).toBe(league);
+    carrier.emit("notice.created");
+    expect(seen).toEqual(["notice"]);
+
+    room.close();
+    expect(carrier.closed).toBe(true);
+    expect(FakeEventSource.instances).toHaveLength(3);
+    const reopened = FakeEventSource.instances[2]!;
+    expect(reopened.url).toBe(notices);
+    reopened.emit("notice.created");
+    expect(seen).toEqual(["notice", "notice"]);
+    inbox.close();
+    expect(reopened.closed).toBe(true);
+  });
+
+  it("replays an already-open league socket's open to the notice subscriber that joins it", () => {
+    const league = nextUrl();
+    const room = subscribeLeagueStream(league);
+    FakeEventSource.instances[0]!.emit("open");
+    const inbox = subscribeLeagueStream(notices);
+    const opens: string[] = [];
+    inbox.addEventListener("open", () => opens.push("open"));
+    expect(opens).toEqual(["open"]);
+    room.close();
+    inbox.close();
+  });
+});
+
+describe("hidden tabs hold nothing (finding 3)", () => {
+  function setVisibility(state: "visible" | "hidden"): void {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }
+
+  afterEach(() => {
+    setVisibility("visible");
+    vi.useRealTimers();
+  });
+
+  it("closes every socket once the tab has been hidden past hiddenCloseMs, and reopens them on return with the listeners rebound", () => {
+    vi.useFakeTimers();
+    const url = nextUrl();
+    const room = subscribeLeagueStream(url);
+    const seen: string[] = [];
+    room.addEventListener("draft.pick", () => seen.push("pick"));
+    const first = FakeEventSource.instances[0]!;
+
+    setVisibility("hidden");
+    vi.advanceTimersByTime(EVENT_STREAM_CONFIG.hiddenCloseMs - 1);
+    expect(first.closed).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(first.closed).toBe(true);
+
+    setVisibility("visible");
+    expect(FakeEventSource.instances).toHaveLength(2);
+    const reopened = FakeEventSource.instances[1]!;
+    expect(reopened.url).toBe(url);
+    reopened.emit("draft.pick");
+    expect(seen).toEqual(["pick"]);
+    room.close();
+    expect(reopened.closed).toBe(true);
+  });
+
+  it("a quick tab switch costs nothing: back before the deadline, the socket never closed", () => {
+    vi.useFakeTimers();
+    const room = subscribeLeagueStream(nextUrl());
+    const socket = FakeEventSource.instances[0]!;
+    setVisibility("hidden");
+    vi.advanceTimersByTime(1_000);
+    setVisibility("visible");
+    vi.advanceTimersByTime(EVENT_STREAM_CONFIG.hiddenCloseMs * 2);
+    expect(socket.closed).toBe(false);
+    expect(FakeEventSource.instances).toHaveLength(1);
+    room.close();
+  });
+
+  it("a subscriber arriving while suspended gets its socket only when the tab returns", () => {
+    vi.useFakeTimers();
+    setVisibility("hidden");
+    vi.advanceTimersByTime(EVENT_STREAM_CONFIG.hiddenCloseMs);
+    const room = subscribeLeagueStream(nextUrl());
+    expect(FakeEventSource.instances).toHaveLength(0);
+    setVisibility("visible");
+    expect(FakeEventSource.instances).toHaveLength(1);
+    room.close();
   });
 });

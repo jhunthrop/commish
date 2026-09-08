@@ -88,9 +88,88 @@ describe("createLeagueEventStream — the opening frame", () => {
       new Promise<string>((resolve) => setTimeout(() => resolve("TIMED OUT"), 1_000)),
     ]);
 
-    expect(first).toBe(": keepalive\n\n");
+    // The retry hint for the planned close rides the same opening bytes (finding 3).
+    expect(first).toBe(`retry: ${REALTIME_CONFIG.retryHintMs}\n: keepalive\n\n`);
     expect(REALTIME_CONFIG.keepaliveMs).toBeGreaterThan(1_000);
     await reader.cancel();
+  });
+});
+
+describe("the planned close (finding 3): the server ends the stream before the platform would", () => {
+  beforeEach(() => {
+    vi.stubEnv("REDIS_URL", process.env.REDIS_URL ?? "redis://localhost:6379");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("closes the body cleanly at plannedCloseMs and releases the caller's connection slot", async () => {
+    const userId = "user_sse_planned";
+    const response = createLeagueEventStream(new Request("http://localhost/x"), "league_sse_planned", userId, { plannedCloseMs: 300 });
+    const reader = response.body!.getReader();
+    await reader.read(); // opening bytes
+    const closed = await Promise.race([
+      reader.read().then((r) => r.done),
+      new Promise<string>((resolve) => setTimeout(() => resolve("STILL OPEN"), 3_000)),
+    ]);
+    expect(closed).toBe(true);
+    // The slot came back: the ceiling's worth of fresh connections is accepted again.
+    const controllers: AbortController[] = [];
+    for (let i = 0; i < REALTIME_CONFIG.maxStreamsPerUser; i++) {
+      const controller = new AbortController();
+      controllers.push(controller);
+      expect(createUserEventStream(new Request("http://localhost/n", { signal: controller.signal }), userId).status).toBe(200);
+    }
+    for (const controller of controllers) controller.abort();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+
+  it("sits under the routes' function cap with margin", () => {
+    expect(REALTIME_CONFIG.plannedCloseMs).toBeLessThanOrEqual(280_000);
+    expect(REALTIME_CONFIG.plannedCloseMs).toBeGreaterThan(REALTIME_CONFIG.keepaliveMs);
+  });
+});
+
+describe("createLeagueEventStream — one socket per tab (finding 3): the caller's own notices ride the league stream", () => {
+  const controllers: AbortController[] = [];
+
+  beforeEach(() => {
+    vi.stubEnv("REDIS_URL", process.env.REDIS_URL ?? "redis://localhost:6379");
+  });
+
+  afterEach(async () => {
+    for (const controller of controllers) controller.abort();
+    controllers.length = 0;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    vi.unstubAllEnvs();
+  });
+
+  it("relays a frame published to the caller's user key on the league connection, and never another user's", async () => {
+    const suffix = Date.now();
+    const leagueId = `league_sse_carry_${suffix}`;
+    const userId = `user_sse_carry_${suffix}`;
+    const controller = new AbortController();
+    controllers.push(controller);
+    const headers = { "last-event-id": `${Date.now() - 1_000}-0` };
+    const response = createLeagueEventStream(new Request("http://localhost/x", { signal: controller.signal, headers }), leagueId, userId);
+    const reader = response.body!.getReader();
+    await reader.read();
+
+    const redis = createRedisConnection();
+    try {
+      const publisher = createPublisher({ redis, clock: { now: () => "2026-09-08T12:00:00.000Z" } });
+      await publisher.publishToUser({ userId: `${userId}_other`, leagueId, type: "notice.created", payload: { noticeId: "not-yours" } });
+      await publisher.publishToUser({ userId, leagueId, type: "notice.created", payload: { noticeId: "n1" } });
+      const frame = new TextDecoder().decode((await reader.read()).value);
+      expect(frame).toContain("event: notice.created");
+      expect(frame).toContain('"noticeId":"n1"');
+      expect(frame).not.toContain("not-yours");
+    } finally {
+      await redis.del(REALTIME_CONFIG.leagueStreamKey(leagueId), REALTIME_CONFIG.userStreamKey(userId), REALTIME_CONFIG.userStreamKey(`${userId}_other`));
+      redis.disconnect();
+      await reader.cancel();
+    }
   });
 });
 
@@ -238,24 +317,22 @@ describe("createUserEventStream — shares the same connection ceiling as the le
 
 /**
  * MEDIUM-4. The cap is a number nobody re-derived when the arithmetic under it changed: a league
- * tab used to cost one connection and now costs two, because `NoticeInbox` mounts in `TopBar`
- * on every signed-in page and opens its own per-user stream (correctly sharing this same
- * ceiling). At 8, that silently became a four-tab budget with no headroom at all. Pinned here so
- * a plan that adds a third stream type has to move the number and say why, rather than halving
- * everybody's tab budget by accident.
+ * tab once cost one connection, then two (`NoticeInbox` in `TopBar` opened its own per-user
+ * stream), and since the Neon cost audit's finding 3 one again — the league stream carries the
+ * caller's notice frames. Pinned here so a plan that adds another stream type per tab has to
+ * move the number and say why, rather than halving everybody's tab budget by accident.
  */
 describe("the connection cap and the per-tab cost are one arithmetic", () => {
   it("is exactly four league tabs plus a reconnect's worth of headroom", () => {
-    // 4 x 2 = 8 for the honest case (a room, a TV board, a spare tab, one more), + 2 for the
+    // 4 x 1 for the honest case (a room, a TV board, a spare tab, one more), + 2 for the
     // connection a network blip left behind and the server has not reaped yet.
     expect(REALTIME_CONFIG.maxStreamsPerUser).toBe(4 * REALTIME_CONFIG.streamsPerLeagueTab + 2);
-    // And the budget really is four tabs, not the two the old 8 had quietly become.
     expect(Math.floor(REALTIME_CONFIG.maxStreamsPerUser / REALTIME_CONFIG.streamsPerLeagueTab)).toBeGreaterThanOrEqual(4);
   });
 
-  it("counts a league page as exactly the league stream plus the header's notice stream", () => {
-    // If a third mounted stream type appears, this is the assertion that has to be edited, and
-    // editing it is the moment `maxStreamsPerUser` gets reconsidered.
-    expect(REALTIME_CONFIG.streamsPerLeagueTab).toBe(2);
+  it("counts a league page as exactly ONE stream: the league stream carries the notices too", () => {
+    // If a second mounted stream type per tab appears, this is the assertion that has to be
+    // edited, and editing it is the moment `maxStreamsPerUser` gets reconsidered.
+    expect(REALTIME_CONFIG.streamsPerLeagueTab).toBe(1);
   });
 });
