@@ -132,6 +132,8 @@ describe("the refrains the 2026-09-07 production regeneration measured (producti
     for (const stem of ["the depth chart is", "the books set", "it says nothing about whether he can play"]) expect(CAPSULE_CONFIG.repetition.refrainStems).toContain(stem);
     // The 2026-09-08 regeneration's one flag: the unlisted opener on 49 of 401 written (12.2%).
     expect(CAPSULE_CONFIG.repetition.refrainStems).toContain("nobody is drafting");
+    // Over the line twice on dev in the written rate round (13% and 16% of the written 40).
+    expect(CAPSULE_CONFIG.repetition.refrainStems).toContain("the number that decides");
   });
 
   it("are found however the read cases or punctuates them", () => {

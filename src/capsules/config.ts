@@ -236,6 +236,8 @@ export const CAPSULE_CONFIG = {
       "it says nothing about whether he can play", // the top stock sentence, 2.3% (15 players), the no-props note's old brief read back
       // THE SECOND PRODUCTION REGENERATION (2026-09-08, 659 players, 401 written): the one flag.
       "nobody is drafting", // the opener on 49 players, 12.2%, the unlisted player's own sheet line read back
+      // THE WRITTEN RATE ROUND'S DEV RUNS (2026-09-08, 40 players each): over the opener line twice.
+      "the number that decides", // the opener on 4 then 5 written players, 13% and 16%
     ],
   },
   /** A law group's own `|netEffectPoints|` at or above this reads as a real, citable downside —

@@ -269,6 +269,13 @@ describe("cause 3: name false positives", () => {
     expect(slotResult("What I'd need first is a healthy August, and then he is the pick.").ok).toBe(true);
   });
 
+  it("grounds a verb before the surname of a name that ends in a suffix (\"Take Cook\" failed against James Cook III)", () => {
+    const facts = buildPlayerFacts(baseInput({ identity: { id: "p2", name: "James Cook III", position: "RB", team: "BUF" } }));
+    expect(slotResult("Take Cook at his ADP and never think about it again.", facts).ok).toBe(true);
+    // The exit is still gated on the verb: a given name in that slot is a person the sheet never named.
+    expect(slotResult("Marcus Cook is the man to take, and never think about it again.", facts).ok).toBe(false);
+  });
+
   it("reads a plural position code as a word, never as half a name (\"Past WRs\" failed as a person)", () => {
     expect(slotResult("Past WRs drafted around his pick have busted often, and the sheet says so.").ok).toBe(true);
     expect(slotResult("Most RBs in this range are committee backs, and he is not.").ok).toBe(true);

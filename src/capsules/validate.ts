@@ -382,9 +382,12 @@ const SENTENCE_VERB_WORDS = new Set([
  *  bypass (a bare decomposed surname passing on its own). */
 function isLoneWordSurnameOf(word: string, nameLedger: readonly string[]): boolean {
   const lowerWord = word.toLowerCase();
+  // ANY WORD AFTER THE FIRST, not only the last (written rate round, 2026-09-08): "Take Cook" was
+  // failing against "James Cook III", whose last word is the suffix. Still gated on the verb in
+  // front, so a given name in that slot never reaches this test.
   return nameLedger.some((name) => {
     const nameWords = splitWords(name.toLowerCase());
-    return nameWords.length >= 2 && nameWords[nameWords.length - 1] === lowerWord;
+    return nameWords.length >= 2 && nameWords.slice(1).includes(lowerWord);
   });
 }
 
